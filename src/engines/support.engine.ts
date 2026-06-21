@@ -33,8 +33,8 @@ import {
   type SupportInteraction,
   type SupportRisk,
 } from '../data/support-database';
-import { resolveCanonicalId } from '../data/canonical-map';
-import { SUPPORT_CATALOG_DATA } from '../data/support-catalog';
+import { resolveCanonicalId } from '../data/support-database';
+import { SUPPORT_CATALOG_DATA } from '../data/support-database';
 
 export interface SupportInput {
   userId?: string;

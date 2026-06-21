@@ -1,5 +1,15284 @@
+// ── FROM: interactions.ts ──
+export type InteractionType = 'synergy' | 'conflict' | 'caution';
+export type SeverityLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export interface Interaction {
+  id: string;
+  substanceA: string;
+  substanceB: string;
+  type: InteractionType;
+  effect: string;
+  mechanisms: string[];
+  severity: SeverityLevel;
+  notes: string;
+}
+
+export const INTERACTIONS_DB: Interaction[] = [
+  { id: "INT_CAFFEINE_LTHEANINE", substanceA: "CAFFEINE", substanceB: "L_THEANINE", type: "synergy", effect: "SMOOTH_FOCUS", mechanisms: ["ADENOSINE_BLOCK", "GABA_MOD"], severity: "LOW", notes: "Теанин сглаживает стимуляцию кофеина и уменьшает тревожность" },
+  { id: "INT_CAFFEINE_NICOTINE", substanceA: "CAFFEINE", substanceB: "NICOTINE", type: "synergy", effect: "OVERSTIMULATION", mechanisms: ["ADRENALINE_UP", "DA_UP"], severity: "MEDIUM", notes: "Суммарная стимуляция ЦНС и сердечно-сосудистой системы" },
+  { id: "INT_CAFFEINE_SYNEPHRINE", substanceA: "CAFFEINE", substanceB: "SYNEPHRINE", type: "conflict", effect: "HEART_STRAIN", mechanisms: ["HR_UP", "BP_UP"], severity: "HIGH", notes: "Риск тахикардии и повышения давления" },
+  { id: "INT_CAFFEINE_YOHIMBINE", substanceA: "CAFFEINE", substanceB: "YOHIMBINE", type: "conflict", effect: "ANXIETY_SPIKE", mechanisms: ["NE_UP", "ADRENALINE_UP"], severity: "HIGH", notes: "Резкая тревога, тахикардия, давление" },
+  { id: "INT_IRON_VITC", substanceA: "IRON", substanceB: "VITAMIN_C", type: "synergy", effect: "IRON_ABSORB_UP", mechanisms: ["IRON_UP", "ACIDITY_UP"], severity: "LOW", notes: "Витамин C усиливает всасывание железа" },
+  { id: "INT_IRON_CALCIUM", substanceA: "IRON", substanceB: "CALCIUM", type: "conflict", effect: "IRON_ABSORB_DOWN", mechanisms: ["COMPETE_ABSORB"], severity: "MEDIUM", notes: "Кальций мешает всасыванию железа при совместном приёме" },
+  { id: "INT_IRON_ZINC", substanceA: "IRON", substanceB: "ZINC", type: "conflict", effect: "MINERAL_COMPETE", mechanisms: ["COMPETE_ABSORB"], severity: "MEDIUM", notes: "Конкуренция за транспорт и всасывание" },
+  { id: "INT_ZINC_COPPER", substanceA: "ZINC", substanceB: "COPPER", type: "conflict", effect: "COPPER_DEPLETION", mechanisms: ["METAL_COMPETE"], severity: "MEDIUM", notes: "Длительный высокий цинк снижает медь" },
+  { id: "INT_CALCIUM_MAGNESIUM", substanceA: "CALCIUM", substanceB: "MAGNESIUM", type: "conflict", effect: "ABSORB_COMPETE", mechanisms: ["COMPETE_ABSORB"], severity: "LOW", notes: "Высокие дозы вместе снижают взаимное всасывание" },
+  { id: "INT_CALCIUM_VITD", substanceA: "CALCIUM", substanceB: "VITAMIN_D", type: "synergy", effect: "BONE_SUPPORT", mechanisms: ["CALCIUM_UP", "VITD_UP"], severity: "LOW", notes: "Витамин D улучшает усвоение кальция" },
+  { id: "INT_VITD_K2", substanceA: "VITAMIN_D", substanceB: "VITAMIN_K2", type: "synergy", effect: "CALCIUM_TARGETING", mechanisms: ["VITD_UP", "K2_UP"], severity: "LOW", notes: "К2 направляет кальций в кости, снижая риск кальцификации сосудов" },
+  { id: "INT_VITD_MAGNESIUM", substanceA: "VITAMIN_D", substanceB: "MAGNESIUM", type: "synergy", effect: "VITD_ACTIVATION", mechanisms: ["VDR_UP", "MAG_UP"], severity: "LOW", notes: "Магний нужен для активации витамина D" },
+  { id: "INT_VITD_A", substanceA: "VITAMIN_D", substanceB: "VITAMIN_A", type: "caution", effect: "IMMUNE_BALANCE", mechanisms: ["NUCLEAR_RECEPTORS"], severity: "MEDIUM", notes: "Избыток A+D может смещать иммунный баланс" },
+  { id: "INT_VITK_ANTICOAG", substanceA: "VITAMIN_K2", substanceB: "ANTICOAGULANTS", type: "conflict", effect: "COAGULATION_SHIFT", mechanisms: ["COAGULATION_UP"], severity: "HIGH", notes: "К2 может ослаблять эффект антикоагулянтов" },
+  { id: "INT_OMEGA3_ANTICOAG", substanceA: "OMEGA3", substanceB: "ANTICOAGULANTS", type: "caution", effect: "BLEED_RISK", mechanisms: ["PLATELETS_DOWN"], severity: "MEDIUM", notes: "Высокие дозы омега‑3 усиливают риск кровотечений" },
+  { id: "INT_OMEGA3_NSAIDS", substanceA: "OMEGA3", substanceB: "NSAIDS", type: "synergy", effect: "ANTIINFLAMMATION_UP", mechanisms: ["COX_DOWN"], severity: "LOW", notes: "Суммарный противовоспалительный эффект" },
+  { id: "INT_OMEGA3_VITD", substanceA: "OMEGA3", substanceB: "VITAMIN_D", type: "synergy", effect: "IMMUNE_MOD", mechanisms: ["ANTIINFLAMMATION", "IMMUNE_MOD"], severity: "LOW", notes: "Комбо для иммунки и воспаления" },
+  { id: "INT_MG_MELATONIN", substanceA: "MAGNESIUM", substanceB: "MELATONIN", type: "synergy", effect: "SLEEP_UP", mechanisms: ["GABA_UP", "MELATONIN_UP"], severity: "LOW", notes: "Улучшение качества сна" },
+  { id: "INT_MG_GABA", substanceA: "MAGNESIUM", substanceB: "GABA", type: "synergy", effect: "CALMING", mechanisms: ["GABA_UP", "NMDA_DOWN"], severity: "LOW", notes: "Суммарный анксиолитический эффект" },
+  { id: "INT_MG_STIMULANTS", substanceA: "MAGNESIUM", substanceB: "STIMULANTS", type: "caution", effect: "HEART_MOD", mechanisms: ["HR_MOD", "ELECTROLYTES"], severity: "LOW", notes: "Магний частично смягчает стимуляторы" },
+  { id: "INT_5HTP_SSRIS", substanceA: "5HTP", substanceB: "SSRIs", type: "conflict", effect: "SEROTONIN_SYNDROME", mechanisms: ["SEROTONIN_UP"], severity: "HIGH", notes: "Риск серотонинового синдрома" },
+  { id: "INT_5HTP_TRYPTOPHAN", substanceA: "5HTP", substanceB: "TRYPTOPHAN", type: "caution", effect: "SEROTONIN_EXCESS", mechanisms: ["SEROTONIN_UP"], severity: "MEDIUM", notes: "Избыточная серотонинергическая нагрузка" },
+  { id: "INT_TRYPTOPHAN_MAOI", substanceA: "TRYPTOPHAN", substanceB: "MAOI", type: "conflict", effect: "SEROTONIN_CRISIS", mechanisms: ["SEROTONIN_UP"], severity: "HIGH", notes: "Опасное повышение серотонина" },
+  { id: "INT_STJOHNSWORT_SSRIS", substanceA: "ST_JOHNS_WORT", substanceB: "SSRIs", type: "conflict", effect: "SEROTONIN_SYNDROME", mechanisms: ["SERT_INHIBIT", "SEROTONIN_UP"], severity: "HIGH", notes: "Комбо с СИОЗС опасно" },
+  { id: "INT_STJOHNSWORT_OCP", substanceA: "ST_JOHNS_WORT", substanceB: "ORAL_CONTRACEPTIVES", type: "conflict", effect: "DRUG_CLEARANCE_UP", mechanisms: ["CYP3A4_UP"], severity: "MEDIUM", notes: "Может снижать эффективность ОК" },
+  { id: "INT_STJOHNSWORT_WARFARIN", substanceA: "ST_JOHNS_WORT", substanceB: "WARFARIN", type: "conflict", effect: "ANTICOAG_DOWN", mechanisms: ["CYP_UP"], severity: "MEDIUM", notes: "Ускоряет метаболизм варфарина" },
+  { id: "INT_NAC_PARACETAMOL", substanceA: "NAC", substanceB: "PARACETAMOL", type: "synergy", effect: "LIVER_PROTECT", mechanisms: ["GLUTATHIONE_UP"], severity: "MEDIUM", notes: "NAC снижает гепатотоксичность парацетамола" },
+  { id: "INT_NAC_CHEMO", substanceA: "NAC", substanceB: "CHEMOTHERAPY", type: "caution", effect: "ANTIOX_INTERFERE", mechanisms: ["ROS_MOD"], severity: "MEDIUM", notes: "Антиоксиданты могут мешать части схем химиотерапии" },
+  { id: "INT_NAC_NITROGLYCERIN", substanceA: "NAC", substanceB: "NITRATES", type: "synergy", effect: "NO_UP", mechanisms: ["NO_UP"], severity: "MEDIUM", notes: "NAC усиливает вазодилатацию" },
+  { id: "INT_CURCUMIN_NSAIDS", substanceA: "CURCUMIN", substanceB: "NSAIDS", type: "synergy", effect: "ANTIINFLAMMATION_UP", mechanisms: ["COX_DOWN", "NFkB_DOWN"], severity: "MEDIUM", notes: "Суммарный противовоспалительный эффект" },
+  { id: "INT_CURCUMIN_ANTICOAG", substanceA: "CURCUMIN", substanceB: "ANTICOAGULANTS", type: "caution", effect: "BLEED_RISK", mechanisms: ["PLATELETS_DOWN"], severity: "MEDIUM", notes: "Повышение риска кровотечений" },
+  { id: "INT_CURCUMIN_PPI", substanceA: "CURCUMIN", substanceB: "PPI", type: "caution", effect: "ABSORB_MOD", mechanisms: ["PH_MOD"], severity: "LOW", notes: "Изменение pH и всасывания" },
+  { id: "INT_RESVERATROL_STATINS", substanceA: "RESVERATROL", substanceB: "STATINS", type: "synergy", effect: "LIPIDS_UP;ENDOTHELIUM_UP", mechanisms: ["AMPK_UP", "SIRT1_UP"], severity: "LOW", notes: "Потенциальная синергия по липидам и сосудам" },
+  { id: "INT_RESVERATROL_WARFARIN", substanceA: "RESVERATROL", substanceB: "WARFARIN", type: "caution", effect: "BLEED_RISK", mechanisms: ["PLATELETS_DOWN"], severity: "MEDIUM", notes: "Усиление антикоагуляции" },
+  { id: "INT_PROBIOTICS_ANTIBIOTICS", substanceA: "PROBIOTICS", substanceB: "ANTIBIOTICS", type: "conflict", effect: "BUGS_KILLED", mechanisms: ["ABX_KILL", "MICROBIOME"], severity: "HIGH", notes: "Антибиотики убивают пробиотические штаммы" },
+  { id: "INT_PROBIOTICS_FIBER", substanceA: "PROBIOTICS", substanceB: "PREBIOTIC_FIBER", type: "synergy", effect: "MICROBIOME_UP", mechanisms: ["SCFA_UP"], severity: "LOW", notes: "Клетчатка кормит пробиотики" },
+  { id: "INT_PROBIOTICS_PPI", substanceA: "PROBIOTICS", substanceB: "PPI", type: "synergy", effect: "SURVIVAL_UP", mechanisms: ["PH_UP"], severity: "LOW", notes: "Снижение кислотности повышает выживаемость бактерий" },
+  { id: "INT_FIBER_DRUGS", substanceA: "PREBIOTIC_FIBER", substanceB: "ORAL_DRUGS", type: "caution", effect: "ABSORB_DOWN", mechanisms: ["BINDING"], severity: "MEDIUM", notes: "Клетчатка может снижать всасывание лекарств" },
+  { id: "INT_FIBER_MINERALS", substanceA: "PREBIOTIC_FIBER", substanceB: "MINERALS", type: "caution", effect: "ABSORB_DOWN", mechanisms: ["BINDING"], severity: "MEDIUM", notes: "Связывание минералов в ЖКТ" },
+  { id: "INT_MELATONIN_BENZOS", substanceA: "MELATONIN", substanceB: "BENZODIAZEPINES", type: "synergy", effect: "SEDATION_UP", mechanisms: ["GABA_UP", "SLEEP_UP"], severity: "MEDIUM", notes: "Суммарная седация" },
+  { id: "INT_MELATONIN_ALCOHOL", substanceA: "MELATONIN", substanceB: "ALCOHOL", type: "conflict", effect: "SLEEP_ARCH_DISRUPT", mechanisms: ["GABA_MOD", "CNS_DEPRESS"], severity: "HIGH", notes: "Нарушение структуры сна и ЦНС" },
+  { id: "INT_ALCOHOL_PARACETAMOL", substanceA: "ALCOHOL", substanceB: "PARACETAMOL", type: "conflict", effect: "LIVER_TOX", mechanisms: ["TOXIC_METABOLITES"], severity: "HIGH", notes: "Сильная нагрузка на печень" },
+  { id: "INT_ALCOHOL_BENZOS", substanceA: "ALCOHOL", substanceB: "BENZODIAZEPINES", type: "conflict", effect: "CNS_DEPRESSION", mechanisms: ["CNS_DOWN"], severity: "HIGH", notes: "Риск угнетения дыхания" },
+  { id: "INT_ALCOHOL_ANTIDEPRESSANTS", substanceA: "ALCOHOL", substanceB: "ANTIDEPRESSANTS", type: "caution", effect: "MOOD_INSTABILITY", mechanisms: ["CNS_MOD"], severity: "MEDIUM", notes: "Непредсказуемый эффект на настроение и ЦНС" },
+  { id: "INT_NICOTINE_STIMULANTS", substanceA: "NICOTINE", substanceB: "STIMULANTS", type: "synergy", effect: "OVERSTIMULATION", mechanisms: ["NE_UP", "DA_UP"], severity: "MEDIUM", notes: "Суммарная нагрузка на сердце и ЦНС" },
+  { id: "INT_NICOTINE_BETA_BLOCKERS", substanceA: "NICOTINE", substanceB: "BETA_BLOCKERS", type: "conflict", effect: "DRUG_EFFECT_DOWN", mechanisms: ["RECEPTOR_COMPETE"], severity: "MEDIUM", notes: "Ослабление эффекта бета‑блокаторов" },
+  { id: "INT_GINSENG_STIMULANTS", substanceA: "GINSENG", substanceB: "STIMULANTS", type: "caution", effect: "OVERSTIMULATION", mechanisms: ["ADRENAL_UP"], severity: "MEDIUM", notes: "Риск тревоги и тахикардии" },
+  { id: "INT_GINSENG_ANTICOAG", substanceA: "GINSENG", substanceB: "ANTICOAGULANTS", type: "caution", effect: "BLEED_RISK", mechanisms: ["PLATELETS_MOD"], severity: "MEDIUM", notes: "Возможное усиление кровоточивости" },
+  { id: "INT_ASHWAGANDHA_BENZOS", substanceA: "ASHWAGANDHA", substanceB: "BENZODIAZEPINES", type: "synergy", effect: "SEDATION_UP", mechanisms: ["GABA_MOD"], severity: "MEDIUM", notes: "Суммарная седация и расслабление" },
+  { id: "INT_ASHWAGANDHA_THYROID", substanceA: "ASHWAGANDHA", substanceB: "THYROID_DRUGS", type: "caution", effect: "THYROID_MOD", mechanisms: ["T3_T4_MOD"], severity: "MEDIUM", notes: "Может усиливать или менять эффект тиреоидных препаратов" },
+  { id: "INT_RHODIOLA_STIMULANTS", substanceA: "RHODIOLA", substanceB: "STIMULANTS", type: "caution", effect: "OVERSTIMULATION", mechanisms: ["NE_UP", "DA_UP"], severity: "MEDIUM", notes: "Риск тревоги и тахикардии" },
+  { id: "INT_RHODIOLA_SSRIS", substanceA: "RHODIOLA", substanceB: "SSRIs", type: "caution", effect: "SEROTONIN_UP", mechanisms: ["SEROTONIN_MOD"], severity: "MEDIUM", notes: "Потенциальное усиление серотонинергики" },
+  { id: "INT_LITHIUM_SODIUM", substanceA: "LITHIUM", substanceB: "SODIUM", type: "conflict", effect: "LITHIUM_LEVEL_SHIFT", mechanisms: ["RENAL_CLEARANCE"], severity: "HIGH", notes: "Изменение натрия меняет уровень лития" },
+  { id: "INT_LITHIUM_NSAIDS", substanceA: "LITHIUM", substanceB: "NSAIDS", type: "conflict", effect: "LITHIUM_UP", mechanisms: ["RENAL_CLEARANCE_DOWN"], severity: "HIGH", notes: "НПВС могут повышать концентрацию лития" },
+  { id: "INT_STATINS_GRAPEFRUIT", substanceA: "STATINS", substanceB: "GRAPEFRUIT", type: "conflict", effect: "DRUG_LEVEL_UP", mechanisms: ["CYP3A4_INHIBIT"], severity: "HIGH", notes: "Грейпфрут повышает уровень статинов" },
+  { id: "INT_STATINS_COQ10", substanceA: "STATINS", substanceB: "COQ10", type: "synergy", effect: "MUSCLE_PROTECT", mechanisms: ["MITO_UP"], severity: "LOW", notes: "КоQ10 снижает риск миопатии" },
+  { id: "INT_METFORMIN_B12", substanceA: "METFORMIN", substanceB: "VITAMIN_B12", type: "conflict", effect: "B12_DOWN", mechanisms: ["ABSORB_DOWN"], severity: "MEDIUM", notes: "Метформин снижает всасывание B12" },
+  { id: "INT_METFORMIN_BERBERINE", substanceA: "METFORMIN", substanceB: "BERBERINE", type: "caution", effect: "GLUCOSE_DOWN", mechanisms: ["AMPK_UP", "GLUCOSE_DOWN"], severity: "MEDIUM", notes: "Суммарное снижение глюкозы" },
+  { id: "INT_DIURETICS_ELECTROLYTES", substanceA: "DIURETICS", substanceB: "ELECTROLYTES", type: "caution", effect: "ELECTROLYTE_SHIFT", mechanisms: ["NA_K_MOD"], severity: "HIGH", notes: "Риск нарушений калия/натрия" },
+  { id: "INT_DIURETICS_MG", substanceA: "DIURETICS", substanceB: "MAGNESIUM", type: "conflict", effect: "MG_DOWN", mechanisms: ["RENAL_LOSS"], severity: "MEDIUM", notes: "Диуретики вымывают магний" },
+  { id: "INT_PPI_MINERALS", substanceA: "PPI", substanceB: "MINERALS", type: "conflict", effect: "ABSORB_DOWN", mechanisms: ["PH_UP"], severity: "MEDIUM", notes: "Снижение кислотности ухудшает всасывание минералов" },
+  { id: "INT_PPI_B12", substanceA: "PPI", substanceB: "VITAMIN_B12", type: "conflict", effect: "B12_DOWN", mechanisms: ["PH_UP"], severity: "MEDIUM", notes: "Длительный приём PPI снижает B12" },
+  { id: "INT_FOLATE_METHOTREXATE", substanceA: "FOLATE", substanceB: "METHOTREXATE", type: "conflict", effect: "DRUG_EFFECT_DOWN", mechanisms: ["FOLATE_PATH"], severity: "HIGH", notes: "Фолаты могут ослаблять эффект метотрексата" },
+  { id: "INT_FOLATE_ANTICONVULSANTS", substanceA: "FOLATE", substanceB: "ANTICONVULSANTS", type: "caution", effect: "DRUG_LEVEL_MOD", mechanisms: ["CYP_MOD"], severity: "MEDIUM", notes: "Возможное изменение эффективности противосудорожных" },
+  { id: "INT_KETOGENIC_CARB_DRUGS", substanceA: "KETO_DIET", substanceB: "GLUCOSE_LOWERING_DRUGS", type: "caution", effect: "HYPOGLYCEMIA", mechanisms: ["GLUCOSE_DOWN"], severity: "MEDIUM", notes: "Риск гипогликемии на кето + сахароснижающие" },
+  { id: "INT_KETO_ELECTROLYTES", substanceA: "KETO_DIET", substanceB: "ELECTROLYTES", type: "caution", effect: "ELECTROLYTE_SHIFT", mechanisms: ["NA_K_MOD"], severity: "LOW", notes: "Нужна коррекция электролитов" },
+  { id: "INT_HYPERZINE_CHOLINE", substanceA: "HUPERZINE_A", substanceB: "CHOLINE", type: "synergy", effect: "ACH_UP", mechanisms: ["ACHE_INHIBIT", "ACH_UP"], severity: "MEDIUM", notes: "Сильная холинергическая нагрузка" },
+  { id: "INT_HYPERZINE_STIMULANTS", substanceA: "HUPERZINE_A", substanceB: "STIMULANTS", type: "caution", effect: "CNS_OVERLOAD", mechanisms: ["ACH_UP", "NE_UP"], severity: "MEDIUM", notes: "Риск перегруза ЦНС" },
+  { id: "INT_PSYCHOSTIM_BENZOS", substanceA: "STIMULANTS", substanceB: "BENZODIAZEPINES", type: "caution", effect: "COUNTERACT", mechanisms: ["CNS_UP", "CNS_DOWN"], severity: "LOW", notes: "Взаимное частичное нивелирование эффектов" },
+  { id: "INT_PSYCHOSTIM_ANTIPSYCH", substanceA: "STIMULANTS", substanceB: "ANTIPSYCHOTICS", type: "conflict", effect: "OPPOSITE_EFFECTS", mechanisms: ["DA_UP", "DA_BLOCK"], severity: "MEDIUM", notes: "Противонаправленные эффекты по дофамину" },
+  { id: "INT_GABA_BENZOS", substanceA: "GABA", substanceB: "BENZODIAZEPINES", type: "synergy", effect: "SEDATION_UP", mechanisms: ["GABA_UP"], severity: "MEDIUM", notes: "Сильная седация при совместном приёме" },
+  { id: "INT_GABA_ALCOHOL", substanceA: "GABA", substanceB: "ALCOHOL", type: "conflict", effect: "CNS_DEPRESSION", mechanisms: ["CNS_DOWN"], severity: "HIGH", notes: "Опасное угнетение ЦНС" },
+  { id: "INT_GABA_ASHWAGANDHA", substanceA: "GABA", substanceB: "ASHWAGANDHA", type: "synergy", effect: "CALMING_UP", mechanisms: ["GABA_MOD"], severity: "LOW", notes: "Усиление расслабления" },
+  { id: "INT_TYROSINE_STIMULANTS", substanceA: "TYROSINE", substanceB: "STIMULANTS", type: "synergy", effect: "DA_NE_UP", mechanisms: ["DA_UP", "NE_UP"], severity: "MEDIUM", notes: "Усиление стимуляции" },
+  { id: "INT_TYROSINE_MAOI", substanceA: "TYROSINE", substanceB: "MAOI", type: "conflict", effect: "HYPERTENSIVE_CRISIS", mechanisms: ["NE_UP"], severity: "HIGH", notes: "Риск гипертонического криза" },
+  { id: "INT_TYROSINE_LDOPA", substanceA: "TYROSINE", substanceB: "L_DOPA", type: "caution", effect: "DA_EXCESS", mechanisms: ["DA_UP"], severity: "MEDIUM", notes: "Избыток дофамина" },
+  { id: "INT_CHOLINE_RACETAMS", substanceA: "CHOLINE", substanceB: "RACETAMS", type: "synergy", effect: "ACH_UP", mechanisms: ["ACH_UP"], severity: "LOW", notes: "Холин усиливает эффект рацетамов" },
+  { id: "INT_CHOLINE_HUPERZINE", substanceA: "CHOLINE", substanceB: "HUPERZINE_A", type: "synergy", effect: "ACH_OVERLOAD", mechanisms: ["ACH_UP", "ACHE_INHIBIT"], severity: "MEDIUM", notes: "Сильная холинергическая нагрузка" },
+  { id: "INT_CHOLINE_ANTICHOLINERGICS", substanceA: "CHOLINE", substanceB: "ANTICHOLINERGICS", type: "conflict", effect: "OPPOSITE_EFFECTS", mechanisms: ["ACH_UP", "ACH_BLOCK"], severity: "MEDIUM", notes: "Противонаправленные эффекты" },
+  { id: "INT_RACETAMS_STIMULANTS", substanceA: "RACETAMS", substanceB: "STIMULANTS", type: "synergy", effect: "FOCUS_UP", mechanisms: ["NEURO_UP"], severity: "LOW", notes: "Усиление концентрации" },
+  { id: "INT_RACETAMS_GABA", substanceA: "RACETAMS", substanceB: "GABA", type: "caution", effect: "MOOD_SHIFT", mechanisms: ["GABA_MOD"], severity: "LOW", notes: "Непредсказуемый эффект на настроение" },
+  { id: "INT_RACETAMS_PIRACETAM_CAFFEINE", substanceA: "PIRACETAM", substanceB: "CAFFEINE", type: "synergy", effect: "FOCUS_UP", mechanisms: ["NEURO_UP"], severity: "LOW", notes: "Лёгкая стимуляция + когнитивный буст" },
+  { id: "INT_LCARNITINE_CAFFEINE", substanceA: "L_CARNITINE", substanceB: "CAFFEINE", type: "synergy", effect: "FAT_BURN_UP", mechanisms: ["FAT_OX_UP"], severity: "LOW", notes: "Усиление липолиза" },
+  { id: "INT_LCARNITINE_THYROID", substanceA: "L_CARNITINE", substanceB: "THYROID_DRUGS", type: "conflict", effect: "THYROID_MOD", mechanisms: ["T3_T4_MOD"], severity: "MEDIUM", notes: "Может снижать действие тиреоидных гормонов" },
+  { id: "INT_COQ10_STATINS", substanceA: "COQ10", substanceB: "STATINS", type: "synergy", effect: "MUSCLE_PROTECT", mechanisms: ["MITO_UP"], severity: "LOW", notes: "Снижение риска миопатии" },
+  { id: "INT_COQ10_WARFARIN", substanceA: "COQ10", substanceB: "WARFARIN", type: "caution", effect: "ANTICOAG_MOD", mechanisms: ["COAGULATION_MOD"], severity: "MEDIUM", notes: "Может ослаблять антикоагуляцию" },
+  { id: "INT_BERBERINE_METFORMIN", substanceA: "BERBERINE", substanceB: "METFORMIN", type: "synergy", effect: "GLUCOSE_DOWN", mechanisms: ["AMPK_UP"], severity: "MEDIUM", notes: "Сильное снижение сахара" },
+  { id: "INT_BERBERINE_ANTIBIOTICS", substanceA: "BERBERINE", substanceB: "ANTIBIOTICS", type: "caution", effect: "GUT_MOD", mechanisms: ["ANTIMICROBIAL"], severity: "LOW", notes: "Может менять микробиоту" },
+  { id: "INT_BERBERINE_CYCLOSPORINE", substanceA: "BERBERINE", substanceB: "CYCLOSPORINE", type: "conflict", effect: "DRUG_LEVEL_UP", mechanisms: ["CYP3A4_INHIBIT"], severity: "HIGH", notes: "Опасное повышение уровня препарата" },
+  { id: "INT_QUERCETIN_ANTIHISTAMINES", substanceA: "QUERCETIN", substanceB: "ANTIHISTAMINES", type: "synergy", effect: "ALLERGY_DOWN", mechanisms: ["H1_BLOCK"], severity: "LOW", notes: "Усиление антигистаминного эффекта" },
+  { id: "INT_QUERCETIN_CHEMO", substanceA: "QUERCETIN", substanceB: "CHEMOTHERAPY", type: "caution", effect: "ANTIOX_INTERFERE", mechanisms: ["ROS_MOD"], severity: "MEDIUM", notes: "Антиоксиданты могут мешать терапии" },
+  { id: "INT_QUERCETIN_CYCLOSPORINE", substanceA: "QUERCETIN", substanceB: "CYCLOSPORINE", type: "conflict", effect: "DRUG_LEVEL_UP", mechanisms: ["CYP3A4_INHIBIT"], severity: "HIGH", notes: "Повышение уровня циклоспорина" },
+  { id: "INT_MELATONIN_SSRI", substanceA: "MELATONIN", substanceB: "SSRIs", type: "caution", effect: "SEROTONIN_MOD", mechanisms: ["SEROTONIN_UP"], severity: "LOW", notes: "Может усиливать сонливость" },
+  { id: "INT_MELATONIN_STIMULANTS", substanceA: "MELATONIN", substanceB: "STIMULANTS", type: "conflict", effect: "OPPOSITE_EFFECTS", mechanisms: ["CNS_DOWN", "CNS_UP"], severity: "LOW", notes: "Противонаправленные эффекты" },
+  { id: "INT_MELATONIN_CORTISOL", substanceA: "MELATONIN", substanceB: "CORTISOL_DRUGS", type: "conflict", effect: "HORMONE_SHIFT", mechanisms: ["CIRCADIAN_MOD"], severity: "MEDIUM", notes: "Сдвиг циркадных ритмов" },
+  { id: "INT_YOHIMBINE_STIMULANTS", substanceA: "YOHIMBINE", substanceB: "STIMULANTS", type: "conflict", effect: "OVERSTIMULATION", mechanisms: ["NE_UP", "ADRENALINE_UP"], severity: "HIGH", notes: "Риск паники и тахикардии" },
+  { id: "INT_YOHIMBINE_ANTIHYPERTENSIVES", substanceA: "YOHIMBINE", substanceB: "ANTIHYPERTENSIVES", type: "conflict", effect: "BP_UP", mechanisms: ["ALPHA2_BLOCK"], severity: "HIGH", notes: "Повышает давление" },
+  { id: "INT_YOHIMBINE_SILDENAFIL", substanceA: "YOHIMBINE", substanceB: "SILDENAFIL", type: "caution", effect: "BP_SHIFT", mechanisms: ["NO_UP", "NE_UP"], severity: "MEDIUM", notes: "Непредсказуемое влияние на давление" },
+  { id: "INT_SYNEPHRINE_CAFFEINE", substanceA: "SYNEPHRINE", substanceB: "CAFFEINE", type: "conflict", effect: "HEART_STRAIN", mechanisms: ["HR_UP", "BP_UP"], severity: "HIGH", notes: "Сильная нагрузка на сердце" },
+  { id: "INT_SYNEPHRINE_STIMULANTS", substanceA: "SYNEPHRINE", substanceB: "STIMULANTS", type: "conflict", effect: "OVERSTIMULATION", mechanisms: ["NE_UP"], severity: "HIGH", notes: "Опасная стимуляция" },
+  { id: "INT_SYNEPHRINE_BETA_BLOCKERS", substanceA: "SYNEPHRINE", substanceB: "BETA_BLOCKERS", type: "conflict", effect: "DRUG_EFFECT_DOWN", mechanisms: ["RECEPTOR_COMPETE"], severity: "MEDIUM", notes: "Ослабляет действие бета‑блокаторов" },
+  { id: "INT_GREEN_TEA_CAFFEINE", substanceA: "GREEN_TEA_EXTRACT", substanceB: "CAFFEINE", type: "synergy", effect: "FAT_BURN_UP", mechanisms: ["EGCG_UP"], severity: "LOW", notes: "Усиление термогенеза" },
+  { id: "INT_GREEN_TEA_IRON", substanceA: "GREEN_TEA_EXTRACT", substanceB: "IRON", type: "conflict", effect: "IRON_ABSORB_DOWN", mechanisms: ["TANNINS_BIND"], severity: "MEDIUM", notes: "Снижает всасывание железа" },
+  { id: "INT_GREEN_TEA_WARFARIN", substanceA: "GREEN_TEA_EXTRACT", substanceB: "WARFARIN", type: "conflict", effect: "COAGULATION_SHIFT", mechanisms: ["VITK_MOD"], severity: "MEDIUM", notes: "Может снижать эффект варфарина" },
+  { id: "INT_GINGER_ANTICOAG", substanceA: "GINGER", substanceB: "ANTICOAGULANTS", type: "caution", effect: "BLEED_RISK", mechanisms: ["PLATELETS_DOWN"], severity: "MEDIUM", notes: "Повышение риска кровотечений" },
+  { id: "INT_GINGER_NSAIDS", substanceA: "GINGER", substanceB: "NSAIDS", type: "synergy", effect: "ANTIINFLAMMATION_UP", mechanisms: ["COX_DOWN"], severity: "LOW", notes: "Суммарный противовоспалительный эффект" },
+  { id: "INT_GINGER_HYPOTENSIVES", substanceA: "GINGER", substanceB: "HYPOTENSIVES", type: "synergy", effect: "BP_DOWN", mechanisms: ["VESSEL_RELAX"], severity: "LOW", notes: "Усиление гипотензивного эффекта" },
+  { id: "INT_TURMERIC_PIPERINE", substanceA: "CURCUMIN", substanceB: "PIPERINE", type: "synergy", effect: "BIOAVAIL_UP", mechanisms: ["CYP_INHIBIT"], severity: "LOW", notes: "Пиперин усиливает всасывание куркумина" },
+  { id: "INT_TURMERIC_ANTICOAG", substanceA: "CURCUMIN", substanceB: "ANTICOAGULANTS", type: "caution", effect: "BLEED_RISK", mechanisms: ["PLATELETS_DOWN"], severity: "MEDIUM", notes: "Повышение риска кровотечений" },
+  { id: "INT_TURMERIC_STEROIDS", substanceA: "CURCUMIN", substanceB: "STEROIDS", type: "synergy", effect: "ANTIINFLAMMATION_UP", mechanisms: ["NFkB_DOWN"], severity: "LOW", notes: "Усиление противовоспалительного эффекта" },
+  { id: "INT_GARLIC_ANTICOAG", substanceA: "GARLIC", substanceB: "ANTICOAGULANTS", type: "caution", effect: "BLEED_RISK", mechanisms: ["PLATELETS_DOWN"], severity: "MEDIUM", notes: "Чеснок усиливает антикоагуляцию" },
+  { id: "INT_GARLIC_HIV_DRUGS", substanceA: "GARLIC", substanceB: "HIV_DRUGS", type: "conflict", effect: "DRUG_LEVEL_DOWN", mechanisms: ["CYP3A4_UP"], severity: "MEDIUM", notes: "Снижает концентрацию препаратов" },
+  { id: "INT_GARLIC_BP_DRUGS", substanceA: "GARLIC", substanceB: "BP_DRUGS", type: "synergy", effect: "BP_DOWN", mechanisms: ["VESSEL_RELAX"], severity: "LOW", notes: "Усиление гипотензивного эффекта" },
+  { id: "INT_VITC_IRON", substanceA: "VITAMIN_C", substanceB: "IRON", type: "synergy", effect: "IRON_ABSORB_UP", mechanisms: ["ACIDITY_UP"], severity: "LOW", notes: "Усиление всасывания железа" },
+  { id: "INT_VITC_COPPER", substanceA: "VITAMIN_C", substanceB: "COPPER", type: "conflict", effect: "COPPER_DOWN", mechanisms: ["REDOX_MOD"], severity: "MEDIUM", notes: "Высокие дозы C снижают медь" },
+  { id: "INT_VITC_CHEMO", substanceA: "VITAMIN_C", substanceB: "CHEMOTHERAPY", type: "caution", effect: "ANTIOX_INTERFERE", mechanisms: ["ROS_MOD"], severity: "MEDIUM", notes: "Антиоксиданты могут мешать терапии" },
+  { id: "INT_ZINC_COPPER", substanceA: "ZINC", substanceB: "COPPER", type: "conflict", effect: "COPPER_DEPLETION", mechanisms: ["METAL_COMPETE"], severity: "MEDIUM", notes: "Цинк снижает медь" },
+  { id: "INT_ZINC_IRON", substanceA: "ZINC", substanceB: "IRON", type: "conflict", effect: "ABSORB_COMPETE", mechanisms: ["COMPETE_ABSORB"], severity: "MEDIUM", notes: "Конкуренция минералов" },
+  { id: "INT_ZINC_MAGNESIUM", substanceA: "ZINC", substanceB: "MAGNESIUM", type: "conflict", effect: "ABSORB_COMPETE", mechanisms: ["COMPETE_ABSORB"], severity: "LOW", notes: "Снижение всасывания при одновременном приёме" },
+  { id: "INT_MAGNESIUM_VITD", substanceA: "MAGNESIUM", substanceB: "VITAMIN_D", type: "synergy", effect: "VITD_ACTIVATION", mechanisms: ["VDR_UP"], severity: "LOW", notes: "Магний активирует витамин D" },
+  { id: "INT_MAGNESIUM_CALCIUM", substanceA: "MAGNESIUM", substanceB: "CALCIUM", type: "conflict", effect: "ABSORB_COMPETE", mechanisms: ["COMPETE_ABSORB"], severity: "LOW", notes: "Минералы конкурируют" },
+  { id: "INT_MAGNESIUM_STIMULANTS", substanceA: "MAGNESIUM", substanceB: "STIMULANTS", type: "caution", effect: "HEART_MOD", mechanisms: ["ELECTROLYTES"], severity: "LOW", notes: "Смягчает стимуляцию" },
+  { id: "INT_POTASSIUM_DIURETICS", substanceA: "POTASSIUM", substanceB: "DIURETICS", type: "caution", effect: "K_SHIFT", mechanisms: ["RENAL_MOD"], severity: "MEDIUM", notes: "Риск гиперкалиемии" },
+  { id: "INT_POTASSIUM_ACEI", substanceA: "POTASSIUM", substanceB: "ACE_INHIBITORS", type: "conflict", effect: "K_UP", mechanisms: ["RENAL_MOD"], severity: "HIGH", notes: "Опасное повышение калия" },
+  { id: "INT_POTASSIUM_DIGOXIN", substanceA: "POTASSIUM", substanceB: "DIGOXIN", type: "conflict", effect: "DRUG_EFFECT_MOD", mechanisms: ["ELECTROLYTES"], severity: "HIGH", notes: "Нарушение работы сердца" },
+  { id: "INT_CALCIUM_VITK2", substanceA: "CALCIUM", substanceB: "VITAMIN_K2", type: "synergy", effect: "BONE_UP", mechanisms: ["K2_UP"], severity: "LOW", notes: "К2 направляет кальций в кости" },
+  { id: "INT_CALCIUM_PPI", substanceA: "CALCIUM", substanceB: "PPI", type: "conflict", effect: "ABSORB_DOWN", mechanisms: ["PH_UP"], severity: "MEDIUM", notes: "Снижение всасывания кальция" },
+  { id: "INT_CALCIUM_IRON", substanceA: "CALCIUM", substanceB: "IRON", type: "conflict", effect: "ABSORB_DOWN", mechanisms: ["COMPETE_ABSORB"], severity: "MEDIUM", notes: "Кальций мешает железу" },
+  { id: "INT_SELENIUM_VITC", substanceA: "SELENIUM", substanceB: "VITAMIN_C", type: "caution", effect: "REDOX_SHIFT", mechanisms: ["ANTIOX_MOD"], severity: "LOW", notes: "Изменение антиоксидантного баланса" },
+  { id: "INT_SELENIUM_THYROID", substanceA: "SELENIUM", substanceB: "THYROID_DRUGS", type: "synergy", effect: "THYROID_UP", mechanisms: ["T3_T4_UP"], severity: "LOW", notes: "Поддержка щитовидки" },
+  { id: "INT_SELENIUM_ZINC", substanceA: "SELENIUM", substanceB: "ZINC", type: "synergy", effect: "IMMUNE_UP", mechanisms: ["ANTIOX_UP"], severity: "LOW", notes: "Иммунная синергия" },
+  { id: "INT_IODINE_THYROID", substanceA: "IODINE", substanceB: "THYROID_DRUGS", type: "caution", effect: "THYROID_SHIFT", mechanisms: ["T3_T4_MOD"], severity: "MEDIUM", notes: "Может менять дозировку гормонов" },
+  { id: "INT_IODINE_LITHIUM", substanceA: "IODINE", substanceB: "LITHIUM", type: "conflict", effect: "THYROID_MOD", mechanisms: ["THYROID_UP"], severity: "MEDIUM", notes: "Йод влияет на щитовидку при литии" },
+  { id: "INT_IODINE_ANTITHYROID", substanceA: "IODINE", substanceB: "ANTITHYROID_DRUGS", type: "conflict", effect: "OPPOSITE_EFFECTS", mechanisms: ["T3_T4_UP", "T3_T4_DOWN"], severity: "MEDIUM", notes: "Противонаправленные эффекты" },
+  { id: "INT_ADAPTOGENS_STIMULANTS", substanceA: "ADAPTOGENS", substanceB: "STIMULANTS", type: "caution", effect: "STRESS_AXIS_MOD", mechanisms: ["HPA_MOD"], severity: "LOW", notes: "Может менять реакцию на стимуляторы" },
+  { id: "INT_ADAPTOGENS_BENZOS", substanceA: "ADAPTOGENS", substanceB: "BENZODIAZEPINES", type: "caution", effect: "SEDATION_MOD", mechanisms: ["GABA_MOD"], severity: "LOW", notes: "Суммарная релаксация" },
+  { id: "INT_ADAPTOGENS_SSRI", substanceA: "ADAPTOGENS", substanceB: "SSRIs", type: "caution", effect: "SEROTONIN_MOD", mechanisms: ["SEROTONIN_UP"], severity: "LOW", notes: "Мягкая серотонинергическая модуляция" }
+];
+// ── FROM: interaction-links.ts ──
+export interface InteractionLink {
+  id: string;
+  interactionId: string;
+  substance: string;
+  role: 'A' | 'B';
+}
+
+export const INTERACTION_LINKS_DB: InteractionLink[] = [
+  { id: "LINK_CAFFEINE_LTHEANINE_A", interactionId: "INT_CAFFEINE_LTHEANINE", substance: "CAFFEINE", role: "A" },
+  { id: "LINK_CAFFEINE_LTHEANINE_B", interactionId: "INT_CAFFEINE_LTHEANINE", substance: "L_THEANINE", role: "B" },
+  { id: "LINK_CAFFEINE_NICOTINE_A", interactionId: "INT_CAFFEINE_NICOTINE", substance: "CAFFEINE", role: "A" },
+  { id: "LINK_CAFFEINE_NICOTINE_B", interactionId: "INT_CAFFEINE_NICOTINE", substance: "NICOTINE", role: "B" },
+  { id: "LINK_CAFFEINE_SYNEPHRINE_A", interactionId: "INT_CAFFEINE_SYNEPHRINE", substance: "CAFFEINE", role: "A" },
+  { id: "LINK_CAFFEINE_SYNEPHRINE_B", interactionId: "INT_CAFFEINE_SYNEPHRINE", substance: "SYNEPHRINE", role: "B" },
+  { id: "LINK_CAFFEINE_YOHIMBINE_A", interactionId: "INT_CAFFEINE_YOHIMBINE", substance: "CAFFEINE", role: "A" },
+  { id: "LINK_CAFFEINE_YOHIMBINE_B", interactionId: "INT_CAFFEINE_YOHIMBINE", substance: "YOHIMBINE", role: "B" },
+  { id: "LINK_IRON_VITC_A", interactionId: "INT_IRON_VITC", substance: "IRON", role: "A" },
+  { id: "LINK_IRON_VITC_B", interactionId: "INT_IRON_VITC", substance: "VITAMIN_C", role: "B" },
+  { id: "LINK_IRON_CALCIUM_A", interactionId: "INT_IRON_CALCIUM", substance: "IRON", role: "A" },
+  { id: "LINK_IRON_CALCIUM_B", interactionId: "INT_IRON_CALCIUM", substance: "CALCIUM", role: "B" },
+  { id: "LINK_IRON_ZINC_A", interactionId: "INT_IRON_ZINC", substance: "IRON", role: "A" },
+  { id: "LINK_IRON_ZINC_B", interactionId: "INT_IRON_ZINC", substance: "ZINC", role: "B" },
+  { id: "LINK_ZINC_COPPER_A", interactionId: "INT_ZINC_COPPER", substance: "ZINC", role: "A" },
+  { id: "LINK_ZINC_COPPER_B", interactionId: "INT_ZINC_COPPER", substance: "COPPER", role: "B" },
+  { id: "LINK_CALCIUM_MAGNESIUM_A", interactionId: "INT_CALCIUM_MAGNESIUM", substance: "CALCIUM", role: "A" },
+  { id: "LINK_CALCIUM_MAGNESIUM_B", interactionId: "INT_CALCIUM_MAGNESIUM", substance: "MAGNESIUM", role: "B" },
+  { id: "LINK_CALCIUM_VITD_A", interactionId: "INT_CALCIUM_VITD", substance: "CALCIUM", role: "A" },
+  { id: "LINK_CALCIUM_VITD_B", interactionId: "INT_CALCIUM_VITD", substance: "VITAMIN_D", role: "B" },
+  { id: "LINK_VITD_K2_A", interactionId: "INT_VITD_K2", substance: "VITAMIN_D", role: "A" },
+  { id: "LINK_VITD_K2_B", interactionId: "INT_VITD_K2", substance: "VITAMIN_K2", role: "B" },
+  { id: "LINK_VITD_MAGNESIUM_A", interactionId: "INT_VITD_MAGNESIUM", substance: "VITAMIN_D", role: "A" },
+  { id: "LINK_VITD_MAGNESIUM_B", interactionId: "INT_VITD_MAGNESIUM", substance: "MAGNESIUM", role: "B" },
+  { id: "LINK_VITD_A_A", interactionId: "INT_VITD_A", substance: "VITAMIN_D", role: "A" },
+  { id: "LINK_VITD_A_B", interactionId: "INT_VITD_A", substance: "VITAMIN_A", role: "B" },
+  { id: "LINK_VITK_ANTICOAG_A", interactionId: "INT_VITK_ANTICOAG", substance: "VITAMIN_K2", role: "A" },
+  { id: "LINK_VITK_ANTICOAG_B", interactionId: "INT_VITK_ANTICOAG", substance: "ANTICOAGULANTS", role: "B" },
+  { id: "LINK_OMEGA3_ANTICOAG_A", interactionId: "INT_OMEGA3_ANTICOAG", substance: "OMEGA3", role: "A" },
+  { id: "LINK_OMEGA3_ANTICOAG_B", interactionId: "INT_OMEGA3_ANTICOAG", substance: "ANTICOAGULANTS", role: "B" },
+  { id: "LINK_OMEGA3_NSAIDS_A", interactionId: "INT_OMEGA3_NSAIDS", substance: "OMEGA3", role: "A" },
+  { id: "LINK_OMEGA3_NSAIDS_B", interactionId: "INT_OMEGA3_NSAIDS", substance: "NSAIDS", role: "B" },
+  { id: "LINK_OMEGA3_VITD_A", interactionId: "INT_OMEGA3_VITD", substance: "OMEGA3", role: "A" },
+  { id: "LINK_OMEGA3_VITD_B", interactionId: "INT_OMEGA3_VITD", substance: "VITAMIN_D", role: "B" },
+  { id: "LINK_MG_MELATONIN_A", interactionId: "INT_MG_MELATONIN", substance: "MAGNESIUM", role: "A" },
+  { id: "LINK_MG_MELATONIN_B", interactionId: "INT_MG_MELATONIN", substance: "MELATONIN", role: "B" },
+  { id: "LINK_MG_GABA_A", interactionId: "INT_MG_GABA", substance: "MAGNESIUM", role: "A" },
+  { id: "LINK_MG_GABA_B", interactionId: "INT_MG_GABA", substance: "GABA", role: "B" },
+  { id: "LINK_MG_STIMULANTS_A", interactionId: "INT_MG_STIMULANTS", substance: "MAGNESIUM", role: "A" },
+  { id: "LINK_MG_STIMULANTS_B", interactionId: "INT_MG_STIMULANTS", substance: "STIMULANTS", role: "B" },
+  { id: "LINK_5HTP_SSRIS_A", interactionId: "INT_5HTP_SSRIS", substance: "5HTP", role: "A" },
+  { id: "LINK_5HTP_SSRIS_B", interactionId: "INT_5HTP_SSRIS", substance: "SSRIs", role: "B" },
+  { id: "LINK_5HTP_TRYPTOPHAN_A", interactionId: "INT_5HTP_TRYPTOPHAN", substance: "5HTP", role: "A" },
+  { id: "LINK_5HTP_TRYPTOPHAN_B", interactionId: "INT_5HTP_TRYPTOPHAN", substance: "TRYPTOPHAN", role: "B" },
+  { id: "LINK_TRYPTOPHAN_MAOI_A", interactionId: "INT_TRYPTOPHAN_MAOI", substance: "TRYPTOPHAN", role: "A" },
+  { id: "LINK_TRYPTOPHAN_MAOI_B", interactionId: "INT_TRYPTOPHAN_MAOI", substance: "MAOI", role: "B" },
+  { id: "LINK_STJOHNSWORT_SSRIS_A", interactionId: "INT_STJOHNSWORT_SSRIS", substance: "ST_JOHNS_WORT", role: "A" },
+  { id: "LINK_STJOHNSWORT_SSRIS_B", interactionId: "INT_STJOHNSWORT_SSRIS", substance: "SSRIs", role: "B" },
+  { id: "LINK_STJOHNSWORT_OCP_A", interactionId: "INT_STJOHNSWORT_OCP", substance: "ST_JOHNS_WORT", role: "A" },
+  { id: "LINK_STJOHNSWORT_OCP_B", interactionId: "INT_STJOHNSWORT_OCP", substance: "ORAL_CONTRACEPTIVES", role: "B" },
+  { id: "LINK_STJOHNSWORT_WARFARIN_A", interactionId: "INT_STJOHNSWORT_WARFARIN", substance: "ST_JOHNS_WORT", role: "A" },
+  { id: "LINK_STJOHNSWORT_WARFARIN_B", interactionId: "INT_STJOHNSWORT_WARFARIN", substance: "WARFARIN", role: "B" },
+  { id: "LINK_NAC_PARACETAMOL_A", interactionId: "INT_NAC_PARACETAMOL", substance: "NAC", role: "A" },
+  { id: "LINK_NAC_PARACETAMOL_B", interactionId: "INT_NAC_PARACETAMOL", substance: "PARACETAMOL", role: "B" },
+  { id: "LINK_NAC_CHEMO_A", interactionId: "INT_NAC_CHEMO", substance: "NAC", role: "A" },
+  { id: "LINK_NAC_CHEMO_B", interactionId: "INT_NAC_CHEMO", substance: "CHEMOTHERAPY", role: "B" },
+  { id: "LINK_NAC_NITROGLYCERIN_A", interactionId: "INT_NAC_NITROGLYCERIN", substance: "NAC", role: "A" },
+  { id: "LINK_NAC_NITROGLYCERIN_B", interactionId: "INT_NAC_NITROGLYCERIN", substance: "NITRATES", role: "B" },
+  { id: "LINK_CURCUMIN_NSAIDS_A", interactionId: "INT_CURCUMIN_NSAIDS", substance: "CURCUMIN", role: "A" },
+  { id: "LINK_CURCUMIN_NSAIDS_B", interactionId: "INT_CURCUMIN_NSAIDS", substance: "NSAIDS", role: "B" },
+  { id: "LINK_CURCUMIN_ANTICOAG_A", interactionId: "INT_CURCUMIN_ANTICOAG", substance: "CURCUMIN", role: "A" },
+  { id: "LINK_CURCUMIN_ANTICOAG_B", interactionId: "INT_CURCUMIN_ANTICOAG", substance: "ANTICOAGULANTS", role: "B" },
+  { id: "LINK_CURCUMIN_PPI_A", interactionId: "INT_CURCUMIN_PPI", substance: "CURCUMIN", role: "A" },
+  { id: "LINK_CURCUMIN_PPI_B", interactionId: "INT_CURCUMIN_PPI", substance: "PPI", role: "B" },
+  { id: "LINK_RESVERATROL_STATINS_A", interactionId: "INT_RESVERATROL_STATINS", substance: "RESVERATROL", role: "A" },
+  { id: "LINK_RESVERATROL_STATINS_B", interactionId: "INT_RESVERATROL_STATINS", substance: "STATINS", role: "B" },
+  { id: "LINK_RESVERATROL_WARFARIN_A", interactionId: "INT_RESVERATROL_WARFARIN", substance: "RESVERATROL", role: "A" },
+  { id: "LINK_RESVERATROL_WARFARIN_B", interactionId: "INT_RESVERATROL_WARFARIN", substance: "WARFARIN", role: "B" },
+  { id: "LINK_PROBIOTICS_ANTIBIOTICS_A", interactionId: "INT_PROBIOTICS_ANTIBIOTICS", substance: "PROBIOTICS", role: "A" },
+  { id: "LINK_PROBIOTICS_ANTIBIOTICS_B", interactionId: "INT_PROBIOTICS_ANTIBIOTICS", substance: "ANTIBIOTICS", role: "B" },
+  { id: "LINK_PROBIOTICS_FIBER_A", interactionId: "INT_PROBIOTICS_FIBER", substance: "PROBIOTICS", role: "A" },
+  { id: "LINK_PROBIOTICS_FIBER_B", interactionId: "INT_PROBIOTICS_FIBER", substance: "PREBIOTIC_FIBER", role: "B" },
+  { id: "LINK_PROBIOTICS_PPI_A", interactionId: "INT_PROBIOTICS_PPI", substance: "PROBIOTICS", role: "A" },
+  { id: "LINK_PROBIOTICS_PPI_B", interactionId: "INT_PROBIOTICS_PPI", substance: "PPI", role: "B" },
+  { id: "LINK_FIBER_DRUGS_A", interactionId: "INT_FIBER_DRUGS", substance: "PREBIOTIC_FIBER", role: "A" },
+  { id: "LINK_FIBER_DRUGS_B", interactionId: "INT_FIBER_DRUGS", substance: "ORAL_DRUGS", role: "B" },
+  { id: "LINK_FIBER_MINERALS_A", interactionId: "INT_FIBER_MINERALS", substance: "PREBIOTIC_FIBER", role: "A" },
+  { id: "LINK_FIBER_MINERALS_B", interactionId: "INT_FIBER_MINERALS", substance: "MINERALS", role: "B" },
+  { id: "LINK_MELATONIN_BENZOS_A", interactionId: "INT_MELATONIN_BENZOS", substance: "MELATONIN", role: "A" },
+  { id: "LINK_MELATONIN_BENZOS_B", interactionId: "INT_MELATONIN_BENZOS", substance: "BENZODIAZEPINES", role: "B" },
+  { id: "LINK_MELATONIN_ALCOHOL_A", interactionId: "INT_MELATONIN_ALCOHOL", substance: "MELATONIN", role: "A" },
+  { id: "LINK_MELATONIN_ALCOHOL_B", interactionId: "INT_MELATONIN_ALCOHOL", substance: "ALCOHOL", role: "B" },
+  { id: "LINK_ALCOHOL_PARACETAMOL_A", interactionId: "INT_ALCOHOL_PARACETAMOL", substance: "ALCOHOL", role: "A" },
+  { id: "LINK_ALCOHOL_PARACETAMOL_B", interactionId: "INT_ALCOHOL_PARACETAMOL", substance: "PARACETAMOL", role: "B" },
+  { id: "LINK_ALCOHOL_BENZOS_A", interactionId: "INT_ALCOHOL_BENZOS", substance: "ALCOHOL", role: "A" },
+  { id: "LINK_ALCOHOL_BENZOS_B", interactionId: "INT_ALCOHOL_BENZOS", substance: "BENZODIAZEPINES", role: "B" },
+  { id: "LINK_ALCOHOL_ANTIDEPRESSANTS_A", interactionId: "INT_ALCOHOL_ANTIDEPRESSANTS", substance: "ALCOHOL", role: "A" },
+  { id: "LINK_ALCOHOL_ANTIDEPRESSANTS_B", interactionId: "INT_ALCOHOL_ANTIDEPRESSANTS", substance: "ANTIDEPRESSANTS", role: "B" },
+  { id: "LINK_NICOTINE_STIMULANTS_A", interactionId: "INT_NICOTINE_STIMULANTS", substance: "NICOTINE", role: "A" },
+  { id: "LINK_NICOTINE_STIMULANTS_B", interactionId: "INT_NICOTINE_STIMULANTS", substance: "STIMULANTS", role: "B" },
+  { id: "LINK_NICOTINE_BETA_BLOCKERS_A", interactionId: "INT_NICOTINE_BETA_BLOCKERS", substance: "NICOTINE", role: "A" },
+  { id: "LINK_NICOTINE_BETA_BLOCKERS_B", interactionId: "INT_NICOTINE_BETA_BLOCKERS", substance: "BETA_BLOCKERS", role: "B" },
+  { id: "LINK_GABA_BENZOS_A", interactionId: "INT_GABA_BENZOS", substance: "GABA", role: "A" },
+  { id: "LINK_GABA_BENZOS_B", interactionId: "INT_GABA_BENZOS", substance: "BENZODIAZEPINES", role: "B" },
+  { id: "LINK_GABA_ALCOHOL_A", interactionId: "INT_GABA_ALCOHOL", substance: "GABA", role: "A" },
+  { id: "LINK_GABA_ALCOHOL_B", interactionId: "INT_GABA_ALCOHOL", substance: "ALCOHOL", role: "B" },
+  { id: "LINK_GABA_ASHWAGANDHA_A", interactionId: "INT_GABA_ASHWAGANDHA", substance: "GABA", role: "A" },
+  { id: "LINK_GABA_ASHWAGANDHA_B", interactionId: "INT_GABA_ASHWAGANDHA", substance: "ASHWAGANDHA", role: "B" },
+  { id: "LINK_TYROSINE_STIMULANTS_A", interactionId: "INT_TYROSINE_STIMULANTS", substance: "TYROSINE", role: "A" },
+  { id: "LINK_TYROSINE_STIMULANTS_B", interactionId: "INT_TYROSINE_STIMULANTS", substance: "STIMULANTS", role: "B" },
+  { id: "LINK_TYROSINE_MAOI_A", interactionId: "INT_TYROSINE_MAOI", substance: "TYROSINE", role: "A" },
+  { id: "LINK_TYROSINE_MAOI_B", interactionId: "INT_TYROSINE_MAOI", substance: "MAOI", role: "B" },
+  { id: "LINK_TYROSINE_LDOPA_A", interactionId: "INT_TYROSINE_LDOPA", substance: "TYROSINE", role: "A" },
+  { id: "LINK_TYROSINE_LDOPA_B", interactionId: "INT_TYROSINE_LDOPA", substance: "L_DOPA", role: "B" },
+  { id: "LINK_CHOLINE_RACETAMS_A", interactionId: "INT_CHOLINE_RACETAMS", substance: "CHOLINE", role: "A" },
+  { id: "LINK_CHOLINE_RACETAMS_B", interactionId: "INT_CHOLINE_RACETAMS", substance: "RACETAMS", role: "B" },
+  { id: "LINK_CHOLINE_HUPERZINE_A", interactionId: "INT_CHOLINE_HUPERZINE", substance: "CHOLINE", role: "A" },
+  { id: "LINK_CHOLINE_HUPERZINE_B", interactionId: "INT_CHOLINE_HUPERZINE", substance: "HUPERZINE_A", role: "B" },
+  { id: "LINK_CHOLINE_ANTICHOLINERGICS_A", interactionId: "INT_CHOLINE_ANTICHOLINERGICS", substance: "CHOLINE", role: "A" },
+  { id: "LINK_CHOLINE_ANTICHOLINERGICS_B", interactionId: "INT_CHOLINE_ANTICHOLINERGICS", substance: "ANTICHOLINERGICS", role: "B" },
+  { id: "LINK_RACETAMS_STIMULANTS_A", interactionId: "INT_RACETAMS_STIMULANTS", substance: "RACETAMS", role: "A" },
+  { id: "LINK_RACETAMS_STIMULANTS_B", interactionId: "INT_RACETAMS_STIMULANTS", substance: "STIMULANTS", role: "B" },
+  { id: "LINK_RACETAMS_GABA_A", interactionId: "INT_RACETAMS_GABA", substance: "RACETAMS", role: "A" },
+  { id: "LINK_RACETAMS_GABA_B", interactionId: "INT_RACETAMS_GABA", substance: "GABA", role: "B" },
+  { id: "LINK_RACETAMS_PIRACETAM_CAFFEINE_A", interactionId: "INT_RACETAMS_PIRACETAM_CAFFEINE", substance: "PIRACETAM", role: "A" },
+  { id: "LINK_RACETAMS_PIRACETAM_CAFFEINE_B", interactionId: "INT_RACETAMS_PIRACETAM_CAFFEINE", substance: "CAFFEINE", role: "B" },
+  { id: "LINK_LCARNITINE_CAFFEINE_A", interactionId: "INT_LCARNITINE_CAFFEINE", substance: "L_CARNITINE", role: "A" },
+  { id: "LINK_LCARNITINE_CAFFEINE_B", interactionId: "INT_LCARNITINE_CAFFEINE", substance: "CAFFEINE", role: "B" },
+  { id: "LINK_LCARNITINE_THYROID_A", interactionId: "INT_LCARNITINE_THYROID", substance: "L_CARNITINE", role: "A" },
+  { id: "LINK_LCARNITINE_THYROID_B", interactionId: "INT_LCARNITINE_THYROID", substance: "THYROID_DRUGS", role: "B" },
+  { id: "LINK_COQ10_STATINS_A", interactionId: "INT_COQ10_STATINS", substance: "COQ10", role: "A" },
+  { id: "LINK_COQ10_STATINS_B", interactionId: "INT_COQ10_STATINS", substance: "STATINS", role: "B" },
+  { id: "LINK_COQ10_WARFARIN_A", interactionId: "INT_COQ10_WARFARIN", substance: "COQ10", role: "A" },
+  { id: "LINK_COQ10_WARFARIN_B", interactionId: "INT_COQ10_WARFARIN", substance: "WARFARIN", role: "B" },
+  { id: "LINK_BERBERINE_METFORMIN_A", interactionId: "INT_BERBERINE_METFORMIN", substance: "BERBERINE", role: "A" },
+  { id: "LINK_BERBERINE_METFORMIN_B", interactionId: "INT_BERBERINE_METFORMIN", substance: "METFORMIN", role: "B" },
+  { id: "LINK_BERBERINE_ANTIBIOTICS_A", interactionId: "INT_BERBERINE_ANTIBIOTICS", substance: "BERBERINE", role: "A" },
+  { id: "LINK_BERBERINE_ANTIBIOTICS_B", interactionId: "INT_BERBERINE_ANTIBIOTICS", substance: "ANTIBIOTICS", role: "B" },
+  { id: "LINK_BERBERINE_CYCLOSPORINE_A", interactionId: "INT_BERBERINE_CYCLOSPORINE", substance: "BERBERINE", role: "A" },
+  { id: "LINK_BERBERINE_CYCLOSPORINE_B", interactionId: "INT_BERBERINE_CYCLOSPORINE", substance: "CYCLOSPORINE", role: "B" },
+  { id: "LINK_QUERCETIN_ANTIHISTAMINES_A", interactionId: "INT_QUERCETIN_ANTIHISTAMINES", substance: "QUERCETIN", role: "A" },
+  { id: "LINK_QUERCETIN_ANTIHISTAMINES_B", interactionId: "INT_QUERCETIN_ANTIHISTAMINES", substance: "ANTIHISTAMINES", role: "B" },
+  { id: "LINK_QUERCETIN_CHEMO_A", interactionId: "INT_QUERCETIN_CHEMO", substance: "QUERCETIN", role: "A" },
+  { id: "LINK_QUERCETIN_CHEMO_B", interactionId: "INT_QUERCETIN_CHEMO", substance: "CHEMOTHERAPY", role: "B" },
+  { id: "LINK_QUERCETIN_CYCLOSPORINE_A", interactionId: "INT_QUERCETIN_CYCLOSPORINE", substance: "QUERCETIN", role: "A" },
+  { id: "LINK_QUERCETIN_CYCLOSPORINE_B", interactionId: "INT_QUERCETIN_CYCLOSPORINE", substance: "CYCLOSPORINE", role: "B" },
+  { id: "LINK_MELATONIN_SSRI_A", interactionId: "INT_MELATONIN_SSRI", substance: "MELATONIN", role: "A" },
+  { id: "LINK_MELATONIN_SSRI_B", interactionId: "INT_MELATONIN_SSRI", substance: "SSRIs", role: "B" },
+  { id: "LINK_MELATONIN_STIMULANTS_A", interactionId: "INT_MELATONIN_STIMULANTS", substance: "MELATONIN", role: "A" },
+  { id: "LINK_MELATONIN_STIMULANTS_B", interactionId: "INT_MELATONIN_STIMULANTS", substance: "STIMULANTS", role: "B" },
+  { id: "LINK_MELATONIN_CORTISOL_A", interactionId: "INT_MELATONIN_CORTISOL", substance: "MELATONIN", role: "A" },
+  { id: "LINK_MELATONIN_CORTISOL_B", interactionId: "INT_MELATONIN_CORTISOL", substance: "CORTISOL_DRUGS", role: "B" },
+  { id: "LINK_YOHIMBINE_STIMULANTS_A", interactionId: "INT_YOHIMBINE_STIMULANTS", substance: "YOHIMBINE", role: "A" },
+  { id: "LINK_YOHIMBINE_STIMULANTS_B", interactionId: "INT_YOHIMBINE_STIMULANTS", substance: "STIMULANTS", role: "B" },
+  { id: "LINK_YOHIMBINE_ANTIHYPERTENSIVES_A", interactionId: "INT_YOHIMBINE_ANTIHYPERTENSIVES", substance: "YOHIMBINE", role: "A" },
+  { id: "LINK_YOHIMBINE_ANTIHYPERTENSIVES_B", interactionId: "INT_YOHIMBINE_ANTIHYPERTENSIVES", substance: "ANTIHYPERTENSIVES", role: "B" },
+  { id: "LINK_YOHIMBINE_SILDENAFIL_A", interactionId: "INT_YOHIMBINE_SILDENAFIL", substance: "YOHIMBINE", role: "A" },
+  { id: "LINK_YOHIMBINE_SILDENAFIL_B", interactionId: "INT_YOHIMBINE_SILDENAFIL", substance: "SILDENAFIL", role: "B" },
+  { id: "LINK_SYNEPHRINE_CAFFEINE_A", interactionId: "INT_SYNEPHRINE_CAFFEINE", substance: "SYNEPHRINE", role: "A" },
+  { id: "LINK_SYNEPHRINE_CAFFEINE_B", interactionId: "INT_SYNEPHRINE_CAFFEINE", substance: "CAFFEINE", role: "B" },
+  { id: "LINK_SYNEPHRINE_STIMULANTS_A", interactionId: "INT_SYNEPHRINE_STIMULANTS", substance: "SYNEPHRINE", role: "A" },
+  { id: "LINK_SYNEPHRINE_STIMULANTS_B", interactionId: "INT_SYNEPHRINE_STIMULANTS", substance: "STIMULANTS", role: "B" },
+  { id: "LINK_SYNEPHRINE_BETA_BLOCKERS_A", interactionId: "INT_SYNEPHRINE_BETA_BLOCKERS", substance: "SYNEPHRINE", role: "A" },
+  { id: "LINK_SYNEPHRINE_BETA_BLOCKERS_B", interactionId: "INT_SYNEPHRINE_BETA_BLOCKERS", substance: "BETA_BLOCKERS", role: "B" },
+  { id: "LINK_GREEN_TEA_CAFFEINE_A", interactionId: "INT_GREEN_TEA_CAFFEINE", substance: "GREEN_TEA_EXTRACT", role: "A" },
+  { id: "LINK_GREEN_TEA_CAFFEINE_B", interactionId: "INT_GREEN_TEA_CAFFEINE", substance: "CAFFEINE", role: "B" },
+  { id: "LINK_GREEN_TEA_IRON_A", interactionId: "INT_GREEN_TEA_IRON", substance: "GREEN_TEA_EXTRACT", role: "A" },
+  { id: "LINK_GREEN_TEA_IRON_B", interactionId: "INT_GREEN_TEA_IRON", substance: "IRON", role: "B" },
+  { id: "LINK_GREEN_TEA_WARFARIN_A", interactionId: "INT_GREEN_TEA_WARFARIN", substance: "GREEN_TEA_EXTRACT", role: "A" },
+  { id: "LINK_GREEN_TEA_WARFARIN_B", interactionId: "INT_GREEN_TEA_WARFARIN", substance: "WARFARIN", role: "B" },
+  { id: "LINK_GINGER_ANTICOAG_A", interactionId: "INT_GINGER_ANTICOAG", substance: "GINGER", role: "A" },
+  { id: "LINK_GINGER_ANTICOAG_B", interactionId: "INT_GINGER_ANTICOAG", substance: "ANTICOAGULANTS", role: "B" },
+  { id: "LINK_GINGER_NSAIDS_A", interactionId: "INT_GINGER_NSAIDS", substance: "GINGER", role: "A" },
+  { id: "LINK_GINGER_NSAIDS_B", interactionId: "INT_GINGER_NSAIDS", substance: "NSAIDS", role: "B" },
+  { id: "LINK_GINGER_HYPOTENSIVES_A", interactionId: "INT_GINGER_HYPOTENSIVES", substance: "GINGER", role: "A" },
+  { id: "LINK_GINGER_HYPOTENSIVES_B", interactionId: "INT_GINGER_HYPOTENSIVES", substance: "HYPOTENSIVES", role: "B" },
+  { id: "LINK_TURMERIC_PIPERINE_A", interactionId: "INT_TURMERIC_PIPERINE", substance: "CURCUMIN", role: "A" },
+  { id: "LINK_TURMERIC_PIPERINE_B", interactionId: "INT_TURMERIC_PIPERINE", substance: "PIPERINE", role: "B" },
+  { id: "LINK_TURMERIC_ANTICOAG_A", interactionId: "INT_TURMERIC_ANTICOAG", substance: "CURCUMIN", role: "A" },
+  { id: "LINK_TURMERIC_ANTICOAG_B", interactionId: "INT_TURMERIC_ANTICOAG", substance: "ANTICOAGULANTS", role: "B" },
+  { id: "LINK_TURMERIC_STEROIDS_A", interactionId: "INT_TURMERIC_STEROIDS", substance: "CURCUMIN", role: "A" },
+  { id: "LINK_TURMERIC_STEROIDS_B", interactionId: "INT_TURMERIC_STEROIDS", substance: "STEROIDS", role: "B" },
+  { id: "LINK_GARLIC_ANTICOAG_A", interactionId: "INT_GARLIC_ANTICOAG", substance: "GARLIC", role: "A" },
+  { id: "LINK_GARLIC_ANTICOAG_B", interactionId: "INT_GARLIC_ANTICOAG", substance: "ANTICOAGULANTS", role: "B" },
+  { id: "LINK_GARLIC_HIV_DRUGS_A", interactionId: "INT_GARLIC_HIV_DRUGS", substance: "GARLIC", role: "A" },
+  { id: "LINK_GARLIC_HIV_DRUGS_B", interactionId: "INT_GARLIC_HIV_DRUGS", substance: "HIV_DRUGS", role: "B" },
+  { id: "LINK_GARLIC_BP_DRUGS_A", interactionId: "INT_GARLIC_BP_DRUGS", substance: "GARLIC", role: "A" },
+  { id: "LINK_GARLIC_BP_DRUGS_B", interactionId: "INT_GARLIC_BP_DRUGS", substance: "BP_DRUGS", role: "B" },
+  { id: "LINK_VITC_IRON_A", interactionId: "INT_VITC_IRON", substance: "VITAMIN_C", role: "A" },
+  { id: "LINK_VITC_IRON_B", interactionId: "INT_VITC_IRON", substance: "IRON", role: "B" },
+  { id: "LINK_VITC_COPPER_A", interactionId: "INT_VITC_COPPER", substance: "VITAMIN_C", role: "A" },
+  { id: "LINK_VITC_COPPER_B", interactionId: "INT_VITC_COPPER", substance: "COPPER", role: "B" },
+  { id: "LINK_VITC_CHEMO_A", interactionId: "INT_VITC_CHEMO", substance: "VITAMIN_C", role: "A" },
+  { id: "LINK_VITC_CHEMO_B", interactionId: "INT_VITC_CHEMO", substance: "CHEMOTHERAPY", role: "B" },
+  { id: "LINK_ZINC_COPPER_A", interactionId: "INT_ZINC_COPPER", substance: "ZINC", role: "A" },
+  { id: "LINK_ZINC_COPPER_B", interactionId: "INT_ZINC_COPPER", substance: "COPPER", role: "B" },
+  { id: "LINK_ZINC_IRON_A", interactionId: "INT_ZINC_IRON", substance: "ZINC", role: "A" },
+  { id: "LINK_ZINC_IRON_B", interactionId: "INT_ZINC_IRON", substance: "IRON", role: "B" },
+  { id: "LINK_ZINC_MAGNESIUM_A", interactionId: "INT_ZINC_MAGNESIUM", substance: "ZINC", role: "A" },
+  { id: "LINK_ZINC_MAGNESIUM_B", interactionId: "INT_ZINC_MAGNESIUM", substance: "MAGNESIUM", role: "B" },
+  { id: "LINK_MAGNESIUM_VITD_A", interactionId: "INT_MAGNESIUM_VITD", substance: "MAGNESIUM", role: "A" },
+  { id: "LINK_MAGNESIUM_VITD_B", interactionId: "INT_MAGNESIUM_VITD", substance: "VITAMIN_D", role: "B" },
+  { id: "LINK_MAGNESIUM_CALCIUM_A", interactionId: "INT_MAGNESIUM_CALCIUM", substance: "MAGNESIUM", role: "A" },
+  { id: "LINK_MAGNESIUM_CALCIUM_B", interactionId: "INT_MAGNESIUM_CALCIUM", substance: "CALCIUM", role: "B" },
+  { id: "LINK_MAGNESIUM_STIMULANTS_A", interactionId: "INT_MAGNESIUM_STIMULANTS", substance: "MAGNESIUM", role: "A" },
+  { id: "LINK_MAGNESIUM_STIMULANTS_B", interactionId: "INT_MAGNESIUM_STIMULANTS", substance: "STIMULANTS", role: "B" },
+  { id: "LINK_POTASSIUM_DIURETICS_A", interactionId: "INT_POTASSIUM_DIURETICS", substance: "POTASSIUM", role: "A" },
+  { id: "LINK_POTASSIUM_DIURETICS_B", interactionId: "INT_POTASSIUM_DIURETICS", substance: "DIURETICS", role: "B" },
+  { id: "LINK_POTASSIUM_ACEI_A", interactionId: "INT_POTASSIUM_ACEI", substance: "POTASSIUM", role: "A" },
+  { id: "LINK_POTASSIUM_ACEI_B", interactionId: "INT_POTASSIUM_ACEI", substance: "ACE_INHIBITORS", role: "B" },
+  { id: "LINK_POTASSIUM_DIGOXIN_A", interactionId: "INT_POTASSIUM_DIGOXIN", substance: "POTASSIUM", role: "A" },
+  { id: "LINK_POTASSIUM_DIGOXIN_B", interactionId: "INT_POTASSIUM_DIGOXIN", substance: "DIGOXIN", role: "B" },
+  { id: "LINK_CALCIUM_VITK2_A", interactionId: "INT_CALCIUM_VITK2", substance: "CALCIUM", role: "A" },
+  { id: "LINK_CALCIUM_VITK2_B", interactionId: "INT_CALCIUM_VITK2", substance: "VITAMIN_K2", role: "B" },
+  { id: "LINK_CALCIUM_PPI_A", interactionId: "INT_CALCIUM_PPI", substance: "CALCIUM", role: "A" },
+  { id: "LINK_CALCIUM_PPI_B", interactionId: "INT_CALCIUM_PPI", substance: "PPI", role: "B" },
+  { id: "LINK_CALCIUM_IRON_A", interactionId: "INT_CALCIUM_IRON", substance: "CALCIUM", role: "A" },
+  { id: "LINK_CALCIUM_IRON_B", interactionId: "INT_CALCIUM_IRON", substance: "IRON", role: "B" },
+  { id: "LINK_SELENIUM_VITC_A", interactionId: "INT_SELENIUM_VITC", substance: "SELENIUM", role: "A" },
+  { id: "LINK_SELENIUM_VITC_B", interactionId: "INT_SELENIUM_VITC", substance: "VITAMIN_C", role: "B" },
+  { id: "LINK_SELENIUM_THYROID_A", interactionId: "INT_SELENIUM_THYROID", substance: "SELENIUM", role: "A" },
+  { id: "LINK_SELENIUM_THYROID_B", interactionId: "INT_SELENIUM_THYROID", substance: "THYROID_DRUGS", role: "B" },
+  { id: "LINK_SELENIUM_ZINC_A", interactionId: "INT_SELENIUM_ZINC", substance: "SELENIUM", role: "A" },
+  { id: "LINK_SELENIUM_ZINC_B", interactionId: "INT_SELENIUM_ZINC", substance: "ZINC", role: "B" },
+  { id: "LINK_IODINE_THYROID_A", interactionId: "INT_IODINE_THYROID", substance: "IODINE", role: "A" },
+  { id: "LINK_IODINE_THYROID_B", interactionId: "INT_IODINE_THYROID", substance: "THYROID_DRUGS", role: "B" },
+  { id: "LINK_IODINE_LITHIUM_A", interactionId: "INT_IODINE_LITHIUM", substance: "IODINE", role: "A" },
+  { id: "LINK_IODINE_LITHIUM_B", interactionId: "INT_IODINE_LITHIUM", substance: "LITHIUM", role: "B" },
+  { id: "LINK_IODINE_ANTITHYROID_A", interactionId: "INT_IODINE_ANTITHYROID", substance: "IODINE", role: "A" },
+  { id: "LINK_IODINE_ANTITHYROID_B", interactionId: "INT_IODINE_ANTITHYROID", substance: "ANTITHYROID_DRUGS", role: "B" },
+  { id: "LINK_ADAPTOGENS_STIMULANTS_A", interactionId: "INT_ADAPTOGENS_STIMULANTS", substance: "ADAPTOGENS", role: "A" },
+  { id: "LINK_ADAPTOGENS_STIMULANTS_B", interactionId: "INT_ADAPTOGENS_STIMULANTS", substance: "STIMULANTS", role: "B" },
+  { id: "LINK_ADAPTOGENS_BENZOS_A", interactionId: "INT_ADAPTOGENS_BENZOS", substance: "ADAPTOGENS", role: "A" },
+  { id: "LINK_ADAPTOGENS_BENZOS_B", interactionId: "INT_ADAPTOGENS_BENZOS", substance: "BENZODIAZEPINES", role: "B" },
+  { id: "LINK_ADAPTOGENS_SSRI_A", interactionId: "INT_ADAPTOGENS_SSRI", substance: "ADAPTOGENS", role: "A" },
+  { id: "LINK_ADAPTOGENS_SSRI_B", interactionId: "INT_ADAPTOGENS_SSRI", substance: "SSRIs", role: "B" }
+];
+// ── FROM: categories.ts ──
+export interface Category {
+  id: string;
+  type: string;
+  name: string;
+  description: string;
+}
+
+export const CATEGORIES_DB: Category[] = [
+  { id: "CAT_SUB_VITAMINS", type: "SUBSTANCE", name: "Витамины", description: "Микронутриенты для метаболизма и иммунитета." },
+  { id: "CAT_SUB_MINERALS", type: "SUBSTANCE", name: "Минералы", description: "Электролиты и кофакторы ферментов." },
+  { id: "CAT_SUB_AMINO", type: "SUBSTANCE", name: "Аминокислоты", description: "Строительный материал и нейромедиаторы." },
+  { id: "CAT_SUB_ADAPTOGENS", type: "SUBSTANCE", name: "Адаптогены", description: "Регуляция стресса и кортизола." },
+  { id: "CAT_SUB_STIMULANTS", type: "SUBSTANCE", name: "Стимуляторы", description: "Повышение энергии и концентрации." },
+  { id: "CAT_SUB_NOOTROPICS", type: "SUBSTANCE", name: "Ноотропы", description: "Когнитивная поддержка." },
+  { id: "CAT_SUB_FATTYACIDS", type: "SUBSTANCE", name: "Жирные кислоты", description: "Противовоспалительные и структурные функции." },
+  { id: "CAT_SUB_HERBS", type: "SUBSTANCE", name: "Травы", description: "Фитотерапия и модуляция систем." },
+  { id: "CAT_SUB_PROBIOTICS", type: "SUBSTANCE", name: "Пробиотики", description: "Микробиота и ЖКТ." },
+  { id: "CAT_SUB_ENZYMES", type: "SUBSTANCE", name: "Ферменты", description: "Улучшение пищеварения." },
+  { id: "CAT_SUB_HORMONAL", type: "SUBSTANCE", name: "Гормональные вещества", description: "Регуляция эндокринной системы." },
+  { id: "CAT_SUB_DETOX", type: "SUBSTANCE", name: "Детокс‑вещества", description: "Поддержка печени и антиоксидантов." },
+  { id: "CAT_RISK_LIVER", type: "RISK", name: "Печень", description: "Риски, связанные с функцией печени." },
+  { id: "CAT_RISK_KIDNEYS", type: "RISK", name: "Почки", description: "Риски почечной функции." },
+  { id: "CAT_RISK_HEART", type: "RISK", name: "Сердце", description: "Кардио‑риски." },
+  { id: "CAT_RISK_LUNGS", type: "RISK", name: "Лёгкие", description: "Риски дыхательной системы." },
+  { id: "CAT_RISK_GUT", type: "RISK", name: "ЖКТ", description: "Риски пищеварения." },
+  { id: "CAT_RISK_HORMONES", type: "RISK", name: "Гормоны", description: "Эндокринные риски." },
+  { id: "CAT_RISK_BRAIN", type: "RISK", name: "Мозг", description: "Когнитивные и нервные риски." },
+  { id: "CAT_RISK_BLOOD", type: "RISK", name: "Кровь", description: "Гематологические риски." },
+  { id: "CAT_RISK_JOINTS", type: "RISK", name: "Суставы", description: "Опорно‑двигательные риски." },
+  { id: "CAT_RISK_SKIN", type: "RISK", name: "Кожа", description: "Дерматологические риски." },
+  { id: "CAT_RISK_VISION", type: "RISK", name: "Зрение", description: "Офтальмологические риски." },
+  { id: "CAT_RISK_IMMUNE", type: "RISK", name: "Иммунитет", description: "Иммунные риски." },
+  { id: "CAT_MECH_INFLAMMATION", type: "MECHANISM", name: "Воспаление", description: "Уровень системного воспаления." },
+  { id: "CAT_MECH_CORTISOL", type: "MECHANISM", name: "Кортизол", description: "Стресс‑ось." },
+  { id: "CAT_MECH_THYROID", type: "MECHANISM", name: "Щитовидка", description: "Гормоны T3/T4." },
+  { id: "CAT_MECH_GABA", type: "MECHANISM", name: "GABA", description: "Тормозная система мозга." },
+  { id: "CAT_MECH_DOPAMINE", type: "MECHANISM", name: "Дофамин", description: "Мотивация и энергия." },
+  { id: "CAT_MECH_SEROTONIN", type: "MECHANISM", name: "Серотонин", description: "Настроение и сон." },
+  { id: "CAT_MECH_LIPIDS", type: "MECHANISM", name: "Липиды", description: "Жировой обмен." },
+  { id: "CAT_MECH_GLUCOSE", type: "MECHANISM", name: "Глюкоза", description: "Углеводный обмен." },
+  { id: "CAT_MECH_OXIDATIVE", type: "MECHANISM", name: "Окисление", description: "Антиоксидантный статус." },
+  { id: "CAT_MECH_DETOX", type: "MECHANISM", name: "Детокс", description: "Функция печени." },
+  { id: "CAT_ORGAN_LIVER", type: "ORGAN", name: "Печень", description: "Метаболизм и детокс." },
+  { id: "CAT_ORGAN_KIDNEYS", type: "ORGAN", name: "Почки", description: "Фильтрация и электролиты." },
+  { id: "CAT_ORGAN_HEART", type: "ORGAN", name: "Сердце", description: "Кровообращение." },
+  { id: "CAT_ORGAN_LUNGS", type: "ORGAN", name: "Лёгкие", description: "Дыхание." },
+  { id: "CAT_ORGAN_GUT", type: "ORGAN", name: "ЖКТ", description: "Пищеварение и микробиота." },
+  { id: "CAT_ORGAN_BRAIN", type: "ORGAN", name: "Мозг", description: "ЦНС и когнитивные функции." },
+  { id: "CAT_ORGAN_HORMONES", type: "ORGAN", name: "Гормоны", description: "Эндокринная система." },
+  { id: "CAT_ORGAN_IMMUNE", type: "ORGAN", name: "Иммунитет", description: "Защитные функции." },
+  { id: "CAT_ORGAN_BLOOD", type: "ORGAN", name: "Кровь", description: "Гемостаз и перенос кислорода." },
+  { id: "CAT_ORGAN_JOINTS", type: "ORGAN", name: "Суставы", description: "Опорно‑двигательная система." },
+  { id: "CAT_ORGAN_SKIN", type: "ORGAN", name: "Кожа", description: "Барьер и воспаление." },
+  { id: "CAT_ORGAN_EYES", type: "ORGAN", name: "Глаза", description: "Зрение." },
+  { id: "CAT_AXIS_LIVER_THYROID", type: "AXIS", name: "Печень–Щитовидка", description: "Конверсия T4→T3." },
+  { id: "CAT_AXIS_GUT_BRAIN", type: "AXIS", name: "Кишечник–Мозг", description: "Серотонин и воспаление." },
+  { id: "CAT_AXIS_ADRENAL_GONAD", type: "AXIS", name: "Надпочечники–Гонады", description: "Кортизол и половые гормоны." },
+  { id: "CAT_AXIS_HEART_KIDNEY", type: "AXIS", name: "Сердце–Почки", description: "Давление и фильтрация." },
+  { id: "CAT_AXIS_LIVER_GUT", type: "AXIS", name: "Печень–ЖКТ", description: "Желчь и микробиота." },
+  { id: "CAT_AXIS_GUT_IMMUNE", type: "AXIS", name: "ЖКТ–Иммунитет", description: "Барьер и воспаление." },
+  { id: "CAT_AXIS_BRAIN_ADRENAL", type: "AXIS", name: "Мозг–Надпочечники", description: "Стресс‑ось." },
+  { id: "CAT_AXIS_LIVER_SKIN", type: "AXIS", name: "Печень–Кожа", description: "Детокс и воспаление." },
+  { id: "CAT_AXIS_EYES_BRAIN", type: "AXIS", name: "Глаза–Мозг", description: "Нагрузка и когнитивная связь." },
+  { id: "CAT_SYSTEM_LIVER", type: "SYSTEM", name: "Печень", description: "Состояние печени." },
+  { id: "CAT_SYSTEM_KIDNEYS", type: "SYSTEM", name: "Почки", description: "Состояние почек." },
+  { id: "CAT_SYSTEM_HEART", type: "SYSTEM", name: "Сердце", description: "Состояние сердца." },
+  { id: "CAT_SYSTEM_GUT", type: "SYSTEM", name: "ЖКТ", description: "Состояние пищеварения." },
+  { id: "CAT_SYSTEM_BRAIN", type: "SYSTEM", name: "Мозг", description: "Состояние ЦНС." },
+  { id: "CAT_SYSTEM_HORMONES", type: "SYSTEM", name: "Гормоны", description: "Состояние эндокринной системы." },
+  { id: "CAT_SYSTEM_IMMUNE", type: "SYSTEM", name: "Иммунитет", description: "Состояние иммунной системы." },
+  { id: "CAT_GLOBAL_SLEEP", type: "GLOBAL", name: "Сон", description: "Гигиена сна." },
+  { id: "CAT_GLOBAL_STRESS", type: "GLOBAL", name: "Стресс", description: "Уровень стресса." },
+  { id: "CAT_GLOBAL_DIET", type: "GLOBAL", name: "Питание", description: "Качество рациона." },
+  { id: "CAT_GLOBAL_ACTIVITY", type: "GLOBAL", name: "Активность", description: "Физическая нагрузка." },
+  { id: "CAT_GLOBAL_WATER", type: "GLOBAL", name: "Вода", description: "Гидратация." },
+  { id: "CAT_GLOBAL_CAFFEINE", type: "GLOBAL", name: "Кофеин", description: "Стимуляторы." },
+  { id: "CAT_GLOBAL_ALCOHOL", type: "GLOBAL", name: "Алкоголь", description: "Нагрузка алкоголем." },
+  { id: "CAT_GLOBAL_SUGAR", type: "GLOBAL", name: "Сахар", description: "Углеводная нагрузка." },
+  { id: "CAT_GLOBAL_SCREENS", type: "GLOBAL", name: "Экраны", description: "Цифровая нагрузка." },
+  { id: "CAT_GLOBAL_RECOVERY", type: "GLOBAL", name: "Восстановление", description: "Регенерация." },
+  { id: "CAT_GLOBAL_CIRCADIAN", type: "GLOBAL", name: "Циркадные ритмы", description: "Режим дня." }
+];
+// ── FROM: effects.ts ──
+export type EffectType = 'DIRECT' | 'SYSTEMIC';
+
+export interface Effect {
+  id: string;
+  type: EffectType;
+  description: string;
+  riskId: string;
+}
+
+export const EFFECTS_DB: Effect[] = [
+  { id: "GABA_UP", type: "DIRECT", description: "Повышает активность GABA-рецепторов", riskId: "GABA_UP" },
+  { id: "GABA_DOWN", type: "DIRECT", description: "Снижает активность GABA-рецепторов", riskId: "GABA_DOWN" },
+  { id: "SEROTONIN_UP", type: "DIRECT", description: "Повышает уровень серотонина", riskId: "SEROTONIN_UP" },
+  { id: "SEROTONIN_DOWN", type: "DIRECT", description: "Снижает уровень серотонина", riskId: "SEROTONIN_DOWN" },
+  { id: "DOPAMINE_UP", type: "DIRECT", description: "Повышает уровень дофамина", riskId: "DOPAMINE_UP" },
+  { id: "DOPAMINE_DOWN", type: "DIRECT", description: "Снижает уровень дофамина", riskId: "DOPAMINE_DOWN" },
+  { id: "NE_UP", type: "DIRECT", description: "Повышает норадреналин", riskId: "NE_UP" },
+  { id: "NE_DOWN", type: "DIRECT", description: "Снижает норадреналин", riskId: "NE_DOWN" },
+  { id: "CORTISOL_UP", type: "SYSTEMIC", description: "Повышает кортизол", riskId: "CORTISOL_UP" },
+  { id: "CORTISOL_DOWN", type: "SYSTEMIC", description: "Снижает кортизол", riskId: "CORTISOL_DOWN" },
+  { id: "ADRENALINE_UP", type: "DIRECT", description: "Повышает адреналин", riskId: "ADRENALINE_UP" },
+  { id: "ADRENALINE_DOWN", type: "DIRECT", description: "Снижает адреналин", riskId: "ADRENALINE_DOWN" },
+  { id: "T3_T4_UP", type: "DIRECT", description: "Повышает активность щитовидных гормонов", riskId: "T3_T4_UP" },
+  { id: "T3_T4_DOWN", type: "DIRECT", description: "Снижает активность щитовидных гормонов", riskId: "T3_T4_DOWN" },
+  { id: "IODINE_UP", type: "DIRECT", description: "Повышает доступность йода", riskId: "T3_T4_UP" },
+  { id: "INSULIN_SENS_UP", type: "SYSTEMIC", description: "Повышает чувствительность к инсулину", riskId: "GLUCOSE_UP" },
+  { id: "INSULIN_SENS_DOWN", type: "SYSTEMIC", description: "Снижает чувствительность к инсулину", riskId: "GLUCOSE_DOWN" },
+  { id: "GLUCOSE_UP", type: "DIRECT", description: "Повышает глюкозу", riskId: "GLUCOSE_UP" },
+  { id: "GLUCOSE_DOWN", type: "DIRECT", description: "Снижает глюкозу", riskId: "GLUCOSE_DOWN" },
+  { id: "LIPIDS_UP", type: "SYSTEMIC", description: "Повышает липиды", riskId: "LIPIDS_UP" },
+  { id: "LIPIDS_DOWN", type: "SYSTEMIC", description: "Снижает липиды", riskId: "LIPIDS_DOWN" },
+  { id: "LDL_UP", type: "DIRECT", description: "Повышает ЛПНП", riskId: "LIPIDS_UP" },
+  { id: "LDL_DOWN", type: "DIRECT", description: "Снижает ЛПНП", riskId: "LIPIDS_DOWN" },
+  { id: "HDL_UP", type: "DIRECT", description: "Повышает ЛПВП", riskId: "LIPIDS_DOWN" },
+  { id: "HDL_DOWN", type: "DIRECT", description: "Снижает ЛПВП", riskId: "LIPIDS_UP" },
+  { id: "TG_UP", type: "DIRECT", description: "Повышает триглицериды", riskId: "LIPIDS_UP" },
+  { id: "TG_DOWN", type: "DIRECT", description: "Снижает триглицериды", riskId: "LIPIDS_DOWN" },
+  { id: "INFLAMMATION_UP", type: "SYSTEMIC", description: "Повышает воспаление", riskId: "INFLAMMATION_UP" },
+  { id: "INFLAMMATION_DOWN", type: "SYSTEMIC", description: "Снижает воспаление", riskId: "INFLAMMATION_DOWN" },
+  { id: "NFkB_DOWN", type: "DIRECT", description: "Снижает NF-kB", riskId: "INFLAMMATION_DOWN" },
+  { id: "COX_DOWN", type: "DIRECT", description: "Снижает COX", riskId: "INFLAMMATION_DOWN" },
+  { id: "OXIDATIVE_STRESS_UP", type: "SYSTEMIC", description: "Повышает оксидативный стресс", riskId: "OXIDATIVE_UP" },
+  { id: "OXIDATIVE_STRESS_DOWN", type: "SYSTEMIC", description: "Снижает оксидативный стресс", riskId: "OXIDATIVE_DOWN" },
+  { id: "ANTIOX_UP", type: "DIRECT", description: "Повышает антиоксидантную защиту", riskId: "OXIDATIVE_DOWN" },
+  { id: "BILE_FLOW_UP", type: "DIRECT", description: "Улучшает отток желчи", riskId: "BILE_FLOW_UP" },
+  { id: "BILE_FLOW_DOWN", type: "DIRECT", description: "Снижает отток желчи", riskId: "BILE_FLOW_DOWN" },
+  { id: "DETOX_UP", type: "SYSTEMIC", description: "Ускоряет детокс печени", riskId: "DETOX_UP" },
+  { id: "DETOX_DOWN", type: "SYSTEMIC", description: "Замедляет детокс печени", riskId: "DETOX_DOWN" },
+  { id: "MICROBIOME_UP", type: "SYSTEMIC", description: "Улучшает микробиоту", riskId: "MICROBIOME_UP" },
+  { id: "MICROBIOME_DOWN", type: "SYSTEMIC", description: "Ухудшает микробиоту", riskId: "MICROBIOME_DOWN" },
+  { id: "LPS_UP", type: "SYSTEMIC", description: "Повышает эндотоксины", riskId: "LPS_UP" },
+  { id: "LPS_DOWN", type: "SYSTEMIC", description: "Снижает эндотоксины", riskId: "LPS_DOWN" },
+  { id: "NO_UP", type: "DIRECT", description: "Повышает оксид азота", riskId: "NO_UP" },
+  { id: "NO_DOWN", type: "DIRECT", description: "Снижает оксид азота", riskId: "NO_DOWN" },
+  { id: "HR_UP", type: "DIRECT", description: "Повышает ЧСС", riskId: "CARDIO_UP" },
+  { id: "HR_DOWN", type: "DIRECT", description: "Снижает ЧСС", riskId: "CARDIO_DOWN" },
+  { id: "BP_UP", type: "DIRECT", description: "Повышает давление", riskId: "CARDIO_UP" },
+  { id: "BP_DOWN", type: "DIRECT", description: "Снижает давление", riskId: "CARDIO_DOWN" },
+  { id: "PLATELETS_UP", type: "DIRECT", description: "Повышает тромбоциты", riskId: "COAG_UP" },
+  { id: "PLATELETS_DOWN", type: "DIRECT", description: "Снижает тромбоциты", riskId: "COAG_DOWN" },
+  { id: "COAG_UP", type: "SYSTEMIC", description: "Повышает свёртываемость", riskId: "COAG_UP" },
+  { id: "COAG_DOWN", type: "SYSTEMIC", description: "Снижает свёртываемость", riskId: "COAG_DOWN" },
+  { id: "MOTILITY_UP", type: "DIRECT", description: "Ускоряет моторику ЖКТ", riskId: "GUT_UP" },
+  { id: "MOTILITY_DOWN", type: "DIRECT", description: "Замедляет моторику ЖКТ", riskId: "GUT_DOWN" },
+  { id: "ACID_UP", type: "DIRECT", description: "Повышает кислотность желудка", riskId: "GUT_UP" },
+  { id: "ACID_DOWN", type: "DIRECT", description: "Снижает кислотность желудка", riskId: "GUT_DOWN" },
+  { id: "IMMUNE_UP", type: "SYSTEMIC", description: "Повышает иммунитет", riskId: "IMMUNE_UP" },
+  { id: "IMMUNE_DOWN", type: "SYSTEMIC", description: "Снижает иммунитет", riskId: "IMMUNE_DOWN" },
+  { id: "AUTOIMMUNE_UP", type: "SYSTEMIC", description: "Повышает аутоиммунную активность", riskId: "IMMUNE_UP" },
+  { id: "MITO_UP", type: "DIRECT", description: "Улучшает митохондрии", riskId: "ENERGY_UP" },
+  { id: "MITO_DOWN", type: "DIRECT", description: "Снижает митохондриальную функцию", riskId: "ENERGY_DOWN" },
+  { id: "ATP_UP", type: "DIRECT", description: "Повышает энергию", riskId: "ENERGY_UP" },
+  { id: "ATP_DOWN", type: "DIRECT", description: "Снижает энергию", riskId: "ENERGY_DOWN" }
+];
+// ── FROM: mechanisms.ts ──
+export interface Mechanism {
+  id: string;
+  name: string;
+  systemsUp: string[];
+  systemsDown: string[];
+  effectsPositive: string[];
+  effectsNegative: string[];
+}
+
+export const MECHANISMS_DB: Mechanism[] = [
+  { id: "GABA_UP", name: "Повышение GABA", systemsUp: ["BRAIN"], systemsDown: [], effectsPositive: ["BRAIN_ANXIETY_DOWN"], effectsNegative: ["BRAIN_ANXIETY"] },
+  { id: "GABA_DOWN", name: "Снижение GABA", systemsUp: [], systemsDown: ["BRAIN"], effectsPositive: [], effectsNegative: ["BRAIN_SLEEP_ISSUES"] },
+  { id: "SEROTONIN_UP", name: "Повышение серотонина", systemsUp: ["BRAIN", "GUT"], systemsDown: [], effectsPositive: ["BRAIN_DEPRESSION_DOWN"], effectsNegative: ["BRAIN_DEPRESSION"] },
+  { id: "SEROTONIN_DOWN", name: "Снижение серотонина", systemsUp: [], systemsDown: ["BRAIN"], effectsPositive: [], effectsNegative: ["BRAIN_SLEEP_ISSUES"] },
+  { id: "DOPAMINE_UP", name: "Повышение дофамина", systemsUp: ["BRAIN"], systemsDown: [], effectsPositive: ["BRAIN_FOG_DOWN"], effectsNegative: ["BRAIN_FOG"] },
+  { id: "DOPAMINE_DOWN", name: "Снижение дофамина", systemsUp: [], systemsDown: ["BRAIN"], effectsPositive: [], effectsNegative: ["BRAIN_MOTIVATION_LOW"] },
+  { id: "CORTISOL_UP", name: "Повышение кортизола", systemsUp: ["ADRENALS"], systemsDown: ["BRAIN", "GUT"], effectsPositive: [], effectsNegative: ["HORMONE_LOW_T"] },
+  { id: "CORTISOL_DOWN", name: "Снижение кортизола", systemsUp: ["BRAIN", "ADRENALS"], systemsDown: [], effectsPositive: [], effectsNegative: [] },
+  { id: "T3_T4_UP", name: "Повышение щитовидных гормонов", systemsUp: ["THYROID", "LIVER"], systemsDown: [], effectsPositive: [], effectsNegative: ["HORMONE_HYPER"] },
+  { id: "T3_T4_DOWN", name: "Снижение щитовидных гормонов", systemsUp: [], systemsDown: ["THYROID"], effectsPositive: [], effectsNegative: [] },
+  { id: "GLUCOSE_UP", name: "Повышение глюкозы", systemsUp: [], systemsDown: ["PANCREAS"], effectsPositive: [], effectsNegative: ["INSULIN_RESISTANCE"] },
+  { id: "GLUCOSE_DOWN", name: "Снижение глюкозы", systemsUp: ["PANCREAS"], systemsDown: [], effectsPositive: [], effectsNegative: [] },
+  { id: "LIPIDS_UP", name: "Повышение липидов", systemsUp: [], systemsDown: ["HEART"], effectsPositive: [], effectsNegative: ["HEART_ATHEROSCLEROSIS"] },
+  { id: "LIPIDS_DOWN", name: "Снижение липидов", systemsUp: ["HEART"], systemsDown: [], effectsPositive: [], effectsNegative: [] },
+  { id: "INFLAMMATION_UP", name: "Повышение воспаления", systemsUp: [], systemsDown: ["ALL"], effectsPositive: [], effectsNegative: ["ALL_DISEASE"] },
+  { id: "INFLAMMATION_DOWN", name: "Снижение воспаления", systemsUp: ["ALL"], systemsDown: [], effectsPositive: [], effectsNegative: [] },
+  { id: "OXIDATIVE_UP", name: "Повышение оксидативного стресса", systemsUp: [], systemsDown: ["ALL"], effectsPositive: [], effectsNegative: ["AGING"] },
+  { id: "OXIDATIVE_DOWN", name: "Снижение оксидативного стресса", systemsUp: ["ALL"], systemsDown: [], effectsPositive: [], effectsNegative: [] },
+  { id: "DETOX_UP", name: "Ускорение детокса", systemsUp: ["LIVER"], systemsDown: [], effectsPositive: [], effectsNegative: ["LIVER_TOXICITY"] },
+  { id: "DETOX_DOWN", name: "Замедление детокса", systemsUp: [], systemsDown: ["LIVER"], effectsPositive: [], effectsNegative: [] },
+  { id: "BILE_FLOW_UP", name: "Улучшение желчи", systemsUp: ["LIVER", "GI"], systemsDown: [], effectsPositive: [], effectsNegative: ["LIVER_CHOLESTASIS"] },
+  { id: "BILE_FLOW_DOWN", name: "Снижение желчи", systemsUp: [], systemsDown: ["GI"], effectsPositive: [], effectsNegative: ["GI_DYSBIOSIS"] },
+  { id: "MICROBIOME_UP", name: "Улучшение микробиоты", systemsUp: ["GI"], systemsDown: [], effectsPositive: [], effectsNegative: ["IMMUNE_AUTOIMMUNE"] },
+  { id: "MICROBIOME_DOWN", name: "Ухудшение микробиоты", systemsUp: [], systemsDown: ["GI"], effectsPositive: [], effectsNegative: ["IMMUNE_AUTOIMMUNE"] },
+  { id: "NO_UP", name: "Повышение NO", systemsUp: ["HEART"], systemsDown: [], effectsPositive: [], effectsNegative: ["ERECTION_UP"] },
+  { id: "NO_DOWN", name: "Снижение NO", systemsUp: [], systemsDown: ["HEART"], effectsPositive: [], effectsNegative: ["ERECTION_DOWN"] },
+  { id: "CARDIO_UP", name: "Повышение нагрузки на сердце", systemsUp: [], systemsDown: ["HEART"], effectsPositive: [], effectsNegative: ["HEART_FAILURE"] },
+  { id: "CARDIO_DOWN", name: "Снижение нагрузки на сердце", systemsUp: ["HEART"], systemsDown: [], effectsPositive: [], effectsNegative: [] },
+  { id: "COAG_UP", name: "Повышение свёртываемости", systemsUp: [], systemsDown: ["BLOOD"], effectsPositive: [], effectsNegative: ["BLOOD_THICK"] },
+  { id: "COAG_DOWN", name: "Снижение свёртываемости", systemsUp: ["BLOOD"], systemsDown: [], effectsPositive: [], effectsNegative: [] },
+  { id: "GUT_UP", name: "Улучшение ЖКТ", systemsUp: ["GI"], systemsDown: [], effectsPositive: [], effectsNegative: ["GI_REFLUX"] },
+  { id: "GUT_DOWN", name: "Снижение функции ЖКТ", systemsUp: [], systemsDown: ["GI"], effectsPositive: [], effectsNegative: ["GI_DYSBIOSIS"] },
+  { id: "IMMUNE_UP", name: "Повышение иммунитета", systemsUp: ["IMMUNE_SYSTEM"], systemsDown: [], effectsPositive: [], effectsNegative: ["AUTOIMMUNE_UP"] },
+  { id: "IMMUNE_DOWN", name: "Снижение иммунитета", systemsUp: [], systemsDown: ["IMMUNE_SYSTEM"], effectsPositive: [], effectsNegative: ["INFECTION_RISK"] },
+  { id: "ENERGY_UP", name: "Повышение энергии", systemsUp: ["ALL"], systemsDown: [], effectsPositive: [], effectsNegative: ["FATIGUE"] },
+  { id: "ENERGY_DOWN", name: "Снижение энергии", systemsUp: [], systemsDown: ["ALL"], effectsPositive: [], effectsNegative: ["LOW_ENERGY"] }
+];
+// ── FROM: axes.ts ──
+export interface Axis {
+  id: string;
+  name: string;
+  organs: string[];
+  description: string;
+  mechanismUp: string[];
+  mechanismDown: string[];
+  riskUp: string[];
+  riskDown: string[];
+}
+
+export const AXES_DB: Axis[] = [
+  { id: "AXIS_LIVER_THYROID", name: "Liver → Thyroid Axis", organs: ["LIVER", "THYROID"], description: "Печень активирует T4→T3", mechanismUp: ["DETOX_UP", "T3_T4_UP"], mechanismDown: ["TOXIC_LOAD", "INFLAMMATION"], riskUp: ["LIVER_FATTY", "LIVER_NASH", "LIVER_CHOLESTASIS"], riskDown: ["HORMONE_HYPO"] },
+  { id: "AXIS_THYROID_LIVER", name: "Thyroid → Liver Axis", organs: ["THYROID", "LIVER"], description: "Тиреоидные гормоны регулируют липиды и желчь", mechanismUp: ["T3_T4_UP"], mechanismDown: ["LIPID_DISORDER", "BILE_STASIS"], riskUp: ["HORMONE_HYPO", "HORMONE_HYPER"], riskDown: ["LIVER_FATTY"] },
+  { id: "AXIS_GUT_BRAIN", name: "Gut → Brain Axis", organs: ["GI", "BRAIN"], description: "Микробиота управляет серотонином и воспалением", mechanismUp: ["SCFA_UP", "SEROTONIN_UP"], mechanismDown: ["DYSBIOSIS", "INFLAMMATION"], riskUp: ["GI_DYSBIOSIS", "GI_IBS"], riskDown: ["BRAIN_ANXIETY", "BRAIN_DEPRESSION"] },
+  { id: "AXIS_BRAIN_GUT", name: "Brain → Gut Axis", organs: ["BRAIN", "GI"], description: "Стресс влияет на моторику и кислотность", mechanismUp: ["CORTISOL_UP", "NE_UP"], mechanismDown: ["MOTILITY_DOWN", "ACID_DOWN"], riskUp: ["BRAIN_ANXIETY", "BRAIN_BURNOUT"], riskDown: ["GI_IBS", "GI_REFLUX"] },
+  { id: "AXIS_ADRENAL_GONAD", name: "Adrenals → Gonads Axis", organs: ["ADRENALS", "TESTES", "OVARIES"], description: "Кортизол подавляет половые гормоны", mechanismUp: ["CORTISOL_UP"], mechanismDown: ["TESTOSTERONE_DOWN", "ESTROGEN_DOWN"], riskUp: ["HORMONE_HIGH_CORTISOL"], riskDown: ["HORMONE_LOW_T", "HORMONE_LOW_E2"] },
+  { id: "AXIS_GONAD_ADRENAL", name: "Gonads → Adrenals Axis", organs: ["TESTES", "OVARIES", "ADRENALS"], description: "Половые гормоны регулируют стресс‑ответ", mechanismUp: ["TESTOSTERONE_UP", "ESTROGEN_UP"], mechanismDown: ["CORTISOL_UP"], riskUp: ["HORMONE_LOW_T", "HORMONE_LOW_E2"], riskDown: ["HORMONE_HIGH_CORTISOL"] },
+  { id: "AXIS_LIVER_GUT", name: "Liver → Gut Axis", organs: ["LIVER", "GI"], description: "Желчь регулирует микробиоту и переваривание", mechanismUp: ["BILE_FLOW_UP"], mechanismDown: ["STASIS", "DYSBIOSIS"], riskUp: ["LIVER_CHOLESTASIS", "LIVER_BILE_SLUDGE"], riskDown: ["GI_DYSBIOSIS"] },
+  { id: "AXIS_GUT_LIVER", name: "Gut → Liver Axis", organs: ["GI", "LIVER"], description: "Эндотоксины → воспаление печени", mechanismUp: ["LPS_DOWN", "SCFA_UP"], mechanismDown: ["INFLAMMATION_UP"], riskUp: ["GI_DYSBIOSIS"], riskDown: ["LIVER_NASH", "LIVER_FATTY"] },
+  { id: "AXIS_HEART_KIDNEY", name: "Heart → Kidney Axis", organs: ["HEART", "KIDNEYS"], description: "Сердечный выброс регулирует фильтрацию", mechanismUp: ["GFR_UP"], mechanismDown: ["GFR_DOWN", "EDEMA"], riskUp: ["HEART_FAILURE"], riskDown: ["KIDNEY_CKD"] },
+  { id: "AXIS_KIDNEY_HEART", name: "Kidney → Heart Axis", organs: ["KIDNEYS", "HEART"], description: "Электролиты управляют ритмом сердца", mechanismUp: ["ELECTROLYTES_UP"], mechanismDown: ["ELECTROLYTES_DOWN"], riskUp: ["KIDNEY_CKD", "KIDNEY_ELECTROLYTE_IMBALANCE"], riskDown: ["HEART_ARRHYTHMIA"] },
+  { id: "AXIS_LIVER_HORMONES", name: "Liver → Hormones Axis", organs: ["LIVER", "HORMONES"], description: "Печень очищает эстрогены и гормоны", mechanismUp: ["DETOX_UP"], mechanismDown: ["CLEARANCE_DOWN"], riskUp: ["LIVER_FATTY", "LIVER_CHOLESTASIS"], riskDown: ["HORMONE_HIGH_E2"] },
+  { id: "AXIS_HORMONES_LIVER", name: "Hormones → Liver Axis", organs: ["HORMONES", "LIVER"], description: "Эстрогены влияют на желчь и липиды", mechanismUp: ["ESTROGEN_UP"], mechanismDown: ["BILE_STASIS"], riskUp: ["HORMONE_HIGH_E2"], riskDown: ["LIVER_CHOLESTASIS"] },
+  { id: "AXIS_IMMUNE_GUT", name: "Immune → Gut Axis", organs: ["IMMUNE_SYSTEM", "GI"], description: "Иммунитет управляет барьером кишечника", mechanismUp: ["IMMUNE_UP"], mechanismDown: ["INFLAMMATION_UP"], riskUp: ["IMMUNE_AUTOIMMUNE"], riskDown: ["GI_IBD"] },
+  { id: "AXIS_GUT_IMMUNE", name: "Gut → Immune Axis", organs: ["GI", "IMMUNE_SYSTEM"], description: "Микробиота регулирует иммунитет", mechanismUp: ["SCFA_UP"], mechanismDown: ["DYSBIOSIS"], riskUp: ["GI_DYSBIOSIS"], riskDown: ["IMMUNE_LOW", "IMMUNE_ALLERGY"] },
+  { id: "AXIS_BRAIN_ADRENAL", name: "Brain → Adrenal Axis", organs: ["BRAIN", "ADRENALS"], description: "Стресс → кортизол", mechanismUp: ["CORTISOL_UP"], mechanismDown: ["HPA_DYSREGULATION"], riskUp: ["BRAIN_ANXIETY", "BRAIN_BURNOUT"], riskDown: ["HORMONE_HIGH_CORTISOL"] },
+  { id: "AXIS_ADRENAL_BRAIN", name: "Adrenal → Brain Axis", organs: ["ADRENALS", "BRAIN"], description: "Кортизол влияет на настроение", mechanismUp: ["CORTISOL_UP"], mechanismDown: ["SEROTONIN_DOWN"], riskUp: ["HORMONE_HIGH_CORTISOL"], riskDown: ["BRAIN_DEPRESSION", "BRAIN_BRAIN_FOG"] },
+  { id: "AXIS_HEART_LIVER", name: "Heart → Liver Axis", organs: ["HEART", "LIVER"], description: "Кровоток влияет на детокс", mechanismUp: ["CO_UP"], mechanismDown: ["DETOX_DOWN"], riskUp: ["HEART_FAILURE"], riskDown: ["LIVER_CONGESTION"] },
+  { id: "AXIS_LIVER_HEART", name: "Liver → Heart Axis", organs: ["LIVER", "HEART"], description: "Липиды → сосуды", mechanismUp: ["LIPIDS_UP"], mechanismDown: ["INFLAMMATION_UP"], riskUp: ["LIVER_FATTY", "LIVER_NASH"], riskDown: ["HEART_ATHEROSCLEROSIS"] },
+  { id: "AXIS_KIDNEY_ELECTROLYTES", name: "Kidney → Electrolytes Axis", organs: ["KIDNEYS", "CELLS"], description: "Почки регулируют натрий/калий", mechanismUp: ["ELECTROLYTES_UP"], mechanismDown: ["ELECTROLYTES_DOWN"], riskUp: ["KIDNEY_CKD"], riskDown: ["HEART_ARRHYTHMIA"] },
+  { id: "AXIS_ELECTROLYTES_HEART", name: "Electrolytes → Heart Axis", organs: ["CELLS", "HEART"], description: "Электролиты управляют ритмом сердца", mechanismUp: ["K_UP", "MG_UP"], mechanismDown: ["K_DOWN", "MG_DOWN"], riskUp: ["KIDNEY_ELECTROLYTE_IMBALANCE"], riskDown: ["HEART_ARRHYTHMIA"] },
+  { id: "AXIS_LIVER_SKIN", name: "Liver → Skin Axis", organs: ["LIVER", "SKIN"], description: "Токсины → кожа", mechanismUp: ["DETOX_UP"], mechanismDown: ["TOXIC_LOAD_UP"], riskUp: ["LIVER_DETOX_OVERLOAD"], riskDown: ["SKIN_ACNE", "SKIN_ECZEMA"] },
+  { id: "AXIS_SKIN_IMMUNE", name: "Skin → Immune Axis", organs: ["SKIN", "IMMUNE_SYSTEM"], description: "Кожа отражает иммунный статус", mechanismUp: ["INFLAMMATION_UP"], mechanismDown: ["BARRIER_DOWN"], riskUp: ["SKIN_ECZEMA", "SKIN_PSORIASIS"], riskDown: ["IMMUNE_AUTOIMMUNE"] },
+  { id: "AXIS_EYES_BRAIN", name: "Eyes → Brain Axis", organs: ["EYES", "BRAIN"], description: "Зрение связано с когнитивной нагрузкой", mechanismUp: ["RETINA_UP"], mechanismDown: ["NEUROFATIGUE_UP"], riskUp: ["VISION_AGE"], riskDown: ["BRAIN_BRAIN_FOG"] },
+  { id: "AXIS_BRAIN_EYES", name: "Brain → Eyes Axis", organs: ["BRAIN", "EYES"], description: "Стресс влияет на аккомодацию", mechanismUp: ["CORTISOL_UP"], mechanismDown: ["ACCOMMODATION_DOWN"], riskUp: ["BRAIN_ANXIETY"], riskDown: ["VISION_MYOPIA"] }
+];
+// ── FROM: brands.ts ──
+export interface Brand {
+  id: string;
+  name: string;
+  type: string;
+  country: string;
+  description: string;
+}
+
+export const BRANDS_DB: Brand[] = [
+  { id: "BRAND_HEALTH_FACTOR", name: "Health Factor", type: "brand", country: "Россия", description: "Производитель БАДов и нутра" },
+  { id: "BRAND_DR_BADY", name: "DR.BADY", type: "brand", country: "Россия", description: "Российский бренд нутра" },
+  { id: "BRAND_EASY_MAGIC", name: "Easy Magic", type: "brand", country: "Россия", description: "Российский бренд функциональных комплексов" },
+  { id: "BRAND_MENTOR_MIND", name: "Mentor Mind", type: "brand", country: "Россия", description: "Нейро‑нутра и когнитивные комплексы" },
+  { id: "BRAND_ASMD", name: "ASMD", type: "brand", country: "Россия", description: "Российский бренд спортивной и функциональной нутра" },
+  { id: "BRAND_LIFE_EXTENSION", name: "Life Extension", type: "brand", country: "США", description: "Премиальная нутра и научные формулы" },
+  { id: "BRAND_THORNE", name: "Thorne Research", type: "brand", country: "США", description: "Профессиональная нутра высокого уровня" },
+  { id: "BRAND_PURE_ENCAPS", name: "Pure Encapsulations", type: "brand", country: "США", description: "Гипоаллергенные премиальные комплексы" },
+  { id: "BRAND_NOW_FOODS", name: "Now Foods", type: "brand", country: "США", description: "Один из крупнейших мировых производителей БАДов" },
+  { id: "BRAND_JARROW", name: "Jarrow Formulas", type: "brand", country: "США", description: "Научно ориентированный бренд нутра" },
+  { id: "BRAND_SOLGAR", name: "Solgar", type: "brand", country: "США", description: "Один из старейших брендов витаминов и минералов" },
+  { id: "BRAND_CALIFORNIA_GOLD", name: "California Gold Nutrition", type: "brand", country: "США", description: "Популярный бренд iHerb" },
+  { id: "BRAND_NUTRICOST", name: "Nutricost", type: "brand", country: "USA", description: "Один из крупнейших производителей монокомпонентной нутры" },
+  { id: "BRAND_KAGED", name: "Kaged", type: "brand", country: "USA", description: "Премиальная спортивная нутра" },
+  { id: "BRAND_OPTIMUM", name: "Optimum Nutrition", type: "brand", country: "USA", description: "Мировой лидер спортивного питания" },
+  { id: "BRAND_BULK", name: "Bulk Supplements", type: "brand", country: "USA", description: "Чистые порошковые ингредиенты" },
+  { id: "BRAND_GARDEN_OF_LIFE", name: "Garden of Life", type: "brand", country: "USA", description: "Органическая нутра" },
+  { id: "BRAND_SPORTS_RESEARCH", name: "Sports Research", type: "brand", country: "USA", description: "Популярный бренд витаминов и омега‑3" },
+  { id: "BRAND_MUSCLETECH", name: "MuscleTech", type: "brand", country: "USA", description: "Спортивная нутра" },
+  { id: "BRAND_MYPROTEIN", name: "MyProtein", type: "brand", country: "UK", description: "Европейский гигант спортивного питания" },
+  { id: "BRAND_SWANSON", name: "Swanson", type: "brand", country: "USA", description: "Бюджетная нутра" },
+  { id: "BRAND_BLUEBONNET", name: "Bluebonnet Nutrition", type: "brand", country: "USA", description: "Премиальная нутра" },
+  { id: "BRAND_DOCTORS_BEST", name: "Doctor's Best", type: "brand", country: "USA", description: "Научно ориентированные формулы" }
+];
+// ── FROM: bands.ts ──
+export interface Band {
+  id: string;
+  name: string;
+  country: string;
+  type: string;
+}
+
+export const BANDS_DB: Band[] = [];
+// ── FROM: risks.ts ──
+export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export interface Risk {
+  id: string;
+  name: string;
+  system: string;
+  organs: string[];
+  symptoms: string[];
+  levels: RiskLevel[];
+  description: string;
+}
+
+// Маппинг старых систем на стандартные RISK_SYSTEMS
+export const RISK_SYSTEM_MAP: Record<string, string> = {
+  metabolic: 'metabolic',
+  structural: 'hepatic',
+  bile: 'hepatic',
+  lab: 'hepatic',
+  toxic: 'hepatic',
+  infectious: 'hepatic',
+  autoimmune: 'hematologic',
+  functional: 'renal',
+  vascular: 'cardio',
+  degenerative: 'musculoskeletal',
+  inflammatory: 'musculoskeletal',
+  skin: 'hematologic',
+  vision: 'neuro',
+  hormonal: 'endocrine',
+  psychological: 'neuro',
+  endo: 'endocrine',
+  repro: 'reproductive',
+  hem: 'hematologic',
+  ms: 'musculoskeletal',
+  renal_system: 'renal',
+  nervous: 'neuro',
+  blood_system: 'blood',
+  vessels_system: 'vessels',
+};
+
+export const RISKS_DB: Risk[] = [
+  // === ПЕЧЕНЬ (hepatic) ===
+  { id: "LIVER_FATTY", name: "Жировой гепатоз", system: "hepatic", organs: ["Печень"], symptoms: ["Утомляемость", "Тяжесть в правом подреберье", "Вздутие"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Накопление жира в гепатоцитах" },
+  { id: "LIVER_NASH", name: "НАСГ", system: "hepatic", organs: ["Печень"], symptoms: ["Утомляемость", "Боль в правом подреберье", "Инсулинорезистентность"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Неалкогольный стеатогепатит — воспаление на фоне жировой инфильтрации" },
+  { id: "LIVER_CIRRHOSIS", name: "Цирроз печени", system: "hepatic", organs: ["Печень"], symptoms: ["Асцит", "Сосудистые звёздочки", "Потеря веса"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Фиброзное замещение паренхимы печени" },
+  { id: "LIVER_CHOLESTASIS", name: "Холестаз", system: "hepatic", organs: ["Печень", "Жёлчные протоки"], symptoms: ["Зуд", "Желтуха", "Тёмная моча"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Нарушение оттока жёлчи" },
+  { id: "LIVER_ENZYMES_HIGH", name: "Повышенные АЛТ/АСТ", system: "hepatic", organs: ["Печень"], symptoms: ["Утомляемость", "Тошнота", "Дискомфорт в правом подреберье"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Цитолиз гепатоцитов — индикатор гепатотоксичности" },
+  { id: "LIVER_DRUG_TOXICITY", name: "Лекарственная гепатотоксичность", system: "hepatic", organs: ["Печень"], symptoms: ["Тошнота", "Рвота", "Желтуха"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повреждение печени препаратами (17α-алкилированные ААС, НПВС)" },
+  { id: "LIVER_ALCOHOLIC", name: "Алкогольное поражение печени", system: "hepatic", organs: ["Печень"], symptoms: ["Утомляемость", "Боль в правом подреберье", "Похмелье"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Сочетание ААС и алкоголя синергично повреждает печень" },
+  { id: "LIVER_DETOX_OVERLOAD", name: "Перегрузка детокс-систем", system: "hepatic", organs: ["Печень"], symptoms: ["Утомляемость", "Головная боль", "Чувствительность к запахам"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Нарушение фазы I/II детоксикации печени" },
+  { id: "LIVER_BILE_SLUDGE", name: "Застой жёлчи (сладж)", system: "hepatic", organs: ["Печень", "Жёлчный пузырь"], symptoms: ["Тошнота", "Горечь во рту", "Вздутие"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Сгущение жёлчи и образование осадка" },
+  { id: "LIVER_GALLSTONES", name: "Жёлчнокаменная болезнь", system: "hepatic", organs: ["Жёлчный пузырь"], symptoms: ["Боль в правом подреберье", "Тошнота", "Рвота"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Камни в жёлчном пузыре" },
+  { id: "LIVER_FIBROSIS", name: "Фиброз печени", system: "hepatic", organs: ["Печень"], symptoms: ["Утомляемость", "Боль в правом подреберье", "Слабость"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Фиброзное перерождение печёночной ткани" },
+
+  // === ПОЧКИ (renal) ===
+  { id: "KIDNEY_CKD", name: "Хроническая болезнь почек", system: "renal", organs: ["Почки"], symptoms: ["Отёки", "Утомляемость", "Пенистая моча"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Прогрессирующее снижение функции почек" },
+  { id: "KIDNEY_STONES", name: "Мочекаменная болезнь", system: "renal", organs: ["Почки"], symptoms: ["Боль в пояснице", "Кровь в моче", "Тошнота"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Образование камней в почках" },
+  { id: "KIDNEY_INFECTION", name: "Пиелонефрит", system: "renal", organs: ["Почки"], symptoms: ["Лихорадка", "Боль в спине", "Озноб"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Инфекционное воспаление почечной лоханки" },
+  { id: "KIDNEY_PROTEINURIA", name: "Протеинурия", system: "renal", organs: ["Почки"], symptoms: ["Пенистая моча", "Отёки", "Утомляемость"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Потеря белка с мочой — маркер клубочкового повреждения" },
+  { id: "KIDNEY_HYPERTENSION", name: "Почечная гипертензия", system: "renal", organs: ["Почки"], symptoms: ["Высокое АД", "Головная боль", "Никтурия"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повышение АД вследствие поражения почек" },
+  { id: "KIDNEY_DRUG_TOXICITY", name: "Лекарственная нефротоксичность", system: "renal", organs: ["Почки"], symptoms: ["Снижение диуреза", "Отёки", "Тошнота"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повреждение почек препаратами" },
+  { id: "KIDNEY_DEHYDRATION", name: "Дегидратация", system: "renal", organs: ["Почки"], symptoms: ["Жажда", "Тёмная моча", "Судороги"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Обезвоживание — фактор острого повреждения почек" },
+  { id: "KIDNEY_UTI", name: "ИМП (инфекция мочевых путей)", system: "renal", organs: ["Мочевые пути"], symptoms: ["Боль при мочеиспускании", "Частые позывы", "Мутная моча"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Инфекция мочевыводящих путей" },
+
+  // === СЕРДЦЕ И СОСУДЫ (cardio) ===
+  { id: "HEART_HYPERTENSION", name: "Артериальная гипертензия", system: "cardio", organs: ["Сердце", "Сосуды"], symptoms: ["Высокое АД", "Головная боль", "Мелькание мушек"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повышение артериального давления" },
+  { id: "HEART_LVH", name: "Гипертрофия левого желудочка", system: "cardio", organs: ["Сердце"], symptoms: ["Одышка", "Боль в груди", "Утомляемость"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Утолщение стенок ЛЖ на фоне ААС и гипертензии" },
+  { id: "HEART_ATHEROSCLEROSIS", name: "Атеросклероз", system: "cardio", organs: ["Артерии"], symptoms: ["Стенокардия", "Перемежающаяся хромота", "ИБС"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Поражение артерий холестериновыми бляшками" },
+  { id: "HEART_ARRHYTHMIA", name: "Аритмия", system: "cardio", organs: ["Сердце"], symptoms: ["Учащённое сердцебиение", "Перебои", "Головокружение"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Нарушение ритма сердца" },
+  { id: "HEART_THROMBOSIS", name: "Тромбоз", system: "cardio", organs: ["Сосуды"], symptoms: ["Боль в конечности", "Отёк", "Одышка (ТЭЛА)"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Образование тромбов вследствие полицитемии" },
+  { id: "HEART_EMBOLISM", name: "Лёгочная эмболия", system: "cardio", organs: ["Лёгкие", "Сосуды"], symptoms: ["Одышка", "Боль в груди", "Кашель с кровью"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Тромбоэмболия лёгочной артерии — жизнеугрожающее состояние" },
+  { id: "VESSELS_STIFF", name: "Сосудистая ригидность", system: "cardio", organs: ["Сосуды"], symptoms: ["Повышенное АД", "Холодные конечности"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Снижение эластичности сосудистой стенки" },
+
+  // === НЕРВНАЯ СИСТЕМА (neuro) ===
+  { id: "NEURO_INSOMNIA", name: "Бессонница", system: "neuro", organs: ["ЦНС"], symptoms: ["Нарушение засыпания", "Частые пробуждения", "Утренняя слабость"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Нарушение сна — частый эффект тренболона и высоких доз тестостерона" },
+  { id: "NEURO_AGRESSION", name: "Повышенная агрессия", system: "neuro", organs: ["ЦНС"], symptoms: ["Раздражительность", "Агрессия", "Импульсивность"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Дофаминовая дисрегуляция на фоне ААС" },
+  { id: "NEURO_ANXIETY", name: "Тревожность", system: "neuro", organs: ["ЦНС"], symptoms: ["Тревога", "Панические атаки", "Внутреннее напряжение"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Нарушение ГАМК-ергической передачи" },
+  { id: "NEURO_DEPRESSION", name: "Депрессия (ПКТ)", system: "neuro", organs: ["ЦНС"], symptoms: ["Подавленность", "Апатия", "Потеря мотивации"], levels: ["LOW", "MEDIUM", "HIGH"], description: "«Гормональная яма» после отмены ААС — низкий дофамин и серотонин" },
+  { id: "NEURO_NEUROPATHY", name: "Периферическая нейропатия", system: "neuro", organs: ["Периферические нервы"], symptoms: ["Парестезии", "Онемение", "Жжение"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повреждение периферических нервов" },
+  { id: "NEURO_BRAIN_FOG", name: "Туман в голове", system: "neuro", organs: ["ЦНС"], symptoms: ["Снижение концентрации", "Ухудшение памяти", "Рассеянность"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Когнитивные нарушения на фоне нейротоксичности" },
+
+  // === ЭНДОКРИННАЯ СИСТЕМА (endocrine) ===
+  { id: "ENDO_HPG_SUPPRESSION", name: "Подавление ГГГ оси", system: "endocrine", organs: ["Гипоталамус", "Гипофиз", "Яички"], symptoms: ["Низкий тестостерон", "Атрофия яичек", "Бесплодие"], levels: ["LOW", "MEDIUM", "HIGH"], description: "ААС подавляют ЛГ/ФСГ → остановка эндогенного тестостерона" },
+  { id: "ENDO_GYNECOMASTIA", name: "Гинекомастия", system: "endocrine", organs: ["Молочные железы"], symptoms: ["Увеличение грудных желёз", "Болезненность", "Выделения"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Ароматизация тестостерона → эстрадиол → рост грудных желёз" },
+  { id: "ENDO_PROLACTIN", name: "Гиперпролактинемия", system: "endocrine", organs: ["Гипофиз"], symptoms: ["Галакторея", "Снижение либидо", "Аменорея (у женщин)"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повышение пролактина (прогестагенные ААС, тренболон)" },
+  { id: "ENDO_THYROID", name: "Нарушение щитовидной железы", system: "endocrine", organs: ["Щитовидная железа"], symptoms: ["Утомляемость", "Изменение веса", "Тремор"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Влияние ААС на ТТГ, Т3, Т4" },
+  { id: "ENDO_CORTISOL", name: "Дисбаланс кортизола", system: "endocrine", organs: ["Надпочечники"], symptoms: ["Утомляемость", "Мышечная слабость", "Отёки"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повышение или подавление кортизола на фоне ААС" },
+
+  // === КРОВЕТВОРНАЯ СИСТЕМА (hematologic) ===
+  { id: "HEMA_POLYCYTHEMIA", name: "Полицитемия", system: "hematologic", organs: ["Костный мозг"], symptoms: ["Покраснение лица", "Головная боль", "Затуманивание зрения"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повышение гематокрита >54% на фоне ААС" },
+  { id: "HEMA_THROMBOSIS_RISK", name: "Риск тромбоза", system: "hematologic", organs: ["Сосуды"], symptoms: ["Боль в ноге", "Отёк", "Одышка"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Гиперкоагуляция и полицитемия → тромбоз глубоких вен, ТЭЛА" },
+  { id: "HEMA_ANEMIA", name: "Анемия", system: "hematologic", organs: ["Костный мозг"], symptoms: ["Бледность", "Утомляемость", "Одышка при нагрузке"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Снижение гемоглобина и эритроцитов" },
+  { id: "HEMA_HIGH_LDL", name: "Дислипидемия", system: "hematologic", organs: ["Печень", "Сосуды"], symptoms: ["Бессимптомно", "Атеросклероз (длительно)"], levels: ["LOW", "MEDIUM", "HIGH"], description: "ЛПНП ↑ ЛПВП ↓ на фоне ААС — основной фактор атеросклероза" },
+
+  // === РЕПРОДУКТИВНАЯ СИСТЕМА (reproductive) ===
+  { id: "REPRO_TESTICULAR_ATROPHY", name: "Атрофия яичек", system: "reproductive", organs: ["Яички"], symptoms: ["Уменьшение яичек", "Снижение сперматогенеза", "Бесплодие"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Подавление ЛГ/ФСГ → остановка эндогенного тестостерона" },
+  { id: "REPRO_INFERTILITY", name: "Мужское бесплодие", system: "reproductive", organs: ["Яички", "Эпидидимис"], symptoms: ["Олигоспермия", "Астеноспермия", "Низкий объём спермы"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Нарушение сперматогенеза на фоне ААС" },
+  { id: "REPRO_PROSTATE", name: "Гиперплазия простаты", system: "reproductive", organs: ["Предстательная железа"], symptoms: ["Частое мочеиспускание", "Слабая струя", "Ночные позывы"], levels: ["LOW", "MEDIUM", "HIGH"], description: "DHT-опосредованная гиперплазия предстательной железы" },
+  { id: "REPRO_ERECTILE", name: "Эректильная дисфункция", system: "reproductive", organs: ["Половой член"], symptoms: ["Снижение либидо", "Эректильная дисфункция", "Снижение утренних эрекций"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Нарушение эректильной функции на фоне подавления ГГГ" },
+
+  // === ОПОРНО-ДВИГАТЕЛЬНАЯ СИСТЕМА (musculoskeletal) ===
+  { id: "JOINT_TENDON_RISK", name: "Риск разрыва сухожилий", system: "musculoskeletal", organs: ["Сухожилия", "Связки"], symptoms: ["Боль в сухожилиях", "Слабость связок", "Ограничение подвижности"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Мышечная сила ↑ быстрее, чем адаптируются сухожилия" },
+  { id: "JOINT_ARTHRITIS", name: "Артрит", system: "musculoskeletal", organs: ["Суставы"], symptoms: ["Боль", "Отечность", "Покраснение"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Воспаление суставов" },
+  { id: "JOINT_ARTHROSIS", name: "Артроз", system: "musculoskeletal", organs: ["Суставы"], symptoms: ["Боль", "Хруст", "Ограничение подвижности"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Дегенеративное поражение суставного хряща" },
+  { id: "JOINT_GOUT", name: "Подагра", system: "metabolic", organs: ["Суставы"], symptoms: ["Острая боль", "Покраснение", "Отечность"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Отложение мочевой кислоты в суставах" },
+  { id: "JOINT_TENDONITIS", name: "Тендинит", system: "musculoskeletal", organs: ["Сухожилия"], symptoms: ["Боль", "Отечность", "Ограничение подвижности"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Воспаление сухожилий" },
+
+  // === МЕТАБОЛИЗМ (metabolic) ===
+  { id: "METABOLIC_SYNDROME", name: "Метаболический синдром", system: "metabolic", organs: ["Печень", "Поджелудочная", "Жировая ткань"], symptoms: ["Инсулинорезистентность", "Абдоминальное ожирение", "Дислипидемия"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Комплекс метаболических нарушений на фоне ААС" },
+  { id: "METABOLIC_INSULIN_RESISTANCE", name: "Инсулинорезистентность", system: "metabolic", organs: ["Мышцы", "Печень", "Жировая ткань"], symptoms: ["Повышенный сахар", "Увеличение жировой массы", "Усталость после еды"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Снижение чувствительности тканей к инсулину" },
+  { id: "METABOLIC_HYPERURICEMIA", name: "Гиперурикемия", system: "metabolic", organs: ["Почки", "Суставы"], symptoms: ["Подагрические атаки", "Боль в суставах", "Мочевые камни"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повышение мочевой кислоты в крови" },
+
+  // === GH/IGF (ghigf) ===
+  { id: "GH_ACROMEGALY_RISK", name: "Риск акромегалии", system: "ghigf", organs: ["Гипофиз", "Кости", "Мягкие ткани"], symptoms: ["Увеличение кистей/стоп", "Грубые черты лица", "Головная боль"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Хронический избыток GH/IGF-1 → акромегалия" },
+  { id: "GH_INSULIN_RESISTANCE", name: "Инсулинорезистентность (GH)", system: "ghigf", organs: ["Печень", "Мышцы"], symptoms: ["Повышенный сахар", "Отёки", "Суставные боли"], levels: ["LOW", "MEDIUM", "HIGH"], description: "GH antagonizes insulin → гипергликемия" },
+  { id: "GH_CARPAL_TUNNEL", name: "Синдром запястного канала", system: "ghigf", organs: ["Запястье", "Срединный нерв"], symptoms: ["Онемение пальцев", "Боль в запястье", "Слабость кисти"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Отёк и компрессия срединного нерва на фоне GH" },
+
+  // === ИНСУЛИНОВАЯ ОСЬ (ins_axis) ===
+  { id: "INS_DIABETES_RISK", name: "Риск сахарного диабета", system: "ins_axis", organs: ["Поджелудочная железа", "Мышцы", "Печень"], symptoms: ["Жажда", "Частое мочеиспускание", "Утомляемость"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Хроническая инсулинорезистентность → диабет 2 типа" },
+
+  // === НЕЙРОТОКСИЧНОСТЬ (neuro_toxicity) ===
+  { id: "NEUROTOX_DOPAMINE", name: "Дофаминовая дисрегуляция", system: "neuro_toxicity", organs: ["Дофаминовые нейроны"], symptoms: ["Агрессия", "Мания", "Зависимость", "ПКТ-депрессия"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Нарушение дофаминовой передачи — тренболон, высокие дозы тестостерона" },
+  { id: "NEUROTOX_SEROTONIN", name: "Серотониновый дисбаланс", system: "neuro_toxicity", organs: ["Серотониновые нейроны"], symptoms: ["Тревога", "Депрессия", "Бессонница", "Раздражительность"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Нарушение серотониновой передачи — риск серотонинового синдрома при комбинациях" },
+  { id: "NEUROTOX_GABA", name: "ГАМК-дисфункция", system: "neuro_toxicity", organs: ["ГАМК-рецепторы"], symptoms: ["Бессонница", "Тревожность", "Судороги", "Тремор"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Подавление ГАМК-ергической передачи — снижение торможения в ЦНС" },
+  { id: "NEUROTOX_PERIPHERAL", name: "Периферическая нейропатия", system: "neuro_toxicity", organs: ["Периферические нервы"], symptoms: ["Парестезии", "Онемение", "Боль", "Мышечная слабость"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повреждение периферических нервов токсичными метаболитами" },
+
+  // === КРОВЬ (blood) ===
+  { id: "BLOOD_POLYCYTHEMIA", name: "Эритроцитоз", system: "blood", organs: ["Костный мозг"], symptoms: ["Покраснение кожи", "Головная боль", "Затуманивание зрения"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Стимуляция эритропоэза ААС → HCT >54%" },
+  { id: "BLOOD_COAGULATION", name: "Гиперкоагуляция", system: "blood", organs: ["Плазма"], symptoms: ["Тромбоз", "ТЭЛА (редко)", "D-димер ↑"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повышение свёртываемости крови на фоне ААС" },
+
+  // === СОСУДЫ (vessels) ===
+  { id: "VESSELS_ENDOTHELIUM", name: "Эндотелиальная дисфункция", system: "vessels", organs: ["Эндотелий"], symptoms: ["Повышенное АД", "Холодные конечности", "Варикоз"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повреждение эндотелия сосудов — ранний маркер атеросклероза" },
+  { id: "VESSELS_ATHEROSCLEROSIS", name: "Атеросклероз сосудов", system: "vessels", organs: ["Артерии"], symptoms: ["ИБС", "Стенокардия", "Перемежающаяся хромота"], levels: ["LOW", "MEDIUM", "HIGH"], description: "ЛПНП ↑ + эндотелиальная дисфункция → атеросклероз" },
+  { id: "VESSELS_VASOSPASM", name: "Вазоспазм", system: "vessels", organs: ["Артерии"], symptoms: ["Головная боль", "Холодные конечности", "Мышечные судороги"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Спазм сосудов на фоне ААС (тренболон, высокие дозы)" },
+];
+
+
+
+// ── FROM: recommendations.ts ──
+export interface Recommendation {
+  recId: string;
+  type: string;
+  riskId: string;
+  level: string;
+  title: string;
+  text: string;
+}
+
+export const RECOMMENDATIONS_DB: Recommendation[] = [
+  // === ПЕЧЕНЬ ===
+  { recId: "REC_LIVER_FATTY_LOW", type: "RISK", riskId: "LIVER_FATTY", level: "LOW", title: "Лёгкий стеатоз", text: "Уменьши сахар и фастфуд, добавь 20–30 минут ходьбы." },
+  { recId: "REC_LIVER_FATTY_MED", type: "RISK", riskId: "LIVER_FATTY", level: "MEDIUM", title: "Стеатоз средней степени", text: "Убери сахар, добавь омега-3 и NAC, контролируй вес." },
+  { recId: "REC_LIVER_FATTY_HIGH", type: "RISK", riskId: "LIVER_FATTY", level: "HIGH", title: "Выраженный стеатоз", text: "Срочно снижать углеводы, добавить силовые, омега-3, УДХК." },
+  { recId: "REC_LIVER_NASH_LOW", type: "RISK", riskId: "LIVER_NASH", level: "LOW", title: "Начало воспаления печени", text: "Убери алкоголь, добавь куркумин и омега-3." },
+  { recId: "REC_LIVER_NASH_MED", type: "RISK", riskId: "LIVER_NASH", level: "MEDIUM", title: "НАСГ средней тяжести", text: "Добавь NAC, витамин E, контроль веса." },
+  { recId: "REC_LIVER_NASH_HIGH", type: "RISK", riskId: "LIVER_NASH", level: "HIGH", title: "Выраженный НАСГ", text: "Требуется агрессивное снижение веса и антиоксиданты." },
+  { recId: "REC_LIVER_CHOLESTASIS_LOW", type: "RISK", riskId: "LIVER_CHOLESTASIS", level: "LOW", title: "Лёгкий холестаз", text: "Добавь таурин и артишок." },
+  { recId: "REC_LIVER_CHOLESTASIS_MED", type: "RISK", riskId: "LIVER_CHOLESTASIS", level: "MEDIUM", title: "Холестаз", text: "Убери жирное, добавь УДХК (урсосан)." },
+  { recId: "REC_LIVER_CHOLESTASIS_HIGH", type: "RISK", riskId: "LIVER_CHOLESTASIS", level: "HIGH", title: "Выраженный холестаз", text: "Нужна медикаментозная терапия и контроль ферментов." },
+  { recId: "REC_LIVER_ENZYMES_LOW", type: "RISK", riskId: "LIVER_ENZYMES_HIGH", level: "LOW", title: "Повышенные АЛТ/АСТ", text: "Контроль ферментов через 2 недели, добавить NAC." },
+  { recId: "REC_LIVER_ENZYMES_MED", type: "RISK", riskId: "LIVER_ENZYMES_HIGH", level: "MEDIUM", title: "Умеренный цитолиз", text: "Снизить дозу ААС, добавить гепатопротекторы, контроль через 1 неделю." },
+  { recId: "REC_LIVER_ENZYMES_HIGH", type: "RISK", riskId: "LIVER_ENZYMES_HIGH", level: "HIGH", title: "Выраженный цитолиз", text: "Немедленно снизить дозу или отменить гепатотоксичный препарат." },
+
+  // === ПОЧКИ ===
+  { recId: "REC_KIDNEY_CKD_LOW", type: "RISK", riskId: "KIDNEY_CKD", level: "LOW", title: "Снижение функции почек", text: "Пей воду, убери НПВС." },
+  { recId: "REC_KIDNEY_CKD_MED", type: "RISK", riskId: "KIDNEY_CKD", level: "MEDIUM", title: "ХБП средней степени", text: "Контроль давления, ограничение соли." },
+  { recId: "REC_KIDNEY_CKD_HIGH", type: "RISK", riskId: "KIDNEY_CKD", level: "HIGH", title: "Выраженная ХБП", text: "Срочно к нефрологу, контроль калия." },
+  { recId: "REC_KIDNEY_STONES_LOW", type: "RISK", riskId: "KIDNEY_STONES", level: "LOW", title: "Риск камней", text: "Пей воду, добавь магний." },
+  { recId: "REC_KIDNEY_STONES_MED", type: "RISK", riskId: "KIDNEY_STONES", level: "MEDIUM", title: "Камни", text: "Убери оксалаты, добавь цитрат калия." },
+  { recId: "REC_KIDNEY_STONES_HIGH", type: "RISK", riskId: "KIDNEY_STONES", level: "HIGH", title: "Крупные камни", text: "Требуется УЗИ и терапия." },
+  { recId: "REC_KIDNEY_PROTEINURIA_LOW", type: "RISK", riskId: "KIDNEY_PROTEINURIA", level: "LOW", title: "Следы белка", text: "Увеличь потребление воды, снизь белок до 2г/кг." },
+  { recId: "REC_KIDNEY_PROTEINURIA_MED", type: "RISK", riskId: "KIDNEY_PROTEINURIA", level: "MEDIUM", title: "Протеинурия", text: "Обязательно УЗИ почек, контроль креатинина." },
+  { recId: "REC_KIDNEY_PROTEINURIA_HIGH", type: "RISK", riskId: "KIDNEY_PROTEINURIA", level: "HIGH", title: "Выраженная протеинурия", text: "Срочно к нефрологу, возможна биопсия." },
+
+  // === СЕРДЦЕ ===
+  { recId: "REC_HEART_HYPERTENSION_LOW", type: "RISK", riskId: "HEART_HYPERTENSION", level: "LOW", title: "Повышенное давление", text: "Уменьши соль, добавь магний." },
+  { recId: "REC_HEART_HYPERTENSION_MED", type: "RISK", riskId: "HEART_HYPERTENSION", level: "MEDIUM", title: "Гипертензия", text: "Добавь калий, омега-3, контроль веса." },
+  { recId: "REC_HEART_HYPERTENSION_HIGH", type: "RISK", riskId: "HEART_HYPERTENSION", level: "HIGH", title: "Высокое давление", text: "Требуется медикаментозная терапия." },
+  { recId: "REC_HEART_ATHEROSCLEROSIS_LOW", type: "RISK", riskId: "HEART_ATHEROSCLEROSIS", level: "LOW", title: "Риск атеросклероза", text: "Добавь омега-3 и витамин K2." },
+  { recId: "REC_HEART_ATHEROSCLEROSIS_MED", type: "RISK", riskId: "HEART_ATHEROSCLEROSIS", level: "MEDIUM", title: "Атеросклероз", text: "Контроль липидов, добавить CoQ10." },
+  { recId: "REC_HEART_ATHEROSCLEROSIS_HIGH", type: "RISK", riskId: "HEART_ATHEROSCLEROSIS", level: "HIGH", title: "Выраженный атеросклероз", text: "Требуется терапия статинами." },
+  { recId: "REC_HEART_THROMBOSIS_LOW", type: "RISK", riskId: "HEART_THROMBOSIS", level: "LOW", title: "Риск тромбоза", text: "Аспирин 100 мг/день, обильное питьё." },
+  { recId: "REC_HEART_THROMBOSIS_MED", type: "RISK", riskId: "HEART_THROMBOSIS", level: "MEDIUM", title: "Умеренный риск тромбоза", text: "Сдача крови, контроль HCT, омега-3." },
+  { recId: "REC_HEART_THROMBOSIS_HIGH", type: "RISK", riskId: "HEART_THROMBOSIS", level: "HIGH", title: "Высокий риск тромбоза", text: "HCT >54% — кровопускание, антикоагулянты." },
+
+  // === НЕРВНАЯ СИСТЕМА ===
+  { recId: "REC_NEURO_INSOMNIA_LOW", type: "RISK", riskId: "NEURO_INSOMNIA", level: "LOW", title: "Лёгкая бессонница", text: "Магний L-треонат, мелатонин 0.5 мг." },
+  { recId: "REC_NEURO_INSOMNIA_MED", type: "RISK", riskId: "NEURO_INSOMNIA", level: "MEDIUM", title: "Бессонница", text: "Глицин, 5-HTP, гигиена сна." },
+  { recId: "REC_NEURO_INSOMNIA_HIGH", type: "RISK", riskId: "NEURO_INSOMNIA", level: "HIGH", title: "Тяжёлая бессонница", text: "Консультация сомнолога, возможна фармакотерапия." },
+  { recId: "REC_NEURO_AGRESSION_LOW", type: "RISK", riskId: "NEURO_AGRESSION", level: "LOW", title: "Раздражительность", text: "Медитация, L-теанин." },
+  { recId: "REC_NEURO_AGRESSION_MED", type: "RISK", riskId: "NEURO_AGRESSION", level: "MEDIUM", title: "Агрессия", text: "Снизить дозу, добавить антиоксиданты, проверить эстрадиол." },
+  { recId: "REC_NEURO_AGRESSION_HIGH", type: "RISK", riskId: "NEURO_AGRESSION", level: "HIGH", title: "Выраженная агрессия", text: "Немедленно снизить дозу, консультация психиатра." },
+  { recId: "REC_NEURO_ANXIETY_LOW", type: "RISK", riskId: "NEURO_ANXIETY", level: "LOW", title: "Лёгкая тревожность", text: "Магний, L-теанин, дыхательные практики." },
+  { recId: "REC_NEURO_ANXIETY_MED", type: "RISK", riskId: "NEURO_ANXIETY", level: "MEDIUM", title: "Тревожность", text: "Ашваганда, Родинола розовая." },
+  { recId: "REC_NEURO_ANXIETY_HIGH", type: "RISK", riskId: "NEURO_ANXIETY", level: "HIGH", title: "Выраженная тревога", text: "Консультация психиатра, возможна фармакотерапия." },
+  { recId: "REC_NEURO_DEPRESSION_LOW", type: "RISK", riskId: "NEURO_DEPRESSION", level: "LOW", title: "Лёгкая депрессия на ПКТ", text: "Семгу, витамин D, физическая активность." },
+  { recId: "REC_NEURO_DEPRESSION_MED", type: "RISK", riskId: "NEURO_DEPRESSION", level: "MEDIUM", title: "Депрессия на ПКТ", text: "5-HTP, дофаминовые предшественники, контроль гормонов." },
+  { recId: "REC_NEURO_DEPRESSION_HIGH", type: "RISK", riskId: "NEURO_DEPRESSION", level: "HIGH", title: "Тяжёлая депрессия", text: "Консультация психиатра, антидепрессанты." },
+
+  // === ЭНДОКРИННАЯ СИСТЕМА ===
+  { recId: "REC_ENDO_HPG_LOW", type: "RISK", riskId: "ENDO_HPG_SUPPRESSION", level: "LOW", title: "Лёгкое подавление ГГГ", text: "ХГЧ 500 МЕ 2р/нед (схема 3/1), контроль ЛГ/ФСГ." },
+  { recId: "REC_ENDO_HPG_MED", type: "RISK", riskId: "ENDO_HPG_SUPPRESSION", level: "MEDIUM", title: "Умеренное подавление ГГГ", text: "ХГЧ (500 МЕ 2р/нед, 3/1) + Кломид, контроль тестостерона и эстрадиола." },
+  { recId: "REC_ENDO_HPG_HIGH", type: "RISK", riskId: "ENDO_HPG_SUPPRESSION", level: "HIGH", title: "Выраженное подавление ГГГ", text: "Длительная ПКТ (Кломид + Тамоксифен), эндокринолог." },
+  { recId: "REC_ENDO_GYNECO_LOW", type: "RISK", riskId: "ENDO_GYNECOMASTIA", level: "LOW", title: "Риск гинекомастии", text: "Контроль эстрадиола, при ↑ — АИ." },
+  { recId: "REC_ENDO_GYNECO_MED", type: "RISK", riskId: "ENDO_GYNECOMASTIA", level: "MEDIUM", title: "Гинекомастия", text: "Анастрозол 0.25-0.5 мг, контроль E2." },
+  { recId: "REC_ENDO_GYNECO_HIGH", type: "RISK", riskId: "ENDO_GYNECOMASTIA", level: "HIGH", title: "Выраженная гинекомастия", text: "Хирургическая консультация, тамоксифен." },
+
+  // === КРОВЕТВОРНАЯ СИСТЕМА ===
+  { recId: "REC_HEMA_POLYCYTHEMIA_LOW", type: "RISK", riskId: "HEMA_POLYCYTHEMIA", level: "LOW", title: "Лёгкий эритроцитоз", text: "Обильное питьё, контроль HCT." },
+  { recId: "REC_HEMA_POLYCYTHEMIA_MED", type: "RISK", riskId: "HEMA_POLYCYTHEMIA", level: "MEDIUM", title: "Эритроцитоз", text: "Кровопускание 450 мл, аспирин." },
+  { recId: "REC_HEMA_POLYCYTHEMIA_HIGH", type: "RISK", riskId: "HEMA_POLYCYTHEMIA", level: "HIGH", title: "Опасный эритроцитоз", text: "HCT >54% — немедленное кровопускание, антикоагулянты." },
+  { recId: "REC_HEMA_THROMBOSIS_LOW", type: "RISK", riskId: "HEMA_THROMBOSIS_RISK", level: "LOW", title: "Риск тромбоза", text: "Аспирин 100 мг, омега-3." },
+  { recId: "REC_HEMA_THROMBOSIS_MED", type: "RISK", riskId: "HEMA_THROMBOSIS_RISK", level: "MEDIUM", title: "Умеренный риск", text: "Аспирин, контроль D-димера." },
+  { recId: "REC_HEMA_THROMBOSIS_HIGH", type: "RISK", riskId: "HEMA_THROMBOSIS_RISK", level: "HIGH", title: "Высокий риск тромбоза", text: "Антикоагулянты, снижение дозы ААС." },
+
+  // === РЕПРОДУКТИВНАЯ СИСТЕМА ===
+  { recId: "REC_REPO_ATROPHY_LOW", type: "RISK", riskId: "REPRO_TESTICULAR_ATROPHY", level: "LOW", title: "Лёгкая атрофия яичек", text: "ХГЧ 500 МЕ 2×/нед, 3 нед через 1." },
+  { recId: "REC_REPO_ATROPHY_MED", type: "RISK", riskId: "REPRO_TESTICULAR_ATROPHY", level: "MEDIUM", title: "Атрофия яичек", text: "ХГЧ 500 МЕ 2×/нед, 3 нед через 1, контроль объёма." },
+  { recId: "REC_REPO_ATROPHY_HIGH", type: "RISK", riskId: "REPRO_TESTICULAR_ATROPHY", level: "HIGH", title: "Выраженная атрофия", text: "Экстренная ПКТ, консультация андролога." },
+  { recId: "REC_REPO_PROSTATE_LOW", type: "RISK", riskId: "REPRO_PROSTATE", level: "LOW", title: "Риск гиперплазии простаты", text: "Контроль ПСА, пальцевое исследование." },
+  { recId: "REC_REPO_PROSTATE_MED", type: "RISK", riskId: "REPRO_PROSTATE", level: "MEDIUM", title: "Гиперплазия простаты", text: "Финастерид, контроль ПСА каждые 3 месяца." },
+  { recId: "REC_REPO_PROSTATE_HIGH", type: "RISK", riskId: "REPRO_PROSTATE", level: "HIGH", title: "Выраженная гиперплазия", text: "Уролог, биопсия при ПСА >4." },
+
+  // === ОПОРНО-ДВИГАТЕЛЬНАЯ ===
+  { recId: "REC_JOINT_TENDON_LOW", type: "RISK", riskId: "JOINT_TENDON_RISK", level: "LOW", title: "Риск сухожилий", text: "Ограничь рабочий вес, добавь коллаген." },
+  { recId: "REC_JOINT_TENDON_MED", type: "RISK", riskId: "JOINT_TENDON_RISK", level: "MEDIUM", title: "Боль в сухожилиях", text: "Снизь объём, добавить BPC-157, MSM." },
+  { recId: "REC_JOINT_TENDON_HIGH", type: "RISK", riskId: "JOINT_TENDON_RISK", level: "HIGH", title: "Высокий риск разрыва", text: "Полный отдых, МРТ, BPC-157, консультация ортопеда." },
+
+  // === МЕТАБОЛИЗМ ===
+  { recId: "REC_METABOLIC_SYNDROME_LOW", type: "RISK", riskId: "METABOLIC_SYNDROME", level: "LOW", title: "Риск метаболического синдрома", text: "Контроль сахара, добавить клетчатку." },
+  { recId: "REC_METABOLIC_SYNDROME_MED", type: "RISK", riskId: "METABOLIC_SYNDROME", level: "MEDIUM", title: "Метаболический синдром", text: "Низкоуглеводная диета, омега-3, контроль HOMA-IR." },
+  { recId: "REC_METABOLIC_SYNDROME_HIGH", type: "RISK", riskId: "METABOLIC_SYNDROME", level: "HIGH", title: "Выраженный метаболический синдром", text: "Эндокринолог, метформин, строгая диета." },
+  { recId: "REC_METABOLIC_INSULIN_LOW", type: "RISK", riskId: "METABOLIC_INSULIN_RESISTANCE", level: "LOW", title: "Лёгкая инсулинорезистентность", text: "Добавь клетчатку, снизь быстрые углеводы." },
+  { recId: "REC_METABOLIC_INSULIN_MED", type: "RISK", riskId: "METABOLIC_INSULIN_RESISTANCE", level: "MEDIUM", title: "Инсулинорезистентность", text: "Низкий ГИ, хром, контроль HOMA-IR." },
+  { recId: "REC_METABOLIC_INSULIN_HIGH", type: "RISK", riskId: "METABOLIC_INSULIN_RESISTANCE", level: "HIGH", title: "Выраженная инсулинорезистентность", text: "Эндокринолог, метформин." },
+
+  // === НЕЙРОТОКСИЧНОСТЬ ===
+  { recId: "REC_NEUROTOX_DOPAMINE_LOW", type: "RISK", riskId: "NEUROTOX_DOPAMINE", level: "LOW", title: "Дофаминовый дисбаланс", text: "L-тирозин, витамин B6." },
+  { recId: "REC_NEUROTOX_DOPAMINE_MED", type: "RISK", riskId: "NEUROTOX_DOPAMINE", level: "MEDIUM", title: "Дофаминовая дисрегуляция", text: "Снизить дозу тренболона, добавить антиоксиданты." },
+  { recId: "REC_NEUROTOX_DOPAMINE_HIGH", type: "RISK", riskId: "NEUROTOX_DOPAMINE", level: "HIGH", title: "Выраженная дофаминовая токсичность", text: "Немедленно отменить тренболон, консультация психиатра." },
+  { recId: "REC_NEUROTOX_GABA_LOW", type: "RISK", riskId: "NEUROTOX_GABA", level: "LOW", title: "Лёгкая ГАМК-дисфункция", text: "Магний, L-теанин, глицин." },
+  { recId: "REC_NEUROTOX_GABA_MED", type: "RISK", riskId: "NEUROTOX_GABA", level: "MEDIUM", title: "ГАМК-дисфункция", text: "Магний L-треонат, фенибут (не более 2 недель)." },
+  { recId: "REC_NEUROTOX_GABA_HIGH", type: "RISK", riskId: "NEUROTOX_GABA", level: "HIGH", title: "Тяжёлая ГАМК-дисфункция", text: "Консультация невролога, возможна фармакотерапия." },
+
+  // === СОСУДЫ ===
+  { recId: "REC_VESSELS_ENDOTHELIUM_LOW", type: "RISK", riskId: "VESSELS_ENDOTHELIUM", level: "LOW", title: "Лёгкая эндотелиальная дисфункция", text: "Омега-3, L-аргинин, витамин C." },
+  { recId: "REC_VESSELS_ENDOTHELIUM_MED", type: "RISK", riskId: "VESSELS_ENDOTHELIUM", level: "MEDIUM", title: "Эндотелиальная дисфункция", text: "Омега-3 3г/день, CoQ10, контроль ЛПНП/ЛПВП." },
+  { recId: "REC_VESSELS_ENDOTHELIUM_HIGH", type: "RISK", riskId: "VESSELS_ENDOTHELIUM", level: "HIGH", title: "Выраженная эндотелиальная дисфункция", text: "Статины, кардиолог, ЭХО-КГ." },
+
+  // === МЕХАНИЗМЫ (общие) ===
+  { recId: "REC_MECH_INFLAMMATION_UP", type: "MECHANISM", riskId: "INFLAMMATION_UP", level: "MEDIUM", title: "Повышено воспаление", text: "Добавь омега-3, куркумин, убери сахар." },
+  { recId: "REC_MECH_CORTISOL_UP", type: "MECHANISM", riskId: "CORTISOL_UP", level: "MEDIUM", title: "Кортизол повышен", text: "Добавь магний и адаптогены." },
+  { recId: "REC_MECH_T3_T4_DOWN", type: "MECHANISM", riskId: "T3_T4_DOWN", level: "MEDIUM", title: "Щитовидка снижена", text: "Добавь йод, селен." },
+  { recId: "REC_MECH_GABA_DOWN", type: "MECHANISM", riskId: "GABA_DOWN", level: "MEDIUM", title: "Снижение GABA", text: "Добавь магний и теанин." },
+
+  // === ОРГАНЫ (общие) ===
+  { recId: "REC_ORGAN_LIVER", type: "ORGAN", riskId: "LIVER", level: "MEDIUM", title: "Печень нагружена", text: "Убери алкоголь, добавь NAC." },
+  { recId: "REC_ORGAN_KIDNEYS", type: "ORGAN", riskId: "KIDNEYS", level: "MEDIUM", title: "Почки нагружены", text: "Пей воду, убери НПВС." },
+  { recId: "REC_ORGAN_HEART", type: "ORGAN", riskId: "HEART", level: "MEDIUM", title: "Сердце нагружено", text: "Контроль АД, омега-3, CoQ10." },
+  { recId: "REC_ORGAN_BRAIN", type: "ORGAN", riskId: "BRAIN", level: "MEDIUM", title: "ЦНС нагружена", text: "Магний, глицин, контроль сна." },
+];
+
+// ── FROM: hormonal-axes.ts ──
+export interface HormonalAxisData {
+  id: string;
+  name: string;
+  type: 'hormonal_axis' | 'hormonal_dysfunction' | 'hormonal_intervention';
+  pathway: string;
+  organs: string;
+  target: string;
+  description: string;
+}
+
+export const HORMONAL_AXES_DB: HormonalAxisData[] = [
+  { id: "AXIS_HPA", name: "HPA Axis", type: "hormonal_axis", pathway: "CRH>ACTH>CORTISOL", organs: "HYPOTHALAMUS>PITUITARY>ADRENALS", target: "STRESS_RESPONSE", description: "Ось стресс-реакции" },
+  { id: "AXIS_HPT", name: "HPT Axis", type: "hormonal_axis", pathway: "TRH>TSH>T4/T3", organs: "HYPOTHALAMUS>PITUITARY>THYROID", target: "METABOLISM", description: "Ось щитовидки" },
+  { id: "AXIS_HPG", name: "HPG Axis", type: "hormonal_axis", pathway: "GnRH>LH/FSH>SEX_HORMONES", organs: "HYPOTHALAMUS>PITUITARY>GONADS", target: "REPRODUCTION", description: "Ось половых гормонов" },
+  { id: "AXIS_HPTA", name: "HPTA Axis", type: "hormonal_axis", pathway: "GHRH>GH>IGF1", organs: "HYPOTHALAMUS>PITUITARY>LIVER", target: "GROWTH_REPAIR", description: "Ось роста" },
+  { id: "AXIS_METABOLIC", name: "Metabolic Axis", type: "hormonal_axis", pathway: "INSULIN>LEPTIN>ADIPONECTIN", organs: "PANCREAS>FAT_TISSUE", target: "ENERGY_BALANCE", description: "Метаболическая ось" },
+  { id: "AXIS_GI", name: "GI Endocrine Axis", type: "hormonal_axis", pathway: "GLP1>GIP>PYY>CCK", organs: "GI_TRACT", target: "APPETITE_DIGESTION", description: "Кишечная эндокринная ось" },
+  { id: "AXIS_BONE", name: "Bone Endocrine Axis", type: "hormonal_axis", pathway: "PTH>CALCITONIN>FGF23", organs: "BONE>THYROID>KIDNEY", target: "CALCIUM_BALANCE", description: "Костная эндокринная ось" },
+  { id: "AXIS_HPA_DYS", name: "HPA Dysfunction", type: "hormonal_dysfunction", pathway: "CORTISOL_HIGH/DHEA_LOW", organs: "STRESS_BURNOUT", target: "", description: "Хронический стресс" },
+  { id: "AXIS_HPT_DYS", name: "HPT Dysfunction", type: "hormonal_dysfunction", pathway: "LOW_T3/HIGH_rT3", organs: "HYPOTHYROIDISM", target: "", description: "Гипотиреоз" },
+  { id: "AXIS_HPG_DYS", name: "HPG Dysfunction", type: "hormonal_dysfunction", pathway: "LOW_TESTOSTERONE/HIGH_PROLACTIN", organs: "SEX_DYSFUNCTION", target: "", description: "Гипогонадизм" },
+  { id: "AXIS_HPTA_DYS", name: "HPTA Dysfunction", type: "hormonal_dysfunction", pathway: "LOW_GH/LOW_IGF1", organs: "GROWTH_DEFICIT", target: "", description: "Дефицит гормона роста" },
+  { id: "AXIS_METABOLIC_DYS", name: "Metabolic Dysfunction", type: "hormonal_dysfunction", pathway: "INSULIN_RESISTANCE/LEPTIN_RESISTANCE", organs: "OBESITY", target: "", description: "Метаболический синдром" },
+  { id: "AXIS_GI_DYS", name: "GI Endocrine Dysfunction", type: "hormonal_dysfunction", pathway: "LOW_GLP1/HIGH_GHRELIN", organs: "APPETITE_DYSREGULATION", target: "", description: "Нарушение аппетита" },
+  { id: "AXIS_BONE_DYS", name: "Bone Endocrine Dysfunction", type: "hormonal_dysfunction", pathway: "HIGH_PTH/LOW_CALCITONIN", organs: "OSTEOPOROSIS", target: "", description: "Остеопороз" },
+  { id: "AXIS_HPA_INTERVENTION", name: "HPA Intervention", type: "hormonal_intervention", pathway: "LOWER_CRH/LOWER_ACTH/RAISE_DHEA", organs: "STRESS_DOWN", target: "", description: "Коррекция стресса" },
+  { id: "AXIS_HPT_INTERVENTION", name: "HPT Intervention", type: "hormonal_intervention", pathway: "IMPROVE_T4_TO_T3/LOWER_rT3", organs: "METABOLISM_UP", target: "", description: "Коррекция щитовидки" },
+  { id: "AXIS_HPG_INTERVENTION", name: "HPG Intervention", type: "hormonal_intervention", pathway: "LOWER_PROLACTIN/RAISE_LH/FSH", organs: "SEX_HORMONES_UP", target: "", description: "Коррекция половых гормонов" },
+  { id: "AXIS_HPTA_INTERVENTION", name: "HPTA Intervention", type: "hormonal_intervention", pathway: "RAISE_GHRH/LOWER_SOMATOSTATIN", organs: "GH_IGF1_UP", target: "", description: "Коррекция роста" },
+  { id: "AXIS_METABOLIC_INTERVENTION", name: "Metabolic Intervention", type: "hormonal_intervention", pathway: "IMPROVE_INSULIN/IMPROVE_LEPTIN", organs: "ENERGY_BALANCE_UP", target: "", description: "Коррекция метаболизма" },
+  { id: "AXIS_GI_INTERVENTION", name: "GI Endocrine Intervention", type: "hormonal_intervention", pathway: "RAISE_GLP1/LOWER_GHRELIN", organs: "APPETITE_CONTROL", target: "", description: "Коррекция аппетита" },
+  { id: "AXIS_BONE_INTERVENTION", name: "Bone Endocrine Intervention", type: "hormonal_intervention", pathway: "LOWER_PTH/RAISE_CALCITONIN", organs: "BONE_STRENGTH_UP", target: "", description: "Коррекция костей" }
+];
+// ── FROM: pharma-details.ts ──
+import type { PharmaSynergy, SideEffect } from '../core/types';
+
+export interface PharmaDetail {
+  id: string;
+  description: string;
+  mechanism: string;
+  synergies: PharmaSynergy[];
+  contraindications: string[];
+  sideEffects: SideEffect[];
+  dosageRange?: { min: number; max: number; unit: string; frequency: string };
+}
+
+export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
+  test_enan: {
+    id: 'test_enan',
+    description: 'Эфирированная форма тестостерона с периодом полувыведения ~4.5 дня. Основной андрогенный препарат для ЗТТ и массонаборных курсов. Обеспечивает стабильный уровень тестостерона при еженедельных инъекциях.',
+    mechanism: 'Связывается с андрогенными рецепторами (AR) → транслокация комплекса AR-тестостерон в ядро → активация генов белкового синтеза (AR-dependent транскрипция). Конвертируется в дигидротестостерон (ДГТ) через 5α-редуктазу и в эстрадиол через ароматазу.',
+    synergies: [
+      { with: 'hcg', type: 'complementary', desc: 'Предотвращает атрофию яичек, сохраняет эндогенную продукцию тестостерона и дескенс-цепь ЛГ' },
+      { with: 'anastro', type: 'complementary', desc: 'Контроль эстрадиола при ароматизации — предотвращает гинекомастию и задержку жидкости' },
+      { with: 'nandrolone', type: 'synergistic', desc: 'Усиленный анаболический эффект через синергию AR-зависимых путей белкового синтеза' },
+      { with: 'finasteride', type: 'antagonistic', desc: 'Снижает ДГТ-зависимые побочки, но может маскировать андрогенный дефицит в коже/простате' },
+    ],
+    contraindications: ['Рак простаты', 'Рак молочной железы (муж)', 'Тромбофилия', 'Полицитемия (Hct >54%)', 'Обструктивная гипертрофия простаты', 'Тяжёлая сердечная недостаточность'],
+    sideEffects: [
+      { effect: 'Эстрадиоловая ароматизация (гино, отёки, перепады настроения)', frequency: 'common' },
+      { effect: 'ДГТ-зависимые эффекты (алопеция, акне, гипертрофия простаты)', frequency: 'common' },
+      { effect: 'Супрессия HPTA (эндогенный тестостерон ↓)', frequency: 'common' },
+      { effect: 'Эритропоэз (полицитемия)', frequency: 'common' },
+      { effect: 'Дислипидемия (ЛПВП ↓)', frequency: 'common' },
+      { effect: 'Кардиотоксичность при высоких дозах', frequency: 'rare' },
+      { effect: 'Задержка натрия и воды', frequency: 'common' },
+    ],
+    dosageRange: { min: 100, max: 500, unit: 'мг/нед', frequency: '1 раз в 5-7 дней' },
+  },
+
+  tren_acet: {
+    id: 'tren_acet',
+    description: '19-нор производное тестостерона. Мощнейший анаболик (анаболический индекс 500 vs тестостерон 100). Не ароматизируется, но значительно повышает пролактин. Ацетатный эфир — короткий период полувыведения (~3 дня).',
+    mechanism: 'Мощный агонист AR (аффинность в 5× выше тестостерона). Активирует mTOR и MAPK/ERK-каскад → массивный белковый синтез. Не конвертируется в эстрадиол, но индуцирует пролактин через серотонинергические пути. Ингибирует 11β-HSD2 → кортизоловый парадокс.',
+    synergies: [
+      { with: 'test_enan', type: 'synergistic', desc: 'Комбинация тестостерон + тренболоне — классический массонаборный стек, синергия по AR' },
+      { with: 'caberg', type: 'complementary', desc: 'Каберголин подавляет пролактин, индуцированный тренболоном — предотвращает гинекомастию и снижение либидо' },
+      { with: 'anastro', type: 'antagonistic', desc: 'Тренболон не ароматизируется — ИА не нужны и могут снизить эстрадиол до опасных уровней' },
+    ],
+    contraindications: ['Рак простаты', 'Тяжёлая гипертензия', 'Психические расстройства (паранойя, агрессия)', 'Тромбофилия', 'Беременность партнёрши'],
+    sideEffects: [
+      { effect: 'Пролактин-индуцированная гинекомастия', frequency: 'common' },
+      { effect: 'Агрессия, бессонница, «трен-кашель»', frequency: 'common' },
+      { effect: 'Почечная токсичность (не гепатотоксичен!)', frequency: 'common' },
+      { effect: 'Супрессия HPTA (полная, быстрое восстановление)', frequency: 'common' },
+      { effect: 'Ночная потливость и бессонница', frequency: 'common' },
+      { effect: 'Кардиотоксичность (гипертрофия левого желудочка)', frequency: 'rare' },
+      { effect: 'Психозоподобные состояния', frequency: 'very_rare' },
+    ],
+    dosageRange: { min: 50, max: 350, unit: 'мг/нед', frequency: 'через день ( acetate)' },
+  },
+
+  oxan: {
+    id: 'oxan',
+    description: 'Оксандролон (Анавар) — пероральный ААС с минимальной андрогенной активностью и низким гепатотоксическим потенциалом. Популярен на сушке и у женщин.',
+    mechanism: 'Слабый агонист AR (анаболический индекс 322-630 vs тестостерон 100). Не ароматизируется, не конвертируется в ДГТ. Активирует AR → ↑ белковый синтез, ↑ азотистый баланс, ↑ IGF-1. Минимально подавляет HPTA при дозах <20 мг/день.',
+    synergies: [
+      { with: 'test_enan', type: 'synergistic', desc: 'Тестостерон как база + оксандролон для синергии белкового синтеза' },
+      { with: 'stan', type: 'complementary', desc: 'Оба DHT-производные — синергия при сушке, но двойная нагрузка на суставы' },
+    ],
+    contraindications: ['Тяжёлая печёночная недостаточность', 'Рак простаты', 'Беременность', 'Гиперкальциемия при злокачественных опухолях'],
+    sideEffects: [
+      { effect: 'Лёгкая гепатотоксичность (меньше чем у других оралов)', frequency: 'rare' },
+      { effect: 'Супрессия HPTA (дозозависимая)', frequency: 'common' },
+      { effect: 'Дислипидемия (ЛПВП ↓)', frequency: 'common' },
+      { effect: 'Снижение либидо при высоких дозах', frequency: 'rare' },
+    ],
+    dosageRange: { min: 20, max: 80, unit: 'мг/день', frequency: 'ежедневно' },
+  },
+
+  anastro: {
+    id: 'anastro',
+    description: 'Анастрозол (Аримидекс) — ингибитор ароматазы III поколения. Блокирует конверсию тестостерона в эстрадиол на >80%. Ключевой препарат контроля эстрогена на курсах.',
+    mechanism: 'Обратимо связывает ароматазу → блокирует конверсию андростендиона и тестостерона в эстрадиол. Уменьшает эстрадиол на 80-96% при 1 мг/день. ↑ ЛГ и ФСГ через обратную связь (устранение отрицательной обратной связи эстрогена).',
+    synergies: [
+      { with: 'test_enan', type: 'complementary', desc: 'Предотвращает эстрадиоловые побочки на тестостероновых курсах' },
+      { with: 'clomi', type: 'complementary', desc: 'ИА + кломид на ПКТ: ИА снижает эстрадиол, кломид стимулирует ЛГ/ФСГ' },
+      { with: 'tren_acet', type: 'antagonistic', desc: 'Трен не ароматизируется — ИА может снизить эстрадиол до опасных уровней (суставы, либидо, настроение)' },
+    ],
+    contraindications: ['Беременность', 'Тяжёлый остеопороз (эстроген.Protectiv для костей)', 'Предменопауза без ЗТТ'],
+    sideEffects: [
+      { effect: 'Суставные боли (снижение эстрогена до критических уровней)', frequency: 'common' },
+      { effect: 'Снижение либидо при передозировке', frequency: 'common' },
+      { effect: 'Ухудшение липидного профиля (ЛПВП ↓↓ )', frequency: 'common' },
+      { effect: 'Остеопороз при длительном применении', frequency: 'rare' },
+      { effect: 'Депрессия и раздражительность', frequency: 'common' },
+    ],
+    dosageRange: { min: 0.25, max: 1, unit: 'мг/день', frequency: '2-3 раза в неделю' },
+  },
+
+  caberg: {
+    id: 'caberg',
+    description: 'Каберголин (Достинекс) — агонист дофаминовых D2-рецепторов длительного действия. Мощный супрессор пролактина. Необходим при 19-нор курсах.',
+    mechanism: 'Мощный агонист D2-рецепторов → прямое ингибирование секреции пролактина лактотрофами аденогипофиза. Период полувыведения ~65 часов. Также снижает резистентность к инсулину через дофаминергические пути.',
+    synergies: [
+      { with: 'tren_acet', type: 'complementary', desc: 'Контроль пролактина, индуцированного тренболоном' },
+      { with: 'deca', type: 'complementary', desc: 'Нандролон ↑ пролактин — каберголин подавляет' },
+      { with: 'test_enan', type: 'complementary', desc: 'Контроль пролактина при стеках с 19-нор' },
+    ],
+    contraindications: ['Тяжёлая печёночная недостаточность', 'Фиброзные заболевания сердечных клапанов', 'Психозы', 'Неконтролируемая гипертензия'],
+    sideEffects: [
+      { effect: 'Тошнота и желудочно-кишечные нарушения', frequency: 'common' },
+      { effect: 'Снижение АД (ортостатическая гипотензия)', frequency: 'common' },
+      { effect: 'Импульсивные расстройства (гиперсексуальность, азартные игры)', frequency: 'rare' },
+      { effect: 'Фиброз клапанов сердца при длительном применении', frequency: 'very_rare' },
+    ],
+    dosageRange: { min: 0.25, max: 1, unit: 'мг/нед', frequency: '1-2 раза в неделю' },
+  },
+
+  clomi: {
+    id: 'clomi',
+    description: 'Кломифена цитрат — селективный модулятор эстрогеновых рецепторов (SERM). Стандартный препарат ПКТ для восстановления HPTA.',
+    mechanism: 'Конкурентно связывается с эстрогеновыми рецепторами в гипоталамусе и гипофизе → блокирует отрицательную обратную связь эстрадиола → ↑ ГнРГ → ↑ ЛГ и ФСГ. В периферических тканях действует как антиэстроген (грудь, простата) и эстроген (кость, липиды).',
+    synergies: [
+      { with: 'tamox', type: 'synergistic', desc: 'Комбинация Кломид + Тамоксифен — золотой стандарт ПКТ' },
+      { with: 'hcg', type: 'complementary', desc: 'ХГЧ восстанавливает яички + Кломид стимулирует ЛГ/ФСГ' },
+      { with: 'anastro', type: 'complementary', desc: 'ИА снижает эстрадиол, Кломид блокирует ER — синергия на ПКТ' },
+    ],
+    contraindications: ['Беременность', 'Тяжёлая печёночная недостаточность', 'Тромбоэмболия в анамнезе', 'Кисты яичников'],
+    sideEffects: [
+      { effect: 'Перепады настроения, раздражительность', frequency: 'common' },
+      { effect: 'Затуманивание зрения (редко)', frequency: 'rare' },
+      { effect: 'Приливы жара', frequency: 'common' },
+      { effect: 'Головные боли', frequency: 'common' },
+    ],
+    dosageRange: { min: 25, max: 100, unit: 'мг/день', frequency: 'ежедневно на ПКТ' },
+  },
+
+  bpc157: {
+    id: 'bpc157',
+    description: 'BPC-157 (Body Protective Compound-157) — пептид из 15 аминокислот, производный белка желудка. Мощнейший регенератор тканей — связывает ангиогенные и цитопротекторные эффекты.',
+    mechanism: 'Активирует VEGF (сосудистый эндотелиальный фактор роста) → ангиогенез → неоваскуляризация повреждённых тканей. Активирует FGF-2 → пролиферация фибробластов и синтез коллагена. Стабилизирует NO-путь → цитопротекция endothelial NO-synthase. Модулирует простагландиновый каскад через POS-путь.',
+    synergies: [
+      { with: 'tb500', type: 'synergistic', desc: 'BPC-157 (ангиогенез) + TB-500 (актин-ремоделирование) = синергия регенерации сухожилий и связок' },
+      { with: 'vitamin_c', type: 'complementary', desc: 'Витамин C + BPC-157 → синергия синтеза коллагена и ангиогенеза' },
+    ],
+    contraindications: ['Активные злокачественные новообразования (ангиогенез может стимулировать рост опухолей)', 'Беременность'],
+    sideEffects: [
+      { effect: 'Возможная стимуляция ангиогенеза при скрытых опухолях', frequency: 'very_rare' },
+      { effect: 'Лёгкая тошнота при пероральном приёме', frequency: 'rare' },
+    ],
+    dosageRange: { min: 200, max: 500, unit: 'мкг/день', frequency: '1-2 раза в день, 2-4 недели' },
+  },
+
+  semax: {
+    id: 'semax',
+    description: 'Семакс (Ме-Glu-His-Phe-Pro-Gly-Pro) — ноотропный пептид, синтетический аналог ACTH(4-7). Стимулирует нейрогенез, повышает BDNF, улучшает когнитивные функции.',
+    mechanism: 'Активирует меланокортиновые рецепторы MC3/MC4 → ↑ BDNF и NGF в гиппокампе. Модулирует серотониновый и дофаминовый обмен. Улучшает церебральный кровоток через NO-путь. Нормализует баланс возбуждения/торможения в ЦНС.',
+    synergies: [
+      { with: 'selank', type: 'synergistic', desc: 'Семакс + Селанк = синергия нейропротекции и ноотропии' },
+      { with: 'vitamin_b12', type: 'complementary', desc: 'Витамин B12 + Семакс = улучшение нервной проводимости' },
+    ],
+    contraindications: ['Беременность', 'Повышенная чувствительность к пептидам'],
+    sideEffects: [
+      { effect: 'Лёгкое раздражение слизистой носа', frequency: 'common' },
+      { effect: 'Головная боль при высоких дозах', frequency: 'rare' },
+    ],
+    dosageRange: { min: 500, max: 2000, unit: 'мкг/день', frequency: '2 раза в день (назальный спрей)' },
+  },
+
+  selank: {
+    id: 'selank',
+    description: 'Селанк (Ме-Glu-His-Pro-Gly-Pro) — ноотропный пептид, синтетический аналог пептида Тимуса. Анксиолитическое и нейропротекторное действие.',
+    mechanism: 'Модулирует дофаминовый, серотониновый и ГАМК-ергический обмен. ↑ BDNF и NGF. Стабилизирует баланс возбуждения/торможения в ЦНС. Обладает выраженным анксиолитическим эффектом без седации.',
+    synergies: [
+      { with: 'semax', type: 'synergistic', desc: 'Селанк + Семакс = синергия нейропротекции и ноотропии' },
+      { with: 'vitamin_b12', type: 'complementary', desc: 'Витамин B12 + Селанк = улучшение нервной проводимости' },
+    ],
+    contraindications: ['Беременность', 'Повышенная чувствительность к пептидам'],
+    sideEffects: [
+      { effect: 'Лёгкое раздражение слизистой носа', frequency: 'common' },
+      { effect: 'Головная боль при высоких дозах', frequency: 'rare' },
+    ],
+    dosageRange: { min: 500, max: 2000, unit: 'мкг/день', frequency: '2 раза в день (назальный спрей)' },
+  },
+
+  mk677: {
+    id: 'mk677',
+    description: 'Ибутаморен (MK-677) — пероральный секретагог гормона роста. Миметизирует грелиновый рецептор (GHSR), стимулирует пульс GH и IGF-1. Пероральная альтернатива инъекционному GH.',
+    mechanism: 'Мощный агонист GHSR (грелинового рецептора) → стимуляция соматотрофов аденогипофиза → пульсирующая секреция GH → ↑ IGF-1 в печени. Также ↑ ЛГ/ФСГ (слабо) и ↑ аппетит через грелиновый путь в гипоталамусе.',
+    synergies: [
+      { with: 'cjc1295', type: 'synergistic', desc: 'GHRH (CJC) + GHSR-агонист (MK-677) = максимальный пульс GH, больше чем каждый по отдельности' },
+      { with: 'berberine', type: 'complementary', desc: 'MK-677 может ↑ инсулинорезистентность → береберин компенсирует через AMPK' },
+    ],
+    contraindications: ['Активные злокачественные опухоли (GH/IGF-1 могут стимулировать рост)', 'Диабет 2 типа без контроля', 'Синдром МЭН', 'Беременность'],
+    sideEffects: [
+      { effect: 'Значительное ↑ аппетита', frequency: 'common' },
+      { effect: 'Инсулинорезистентность (↑ глюкоза, ↑ инсулин)', frequency: 'common' },
+      { effect: 'Задержка воды, отёки', frequency: 'common' },
+      { effect: 'Летаргия при высоких дозах', frequency: 'rare' },
+    ],
+    dosageRange: { min: 10, max: 25, unit: 'мг/день', frequency: 'ежедневно перорально на ночь' },
+  },
+
+  ostarine: {
+    id: 'ostarine',
+    description: 'Остарин (MK-2866, GTx-024) — селективный модулятор андрогенных рецепторов (SARM). Анаболический эффект в мышцах и костях с минимальным воздействием на простату и кожу.',
+    mechanism: 'Селективный агонист AR в мышечной и костной ткани → ↑ белковый синтез без активации AR в простате и коже. Анаболический индекс ~3:1 (мышцы:простата). Не ароматизируется, не конвертируется в ДГТ.',
+    synergies: [
+      { with: 'test_enan', type: 'synergistic', desc: 'Тестостерон как база + остарин для дополнительного анаболизма' },
+      { with: 'anastro', type: 'antagonistic', desc: 'IA не нужны — остарин не ароматизируется, риск снижения эстрадиола до нуля' },
+    ],
+    contraindications: ['Беременность', 'Рак простаты (теоретический риск)', 'Тяжёлые заболевания печени'],
+    sideEffects: [
+      { effect: 'Супрессия HPTA (дозозависимая, обратимая)', frequency: 'common' },
+      { effect: 'Лёгкое ↑ ЛПНП и ↓ ЛПВП', frequency: 'common' },
+      { effect: 'Гепатотоксичность (реже чем у оральных ААС)', frequency: 'rare' },
+    ],
+    dosageRange: { min: 10, max: 25, unit: 'мг/день', frequency: 'ежедневно перорально' },
+  },
+
+  deca: {
+    id: 'deca',
+    description: 'Нандролон деканоат (Дека) — один из самых популярных ААС для массонабора и лечения остеопороза. Деканоатный эфир обеспечивает длительное высвобождение (период полувыведения ~15 дней).',
+    mechanism: 'Агонист AR с высокой аффинностью. Скорость конверсии в эстроген ~20% от тестостерона (через ароматазу). Конвертируется в дигидронандролон (ДГН) через 5α-редуктазу — значительно менее андрогенный, чем ДГТ. ↑ синтез коллагена, ↑ минерализация костей, ↑ эритропоэз.',
+    synergies: [
+      { with: 'test_enan', type: 'synergistic', desc: 'Классический стек: тестостерон база + нандролон для синергии белкового синтеза' },
+      { with: 'caberg', type: 'complementary', desc: 'Нандролон ↑ пролактин → каберголин подавляет пролактин' },
+    ],
+    contraindications: ['Рак простаты', 'Рак молочной железы', 'Тяжёлая гипертензия', 'Нефроз', 'Беременность'],
+    sideEffects: [
+      { effect: 'Пролактин-индуцированная гинекомастия и ↓ либидо', frequency: 'common' },
+      { effect: 'Задержка жидкости (периферические отёки)', frequency: 'common' },
+      { effect: 'Супрессия HPTA (очень длительная — до 6 мес)', frequency: 'common' },
+      { effect: 'Дислипидемия (ЛПВП ↓)', frequency: 'common' },
+      { effect: 'Синдром «Дека-дика» (эректильная дисфункция после курса)', frequency: 'common' },
+    ],
+    dosageRange: { min: 200, max: 600, unit: 'мг/нед', frequency: '1 раз в 7-10 дней' },
+  },
+
+  stan: {
+    id: 'stan',
+    description: 'Станозолол (Винстрол) — ДГТ-производный ААС с уникальным профилем: одновременно анаболический и умеренно антиэстрогенный. Не ароматизируется. Популярен на сушке.',
+    mechanism: 'Агонист AR с пониженной аффинностью, но сниженным SHBG-связыванием → ↑ свободный тестостерон. Не ароматизируется. Ингибирует SHBG → ↑ биодоступность других ААС. Стимулирует эритропоэз. Умеренно гепатотоксичен.',
+    synergies: [
+      { with: 'test_enan', type: 'synergistic', desc: '↓ SHBG → ↑ свободный тестостерон — синергия при сушке' },
+      { with: 'oxan', type: 'complementary', desc: 'Оба DHT-производных для сушки, но двойная суставная нагрузка' },
+    ],
+    contraindications: ['Тяжёлые заболевания печени', 'Гиперкальциемия', 'Рак простаты', 'Беременность'],
+    sideEffects: [
+      { effect: 'Гепатотоксичность (↑ АЛТ, АСТ)', frequency: 'common' },
+      { effect: 'Дислипидемия (ЛПВП ↓, ЛПНП ↑)', frequency: 'common' },
+      { effect: 'Суставные боли (снижение синтовиальной жидкости)', frequency: 'common' },
+      { effect: 'Выпадение волос (ДГТ-зависимое)', frequency: 'common' },
+      { effect: 'Сухость связок → риск разрыва', frequency: 'rare' },
+    ],
+    dosageRange: { min: 20, max: 50, unit: 'мг/день', frequency: 'ежедневно (орал) / через день (инъекция)' },
+  },
+
+  telmi: {
+    id: 'telmi',
+    description: 'Телмисартан (Микардис) — АРБ (антагонист рецепторов ангиотензина II) с уникальным PPAR-γ частичным агонизмом. Используется для кардиопротекции на ААС-курсах.',
+    mechanism: 'Блокада AT1-рецепторов ангиотензина II → ↓ вазоконстрикция, ↓ альдостерон → ↓ АД. Частичный агонист PPAR-γ → ↑ инсулиновая чувствительность, ↑ липидный обмен, ↓ воспаление. Снижает TGF-β1 → нефропротекция. Улучшает эндотелиальную функцию через ↑ NO.',
+    synergies: [
+      { with: 'omega3', type: 'complementary', desc: 'Телмисартан + Омега-3 = синергия кардиопротекции через PPAR-γ и EPA/DHA' },
+      { with: 'nac', type: 'complementary', desc: 'Телмисартан (нефропротекция) + NAC (гепатопротекция) = комбинированная органопротекция' },
+    ],
+    contraindications: ['Беременность (II и III триместр)', 'Двусторонний стеноз почечных артерий', 'Обструктивная гипертрофическая кардиомиопатия', 'Одновременный приём ИАПФ'],
+    sideEffects: [
+      { effect: 'Гипотензия (при передозировке)', frequency: 'common' },
+      { effect: 'Головокружение', frequency: 'common' },
+      { effect: 'Гиперкалиемия (редко)', frequency: 'rare' },
+    ],
+    dosageRange: { min: 20, max: 80, unit: 'мг/день', frequency: 'ежедневно' },
+  },
+
+  nac: {
+    id: 'nac',
+    description: 'N-ацетилцистеин (NAC) — предшественник глутатиона, главного внутриклеточного антиоксиданта. Гепатопротектор, муколитик, нейропротектор.',
+    mechanism: 'Деацетилируется до цистеина → предшественник глутатиона (GSH) → нейтрализация ROS и электрофильных токсинов. Модулирует NF-κB → противовоспительное действие. Расщепляет дисульфидные связи мукопротеинов → муколитический эффект. Хелатирует тяжёлые металлы.',
+    synergies: [
+      { with: 'tudca', type: 'synergistic', desc: 'NAC (глутатион ↑) + TUDCA (холестаз) = максимальная гепатопротекция' },
+      { with: 'vitamin_c', type: 'synergistic', desc: 'NAC (GSH ↑) + Vit C (водорастворимый антиоксидант) = синергия антиоксидантной защиты' },
+    ],
+    contraindications: ['Бронхиальная астма (риск бронхоспазма при ингаляции)', 'Тяжёлая печёночная недостаточность'],
+    sideEffects: [
+      { effect: 'Тошнота, желудочно-кишечные нарушения', frequency: 'common' },
+      { effect: 'Неприятный запах (сероводород)', frequency: 'common' },
+      { effect: 'Аллергические реакции (редко)', frequency: 'very_rare' },
+    ],
+    dosageRange: { min: 600, max: 1800, unit: 'мг/день', frequency: '1-2 раза в день' },
+  },
+
+  omega3: {
+    id: 'omega3',
+    description: 'Омега-3 жирные кислоты (EPA + DHA) — эссенциальные полиненасыщенные жирные кислоты. Кардиопротектор, противовоспалительный, нейропротектор.',
+    mechanism: 'EPA и DHA интегрируются в фосфолипидный бислой мембран → ↓ вязкость, ↑ текучесть. Служат предшественниками противовоспалительных эйкозаноидов (PGE3, LTB5) вместо прововоспалительных PGE2/LTB4 из арахидоновой кислоты. Активируют PPAR-α и PPAR-γ → ↓ триглицериды, ↑ ЛПВП. DHA — ключевой компонент мембран нейронов.',
+    synergies: [
+      { with: 'telmi', type: 'complementary', desc: 'Омега-3 + Телмисартан → PPAR-γ синергия, максимальная кардиопротекция' },
+      { with: 'vitamin_d3', type: 'complementary', desc: 'Омега-3 + Витамин D → синергия иммунитета и костного метаболизма' },
+    ],
+    contraindications: ['Гемофилия и другие нарушения свёртываемости (высокие дозы)', 'Одновременный приём антикоагулянтов без контроля МНО'],
+    sideEffects: [
+      { effect: 'Рыбный запах от тела', frequency: 'common' },
+      { effect: 'Разжижение крови при высоких дозах', frequency: 'rare' },
+      { effect: 'ЖК дискомфорт', frequency: 'common' },
+    ],
+    dosageRange: { min: 1000, max: 3000, unit: 'мг/день EPA+DHA', frequency: 'с едой 1-2 раза' },
+  },
+
+  vitamin_d3: {
+    id: 'vitamin_d3',
+    description: 'Витамин D3 (холекальциферол) — стероидный прогормон, синтезирующийся в коже под УФ. Критичен для кальциевого гомеостаза, иммунитета и тестостерона.',
+    mechanism: 'Гидроксилируется в печени (25-OH-D3) → почках (1,25-OH2-D3 = кальцитриол) → связывается с VDR (витамин D рецептор) → активирует >200 генов. ↑ всасывание Ca/P в кишечнике, ↑ остеокальцин, ↑ ФПП-23. ↑ иммунитет через кателицидины. ↑ тестостерон через стимуляцию ЛГ.',
+    synergies: [
+      { with: 'vitamin_k2', type: 'synergistic', desc: 'D3 ↑ всасывание Ca → K2 направляет Ca в кости (остеокальцин), предотвращая кальцификацию сосудов' },
+      { with: 'magnesium', type: 'synergistic', desc: 'Mg необходим для активации D3 (25-OHase) → синергия метаболизма витамина D' },
+    ],
+    contraindications: ['Гиперкальциемия', 'Гипервитаминоз D', 'Саркоидоз (риск гиперкальциемии)', 'Тяжёлая почечная недостаточность'],
+    sideEffects: [
+      { effect: 'Гиперкальциемия при передозировке (>10000 МЕ/день)', frequency: 'rare' },
+      { effect: 'Тошнота при высоких дозах', frequency: 'rare' },
+    ],
+    dosageRange: { min: 2000, max: 5000, unit: 'МЕ/день', frequency: 'ежедневно с едой' },
+  },
+};
+// ── FROM: mechanism-labels.ts ──
+export const MECHANISM_LABELS: Record<string, string> = {
+  '5AR_INHIBITION': 'Ингибирование 5α-редуктазы',
+  '5_LOX_INHIBITION': 'Ингибирование 5-липоксигеназы',
+  'ACETYLATION': 'Ацетилирование',
+  'ACETYLCHOLINESTERASE_INHIBITION': 'Ингибирование ацетилхолинэстеразы',
+  'ACETYLCHOLINE_MODULATION': 'Модуляция ацетилхолина',
+  'ACETYLCHOLINE_PRECURSOR': 'Предшественник ацетилхолина',
+  'ACETYLCHOLINE_SYNTHESIS': 'Синтез ацетилхолина',
+  'ACE_INHIBITION': 'Ингибирование АПФ',
+  'ACID_NEUTRALIZATION': 'Нейтрализация кислоты',
+  'ACID_REDUCTION': 'Снижение кислотности',
+  'ACTIN_REGULATION': 'Регуляция актина',
+  'ADAPTOGENIC': 'Адаптогенное действие',
+  'ADENOSINE_ANTAGONISM': 'Антагонизм аденозина',
+  'ADRENAL_RECOVERY': 'Восстановление надпочечников',
+  'ADRENAL_SUPPORT': 'Поддержка надпочечников',
+  'ALDOSTERONE_ANTAGONISM': 'Антагонизм альдостерона',
+  'ALLERGY_REDUCTION': 'Снижение аллергии',
+  'ALPHA_WAVE_INDUCTION': 'Индукция альфа-волн',
+  'AMINO_ACID_METABOLISM': 'Метаболизм аминокислот',
+  'AMMONIA_DETOX': 'Детоксикация аммиака',
+  'AMMONIA_DETOXIFICATION': 'Детоксификация аммиака',
+  'AMPK_ACTIVATION': 'Активация AMPK',
+  'ANABOLIC_EFFECT': 'Анаболический эффект',
+  'ANALGESIC': 'Анальгетик',
+  'ANDROGENIC_EFFECT': 'Андрогенный эффект',
+  'ANDROGEN_PRECURSOR': 'Предшественник андрогенов',
+  'ANGINA_PREVENTION': 'Профилактика стенокардии',
+  'ANGIOGENESIS': 'Ангиогенез',
+  'ANGIOTENSIN_RECEPTOR_BLOCKADE': 'Блокада рецепторов ангиотензина',
+  'ANTIATHEROGENIC': 'Антиатерогенное действие',
+  'ANTICANCER': 'Противораковое действие',
+  'ANTIDEPRESSANT': 'Антидепрессант',
+  'ANTIFIBROTIC': 'Антифибротическое действие',
+  'ANTIHISTAMINE': 'Антигистаминное действие',
+  'ANTIMICROBIAL': 'Противомикробное действие',
+  'ANTIOXIDANT': 'Антиоксидант',
+  'ANTIOXIDANT_6000X': 'Антиоксидант 6000x',
+  'ANTIOXIDANT_DEFENSE': 'Антиоксидантная защита',
+  'ANTIOXIDANT_ENZYME_INDUCTION': 'Индукция антиоксидантных ферментов',
+  'ANTIOXIDANT_MASTER': 'Мастер-антиоксидант',
+  'ANTIOXIDANT_NETWORK': 'Антиоксидантная сеть',
+  'ANTIPYRETIC': 'Жаропонижающее',
+  'ANTI_AGING': 'Антивозрастное действие',
+  'ANTI_ANDROGEN': 'Антиандроген',
+  'ANTI_ANDROGENIC': 'Антиандрогенное действие',
+  'ANTI_APOPTOTIC': 'Антиапоптотическое действие',
+  'ANTI_CATABOLIC': 'Антикатаболическое действие',
+  'ANTI_FATIGUE': 'Противоутомительное действие',
+  'ANTI_FIBROTIC': 'Антифибротическое действие',
+  'ANTI_GLYCATION': 'Антигликационное действие',
+  'ANTI_INFLAMMATORY': 'Противовоспалительное действие',
+  'ANTI_MUTAGENIC': 'Антимутагенное действие',
+  'ANTI_VIRAL': 'Противовирусное действие',
+  'ANXIOLYTIC': 'Анксиолитик',
+  'APHRODISIAC_EFFECT': 'Афродизиак',
+  'APOPTOSIS_INHIBITION': 'Ингибирование апоптоза',
+  'APOPTOSIS_REGULATION': 'Регуляция апоптоза',
+  'APPETITE_CONTROL': 'Контроль аппетита',
+  'APPETITE_IMPROVEMENT': 'Улучшение аппетита',
+  'APPETITE_REGULATION': 'Регуляция аппетита',
+  'APPETITE_STIMULATION': 'Стимуляция аппетита',
+  'APPETITE_SUPPRESSION': 'Подавление аппетита',
+  'ARRHYTHMIA_PREVENTION': 'Профилактика аритмии',
+  'AR_RECEPTOR_MODULATION': 'Модуляция андрогенных рецепторов',
+  'ATP_PRODUCTION': 'Продукция АТФ',
+  'ATP_REGENERATION': 'Регенерация АТФ',
+  'ATP_SYNTHESIS': 'Синтез АТФ',
+  'AUTOIMMUNE_TREATMENT': 'Лечение аутоиммунных заболеваний',
+  'BACTERIAL_INFECTION_TREATMENT': 'Лечение бактериальных инфекций',
+  'BDNF_INCREASE': 'Повышение BDNF',
+  'BETA1_BLOCKADE': 'Блокада β1-рецепторов',
+  'BETA_GLUCAN_DELIVERY': 'Доставка β-глюкана',
+  'BETA_RECEPTOR_BLOCKADE': 'Блокада β-рецепторов',
+  'BIFIDOBACTERIA_GROWTH': 'Рост бифидобактерий',
+  'BILE_ACID_BINDING': 'Связывание желчных кислот',
+  'BILE_ACID_CONJUGATION': 'Конъюгация желчных кислот',
+  'BILE_FLOW': 'Отток желчи',
+  'BILE_FLOW_STIMULATION': 'Стимуляция оттока желчи',
+  'BILE_SECRETION': 'Секреция желчи',
+  'BLOOD_CLOTTING': 'Свёртывание крови',
+  'BLOOD_FLOW_ENHANCEMENT': 'Усиление кровотока',
+  'BLOOD_FLOW_IMPROVEMENT': 'Улучшение кровотока',
+  'BLOOD_PRESSURE': 'Артериальное давление',
+  'BLOOD_PRESSURE_LOWERING': 'Снижение артериального давления',
+  'BLOOD_PRESSURE_REGULATION': 'Регуляция артериального давления',
+  'BLOOD_THINNING': 'Разжижение крови',
+  'BLUE_LIGHT_FILTER': 'Фильтр синего света',
+  'BMR_REGULATION': 'Регуляция базального метаболизма',
+  'BONDING_ENHANCEMENT': 'Усиление социальных связей',
+  'BONE_DENSITY': 'Плотность костей',
+  'BONE_DENSITY_REGULATION': 'Регуляция плотности костей',
+  'BONE_FORMATION': 'Формирование костной ткани',
+  'BONE_HEALING': 'Заживление костей',
+  'BONE_MINERALIZATION': 'Минерализация костей',
+  'BONE_MINERAL_DENSITY': 'Минеральная плотность костей',
+  'BONE_PROTECTION': 'Защита костей',
+  'BP_REDUCTION': 'Снижение АД',
+  'BRAIN_DEVELOPMENT': 'Развитие мозга',
+  'BRAIN_ENERGY': 'Энергия мозга',
+  'BRAIN_GUT_AXIS': 'Ось мозг-кишечник',
+  'BRAIN_PROTECTION': 'Защита мозга',
+  'BRONCHODILATION': 'Бронходилатация',
+  'BUTYRATE_PRODUCTION': 'Продукция бутирата',
+  'B_VITAMIN_SOURCE': 'Источник витаминов группы B',
+  'B_VITAMIN_SYNERGY': 'Синергия витаминов группы B',
+  'CALCIUM_ABSORPTION': 'Абсорбция кальция',
+  'CALCIUM_CHANNEL_BLOCKADE': 'Блокада кальциевых каналов',
+  'CALCIUM_DISTRIBUTION': 'Распределение кальция',
+  'CALCIUM_REGULATION': 'Регуляция кальция',
+  'CARBOXYLASE_COENZYME': 'Кофермент карбоксилаз',
+  'CARDIAC_FUEL': 'Топливо для сердца',
+  'CARDIOVASCULAR_PROTECTION': 'Защита сердечно-сосудистой системы',
+  'CARNOSINE_PRECURSOR': 'Предшественник карнозина',
+  'CARNOSINE_SYNTHESIS': 'Синтез карнозина',
+  'CARTILAGE_FORMATION': 'Формирование хряща',
+  'CARTILAGE_REPAIR': 'Восстановление хряща',
+  'CELL_PROTECTION': 'Защита клеток',
+  'CELL_SIGNALING': 'Клеточная сигнализация',
+  'CEREBRAL_BLOOD_FLOW': 'Церебральный кровоток',
+  'CERULOPLASMIN': 'Церулоплазмин',
+  'CHOLESTEROL_LOWERING': 'Снижение холестерина',
+  'CHOLESTEROL_MODULATION': 'Модуляция холестерина',
+  'CHOLESTEROL_REDUCTION': 'Снижение холестерина',
+  'CHOLESTEROL_SOLUBILIZATION': 'Растворение холестерина',
+  'CHOLINE_UPTAKE_ENHANCEMENT': 'Усиление захвата холина',
+  'CIRCADIAN_RHYTHM': 'Циркадный ритм',
+  'CIRCADIAN_RHYTHM_REGULATION': 'Регуляция циркадного ритма',
+  'CIRCULATION_ENHANCEMENT': 'Улучшение кровообращения',
+  'CNS_STIMULATION': 'Стимуляция ЦНС',
+  'COAGULATION_INHIBITION': 'Ингибирование коагуляции',
+  'COENZYME_A_SYNTHESIS': 'Синтез кофермента A',
+  'COFACTOR_SUPPORT': 'Поддержка кофакторов',
+  'COGNITION_ENHANCEMENT': 'Улучшение когнитивных функций',
+  'COGNITION_SUPPORT': 'Поддержка когнитивных функций',
+  'COGNITIVE_ENHANCEMENT': 'Улучшение когнитивных функций',
+  'COLLAGEN_CROSS_LINKING': 'Сшивка коллагена',
+  'COLLAGEN_PROTECTION': 'Защита коллагена',
+  'COLLAGEN_SYNTHESIS': 'Синтез коллагена',
+  'COLONOCYTE_FUEL': 'Топливо для колоноцитов',
+  'COMPREHENSIVE_NUTRITION': 'Комплексное питание',
+  'CONNECTIVE_TISSUE': 'Соединительная ткань',
+  'COPPER_DELIVERY': 'Доставка меди',
+  'CORTISOL_ANTAGONISM': 'Антагонизм кортизола',
+  'CORTISOL_BALANCE': 'Баланс кортизола',
+  'CORTISOL_INCREASE': 'Повышение кортизола',
+  'CORTISOL_MODULATION': 'Модуляция кортизола',
+  'CORTISOL_REDUCTION': 'Снижение кортизола',
+  'CORTISOL_REGULATION': 'Регуляция кортизола',
+  'CORTISOL_REPLACEMENT': 'Замещение кортизола',
+  'COURSE_SUPPORT': 'Поддержка курса',
+  'COX2_INHIBITION': 'Ингибирование ЦОГ-2',
+  'COX2_SELECTIVE_INHIBITION': 'Селективное ингибирование ЦОГ-2',
+  'COX_INHIBITION': 'Ингибирование ЦОГ',
+  'CREATIVITY_BOOST': 'Повышение креативности',
+  'CYP3A4_INHIBITION': 'Ингибирование CYP3A4',
+  'DETOXIFICATION': 'Детоксификация',
+  'DETOXIFICATION_PHASE2': 'Детоксификация фазы 2',
+  'DHA_BRAIN_STRUCTURE': 'DHA для структуры мозга',
+  'DHEA_PRODUCTION': 'Продукция ДГЭА',
+  'DHT_INHIBITION_5AR': 'Ингибирование ДГТ (5AR)',
+  'DHT_REDUCTION': 'Снижение ДГТ',
+  'DIGESTION_ENHANCEMENT': 'Улучшение пищеварения',
+  'DIGESTION_IMPROVEMENT': 'Улучшение пищеварения',
+  'DIGESTION_STIMULATION': 'Стимуляция пищеварения',
+  'DNA_PROTECTION': 'Защита ДНК',
+  'DNA_REPAIR': 'Восстановление ДНК',
+  'DNA_SYNTHESIS': 'Синтез ДНК',
+  'DOPAMINE_ANTAGONISM': 'Антагонизм дофамина',
+  'DOPAMINE_D2_AGONISM': 'Агонизм D2-рецепторов дофамина',
+  'DOPAMINE_MODULATION': 'Модуляция дофамина',
+  'DOPAMINE_PRECURSOR': 'Предшественник дофамина',
+  'DOPAMINE_PROTECTION': 'Защита дофамина',
+  'DOPAMINE_SYNTHESIS_UPREGULATION': 'Усиление синтеза дофамина',
+  'DVT_PREVENTION': 'Профилактика тромбоза глубоких вен',
+  'EDEMA_REDUCTION': 'Снижение отёков',
+  'ELASTICITY_RESTORATION': 'Восстановление эластичности',
+  'ELECTROLYTE_BALANCE': 'Электролитный баланс',
+  'ELECTROLYTE_SUPPORT': 'Поддержка электролитов',
+  'ELECTRON_TRANSPORT': 'Транспорт электронов',
+  'ELECTRON_TRANSPORT_CHAIN': 'Цепь переноса электронов',
+  'ENDOTHELIAL_PROTECTION': 'Защита эндотелия',
+  'ENDURANCE_ENHANCEMENT': 'Повышение выносливости',
+  'ENERGY_BOOST': 'Энергетический заряд',
+  'ENERGY_ENHANCEMENT': 'Повышение энергии',
+  'ENERGY_METABOLISM': 'Энергетический метаболизм',
+  'ENERGY_PRODUCTION': 'Продукция энергии',
+  'ENZYME_ACTIVATION': 'Активация ферментов',
+  'ENZYME_COFACTOR': 'Кофактор ферментов',
+  'EPA_ANTI_INFLAMMATORY': 'Противовоспалительное действие EPA',
+  'EPITHELIAL_MAINTENANCE': 'Поддержание эпителия',
+  'ERECTILE_FUNCTION': 'Эректильная функция',
+  'ER_STRESS_REDUCTION': 'Снижение стресса ЭПР',
+  'ESOPHAGUS_PROTECTION': 'Защита пищевода',
+  'ESSENTIAL_AMINO_ACID_SUPPLY': 'Поставка незаменимых аминокислот',
+  'ESTROGEN_METABOLISM': 'Метаболизм эстрогенов',
+  'ESTROGEN_MODULATION': 'Модуляция эстрогенов',
+  'FAD_COENZYME': 'Кофермент FAD',
+  'FATIGUE_REDUCTION': 'Снижение утомляемости',
+  'FATTY_ACID_SYNTHESIS': 'Синтез жирных кислот',
+  'FATTY_ACID_TRANSPORT': 'Транспорт жирных кислот',
+  'FAT_LOSS': 'Сжигание жира',
+  'FAT_METABOLISM': 'Метаболизм жиров',
+  'FAT_OXIDATION': 'Окисление жиров',
+  'FERTILITY_SUPPORT': 'Поддержка фертильности',
+  'FEVER_REDUCTION': 'Снижение температуры',
+  'FIBRINOLYSIS': 'Фибринолиз',
+  'FIBROSIS_REDUCTION': 'Снижение фиброза',
+  'FIGHT_OR_FLIGHT': 'Реакция борьбы или бегства',
+  'FLUID_REGULATION': 'Регуляция жидкости',
+  'FLUID_REMOVAL': 'Выведение жидкости',
+  'FOCUS_ENHANCEMENT': 'Улучшение концентрации',
+  'FOCUS_IMPROVEMENT': 'Улучшение фокуса',
+  'FOLLICLE_REGULATION': 'Регуляция фолликулов',
+  'FREE_TESTOSTERONE_INCREASE': 'Повышение свободного тестостерона',
+  'FULVIC_ACID_DELIVERY': 'Доставка фульвовой кислоты',
+  'GABA_B_AGONIST': 'Агонист ГАМК-B',
+  'GABA_MODULATION': 'Модуляция ГАМК',
+  'GABA_PRECURSOR': 'Предшественник ГАМК',
+  'GABA_RECEPTOR_AGONISM': 'Агонизм ГАМК-рецепторов',
+  'GABA_RECEPTOR_MODULATION': 'Модуляция ГАМК-рецепторов',
+  'GALLSTONE_PREVENTION': 'Профилактика камней в желчном',
+  'GASTRIC_PROTECTION': 'Защита желудка',
+  'GH_RELEASE': 'Высвобождение ГР',
+  'GH_RELEASE_SELECTIVE': 'Селективное высвобождение ГР',
+  'GH_RELEASING_IGH_INCREASE': 'Повышение ГР/ИФР-1',
+  'GLA_ANTI_INFLAMMATORY': 'Противовоспалительное действие GLA',
+  'GLP1_RECEPTOR_AGONISM': 'Агонизм рецепторов ГПП-1',
+  'GLUCONEOGENESIS': 'Глюконеогенез',
+  'GLUCONEOGENESIS_INHIBITION': 'Ингибирование глюконеогенеза',
+  'GLUCOSAMINE_POTENTIATION': 'Потенцирование глюкозамина',
+  'GLUCOSE_ELEVATION': 'Повышение глюкозы',
+  'GLUCOSE_LOWERING': 'Снижение глюкозы',
+  'GLUCOSE_METABOLISM': 'Метаболизм глюкозы',
+  'GLUCOSE_REGULATION': 'Регуляция глюкозы',
+  'GLUCOSE_UPTAKE': 'Захват глюкозы',
+  'GLUTAMATE_MODULATION': 'Модуляция глутамата',
+  'GLUTATHIONE_PRECURSOR': 'Предшественник глутатиона',
+  'GLUTATHIONE_RECYCLING': 'Рециклинг глутатиона',
+  'GLUTATHIONE_REGENERATION': 'Регенерация глутатиона',
+  'GLUTATHIONE_SYNTHESIS': 'Синтез глутатиона',
+  'GLYCOGEN_STORAGE': 'Хранение гликогена',
+  'GLYCOGEN_SYNTHESIS': 'Синтез гликогена',
+  'GNRH_RELEASE': 'Высвобождение ГнРГ',
+  'GPX_SYNTHESIS': 'Синтез GPX',
+  'GROWTH_FACTORS': 'Факторы роста',
+  'GROWTH_HORMONE_RELEASE': 'Высвобождение гормона роста',
+  'GSK3_INHIBITION': 'Ингибирование GSK-3',
+  'GUT_BARRIER_INTEGRITY': 'Целостность кишечного барьера',
+  'GUT_BARRIER_STRENGTHENING': 'Укрепление кишечного барьера',
+  'GUT_DETOXIFICATION': 'Детоксикация кишечника',
+  'GUT_FLORA_BALANCE': 'Баланс микрофлоры',
+  'GUT_FLORA_DISRUPTION': 'Нарушение микрофлоры',
+  'GUT_FLORA_SUPPORT': 'Поддержка микрофлоры',
+  'GUT_MICROBIOME_MODULATION': 'Модуляция микробиома',
+  'GUT_MICROBIOME_SUPPORT': 'Поддержка микробиома',
+  'GUT_MOTILITY': 'Моторика кишечника',
+  'GUT_PROTECTION': 'Защита кишечника',
+  'H1_RECEPTOR_BLOCKADE': 'Блокада H1-рецепторов',
+  'HAIR_LOSS_PREVENTION': 'Профилактика выпадения волос',
+  'HBA1C_REDUCTION': 'Снижение HbA1c',
+  'HDAC_INHIBITION': 'Ингибирование HDAC',
+  'HEARTBURN_RELIEF': 'Облегчение изжоги',
+  'HEART_RATE_INCREASE': 'Повышение ЧСС',
+  'HEART_RATE_REDUCTION': 'Снижение ЧСС',
+  'HEMOGLOBIN_PRODUCTION': 'Продукция гемоглобина',
+  'HEPATOPROTECTION': 'Гепатопротекция',
+  'HISTAMINE_RELEASE_INHIBITION': 'Ингибирование высвобождения гистамина',
+  'HOMEOSTASIS': 'Гомеостаз',
+  'HORMONE_BALANCE': 'Гормональный баланс',
+  'HYDRATION': 'Гидратация',
+  'HYDROCHLORIC_ACID_SECRETION': 'Секреция соляной кислоты',
+  'HYPERTHYROIDISM': 'Гипертиреоз',
+  'HYPOTHALAMIC_REGULATION': 'Регуляция гипоталамуса',
+  'IGF1_INCREASE': 'Повышение ИФР-1',
+  'IMMUNE_ACTIVATION': 'Активация иммунитета',
+  'IMMUNE_ENHANCEMENT': 'Усиление иммунитета',
+  'IMMUNE_MODULATION': 'Модуляция иммунитета',
+  'IMMUNE_REGULATION': 'Регуляция иммунитета',
+  'IMMUNE_SUPPORT': 'Поддержка иммунитета',
+  'IMMUNOMODULATION': 'Иммуномодуляция',
+  'INFLAMMATION_REDUCTION': 'Снижение воспаления',
+  'INSULIN_MIMESIS': 'Мимезис инсулина',
+  'INSULIN_OPTIMIZATION': 'Оптимизация инсулина',
+  'INSULIN_RECEPTOR_SENSITIVITY': 'Чувствительность инсулиновых рецепторов',
+  'INSULIN_REGULATION': 'Регуляция инсулина',
+  'INSULIN_SENSITIVITY': 'Чувствительность к инсулину',
+  'INTERLEUKIN_REDUCTION': 'Снижение интерлейкинов',
+  'IRON_ABSORPTION': 'Абсорбция железа',
+  'IRON_DELIVERY': 'Доставка железа',
+  'ITCHING_RELIEF': 'Облегчение зуда',
+  'JOINT_FUNCTION': 'Функция суставов',
+  'JOINT_LUBRICATION': 'Смазка суставов',
+  'JOINT_PROTECTION': 'Защита суставов',
+  'JOINT_SUPPORT': 'Поддержка суставов',
+  'KERATIN_SYNTHESIS': 'Синтез кератина',
+  'KETOGENESIS_REGULATION': 'Регуляция кетогенеза',
+  'KETONE_PRODUCTION': 'Продукция кетонов',
+  'KIDNEY_PROTECTION': 'Защита почек',
+  'KREBS_CYCLE_INTERMEDIATE': 'Интермедиат цикла Кребса',
+  'LEAN_MASS_GAIN': 'Набор сухой массы',
+  'LEAN_MASS_PRESERVATION': 'Сохранение сухой массы',
+  'LEARNING_BOOST': 'Улучшение обучения',
+  'LH_FSH_REGULATION': 'Регуляция ЛГ/ФСГ',
+  'LH_FSH_STIMULATION': 'Стимуляция ЛГ/ФСГ',
+  'LH_MIMIC': 'Миметик ЛГ',
+  'LH_PULSE_RESTORE': 'Восстановление пульсации ЛГ',
+  'LH_RELEASE': 'Высвобождение ЛГ',
+  'LH_STIMULATION': 'Стимуляция ЛГ',
+  'LIBIDO_ENHANCEMENT': 'Повышение либидо',
+  'LIBIDO_RECOVERY': 'Восстановление либидо',
+  'LIPID_IMPROVEMENT': 'Улучшение липидного профиля',
+  'LIPID_LOWERING': 'Снижение липидов',
+  'LIPID_METABOLISM': 'Метаболизм липидов',
+  'LIPID_PEROXIDATION_INHIBITION': 'Ингибирование перекисного окисления липидов',
+  'LIPID_REDUCTION': 'Снижение липидов',
+  'LIPID_SIGNALING': 'Липидная сигнализация',
+  'LIPID_TRANSPORT': 'Транспорт липидов',
+  'LIPOTROPIC_EFFECT': 'Липотропный эффект',
+  'LIVER_DETOXIFICATION': 'Детоксикация печени',
+  'LIVER_LIPID_REGULATION': 'Регуляция липидов в печени',
+  'LIVER_PROTECTION': 'Защита печени',
+  'MACULA_PROTECTION': 'Защита макулы',
+  'MALATE_AS_PARTATE_SHUTTLE': 'Малат-аспартатный челнок',
+  'MAO_B_INHIBITION': 'Ингибирование МАО-В',
+  'MATRIX_GLA_PROTEIN_ACTIVATION': 'Активация матриксного Gla-белка',
+  'MCT_KETOSIS': 'Кетоз MCT',
+  'MELANIN_SYNTHESIS': 'Синтез меланина',
+  'MELANOCORTIN_ACTIVATION': 'Активация меланокортина',
+  'MELANOGENESIS': 'Меланогенез',
+  'MELATONIN_SYNTHESIS': 'Синтез мелатонина',
+  'MEMBRANE_STABILIZATION': 'Стабилизация мембран',
+  'MEMBRANE_SYNTHESIS': 'Синтез мембран',
+  'MEMORY_ENHANCEMENT': 'Улучшение памяти',
+  'MEMORY_IMPROVEMENT': 'Улучшение памяти',
+  'MEMORY_PRESERVATION': 'Сохранение памяти',
+  'MEMORY_SUPPORT': 'Поддержка памяти',
+  'METABOLIC_IMPROVEMENT': 'Улучшение метаболизма',
+  'METABOLIC_PROTECTION': 'Метаболическая защита',
+  'METABOLIC_RATE': 'Скорость метаболизма',
+  'METABOLIC_RATE_REDUCTION': 'Снижение скорости метаболизма',
+  'METABOLIC_REGULATION': 'Регуляция метаболизма',
+  'METAL_CHELATION': 'Хелатирование металлов',
+  'METHYLATION': 'Метилирование',
+  'METHYLATION_SUPPORT': 'Поддержка метилирования',
+  'METHYL_DONATION': 'Донор метильных групп',
+  'MICROBIOME_BALANCE': 'Баланс микробиома',
+  'MICROBIOME_SUPPORT': 'Поддержка микробиома',
+  'MICROCIRCULATION': 'Микроциркуляция',
+  'MICROCIRCULATION_IMPROVEMENT': 'Улучшение микроциркуляции',
+  'MICRONUTRIENT_REPLETION': 'Восполнение микронутриентов',
+  'MINERAL_REPLETION': 'Восполнение минералов',
+  'MITOCHONDRIAL_BETA_OXIDATION': 'Митохондриальное β-окисление',
+  'MITOCHONDRIAL_BIOGENESIS': 'Биогенез митохондрий',
+  'MITOCHONDRIAL_ENHANCEMENT': 'Улучшение функции митохондрий',
+  'MITOCHONDRIAL_FUNCTION': 'Функция митохондрий',
+  'MITOCHONDRIAL_PROTECTION': 'Защита митохондрий',
+  'MITOPHAGY_ACTIVATION': 'Активация митофагии',
+  'MOOD_REGULATION': 'Регуляция настроения',
+  'MOOD_STABILIZATION': 'Стабилизация настроения',
+  'MORNING_CORTISOL_RHYTHM': 'Утренний ритм кортизола',
+  'MOTOR_FUNCTION': 'Моторная функция',
+  'MTOR_ACTIVATION': 'Активация mTOR',
+  'MUCIN_SYNTHESIS': 'Синтез муцина',
+  'MUCOLYTIC': 'Муколитик',
+  'MUCOSA_PROTECTION': 'Защита слизистой',
+  'MUCUS_PROTECTION': 'Защита слизистой',
+  'MULTI_ORGAN_PROTECTION': 'Мультиорганная защита',
+  'MUSCLE_BREAKDOWN_PREVENTION': 'Предотвращение распада мышц',
+  'MUSCLE_CONTRACTION': 'Мышечное сокращение',
+  'MUSCLE_ENDURANCE': 'Мышечная выносливость',
+  'MUSCLE_FUNCTION': 'Мышечная функция',
+  'MUSCLE_GROWTH': 'Рост мышц',
+  'MUSCLE_HYPERTROPHY': 'Мышечная гипертрофия',
+  'MUSCLE_PROTEIN_SYNTHESIS': 'Синтез мышечного белка',
+  'MUSCLE_PUMP': 'Мышечный пампинг',
+  'MUSCLE_RECOVERY': 'Восстановление мышц',
+  'MUSCLE_REGENERATION': 'Регенерация мышц',
+  'MUSCLE_REGULATION': 'Регуляция мышц',
+  'MUSCLE_RELAXATION': 'Расслабление мышц',
+  'MYELIN_REPAIR': 'Восстановление миелина',
+  'MYELIN_SYNTHESIS': 'Синтез миелина',
+  'MYOGLOBIN_SYNTHESIS': 'Синтез миоглобина',
+  'MYOSTATIN_INHIBITION': 'Ингибирование миостатина',
+  'NAD_PRECURSOR': 'Предшественник НАД+',
+  'NAD_PRODUCTION': 'Продукция НАД+',
+  'NAUSEA_RELIEF': 'Облегчение тошноты',
+  'NERVE_CONDUCTION': 'Нервная проводимость',
+  'NERVE_PAIN_RELIEF': 'Облегчение невралгической боли',
+  'NERVE_REGENERATION': 'Регенерация нервов',
+  'NERVE_SIGNALING': 'Нервная сигнализация',
+  'NEUROGENESIS': 'Нейрогенез',
+  'NEUROPLASTICITY': 'Нейропластичность',
+  'NEUROPROTECTION': 'Нейропротекция',
+  'NEUROSTEROID_PRECURSOR': 'Предшественник нейростероидов',
+  'NEUROTRANSMISSION': 'Нейротрансмиссия',
+  'NEUROTRANSMITTER_SYNTHESIS': 'Синтез нейротрансмиттеров',
+  'NEUROTROPHIC_STIMULATION': 'Нейротрофическая стимуляция',
+  'NF_KB_INHIBITION': 'Ингибирование NF-κB',
+  'NGF_STIMULATION': 'Стимуляция NGF',
+  'NITRIC_OXIDE_MODULATION': 'Модуляция оксида азота',
+  'NITRIC_OXIDE_PRODUCTION': 'Продукция оксида азота',
+  'NITROGEN_BALANCE': 'Азотистый баланс',
+  'NITROGEN_TRANSPORT': 'Транспорт азота',
+  'NK_CELL_INCREASE': 'Повышение NK-клеток',
+  'NMDA_ANTAGONISM': 'Антагонизм NMDA',
+  'NMDA_MODULATION': 'Модуляция NMDA',
+  'NMDA_RECEPTOR_ACTIVATION': 'Активация NMDA-рецепторов',
+  'NMDA_REGULATION': 'Регуляция NMDA',
+  'NORADRENALINE_RELEASE': 'Высвобождение норэпинефрина',
+  'NOREPINEPHRINE_MODULATION': 'Модуляция норэпинефрина',
+  'NOREPINEPHRINE_PRECURSOR': 'Предшественник норэпинефрина',
+  'NOREPINEPHRINE_SYNTHESIS': 'Синтез норэпинефрина',
+  'NO_PRODUCTION': 'Продукция NO',
+  'NO_RELEASE': 'Высвобождение NO',
+  'NRF2_ACTIVATION': 'Активация Nrf2',
+  'NUTRIENT_BIOAVAILABILITY': 'Биодоступность нутриентов',
+  'NUTRIENT_TRANSPORT': 'Транспорт нутриентов',
+  'OLEIC_ACID_ANTI_INFLAMMATORY': 'Противовоспалительное действие олеиновой кислоты',
+  'OMEGA3_6_9_BALANCE': 'Баланс Омега-3/6/9',
+  'OOCYTE_MATURATION': 'Созревание ооцитов',
+  'OSMOPROTECTION': 'Осмопротекция',
+  'OSMOREGULATION': 'Осморегуляция',
+  'OSTEOCALCIN_ACTIVATION': 'Активация остеокальцина',
+  'OSTEOCLAST_INHIBITION': 'Ингибирование остеокластов',
+  'OXIDATIVE_STRESS_REDUCTION': 'Снижение окислительного стресса',
+  'OXYGEN_TRANSPORT': 'Транспорт кислорода',
+  'OXYGEN_UTILIZATION': 'Утилизация кислорода',
+  'PAIN_MODULATION': 'Модуляция боли',
+  'PAIN_RELIEF': 'Обезболивание',
+  'PATHOGEN_EXCLUSION': 'Исключение патогенов',
+  'PCT_PREPARATION': 'Подготовка к ПКТ',
+  'PCT_SUPPORT': 'Поддержка ПКТ',
+  'PHASE2_DETOXIFICATION': 'Детоксикация фазы 2',
+  'PHOSPHOCREATINE_BUFFER': 'Буфер фосфокреатина',
+  'PHOSPHOLIPID_PRECURSOR': 'Предшественник фосфолипидов',
+  'PHOSPHOLIPID_SYNTHESIS': 'Синтез фосфолипидов',
+  'PHYSICAL_ENDURANCE': 'Физическая выносливость',
+  'PHYTOESTROGEN': 'Фитоэстроген',
+  'PH_BALANCE': 'pH-баланс',
+  'PH_BUFFER': 'pH-буфер',
+  'PLAQUE_STABILIZATION': 'Стабилизация бляшки',
+  'PLATELET_AGGREGATION_INHIBITION': 'Ингибирование агрегации тромбоцитов',
+  'PLATELET_INHIBITION': 'Ингибирование тромбоцитов',
+  'PLP_COENZYME': 'Кофермент PLP',
+  'POTASSIUM_SPARING': 'Калийсберегающее действие',
+  'POWER_OUTPUT': 'Выходная мощность',
+  'PPAR_GAMMA_ACTIVATION': 'Активация PPAR-γ',
+  'PROBIOTIC_GROWTH': 'Рост пробиотиков',
+  'PROGESTERONE_BALANCE': 'Баланс прогестерона',
+  'PROLACTIN_INCREASE': 'Повышение пролактина',
+  'PROLACTIN_INHIBITION': 'Ингибирование пролактина',
+  'PROMOTING': 'Промотирование',
+  'PROSTAGLANDIN_BALANCE': 'Баланс простагландинов',
+  'PROSTATE_PROTECTION': 'Защита простаты',
+  'PROSTATE_SHRINKAGE': 'Уменьшение простаты',
+  'PROTEIN_ABSORPTION': 'Абсорбция белка',
+  'PROTEIN_SYNTHESIS': 'Синтез белка',
+  'PROTEIN_SYNTHESIS_STIMULATION': 'Стимуляция синтеза белка',
+  'PROTON_PUMP_INHIBITION': 'Ингибирование протонной помпы',
+  'PSA_LOWERING': 'Снижение ПСА',
+  'PSYCHOSIS_PREVENTION': 'Профилактика психоза',
+  'PTP_INHIBITION': 'Ингибирование PTP',
+  'PUBERTY_REGULATION': 'Регуляция полового созревания',
+  'QUICK_ENERGY': 'Быстрая энергия',
+  'RAPID_ANTIDEPRESSANT': 'Быстрый антидепрессант',
+  'RECOVERY': 'Восстановление',
+  'RECOVERY_ENHANCEMENT': 'Улучшение восстановления',
+  'RED_BLOOD_CELL_PRODUCTION': 'Продукция эритроцитов',
+  'REMODELING_PREVENTION': 'Предотвращение ремоделирования',
+  'RENAL_PROTECTION': 'Защита почек',
+  'RENOPROTECTION': 'Ренопротекция',
+  'REPRODUCTIVE_FUNCTION': 'Репродуктивная функция',
+  'REPRODUCTIVE_HORMONES': 'Репродуктивные гормоны',
+  'REPRODUCTIVE_RECOVERY': 'Восстановление репродуктивной функции',
+  'RETINOID_RECEPTOR': 'Ретиноидный рецептор',
+  'RISK_REDUCTION': 'Снижение риска',
+  'SATELLITE_CELL_ACTIVATION': 'Активация сателлитных клеток',
+  'SATIETY': 'Насыщение',
+  'SEIZURE_PREVENTION': 'Профилактика судорог',
+  'SENOLYTIC': 'Сенолитик',
+  'SERINE_SYNTHESIS': 'Синтез серина',
+  'SEROTONIN_MODULATION': 'Модуляция серотонина',
+  'SEROTONIN_PRECURSOR': 'Предшественник серотонина',
+  'SEROTONIN_REUPTAKE_ENHANCEMENT': 'Усиление обратного захвата серотонина',
+  'SHORT_CHAIN_FATTY_ACID_PRODUCTION': 'Продукция короткоцепочечных жирных кислот',
+  'SIRT1_ACTIVATION': 'Активация SIRT1',
+  'SKIN_BARRIER': 'Барьер кожи',
+  'SKIN_ELASTICITY': 'Эластичность кожи',
+  'SKIN_HEALTH': 'Здоровье кожи',
+  'SKIN_PROTECTION': 'Защита кожи',
+  'SLEEP_IMPROVEMENT': 'Улучшение сна',
+  'SLEEP_REGULATION': 'Регуляция сна',
+  'SOCIAL_BONDING': 'Социальные связи',
+  'SOD_MITOCHONDRIAL': 'Митохондриальная СОД',
+  'SPERMATOGENESIS': 'Сперматогенез',
+  'SPERMATOGENESIS_RESTORE': 'Восстановление сперматогенеза',
+  'STEROIDOGENESIS': 'Стероидогенез',
+  'STRESS_ADAPTATION': 'Адаптация к стрессу',
+  'STRESS_MODULATION': 'Модуляция стресса',
+  'STRESS_REDUCTION': 'Снижение стресса',
+  'STRESS_RESILIENCE': 'Устойчивость к стрессу',
+  'STRESS_RESPONSE': 'Реакция на стресс',
+  'STROKE_PREVENTION': 'Профилактика инсульта',
+  'SULFITE_OXIDASE': 'Сульфит-оксидаза',
+  'SULFUR_DONOR': 'Донор серы',
+  'SYNAPTIC_PLASTICITY': 'Синаптическая пластичность',
+  'SYNOVIAL_FLUID_PRODUCTION': 'Продукция синовиальной жидкости',
+  'T3_T4_BALANCE': 'Баланс Т3/Т4',
+  'T3_T4_LOWERING': 'Снижение Т3/Т4',
+  'T4_REPLACEMENT': 'Замещение Т4',
+  'TELOMERE_SUPPORT': 'Поддержка теломер',
+  'TEMPERATURE_REGULATION': 'Терморегуляция',
+  'TENDON_STRENGTH': 'Прочность сухожилий',
+  'TESTICULAR_VOLUME_PRESERVATION': 'Сохранение объёма яичек',
+  'TESTOSTERONE_PRODUCTION': 'Продукция тестостерона',
+  'TESTOSTERONE_RESTORE': 'Восстановление тестостерона',
+  'TESTOSTERONE_SUPPORT': 'Поддержка тестостерона',
+  'TESTOSTERONE_SYNTHESIS': 'Синтез тестостерона',
+  'THIAMINE_PYROPHOSPHATE': 'Тиаминпирофосфат',
+  'THROMBUS_PREVENTION': 'Профилактика тромбоза',
+  'THYROID_FUNCTION': 'Функция щитовидной железы',
+  'THYROID_HORMONE_ACTIVATION': 'Активация гормонов щитовидной железы',
+  'THYROID_HORMONE_NORMALIZATION': 'Нормализация гормонов щитовидной железы',
+  'THYROID_HORMONE_PRECURSOR': 'Предшественник гормонов щитовидной железы',
+  'THYROID_HORMONE_REGULATION': 'Регуляция гормонов щитовидной железы',
+  'THYROID_HORMONE_SYNTHESIS': 'Синтез гормонов щитовидной железы',
+  'THYROID_HORMONE_SYNTHESIS_INHIBITION': 'Ингибирование синтеза гормонов щитовидной железы',
+  'THYROID_T3_INCREASE': 'Повышение Т3',
+  'TISSUE_RECOVERY': 'Восстановление тканей',
+  'TRANSPLANT_PROTECTION': 'Защита трансплантата',
+  'TRIGLYCERIDE_LOWERING': 'Снижение триглицеридов',
+  'T_CELL_ACTIVATION': 'Активация T-клеток',
+  'ULCER_PREVENTION': 'Профилактика язвы',
+  'UREA_CYCLE': 'Мочевинный цикл',
+  'UTI_PREVENTION': 'Профилактика ИМП',
+  'UV_PROTECTION': 'Защита от УФ',
+  'VASCULAR_PROTECTION': 'Защита сосудов',
+  'VASODILATION': 'Вазодилатация',
+  'VDR_RECEPTOR_ACTIVATION': 'Активация VDR-рецепторов',
+  'VISION_CYCLE': 'Цикл зрения',
+  'VISION_IMPROVEMENT': 'Улучшение зрения',
+  'VISION_PROTECTION': 'Защита зрения',
+  'VISION_SUPPORT': 'Поддержка зрения',
+  'VITAMIN_C_POTENTIATION': 'Потенцирование витамина C',
+  'VITAMIN_D_ACTIVATION': 'Активация витамина D',
+  'VITAMIN_MINERAL_SUPPORT': 'Поддержка витаминов и минералов',
+  'WAKEFULNESS': 'Бодрствование',
+  'WASTE_REMOVAL': 'Выведение отходов',
+  'WATER_RETENTION': 'Задержка воды',
+  'WEIGHT_LOSS': 'Похудение',
+  'WHITE_BLOOD_CELL_SUPPORT': 'Поддержка лейкоцитов',
+  'WOUND_HEALING': 'Заживление ран',
+  'XANTHINE_OXIDASE': 'Ксантиноксидаза',
+  'GH_UP': '↑ Гормон роста',
+  'IGF1_UP': '↑ ИФР-1',
+  'TESTOSTERONE_UP': '↑ Тестостерон',
+  'DHT_BLOCK': '↓ ДГТ',
+  'E2_BLOCK': '↓ Эстрадиол',
+  'DOPAMINE_UP': '↑ Дофамин',
+  'SEROTONIN_UP': '↑ Серотонин',
+  'GABA_UP': '↑ ГАМК',
+  'CORTISOL_DOWN': '↓ Кортизол',
+  'AMPK_UP': 'AMPK-активация',
+  'Nrf2_UP': 'Nrf2-антиоксидант',
+  'NFKB_INHIBIT': '↓ NF-κB',
+  'COX2_INHIBIT': '↓ COX-2',
+  'NO_UP': '↑ Оксид азота',
+  'MITO_UP': '↑ Митохондрии',
+  'ATP_UP': '↑ АТФ-продукция',
+  'GSH_UP': '↑ Глутатион',
+  'BILE_FLOW_UP': '↑ Желчеотток',
+  'TISSUE_REPAIR': 'Регенерация тканей',
+  'CELL_MIGRATION': 'Миграция клеток',
+  'BDNF_UP': '↑ BDNF',
+  'SLEEP_UP': '↑ Качество сна',
+  'MELANIN_UP': '↑ Меланин',
+  'LIBIDO_UP': '↑ Либидо',
+  'INSULIN_SENS': '↑ Чувствительность к инсулину',
+  'LIPID_BALANCE': 'Липидный баланс',
+  'ANTIOX_UP': 'Антиоксидант',
+  'IMMUNE_UP': '↑ Иммунитет',
+  'SUPPORT': 'Поддержка',
+};
+// ── FROM: canonical-map.ts ──
+// ===========================================================================
+// CANONICAL_ID_MAP - Maps all 2083+ variant substance IDs to canonical IDs
+// No duplicates, no orphans. Every ID maps to one canonical substance.
+// ===========================================================================
+
+export const CANONICAL_ID_MAP: Record<string, string> = {
+  "VIT_A_BETA": "vitamin_a",
+  "VIT_A_PALMITATE": "vitamin_a",
+  "VIT_B1": "vitamin_b1",
+  "VIT_B1_BENF": "vitamin_b1",
+  "VIT_B2": "vitamin_b2",
+  "VIT_B2_R5P": "vitamin_b2",
+  "VIT_B3_NIACIN": "vitamin_b3",
+  "VIT_B3_NIACINAMIDE": "vitamin_b3",
+  "VIT_B3_NMN": "nmn",
+  "VIT_B3_NR": "nmn",
+  "VIT_B5": "vitamin_b5",
+  "VIT_B5_PANTETHINE": "vitamin_b5",
+  "VIT_B6": "vitamin_b6",
+  "VIT_B6_P5P": "vitamin_b6",
+  "VIT_B7": "biotin",
+  "VIT_B9_FOLIC": "folate",
+  "VIT_B9_MTHF": "folate",
+  "VIT_B9_FOLINIC": "folate",
+  "VIT_B12_CYANO": "vitamin_b1",
+  "VIT_B12_METHYL": "vitamin_b1",
+  "VIT_B12_ADENO": "vitamin_b1",
+  "VIT_B12_HYDROXO": "vitamin_b1",
+  "VIT_C": "vitamin_c",
+  "VIT_C_LIP": "vitamin_c",
+  "VIT_C_CALCIUM": "vitamin_c",
+  "VIT_D3": "vitamin_d3",
+  "VIT_D2": "vitamin_d3",
+  "VIT_D3_K2": "vitamin_d3",
+  "VIT_E_ALPHA": "vitamin_e",
+  "VIT_E_MIXED": "vitamin_e",
+  "VIT_E_TOCOTRIENOLS": "vitamin_e",
+  "VIT_K1": "vitamin_k2",
+  "VIT_K2_MK4": "vitamin_k2",
+  "VIT_K2_MK7": "vitamin_k2",
+  "VIT_B_COMPLEX": "vitamin_b_complex",
+  "VIT_B_COMPLEX_ACTIVE": "vitamin_b_complex",
+  "VIT_CHOLINE": "vitamin_c",
+  "VIT_CHOLINE_CDP": "vitamin_c",
+  "VIT_CHOLINE_ALPHA": "vitamin_c",
+  "VIT_INOSITOL": "inositol",
+  "VIT_INOSITOL_MYOINO": "inositol",
+  "VIT_INOSITOL_DCHIRO": "inositol",
+  "VIT_PABA": "vitamin_b_complex",
+  "VIT_B15_PANGAMATE": "vitamin_b1",
+  "VIT_TMG": "betaine",
+  "VIT_CARNITINE_LC": "vitamin_c",
+  "VIT_CARNITINE_ALCAR": "vitamin_c",
+  "VIT_C_ESTER": "vitamin_c",
+  "VIT_C_SODIUM": "vitamin_c",
+  "VIT_C_RALA": "vitamin_c",
+  "VIT_D3_LIP": "vitamin_d3",
+  "VIT_D3_SOFTGEL": "vitamin_d3",
+  "VIT_D3_HIGH": "vitamin_d3",
+  "VIT_E_GAMMA": "vitamin_e",
+  "VIT_E_DELTA": "vitamin_e",
+  "VIT_E_SYNERGY": "vitamin_e",
+  "VIT_K2_LIP": "vitamin_k2",
+  "VIT_K2_COMPLEX": "vitamin_k2",
+  "VIT_B1_TTFD": "vitamin_b1",
+  "VIT_B2_COMPLEX": "vitamin_b2",
+  "VIT_B3_NICOTINIC": "vitamin_b3",
+  "VIT_B3_TRIP": "vitamin_b3",
+  "VIT_B5_COA": "vitamin_b5",
+  "VIT_B6_COMPLEX": "vitamin_b6",
+  "VIT_B7_HIGH": "biotin",
+  "VIT_B9_COMPLEX": "folate",
+  "VIT_B12_COMPLEX": "vitamin_b1",
+  "VIT_C_RUTIN": "vitamin_c",
+  "VIT_C_BIOFLAV": "vitamin_c",
+  "VIT_D3_MCT": "vitamin_d3",
+  "VIT_E_COMPLEX": "vitamin_e",
+  "VIT_K_COMPLEX": "vitamin_k2",
+  "VIT_CHOLINE_COMPLEX": "vitamin_c",
+  "VIT_INOSITOL_COMPLEX": "inositol",
+  "VIT_PQQ": "pqq",
+  "VIT_Q10": "coq10",
+  "VIT_Q10_UBIQUINOL": "coq10",
+  "VIT_LIPOIC_R": "alpha_lipoic",
+  "VIT_LIPOIC_S": "alpha_lipoic",
+  "VIT_LIPOIC_COMPLEX": "alpha_lipoic",
+  "VIT_PANTETHEINE": "vitamin_b5",
+  "VIT_MENAQ7": "vitamin_complex",
+  "VIT_MITO_B": "vitamin_b_complex",
+  "VIT_PTEROSTILBENE": "pterostilbene",
+  "VIT_NADH": "nmn",
+  "VIT_FAD": "vitamin_b2",
+  "VIT_FMN": "vitamin_b2",
+  "VIT_THF": "folate",
+  "VIT_METHYL_DONOR": "folate",
+  "VIT_CHROMIUM_PIC": "vitamin_c",
+  "VIT_CHROMIUM_NIC": "vitamin_c",
+  "VIT_MOLYBDENUM": "molybdenum",
+  "VIT_BORON": "boron",
+  "VIT_SILICON": "silicon",
+  "MIN_MAG_CITRATE": "magnesium",
+  "MIN_MAG_GLYCINATE": "magnesium",
+  "MIN_MAG_MALATE": "magnesium",
+  "MIN_MAG_TAURATE": "magnesium",
+  "MIN_MAG_THREONATE": "magnesium",
+  "MIN_MAG_OXIDE": "magnesium",
+  "MIN_MAG_SULFATE": "magnesium",
+  "MIN_MAG_CHLORIDE": "magnesium",
+  "MIN_ZINC_PICOLINATE": "zinc",
+  "MIN_ZINC_GLUCONATE": "zinc",
+  "MIN_ZINC_CITRATE": "zinc",
+  "MIN_ZINC_METHIONINE": "zinc",
+  "MIN_SELEN_METHIONINE": "selenium",
+  "MIN_SELEN_SODIUM": "selenium",
+  "MIN_SELEN_YEAST": "selenium",
+  "MIN_CALCIUM_CITRATE": "calcium",
+  "MIN_CALCIUM_CARBONATE": "calcium",
+  "MIN_CALCIUM_HYDROXY": "calcium",
+  "MIN_POTASSIUM_CITRATE": "potassium",
+  "MIN_POTASSIUM_CHLORIDE": "potassium",
+  "MIN_SODIUM_BICARB": "sodium",
+  "MIN_SODIUM_CHLORIDE": "sodium",
+  "MIN_COPPER_GLUCONATE": "copper",
+  "MIN_COPPER_BISGLY": "copper",
+  "MIN_MANGANESE_SULFATE": "manganese",
+  "MIN_MANGANESE_BISGLY": "manganese",
+  "MIN_MOLYBDENUM_GLYC": "molybdenum",
+  "MIN_MOLYBDENUM_SODIUM": "molybdenum",
+  "MIN_IODINE_KI": "iodine",
+  "MIN_IODINE_KELP": "iodine",
+  "MIN_IODINE_LUGOL": "iodine",
+  "MIN_IRON_BISGLY": "iron",
+  "MIN_IRON_FERROUS": "iron",
+  "MIN_IRON_FERRIC": "iron",
+  "MIN_IRON_POLYSAC": "iron",
+  "MIN_LITHIUM_OROTATE": "lithium",
+  "MIN_BORON_CHELATE": "boron",
+  "MIN_BORON_GLYCINATE": "boron",
+  "MIN_SILICON_CHOLINE": "silicon",
+  "MIN_SILICON_HORS": "silicon",
+  "MIN_VANADIUM_SULFATE": "vanadium",
+  "MIN_PHOSPHORUS": "phosphorus",
+  "MIN_SULFUR_MSM": "msm",
+  "MIN_ELECTROLYTE_COMPLEX": "electrolyte_complex",
+  "MIN_TRACE_COMPLEX": "trace_minerals",
+  "MIN_MAG_LACTATE": "magnesium",
+  "MIN_MAG_ASPARTATE": "magnesium",
+  "MIN_MAG_FUMARATE": "magnesium",
+  "MIN_MAG_SUCCINATE": "magnesium",
+  "MIN_MAG_OROTATE": "magnesium",
+  "MIN_MAG_PHOSPHATE": "magnesium",
+  "MIN_ZINC_ACETATE": "zinc",
+  "MIN_ZINC_SULFATE": "zinc",
+  "MIN_ZINC_LIPOSOMAL": "zinc",
+  "MIN_SELEN_LIPOSOMAL": "selenium",
+  "MIN_SELEN_ENHANCED": "selenium",
+  "MIN_CALCIUM_LACTATE": "calcium",
+  "MIN_CALCIUM_AA": "calcium",
+  "MIN_POTASSIUM_BICARB": "potassium",
+  "MIN_POTASSIUM_OROTATE": "potassium",
+  "MIN_SODIUM_OROTATE": "sodium",
+  "MIN_COPPER_CHELATE": "copper",
+  "MIN_COPPER_LIPOSOMAL": "copper",
+  "MIN_MANGANESE_CHELATE": "manganese",
+  "MIN_CHROMIUM_GTF": "chromium",
+  "MIN_MOLYBDENUM_COMPLEX": "molybdenum",
+  "MIN_IODINE_ATOMIC": "iodine",
+  "MIN_IODINE_NAScent": "iodine",
+  "MIN_IRON_HEME": "iron",
+  "MIN_IRON_LIPOSOMAL": "iron",
+  "MIN_IRON_FUMARATE": "iron",
+  "MIN_LITHIUM_ASPARTATE": "lithium",
+  "MIN_BORON_CALCIUM": "boron",
+  "MIN_SILICON_BAMBOO": "silicon",
+  "MIN_VANADIUM_OROTATE": "vanadium",
+  "MIN_PHOSPHORUS_ORGANIC": "phosphorus",
+  "MIN_SULFUR_DMSO": "msm",
+  "MIN_ELECTROLYTE_SEA": "electrolyte_complex",
+  "MIN_ELECTROLYTE_IONIC": "electrolyte_complex",
+  "MIN_TRACE_FULVIC": "trace_minerals",
+  "MIN_TRACE_HUMIC": "trace_minerals",
+  "MIN_SILVER_COLLOID": "colloidal_minerals",
+  "MIN_GOLD_COLLOID": "colloidal_minerals",
+  "MIN_PLATINUM_COLLOID": "colloidal_minerals",
+  "MIN_GERMANIUM_ORG": "colloidal_minerals",
+  "MIN_GERMANIUM_SEMI": "colloidal_minerals",
+  "MIN_RUBIDIUM": "colloidal_minerals",
+  "MIN_CESIUM": "colloidal_minerals",
+  "MIN_STRONTIUM": "strontium",
+  "MIN_STRONTIUM_CITRATE": "strontium",
+  "MIN_ZEOLITE": "colloidal_minerals",
+  "MIN_BENTONITE": "colloidal_minerals",
+  "MIN_CORAL_CALCIUM": "calcium",
+  "MIN_RED_MINERAL": "colloidal_minerals",
+  "MIN_BLACK_MINERAL": "colloidal_minerals",
+  "MIN_BLUE_MINERAL": "colloidal_minerals",
+  "FA_OMEGA3_EPA": "omega3",
+  "FA_OMEGA3_DHA": "omega3",
+  "FA_OMEGA3_DPA": "omega3",
+  "FA_OMEGA3_ALA": "omega3",
+  "FA_OMEGA3_SDA": "omega3",
+  "FA_OMEGA3_ETA": "omega3",
+  "FA_OMEGA3_TG": "omega3",
+  "FA_OMEGA3_EE": "omega3",
+  "FA_OMEGA3_PHOSPHO": "omega3",
+  "FA_OMEGA3_ALGAE_DHA": "omega3",
+  "FA_OMEGA3_ALGAE_EPA": "omega3",
+  "FA_OMEGA3_KRILL": "omega3",
+  "FA_OMEGA3_SQUID": "omega3",
+  "FA_OMEGA3_SALMON": "omega3",
+  "FA_OMEGA3_TUNA": "omega3",
+  "FA_OMEGA3_MOLLUSK": "omega3",
+  "FA_OMEGA3_PLANT_COMPLEX": "omega3",
+  "FA_OMEGA3_MONOGLYCERIDE": "omega3",
+  "FA_OMEGA3_DIGLYCERIDE": "omega3",
+  "FA_OMEGA3_LYSO_PC": "omega3",
+  "FA_OMEGA3_ASTAX": "omega3",
+  "FA_OMEGA3_CERAMIDE": "omega3",
+  "FA_OMEGA3_STEARIDONIC": "omega3",
+  "FA_OMEGA3_HARPAG": "omega3",
+  "FA_OMEGA3_NEURO": "omega3",
+  "FA_OMEGA3_HEART": "omega3",
+  "FA_OMEGA3_LIVER": "omega3",
+  "FA_OMEGA3_IMMUNE": "omega3",
+  "FA_OMEGA3_SKIN": "omega3",
+  "FA_OMEGA3_EYE": "omega3",
+  "FA_OMEGA3_PREG": "omega3",
+  "FA_OMEGA3_CHILD": "omega3",
+  "FA_OMEGA3_HIGH_EPA": "omega3",
+  "FA_OMEGA3_HIGH_DHA": "omega3",
+  "FA_OMEGA3_BALANCED": "omega3",
+  "FA_OMEGA3_ANTARCTIC": "omega3",
+  "FA_OMEGA3_GREENLAND": "omega3",
+  "FA_OMEGA3_DEEPSEA": "omega3",
+  "FA_OMEGA3_MICROALGAE": "omega3",
+  "FA_OMEGA3_POLAR": "omega3",
+  "FA_OMEGA3_LIPOCOMPLEX": "omega3",
+  "FA_OMEGA3_NANO": "omega3",
+  "FA_OMEGA3_EMULSIFIED": "omega3",
+  "FA_OMEGA3_KETO": "omega3",
+  "FA_OMEGA3_MITO": "omega3",
+  "FA_OMEGA3_ANTIAGING": "omega3",
+  "FA_OMEGA3_JOINT": "omega3",
+  "FA_OMEGA3_SKIN_CERAMIDE": "omega3",
+  "FA_OMEGA3_HAIR": "omega3",
+  "FA_OMEGA3_BRAIN_PC": "omega3",
+  "FA_OMEGA3_LIVER_PC": "omega3",
+  "FA_OMEGA3_IMMUNE_PC": "omega3",
+  "FA_OMEGA3_VESSEL_PC": "omega3",
+  "FA_OMEGA3_COMPLEX_FULL": "omega3",
+  "FA_OMEGA3_ADVANCED": "omega3",
+  "FA_OMEGA3_ULTRA": "omega3",
+  "FA_OMEGA6_GLA": "omega6",
+  "FA_OMEGA6_LA": "omega6",
+  "FA_OMEGA6_ARACHIDONIC": "omega6",
+  "FA_OMEGA6_EPO": "omega6",
+  "FA_OMEGA6_BORAGE": "omega6",
+  "FA_OMEGA6_BLACKCURRANT": "omega6",
+  "FA_OMEGA7_PALMITOLEIC": "omega7",
+  "FA_OMEGA9_OLEIC": "omega9",
+  "FA_OMEGA9_AVOCADO": "omega9",
+  "FA_OMEGA9_OLIVE": "omega9",
+  "FA_CLA": "cla",
+  "FA_CLA_TONALIN": "cla",
+  "FA_MCT_C8": "mct",
+  "FA_MCT_C10": "mct",
+  "FA_MCT_COMPLEX": "mct",
+  "FA_PHOSPHO_PC": "phosphatidylcholine",
+  "FA_PHOSPHO_PS": "phosphatidylcholine",
+  "FA_PHOSPHO_PE": "phosphatidylcholine",
+  "FA_SPHINGOLIPIDS": "phosphatidylcholine",
+  "FA_SPHINGOMYELIN": "phosphatidylcholine",
+  "FA_CARDIOLIPIN": "phosphatidylcholine",
+  "FA_CARDIOLIPIN_REPAIR": "phosphatidylcholine",
+  "FA_PLASMALEGENS": "phosphatidylcholine",
+  "FA_PLASMALEGENS_OCEAN": "phosphatidylcholine",
+  "FA_CERAMIDES": "ceramides",
+  "FA_DHA_PHOSPHO": "omega3",
+  "FA_EPA_PHOSPHO": "omega3",
+  "FA_PHOSPHO_PI": "omega3",
+  "FA_DHA_LIPOSOMAL": "omega3",
+  "FA_EPA_LIPOSOMAL": "omega3",
+  "FA_MUFA_COMPLEX": "omega3",
+  "FA_PUFA_COMPLEX": "omega3",
+  "FA_KETONE_ESTERS": "mct",
+  "FA_SHORT_CHAIN_BUTYRATE": "butyrate",
+  "FA_SHORT_CHAIN_PROPIONATE": "butyrate",
+  "FA_SHORT_CHAIN_ACETATE": "butyrate",
+  "AA_L_GLUTAMINE": "glutamine",
+  "AA_L_GLYCINE": "glycine",
+  "AA_L_TAURINE": "taurine",
+  "AA_L_THEANINE": "theanine",
+  "AA_L_TYROSINE": "tyrosine",
+  "AA_L_DOPA": "l_dopa",
+  "AA_L_TRYPTOPHAN": "tryptophan",
+  "AA_5HTP": "x5htp",
+  "AA_L_CARNITINE_TARTRATE": "l_carnitine",
+  "AA_L_CITRULLINE": "citrulline",
+  "AA_L_ARGININE": "arginine",
+  "AA_AGMATINE": "agmatine",
+  "AA_L_HISTIDINE": "histidine",
+  "AA_L_METHIONINE": "methionine",
+  "AA_L_CYSTEINE": "cysteine",
+  "AA_NAC": "nac",
+  "AA_L_SERINE": "serine",
+  "AA_L_PHOSPHO_SERINE": "serine",
+  "AA_L_ALANINE": "alanine",
+  "AA_BETA_ALANINE": "beta_alanine",
+  "AA_L_PROLINE": "proline",
+  "AA_L_HYDROXYPROLINE": "proline",
+  "AA_L_VALINE": "bcaa",
+  "AA_L_LEUCINE": "bcaa",
+  "AA_L_ISOLEUCINE": "bcaa",
+  "AA_BCAA_COMPLEX": "bcaa",
+  "AA_L_GLUTAMIC": "glutamine",
+  "AA_L_ASPARTIC": "aspartate",
+  "AA_L_ORNITHINE": "ornithine",
+  "AA_L_CITRULLINE_DL": "citrulline",
+  "AA_L_ASPARAGINE": "aspartate",
+  "AA_L_THREONINE": "threonine",
+  "AA_L_LYSINE": "lysine",
+  "AA_L_HYDROXYLYSINE": "lysine",
+  "AA_L_PHENYLALANINE": "phenylalanine",
+  "AA_D_PHE": "amino_complex",
+  "AA_DL_PHE": "amino_complex",
+  "AA_L_HOMOCYSTEINE": "cysteine",
+  "AA_L_GABA": "gaba",
+  "AA_PHENIBUT": "phenibut",
+  "AA_L_BETAINE": "betaine",
+  "AA_L_CARNOSINE": "carnosine",
+  "AA_L_ANserine": "serine",
+  "AA_L_SARCOSINE": "amino_complex",
+  "AA_L_D_SERINE": "serine",
+  "AA_L_BETAINE_HCL": "betaine",
+  "AA_L_GLUCONIC": "amino_complex",
+  "AA_L_COLLAGEN_AMINO": "collagen",
+  "AA_L_NORVALINE": "bcaa",
+  "AA_L_NORLEUCINE": "bcaa",
+  "AA_L_CITRAPEAK": "amino_complex",
+  "AA_L_ARG_KETO": "amino_complex",
+  "AA_L_HMB": "hmb",
+  "AA_L_HICA": "amino_complex",
+  "AA_L_GLUCONATE": "amino_complex",
+  "AA_L_GLUTATHIONE": "glutathione",
+  "AA_L_GSH_LIP": "glutathione",
+  "AA_L_GLYCINE_PROPIONYL": "glycine",
+  "AA_L_GLYCINE_ACETYL": "glycine",
+  "AA_L_METHYLHISTIDINE": "histidine",
+  "AA_L_CARNITINE_FUMARATE": "l_carnitine",
+  "AA_L_GAMMA_BUTYROBETAINE": "betaine",
+  "AA_L_ARGININE_NITRATE": "arginine",
+  "AA_L_CITRULLINE_NITRATE": "citrulline",
+  "AA_L_HISTAMINE_REG": "amino_complex",
+  "AA_L_GLYCOCARN": "glycine",
+  "AA_L_TMG_BETAINE": "betaine",
+  "AA_L_CYSTEINE_BOND": "cysteine",
+  "AA_L_GABA_PHARMA": "gaba",
+  "AA_L_GLYCINE_MAG": "glycine",
+  "AA_L_TAURINE_MAG": "taurine",
+  "AA_L_TAURINE_ZINC": "taurine",
+  "AA_L_GLYCINE_ZINC": "glycine",
+  "AA_L_METHIONINE_SAMe": "methionine",
+  "AA_L_CYSTATHIONINE": "cysteine",
+  "AA_L_HOMOSERINE": "serine",
+  "AA_L_SELENOCYSTEINE": "cysteine",
+  "AA_L_PYRROLYSINE": "lysine",
+  "AA_L_ORNITHINE_AKG": "ornithine",
+  "AA_L_ARGININE_SILICON": "arginine",
+  "AA_L_GLYCINE_SILICON": "glycine",
+  "AA_L_HISTIDINE_ZINC": "histidine",
+  "AA_L_CYSTEINE_ZINC": "cysteine",
+  "AA_L_GLYCINE_IRON": "glycine",
+  "AA_L_HISTIDINE_IRON": "histidine",
+  "AA_L_CARNITINE_ZINC": "l_carnitine",
+  "AA_L_CARNITINE_MAG": "l_carnitine",
+  "AA_L_GLYCINE_CALCIUM": "glycine",
+  "AA_L_GLYCINE_POTASSIUM": "glycine",
+  "AA_L_GLYCINE_MANGANESE": "glycine",
+  "AA_L_GLYCINE_COPPER": "glycine",
+  "AA_L_GLYCINE_MOLYBDENUM": "glycine",
+  "AA_L_GLYCINE_CHROMIUM": "glycine",
+  "AA_L_GLYCINE_BORON": "glycine",
+  "AA_L_GLYCINE_SILVER": "glycine",
+  "AA_L_GLYCINE_GOLD": "glycine",
+  "AA_L_GLYCINE_PLATINUM": "glycine",
+  "AA_L_GLYCINE_GERMANIUM": "glycine",
+  "AA_L_GLYCINE_VANADIUM": "glycine",
+  "AA_LEUCINE": "bcaa",
+  "AA_ISOLEUCINE": "bcaa",
+  "AA_VALINE": "bcaa",
+  "AA_LYSINE": "lysine",
+  "AA_METHIONINE": "methionine",
+  "AA_PHENYLALANINE": "phenylalanine",
+  "AA_THREONINE": "threonine",
+  "AA_TRYPTOPHAN": "tryptophan",
+  "AA_HISTIDINE": "histidine",
+  "AA_CARNITINE": "l_carnitine",
+  "AA_ACETYL_CARNITINE": "l_carnitine",
+  "AA_PROPIONYL_CARNITINE": "l_carnitine",
+  "AA_CITRULLINE": "citrulline",
+  "AA_CITRULLINE_MALATE": "citrulline",
+  "AA_ARGININE": "arginine",
+  "AA_SERINE": "serine",
+  "AA_PROLINE": "proline",
+  "AA_ALANINE": "alanine",
+  "AA_ASPARAGINE": "aspartate",
+  "AA_ASPARTATE": "aspartate",
+  "AA_GLUTAMATE": "glutamate",
+  "AA_GLUAMINE": "amino_complex",
+  "AA_GLUAMINE_PEPTIDE": "amino_complex",
+  "AA_HMB": "hmb",
+  "AA_EAA_COMPLEX": "eaa",
+  "AA_CYSTEINE": "cysteine",
+  "AA_TYROSINE": "tyrosine",
+  "AA_HOMOCYSTEINE_MOD": "cysteine",
+  "AA_ORNITHINE": "ornithine",
+  "AA_CITRULLINE_ORNITHINE": "citrulline",
+  "AA_HISTIDINE_BETA": "histidine",
+  "AA_SULFUR_AMINO": "amino_complex",
+  "AA_COLLAGEN_AMINOS": "collagen",
+  "AA_NEURO_AMINO": "amino_complex",
+  "AA_FULL_AMINO_PREMIUM": "amino_complex",
+  "AA_D_ASPARTIC_ACID": "d_aspartic_acid",
+  "AA_D_ALANINE": "amino_complex",
+  "AA_GABA": "gaba",
+  "AA_GABA_ENHANCED": "gaba",
+  "AA_L_DOPA_PRECURSOR": "l_dopa",
+  "AA_ORNITHINE_ASPARTATE": "ornithine",
+  "AA_ARGININE_AKG": "arginine",
+  "AA_CITRULLINE_PEPTIDE": "citrulline",
+  "AA_GLYCINE_BETAINE": "glycine",
+  "AA_TAURINE_PREMIUM": "taurine",
+  "AA_CARNITINE_L_TARTRATE": "l_carnitine",
+  "AA_ALCAR_ARG": "amino_complex",
+  "AA_GLUAMINE_SYNERGY": "amino_complex",
+  "AA_GLUAMIC_ACID": "glutamate",
+  "AA_ASPARTIC_ACID": "aspartate",
+  "AA_HISTAMINE_PRECURSOR": "amino_complex",
+  "AA_CYSTINE": "cysteine",
+  "AA_SELENOMETHIONINE": "methionine",
+  "AA_METHYL_METHIONINE": "methionine",
+  "AA_HOMOCYSTEINE_BLOCK": "cysteine",
+  "AA_GLUCOSE_AMINO": "amino_complex",
+  "AA_NEURO_TRANSMITTER_AMINOS": "amino_complex",
+  "AA_THYROID_AMINO": "amino_complex",
+  "AA_ADRENAL_AMINO": "amino_complex",
+  "AA_LIVER_AMINO": "amino_complex",
+  "AA_KIDNEY_AMINO": "amino_complex",
+  "AA_HEART_AMINO": "amino_complex",
+  "AA_BRAIN_AMINO": "amino_complex",
+  "AA_SKIN_AMINO": "amino_complex",
+  "AA_JOINT_AMINO": "amino_complex",
+  "AA_GUT_AMINO": "amino_complex",
+  "AA_MITO_AMINO": "amino_complex",
+  "AA_ANTIAGING_AMINO": "amino_complex",
+  "AA_ANTIOX_AMINO": "amino_complex",
+  "AA_IMMUNE_AMINO": "amino_complex",
+  "AA_HORMONE_AMINO": "amino_complex",
+  "AA_FULL_AMINO_COMPLEX": "amino_complex",
+  "AA_FULL_AMINO_PREMIUM2": "amino_complex",
+  "AA_ALPHA_KETOGLUTARATE": "alpha_ketoglutarate",
+  "AA_CALCIUM_AKG": "alpha_ketoglutarate",
+  "AA_GLYCINE_AKG": "glycine",
+  "AA_LYSINE_AKG": "lysine",
+  "AA_HMB_FREE": "hmb",
+  "AA_HMB_CA": "hmb",
+  "AA_EAA_PREMIUM": "eaa",
+  "AA_BCAA_411": "bcaa",
+  "AA_BCAA_811": "bcaa",
+  "AA_HISTIDINE_PREMIUM": "histidine",
+  "AA_TYROSINE_PREMIUM": "tyrosine",
+  "AA_TRYPTOPHAN_PREMIUM": "tryptophan",
+  "AA_GABA_PURE": "gaba",
+  "AA_GABA_LIPOSOMAL": "gaba",
+  "AA_CARNITINE_SYNERGY": "l_carnitine",
+  "AA_TAURINE_SYNERGY": "taurine",
+  "AA_CYSTEINE_PREMIUM": "cysteine",
+  "AA_NAC_PREMIUM": "nac",
+  "AA_METHIONINE_PREMIUM": "methionine",
+  "AA_BETAINE_PREMIUM": "betaine",
+  "AA_GLYCINE_PREMIUM": "glycine",
+  "AA_PROLINE_PREMIUM": "proline",
+  "AA_SERINE_PREMIUM": "serine",
+  "AA_GLUTAMINE_LIPOSOMAL": "glutamine",
+  "AA_GLUTAMINE_PREMIUM": "glutamine",
+  "AA_ASPARTATE_PREMIUM": "aspartate",
+  "AA_ALANINE_PREMIUM": "alanine",
+  "AA_ORNITHINE_PREMIUM": "ornithine",
+  "AA_ARGININE_PREMIUM": "arginine",
+  "AA_CITRULLINE_PREMIUM": "citrulline",
+  "AA_HICA_PREMIUM": "amino_complex",
+  "AA_HMB_SYNERGY": "hmb",
+  "AA_NEURO_AMINO_PREMIUM": "amino_complex",
+  "AA_MITO_AMINO_PREMIUM": "amino_complex",
+  "AA_ANTIAGING_AMINO_PREMIUM": "amino_complex",
+  "AA_ANTIOX_AMINO_PREMIUM": "amino_complex",
+  "AA_IMMUNE_AMINO_PREMIUM": "amino_complex",
+  "AA_HORMONE_AMINO_PREMIUM": "amino_complex",
+  "AA_GUT_AMINO_PREMIUM": "amino_complex",
+  "AA_JOINT_AMINO_PREMIUM": "amino_complex",
+  "AA_SKIN_AMINO_PREMIUM": "amino_complex",
+  "AA_FULL_AMINO_ULTRA": "amino_complex",
+  "AA_FULL_AMINO_SYNERGY": "amino_complex",
+  "AD_GINSENG_PANAX": "ginseng",
+  "AD_GINSENG_RED": "ginseng",
+  "AD_GINSENG_SIBERIAN": "ginseng",
+  "AD_GINSENG_AMERICAN": "ginseng",
+  "AD_RHODIOLA_ROSEA": "rhodiola",
+  "AD_RHODIOLA_SALIDROSIDE": "rhodiola",
+  "AD_RHODIOLA_ROSAVINS": "rhodiola",
+  "AD_ASHWAGANDHA_KSM": "ashwagandha",
+  "AD_ASHWAGANDHA_SENSORIL": "ashwagandha",
+  "AD_ASHWAGANDHA_ROOT": "ashwagandha",
+  "AD_SCHISANDRA": "adaptogen_complex",
+  "AD_CORDYCEPS_CS4": "cordyceps",
+  "AD_CORDYCEPS_MILITARIS": "cordyceps",
+  "AD_CORDYCEPIN": "adaptogen_complex",
+  "AD_REISHI": "reishi",
+  "AD_REISHI_TRITERPENES": "reishi",
+  "AD_CHAGA": "chaga",
+  "AD_CHAGA_BETA": "chaga",
+  "AD_LIONS_MANE": "lions_mane",
+  "AD_LIONS_MANE_ERINACINES": "lions_mane",
+  "AD_LIONS_MANE_HERICENONES": "lions_mane",
+  "AD_MAITAKE": "maitake",
+  "AD_SHIITAKE": "shiitake",
+  "AD_TULSI": "holy_basil",
+  "AD_GOTU_KOLA": "gotu_kola",
+  "AD_BACOPA": "bacopa",
+  "AD_BACOSIDES": "bacopa",
+  "AD_MACA": "maca",
+  "AD_MACA_BLACK": "maca",
+  "AD_MACA_RED": "maca",
+  "AD_SUMA": "adaptogen_complex",
+  "AD_RHAPONTICUM": "adaptogen_complex",
+  "AD_ECDYSTERONE": "ecdysterone",
+  "AD_SHILAJIT": "shilajit",
+  "AD_FULVIC": "trace_minerals",
+  "AD_SAFFRON": "saffron",
+  "AD_CROCIN": "saffron",
+  "AD_SAFRANAL": "adaptogen_complex",
+  "AD_ASTRAGALUS": "astragalus",
+  "AD_ASTRAGALOSIDE": "astragalus",
+  "AD_MORINGA": "adaptogen_complex",
+  "AD_AMLA": "adaptogen_complex",
+  "AD_GINGER": "ginger",
+  "AD_TURMERIC": "adaptogen_complex",
+  "AD_HOLY_BASIL": "holy_basil",
+  "AD_FULL_ADAPTOGEN_COMPLEX": "adaptogen_complex",
+  "AD_RHODIOLA_ARCTIC": "rhodiola",
+  "AD_RHODIOLA_PREMIUM": "rhodiola",
+  "AD_ASHWAGANDHA_FULLSPEC": "ashwagandha",
+  "AD_ASHWAGANDHA_LIPOSOMAL": "ashwagandha",
+  "AD_GINSENG_WILD": "ginseng",
+  "AD_GINSENG_FERMENTED": "ginseng",
+  "AD_CORDYCEPS_HIMALAYAN": "cordyceps",
+  "AD_CORDYCEPS_BIOACTIVE": "cordyceps",
+  "AD_REISHI_RED": "reishi",
+  "AD_REISHI_BLACK": "reishi",
+  "AD_CHAGA_PREMIUM": "chaga",
+  "AD_CHAGA_MELANIN": "chaga",
+  "AD_LIONS_MANE_LIPOSOMAL": "lions_mane",
+  "AD_LIONS_MANE_FULLSPEC": "lions_mane",
+  "AD_SHIITAKE_LENTINAN": "shiitake",
+  "AD_MAITAKE_D_FRACTION": "maitake",
+  "AD_TULSI_PREMIUM": "holy_basil",
+  "AD_GOTU_KOLA_ASIATICOSIDE": "gotu_kola",
+  "AD_GOTU_KOLA_MADECA": "gotu_kola",
+  "AD_BACOPA_LIPOSOMAL": "bacopa",
+  "AD_BACOPA_SYNAPSE": "bacopa",
+  "AD_MACA_GELATINIZED": "maca",
+  "AD_MACA_YELLOW": "maca",
+  "AD_SHILAJIT_PURIFIED": "shilajit",
+  "AD_SHILAJIT_GOLD": "shilajit",
+  "AD_ASTRAGALUS_MEMBRANE": "astragalus",
+  "AD_ASTRAGALUS_CYCLO": "astragalus",
+  "AD_SUMA_PREMIUM": "adaptogen_complex",
+  "AD_RHAPONTICUM_ECDY": "adaptogen_complex",
+  "AD_GINSENG_GINSENOSIDES": "ginseng",
+  "AD_SCHISANDRA_LIGNANS": "adaptogen_complex",
+  "AD_CORDYCEPS_ADENOSINE": "cordyceps",
+  "AD_REISHI_SPORE_OIL": "reishi",
+  "AD_CHAGA_POLYPHENOL": "chaga",
+  "AD_LIONS_MANE_MYCO": "lions_mane",
+  "AD_SHIITAKE_POLYSAC": "shiitake",
+  "AD_MAITAKE_POLYSAC": "maitake",
+  "AD_TULSI_URTICA": "holy_basil",
+  "AD_GOTU_KOLA_NEURO": "gotu_kola",
+  "AD_BACOPA_MEMORY": "bacopa",
+  "AD_ASTRAGALUS_IMMUNE": "astragalus",
+  "AD_SHILAJIT_MITO": "shilajit",
+  "AD_FULL_ADAPTOGEN_PREMIUM": "adaptogen_complex",
+  "AO_NAC": "nac",
+  "AO_ALA": "alpha_lipoic",
+  "AO_GSH_LIP": "glutathione",
+  "AO_GSH_SAC": "glutathione",
+  "AO_SELENIUM": "selenium",
+  "AO_CATALASE": "glutathione",
+  "AO_SOD": "glutathione",
+  "AO_ASTAX": "astaxanthin",
+  "AO_LUTEIN": "lutein",
+  "AO_ZEAXANTHIN": "lutein",
+  "AO_LYCOPENE": "lycopene",
+  "AO_RESVERATROL": "resveratrol",
+  "AO_PTEROSTILBENE": "pterostilbene",
+  "AO_QUERCETIN": "quercetin",
+  "AO_RUTIN": "quercetin",
+  "AO_CURCUMIN": "curcumin",
+  "AO_CURCUMIN_BC": "curcumin",
+  "AO_EGCG": "egcg",
+  "AO_CATECHINS": "egcg",
+  "AO_ANTHOCYANINS": "anthocyanins",
+  "AO_BILBERRY": "anthocyanins",
+  "AO_GRAPESEED": "grape_seed_extract",
+  "AO_PYCNOGENOL": "pycnogenol",
+  "AO_COCOA_FLAVANOLS": "cocoa_flavanols",
+  "AO_SULFORAPHANE": "sulforaphane",
+  "AO_BROCCOLI_SPROUT": "sulforaphane",
+  "AO_MELATONIN": "melatonin",
+  "AO_MELATONIN_LIP": "melatonin",
+  "AO_CAROTENOID_COMPLEX": "vitamin_a",
+  "AO_ALPHA_LIPOAMIDE": "alpha_lipoic",
+  "AO_C60": "c60",
+  "AO_MITOQ": "coq10",
+  "AO_SKQ1": "antioxidant_complex",
+  "AO_GLUTATHIONE_PRECURSOR": "glutathione",
+  "AO_NRF2_COMPLEX": "nrf2_activator",
+  "AO_HYDROXYTYROSOL": "olive_extract",
+  "AO_OLEUROPEIN": "olive_extract",
+  "AO_FERULIC": "polyphenol_complex",
+  "AO_CAFFEIC": "polyphenol_complex",
+  "AO_CHLOROGENIC": "polyphenol_complex",
+  "AO_HESPERIDIN": "citrus_bioflavonoids",
+  "AO_NARINGIN": "citrus_bioflavonoids",
+  "AO_APIGENIN": "flavonoids",
+  "AO_LUTEOLIN": "flavonoids",
+  "AO_MYRICETIN": "flavonoids",
+  "AO_KAEMPFEROL": "flavonoids",
+  "AO_ELLAGIC": "ellagic_acid",
+  "AO_ELLAGITANNINS": "polyphenol_complex",
+  "AO_UBIQUINONE_QH": "coq10",
+  "AO_MITO_PQQ": "pqq",
+  "AO_MITO_TEMPO": "antioxidant_complex",
+  "AO_CAROTENE_COMPLEX": "vitamin_a",
+  "AO_BETAINE_ANTIOX": "betaine",
+  "AO_TANNINS": "polyphenol_complex",
+  "AO_URSOLIC": "ursolic_acid",
+  "AO_OLEANOLIC": "ursolic_acid",
+  "AO_HYDROXYCINNAMIC": "polyphenol_complex",
+  "AO_GINKGO_FLAVONES": "ginkgo",
+  "AO_GINSENOSIDES": "ginseng",
+  "AO_SCHISANDRIN": "schisandra",
+  "AO_SCHISANDRIN_B": "schisandra",
+  "AO_BERBERINE_ANTIOX": "berberine",
+  "AO_HONOKIOL": "magnolia",
+  "AO_MAGNOLIN": "magnolia",
+  "AO_PICRO": "gentian",
+  "AO_SILYMARIN": "milk_thistle",
+  "AO_SILIBININ": "milk_thistle",
+  "AO_ARTICHOKE": "artichoke",
+  "AO_TURMERONES": "curcumin",
+  "AO_GARLIC_SULFUR": "garlic",
+  "AO_ALPHA_CAROTENE": "vitamin_a",
+  "AO_GAMMA_CAROTENE": "vitamin_a",
+  "AO_TOMATO_LYCOPENE": "lycopene",
+  "AO_PUNICALAGIN": "alpha_lipoic",
+  "AO_MANGO_XANTHONES": "mangosteen",
+  "AO_MANGOSTEEN_XANTHONES": "mangosteen",
+  "AO_BETAINE_POLYPHENOL": "polyphenol_complex",
+  "AO_ANTIOX_COMPLEX_FULL": "polyphenol_complex",
+  "AO_ASTAXANTHIN_12MG": "astaxanthin",
+  "AO_GLUTATHIONE_LIPOSOMAL": "glutathione",
+  "AO_GRAPE_SEED_OPC": "grape_seed_extract",
+  "AO_SOD_EXTRACELLULAR": "glutathione",
+  "PEP_COLLAGEN_TYPE1": "collagen",
+  "PEP_COLLAGEN_TYPE2": "collagen",
+  "PEP_COLLAGEN_TYPE3": "collagen",
+  "PEP_ELASTIN": "elastin",
+  "PEP_KERATIN": "peptide_complex",
+  "PEP_SILK": "peptide_complex",
+  "PEP_BIOACTIVE_COLLAGEN": "collagen",
+  "PEP_GHK_CU": "ghk_cu",
+  "PEP_GHK": "ghk_cu",
+  "PEP_ACETYL_HEXAPEPTIDE8": "peptide_complex",
+  "PEP_PALMITOYL_PENTAPEPTIDE4": "peptide_complex",
+  "PEP_PALMITOYL_TRIPEPTIDE1": "peptide_complex",
+  "PEP_PALMITOYL_TETRAPEPTIDE7": "peptide_complex",
+  "PEP_COPPER_TRIPEPTIDE": "peptide_complex",
+  "PEP_BPC157": "bpc157",
+  "PEP_TB500": "tb500",
+  "PEP_THYMOSIN_ALPHA1": "thymosin_alpha1",
+  "PEP_THYMOSIN_BETA4": "tb500",
+  "PEP_MOTILIN": "peptide_complex",
+  "PEP_GASTRIN": "peptide_complex",
+  "PEP_CCK": "peptide_complex",
+  "PEP_NEUROTENSIN": "peptide_complex",
+  "PEP_SUBSTANCE_P": "peptide_complex",
+  "PEP_VIP": "peptide_complex",
+  "PEP_OXYTOCIN": "oxytocin",
+  "PEP_MELANOTAN1": "melanotan1",
+  "PEP_MELANOTAN2": "melanotan2",
+  "PEP_PT141": "pt141",
+  "PEP_CJC1295": "cjc1295",
+  "PEP_CJC1295_DAC": "cjc1295",
+  "PEP_IPAMORELIN": "ipamorelin",
+  "PEP_GHRP2": "ghrp2",
+  "PEP_GHRP6": "ghrp6",
+  "PEP_FOLLISTATIN344": "follistatin",
+  "PEP_FOLLISTATIN315": "follistatin",
+  "PEP_KPV": "kpv",
+  "PEP_THYROID_TRH": "peptide_complex",
+  "PEP_ADH": "peptide_complex",
+  "PEP_ANGIOTENSIN": "peptide_complex",
+  "PEP_BRADYKININ": "peptide_complex",
+  "PEP_NEUROPEPTIDE_Y": "peptide_complex",
+  "PEP_PACAP": "peptide_complex",
+  "PEP_MOTIVATION_PEPTIDE": "peptide_complex",
+  "PEP_SLEEP_PEPTIDE": "peptide_complex",
+  "PEP_MITO_PEPTIDE": "peptide_complex",
+  "PEP_IMMUNE_PEPTIDE": "peptide_complex",
+  "PEP_FULL_PEPTIDE_COMPLEX": "peptide_complex",
+  "PEP_SEMAX": "semax",
+  "PEP_SELANK": "selank",
+  "PEP_DSIP": "dsip",
+  "PEP_P21": "p21",
+  "PEP_CELERGEN": "peptide_complex",
+  "PEP_MOTS_C": "mots_c",
+  "PEP_HUMANIN": "humanin",
+  "PEP_SS31": "ss31",
+  "PEP_THYMULIN": "thymosin_alpha1",
+  "PEP_THYMOPENTIN": "thymosin_alpha1",
+  "PEP_LR3_IGF1": "igf1",
+  "PEP_DES_IGF1": "igf1",
+  "PEP_FOLLISTATIN_SYNERGY": "follistatin",
+  "PEP_MGF": "mgf",
+  "PEP_MGF_C": "mgf",
+  "PEP_GONADORELIN": "gonadorelin",
+  "PEP_KISSPEPTIN10": "kisspeptin",
+  "PEP_TRIPTORELIN": "peptide_complex",
+  "PEP_GLP1": "glp1",
+  "PEP_GIP": "gip",
+  "PEP_OXYNTOMODULIN": "peptide_complex",
+  "PEP_PYY": "peptide_complex",
+  "PEP_LEPTIN": "peptide_complex",
+  "PEP_ADIPONECTIN": "peptide_complex",
+  "PEP_MELANOCORTIN": "peptide_complex",
+  "PEP_GASTROINTESTINAL_REPAIR": "peptide_complex",
+  "PEP_ANTIINFLAMMATORY_PEPTIDE": "peptide_complex",
+  "PEP_ANTIOXIDANT_PEPTIDE": "peptide_complex",
+  "PEP_MITO_PEPTIDE_PREMIUM": "peptide_complex",
+  "PEP_NEURO_PEPTIDE_PREMIUM": "peptide_complex",
+  "PEP_SKIN_PEPTIDE_PREMIUM": "peptide_complex",
+  "PEP_JOINT_PEPTIDE_PREMIUM": "peptide_complex",
+  "PEP_LIVER_PEPTIDE_PREMIUM": "peptide_complex",
+  "PEP_HEART_PEPTIDE_PREMIUM": "peptide_complex",
+  "PEP_KIDNEY_PEPTIDE_PREMIUM": "peptide_complex",
+  "PEP_ADRENAL_PEPTIDE_PREMIUM": "peptide_complex",
+  "PEP_THYROID_PEPTIDE_PREMIUM": "peptide_complex",
+  "PEP_BRAIN_PEPTIDE_COMPLEX": "peptide_complex",
+  "PEP_FULL_PEPTIDE_PREMIUM": "peptide_complex",
+  "PEP_CIRCULATION_PEPTIDE": "peptide_complex",
+  "PEP_SKIN_ELASTIN_COMPLEX": "elastin",
+  "PEP_CARTILAGE_REPAIR_PEPTIDE": "peptide_complex",
+  "PEP_TENDON_REPAIR_PEPTIDE": "peptide_complex",
+  "PEP_MUSCLE_REPAIR_PEPTIDE": "peptide_complex",
+  "PEP_FULL_REGEN_PEPTIDE": "peptide_complex",
+  "PEP_CELLEX_GHK": "ghk_cu",
+  "PEP_CELLEX_CU": "peptide_complex",
+  "PEP_EYELASH_PEPTIDE": "peptide_complex",
+  "PEP_HAIR_GROWTH_PEPTIDE": "peptide_complex",
+  "PEP_BIOTIN_PEPTIDE": "peptide_complex",
+  "PEP_CARTILAGE_PEPTIDE": "peptide_complex",
+  "PEP_TENDON_MATRIX_PEPTIDE": "peptide_complex",
+  "PEP_BONE_PEPTIDE": "peptide_complex",
+  "PEP_CARTILAGE_SYNERGY": "peptide_complex",
+  "PEP_THYMUS_PEPTIDE": "peptide_complex",
+  "PEP_SPLEEN_PEPTIDE": "peptide_complex",
+  "PEP_LIVER_PEPTIDE": "peptide_complex",
+  "PEP_PANCREAS_PEPTIDE": "peptide_complex",
+  "PEP_HEART_PEPTIDE": "peptide_complex",
+  "PEP_VESSEL_PEPTIDE": "peptide_complex",
+  "PEP_LUNG_PEPTIDE": "peptide_complex",
+  "PEP_KIDNEY_PEPTIDE": "peptide_complex",
+  "PEP_STOMACH_PEPTIDE": "peptide_complex",
+  "PEP_INTESTINE_PEPTIDE": "peptide_complex",
+  "PEP_BRAIN_PEPTIDE": "peptide_complex",
+  "PEP_NEURO_REPAIR_PEPTIDE": "peptide_complex",
+  "PEP_RETINA_PEPTIDE": "peptide_complex",
+  "PEP_PINEAL_PEPTIDE": "peptide_complex",
+  "PEP_PITUITARY_PEPTIDE": "peptide_complex",
+  "PEP_ADRENAL_PEPTIDE": "peptide_complex",
+  "PEP_THYROID_PEPTIDE": "peptide_complex",
+  "PEP_OVARY_PEPTIDE": "peptide_complex",
+  "PEP_TESTIS_PEPTIDE": "peptide_complex",
+  "PEP_PROSTATE_PEPTIDE": "peptide_complex",
+  "PEP_UTERUS_PEPTIDE": "peptide_complex",
+  "PEP_SKIN_WHITENING_PEPTIDE": "peptide_complex",
+  "PEP_ANTI_SCAR_PEPTIDE": "peptide_complex",
+  "PEP_WOUND_HEALING_PEPTIDE": "peptide_complex",
+  "PEP_ANTI_ACNE_PEPTIDE": "peptide_complex",
+  "PEP_ANTI_WRINKLE_PEPTIDE": "peptide_complex",
+  "PEP_ANTI_PIGMENT_PEPTIDE": "peptide_complex",
+  "PEP_ANTI_REDNESS_PEPTIDE": "peptide_complex",
+  "PEP_ANTI_GLYCATION_PEPTIDE": "peptide_complex",
+  "PEP_ANTI_CELLULITE_PEPTIDE": "peptide_complex",
+  "PEP_MUSCLE_GROWTH_PEPTIDE": "peptide_complex",
+  "PEP_MUSCLE_ENDURANCE_PEPTIDE": "peptide_complex",
+  "PEP_MUSCLE_FATLOSS_PEPTIDE": "peptide_complex",
+  "PEP_FULL_ORGAN_PEPTIDE": "peptide_complex",
+  "PEP_FULL_REPAIR_PEPTIDE": "peptide_complex",
+  "PEP_FULL_SIGNAL_PEPTIDE": "peptide_complex",
+  "PEP_CEREBROLYSIN": "cerebrolysin",
+  "PEP_CORTEXIN": "cortexin",
+  "PEP_RETINOLIN": "peptide_complex",
+  "PEP_VENTFORT": "peptide_complex",
+  "PEP_CARDIOGEN": "peptide_complex",
+  "PEP_ENDOLUTEN": "peptide_complex",
+  "PEP_SIGUMIR": "peptide_complex",
+  "PEP_SUPREFORT": "peptide_complex",
+  "PEP_VENTRAMIN": "peptide_complex",
+  "PEP_TAXOREN": "peptide_complex",
+  "PEP_CRYSTAGEN": "peptide_complex",
+  "PEP_THYREOGEN": "peptide_complex",
+  "PEP_BRONCHOGEN": "peptide_complex",
+  "PEP_CHONDRAMIN": "peptide_complex",
+  "PEP_GASTROGEN": "peptide_complex",
+  "PEP_HEPATOGEN": "peptide_complex",
+  "PEP_NEUROGEN": "peptide_complex",
+  "PEP_CARDIOGEN_PREMIUM": "peptide_complex",
+  "PEP_VESSEL_PREMIUM": "peptide_complex",
+  "PEP_MITOCHONDRIAL_SIGNAL": "peptide_complex",
+  "PEP_MITOCHONDRIAL_REPAIR": "peptide_complex",
+  "PEP_CYTOKINE_BLOCKER": "peptide_complex",
+  "PEP_IL10_UP": "peptide_complex",
+  "PEP_IGF1_SIGNAL": "igf1",
+  "PEP_GH_SIGNAL": "peptide_complex",
+  "PEP_ANGIOGENESIS_UP": "peptide_complex",
+  "PEP_ANGIOGENESIS_DOWN": "peptide_complex",
+  "PEP_SKIN_REGEN_PREMIUM": "peptide_complex",
+  "PEP_SKIN_BARRIER_UP": "peptide_complex",
+  "PEP_HAIR_FOLLICLE_PREMIUM": "peptide_complex",
+  "PEP_NAIL_REPAIR_PEPTIDE": "peptide_complex",
+  "PEP_CARTILAGE_PREMIUM": "peptide_complex",
+  "PEP_TENDON_PREMIUM": "peptide_complex",
+  "PEP_BONE_PREMIUM": "peptide_complex",
+  "PEP_ORGAN_FULL": "peptide_complex",
+  "PEP_SIGNALING_PREMIUM": "peptide_complex",
+  "PEP_REGEN_PREMIUM": "peptide_complex",
+  "PEP_FULL_PEPTIDE_ULTRA": "peptide_complex",
+  "PEP_FULL_PEPTIDE_SYNERGY": "peptide_complex",
+  "PEP_ORGAN_SYNERGY": "peptide_complex",
+  "PEP_MITO_SYNERGY": "peptide_complex",
+  "PEP_NEURO_SYNERGY": "peptide_complex",
+  "PEP_IMMUNE_SYNERGY": "peptide_complex",
+  "PEP_HORMONE_SYNERGY": "peptide_complex",
+  "PEP_FULL_REPAIR_ULTRA": "peptide_complex",
+  "PEP_MELC": "peptide_complex",
+  "PEP_NRF2_PEPTIDE": "peptide_complex",
+  "PEP_SIRT1_PEPTIDE": "peptide_complex",
+  "PEP_SIRT6_PEPTIDE": "peptide_complex",
+  "PEP_TELOMERASE_UP": "peptide_complex",
+  "PEP_DNA_REPAIR_PEPTIDE": "peptide_complex",
+  "PEP_MITO_DYNAMICS": "peptide_complex",
+  "PEP_MITO_ANTIOX": "peptide_complex",
+  "PEP_ATP_SYNTHASE_UP": "peptide_complex",
+  "PEP_NAD_UP": "peptide_complex",
+  "PEP_NMN_SIGNAL": "peptide_complex",
+  "PEP_AMPK_UP": "peptide_complex",
+  "PEP_PPAR_DELTA": "peptide_complex",
+  "PEP_PPAR_GAMMA": "peptide_complex",
+  "PEP_LEPTIN_SIGNAL": "peptide_complex",
+  "PEP_ADIPONECTIN_SIGNAL": "peptide_complex",
+  "PEP_GLUCOSE_SENSOR": "peptide_complex",
+  "PEP_KETONE_UP": "peptide_complex",
+  "PEP_LIPOLYSIS_UP": "peptide_complex",
+  "PEP_BROWN_FAT_UP": "peptide_complex",
+  "PEP_APPETITE_BLOCK": "peptide_complex",
+  "PEP_GUT_BARRIER_UP": "peptide_complex",
+  "PEP_GUT_MUCIN_UP": "peptide_complex",
+  "PEP_ANTI_PATHOGEN_PEPTIDE": "peptide_complex",
+  "PEP_IGA_UP": "peptide_complex",
+  "PEP_TREG_UP": "peptide_complex",
+  "PEP_IL6_BLOCK": "peptide_complex",
+  "PEP_TNF_BLOCK": "peptide_complex",
+  "PEP_ANTIVIRAL_PEPTIDE": "peptide_complex",
+  "PEP_ANTIBACTERIAL_PEPTIDE": "peptide_complex",
+  "PEP_ANTIFUNGAL_PEPTIDE": "peptide_complex",
+  "PEP_ANTIPARASITIC_PEPTIDE": "peptide_complex",
+  "PEP_SKIN_STEMCELL_UP": "peptide_complex",
+  "PEP_HAIR_STEMCELL_UP": "peptide_complex",
+  "PEP_MELANIN_RESET": "peptide_complex",
+  "PEP_SCAR_DISSOLVE": "peptide_complex",
+  "PEP_CAPILLARY_REPAIR": "peptide_complex",
+  "PEP_LYMPH_FLOW_UP": "peptide_complex",
+  "PEP_ORGAN_REPAIR_MASTER": "peptide_complex",
+  "PEP_FULL_SIGNAL_ULTRA": "peptide_complex",
+  "PEP_FULL_REGEN_ULTRA": "peptide_complex",
+  "PEP_FULL_PEPTIDE_INFINITY": "peptide_complex",
+  "PEP_MITO_NRF1": "peptide_complex",
+  "PEP_MITO_NRF2": "peptide_complex",
+  "PEP_MITO_PGC1A": "peptide_complex",
+  "PEP_MITO_UCP1": "peptide_complex",
+  "PEP_MITO_CARDIOLIPIN": "peptide_complex",
+  "PEP_MITO_MEMBRANE": "peptide_complex",
+  "PEP_MITO_AUTOPHAGY": "peptide_complex",
+  "PEP_MITO_MITOPHAGY": "peptide_complex",
+  "PEP_DNA_METHYLATION": "peptide_complex",
+  "PEP_DNA_ACETYLATION": "peptide_complex",
+  "PEP_CHROMATIN_REMODEL": "peptide_complex",
+  "PEP_STEMCELL_MASTER": "peptide_complex",
+  "PEP_STEMCELL_SKIN": "peptide_complex",
+  "PEP_STEMCELL_MUSCLE": "peptide_complex",
+  "PEP_STEMCELL_NEURO": "peptide_complex",
+  "PEP_ANGIO_MASTER": "peptide_complex",
+  "PEP_ANGIO_BALANCE": "peptide_complex",
+  "PEP_CARTILAGE_MASTER": "peptide_complex",
+  "PEP_TENDON_MASTER": "peptide_complex",
+  "PEP_BONE_MASTER": "peptide_complex",
+  "PEP_SKIN_MASTER": "peptide_complex",
+  "PEP_HAIR_MASTER": "peptide_complex",
+  "PEP_LIVER_MASTER": "peptide_complex",
+  "PEP_PANCREAS_MASTER": "peptide_complex",
+  "PEP_HEART_MASTER": "peptide_complex",
+  "PEP_LUNG_MASTER": "peptide_complex",
+  "PEP_KIDNEY_MASTER": "peptide_complex",
+  "PEP_BRAIN_MASTER": "peptide_complex",
+  "PEP_THYROID_MASTER": "peptide_complex",
+  "PEP_ADRENAL_MASTER": "peptide_complex",
+  "PEP_OVARY_MASTER": "peptide_complex",
+  "PEP_TESTIS_MASTER": "peptide_complex",
+  "PEP_PROSTATE_MASTER": "peptide_complex",
+  "PEP_UTERUS_MASTER": "peptide_complex",
+  "PEP_RETINA_MASTER": "peptide_complex",
+  "PEP_PINEAL_MASTER": "peptide_complex",
+  "PEP_PITUITARY_MASTER": "peptide_complex",
+  "PEP_FULL_ORGAN_ULTRA": "peptide_complex",
+  "PEP_FULL_SIGNAL_MASTER": "peptide_complex",
+  "PEP_FULL_REGEN_MASTER": "peptide_complex",
+  "PEP_INFINITY_PEPTIDE": "peptide_complex",
+  "PEP_MITO_COQ10": "peptide_complex",
+  "PEP_MITO_ETC": "peptide_complex",
+  "PEP_MITO_COMPLEX1": "peptide_complex",
+  "PEP_MITO_COMPLEX2": "peptide_complex",
+  "PEP_MITO_COMPLEX3": "peptide_complex",
+  "PEP_MITO_COMPLEX4": "peptide_complex",
+  "PEP_MITO_COMPLEX5": "peptide_complex",
+  "PEP_MITO_SUPEROXIDE": "peptide_complex",
+  "PEP_MITO_GPX": "peptide_complex",
+  "PEP_MITO_CATALASE": "peptide_complex",
+  "PEP_MITO_MEMBRANE_REPAIR": "peptide_complex",
+  "PEP_MITO_SHIELD": "peptide_complex",
+  "PEP_MITO_FUSION": "peptide_complex",
+  "PEP_MITO_FISSION": "peptide_complex",
+  "PEP_MITO_BIOGENESIS": "peptide_complex",
+  "PEP_MITO_STABILITY": "peptide_complex",
+  "PEP_MITO_CYTOCHROME": "peptide_complex",
+  "PEP_MITO_ATPASE": "peptide_complex",
+  "PEP_MITO_NADH": "peptide_complex",
+  "PEP_MITO_FAD": "peptide_complex",
+  "PEP_MITO_QC": "peptide_complex",
+  "PEP_MITO_STRESS_RESIST": "peptide_complex",
+  "PEP_MITO_LONGEVITY": "peptide_complex",
+  "PEP_MITO_TELOMERE": "peptide_complex",
+  "PEP_MITO_DNA_REPAIR": "peptide_complex",
+  "PEP_MITO_RNA_REPAIR": "peptide_complex",
+  "PEP_MITO_PROTEOSTASIS": "peptide_complex",
+  "PEP_MITO_HEAT_SHOCK": "peptide_complex",
+  "PEP_MITO_COLD_SHOCK": "peptide_complex",
+  "PEP_MITO_ANTIFIBROSIS": "peptide_complex",
+  "PEP_MITO_ANTIAPOPTOSIS": "peptide_complex",
+  "PEP_MITO_ANTISENESCENCE": "peptide_complex",
+  "PEP_MITO_CLEANUP": "peptide_complex",
+  "PEP_MITO_REBOOT": "peptide_complex",
+  "PEP_MITO_SUPERCHARGE": "peptide_complex",
+  "PEP_MITO_HYPERCHARGE": "peptide_complex",
+  "PEP_MITO_ULTRA": "peptide_complex",
+  "PEP_MITO_INFINITY": "peptide_complex",
+  "PEP_MITO_OMEGA": "peptide_complex",
+  "PEP_MITO_PRIME": "peptide_complex",
+  "PEP_MITO_CORE": "peptide_complex",
+  "PEP_MITO_MATRIX": "peptide_complex",
+  "PEP_MITO_SIGNAL_ULTRA": "peptide_complex",
+  "PEP_MITO_REGEN_ULTRA": "peptide_complex",
+  "PEP_MITO_FULL_SPECTRUM": "peptide_complex",
+  "PEP_EPIGENETIC_RESET": "peptide_complex",
+  "PEP_HDAC_INHIBITOR": "peptide_complex",
+  "PEP_HAT_UP": "peptide_complex",
+  "PEP_METHYLATION_BALANCE": "peptide_complex",
+  "PEP_DNMT_BLOCK": "peptide_complex",
+  "PEP_TELOMERE_EXTEND": "peptide_complex",
+  "PEP_TELOMERE_SHIELD": "peptide_complex",
+  "PEP_SENOLYTIC": "peptide_complex",
+  "PEP_SENOMOD": "peptide_complex",
+  "PEP_LONGEVITY_PATHWAY": "peptide_complex",
+  "PEP_FOXO_UP": "peptide_complex",
+  "PEP_SIRT3_UP": "peptide_complex",
+  "PEP_SIRT5_UP": "peptide_complex",
+  "PEP_P53_RESTORE": "peptide_complex",
+  "PEP_P21_RESTORE": "peptide_complex",
+  "PEP_AUTOPHAGY_MASTER": "peptide_complex",
+  "PEP_LYSOSOME_UP": "peptide_complex",
+  "PEP_PROTEIN_FOLDING": "peptide_complex",
+  "PEP_ER_STRESS_DOWN": "peptide_complex",
+  "PEP_MITO_NUCLEAR_SYNC": "peptide_complex",
+  "PEP_DOPAMINE_RESET": "peptide_complex",
+  "PEP_SEROTONIN_RESET": "peptide_complex",
+  "PEP_GABA_RESET": "peptide_complex",
+  "PEP_NEUROPLASTICITY_UP": "peptide_complex",
+  "PEP_AXON_REPAIR": "peptide_complex",
+  "PEP_MYELIN_UP": "peptide_complex",
+  "PEP_SYNAPSE_UP": "peptide_complex",
+  "PEP_NEURO_SHIELD": "peptide_complex",
+  "PEP_NEURO_REBOOT": "peptide_complex",
+  "PEP_NEURO_ULTRA": "peptide_complex",
+  "PEP_ORGAN_REBOOT": "peptide_complex",
+  "PEP_ORGAN_STEMCELL": "peptide_complex",
+  "PEP_ORGAN_MATRIX": "peptide_complex",
+  "PEP_ORGAN_SIGNAL": "peptide_complex",
+  "PEP_ORGAN_ULTRA": "peptide_complex",
+  "PEP_FULL_EPIGENETIC": "peptide_complex",
+  "PEP_FULL_LONGEVITY": "peptide_complex",
+  "PEP_FULL_NEURO": "peptide_complex",
+  "PEP_FULL_MITO": "peptide_complex",
+  "PEP_FULL_REGEN": "peptide_complex",
+  "PEP_INFINITY_SIGNAL": "peptide_complex",
+  "PEP_INFINITY_REGEN": "peptide_complex",
+  "PEP_INFINITY_ORGAN": "peptide_complex",
+  "PEP_MITO_SIGNAL_CORE": "peptide_complex",
+  "PEP_MITO_SIGNAL_PRIME": "peptide_complex",
+  "PEP_MITO_REPAIR_CORE": "peptide_complex",
+  "PEP_MITO_REPAIR_PRIME": "peptide_complex",
+  "PEP_MITO_ANTIOX_CORE": "peptide_complex",
+  "PEP_MITO_ANTIOX_PRIME": "peptide_complex",
+  "PEP_MITO_DYNAMICS_CORE": "peptide_complex",
+  "PEP_MITO_DYNAMICS_PRIME": "peptide_complex",
+  "PEP_MITO_QC_CORE": "peptide_complex",
+  "PEP_MITO_QC_PRIME": "peptide_complex",
+  "PEP_MITO_TELOMERE_CORE": "peptide_complex",
+  "PEP_MITO_TELOMERE_PRIME": "peptide_complex",
+  "PEP_MITO_STEMCELL_CORE": "peptide_complex",
+  "PEP_MITO_STEMCELL_PRIME": "peptide_complex",
+  "PEP_MITO_LONGEVITY_CORE": "peptide_complex",
+  "PEP_MITO_LONGEVITY_PRIME": "peptide_complex",
+  "PEP_MITO_REBOOT_CORE": "peptide_complex",
+  "PEP_MITO_REBOOT_PRIME": "peptide_complex",
+  "PEP_MITO_ULTRA_CORE": "peptide_complex",
+  "PEP_MITO_ULTRA_PRIME": "peptide_complex",
+  "PEP_MITO_INFINITY_CORE": "peptide_complex",
+  "PEP_MITO_INFINITY_PRIME": "peptide_complex",
+  "PEP_ORGAN_SIGNAL_CORE": "peptide_complex",
+  "PEP_ORGAN_SIGNAL_PRIME": "peptide_complex",
+  "PEP_ORGAN_REPAIR_CORE": "peptide_complex",
+  "PEP_ORGAN_REPAIR_PRIME": "peptide_complex",
+  "PEP_ORGAN_STEMCELL_CORE": "peptide_complex",
+  "PEP_ORGAN_STEMCELL_PRIME": "peptide_complex",
+  "PEP_ORGAN_MATRIX_CORE": "peptide_complex",
+  "PEP_ORGAN_MATRIX_PRIME": "peptide_complex",
+  "PEP_ORGAN_LONGEVITY_CORE": "peptide_complex",
+  "PEP_ORGAN_LONGEVITY_PRIME": "peptide_complex",
+  "PEP_ORGAN_REBOOT_CORE": "peptide_complex",
+  "PEP_ORGAN_REBOOT_PRIME": "peptide_complex",
+  "PEP_ORGAN_ULTRA_CORE": "peptide_complex",
+  "PEP_ORGAN_ULTRA_PRIME": "peptide_complex",
+  "PEP_ORGAN_INFINITY_CORE": "peptide_complex",
+  "PEP_ORGAN_INFINITY_PRIME": "peptide_complex",
+  "PEP_FULL_SIGNAL_CORE": "peptide_complex",
+  "PEP_FULL_SIGNAL_PRIME": "peptide_complex",
+  "PEP_FULL_REGEN_CORE": "peptide_complex",
+  "PEP_FULL_REGEN_PRIME": "peptide_complex",
+  "PEP_FULL_LONGEVITY_CORE": "peptide_complex",
+  "PEP_FULL_LONGEVITY_PRIME": "peptide_complex",
+  "PEP_INFINITY_CORE": "peptide_complex",
+  "PEP_INFINITY_PRIME": "peptide_complex",
+  "PEP_MITO_QUANTUM": "peptide_complex",
+  "PEP_MITO_PHOTON": "peptide_complex",
+  "PEP_MITO_ELECTRON_FLOW": "peptide_complex",
+  "PEP_MITO_PROTON_GRADIENT": "peptide_complex",
+  "PEP_MITO_OXPHOS": "peptide_complex",
+  "PEP_MITO_RESP_CHAIN": "peptide_complex",
+  "PEP_MITO_ANTIOX_SUPER": "peptide_complex",
+  "PEP_MITO_ANTIOX_NANO": "peptide_complex",
+  "PEP_MITO_REPAIR_NANO": "peptide_complex",
+  "PEP_MITO_SIGNAL_NANO": "peptide_complex",
+  "PEP_MITO_STEMCELL_NANO": "peptide_complex",
+  "PEP_MITO_LONGEVITY_NANO": "peptide_complex",
+  "PEP_MITO_TELOMERE_NANO": "peptide_complex",
+  "PEP_MITO_QUANTUM_REPAIR": "peptide_complex",
+  "PEP_MITO_QUANTUM_SIGNAL": "peptide_complex",
+  "PEP_MITO_QUANTUM_LONGEVITY": "peptide_complex",
+  "PEP_MITO_QUANTUM_STEMCELL": "peptide_complex",
+  "PEP_MITO_QUANTUM_TELOMERE": "peptide_complex",
+  "PEP_ORGAN_QUANTUM": "peptide_complex",
+  "PEP_ORGAN_QUANTUM_SIGNAL": "peptide_complex",
+  "PEP_ORGAN_QUANTUM_STEMCELL": "peptide_complex",
+  "PEP_ORGAN_QUANTUM_LONGEVITY": "peptide_complex",
+  "PEP_ORGAN_QUANTUM_REBOOT": "peptide_complex",
+  "PEP_ORGAN_QUANTUM_ULTRA": "peptide_complex",
+  "PEP_ORGAN_QUANTUM_INFINITY": "peptide_complex",
+  "PEP_EPIGENETIC_QUANTUM": "peptide_complex",
+  "PEP_EPIGENETIC_PRIME": "peptide_complex",
+  "PEP_EPIGENETIC_CORE": "peptide_complex",
+  "PEP_EPIGENETIC_ULTRA": "peptide_complex",
+  "PEP_EPIGENETIC_INFINITY": "peptide_complex",
+  "PEP_SIGNAL_QUANTUM": "peptide_complex",
+  "PEP_SIGNAL_ULTRA": "peptide_complex",
+  "PEP_SIGNAL_INFINITY": "peptide_complex",
+  "PEP_REGEN_QUANTUM": "peptide_complex",
+  "PEP_REGEN_ULTRA": "peptide_complex",
+  "PEP_REGEN_INFINITY": "peptide_complex",
+  "PEP_LONGEVITY_QUANTUM": "peptide_complex",
+  "PEP_LONGEVITY_ULTRA": "peptide_complex",
+  "PEP_LONGEVITY_INFINITY": "peptide_complex",
+  "PEP_FULL_QUANTUM": "peptide_complex",
+  "PEP_FULL_ULTRA": "peptide_complex",
+  "PEP_FULL_INFINITY": "peptide_complex",
+  "PEP_EPI_CHROMATIN_OPEN": "peptide_complex",
+  "PEP_EPI_CHROMATIN_CLOSE": "peptide_complex",
+  "PEP_EPI_HDAC_SUPPRESS": "peptide_complex",
+  "PEP_EPI_HDAC_BALANCE": "peptide_complex",
+  "PEP_EPI_HAT_SUPER": "peptide_complex",
+  "PEP_EPI_HAT_BALANCE": "peptide_complex",
+  "PEP_EPI_DNMT_SUPPRESS": "peptide_complex",
+  "PEP_EPI_DNMT_BALANCE": "peptide_complex",
+  "PEP_EPI_METHYLATION_RESET": "peptide_complex",
+  "PEP_EPI_METHYLATION_STABILIZE": "peptide_complex",
+  "PEP_EPI_ACETYLATION_UP": "peptide_complex",
+  "PEP_EPI_ACETYLATION_RESET": "peptide_complex",
+  "PEP_EPI_HISTONE_REPAIR": "peptide_complex",
+  "PEP_EPI_HISTONE_MOD": "peptide_complex",
+  "PEP_EPI_TELOMERE_REPAIR": "peptide_complex",
+  "PEP_EPI_TELOMERE_EXPAND": "peptide_complex",
+  "PEP_EPI_TELOMERE_SHIELD2": "peptide_complex",
+  "PEP_EPI_SENESCENCE_CLEAR": "peptide_complex",
+  "PEP_EPI_SENESCENCE_REVERSE": "peptide_complex",
+  "PEP_EPI_SASP_BLOCK": "peptide_complex",
+  "PEP_EPI_P53_RESTORE2": "peptide_complex",
+  "PEP_EPI_P21_RESTORE2": "peptide_complex",
+  "PEP_EPI_FOXO_MASTER": "peptide_complex",
+  "PEP_EPI_FOXO_BALANCE": "peptide_complex",
+  "PEP_EPI_SIRT1_MASTER": "peptide_complex",
+  "PEP_EPI_SIRT6_MASTER": "peptide_complex",
+  "PEP_EPI_SIRT7_UP": "peptide_complex",
+  "PEP_EPI_CHROMATIN_REMODEL2": "peptide_complex",
+  "PEP_EPI_NUCLEAR_REPAIR": "peptide_complex",
+  "PEP_EPI_NUCLEAR_STABILITY": "peptide_complex",
+  "PEP_EPI_MITO_NUCLEAR_SYNC2": "peptide_complex",
+  "PEP_EPI_DNA_UNFOLD": "peptide_complex",
+  "PEP_EPI_DNA_REFOLD": "peptide_complex",
+  "PEP_EPI_RNA_REPAIR": "peptide_complex",
+  "PEP_EPI_RNA_STABILITY": "peptide_complex",
+  "PEP_EPI_TRANSCRIPTION_UP": "peptide_complex",
+  "PEP_EPI_TRANSCRIPTION_RESET": "peptide_complex",
+  "PEP_EPI_TRANSLATION_UP": "peptide_complex",
+  "PEP_EPI_TRANSLATION_RESET": "peptide_complex",
+  "PEP_EPI_CHROMOSOME_REPAIR": "peptide_complex",
+  "PEP_EPI_CHROMOSOME_STABILITY": "peptide_complex",
+  "PEP_EPI_GENE_REBOOT": "peptide_complex",
+  "PEP_EPI_GENE_SHIELD": "peptide_complex",
+  "PEP_EPI_FULL_RESET": "peptide_complex",
+  "PEP_EPI_FULL_REPAIR": "peptide_complex",
+  "PEP_EPI_FULL_LONGEVITY": "peptide_complex",
+  "PEP_EPI_INFINITY_RESET": "peptide_complex",
+  "PEP_EPI_INFINITY_REPAIR": "peptide_complex",
+  "PEP_EPI_INFINITY_LONGEVITY": "peptide_complex",
+  "PEP_EPI_LAMIN_A_REBUILD": "peptide_complex",
+  "PEP_EPI_LAMIN_B_REBUILD": "peptide_complex",
+  "PEP_EPI_LAMIN_NETWORK_UP": "peptide_complex",
+  "PEP_EPI_LAMIN_NETWORK_RESET": "peptide_complex",
+  "PEP_EPI_NUCLEAR_SCAFFOLD_UP": "peptide_complex",
+  "PEP_EPI_NUCLEAR_SCAFFOLD_REPAIR": "peptide_complex",
+  "PEP_EPI_TAD_BOUNDARY_UP": "peptide_complex",
+  "PEP_EPI_TAD_BOUNDARY_REPAIR": "peptide_complex",
+  "PEP_EPI_LOOP_EXTRUSION_UP": "peptide_complex",
+  "PEP_EPI_LOOP_EXTRUSION_RESET": "peptide_complex",
+  "PEP_EPI_CTCF_STABILIZE": "peptide_complex",
+  "PEP_EPI_CTCF_REBUILD": "peptide_complex",
+  "PEP_EPI_COHESIN_STABILIZE": "peptide_complex",
+  "PEP_EPI_COHESIN_REBUILD": "peptide_complex",
+  "PEP_EPI_SMC_COMPLEX_STABILIZE": "peptide_complex",
+  "PEP_EPI_SMC_COMPLEX_REBUILD": "peptide_complex",
+  "PEP_EPI_SUPERENHANCER_STABILIZE": "peptide_complex",
+  "PEP_EPI_SUPERENHANCER_REBUILD": "peptide_complex",
+  "PEP_EPI_INSULATOR_STABILIZE": "peptide_complex",
+  "PEP_EPI_INSULATOR_REBUILD": "peptide_complex",
+  "PEP_EPI_NUCLEAR_BODY_STABILIZE": "peptide_complex",
+  "PEP_EPI_NUCLEAR_BODY_REBUILD": "peptide_complex",
+  "PEP_EPI_NUCLEOLUS_STABILIZE": "peptide_complex",
+  "PEP_EPI_NUCLEOLUS_REBUILD": "peptide_complex",
+  "PEP_EPI_HETEROCHROMATIN_STABILIZE": "peptide_complex",
+  "PEP_EPI_HETEROCHROMATIN_REBUILD": "peptide_complex",
+  "PEP_EPI_EUCHROMATIN_STABILIZE": "peptide_complex",
+  "PEP_EPI_EUCHROMATIN_REBUILD": "peptide_complex",
+  "PEP_EPI_DNA_LOOPING_STABILIZE": "peptide_complex",
+  "PEP_EPI_DNA_LOOPING_REBUILD": "peptide_complex",
+  "PEP_EPI_3D_ARCHITECTURE_STABILIZE": "peptide_complex",
+  "PEP_EPI_3D_ARCHITECTURE_REBUILD": "peptide_complex",
+  "PEP_EPI_GENOME_INSULATION_STABILIZE": "peptide_complex",
+  "PEP_EPI_GENOME_INSULATION_REBUILD": "peptide_complex",
+  "PEP_EPI_FULL_STRUCTURE2": "peptide_complex",
+  "PEP_EPI_FULL_RESET3": "peptide_complex",
+  "PEP_EPI_INFINITY_STRUCTURE2": "peptide_complex",
+  "PEP_EPI_INFINITY_RESET3": "peptide_complex",
+  "PEP_HEXARELIN": "peptide_complex",
+  "PEP_IGF1_LR3": "igf1",
+  "PEP_AOD9604": "peptide_complex",
+  "PEP_HGH_FRAG176": "peptide_complex",
+  "PHARMA_PIRACETAM": "piracetam",
+  "PHARMA_ANIRACETAM": "aniracetam",
+  "PHARMA_OXIRACETAM": "oxiracetam",
+  "PHARMA_PRAMIRACETAM": "pramiracetam",
+  "PHARMA_FASORACETAM": "fasoracetam",
+  "PHARMA_COLURACETAM": "coluracetam",
+  "PHARMA_NOOPEPT": "noopept",
+  "PHARMA_SEMAX": "semax",
+  "PHARMA_SELANK": "selank",
+  "PHARMA_CITICOLINE": "citicoline",
+  "PHARMA_ALPHA_GPC": "alpha_gpc",
+  "PHARMA_VINPOCETINE": "vinpocetine",
+  "PHARMA_MODAFINIL": "modafinil",
+  "PHARMA_ADRAFINIL": "modafinil",
+  "PHARMA_SELEGILINE": "selegiline",
+  "PHARMA_MEMANTINE": "memantine",
+  "PHARMA_AMANTADINE": "memantine",
+  "PHARMA_BROMANTANE": "bromantane",
+  "PHARMA_TIANEPTINE": "tianeptine",
+  "PHARMA_HUPERZINE_A": "huperzine_a",
+  "PHARMA_CEREBROLYSIN": "cerebrolysin",
+  "PHARMA_TELMISARTAN": "telmisartan",
+  "PHARMA_NEBIVOLOL": "nebivolol",
+  "PHARMA_METFORMIN": "metformin",
+  "PHARMA_SEMAGLUTIDE": "semaglutide",
+  "PHARMA_FINASTERIDE": "finasteride",
+  "PHARMA_DUTASTERIDE": "finasteride",
+  "PHARMA_CABERGOLINE": "cabergoline",
+  "PHARMA_HCG": "hcg",
+  "PHARMA_TESTOSTERONE": "testosterone",
+  "PHARMA_CAFFEINE": "caffeine",
+  "PHARMA_DICLOFENAC": "diclofenac",
+  "PHARMA_MELOXICAM": "meloxicam",
+  "PHARMA_OMEPRAZOLE": "ppi_drugs",
+  "PHARMA_SPIRONOLACTONE": "spironolactone",
+  "PHARMA_NIACIN": "vitamin_b3",
+  "PHARMA_OMEGA3_RX": "omega3",
+  "PHARMA_NMN": "nmn",
+  "PHARMA_NR": "nmn",
+  "PHARMA_VINCAMINE": "pharma_drugs",
+  "PHARMA_NICERGOLINE": "pharma_drugs",
+  "PHARMA_CINNARIZINE": "pharma_drugs",
+  "PHARMA_FLUNARIZINE": "pharma_drugs",
+  "PHARMA_RASAGILINE": "pharma_drugs",
+  "PHARMA_AMPAKINE_SUN": "pharma_drugs",
+  "PHARMA_AMPAKINE_FAR": "pharma_drugs",
+  "PHARMA_PROGLUMETACIN": "pharma_drugs",
+  "PHARMA_CORTEXIN": "pharma_drugs",
+  "PHARMA_ACTOVEGIN": "pharma_drugs",
+  "PHARMA_MEXIDOL": "pharma_drugs",
+  "PHARMA_EMOXYPINE": "pharma_drugs",
+  "PHARMA_PICAMILON": "pharma_drugs",
+  "PHARMA_PANTOGAM": "ppi_drugs",
+  "PHARMA_PANTOCALCIN": "ppi_drugs",
+  "PHARMA_FENIBUT": "pharma_drugs",
+  "PHARMA_BACLOFEN": "pharma_drugs",
+  "PHARMA_CYTOFLAVIN": "pharma_drugs",
+  "PHARMA_MELDONIUM": "pharma_drugs",
+  "PHARMA_TRIMETAZIDINE": "pharma_drugs",
+  "PHARMA_NICOTINAMIDE": "pharma_drugs",
+  "PHARMA_THEOBROMINE": "pharma_drugs",
+  "PHARMA_SULBUTIAMINE": "pharma_drugs",
+  "PHARMA_TYROSINE": "pharma_drugs",
+  "PHARMA_SERTRALINE": "antidepressant_drugs",
+  "PHARMA_FLUOXETINE": "antidepressant_drugs",
+  "PHARMA_PAROXETINE": "antidepressant_drugs",
+  "PHARMA_ESCITALOPRAM": "antidepressant_drugs",
+  "PHARMA_CITALOPRAM": "antidepressant_drugs",
+  "PHARMA_FLUVOXAMINE": "antidepressant_drugs",
+  "PHARMA_VENLAFAXINE": "antidepressant_drugs",
+  "PHARMA_DESVENLAFAXINE": "antidepressant_drugs",
+  "PHARMA_DULOXETINE": "antidepressant_drugs",
+  "PHARMA_MILNACIPRAN": "antidepressant_drugs",
+  "PHARMA_BUPROPION": "antidepressant_drugs",
+  "PHARMA_MIRTAZAPINE": "antidepressant_drugs",
+  "PHARMA_TRAZODONE": "antidepressant_drugs",
+  "PHARMA_AGOMELATINE": "antidepressant_drugs",
+  "PHARMA_VORTIOXETINE": "antidepressant_drugs",
+  "PHARMA_AMITRIPTYLINE": "antidepressant_drugs",
+  "PHARMA_IMIPRAMINE": "antidepressant_drugs",
+  "PHARMA_CLOMIPRAMINE": "antidepressant_drugs",
+  "PHARMA_MAOI_SELEGILINE": "antidepressant_drugs",
+  "PHARMA_MAOI_TRANYLCYPROMINE": "antidepressant_drugs",
+  "PHARMA_BUSPIRONE": "anxiolytic_drugs",
+  "PHARMA_HYDROXYZINE": "anxiolytic_drugs",
+  "PHARMA_PREGABALIN": "anxiolytic_drugs",
+  "PHARMA_GABAPENTIN": "anxiolytic_drugs",
+  "PHARMA_DIAZEPAM": "anxiolytic_drugs",
+  "PHARMA_LORAZEPAM": "anxiolytic_drugs",
+  "PHARMA_ALPRAZOLAM": "anxiolytic_drugs",
+  "PHARMA_CLONAZEPAM": "anxiolytic_drugs",
+  "PHARMA_ETIZOLAM": "anxiolytic_drugs",
+  "PHARMA_PROPRANOLOL": "pharma_drugs",
+  "PHARMA_QUETIAPINE_LOW": "antipsychotic_drugs",
+  "PHARMA_OLANZAPINE": "antipsychotic_drugs",
+  "PHARMA_RISPERIDONE": "antipsychotic_drugs",
+  "PHARMA_ARIPIPRAZOLE": "antipsychotic_drugs",
+  "PHARMA_LAMOTRIGINE": "anticonvulsant_drugs",
+  "PHARMA_VALPROATE": "anticonvulsant_drugs",
+  "PHARMA_LITHIUM": "lithium",
+  "PHARMA_KETAMINE": "ketamine",
+  "PHARMA_ESKETAMINE": "ketamine",
+  "PHARMA_CARBAMAZEPINE": "anticonvulsant_drugs",
+  "PHARMA_TOPIRAMATE": "anticonvulsant_drugs",
+  "PHARMA_PROCHLORPERAZINE": "pharma_drugs",
+  "PHARMA_CYPROHEPTADINE": "pharma_drugs",
+  "PHARMA_BETAHISTINE": "pharma_drugs",
+  "PHARMA_MIANESIN": "pharma_drugs",
+  "PHARMA_TIZANIDINE": "pharma_drugs",
+  "PHARMA_GLUCOBAY": "pharma_drugs",
+  "PHARMA_PIOGLITAZONE": "antidiabetic_drugs",
+  "PHARMA_ROSIGLITAZONE": "antidiabetic_drugs",
+  "PHARMA_SITAGLIPTIN": "antidiabetic_drugs",
+  "PHARMA_VILDAGLIPTIN": "antidiabetic_drugs",
+  "PHARMA_LINAGLIPTIN": "antidiabetic_drugs",
+  "PHARMA_EXENATIDE": "antidiabetic_drugs",
+  "PHARMA_LIRAGLUTIDE": "antidiabetic_drugs",
+  "PHARMA_INSULIN_HUMAN": "antidiabetic_drugs",
+  "PHARMA_INSULIN_ANALOG_FAST": "antidiabetic_drugs",
+  "PHARMA_INSULIN_ANALOG_LONG": "antidiabetic_drugs",
+  "PHARMA_LEVOTHYROXINE": "thyroid_drugs",
+  "PHARMA_LIOTHYRONINE": "thyroid_drugs",
+  "PHARMA_PTU": "thyroid_drugs",
+  "PHARMA_METHIMAZOLE": "thyroid_drugs",
+  "PHARMA_HYDROCORTISONE": "corticosteroid_drugs",
+  "PHARMA_PREDNISOLONE": "corticosteroid_drugs",
+  "PHARMA_DEXAMETHASONE": "corticosteroid_drugs",
+  "PHARMA_FLUDROCORTISONE": "pharma_drugs",
+  "PHARMA_TESTOSTERONE_GEL": "pharma_drugs",
+  "PHARMA_TESTOSTERONE_UNDECANOATE": "pharma_drugs",
+  "PHARMA_DHT_GEL": "pharma_drugs",
+  "PHARMA_ESTRADIOL": "pharma_drugs",
+  "PHARMA_ESTRADIOL_PATCH": "pharma_drugs",
+  "PHARMA_PROGESTERONE": "pharma_drugs",
+  "PHARMA_DYDROGESTERONE": "pharma_drugs",
+  "PHARMA_BROMOCRIPTINE": "pharma_drugs",
+  "PHARMA_GNRH_AGONIST": "pharma_drugs",
+  "PHARMA_GNRH_ANTAGONIST": "pharma_drugs",
+  "PHARMA_GH": "pharma_drugs",
+  "PHARMA_IGF1": "pharma_drugs",
+  "PHARMA_DESMOPRESSIN": "pharma_drugs",
+  "PHARMA_ORLISTAT": "pharma_drugs",
+  "PHARMA_ACETAZOLAMIDE": "pharma_drugs",
+  "PHARMA_THYROID_DESICCATED": "thyroid_drugs",
+  "PHARMA_MIFEPRISTONE": "pharma_drugs",
+  "PHARMA_KETOCONAZOLE_HORM": "pharma_drugs",
+  "PHARMA_MITOTANE": "pharma_drugs",
+  "PHARMA_ATORVASTATIN": "statin_drugs",
+  "PHARMA_ROSUVASTATIN": "statin_drugs",
+  "PHARMA_SIMVASTATIN": "statin_drugs",
+  "PHARMA_EZETIMIBE": "pharma_drugs",
+  "PHARMA_FENOFIBRATE": "pharma_drugs",
+  "PHARMA_GEMFIBROZIL": "pharma_drugs",
+  "PHARMA_CLOPIDOGREL": "antiplatelet_drugs",
+  "PHARMA_TICAGRELOR": "antiplatelet_drugs",
+  "PHARMA_PRASUGREL": "antiplatelet_drugs",
+  "PHARMA_WARFARIN": "anticoagulant_drugs",
+  "PHARMA_APIXABAN": "anticoagulant_drugs",
+  "PHARMA_RIVAROXABAN": "anticoagulant_drugs",
+  "PHARMA_ENALAPRIL": "ace_inhibitor_drugs",
+  "PHARMA_LISINOPRIL": "ace_inhibitor_drugs",
+  "PHARMA_RAMIPRIL": "ace_inhibitor_drugs",
+  "PHARMA_LOSARTAN": "arb_drugs",
+  "PHARMA_VALSARTAN": "arb_drugs",
+  "PHARMA_AMLODIPINE": "ccb_drugs",
+  "PHARMA_NIFEDIPINE": "ccb_drugs",
+  "PHARMA_VERAPAMIL": "ccb_drugs",
+  "PHARMA_METOPROLOL": "beta_blocker_drugs",
+  "PHARMA_BISOPROLOL": "beta_blocker_drugs",
+  "PHARMA_CARVEDILOL": "beta_blocker_drugs",
+  "PHARMA_DIGOXIN": "pharma_drugs",
+  "PHARMA_FUROSEMIDE": "diuretic_drugs",
+  "PHARMA_HYDROCHLOROTHIAZIDE": "diuretic_drugs",
+  "PHARMA_SPIRONOLACTONE_CARDIO": "pharma_drugs",
+  "PHARMA_ESOMEPRAZOLE": "ppi_drugs",
+  "PHARMA_PANTOPRAZOLE": "ppi_drugs",
+  "PHARMA_RANITIDINE": "pharma_drugs",
+  "PHARMA_FAMOTIDINE": "pharma_drugs",
+  "PHARMA_DOMPERIDONE": "pharma_drugs",
+  "PHARMA_METOCLOPRAMIDE": "pharma_drugs",
+  "PHARMA_ITOPRIDE": "pharma_drugs",
+  "PHARMA_TRIMEBUTINE": "pharma_drugs",
+  "PHARMA_MACROGOL": "pharma_drugs",
+  "PHARMA_MESALAZINE": "pharma_drugs",
+  "PHARMA_SULFASALAZINE": "pharma_drugs",
+  "PHARMA_PREDNISONE_GI": "corticosteroid_drugs",
+  "PHARMA_AZATHIOPRINE": "immunosuppressant_drugs",
+  "PHARMA_METHOTREXATE": "immunosuppressant_drugs",
+  "PHARMA_CYCLOSPORINE": "immunosuppressant_drugs",
+  "PHARMA_TACROLIMUS": "pharma_drugs",
+  "PHARMA_ADALIMUMAB": "immunosuppressant_drugs",
+  "PHARMA_INFLIXIMAB": "immunosuppressant_drugs",
+  "PHARMA_ETANERCEPT": "immunosuppressant_drugs",
+  "PHARMA_TOFACITINIB": "antibiotic_drugs",
+  "PHARMA_BARICITINIB": "antibiotic_drugs",
+  "PHARMA_CETIRIZINE": "antihistamine_drugs",
+  "PHARMA_LEVOCETIRIZINE": "antibiotic_drugs",
+  "PHARMA_LORATADINE": "antihistamine_drugs",
+  "PHARMA_DESLORATADINE": "antihistamine_drugs",
+  "PHARMA_FEXOFENADINE": "antihistamine_drugs",
+  "PHARMA_RUPATADINE": "antihistamine_drugs",
+  "PHARMA_KETOTIFEN": "antihistamine_drugs",
+  "PHARMA_AZELASTINE": "antihistamine_drugs",
+  "PHARMA_MONTELUKAST": "pharma_drugs",
+  "PHARMA_ZAFIRLUKAST": "pharma_drugs",
+  "PHARMA_IBUPROFEN": "nsaid_drugs",
+  "PHARMA_NAPROXEN": "nsaid_drugs",
+  "PHARMA_KETOPROFEN": "nsaid_drugs",
+  "PHARMA_CELECOXIB": "nsaid_drugs",
+  "PHARMA_ETORICOXIB": "nsaid_drugs",
+  "PHARMA_NIMESULIDE": "nsaid_drugs",
+  "PHARMA_PARACETAMOL": "nsaid_drugs",
+  "PHARMA_METAMIZOLE": "nsaid_drugs",
+  "PHARMA_KETOROLAC": "nsaid_drugs",
+  "PHARMA_PREDNISONE": "corticosteroid_drugs",
+  "PHARMA_METHYLPREDNISOLONE": "corticosteroid_drugs",
+  "PHARMA_CYCLOFOSPHAMIDE": "immunosuppressant_drugs",
+  "PHARMA_MYCOFENOLATE": "pharma_drugs",
+  "PHARMA_INTERFERON_ALPHA": "pharma_drugs",
+  "PHARMA_INTERFERON_BETA": "pharma_drugs",
+  "PHARMA_OSeltamivir": "pharma_drugs",
+  "PHARMA_ZANAMIVIR": "pharma_drugs",
+  "PHARMA_ACYCLOVIR": "immunosuppressant_drugs",
+  "PHARMA_VALACYCLOVIR": "immunosuppressant_drugs",
+  "PHARMA_AMOXICILLIN": "antibiotic_drugs",
+  "PHARMA_AUGMENTIN": "antibiotic_drugs",
+  "PHARMA_AMPICILLIN": "antibiotic_drugs",
+  "PHARMA_CEFTRIAXONE": "antibiotic_drugs",
+  "PHARMA_CEFIXIME": "antibiotic_drugs",
+  "PHARMA_CEFUROXIME": "antibiotic_drugs",
+  "PHARMA_AZITHROMYCIN": "antibiotic_drugs",
+  "PHARMA_CLARITHROMYCIN": "antibiotic_drugs",
+  "PHARMA_DOXYCYCLINE": "antibiotic_drugs",
+  "PHARMA_TETRACYCLINE": "antibiotic_drugs",
+  "PHARMA_CIPROFLOXACIN": "antibiotic_drugs",
+  "PHARMA_LEVOFLOXACIN": "antibiotic_drugs",
+  "PHARMA_MOXIFLOXACIN": "pharma_drugs",
+  "PHARMA_METRONIDAZOLE": "antibiotic_drugs",
+  "PHARMA_TINIDAZOLE": "antibiotic_drugs",
+  "PHARMA_LINEZOLID": "antibiotic_drugs",
+  "PHARMA_VANCOMYCIN": "antibiotic_drugs",
+  "PHARMA_RIFAMPICIN": "antibiotic_drugs",
+  "PHARMA_ISONIAZID": "antibiotic_drugs",
+  "HORM_CORTISOL": "cortisol",
+  "HORM_CORTISONE": "cortisol",
+  "HORM_ADRENALINE": "adrenaline",
+  "HORM_NORADRENALINE": "adrenaline",
+  "HORM_DHEA": "dhea",
+  "HORM_DHEA_S": "dhea",
+  "HORM_CRH": "endocrine_marker",
+  "HORM_ACTH": "endocrine_marker",
+  "HORM_TSH": "endocrine_marker",
+  "HORM_T3": "endocrine_marker",
+  "HORM_T4": "endocrine_marker",
+  "HORM_RT3": "endocrine_marker",
+  "HORM_TRH": "endocrine_marker",
+  "HORM_LH": "endocrine_marker",
+  "HORM_FSH": "endocrine_marker",
+  "HORM_TESTOSTERONE": "testosterone",
+  "HORM_DHT": "testosterone",
+  "HORM_ESTRADIOL": "estradiol",
+  "HORM_PROGESTERONE": "progesterone",
+  "HORM_GNRH": "endocrine_marker",
+  "HORM_INSULIN": "insulin",
+  "HORM_GLUCAGON": "glucagon",
+  "HORM_GH": "endocrine_marker",
+  "HORM_IGF1": "endocrine_marker",
+  "HORM_PROLACTIN": "endocrine_marker",
+  "HORM_OXYTOCIN": "oxytocin",
+  "HORM_VASOPRESSIN": "vasopressin",
+  "HORM_LEPTIN": "endocrine_marker",
+  "HORM_ADIPONECTIN": "endocrine_marker",
+  "HORM_RESISTIN": "endocrine_marker",
+  "HORM_GHRELIN": "endocrine_marker",
+  "HORM_PYY": "endocrine_marker",
+  "HORM_GLP1": "endocrine_marker",
+  "HORM_GIP": "endocrine_marker",
+  "HORM_CCK": "endocrine_marker",
+  "HORM_SECRETIN": "endocrine_marker",
+  "HORM_MOTILIN": "endocrine_marker",
+  "HORM_ERITHROPOIETIN": "endocrine_marker",
+  "HORM_CALCITONIN": "endocrine_marker",
+  "HORM_PTH": "endocrine_marker",
+  "HORM_VITD_ACTIVE": "vitamin_d3",
+  "HORM_ALDOSTERONE": "endocrine_marker",
+  "HORM_ANP": "endocrine_marker",
+  "HORM_BNP": "endocrine_marker",
+  "HORM_KISSPEPTIN": "endocrine_marker",
+  "HORM_NEUROPEPTIDE_Y": "endocrine_marker",
+  "HORM_AGRP": "endocrine_marker",
+  "HORM_POMC": "endocrine_marker",
+  "HORM_BETA_ENDORPHIN": "endocrine_marker",
+  "HORM_ENKEPHALIN": "endocrine_marker",
+  "HORM_DYNORPHIN": "endocrine_marker",
+  "HORM_SOMATOSTATIN": "endocrine_marker",
+  "HORM_GASTRIN": "endocrine_marker",
+  "HORM_NEUROTENSIN_HORM": "endocrine_marker",
+  "HORM_GLP2": "endocrine_marker",
+  "HORM_INCRETIN_GIP": "endocrine_marker",
+  "HORM_MSH_ALPHA": "endocrine_marker",
+  "HORM_MSH_BETA": "endocrine_marker",
+  "HORM_MSH_GAMMA": "endocrine_marker",
+  "HORM_INHIBIN": "endocrine_marker",
+  "HORM_ACTIVIN": "endocrine_marker",
+  "HORM_RELAXIN": "endocrine_marker",
+  "HORM_HCG": "endocrine_marker",
+  "HORM_PLACENTAL_LACTOGEN": "endocrine_marker",
+  "HORM_HEPCIDIN": "endocrine_marker",
+  "HORM_ANGIOTENSIN2": "endocrine_marker",
+  "HORM_RENIN": "endocrine_marker",
+  "HORM_FGF21": "endocrine_marker",
+  "HORM_FGF23": "endocrine_marker",
+  "HORM_OSTEOCALCIN": "endocrine_marker",
+  "HORM_OSTEOPROTEGERIN": "endocrine_marker",
+  "HORM_GDF15": "endocrine_marker",
+  "HORM_IL6": "endocrine_marker",
+  "HORM_IL1B": "endocrine_marker",
+  "HORM_TNF": "endocrine_marker",
+  "HORM_IFN_GAMMA": "endocrine_marker",
+  "HORM_IL10": "endocrine_marker",
+  "HORM_NT_PROBNP": "endocrine_marker",
+  "HORM_ENDOTHELIN": "endocrine_marker",
+  "HORM_NO": "endocrine_marker",
+  "HORM_PROSTAGLANDIN_E2": "endocrine_marker",
+  "HORM_PROSTAGLANDIN_F2": "endocrine_marker",
+  "HORM_SEROTONIN_GUT": "endocrine_marker",
+  "HORM_DOPAMINE_PIT": "endocrine_marker",
+  "HORM_HISTAMINE": "endocrine_marker",
+  "HORM_NEUROPEPTIDE_B": "endocrine_marker",
+  "HORM_NEUROPEPTIDE_W": "endocrine_marker",
+  "HORM_GALANIN": "endocrine_marker",
+  "HORM_OREXIN_A": "endocrine_marker",
+  "HORM_OREXIN_B": "endocrine_marker",
+  "HORM_LIPOCALIN2": "endocrine_marker",
+  "HORM_LEUKOTRIENE_B4": "endocrine_marker",
+  "HORM_LEUKOTRIENE_C4": "endocrine_marker",
+  "HORM_PROSTACYCLIN": "endocrine_marker",
+  "HORM_THROMBOXANE_A2": "endocrine_marker",
+  "HORM_ENDOCANNABINOID_AEA": "endocannabinoid",
+  "HORM_ENDOCANNABINOID_2AG": "endocannabinoid",
+  "HORM_NEUROSTEROID_ALLOPREG": "neurosteroid",
+  "HORM_NEUROSTEROID_PREG": "neurosteroid",
+  "HORM_GABA_GUT": "endocrine_marker",
+  "HORM_ACETYLCHOLINE_GUT": "endocrine_marker",
+  "HORM_SEROTONIN_PLATELETS": "endocrine_marker",
+  "HORM_NO_SYNTHASE": "endocrine_marker",
+  "HORM_ADRENOMEDULLIN": "endocrine_marker",
+  "HORM_VISFATIN": "endocrine_marker",
+  "HORM_APELIN": "endocrine_marker",
+  "HORM_IRISIN": "endocrine_marker",
+  "HORM_MYOSTATIN": "endocrine_marker",
+  "HORM_FOLLISTATIN": "follistatin",
+  "HORM_ANGIOTENSIN_1_7": "endocrine_marker",
+  "HORM_ANGIOTENSIN_III": "endocrine_marker",
+  "HORM_GHRELIN_DESAC": "endocrine_marker",
+  "HORM_HEPATOKINE_ANGPTL4": "endocrine_marker",
+  "HORM_HEPATOKINE_FETUIN_A": "endocrine_marker",
+  "HORM_HEPATOKINE_FETUIN_B": "endocrine_marker",
+  "HORM_HEPATOKINE_SEXHBG": "endocrine_marker",
+  "HORM_HEPATOKINE_HGF": "endocrine_marker",
+  "HORM_BONE_SCLEROSTIN": "endocrine_marker",
+  "HORM_BONE_RANKL": "endocrine_marker",
+  "HORM_BONE_OPN": "endocrine_marker",
+  "HORM_SKIN_MSH": "endocrine_marker",
+  "HORM_SKIN_VEGF": "endocrine_marker",
+  "HORM_SKIN_TGF_BETA": "endocrine_marker",
+  "HORM_SKIN_IL33": "endocrine_marker",
+  "HORM_LUNG_SURFACTANT": "endocrine_marker",
+  "HORM_LUNG_ENDOTHELIN_LUNG": "endocrine_marker",
+  "HORM_GUT_SOMATOSTATIN": "endocrine_marker",
+  "HORM_GUT_NEUROTENSIN": "endocrine_marker",
+  "HORM_GUT_GASTRIC_INHIBITORY_POLYPEPTIDE": "endocrine_marker",
+  "HORM_GUT_NEUROMEDIN_U": "endocrine_marker",
+  "HORM_GUT_NEUROMEDIN_B": "endocrine_marker",
+  "HORM_GUT_PACAP": "endocrine_marker",
+  "HORM_HEART_ADRENOMEDULLIN": "endocrine_marker",
+  "HORM_HEART_NP_C": "endocrine_marker",
+  "HORM_KIDNEY_KLOTHO": "endocrine_marker",
+  "HORM_KIDNEY_ERITROPOIETIN": "endocrine_marker",
+  "HORM_IMMUNE_TSLP": "endocrine_marker",
+  "HORM_IMMUNE_IL17": "endocrine_marker",
+  "HORM_LIPOXIN_A4": "endocrine_marker",
+  "HORM_LIPOXIN_B4": "endocrine_marker",
+  "HORM_RESOLVIN_D1": "endocrine_marker",
+  "HORM_RESOLVIN_E1": "endocrine_marker",
+  "HORM_PROTECTIN_D1": "endocrine_marker",
+  "HORM_MARESIN_1": "endocrine_marker",
+  "HORM_S1P": "endocrine_marker",
+  "HORM_CERAMIDE": "ceramides",
+  "HORM_LPA": "endocrine_marker",
+  "HORM_PAF": "endocrine_marker",
+  "HORM_ENDOTHELIN_2": "endocrine_marker",
+  "HORM_ENDOTHELIN_3": "endocrine_marker",
+  "HORM_VEGF_B": "endocrine_marker",
+  "HORM_VEGF_C": "endocrine_marker",
+  "HORM_VEGF_D": "endocrine_marker",
+  "HORM_PDGF_A": "endocrine_marker",
+  "HORM_PDGF_B": "endocrine_marker",
+  "HORM_TGF_B1": "endocrine_marker",
+  "HORM_TGF_B2": "endocrine_marker",
+  "HORM_TGF_B3": "endocrine_marker",
+  "HORM_IL18": "endocrine_marker",
+  "HORM_IL22": "endocrine_marker",
+  "HORM_IL23": "endocrine_marker",
+  "HORM_CSF1": "endocrine_marker",
+  "HORM_G_CSF": "endocrine_marker",
+  "HORM_GM_CSF": "endocrine_marker",
+  "HORM_ERITROFERRONE": "endocrine_marker",
+  "HORM_HEPCIDIN_LIVER": "endocrine_marker",
+  "HORM_ANGPT1": "endocrine_marker",
+  "HORM_ANGPT2": "endocrine_marker",
+  "HORM_LEPTIN_RECEPTOR": "endocrine_marker",
+  "HORM_ADIPOKINE_RETNLB": "endocrine_marker",
+  "HORM_ADIPOKINE_CHEMERIN": "endocrine_marker",
+  "HORM_ADIPOKINE_OMENTIN": "endocrine_marker",
+  "HORM_ADIPOKINE_ZAG": "endocrine_marker",
+  "HORM_MYOKINE_IL6": "endocrine_marker",
+  "HORM_MYOKINE_IL15": "endocrine_marker",
+  "HORM_MYOKINE_BDNF": "endocrine_marker",
+  "HORM_BRAIN_NGF": "endocrine_marker",
+  "HORM_BRAIN_BDNF": "endocrine_marker",
+  "HORM_BRAIN_GDNF": "endocrine_marker",
+  "HORM_BRAIN_NTS": "endocrine_marker",
+  "HORM_BRAIN_CRF": "endocrine_marker",
+  "HORM_SKIN_ENDORPHIN": "endocrine_marker",
+  "HORM_SKIN_CGRP": "endocrine_marker",
+  "HORM_GUT_GALANIN": "endocrine_marker",
+  "HORM_GUT_SUBSTANCE_P": "endocrine_marker",
+  "HORM_LIVER_ANGPTL8": "endocrine_marker",
+  "HORM_LIVER_FGF19": "endocrine_marker",
+  "HORM_BONE_DKK1": "endocrine_marker",
+  "HORM_BONE_WNT": "endocrine_marker",
+  "PRO_L_ACIDOPHILUS": "probiotics",
+  "PRO_L_RHAMNOSUS": "probiotics",
+  "PRO_L_PLANTARUM": "probiotics",
+  "PRO_L_REUTERI": "probiotics",
+  "PRO_L_CASEI": "probiotics",
+  "PRO_L_HELVETICUS": "probiotics",
+  "PRO_L_SALIVARIUS": "probiotics",
+  "PRO_L_GASSERI": "probiotics",
+  "PRO_L_FERMENTUM": "probiotics",
+  "PRO_L_PARACASEI": "probiotics",
+  "PRO_B_LONGUM": "probiotics",
+  "PRO_B_BIFIDUM": "probiotics",
+  "PRO_B_LACTIS": "probiotics",
+  "PRO_B_BREVE": "probiotics",
+  "PRO_B_INFANTIS": "probiotics",
+  "PRO_B_ANIMALIS": "probiotics",
+  "PRO_S_BOULARDII": "probiotics",
+  "PRO_S_CEREVISIAE": "probiotics",
+  "PRO_BACILLUS_COAG": "probiotics",
+  "PRO_BACILLUS_SUBTILIS": "probiotics",
+  "PRO_BACILLUS_CLAUSII": "probiotics",
+  "PRO_BACILLUS_LICHEN": "probiotics",
+  "PRO_L_ACIDOPHILUS_NCFM": "probiotics",
+  "PRO_L_RHAMNOSUS_HN001": "probiotics",
+  "PRO_L_PLANTARUM_299V": "probiotics",
+  "PRO_L_REUTERI_ATCC": "probiotics",
+  "PRO_B_LONGUM_35624": "probiotics",
+  "PRO_B_LACTIS_HN019": "probiotics",
+  "PRO_B_BREVE_M16V": "probiotics",
+  "PRO_S_BOULARDII_CNCM": "probiotics",
+  "PRO_L_KEFIRI": "probiotics",
+  "PRO_L_JOHNSONII": "probiotics",
+  "PRO_L_DELBRUECKII": "probiotics",
+  "PRO_B_ADOLESCENTIS": "probiotics",
+  "PRO_B_PSEUDOCATENULATUM": "probiotics",
+  "PRO_BACILLUS_INDICUS": "probiotics",
+  "PRO_BACILLUS_MEGATERIUM": "probiotics",
+  "PRO_L_HAMMOSUS_GR1": "probiotics",
+  "PRO_L_REUTERI_RC14": "probiotics",
+  "PRO_L_PARACASEI_LPC37": "probiotics",
+  "PRO_L_HELVETICUS_R0052": "probiotics",
+  "PRO_B_LONGUM_R0175": "probiotics",
+  "PRO_SYMBIO_COMPLEX": "probiotics",
+  "PRO_POSTBIOTIC_SCFA": "postbiotics",
+  "PRO_POSTBIOTIC_BUTYRATE": "postbiotics",
+  "PRO_POSTBIOTIC_CALCIUM_BUTYRATE": "postbiotics",
+  "PRO_POSTBIOTIC_PROPIONATE": "postbiotics",
+  "PRO_POSTBIOTIC_ACETATE": "postbiotics",
+  "PRO_PARAPROBIOTIC_L_RHAMNOSUS": "paraprobiotics",
+  "PRO_PARAPROBIOTIC_L_PLANTARUM": "paraprobiotics",
+  "PRO_PARAPROBIOTIC_B_LACTIS": "paraprobiotics",
+  "PRO_PARAPROBIOTIC_S_BOULARDII": "paraprobiotics",
+  "PRO_METABIOTIC_L_RHAMNOSUS": "postbiotics",
+  "PRO_METABIOTIC_L_REUTERI": "postbiotics",
+  "PRO_METABIOTIC_B_LONGUM": "postbiotics",
+  "PRO_METABIOTIC_S_BOULARDII": "postbiotics",
+  "PRO_L_CRISPATUS": "probiotics",
+  "PRO_L_JENSENII": "probiotics",
+  "PRO_L_MUCOSA": "probiotics",
+  "PRO_L_AMYLOVORUS": "probiotics",
+  "PRO_L_KURASHIGE": "probiotics",
+  "PRO_L_PENTOSUS": "probiotics",
+  "PRO_B_THERMOPHILUM": "probiotics",
+  "PRO_B_CETTI": "probiotics",
+  "PRO_BACILLUS_VELES": "probiotics",
+  "PRO_BACILLUS_PUMILUS": "probiotics",
+  "PRO_BACILLUS_FLEXUS": "probiotics",
+  "PRO_S_THERMOPHILUS": "probiotics",
+  "PRO_S_SALIVARIUS_K12": "probiotics",
+  "PRO_S_SALIVARIUS_M18": "probiotics",
+  "PRO_L_HAMMOSUS_GG2": "probiotics",
+  "PRO_L_PLANTARUM_HEATKILLED": "paraprobiotics",
+  "PRO_L_REUTERI_DSM": "probiotics",
+  "PRO_L_REUTERI_PROTECTIS": "probiotics",
+  "PRO_B_LONGUM_BB536": "probiotics",
+  "PRO_B_BIFIDUM_BGN4": "probiotics",
+  "PRO_S_BOULARDII_ULTRA": "probiotics",
+  "PRO_L_ACIDOPHILUS_HEATKILLED": "paraprobiotics",
+  "PRO_B_LACTIS_HEATKILLED": "paraprobiotics",
+  "PRO_POSTBIOTIC_AMINO": "postbiotics",
+  "PRO_POSTBIOTIC_PEPTIDES": "postbiotics",
+  "PRO_METABIOTIC_SCFA": "postbiotics",
+  "PRO_METABIOTIC_POLYPHENOL": "postbiotics",
+  "PRO_UBIOME_DIVERSITY": "probiotics",
+  "PRO_UBIOME_BUTYRATE": "postbiotics",
+  "PRO_UBIOME_MUCIN": "probiotics",
+  "PRO_SYMBIOTIC_PREMIUM": "probiotics",
+  "PRO_SYMBIOTIC_FULLSPEC": "probiotics",
+  "PRE_INULIN": "prebiotics",
+  "PRE_FOS": "prebiotics",
+  "PRE_GOS": "prebiotics",
+  "PRE_XOS": "prebiotics",
+  "PRE_AXOS": "prebiotics",
+  "PRE_RESISTANT_STARCH_RS2": "resistant_starch",
+  "PRE_RESISTANT_STARCH_RS3": "resistant_starch",
+  "PRE_RESISTANT_STARCH_RS4": "resistant_starch",
+  "PRE_ARABINOGALACTAN": "prebiotics",
+  "PRE_BETA_GLUCANS": "beta_glucan",
+  "PRE_PECTIN": "pectin",
+  "PRE_APPLE_PECTIN": "pectin",
+  "PRE_CITRUS_PECTIN": "pectin",
+  "PRE_MODIFIED_CITRUS_PECTIN": "pectin",
+  "PRE_LARCH_FIBER": "fiber",
+  "PRE_ISOMALTOOLIGOSACCHARIDES": "prebiotics",
+  "PRE_POLYDEXTROSE": "prebiotics",
+  "PRE_LACTULOSE": "prebiotics",
+  "PRE_HMO_2FL": "hmo_prebiotics",
+  "PRE_HMO_3GL": "hmo_prebiotics",
+  "PRE_HMO_LNNT": "hmo_prebiotics",
+  "PRE_GLUCOMANNAN": "prebiotics",
+  "PRE_ACACIA_FIBER": "fiber",
+  "PRE_GUAR_FIBER": "fiber",
+  "PRE_INULIN_HP": "prebiotics",
+  "PRE_FOS_SHORTCHAIN": "prebiotics",
+  "PRE_FOS_LONGCHAIN": "prebiotics",
+  "PRE_GOS_SYNERGY": "prebiotics",
+  "PRE_XOS_SYNERGY": "prebiotics",
+  "PRE_AXOS_SYNERGY": "prebiotics",
+  "PRE_RESISTANT_DEXTRIN": "prebiotics",
+  "PRE_YACON_SYRUP": "prebiotics",
+  "PRE_BANANA_FIBER": "fiber",
+  "PRE_PSYLLIUM": "fiber",
+  "PRE_OAT_BETA_GLUCAN": "beta_glucan",
+  "PRE_BARLEY_BETA_GLUCAN": "beta_glucan",
+  "PRE_POLYPHENOL_PREBIOTIC": "prebiotics",
+  "PRE_SEAWEED_FIBER": "fiber",
+  "PRE_ALGINATE": "prebiotics",
+  "PRE_CHITOSAN_OLIGO": "prebiotics",
+  "PRE_GLUCOOLIGOSACCHARIDES": "prebiotics",
+  "PRE_HMO_COMPLEX": "hmo_prebiotics",
+  "PRE_SYNERGY_FIBER": "fiber",
+  "PRE_INULIN_PREMIUM": "prebiotics",
+  "PRE_INULIN_LC": "prebiotics",
+  "PRE_INULIN_SC": "prebiotics",
+  "PRE_FOS_PREMIUM": "prebiotics",
+  "PRE_GOS_PREMIUM": "prebiotics",
+  "PRE_XOS_PREMIUM": "prebiotics",
+  "PRE_AXOS_PREMIUM": "prebiotics",
+  "PRE_HMO_2FL_PREMIUM": "hmo_prebiotics",
+  "PRE_HMO_3GL_PREMIUM": "hmo_prebiotics",
+  "PRE_HMO_LNNT_PREMIUM": "hmo_prebiotics",
+  "PRE_HMO_6SL": "hmo_prebiotics",
+  "PRE_HMO_3SL": "hmo_prebiotics",
+  "PRE_HMO_FDSL": "hmo_prebiotics",
+  "PRE_GALACTOMANNAN": "prebiotics",
+  "PRE_MANNAN_OLIGO": "prebiotics",
+  "PRE_FRUCTAN_COMPLEX": "prebiotics",
+  "PRE_POLYPHENOL_FIBER": "fiber",
+  "PRE_SEAWEED_OLIGO": "prebiotics",
+  "PRE_ALGINATE_PREMIUM": "prebiotics",
+  "PRE_CHITOSAN_PREMIUM": "prebiotics",
+  "PRE_GLUCOMANNAN_PREMIUM": "prebiotics",
+  "PRE_PSYLLIUM_PREMIUM": "fiber",
+  "PRE_OAT_FIBER_PREMIUM": "beta_glucan",
+  "PRE_BARLEY_FIBER_PREMIUM": "beta_glucan",
+  "PRE_CORN_FIBER": "fiber",
+  "PRE_WHEAT_ARABINOXYLAN": "fiber",
+  "PRE_RICE_FIBER": "fiber",
+  "PRE_CASSAVA_RESISTANT": "resistant_starch",
+  "PRE_TAPIOCA_RESISTANT": "resistant_starch",
+  "PRE_GREEN_PLANTAIN_RS": "resistant_starch",
+  "PRE_JERUSALEM_ARTICHOKE": "prebiotics",
+  "PRE_CARROT_FIBER": "fiber",
+  "PRE_BEET_FIBER": "fiber",
+  "PRE_POTATO_RESISTANT": "resistant_starch",
+  "PRE_CITRUS_FIBER": "fiber",
+  "PRE_BAMBOO_FIBER": "fiber",
+  "PRE_KONJAC_FIBER": "fiber",
+  "PRE_FULL_FIBER_PREMIUM": "fiber",
+  "PRE_GI_BARRIER_COMPLEX": "prebiotics",
+  "PRE_MUCIN_PREBIOTIC": "prebiotics",
+  "PRE_ANTIINFLAMMATORY_FIBER": "fiber",
+  "PRE_SYNERGY_PREBIOTIC": "prebiotics",
+  "POST_SCFA_BUTYRATE": "butyrate",
+  "POST_SCFA_CALCIUM_BUTYRATE": "butyrate",
+  "POST_SCFA_MAGNESIUM_BUTYRATE": "butyrate",
+  "POST_SCFA_PROPIONATE": "butyrate",
+  "POST_SCFA_ACETATE": "butyrate",
+  "POST_SCFA_ISOBUTYRATE": "butyrate",
+  "POST_SCFA_VALERATE": "butyrate",
+  "POST_LACTATE": "lactate",
+  "POST_LACTATE_D": "lactate",
+  "POST_LACTATE_L": "lactate",
+  "POST_REUTERIN": "postbiotics",
+  "POST_BACTERIOCINS": "postbiotics",
+  "POST_MURAMYL_DIPEPTIDE": "postbiotics",
+  "POST_LTA": "postbiotics",
+  "POST_PEPTIDOGLYCAN": "postbiotics",
+  "POST_EXOPOLYSACCHARIDES": "postbiotics",
+  "POST_GAMMA_AMINOBUTYRATE": "butyrate",
+  "POST_SEROTONIN_MICROBIAL": "postbiotics",
+  "POST_DOPAMINE_MICROBIAL": "postbiotics",
+  "POST_INDOL_3_PROPIONATE": "postbiotics",
+  "POST_INDOL_3_LACTATE": "lactate",
+  "POST_INDOL_3_ACETATE": "postbiotics",
+  "POST_UROLITHIN_A": "urolithin_a",
+  "POST_UROLITHIN_B": "urolithin_a",
+  "POST_PSCFA": "butyrate",
+  "POST_SUCCINATE": "postbiotics",
+  "POST_PYRUVATE": "postbiotics",
+  "POST_ACETOIN": "postbiotics",
+  "POST_DIACETYL": "postbiotics",
+  "POST_HYDROXYFATTY_ACIDS": "postbiotics",
+  "POST_CONJUGATED_LINOLEIC": "postbiotics",
+  "POST_SPHINGOLIPIDS": "postbiotics",
+  "POST_BILE_ACID_DCA": "bile_acids",
+  "POST_BILE_ACID_LCA": "bile_acids",
+  "POST_BILE_ACID_UDCA": "bile_acids",
+  "POST_POLYPHENOL_METABOLITES": "postbiotics",
+  "POST_SHORTCHAIN_AMINES": "postbiotics",
+  "POST_PEPTIDES_ANTIMICROBIAL": "postbiotics",
+  "POST_PEPTIDES_IMMUNE": "postbiotics",
+  "POST_PEPTIDES_GI_REPAIR": "postbiotics",
+  "POST_AMINO_ACID_DERIVATIVES": "postbiotics",
+  "POST_NUCLEOTIDES": "postbiotics",
+  "POST_POLYSACCHARIDE_FRACTIONS": "postbiotics",
+  "POST_FULL_POSTBIOTIC_COMPLEX": "postbiotics",
+  "POST_NEURO_GABA": "gaba",
+  "POST_NEURO_SEROTONIN": "postbiotics",
+  "POST_NEURO_DOPAMINE": "postbiotics",
+  "POST_NEURO_TRYPTAMINE": "postbiotics",
+  "POST_NEURO_PHENETHYLAMINE": "postbiotics",
+  "POST_IMMUNE_IL10": "postbiotics",
+  "POST_IMMUNE_IFN": "postbiotics",
+  "POST_IMMUNE_TREG": "postbiotics",
+  "POST_ANTIINFLAMMATORY_NF_KB": "postbiotics",
+  "POST_ANTIINFLAMMATORY_COX2": "postbiotics",
+  "POST_GI_MUCIN_UP": "postbiotics",
+  "POST_GI_TIGHT_JUNCTION": "postbiotics",
+  "POST_GI_ANTI_PATHOGEN": "postbiotics",
+  "POST_GI_UREASE_BLOCK": "postbiotics",
+  "POST_METABOLIC_AMPK": "postbiotics",
+  "POST_METABOLIC_PPAR": "postbiotics",
+  "POST_METABOLIC_FGF21": "postbiotics",
+  "POST_ANTIOXIDANT_NRF2": "postbiotics",
+  "POST_ANTIOXIDANT_GSH": "postbiotics",
+  "POST_LIVER_BILE_FLOW": "postbiotics",
+  "POST_LIVER_ANTI_FIBROSIS": "postbiotics",
+  "POST_VESSEL_NO": "postbiotics",
+  "POST_VESSEL_ANTI_CLOT": "postbiotics",
+  "POST_SKIN_CERAMIDE_UP": "postbiotics",
+  "POST_SKIN_COLLAGEN_UP": "postbiotics",
+  "POST_SKIN_MELANIN_BALANCE": "postbiotics",
+  "POST_HORMONE_ESTROGEN_MOD": "postbiotics",
+  "POST_HORMONE_ANDROGEN_MOD": "postbiotics",
+  "POST_NEURO_BDNF_UP": "postbiotics",
+  "POST_NEURO_NGF_UP": "postbiotics",
+  "POST_IMMUNE_IGA": "postbiotics",
+  "POST_IMMUNE_ANTIVIRAL": "postbiotics",
+  "POST_GI_MOTILITY_UP": "postbiotics",
+  "POST_GI_ANTI_SPASM": "postbiotics",
+  "POST_METABOLIC_KETONE": "postbiotics",
+  "POST_UREMIC_TOXIN_BLOCK": "postbiotics",
+  "POST_AMINO_ACID_SIGNAL": "postbiotics",
+  "POST_POLYPHENOL_SYNERGY": "postbiotics",
+  "POST_FULL_POSTBIOTIC_PREMIUM": "postbiotics",
+  "PP_GALLIC": "polyphenol_complex",
+  "PP_OPC": "grape_seed_extract",
+  "PP_POLYGONUM": "polyphenol_complex",
+  "PP_CRANBERRY": "cranberry",
+  "PP_POMEGRANATE": "pomegranate",
+  "PP_CINNAMON_POLYPHENOLS": "cinnamon",
+  "PP_CLOVES_POLYPHENOLS": "polyphenol_complex",
+  "PP_ROSEMARY_CARNOSIC": "rosemary",
+  "PP_ROSEMARY_CARNOSOL": "rosemary",
+  "PP_THYME_POLYPHENOLS": "polyphenol_complex",
+  "PP_OREGANO_POLYPHENOLS": "polyphenol_complex",
+  "PP_SAGE_POLYPHENOLS": "polyphenol_complex",
+  "PP_MINT_POLYPHENOLS": "polyphenol_complex",
+  "PP_FULL_POLYPHENOL_COMPLEX": "polyphenol_complex",
+  "PP_FISETIN": "fisetin",
+  "PP_QUERCETIN_PH": "quercetin",
+  "PP_RESVERATROL_TRANS": "resveratrol",
+  "PP_PTERO_LIPOSOMAL": "polyphenol_complex",
+  "PP_BAICALEIN": "baicalin",
+  "PP_BAICALIN": "baicalin",
+  "PP_WOGONIN": "baicalin",
+  "PP_SCUTELLARIN": "baicalin",
+  "PP_HONOKIOL_PREMIUM": "magnolia",
+  "PP_MAGNOLONE": "magnolia",
+  "PP_TAXIFOLIN": "taxifolin",
+  "PP_DIHYDROQUERCETIN": "quercetin",
+  "PP_GARCINOL": "polyphenol_complex",
+  "PP_GAMBOGIC": "polyphenol_complex",
+  "PP_TANNIC_ACID": "polyphenol_complex",
+  "PP_PROANTHOCYANIDINS": "polyphenol_complex",
+  "PP_CATECHIN_EPI": "egcg",
+  "PP_EPICATECHIN_GAL": "egcg",
+  "PP_THEAFLAVINS": "polyphenol_complex",
+  "PP_THEARUBIGINS": "polyphenol_complex",
+  "PP_ANTHOCYANIN_COMPLEX": "anthocyanins",
+  "PP_BLUEBERRY_POLYPHENOLS": "anthocyanins",
+  "PP_BLACKCURRANT_POLYPHENOLS": "anthocyanins",
+  "PP_GRAPE_SKIN": "grape_seed_extract",
+  "PP_GRAPE_POMACE": "grape_seed_extract",
+  "PP_CACAO_POLYPHENOLS": "cocoa_flavanols",
+  "PP_OLIVE_POLYPHENOLS": "olive_extract",
+  "PP_COFFEE_POLYPHENOLS": "polyphenol_complex",
+  "PP_TEA_POLYPHENOLS": "polyphenol_complex",
+  "PP_HIBISCUS_POLYPHENOLS": "polyphenol_complex",
+  "PP_ELDERBERRY_POLYPHENOLS": "polyphenol_complex",
+  "PP_ARONIA_POLYPHENOLS": "anthocyanins",
+  "PP_ROSEHIP_POLYPHENOLS": "polyphenol_complex",
+  "PP_SEABUCKTHORN_POLYPHENOLS": "polyphenol_complex",
+  "PP_TURMERIC_POLYPHENOLS": "curcumin",
+  "PP_GINGER_POLYPHENOLS": "ginger",
+  "PP_CLOVER_POLYPHENOLS": "soy_isoflavones",
+  "PP_SOY_ISOFLAVONES": "soy_isoflavones",
+  "PP_GENISTEIN": "soy_isoflavones",
+  "PP_DAIDZEIN": "soy_isoflavones",
+  "PP_FULL_POLYPHENOL_PREMIUM": "polyphenol_complex",
+  "FUNG_REISHI_POLYSAC": "reishi",
+  "FUNG_CORDYCEPS": "cordyceps",
+  "FUNG_CHAGA_POLYPHENOLS": "chaga",
+  "FUNG_AGARICUS": "agaricus",
+  "FUNG_AGARICUS_POLYSAC": "agaricus",
+  "FUNG_TURKEY_TAIL": "turkey_tail",
+  "FUNG_TURKEY_TAIL_PSK": "turkey_tail",
+  "FUNG_TURKEY_TAIL_PSP": "turkey_tail",
+  "FUNG_PORIA": "mushroom_complex",
+  "FUNG_PORIA_POLYSAC": "mushroom_complex",
+  "FUNG_CORDYCEPS_BLACK": "cordyceps",
+  "FUNG_REISHI_SPORE": "reishi",
+  "FUNG_LIONS_MANE_MYCELIUM": "lions_mane",
+  "FUNG_REISHI_POLYPHENOL": "reishi",
+  "FUNG_MORCHELLA": "mushroom_complex",
+  "FUNG_ENOKI": "mushroom_complex",
+  "FUNG_SHIMEJI": "mushroom_complex",
+  "FUNG_OYSTER": "mushroom_complex",
+  "FUNG_OYSTER_ERGOTHIONEINE": "mushroom_complex",
+  "FUNG_COPRINUS": "mushroom_complex",
+  "FUNG_POLYPORUS": "mushroom_complex",
+  "FUNG_ANTRODIA": "mushroom_complex",
+  "FUNG_TREMELLA": "mushroom_complex",
+  "FUNG_TREMELLA_POLYSAC": "mushroom_complex",
+  "FUNG_AURICULARIA": "mushroom_complex",
+  "FUNG_PHELLINUS": "mushroom_complex",
+  "FUNG_CORDYCEPS_PREMIUM": "cordyceps",
+  "FUNG_FULL_FUNGI_COMPLEX": "mushroom_complex",
+  "FUNG_REISHI_PREMIUM": "reishi",
+  "FUNG_REISHI_GANODERMA": "reishi",
+  "FUNG_REISHI_CRACKED_SPORE": "reishi",
+  "FUNG_CORDYCEPS_ELITE": "cordyceps",
+  "FUNG_CORDYCEPS_POLYSAC": "cordyceps",
+  "FUNG_CORDYCEPS_MYCO": "cordyceps",
+  "FUNG_LIONS_MANE_PREMIUM": "lions_mane",
+  "FUNG_CHAGA_FULLSPEC": "chaga",
+  "FUNG_CHAGA_CHROMOGEN": "chaga",
+  "FUNG_SHIITAKE_PREMIUM": "shiitake",
+  "FUNG_SHIITAKE_FULLSPEC": "shiitake",
+  "FUNG_MAITAKE_PREMIUM": "maitake",
+  "FUNG_MAITAKE_SYNERGY": "maitake",
+  "FUNG_TURKEY_TAIL_PREMIUM": "turkey_tail",
+  "FUNG_TURKEY_TAIL_FULLSPEC": "turkey_tail",
+  "FUNG_AGARICUS_PREMIUM": "agaricus",
+  "FUNG_AGARICUS_FULLSPEC": "agaricus",
+  "FUNG_TREMELLA_PREMIUM": "mushroom_complex",
+  "FUNG_TREMELLA_FULLSPEC": "mushroom_complex",
+  "FUNG_ANTRODIA_PREMIUM": "mushroom_complex",
+  "FUNG_ANTRODIA_FULLSPEC": "mushroom_complex",
+  "FUNG_POLYPORUS_PREMIUM": "mushroom_complex",
+  "FUNG_POLYPORUS_FULLSPEC": "mushroom_complex",
+  "FUNG_MORCHELLA_PREMIUM": "mushroom_complex",
+  "FUNG_MORCHELLA_FULLSPEC": "mushroom_complex",
+  "FUNG_ENOKI_PREMIUM": "mushroom_complex",
+  "FUNG_SHIMEJI_PREMIUM": "mushroom_complex",
+  "FUNG_OYSTER_PREMIUM": "mushroom_complex",
+  "FUNG_OYSTER_ERGO_PREMIUM": "mushroom_complex",
+  "FUNG_COPRINUS_PREMIUM": "mushroom_complex",
+  "FUNG_AURICULARIA_PREMIUM": "mushroom_complex",
+  "FUNG_AURICULARIA_FULLSPEC": "mushroom_complex",
+  "FUNG_PHELLINUS_PREMIUM": "mushroom_complex",
+  "FUNG_PHELLINUS_FULLSPEC": "mushroom_complex",
+  "FUNG_GANODERMA_APPLANATUM": "reishi",
+  "FUNG_GANODERMA_TSUGAE": "reishi",
+  "FUNG_INONOTUS_OBLIQUUS": "mushroom_complex",
+  "FUNG_INONOTUS_FULLSPEC": "mushroom_complex",
+  "FUNG_CORDYCEPS_SYNERGY": "cordyceps",
+  "FUNG_REISHI_SYNERGY": "reishi",
+  "FUNG_FULL_FUNGI_PREMIUM": "mushroom_complex",
+  "BILE_TUDCA": "tudca",
+  "BILE_UDCA": "tudca",
+  "BLOOD_NATTOKINASE": "nattokinase",
+  "BLOOD_GRAPEFRUIT_SEED": "grapefruit_seed",
+  "CARDIO_PYCNOGENOL": "pycnogenol",
+  "CARDIO_NOBILETIN": "nobiletin",
+  "CARDIO_OLIVE_LEAF": "olive_extract",
+  "DIGEST_BETAINE_HCL_PEPSIN": "betaine",
+  "DIGEST_OKRA_PEPSIN": "digestive_enzymes",
+  "DIGEST_BROAD_SPECTRUM_ENZYMES": "digestive_enzymes",
+  "DIGEST_L_GLUTAMINE_POWDER": "glutamine",
+  "DIGEST_ZINC_CARNOSINE": "zinc_carnosine",
+  "ENDO_ASHWAGANDHA_KSM66": "ashwagandha",
+  "ENDO_BORON_CITRATE": "boron",
+  "ENDO_FADOGIA_AGRESTIS": "fadogia",
+  "ENDO_PREGNENOLONE_LIPOSOMAL": "pregnenolone",
+  "IMMUNE_EPICOR": "immune_support",
+  "IMMUNE_ANDROGRAPHIS": "andrographis",
+  "IMMUNE_COLOSTRUM": "colostrum",
+  "IMMUNE_AHCC_MUSHROOM": "ahcc",
+  "IMMUNE_BETA_GLUCAN_WELLMUNE": "beta_glucan",
+  "JOINT_BOSWELLIA": "boswellia",
+  "JOINT_CURCUMIN_MERIVA": "curcumin",
+  "JOINT_COLLAGEN_UC2": "collagen",
+  "JOINT_CISSUS": "cissus",
+  "KIDNEY_ASTRAGALUS": "astragalus",
+  "KIDNEY_CORDYCEPS_MILITARIS": "cordyceps",
+  "LIVER_NAC_SUSTAINED": "nac",
+  "LIVER_SILYMARIN_COMPLEX": "milk_thistle",
+  "LIVER_GLYCYRRHIZIN": "licorice",
+  "LIVER_PHOSPHATIDYLCHOLINE": "phosphatidylcholine",
+  "SLEEP_MELATONIN_LOW": "melatonin",
+  "SLEEP_MELATONIN_MEDIUM": "melatonin",
+  "SLEEP_MELATONIN_HIGH": "melatonin",
+  "SLEEP_MELATONIN_LIPO": "melatonin",
+  "NEURO_GINKGO_BILOBA": "ginkgo",
+  "NEURO_BACOPA_MONNIERI": "bacopa",
+  "NEURO_RHODIOLA_EXTRACT": "rhodiola",
+  "NEURO_L_THEANINE_EXTRACT": "theanine",
+  "ASMD_PSD_UMC_PC": "phosphatidylserine",
+  "ASMD_ALPHA_GPC_STACK": "alpha_gpc",
+  "BLOOD_VITAMIN_K2_MK7": "vitamin_k2",
+  "HF_IRON_GUARD": "brand_complex",
+  "HF_JOIN_HEALTH": "brand_complex",
+  "HF_ATP_OPTIMIZER": "brand_complex",
+  "HF_DIO_MAX": "brand_complex",
+  "HF_ZENKAI_BOOST": "brand_complex",
+  "HF_K_ELEMENT": "brand_complex",
+  "HF_HERCULES_POTION": "brand_complex",
+  "HF_FIRE_FUZE": "brand_complex",
+  "HF_PUSSY_BOY_ANTIDOTE": "brand_complex",
+  "HF_BP_OPTIMIZER": "brand_complex",
+  "HF_B_REAL": "brand_complex",
+  "HF_FALCON_VISION": "brand_complex",
+  "HF_PROCESS_REMEDY": "brand_complex",
+  "HF_CARB_LOADER": "brand_complex",
+  "HF_JOINT_HEALTH_OPTIMIZER": "brand_complex",
+  "MM_ST_JOHNS_WORT": "brand_complex",
+  "MM_FAST_BLOOD": "brand_complex",
+  "MM_BRILLIANT_SIGHT": "brand_complex",
+  "MM_CRAZY_BRAIN": "brand_complex",
+  "MM_DANGEROUS": "brand_complex",
+  "MM_BLAZE_BRAIN": "brand_complex",
+  "MM_SALVUS": "brand_complex",
+  "MM_ENERGY_RAPE": "brand_complex",
+  "MM_I_AM_LIBIDO": "brand_complex",
+  "MM_GET_HIGH": "brand_complex",
+  "MM_TIME_RELEASE": "brand_complex",
+  "MM_SERRANATTO": "brand_complex",
+  "ACID_DOWN": "antacid",
+  "ACID_UP": "betaine",
+  "ACTIVITY": "stimulant_complex",
+  "TG_DOWN": "omega3",
+  "TG_UP": "lipid_complex",
+  "T3_T4_DOWN": "antithyroid_drugs",
+  "T3_T4_UP": "levothyroxine",
+  "WATER": "water",
+  "NEURO_CITICOLINE_COGNIZIN": "citicoline",
+  "NEURO_HUPERZINE_A": "huperzine_a",
+  "NEURO_ALPHA_GPC_POWDER": "alpha_gpc",
+  "NEURO_PRAMIRACETAM": "pramiracetam",
+  "SLEEP_MAGNESIUM_GLYCINATE_LYSINATE": "magnesium",
+  "SLEEP_APIGENIN": "apigenin",
+  "SLEEP_GLYCINE_3G": "glycine",
+  "SLEEP_LEMON_BALM": "lemon_balm",
+  "BLOOD_IP6_INOSITOL": "inositol",
+};
+
+/** Resolve any substance ID (variant or canonical) to its canonical ID */
+export function resolveCanonicalId(id: string): string {
+  if (!id) return id;
+  return CANONICAL_ID_MAP[id] || id;
+}
+
+/** Get all variant IDs for a canonical ID */
+export function getVariantIds(canonicalId: string): string[] {
+  return Object.entries(CANONICAL_ID_MAP)
+    .filter(([, v]) => v === canonicalId)
+    .map(([k]) => k);
+}
+
+/** Get all unique canonical IDs */
+export function getAllCanonicalIds(): string[] {
+  return [...new Set(Object.values(CANONICAL_ID_MAP))];
+}
+
+// ── FROM: substance-tiers.ts ──
+﻿// Substance tier classification: core (essential), standard (recommended), advanced (specific), specialty (pharma/peptide)
+export const SUBSTANCE_TIER: Record<string, 'core' | 'standard' | 'advanced' | 'specialty'> = {
+  // CORE — essential for any AAS support stack
+  nac: 'core', tudca: 'core', magnesium: 'core', vitamin_d3: 'core', vitamin_k2: 'core',
+  omega3: 'core', selenium: 'core', taurine: 'core', coq10: 'core', zinc: 'core',
+  folate: 'core', vitamin_b12: 'core', vitamin_c: 'core', milk_thistle: 'core',
+  alpha_lipoic: 'core', curcumin: 'core', ashwagandha: 'core', berberine: 'core',
+  probiotics: 'core', vitamin_e: 'core', phosphatidylcholine: 'core',
+  iron: 'core', copper: 'core', glucosamine: 'core', collagen: 'core',
+
+  // SPECIALTY — pharma, peptides, prescription-only
+  telmisartan: 'specialty', nebivolol: 'specialty', saw_palmetto: 'specialty', hcg: 'specialty',
+  bpc157: 'specialty', tb500: 'specialty', meloxicam: 'specialty', diclofenac: 'specialty',
+
+  // ADVANCED — specific goals/conditions
+  astragalus: 'advanced', melatonin: 'advanced', ginseng: 'advanced', egcg: 'advanced',
+  l_carnitine: 'advanced', boswellia: 'advanced', bromelain: 'advanced', msm: 'advanced',
+  hyaluronic: 'advanced', chondroitin: 'advanced',
+  creatine: 'advanced', beta_alanine: 'advanced', citrulline: 'advanced', arginine: 'advanced',
+  d_aspartic_acid: 'advanced', tribulus: 'advanced', maca: 'advanced',
+  stinging_nettle: 'advanced', pygeum: 'advanced', dimm: 'advanced',
+  grape_seed_extract: 'advanced', quercetin: 'advanced', resveratrol: 'advanced', nmn: 'advanced',
+  pqq: 'advanced', lions_mane: 'advanced', reishi: 'advanced', cordyceps: 'advanced',
+  chaga: 'advanced', bacopa: 'advanced', ginkgo: 'advanced', rhodiola: 'advanced',
+  theanine: 'advanced', '5htp': 'advanced',
+};
+// Default tier for substances not in this map: 'standard'
+
+export function getSubstanceTier(id: string): 'core' | 'standard' | 'advanced' | 'specialty' {
+  return SUBSTANCE_TIER[id] || 'standard';
+}
+
+export const TIER_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
+  core: { label: 'Ядро', emoji: '🟢', color: '#22c55e' },
+  standard: { label: 'Стандарт', emoji: '🟡', color: '#eab308' },
+  advanced: { label: 'Продвинутый', emoji: '🟠', color: '#f97316' },
+  specialty: { label: 'Специальный', emoji: '🔴', color: '#ef4444' },
+};
+
+// ── FROM: support-levels.ts ──
+﻿// Support Levels with Phase Awareness, Analogs, and Enhancers
+
+export type SupportPhase = 'course' | 'bridge' | 'pct' | 'fertility';
+
+export interface SubstanceDosage {
+  mg: number;
+  timing: string;
+}
+
+export interface SupportLevel {
+  label: string;
+  desc: string;
+  subs: string[];
+  dosages: Record<string, SubstanceDosage>;
+}
+
+// Substance analogs: what can replace what
+export const SUBSTANCE_ANALOGS: Record<string, { id: string; name: string; reason: string; form?: string; mg?: number; timing?: string }[]> = {
+  nac: [{ id: 'nac', name: 'NAC', reason: 'Оригинал', form: 'капсулы', mg: 600, timing: 'натощак' }, { id: 'milk_thistle', name: 'Силимарин', reason: 'Гепатопротекция', form: 'капсулы', mg: 600, timing: 'с едой, 2x/д' }, { id: 'alpha_lipoic', name: 'АЛЬК', reason: 'Глутатион + антиоксидант', form: 'R-форма', mg: 300, timing: 'натощак' }],
+  omega3: [{ id: 'omega3', name: 'Омега-3', reason: 'Оригинал', form: 'EPA+DHA 60%', mg: 2000, timing: 'с едой, 2x/д' }, { id: 'egcg', name: 'EGCG', reason: 'Антиоксидант + липиды', form: 'капсулы', mg: 400, timing: 'натощак' }],
+  tudca: [{ id: 'tudca', name: 'TUDCA', reason: 'Оригинал', form: 'капсулы', mg: 500, timing: 'перед едой, 2x/д' }, { id: 'milk_thistle', name: 'Силимарин', reason: 'Гепатопротекция (слабее)', form: 'капсулы', mg: 600, timing: 'с едой, 2x/д' }, { id: 'phosphatidylcholine', name: 'Фосфатидилхолин', reason: 'Мембраны гепатоцитов', form: 'капсулы', mg: 1200, timing: 'с едой' }],
+  magnesium: [{ id: 'magnesium', name: 'Магний бисглицинат', reason: 'Оригинал', form: 'бисглицинат', mg: 400, timing: 'на ночь' }, { id: 'taurine', name: 'Таурин', reason: 'Расслабление + антиоксидант', form: 'порошок', mg: 2000, timing: 'натощак' }],
+  vitamin_d3: [{ id: 'vitamin_d3', name: 'Витамин D3', reason: 'Оригинал', form: 'капсулы', mg: 5000, timing: 'с едой (МЕ)' }, { id: 'vitamin_k2', name: 'Витамин K2', reason: 'Направление Ca в кости', form: 'МК-7', mg: 200, timing: 'с едой (мкг)' }],
+  coq10: [{ id: 'coq10', name: 'CoQ10 убихинол', reason: 'Оригинал', form: 'убихинол', mg: 200, timing: 'с едой' }],
+  zinc: [{ id: 'zinc', name: 'Цинк пиколинат', reason: 'Оригинал', form: 'пиколинат', mg: 30, timing: 'на ночь' }],
+  berberine: [{ id: 'berberine', name: 'Берберин', reason: 'Оригинал', form: 'капсулы', mg: 500, timing: 'с едой, 2x/д' }],
+  ashwagandha: [{ id: 'ashwagandha', name: 'Ашваганда KSM-66', reason: 'Оригинал', form: 'KSM-66', mg: 600, timing: 'вечер' }],
+  alpha_lipoic: [{ id: 'alpha_lipoic', name: 'АЛЬК R-форма', reason: 'Оригинал', form: 'R-форма', mg: 300, timing: 'натощак' }],
+  selenium: [{ id: 'selenium', name: 'Селен метионин', reason: 'Оригинал', form: 'метионин', mg: 200, timing: 'с едой (мкг)' }],
+  taurine: [{ id: 'taurine', name: 'Таурин', reason: 'Оригинал', form: 'порошок', mg: 2000, timing: 'натощак' }, { id: 'magnesium', name: 'Магний', reason: 'Кардиопротекция', form: 'бисглицинат', mg: 400, timing: 'на ночь' }],
+  milk_thistle: [{ id: 'milk_thistle', name: 'Силимарин', reason: 'Оригинал', form: 'капсулы', mg: 600, timing: 'с едой, 2x/д' }, { id: 'nac', name: 'NAC', reason: 'Глутатион + гепатопротекция', form: 'капсулы', mg: 600, timing: 'натощак' }],
+  glucosamine: [{ id: 'glucosamine', name: 'Глюкозамин', reason: 'Оригинал', form: 'сульфат', mg: 1500, timing: 'с едой' }],
+  collagen: [{ id: 'collagen', name: 'Коллаген гидролизат', reason: 'Оригинал', form: 'гидролизат', mg: 10000, timing: 'с едой' }, { id: 'vitamin_c', name: 'Витамин C', reason: 'Синтез коллагена', form: 'порошок', mg: 1000, timing: 'натощак' }],
+  curcumin: [{ id: 'curcumin', name: 'Куркумин + пиперин', reason: 'Оригинал', form: '+ пиперин', mg: 1000, timing: 'с едой' }],
+  probiotics: [{ id: 'probiotics', name: 'Пробиотики', reason: 'Оригинал', form: 'капсулы', mg: 20, timing: 'натощак (млрд КОЕ)' }],
+  vitamin_b12: [{ id: 'vitamin_b12', name: 'B12 метилкобаламин', reason: 'Оригинал', form: 'метилкобаламин', mg: 1000, timing: 'утро (мкг)' }],
+  folate: [{ id: 'folate', name: 'Фолат 5-MTHF', reason: 'Оригинал', form: '5-MTHF', mg: 800, timing: 'с едой (мкг)' }],
+  telmisartan: [{ id: 'telmisartan', name: 'Тельмисартан', reason: 'Оригинал', form: 'таблетки', mg: 40, timing: 'утро' }],
+  nebivolol: [{ id: 'nebivolol', name: 'Небиволол', reason: 'Оригинал', form: 'таблетки', mg: 5, timing: 'утро' }],
+  saw_palmetto: [{ id: 'saw_palmetto', name: 'Сабаль пальметто', reason: 'Оригинал', form: 'капсулы', mg: 640, timing: 'с едой, 2x/д' }],
+  hcg: [{ id: 'hcg', name: 'ХГЧ', reason: '500 МЕ 2р/нед, схема 3/1 (3 нед приема, 1 нед отдых)', form: 'инъекции', mg: 500, timing: '2x/нед (МЕ)' }],
+};
+
+// Substance enhancers: what boosts each substance
+export const SUBSTANCE_ENHANCERS: Record<string, { id: string; name: string; reason: string; form?: string; mg?: number; timing?: string }[]> = {
+  nac: [{ id: 'vitamin_c', name: 'Витамин C', reason: 'Регенерация глутатиона', form: 'порошок', mg: 1000, timing: 'натощак' }, { id: 'alpha_lipoic', name: 'АЛЬК', reason: 'Усиление антиоксидантной сети', form: 'R-форма', mg: 300, timing: 'натощак' }, { id: 'selenium', name: 'Селен', reason: 'Глутатионпероксидаза', form: 'метионин', mg: 200, timing: 'с едой (мкг)' }],
+  omega3: [{ id: 'vitamin_e', name: 'Витамин E', reason: 'Защита от окисления EPA/DHA', form: 'd-альфа-токоферол', mg: 400, timing: 'с едой (МЕ)' }],
+  tudca: [{ id: 'milk_thistle', name: 'Силимарин', reason: 'Синергия гепатопротекции', form: 'капсулы', mg: 600, timing: 'с едой, 2x/д' }, { id: 'phosphatidylcholine', name: 'Фосфатидилхолин', reason: 'Мембраны гепатоцитов', form: 'капсулы', mg: 1200, timing: 'с едой' }],
+  magnesium: [{ id: 'vitamin_b6', name: 'Витамин B6', reason: 'Улучшение усвоения Mg', form: 'пиридоксин', mg: 50, timing: 'с едой' }, { id: 'taurine', name: 'Таурин', reason: 'Синергия расслабления', form: 'порошок', mg: 2000, timing: 'натощак' }],
+  coq10: [{ id: 'selenium', name: 'Селен', reason: 'Защита митохондрий', form: 'метионин', mg: 200, timing: 'с едой (мкг)' }, { id: 'alpha_lipoic', name: 'АЛЬК', reason: 'Регенерация CoQ10', form: 'R-форма', mg: 300, timing: 'натощак' }],
+  vitamin_d3: [{ id: 'vitamin_k2', name: 'Витамин K2', reason: 'Направление Ca в кости', form: 'МК-7', mg: 200, timing: 'с едой (мкг)' }, { id: 'magnesium', name: 'Магний', reason: 'Активация D3', form: 'бисглицинат', mg: 400, timing: 'на ночь' }],
+  zinc: [{ id: 'copper', name: 'Медь', reason: 'Баланс Zn/Cu', form: 'бисглицинат', mg: 2, timing: 'отдельно от цинка' }, { id: 'vitamin_c', name: 'Витамин C', reason: 'Улучшение всасывания', form: 'порошок', mg: 1000, timing: 'натощак' }],
+  collagen: [{ id: 'vitamin_c', name: 'Витамин C', reason: 'Необходим для синтеза коллагена', form: 'порошок', mg: 1000, timing: 'натощак' }, { id: 'msm', name: 'MSM', reason: 'Сера для коллагена', form: 'порошок', mg: 2000, timing: 'с едой' }],
+  glucosamine: [{ id: 'chondroitin', name: 'Хондроитин', reason: 'Синергия для хрящей', form: 'сульфат', mg: 1200, timing: 'с едой' }, { id: 'msm', name: 'MSM', reason: 'Сера для суставов', form: 'порошок', mg: 2000, timing: 'с едой' }],
+  curcumin: [{ id: 'piperine', name: 'Пиперин', reason: 'Увеличение биодоступности 2000%', form: 'капсулы', mg: 10, timing: 'с куркумином' }],
+  ashwagandha: [{ id: 'magnesium', name: 'Магний', reason: 'Синергия кортизол/расслабление', form: 'бисглицинат', mg: 400, timing: 'на ночь' }],
+  probiotics: [{ id: 'prebiotics', name: 'Пребиотики', reason: 'Пища для пробиотиков', form: 'порошок', mg: 5000, timing: 'с едой' }],
+};
+
+// Phase-specific modifications
+export const PHASE_MODS: Record<SupportPhase, { label: string; emoji: string; desc: string; addSubs: string[]; removeSubs: string[]; doseMultipliers: Record<string, number> }> = {
+  course: { label: 'Курс', emoji: '💉', desc: 'Поддержка во время курса ААС — гепатопротекция, кардио, эндокринная система', addSubs: ['milk_thistle', 'saw_palmetto'], removeSubs: ['hcg'], doseMultipliers: { nac: 1.5, tudca: 1.5, omega3: 1.25, coq10: 1.5 } },
+  bridge: { label: 'Мост', emoji: '🌉', desc: 'Между курсами — восстановление, стабилизация гормонов, детокс', addSubs: ['ashwagandha', 'milk_thistle', 'vitamin_b12', 'folate'], removeSubs: ['hcg', 'saw_palmetto', 'telmisartan'], doseMultipliers: { nac: 1, tudca: 1, ashwagandha: 1.5, magnesium: 1.25 } },
+  pct: { label: 'ПКТ', emoji: '🔄', desc: 'Послекурсовая терапия — восстановление оси ГГЯ, фертильность, антикатаболизм', addSubs: ['hcg', 'ashwagandha', 'vitamin_d3', 'zinc', 'vitamin_b12', 'folate', 'milk_thistle', 'taurine'], removeSubs: ['telmisartan', 'nebivolol', 'saw_palmetto'], doseMultipliers: { nac: 0.75, tudca: 0.75, zinc: 1.5, ashwagandha: 1.5, vitamin_d3: 1.5 } },
+  fertility: { label: 'Фертильность', emoji: '⚧', desc: 'Восстановление фертильности — сперматогенез, гормональный баланс', addSubs: ['zinc', 'selenium', 'vitamin_c', 'coq10', 'vitamin_e', 'folate', 'vitamin_b12', 'ashwagandha', 'l_carnitine'], removeSubs: ['hcg', 'telmisartan', 'nebivolol', 'saw_palmetto', 'berberine'], doseMultipliers: { zinc: 2, selenium: 1.5, vitamin_c: 1.5, coq10: 1.5, l_carnitine: 2 } },
+};
+
+// Default dosages for substances that may be added by phase
+export const DEFAULT_DOSAGES: Record<string, SubstanceDosage> = {
+  milk_thistle: { mg: 600, timing: 'с едой, 2x/д' }, saw_palmetto: { mg: 640, timing: 'с едой, 2x/д' },
+  ashwagandha: { mg: 600, timing: 'вечер' }, vitamin_b12: { mg: 1000, timing: 'утро (мкг)' },
+  folate: { mg: 800, timing: 'с едой (мкг)' }, taurine: { mg: 2000, timing: 'натощак' },
+  hcg: { mg: 500, timing: '2x/нед, схема 3/1 (МЕ)' }, l_carnitine: { mg: 2000, timing: 'натощак' },
+  vitamin_e: { mg: 400, timing: 'с едой (МЕ)' }, selenium: { mg: 200, timing: 'с едой (мкг)' },
+  vitamin_c: { mg: 1000, timing: 'натощак' }, probiotics: { mg: 20, timing: 'натощак (млрд КОЕ)' },
+  coq10: { mg: 200, timing: 'с едой' }, prebiotics: { mg: 5000, timing: 'с едой (мг)' },
+  alpha_lipoic: { mg: 600, timing: 'натощак (R-форма)' },
+  berberine: { mg: 500, timing: 'с едой, 2x/д' },
+  collagen: { mg: 10000, timing: 'с едой (мг, гидролизат)' },
+  curcumin: { mg: 1000, timing: 'с пиперином, с едой' },
+  egcg: { mg: 400, timing: 'натощак' },
+  glucosamine: { mg: 1500, timing: 'с едой' },
+  magnesium: { mg: 400, timing: 'на ночь (бисглицинат)' },
+  nac: { mg: 1200, timing: 'натощак' },
+  nebivolol: { mg: 5, timing: 'утро (ЧСС контроль!)' },
+  omega3: { mg: 4000, timing: 'с едой, 2x/д (EPA+DHA 60%)' },
+  phosphatidylcholine: { mg: 1200, timing: 'с едой' },
+  telmisartan: { mg: 40, timing: 'утро (КАД и ЧСС контроль!)' },
+  tudca: { mg: 1000, timing: 'перед едой, 2x/д' },
+  vitamin_b6: { mg: 50, timing: 'с едой' },
+  vitamin_d3: { mg: 5000, timing: 'с едой (МЕ)' },
+  zinc: { mg: 30, timing: 'на ночь (пиколинат)' },
+  piperine: { mg: 10, timing: 'с куркумином' }, chondroitin: { mg: 1200, timing: 'с едой' },
+  msm: { mg: 2000, timing: 'с едой' }, copper: { mg: 2, timing: 'отдельно от цинка (мг)' },
+  vitamin_k2: { mg: 200, timing: 'с едой (мкг)' }, iron: { mg: 18, timing: 'натощак' },
+};
+
+// Compute phase-adjusted level
+export function getPhaseLevel(
+  baseLevel: 'basic' | 'mid' | 'max' | 'boost',
+  phase: SupportPhase,
+  baseLevels: Record<string, { label: string; desc: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }> }>
+): { label: string; desc: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }>; phaseLabel: string; phaseEmoji: string } {
+  const base = baseLevels[baseLevel];
+  if (!base) return { ...baseLevels.basic, phaseLabel: 'Курс', phaseEmoji: '💉' };
+  const mod = PHASE_MODS[phase];
+  const subs = [...base.subs];
+  if (mod) {
+    for (const s of mod.addSubs) { if (!subs.includes(s)) subs.push(s); }
+    for (const s of mod.removeSubs) { const idx = subs.indexOf(s); if (idx >= 0) subs.splice(idx, 1); }
+  }
+  const dosages: Record<string, { mg: number; timing: string }> = {};
+  for (const [id, d] of Object.entries(base.dosages)) {
+    const mult = mod?.doseMultipliers?.[id] || 1;
+    dosages[id] = { mg: Math.round(d.mg * mult), timing: d.timing };
+  }
+  if (mod) {
+    for (const s of mod.addSubs) {
+      if (!dosages[s]) dosages[s] = DEFAULT_DOSAGES[s] || { mg: 500, timing: 'с едой' };
+    }
+  }
+  return { ...base, subs, dosages, phaseLabel: mod?.label || 'Курс', phaseEmoji: mod?.emoji || '💉' };
+}
+
+// ── FROM: support-catalog.ts ──
+// ===========================================================================
+// SUPPORT CATALOG — Complete substance database with forms, organs, systems,
+// mechanisms, synergies, conflicts, monitoring, contraindications, side effects.
+// Each substance has ALL forms grouped (no duplicates), tier classification,
+// organ/system mapping, and full interaction data.
+// ===========================================================================
+
+export interface CatalogSubstanceForm {
+  id: string;
+  name: string;
+  nameRu: string;
+  dose: string;
+  best: boolean;
+  notes?: string;
+}
+
+export interface SynergyInfo {
+  with: string;
+  effect: string;
+  mechanism: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
+export interface ConflictInfo {
+  with: string;
+  effect: string;
+  mechanism: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
+export interface MonitoringItem {
+  what: string;
+  when: string;
+  targetRange?: string;
+}
+
+export interface SupportCatalogEntry {
+  id: string;
+  name: string;
+  nameRu: string;
+  tier: 'core' | 'standard' | 'advanced' | 'specialty';
+  category: string[];
+  forms: CatalogSubstanceForm[];
+  organs: string[];
+  systems: string[];
+  mechanisms: string[];
+  description: string;
+  synergies: SynergyInfo[];
+  conflicts: ConflictInfo[];
+  monitoring: MonitoringItem[];
+  contraindications: string[];
+  sideEffects: string[];
+  dosage: { mg: number; timing: string; form?: string };
+  bestForCourse: boolean;
+  analog?: string[];
+}
+
+export const ORGAN_LABELS: Record<string, string> = {
+  LIVER: '🫁 Печень', KIDNEYS: '🫘 Почки', HEART: '❤️ Сердце', VESSELS: '🩸 Сосуды',
+  BRAIN: '🧠 Мозг', NERVES: '⚡ Нервы', LUNGS: '🫁 Лёгкие', SKIN: '🧴 Кожа',
+  EYES: '👁️ Глаза', IMMUNE_SYSTEM: '🛡️ Иммунитет', REPRODUCTIVE: '🧬 Репродуктивная',
+  MUSCLES: '💪 Мышцы', BONES: '🦴 Кости', JOINTS: '🦴 Суставы', PANCREAS: '🫁 Поджелудочная',
+  THYROID: '🦋 Щитовидная', ADRENALS: '⚖️ Надпочечники', STOMACH: '🫁 Желудок',
+  INTESTINES: '🫁 Кишечник', BLOOD: '🩸 Кровь', PROSTATE: '🔴 Простата',
+};
+
+export const SYSTEM_LABELS_CATALOG: Record<string, string> = {
+  hepatic: '🫁 Печень', cardio: '❤️ ССС', renal: '🫘 Почки', neuro: '🧠 Нервная',
+  endocrine: '⚖️ Эндокринная', hematologic: '🩸 Кровь', reproductive: '🧬 Репродуктивная',
+  musculoskeletal: '💪 Опорно-двигательная', immune: '🛡️ Иммунитет', metabolic: '⚡ Метаболизм',
+};
+
+export const CATEGORY_LABELS: Record<string, string> = {
+  antioxidant: '🛡️ Антиоксидант', hepatoprotector: '🫁 Гепатопротектор', cardioprotector: '❤️ Кардиопротектор',
+  mineral: '💊 Минерал', vitamin: '💊 Витамин', amino: '🧬 Аминокислота', fatty_acid: '🐟 ЖК',
+  adaptogen: '🌿 Адаптоген', antiinflammatory: '🔥 Противовоспалительное', probiotic: '🦠 Пробиотик',
+  choleretic: '🫁 Желчегонное', respiratory: '🫁 Дыхательная', neuroprotector: '🧠 Нейропротектор',
+  renoprotector: '🫘 Нефропротектор', joint: '🦴 Суставное', hormonal: '⚖️ Гормональное',
+  peptide: '🧬 Пептид', pharma: '💊 Фармакология', herb: '🌿 Трава', nootropic: '🧠 Ноотроп',
+  immunomodulator: '🛡️ Иммуномодулятор', anabolic: '💪 Анаболическое', metabolic: '⚡ Метаболическое',
+  gut: '🫁 ЖКТ', gastrointestinal: '🫁 Желудочно-кишечный', stimulant: '⚡ Стимулятор',
+  anti_aging: '🕰 Антивозрастное', mitochondrial: '🔋 Митохондриальное', thyroid: '🦋 Щитовидная железа',
+  anticoagulant: '🩸 Антикоагулянт', antimicrobial: '🦠 Антимикробное', anxiolytic: '😌 Анксиолитик',
+  antidepressant: '😊 Антидепрессант', bone: '🦴 Костное',
+  skin: '🧴 Кожное', beauty: '💅 Красота', eye_protector: '👁 Защита глаз',
+  hydration: '💧 Гидратация', electrolyte: '⚡ Электролит', lipid: '🫧 Липидное',
+  multivitamin: '💊 Мультивитамин', mushroom: '🍄 Грибы', recovery: '🔄 Восстановление',
+  nsaid: '💊 НПВС', marker: '📊 Маркер', hematologic: '🩸 Гематологическое',
+  immune: '🛡️ Иммунное', urinary_protector: '🚽 Урологическое', polyphenol: '🫐 Полифенол',
+  anti_inflammatory: '🔥 Противовоспалительное',
+};
+
+export const TIER_LABELS_CATALOG: Record<string, { label: string; emoji: string; color: string; desc: string }> = {
+  core: { label: 'Ядро', emoji: '🟢', color: '#22c55e', desc: 'Обязательно на любом курсе' },
+  standard: { label: 'Стандарт', emoji: '🟡', color: '#eab308', desc: 'Рекомендовано при дозах >500 мг/нед' },
+  advanced: { label: 'Продвинутый', emoji: '🟠', color: '#f97316', desc: 'При специфических целях и условиях' },
+  specialty: { label: 'Специальный', emoji: '🔴', color: '#ef4444', desc: 'Фармакология, рецептурные препараты' },
+};
+
+
+export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
+  nac: {
+    id: "nac",
+    name: "NAC",
+    nameRu: "N-Ацетилцистеин",
+    tier: "core",
+    category: [
+      "antioxidant",
+      "hepatoprotector",
+      "respiratory"
+    ],
+    forms: [
+      {
+        id: "nac",
+        name: "NAC 600mg",
+        nameRu: "NAC 600 мг",
+        dose: "600 мг натощак",
+        best: true
+      },
+      {
+        id: "AA_NAC",
+        name: "NAC Premium",
+        nameRu: "NAC Премиум",
+        dose: "600 мг 2x/д",
+        best: false
+      },
+      {
+        id: "AA_NAC_PREMIUM",
+        name: "NAC Premium+",
+        nameRu: "NAC Премиум+",
+        dose: "900 мг натощак",
+        best: false
+      }
+    ],
+    organs: [
+      "LIVER",
+      "LUNGS",
+      "KIDNEYS",
+      "BRAIN"
+    ],
+    systems: [
+      "hepatic",
+      "neuro",
+      "renal"
+    ],
+    mechanisms: [
+      "GLUTATHIONE_SYNTHESIS",
+      "MUCOLYTIC",
+      "ANTIOXIDANT",
+      "DETOXIFICATION"
+    ],
+    description: "N-Ацетилцистеин — предшественник глутатиона, главного антиоксиданта организма. Разжижает слизь, защищает печень от токсинов, снижает окислительный стресс. Обязателен на любом курсе.",
+    synergies: [
+      {
+        with: "vitamin_c",
+        effect: "Регенерация глутатиона",
+        mechanism: "Витамин C восстанавливает окисленный глутатион",
+        severity: "HIGH"
+      },
+      {
+        with: "alpha_lipoic",
+        effect: "Усиление антиоксидантной сети",
+        mechanism: "АЛЬК регенерирует глутатион и витамин C",
+        severity: "HIGH"
+      },
+      {
+        with: "selenium",
+        effect: "Глутатионпероксидаза",
+        mechanism: "Селен — кофактор GPx",
+        severity: "MEDIUM"
+      },
+      {
+        with: "milk_thistle",
+        effect: "Синергия гепатопротекции",
+        mechanism: "Разные механизмы защиты гепатоцитов",
+        severity: "MEDIUM"
+      }
+    ],
+    conflicts: [
+      {
+        with: "charcoal",
+        effect: "Снижение абсорбции",
+        mechanism: "Активированный уголь связывает NAC",
+        severity: "MEDIUM"
+      },
+      {
+        with: "nitroglycerin",
+        effect: "Гипотония",
+        mechanism: "Усиление вазодилатации",
+        severity: "HIGH"
+      }
+    ],
+    monitoring: [
+      {
+        what: "АЛТ/АСТ",
+        when: "Каждые 4 нед",
+        targetRange: "<40 Ед/л"
+      },
+      {
+        what: "ГГТП",
+        when: "Каждые 6 нед",
+        targetRange: "<50 Ед/л"
+      }
+    ],
+    contraindications: [
+      "Язвенная болезнь",
+      "Бронхиальная астма (с осторожностью)"
+    ],
+    sideEffects: [
+      "Тошнота натощак",
+      "Изжога",
+      "Редко: кожная сыпь"
+    ],
+    dosage: {
+      mg: 1200,
+      timing: "натощак, 2x/д",
+      form: "капсулы"
+    },
+    bestForCourse: true
+  },
+  tudca: {
+    id: "tudca",
+    name: "TUDCA",
+    nameRu: "Тауроурсодезоксихолевая кислота",
+    tier: "core",
+    category: [
+      "hepatoprotector",
+      "bile_acid",
+      "choleretic"
+    ],
+    forms: [
+      {
+        id: "tudca",
+        name: "TUDCA 250mg",
+        nameRu: "TUDCA 250 мг",
+        dose: "500 мг перед едой 2x/д",
+        best: true
+      }
+    ],
+    organs: [
+      "LIVER",
+      "GALLBLADDER",
+      "KIDNEYS"
+    ],
+    systems: [
+      "hepatic",
+      "renal"
+    ],
+    mechanisms: [
+      "BILE_FLOW_STIMULATION",
+      "MITOCHONDRIAL_PROTECTION",
+      "ER_STRESS_REDUCTION",
+      "ANTI_APOPTOTIC"
+    ],
+    description: "TUDCA — урсодезоксихолевая кислота с таурином. Стимулирует желчеотток, защищает митохондрии гепатоцитов, подавляет ER-стресс. Один из важнейших гепатопротекторов.",
+    synergies: [
+      {
+        with: "milk_thistle",
+        effect: "Синергия гепатопротекции",
+        mechanism: "Силимарин стабилизирует мембраны, TUDCA стимулирует желчеотток",
+        severity: "HIGH"
+      },
+      {
+        with: "phosphatidylcholine",
+        effect: "Защита мембран",
+        mechanism: "ФХ + TUDCA = комплексная защита гепатоцитов",
+        severity: "MEDIUM"
+      },
+      {
+        with: "nac",
+        effect: "Комплексная защита печени",
+        mechanism: "NAC повышает глутатион, TUDCA защищает желчные пути",
+        severity: "MEDIUM"
+      }
+    ],
+    conflicts: [
+        {with: "charcoal", effect: "Снижение абсорбции", mechanism: "Уголь связывает желчные кислоты", severity: "LOW"},
+      ],
+    monitoring: [
+      {
+        what: "АЛТ/АСТ",
+        when: "Каждые 4 нед",
+        targetRange: "<40 Ед/л"
+      },
+      {
+        what: "ГГТП",
+        when: "Каждые 4 нед",
+        targetRange: "<50 Ед/л"
+      },
+      {
+        what: "Билирубин",
+        when: "Каждые 6 нед",
+        targetRange: "<20 мкмоль/л"
+      }
+    ],
+    contraindications: [
+      "Желчнокаменная болезнь (с осторожностью)",
+      "Острый холецистит",
+      "Обструкция желчных путей"
+    ],
+    sideEffects: [
+      "Диарея при высоких дозах",
+      "Редко: боли в правом подреберье"
+    ],
+    dosage: {
+      mg: 1000,
+      timing: "перед едой, 2x/д",
+      form: "капсулы"
+    },
+    bestForCourse: true
+  },
+  magnesium: {
+    id: "magnesium",
+    name: "Magnesium",
+    nameRu: "Магний",
+    tier: "core",
+    category: [
+      "mineral",
+      "neuroprotector",
+      "cardioprotector"
+    ],
+    forms: [
+      {
+        id: "magnesium",
+        name: "Magnesium Bisglycinate",
+        nameRu: "Магний бисглицинат",
+        dose: "400 мг на ночь",
+        best: true
+      },
+      {
+        id: "MIN_MG_CITRATE",
+        name: "Magnesium Citrate",
+        nameRu: "Магний цитрат",
+        dose: "400 мг",
+        best: false
+      },
+      {
+        id: "MIN_MG_THREONATE",
+        name: "Magnesium L-Threonate",
+        nameRu: "Магний L-треонат",
+        dose: "200 мг (для мозга)",
+        best: false
+      },
+      {
+        id: "MIN_MG_MALATE",
+        name: "Magnesium Malate",
+        nameRu: "Магний малат",
+        dose: "400 мг (для мышц)",
+        best: false
+      },
+      {
+        id: "MIN_MG_OXIDE",
+        name: "Magnesium Oxide",
+        nameRu: "Магний оксид",
+        dose: "400 мг (низкая усвояемость)",
+        best: false,
+        notes: "Низкая биодоступность (~4%)"
+      }
+    ],
+    organs: [
+      "BRAIN",
+      "HEART",
+      "MUSCLES",
+      "NERVES"
+    ],
+    systems: [
+      "neuro",
+      "cardio",
+      "musculoskeletal"
+    ],
+    mechanisms: [
+      "GABA_RECEPTOR_MODULATION",
+      "NMDA_ANTAGONISM",
+      "MUSCLE_RELAXATION",
+      "ATP_PRODUCTION",
+      "INSULIN_SENSITIVITY",
+      "BLOOD_PRESSURE_REGULATION"
+    ],
+    description: "Магний — эссенциальный минерал, участвующий в 300+ ферментных реакциях. Успокаивает нервную систему (GABA), расслабляет мышцы, снижает давление, улучшает сон. Бисглицинат — лучшая форма.",
+    synergies: [
+      {
+        with: "vitamin_b6",
+        effect: "Улучшение усвоения Mg",
+        mechanism: "B6 усиливает транспорт Магний в клетки",
+        severity: "MEDIUM"
+      },
+      {
+        with: "taurine",
+        effect: "Синергия расслабления",
+        mechanism: "Таурин + Магний = кардиопротекция и расслабление мышц",
+        severity: "MEDIUM"
+      },
+      {
+        with: "vitamin_d3",
+        effect: "Взаимное усвоение",
+        mechanism: "Магний необходим для активации витамина D",
+        severity: "MEDIUM"
+      },
+      {
+        with: "zinc",
+        effect: "Баланс минералов",
+        mechanism: "Сбалансированный приём Цинк и Mg",
+        severity: "LOW"
+      }
+    ],
+    conflicts: [
+      {
+        with: "calcium_high",
+        effect: "Конкуренция за всасывание",
+        mechanism: "Кальций и Магний конкурируют за транспортёры",
+        severity: "LOW"
+      },
+      {
+        with: "iron",
+        effect: "Раздельный приём",
+        mechanism: "Магний снижает всасывание железа при одновременном приёме",
+        severity: "LOW"
+      }
+    ],
+    monitoring: [
+      {
+        what: "Магний сыворотки",
+        when: "Каждые 8 нед",
+        targetRange: "0.75-0.95 ммоль/л"
+      },
+      {
+        what: "Магний эритроцитов",
+        when: "При возможности",
+        targetRange: ">1.8 ммоль/л"
+      }
+    ],
+    contraindications: [
+      "Тяжёлая почечная недостаточность (ClCr<30)",
+      "Атриовентрикулярная блокада"
+    ],
+    sideEffects: [
+      "Диарея при высоких дозах (цитрат/оксид)",
+      "Сонливость при приёме на ночь"
+    ],
+    dosage: {
+      mg: 400,
+      timing: "на ночь (бисглицинат)",
+      form: "бисглицинат"
+    },
+    bestForCourse: true
+  },
+  coq10: {
+    id: 'coq10', name: 'CoQ10 (Ubiquinol)', nameRu: 'Коэнзим Q10 (Убихинол)',
+    tier: 'core', category: ['antioxidant', 'cardioprotector', 'mitochondrial'],
+    forms: [
+      { id: 'coq10', name: 'Ubiquinol 200mg', nameRu: 'Убихинол 200 мг', dose: '200 мг с едой', best: true },
+      { id: 'AO_COQ10_UBIQUINONE', name: 'Ubiquinone', nameRu: 'Убихинон 200 мг', dose: '200 мг с едой', best: false, notes: 'Менее биодоступен' },
+      { id: 'AO_COQ10_MQ10', name: 'MitoQ', nameRu: 'MitoQ 10 мг', dose: '10 мг', best: false, notes: 'Целевая доставка в митохондрии' },
+    ],
+    organs: ['HEART', 'KIDNEYS', 'LIVER', 'MUSCLES'],
+    systems: ['cardio', 'renal', 'hepatic'],
+    mechanisms: ['ELECTRON_TRANSPORT_CHAIN', 'ANTIOXIDANT', 'ATP_PRODUCTION', 'MEMBRANE_STABILIZATION'],
+    description: 'Коэнзим Q10 — ключевой компонент дыхательной цепи митохондрий. Защищает сердце от окислительного стресса, поддерживает продукцию АТФ. Обязателен при приёме ААС.',
+    synergies: [
+      { with: 'selenium', effect: 'Защита митохондрий', mechanism: 'Se — кофактор GPx', severity: 'MEDIUM' },
+      { with: 'alpha_lipoic', effect: 'Регенерация CoQ10', mechanism: 'АЛЬК регенерирует окисленный CoQ10', severity: 'HIGH' },
+      { with: 'omega3', effect: 'Кардиопротекция', mechanism: 'Разные механизмы защиты миокарда', severity: 'MEDIUM' },
+    ],
+    conflicts: [
+      { with: 'warfarin', effect: 'Снижение антикоагулянтного эффекта', mechanism: 'CoQ10 структурно похож на витамин K', severity: 'MEDIUM' },
+    ],
+    monitoring: [
+      { what: 'CoQ10 сыворотки', when: 'Каждые 12 нед', targetRange: '>0.5 мкг/мл' },
+    ],
+    contraindications: ['Приём варфарина (конфликт)', 'Гипотония (с осторожностью)'],
+    sideEffects: ['Редко: тошнота при приёме натощак', 'Редко: бессонница при вечернем приёме'],
+    dosage: { mg: 200, timing: 'с едой (убихинол)', form: 'убихинол' },
+    bestForCourse: true,
+  },
+  vitamin_d3: {
+    id: 'vitamin_d3', name: 'Vitamin D3', nameRu: 'Витамин D3',
+    tier: 'core', category: ['vitamin', 'hormonal', 'immunomodulator'],
+    forms: [
+      { id: 'vitamin_d3', name: 'Vitamin D3 5000 IU', nameRu: 'Витамин D3 5000 МЕ', dose: '5000 МЕ с едой', best: true },
+      { id: 'VIT_D3_LIP', name: 'Vitamin D3 Liposomal', nameRu: 'Липосомальный D3 5000 МЕ', dose: '5000 МЕ', best: false, notes: 'Лучшая биодоступность' },
+    ],
+    organs: ['BONES', 'IMMUNE_SYSTEM', 'THYROID', 'REPRODUCTIVE'],
+    systems: ['endocrine', 'hepatic', 'hematologic'],
+    mechanisms: ['VDR_RECEPTOR_ACTIVATION', 'CALCIUM_REGULATION', 'IMMUNE_MODULATION', 'TESTOSTERONE_SYNTHESIS'],
+    description: 'Витамин D3 — прогормон, регулирующий кальций, иммунитет и гормональный баланс. 80% населения в дефиците. Критически важен на курсе ААС.',
+    synergies: [
+      { with: 'vitamin_k2', effect: 'Направление Ca в кости', mechanism: 'K2 активирует остеокальцин', severity: 'HIGH' },
+      { with: 'magnesium', effect: 'Активация D3', mechanism: 'Mg необходим для конвертации D3 в 25-OH-D', severity: 'HIGH' },
+      { with: 'zinc', effect: 'Усиление иммунитета', mechanism: 'Синергичная модуляция иммунного ответа', severity: 'MEDIUM' },
+    ],
+    conflicts: [
+      { with: 'calcium_high', effect: 'Гиперкальциемия', mechanism: 'D3 увеличивает абсорбцию Ca', severity: 'LOW' },
+    ],
+    monitoring: [
+      { what: '25(OH)D', when: 'Каждые 8 нед', targetRange: '50-80 нг/мл' },
+      { what: 'Кальций общий', when: 'Каждые 12 нед', targetRange: '2.1-2.55 ммоль/л' },
+    ],
+    contraindications: ['Гиперкальциемия', 'Саркоидоз', 'Гиперпаратиреоз'],
+    sideEffects: ['Гиперкальциемия при передозировке', 'Тошнота при высоких дозах'],
+    dosage: { mg: 5000, timing: 'с едой (МЕ)', form: 'капсулы' },
+    bestForCourse: true,
+  },
+  zinc: {
+    id: 'zinc', name: 'Zinc', nameRu: 'Цинк',
+    tier: 'core', category: ['mineral', 'immunomodulator', 'hormonal'],
+    forms: [
+      { id: 'zinc', name: 'Zinc Picolinate 30mg', nameRu: 'Цинк пиколинат 30 мг', dose: '30 мг на ночь', best: true },
+      { id: 'MIN_ZN_BISGLYCINATE', name: 'Zinc Bisglycinate', nameRu: 'Цинк бисглицинат 30 мг', dose: '30 мг', best: false },
+      { id: 'MIN_ZN_CITRATE', name: 'Zinc Citrate', nameRu: 'Цинк цитрат 30 мг', dose: '30 мг', best: false },
+    ],
+    organs: ['REPRODUCTIVE', 'IMMUNE_SYSTEM', 'SKIN', 'PROSTATE'],
+    systems: ['reproductive', 'endocrine', 'hematologic'],
+    mechanisms: ['TESTOSTERONE_SYNTHESIS', 'AR_RECEPTOR_MODULATION', 'IMMUNE_CELL_PROLIFERATION', 'WOUND_HEALING'],
+    description: 'Цинк — эссенциальный микроэлемент для синтеза тестостерона, иммунитета и репродукции. Пиколинат — лучшая форма для усвоения.',
+    synergies: [
+      { with: 'vitamin_c', effect: 'Улучшение всасывания', mechanism: 'Витамин C усиливает абсорбцию цинка', severity: 'MEDIUM' },
+      { with: 'vitamin_d3', effect: 'Усиление иммунитета', mechanism: 'Синергичная модуляция иммунного ответа', severity: 'MEDIUM' },
+      { with: 'selenium', effect: 'Защита простаты', mechanism: 'Zn + Se = защита от окислительного стресса', severity: 'MEDIUM' },
+    ],
+    conflicts: [
+      { with: 'copper', effect: 'Дисбаланс Zn/Cu', mechanism: 'Высокий Zn истощает медь при длительном приёме', severity: 'MEDIUM' },
+      { with: 'iron', effect: 'Конкуренция за всасывание', mechanism: 'Zn и Fe конкурируют за DMT1', severity: 'LOW' },
+    ],
+    monitoring: [
+      { what: 'Цинк сыворотки', when: 'Каждые 8 нед', targetRange: '11-18 мкмоль/л' },
+      { what: 'Медь сыворотки', when: 'Каждые 12 нед', targetRange: '11-22 мкмоль/л' },
+    ],
+    contraindications: ['Болезнь Вильсона (медь)', 'Приём медьсодержащих препаратов'],
+    sideEffects: ['Тошнота натощак', 'Металлический привкус', 'Дефицит меди при длительном приёме'],
+    dosage: { mg: 30, timing: 'на ночь (пиколинат)', form: 'пиколинат' },
+    bestForCourse: true,
+  },
+  selenium: {
+    id: 'selenium', name: 'Selenium', nameRu: 'Селен',
+    tier: 'core', category: ['mineral', 'antioxidant', 'thyroid'],
+    forms: [
+      { id: 'selenium', name: 'Selenium Methionine 200mcg', nameRu: 'Селен метионин 200 мкг', dose: '200 мкг с едой', best: true },
+      { id: 'MIN_SE_YEAST', name: 'Selenium Yeast', nameRu: 'Селен дрожжевой 200 мкг', dose: '200 мкг', best: false },
+    ],
+    organs: ['THYROID', 'LIVER', 'IMMUNE_SYSTEM', 'REPRODUCTIVE'],
+    systems: ['endocrine', 'hepatic', 'hematologic'],
+    mechanisms: ['GPX_SYNTHESIS', 'THYROID_HORMONE_ACTIVATION', 'ANTIOXIDANT', 'DNA_REPAIR'],
+    description: 'Селен — кофактор глутатионпероксидазы и дейодиназы щитовидной железы. Критически важен для антиоксидантной защиты и мужской фертильности.',
+    synergies: [
+      { with: 'vitamin_e', effect: 'Антиоксидантная синергия', mechanism: 'Se (GPx) + вит. E = двойная защита мембран', severity: 'HIGH' },
+      { with: 'nac', effect: 'Глутатионовая система', mechanism: 'Se = GPx, NAC = предшественник глутатиона', severity: 'HIGH' },
+    ],
+    conflicts: [
+        {with: "vitamin_c", effect: "Снижение биодоступности Se", mechanism: "Высокие дозы C окисляют Se", severity: "LOW"},
+      ],
+    monitoring: [
+      { what: 'Селен сыворотки', when: 'Каждые 12 нед', targetRange: '70-150 нг/мл' },
+    ],
+    contraindications: ['Гипертиреоз (с осторожностью)', 'Приём других селен-содержащих добавок'],
+    sideEffects: ['Запах чеснока при передозировке', 'Выпадение волос при >400 мкг/д'],
+    dosage: { mg: 200, timing: 'с едой (мкг)', form: 'метионин' },
+    bestForCourse: true,
+  },
+  milk_thistle: {
+    id: 'milk_thistle', name: 'Milk Thistle (Silymarin)', nameRu: 'Расторопша (Силимарин)',
+    tier: 'core', category: ['hepatoprotector', 'antioxidant', 'herb'],
+    forms: [
+      { id: 'milk_thistle', name: 'Silymarin 600mg', nameRu: 'Силимарин 600 мг', dose: '600 мг с едой 2x/д', best: true },
+      { id: 'AO_SILYMARIN_PHOSPHO', name: 'Silymarin + Phospholipids', nameRu: 'Силимарин + фосфолипиды 300 мг 2x/д', dose: '300 мг 2x/д', best: false, notes: 'Лучшая биодоступность' },
+    ],
+    organs: ['LIVER', 'GALLBLADDER'],
+    systems: ['hepatic'],
+    mechanisms: ['MEMBRANE_STABILIZATION', 'ANTIOXIDANT', 'PROTEIN_SYNTHESIS_STIMULATION', 'ANTIFIBROTIC'],
+    description: 'Расторопша (силимарин) — стандартизированный экстракт. Стабилизирует мембраны гепатоцитов, подавляет фиброз. Один из основных гепатопротекторов.',
+    synergies: [
+      { with: 'nac', effect: 'Комплексная гепатопротекция', mechanism: 'NAC = глутатион, силимарин = мембраны', severity: 'HIGH' },
+      { with: 'tudca', effect: 'Максимальная гепатопротекция', mechanism: 'TUDCA + силимарин = полный охват', severity: 'HIGH' },
+    ],
+    conflicts: [
+        {with: "statin_drugs", effect: "Изменение метаболизма статинов", mechanism: "Силимарин ингибирует CYP3A4", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
+    ],
+    contraindications: ['Желчнокаменная болезнь (с осторожностью)', 'Аллергия на астровые'],
+    sideEffects: ['Редко: диарея', 'Редко: аллергия'],
+    dosage: { mg: 600, timing: 'с едой, 2x/д', form: 'капсулы' },
+    bestForCourse: true,
+  },
+  curcumin: {
+    id: 'curcumin', name: 'Curcumin + Piperine', nameRu: 'Куркумин + Пиперин',
+    tier: 'core', category: ['polyphenol', 'antiinflammatory', 'antioxidant'],
+    forms: [
+      { id: 'curcumin', name: 'Curcumin + Piperine 1000mg', nameRu: 'Куркумин + Пиперин 1000 мг', dose: '1000 мг с пиперином, с едой', best: true },
+      { id: 'PP_CURCUMIN_MERIVA', name: 'Curcumin Meriva (фитосомы)', nameRu: 'Куркумин Мерива 500 мг', dose: '500 мг', best: false, notes: 'Лучшая биодоступность' },
+      { id: 'PP_CURCUMIN_THERACURMIN', name: 'Theracurmin', nameRu: 'Теракурмин 300 мг', dose: '300 мг', best: false, notes: 'Максимальная биодоступность' },
+    ],
+    organs: ['LIVER', 'JOINTS', 'BRAIN', 'INTESTINES'],
+    systems: ['hepatic', 'musculoskeletal', 'neuro'],
+    mechanisms: ['NF_KB_INHIBITION', 'COX2_INHIBITION', 'ANTIOXIDANT', 'ANTI_FIBROTIC', 'BDNF_INCREASE'],
+    description: 'Куркумин — мощный противовоспалительный агент. Ингибирует NF-kB и COX-2. Пиперин увеличивает биодоступность на 2000%. Обязателен для печени и суставов.',
+    synergies: [
+      { with: 'omega3', effect: 'Противовоспалительная синергия', mechanism: 'COX-2 + резольвины', severity: 'MEDIUM' },
+      { with: 'boswellia', effect: 'Суставная синергия', mechanism: '5-LOX + COX-2 = полный путь воспаления', severity: 'MEDIUM' },
+      { with: 'vitamin_c', effect: 'Синтез коллагена', mechanism: 'Куркумин подавляет MMP, вит. C стимулирует коллаген', severity: 'LOW' },
+    ],
+    conflicts: [
+      { with: 'anticoagulants', effect: 'Усиление антикоагуляции', mechanism: 'Ингибирование агрегации тромбоцитов', severity: 'MEDIUM' },
+      { with: 'piperine_high', effect: 'Взаимодействие с лекарствами', mechanism: 'Пиперин ингибирует CYP3A4', severity: 'HIGH' },
+    ],
+    monitoring: [
+      { what: 'АЛТ/АСТ', when: 'Каждые 6 нед', targetRange: '<40 Ед/л' },
+      { what: 'СРБ', when: 'Каждые 8 нед', targetRange: '<5 мг/л' },
+    ],
+    contraindications: ['Желчнокаменная болезнь', 'Приём антикоагулянтов', 'Беременность'],
+    sideEffects: ['Диарея при высоких дозах', 'Редко: аллергия'],
+    dosage: { mg: 1000, timing: 'с пиперином, с едой', form: 'капсулы + пиперин' },
+    bestForCourse: true,
+  },
+  ashwagandha: {
+    id: 'ashwagandha', name: 'Ashwagandha KSM-66', nameRu: 'Ашваганда KSM-66',
+    tier: 'core', category: ['adaptogen', 'antiinflammatory', 'hormonal'],
+    forms: [
+      { id: 'ashwagandha', name: 'Ashwagandha KSM-66 600mg', nameRu: 'Ашваганда KSM-66 600 мг', dose: '600 мг вечером', best: true },
+      { id: 'AD_ASHWAGANDHA_SENSORIL', name: 'Ashwagandha Sensoril 250mg', nameRu: 'Ашваганда Sensoril 250 мг', dose: '250 мг', best: false, notes: 'Больше расслабления' },
+    ],
+    organs: ['ADRENALS', 'BRAIN', 'THYROID', 'REPRODUCTIVE'],
+    systems: ['neuro', 'endocrine', 'reproductive'],
+    mechanisms: ['CORTISOL_REDUCTION', 'GABA_RECEPTOR_AGONISM', 'THYROID_T3_INCREASE', 'TESTOSTERONE_SUPPORT'],
+    description: 'Ашваганда KSM-66 — адаптоген, снижающий кортизол на 30%, повышающий тестостерон, улучшающий сон.',
+    synergies: [
+      { with: 'magnesium', effect: 'Синергия кортизол/расслабление', mechanism: 'Максимальное снижение кортизола', severity: 'HIGH' },
+      { with: 'taurine', effect: 'Расслабление + кардиопротекция', mechanism: 'Снижение давления и кортизола', severity: 'MEDIUM' },
+    ],
+    conflicts: [
+      { with: 'thyroid_medication', effect: 'Усиление действия гормонов щитовидной', mechanism: 'Ашваганда повышает T3/T4', severity: 'MEDIUM' },
+    ],
+    monitoring: [
+      { what: 'Кортизол утренний', when: 'Каждые 8 нед', targetRange: '6-23 мкг/дл' },
+      { what: 'ТТГ', when: 'Каждые 12 нед', targetRange: '0.4-4.0 мМЕ/л' },
+    ],
+    contraindications: ['Гипертиреоз', 'Аутоиммунные заболевания (с осторожностью)'],
+    sideEffects: ['Сонливость в начале приёма', 'Редко: ЖК-дискомфорт'],
+    dosage: { mg: 600, timing: 'вечер (KSM-66)', form: 'KSM-66' },
+    bestForCourse: true,
+  },
+  vitamin_c: {
+    id: 'vitamin_c', name: 'Vitamin C', nameRu: 'Витамин C (Аскорбиновая кислота)',
+    tier: 'core', category: ['vitamin', 'antioxidant', 'immunomodulator'],
+    forms: [
+      { id: 'vitamin_c', name: 'Vitamin C 1000mg', nameRu: 'Витамин C 1000 мг', dose: '1000 мг натощак', best: true },
+      { id: 'VIT_C_LIP', name: 'Liposomal Vitamin C', nameRu: 'Липосомальный витамин C 1000 мг', dose: '1000 мг', best: false, notes: 'Лучшая биодоступность' },
+    ],
+    organs: ['IMMUNE_SYSTEM', 'SKIN', 'BLOOD', 'ADRENALS'],
+    systems: ['hematologic', 'hepatic', 'immune'],
+    mechanisms: ['COLLAGEN_SYNTHESIS', 'ANTIOXIDANT', 'IMMUNE_CELL_FUNCTION', 'IRON_ABSORPTION', 'GLUTATHIONE_REGENERATION'],
+    description: 'Витамин C — водорастворимый антиоксидант, необходимый для синтеза коллагена, иммунитета и регенерации глутатиона.',
+    synergies: [
+      { with: 'iron', effect: 'Усиление всасывания железа', mechanism: 'Витамин C восстанавливает Fe3+ в Fe2+', severity: 'HIGH' },
+      { with: 'zinc', effect: 'Улучшение всасывания цинка', mechanism: 'Витамин C усиливает абсорбцию', severity: 'MEDIUM' },
+      { with: 'collagen', effect: 'Синтез коллагена', mechanism: 'Витамин C — кофактор гидроксилирования пролина', severity: 'HIGH' },
+      { with: 'nac', effect: 'Регенерация глутатиона', mechanism: 'Витамин C восстанавливает окисленный глутатион', severity: 'HIGH' },
+    ],
+    conflicts: [
+      { with: 'copper', effect: 'Снижение меди при высоких дозах', mechanism: 'Высокие дозы вит. C истощают медь', severity: 'LOW' },
+    ],
+    monitoring: [],
+    contraindications: ['Гемохроматоз (с осторожностью)', 'Оксалатные камни почек'],
+    sideEffects: ['Диарея при дозах >2000 мг', 'Риск камней при склонности'],
+    dosage: { mg: 1000, timing: 'натощак', form: 'порошок/таблетки' },
+    bestForCourse: true,
+  },
+  taurine: {
+    id: 'taurine', name: 'Taurine', nameRu: 'Таурин',
+    tier: 'core', category: ['amino', 'cardioprotector', 'neuroprotector'],
+    forms: [
+      { id: 'taurine', name: 'Taurine 2000mg', nameRu: 'Таурин 2000 мг', dose: '2000 мг натощак', best: true },
+    ],
+    organs: ['HEART', 'BRAIN', 'LIVER', 'KIDNEYS'],
+    systems: ['cardio', 'neuro', 'hepatic', 'renal'],
+    mechanisms: ['OSMOREGULATION', 'ANTIOXIDANT', 'CALCIUM_REGULATION', 'GABA_RECEPTOR_MODULATION', 'BILE_ACID_CONJUGATION'],
+    description: 'Таурин — условно-заменимая аминокислота. Кардиопротектор, нейропротектор, антиоксидант. Снижает давление, улучшает сократимость миокарда.',
+    synergies: [
+      { with: 'magnesium', effect: 'Кардиопротекция и расслабление', mechanism: 'Таурин + Mg = максимальная защита сердца', severity: 'MEDIUM' },
+      { with: 'caffeine', effect: 'Сглаживание стимуляции', mechanism: 'Таурин уменьшает тревожность от кофеина', severity: 'LOW' },
+    ],
+    conflicts: [],
+    monitoring: [],
+    contraindications: ['Тяжёлая почечная недостаточность'],
+    sideEffects: ['Редко: диарея при высоких дозах'],
+    dosage: { mg: 2000, timing: 'натощак', form: 'порошок' },
+    bestForCourse: true,
+  },
+  alpha_lipoic: {
+    id: 'alpha_lipoic', name: 'Alpha-Lipoic Acid (R-ALA)', nameRu: 'АЛЬК R-форма',
+    tier: 'core', category: ['antioxidant', 'neuroprotector', 'metabolic'],
+    forms: [
+      { id: 'alpha_lipoic', name: 'R-ALA 300mg', nameRu: 'АЛЬК R-форма 300 мг', dose: '300 мг натощак', best: true },
+      { id: 'VIT_LIPOIC_R', name: 'R-Lipoic Acid 100mg', nameRu: 'R-липоевая кислота 100 мг', dose: '100 мг натощак', best: false, notes: 'R-форма более биодоступна' },
+    ],
+    organs: ['LIVER', 'BRAIN', 'NERVES', 'KIDNEYS'],
+    systems: ['neuro', 'hepatic', 'renal'],
+    mechanisms: ['ANTIOXIDANT_NETWORK', 'GLUTATHIONE_REGENERATION', 'MITOCHONDRIAL_FUNCTION', 'INSULIN_SENSITIVITY'],
+    description: 'АЛЬК R-форма — универсальный антиоксидант. Регенерирует витамин C, E и глутатион. Улучшает инсулиновую чувствительность и нейропатию.',
+    synergies: [
+      { with: 'nac', effect: 'Усиление антиоксидантной сети', mechanism: 'АЛЬК регенерирует глутатион и вит. C', severity: 'HIGH' },
+      { with: 'coq10', effect: 'Регенерация CoQ10', mechanism: 'АЛЬК восстанавливает окисленный CoQ10', severity: 'MEDIUM' },
+      { with: 'vitamin_c', effect: 'Регенерация витамина E', mechanism: 'АЛЬК → вит. C → вит. E', severity: 'MEDIUM' },
+    ],
+    conflicts: [
+        {with: "thyroid_drugs", effect: "Снижение T3", mechanism: "АЛЬК может снижать T3", severity: "MEDIUM"},
+      ],
+    monitoring: [],
+    contraindications: ['Тяжёлая почечная недостаточность', 'Беременность'],
+    sideEffects: ['Тошнота натощак', 'Редко: кожная сыпь', 'Редко: гипогликемия'],
+    dosage: { mg: 300, timing: 'натощак (R-форма)', form: 'R-форма' },
+    bestForCourse: true,
+  },
+  berberine: {
+    id: 'berberine', name: 'Berberine', nameRu: 'Берберин',
+    tier: 'core', category: ['antioxidant', 'metabolic', 'cardioprotector'],
+    forms: [
+      { id: 'berberine', name: 'Berberine HCl 500mg', nameRu: 'Берберин HCl 500 мг', dose: '500 мг с едой 2x/д', best: true },
+    ],
+    organs: ['LIVER', 'PANCREAS', 'INTESTINES', 'HEART'],
+    systems: ['endocrine', 'hepatic', 'cardio'],
+    mechanisms: ['AMPK_ACTIVATION', 'INSULIN_SENSITIVITY', 'CYP3A4_INHIBITION', 'NF_KB_INHIBITION', 'CHOLESTEROL_REDUCTION'],
+    description: 'Берберин — алкалоид с мощной АМПК-активацией. Снижает сахар и триглицериды. Ингибирует CYP3A4 — осторожно с лекарствами.',
+    synergies: [
+      { with: 'milk_thistle', effect: 'Гепатопротекция + метаболизм', mechanism: 'Разные механизмы защиты печени', severity: 'MEDIUM' },
+    ],
+    conflicts: [
+      { with: 'cyp3a4_substrates', effect: 'Взаимодействие с лекарствами', mechanism: 'Ингибирует CYP3A4', severity: 'HIGH' },
+    ],
+    monitoring: [
+      { what: 'Глюкоза натощак', when: 'Каждые 4 нед', targetRange: '3.9-5.5 ммоль/л' },
+      { what: 'АЛТ/АСТ', when: 'Каждые 6 нед', targetRange: '<40 Ед/л' },
+    ],
+    contraindications: ['Приём CYP3A4-субстратов', 'Беременность', 'Тяжёлая печёночная недостаточность'],
+    sideEffects: ['Запор', 'Тошнота при высоких дозах', 'Взаимодействие с лекарствами (CYP3A4)'],
+    dosage: { mg: 500, timing: 'с едой, 2x/д', form: 'HCl' },
+    bestForCourse: true,
+  },
+  vitamin_k2: {
+    id: 'vitamin_k2', name: 'Vitamin K2 (MK-7)', nameRu: 'Витамин K2 (МК-7)',
+    tier: 'core', category: ['vitamin', 'cardioprotector', 'bone'],
+    forms: [
+      { id: 'vitamin_k2', name: 'Vitamin K2 MK-7 200mcg', nameRu: 'Витамин K2 МК-7 200 мкг', dose: '200 мкг с едой', best: true },
+      { id: 'VIT_K2_MK4', name: 'Vitamin K2 MK-4 45mg', nameRu: 'Витамин K2 МК-4 45 мг', dose: '45 мг (частый приём)', best: false, notes: 'Короткий период полувыведения' },
+    ],
+    organs: ['BONES', 'HEART', 'VESSELS'],
+    systems: ['cardio', 'hematologic'],
+    mechanisms: ['OSTEOCALCIN_ACTIVATION', 'MATRIX_GLA_PROTEIN_ACTIVATION', 'CALCIUM_DISTRIBUTION'],
+    description: 'Витамин K2 (МК-7) — активатор остеокальцина и MGP. Направляет кальций из сосудов в кости. Критически важен с витамином D3.',
+    synergies: [
+      { with: 'vitamin_d3', effect: 'Направление Ca в кости', mechanism: 'D3 увеличивает всасывание Ca, K2 направляет в кости', severity: 'HIGH' },
+    ],
+    conflicts: [
+      { with: 'warfarin', effect: 'Антагонизм', mechanism: 'K2 конкурирует с варфарином', severity: 'HIGH' },
+    ],
+    monitoring: [],
+    contraindications: ['Приём варфарина/антикоагулянтов', 'Тромбофилия'],
+    sideEffects: ['Редко при передозировке'],
+    dosage: { mg: 200, timing: 'с едой (мкг)', form: 'МК-7' },
+    bestForCourse: true,
+  },
+  probiotics: {
+    id: 'probiotics', name: 'Probiotics', nameRu: 'Пробиотики',
+    tier: 'standard', category: ['probiotic', 'immunomodulator', 'hepatoprotector'],
+    forms: [
+      { id: 'probiotics', name: 'Multi-Strain Probiotic 20B CFU', nameRu: 'Мультиштаммовый пробиотик 20 млрд КОЕ', dose: '20 млрд КОЕ натощак', best: true },
+      { id: 'PRO_L_RHAMNOSUS', name: 'L. Rhamnosus GG', nameRu: 'Л. Рамнозус GG', dose: '10 млрд КОЕ', best: false },
+      { id: 'PRO_B_BIFIDUM', name: 'B. Bifidum', nameRu: 'Б. Бифидум', dose: '5 млрд КОЕ', best: false },
+      { id: 'PRO_SACCHAROMYCES', name: 'S. Boulardii', nameRu: 'С. Буларди', dose: '5 млрд КОЕ', best: false, notes: 'Дрожжевой пробиотик, не уничтожается антибиотиками' },
+    ],
+    organs: ['INTESTINES', 'LIVER', 'IMMUNE_SYSTEM'],
+    systems: ['hepatic', 'immune', 'hematologic'],
+    mechanisms: ['GUT_MICROBIOME_MODULATION', 'IMMUNE_REGULATION', 'GUT_BARRIER_INTEGRITY', 'SHORT_CHAIN_FATTY_ACID_PRODUCTION', 'PATHOGEN_EXCLUSION'],
+    description: 'Пробиотики — живые микроорганизмы, улучшающие микробиом кишечника. Укрепляют кишечный барьер, модулируют иммунитет, подавляют патогенную флору. Обязательны на курсе ААС.',
+    synergies: [
+      { with: 'prebiotics', effect: 'Синергия пребиотик + пробиотик', mechanism: 'Пребиотики обеспечивают питание для пробиотиков', severity: 'HIGH' },
+      { with: 'milk_thistle', effect: 'Кишечно-печёночная ось', mechanism: 'Пробиотики улучшают всасывание силимарина', severity: 'LOW' },
+      { with: 'vitamin_d3', effect: 'Усиление иммунитета', mechanism: 'Пробиотики + D3 = синергичная иммунная модуляция', severity: 'MEDIUM' },
+    ],
+    conflicts: [
+        {with: "antibiotic_drugs", effect: "Уничтожение пробиотиков", mechanism: "Антибиотики убивают штаммы", severity: "HIGH"},
+      ],
+    monitoring: [],
+    contraindications: ['Тяжёлый иммунодефицит', 'Центральный венозный катетер (риск бактериемии)'],
+    sideEffects: ['Вздутие в начале приёма', 'Редко: диарея', 'Редко: аллергия на штамм'],
+    dosage: { mg: 20, timing: 'натощак (млрд КОЕ)', form: 'капсулы' },
+    bestForCourse: true,
+  },
+  collagen: {
+    id: 'collagen', name: 'Collagen Hydrolysate', nameRu: 'Коллаген гидролизат',
+    tier: 'standard', category: ['amino', 'joint', 'beauty'],
+    forms: [
+      { id: 'collagen', name: 'Collagen Hydrolysate 10g', nameRu: 'Коллаген гидролизат 10 г', dose: '10 г с едой', best: true },
+      { id: 'AA_COLLAGEN_AMINO', name: 'Collagen Peptides', nameRu: 'Коллагеновые пептиды 10 г', dose: '10 г', best: false },
+    ],
+    organs: ['JOINTS', 'SKIN', 'BONES', 'MUSCLES'],
+    systems: ['musculoskeletal'],
+    mechanisms: ['COLLAGEN_SYNTHESIS', 'CARTILAGE_REPAIR', 'SKIN_ELASTICITY', 'TENDON_STRENGTH'],
+    description: 'Гидролизованный коллаген — источник аминокислот для восстановления хрящей, сухожилий и кожи. Синергичен с витамином C для синтеза нового коллагена.',
+    synergies: [
+      { with: 'vitamin_c', effect: 'Синтез коллагена', mechanism: 'Витамин C — кофактор гидроксилирования пролина в коллагене', severity: 'HIGH' },
+      { with: 'glucosamine', effect: 'Суставная синергия', mechanism: 'Коллаген + глюкозамин = восстановление хрящей', severity: 'MEDIUM' },
+      { with: 'msm', effect: 'Сера для коллагена', mechanism: 'MSM поставляет серу для дисульфидных связей', severity: 'MEDIUM' },
+    ],
+    conflicts: [],
+    monitoring: [],
+    contraindications: [],
+    sideEffects: ['Редко: тяжесть в желудке при приёме натощак'],
+    dosage: { mg: 10000, timing: 'с едой (мг, гидролизат)', form: 'гидролизат' },
+    bestForCourse: true,
+  },
+  glucosamine: {
+    id: 'glucosamine', name: 'Glucosamine', nameRu: 'Глюкозамин',
+    tier: 'standard', category: ['amino', 'joint'],
+    forms: [
+      { id: 'glucosamine', name: 'Glucosamine Sulfate 1500mg', nameRu: 'Глюкозамин сульфат 1500 мг', dose: '1500 мг с едой', best: true },
+    ],
+    organs: ['JOINTS', 'BONES'],
+    systems: ['musculoskeletal'],
+    mechanisms: ['CARTILAGE_REPAIR', 'SYNOVIAL_FLUID_PRODUCTION', 'ANTI_INFLAMMATORY'],
+    description: 'Глюкозамин — строительный блок хрящевой ткани. Улучшает продукцию синовиальной жидкости и замедляет дегенерацию суставов.',
+    synergies: [
+      { with: 'chondroitin', effect: 'Суставная синергия', mechanism: 'Глюкозамин строит хрящ, хондроитин удерживает воду', severity: 'HIGH' },
+      { with: 'msm', effect: 'Противовоспалительная синергия', mechanism: 'MSM снижает воспаление + глюкозамин восстанавливает хрящ', severity: 'MEDIUM' },
+      { with: 'collagen', effect: 'Восстановление суставов', mechanism: 'Коллаген + глюкозамин = полный набор для хряща', severity: 'MEDIUM' },
+    ],
+    conflicts: [
+        {with: "antidiabetic_drugs", effect: "Инсулинорезистентность", mechanism: "Глюкозамин может ухудшать", severity: "LOW"},
+      ],
+    monitoring: [],
+    contraindications: ['Аллергия на моллюсков (для хондроитина из моллюсков)', 'С осторожностью при диабете'],
+    sideEffects: ['Редко: дискомфорт в ЖКТ', 'Редко: аллергия'],
+    dosage: { mg: 1500, timing: 'с едой', form: 'сульфат' },
+    bestForCourse: false,
+  },
+  telmisartan: {
+    id: 'telmisartan', name: 'Telmisartan', nameRu: 'Тельмисартан',
+    tier: 'specialty', category: ['pharma', 'cardioprotector', 'metabolic'],
+    forms: [
+      { id: 'telmisartan', name: 'Telmisartan 40mg', nameRu: 'Тельмисартан 40 мг', dose: '40 мг утром (КАД контроль!)', best: true },
+    ],
+    organs: ['HEART', 'VESSELS', 'KIDNEYS'],
+    systems: ['cardio', 'renal', 'endocrine'],
+    mechanisms: ['ANGIOTENSIN_RECEPTOR_BLOCKADE', 'PPAR_GAMMA_ACTIVATION', 'BP_REDUCTION', 'RENOPROTECTION'],
+    description: 'Тельмисартан — сартан с уникальным PPAR-γ эффектом. Снижает давление, защищает почки, улучшает инсулиновую чувствительность. Препарат выбора на курсе ААС для контроля давления.',
+    synergies: [
+      { with: 'omega3', effect: 'Кардиопротекция', mechanism: 'Разные механизмы снижения давления и воспаления', severity: 'MEDIUM' },
+      { with: 'nebivolol', effect: 'Максимальный контроль давления и ЧСС', mechanism: 'Сартан + бета-блокатор = аддитивный эффект', severity: 'MEDIUM' },
+    ],
+    conflicts: [
+      { with: 'ace_inhibitors', effect: 'Риск гиперкалиемии', mechanism: 'Двойная блокада РААС', severity: 'HIGH' },
+      { with: 'potassium_supplements', effect: 'Гиперкалиемия', mechanism: 'Сартаны снижают экскрецию калия', severity: 'MEDIUM' },
+    ],
+    monitoring: [
+      { what: 'АД', when: 'Ежедневно', targetRange: '<130/85 мм рт.ст.' },
+      { what: 'Калий', when: 'Каждые 4 нед', targetRange: '3.5-5.0 ммоль/л' },
+      { what: 'Креатинин', when: 'Каждые 8 нед', targetRange: '<110 мкмоль/л' },
+    ],
+    contraindications: ['Беременность', 'Двусторонний стеноз почечных артерий', 'Тяжёлая печёночная недостаточность'],
+    sideEffects: ['Головокружение при первом приёме', 'Редко: гипотония', 'Гиперкалиемия при комбинировании с калийсберегающими'],
+    dosage: { mg: 40, timing: 'утро (КАД контроль!)', form: 'таблетки' },
+    bestForCourse: true,
+  },
+  nebivolol: {
+    id: 'nebivolol', name: 'Nebivolol', nameRu: 'Небиволол',
+    tier: 'specialty', category: ['pharma', 'cardioprotector'],
+    forms: [
+      { id: 'nebivolol', name: 'Nebivolol 5mg', nameRu: 'Небиволол 5 мг', dose: '5 мг утром (ЧСС контроль!)', best: true },
+    ],
+    organs: ['HEART', 'VESSELS'],
+    systems: ['cardio'],
+    mechanisms: ['BETA1_BLOCKADE', 'NO_RELEASE', 'HR_REDUCTION', 'BP_REDUCTION'],
+    description: 'Небиволол — кардиоселективный бета-блокатор с уникальным NO-модулирующим эффектом. Снижает ЧСС и давление, улучшает эндотелиальную функцию. Препарат выбора для контроля ЧСС на курсе ААС.',
+    synergies: [
+      { with: 'telmisartan', effect: 'Контроль давления и ЧСС', mechanism: 'Бета-блокатор + сартан = аддитивный эффект', severity: 'MEDIUM' },
+      { with: 'taurine', effect: 'Кардиопротекция', mechanism: 'Таурин + небиволол = максимальная защита миокарда', severity: 'LOW' },
+    ],
+    conflicts: [
+      { with: 'beta_agonists', effect: 'Антагонизм', mechanism: 'Бета-блокаторы блокируют бета-агонисты', severity: 'MEDIUM' },
+      { with: 'verapamil', effect: 'Риск брадикардии', mechanism: 'Аддитивное замедление AV-проводимости', severity: 'HIGH' },
+    ],
+    monitoring: [
+      { what: 'ЧСС', when: 'Ежедневно', targetRange: '55-70 уд/мин' },
+      { what: 'АД', when: 'Ежедневно', targetRange: '<130/85 мм рт.ст.' },
+    ],
+    contraindications: ['Бронхиальная астма (с осторожностью)', 'AV-блокада 2-3 степени', 'Брадикардия <50'],
+    sideEffects: ['Брадикардия', 'Усталость', 'Редко: эректильная дисфункция', 'Редко: бронхоспазм'],
+    dosage: { mg: 5, timing: 'утро (ЧСС контроль!)', form: 'таблетки' },
+    bestForCourse: true,
+  },
+
+
+
+
+
+  iron: {
+    id: 'iron', name: 'Iron', nameRu: 'Железо', tier: 'core',
+    category: ['mineral', 'hematologic'],
+    forms: [
+      { id: 'iron', name: 'Iron Bisglycinate', nameRu: 'Железо бисглицинат', dose: '18 мг натощак или с витамином С', best: true },
+      { id: 'MIN_IRON', name: 'Iron Chelate', nameRu: 'Железо хелат', dose: '25 мг натощак', best: false },
+      { id: 'BLOOD_IRON', name: 'Iron Complex', nameRu: 'Железо Комплекс', dose: '30 мг с витамином С', best: false },
+    ],
+    organs: ['BLOOD', 'LIVER', 'MUSCLES'],
+    systems: ['hematologic', 'hepatic', 'musculoskeletal'],
+    mechanisms: ['HEMOGLOBIN_SYNTHESIS', 'MYOGLOBIN_SYNTHESIS', 'OXYGEN_TRANSPORT', 'ENERGY_PRODUCTION'],
+    description: 'Железо — ключевой компонент гемоглобина и миоглобина. На курсе ААС предотвращает анемию. Бисглицинат — лучшая форма. Синергично с витамином С.',
+    synergies: [
+      { with: 'vitamin_c', effect: 'Усиление всасывания железа', mechanism: 'Витамин С восстанавливает Fe3+ в Fe2+, улучшает абсорбцию 3-6x', severity: 'HIGH' },
+      { with: 'copper', effect: 'Мобилизация железа из депо', mechanism: 'Медь через церулоплазмин обеспечивает транспорт железа', severity: 'MEDIUM' },
+      { with: 'folate', effect: 'Синергия кроветворения', mechanism: 'Железо + фолат — кофакторы эритропоэза', severity: 'MEDIUM' },
+    ],
+    conflicts: [
+      { with: 'zinc', effect: 'Конкуренция за всасывание', mechanism: 'Железо и цинк конкурируют за DMT1', severity: 'MEDIUM' },
+      { with: 'calcium', effect: 'Снижение всасывания железа', mechanism: 'Кальций блокирует транспорт железа, интервал 2 часа', severity: 'MEDIUM' },
+    ],
+    monitoring: [
+      { what: 'Ферритин', when: 'Каждые 8 нед', targetRange: '30-150 нг/мл' },
+      { what: 'Гемоглобин', when: 'Каждые 8 нед', targetRange: '>130 г/л' },
+    ],
+    contraindications: ['Гемохроматоз', 'Гемосидероз', 'Талассемия'],
+    sideEffects: ['Запор (при сульфате)', 'Тёмный стул (норма)', 'Тошнота натощак'],
+    dosage: { mg: 18, timing: 'натощак или с витамином С', form: 'бисглицинат железа (хелат)' },
+    bestForCourse: true,
+  },
+  copper: {
+    id: 'copper', name: 'Copper', nameRu: 'Медь', tier: 'standard',
+    category: ['mineral', 'antioxidant'],
+    forms: [
+      { id: 'copper', name: 'Copper Bisglycinate', nameRu: 'Медь бисглицинат', dose: '2 мг с едой', best: true },
+      { id: 'MIN_COPPER', name: 'Copper Chelate', nameRu: 'Медь хелат', dose: '2 мг с едой', best: false },
+    ],
+    organs: ['LIVER', 'BLOOD', 'BONES'],
+    systems: ['hepatic', 'hematologic', 'musculoskeletal'],
+    mechanisms: ['IRON_METABOLISM', 'CERULOPLASMIN', 'COLLAGEN_CROSS_LINKING', 'MELANIN_SYNTHESIS'],
+    description: 'Медь — кофактор церулоплазмина, критична для метаболизма железа и перекрёстных связей коллагена. На курсе ААС поддерживает кроветворение и прочность связок.',
+    synergies: [
+      { with: 'iron', effect: 'Мобилизация железа из депо', mechanism: 'Медь через церулоплазмин окисляет Fe2+ и обеспечивает транспорт', severity: 'HIGH' },
+    ],
+    conflicts: [
+      { with: 'zinc', effect: 'Конкуренция за всасывание', mechanism: 'Высокие дозы цинка индуцируют металлотионеин, связывающий медь', severity: 'HIGH' },
+    ],
+    monitoring: [
+      { what: 'Церулоплазмин', when: 'Каждые 12 нед', targetRange: '0.2-0.6 г/л' },
+      { what: 'Медь в крови', when: 'Каждые 12 нед', targetRange: '12-20 мкмоль/л' },
+    ],
+    contraindications: ['Болезнь Вильсона'],
+    sideEffects: ['Тошнота при высоких дозах', 'Вкус металла', 'Антагонизм с цинком'],
+    dosage: { mg: 2, timing: 'с едой', form: 'медь бисглицинат' },
+    bestForCourse: true,
+  },
+  vitamin_b12: {
+    id: 'vitamin_b12', name: 'Vitamin B12', nameRu: 'Витамин В12 (Кобаламин)', tier: 'core',
+    category: ['vitamin', 'hematologic'],
+    forms: [
+      { id: 'vitamin_b12', name: 'Methylcobalamin', nameRu: 'Метилкобаламин', dose: '1000 мкг с едой', best: true },
+      { id: 'VIT_B12_METHYL', name: 'Methylcobalamin Premium', nameRu: 'Метилкобаламин Премиум', dose: '5000 мкг сублингвально', best: false },
+      { id: 'VIT_B12_ADENO', name: 'Adenosylcobalamin', nameRu: 'Аденозилкобаламин', dose: '1000 мкг с едой', best: false },
+      { id: 'VIT_B12_HYDROXO', name: 'Hydroxocobalamin', nameRu: 'Гидроксокобаламин', dose: '1000 мкг с едой', best: false },
+      { id: 'VIT_B12_CYANO', name: 'Cyanocobalamin', nameRu: 'Цианокобаламин', dose: '1000 мкг с едой', best: false },
+    ],
+    organs: ['BLOOD', 'BRAIN', 'NERVES'],
+    systems: ['hematologic', 'neuro'],
+    mechanisms: ['METHYLATION', 'DNA_SYNTHESIS', 'MYELIN_SYNTHESIS', 'HOMOCYSTEINE_LOWERING'],
+    description: 'Витамин В12 (кобаламин) — ключевой кофактор метилирования, синтеза ДНК и миелина. Метилкобаламин — активная форма для метилирования. На курсе ААС критичен для кроветворения и профилактики нейропатии.',
+    synergies: [
+      { with: 'folate', effect: 'Синергия метилирования', mechanism: 'В12 + фолат — кофакторы метионинсинтазы и синтеза тимидилата', severity: 'HIGH' },
+      { with: 'vitamin_b6', effect: 'Снижение гомоцистеина', mechanism: 'В12 + В6 + фолат — тройная синергия метилирования', severity: 'HIGH' },
+      { with: 'iron', effect: 'Синергия эритропоэза', mechanism: 'В12 и железо — необходимые кофакторы продукции эритроцитов', severity: 'MEDIUM' },
+    ],
+    conflicts: [
+      { with: 'metformin', effect: 'Снижение всасывания В12', mechanism: 'Метформин блокирует рецептор кальция в подвздошной кишке, снижая абсорбцию В12 на 30%', severity: 'HIGH' },
+    ],
+    monitoring: [
+      { what: 'В12 в крови', when: 'Каждые 12 нед', targetRange: '>300 пг/мл' },
+      { what: 'Гомоцистеин', when: 'Каждые 8 нед', targetRange: '<15 мкмоль/л' },
+    ],
+    contraindications: ['Болезнь Лебера', 'Аллергия на кобальт'],
+    sideEffects: ['Редко: акне при высоких дозах', 'Маскировка фолат-дефицита'],
+    dosage: { mg: 1, timing: 'с едой или натощак (метилкобаламин)', form: 'метилкобаламин (сублингвальный)' },
+    bestForCourse: true,
+  },
+  potassium: {
+    id: 'potassium', name: 'Potassium', nameRu: 'Калий', tier: 'core',
+    category: ['mineral', 'cardioprotector'],
+    forms: [
+      { id: 'potassium', name: 'Potassium Citrate', nameRu: 'Калия цитрат', dose: '300 мг с едой 2x/д', best: true },
+      { id: 'MIN_POTASSIUM', name: 'Potassium Chloride', nameRu: 'Калия хлорид', dose: '300 мг с едой', best: false },
+    ],
+    organs: ['HEART', 'MUSCLES', 'KIDNEYS'],
+    systems: ['cardio', 'renal', 'metabolic'],
+    mechanisms: ['ELECTROLYTE_BALANCE', 'MUSCLE_CONTRACTION', 'HEART_RHYTHM', 'FLUID_REGULATION'],
+    description: 'Калий — ключевой внутриклеточный электролит, критичен для ритма сердца и мышечного сокращения. На курсе ААС компенсирует потери, особенно при использовании диуретиков.',
+    synergies: [
+      { with: 'magnesium', effect: 'Синергия электролитов', mechanism: 'Калий + магний — координация мембранного потенциала и ритма сердца', severity: 'HIGH' },
+    ],
+    conflicts: [
+      { with: 'ace_inhibitor_drugs', effect: 'Риск гиперкалиемии', mechanism: 'ИАПФ снижают экскрецию калия, дополнительный калий опасен', severity: 'HIGH' },
+    ],
+    monitoring: [
+      { what: 'Калий в сыворотке', when: 'Каждые 4 нед', targetRange: '3.5-5.0 ммоль/л' },
+    ],
+    contraindications: ['Гиперкалиемия', 'Почечная недостаточность'],
+    sideEffects: ['Тошнота', 'Диарея при высоких дозах', 'Риск аритмии при избытке'],
+    dosage: { mg: 300, timing: 'с едой 2x/д', form: 'цитрат калия' },
+    bestForCourse: true,
+  },
+  electrolyte_complex: {
+    id: 'electrolyte_complex', name: 'Electrolyte Complex', nameRu: 'Электролитный комплекс', tier: 'core',
+    category: ['mineral', 'cardioprotector'],
+    forms: [
+      { id: 'electrolyte_complex', name: 'Electrolyte Complex', nameRu: 'Электролитный комплекс (K+Mg+Ca+Na)', dose: '1 порция 2x/д с едой', best: true },
+    ],
+    organs: ['HEART', 'MUSCLES', 'KIDNEYS'],
+    systems: ['cardio', 'renal', 'metabolic'],
+    mechanisms: ['ELECTROLYTE_BALANCE', 'FLUID_REGULATION', 'MUSCLE_FUNCTION', 'HEART_RHYTHM'],
+    description: 'Комплекс электролитов (K, Na, Mg, Ca) — критичен на курсе ААС для поддержания ритма сердца, мышечной функции и гидратации. Особенно важен при диуретиках.',
+    synergies: [
+      { with: 'magnesium', effect: 'Максимальная кардиопротекция', mechanism: 'К+Mg — координация ритма сердца и мембранного потенциала', severity: 'HIGH' },
+      { with: 'taurine', effect: 'Усиление калий-натриевого насоса', mechanism: 'Таурин усиливает функцию Na+/K+-АТФазы', severity: 'MEDIUM' },
+    ],
+    conflicts: [
+      { with: 'ace_inhibitor_drugs', effect: 'Риск гиперкалиемии', mechanism: 'ИАПФ + калий — опасное повышение калия', severity: 'HIGH' },
+    ],
+    monitoring: [
+      { what: 'Калий', when: 'Каждые 4 нед', targetRange: '3.5-5.0 ммоль/л' },
+      { what: 'Магний', when: 'Каждые 4 нед', targetRange: '>0.75 ммоль/л' },
+    ],
+    contraindications: ['Гиперкалиемия', 'Почечная недостаточность'],
+    sideEffects: ['Редко: диарея при высоких дозах Mg'],
+    dosage: { mg: 1, timing: '2x/д с едой', form: 'электролитный комплекс (K+Mg+Ca+Na)' },
+    bestForCourse: true,
+  },
+  vitamin_b6: {
+    id: 'vitamin_b6', name: 'Vitamin B6', nameRu: 'Витамин В6 (Пиридоксин)', tier: 'core',
+    category: ['vitamin', 'neuroprotector'],
+    forms: [
+      { id: 'vitamin_b6', name: 'Pyridoxal-5-Phosphate', nameRu: 'Пиридоксаль-5-фосфат (P-5-P)', dose: '50 мг с едой', best: true },
+      { id: 'VIT_B6', name: 'Pyridoxine HCl', nameRu: 'Пиридоксин HCl', dose: '50 мг с едой', best: false },
+      { id: 'VIT_B6_P5P', name: 'P-5-P Premium', nameRu: 'P-5-P Премиум', dose: '50 мг натощак', best: false },
+    ],
+    organs: ['BRAIN', 'NERVES', 'LIVER'],
+    systems: ['neuro', 'hepatic', 'hematologic'],
+    mechanisms: ['PLP_COENZYME', 'AMINO_ACID_METABOLISM', 'NEUROTRANSMITTER_SYNTHESIS', 'HOMOCYSTEINE_LOWERING'],
+    description: 'Пиридоксаль-5-фосфат — активная форма В6, кофермент 140+ реакций. Ключевой для метаболизма аминокислот, синтеза нейромедиаторов и снижения гомоцистеина. На курсе ААС критичен для профилактики нейропатии. P-5-P предпочтительнее пиридоксина.',
+    synergies: [
+      { with: 'magnesium', effect: 'Синергия нервной системы', mechanism: 'В6 активирует P-5-P, магний — кофактор 300+ ферментов', severity: 'HIGH' },
+      { with: 'folate', effect: 'Снижение гомоцистеина', mechanism: 'В6 + фолат + В12 — тройная синергия', severity: 'HIGH' },
+    ],
+    conflicts: [
+      { with: 'levodopa', effect: 'Снижение эффективности леводопы', mechanism: 'В6 ускоряет декарбоксилирование на периферии', severity: 'HIGH' },
+    ],
+    monitoring: [
+      { what: 'Гомоцистеин', when: 'Каждые 8 нед', targetRange: '<15 мкмоль/л' },
+    ],
+    contraindications: ['Болезнь Паркинсона (при приёме леводопы)'],
+    sideEffects: ['При дозах >200 мг/д — нейропатия', 'Фотосенсибилизация'],
+    dosage: { mg: 50, timing: 'с едой (P-5-P) или натощак', form: 'пиридоксаль-5-фосфат (P-5-P)' },
+    bestForCourse: true,
+  },
+  vitamin_a: {
+    id: 'vitamin_a',
+    name: 'Vitamin A',
+    nameRu: 'Витамин А (Ретинол)',
+    tier: 'standard',
+    category: ['vitamin', 'antioxidant'],
+    forms: [
+      { id: 'vitamin_a', name: 'Vitamin A', nameRu: 'Ретинола пальмитат 10000 МЕ', dose: '1 мг', best: true },
+      { id: 'vitamin_a_2', name: 'Vitamin A', nameRu: 'Бета-каротин 25000 МЕ', dose: '1 мг', best: false }
+    ],
+    organs: ['EYES', 'SKIN', 'IMMUNE_SYSTEM'],
+    systems: ['neuro', 'endocrine'],
+    mechanisms: ['RETINOID_RECEPTOR', 'VISION_CYCLE', 'IMMUNE_MODULATION', 'EPITHELIAL_MAINTENANCE'],
+    description: 'Ретинол — жирорастворимый витамин, критичный для зрения и иммунитета. На курсе ААС помогает кожным проблемам.',
+    synergies: [
+      { with: "zinc", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "vitamin_a", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "astaxanthin", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "lutein", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "anthocyanins", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "antioxidant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "peptide_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "brand_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "vitamin_d3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Витамин А в крови', when: 'Каждые 8 нед', targetRange: '0.3-0.8 мкг/мл' }
+    ],
+    contraindications: ['Беременность (тератогенность)', 'Гипервитаминоз А'],
+    sideEffects: ['Тошнота при избытке', 'Сухость кожи', 'Головная боль при передозировке'],
+    dosage: { mg: 1, timing: 'с едой (жирорастворимый)', form: 'капсулы ретинола пальмитат' },
+    bestForCourse: false,
+  },
+  vitamin_b1: {
+    id: 'vitamin_b1',
+    name: 'Vitamin B1',
+    nameRu: 'Витамин В1 (Тиамин)',
+    tier: 'standard',
+    category: ['vitamin', 'neuroprotector'],
+    forms: [
+      { id: 'vitamin_b1', name: 'Vitamin B1', nameRu: 'Тиамин HCl 100 мг', dose: '100 мг 2x/д', best: true },
+      { id: 'vitamin_b1_2', name: 'Vitamin B1', nameRu: 'Бенфотиамин 150 мг', dose: '100 мг', best: false }
+    ],
+    organs: ['BRAIN', 'NERVES', 'HEART'],
+    systems: ['neuro', 'cardio'],
+    mechanisms: ['THIAMINE_PYROPHOSPHATE', 'GLUCOSE_METABOLISM', 'NERVE_CONDUCTION', 'ENERGY_PRODUCTION'],
+    description: 'Тиамин — кофермент пируватдегидрогеназы. Критичен для метаболизма глюкозы и нервной проводимости. Дефицит на курсе ведёт к нейропатии.',
+    synergies: [
+      { with: "vitamin_b1", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Тиамин в крови', when: 'Каждые 12 нед', targetRange: '>70 нмоль/л' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: аллергия при в/в введении', 'При высоких дозах — бессонница'],
+    dosage: { mg: 100, timing: 'утро с едой', form: 'тиамин или бенфотиамин' },
+    bestForCourse: false,
+  },
+  vitamin_b2: {
+    id: 'vitamin_b2',
+    name: 'Vitamin B2',
+    nameRu: 'Витамин В2 (Рибофлавин)',
+    tier: 'standard',
+    category: ['vitamin', 'antioxidant'],
+    forms: [
+      { id: 'vitamin_b2', name: 'Vitamin B2', nameRu: 'Рибофлавин 10 мг', dose: '10 мг', best: true },
+      { id: 'vitamin_b2_2', name: 'Vitamin B2', nameRu: 'R-5-P (Рибофлавин-5-фосфат) 10 мг', dose: '10 мг', best: false }
+    ],
+    organs: ['EYES', 'SKIN', 'LIVER'],
+    systems: ['hepatic', 'neuro'],
+    mechanisms: ['FAD_COENZYME', 'ELECTRON_TRANSPORT', 'GLUTATHIONE_RECYCLING', 'IRON_ABSORPTION'],
+    description: 'Рибофлавин — предшественник FAD и FMN. Участвует в рециклинге глутатиона и метаболизме железа.',
+    synergies: [
+      { with: "vitamin_b2", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Рибофлавин в моче', when: 'Каждые 12 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Окрашивание мочи в жёлтый', 'Редко: зуд кожи'],
+    dosage: { mg: 10, timing: 'с едой', form: 'рибофлавин или R-5-P' },
+    bestForCourse: false,
+  },
+  vitamin_b3: {
+    id: 'vitamin_b3',
+    name: 'Vitamin B3',
+    nameRu: 'Витамин В3 (Ниацин)',
+    tier: 'standard',
+    category: ['vitamin', 'cardioprotector', 'metabolic'],
+    forms: [
+      { id: 'vitamin_b3', name: 'Vitamin B3', nameRu: 'Ниацин 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'vitamin_b3_2', name: 'Vitamin B3', nameRu: 'Ниацинамид 500 мг', dose: '500 мг', best: false }
+    ],
+    organs: ['LIVER', 'HEART', 'VESSELS', 'SKIN'],
+    systems: ['cardio', 'hepatic', 'endocrine'],
+    mechanisms: ['NAD_PRECURSOR', 'LIPID_LOWERING', 'VASODILATION', 'CHOLESTEROL_MODULATION'],
+    description: 'Ниацин — предшественник NAD+, снижает ЛПНП и ТГ, повышает ЛПВП. На курсе ААС помогает контролировать липидный профиль.',
+    synergies: [
+      { with: "vitamin_b3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "pterostilbene", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+        {with: "statin_drugs", effect: "Риск миопатии", mechanism: "Ниацин + статины — мышцы", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед', targetRange: 'ЛПНП<3.0 ЛПВП>1.0' }
+    ],
+    contraindications: ['Подагра', 'Язвенная болезнь', 'Декомпенсированный диабет'],
+    sideEffects: ['Флаш (покраснение кожи)', 'Зуд', 'Повышение глюкозы', 'Повышение мочевой кислоты'],
+    dosage: { mg: 500, timing: 'с едой', form: 'ниацин или ниацинамид' },
+    bestForCourse: true,
+  },
+  vitamin_b5: {
+    id: 'vitamin_b5',
+    name: 'Vitamin B5',
+    nameRu: 'Витамин В5 (Пантотеновая к-та)',
+    tier: 'standard',
+    category: ['vitamin', 'metabolic'],
+    forms: [
+      { id: 'vitamin_b5', name: 'Vitamin B5', nameRu: 'Пантотенат кальция 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'vitamin_b5_2', name: 'Vitamin B5', nameRu: 'Пантетин 300 мг', dose: '500 мг', best: false }
+    ],
+    organs: ['ADRENALS', 'SKIN', 'LIVER'],
+    systems: ['endocrine', 'hepatic'],
+    mechanisms: ['COENZYME_A_SYNTHESIS', 'ACETYLATION', 'STEROIDOGENESIS', 'WOUND_HEALING'],
+    description: 'Пантотеновая кислота — предшественник Коэнзима А, критичного для стероидогенеза. Поддерживает надпочечники.',
+    synergies: [
+      { with: "vitamin_b5", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Кортизол утром', when: 'Каждые 8 нед', targetRange: '6-23 мкг/дл' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: диарея при высоких дозах'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'пантотенат или пантетин' },
+    bestForCourse: false,
+  },
+  biotin: {
+    id: 'biotin',
+    name: 'Biotin',
+    nameRu: 'Биотин (Витамин В7)',
+    tier: 'standard',
+    category: ['vitamin', 'metabolic'],
+    forms: [
+      { id: 'biotin', name: 'Biotin', nameRu: 'Биотин 5000 мкг', dose: '5 мг', best: true },
+      { id: 'biotin_2', name: 'Biotin', nameRu: 'Биотин 10000 мкг', dose: '5 мг', best: false }
+    ],
+    organs: ['SKIN', 'MUSCLES'],
+    systems: ['endocrine', 'metabolic'],
+    mechanisms: ['CARBOXYLASE_COENZYME', 'KERATIN_SYNTHESIS', 'GLUCONEOGENESIS', 'FATTY_ACID_SYNTHESIS'],
+    description: 'Биотин — кофермент карбоксилаз, критичен для синтеза кератина. На курсе ААС поддерживает кожу и волосы.',
+    synergies: [
+      { with: "biotin", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Биотин в крови', when: 'Каждые 12 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: акне при высоких дозах', 'Мешает лабораторным тестам'],
+    dosage: { mg: 5, timing: 'с едой', form: 'биотин капсулы' },
+    bestForCourse: false,
+  },
+  folate: {
+    id: 'folate',
+    name: 'Folate',
+    nameRu: 'Фолат (Витамин В9)',
+    tier: 'core',
+    category: ['vitamin', 'hematologic'],
+    forms: [
+      { id: 'folate', name: 'Folate', nameRu: 'Метилфолат (5-MTHF) 800 мкг', dose: '800 мкг', best: true },
+      { id: 'folate_2', name: 'Folate', nameRu: 'Фолиевая кислота 400 мкг', dose: '800 мкг', best: false },
+      { id: 'folate_3', name: 'Folate', nameRu: 'Фолиновая кислота 400 мкг', dose: '800 мкг', best: false }
+    ],
+    organs: ['LIVER', 'BLOOD', 'BRAIN'],
+    systems: ['hematologic', 'hepatic', 'neuro'],
+    mechanisms: ['METHYLATION', 'DNA_SYNTHESIS', 'HOMOCYSTEINE_LOWERING', 'RED_BLOOD_CELL_PRODUCTION'],
+    description: 'Фолат — ключевой витамин для метилирования и синтеза ДНК. Метилфолат предпочтительнее фолиевой кислоты. На курсе ААС критичен для профилактики анемии.',
+    synergies: [
+      { with: "vitamin_b12", effect: "В12 + Фолат — синергия метилирования и эритропоэза", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "betaine", effect: "Бетаин + Фолат — метилирование", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "folate", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "immunosuppressant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "anticonvulsant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Гомоцистеин', when: 'Каждые 8 нед', targetRange: '<15 мкмоль/л' },
+      { what: 'Фолат в крови', when: 'Каждые 12 нед', targetRange: '>10 нмоль/л' }
+    ],
+    contraindications: ['В12-дефицитная анемия (маскировка)', 'Эпилепсия (с осторожностью)'],
+    sideEffects: ['Редко: аллергия', 'Маскировка В12-дефицита без В12'],
+    dosage: { mg: 0.8, timing: 'с едой', form: 'метилфолат (5-MTHF)' },
+    bestForCourse: true,
+  },
+  vitamin_e: {
+    id: 'vitamin_e',
+    name: 'Vitamin E',
+    nameRu: 'Витамин Е (Токоферол)',
+    tier: 'standard',
+    category: ['vitamin', 'antioxidant'],
+    forms: [
+      { id: 'vitamin_e', name: 'Vitamin E', nameRu: 'Смешанные токоферолы 400 МЕ', dose: '200 мг 2x/д', best: true },
+      { id: 'vitamin_e_2', name: 'Vitamin E', nameRu: 'd-Альфа-токоферол 200 МЕ', dose: '200 мг', best: false },
+      { id: 'vitamin_e_3', name: 'Vitamin E', nameRu: 'Токотриенолы 100 мг', dose: '200 мг', best: false }
+    ],
+    organs: ['HEART', 'VESSELS', 'SKIN', 'LIVER'],
+    systems: ['cardio', 'hepatic'],
+    mechanisms: ['LIPID_PEROXIDATION_INHIBITION', 'MEMBRANE_STABILIZATION', 'IMMUNE_MODULATION', 'ANTIATHEROGENIC'],
+    description: 'Витамин Е — главный жирорастворимый антиоксидант. На курсе ААС защищает сердце и печень от окислительного стресса.',
+    synergies: [
+      { with: "vitamin_e", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega3", effect: "Витамин Е защищает Омега-3 от перекисного окисления", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "astaxanthin", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Усиление антикоагуляции", mechanism: "E снижает агрегацию тромбоцитов", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Витамин Е в крови', when: 'Каждые 12 нед', targetRange: '12-46 мкмоль/л' }
+    ],
+    contraindications: ['Приём антикоагулянтов', 'Дефицит витамина К'],
+    sideEffects: ['При высоких дозах — кровоточивость', 'Взаимодействие с антикоагулянтами'],
+    dosage: { mg: 200, timing: 'с едой (жирорастворимый)', form: 'смешанные токоферолы' },
+    bestForCourse: true,
+  },
+  vitamin_b_complex: {
+    id: 'vitamin_b_complex',
+    name: 'Vitamin B Complex',
+    nameRu: 'Витамин В-Комплекс',
+    tier: 'standard',
+    category: ['vitamin', 'metabolic', 'neuroprotector'],
+    forms: [
+      { id: 'vitamin_b_complex', name: 'Vitamin B Complex', nameRu: 'B-50 Комплекс', dose: '50 мг', best: true },
+      { id: 'vitamin_b_complex_2', name: 'Vitamin B Complex', nameRu: 'B-100 Комплекс', dose: '50 мг', best: false }
+    ],
+    organs: ['BRAIN', 'LIVER', 'NERVES'],
+    systems: ['neuro', 'hepatic', 'hematologic'],
+    mechanisms: ['B_VITAMIN_SYNERGY', 'METHYLATION_SUPPORT', 'ENERGY_PRODUCTION', 'NEUROTRANSMITTER_SYNTHESIS'],
+    description: 'Комплекс витаминов группы В — синергетическая формула для нервной системы и метилирования. На курсе ААС компенсирует возросшую потребность.',
+    synergies: [
+      { with: "vitamin_b_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Гомоцистеин', when: 'Каждые 8 нед', targetRange: '<15 мкмоль/л' }
+    ],
+    contraindications: [],
+    sideEffects: ['Окрашивание мочи (В2)', 'Тошнота натощак', 'При высоких дозах B6 — нейропатия'],
+    dosage: { mg: 50, timing: 'утро с едой', form: 'капсулы B-50 или B-100' },
+    bestForCourse: true,
+  },
+  inositol: {
+    id: 'inositol',
+    name: 'Inositol',
+    nameRu: 'Инозитол (Мио-инозитол)',
+    tier: 'advanced',
+    category: ['metabolic', 'hormonal'],
+    forms: [
+      { id: 'inositol', name: 'Inositol', nameRu: 'Мио-инозитол 2000 мг', dose: '2 г 2x/д', best: true },
+      { id: 'inositol_2', name: 'Inositol', nameRu: 'Смесь мио/D-хиро-инозитол 40:1', dose: '2 г', best: false }
+    ],
+    organs: ['BRAIN', 'LIVER', 'REPRODUCTIVE'],
+    systems: ['neuro', 'endocrine', 'reproductive'],
+    mechanisms: ['INSULIN_SIGNALING', 'SEROTONIN_MODULATION', 'LIPID_SIGNALING', 'OOCYTE_MATURATION'],
+    description: 'Инозитол — второй мессенджер инсулина и серотонина. Улучшает чувствительность к инсулину. На курсе поддерживает инсулиновую чувствительность.',
+    synergies: [
+        {with: "vitamin_b_complex", effect: "Сигнальные пути", mechanism: "Инозитол — вторичный мессенджер", severity: "MEDIUM"},
+        {with: "choline", effect: "Фосфолипидный обмен", mechanism: "Оба — фосфатидилинозитол", severity: "MEDIUM"},
+        {with: "folic_acid", effect: "Репродуктивное здоровье", mechanism: "Инозитол + фолат — СПКЯ", severity: "HIGH"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Инсулин натощак', when: 'Каждые 8 нед', targetRange: '<12 мкЕд/мл' }
+    ],
+    contraindications: ['Беременность (с осторожностью)'],
+    sideEffects: ['Редко: диарея при высоких дозах', 'Метеоризм'],
+    dosage: { mg: 2000, timing: '2x/д с едой', form: 'мио-инозитол или смесь 40:1' },
+    bestForCourse: false,
+  },
+  betaine: {
+    id: 'betaine',
+    name: 'Betaine',
+    nameRu: 'Бетаин (Триметилглицин)',
+    tier: 'advanced',
+    category: ['metabolic', 'hepatoprotector'],
+    forms: [
+      { id: 'betaine', name: 'Betaine', nameRu: 'Бетаин HCl 3 г', dose: '3 г 2x/д', best: true },
+      { id: 'betaine_2', name: 'Betaine', nameRu: 'Безводный бетаин (ТМГ) 3 г', dose: '3 г', best: false }
+    ],
+    organs: ['LIVER', 'HEART'],
+    systems: ['hepatic', 'cardio', 'metabolic'],
+    mechanisms: ['METHYL_DONATION', 'HOMOCYSTEINE_LOWERING', 'OSMOPROTECTION', 'LIPID_REDUCTION'],
+    description: 'Бетаин — донор метильных групп, снижает гомоцистеин и защищает печень. На курсе ААС поддерживает метилирование.',
+    synergies: [
+      { with: "folate", effect: "Бетаин + Фолат — метилирование", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "betaine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Гомоцистеин', when: 'Каждые 8 нед', targetRange: '<15 мкмоль/л' },
+      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' }
+    ],
+    contraindications: ['Тяжёлая почечная недостаточность'],
+    sideEffects: ['Диарея при высоких дозах', 'Тошнота'],
+    dosage: { mg: 3000, timing: 'с едой 2x/д', form: 'бетаин HCl или безводный бетаин' },
+    bestForCourse: false,
+  },
+  pqq: {
+    id: 'pqq',
+    name: 'PQQ',
+    nameRu: 'Пирролохинолинхинон (PQQ)',
+    tier: 'advanced',
+    category: ['antioxidant', 'neuroprotector'],
+    forms: [
+      { id: 'pqq', name: 'PQQ', nameRu: 'PQQ 20 мг', dose: '20 мг', best: true },
+      { id: 'pqq_2', name: 'PQQ', nameRu: 'PQQ + CoQ10 комплекс', dose: '20 мг', best: false }
+    ],
+    organs: ['BRAIN', 'HEART'],
+    systems: ['neuro', 'cardio', 'metabolic'],
+    mechanisms: ['MITOCHONDRIAL_BIOGENESIS', 'ANTIOXIDANT', 'NGF_STIMULATION', 'ENERGY_PRODUCTION'],
+    description: 'PQQ — редокс-кофактор, стимулирует биогенез митохондрий через PGC-1a. Синергичен с CoQ10.',
+    synergies: [
+      { with: "coq10", effect: "PQQ + КоКю10 — митохондриальный биогенез", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Энергия/усталость', when: 'Субъективно каждые 4 нед' }
+    ],
+    contraindications: ['Беременность', 'Аутоиммунные заболевания (с осторожностью)'],
+    sideEffects: ['Редко: бессонница при приёме вечером', 'Головная боль'],
+    dosage: { mg: 20, timing: 'утро с едой', form: 'PQQ динатриевая соль' },
+    bestForCourse: false,
+  },
+  vitamin_complex: {
+    id: 'vitamin_complex',
+    name: 'Vitamin Complex',
+    nameRu: 'Витаминный комплекс',
+    tier: 'standard',
+    category: ['vitamin', 'metabolic'],
+    forms: [
+      { id: 'vitamin_complex', name: 'Vitamin Complex', nameRu: 'Мультивитаминный комплекс для мужчин', dose: '1 мг', best: true },
+      { id: 'vitamin_complex_2', name: 'Vitamin Complex', nameRu: 'Мультивитаминный комплекс спорт', dose: '1 мг', best: false }
+    ],
+    organs: ['LIVER', 'BRAIN', 'IMMUNE_SYSTEM'],
+    systems: ['hepatic', 'neuro', 'immune', 'metabolic'],
+    mechanisms: ['MICRONUTRIENT_REPLETION', 'COFACTOR_SUPPORT', 'ANTIOXIDANT_NETWORK', 'METHYLATION'],
+    description: 'Мультивитаминный комплекс — базовая добавка для покрытия дефицитов. На курсе ААС потребность в витаминах возрастает на 30-50%.',
+    synergies: [
+        {with: "mineral_complex", effect: "Полное покрытие микронутриентов", mechanism: "Витамины + минералы — кофакторы", severity: "HIGH"},
+        {with: "omega3", effect: "Базовая поддержка", mechanism: "Жирорастворимые нужны омега-3", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'ОАК', when: 'Каждые 8 нед' },
+      { what: 'Ферритин', when: 'Каждые 12 нед', targetRange: '30-150 нг/мл' }
+    ],
+    contraindications: ['Гипервитаминоз А или D', 'Гемохроматоз (формы с железом)'],
+    sideEffects: ['Окрашивание мочи (В2)', 'Тошнота натощак'],
+    dosage: { mg: 1, timing: 'утро с едой', form: 'капсулы мультивитаминов' },
+    bestForCourse: true,
+  },
+  pterostilbene: {
+    id: 'pterostilbene',
+    name: 'Pterostilbene',
+    nameRu: 'Птеростильбен',
+    tier: 'advanced',
+    category: ['antioxidant', 'cardioprotector'],
+    forms: [
+      { id: 'pterostilbene', name: 'Pterostilbene', nameRu: 'Птеростильбен 250 мг', dose: '250 мг 2x/д', best: true },
+      { id: 'pterostilbene_2', name: 'Pterostilbene', nameRu: 'Птеростильбен + Ресвератрол комплекс', dose: '250 мг', best: false }
+    ],
+    organs: ['HEART', 'BRAIN', 'LIVER'],
+    systems: ['cardio', 'neuro', 'hepatic'],
+    mechanisms: ['SIRT1_ACTIVATION', 'ANTIOXIDANT', 'LIPID_LOWERING', 'ANTI_INFLAMMATORY'],
+    description: 'Птеростильбен — диметиловый аналог ресвератрола с биодоступностью 80%. Активирует SIRT1, снижает холестерин.',
+    synergies: [
+      { with: "vitamin_b3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед', targetRange: 'ЛПНП<3.0' }
+    ],
+    contraindications: ['Приём антикоагулянтов (с осторожностью)'],
+    sideEffects: ['Редко: диарея', 'Головная боль при высоких дозах'],
+    dosage: { mg: 250, timing: 'утро с едой', form: 'птеростильбен капсулы' },
+    bestForCourse: false,
+  },
+  saw_palmetto: {
+    id: 'saw_palmetto',
+    name: 'Saw Palmetto',
+    nameRu: 'Сереноа ползучая (Пальметто)',
+    tier: 'advanced',
+    category: ['herb', 'hormonal'],
+    forms: [
+      { id: 'saw_palmetto', name: 'Saw Palmetto', nameRu: 'Экстракт сереноа 320 мг', dose: '320 мг 2x/д', best: true },
+      { id: 'saw_palmetto_2', name: 'Saw Palmetto', nameRu: 'Сереноа + Цинк комплекс', dose: '320 мг', best: false }
+    ],
+    organs: ['PROSTATE', 'REPRODUCTIVE'],
+    systems: ['reproductive', 'endocrine'],
+    mechanisms: ['5AR_INHIBITION', 'DHT_REDUCTION', 'PROSTATE_SHRINKAGE', 'ANTI_ANDROGENIC'],
+    description: 'Сереноа — ингибитор 5-альфа-редуктазы, снижает DHT локально в простате. На курсе ААС защищает простату от гипертрофии.',
+    synergies: [
+      { with: "vitamin_b6", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "saw_palmetto", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+        {with: "hormonal_therapy", effect: "Взаимодействие с гормонами", mechanism: "Может влиять на гормональный баланс", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'ПСА', when: 'Каждые 12 нед', targetRange: '<4 нг/мл' },
+      { what: 'Свободный тестостерон', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Рак простаты (может маскировать ПСА)'],
+    sideEffects: ['Редко: снижение либидо', 'Редко: желудочный дискомфорт'],
+    dosage: { mg: 320, timing: 'с едой 2x/д', form: 'экстракт сереноа 85-95% жирных кислот' },
+    bestForCourse: true,
+  },
+  hcg: {
+    id: 'hcg',
+    name: 'HCG',
+    nameRu: 'ХГЧ (Хорионический гонадотропин)',
+    tier: 'specialty',
+    category: ['peptide', 'hormonal'],
+    forms: [
+      { id: 'hcg', name: 'HCG', nameRu: 'ХГЧ 5000 МЕ', dose: '500 МЕ 2р/нед', best: true },
+      { id: 'hcg_2', name: 'HCG', nameRu: 'ХГЧ 10000 МЕ', dose: '500 МЕ 2р/нед', best: false }
+    ],
+    organs: ['REPRODUCTIVE', 'TESTES'],
+    systems: ['reproductive', 'endocrine'],
+    mechanisms: ['LH_MIMIC', 'TESTOSTERONE_PRODUCTION', 'SPERMATOGENESIS_RESTORE', 'TESTICULAR_VOLUME_PRESERVATION'],
+    description: 'ХГЧ — мимик ЛГ, стимулирует клетки Лейдига к продукции тестостерона. Стандартная схема: 500 МЕ 2 раза в неделю, 3 недели приема, 1 неделя отдыха (3/1).',
+    synergies: [
+      { with: "testosterone", effect: "ХГЧ + Тестостерон — восстановление оси ГРГ-ЛГ", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+        {with: "aromatase_inhibitor", effect: "Десенситизация", mechanism: "Высокие дозы ХГЧ (>1000 МЕ)", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Тестостерон общий', when: 'Каждые 4 нед', targetRange: '12-33 нмоль/л' },
+      { what: 'Эстрадиол', when: 'Каждые 4 нед', targetRange: '<200 пмоль/л' }
+    ],
+    contraindications: ['Рак яичек', 'Рак простаты', 'Гинекомастия в анамнезе'],
+    sideEffects: ['Гинекомастия (без ИА)', 'Задержка жидкости', 'Повышение эстрадиола'],
+    dosage: { mg: 500, timing: '2x/нед, схема 3/1 (3 нед приема, 1 нед отдых)', form: 'ХГЧ лиофилизат (реконструкция)' },
+    bestForCourse: true,
+  },
+  l_carnitine: {
+    id: 'l_carnitine',
+    name: 'L-Carnitine',
+    nameRu: 'Л-Карнитин',
+    tier: 'standard',
+    category: ['amino', 'metabolic', 'cardioprotector'],
+    forms: [
+      { id: 'l_carnitine', name: 'L-Carnitine', nameRu: 'Л-Карнитин тартрат 1000 мг', dose: '2 г 2x/д', best: true },
+      { id: 'l_carnitine_2', name: 'L-Carnitine', nameRu: 'Ацетил-Л-Карнитин 500 мг', dose: '2 г', best: false },
+      { id: 'l_carnitine_3', name: 'L-Carnitine', nameRu: 'Пропионил-Л-Карнитин 500 мг', dose: '2 г', best: false }
+    ],
+    organs: ['HEART', 'MUSCLES', 'LIVER'],
+    systems: ['cardio', 'metabolic', 'hepatic'],
+    mechanisms: ['FATTY_ACID_TRANSPORT', 'MITOCHONDRIAL_BETA_OXIDATION', 'ENERGY_PRODUCTION', 'CARDIAC_FUEL'],
+    description: 'Л-Карнитин — транспортировщик жирных кислот в митохондрии. АЛК дополнительно повышает ацетилхолин. На курсе — кардиопротектор.',
+    synergies: [
+      { with: "caffeine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "alpha_lipoic", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "lions_mane", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "thyroid_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'ТМАО', when: 'Каждые 12 нед', targetRange: '<5 мкмоль/л' },
+      { what: 'Липидограмма', when: 'Каждые 8 нед', targetRange: 'ТГ<1.7 ммоль/л' }
+    ],
+    contraindications: ['Эпилепсия (с осторожностью)', 'Гипотиреоз (с осторожностью)'],
+    sideEffects: ['Рыбный запах тела при высоких дозах', 'Тошнота натощак'],
+    dosage: { mg: 2000, timing: 'натощак, 30 мин до тренировки', form: 'Л-карнитин тартрат или АЛК' },
+    bestForCourse: true,
+  },
+  phosphatidylcholine: {
+    id: 'phosphatidylcholine',
+    name: 'Phosphatidylcholine',
+    nameRu: 'Фосфатидилхолин (Лецитин/PPC)',
+    tier: 'core',
+    category: ['hepatoprotector', 'neuroprotector'],
+    forms: [
+      { id: 'phosphatidylcholine', name: 'Phosphatidylcholine', nameRu: 'PPC (Эссенциале) 1200 мг', dose: '1.2 г 2x/д', best: true },
+      { id: 'phosphatidylcholine_2', name: 'Phosphatidylcholine', nameRu: 'Лецитин 1200 мг', dose: '1.2 г', best: false },
+      { id: 'phosphatidylcholine_3', name: 'Phosphatidylcholine', nameRu: 'Альфа-GPC 300 мг', dose: '1.2 г', best: false }
+    ],
+    organs: ['LIVER', 'BRAIN'],
+    systems: ['hepatic', 'neuro'],
+    mechanisms: ['MEMBRANE_SYNTHESIS', 'BILE_FLOW', 'LIPID_TRANSPORT', 'ACETYLCHOLINE_PRECURSOR'],
+    description: 'Фосфатидилхолин — главный компонент мембран и желчи. В форме PPC защищает печень от жировой инфильтрации. На курсе — препарат выбора для гепатопротекции.',
+    synergies: [
+      { with: "huperzine_a", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega3", effect: "Фосфатидилхолин + Омега-3 — фосфолипиды мозга", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "antipsychotic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
+      { what: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<50 Ед/л' },
+      { what: 'УЗИ печени', when: 'Каждые 12 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Диарея при высоких дозах', 'Редко: тошнота'],
+    dosage: { mg: 1200, timing: 'с едой 2x/д', form: 'PPC (полиенилфосфатидилхолин) или лецитин' },
+    bestForCourse: true,
+  },
+  prebiotics: {
+    id: 'prebiotics',
+    name: 'Prebiotics',
+    nameRu: 'Пребиотики',
+    tier: 'standard',
+    category: ['probiotic', 'gut'],
+    forms: [
+      { id: 'prebiotics', name: 'Prebiotics', nameRu: 'Пребиотический комплекс 5 г', dose: '5 г 2x/д', best: true },
+      { id: 'prebiotics_2', name: 'Prebiotics', nameRu: 'Инулин 5 г', dose: '5 г', best: false },
+      { id: 'prebiotics_3', name: 'Prebiotics', nameRu: 'ФОС 3 г', dose: '5 г', best: false }
+    ],
+    organs: ['INTESTINES'],
+    systems: ['hepatic', 'immune', 'metabolic'],
+    mechanisms: ['PROBIOTIC_GROWTH', 'SHORT_CHAIN_FATTY_ACID_PRODUCTION', 'GUT_BARRIER_INTEGRITY', 'IMMUNE_MODULATION'],
+    description: 'Пребиотики — неперевариваемые пищевые волокна, питающие полезную микрофлору. На курсе ААС поддерживают микробиом.',
+    synergies: [
+      { with: "probiotics", effect: "Синбиотик — пребиотики питают пробиотики", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "pharma_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "colloidal_minerals", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Калпротектин', when: 'Каждые 8 нед', targetRange: '<50 мкг/г' }
+    ],
+    contraindications: ['SIBO', 'FODMAP-непереносимость'],
+    sideEffects: ['Метеоризм при начале', 'Диарея при высоких дозах'],
+    dosage: { mg: 5000, timing: 'с едой, начать с 2-3 г', form: 'порошок пребиотического комплекса' },
+    bestForCourse: true,
+  },
+  glutamine: {
+    id: 'glutamine',
+    name: 'Glutamine',
+    nameRu: 'Глутамин (Л-Глутамин)',
+    tier: 'standard',
+    category: ['amino', 'gut', 'immune'],
+    forms: [
+      { id: 'glutamine', name: 'Glutamine', nameRu: 'Л-Глутамин 5 г', dose: '5 г 2x/д', best: true },
+      { id: 'glutamine_2', name: 'Glutamine', nameRu: 'Глутамин Премиум 5 г', dose: '5 г', best: false },
+      { id: 'glutamine_3', name: 'Glutamine', nameRu: 'Аланил-глутамин 5 г', dose: '5 г', best: false }
+    ],
+    organs: ['INTESTINES', 'IMMUNE_SYSTEM', 'MUSCLES'],
+    systems: ['immune', 'hepatic', 'metabolic'],
+    mechanisms: ['INTESTINAL_CELL_FUEL', 'IMMUNE_CELL_PROLIFERATION', 'GLUTATHIONE_PRECURSOR', 'NITROGEN_TRANSPORT'],
+    description: 'Глутамин — условно-незаменимая аминокислота, топливо для энтероцитов. Предшественник глутатиона. На курсе поддерживает кишечный барьер и иммунитет.',
+    synergies: [
+        {with: "probiotics", effect: "Здоровье кишечника", mechanism: "Глутамин — топливо энтероцитов", severity: "HIGH"},
+        {with: "vitamin_c", effect: "Иммунитет кишечника", mechanism: "Оба поддерживают иммунитет слизистых", severity: "MEDIUM"},
+        {with: "zinc_carnosine", effect: "Заживление ЖКТ", mechanism: "Оба восстанавливают барьер", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Глутамин в плазме', when: 'Каждые 12 нед', targetRange: '500-900 мкмоль/л' }
+    ],
+    contraindications: ['Тяжёлая печёночная недостаточность'],
+    sideEffects: ['Метеоризм при высоких дозах', 'Диарея при >15 г/д'],
+    dosage: { mg: 5000, timing: 'натощак или после тренировки', form: 'Л-глутамин порошок' },
+    bestForCourse: true,
+  },
+  molybdenum: {
+    id: 'molybdenum',
+    name: 'Molybdenum',
+    nameRu: 'Молибден',
+    tier: 'advanced',
+    category: ['mineral', 'metabolic'],
+    forms: [
+      { id: 'molybdenum', name: 'Molybdenum', nameRu: 'Молибден 100 мкг', dose: '100 мкг', best: true },
+      { id: 'molybdenum_2', name: 'Molybdenum', nameRu: 'Молибден 200 мкг', dose: '100 мкг', best: false }
+    ],
+    organs: ['LIVER', 'KIDNEYS'],
+    systems: ['hepatic', 'renal', 'metabolic'],
+    mechanisms: ['SULFITE_OXIDASE', 'XANTHINE_OXIDASE', 'DETOXIFICATION'],
+    description: 'Молибден — кофактор сульфитоксидазы и ксантиноксидазы, критичен для детоксикации сульфитов.',
+    synergies: [
+        {with: "sulfur_compounds", effect: "Метаболизм сульфитов", mechanism: "Молибден — кофактор сульфитоксидазы", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "copper", effect: "Конкуренция", mechanism: "Высокие дозы Молибден снижают Cu", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Мочевая кислота', when: 'Каждые 12 нед', targetRange: '<420 мкмоль/л' }
+    ],
+    contraindications: ['Молибденовая подагра (редко)'],
+    sideEffects: ['Тошнота'],
+    dosage: { mg: 0.1, timing: 'с едой', form: 'молибден цитрат' },
+    bestForCourse: false,
+  },
+  boron: {
+    id: 'boron',
+    name: 'Boron',
+    nameRu: 'Бор',
+    tier: 'advanced',
+    category: ['mineral', 'hormonal'],
+    forms: [
+      { id: 'boron', name: 'Boron', nameRu: 'Бор цитрат 3 мг', dose: '3 мг', best: true },
+      { id: 'boron_2', name: 'Boron', nameRu: 'Бор глицинат 3 мг', dose: '3 мг', best: false }
+    ],
+    organs: ['BONES', 'REPRODUCTIVE'],
+    systems: ['endocrine', 'musculoskeletal'],
+    mechanisms: ['BONE_MINERALIZATION', 'FREE_TESTOSTERONE_INCREASE', 'VITAMIN_D_ACTIVATION', 'ESTROGEN_MODULATION'],
+    description: 'Бор — следовой минерал, повышает свободный тестостерон и активирует витамин D. На курсе ААС поддерживает костную ткань.',
+    synergies: [
+      { with: "zinc", effect: "Бор + Цинк — свободный тестостерон", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Свободный тестостерон', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: тошнота при высоких дозах'],
+    dosage: { mg: 3, timing: 'с едой', form: 'бор цитрат или глицинат' },
+    bestForCourse: false,
+  },
+  silicon: {
+    id: 'silicon',
+    name: 'Silicon',
+    nameRu: 'Кремний',
+    tier: 'advanced',
+    category: ['mineral', 'joint'],
+    forms: [
+      { id: 'silicon', name: 'Silicon', nameRu: 'Ортокремниевая кислота 10 мг', dose: '10 мг', best: true },
+      { id: 'silicon_2', name: 'Silicon', nameRu: 'Экстракт хвоща 10 мг', dose: '10 мг', best: false }
+    ],
+    organs: ['BONES', 'JOINTS', 'SKIN'],
+    systems: ['musculoskeletal'],
+    mechanisms: ['COLLAGEN_SYNTHESIS', 'BONE_MINERALIZATION', 'CONNECTIVE_TISSUE', 'CARTILAGE_FORMATION'],
+    description: 'Кремний — важен для синтеза коллагена и минерализации костей. На курсе ААС поддерживает соединительную ткань.',
+    synergies: [
+      { with: "silicon", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "calcium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "glycine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Костная плотность', when: 'Каждые 12 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: диарея при высоких дозах'],
+    dosage: { mg: 10, timing: 'с едой', form: 'ортокремниевая кислота или экстракт хвоща' },
+    bestForCourse: false,
+  },
+  calcium: {
+    id: 'calcium',
+    name: 'Calcium',
+    nameRu: 'Кальций',
+    tier: 'standard',
+    category: ['mineral', 'bone'],
+    forms: [
+      { id: 'calcium', name: 'Calcium', nameRu: 'Цитрат кальция 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'calcium_2', name: 'Calcium', nameRu: 'Карбонат кальция 500 мг', dose: '500 мг', best: false }
+    ],
+    organs: ['BONES', 'MUSCLES', 'HEART'],
+    systems: ['musculoskeletal', 'cardio', 'hematologic'],
+    mechanisms: ['BONE_MINERALIZATION', 'MUSCLE_CONTRACTION', 'BLOOD_CLOTTING', 'NERVE_SIGNALING'],
+    description: 'Кальций — основной минерал костной ткани. На курсе ААС поддерживает плотность костей, особенно при ИА.',
+    synergies: [
+      { with: "vitamin_d3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "vitamin_k2", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "sulforaphane", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "silicon", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "calcium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "glycine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "diuretic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "iron", effect: "Кальций блокирует всасывание железа", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "magnesium", effect: "Избыток кальция блокирует магний", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "ppi_drugs", effect: "ИПП снижают всасывание кальция", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "magnesium", effect: "Избыток кальция блокирует магний", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "iron", effect: "Кальций блокирует всасывание железа", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "diuretic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'Кальций общий', when: 'Каждые 12 нед', targetRange: '2.1-2.6 ммоль/л' }
+    ],
+    contraindications: ['Гиперкальциемия', 'Камни в почках (с осторожностью)'],
+    sideEffects: ['Запор при карбонате', 'Риск камней в почках при избытке'],
+    dosage: { mg: 500, timing: 'с едой (2x/д)', form: 'цитрат или карбонат кальция' },
+    bestForCourse: true,
+  },
+  sodium: {
+    id: 'sodium',
+    name: 'Sodium',
+    nameRu: 'Натрий',
+    tier: 'standard',
+    category: ['mineral', 'electrolyte'],
+    forms: [
+      { id: 'sodium', name: 'Sodium', nameRu: 'Натрия цитрат 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'sodium_2', name: 'Sodium', nameRu: 'Натрия хлорид 500 мг', dose: '500 мг', best: false }
+    ],
+    organs: ['KIDNEYS', 'HEART', 'MUSCLES'],
+    systems: ['renal', 'cardio', 'metabolic'],
+    mechanisms: ['ELECTROLYTE_BALANCE', 'FLUID_REGULATION', 'BLOOD_PRESSURE', 'NERVE_SIGNALING'],
+    description: 'Натрий — основной внеклеточный электролит. На курсе ААС важен для электролитного баланса.',
+    synergies: [
+        {with: "potassium", effect: "Электролитный баланс", mechanism: "Натрий/Калий насос — основа клетки", severity: "HIGH"},
+        {with: "magnesium", effect: "Нервно-мышечная проводимость", mechanism: "Оба — критичные электролиты", severity: "MEDIUM"},
+      ],
+    conflicts: [
+      { with: "lithium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "magnesium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Натрий в сыворотке', when: 'Каждые 4 нед', targetRange: '135-145 ммоль/л' }
+    ],
+    contraindications: ['Гипертоническая болезнь (ограничить)'],
+    sideEffects: ['Отёки при избытке', 'Повышение давления при избытке'],
+    dosage: { mg: 500, timing: 'с едой', form: 'натрия хлорид или цитрат' },
+    bestForCourse: false,
+  },
+  manganese: {
+    id: 'manganese',
+    name: 'Manganese',
+    nameRu: 'Марганец',
+    tier: 'advanced',
+    category: ['mineral', 'metabolic'],
+    forms: [
+      { id: 'manganese', name: 'Manganese', nameRu: 'Марганца глицинат 5 мг', dose: '5 мг', best: true },
+      { id: 'manganese_2', name: 'Manganese', nameRu: 'Марганца цитрат 5 мг', dose: '5 мг', best: false }
+    ],
+    organs: ['BONES', 'LIVER', 'JOINTS'],
+    systems: ['hepatic', 'musculoskeletal', 'metabolic'],
+    mechanisms: ['SOD_MITOCHONDRIAL', 'BONE_FORMATION', 'GLUCONEOGENESIS', 'COLLAGEN_SYNTHESIS'],
+    description: 'Марганец — кофактор митохондриальной СОД. На курсе ААС защищает суставы.',
+    synergies: [
+        {with: "glucosamine", effect: "Синтез хряща", mechanism: "Марганец — кофактор гликозилтрансфераз", severity: "MEDIUM"},
+        {with: "chondroitin", effect: "Структура хряща", mechanism: "Марганец — кофактор синтеза ГАГ", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "iron", effect: "Конкуренция за всасывание", mechanism: "Оба используют DMT1", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Марганец в крови', when: 'Каждые 12 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: нейротоксичность при высоких дозах'],
+    dosage: { mg: 5, timing: 'с едой', form: 'марганца глицинат' },
+    bestForCourse: false,
+  },
+  iodine: {
+    id: 'iodine',
+    name: 'Iodine',
+    nameRu: 'Йод',
+    tier: 'standard',
+    category: ['mineral', 'hormonal'],
+    forms: [
+      { id: 'iodine', name: 'Iodine', nameRu: 'Йодид калия 150 мкг', dose: '150 мкг', best: true },
+      { id: 'iodine_2', name: 'Iodine', nameRu: 'Ламинария 150 мкг', dose: '150 мкг', best: false }
+    ],
+    organs: ['THYROID', 'REPRODUCTIVE'],
+    systems: ['endocrine', 'reproductive'],
+    mechanisms: ['THYROID_HORMONE_SYNTHESIS', 'ENERGY_METABOLISM', 'BRAIN_DEVELOPMENT', 'ESTROGEN_METABOLISM'],
+    description: 'Йод — ключевой элемент синтеза тиреоидных гормонов. На курсе ААС поддерживает функцию щитовидной железы.',
+    synergies: [
+      { with: "selenium", effect: "Йод + Селен — щитовидная железа", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "thyroid_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "lithium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "antithyroid_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'ТТГ', when: 'Каждые 8 нед', targetRange: '0.4-4.0 мЕд/л' },
+      { what: 'Т3 свободный', when: 'Каждые 8 нед', targetRange: '2.3-6.5 пмоль/л' }
+    ],
+    contraindications: ['Гипертиреоз', 'Тиреотоксикоз'],
+    sideEffects: ['Акне при высоких дозах', 'Йод-индуцированный гипертиреоз (редко)'],
+    dosage: { mg: 0.15, timing: 'с едой', form: 'йодид калия или ламинария' },
+    bestForCourse: false,
+  },
+  lithium: {
+    id: 'lithium',
+    name: 'Lithium',
+    nameRu: 'Литий (микродозы)',
+    tier: 'specialty',
+    category: ['mineral', 'neuroprotector'],
+    forms: [
+      { id: 'lithium', name: 'Lithium', nameRu: 'Оротат лития 1 мг', dose: '1 мг', best: true },
+      { id: 'lithium_2', name: 'Lithium', nameRu: 'Аспартат лития 1 мг', dose: '1 мг', best: false }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['MOOD_STABILIZATION', 'NEUROPROTECTION', 'GSK3_INHIBITION', 'BDNF_INCREASE'],
+    description: 'Литий в микродозах — нейропротектор, стабилизирует настроение через ингибирование GSK-3b и повышение BDNF.',
+    synergies: [
+        {with: "omega3", effect: "Нейропротекция", mechanism: "Оба поддерживают мозг", severity: "MEDIUM"},
+        {with: "vitamin_b_complex", effect: "Стабильность настроения", mechanism: "Литий + B — нейротрансмиттеры", severity: "MEDIUM"},
+      ],
+    conflicts: [
+      { with: "sodium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "nsaid_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "iodine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "magnesium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Литий в крови', when: 'Каждые 12 нед', targetRange: '<0.6 ммоль/л (микродозы)' }
+    ],
+    contraindications: ['Болезнь почек', 'Дегидратация'],
+    sideEffects: ['Редко побочные в микродозах', 'При превышении — тремор', ' полиурия'],
+    dosage: { mg: 1, timing: 'утро', form: 'оротат лития или аспартат' },
+    bestForCourse: false,
+  },
+  vanadium: {
+    id: 'vanadium',
+    name: 'Vanadium',
+    nameRu: 'Ванадий',
+    tier: 'specialty',
+    category: ['mineral', 'metabolic'],
+    forms: [
+      { id: 'vanadium', name: 'Vanadium', nameRu: 'Ванадила сульфат 100 мкг', dose: '100 мкг', best: true },
+      { id: 'vanadium_2', name: 'Vanadium', nameRu: 'BMV (бис-мальтолатооксо-ванадий) 100 мкг', dose: '100 мкг', best: false }
+    ],
+    organs: ['LIVER', 'PANCREAS', 'MUSCLES'],
+    systems: ['hepatic', 'endocrine', 'metabolic'],
+    mechanisms: ['INSULIN_MIMETIC', 'GLUCONEOGENESIS_INHIBITION', 'GLYCOGEN_SYNTHESIS', 'PTP_INHIBITION'],
+    description: 'Ванадий — инсулиномиметик. На курсе ААС поддерживает углеводный обмен.',
+    synergies: [
+        {with: "chromium", effect: "Метаболизм глюкозы", mechanism: "Оба имитируют инсулин", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Глюкоза натощак', when: 'Каждые 4 нед', targetRange: '<6.1 ммоль/л' }
+    ],
+    contraindications: ['Беременность', 'Кормление грудью'],
+    sideEffects: ['Тошнота', 'Зелёный стул (ванадила сульфат)'],
+    dosage: { mg: 0.1, timing: 'с едой', form: 'ванадила сульфат или BMV' },
+    bestForCourse: false,
+  },
+  phosphorus: {
+    id: 'phosphorus',
+    name: 'Phosphorus',
+    nameRu: 'Фосфор',
+    tier: 'standard',
+    category: ['mineral', 'bone'],
+    forms: [
+      { id: 'phosphorus', name: 'Phosphorus', nameRu: 'Дикальцийфосфат 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'phosphorus_2', name: 'Phosphorus', nameRu: 'Фосфат калия 500 мг', dose: '500 мг', best: false }
+    ],
+    organs: ['BONES', 'KIDNEYS', 'MUSCLES'],
+    systems: ['musculoskeletal', 'renal', 'metabolic'],
+    mechanisms: ['BONE_MINERALIZATION', 'ATP_SYNTHESIS', 'PHOSPHOLIPID_SYNTHESIS', 'ENERGY_PRODUCTION'],
+    description: 'Фосфор — ключевой компонент костей и АТФ. На курсе ААС поддерживает костную ткань.',
+    synergies: [
+        {with: "calcium", effect: "Костная минерализация", mechanism: "Кальций:Фосфор = 2:1 для костей", severity: "HIGH"},
+        {with: "vitamin_d3", effect: "Всасывание фосфора", mechanism: "Витамин D3 регулирует фосфатный транспорт", severity: "MEDIUM"},
+      ],
+    conflicts: [
+      { with: "magnesium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Фосфор в крови', when: 'Каждые 12 нед', targetRange: '0.8-1.5 ммоль/л' }
+    ],
+    contraindications: ['Гиперфосфатемия', 'Почечная недостаточность'],
+    sideEffects: ['Редко: диарея при высоких дозах'],
+    dosage: { mg: 500, timing: 'с едой', form: 'дикальцийфосфат или фосфат калия' },
+    bestForCourse: false,
+  },
+  msm: {
+    id: 'msm',
+    name: 'MSM',
+    nameRu: 'МСМ (Метилсульфонилметан)',
+    tier: 'advanced',
+    category: ['joint', 'antiinflammatory'],
+    forms: [
+      { id: 'msm', name: 'MSM', nameRu: 'МСМ 1500 мг', dose: '1.5 г 2x/д', best: true },
+      { id: 'msm_2', name: 'MSM', nameRu: 'МСМ порошок 3 г', dose: '1.5 г', best: false }
+    ],
+    organs: ['JOINTS', 'SKIN', 'MUSCLES'],
+    systems: ['musculoskeletal'],
+    mechanisms: ['SULFUR_DONOR', 'COLLAGEN_SYNTHESIS', 'ANTI_INFLAMMATORY', 'GLUCOSAMINE_POTENTIATION'],
+    description: 'МСМ — органическая сера, донор сульфидных групп для синтеза коллагена. Синергичен с глюкозамином. На курсе защищает суставы.',
+    synergies: [
+      { with: "glucosamine", effect: "Глюкозамин + МСМ — сера для хряща + строительный блок", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Боль в суставах', when: 'Субъективно каждые 2 нед' }
+    ],
+    contraindications: ['Аллергия на серу (редко)'],
+    sideEffects: ['Редко: тошнота', 'Диарея при высоких дозах'],
+    dosage: { mg: 1500, timing: 'с едой 2x/д', form: 'МСМ капсулы или порошок' },
+    bestForCourse: false,
+  },
+  trace_minerals: {
+    id: 'trace_minerals',
+    name: 'Trace Minerals',
+    nameRu: 'Комплекс микроэлементов',
+    tier: 'standard',
+    category: ['mineral', 'metabolic'],
+    forms: [
+      { id: 'trace_minerals', name: 'Trace Minerals', nameRu: 'Хелатный комплекс микроэлементов', dose: '1 мг', best: true },
+      { id: 'trace_minerals_2', name: 'Trace Minerals', nameRu: 'Коллоидные минералы', dose: '1 мг', best: false }
+    ],
+    organs: ['LIVER', 'IMMUNE_SYSTEM'],
+    systems: ['hepatic', 'immune', 'metabolic'],
+    mechanisms: ['ENZYME_COFACTOR', 'IMMUNE_FUNCTION', 'ANTIOXIDANT_DEFENSE', 'HORMONE_SYNTHESIS'],
+    description: 'Комплекс микроэлементов (Se, Mn, Mo, Cr, V, B, Si) — обеспечивает работу 300+ ферментов.',
+    synergies: [
+        {with: "vitamin_complex", effect: "Полный спектр", mechanism: "Следовые элементы — кофакторы", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Микроэлементы в волосах', when: 'Каждые 12 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: тошнота натощак'],
+    dosage: { mg: 1, timing: 'с едой', form: 'хелатный комплекс микроэлементов' },
+    bestForCourse: false,
+  },
+  chromium: {
+    id: 'chromium',
+    name: 'Chromium',
+    nameRu: 'Хром',
+    tier: 'standard',
+    category: ['mineral', 'metabolic'],
+    forms: [
+      { id: 'chromium', name: 'Chromium', nameRu: 'Хрома пиколинат 200 мкг', dose: '200 мкг', best: true },
+      { id: 'chromium_2', name: 'Chromium', nameRu: 'Хром хелат 200 мкг', dose: '200 мкг', best: false }
+    ],
+    organs: ['PANCREAS', 'MUSCLES', 'LIVER'],
+    systems: ['endocrine', 'metabolic'],
+    mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_METABOLISM', 'GLYCOGEN_SYNTHESIS', 'LIPID_METABOLISM'],
+    description: 'Хром — усиливает действие инсулина через хромодулин. На курсе ААС поддерживает инсулиновую чувствительность.',
+    synergies: [
+        {with: "vitamin_b3", effect: "Метаболизм глюкозы", mechanism: "Хром + ниацин — толерантность к глюкозе", severity: "MEDIUM"},
+        {with: "vanadium", effect: "Инсулиноподобная активность", mechanism: "Оба усиливают инсулин", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Глюкоза натощак', when: 'Каждые 8 нед', targetRange: '<6.1 ммоль/л' },
+      { what: 'Инсулин натощак', when: 'Каждые 8 нед', targetRange: '<12 мкЕд/мл' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: тошнота', 'Головная боль при высоких дозах'],
+    dosage: { mg: 0.2, timing: 'с едой', form: 'хрома пиколинат или хелат' },
+    bestForCourse: false,
+  },
+  colloidal_minerals: {
+    id: 'colloidal_minerals',
+    name: 'Colloidal Minerals',
+    nameRu: 'Коллоидные минералы',
+    tier: 'advanced',
+    category: ['mineral', 'metabolic'],
+    forms: [
+      { id: 'colloidal_minerals', name: 'Colloidal Minerals', nameRu: 'Коллоидные минералы жидкие', dose: '15 мг', best: true },
+      { id: 'colloidal_minerals_2', name: 'Colloidal Minerals', nameRu: 'Коллоидные минералы + витамины', dose: '15 мг', best: false }
+    ],
+    organs: ['BONES', 'LIVER', 'KIDNEYS'],
+    systems: ['hepatic', 'renal', 'musculoskeletal'],
+    mechanisms: ['MINERAL_REPLETION', 'ENZYME_ACTIVATION', 'PH_BALANCE', 'ELECTROLYTE_SUPPORT'],
+    description: 'Коллоидные минералы — жидкая форма 70+ микроэлементов с высокой биодоступностью.',
+    synergies: [
+        {with: "vitamin_complex", effect: "Полный минеральный спектр", mechanism: "Коллоидные минералы — наноразмерные", severity: "MEDIUM"},
+      ],
+    conflicts: [
+      { with: "prebiotics", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "ppi_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "magnesium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Общий минеральный статус', when: 'Каждые 12 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Металлический привкус', 'Редко: тошнота'],
+    dosage: { mg: 15, timing: 'натощак', form: 'коллоидная жидкая форма' },
+    bestForCourse: false,
+  },
+  strontium: {
+    id: 'strontium',
+    name: 'Strontium',
+    nameRu: 'Стронций',
+    tier: 'specialty',
+    category: ['mineral', 'bone'],
+    forms: [
+      { id: 'strontium', name: 'Strontium', nameRu: 'Стронция ренелат 680 мг', dose: '680 мкг', best: true },
+      { id: 'strontium_2', name: 'Strontium', nameRu: 'Стронция цитрат 340 мг', dose: '680 мкг', best: false }
+    ],
+    organs: ['BONES'],
+    systems: ['musculoskeletal'],
+    mechanisms: ['BONE_FORMATION', 'OSTEOCLAST_INHIBITION', 'CALCIUM_ABSORPTION', 'BONE_MINERAL_DENSITY'],
+    description: 'Стронций (ренелат) — увеличивает костное формирование и подавляет резорбцию.',
+    synergies: [
+        {with: "vitamin_d3", effect: "Костная плотность", mechanism: "Стронций замещает Ca, Витамин D3 — всасывание", severity: "MEDIUM"},
+        {with: "vitamin_k2", effect: "Правильная минерализация", mechanism: "Витамин K2 направляет минералы в кости", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "calcium", effect: "Конкуренция за всасывание", mechanism: "Принимать в разное время", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Денситометрия', when: 'Каждые 12 мес' },
+      { what: 'Кальций', when: 'Каждые 12 нед', targetRange: '2.1-2.6 ммоль/л' }
+    ],
+    contraindications: ['Тяжёлая почечная недостаточность', 'Венозная тромбоэмболия'],
+    sideEffects: ['Тошнота', 'Диарея', 'Редко: сыпь'],
+    dosage: { mg: 0.68, timing: 'на ночь (отдельно от Ca)', form: 'стронция ренелат' },
+    bestForCourse: false,
+  },
+  omega6: {
+    id: 'omega6',
+    name: 'Omega-6',
+    nameRu: 'Омега-6 (GLA)',
+    tier: 'standard',
+    category: ['fatty_acid', 'antiinflammatory'],
+    forms: [
+      { id: 'omega6', name: 'Omega-6', nameRu: 'Масло энотеры 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'omega6_2', name: 'Omega-6', nameRu: 'Масло бурачника 500 мг', dose: '500 мг', best: false }
+    ],
+    organs: ['SKIN', 'REPRODUCTIVE'],
+    systems: ['endocrine', 'reproductive'],
+    mechanisms: ['GLA_ANTI_INFLAMMATORY', 'PROSTAGLANDIN_BALANCE', 'SKIN_BARRIER', 'HORMONE_REGULATION'],
+    description: 'Омега-6 (гамма-линоленовая кислота) — из энотеры и бурачника. Противовоспалительная через PGE1.',
+    synergies: [
+      { with: "omega6", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+        {with: "omega3_excess", effect: "Нарушение баланса ЖК", mechanism: "Избыток омега-6 = воспаление", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Кожные покровы', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: диарея', 'Рыбная отрыжка'],
+    dosage: { mg: 500, timing: 'с едой', form: 'масло энотеры или бурачника' },
+    bestForCourse: false,
+  },
+  omega7: {
+    id: 'omega7',
+    name: 'Omega-7',
+    nameRu: 'Омега-7 (Пальмитолеиновая к-та)',
+    tier: 'advanced',
+    category: ['fatty_acid', 'metabolic'],
+    forms: [
+      { id: 'omega7', name: 'Omega-7', nameRu: 'Масло облепихи 250 мг', dose: '250 мг 2x/д', best: true },
+      { id: 'omega7_2', name: 'Omega-7', nameRu: 'Пальмитолеат 250 мг', dose: '250 мг', best: false }
+    ],
+    organs: ['SKIN', 'MUCOSA', 'LIVER'],
+    systems: ['hepatic', 'metabolic'],
+    mechanisms: ['MUCOSA_PROTECTION', 'LIPID_METABOLISM', 'SKIN_BARRIER', 'INSULIN_SENSITIVITY'],
+    description: 'Омега-7 — из облепихи. Защищает слизистые и кожу. На курсе ААС — поддержка слизистых ЖКТ.',
+    synergies: [
+        {with: "omega3", effect: "Комплексная ЖК поддержка", mechanism: "Омега-7 — слизистые, омега-3 — воспаление", severity: "MEDIUM"},
+        {with: "probiotics", effect: "Здоровье слизистых", mechanism: "Оба поддерживают кишечный барьер", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Кожа/слизистые', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: диарея'],
+    dosage: { mg: 250, timing: 'с едой', form: 'масло облепихи или пальмитолеат' },
+    bestForCourse: false,
+  },
+  omega9: {
+    id: 'omega9',
+    name: 'Omega-9',
+    nameRu: 'Омега-9 (Олеиновая к-та)',
+    tier: 'standard',
+    category: ['fatty_acid', 'cardioprotector'],
+    forms: [
+      { id: 'omega9', name: 'Omega-9', nameRu: 'Оливковое масло 1 ст.л.', dose: '1 мг', best: true },
+      { id: 'omega9_2', name: 'Omega-9', nameRu: 'Авокадо масло 1 ст.л.', dose: '1 мг', best: false }
+    ],
+    organs: ['HEART', 'VESSELS', 'LIVER'],
+    systems: ['cardio', 'hepatic'],
+    mechanisms: ['OLEIC_ACID_ANTI_INFLAMMATORY', 'LIPID_LOWERING', 'BILE_FLOW_STIMULATION', 'INSULIN_SENSITIVITY'],
+    description: 'Омега-9 (олеиновая кислота) — из оливкового масла. Снижает ЛПНП, поддерживает желчеотток.',
+    synergies: [
+      { with: "omega3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega9", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "egcg", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "polyphenol_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "mushroom_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед', targetRange: 'ЛПНП<3.0' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: диарея при избытке'],
+    dosage: { mg: 1, timing: 'с едой', form: 'оливковое масло или авокадо' },
+    bestForCourse: false,
+  },
+  cla: {
+    id: 'cla',
+    name: 'CLA',
+    nameRu: 'КЛА (Конъюгированная линолевая к-та)',
+    tier: 'advanced',
+    category: ['fatty_acid', 'metabolic'],
+    forms: [
+      { id: 'cla', name: 'CLA', nameRu: 'CLA 1500 мг 2x/д', dose: '3 г 2x/д', best: true },
+      { id: 'cla_2', name: 'CLA', nameRu: 'CLA порошок 3 г', dose: '3 г', best: false }
+    ],
+    organs: ['MUSCLES', 'LIVER', 'REPRODUCTIVE'],
+    systems: ['metabolic', 'endocrine'],
+    mechanisms: ['FAT_OXIDATION', 'LEAN_MASS_PRESERVATION', 'INSULIN_SENSITIVITY', 'ANTI_INFLAMMATORY'],
+    description: 'КЛА — улучшает композицию тела через стимуляцию окисления жиров и сохранение сухой массы.',
+    synergies: [
+        {with: "omega3", effect: "Состав тела", mechanism: "КЛК + омега-3 — жировой метаболизм", severity: "MEDIUM"},
+        {with: "l_carnitine", effect: "Окисление жиров", mechanism: "Оба способствуют липолизу", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Жировая масса', when: 'Каждые 4 нед' },
+      { what: 'Инсулин натощак', when: 'Каждые 8 нед', targetRange: '<12 мкЕд/мл' }
+    ],
+    contraindications: [],
+    sideEffects: ['Диарея', 'Тошнота', 'Редко: инсулинорезистентность при высоких дозах'],
+    dosage: { mg: 3000, timing: 'с едой 2x/д', form: 'CLA капсулы (т10ц12+ц9т11 изомеры)' },
+    bestForCourse: false,
+  },
+  mct: {
+    id: 'mct',
+    name: 'MCT Oil',
+    nameRu: 'МСТ Масло',
+    tier: 'advanced',
+    category: ['fatty_acid', 'metabolic'],
+    forms: [
+      { id: 'mct', name: 'MCT Oil', nameRu: 'МСТ масло С8 (каприловое)', dose: '15 г 2x/д', best: true },
+      { id: 'mct_2', name: 'MCT Oil', nameRu: 'МСТ масло С8/С10 смесь', dose: '15 г', best: false }
+    ],
+    organs: ['LIVER', 'MUSCLES', 'BRAIN'],
+    systems: ['hepatic', 'metabolic', 'neuro'],
+    mechanisms: ['KETONE_PRODUCTION', 'QUICK_ENERGY', 'LIPID_METABOLISM', 'MCT_KETOSIS'],
+    description: 'МСТ масло — среднецепочечные триглицериды, быстро конвертируются в кетоны. На курсе обеспечивает быструю энергию.',
+    synergies: [
+        {with: "l_carnitine", effect: "Производство кетонов", mechanism: "МСТ → кетоны, L-карнитин — транспорт", severity: "MEDIUM"},
+        {with: "coq10", effect: "Энергетический метаболизм", mechanism: "МСТ — топливо, CoQ10 — АТФ", severity: "LOW"},
+      ],
+    conflicts: [
+      { with: "antidiabetic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "electrolyte_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Кетоны в крови', when: 'По показаниям' }
+    ],
+    contraindications: ['Декомпенсированный диабет'],
+    sideEffects: ['Диарея при высоких дозах (старт с малых)', 'Тошнота при превышении'],
+    dosage: { mg: 15000, timing: 'с едой (старт с 5 мл)', form: 'МСТ масло (С8>С10)' },
+    bestForCourse: false,
+  },
+  ceramides: {
+    id: 'ceramides',
+    name: 'Ceramides',
+    nameRu: 'Церамиды',
+    tier: 'advanced',
+    category: ['fatty_acid', 'skin'],
+    forms: [
+      { id: 'ceramides', name: 'Ceramides', nameRu: 'Церамиды 30 мг', dose: '1 мг', best: true },
+      { id: 'ceramides_2', name: 'Ceramides', nameRu: 'Церамиды + коллаген комплекс', dose: '1 мг', best: false }
+    ],
+    organs: ['SKIN', 'JOINTS', 'MUSCLES'],
+    systems: ['musculoskeletal'],
+    mechanisms: ['SKIN_BARRIER', 'JOINT_LUBRICATION', 'CELL_SIGNALING', 'APOPTOSIS_REGULATION'],
+    description: 'Церамиды — сфинголипиды, ключевые компоненты кожного барьера и суставной жидкости.',
+    synergies: [
+        {with: "hyaluronic", effect: "Увлажнение кожи", mechanism: "Церамиды — барьер, гиалуронка — увлажнение", severity: "MEDIUM"},
+        {with: "collagen", effect: "Структурная поддержка кожи", mechanism: "Оба — компоненты матрикса", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Кожа/суставы', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: диарея при высоких дозах'],
+    dosage: { mg: 1, timing: 'с едой', form: 'церамиды (экстракт или синтетические)' },
+    bestForCourse: false,
+  },
+  butyrate: {
+    id: 'butyrate',
+    name: 'Butyrate',
+    nameRu: 'Бутират (Масляная кислота)',
+    tier: 'advanced',
+    category: ['fatty_acid', 'gut'],
+    forms: [
+      { id: 'butyrate', name: 'Butyrate', nameRu: 'Бутират натрия 1500 мг', dose: '1.5 г 2x/д', best: true },
+      { id: 'butyrate_2', name: 'Butyrate', nameRu: 'Бутират кальция 1500 мг', dose: '1.5 г', best: false }
+    ],
+    organs: ['INTESTINES', 'LIVER'],
+    systems: ['hepatic', 'metabolic'],
+    mechanisms: ['GUT_BARRIER_INTEGRITY', 'ANTI_INFLAMMATORY', 'HDAC_INHIBITION', 'COLONOCYTE_FUEL'],
+    description: 'Бутират — короткоцепочечная жирная кислота, главный энергетический субстрат колоноцитов. Укрепляет кишечный барьер.',
+    synergies: [
+        {with: "probiotics", effect: "Здоровье кишечника", mechanism: "Бутират — топливо колоноцитов", severity: "HIGH"},
+        {with: "fiber", effect: "Производство бутирата", mechanism: "Клетчатка → бутират", severity: "MEDIUM"},
+        {with: "glutamine", effect: "Заживление кишечника", mechanism: "Оба питают клетки", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Калпротектин', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: тошнота', 'Диарея при высоких дозах'],
+    dosage: { mg: 1500, timing: 'с едой 2x/д', form: 'бутират натрия или кальция' },
+    bestForCourse: false,
+  },
+  glycine: {
+    id: 'glycine',
+    name: 'Glycine',
+    nameRu: 'Глицин',
+    tier: 'advanced',
+    category: ['amino', 'neuroprotector'],
+    forms: [
+      { id: 'glycine', name: 'Glycine', nameRu: 'Глицин 1000 мг', dose: '3 г 2x/д', best: true },
+      { id: 'glycine_2', name: 'Glycine', nameRu: 'Глицин порошок 3 г', dose: '3 г', best: false }
+    ],
+    organs: ['BRAIN', 'LIVER', 'JOINTS'],
+    systems: ['neuro', 'hepatic', 'musculoskeletal'],
+    mechanisms: ['INHIBITORY_NEUROTRANSMITTER', 'COLLAGEN_SYNTHESIS', 'GLUTATHIONE_PRECURSOR', 'SLEEP_IMPROVEMENT'],
+    description: 'Глицин — тормозной нейромедиатор, предшественник коллагена и глутатиона. Улучшает сон.',
+    synergies: [
+      { with: "magnesium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "silicon", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "calcium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "glycine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "zinc", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Качество сна', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: тошнота при высоких дозах'],
+    dosage: { mg: 3000, timing: 'на ночь или 2x/д', form: 'глицин порошок или капсулы' },
+    bestForCourse: false,
+  },
+  theanine: {
+    id: 'theanine',
+    name: 'L-Theanine',
+    nameRu: 'Л-Теанин',
+    tier: 'advanced',
+    category: ['amino', 'neuroprotector'],
+    forms: [
+      { id: 'theanine', name: 'L-Theanine', nameRu: 'Л-Теанин 200 мг', dose: '200 мг 2x/д', best: true },
+      { id: 'theanine_2', name: 'L-Theanine', nameRu: 'Теанин + Кофеин комплекс', dose: '200 мг', best: false }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['ALPHA_WAVE_INDUCTION', 'GABA_MODULATION', 'CORTISOL_REDUCTION', 'FOCUS_ENHANCEMENT'],
+    description: 'Л-Теанин — аминокислота из зелёного чая, индуцирует альфа-волны, снижает кортизол. Улучшает фокус без сонливости.',
+    synergies: [
+      { with: "caffeine", effect: "Теанин сглаживает стимуляцию кофеина", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "gaba", effect: "Теанин + ГАМК — двойное расслабление", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Качество сна', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: сонливость при высоких дозах'],
+    dosage: { mg: 200, timing: 'на ночь или утром', form: 'Л-теанин капсулы' },
+    bestForCourse: false,
+  },
+  tyrosine: {
+    id: 'tyrosine',
+    name: 'L-Tyrosine',
+    nameRu: 'Л-Тирозин',
+    tier: 'advanced',
+    category: ['amino', 'nootropic'],
+    forms: [
+      { id: 'tyrosine', name: 'L-Tyrosine', nameRu: 'Л-Тирозин 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'tyrosine_2', name: 'L-Tyrosine', nameRu: 'N-Ацетил-Л-Тирозин 300 мг', dose: '500 мг', best: false }
+    ],
+    organs: ['BRAIN', 'ADRENALS'],
+    systems: ['neuro', 'endocrine'],
+    mechanisms: ['DOPAMINE_PRECURSOR', 'NOREPINEPHRINE_SYNTHESIS', 'THYROID_HORMONE_PRECURSOR', 'STRESS_RESILIENCE'],
+    description: 'Л-Тирозин — предшественник дофамина, норадреналина и тиреоидных гормонов. Улучшает стрессоустойчивость и фокус.',
+    synergies: [
+      { with: "stimulant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "rhodiola", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "antidepressant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "l_dopa", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Тирозин в плазме', when: 'Каждые 12 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Тошнота натощак при высоких дозах'],
+    dosage: { mg: 500, timing: 'натощак утром', form: 'Л-тирозин капсулы' },
+    bestForCourse: false,
+  },
+  tryptophan: {
+    id: 'tryptophan',
+    name: 'L-Tryptophan',
+    nameRu: 'Л-Триптофан',
+    tier: 'advanced',
+    category: ['amino', 'neuroprotector'],
+    forms: [
+      { id: 'tryptophan', name: 'L-Tryptophan', nameRu: 'Л-Триптофан 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'tryptophan_2', name: 'L-Tryptophan', nameRu: '5-HTP 100 мг', dose: '500 мг', best: false }
+    ],
+    organs: ['BRAIN', 'INTESTINES'],
+    systems: ['neuro', 'metabolic'],
+    mechanisms: ['SEROTONIN_PRECURSOR', 'MELATONIN_SYNTHESIS', 'SLEEP_IMPROVEMENT', 'MOOD_REGULATION'],
+    description: 'Л-Триптофан — предшественник серотонина и мелатонина. Улучшает сон и настроение.',
+    synergies: [
+        {with: "vitamin_b6", effect: "Синтез серотонина", mechanism: "B6 — кофактор декарбоксилазы", severity: "HIGH"},
+        {with: "magnesium", effect: "Улучшение сна", mechanism: "Триптофан → мелатонин + Mg", severity: "MEDIUM"},
+        {with: "vitamin_b3", effect: "Синтез ниацина", mechanism: "Триптофан → ниацин", severity: "MEDIUM"},
+      ],
+    conflicts: [
+      { with: "x5htp", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "antidepressant_drugs", effect: "СИОЗС + Триптофан — риск серотонинового синдрома", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'Качество сна', when: 'Субъективно' }
+    ],
+    contraindications: ['Приём антидепрессантов СИОЗС (серотониновый синдром)'],
+    sideEffects: ['Сонливость', 'Тошнота натощак'],
+    dosage: { mg: 500, timing: 'на ночь или натощак', form: 'Л-триптофан капсулы' },
+    bestForCourse: false,
+  },
+  x5htp: {
+    id: 'x5htp',
+    name: '5-HTP',
+    nameRu: '5-HTP (5-Гидрокситриптофан)',
+    tier: 'advanced',
+    category: ['amino', 'neuroprotector'],
+    forms: [
+      { id: 'x5htp', name: '5-HTP', nameRu: '5-HTP 100 мг', dose: '100 мг 2x/д', best: true },
+      { id: '5htp_2', name: '5-HTP', nameRu: '5-HTP 50 мг', dose: '100 мг', best: false }
+    ],
+    organs: ['BRAIN', 'INTESTINES'],
+    systems: ['neuro', 'metabolic'],
+    mechanisms: ['SEROTONIN_PRECURSOR', 'MELATONIN_SYNTHESIS', 'MOOD_REGULATION', 'APPETITE_CONTROL'],
+    description: '5-HTP — прямой предшественник серотонина, эффективнее триптофана. Улучшает настроение и сон.',
+    synergies: [
+      { with: "magnesium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "antidepressant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "tryptophan", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Качество сна', when: 'Субъективно' }
+    ],
+    contraindications: ['Приём антидепрессантов СИОЗС (серотониновый синдром)'],
+    sideEffects: ['Тошнота при начале', 'Сонливость'],
+    dosage: { mg: 100, timing: 'на ночь или 2x/д', form: '5-HTP капсулы' },
+    bestForCourse: false,
+  },
+  gaba: {
+    id: 'gaba',
+    name: 'GABA',
+    nameRu: 'ГАМК (Гамма-аминомасляная кислота)',
+    tier: 'advanced',
+    category: ['amino', 'neuroprotector'],
+    forms: [
+      { id: 'gaba', name: 'GABA', nameRu: 'ГАМК 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'gaba_2', name: 'GABA', nameRu: 'ГАМК порошок 3 г', dose: '500 мг', best: false },
+      { id: 'gaba_3', name: 'GABA', nameRu: 'Фенибут (производное)', dose: '500 мг', best: false }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['INHIBITORY_NEUROTRANSMITTER', 'ANXIOLYTIC', 'SLEEP_IMPROVEMENT', 'MUSCLE_RELAXATION'],
+    description: 'ГАМК — главный тормозной нейромедиатор. Снижает тревожность и улучшает сон. Плохо проникает ГГБ.',
+    synergies: [
+      { with: "magnesium", effect: "Магний — кофактор ГАМК-рецепторов", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "anxiolytic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "ashwagandha", effect: "Ашваганда потенцирует ГАМК", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "theanine", effect: "Теанин потенцирует ГАМК-рецепторы", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "melatonin", effect: "Мелатонин + ГАМК — двойное расслабление", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "nsaid_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "anxiolytic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "antidepressant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "gaba", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'Тревожность/сон', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: покалывание кожи', 'Сонливость'],
+    dosage: { mg: 500, timing: 'на ночь', form: 'ГАМК капсулы или порошок' },
+    bestForCourse: false,
+  },
+  creatine: {
+    id: 'creatine',
+    name: 'Creatine',
+    nameRu: 'Креатин',
+    tier: 'standard',
+    category: ['amino', 'metabolic'],
+    forms: [
+      { id: 'creatine', name: 'Creatine', nameRu: 'Креатин моногидрат 5 г', dose: '5 г 2x/д', best: true },
+      { id: 'creatine_2', name: 'Creatine', nameRu: 'Креатин HCl 3 г', dose: '5 г', best: false }
+    ],
+    organs: ['MUSCLES', 'BRAIN', 'HEART'],
+    systems: ['musculoskeletal', 'neuro', 'metabolic'],
+    mechanisms: ['ATP_REGENERATION', 'PHOSPHOCREATINE_BUFFER', 'MUSCLE_HYPERTROPHY', 'BRAIN_ENERGY'],
+    description: 'Креатин — фосфагенная система быстрого ресинтеза АТФ. Улучшает силу, мощность и когнитивную функцию.',
+    synergies: [
+      { with: "beta_alanine", effect: "Креатин + β-аланин — сила + выносливость", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Креатин в крови', when: 'Каждые 12 нед', targetRange: '0.5-1.0 мг/дл' }
+    ],
+    contraindications: ['Не выявлено'],
+    sideEffects: ['Задержка воды (1-2 кг)', 'Редко: дискомфорт в ЖКТ'],
+    dosage: { mg: 5000, timing: 'с едой или после тренировки', form: 'креатин моногидрат' },
+    bestForCourse: true,
+  },
+  beta_alanine: {
+    id: 'beta_alanine',
+    name: 'Beta-Alanine',
+    nameRu: 'Бета-Аланин',
+    tier: 'advanced',
+    category: ['amino', 'metabolic'],
+    forms: [
+      { id: 'beta_alanine', name: 'Beta-Alanine', nameRu: 'Бета-аланин 1600 мг 2x/д', dose: '3.2 г 2x/д', best: true },
+      { id: 'beta_alanine_2', name: 'Beta-Alanine', nameRu: 'Бета-аланин порошок 3.2 г', dose: '3.2 г', best: false }
+    ],
+    organs: ['MUSCLES'],
+    systems: ['musculoskeletal', 'metabolic'],
+    mechanisms: ['CARNOSINE_SYNTHESIS', 'PH_BUFFER', 'MUSCLE_ENDURANCE', 'ANTIOXIDANT'],
+    description: 'Бета-аланин — предшественник карнозина, внутриклеточного буфера. Улучшает выносливость при высокоинтенсивной нагрузке.',
+    synergies: [
+      { with: "creatine", effect: "β-аланин + Креатин — буфер + АТФ", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+        {with: "taurine", effect: "Конкуренция за транспорт", mechanism: "Бета-аланин конкурирует с таурином", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Карнозин в мышцах', when: 'Каждые 12 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Парестезия (покалывание кожи)', 'Редко: тошнота'],
+    dosage: { mg: 3200, timing: '2x/д с едой', form: 'бета-аланин порошок или капсулы' },
+    bestForCourse: false,
+  },
+  citrulline: {
+    id: 'citrulline',
+    name: 'L-Citrulline',
+    nameRu: 'Л-Цитруллин',
+    tier: 'advanced',
+    category: ['amino', 'cardioprotector'],
+    forms: [
+      { id: 'citrulline', name: 'L-Citrulline', nameRu: 'Л-Цитруллин 6 г', dose: '6 г 2x/д', best: true },
+      { id: 'citrulline_2', name: 'L-Citrulline', nameRu: 'Цитруллин малат 6 г', dose: '6 г', best: false }
+    ],
+    organs: ['VESSELS', 'MUSCLES', 'KIDNEYS'],
+    systems: ['cardio', 'renal', 'metabolic'],
+    mechanisms: ['NITRIC_OXIDE_PRODUCTION', 'AMMONIA_DETOXIFICATION', 'BLOOD_FLOW_ENHANCEMENT', 'MUSCLE_PUMP'],
+    description: 'Л-Цитруллин — предшественник оксида азота, эффективнее аргинина. Улучшает кровоток и мышечный памп.',
+    synergies: [
+      { with: "arginine", effect: "Цитруллин + Аргинин — усиление NO-продукции", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Артериальное давление', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: тошнота при высоких дозах'],
+    dosage: { mg: 6000, timing: 'натощак, 30 мин до тренировки', form: 'Л-цитруллин или цитруллин малат' },
+    bestForCourse: false,
+  },
+  arginine: {
+    id: 'arginine',
+    name: 'L-Arginine',
+    nameRu: 'Л-Аргинин',
+    tier: 'advanced',
+    category: ['amino', 'cardioprotector'],
+    forms: [
+      { id: 'arginine', name: 'L-Arginine', nameRu: 'Л-Аргинин 3 г', dose: '3 г 2x/д', best: true },
+      { id: 'arginine_2', name: 'L-Arginine', nameRu: 'Аргинин альфа-кетоглутарат 3 г', dose: '3 г', best: false }
+    ],
+    organs: ['VESSELS', 'MUSCLES'],
+    systems: ['cardio', 'reproductive', 'metabolic'],
+    mechanisms: ['NITRIC_OXIDE_PRODUCTION', 'GROWTH_HORMONE_RELEASE', 'AMMONIA_DETOXIFICATION', 'WOUND_HEALING'],
+    description: 'Л-Аргинин — предшественник оксида азота и гормона роста. Улучшает кровоток. Цитруллин предпочтительнее.',
+    synergies: [
+      { with: "citrulline", effect: "Цитруллин рециклирует аргинин → больше NO", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+        {with: "antiviral_drugs", effect: "Взаимодействие", mechanism: "Аргинин может усиливать репликацию вирусов", severity: "LOW"},
+      ],
+    monitoring: [
+      { what: 'Артериальное давление', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: тошнота', 'Диарея при высоких дозах'],
+    dosage: { mg: 3000, timing: 'натощак или на ночь', form: 'Л-аргинин капсулы или порошок' },
+    bestForCourse: false,
+  },
+  agmatine: {
+    id: 'agmatine',
+    name: 'Agmatine',
+    nameRu: 'Агматин',
+    tier: 'advanced',
+    category: ['amino', 'neuroprotector'],
+    forms: [
+      { id: 'agmatine', name: 'Agmatine', nameRu: 'Агматин сульфат 1000 мг', dose: '1 г 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES', 'MUSCLES'],
+    systems: ['neuro', 'metabolic'],
+    mechanisms: ['NITRIC_OXIDE_MODULATION', 'NMDA_REGULATION', 'NORADRENALINE_RELEASE', 'INSULIN_SENSITIVITY'],
+    description: 'Агматин — метаболит аргинина, нейромодулятор. Регулирует оксид азота и NMDA-рецепторы. Улучшает памп и настроение.',
+    synergies: [
+        {with: "creatine", effect: "Производительность", mechanism: "Агматин модулирует NMDA", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Настроение/памп', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: тошнота при высоких дозах'],
+    dosage: { mg: 1000, timing: 'натощак или 2x/д', form: 'агматин сульфат' },
+    bestForCourse: false,
+  },
+  bcaa: {
+    id: 'bcaa',
+    name: 'BCAA',
+    nameRu: 'BCAA (Аминокислоты с разветвлённой цепью)',
+    tier: 'standard',
+    category: ['amino', 'metabolic'],
+    forms: [
+      { id: 'bcaa', name: 'BCAA', nameRu: 'BCAA 2:1:1 порошок 10 г', dose: '10 г 2x/д', best: true },
+      { id: 'bcaa_2', name: 'BCAA', nameRu: 'BCAA капсулы 5 г', dose: '10 г', best: false }
+    ],
+    organs: ['MUSCLES', 'LIVER'],
+    systems: ['musculoskeletal', 'hepatic', 'metabolic'],
+    mechanisms: ['MUSCLE_PROTEIN_SYNTHESIS', 'MUSCLE_BREAKDOWN_PREVENTION', 'ENERGY_PRODUCTION', 'MTOR_ACTIVATION'],
+    description: 'BCAA (лейцин, изолейцин, валин) — стимулируют синтез белка через mTOR. Предотвращают катаболизм на курсе ААС.',
+    synergies: [
+        {with: "creatine", effect: "Антикатаболическое действие", mechanism: "BCAA + креатин — мышцы", severity: "MEDIUM"},
+        {with: "vitamin_b6", effect: "Метаболизм BCAA", mechanism: "B6 — кофактор трансаминирования", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "tryptophan", effect: "Конкуренция за транспорт", mechanism: "BCAA конкурируют с триптофаном за LAT1", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Мышечная масса', when: 'Каждые 4 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: тошнота при натощак'],
+    dosage: { mg: 10000, timing: 'до или после тренировки', form: 'BCAA порошок (лейцин:изолейцин:валин 2:1:1)' },
+    bestForCourse: false,
+  },
+  hmb: {
+    id: 'hmb',
+    name: 'HMB',
+    nameRu: 'HMB (Бета-гидрокси-бета-метилмасляная кислота)',
+    tier: 'advanced',
+    category: ['amino', 'metabolic'],
+    forms: [
+      { id: 'hmb', name: 'HMB', nameRu: 'HMB-Ca 1500 мг 2x/д', dose: '3 г 2x/д', best: true },
+      { id: 'hmb_2', name: 'HMB', nameRu: 'HMB Free Acid 3000 мг', dose: '3 г', best: false }
+    ],
+    organs: ['MUSCLES'],
+    systems: ['musculoskeletal', 'metabolic'],
+    mechanisms: ['MUSCLE_BREAKDOWN_PREVENTION', 'MTOR_ACTIVATION', 'CORTISOL_ANTAGONISM', 'RECOVERY_ENHANCEMENT'],
+    description: 'HMB — метаболит лейцина, мощный антикатаболик. Предотвращает распад мышц при калорийном дефиците и стрессе.',
+    synergies: [
+        {with: "creatine", effect: "Максимальное антикатаболическое", mechanism: "HMB + креатин — мышцы", severity: "HIGH"},
+        {with: "vitamin_d3", effect: "Синтез белка", mechanism: "Витамин D3 усиливает mTOR", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Мышечная масса', when: 'Каждые 4 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: тошнота при натощак'],
+    dosage: { mg: 3000, timing: '2x/д с едой', form: 'HMB кальций порошок или капсулы' },
+    bestForCourse: false,
+  },
+  glutathione: {
+    id: 'glutathione',
+    name: 'Glutathione',
+    nameRu: 'Глутатион',
+    tier: 'advanced',
+    category: ['antioxidant', 'hepatoprotector'],
+    forms: [
+      { id: 'glutathione', name: 'Glutathione', nameRu: 'Липосомальный глутатион 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'glutathione_2', name: 'Glutathione', nameRu: 'Глутатион редуцированный 500 мг', dose: '500 мг', best: false }
+    ],
+    organs: ['LIVER', 'BRAIN', 'IMMUNE_SYSTEM'],
+    systems: ['hepatic', 'neuro', 'immune'],
+    mechanisms: ['ANTIOXIDANT_MASTER', 'DETOXIFICATION_PHASE2', 'IMMUNE_REGULATION', 'MITOCHONDRIAL_PROTECTION'],
+    description: 'Глутатион — главный внутриклеточный антиоксидант и детоксикант. На курсе ААС критичен для защиты печени. Липосомальная форма предпочтительнее.',
+    synergies: [
+      { with: "alpha_lipoic", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Глутатион в крови', when: 'Каждые 8 нед', targetRange: '>600 мкмоль/л' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: аллергия при в/в введении'],
+    dosage: { mg: 500, timing: 'натощак', form: 'липосомальный глутатион или NAC+витамин С' },
+    bestForCourse: false,
+  },
+  eaa: {
+    id: 'eaa',
+    name: 'EAA',
+    nameRu: 'EAA (Незаменимые аминокислоты)',
+    tier: 'standard',
+    category: ['amino', 'metabolic'],
+    forms: [
+      { id: 'eaa', name: 'EAA', nameRu: 'EAA порошок 10 г', dose: '10 г 2x/д', best: true },
+      { id: 'eaa_2', name: 'EAA', nameRu: 'EAA капсулы 5 г', dose: '10 г', best: false }
+    ],
+    organs: ['MUSCLES', 'LIVER'],
+    systems: ['musculoskeletal', 'metabolic'],
+    mechanisms: ['MUSCLE_PROTEIN_SYNTHESIS', 'MTOR_ACTIVATION', 'ESSENTIAL_AMINO_ACID_SUPPLY', 'RECOVERY_ENHANCEMENT'],
+    description: 'EAA — полный набор незаменимых аминокислот для синтеза белка. Альтернатива протеину с быстрой абсорбцией.',
+    synergies: [
+        {with: "creatine", effect: "Синтез белка", mechanism: "EAA + креатин — анаболизм", severity: "MEDIUM"},
+        {with: "vitamin_b6", effect: "Метаболизм аминокислот", mechanism: "B6 — кофактор трансаминаз", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Мышечная масса', when: 'Каждые 4 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: тошнота натощак'],
+    dosage: { mg: 10000, timing: 'до или после тренировки', form: 'EAA порошок' },
+    bestForCourse: false,
+  },
+  d_aspartic_acid: {
+    id: 'd_aspartic_acid',
+    name: 'D-Aspartic Acid',
+    nameRu: 'D-Аспарагиновая кислота',
+    tier: 'specialty',
+    category: ['amino', 'hormonal'],
+    forms: [
+      { id: 'd_aspartic_acid', name: 'D-Aspartic Acid', nameRu: 'D-Аспарагиновая кислота 3 г', dose: '3 г 2x/д', best: true }
+    ],
+    organs: ['REPRODUCTIVE', 'BRAIN'],
+    systems: ['reproductive', 'endocrine'],
+    mechanisms: ['TESTOSTERONE_SYNTHESIS', 'LH_RELEASE', 'SPERMATOGENESIS', 'NMDA_RECEPTOR_ACTIVATION'],
+    description: 'D-Аспарагиновая кислота — стимулирует высвобождение ЛГ и синтез тестостерона. Эффект кратковременный (12-15 дней).',
+    synergies: [
+      { with: "zinc", effect: "D-Аспарагиновая кислота + Цинк — синтез тестостерона", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "maca", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Свободный тестостерон', when: 'Каждые 2 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: головная боль', 'Тошнота'],
+    dosage: { mg: 3000, timing: 'утро натощак, курс 12-15 дней', form: 'D-аспарагиновая кислота порошок' },
+    bestForCourse: false,
+  },
+  phenibut: {
+    id: 'phenibut',
+    name: 'Phenibut',
+    nameRu: 'Фенибут',
+    tier: 'specialty',
+    category: ['amino', 'anxiolytic'],
+    forms: [
+      { id: 'phenibut', name: 'Phenibut', nameRu: 'Фенибут 250 мг', dose: '250 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['GABA_B_AGONIST', 'ANXIOLYTIC', 'COGNITIVE_ENHANCEMENT', 'SLEEP_IMPROVEMENT'],
+    description: 'Фенибут — производное ГАМК с фенильным кольцом, проникает через ГГБ. Снижает тревожность, улучшает сон. Риск зависимости.',
+    synergies: [
+        {with: "magnesium", effect: "Расслабление", mechanism: "Оба усиливают GABA", severity: "MEDIUM"},
+        {with: "theanine", effect: "Фокус без седации", mechanism: "Разные GABA-механизмы", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "sedative_drugs", effect: "Опасная седация", mechanism: "Фенибут + бензодиазепины", severity: "HIGH"},
+        {with: "alcohol", effect: "Депрессия ЦНС", mechanism: "Оба — депрессанты ЦНС", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Тревожность/сон', when: 'Субъективно' }
+    ],
+    contraindications: ['Эпилепсия (с осторожностью)', 'Беременность'],
+    sideEffects: ['Сонливость при начале', 'Зависимость при длительном приёме'],
+    dosage: { mg: 250, timing: 'на ночь или 2x/д, курс 2-4 нед', form: 'фенибут 250 мг' },
+    bestForCourse: false,
+  },
+  carnosine: {
+    id: 'carnosine',
+    name: 'Carnosine',
+    nameRu: 'Карнозин',
+    tier: 'advanced',
+    category: ['amino', 'antioxidant'],
+    forms: [
+      { id: 'carnosine', name: 'Carnosine', nameRu: 'Карнозин 500 мг 2x/д', dose: '1 г 2x/д', best: true }
+    ],
+    organs: ['MUSCLES', 'BRAIN', 'HEART'],
+    systems: ['musculoskeletal', 'neuro', 'metabolic'],
+    mechanisms: ['PH_BUFFER', 'ANTIOXIDANT', 'ANTI_GLYCATION', 'MUSCLE_ENDURANCE'],
+    description: 'Карнозин — дипептид (бета-аланин + гистидин), внутриклеточный буфер и антиоксидант. Предотвращает гликирование.',
+    synergies: [
+        {with: "beta_alanine", effect: "Увеличение запасов карнозина", mechanism: "Бета-аланин → карнозин", severity: "HIGH"},
+        {with: "creatine", effect: "Буферинг и энергетика", mechanism: "Карнозин — буфер, креатин — АТФ", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Мышечная выносливость', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: покалывание кожи (от бета-аланина)'],
+    dosage: { mg: 1000, timing: '2x/д с едой', form: 'карнозин капсулы' },
+    bestForCourse: false,
+  },
+  alanine: {
+    id: 'alanine',
+    name: 'Alanine',
+    nameRu: 'Аланин',
+    tier: 'standard',
+    category: ['amino', 'metabolic'],
+    forms: [
+      { id: 'alanine', name: 'Alanine', nameRu: 'Аланин 2 г', dose: '2 г 2x/д', best: true }
+    ],
+    organs: ['LIVER', 'MUSCLES'],
+    systems: ['hepatic', 'metabolic'],
+    mechanisms: ['GLUCONEOGENESIS', 'AMINO_ACID_METABOLISM', 'LIVER_PROTECTION', 'GLUCOSE_REGULATION'],
+    description: 'Аланин — заменимая аминокислота, ключевой субстрат глюконеогенеза в печени. Поддерживает уровень глюкозы.',
+    synergies: [
+        {with: "glycine", effect: "Метаболическая поддержка", mechanism: "Оба — заменимые аминокислоты", severity: "LOW"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Глюкоза натощак', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: тошнота при высоких дозах'],
+    dosage: { mg: 2000, timing: 'с едой', form: 'аланин порошок' },
+    bestForCourse: false,
+  },
+  l_dopa: {
+    id: 'l_dopa',
+    name: 'L-DOPA',
+    nameRu: 'Леводопа (L-DOPA)',
+    tier: 'specialty',
+    category: ['amino', 'nootropic'],
+    forms: [
+      { id: 'l_dopa', name: 'L-DOPA', nameRu: 'Л-ДОФА (Мукуна) 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['DOPAMINE_PRECURSOR', 'NOREPINEPHRINE_PRECURSOR', 'MOTOR_FUNCTION', 'MOOD_REGULATION'],
+    description: 'Л-ДОФА — прямой предшественник дофамина. Используется для кратковременного повышения дофамина. Ряд побочных эффектов.',
+    synergies: [
+        {with: "vitamin_b6", effect: "Синтез дофамина", mechanism: "B6 — кофактор декарбоксилазы", severity: "HIGH"},
+      ],
+    conflicts: [
+      { with: "tyrosine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Настроение/фокус', when: 'Субъективно' }
+    ],
+    contraindications: ['Приём антидепрессантов СИОЗС', 'Болезнь Паркинсона (без назначения)'],
+    sideEffects: ['Тошнота', 'Ортостатическая гипотензия', 'Риск дискинезии при длительном приёме'],
+    dosage: { mg: 500, timing: 'натощак, курс 5-7 дней', form: 'Л-ДОФА (экстракт мукуны) капсулы' },
+    bestForCourse: false,
+  },
+  phosphatidylserine: {
+    id: 'phosphatidylserine',
+    name: 'Phosphatidylserine',
+    nameRu: 'Фосфатидилсерин',
+    tier: 'advanced',
+    category: ['lipid', 'neuroprotector'],
+    forms: [
+      { id: 'phosphatidylserine', name: 'Phosphatidylserine', nameRu: 'Фосфатидилсерин 100 мг 3x/д', dose: '300 мг 2x/д', best: true },
+      { id: 'phosphatidylserine_2', name: 'Phosphatidylserine', nameRu: 'Фосфатидилсерин 300 мг на ночь', dose: '300 мг', best: false }
+    ],
+    organs: ['BRAIN', 'NERVES', 'ADRENALS'],
+    systems: ['neuro', 'endocrine'],
+    mechanisms: ['CORTISOL_REDUCTION', 'MEMORY_ENHANCEMENT', 'CELL_SIGNALING', 'NEUROPROTECTION'],
+    description: 'Фосфатидилсерин — фосфолипид мембран нейронов, снижает кортизол на 30% после нагрузки. Улучшает память и когницию.',
+    synergies: [
+      { with: "bacopa", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Кортизол утром', when: 'Каждые 4 нед', targetRange: '6-23 мкг/дл' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: бессонница при приёме вечером'],
+    dosage: { mg: 300, timing: 'с едой 2x/д', form: 'фосфатидилсерин из соевого лецитина' },
+    bestForCourse: false,
+  },
+  methionine: {
+    id: 'methionine',
+    name: 'Methionine',
+    nameRu: 'Метионин',
+    tier: 'standard',
+    category: ['amino', 'hepatoprotector'],
+    forms: [
+      { id: 'methionine', name: 'Methionine', nameRu: 'Метионин 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'methionine_2', name: 'Methionine', nameRu: 'N-Ацетил-Л-метионин 500 мг', dose: '500 мг', best: false }
+    ],
+    organs: ['LIVER'],
+    systems: ['hepatic', 'metabolic'],
+    mechanisms: ['METHYL_DONATION', 'LIPOTROPIC_EFFECT', 'GLUTATHIONE_PRECURSOR', 'HOMOCYSTEINE_SOURCE'],
+    description: 'Метионин — незаменимая аминокислота, донор метильных групп и липотропик. Предшественник SAMe и глутатиона.',
+    synergies: [
+        {with: "betaine", effect: "Метилирование", mechanism: "Метионин → SAMe", severity: "HIGH"},
+        {with: "vitamin_b_complex", effect: "Гомоцистеин", mechanism: "B6, B12, фолат — реметилирование", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Гомоцистеин', when: 'Каждые 8 нед', targetRange: '<15 мкмоль/л' }
+    ],
+    contraindications: ['Гипергомоцистеинемия (без фолата/B12/B6)'],
+    sideEffects: ['Тошнота при высоких дозах', 'Повышение гомоцистеина при избытке'],
+    dosage: { mg: 500, timing: 'с едой', form: 'метионин капсулы' },
+    bestForCourse: false,
+  },
+  s_adenosyl_methionine: {
+    id: 's_adenosyl_methionine',
+    name: 'SAMe',
+    nameRu: 'SAMe (S-Аденозилметионин)',
+    tier: 'advanced',
+    category: ['amino', 'hepatoprotector', 'antidepressant'],
+    forms: [
+      { id: 's_adenosyl_methionine', name: 'SAMe', nameRu: 'SAMe 200 мг 2x/д', dose: '400 мг 2x/д', best: true },
+      { id: 's_adenosyl_methionine_2', name: 'SAMe', nameRu: 'SAMe 400 мг 2x/д', dose: '400 мг', best: false }
+    ],
+    organs: ['LIVER', 'BRAIN'],
+    systems: ['hepatic', 'neuro'],
+    mechanisms: ['METHYL_DONATION', 'ANTIDEPRESSANT', 'JOINT_PROTECTION', 'LIVER_DETOXIFICATION'],
+    description: 'SAMe — главный донор метильных групп в организме. Антидепрессант, гепатопротектор, хондропротектор.',
+    synergies: [
+        {with: "vitamin_b_complex", effect: "Метилирование и настроение", mechanism: "SAMe + B-кофакторы", severity: "HIGH"},
+        {with: "betaine", effect: "Цикл метилирования", mechanism: "Бетаин — альтернативный путь", severity: "MEDIUM"},
+        {with: "curcumin", effect: "Противовоспалительное + антидепрессивное", mechanism: "Оба модулируют воспаление", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "antidepressant_drugs", effect: "Серотониновый синдром", mechanism: "SAMe + СИОЗС", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Настроение', when: 'Субъективно' },
+      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' }
+    ],
+    contraindications: ['Биполярное расстройство (может вызвать манию)'],
+    sideEffects: ['Тошнота натощак', 'Редко: мания при биполярном расстройстве'],
+    dosage: { mg: 400, timing: 'натощак 2x/д', form: 'SAMe энтеросолюбильный' },
+    bestForCourse: false,
+  },
+  ginseng: {
+    id: 'ginseng',
+    name: 'Ginseng',
+    nameRu: 'Женьшень (Panax Ginseng)',
+    tier: 'advanced',
+    category: ['adaptogen', 'hormonal'],
+    forms: [
+      { id: 'ginseng', name: 'Ginseng', nameRu: 'Экстракт женьшеня 200 мг', dose: '200 мг 2x/д', best: true },
+      { id: 'ginseng_2', name: 'Ginseng', nameRu: 'Женьшень Премиум 400 мг', dose: '200 мг', best: false }
+    ],
+    organs: ['BRAIN', 'ADRENALS', 'REPRODUCTIVE'],
+    systems: ['neuro', 'endocrine', 'reproductive'],
+    mechanisms: ['ADAPTOGENIC', 'CORTISOL_REGULATION', 'NO_PRODUCTION', 'ENERGY_ENHANCEMENT'],
+    description: 'Женьшень — король адаптогенов, повышает энергетику, снижает кортизол, улучшает когницию и либидо. На курсе ААС помогает с восстановлением.',
+    synergies: [
+      { with: "ginkgo", effect: "Женьшень + Гинкго — энергия + кровоток", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "stimulant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "anticoagulant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Кортизол утром', when: 'Каждые 4 нед', targetRange: '6-23 мкг/дл' }
+    ],
+    contraindications: ['Беременность', 'Гипертония (с осторожностью)'],
+    sideEffects: ['Бессонница при приёме вечером', 'Головная боль при высоких дозах'],
+    dosage: { mg: 200, timing: 'утро с едой', form: 'экстракт женьшеня (5% гинзенозидов)' },
+    bestForCourse: false,
+  },
+  rhodiola: {
+    id: 'rhodiola',
+    name: 'Rhodiola',
+    nameRu: 'Родиола розовая',
+    tier: 'advanced',
+    category: ['adaptogen', 'neuroprotector'],
+    forms: [
+      { id: 'rhodiola', name: 'Rhodiola', nameRu: 'Родиола 300 мг', dose: '300 мг 2x/д', best: true },
+      { id: 'rhodiola_2', name: 'Rhodiola', nameRu: 'Родиола + Женьшень комплекс', dose: '300 мг', best: false }
+    ],
+    organs: ['BRAIN', 'ADRENALS', 'HEART'],
+    systems: ['neuro', 'endocrine', 'cardio'],
+    mechanisms: ['ADAPTOGENIC', 'CORTISOL_REDUCTION', 'FOCUS_ENHANCEMENT', 'PHYSICAL_ENDURANCE'],
+    description: 'Родиола розовая — адаптоген, снижает кортизол и утомление, повышает фокус и выносливость. На курсе ААС помогает с восстановлением.',
+    synergies: [
+      { with: "ashwagandha", effect: "Двойной адаптоген — кортизол + стресс", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "tyrosine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "stimulant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "antidepressant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Утомление/фокус', when: 'Субъективно' }
+    ],
+    contraindications: ['Биполярное расстройство (с осторожностью)'],
+    sideEffects: ['Бессонница при приёме вечером', 'Раздражительность при высоких дозах'],
+    dosage: { mg: 300, timing: 'утро натощак', form: 'экстракт родиолы (3% розавин)' },
+    bestForCourse: false,
+  },
+  bacopa: {
+    id: 'bacopa',
+    name: 'Bacopa',
+    nameRu: 'Бакопа моньери',
+    tier: 'advanced',
+    category: ['adaptogen', 'nootropic'],
+    forms: [
+      { id: 'bacopa', name: 'Bacopa', nameRu: 'Бакопа 300 мг', dose: '300 мг 2x/д', best: true },
+      { id: 'bacopa_2', name: 'Bacopa', nameRu: 'Бакопа 150 мг 2x/д', dose: '300 мг', best: false }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['MEMORY_ENHANCEMENT', 'ANTI_INFLAMMATORY', 'ANTIOXIDANT', 'ANXIOLYTIC'],
+    description: 'Бакопа — ноотропный адаптоген, улучшает память и когницию через серотонинергические и холинергические механизмы.',
+    synergies: [
+      { with: "ginkgo", effect: "Бакопа + Гинкго — память + кровоток", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "phosphatidylserine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Память/фокус', when: 'Субъективно (4-12 нед)' }
+    ],
+    contraindications: [],
+    sideEffects: ['Тошнота при натощак', 'Разжижение стула'],
+    dosage: { mg: 300, timing: 'с едой 2x/д', form: 'экстракт бакопы (50% бакозидов)' },
+    bestForCourse: false,
+  },
+  lions_mane: {
+    id: 'lions_mane',
+    name: 'Lions Mane',
+    nameRu: 'Ежовик гребенчатый',
+    tier: 'advanced',
+    category: ['adaptogen', 'nootropic'],
+    forms: [
+      { id: 'lions_mane', name: 'Lions Mane', nameRu: 'Ежовик экстракт 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'lions_mane_2', name: 'Lions Mane', nameRu: 'Ежовик + Бакопа комплекс', dose: '500 мг', best: false }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['NGF_STIMULATION', 'MYELIN_REPAIR', 'MEMORY_ENHANCEMENT', 'NEUROPROTECTION'],
+    description: 'Ежовик гребенчатый — стимулирует фактор роста нервов (NGF), восстанавливает миелин. На курсе ААС нейропротектор.',
+    synergies: [
+      { with: "l_carnitine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когниция/память', when: 'Субъективно (4-12 нед)' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: аллергия при грибковой непереносимости'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт ежовика (50% эринацинов)' },
+    bestForCourse: false,
+  },
+  cordyceps: {
+    id: 'cordyceps',
+    name: 'Cordyceps',
+    nameRu: 'Кордицепс',
+    tier: 'advanced',
+    category: ['adaptogen', 'metabolic'],
+    forms: [
+      { id: 'cordyceps', name: 'Cordyceps', nameRu: 'Кордицепс 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'cordyceps_2', name: 'Cordyceps', nameRu: 'Кордицепс CS-4 1000 мг', dose: '500 мг', best: false }
+    ],
+    organs: ['LUNGS', 'MUSCLES', 'KIDNEYS'],
+    systems: ['cardio', 'renal', 'metabolic'],
+    mechanisms: ['ATP_PRODUCTION', 'OXYGEN_UTILIZATION', 'ADAPTOGENIC', 'TESTOSTERONE_SUPPORT'],
+    description: 'Кордицепс — адаптоген, повышает VO2max и продукцию АТФ. Улучшает кислородное снабжение. На курсе поддерживает выносливость.',
+    synergies: [
+      { with: "cordyceps", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "ss31", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "peptide_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'VO2max', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: диарея при высоких дозах'],
+    dosage: { mg: 500, timing: 'утро с едой', form: 'экстракт кордицепса (7% кордицепина)' },
+    bestForCourse: false,
+  },
+  maca: {
+    id: 'maca',
+    name: 'Maca',
+    nameRu: 'Мака (Лепидиум мейени)',
+    tier: 'advanced',
+    category: ['adaptogen', 'hormonal'],
+    forms: [
+      { id: 'maca', name: 'Maca', nameRu: 'Мака порошок 1.5 г', dose: '1.5 г 2x/д', best: true },
+      { id: 'maca_2', name: 'Maca', nameRu: 'Мака экстракт 500 мг', dose: '1.5 г', best: false }
+    ],
+    organs: ['REPRODUCTIVE', 'ADRENALS'],
+    systems: ['reproductive', 'endocrine'],
+    mechanisms: ['LIBIDO_ENHANCEMENT', 'ENERGY_BOOST', 'HORMONE_BALANCE', 'FERTILITY_SUPPORT'],
+    description: 'Мака — перуанский адаптоген, повышает либидо и энергетику. Не влияет на гормоны напрямую, но балансирует ГГЯ ось.',
+    synergies: [
+      { with: "d_aspartic_acid", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Либидо/энергия', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Метеоризм при начале', 'Редко: бессонница при приёме вечером'],
+    dosage: { mg: 1500, timing: 'с едой', form: 'порошок или экстракт маки (желатинизированный)' },
+    bestForCourse: false,
+  },
+  holy_basil: {
+    id: 'holy_basil',
+    name: 'Holy Basil',
+    nameRu: 'Туласи (Святой базилик)',
+    tier: 'advanced',
+    category: ['adaptogen', 'antiinflammatory'],
+    forms: [
+      { id: 'holy_basil', name: 'Holy Basil', nameRu: 'Туласи 400 мг', dose: '400 мг 2x/д', best: true },
+      { id: 'holy_basil_2', name: 'Holy Basil', nameRu: 'Святой базилик экстракт 300 мг', dose: '400 мг', best: false }
+    ],
+    organs: ['BRAIN', 'ADRENALS', 'LIVER'],
+    systems: ['neuro', 'endocrine', 'hepatic'],
+    mechanisms: ['CORTISOL_REDUCTION', 'ADAPTOGENIC', 'ANTI_INFLAMMATORY', 'ANTIOXIDANT'],
+    description: 'Туласи — священный базилик Аюрведы, мощный адаптоген. Снижает кортизол, сахар и воспаление. На курсе ААС помогает с восстановлением.',
+    synergies: [
+      { with: "soy_isoflavones", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "antidepressant_drugs", effect: "Туласи потенцирует антидепрессанты", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "progesterone", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "anticoagulant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'Кортизол/сахар', when: 'Каждые 4 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: диарея при высоких дозах'],
+    dosage: { mg: 400, timing: 'с едой 2x/д', form: 'экстракт туласи (2% урсоловой кислоты)' },
+    bestForCourse: false,
+  },
+  gotu_kola: {
+    id: 'gotu_kola',
+    name: 'Gotu Kola',
+    nameRu: 'Готу Кола',
+    tier: 'advanced',
+    category: ['adaptogen', 'nootropic'],
+    forms: [
+      { id: 'gotu_kola', name: 'Gotu Kola', nameRu: 'Готу Кола 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'SKIN', 'JOINTS'],
+    systems: ['neuro', 'musculoskeletal'],
+    mechanisms: ['COLLAGEN_SYNTHESIS', 'NEUROPROTECTION', 'CIRCULATION_ENHANCEMENT', 'ANXIOLYTIC'],
+    description: 'Готу Кола — ноотропный адаптоген, стимулирует синтез коллагена, улучшает кровообращение и память.',
+    synergies: [
+        {with: "bacopa", effect: "Когнитивная функция", mechanism: "Оба — ноотропы", severity: "MEDIUM"},
+        {with: "ginkgo", effect: "Кровообращение мозга", mechanism: "Оба улучшают кровоток", severity: "MEDIUM"},
+        {with: "collagen", effect: "Заживление ран", mechanism: "Готу кола + синтез коллагена", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когниция/кожа', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: головная боль при высоких дозах'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт готу колы' },
+    bestForCourse: false,
+  },
+  ecdysterone: {
+    id: 'ecdysterone',
+    name: 'Ecdysterone',
+    nameRu: 'Экдистерон',
+    tier: 'advanced',
+    category: ['adaptogen', 'anabolic'],
+    forms: [
+      { id: 'ecdysterone', name: 'Ecdysterone', nameRu: 'Экдистерон 200 мг 2x/д', dose: '400 мг 2x/д', best: true }
+    ],
+    organs: ['MUSCLES', 'LIVER'],
+    systems: ['musculoskeletal', 'metabolic'],
+    mechanisms: ['PROTEIN_SYNTHESIS', 'MTOR_ACTIVATION', 'LEAN_MASS_GAIN', 'INSULIN_SENSITIVITY'],
+    description: 'Экдистерон — фитостероид из левзеи, стимулирует синтез белка через mTOR без андрогенных эффектов. Улучшает композицию тела.',
+    synergies: [
+        {with: "vitamin_d3", effect: "Сигнальные пути роста", mechanism: "Экдистерон + D3", severity: "MEDIUM"},
+        {with: "creatine", effect: "Анаболическая синергия", mechanism: "Оба активируют синтез белка", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Мышечная масса', when: 'Каждые 4 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: тошнота'],
+    dosage: { mg: 400, timing: 'с едой (с белком)', form: 'экдистерон (95%)' },
+    bestForCourse: false,
+  },
+  shilajit: {
+    id: 'shilajit',
+    name: 'Shilajit',
+    nameRu: 'Мумиё (Шиладжит)',
+    tier: 'advanced',
+    category: ['adaptogen', 'metabolic'],
+    forms: [
+      { id: 'shilajit', name: 'Shilajit', nameRu: 'Мумиё очищенное 250 мг', dose: '250 мг 2x/д', best: true },
+      { id: 'shilajit_2', name: 'Shilajit', nameRu: 'Шиладжит экстракт 250 мг', dose: '250 мг', best: false }
+    ],
+    organs: ['BRAIN', 'MUSCLES', 'KIDNEYS'],
+    systems: ['neuro', 'renal', 'metabolic'],
+    mechanisms: ['FULVIC_ACID_DELIVERY', 'MINERAL_REPLETION', 'MITOCHONDRIAL_ENHANCEMENT', 'TESTOSTERONE_SUPPORT'],
+    description: 'Шиладжит — минеральная смола из Гималаев, содержит фульвокислоты и 80+ минералов. Повышает тестостерон и энергетику.',
+    synergies: [
+        {with: "coq10", effect: "Усиление АТФ", mechanism: "Мумиё повышает биодоступность CoQ10", severity: "MEDIUM"},
+        {with: "ashwagandha", effect: "Адаптогенный эффект", mechanism: "Оба модулируют стресс", severity: "MEDIUM"},
+        {with: "iron", effect: "Предотвращение анемии", mechanism: "Мумиё содержит Fe", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Тестостерон общий', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: аллергия'],
+    dosage: { mg: 250, timing: 'с едой', form: 'мумиё очищенное или экстракт' },
+    bestForCourse: false,
+  },
+  schisandra: {
+    id: 'schisandra',
+    name: 'Schisandra',
+    nameRu: 'Лимонник китайский (Шизандра)',
+    tier: 'advanced',
+    category: ['adaptogen', 'hepatoprotector'],
+    forms: [
+      { id: 'schisandra', name: 'Schisandra', nameRu: 'Шизандра 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'schisandra_2', name: 'Schisandra', nameRu: 'Лимонник экстракт 300 мг', dose: '500 мг', best: false }
+    ],
+    organs: ['LIVER', 'BRAIN', 'ADRENALS'],
+    systems: ['hepatic', 'neuro', 'endocrine'],
+    mechanisms: ['ADAPTOGENIC', 'LIVER_PROTECTION', 'CORTISOL_REGULATION', 'ANTIOXIDANT'],
+    description: 'Шизандра — адаптоген и гепатопротектор, содержит схизандрины. Защищает печень и повышает выносливость.',
+    synergies: [
+      { with: "adaptogen_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: бессонница при приёме вечером'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт шизандры (9% схизандринов)' },
+    bestForCourse: false,
+  },
+  ginger: {
+    id: 'ginger',
+    name: 'Ginger',
+    nameRu: 'Имбирь',
+    tier: 'standard',
+    category: ['herb', 'antiinflammatory'],
+    forms: [
+      { id: 'ginger', name: 'Ginger', nameRu: 'Имбирь экстракт 1000 мг', dose: '1 г 2x/д', best: true },
+      { id: 'ginger_2', name: 'Ginger', nameRu: 'Имбирь порошок 2 г', dose: '1 г', best: false }
+    ],
+    organs: ['STOMACH', 'INTESTINES', 'MUSCLES'],
+    systems: ['hepatic', 'metabolic'],
+    mechanisms: ['ANTI_INFLAMMATORY', 'NAUSEA_RELIEF', 'DIGESTION_ENHANCEMENT', 'MUSCLE_RECOVERY'],
+    description: 'Имбирь — противовоспалительное и противорвотное. Джинджеролы ингибируют COX-2 и LOX. На курсе помогает с тошнотой.',
+    synergies: [
+      { with: "nsaid_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "arb_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "curcumin", effect: "Имбирь + Куркумин — двойное противовоспалительное", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "anticoagulant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Тошнота/воспаление', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: изжога при высоких дозах'],
+    dosage: { mg: 1000, timing: 'с едой', form: 'имбиря экстракт (5% джинджеролов)' },
+    bestForCourse: false,
+  },
+  astaxanthin: {
+    id: 'astaxanthin',
+    name: 'Astaxanthin',
+    nameRu: 'Астаксантин',
+    tier: 'advanced',
+    category: ['antioxidant', 'cardioprotector'],
+    forms: [
+      { id: 'astaxanthin', name: 'Astaxanthin', nameRu: 'Астаксантин 12 мг', dose: '12 мг', best: true },
+      { id: 'astaxanthin_2', name: 'Astaxanthin', nameRu: 'Астаксантин 4 мг', dose: '12 мг', best: false }
+    ],
+    organs: ['SKIN', 'EYES', 'HEART', 'MUSCLES'],
+    systems: ['cardio', 'neuro'],
+    mechanisms: ['ANTIOXIDANT_6000X', 'UV_PROTECTION', 'ANTI_INFLAMMATORY', 'ENDURANCE_ENHANCEMENT'],
+    description: 'Астаксантин — в 6000 раз сильнее витамина С. Защищает кожу от UV и мышцы от окисления.',
+    synergies: [
+      { with: "lycopene", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "vitamin_e", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega3", effect: "Астаксантин защищает Омега-3 от окисления", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "vitamin_a", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Окислительный стресс', when: 'Каждые 12 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: лососёвый оттенок кожи'],
+    dosage: { mg: 12, timing: 'с едой (жирорастворимый)', form: 'астаксантин из Haematococcus' },
+    bestForCourse: false,
+  },
+  resveratrol: {
+    id: 'resveratrol',
+    name: 'Resveratrol',
+    nameRu: 'Ресвератрол',
+    tier: 'advanced',
+    category: ['antioxidant', 'cardioprotector'],
+    forms: [
+      { id: 'resveratrol', name: 'Resveratrol', nameRu: 'Транс-ресвератрол 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'resveratrol_2', name: 'Resveratrol', nameRu: 'Ресвератрол + Кверцетин', dose: '500 мг', best: false }
+    ],
+    organs: ['HEART', 'BRAIN', 'LIVER'],
+    systems: ['cardio', 'neuro', 'hepatic'],
+    mechanisms: ['SIRT1_ACTIVATION', 'ANTIOXIDANT', 'ANTI_INFLAMMATORY', 'NRF2_ACTIVATION'],
+    description: 'Ресвератрол — активатор SIRT1 и NRF2. Биодоступность около 20 процентов, птеростильбен предпочтительнее.',
+    synergies: [
+      { with: "statin_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "nmn", effect: "Резвератрол + NMN — NAD+ + сиртуины", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "anticoagulant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед', targetRange: 'ЛПНП<3.0' }
+    ],
+    contraindications: ['Приём антикоагулянтов (с осторожностью)'],
+    sideEffects: ['Редко: диарея при высоких дозах'],
+    dosage: { mg: 500, timing: 'с едой', form: 'транс-ресвератрол' },
+    bestForCourse: false,
+  },
+  quercetin: {
+    id: 'quercetin',
+    name: 'Quercetin',
+    nameRu: 'Кверцетин',
+    tier: 'advanced',
+    category: ['antioxidant', 'cardioprotector'],
+    forms: [
+      { id: 'quercetin', name: 'Quercetin', nameRu: 'Кверцетин 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'quercetin_2', name: 'Quercetin', nameRu: 'Кверцетин + Бромелайн', dose: '500 мг', best: false }
+    ],
+    organs: ['HEART', 'LUNGS', 'BRAIN'],
+    systems: ['cardio', 'neuro', 'hepatic'],
+    mechanisms: ['ANTI_INFLAMMATORY', 'ANTIHISTAMINE', 'SENOLYTIC', 'NRF2_ACTIVATION'],
+    description: 'Кверцетин — флавоноид с противовоспалительным и антигистаминным действием. Сенолитик.',
+    synergies: [
+      { with: "antihistamine_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "vitamin_c", effect: "Кверцетин + Витамин С — антиоксидантная синергия", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "anthocyanins", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "antibiotic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "immunosuppressant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'Окислительный стресс', when: 'Каждые 12 нед' }
+    ],
+    contraindications: ['Приём антикоагулянтов (с осторожностью)'],
+    sideEffects: ['Редко: головная боль'],
+    dosage: { mg: 500, timing: 'с едой (с жирами)', form: 'кверцетин' },
+    bestForCourse: false,
+  },
+  egcg: {
+    id: 'egcg',
+    name: 'EGCG',
+    nameRu: 'EGCG',
+    tier: 'advanced',
+    category: ['antioxidant', 'metabolic'],
+    forms: [
+      { id: 'egcg', name: 'EGCG', nameRu: 'EGCG 400 мг', dose: '400 мг 2x/д', best: true },
+      { id: 'egcg_2', name: 'EGCG', nameRu: 'Зелёный чай экстракт 500 мг', dose: '400 мг', best: false }
+    ],
+    organs: ['LIVER', 'BRAIN', 'HEART'],
+    systems: ['hepatic', 'neuro', 'metabolic'],
+    mechanisms: ['ANTIOXIDANT', 'FAT_OXIDATION', 'ANTI_INFLAMMATORY', 'AMPK_ACTIVATION'],
+    description: 'EGCG — главный катехин зелёного чая. Активирует AMPK, стимулирует жиросжигание.',
+    synergies: [
+      { with: "vitamin_d3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega9", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "polyphenol_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "mushroom_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+        {with: "iron", effect: "Снижение всасывания Fe", mechanism: "Дубильные вещества связывают Fe", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' }
+    ],
+    contraindications: ['Беременность', 'Тяжёлая анемия'],
+    sideEffects: ['Тошнота натощак'],
+    dosage: { mg: 400, timing: 'натощак или с едой', form: 'EGCG экстракт' },
+    bestForCourse: false,
+  },
+  sulforaphane: {
+    id: 'sulforaphane',
+    name: 'Sulforaphane',
+    nameRu: 'Сульфорафан',
+    tier: 'advanced',
+    category: ['antioxidant', 'hepatoprotector'],
+    forms: [
+      { id: 'sulforaphane', name: 'Sulforaphane', nameRu: 'Сульфорафан 20 мг', dose: '20 мг', best: true },
+      { id: 'sulforaphane_2', name: 'Sulforaphane', nameRu: 'Проростки брокколи экстракт', dose: '20 мг', best: false }
+    ],
+    organs: ['LIVER', 'LUNGS', 'INTESTINES'],
+    systems: ['hepatic', 'immune', 'metabolic'],
+    mechanisms: ['NRF2_ACTIVATION', 'PHASE2_DETOXIFICATION', 'ANTI_INFLAMMATORY', 'ANTICANCER'],
+    description: 'Сульфорафан — мощнейший активатор NRF2. Из брокколи. На курсе — ключевая гепатопротекция.',
+    synergies: [
+      { with: "calcium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Окислительный стресс', when: 'Каждые 12 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Тошнота при натощак'],
+    dosage: { mg: 20, timing: 'натощак или с едой', form: 'экстракт проростков брокколи' },
+    bestForCourse: false,
+  },
+  melatonin: {
+    id: 'melatonin',
+    name: 'Melatonin',
+    nameRu: 'Мелатонин',
+    tier: 'advanced',
+    category: ['hormonal', 'neuroprotector'],
+    forms: [
+      { id: 'melatonin', name: 'Melatonin', nameRu: 'Мелатонин 3 мг', dose: '3 мг', best: true },
+      { id: 'melatonin_2', name: 'Melatonin', nameRu: 'Мелатонин 5 мг', dose: '3 мг', best: false }
+    ],
+    organs: ['BRAIN', 'IMMUNE_SYSTEM', 'INTESTINES'],
+    systems: ['neuro', 'immune', 'metabolic'],
+    mechanisms: ['SLEEP_REGULATION', 'ANTIOXIDANT', 'IMMUNE_MODULATION', 'CIRCADIAN_RHYTHM'],
+    description: 'Мелатонин — гормон сна, мощный антиоксидант. На курсе улучшает восстановление.',
+    synergies: [
+      { with: "magnesium", effect: "Мелатонин + Магний — расслабление + сон", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "anxiolytic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "gaba", effect: "Мелатонин + ГАМК — двойное расслабление", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "antidepressant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "stimulant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'Качество сна', when: 'Субъективно' }
+    ],
+    contraindications: ['Аутоиммунные заболевания (с осторожностью)'],
+    sideEffects: ['Сонливость', 'Редко: яркие сновидения'],
+    dosage: { mg: 3, timing: 'на ночь за 30 мин до сна', form: 'мелатонин капсулы' },
+    bestForCourse: false,
+  },
+  ginkgo: {
+    id: 'ginkgo',
+    name: 'Ginkgo Biloba',
+    nameRu: 'Гинкго Билоба',
+    tier: 'advanced',
+    category: ['nootropic', 'cardioprotector'],
+    forms: [
+      { id: 'ginkgo', name: 'Ginkgo Biloba', nameRu: 'Гинкго 60 мг 2x/д', dose: '120 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'VESSELS', 'EYES'],
+    systems: ['neuro', 'cardio'],
+    mechanisms: ['CEREBRAL_BLOOD_FLOW', 'ANTIOXIDANT', 'MEMORY_ENHANCEMENT', 'PLATELET_AGGREGATION_INHIBITION'],
+    description: 'Гинкго — улучшает мозговой кровоток и память.',
+    synergies: [
+      { with: "bacopa", effect: "Гинкго + Бакопа — кровоток + память", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "ginseng", effect: "Женьшень + Гинкго — энергия + кровоток", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "vinpocetine", effect: "Гинкго + Винпоцетин — двойной мозговой кровоток", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Риск кровотечения", mechanism: "Гинкго снижает агрегацию тромбоцитов", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Когниция/память', when: 'Субъективно' }
+    ],
+    contraindications: ['Приём антикоагулянтов (с осторожностью)'],
+    sideEffects: ['Редко: головная боль', 'Риск кровотечения'],
+    dosage: { mg: 120, timing: 'с едой 2x/д', form: 'экстракт гинкго' },
+    bestForCourse: false,
+  },
+  cjc1295: {
+    id: 'cjc1295',
+    name: 'CJC-1295',
+    nameRu: 'CJC-1295 (с модагриком)',
+    tier: 'specialty',
+    category: ['peptide', 'hormonal'],
+    forms: [
+      { id: 'cjc1295', name: 'CJC-1295', nameRu: 'CJC-1295 + Ipamorelin 2 мг', dose: '2 мг 2x/д', best: true },
+      { id: 'cjc1295_2', name: 'CJC-1295', nameRu: 'CJC-1295 5 мг', dose: '2 мг', best: false }
+    ],
+    organs: ['REPRODUCTIVE', 'BRAIN'],
+    systems: ['reproductive', 'endocrine'],
+    mechanisms: ['GH_RELEASING_IGH_INCREASE', 'LH_RELEASE', 'MUSCLE_GROWTH', 'FAT_LOSS'],
+    description: 'CJC-1295 с модагриком — пептид GHRH-аналог, стимулирует выброс ГР и ИФР-1. Улучшает композицию тела и восстановление.',
+    synergies: [
+        {with: "ipamorelin", effect: "Максимальная стимуляция GH", mechanism: "CJC-1295 + ипаморелин — GHRH+GHRP", severity: "HIGH"},
+        {with: "ghrp6", effect: "Усиление пульсации GH", mechanism: "GHRH+GHRP = синергия GH", severity: "HIGH"},
+      ],
+    conflicts: [
+        {with: "somatostatin_analogues", effect: "Подавление GH", mechanism: "Соматостатин блокирует GH", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'ИФР-1', when: 'Каждые 4 нед', targetRange: '150-450 нг/мл' }
+    ],
+    contraindications: ['Беременность', 'Активный онкологический процесс'],
+    sideEffects: ['Редко: задержка жидкости', 'Покраснение в месте инъекции'],
+    dosage: { mg: 2, timing: '1x/нед п/к', form: 'CJC-1295 2 мг' },
+    bestForCourse: false,
+  },
+  ipamorelin: {
+    id: 'ipamorelin',
+    name: 'Ipamorelin',
+    nameRu: 'Ипаморелин',
+    tier: 'specialty',
+    category: ['peptide', 'hormonal'],
+    forms: [
+      { id: 'ipamorelin', name: 'Ipamorelin', nameRu: 'Ипаморелин 100 мкг', dose: '100 мкг 2x/д', best: true },
+      { id: 'ipamorelin_2', name: 'Ipamorelin', nameRu: 'Ипаморелин 200 мкг', dose: '100 мкг', best: false }
+    ],
+    organs: ['REPRODUCTIVE', 'BRAIN'],
+    systems: ['reproductive', 'endocrine'],
+    mechanisms: ['GH_RELEASE_SELECTIVE', 'LH_RELEASE', 'MUSCLE_RECOVERY', 'FAT_LOSS'],
+    description: 'Ипаморелин — селективный секретагог ГР, не повышает кортизол и пролактин. На курсе — восстановление и жиросжигание.',
+    synergies: [
+      { with: "insulin", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+        {with: "somatostatin_analogues", effect: "Блокировка GH", mechanism: "Соматостатин блокирует GH", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'ИФР-1', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Беременность'],
+    sideEffects: ['Редко: покраснение в месте инъекции', 'Тошнота при начале'],
+    dosage: { mg: 0.1, timing: '2-3x/д п/к', form: 'Ипаморелин 100 мкг' },
+    bestForCourse: false,
+  },
+  ghrp2: {
+    id: 'ghrp2',
+    name: 'GHRP-2',
+    nameRu: 'GHRP-2',
+    tier: 'specialty',
+    category: ['peptide', 'hormonal'],
+    forms: [
+      { id: 'ghrp2', name: 'GHRP-2', nameRu: 'GHRP-2 100 мкг', dose: '100 мкг 2x/д', best: true }
+    ],
+    organs: ['REPRODUCTIVE', 'BRAIN'],
+    systems: ['reproductive', 'endocrine'],
+    mechanisms: ['GH_RELEASE', 'CORTISOL_MODULATION', 'APPETITE_STIMULATION', 'MUSCLE_RECOVERY'],
+    description: 'GHRP-2 — секретагог ГР, стимулирует аппетит и восстановление. Менее селективный чем ипаморелин.',
+    synergies: [
+        {with: "cjc1295", effect: "Максимальная стимуляция GH", mechanism: "GHRH+GHRP = синергия GH", severity: "HIGH"},
+        {with: "ipamorelin", effect: "GHRP синергия", mechanism: "Оба — GHRP-агонисты", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "somatostatin_analogues", effect: "Блокировка GH", mechanism: "Соматостатин ингибирует GHRP", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'ИФР-1', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Беременность'],
+    sideEffects: ['Повышение аппетита', 'Покраснение в месте инъекции'],
+    dosage: { mg: 0.1, timing: '2-3x/д п/к', form: 'GHRP-2 100 мкг' },
+    bestForCourse: false,
+  },
+  ghrp6: {
+    id: 'ghrp6',
+    name: 'GHRP-6',
+    nameRu: 'GHRP-6',
+    tier: 'specialty',
+    category: ['peptide', 'hormonal'],
+    forms: [
+      { id: 'ghrp6', name: 'GHRP-6', nameRu: 'GHRP-6 100 мкг', dose: '100 мкг 2x/д', best: true }
+    ],
+    organs: ['REPRODUCTIVE', 'BRAIN'],
+    systems: ['reproductive', 'endocrine'],
+    mechanisms: ['GH_RELEASE', 'APPETITE_STIMULATION', 'CORTISOL_INCREASE', 'MUSCLE_RECOVERY'],
+    description: 'GHRP-6 — секретагог ГР с сильным стимулирующим аппетит действием. На курсе — набор массы.',
+    synergies: [
+        {with: "cjc1295", effect: "Максимальная стимуляция GH", mechanism: "GHRH+GHRP = синергия GH", severity: "HIGH"},
+        {with: "ghrp2", effect: "Усиление аппетита и GH", mechanism: "GHRP-6 — самый сильный GHRP", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "somatostatin_analogues", effect: "Блокировка GH", mechanism: "Соматостатин ингибирует GHRP", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'ИФР-1', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Беременность'],
+    sideEffects: ['Сильное повышение аппетита', 'Покраснение в месте инъекции'],
+    dosage: { mg: 0.1, timing: '2-3x/д п/к', form: 'GHRP-6 100 мкг' },
+    bestForCourse: false,
+  },
+  follistatin: {
+    id: 'follistatin',
+    name: 'Follistatin',
+    nameRu: 'Фоллистатин',
+    tier: 'specialty',
+    category: ['peptide', 'hormonal'],
+    forms: [
+      { id: 'follistatin', name: 'Follistatin', nameRu: 'Фоллистатин 1 мг', dose: '1 мг 2x/д', best: true }
+    ],
+    organs: ['MUSCLES', 'REPRODUCTIVE'],
+    systems: ['reproductive', 'endocrine'],
+    mechanisms: ['MYOSTATIN_INHIBITION', 'MUSCLE_GROWTH', 'FOLLICLE_REGULATION'],
+    description: 'Фоллистатин — белок-ингибитор миостатина, блокирует ограничитель роста мышц. Потенцирует гипертрофию на курсе.',
+    synergies: [
+        {with: "cjc1295", effect: "Рост мышц: миостатин+GH", mechanism: "Фоллистатин + CJC-1295", severity: "HIGH"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Миостатин', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Беременность', 'Онкология'],
+    sideEffects: ['Редко: реакция в месте инъекции'],
+    dosage: { mg: 1, timing: '2x/нед п/к', form: 'Фоллистатин 1 мг' },
+    bestForCourse: false,
+  },
+  semax: {
+    id: 'semax',
+    name: 'Semax',
+    nameRu: 'Семакс',
+    tier: 'specialty',
+    category: ['peptide', 'nootropic'],
+    forms: [
+      { id: 'semax', name: 'Semax', nameRu: 'Семакс 0.1% капли', dose: '0.3 мкг 2x/д', best: true },
+      { id: 'semax_2', name: 'Semax', nameRu: 'Семакс 0.3% капли', dose: '0.3 мкг', best: false }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['NGF_STIMULATION', 'BDNF_INCREASE', 'NEUROPROTECTION', 'COGNITION_ENHANCEMENT'],
+    description: 'Семакс — нейропептид, стимулирует синтез NGF и BDNF, улучшает память, внимание и нейропротекцию. Обязателен на курсе ААС.',
+    synergies: [
+        {with: "selank", effect: "Комплексная нейропротекция", mechanism: "Семакс — BDNF, Селанк — GABA", severity: "MEDIUM"},
+        {with: "citicoline", effect: "Когнитивная функция", mechanism: "Оба улучшают память", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Эпилепсия', 'Острый психоз'],
+    sideEffects: ['Редко: раздражение слизистой'],
+    dosage: { mg: 0.0003, timing: '2x/д интраназально', form: 'Семакс 0.3 мг/капли' },
+    bestForCourse: true,
+  },
+  selank: {
+    id: 'selank',
+    name: 'Selank',
+    nameRu: 'Селанк',
+    tier: 'specialty',
+    category: ['peptide', 'nootropic'],
+    forms: [
+      { id: 'selank', name: 'Selank', nameRu: 'Селанк 0.1% капли', dose: '0.3 мкг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['nero'],
+    mechanisms: ['GABA_MODULATION', 'ANXIOLYTIC', 'NEUROPROTECTION', 'MOOD_REGULATION'],
+    description: 'Селанк — анксиолитический пептид, модулирует ГАМК-систему, снижает тревожность и улучшает сон. На курсе — антистресс.',
+    synergies: [
+        {with: "semax", effect: "Нейропротекция + антистресс", mechanism: "Семакс — BDNF/NGF, Селанк — GABA", severity: "MEDIUM"},
+        {with: "magnesium", effect: "Анксиолитический эффект", mechanism: "Оба снижают тревожность", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: ['Индивидуальная непереносимость'],
+    sideEffects: ['Редко: раздражение слизистой'],
+    dosage: { mg: 0.0003, timing: '2-3x/д интраназально', form: 'Селанк 0.3 мг/капли' },
+    bestForCourse: false,
+  },
+  dsip: {
+    id: 'dsip',
+    name: 'DSIP',
+    nameRu: 'DSIP (Дельта-сон-индуцирующий пептид)',
+    tier: 'specialty',
+    category: ['peptide', 'neuroprotector'],
+    forms: [
+      { id: 'dsip', name: 'DSIP', nameRu: 'DSIP 1 мг', dose: '1 мг 2x/д', best: true },
+      { id: 'dsip_2', name: 'DSIP', nameRu: 'DSIP 2 мг', dose: '1 мг', best: false }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['nero'],
+    mechanisms: ['SLEEP_REGULATION', 'ANALGESIC', 'CORTISOL_REDUCTION', 'STRESS_MODULATION'],
+    description: 'DSIP — дельта-сон-индуцирующий пептид, нормализует структуру сна, снижает кортизол. На курсе — улучшение восстановления.',
+    synergies: [
+        {with: "melatonin", effect: "Глубокий сон", mechanism: "DSIP — дельта-сон, мелатонин — циркадный", severity: "MEDIUM"},
+        {with: "magnesium", effect: "Расслабление", mechanism: "Оба — глубокий сон", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Сон (соно-графия)', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: покраснение в месте инъекции'],
+    dosage: { mg: 1, timing: 'на ночь п/к', form: 'DSIP 1 мг' },
+    bestForCourse: false,
+  },
+  p21: {
+    id: 'p21',
+    name: 'P21',
+    nameRu: 'P21 (Пептид 21)',
+    tier: 'specialty',
+    category: ['peptide', 'nootropic'],
+    forms: [
+      { id: 'p21', name: 'P21', nameRu: 'P21 1 мг', dose: '1 мкг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['NEUROGENESIS', 'MEMORY_ENHANCEMENT', 'BDNF_INCREASE', 'NEUROPROTECTION'],
+    description: 'P21 — ноотропный пептид, стимулирует нейрогенез и BDNF. Улучшает память и обучение на курсе.',
+    synergies: [
+        {with: "semax", effect: "Нейропластичность", mechanism: "Оба стимулируют нейрогенез", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: покраснение в месте инъекции'],
+    dosage: { mg: 0.001, timing: '1x/д п/к', form: 'P21 1 мг' },
+    bestForCourse: false,
+  },
+  mots_c: {
+    id: 'mots_c',
+    name: 'MOTS-c',
+    nameRu: 'MOTS-c',
+    tier: 'specialty',
+    category: ['peptide', 'metabolic'],
+    forms: [
+      { id: 'mots_c', name: 'MOTS-c', nameRu: 'MOTS-c 10 мг', dose: '10 мг 2x/д', best: true }
+    ],
+    organs: ['MUSCLES', 'LIVER', 'BRAIN'],
+    systems: ['hepatic', 'metabolic'],
+    mechanisms: ['AMPK_ACTIVATION', 'FAT_OXIDATION', 'INSULIN_SENSITIVITY', 'MUSCLE_REGULATION'],
+    description: 'MOTS-c — митохондриальный пептид, активирует AMPK, улучшает инсулиновую чувствительность и жиросжигание.',
+    synergies: [
+        {with: "nmn", effect: "Митохондриальная функция", mechanism: "MOTS-c + NMN — путь NAD+", severity: "MEDIUM"},
+        {with: "coq10", effect: "Энергетический метаболизм", mechanism: "Оба поддерживают митохондрии", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Глюкоза натощак', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Беременность'],
+    sideEffects: ['Редко: покраснение в месте инъекции'],
+    dosage: { mg: 10, timing: '1x/д п/к', form: 'MOTS-c 10 мг' },
+    bestForCourse: false,
+  },
+  humanin: {
+    id: 'humanin',
+    name: 'Humanin',
+    nameRu: 'Хьюманин',
+    tier: 'specialty',
+    category: ['peptide', 'neuroprotector'],
+    forms: [
+      { id: 'humanin', name: 'Humanin', nameRu: 'Хьюманин 5 мг', dose: '5 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'MUSCLES', 'HEART'],
+    systems: ['neuro', 'cardio'],
+    mechanisms: ['NEUROPROTECTION', 'APOPTOSIS_INHIBITION', 'MITOCHONDRIAL_PROTECTION', 'INSULIN_SENSITIVITY'],
+    description: 'Хьюманин — митохондриальный пептид, подавляет апоптоз, нейропротекция и защита митохондрий. Анти-возрастной.',
+    synergies: [
+        {with: "mots_c", effect: "Митохондриальная защита", mechanism: "Оба — митохондриальные пептиды", severity: "MEDIUM"},
+        {with: "coq10", effect: "Клеточная защита", mechanism: "Хьюманин защищает от апоптоза", severity: "LOW"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: покраснение в месте инъекции'],
+    dosage: { mg: 5, timing: '1x/д п/к', form: 'Хьюманин 5 мг' },
+    bestForCourse: false,
+  },
+  ss31: {
+    id: 'ss31',
+    name: 'SS-31',
+    nameRu: 'SS-31 (Элампирад)',
+    tier: 'specialty',
+    category: ['peptide', 'mitochondrial'],
+    forms: [
+      { id: 'ss31', name: 'SS-31', nameRu: 'SS-31 1 мг', dose: '1 мг 2x/д', best: true }
+    ],
+    organs: ['MUSCLES', 'HEART', 'KIDNEYS'],
+    systems: ['cardio', 'renal'],
+    mechanisms: ['MITOCHONDRIAL_PROTECTION', 'ATP_PRODUCTION', 'OXIDATIVE_STRESS_REDUCTION', 'MUSCLE_RECOVERY'],
+    description: 'SS-31 — митохондриальный пептид, защищает внутреннюю мембрану митохондрий, снижает окислительный стресс.',
+    synergies: [
+      { with: "cordyceps", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "peptide_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'КФК', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Беременность'],
+    sideEffects: ['Редко: покраснение в месте инъекции'],
+    dosage: { mg: 1, timing: '1x/д п/к', form: 'SS-31 1 мг' },
+    bestForCourse: false,
+  },
+  thymosin_alpha1: {
+    id: 'thymosin_alpha1',
+    name: 'Thymosin Alpha-1',
+    nameRu: 'Тимозин Альфа-1',
+    tier: 'specialty',
+    category: ['peptide', 'immunomodulator'],
+    forms: [
+      { id: 'thymosin_alpha1', name: 'Thymosin Alpha-1', nameRu: 'Тимозин Альфа-1 1.6 мг', dose: '1.6 мг 2x/д', best: true }
+    ],
+    organs: ['THYMUS', 'IMMUNE_SYSTEM'],
+    systems: ['immune'],
+    mechanisms: ['IMMUNE_REGULATION', 'T_CELL_ACTIVATION', 'ANTI_INFLAMMATORY', 'INFECTION_RESISTANCE'],
+    description: 'Тимозин Альфа-1 — иммуномодулирующий пептид, активирует Т-клетки и NK-клетки. На курсе — защита от инфекций.',
+    synergies: [
+        {with: "vitamin_d3", effect: "Иммунная модуляция", mechanism: "Оба усиливают Th1-иммунитет", severity: "MEDIUM"},
+        {with: "zinc", effect: "Т-клеточный иммунитет", mechanism: "Оба поддерживают Т-лимфоциты", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "Тимозин стимулирует иммунитет", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Иммунограмма', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Аутоиммунные заболевания (с осторожностью)'],
+    sideEffects: ['Редко: покраснение в месте инъекции'],
+    dosage: { mg: 1.6, timing: '2x/нед п/к', form: 'Тимозин Альфа-1 1.6 мг' },
+    bestForCourse: false,
+  },
+  ghk_cu: {
+    id: 'ghk_cu',
+    name: 'GHK-Cu',
+    nameRu: 'GHK-Cu (Глицил-гистидил-лизин-медь)',
+    tier: 'advanced',
+    category: ['peptide', 'joint', 'antioxidant'],
+    forms: [
+      { id: 'ghk_cu', name: 'GHK-Cu', nameRu: 'GHK-Cu 2 мг', dose: '2 мг 2x/д', best: true },
+      { id: 'ghk_cu_2', name: 'GHK-Cu', nameRu: 'GHK-Cu крем 1%', dose: '2 мг', best: false }
+    ],
+    organs: ['SKIN', 'JOINTS', 'HAIR'],
+    systems: ['musculoskeletal'],
+    mechanisms: ['WOUND_HEALING', 'COLLAGEN_SYNTHESIS', 'ANTI_INFLAMMATORY', 'COPPER_DELIVERY'],
+    description: 'GHK-Cu — медный пептид, стимулирует синтез коллагена, заживление ран, антиоксидант. На курсе — кожа, связки, волосы.',
+    synergies: [
+        {with: "vitamin_c", effect: "Синтез коллагена", mechanism: "GHK-Медь стимулирует синтез", severity: "HIGH"},
+        {with: "zinc", effect: "Заживление ран", mechanism: "Оба — кофакторы восстановления", severity: "MEDIUM"},
+        {with: "bpc157", effect: "Комплексное заживление", mechanism: "Оба стимулируют ангиогенез", severity: "HIGH"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Медь сыворотки', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Болезнь Вильсона', 'Избыток меди'],
+    sideEffects: ['Покраснение', 'Редко: тошнота'],
+    dosage: { mg: 2, timing: '1x/д п/к или наружно', form: 'GHK-Cu 2 мг' },
+    bestForCourse: false,
+  },
+  bpc157: {
+    id: 'bpc157',
+    name: 'BPC-157',
+    nameRu: 'BPC-157 (Пептид защиты тела)',
+    tier: 'specialty',
+    category: ['peptide', 'joint'],
+    forms: [
+      { id: 'bpc157', name: 'BPC-157', nameRu: 'BPC-157 250 мкг', dose: '250 мкг 2x/д', best: true },
+      { id: 'bpc157_2', name: 'BPC-157', nameRu: 'BPC-157 500 мкг', dose: '250 мкг', best: false }
+    ],
+    organs: ['JOINTS', 'GUT', 'MUSCLES'],
+    systems: ['musculoskeletal', 'gastrointestinal'],
+    mechanisms: ['WOUND_HEALING', 'ANGIOGENESIS', 'GUT_PROTECTION', 'ANTI_INFLAMMATORY'],
+    description: 'BPC-157 — пептид защиты тела, ускоряет заживление связок, сухожилий, кишки. На курсе — защита суставов и ЖКТ.',
+    synergies: [
+        {with: "tb500", effect: "Максимальное заживление", mechanism: "BPC-157 — ангиогенез, TB-500 — миграция", severity: "HIGH"},
+        {with: "vitamin_c", effect: "Синтез коллагена", mechanism: "Оба — синтез коллагена", severity: "MEDIUM"},
+        {with: "ghk_cu", effect: "Регенерация тканей", mechanism: "Оба — заживление через разные пути", severity: "HIGH"},
+        {with: "glucosamine", effect: "Восстановление суставов", mechanism: "BPC-157 + глюкозамин — хрящ", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Контроль суставов', when: 'Субъективно' }
+    ],
+    contraindications: ['Беременность', 'Онкология'],
+    sideEffects: ['Редко: покраснение в месте инъекции'],
+    dosage: { mg: 0.25, timing: '2x/д п/к или перорально', form: 'BPC-157 250 мкг' },
+    bestForCourse: true,
+  },
+  tb500: {
+    id: 'tb500',
+    name: 'TB-500',
+    nameRu: 'TB-500 (Тимозин Бета-4)',
+    tier: 'specialty',
+    category: ['peptide', 'joint'],
+    forms: [
+      { id: 'tb500', name: 'TB-500', nameRu: 'TB-500 5 мг', dose: '5 мг 2x/д', best: true },
+      { id: 'tb500_2', name: 'TB-500', nameRu: 'TB-500 10 мг', dose: '5 мг', best: false }
+    ],
+    organs: ['JOINTS', 'MUSCLES', 'HEART'],
+    systems: ['musculoskeletal'],
+    mechanisms: ['ACTIN_REGULATION', 'WOUND_HEALING', 'MUSCLE_RECOVERY', 'ANTI_INFLAMMATORY'],
+    description: 'TB-500 — пептид на основе тимозина бета-4, регулирует актин, ускоряет заживление мышц и связок. На курсе — восстановление.',
+    synergies: [
+        {with: "bpc157", effect: "Максимальное заживление", mechanism: "TB-500 — актин, BPC-157 — ангиогенез", severity: "HIGH"},
+        {with: "vitamin_c", effect: "Заживление", mechanism: "Оба способствуют восстановлению", severity: "MEDIUM"},
+        {with: "ghk_cu", effect: "Регенерация", mechanism: "Оба стимулируют миграцию", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Контроль суставов', when: 'Субъективно' }
+    ],
+    contraindications: ['Беременность', 'Онкология'],
+    sideEffects: ['Редко: покраснение в месте инъекции'],
+    dosage: { mg: 5, timing: '2x/нед п/к', form: 'TB-500 5 мг' },
+    bestForCourse: true,
+  },
+  melanotan1: {
+    id: 'melanotan1',
+    name: 'Melanotan-1',
+    nameRu: 'Меланотан-1',
+    tier: 'specialty',
+    category: ['peptide', 'hormonal'],
+    forms: [
+      { id: 'melanotan1', name: 'Melanotan-1', nameRu: 'Меланотан-1 1 мг', dose: '1 мг 2x/д', best: true }
+    ],
+    organs: ['SKIN', 'REPRODUCTIVE'],
+    systems: ['reproductive'],
+    mechanisms: ['MELANOGENESIS', 'SKIN_PROTECTION', 'UV_PROTECTION', 'APHRODISIAC_EFFECT'],
+    description: 'Меланотан-1 — пептид, стимулирующий меланогенез, защиту кожи от УФ. Минимальные побочные эффекты.',
+    synergies: [
+        {with: "vitamin_d3", effect: "Пигментация и синтез витамина D", mechanism: "Меланотан → меланин → D3", severity: "LOW"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Пигментация кожи', when: 'Субъективно' }
+    ],
+    contraindications: ['Беременность', 'Меланома в анамнезе'],
+    sideEffects: ['Тошнота при начале', 'Покраснение'],
+    dosage: { mg: 1, timing: '1x/д п/к', form: 'Меланотан-1 1 мг' },
+    bestForCourse: false,
+  },
+  melanotan2: {
+    id: 'melanotan2',
+    name: 'Melanotan-2',
+    nameRu: 'Меланотан-2',
+    tier: 'specialty',
+    category: ['peptide', 'hormonal'],
+    forms: [
+      { id: 'melanotan2', name: 'Melanotan-2', nameRu: 'Меланотан-2 0.5 мг', dose: '500 мкг 2x/д', best: true }
+    ],
+    organs: ['SKIN', 'REPRODUCTIVE'],
+    systems: ['reproductive'],
+    mechanisms: ['MELANOGENESIS', 'APHRODISIAC_EFFECT', 'APPETITE_SUPPRESSION', 'UV_PROTECTION'],
+    description: 'Меланотан-2 — сильнее МТ1, стимулирует загар и либидо, но с больше побочными. На курсе — защита кожи.',
+    synergies: [
+        {with: "vitamin_d3", effect: "Пигментация и синтез витамина D", mechanism: "Меланотан → меланин → D3", severity: "LOW"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Пигментация кожи', when: 'Субъективно' }
+    ],
+    contraindications: ['Беременность', 'Меланома', 'Сердечно-сосудистые заболевания'],
+    sideEffects: ['Тошнота', 'Приливы', 'Потемнение веснушек'],
+    dosage: { mg: 0.5, timing: '1x/д п/к (титровать)', form: 'Меланотан-2 0.5 мг' },
+    bestForCourse: false,
+  },
+  pt141: {
+    id: 'pt141',
+    name: 'PT-141',
+    nameRu: 'PT-141 (Бремеланотид)',
+    tier: 'specialty',
+    category: ['peptide', 'hormonal'],
+    forms: [
+      { id: 'pt141', name: 'PT-141', nameRu: 'PT-141 2 мг', dose: '2 мг 2x/д', best: true }
+    ],
+    organs: ['REPRODUCTIVE', 'BRAIN'],
+    systems: ['reproductive'],
+    mechanisms: ['MELANOCORTIN_ACTIVATION', 'APHRODISIAC_EFFECT', 'LIBIDO_ENHANCEMENT', 'ERECTILE_FUNCTION'],
+    description: 'PT-141 — пептид для лечения сексуальной дисфункции, активирует меланокортиновые рецепторы. На курсе — либидо.',
+    synergies: [
+        {with: "melanotan2", effect: "Усиление эффекта", mechanism: "PT-141 — метаболит меланотана II", severity: "MEDIUM"},
+      ],
+    conflicts: [
+      { with: "stimulant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Либидо', when: 'Субъективно' }
+    ],
+    contraindications: ['Беременность', 'Неконтролируемая гипертензия'],
+    sideEffects: ['Тошнота', 'Приливы', 'Повышение АД'],
+    dosage: { mg: 2, timing: 'за 30 мин до п/к', form: 'PT-141 2 мг' },
+    bestForCourse: false,
+  },
+  gonadorelin: {
+    id: 'gonadorelin',
+    name: 'Gonadorelin',
+    nameRu: 'Гонадорелин',
+    tier: 'specialty',
+    category: ['peptide', 'hormonal'],
+    forms: [
+      { id: 'gonadorelin', name: 'Gonadorelin', nameRu: 'Гонадорелин 100 мкг', dose: '100 мкг 2x/д', best: true }
+    ],
+    organs: ['REPRODUCTIVE', 'BRAIN'],
+    systems: ['reproductive', 'endocrine'],
+    mechanisms: ['GNRH_RELEASE', 'LH_FSH_REGULATION', 'TESTOSTERONE_RESTORE', 'PCT_SUPPORT'],
+    description: 'Гонадорелин — стимулятор ГнРГ, восстанавливает ось ГРГ-ЛГ-ФСГ. Для ПКТ и восстановления после курса.',
+    synergies: [
+        {with: "hcg", effect: "Стимуляция HPG-оси", mechanism: "Гонадорелин — GnRH, ХГЧ — LH-аналог", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'ЛГ/ФСГ', when: 'Каждые 2 нед' }
+    ],
+    contraindications: ['Беременность', 'Гипофизарная недостаточность'],
+    sideEffects: ['Редко: покраснение в месте инъекции'],
+    dosage: { mg: 0.1, timing: '2-3x/д п/к', form: 'Гонадорелин 100 мкг' },
+    bestForCourse: false,
+  },
+  kisspeptin: {
+    id: 'kisspeptin',
+    name: 'Kisspeptin',
+    nameRu: 'Киссептин',
+    tier: 'specialty',
+    category: ['peptide', 'hormonal'],
+    forms: [
+      { id: 'kisspeptin', name: 'Kisspeptin', nameRu: 'Киссептин 100 мкг', dose: '100 мкг 2x/д', best: true }
+    ],
+    organs: ['REPRODUCTIVE', 'BRAIN'],
+    systems: ['reproductive', 'endocrine'],
+    mechanisms: ['GNRH_RELEASE', 'LH_FSH_STIMULATION', 'PUBERTY_REGULATION', 'REPRODUCTIVE_RECOVERY'],
+    description: 'Киссептин — пептид, стимулирующий выброс ГнРГ, восстанавливает репродуктивную ось. Для ПКТ и восстановления.',
+    synergies: [
+        {with: "gonadorelin", effect: "Стимуляция HPG-оси", mechanism: "Кисспептин → GnRH → LH/FSH", severity: "HIGH"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'ЛГ/ФСГ', when: 'Каждые 2 нед' }
+    ],
+    contraindications: ['Беременность'],
+    sideEffects: ['Редко: покраснение в месте инъекции'],
+    dosage: { mg: 0.1, timing: '1x/д п/к', form: 'Киссептин 100 мкг' },
+    bestForCourse: false,
+  },
+  glp1: {
+    id: 'glp1',
+    name: 'GLP-1',
+    nameRu: 'ГПП-1 (Глюкагоноподобный пептид-1)',
+    tier: 'specialty',
+    category: ['peptide', 'metabolic'],
+    forms: [
+      { id: 'glp1', name: 'GLP-1', nameRu: 'ГПП-1 0.5 мг', dose: '500 мкг 2x/д', best: true }
+    ],
+    organs: ['PANCREAS', 'BRAIN', 'GUT'],
+    systems: ['metabolic', 'gastrointestinal'],
+    mechanisms: ['INSULIN_SECRETION', 'GLUCOSE_REGULATION', 'APPETITE_SUPPRESSION', 'WEIGHT_LOSS'],
+    description: 'ГПП-1 — инкретиновый пептид, стимулирует инсулин, подавляет аппетит. На курсе — контроль глюкозы и веса.',
+    synergies: [
+        {with: "berberine", effect: "Контроль глюкозы и аппетита", mechanism: "Оба снижают аппетит и глюкозу", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "antidiabetic_drugs", effect: "Риск гипогликемии", mechanism: "Двойное снижение глюкозы", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Глюкоза натощак', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Медуллярный рак щитовидной железы', 'МЭН2'],
+    sideEffects: ['Тошнота', 'Диарея при начале'],
+    dosage: { mg: 0.5, timing: '1-2x/д п/к', form: 'ГПП-1 0.5 мг' },
+    bestForCourse: false,
+  },
+  gip: {
+    id: 'gip',
+    name: 'GIP',
+    nameRu: 'ГИП (Глюкозозависимый инсулинотропный полипептид)',
+    tier: 'specialty',
+    category: ['peptide', 'metabolic'],
+    forms: [
+      { id: 'gip', name: 'GIP', nameRu: 'ГИП 0.5 мг', dose: '500 мкг 2x/д', best: true }
+    ],
+    organs: ['PANCREAS', 'GUT', 'BONE'],
+    systems: ['metabolic'],
+    mechanisms: ['INSULIN_SECRETION', 'BONE_FORMATION', 'FAT_METABOLISM', 'GLUCOSE_REGULATION'],
+    description: 'ГИП — инкретиновый пептид, стимулирует инсулин и формирование кости. Дополнение к ГПП-1.',
+    synergies: [
+        {with: "glp1", effect: "Двойной инкретиновый эффект", mechanism: "GLP-1 + GIP — двойной инкретин", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Глюкоза натощак', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Беременность'],
+    sideEffects: ['Редко: тошнота'],
+    dosage: { mg: 0.5, timing: '1x/д п/к', form: 'ГИП 0.5 мг' },
+    bestForCourse: false,
+  },
+  cerebrolysin: {
+    id: 'cerebrolysin',
+    name: 'Cerebrolysin',
+    nameRu: 'Церебролизин',
+    tier: 'specialty',
+    category: ['peptide', 'nootropic'],
+    forms: [
+      { id: 'cerebrolysin', name: 'Cerebrolysin', nameRu: 'Церебролизин 5 мл', dose: '5 мг 2x/д', best: true },
+      { id: 'cerebrolysin_2', name: 'Cerebrolysin', nameRu: 'Церебролизин 10 мл', dose: '5 мг', best: false }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['NEUROTROPHIC_STIMULATION', 'NEUROPROTECTION', 'SYNAPTIC_PLASTICITY', 'MEMORY_ENHANCEMENT'],
+    description: 'Церебролизин — комплекс нейропептидов, нейротрофическая активность, улучшает память и когницию. На курсе — нейропротекция.',
+    synergies: [
+        {with: "semax", effect: "Нейропротекция", mechanism: "Оба стимулируют нейротрофические факторы", severity: "HIGH"},
+        {with: "citicoline", effect: "Когнитивная функция", mechanism: "Оба улучшают память", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Эпилепсия', 'Острый инсульт'],
+    sideEffects: ['Редко: возбуждение', 'Боль в месте инъекции'],
+    dosage: { mg: 5, timing: 'в/м или в/в 1x/д', form: 'Церебролизин 5 мл' },
+    bestForCourse: false,
+  },
+  cortexin: {
+    id: 'cortexin',
+    name: 'Cortexin',
+    nameRu: 'Кортексин',
+    tier: 'specialty',
+    category: ['peptide', 'nootropic'],
+    forms: [
+      { id: 'cortexin', name: 'Cortexin', nameRu: 'Кортексин 10 мг', dose: '10 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['NEUROPROTECTION', 'COGNITION_ENHANCEMENT', 'BDNF_INCREASE', 'MEMORY_IMPROVEMENT'],
+    description: 'Кортексин — комплекс корковых пептидов, нейропротектор и ноотроп. Улучшает память и внимание на курсе.',
+    synergies: [
+        {with: "cerebrolysin", effect: "Нейропротекция", mechanism: "Оба содержат нейропептиды", severity: "MEDIUM"},
+        {with: "piracetam", effect: "Ноотропная синергия", mechanism: "Оба улучшают когницию", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: ['Индивидуальная непереносимость'],
+    sideEffects: ['Редко: аллергическая реакция'],
+    dosage: { mg: 10, timing: 'в/м 1x/д', form: 'Кортексин 10 мг' },
+    bestForCourse: false,
+  },
+  peptide_complex: {
+    id: 'peptide_complex',
+    name: 'Peptide Complex',
+    nameRu: 'Пептидный комплекс',
+    tier: 'advanced',
+    category: ['peptide', 'adaptogen'],
+    forms: [
+      { id: 'peptide_complex', name: 'Peptide Complex', nameRu: 'Пептидный комплекс 5 мг', dose: '5 мг 2x/д', best: true },
+      { id: 'peptide_complex_2', name: 'Peptide Complex', nameRu: 'Пептидный комплекс (BPC+TB+GHK) 5 мл', dose: '5 мг', best: false }
+    ],
+    organs: ['MUSCLES', 'JOINTS', 'BRAIN'],
+    systems: ['musculoskeletal', 'neuro'],
+    mechanisms: ['TISSUE_RECOVERY', 'IMMUNE_MODULATION', 'NEUROPROTECTION', 'ANTI_AGING'],
+    description: 'Пептидный комплекс — комбинация восстановительных пептидов для комплексной поддержки организма на курсе.',
+    synergies: [
+      { with: "polyphenol_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "lycopene", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "chaga", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "amino_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "peptide_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "cordyceps", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "ss31", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "alpha_ketoglutarate", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "vitamin_a", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Контроль суставов', when: 'Субъективно' }
+    ],
+    contraindications: ['Беременность', 'Онкология'],
+    sideEffects: ['Редко: покраснение в месте инъекции'],
+    dosage: { mg: 5, timing: '1x/д п/к', form: 'Пептидный комплекс 5 мг' },
+    bestForCourse: false,
+  },
+  elastin: {
+    id: 'elastin',
+    name: 'Elastin',
+    nameRu: 'Эластин',
+    tier: 'advanced',
+    category: ['amino', 'joint'],
+    forms: [
+      { id: 'elastin', name: 'Elastin', nameRu: 'Эластин пептиды 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['SKIN', 'JOINTS', 'MUSCLES'],
+    systems: ['musculoskeletal'],
+    mechanisms: ['ELASTICITY_RESTORATION', 'JOINT_FUNCTION', 'SKIN_ELASTICITY', 'ANTI_AGING'],
+    description: 'Эластин — структурный белок соединительной ткани, обеспечивает упругость кожи и связок. На курсе — поддержка связок.',
+    synergies: [
+        {with: "collagen", effect: "Структурная поддержка", mechanism: "Эластин + коллаген — каркас", severity: "MEDIUM"},
+        {with: "vitamin_c", effect: "Синтез эластина", mechanism: "C — кофактор синтеза", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Кожа/суставы', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: аллергия'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'эластин пептиды' },
+    bestForCourse: false,
+  },
+  histidine: {
+    id: 'histidine',
+    name: 'Histidine',
+    nameRu: 'Гистидин',
+    tier: 'standard',
+    category: ['amino', 'antioxidant'],
+    forms: [
+      { id: 'histidine', name: 'Histidine', nameRu: 'L-Гистидин 1000 мг', dose: '1 г 2x/д', best: true }
+    ],
+    organs: ['MUSCLES', 'BLOOD', 'SKIN'],
+    systems: ['musculoskeletal', 'hematologic'],
+    mechanisms: ['HISTAMINE_SYNTHESIS', 'CARNOSINE_PRECURSOR', 'METAL_CHELATION', 'ANTI_INFLAMMATORY'],
+    description: 'Гистидин — незаменимая аминокислота, предшественник гистамина и карнозина. Хелатирует тяжёлые металлы, поддерживает иммунитет.',
+    synergies: [
+        {with: "zinc", effect: "Иммунная функция", mechanism: "Гистидин — предшественник гистамина", severity: "LOW"},
+        {with: "vitamin_c", effect: "Карнозиновая система", mechanism: "Гистидин + бета-аланин → карнозин", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Общий белок', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Беременность', 'Подагра'],
+    sideEffects: ['Редко: аллергия', 'Тошнота при высоких дозах'],
+    dosage: { mg: 1000, timing: 'натощак 2x/д', form: 'L-Гистидин 1000 мг' },
+    bestForCourse: false,
+  },
+  cysteine: {
+    id: 'cysteine',
+    name: 'Cysteine',
+    nameRu: 'Цистеин',
+    tier: 'standard',
+    category: ['amino', 'antioxidant'],
+    forms: [
+      { id: 'cysteine', name: 'Cysteine', nameRu: 'N-Ацетилцистеин 600 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'cysteine_2', name: 'Cysteine', nameRu: 'L-Цистеин 500 мг', dose: '500 мг', best: false }
+    ],
+    organs: ['LIVER', 'KIDNEYS', 'SKIN'],
+    systems: ['hepatic', 'renal'],
+    mechanisms: ['GLUTATHIONE_SYNTHESIS', 'METAL_CHELATION', 'SKIN_HEALTH', 'DETOXIFICATION'],
+    description: 'Цистеин — серосодержащая аминокислота, предшественник глутатиона. Защищает печень, хелатирует тяжёлые металлы.',
+    synergies: [
+        {with: "nac", effect: "Синтез глутатиона", mechanism: "Цистеин — предшественник глутатиона", severity: "HIGH"},
+        {with: "vitamin_c", effect: "Антиоксидантная сеть", mechanism: "Оба поддерживают редокс-баланс", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Бронхиальная астма (с осторожностью)'],
+    sideEffects: ['Тошнота натощак', 'Изжога'],
+    dosage: { mg: 500, timing: 'натощак 2x/д', form: 'N-Ацетилцистеин 600 мг' },
+    bestForCourse: true,
+  },
+  serine: {
+    id: 'serine',
+    name: 'Serine',
+    nameRu: 'Серин',
+    tier: 'standard',
+    category: ['amino', 'neuroprotector'],
+    forms: [
+      { id: 'serine', name: 'Serine', nameRu: 'L-Серин 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES', 'MUSCLES'],
+    systems: ['neuro'],
+    mechanisms: ['SERINE_SYNTHESIS', 'PHOSPHOLIPID_PRECURSOR', 'NEUROPROTECTION', 'MEMORY_SUPPORT'],
+    description: 'Серин — заменимая аминокислота, предшественник фосфолипидов и сериновых протеаз. Поддержка мозга и нервной системы.',
+    synergies: [
+        {with: "vitamin_b_complex", effect: "Фосфолипидный обмен", mechanism: "Серин — фосфатидилсерин", severity: "LOW"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'L-Серин 500 мг' },
+    bestForCourse: false,
+  },
+  proline: {
+    id: 'proline',
+    name: 'Proline',
+    nameRu: 'Пролин',
+    tier: 'standard',
+    category: ['amino', 'joint'],
+    forms: [
+      { id: 'proline', name: 'Proline', nameRu: 'L-Пролин 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['SKIN', 'JOINTS', 'MUSCLES'],
+    systems: ['musculoskeletal'],
+    mechanisms: ['COLLAGEN_SYNTHESIS', 'JOINT_SUPPORT', 'SKIN_HEALTH', 'WOUND_HEALING'],
+    description: 'Пролин — заменимая аминокислота, ключевой компонент коллагена. Поддержка суставов, связок и кожи на курсе.',
+    synergies: [
+      { with: "lysine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "collagen", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Кожа/суставы', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'L-Пролин 500 мг' },
+    bestForCourse: false,
+  },
+  aspartate: {
+    id: 'aspartate',
+    name: 'Aspartate',
+    nameRu: 'Аспартат',
+    tier: 'standard',
+    category: ['amino', 'metabolic'],
+    forms: [
+      { id: 'aspartate', name: 'Aspartate', nameRu: 'L-Аспартат 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['MUSCLES', 'LIVER', 'BRAIN'],
+    systems: ['hepatic', 'metabolic'],
+    mechanisms: ['UREA_CYCLE', 'MALATE_AS_PARTATE_SHUTTLE', 'ENERGY_PRODUCTION', 'AMMONIA_DETOX'],
+    description: 'Аспартат — заменимая аминокислота, участвует в цикле мочевины и малат-аспартатном челноке. Детоксикация аммиака.',
+    synergies: [
+      { with: "amino_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Аммиак', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'L-Аспартат 500 мг' },
+    bestForCourse: false,
+  },
+  ornithine: {
+    id: 'ornithine',
+    name: 'Ornithine',
+    nameRu: 'Орнитин',
+    tier: 'standard',
+    category: ['amino', 'hepatoprotector'],
+    forms: [
+      { id: 'ornithine', name: 'Ornithine', nameRu: 'L-Орнитин 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'ornithine_2', name: 'Ornithine', nameRu: 'L-Орнитин-L-Аргинин 500 мг', dose: '500 мг', best: false }
+    ],
+    organs: ['LIVER', 'MUSCLES'],
+    systems: ['hepatic'],
+    mechanisms: ['UREA_CYCLE', 'AMMONIA_DETOX', 'GH_RELEASE', 'LIVER_PROTECTION'],
+    description: 'Орнитин — заменимая аминокислота, участвует в цикле мочевины, снижает аммиак, стимулирует выброс ГР. На курсе — защита печени.',
+    synergies: [
+        {with: "arginine", effect: "Цикл мочевины", mechanism: "Оба — компоненты цикла мочевины", severity: "MEDIUM"},
+        {with: "citrulline", effect: "NO-путь", mechanism: "Орнитин → цитруллин → NO", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Аммиак', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 500, timing: 'натощак на ночь', form: 'L-Орнитин 500 мг' },
+    bestForCourse: false,
+  },
+  threonine: {
+    id: 'threonine',
+    name: 'Threonine',
+    nameRu: 'Треонин',
+    tier: 'standard',
+    category: ['amino', 'immunomodulator'],
+    forms: [
+      { id: 'threonine', name: 'Threonine', nameRu: 'L-Треонин 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['LIVER', 'GUT', 'IMMUNE_SYSTEM'],
+    systems: ['hepatic', 'immune'],
+    mechanisms: ['MUCIN_SYNTHESIS', 'LIVER_LIPID_REGULATION', 'IMMUNE_FUNCTION', 'COLLAGEN_SYNTHESIS'],
+    description: 'Треонин — незаменимая аминокислота, важна для синтеза муцина (защита ЖКТ) и иммунных белков. На курсе — защита ЖКТ.',
+    synergies: [
+        {with: "vitamin_b6", effect: "Метаболизм треонина", mechanism: "B6 — кофактор", severity: "LOW"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Общий белок', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'L-Треонин 500 мг' },
+    bestForCourse: false,
+  },
+  lysine: {
+    id: 'lysine',
+    name: 'Lysine',
+    nameRu: 'Лизин',
+    tier: 'standard',
+    category: ['amino', 'immunomodulator'],
+    forms: [
+      { id: 'lysine', name: 'Lysine', nameRu: 'L-Лизин 1000 мг', dose: '1 г 2x/д', best: true },
+      { id: 'lysine_2', name: 'Lysine', nameRu: 'L-Лизин 500 мг', dose: '1 г', best: false }
+    ],
+    organs: ['MUSCLES', 'BONES', 'IMMUNE_SYSTEM'],
+    systems: ['musculoskeletal', 'immune'],
+    mechanisms: ['COLLAGEN_CROSS_LINKING', 'ANTI_VIRAL', 'CALCIUM_ABSORPTION', 'MUSCLE_RECOVERY'],
+    description: 'Лизин — незаменимая аминокислота, необходима для кросс-линкинга коллагена и усвоения кальция. Антивирусная защита.',
+    synergies: [
+      { with: "proline", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "collagen", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Кальций сыворотки', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Печёночная недостаточность'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 1000, timing: 'натощак 2x/д', form: 'L-Лизин 1000 мг' },
+    bestForCourse: false,
+  },
+  phenylalanine: {
+    id: 'phenylalanine',
+    name: 'Phenylalanine',
+    nameRu: 'Фенилаланин',
+    tier: 'standard',
+    category: ['amino', 'nootropic'],
+    forms: [
+      { id: 'phenylalanine', name: 'Phenylalanine', nameRu: 'DL-Фенилаланин 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES', 'THYROID'],
+    systems: ['neuro', 'endocrine'],
+    mechanisms: ['DOPAMINE_PRECURSOR', 'NOREPINEPHRINE_SYNTHESIS', 'PAIN_MODULATION', 'MOOD_REGULATION'],
+    description: 'Фенилаланин — незаменимая аминокислота, предшественник дофамина и норадреналина. Улучшает настроение и концентрацию.',
+    synergies: [
+        {with: "vitamin_b6", effect: "Синтез дофамина", mechanism: "Фенилаланин → тирозин → дофамин", severity: "MEDIUM"},
+        {with: "vitamin_c", effect: "Синтез норадреналина", mechanism: "C — кофактор дофамин-бета-гидроксилазы", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "maoi_drugs", effect: "Гипертонический криз", mechanism: "Фенилаланин + ИМАО = опасно", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: ['Фенилкетонурия', 'Шизофрения'],
+    sideEffects: ['Тошнота при высоких дозах', 'Бессонница'],
+    dosage: { mg: 500, timing: 'натощак 2x/д', form: 'DL-Фенилаланин 500 мг' },
+    bestForCourse: false,
+  },
+  amino_complex: {
+    id: 'amino_complex',
+    name: 'Amino Complex',
+    nameRu: 'Аминокислотный комплекс',
+    tier: 'standard',
+    category: ['amino', 'recovery'],
+    forms: [
+      { id: 'amino_complex', name: 'Amino Complex', nameRu: 'Аминокислотный комплекс 5 г', dose: '5 г 2x/д', best: true },
+      { id: 'amino_complex_2', name: 'Amino Complex', nameRu: 'BCAA+ЕАА комплекс 3 г', dose: '5 г', best: false }
+    ],
+    organs: ['MUSCLES', 'LIVER', 'BRAIN'],
+    systems: ['musculoskeletal', 'hepatic'],
+    mechanisms: ['MUSCLE_RECOVERY', 'LIVER_PROTECTION', 'NITROGEN_BALANCE', 'PROTEIN_SYNTHESIS'],
+    description: 'Аминокислотный комплекс — полный спектр незаменимых и заменимых аминокислот для восстановления и защиты на курсе.',
+    synergies: [
+      { with: "polyphenol_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "lycopene", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "chaga", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "amino_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "peptide_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "aspartate", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Общий белок', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 5000, timing: 'с едой 2x/д', form: 'Аминокислотный комплекс 5 г' },
+    bestForCourse: false,
+  },
+  glutamate: {
+    id: 'glutamate',
+    name: 'Glutamate',
+    nameRu: 'Глутамат',
+    tier: 'standard',
+    category: ['amino', 'neuroprotector'],
+    forms: [
+      { id: 'glutamate', name: 'Glutamate', nameRu: 'L-Глутамат 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES', 'MUSCLES'],
+    systems: ['neuro'],
+    mechanisms: ['NEUROTRANSMISSION', 'AMMONIA_DETOX', 'GABA_PRECURSOR', 'ENERGY_PRODUCTION'],
+    description: 'Глутамат — заменимая аминокислота, главный возбуждающий нейромедиатор. В избытке — эксайтотоксичность.',
+    synergies: [
+        {with: "magnesium", effect: "Блокировка эксайтотоксичности", mechanism: "Магний блокирует NMDA при избытке глутамата", severity: "HIGH"},
+      ],
+    conflicts: [
+        {with: "msg_sensitivity", effect: "Головная боль", mechanism: "Избыток глутамата — эксайтотоксичность", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Аммиак', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Эпилепсия', 'Нейродегенеративные заболевания'],
+    sideEffects: ['Возбуждение при высоких дозах'],
+    dosage: { mg: 500, timing: 'с едой 1x/д', form: 'L-Глутамат 500 мг' },
+    bestForCourse: false,
+  },
+  alpha_ketoglutarate: {
+    id: 'alpha_ketoglutarate',
+    name: 'Alpha-Ketoglutarate',
+    nameRu: 'Альфа-кетоглутарат',
+    tier: 'standard',
+    category: ['amino', 'metabolic'],
+    forms: [
+      { id: 'alpha_ketoglutarate', name: 'Alpha-Ketoglutarate', nameRu: 'Альфа-кетоглутарат 1 г', dose: '1 г 2x/д', best: true }
+    ],
+    organs: ['MUSCLES', 'LIVER', 'KIDNEYS'],
+    systems: ['hepatic', 'renal'],
+    mechanisms: ['KREBS_CYCLE_INTERMEDIATE', 'AMMONIA_DETOX', 'NITROGEN_TRANSPORT', 'ENERGY_PRODUCTION'],
+    description: 'Альфа-кетоглутарат — интермедиат цикла Кребса, снижает аммиак и поддерживает энергообмен. На курсе — детокс.',
+    synergies: [
+      { with: "peptide_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Аммиак', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'Альфа-кетоглутарат 1 г' },
+    bestForCourse: false,
+  },
+  reishi: {
+    id: 'reishi',
+    name: 'Reishi',
+    nameRu: 'Рейши (Ганодерма)',
+    tier: 'advanced',
+    category: ['mushroom', 'adaptogen', 'immunomodulator'],
+    forms: [
+      { id: 'reishi', name: 'Reishi', nameRu: 'Рейши экстракт 1000 мг', dose: '1 г 2x/д', best: true },
+      { id: 'reishi_2', name: 'Reishi', nameRu: 'Рейши + Кордицепс комплекс 500 мг', dose: '1 г', best: false }
+    ],
+    organs: ['LIVER', 'IMMUNE_SYSTEM', 'BRAIN'],
+    systems: ['hepatic', 'immune', 'neuro'],
+    mechanisms: ['IMMUNE_REGULATION', 'ANTI_INFLAMMATORY', 'LIVER_PROTECTION', 'STRESS_REDUCTION'],
+    description: 'Рейши — король грибов, иммуномодулятор и адаптоген. Защищает печень, снижает воспаление и стресс на курсе.',
+    synergies: [
+        {with: "ashwagandha", effect: "Адаптогенный и иммунный", mechanism: "Оба модулируют стресс и иммунитет", severity: "MEDIUM"},
+        {with: "vitamin_c", effect: "Иммуномодуляция", mechanism: "Оба поддерживают иммунитет", severity: "MEDIUM"},
+        {with: "turkey_tail", effect: "Максимальная иммуномодуляция", mechanism: "Разные бета-глюканы", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "Рейши стимулирует иммунитет", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'АЛТ/АСТ', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Аутоиммунные заболевания (с осторожностью)', 'Приём антикоагулянтов'],
+    sideEffects: ['Редко: сухость во рту', 'Желудочный дискомфорт'],
+    dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'экстракт рейши' },
+    bestForCourse: false,
+  },
+  chaga: {
+    id: 'chaga',
+    name: 'Chaga',
+    nameRu: 'Чага',
+    tier: 'advanced',
+    category: ['mushroom', 'antioxidant', 'immunomodulator'],
+    forms: [
+      { id: 'chaga', name: 'Chaga', nameRu: 'Чага экстракт 1000 мг', dose: '1 г 2x/д', best: true },
+      { id: 'chaga_2', name: 'Chaga', nameRu: 'Чага порошок 2 г', dose: '1 г', best: false }
+    ],
+    organs: ['IMMUNE_SYSTEM', 'LIVER', 'GUT'],
+    systems: ['hepatic', 'immune', 'gastrointestinal'],
+    mechanisms: ['ANTIOXIDANT', 'IMMUNE_REGULATION', 'ANTI_INFLAMMATORY', 'DNA_PROTECTION'],
+    description: 'Чага — мощный антиоксидант с высоким ORAC. Поддерживает иммунитет и защищает ДНК от повреждений на курсе.',
+    synergies: [
+      { with: "polyphenol_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "lycopene", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "amino_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "peptide_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Аутоиммунные заболевания (с осторожностью)'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'экстракт чаги' },
+    bestForCourse: false,
+  },
+  maitake: {
+    id: 'maitake',
+    name: 'Maitake',
+    nameRu: 'Майтаке',
+    tier: 'advanced',
+    category: ['mushroom', 'immunomodulator', 'metabolic'],
+    forms: [
+      { id: 'maitake', name: 'Maitake', nameRu: 'Майтаке экстракт 1000 мг', dose: '1 г 2x/д', best: true }
+    ],
+    organs: ['IMMUNE_SYSTEM', 'PANCREAS', 'GUT'],
+    systems: ['immune', 'metabolic'],
+    mechanisms: ['IMMUNE_ACTIVATION', 'GLUCOSE_REGULATION', 'BETA_GLUCAN_DELIVERY', 'ANTI_INFLAMMATORY'],
+    description: 'Майтаке — гриб с высоким содержанием бета-глюканов, активирует иммунитет и регулирует глюкозу. На курсе — метаболическая поддержка.',
+    synergies: [
+        {with: "vitamin_d3", effect: "Иммунитет", mechanism: "Майтаке-D-фракция + D3", severity: "MEDIUM"},
+        {with: "turkey_tail", effect: "Иммуномодуляция", mechanism: "Оба — бета-глюканы", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Глюкоза натощак', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Аутоиммунные заболевания (с осторожностью)'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'экстракт майтаке' },
+    bestForCourse: false,
+  },
+  shiitake: {
+    id: 'shiitake',
+    name: 'Shiitake',
+    nameRu: 'Шиитаке',
+    tier: 'advanced',
+    category: ['mushroom', 'immunomodulator', 'cardioprotector'],
+    forms: [
+      { id: 'shiitake', name: 'Shiitake', nameRu: 'Шиитаке экстракт 1000 мг', dose: '1 г 2x/д', best: true }
+    ],
+    organs: ['IMMUNE_SYSTEM', 'HEART', 'LIVER'],
+    systems: ['immune', 'cardio', 'hepatic'],
+    mechanisms: ['IMMUNE_REGULATION', 'CHOLESTEROL_LOWERING', 'B_VITAMIN_SOURCE', 'LIVER_PROTECTION'],
+    description: 'Шиитаке — гриб с лентинаном, снижает холестерин и поддерживает иммунитет. Источник витаминов группы В.',
+    synergies: [
+        {with: "reishi", effect: "Комплексная грибная поддержка", mechanism: "Разные полисахариды", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Аутоиммунные заболевания (с осторожностью)'],
+    sideEffects: ['Редко: кожная сыпь'],
+    dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'экстракт шиитаке' },
+    bestForCourse: false,
+  },
+  mushroom_complex: {
+    id: 'mushroom_complex',
+    name: 'Mushroom Complex',
+    nameRu: 'Грибной комплекс',
+    tier: 'advanced',
+    category: ['mushroom', 'adaptogen', 'immunomodulator'],
+    forms: [
+      { id: 'mushroom_complex', name: 'Mushroom Complex', nameRu: 'Грибной комплекс 1000 мг', dose: '1 г 2x/д', best: true },
+      { id: 'mushroom_complex_2', name: 'Mushroom Complex', nameRu: 'Грибной комплекс 6-в-1 500 мг', dose: '1 г', best: false }
+    ],
+    organs: ['IMMUNE_SYSTEM', 'LIVER', 'BRAIN'],
+    systems: ['immune', 'hepatic', 'neuro'],
+    mechanisms: ['IMMUNE_REGULATION', 'STRESS_ADAPTATION', 'ANTI_INFLAMMATORY', 'NEUROPROTECTION'],
+    description: 'Грибной комплекс — комбинация 6+ лекарственных грибов (рейши, чага, кордицепс, майтаке, шиитаке, хвост индейки). Комплексная поддержка.',
+    synergies: [
+      { with: "omega9", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "egcg", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "polyphenol_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "mushroom_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Аутоиммунные заболевания (с осторожностью)'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'грибной комплекс экстракт' },
+    bestForCourse: false,
+  },
+  agaricus: {
+    id: 'agaricus',
+    name: 'Agaricus',
+    nameRu: 'Агарикус (Бразильский гриб)',
+    tier: 'advanced',
+    category: ['mushroom', 'immunomodulator'],
+    forms: [
+      { id: 'agaricus', name: 'Agaricus', nameRu: 'Агарикус экстракт 1000 мг', dose: '1 г 2x/д', best: true }
+    ],
+    organs: ['IMMUNE_SYSTEM', 'LIVER', 'GUT'],
+    systems: ['immune', 'hepatic', 'gastrointestinal'],
+    mechanisms: ['IMMUNE_ACTIVATION', 'BETA_GLUCAN_DELIVERY', 'LIVER_PROTECTION', 'ANTI_INFLAMMATORY'],
+    description: 'Агарикус — бразильский гриб с мощными бета-глюканами, активирует NK-клетки и макрофаги. Поддержка иммунитета на курсе.',
+    synergies: [
+        {with: "reishi", effect: "Иммуномодуляция", mechanism: "Оба — мощные иммуномодуляторы", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Аутоиммунные заболевания'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'экстракт агарикуса' },
+    bestForCourse: false,
+  },
+  turkey_tail: {
+    id: 'turkey_tail',
+    name: 'Turkey Tail',
+    nameRu: 'Хвост индейки (Траметес)',
+    tier: 'advanced',
+    category: ['mushroom', 'immunomodulator'],
+    forms: [
+      { id: 'turkey_tail', name: 'Turkey Tail', nameRu: 'Хвост индейки экстракт 1000 мг', dose: '1 г 2x/д', best: true }
+    ],
+    organs: ['IMMUNE_SYSTEM', 'GUT', 'LIVER'],
+    systems: ['immune', 'gastrointestinal', 'hepatic'],
+    mechanisms: ['IMMUNE_REGULATION', 'BETA_GLUCAN_DELIVERY', 'GUT_MICROBIOME_SUPPORT', 'ANTI_INFLAMMATORY'],
+    description: 'Хвост индейки — мощный иммуномодулятор с PSP и PSK полисахаридами. Поддержка кишечника и иммунитета на курсе.',
+    synergies: [
+        {with: "reishi", effect: "Комплексная иммуномодуляция", mechanism: "Оба — бета-глюканы разных типов", severity: "HIGH"},
+        {with: "probiotics", effect: "Микробиом + иммунитет", mechanism: "Оба поддерживают кишечный иммунитет", severity: "MEDIUM"},
+        {with: "vitamin_d3", effect: "Иммунная активация", mechanism: "Оба активируют макрофаги", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Аутоиммунные заболевания (с осторожностью)'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'экстракт хвоста индейки' },
+    bestForCourse: false,
+  },
+  lutein: {
+    id: 'lutein',
+    name: 'Lutein',
+    nameRu: 'Лютеин',
+    tier: 'standard',
+    category: ['antioxidant', 'eye_protector'],
+    forms: [
+      { id: 'lutein', name: 'Lutein', nameRu: 'Лютеин 20 мг', dose: '20 мг 2x/д', best: true },
+      { id: 'lutein_2', name: 'Lutein', nameRu: 'Лютеин + Зеаксантин 20 мг', dose: '20 мг', best: false }
+    ],
+    organs: ['EYES', 'BRAIN', 'SKIN'],
+    systems: ['neuro'],
+    mechanisms: ['MACULA_PROTECTION', 'BLUE_LIGHT_FILTER', 'ANTIOXIDANT', 'SKIN_HEALTH'],
+    description: 'Лютеин — каротиноид, защищает макулу глаза от синего света и окислительного стресса. На курсе — защита зрения.',
+    synergies: [
+      { with: "vitamin_a", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Офтальмолог', when: 'Каждые 12 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: кожный зуд при высоких дозах'],
+    dosage: { mg: 20, timing: 'с едой 1x/д', form: 'лютеин 20 мг' },
+    bestForCourse: false,
+  },
+  lycopene: {
+    id: 'lycopene',
+    name: 'Lycopene',
+    nameRu: 'Ликопин',
+    tier: 'standard',
+    category: ['antioxidant', 'cardioprotector'],
+    forms: [
+      { id: 'lycopene', name: 'Lycopene', nameRu: 'Ликопин 15 мг', dose: '15 мг 2x/д', best: true },
+      { id: 'lycopene_2', name: 'Lycopene', nameRu: 'Ликопин + Селен 15 мг', dose: '15 мг', best: false }
+    ],
+    organs: ['HEART', 'PROSTATE', 'SKIN'],
+    systems: ['cardio', 'reproductive'],
+    mechanisms: ['ANTIOXIDANT', 'PROSTATE_PROTECTION', 'UV_PROTECTION', 'CHOLESTEROL_LOWERING'],
+    description: 'Ликопин — каротиноид из томатов, мощный антиоксидант. Защищает простату и сердце, снижает окислительный стресс.',
+    synergies: [
+      { with: "astaxanthin", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "polyphenol_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "chaga", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "amino_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "peptide_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "olive_extract", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "flavonoids", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'ПСА', when: 'Каждые 12 нед' }
+    ],
+    contraindications: ['Лycopin аллергия'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 15, timing: 'с едой 1x/д', form: 'ликопин 15 мг' },
+    bestForCourse: false,
+  },
+  anthocyanins: {
+    id: 'anthocyanins',
+    name: 'Anthocyanins',
+    nameRu: 'Антоцианы',
+    tier: 'standard',
+    category: ['antioxidant', 'eye_protector'],
+    forms: [
+      { id: 'anthocyanins', name: 'Anthocyanins', nameRu: 'Антоцианы экстракт 200 мг', dose: '200 мг 2x/д', best: true },
+      { id: 'anthocyanins_2', name: 'Anthocyanins', nameRu: 'Черника + Лютеин комплекс', dose: '200 мг', best: false }
+    ],
+    organs: ['EYES', 'HEART', 'BRAIN'],
+    systems: ['cardio', 'neuro'],
+    mechanisms: ['ANTIOXIDANT', 'MICROCIRCULATION_IMPROVEMENT', 'VISION_SUPPORT', 'ANTI_INFLAMMATORY'],
+    description: 'Антоцианы — флавоноиды из ягод, улучшают микроциркуляцию и защищают сосуды сетчатки. На курсе — зрение и сосуды.',
+    synergies: [
+      { with: "vitamin_c", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "quercetin", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "anthocyanins", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "vitamin_a", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Офтальмолог', when: 'Каждые 12 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: аллергия'],
+    dosage: { mg: 200, timing: 'с едой 1x/д', form: 'антоцианы экстракт 200 мг' },
+    bestForCourse: false,
+  },
+  grape_seed_extract: {
+    id: 'grape_seed_extract',
+    name: 'Grape Seed Extract',
+    nameRu: 'Экстракт косточек винограда',
+    tier: 'standard',
+    category: ['antioxidant', 'cardioprotector'],
+    forms: [
+      { id: 'grape_seed_extract', name: 'Grape Seed Extract', nameRu: 'Экстракт косточек винограда 200 мг', dose: '200 мг 2x/д', best: true }
+    ],
+    organs: ['HEART', 'BLOOD_VESSELS', 'SKIN'],
+    systems: ['cardio'],
+    mechanisms: ['ANTIOXIDANT', 'ENDOTHELIAL_PROTECTION', 'COLLAGEN_SYNTHESIS', 'MICROCIRCULATION'],
+    description: 'Экстракт косточек винограда — богат проантоцианидинами, защищает эндотелий и коллаген. На курсе — сосуды и кожа.',
+    synergies: [
+        {with: "vitamin_c", effect: "Антиоксидантная активность", mechanism: "Проантоцианидины + C", severity: "MEDIUM"},
+        {with: "vitamin_e", effect: "Защита сосудов", mechanism: "Оба укрепляют стенки сосудов", severity: "MEDIUM"},
+        {with: "curcumin", effect: "Противовоспалительное", mechanism: "Оба подавляют NF-kB", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Усиление антикоагуляции", mechanism: "Снижает агрегацию тромбоцитов", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Приём антикоагулянтов (с осторожностью)'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 200, timing: 'с едой 1x/д', form: 'экстракт косточек винограда 200 мг' },
+    bestForCourse: false,
+  },
+  pycnogenol: {
+    id: 'pycnogenol',
+    name: 'Pycnogenol',
+    nameRu: 'Пикногенол',
+    tier: 'standard',
+    category: ['antioxidant', 'cardioprotector'],
+    forms: [
+      { id: 'pycnogenol', name: 'Pycnogenol', nameRu: 'Пикногенол 100 мг', dose: '100 мг 2x/д', best: true }
+    ],
+    organs: ['HEART', 'BLOOD_VESSELS', 'SKIN'],
+    systems: ['cardio', 'neuro'],
+    mechanisms: ['ANTIOXIDANT', 'ENDOTHELIAL_PROTECTION', 'COLLAGEN_PROTECTION', 'MICROCIRCULATION'],
+    description: 'Пикногенол — экстракт коры приморской сосны, мощный антиоксидант. Защищает сосуды, кожу и эндотелий.',
+    synergies: [
+        {with: "vitamin_c", effect: "Регенерация витамина C", mechanism: "Пикногенол + C", severity: "MEDIUM"},
+        {with: "vitamin_e", effect: "Защита сосудов и кожи", mechanism: "Оба — антиоксиданты", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Антикоагуляция", mechanism: "Снижает агрегацию тромбоцитов", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Приём антикоагулянтов (с осторожностью)'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 100, timing: 'с едой 1x/д', form: 'пикногенол 100 мг' },
+    bestForCourse: false,
+  },
+  cocoa_flavanols: {
+    id: 'cocoa_flavanols',
+    name: 'Cocoa Flavanols',
+    nameRu: 'Какао-флаванолы',
+    tier: 'standard',
+    category: ['antioxidant', 'cardioprotector'],
+    forms: [
+      { id: 'cocoa_flavanols', name: 'Cocoa Flavanols', nameRu: 'Какао-флаванолы 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['HEART', 'BRAIN', 'BLOOD_VESSELS'],
+    systems: ['cardio', 'neuro'],
+    mechanisms: ['ANTIOXIDANT', 'NITRIC_OXIDE_PRODUCTION', 'BLOOD_FLOW_IMPROVEMENT', 'COGNITION_ENHANCEMENT'],
+    description: 'Какао-флаванолы — улучшают производство NO, кровоток мозга и сердца. На курсе — кардио- и нейропротекция.',
+    synergies: [
+        {with: "omega3", effect: "Кардиопротекция", mechanism: "Оба улучшают эндотелий", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: аллергия на какао'],
+    dosage: { mg: 500, timing: 'с едой 1x/д', form: 'какао-флаванолы 500 мг' },
+    bestForCourse: false,
+  },
+  c60: {
+    id: 'c60',
+    name: 'C60',
+    nameRu: 'C60 (Фуллерен)',
+    tier: 'advanced',
+    category: ['antioxidant', 'anti_aging'],
+    forms: [
+      { id: 'c60', name: 'C60', nameRu: 'C60 в оливковом масле 1 мг', dose: '1 мг 2x/д', best: true }
+    ],
+    organs: ['CELLS', 'MITOCHONDRIA', 'LIVER'],
+    systems: ['hepatic'],
+    mechanisms: ['ANTIOXIDANT', 'MITOCHONDRIAL_PROTECTION', 'ANTI_INFLAMMATORY', 'ANTI_AGING'],
+    description: 'C60 фуллерен — наночастица с мощнейшей антиоксидантной активностью, защищает митохондрии. Экспериментальный анти-возрастной.',
+    synergies: [
+        {with: "olive_oil", effect: "Усиление антиоксидантного эффекта", mechanism: "C60 в масле — лучшая доставка", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Окислительный стресс', when: 'Субъективно' }
+    ],
+    contraindications: ['Беременность', 'Недостаточно данных'],
+    sideEffects: ['Недостаточно данных по долгосрочной безопасности'],
+    dosage: { mg: 1, timing: 'с едой 1x/д', form: 'C60 в оливковом масле 1 мг' },
+    bestForCourse: false,
+  },
+  antioxidant_complex: {
+    id: 'antioxidant_complex',
+    name: 'Antioxidant Complex',
+    nameRu: 'Антиоксидантный комплекс',
+    tier: 'standard',
+    category: ['antioxidant', 'anti_aging'],
+    forms: [
+      { id: 'antioxidant_complex', name: 'Antioxidant Complex', nameRu: 'Антиоксидантный комплекс 1 капсула', dose: '1 мг 2x/д', best: true },
+      { id: 'antioxidant_complex_2', name: 'Antioxidant Complex', nameRu: 'Антиоксидантный комплекс форте', dose: '1 мг', best: false }
+    ],
+    organs: ['CELLS', 'LIVER', 'HEART'],
+    systems: ['hepatic', 'cardio'],
+    mechanisms: ['ANTIOXIDANT_NETWORK', 'OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION', 'ANTI_AGING'],
+    description: 'Антиоксидантный комплекс — комбинация витаминов С, Е, А, селена, АЛЬК для комплексной антиоксидантной защиты.',
+    synergies: [
+      { with: "vitamin_a", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Окислительный стресс', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 1, timing: 'с едой 1x/д', form: 'антиоксидантный комплекс капсула' },
+    bestForCourse: false,
+  },
+  nrf2_activator: {
+    id: 'nrf2_activator',
+    name: 'Nrf2 Activator',
+    nameRu: 'Nrf2-активатор',
+    tier: 'advanced',
+    category: ['antioxidant', 'hepatoprotector'],
+    forms: [
+      { id: 'nrf2_activator', name: 'Nrf2 Activator', nameRu: 'Nrf2-активатор 20 мг', dose: '20 мг 2x/д', best: true }
+    ],
+    organs: ['LIVER', 'CELLS', 'BRAIN'],
+    systems: ['hepatic', 'neuro'],
+    mechanisms: ['NRF2_ACTIVATION', 'ANTIOXIDANT_ENZYME_INDUCTION', 'DETOXIFICATION', 'ANTI_INFLAMMATORY'],
+    description: 'Nrf2-активатор (сульфорафан+куркумин) — индуцирует антиоксидантные ферменты через Nrf2-путь. Мощная гепатопротекция.',
+    synergies: [
+        {with: "sulforaphane", effect: "Максимальная активация Nrf2", mechanism: "Оба активируют Nrf2", severity: "HIGH"},
+        {with: "curcumin", effect: "Антиоксидантный ответ", mechanism: "Куркумин тоже активирует Nrf2", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Аутоиммунные заболевания (с осторожностью)'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 20, timing: 'с едой 1x/д', form: 'Nrf2-активатор 20 мг' },
+    bestForCourse: false,
+  },
+  olive_extract: {
+    id: 'olive_extract',
+    name: 'Olive Extract',
+    nameRu: 'Экстракт оливы (гидрокситирозол)',
+    tier: 'standard',
+    category: ['antioxidant', 'cardioprotector'],
+    forms: [
+      { id: 'olive_extract', name: 'Olive Extract', nameRu: 'Экстракт оливы 250 мг', dose: '250 мг 2x/д', best: true }
+    ],
+    organs: ['HEART', 'BLOOD_VESSELS', 'SKIN'],
+    systems: ['cardio'],
+    mechanisms: ['ANTIOXIDANT', 'ENDOTHELIAL_PROTECTION', 'ANTI_INFLAMMATORY', 'LIPID_IMPROVEMENT'],
+    description: 'Экстракт оливы с гидрокситирозолом — мощный антиоксидант, защищает эндотелий и снижает окисление ЛПНП.',
+    synergies: [
+      { with: "lycopene", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "flavonoids", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "polyphenol_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "olive_extract", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 250, timing: 'с едой 1x/д', form: 'экстракт оливы 250 мг' },
+    bestForCourse: false,
+  },
+  polyphenol_complex: {
+    id: 'polyphenol_complex',
+    name: 'Polyphenol Complex',
+    nameRu: 'Полифенольный комплекс',
+    tier: 'standard',
+    category: ['antioxidant', 'cardioprotector'],
+    forms: [
+      { id: 'polyphenol_complex', name: 'Polyphenol Complex', nameRu: 'Полифенольный комплекс 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['HEART', 'BRAIN', 'BLOOD_VESSELS'],
+    systems: ['cardio', 'neuro'],
+    mechanisms: ['ANTIOXIDANT', 'ANTI_INFLAMMATORY', 'MICROCIRCULATION', 'BRAIN_PROTECTION'],
+    description: 'Полифенольный комплекс — комбинация 10+ полифенолов для сосудистой и нейропротекции. На курсе — антиоксидантный щит.',
+    synergies: [
+      { with: "lycopene", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "polyphenol_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "chaga", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "amino_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "peptide_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "olive_extract", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "flavonoids", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega9", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "egcg", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "mushroom_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 500, timing: 'с едой 1x/д', form: 'полифенольный комплекс 500 мг' },
+    bestForCourse: false,
+  },
+  citrus_bioflavonoids: {
+    id: 'citrus_bioflavonoids',
+    name: 'Citrus Bioflavonoids',
+    nameRu: 'Цитрусовые биофлавоноиды',
+    tier: 'standard',
+    category: ['antioxidant', 'cardioprotector'],
+    forms: [
+      { id: 'citrus_bioflavonoids', name: 'Citrus Bioflavonoids', nameRu: 'Цитрусовые биофлавоноиды 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['BLOOD_VESSELS', 'EYES', 'SKIN'],
+    systems: ['cardio'],
+    mechanisms: ['ANTIOXIDANT', 'VITAMIN_C_POTENTIATION', 'MICROCIRCULATION', 'ANTI_INFLAMMATORY'],
+    description: 'Цитрусовые биофлавоноиды — гесперидин, рутин, нарингенин. Усиливают витамин С, защищают сосуды.',
+    synergies: [
+        {with: "vitamin_c", effect: "Синергия", mechanism: "Флавоноиды + C", severity: "HIGH"},
+        {with: "quercetin", effect: "Противовоспалительное", mechanism: "Оба — флавоноиды", severity: "MEDIUM"},
+      ],
+    conflicts: [
+      { with: "statin_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: аллергия на цитрусовые'],
+    dosage: { mg: 500, timing: 'с едой 1x/д', form: 'цитрусовые биофлавоноиды 500 мг' },
+    bestForCourse: false,
+  },
+  flavonoids: {
+    id: 'flavonoids',
+    name: 'Flavonoids',
+    nameRu: 'Флавоноиды',
+    tier: 'standard',
+    category: ['antioxidant', 'cardioprotector'],
+    forms: [
+      { id: 'flavonoids', name: 'Flavonoids', nameRu: 'Флавоноиды комплекс 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['HEART', 'BRAIN', 'BLOOD_VESSELS'],
+    systems: ['cardio', 'neuro'],
+    mechanisms: ['ANTIOXIDANT', 'ANTI_INFLAMMATORY', 'VASCULAR_PROTECTION', 'COGNITION_SUPPORT'],
+    description: 'Флавоноиды — класс полифенолов с антиоксидантным и противовоспалительным действием. Защита сосудов и мозга.',
+    synergies: [
+      { with: "lycopene", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "olive_extract", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "polyphenol_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 500, timing: 'с едой 1x/д', form: 'флавоноиды комплекс 500 мг' },
+    bestForCourse: false,
+  },
+  ellagic_acid: {
+    id: 'ellagic_acid',
+    name: 'Ellagic Acid',
+    nameRu: 'Эллаговая кислота',
+    tier: 'standard',
+    category: ['antioxidant', 'hepatoprotector'],
+    forms: [
+      { id: 'ellagic_acid', name: 'Ellagic Acid', nameRu: 'Эллаговая кислота 250 мг', dose: '250 мг 2x/д', best: true }
+    ],
+    organs: ['LIVER', 'CELLS', 'GUT'],
+    systems: ['hepatic', 'gastrointestinal'],
+    mechanisms: ['ANTIOXIDANT', 'LIVER_DETOXIFICATION', 'ANTI_MUTAGENIC', 'ANTI_INFLAMMATORY'],
+    description: 'Эллаговая кислота — полифенол из граната и малины, гепатопротектор и антимутаген. Защищает печень и ДНК.',
+    synergies: [
+        {with: "vitamin_c", effect: "Антиоксидант", mechanism: "Оба — антиоксиданты", severity: "LOW"},
+        {with: "curcumin", effect: "Противораковая защита", mechanism: "Оба подавляют пролиферацию", severity: "LOW"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'АЛТ/АСТ', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 250, timing: 'с едой 1x/д', form: 'эллаговая кислота 250 мг' },
+    bestForCourse: false,
+  },
+  ursolic_acid: {
+    id: 'ursolic_acid',
+    name: 'Ursolic Acid',
+    nameRu: 'Урсоловая кислота',
+    tier: 'advanced',
+    category: ['antioxidant', 'metabolic'],
+    forms: [
+      { id: 'ursolic_acid', name: 'Ursolic Acid', nameRu: 'Урсоловая кислота 150 мг', dose: '150 мг 2x/д', best: true }
+    ],
+    organs: ['MUSCLES', 'LIVER', 'SKIN'],
+    systems: ['musculoskeletal', 'hepatic'],
+    mechanisms: ['ANTI_INFLAMMATORY', 'MUSCLE_GROWTH', 'LIPID_LOWERING', 'ANTI_CATABOLIC'],
+    description: 'Урсоловая кислота — тритерпен из яблочных шкурок, антикатаболическое и антивоспалительное действие. Поддержка мышц.',
+    synergies: [
+        {with: "creatine", effect: "Анаболическая поддержка", mechanism: "Урсоловая кислота + mTOR", severity: "MEDIUM"},
+        {with: "curcumin", effect: "Противовоспалительное", mechanism: "Оба подавляют NF-kB", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'КФК', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 150, timing: 'с едой 2x/д', form: 'урсоловая кислота 150 мг' },
+    bestForCourse: false,
+  },
+  magnolia: {
+    id: 'magnolia',
+    name: 'Magnolia',
+    nameRu: 'Магнолия (хонокиол)',
+    tier: 'advanced',
+    category: ['anxiolytic', 'neuroprotector'],
+    forms: [
+      { id: 'magnolia', name: 'Magnolia', nameRu: 'Экстракт магнолии 200 мг', dose: '200 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES', 'LIVER'],
+    systems: ['neuro', 'hepatic'],
+    mechanisms: ['ANXIOLYTIC', 'MUSCLE_RELAXATION', 'NEUROPROTECTION', 'LIVER_PROTECTION'],
+    description: 'Магнолия (хонокиол) — анксиолитик и нейропротектор, расслабляет мышцы и улучшает сон. На курсе — антистресс.',
+    synergies: [
+        {with: "theanine", effect: "Расслабление", mechanism: "Оба усиливают GABA", severity: "MEDIUM"},
+        {with: "magnesium", effect: "Улучшение сна", mechanism: "Оба — расслабление", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "sedative_drugs", effect: "Усиление седации", mechanism: "Магнолол потенцирует седативные", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: ['Седативные препараты (усиление)'],
+    sideEffects: ['Сонливость при начале'],
+    dosage: { mg: 200, timing: 'на ночь 1x/д', form: 'экстракт магнолии 200 мг' },
+    bestForCourse: false,
+  },
+  gentian: {
+    id: 'gentian',
+    name: 'Gentian',
+    nameRu: 'Горечавка',
+    tier: 'standard',
+    category: ['gastrointestinal', 'hepatoprotector'],
+    forms: [
+      { id: 'gentian', name: 'Gentian', nameRu: 'Экстракт горечавки 250 мг', dose: '250 мг 2x/д', best: true }
+    ],
+    organs: ['LIVER', 'GUT', 'STOMACH'],
+    systems: ['hepatic', 'gastrointestinal'],
+    mechanisms: ['DIGESTION_STIMULATION', 'BILE_SECRETION', 'APPETITE_IMPROVEMENT', 'LIVER_PROTECTION'],
+    description: 'Горечавка — горький тоник, стимулирует пищеварение и желчеотток. Улучшает аппетит и усвоение на курсе.',
+    synergies: [
+        {with: "digestive_enzymes", effect: "Улучшение пищеварения", mechanism: "Горечи стимулируют секрецию", severity: "MEDIUM"},
+        {with: "artichoke", effect: "Желчеотток", mechanism: "Оба стимулируют желчеотделение", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Пищеварение', when: 'Субъективно' }
+    ],
+    contraindications: ['Язвенная болезнь'],
+    sideEffects: ['Редко: изжога при избытке'],
+    dosage: { mg: 250, timing: 'за 15 мин до еды', form: 'экстракт горечавки 250 мг' },
+    bestForCourse: false,
+  },
+  artichoke: {
+    id: 'artichoke',
+    name: 'Artichoke',
+    nameRu: 'Артишок',
+    tier: 'standard',
+    category: ['hepatoprotector', 'gastrointestinal'],
+    forms: [
+      { id: 'artichoke', name: 'Artichoke', nameRu: 'Экстракт артишока 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'artichoke_2', name: 'Artichoke', nameRu: 'Артишок + Расторопша комплекс', dose: '500 мг', best: false }
+    ],
+    organs: ['LIVER', 'GALLBLADDER', 'GUT'],
+    systems: ['hepatic', 'gastrointestinal'],
+    mechanisms: ['BILE_SECRETION', 'LIVER_PROTECTION', 'CHOLESTEROL_LOWERING', 'DETOXIFICATION'],
+    description: 'Артишок — гепатопротектор и холеретик, стимулирует желчеотток и защищает печень. На курсе — защита печени.',
+    synergies: [
+      { with: "milk_thistle", effect: "Артишок + Расторопша — двойная гепатопротекция", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Желчнокаменная болезнь'],
+    sideEffects: ['Редко: метеоризм'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт артишока 500 мг' },
+    bestForCourse: false,
+  },
+  garlic: {
+    id: 'garlic',
+    name: 'Garlic',
+    nameRu: 'Чеснок (аллицин)',
+    tier: 'standard',
+    category: ['cardioprotector', 'antioxidant'],
+    forms: [
+      { id: 'garlic', name: 'Garlic', nameRu: 'Чесночный экстракт 1000 мг', dose: '1 г 2x/д', best: true },
+      { id: 'garlic_2', name: 'Garlic', nameRu: 'Аллицин 600 мг', dose: '1 г', best: false }
+    ],
+    organs: ['HEART', 'BLOOD_VESSELS', 'IMMUNE_SYSTEM'],
+    systems: ['cardio', 'immune'],
+    mechanisms: ['CHOLESTEROL_LOWERING', 'ANTI_INFLAMMATORY', 'ANTIMICROBIAL', 'BLOOD_PRESSURE_REGULATION'],
+    description: 'Чеснок (аллицин) — кардиопротектор, снижает холестерин и АД, антимикробное действие. На курсе — сосуды и иммунитет.',
+    synergies: [
+        {with: "vitamin_c", effect: "Иммунитет", mechanism: "Аллицин + C", severity: "MEDIUM"},
+        {with: "omega3", effect: "Кардиопротекция", mechanism: "Оба снижают холестерин", severity: "MEDIUM"},
+      ],
+    conflicts: [
+      { with: "anticoagulant_drugs", effect: "Чеснок потенцирует антикоагулянты", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Приём антикоагулянтов (с осторожностью)'],
+    sideEffects: ['Запах изо рта', 'Желудочный дискомфорт'],
+    dosage: { mg: 1000, timing: 'с едой 1x/д', form: 'чесночный экстракт 1000 мг' },
+    bestForCourse: false,
+  },
+  mangosteen: {
+    id: 'mangosteen',
+    name: 'Mangosteen',
+    nameRu: 'Мангостин',
+    tier: 'standard',
+    category: ['antioxidant', 'anti_aging'],
+    forms: [
+      { id: 'mangosteen', name: 'Mangosteen', nameRu: 'Экстракт мангостина 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['SKIN', 'IMMUNE_SYSTEM', 'GUT'],
+    systems: ['immune', 'gastrointestinal'],
+    mechanisms: ['ANTIOXIDANT', 'ANTI_INFLAMMATORY', 'SKIN_HEALTH', 'IMMUNE_REGULATION'],
+    description: 'Мангостин — источник ксантонов, мощных антиоксидантов. Противовоспалительное и антиоксидантное действие.',
+    synergies: [
+        {with: "curcumin", effect: "Противовоспалительное", mechanism: "Оба подавляют NF-kB и COX-2", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Окислительный стресс', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: аллергия'],
+    dosage: { mg: 500, timing: 'с едой 1x/д', form: 'экстракт мангостина 500 мг' },
+    bestForCourse: false,
+  },
+  nattokinase: {
+    id: 'nattokinase',
+    name: 'Nattokinase',
+    nameRu: 'Наттокиназа',
+    tier: 'standard',
+    category: ['cardioprotector', 'anticoagulant'],
+    forms: [
+      { id: 'nattokinase', name: 'Nattokinase', nameRu: 'Наттокиназа 2000 FU', dose: '2 г 2x/д', best: true },
+      { id: 'nattokinase_2', name: 'Nattokinase', nameRu: 'Наттокиназа + Омега-3 комплекс', dose: '2 г', best: false }
+    ],
+    organs: ['HEART', 'BLOOD_VESSELS', 'BRAIN'],
+    systems: ['cardio'],
+    mechanisms: ['FIBRINOLYSIS', 'BLOOD_THINNING', 'MICROCIRCULATION', 'THROMBUS_PREVENTION'],
+    description: 'Наттокиназа — фермент из натто, растворяет фибрин и предотвращает тромбы. На курсе — защита сосудов.',
+    synergies: [
+        {with: "omega3", effect: "Антитромботическое", mechanism: "Оба снижают риск тромбов", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Риск кровотечения", mechanism: "Наттокиназа + антикоагулянты", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Фибриноген', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Приём антикоагулянтов', 'Язвенная болезнь'],
+    sideEffects: ['Редко: кровотечение при высоких дозах'],
+    dosage: { mg: 2000, timing: 'натощак 1x/д', form: 'наттокиназа 2000 FU' },
+    bestForCourse: false,
+  },
+  grapefruit_seed: {
+    id: 'grapefruit_seed',
+    name: 'Grapefruit Seed',
+    nameRu: 'Экстракт грейпфрутовых косточек',
+    tier: 'standard',
+    category: ['antimicrobial', 'immunomodulator'],
+    forms: [
+      { id: 'grapefruit_seed', name: 'Grapefruit Seed', nameRu: 'Экстракт грейпфрутовых косточек 250 мг', dose: '250 мг 2x/д', best: true }
+    ],
+    organs: ['GUT', 'IMMUNE_SYSTEM', 'SKIN'],
+    systems: ['gastrointestinal', 'immune'],
+    mechanisms: ['ANTIMICROBIAL', 'ANTI_INFLAMMATORY', 'IMMUNE_REGULATION', 'GUT_FLORA_BALANCE'],
+    description: 'Экстракт грейпфрутовых косточек — мощный антимикробный агент, поддерживает микрофлору кишечника и иммунитет.',
+    synergies: [
+        {with: "probiotics", effect: "Антимикробное + пробиотическое", mechanism: "Экстракт грейпфрута — антимикробное", severity: "LOW"},
+      ],
+    conflicts: [
+        {with: "statin_drugs", effect: "Ингибирование CYP3A4", mechanism: "Бергамоттин ингибирует CYP3A4", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Микрофлора', when: 'Субъективно' }
+    ],
+    contraindications: ['Приём иммуносупрессоров'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 250, timing: 'с едой 2x/д', form: 'экстракт грейпфрутовых косточек 250 мг' },
+    bestForCourse: false,
+  },
+  nobiletin: {
+    id: 'nobiletin',
+    name: 'Nobiletin',
+    nameRu: 'Нобилетин',
+    tier: 'advanced',
+    category: ['antioxidant', 'metabolic'],
+    forms: [
+      { id: 'nobiletin', name: 'Nobiletin', nameRu: 'Нобилетин 100 мг', dose: '100 мг 2x/д', best: true }
+    ],
+    organs: ['LIVER', 'BRAIN', 'CELLS'],
+    systems: ['hepatic', 'metabolic'],
+    mechanisms: ['CIRCADIAN_RHYTHM_REGULATION', 'METABOLIC_IMPROVEMENT', 'ANTI_INFLAMMATORY', 'ANTIOXIDANT'],
+    description: 'Нобилетин — флавоноид из цитрусовых, регулирует циркадные ритмы и метаболизм. Антивоспалительное действие.',
+    synergies: [
+        {with: "curcumin", effect: "Противовоспалительное", mechanism: "Оба — флавоноиды", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Глюкоза натощак', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 100, timing: 'с едой 1x/д', form: 'нобилетин 100 мг' },
+    bestForCourse: false,
+  },
+  fisetin: {
+    id: 'fisetin',
+    name: 'Fisetin',
+    nameRu: 'Физетин',
+    tier: 'advanced',
+    category: ['antioxidant', 'anti_aging'],
+    forms: [
+      { id: 'fisetin', name: 'Fisetin', nameRu: 'Физетин 100 мг', dose: '100 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'CELLS', 'KIDNEYS'],
+    systems: ['neuro', 'renal'],
+    mechanisms: ['SENOLYTIC', 'ANTIOXIDANT', 'NEUROPROTECTION', 'ANTI_INFLAMMATORY'],
+    description: 'Физетин — флавоноид с сенолитической активностью, избирательно удаляет стареющие клетки. Анти-возрастной.',
+    synergies: [
+        {with: "quercetin", effect: "Сенолитическая активность", mechanism: "Оба удаляют стареющие клетки", severity: "HIGH"},
+        {with: "curcumin", effect: "Антиоксидантная защита", mechanism: "Оба подавляют воспаление", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Окислительный стресс', when: 'Субъективно' }
+    ],
+    contraindications: ['Беременность'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 100, timing: 'с едой 2x/д', form: 'физетин 100 мг' },
+    bestForCourse: false,
+  },
+  baicalin: {
+    id: 'baicalin',
+    name: 'Baicalin',
+    nameRu: 'Байкалин',
+    tier: 'advanced',
+    category: ['antioxidant', 'neuroprotector'],
+    forms: [
+      { id: 'baicalin', name: 'Baicalin', nameRu: 'Байкалин 200 мг', dose: '200 мг 2x/д', best: true }
+    ],
+    organs: ['LIVER', 'BRAIN', 'NERVES'],
+    systems: ['hepatic', 'neuro'],
+    mechanisms: ['ANTI_INFLAMMATORY', 'NEUROPROTECTION', 'LIVER_PROTECTION', 'ANXIOLYTIC'],
+    description: 'Байкалин — флавоноид из шлемника байкальского, нейропротектор и гепатопротектор. Успокаивает и защищает.',
+    synergies: [
+        {with: "curcumin", effect: "Противовоспалительное", mechanism: "Оба подавляют NF-kB и COX-2", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'АЛТ/АСТ', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Седативные препараты (усиление)'],
+    sideEffects: ['Сонливость при начале'],
+    dosage: { mg: 200, timing: 'с едой 2x/д', form: 'байкалин 200 мг' },
+    bestForCourse: false,
+  },
+  taxifolin: {
+    id: 'taxifolin',
+    name: 'Taxifolin',
+    nameRu: 'Таксифолин (Дигидрокверцетин)',
+    tier: 'advanced',
+    category: ['antioxidant', 'cardioprotector'],
+    forms: [
+      { id: 'taxifolin', name: 'Taxifolin', nameRu: 'Таксифолин 100 мг', dose: '100 мг 2x/д', best: true },
+      { id: 'taxifolin_2', name: 'Taxifolin', nameRu: 'Дигидрокверцетин 100 мг', dose: '100 мг', best: false }
+    ],
+    organs: ['HEART', 'LIVER', 'BLOOD_VESSELS'],
+    systems: ['cardio', 'hepatic'],
+    mechanisms: ['ANTIOXIDANT', 'ANTI_INFLAMMATORY', 'VASCULAR_PROTECTION', 'MITOCHONDRIAL_PROTECTION'],
+    description: 'Таксифолин (дигидрокверцетин) — флавоноид из лиственницы, мощный антиоксидент. Защищает сосуды и митохондрии.',
+    synergies: [
+        {with: "vitamin_c", effect: "Антиоксидантная сеть", mechanism: "Оба — флавоноиды", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: аллергия'],
+    dosage: { mg: 100, timing: 'с едой 1x/д', form: 'таксифолин 100 мг' },
+    bestForCourse: false,
+  },
+  soy_isoflavones: {
+    id: 'soy_isoflavones',
+    name: 'Soy Isoflavones',
+    nameRu: 'Соевые изофлавоны',
+    tier: 'standard',
+    category: ['hormonal', 'cardioprotector'],
+    forms: [
+      { id: 'soy_isoflavones', name: 'Soy Isoflavones', nameRu: 'Соевые изофлавоны 100 мг', dose: '100 мг 2x/д', best: true }
+    ],
+    organs: ['REPRODUCTIVE', 'HEART', 'BONES'],
+    systems: ['reproductive', 'cardio'],
+    mechanisms: ['PHYTOESTROGEN', 'BONE_PROTECTION', 'CHOLESTEROL_LOWERING', 'HOT_FLASH_REDUCTION'],
+    description: 'Соевые изофлавоны — фитоэстрогены, облегчают симптомы менопаузы и защищают кости. На курсе — гормональный баланс.',
+    synergies: [
+      { with: "holy_basil", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+        {with: "tamoxifen", effect: "Антагонизм", mechanism: "Изофлавоны могут мешать антиэстрогенной терапии", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Эстрадиол', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Эстроген-зависимые опухоли'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 100, timing: 'с едой 1x/д', form: 'соевые изофлавоны 100 мг' },
+    bestForCourse: false,
+  },
+  rosemary: {
+    id: 'rosemary',
+    name: 'Rosemary',
+    nameRu: 'Розмарин (карнозиновая кислота)',
+    tier: 'standard',
+    category: ['antioxidant', 'neuroprotector'],
+    forms: [
+      { id: 'rosemary', name: 'Rosemary', nameRu: 'Экстракт розмарина 200 мг', dose: '200 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'LIVER', 'HEART'],
+    systems: ['neuro', 'hepatic'],
+    mechanisms: ['ANTIOXIDANT', 'NEUROPROTECTION', 'LIVER_PROTECTION', 'ANTI_INFLAMMATORY'],
+    description: 'Розмарин (карнозиновая кислота) — мощный антиоксидант и нейропротектор. Улучшает память и защищает мозг.',
+    synergies: [
+        {with: "curcumin", effect: "Нейропротекция", mechanism: "Карнозная кислота + куркумин", severity: "MEDIUM"},
+        {with: "omega3", effect: "Защита ЖК от окисления", mechanism: "Розмарин защищает ЖК", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: аллергия'],
+    dosage: { mg: 200, timing: 'с едой 1x/д', form: 'экстракт розмарина 200 мг' },
+    bestForCourse: false,
+  },
+  cinnamon: {
+    id: 'cinnamon',
+    name: 'Cinnamon',
+    nameRu: 'Корица (коричный альдегид)',
+    tier: 'standard',
+    category: ['metabolic', 'antioxidant'],
+    forms: [
+      { id: 'cinnamon', name: 'Cinnamon', nameRu: 'Корица экстракт 1000 мг', dose: '1 г 2x/д', best: true },
+      { id: 'cinnamon_2', name: 'Cinnamon', nameRu: 'Корица + Хром комплекс', dose: '1 г', best: false }
+    ],
+    organs: ['PANCREAS', 'LIVER', 'BLOOD_VESSELS'],
+    systems: ['metabolic', 'hepatic'],
+    mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_LOWERING', 'ANTI_INFLAMMATORY', 'ANTIMICROBIAL'],
+    description: 'Корица — улучшает чувствительность к инсулину и снижает глюкозу. На курсе — метаболическая поддержка.',
+    synergies: [
+      { with: "berberine", effect: "Корица + Берберин — инсулиновая чувствительность", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Глюкоза натощак', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Заболевания печени (кассия)'],
+    sideEffects: ['Редко: аллергия', 'Раздражение слизистой'],
+    dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'корица экстракт 1000 мг' },
+    bestForCourse: false,
+  },
+  pomegranate: {
+    id: 'pomegranate',
+    name: 'Pomegranate',
+    nameRu: 'Гранат (эллаговая кислота)',
+    tier: 'standard',
+    category: ['antioxidant', 'cardioprotector'],
+    forms: [
+      { id: 'pomegranate', name: 'Pomegranate', nameRu: 'Экстракт граната 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'pomegranate_2', name: 'Pomegranate', nameRu: 'Гранат + Омега-3 комплекс', dose: '500 мг', best: false }
+    ],
+    organs: ['HEART', 'BLOOD_VESSELS', 'REPRODUCTIVE'],
+    systems: ['cardio', 'reproductive'],
+    mechanisms: ['ANTIOXIDANT', 'NITRIC_OXIDE_PRODUCTION', 'PROSTATE_PROTECTION', 'ANTI_INFLAMMATORY'],
+    description: 'Гранат — богат эллаготаннинами, улучшает NO-продукцию и защищает простату. Кардиопротекция на курсе.',
+    synergies: [
+        {with: "vitamin_c", effect: "Антиоксидант", mechanism: "Эллаговая кислота + C", severity: "MEDIUM"},
+        {with: "curcumin", effect: "Противовоспалительное", mechanism: "Оба подавляют NF-kB", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'ПСА', when: 'Каждые 12 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: аллергия'],
+    dosage: { mg: 500, timing: 'с едой 1x/д', form: 'экстракт граната 500 мг' },
+    bestForCourse: false,
+  },
+  cranberry: {
+    id: 'cranberry',
+    name: 'Cranberry',
+    nameRu: 'Клюква (проантоцианидины)',
+    tier: 'standard',
+    category: ['antioxidant', 'urinary_protector'],
+    forms: [
+      { id: 'cranberry', name: 'Cranberry', nameRu: 'Экстракт клюквы 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'cranberry_2', name: 'Cranberry', nameRu: 'Клюква + D-манноза комплекс', dose: '500 мг', best: false }
+    ],
+    organs: ['URINARY_TRACT', 'HEART', 'GUT'],
+    systems: ['renal', 'cardio'],
+    mechanisms: ['UTI_PREVENTION', 'ANTIOXIDANT', 'ANTI_INFLAMMATORY', 'MICROCIRCULATION'],
+    description: 'Клюква — проантоцианидины предотвращают ИМП, антиоксидантная и противовоспалительная защита. На курсе — почки и МП.',
+    synergies: [
+      { with: "cranberry", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "probiotics", effect: "Клюква + Пробиотики — МП защита", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Усиление антикоагуляции", mechanism: "Клюква + варфарин", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Общий анализ мочи', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Оксалатные камни (с осторожностью)'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт клюквы 500 мг' },
+    bestForCourse: false,
+  },
+  urolithin_a: {
+    id: 'urolithin_a',
+    name: 'Urolithin A',
+    nameRu: 'Уролитин А',
+    tier: 'advanced',
+    category: ['anti_aging', 'mitochondrial'],
+    forms: [
+      { id: 'urolithin_a', name: 'Urolithin A', nameRu: 'Уролитин А 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['MUSCLES', 'MITOCHONDRIA', 'BRAIN'],
+    systems: ['musculoskeletal', 'neuro'],
+    mechanisms: ['MITOPHAGY_ACTIVATION', 'MITOCHONDRIAL_BIOGENESIS', 'MUSCLE_FUNCTION', 'ANTI_AGING'],
+    description: 'Уролитин А — метаболит эллаготаннинов, активирует митофагию (очистку митохондрий). Анти-возрастной и мышечная поддержка.',
+    synergies: [
+        {with: "nmn", effect: "Митофагия + NAD+", mechanism: "Уролитин A — митофагия, NMN — NAD+", severity: "HIGH"},
+        {with: "coq10", effect: "Митохондриальная функция", mechanism: "Оба поддерживают митохондрии", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'КФК', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Беременность'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 500, timing: 'с едой 1x/д', form: 'уролитин А 500 мг' },
+    bestForCourse: false,
+  },
+  bile_acids: {
+    id: 'bile_acids',
+    name: 'Bile Acids',
+    nameRu: 'Жёлчные кислоты (урсодезоксихолевая)',
+    tier: 'standard',
+    category: ['hepatoprotector', 'gastrointestinal'],
+    forms: [
+      { id: 'bile_acids', name: 'Bile Acids', nameRu: 'УДХК 250 мг', dose: '250 мг 2x/д', best: true },
+      { id: 'bile_acids_2', name: 'Bile Acids', nameRu: 'УДХК 500 мг', dose: '250 мг', best: false }
+    ],
+    organs: ['LIVER', 'GALLBLADDER', 'GUT'],
+    systems: ['hepatic', 'gastrointestinal'],
+    mechanisms: ['BILE_FLOW_STIMULATION', 'CHOLESTEROL_SOLUBILIZATION', 'LIVER_PROTECTION', 'GALLSTONE_PREVENTION'],
+    description: 'Жёлчные кислоты (УДХК) — стимулируют желчеотток, растворяют камни, защищают печень. На курсе — гепатопротекция.',
+    synergies: [
+        {with: "tudca", effect: "Желчеотток", mechanism: "Оба — желчные кислоты", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Желчнокаменная болезнь (острая)'],
+    sideEffects: ['Диарея при начале'],
+    dosage: { mg: 250, timing: 'с едой 2x/д', form: 'урсодезоксихолевая кислота 250 мг' },
+    bestForCourse: false,
+  },
+  piracetam: {
+    id: 'piracetam',
+    name: 'Piracetam',
+    nameRu: 'Пирацетам',
+    tier: 'standard',
+    category: ['nootropic', 'neuroprotector'],
+    forms: [
+      { id: 'piracetam', name: 'Piracetam', nameRu: 'Пирацетам 800 мг', dose: '1.6 г 2x/д', best: true },
+      { id: 'piracetam_2', name: 'Piracetam', nameRu: 'Пирацетам 1200 мг', dose: '1.6 г', best: false }
+    ],
+    organs: ['BRAIN', 'NERVES', 'BLOOD'],
+    systems: ['neuro'],
+    mechanisms: ['ACETYLCHOLINE_MODULATION', 'NEUROPROTECTION', 'MEMORY_ENHANCEMENT', 'MICROCIRCULATION'],
+    description: 'Пирацетам — классический ноотроп, улучшает память, концентрацию и мозговой кровоток. На курсе — нейропротекция.',
+    synergies: [
+      { with: "caffeine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: ['Геморрагический инсульт (острый)'],
+    sideEffects: ['Редко: возбуждение', 'Головная боль при начале'],
+    dosage: { mg: 1600, timing: 'с едой 2x/д', form: 'пирацетам 800 мг' },
+    bestForCourse: false,
+  },
+  aniracetam: {
+    id: 'aniracetam',
+    name: 'Aniracetam',
+    nameRu: 'Анирацетам',
+    tier: 'advanced',
+    category: ['nootropic', 'anxiolytic'],
+    forms: [
+      { id: 'aniracetam', name: 'Aniracetam', nameRu: 'Анирацетам 750 мг', dose: '750 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['ACETYLCHOLINE_MODULATION', 'ANXIOLYTIC', 'MEMORY_ENHANCEMENT', 'CREATIVITY_BOOST'],
+    description: 'Анирацетам — ноотроп с анксиолитическим действием, улучшает память и снижает тревожность. На курсе — антистресс.',
+    synergies: [
+        {with: "citicoline", effect: "Холинэргическая синергия", mechanism: "Рацетам + холин", severity: "HIGH"},
+        {with: "alpha_gpc", effect: "Фокус и память", mechanism: "Анирацетам + холин", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: ['Тяжёлая печёночная недостаточность'],
+    sideEffects: ['Редко: головная боль'],
+    dosage: { mg: 750, timing: 'с едой 2x/д', form: 'анирацетам 750 мг' },
+    bestForCourse: false,
+  },
+  oxiracetam: {
+    id: 'oxiracetam',
+    name: 'Oxiracetam',
+    nameRu: 'Оксирацетам',
+    tier: 'advanced',
+    category: ['nootropic', 'neuroprotector'],
+    forms: [
+      { id: 'oxiracetam', name: 'Oxiracetam', nameRu: 'Оксирацетам 800 мг', dose: '800 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['MEMORY_ENHANCEMENT', 'NEUROPROTECTION', 'FOCUS_IMPROVEMENT', 'ENERGY_BOOST'],
+    description: 'Оксирацетам — стимулирующий ноотроп, улучшает память и фокус. На курсе — концентрация при тренировках.',
+    synergies: [
+        {with: "citicoline", effect: "Когнитивная функция", mechanism: "Рацетам + холин", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: бессонница при вечернем приёме'],
+    dosage: { mg: 800, timing: 'с едой 2x/д', form: 'оксирацетам 800 мг' },
+    bestForCourse: false,
+  },
+  pramiracetam: {
+    id: 'pramiracetam',
+    name: 'Pramiracetam',
+    nameRu: 'Прамирацетам',
+    tier: 'advanced',
+    category: ['nootropic'],
+    forms: [
+      { id: 'pramiracetam', name: 'Pramiracetam', nameRu: 'Прамирацетам 400 мг', dose: '400 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['MEMORY_ENHANCEMENT', 'FOCUS_IMPROVEMENT', 'ACETYLCHOLINE_MODULATION', 'LEARNING_BOOST'],
+    description: 'Прамирацетам — мощный ноотроп, в 10-30 раз сильнее пирацетама. Улучшает память и обучение на курсе.',
+    synergies: [
+        {with: "citicoline", effect: "Память и фокус", mechanism: "Самый мощный рацетам + холин", severity: "HIGH"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: ['Беременность'],
+    sideEffects: ['Редко: головная боль', 'Раздражительность'],
+    dosage: { mg: 400, timing: 'с едой 2x/д', form: 'прамирацетам 400 мг' },
+    bestForCourse: false,
+  },
+  fasoracetam: {
+    id: 'fasoracetam',
+    name: 'Fasoracetam',
+    nameRu: 'Фасорацетам',
+    tier: 'advanced',
+    category: ['nootropic', 'anxiolytic'],
+    forms: [
+      { id: 'fasoracetam', name: 'Fasoracetam', nameRu: 'Фасорацетам 50 мг', dose: '50 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES', 'ADRENALS'],
+    systems: ['neuro', 'endocrine'],
+    mechanisms: ['GLUTAMATE_MODULATION', 'ANXIOLYTIC', 'MEMORY_ENHANCEMENT', 'ADRENAL_RECOVERY'],
+    description: 'Фасорацетам — ноотроп нового поколения, модулирует глутаматные рецепторы и восстанавливает надпочечники.',
+    synergies: [
+        {with: "magnesium", effect: "GABA-B модуляция", mechanism: "Фасорацетам + GABA-B", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: головная боль'],
+    dosage: { mg: 50, timing: 'натощак 2x/д', form: 'фасорацетам 50 мг' },
+    bestForCourse: false,
+  },
+  coluracetam: {
+    id: 'coluracetam',
+    name: 'Coluracetam',
+    nameRu: 'Колурацетам',
+    tier: 'advanced',
+    category: ['nootropic', 'neuroprotector'],
+    forms: [
+      { id: 'coluracetam', name: 'Coluracetam', nameRu: 'Колурацетам 20 мг', dose: '20 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['CHOLINE_UPTAKE_ENHANCEMENT', 'MEMORY_ENHANCEMENT', 'VISION_IMPROVEMENT', 'NEUROPROTECTION'],
+    description: 'Колурацетам — усиливает захват холина, улучшает память и зрение. На курсе — нейропротекция и фокус.',
+    synergies: [
+        {with: "citicoline", effect: "Холинэргическая синергия", mechanism: "Колурацетам + захват холина", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: головная боль'],
+    dosage: { mg: 20, timing: 'натощак 2x/д', form: 'колурацетам 20 мг' },
+    bestForCourse: false,
+  },
+  noopept: {
+    id: 'noopept',
+    name: 'Noopept',
+    nameRu: 'Ноопепт',
+    tier: 'advanced',
+    category: ['nootropic', 'neuroprotector'],
+    forms: [
+      { id: 'noopept', name: 'Noopept', nameRu: 'Ноопепт 10 мг', dose: '10 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['BDNF_INCREASE', 'NGF_STIMULATION', 'MEMORY_ENHANCEMENT', 'NEUROPROTECTION'],
+    description: 'Ноопепт — ноотроп нового поколения, увеличивает BDNF и NGF, улучшает память и нейропротекцию.',
+    synergies: [
+      { with: "citicoline", effect: "Ноопепт + Цитиколин — BDNF + ацетилхолин", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: ['Беременность', 'Эпилепсия'],
+    sideEffects: ['Редко: раздражительность'],
+    dosage: { mg: 10, timing: 'с едой 2x/д', form: 'ноопепт 10 мг' },
+    bestForCourse: false,
+  },
+  citicoline: {
+    id: 'citicoline',
+    name: 'Citicoline',
+    nameRu: 'Цитиколин (ЦДФ-холин)',
+    tier: 'standard',
+    category: ['nootropic', 'neuroprotector'],
+    forms: [
+      { id: 'citicoline', name: 'Citicoline', nameRu: 'Цитиколин 250 мг', dose: '250 мг 2x/д', best: true },
+      { id: 'citicoline_2', name: 'Citicoline', nameRu: 'Цитиколин 500 мг', dose: '250 мг', best: false }
+    ],
+    organs: ['BRAIN', 'NERVES', 'LIVER'],
+    systems: ['neuro', 'hepatic'],
+    mechanisms: ['ACETYLCHOLINE_SYNTHESIS', 'MEMORY_ENHANCEMENT', 'NEUROPROTECTION', 'PHOSPHOLIPID_SYNTHESIS'],
+    description: 'Цитиколин — предшественник ацетилхолина и фосфолипидов, улучшает память и нейропротекцию. На курсе — мозг.',
+    synergies: [
+      { with: "alpha_gpc", effect: "Цитиколин + Альфа-ГФХ — двойной источник холина", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "noopept", effect: "Ноопепт + Цитиколин — BDNF + ацетилхолин", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: головная боль при начале'],
+    dosage: { mg: 250, timing: 'с едой 2x/д', form: 'цитиколин 250 мг' },
+    bestForCourse: false,
+  },
+  alpha_gpc: {
+    id: 'alpha_gpc',
+    name: 'Alpha-GPC',
+    nameRu: 'Альфа-ГФХ (Альфа-глицерофосфохолин)',
+    tier: 'standard',
+    category: ['nootropic', 'neuroprotector'],
+    forms: [
+      { id: 'alpha_gpc', name: 'Alpha-GPC', nameRu: 'Альфа-ГФХ 300 мг', dose: '300 мг 2x/д', best: true },
+      { id: 'alpha_gpc_2', name: 'Alpha-GPC', nameRu: 'Альфа-ГФХ 600 мг', dose: '300 мг', best: false }
+    ],
+    organs: ['BRAIN', 'NERVES', 'MUSCLES'],
+    systems: ['neuro', 'musculoskeletal'],
+    mechanisms: ['ACETYLCHOLINE_SYNTHESIS', 'MEMORY_ENHANCEMENT', 'POWER_OUTPUT', 'NEUROPROTECTION'],
+    description: 'Альфа-ГФХ — лучший источник холина, увеличивает ацетилхолин, улучшает память и силовой выход. На курсе — мозг и сила.',
+    synergies: [
+      { with: "citicoline", effect: "Цитиколин + Альфа-ГФХ — двойной источник холина", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: головная боль при начале'],
+    dosage: { mg: 300, timing: 'с едой 2x/д', form: 'Альфа-ГФХ 300 мг' },
+    bestForCourse: false,
+  },
+  vinpocetine: {
+    id: 'vinpocetine',
+    name: 'Vinpocetine',
+    nameRu: 'Винпоцетин',
+    tier: 'standard',
+    category: ['nootropic', 'cardioprotector'],
+    forms: [
+      { id: 'vinpocetine', name: 'Vinpocetine', nameRu: 'Винпоцетин 10 мг', dose: '10 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'BLOOD_VESSELS', 'HEART'],
+    systems: ['neuro', 'cardio'],
+    mechanisms: ['CEREBRAL_BLOOD_FLOW', 'MEMORY_ENHANCEMENT', 'NEUROPROTECTION', 'ANTIOXIDANT'],
+    description: 'Винпоцетин — улучшает мозговой кровоток и память. Нейропротектор с сосудорасширяющим действием.',
+    synergies: [
+      { with: "ginkgo", effect: "Винпоцетин + Гинкго — мозговой кровоток", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Риск кровотечения", mechanism: "Винпоцетин + антикоагулянты", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: ['Приём антикоагулянтов (с осторожностью)'],
+    sideEffects: ['Редко: головная боль'],
+    dosage: { mg: 10, timing: 'с едой 2x/д', form: 'винпоцетин 10 мг' },
+    bestForCourse: false,
+  },
+  modafinil: {
+    id: 'modafinil',
+    name: 'Modafinil',
+    nameRu: 'Модафинил',
+    tier: 'specialty',
+    category: ['nootropic', 'stimulant'],
+    forms: [
+      { id: 'modafinil', name: 'Modafinil', nameRu: 'Модафинил 100 мг', dose: '100 мг 2x/д', best: true },
+      { id: 'modafinil_2', name: 'Modafinil', nameRu: 'Модафинил 200 мг', dose: '100 мг', best: false }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['WAKEFULNESS', 'PROMOTING', 'FOCUS_ENHANCEMENT', 'DOPAMINE_MODULATION', 'FATIGUE_REDUCTION'],
+    description: 'Модафинил — стимулятор бодрствования, улучшает фокус и снижает усталость. На курсе — при тренировках в 5 утра.',
+    synergies: [
+        {with: "l_tyrosine", effect: "Бодрость и фокус", mechanism: "Модафинил + тирозин — дофамин", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "antihypertensive_drugs", effect: "Повышение давления", mechanism: "Модафинил может повышать АД", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: ['Аритмия', 'Гипертония (тяжёлая)'],
+    sideEffects: ['Бессонница при вечернем приёме', 'Головная боль'],
+    dosage: { mg: 100, timing: 'утром 1x/д', form: 'модафинил 100 мг' },
+    bestForCourse: false,
+  },
+  selegiline: {
+    id: 'selegiline',
+    name: 'Selegiline',
+    nameRu: 'Селегилин',
+    tier: 'specialty',
+    category: ['nootropic', 'neuroprotector'],
+    forms: [
+      { id: 'selegiline', name: 'Selegiline', nameRu: 'Селегилин 5 мг', dose: '5 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['MAO_B_INHIBITION', 'DOPAMINE_PROTECTION', 'NEUROPROTECTION', 'ANTI_AGING'],
+    description: 'Селегилин — ингибитор МАО-Б, защищает дофамин и обладает нейропротекторным действием. Анти-возрастной.',
+    synergies: [
+        {with: "l_tyrosine", effect: "Дофаминергическая синергия", mechanism: "Селегилин ингибирует MAO-B", severity: "HIGH"},
+      ],
+    conflicts: [
+        {with: "maoi_drugs", effect: "Серотониновый синдром", mechanism: "Двойное ингибирование MAO", severity: "HIGH"},
+        {with: "antidepressant_drugs", effect: "Серотониновый синдром", mechanism: "Селегилин + СИОЗС", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Дофамин', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Приём СИОЗС (серотониновый синдром)'],
+    sideEffects: ['Бессонница при вечернем приёме'],
+    dosage: { mg: 5, timing: 'утром 1x/д', form: 'селегилин 5 мг' },
+    bestForCourse: false,
+  },
+  memantine: {
+    id: 'memantine',
+    name: 'Memantine',
+    nameRu: 'Мемантин',
+    tier: 'specialty',
+    category: ['nootropic', 'neuroprotector'],
+    forms: [
+      { id: 'memantine', name: 'Memantine', nameRu: 'Мемантин 5 мг', dose: '5 мг 2x/д', best: true },
+      { id: 'memantine_2', name: 'Memantine', nameRu: 'Мемантин 10 мг', dose: '5 мг', best: false }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['NMDA_ANTAGONISM', 'NEUROPROTECTION', 'MEMORY_PRESERVATION', 'NEUROPLASTICITY'],
+    description: 'Мемантин — антагонист NMDA-рецепторов, нейропротектор. Предотвращает эксайтотоксичность на курсе.',
+    synergies: [
+        {with: "magnesium", effect: "Нейропротекция", mechanism: "Оба блокируют NMDA", severity: "MEDIUM"},
+        {with: "citicoline", effect: "Когнитивная функция", mechanism: "Мемантин + холин", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: ['Тяжёлая почечная недостаточность'],
+    sideEffects: ['Головокружение при начале'],
+    dosage: { mg: 5, timing: 'с едой 1x/д', form: 'мемантин 5 мг' },
+    bestForCourse: false,
+  },
+  bromantane: {
+    id: 'bromantane',
+    name: 'Bromantane',
+    nameRu: 'Бромантан',
+    tier: 'advanced',
+    category: ['nootropic', 'adaptogen'],
+    forms: [
+      { id: 'bromantane', name: 'Bromantane', nameRu: 'Бромантан 50 мг', dose: '50 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES', 'ADRENALS'],
+    systems: ['neuro', 'endocrine'],
+    mechanisms: ['DOPAMINE_SYNTHESIS_UPREGULATION', 'ANXIOLYTIC', 'ANTI_FATIGUE', 'STRESS_ADAPTATION'],
+    description: 'Бромантан — ноотроп и адаптоген, стимулирует синтез дофамина и снижает тревожность. На курсе — антистресс и фокус.',
+    synergies: [
+        {with: "l_tyrosine", effect: "Синтез дофамина", mechanism: "Бромантан усиливает дофамин", severity: "MEDIUM"},
+        {with: "rhodiola", effect: "Адаптогенный эффект", mechanism: "Оба — актопротекторы", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: ['Беременность'],
+    sideEffects: ['Редко: возбуждение при передозировке'],
+    dosage: { mg: 50, timing: 'утром 1x/д', form: 'бромантан 50 мг' },
+    bestForCourse: false,
+  },
+  tianeptine: {
+    id: 'tianeptine',
+    name: 'Tianeptine',
+    nameRu: 'Тианептин',
+    tier: 'specialty',
+    category: ['nootropic', 'antidepressant'],
+    forms: [
+      { id: 'tianeptine', name: 'Tianeptine', nameRu: 'Тианептин 12.5 мг', dose: '12.5 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['SEROTONIN_REUPTAKE_ENHANCEMENT', 'NEUROPROTECTION', 'BDNF_INCREASE', 'ANXIOLYTIC'],
+    description: 'Тианептин — антидепрессант с нейропротекторным действием, увеличивает BDNF. На курсе — настроение и мозг.',
+    synergies: [
+        {with: "omega3", effect: "Нейропротекция", mechanism: "Оба поддерживают нейропластичность", severity: "LOW"},
+      ],
+    conflicts: [
+        {with: "maoi_drugs", effect: "Серотониновый синдром", mechanism: "Тианептин + ИМАО = опасно", severity: "HIGH"},
+        {with: "antidepressant_drugs", effect: "Серотониновый синдром", mechanism: "Тианептин + СИОЗС", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Настроение', when: 'Субъективно' }
+    ],
+    contraindications: ['Приём СИОЗС (серотониновый синдром)'],
+    sideEffects: ['Редко: сухость во рту', 'Сонливость при начале'],
+    dosage: { mg: 12.5, timing: 'утром 1x/д', form: 'тианептин 12.5 мг' },
+    bestForCourse: false,
+  },
+  huperzine_a: {
+    id: 'huperzine_a',
+    name: 'Huperzine A',
+    nameRu: 'Гуперзин А',
+    tier: 'advanced',
+    category: ['nootropic', 'neuroprotector'],
+    forms: [
+      { id: 'huperzine_a', name: 'Huperzine A', nameRu: 'Гуперзин А 100 мкг', dose: '100 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['ACETYLCHOLINESTERASE_INHIBITION', 'MEMORY_ENHANCEMENT', 'NEUROPROTECTION', 'NMDA_MODULATION'],
+    description: 'Гуперзин А — ингибитор ацетилхолинэстеразы, усиливает память и нейропротекцию. Циклический приём 4 нед/2 нед.',
+    synergies: [
+      { with: "phosphatidylcholine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "stimulant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: ['Брадикардия', 'Астма'],
+    sideEffects: ['Тошнота при высоких дозах'],
+    dosage: { mg: 100, timing: 'с едой 1x/д', form: 'гуперзин А 100 мкг' },
+    bestForCourse: false,
+  },
+  apigenin: {
+    id: 'apigenin',
+    name: 'Apigenin',
+    nameRu: 'Апигенин',
+    tier: 'standard',
+    category: ['nootropic', 'anxiolytic', 'antioxidant'],
+    forms: [
+      { id: 'apigenin', name: 'Apigenin', nameRu: 'Апигенин 50 мг', dose: '50 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES', 'CELLS'],
+    systems: ['neuro'],
+    mechanisms: ['GABA_MODULATION', 'ANXIOLYTIC', 'ANTIOXIDANT', 'ANTI_INFLAMMATORY'],
+    description: 'Апигенин — флавоноид из ромашки, модулирует ГАМК-рецепторы, снижает тревожность и улучшает сон.',
+    synergies: [
+        {with: "magnesium", effect: "Улучшение сна", mechanism: "Оба модулируют GABA", severity: "MEDIUM"},
+        {with: "theanine", effect: "Расслабление", mechanism: "Оба — природные анксиолитики", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: ['Приём седативных (потенцирование)'],
+    sideEffects: ['Сонливость при начале'],
+    dosage: { mg: 50, timing: 'на ночь 1x/д', form: 'апигенин 50 мг' },
+    bestForCourse: false,
+  },
+  lemon_balm: {
+    id: 'lemon_balm',
+    name: 'Lemon Balm',
+    nameRu: 'Мелисса (мелисса лекарственная)',
+    tier: 'standard',
+    category: ['anxiolytic', 'neuroprotector'],
+    forms: [
+      { id: 'lemon_balm', name: 'Lemon Balm', nameRu: 'Экстракт мелиссы 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES', 'GUT'],
+    systems: ['neuro', 'gastrointestinal'],
+    mechanisms: ['GABA_MODULATION', 'ANXIOLYTIC', 'DIGESTION_IMPROVEMENT', 'SLEEP_REGULATION'],
+    description: 'Мелисса — анксиолитик с ГАМК-модулирующим действием, улучшает сон и пищеварение. На курсе — антистресс.',
+    synergies: [
+        {with: "magnesium", effect: "Анксиолитический эффект", mechanism: "Оба усиливают GABA", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "sedative_drugs", effect: "Усиление седации", mechanism: "Мелисса потенцирует седативные", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Когнитивные тесты', when: 'Субъективно' }
+    ],
+    contraindications: ['Гипотиреоз (с осторожностью)'],
+    sideEffects: ['Редко: сонливость'],
+    dosage: { mg: 500, timing: 'на ночь 1x/д', form: 'экстракт мелиссы 500 мг' },
+    bestForCourse: false,
+  },
+  saffron: {
+    id: 'saffron',
+    name: 'Saffron',
+    nameRu: 'Шафран (крокин)',
+    tier: 'standard',
+    category: ['nootropic', 'antidepressant'],
+    forms: [
+      { id: 'saffron', name: 'Saffron', nameRu: 'Шафран экстракт 30 мг', dose: '30 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES', 'EYES'],
+    systems: ['neuro'],
+    mechanisms: ['SEROTONIN_MODULATION', 'ANTIDEPRESSANT', 'VISION_PROTECTION', 'ANTI_INFLAMMATORY'],
+    description: 'Шафран — антидепрессант и ноотроп, модулирует серотонин и защищает зрение. На курсе — настроение.',
+    synergies: [
+        {with: "omega3", effect: "Антидепрессивный эффект", mechanism: "Оба улучшают настроение", severity: "MEDIUM"},
+        {with: "curcumin", effect: "Противовоспалительное + антидепрессивное", mechanism: "Оба модулируют серотонин", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "antidepressant_drugs", effect: "Серотониновый синдром", mechanism: "Шафран + СИОЗС", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Настроение', when: 'Субъективно' }
+    ],
+    contraindications: ['Приём СИОЗС (серотониновый синдром)'],
+    sideEffects: ['Редко: сухость во рту'],
+    dosage: { mg: 30, timing: 'с едой 1x/д', form: 'шафран экстракт 30 мг' },
+    bestForCourse: false,
+  },
+  metformin: {
+    id: 'metformin',
+    name: 'Metformin',
+    nameRu: 'Метформин',
+    tier: 'specialty',
+    category: ['pharma', 'metabolic'],
+    forms: [
+      { id: 'metformin', name: 'Metformin', nameRu: 'Метформин 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'metformin_2', name: 'Metformin', nameRu: 'Метформин 850 мг', dose: '500 мг', best: false }
+    ],
+    organs: ['LIVER', 'PANCREAS', 'MUSCLES'],
+    systems: ['hepatic', 'metabolic'],
+    mechanisms: ['AMPK_ACTIVATION', 'INSULIN_SENSITIVITY', 'GLUCOSE_LOWERING', 'MITOCHONDRIAL_PROTECTION'],
+    description: 'Метформин — препарат первой линии при инсулинорезистентности, активирует AMPK. На курсе — метаболическая защита.',
+    synergies: [
+      { with: "berberine", effect: "Метформин + Берберин — двойная АМПК активация", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "vitamin_b12", effect: "Метформин истощает В12 — необходима добавка", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "berberine", effect: "Метформин + Берберин — двойная АМПК активация", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Глюкоза натощак', when: 'Каждые 4 нед', targetRange: '3.5-5.5 ммоль/л' }
+    ],
+    contraindications: ['Лактоацидоз в анамнезе', 'Тяжёлая почечная недостаточность'],
+    sideEffects: ['Желудочный дискомфорт', 'Диарея при начале'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'метформин 500 мг' },
+    bestForCourse: false,
+  },
+  semaglutide: {
+    id: 'semaglutide',
+    name: 'Semaglutide',
+    nameRu: 'Семаглутид',
+    tier: 'specialty',
+    category: ['pharma', 'metabolic'],
+    forms: [
+      { id: 'semaglutide', name: 'Semaglutide', nameRu: 'Семаглутид 0.25 мг', dose: '250 мкг 2x/д', best: true },
+      { id: 'semaglutide_2', name: 'Semaglutide', nameRu: 'Семаглутид 0.5 мг', dose: '250 мкг', best: false }
+    ],
+    organs: ['PANCREAS', 'BRAIN', 'GUT'],
+    systems: ['metabolic'],
+    mechanisms: ['GLP1_RECEPTOR_AGONISM', 'APPETITE_SUPPRESSION', 'GLUCOSE_REGULATION', 'WEIGHT_LOSS'],
+    description: 'Семаглутид — агонист ГПП-1 рецепторов, мощное снижение аппетита и веса. На курсе — контроль метаболизма.',
+    synergies: [
+        {with: "berberine", effect: "Контроль глюкозы и веса", mechanism: "Оба снижают аппетит", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "antidiabetic_drugs", effect: "Риск гипогликемии", mechanism: "Двойное снижение глюкозы", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Глюкоза натощак', when: 'Каждые 4 нед', targetRange: '3.5-5.5 ммоль/л' }
+    ],
+    contraindications: ['Медуллярный рак щитовидной железы', 'МЭН2', 'Беременность'],
+    sideEffects: ['Тошнота', 'Диарея при начале', 'Риск панкреатита'],
+    dosage: { mg: 0.25, timing: '1x/нед п/к', form: 'семаглутид 0.25 мг' },
+    bestForCourse: false,
+  },
+  finasteride: {
+    id: 'finasteride',
+    name: 'Finasteride',
+    nameRu: 'Финастерид',
+    tier: 'specialty',
+    category: ['pharma', 'hormonal'],
+    forms: [
+      { id: 'finasteride', name: 'Finasteride', nameRu: 'Финастерид 1 мг', dose: '1 мг 2x/д', best: true },
+      { id: 'finasteride_2', name: 'Finasteride', nameRu: 'Финастерид 5 мг', dose: '1 мг', best: false }
+    ],
+    organs: ['PROSTATE', 'HAIR', 'REPRODUCTIVE'],
+    systems: ['reproductive'],
+    mechanisms: ['DHT_INHIBITION_5AR', 'PROSTATE_PROTECTION', 'HAIR_LOSS_PREVENTION', 'PSA_LOWERING'],
+    description: 'Финастерид — ингибитор 5-альфа-редуктазы, снижает ДГТ на 70%. Защита простаты и волос на курсе.',
+    synergies: [
+      { with: "testosterone", effect: "Тестостерон + Финастерид — ДГТ контроль", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "testosterone", effect: "Тестостерон + Финастерид — ДГТ контроль", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'ПСА', when: 'Каждые 12 нед', targetRange: '<4 нг/мл' }
+    ],
+    contraindications: ['Беременность женщин', 'Рак простаты'],
+    sideEffects: ['Снижение либидо', 'Эректильная дисфункция (5-10%)'],
+    dosage: { mg: 1, timing: '1x/д', form: 'финастерид 1 мг' },
+    bestForCourse: false,
+  },
+  cabergoline: {
+    id: 'cabergoline',
+    name: 'Cabergoline',
+    nameRu: 'Каберголин',
+    tier: 'specialty',
+    category: ['pharma', 'hormonal'],
+    forms: [
+      { id: 'cabergoline', name: 'Cabergoline', nameRu: 'Каберголин 0.5 мг', dose: '0.5 мкг 2x/д', best: true }
+    ],
+    organs: ['PITUITARY', 'REPRODUCTIVE'],
+    systems: ['reproductive', 'endocrine'],
+    mechanisms: ['PROLACTIN_INHIBITION', 'DOPAMINE_D2_AGONISM', 'LH_PULSE_RESTORE', 'LIBIDO_RECOVERY'],
+    description: 'Каберголин — агонист D2-рецепторов, подавляет пролактин. Восстанавливает ЛГ и либидо на курсе.',
+    synergies: [
+        {with: "vitamin_b6", effect: "Снижение пролактина", mechanism: "Оба снижают пролактин", severity: "MEDIUM"},
+      ],
+    conflicts: [
+      { with: "testosterone", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Пролактин', when: 'Каждые 2 нед', targetRange: '<15 нг/мл' }
+    ],
+    contraindications: ['Фиброз сердца', 'Тяжёлая печёночная недостаточность'],
+    sideEffects: ['Тошнота', 'Головокружение', 'Риск фиброза при длительном'],
+    dosage: { mg: 0.0005, timing: '2x/нед', form: 'каберголин 0.5 мг' },
+    bestForCourse: false,
+  },
+  testosterone: {
+    id: 'testosterone',
+    name: 'Testosterone',
+    nameRu: 'Тестостерон',
+    tier: 'specialty',
+    category: ['pharma', 'hormonal'],
+    forms: [
+      { id: 'testosterone', name: 'Testosterone', nameRu: 'Тестостерон энантат 250 мг', dose: '200 мг 2x/д', best: true },
+      { id: 'testosterone_2', name: 'Testosterone', nameRu: 'Тестостерон ципионат 200 мг', dose: '200 мг', best: false }
+    ],
+    organs: ['REPRODUCTIVE', 'MUSCLES', 'BRAIN'],
+    systems: ['reproductive', 'musculoskeletal', 'endocrine'],
+    mechanisms: ['ANABOLIC_EFFECT', 'ANDROGENIC_EFFECT', 'PROTEIN_SYNTHESIS', 'MUSCLE_GROWTH'],
+    description: 'Тестостерон — основной андроген, увеличивает мышечную массу, силу и либидо. Основа курса ААС.',
+    synergies: [
+      { with: "finasteride", effect: "Тестостерон + Финастерид — ДГТ контроль", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "nac", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "telmisartan", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "hcg", effect: "ХГЧ + Тестостерон — восстановление оси ГРГ-ЛГ", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "cabergoline", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "finasteride", effect: "Тестостерон + Финастерид — ДГТ контроль", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "tudca", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Тестостерон', when: 'Каждые 4 нед', targetRange: '700-1100 нг/дл' }
+    ],
+    contraindications: ['Рак простаты', 'Беременность'],
+    sideEffects: ['Акне', 'Задержка жидкости', 'Алопеция'],
+    dosage: { mg: 200, timing: '1x/нед в/м', form: 'тестостерон энантат 200 мг' },
+    bestForCourse: false,
+  },
+  caffeine: {
+    id: 'caffeine',
+    name: 'Caffeine',
+    nameRu: 'Кофеин',
+    tier: 'standard',
+    category: ['stimulant', 'nootropic'],
+    forms: [
+      { id: 'caffeine', name: 'Caffeine', nameRu: 'Кофеин 200 мг', dose: '200 мг 2x/д', best: true },
+      { id: 'caffeine_2', name: 'Caffeine', nameRu: 'Кофеин 100 мг', dose: '200 мг', best: false }
+    ],
+    organs: ['BRAIN', 'HEART', 'MUSCLES'],
+    systems: ['neuro', 'cardio'],
+    mechanisms: ['ADENOSINE_ANTAGONISM', 'CNS_STIMULATION', 'FAT_OXIDATION', 'POWER_OUTPUT'],
+    description: 'Кофеин — стимулятор ЦНС, блокирует аденозин, повышает силу и жиросжигание. На курсе — предтренировочный буст.',
+    synergies: [
+      { with: "theanine", effect: "Теанин сглаживает стимуляцию кофеина", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "stimulant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "piracetam", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "l_carnitine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "stimulant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'Пульс', when: 'Субъективно' }
+    ],
+    contraindications: ['Тяжёлая гипертензия', 'Аритмия'],
+    sideEffects: ['Бессонница при вечернем приёме', 'Тахикардия'],
+    dosage: { mg: 200, timing: 'утром за 30 мин до тренировки', form: 'кофеин 200 мг' },
+    bestForCourse: false,
+  },
+  diclofenac: {
+    id: 'diclofenac',
+    name: 'Diclofenac',
+    nameRu: 'Диклофенак',
+    tier: 'specialty',
+    category: ['pharma', 'nsaid'],
+    forms: [
+      { id: 'diclofenac', name: 'Diclofenac', nameRu: 'Диклофенак 50 мг', dose: '50 мг 2x/д', best: true }
+    ],
+    organs: ['JOINTS', 'MUSCLES', 'KIDNEYS'],
+    systems: ['musculoskeletal', 'renal'],
+    mechanisms: ['COX_INHIBITION', 'ANTI_INFLAMMATORY', 'ANALGESIC', 'ANTIPYRETIC'],
+    description: 'Диклофенак — НПВС, ингибитор ЦОГ-1/2, мощное противовоспалительное и обезболивающее. На курсе — суставы (краткосрочно).',
+    synergies: [
+        {with: "omeprazole", effect: "Защита желудка при НПВС", mechanism: "ИПП предотвращает НПВС-гастропатию", severity: "HIGH"},
+      ],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Риск кровотечения", mechanism: "НПВС + антикоагулянты", severity: "HIGH"},
+        {with: "lithium", effect: "Токсичность лития", mechanism: "НПВС снижают выведение Li", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Креатинин', when: 'Каждые 2 нед' }
+    ],
+    contraindications: ['Язвенная болезнь', 'Почечная недостаточность', 'Беременность III триместр'],
+    sideEffects: ['Желудочный дискомфорт', 'Риск язвы', 'Нефротоксичность'],
+    dosage: { mg: 50, timing: 'с едой 2x/д (макс 5 дн)', form: 'диклофенак 50 мг' },
+    bestForCourse: false,
+  },
+  meloxicam: {
+    id: 'meloxicam',
+    name: 'Meloxicam',
+    nameRu: 'Мелоксикам',
+    tier: 'specialty',
+    category: ['pharma', 'nsaid'],
+    forms: [
+      { id: 'meloxicam', name: 'Meloxicam', nameRu: 'Мелоксикам 7.5 мг', dose: '7.5 мг 2x/д', best: true },
+      { id: 'meloxicam_2', name: 'Meloxicam', nameRu: 'Мелоксикам 15 мг', dose: '7.5 мг', best: false }
+    ],
+    organs: ['JOINTS', 'MUSCLES', 'KIDNEYS'],
+    systems: ['musculoskeletal', 'renal'],
+    mechanisms: ['COX2_SELECTIVE_INHIBITION', 'ANTI_INFLAMMATORY', 'ANALGESIC', 'JOINT_PROTECTION'],
+    description: 'Мелоксикам — селективный ингибитор ЦОГ-2, меньше гастротоксичности чем диклофенак. На курсе — суставы.',
+    synergies: [
+        {with: "omeprazole", effect: "Защита ЖКТ", mechanism: "ИПП при НПВС", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Риск кровотечения", mechanism: "НПВС + антикоагулянты", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Креатинин', when: 'Каждые 2 нед' }
+    ],
+    contraindications: ['Язвенная болезнь', 'Почечная недостаточность'],
+    sideEffects: ['Желудочный дискомфорт (меньше чем диклофенак)'],
+    dosage: { mg: 7.5, timing: 'с едой 1x/д (макс 7 дн)', form: 'мелоксикам 7.5 мг' },
+    bestForCourse: false,
+  },
+  ppi_drugs: {
+    id: 'ppi_drugs',
+    name: 'PPI Drugs',
+    nameRu: 'ИПП (Омепразол/Пантопразол)',
+    tier: 'specialty',
+    category: ['pharma', 'gastrointestinal'],
+    forms: [
+      { id: 'ppi_drugs', name: 'PPI Drugs', nameRu: 'Омепразол 20 мг', dose: '20 мг 2x/д', best: true },
+      { id: 'ppi_drugs_2', name: 'PPI Drugs', nameRu: 'Пантопразол 40 мг', dose: '20 мг', best: false }
+    ],
+    organs: ['STOMACH', 'GUT'],
+    systems: ['gastrointestinal'],
+    mechanisms: ['PROTON_PUMP_INHIBITION', 'GASTRIC_PROTECTION', 'ACID_REDUCTION', 'ULCER_PREVENTION'],
+    description: 'Ингибиторы протонной помпы — снижают кислотность желудка, предотвращают язвы и рефлюкс. На курсе — защита ЖКТ.',
+    synergies: [
+      { with: "probiotics", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "curcumin", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "colloidal_minerals", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "vitamin_b12", effect: "ИПП истощают В12 — необходима добавка", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "calcium", effect: "ИПП снижают всасывание кальция", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'Гастроскопия', when: 'Каждые 12 нед' }
+    ],
+    contraindications: ['Длительный приём >6 мес (риск остеопороза)'],
+    sideEffects: ['Головная боль', 'Дефицит B12/Mg при длительном'],
+    dosage: { mg: 20, timing: 'утром натощак 1x/д', form: 'омепразол 20 мг' },
+    bestForCourse: false,
+  },
+  spironolactone: {
+    id: 'spironolactone',
+    name: 'Spironolactone',
+    nameRu: 'Спиронолактон',
+    tier: 'specialty',
+    category: ['pharma', 'cardioprotector'],
+    forms: [
+      { id: 'spironolactone', name: 'Spironolactone', nameRu: 'Спиронолактон 50 мг', dose: '50 мг 2x/д', best: true },
+      { id: 'spironolactone_2', name: 'Spironolactone', nameRu: 'Спиронолактон 25 мг', dose: '50 мг', best: false }
+    ],
+    organs: ['KIDNEYS', 'HEART', 'REPRODUCTIVE'],
+    systems: ['renal', 'cardio'],
+    mechanisms: ['ALDOSTERONE_ANTAGONISM', 'POTASSIUM_SPARING', 'ANTI_ANDROGEN', 'EDEMA_REDUCTION'],
+    description: 'Спиронолактон — антагонист альдостерона, калийсберегающий диуретик с антиандрогенным действием. На курсе — отёки и калий.',
+    synergies: [
+        {with: "saw_palmetto", effect: "Антиандрогенный эффект", mechanism: "Оба подавляют андрогены", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "ace_inhibitor_drugs", effect: "Риск гиперкалиемии", mechanism: "Спиронолактон + ИАПФ = калий", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Калий', when: 'Каждые 2 нед', targetRange: '4.0-5.0 ммоль/л' }
+    ],
+    contraindications: ['Гиперкалиемия', 'Тяжёлая почечная недостаточность'],
+    sideEffects: ['Гинекомастия при высоких дозах', 'Снижение либидо'],
+    dosage: { mg: 50, timing: 'с едой 1x/д', form: 'спиронолактон 50 мг' },
+    bestForCourse: false,
+  },
+  pharma_drugs: {
+    id: 'pharma_drugs',
+    name: 'Pharma Drugs',
+    nameRu: 'Фарма-препараты (комплекс)',
+    tier: 'specialty',
+    category: ['pharma', 'recovery'],
+    forms: [
+      { id: 'pharma_drugs', name: 'Pharma Drugs', nameRu: 'Фарма-комплекс индивидуальный', dose: '1 мг 2x/д', best: true }
+    ],
+    organs: ['LIVER', 'HEART', 'KIDNEYS'],
+    systems: ['hepatic', 'cardio', 'renal'],
+    mechanisms: ['MULTI_ORGAN_PROTECTION', 'RISK_REDUCTION', 'COURSE_SUPPORT', 'PCT_PREPARATION'],
+    description: 'Фарма-препараты — комплексная поддержка на курсе: ИПП, кардиопротекторы, гепатопротекторы. Индивидуальный подбор.',
+    synergies: [],
+    conflicts: [
+      { with: "prebiotics", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Биохимия крови', when: 'Каждые 4 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Индивидуально'],
+    dosage: { mg: 1, timing: 'индивидуально', form: 'фарма-комплекс' },
+    bestForCourse: false,
+  },
+  antidepressant_drugs: {
+    id: 'antidepressant_drugs',
+    name: 'Antidepressant Drugs',
+    nameRu: 'Антидепрессанты',
+    tier: 'specialty',
+    category: ['pharma', 'neuroprotector'],
+    forms: [
+      { id: 'antidepressant_drugs', name: 'Antidepressant Drugs', nameRu: 'Антидепрессант (по назначению врача)', dose: '1 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES', 'ADRENALS'],
+    systems: ['neuro'],
+    mechanisms: ['SEROTONIN_MODULATION', 'NOREPINEPHRINE_MODULATION', 'MOOD_REGULATION', 'ANXIOLYTIC'],
+    description: 'Антидепрессанты — СИОЗС/СИОЗСН для стабилизации настроения на ПКТ. Только по назначению врача.',
+    synergies: [],
+    conflicts: [
+      { with: "x5htp", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "tryptophan", effect: "СИОЗС + Триптофан — риск серотонинового синдрома", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "holy_basil", effect: "Туласи потенцирует антидепрессанты", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "gaba", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "rhodiola", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "tyrosine", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "melatonin", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Настроение', when: 'Субъективно' }
+    ],
+    contraindications: ['Приём МАО-ингибиторов', 'Серотониновый синдром'],
+    sideEffects: ['Тошнота при начале', 'Снижение либидо', 'Бессонница'],
+    dosage: { mg: 1, timing: 'индивидуально', form: 'антидепрессант (по назначению)' },
+    bestForCourse: false,
+  },
+  anxiolytic_drugs: {
+    id: 'anxiolytic_drugs',
+    name: 'Anxiolytic Drugs',
+    nameRu: 'Анксиолитики',
+    tier: 'specialty',
+    category: ['pharma', 'neuroprotector'],
+    forms: [
+      { id: 'anxiolytic_drugs', name: 'Anxiolytic Drugs', nameRu: 'Анксиолитик (по назначению врача)', dose: '1 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['GABA_MODULATION', 'ANXIOLYTIC', 'MUSCLE_RELAXATION', 'SLEEP_REGULATION'],
+    description: 'Анксиолитики — бензодиазепины или небензодиазепиновые препараты для снижения тревожности. Только по назначению.',
+    synergies: [
+      { with: "melatonin", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "ashwagandha", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "gaba", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "gaba", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "stimulant_complex", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Тревожность', when: 'Субъективно' }
+    ],
+    contraindications: ['Зависимость при длительном приёме'],
+    sideEffects: ['Сонливость', 'Зависимость', 'Синдром отмены'],
+    dosage: { mg: 1, timing: 'индивидуально', form: 'анксиолитик (по назначению)' },
+    bestForCourse: false,
+  },
+  antipsychotic_drugs: {
+    id: 'antipsychotic_drugs',
+    name: 'Antipsychotic Drugs',
+    nameRu: 'Антипсихотики',
+    tier: 'specialty',
+    category: ['pharma', 'neuroprotector'],
+    forms: [
+      { id: 'antipsychotic_drugs', name: 'Antipsychotic Drugs', nameRu: 'Антипсихотик (по назначению врача)', dose: '1 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['DOPAMINE_ANTAGONISM', 'PSYCHOSIS_PREVENTION', 'MOOD_STABILIZATION', 'PROLACTIN_INCREASE'],
+    description: 'Антипсихотики — для предотвращения психоза на высоких дозах ААС. Только по назначению врача.',
+    synergies: [],
+    conflicts: [
+      { with: "phosphatidylcholine", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'Психический статус', when: 'Субъективно' }
+    ],
+    contraindications: ['Беременность'],
+    sideEffects: ['Седация', 'Увеличение веса', 'Экстрапирамидные симптомы'],
+    dosage: { mg: 1, timing: 'индивидуально', form: 'антипсихотик (по назначению)' },
+    bestForCourse: false,
+  },
+  anticonvulsant_drugs: {
+    id: 'anticonvulsant_drugs',
+    name: 'Anticonvulsant Drugs',
+    nameRu: 'Противоэпилептические препараты',
+    tier: 'specialty',
+    category: ['pharma', 'neuroprotector'],
+    forms: [
+      { id: 'anticonvulsant_drugs', name: 'Anticonvulsant Drugs', nameRu: 'Противоэпилептический (по назначению врача)', dose: '1 мг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['SEIZURE_PREVENTION', 'NEUROPROTECTION', 'MOOD_STABILIZATION', 'NERVE_PAIN_RELIEF'],
+    description: 'Противоэпилептические препараты — предотвращают судороги и нейропатию на курсе. Только по назначению.',
+    synergies: [],
+    conflicts: [
+      { with: "folate", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'ЭЭГ', when: 'Каждые 12 нед' }
+    ],
+    contraindications: ['Беременность (с осторожностью)'],
+    sideEffects: ['Сонливость', 'Головокружение', 'Тремор'],
+    dosage: { mg: 1, timing: 'индивидуально', form: 'противоэпилептический (по назначению)' },
+    bestForCourse: false,
+  },
+  ketamine: {
+    id: 'ketamine',
+    name: 'Ketamine',
+    nameRu: 'Кетамин',
+    tier: 'specialty',
+    category: ['pharma', 'nootropic', 'antidepressant'],
+    forms: [
+      { id: 'ketamine', name: 'Ketamine', nameRu: 'Кетамин (клиническое применение)', dose: '500 мкг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES'],
+    systems: ['neuro'],
+    mechanisms: ['NMDA_ANTAGONISM', 'RAPID_ANTIDEPRESSANT', 'ANALGESIC', 'NEUROPLASTICITY'],
+    description: 'Кетамин — NMDA-антагонист с быстрым антидепрессивным действием. Только в клинике под наблюдением.',
+    synergies: [],
+    conflicts: [
+        {with: "antidepressant_drugs", effect: "Риск серотонинового синдрома", mechanism: "Кетамин + СИОЗС", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Настроение', when: 'Субъективно' }
+    ],
+    contraindications: ['Гипертензия', 'Психоз'],
+    sideEffects: ['Диссоциация', 'Повышение АД', 'Зависимость'],
+    dosage: { mg: 0.5, timing: 'в клинике 1x/нед в/в', form: 'кетамин 0.5 мг/кг в/в' },
+    bestForCourse: false,
+  },
+  antidiabetic_drugs: {
+    id: 'antidiabetic_drugs',
+    name: 'Antidiabetic Drugs',
+    nameRu: 'Противодиабетические препараты',
+    tier: 'specialty',
+    category: ['pharma', 'metabolic'],
+    forms: [
+      { id: 'antidiabetic_drugs', name: 'Antidiabetic Drugs', nameRu: 'Противодиабетический (по назначению врача)', dose: '1 мг 2x/д', best: true }
+    ],
+    organs: ['PANCREAS', 'LIVER', 'MUSCLES'],
+    systems: ['metabolic', 'hepatic'],
+    mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_LOWERING', 'HBA1C_REDUCTION', 'METABOLIC_PROTECTION'],
+    description: 'Противодиабетические препараты — метформин, СГЛТ2-ингибиторы и др. для контроля глюкозы на курсе.',
+    synergies: [],
+    conflicts: [
+      { with: "mct", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Глюкоза натощак', when: 'Каждые 4 нед', targetRange: '3.5-5.5 ммоль/л' }
+    ],
+    contraindications: ['Кетоацидоз', 'Тяжёлая почечная недостаточность'],
+    sideEffects: ['Индивидуально'],
+    dosage: { mg: 1, timing: 'индивидуально', form: 'противодиабетический (по назначению)' },
+    bestForCourse: false,
+  },
+  thyroid_drugs: {
+    id: 'thyroid_drugs',
+    name: 'Thyroid Drugs',
+    nameRu: 'Тиреоидные препараты',
+    tier: 'specialty',
+    category: ['pharma', 'hormonal'],
+    forms: [
+      { id: 'thyroid_drugs', name: 'Thyroid Drugs', nameRu: 'Левотироксин (по назначению)', dose: '1 мг 2x/д', best: true },
+      { id: 'thyroid_drugs_2', name: 'Thyroid Drugs', nameRu: 'Лиотиронин (по назначению)', dose: '1 мг', best: false }
+    ],
+    organs: ['THYROID', 'BRAIN', 'HEART'],
+    systems: ['endocrine', 'cardio', 'neuro'],
+    mechanisms: ['THYROID_HORMONE_REGULATION', 'METABOLIC_RATE', 'T3_T4_BALANCE', 'ENERGY_PRODUCTION'],
+    description: 'Тиреоидные препараты — левотироксин (Т4) и лиотиронин (Т3) для регуляции метаболизма. Только по назначению.',
+    synergies: [
+      { with: "selenium", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "ashwagandha", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "l_carnitine", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "iodine", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'ТТГ/Т3/Т4', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Тиреотоксикоз', 'Острый инфаркт'],
+    sideEffects: ['Тахикардия', 'Потливость', 'Остеопороз при длительном'],
+    dosage: { mg: 1, timing: 'индивидуально', form: 'тиреоидный препарат (по назначению)' },
+    bestForCourse: false,
+  },
+  corticosteroid_drugs: {
+    id: 'corticosteroid_drugs',
+    name: 'Corticosteroid Drugs',
+    nameRu: 'Глюкокортикоиды',
+    tier: 'specialty',
+    category: ['pharma', 'anti_inflammatory'],
+    forms: [
+      { id: 'corticosteroid_drugs', name: 'Corticosteroid Drugs', nameRu: 'Глюкокортикоид (по назначению врача)', dose: '1 мг 2x/д', best: true }
+    ],
+    organs: ['ADRENALS', 'JOINTS', 'IMMUNE_SYSTEM'],
+    systems: ['endocrine', 'musculoskeletal', 'immune'],
+    mechanisms: ['ANTI_INFLAMMATORY', 'IMMUNOSUPPRESSION', 'CORTISOL_REPLACEMENT', 'EDEMA_REDUCTION'],
+    description: 'Глюкокортикоиды — преднизолон, дексаметазон для снятия воспаления. Только краткосрочно на курсе.',
+    synergies: [
+      { with: "curcumin", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+        {with: "calcium", effect: "Остеопороз", mechanism: "Кортикостероиды вымывают Ca", severity: "HIGH"},
+        {with: "vitamin_d3", effect: "Дефицит D3", mechanism: "Кортикостероиды снижают D3", severity: "MEDIUM"},
+        {with: "nsaid_drugs", effect: "Риск язвы", mechanism: "КС + НПВС = язва желудка", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Кортизол', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Системные инфекции', 'Остеопороз'],
+    sideEffects: ['Остеопороз', 'Увеличение веса', 'Синдром Кушинга'],
+    dosage: { mg: 1, timing: 'индивидуально', form: 'глюкокортикоид (по назначению)' },
+    bestForCourse: false,
+  },
+  statin_drugs: {
+    id: 'statin_drugs',
+    name: 'Statin Drugs',
+    nameRu: 'Статины',
+    tier: 'specialty',
+    category: ['pharma', 'cardioprotector'],
+    forms: [
+      { id: 'statin_drugs', name: 'Statin Drugs', nameRu: 'Аторвастатин 20 мг', dose: '20 мг 2x/д', best: true },
+      { id: 'statin_drugs_2', name: 'Statin Drugs', nameRu: 'Розувастатин 10 мг', dose: '20 мг', best: false }
+    ],
+    organs: ['LIVER', 'HEART', 'BLOOD_VESSELS'],
+    systems: ['hepatic', 'cardio'],
+    mechanisms: ['HMG_COA_REDUCTION', 'CHOLESTEROL_LOWERING', 'PLAQUE_STABILIZATION', 'ANTI_INFLAMMATORY'],
+    description: 'Статины — аторвастатин/розувастатин, снижают холестерин и стабилизируют бляшки. На курсе — кардиопротекция.',
+    synergies: [
+      { with: "resveratrol", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "coq10", effect: "Статины истощают КоКю10 — обязательная добавка", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "citrus_bioflavonoids", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "coq10", effect: "Статины истощают КоКю10 — обязательная добавка", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед', targetRange: 'ЛПНП<2.6 ммоль/л' }
+    ],
+    contraindications: ['Активное заболевание печени', 'Беременность'],
+    sideEffects: ['Миалгия', 'Рабдомиолиз (редко)', 'Повышение трансаминаз'],
+    dosage: { mg: 20, timing: 'на ночь 1x/д', form: 'аторвастатин 20 мг' },
+    bestForCourse: false,
+  },
+  antiplatelet_drugs: {
+    id: 'antiplatelet_drugs',
+    name: 'Antiplatelet Drugs',
+    nameRu: 'Антиагреганты',
+    tier: 'specialty',
+    category: ['pharma', 'cardioprotector'],
+    forms: [
+      { id: 'antiplatelet_drugs', name: 'Antiplatelet Drugs', nameRu: 'Аспирин 100 мг', dose: '100 мг 2x/д', best: true },
+      { id: 'antiplatelet_drugs_2', name: 'Antiplatelet Drugs', nameRu: 'Клопидогрель 75 мг', dose: '100 мг', best: false }
+    ],
+    organs: ['HEART', 'BLOOD_VESSELS', 'BLOOD'],
+    systems: ['cardio', 'hematologic'],
+    mechanisms: ['PLATELET_INHIBITION', 'THROMBUS_PREVENTION', 'MICROCIRCULATION', 'STROKE_PREVENTION'],
+    description: 'Антиагреганты — аспирин/клопидогрел для предотвращения тромбов. На курсе — защита сосудов при эритроцитозе.',
+    synergies: [],
+    conflicts: [
+        {with: "nsaid_drugs", effect: "Риск кровотечения", mechanism: "Двойное подавление тромбоцитов", severity: "HIGH"},
+        {with: "omega3", effect: "Усиление антиагрегантного эффекта", mechanism: "Омега-3 снижает агрегацию", severity: "MEDIUM"},
+        {with: "ginger", effect: "Усиление эффекта", mechanism: "Имбирь ингибирует тромбоциты", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Гемоглобин/Гематокрит', when: 'Каждые 8 нед', targetRange: 'Ht<54%' }
+    ],
+    contraindications: ['Язвенная болезнь', 'Геморрагический диатез'],
+    sideEffects: ['Желудочный дискомфорт', 'Риск кровотечения'],
+    dosage: { mg: 100, timing: 'с едой 1x/д', form: 'аспирин 100 мг' },
+    bestForCourse: false,
+  },
+  anticoagulant_drugs: {
+    id: 'anticoagulant_drugs',
+    name: 'Anticoagulant Drugs',
+    nameRu: 'Антикоагулянты',
+    tier: 'specialty',
+    category: ['pharma', 'cardioprotector'],
+    forms: [
+      { id: 'anticoagulant_drugs', name: 'Anticoagulant Drugs', nameRu: 'Антикоагулянт (по назначению врача)', dose: '1 мг 2x/д', best: true }
+    ],
+    organs: ['HEART', 'BLOOD_VESSELS', 'BLOOD'],
+    systems: ['cardio', 'hematologic'],
+    mechanisms: ['COAGULATION_INHIBITION', 'THROMBUS_PREVENTION', 'DVT_PREVENTION', 'STROKE_PREVENTION'],
+    description: 'Антикоагулянты — эноксапарин/ривароксабан для профилактики тромбозов. На курсе — при высоком гематокрите.',
+    synergies: [],
+    conflicts: [
+      { with: "vitamin_k2", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "omega3", effect: "Усиление антикоагулянтного эффекта — риск кровотечения", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "holy_basil", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "curcumin", effect: "Куркумин потенцирует антикоагулянты", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "resveratrol", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "ginseng", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "coq10", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "ginger", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "garlic", effect: "Чеснок потенцирует антикоагулянты", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'МНО/АЧТВ', when: 'Каждые 2-4 нед' }
+    ],
+    contraindications: ['Активное кровотечение', 'Тромбоцитопения'],
+    sideEffects: ['Риск кровотечения', 'Гематомы'],
+    dosage: { mg: 1, timing: 'индивидуально', form: 'антикоагулянт (по назначению)' },
+    bestForCourse: false,
+  },
+  ace_inhibitor_drugs: {
+    id: 'ace_inhibitor_drugs',
+    name: 'ACE Inhibitor Drugs',
+    nameRu: 'ИАПФ',
+    tier: 'specialty',
+    category: ['pharma', 'cardioprotector'],
+    forms: [
+      { id: 'ace_inhibitor_drugs', name: 'ACE Inhibitor Drugs', nameRu: 'Эналаприл 10 мг', dose: '10 мг 2x/д', best: true },
+      { id: 'ace_inhibitor_drugs_2', name: 'ACE Inhibitor Drugs', nameRu: 'Рамиприл 5 мг', dose: '10 мг', best: false }
+    ],
+    organs: ['HEART', 'BLOOD_VESSELS', 'KIDNEYS'],
+    systems: ['cardio', 'renal'],
+    mechanisms: ['ACE_INHIBITION', 'BLOOD_PRESSURE_LOWERING', 'RENAL_PROTECTION', 'REMODELING_PREVENTION'],
+    description: 'ИАПФ — эналаприл/рамиприл, снижают АД и защищают почки. На курсе — кардиопротекция при гипертензии.',
+    synergies: [],
+    conflicts: [
+      { with: "potassium", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "zinc", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'АД', when: 'Каждые 2 нед', targetRange: '<130/85 мм рт.ст.' }
+    ],
+    contraindications: ['Беременность', 'Двусторонний стеноз почечных артерий'],
+    sideEffects: ['Сухой кашель', 'Гиперкалиемия'],
+    dosage: { mg: 10, timing: '1x/д', form: 'эналаприл 10 мг' },
+    bestForCourse: false,
+  },
+  arb_drugs: {
+    id: 'arb_drugs',
+    name: 'ARB Drugs',
+    nameRu: 'БРА (Сартаны)',
+    tier: 'specialty',
+    category: ['pharma', 'cardioprotector'],
+    forms: [
+      { id: 'arb_drugs', name: 'ARB Drugs', nameRu: 'Лозартан 50 мг', dose: '50 мг 2x/д', best: true },
+      { id: 'arb_drugs_2', name: 'ARB Drugs', nameRu: 'Валсартан 160 мг', dose: '50 мг', best: false }
+    ],
+    organs: ['HEART', 'BLOOD_VESSELS', 'KIDNEYS'],
+    systems: ['cardio', 'renal'],
+    mechanisms: ['ANGIOTENSIN_RECEPTOR_BLOCKADE', 'BLOOD_PRESSURE_LOWERING', 'RENAL_PROTECTION', 'FIBROSIS_REDUCTION'],
+    description: 'БРА (сартаны) — лозартан/валсартан, альтернатива ИАПФ без кашля. На курсе — кардиопротекция.',
+    synergies: [
+      { with: "ginger", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+        {with: "potassium_supplements", effect: "Риск гиперкалиемии", mechanism: "АРБ снижают выведение K", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'АД', when: 'Каждые 2 нед', targetRange: '<130/85 мм рт.ст.' }
+    ],
+    contraindications: ['Беременность', 'Тяжёлая почечная недостаточность'],
+    sideEffects: ['Редко: головокружение', 'Гиперкалиемия'],
+    dosage: { mg: 50, timing: '1x/д', form: 'лозартан 50 мг' },
+    bestForCourse: false,
+  },
+  ccb_drugs: {
+    id: 'ccb_drugs',
+    name: 'CCB Drugs',
+    nameRu: 'БКК (Блокаторы кальциевых каналов)',
+    tier: 'specialty',
+    category: ['pharma', 'cardioprotector'],
+    forms: [
+      { id: 'ccb_drugs', name: 'CCB Drugs', nameRu: 'Амлодипин 5 мг', dose: '5 мг 2x/д', best: true },
+      { id: 'ccb_drugs_2', name: 'CCB Drugs', nameRu: 'Амлодипин 10 мг', dose: '5 мг', best: false }
+    ],
+    organs: ['HEART', 'BLOOD_VESSELS'],
+    systems: ['cardio'],
+    mechanisms: ['CALCIUM_CHANNEL_BLOCKADE', 'BLOOD_PRESSURE_LOWERING', 'VASODILATION', 'ANGINA_PREVENTION'],
+    description: 'БКК — амлодипин/нифедипин, снижают АД и расширяют сосуды. На курсе — гипертензия.',
+    synergies: [],
+    conflicts: [],
+    monitoring: [
+      { what: 'АД', when: 'Каждые 2 нед', targetRange: '<130/85 мм рт.ст.' }
+    ],
+    contraindications: ['Тяжёлая гипотензия', 'Сердечная недостаточность'],
+    sideEffects: ['Отёки голеней', 'Головная боль', 'Приливы'],
+    dosage: { mg: 5, timing: '1x/д', form: 'амлодипин 5 мг' },
+    bestForCourse: false,
+  },
+  beta_blocker_drugs: {
+    id: 'beta_blocker_drugs',
+    name: 'Beta Blocker Drugs',
+    nameRu: 'Бета-блокаторы',
+    tier: 'specialty',
+    category: ['pharma', 'cardioprotector'],
+    forms: [
+      { id: 'beta_blocker_drugs', name: 'Beta Blocker Drugs', nameRu: 'Бисопролол 5 мг', dose: '5 мг 2x/д', best: true },
+      { id: 'beta_blocker_drugs_2', name: 'Beta Blocker Drugs', nameRu: 'Метопролол 50 мг', dose: '5 мг', best: false }
+    ],
+    organs: ['HEART', 'BLOOD_VESSELS', 'LUNGS'],
+    systems: ['cardio'],
+    mechanisms: ['BETA_RECEPTOR_BLOCKADE', 'HEART_RATE_REDUCTION', 'BLOOD_PRESSURE_LOWERING', 'ARRHYTHMIA_PREVENTION'],
+    description: 'Бета-блокаторы — бисопролол/метопролол, снижают ЧСС и АД. На курсе — контроль пульса и АД.',
+    synergies: [
+        {with: "coq10", effect: "Защита сердца", mechanism: "Бета-блокаторы + CoQ10", severity: "MEDIUM"},
+      ],
+    conflicts: [
+      { with: "stimulant_complex", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "potassium", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'Пульс/АД', when: 'Каждые 2 нед', targetRange: 'пульс 60-70' }
+    ],
+    contraindications: ['Бронхиальная астма (неселективные)'],
+    sideEffects: ['Брадикардия', 'Усталость', 'Редко: бронхоспазм'],
+    dosage: { mg: 5, timing: '1x/д', form: 'бисопролол 5 мг' },
+    bestForCourse: false,
+  },
+  diuretic_drugs: {
+    id: 'diuretic_drugs',
+    name: 'Diuretic Drugs',
+    nameRu: 'Диуретики',
+    tier: 'specialty',
+    category: ['pharma', 'cardioprotector'],
+    forms: [
+      { id: 'diuretic_drugs', name: 'Diuretic Drugs', nameRu: 'Диуретик (по назначению врача)', dose: '1 мг 2x/д', best: true }
+    ],
+    organs: ['KIDNEYS', 'HEART'],
+    systems: ['renal', 'cardio'],
+    mechanisms: ['FLUID_REMOVAL', 'POTASSIUM_SPARING', 'BLOOD_PRESSURE_LOWERING', 'EDEMA_REDUCTION'],
+    description: 'Диуретики — фуросемид/гидрохлоротиазид для снятия отёков. На курсе — контроль АД и отёков.',
+    synergies: [
+      { with: "calcium", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "electrolyte_complex", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "magnesium", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "potassium", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "potassium", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "calcium", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'Калий/Креатинин', when: 'Каждые 2 нед', targetRange: 'К+ 4.0-5.0' }
+    ],
+    contraindications: ['Анурия', 'Тяжёлая почечная недостаточность'],
+    sideEffects: ['Гипокалиемия', 'Дегидратация', 'Мышечные судороги'],
+    dosage: { mg: 1, timing: 'индивидуально', form: 'диуретик (по назначению)' },
+    bestForCourse: false,
+  },
+  immunosuppressant_drugs: {
+    id: 'immunosuppressant_drugs',
+    name: 'Immunosuppressant Drugs',
+    nameRu: 'Иммунодепрессанты',
+    tier: 'specialty',
+    category: ['pharma', 'immunomodulator'],
+    forms: [
+      { id: 'immunosuppressant_drugs', name: 'Immunosuppressant Drugs', nameRu: 'Иммунодепрессант (по назначению врача)', dose: '1 мг 2x/д', best: true }
+    ],
+    organs: ['IMMUNE_SYSTEM', 'KIDNEYS', 'HEART'],
+    systems: ['immune', 'renal'],
+    mechanisms: ['IMMUNE_SUPPRESSION', 'ANTI_INFLAMMATORY', 'AUTOIMMUNE_TREATMENT', 'TRANSPLANT_PROTECTION'],
+    description: 'Иммунодепрессанты — циклоспорин/такролимус, подавляют иммунитет. Только по строгим показаниям.',
+    synergies: [],
+    conflicts: [
+      { with: "folate", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "berberine", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "quercetin", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'Иммунограмма', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Активные инфекции', 'Беременность'],
+    sideEffects: ['Инфекции', 'Нефротоксичность', 'Увеличение веса'],
+    dosage: { mg: 1, timing: 'индивидуально', form: 'иммунодепрессант (по назначению)' },
+    bestForCourse: false,
+  },
+  antibiotic_drugs: {
+    id: 'antibiotic_drugs',
+    name: 'Antibiotic Drugs',
+    nameRu: 'Антибиотики',
+    tier: 'specialty',
+    category: ['pharma', 'antimicrobial'],
+    forms: [
+      { id: 'antibiotic_drugs', name: 'Antibiotic Drugs', nameRu: 'Антибиотик (по назначению врача)', dose: '1 мг 2x/д', best: true }
+    ],
+    organs: ['GUT', 'IMMUNE_SYSTEM', 'REPRODUCTIVE'],
+    systems: ['gastrointestinal', 'immune', 'reproductive'],
+    mechanisms: ['BACTERIAL_INFECTION_TREATMENT', 'GUT_FLORA_DISRUPTION', 'IMMUNE_MODULATION', 'INFECTION_PREVENTION'],
+    description: 'Антибиотики — для лечения инфекций на курсе. Обязательно с пробиотиками для защиты микрофлоры.',
+    synergies: [],
+    conflicts: [
+      { with: "nac", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "probiotics", effect: "Антибиотики уничтожают пробиотики — раздельный приём", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "berberine", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "quercetin", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "vitamin_c", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Общий анализ крови', when: 'Каждые 2 нед' }
+    ],
+    contraindications: ['Аллергия на пенициллины (для бета-лактамов)'],
+    sideEffects: ['Диарея', 'Дисбактериоз', 'Кандидоз'],
+    dosage: { mg: 1, timing: 'индивидуально', form: 'антибиотик (по назначению)' },
+    bestForCourse: false,
+  },
+  antihistamine_drugs: {
+    id: 'antihistamine_drugs',
+    name: 'Antihistamine Drugs',
+    nameRu: 'Антигистаминные препараты',
+    tier: 'standard',
+    category: ['pharma', 'immunomodulator'],
+    forms: [
+      { id: 'antihistamine_drugs', name: 'Antihistamine Drugs', nameRu: 'Цетиризин 10 мг', dose: '10 мг 2x/д', best: true },
+      { id: 'antihistamine_drugs_2', name: 'Antihistamine Drugs', nameRu: 'Лоратадин 10 мг', dose: '10 мг', best: false }
+    ],
+    organs: ['IMMUNE_SYSTEM', 'LUNGS', 'SKIN'],
+    systems: ['immune'],
+    mechanisms: ['H1_RECEPTOR_BLOCKADE', 'ALLERGY_REDUCTION', 'ITCHING_RELIEF', 'SLEEP_IMPROVEMENT'],
+    description: 'Антигистаминные — цетиризин/лоратадин для снижения аллергических реакций на курсе.',
+    synergies: [
+      { with: "quercetin", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "stimulant_complex", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Аллергические симптомы', when: 'Субъективно' }
+    ],
+    contraindications: ['Тяжёлая почечная недостаточность'],
+    sideEffects: ['Сонливость (I поколение)', 'Сухость во рту'],
+    dosage: { mg: 10, timing: '1x/д', form: 'цетиризин 10 мг' },
+    bestForCourse: false,
+  },
+  nsaid_drugs: {
+    id: 'nsaid_drugs',
+    name: 'NSAID Drugs',
+    nameRu: 'НПВС',
+    tier: 'specialty',
+    category: ['pharma', 'anti_inflammatory'],
+    forms: [
+      { id: 'nsaid_drugs', name: 'NSAID Drugs', nameRu: 'Ибупрофен 400 мг', dose: '400 мг 2x/д', best: true },
+      { id: 'nsaid_drugs_2', name: 'NSAID Drugs', nameRu: 'Напроксен 250 мг', dose: '400 мг', best: false }
+    ],
+    organs: ['JOINTS', 'MUSCLES', 'STOMACH'],
+    systems: ['musculoskeletal', 'gastrointestinal'],
+    mechanisms: ['COX_INHIBITION', 'ANTI_INFLAMMATORY', 'ANALGESIC', 'ANTIPYRETIC'],
+    description: 'НПВС — ибупрофен/напроксен для снятия боли и воспаления. На курсе — краткосрочно для суставов.',
+    synergies: [
+      { with: "omega3", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "nac", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "curcumin", effect: "НПВС + Куркумин — риск желудочного кровотечения", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "ginger", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "gaba", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "lithium", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'Креатинин', when: 'Каждые 2 нед' }
+    ],
+    contraindications: ['Язвенная болезнь', 'Почечная недостаточность'],
+    sideEffects: ['Желудочный дискомфорт', 'Риск язвы', 'Нефротоксичность'],
+    dosage: { mg: 400, timing: 'с едой (макс 5 дн)', form: 'ибупрофен 400 мг' },
+    bestForCourse: false,
+  },
+  levothyroxine: {
+    id: 'levothyroxine',
+    name: 'Levothyroxine',
+    nameRu: 'Левотироксин',
+    tier: 'specialty',
+    category: ['pharma', 'hormonal'],
+    forms: [
+      { id: 'levothyroxine', name: 'Levothyroxine', nameRu: 'Левотироксин 50 мкг', dose: '50 мкг 2x/д', best: true },
+      { id: 'levothyroxine_2', name: 'Levothyroxine', nameRu: 'Левотироксин 100 мкг', dose: '50 мкг', best: false }
+    ],
+    organs: ['THYROID', 'BRAIN', 'HEART'],
+    systems: ['endocrine', 'cardio', 'neuro'],
+    mechanisms: ['T4_REPLACEMENT', 'THYROID_HORMONE_NORMALIZATION', 'METABOLIC_RATE', 'BMR_REGULATION'],
+    description: 'Левотироксин — замещающая терапия при гипотиреозе. Нормализует ТТГ и метаболизм. Только по назначению.',
+    synergies: [
+        {with: "selenium", effect: "Конверсия T4→T3", mechanism: "Селен — кофактор дейодиназ", severity: "HIGH"},
+        {with: "iron", effect: "Синтез гормонов", mechanism: "Железо необходим для щитовидной", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "calcium", effect: "Снижение всасывания", mechanism: "Кальций снижает всасывание левотироксина", severity: "HIGH"},
+        {with: "iron", effect: "Снижение всасывания", mechanism: "Железо снижает всасывание левотироксина", severity: "HIGH"},
+        {with: "fiber", effect: "Снижение всасывания", mechanism: "Клетчатка может связывать", severity: "LOW"},
+      ],
+    monitoring: [
+      { what: 'ТТГ', when: 'Каждые 8 нед', targetRange: '0.5-3.0 мкМЕ/мл' }
+    ],
+    contraindications: ['Тиреотоксикоз', 'Острый инфаркт'],
+    sideEffects: ['Тахикардия при передозировке', 'Остеопороз при длительном'],
+    dosage: { mg: 0.05, timing: 'натощак за 30 мин до еды 1x/д', form: 'левотироксин 50 мкг' },
+    bestForCourse: false,
+  },
+  antithyroid_drugs: {
+    id: 'antithyroid_drugs',
+    name: 'Antithyroid Drugs',
+    nameRu: 'Антитиреоидные препараты',
+    tier: 'specialty',
+    category: ['pharma', 'hormonal'],
+    forms: [
+      { id: 'antithyroid_drugs', name: 'Antithyroid Drugs', nameRu: 'Тиамазол 10 мг', dose: '10 мг 2x/д', best: true }
+    ],
+    organs: ['THYROID'],
+    systems: ['endocrine'],
+    mechanisms: ['THYROID_HORMONE_SYNTHESIS_INHIBITION', 'T3_T4_LOWERING', 'HYPERTHYROIDISM_TREATMENT', 'METABOLIC_RATE_REDUCTION'],
+    description: 'Антитиреоидные препараты — тирозол/пропилтиоурацил для лечения гипертиреоза. Только по назначению.',
+    synergies: [],
+    conflicts: [
+      { with: "iodine", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'ТТГ/Т3/Т4', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Агранулоцитоз в анамнезе'],
+    sideEffects: ['Кожная сыпь', 'Агранулоцитоз (редко)', 'Зоб'],
+    dosage: { mg: 10, timing: 'с едой 2x/д', form: 'тиамазол 10 мг' },
+    bestForCourse: false,
+  },
+  postbiotics: {
+    id: 'postbiotics',
+    name: 'Postbiotics',
+    nameRu: 'Постбиотики',
+    tier: 'standard',
+    category: ['gut', 'immunomodulator'],
+    forms: [
+      { id: 'postbiotics', name: 'Postbiotics', nameRu: 'Постбиотик комплекс 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['GUT', 'IMMUNE_SYSTEM', 'BRAIN'],
+    systems: ['gastrointestinal', 'immune'],
+    mechanisms: ['GUT_BARRIER_STRENGTHENING', 'ANTI_INFLAMMATORY', 'IMMUNE_REGULATION', 'MICROBIOME_SUPPORT'],
+    description: 'Постбиотики — метаболиты пробиотиков (бутират, лактат, короткоцепочечные кислоты). Укрепляют кишечный барьер.',
+    synergies: [
+        {with: "probiotics", effect: "Комплексная поддержка микробиома", mechanism: "Постбиотики + пробиотики", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Микрофлора', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: вздутие при начале'],
+    dosage: { mg: 500, timing: 'с едой 1x/д', form: 'постбиотик комплекс 500 мг' },
+    bestForCourse: false,
+  },
+  paraprobiotics: {
+    id: 'paraprobiotics',
+    name: 'Paraprobiotics',
+    nameRu: 'Парабиотики',
+    tier: 'standard',
+    category: ['gut', 'immunomodulator'],
+    forms: [
+      { id: 'paraprobiotics', name: 'Paraprobiotics', nameRu: 'Парабиотик комплекс 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['GUT', 'IMMUNE_SYSTEM'],
+    systems: ['gastrointestinal', 'immune'],
+    mechanisms: ['IMMUNE_REGULATION', 'ANTI_INFLAMMATORY', 'GUT_BARRIER_INTEGRITY', 'MICROBIOME_BALANCE'],
+    description: 'Парабиотики — инактивированные пробиотические штаммы, обладают иммуномодулирующим действием без риска для иммунокомпрометированных.',
+    synergies: [
+        {with: "probiotics", effect: "Иммуномодуляция", mechanism: "Парабиотики + живые пробиотики", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Микрофлора', when: 'Субъективно' }
+    ],
+    contraindications: ['Иммунокомпрометация (безопасно)'],
+    sideEffects: ['Редко: вздутие'],
+    dosage: { mg: 500, timing: 'с едой 1x/д', form: 'парабиотик комплекс 500 мг' },
+    bestForCourse: false,
+  },
+  resistant_starch: {
+    id: 'resistant_starch',
+    name: 'Resistant Starch',
+    nameRu: 'Резистентный крахмал',
+    tier: 'standard',
+    category: ['gut', 'metabolic'],
+    forms: [
+      { id: 'resistant_starch', name: 'Resistant Starch', nameRu: 'Резистентный крахмал 20 г', dose: '20 г 2x/д', best: true },
+      { id: 'resistant_starch_2', name: 'Resistant Starch', nameRu: 'Резистентный крахмал (картофельный) 15 г', dose: '20 г', best: false }
+    ],
+    organs: ['GUT', 'LIVER', 'PANCREAS'],
+    systems: ['gastrointestinal', 'metabolic'],
+    mechanisms: ['BUTYRATE_PRODUCTION', 'INSULIN_SENSITIVITY', 'GUT_FLORA_SUPPORT', 'FAT_OXIDATION'],
+    description: 'Резистентный крахмал — пребиотик, ферментируется кишечной микрофлорой с образованием бутирата. Улучшает инсулиновую чувствительность.',
+    synergies: [
+        {with: "probiotics", effect: "Пребиотический эффект", mechanism: "Резистентный крахмал — пища для пробиотиков", severity: "HIGH"},
+        {with: "butyrate", effect: "Здоровье кишечника", mechanism: "Крахмал → бутират", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Глюкоза натощак', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Вздутие при начале'],
+    dosage: { mg: 20000, timing: 'с едой 1x/д', form: 'резистентный крахмал 20 г' },
+    bestForCourse: false,
+  },
+  beta_glucan: {
+    id: 'beta_glucan',
+    name: 'Beta Glucan',
+    nameRu: 'Бета-глюкан',
+    tier: 'standard',
+    category: ['gut', 'immunomodulator'],
+    forms: [
+      { id: 'beta_glucan', name: 'Beta Glucan', nameRu: 'Бета-глюкан 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['GUT', 'IMMUNE_SYSTEM', 'HEART'],
+    systems: ['gastrointestinal', 'immune', 'cardio'],
+    mechanisms: ['IMMUNE_ACTIVATION', 'CHOLESTEROL_LOWERING', 'GUT_FLORA_SUPPORT', 'ANTI_INFLAMMATORY'],
+    description: 'Бета-глюкан — полисахарид из овса/грибов, активирует иммунитет и снижает холестерин. На курсе — иммунитет и сосуды.',
+    synergies: [
+        {with: "vitamin_d3", effect: "Иммунная активация", mechanism: "Бета-глюканы + D3", severity: "MEDIUM"},
+        {with: "zinc", effect: "Иммунитет", mechanism: "Оба — врождённый иммунитет", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "Стимулирует иммунитет", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: вздутие'],
+    dosage: { mg: 500, timing: 'с едой 1x/д', form: 'бета-глюкан 500 мг' },
+    bestForCourse: false,
+  },
+  fiber: {
+    id: 'fiber',
+    name: 'Fiber',
+    nameRu: 'Клетчатка (пищевые волокна)',
+    tier: 'standard',
+    category: ['gut', 'metabolic'],
+    forms: [
+      { id: 'fiber', name: 'Fiber', nameRu: 'Псиллиум 5 г', dose: '10 г 2x/д', best: true },
+      { id: 'fiber_2', name: 'Fiber', nameRu: 'Псиллиум + Пребиотик комплекс 5 г', dose: '10 г', best: false }
+    ],
+    organs: ['GUT', 'HEART', 'PANCREAS'],
+    systems: ['gastrointestinal', 'metabolic', 'cardio'],
+    mechanisms: ['GUT_MOTILITY', 'CHOLESTEROL_LOWERING', 'INSULIN_SENSITIVITY', 'SATIETY'],
+    description: 'Клетчатка — пищевые волокна для нормализации моторики кишечника, снижения холестерина и контроля глюкозы.',
+    synergies: [
+        {with: "probiotics", effect: "Синбиотический эффект", mechanism: "Клетчатка — пребиотик", severity: "HIGH"},
+        {with: "butyrate", effect: "Здоровье кишечника", mechanism: "Клетчатка → бутират", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "iron", effect: "Снижение всасывания", mechanism: "Фитаты связывают железо", severity: "LOW"},
+      ],
+    monitoring: [
+      { what: 'Стул', when: 'Субъективно' }
+    ],
+    contraindications: ['Кишечная непроходимость'],
+    sideEffects: ['Вздутие при начале', 'Метеоризм'],
+    dosage: { mg: 10000, timing: 'с едой 2x/д', form: 'псиллиум 5 г' },
+    bestForCourse: false,
+  },
+  hmo_prebiotics: {
+    id: 'hmo_prebiotics',
+    name: 'HMO Prebiotics',
+    nameRu: 'Олигосахариды грудного молока',
+    tier: 'advanced',
+    category: ['gut', 'immunomodulator'],
+    forms: [
+      { id: 'hmo_prebiotics', name: 'HMO Prebiotics', nameRu: 'HMO пребиотик 1 г', dose: '1 г 2x/д', best: true },
+      { id: 'hmo_prebiotics_2', name: 'HMO Prebiotics', nameRu: '2-FL пребиотик 1 г', dose: '1 г', best: false }
+    ],
+    organs: ['GUT', 'IMMUNE_SYSTEM', 'BRAIN'],
+    systems: ['gastrointestinal', 'immune', 'neuro'],
+    mechanisms: ['BIFIDOBACTERIA_GROWTH', 'GUT_BARRIER_STRENGTHENING', 'IMMUNE_REGULATION', 'BRAIN_GUT_AXIS'],
+    description: 'Олигосахариды грудного молока (HMO) — пребиотики, стимулирующие рост бифидобактерий. Поддержка микробиома и иммунитета.',
+    synergies: [
+        {with: "probiotics", effect: "Рост бифидобактерий", mechanism: "HMO — специфический пребиотик", severity: "HIGH"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Микрофлора', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: вздутие при начале'],
+    dosage: { mg: 1000, timing: 'с едой 1x/д', form: 'HMO пребиотик 1 г' },
+    bestForCourse: false,
+  },
+  lactate: {
+    id: 'lactate',
+    name: 'Lactate',
+    nameRu: 'Лактат (молочная кислота)',
+    tier: 'standard',
+    category: ['gut', 'metabolic'],
+    forms: [
+      { id: 'lactate', name: 'Lactate', nameRu: 'Лактат натрия 1000 мг', dose: '1 г 2x/д', best: true }
+    ],
+    organs: ['MUSCLES', 'LIVER', 'GUT'],
+    systems: ['musculoskeletal', 'gastrointestinal'],
+    mechanisms: ['ENERGY_PRODUCTION', 'GUT_FLORA_SUPPORT', 'MITOCHONDRIAL_FUNCTION', 'MUSCLE_RECOVERY'],
+    description: 'Лактат — молочная кислота, используется как энергетический субстрат. Улучшает восстановление и митохондриальную функцию.',
+    synergies: [
+        {with: "probiotics", effect: "Среда для пробиотиков", mechanism: "Лактат — метаболит лактобактерий", severity: "LOW"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'КФК', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 1000, timing: 'с едой 1x/д', form: 'лактат натрия 1000 мг' },
+    bestForCourse: false,
+  },
+  digestive_enzymes: {
+    id: 'digestive_enzymes',
+    name: 'Digestive Enzymes',
+    nameRu: 'Пищеварительные ферменты',
+    tier: 'standard',
+    category: ['gut', 'hepatoprotector'],
+    forms: [
+      { id: 'digestive_enzymes', name: 'Digestive Enzymes', nameRu: 'Пищеварительные ферменты 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'digestive_enzymes_2', name: 'Digestive Enzymes', nameRu: 'Ферментный комплекс форте', dose: '500 мг', best: false }
+    ],
+    organs: ['STOMACH', 'PANCREAS', 'GUT'],
+    systems: ['gastrointestinal'],
+    mechanisms: ['DIGESTION_IMPROVEMENT', 'PROTEIN_ABSORPTION', 'NUTRIENT_BIOAVAILABILITY', 'GUT_PROTECTION'],
+    description: 'Пищеварительные ферменты — амилаза, протеаза, липаза для улучшения усвоения белка и нутриентов. На курсе — ЖКТ.',
+    synergies: [
+        {with: "probiotics", effect: "Улучшение пищеварения", mechanism: "Ферменты расщепляют, пробиотики усваивают", severity: "MEDIUM"},
+        {with: "betaine", effect: "Переваривание белков", mechanism: "Бетаин HCl + ферменты", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Пищеварение', when: 'Субъективно' }
+    ],
+    contraindications: ['Острый панкреатит'],
+    sideEffects: ['Редко: изжога'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'пищеварительные ферменты 500 мг' },
+    bestForCourse: false,
+  },
+  zinc_carnosine: {
+    id: 'zinc_carnosine',
+    name: 'Zinc Carnosine',
+    nameRu: 'Цинк-карнозин',
+    tier: 'standard',
+    category: ['gut', 'immunomodulator'],
+    forms: [
+      { id: 'zinc_carnosine', name: 'Zinc Carnosine', nameRu: 'Цинк-карнозин 75 мг', dose: '75 мг 2x/д', best: true },
+      { id: 'zinc_carnosine_2', name: 'Zinc Carnosine', nameRu: 'Цинк-карнозин + Пищеварительные ферменты', dose: '75 мг', best: false }
+    ],
+    organs: ['STOMACH', 'GUT', 'IMMUNE_SYSTEM'],
+    systems: ['gastrointestinal', 'immune'],
+    mechanisms: ['GUT_BARRIER_STRENGTHENING', 'ANTI_INFLAMMATORY', 'WOUND_HEALING', 'IMMUNE_SUPPORT'],
+    description: 'Цинк-карнозин — комплекс цинка и карнозина, заживляет слизистую желудка и кишечника. На курсе — защита ЖКТ.',
+    synergies: [
+        {with: "probiotics", effect: "Заживление слизистой ЖКТ", mechanism: "Цинк-карнозин + пробиотики", severity: "HIGH"},
+        {with: "glutamine", effect: "Целостность кишечного барьера", mechanism: "Оба восстанавливают слизистую", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Гастроскопия', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: тошнота'],
+    dosage: { mg: 75, timing: 'с едой 2x/д', form: 'цинк-карнозин 75 мг' },
+    bestForCourse: false,
+  },
+  colostrum: {
+    id: 'colostrum',
+    name: 'Colostrum',
+    nameRu: 'Молозиво',
+    tier: 'standard',
+    category: ['gut', 'immunomodulator'],
+    forms: [
+      { id: 'colostrum', name: 'Colostrum', nameRu: 'Молозиво 3 г', dose: '3 г 2x/д', best: true },
+      { id: 'colostrum_2', name: 'Colostrum', nameRu: 'Молозиво IgG 500 мг', dose: '3 г', best: false }
+    ],
+    organs: ['GUT', 'IMMUNE_SYSTEM', 'MUSCLES'],
+    systems: ['gastrointestinal', 'immune'],
+    mechanisms: ['IMMUNE_REGULATION', 'GUT_BARRIER_STRENGTHENING', 'GROWTH_FACTORS', 'ANTI_INFLAMMATORY'],
+    description: 'Молозиво — первый секрет молочных желёз, богат иммуноглобулинами и факторами роста. Поддержка иммунитета и ЖКТ.',
+    synergies: [
+        {with: "probiotics", effect: "Иммунитет кишечника", mechanism: "Молозиво + пробиотики", severity: "MEDIUM"},
+        {with: "zinc_carnosine", effect: "Заживление ЖКТ", mechanism: "Оба содержат факторы роста", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Молочная аллергия'],
+    sideEffects: ['Редко: вздутие при начале'],
+    dosage: { mg: 3000, timing: 'с едой 2x/д', form: 'молозиво 3 г' },
+    bestForCourse: false,
+  },
+  ahcc: {
+    id: 'ahcc',
+    name: 'AHCC',
+    nameRu: 'AHCC (Активированный гексозный коррелят)',
+    tier: 'advanced',
+    category: ['mushroom', 'immunomodulator'],
+    forms: [
+      { id: 'ahcc', name: 'AHCC', nameRu: 'AHCC 1000 мг', dose: '1 г 2x/д', best: true },
+      { id: 'ahcc_2', name: 'AHCC', nameRu: 'AHCC 500 мг', dose: '1 г', best: false }
+    ],
+    organs: ['IMMUNE_SYSTEM', 'LIVER'],
+    systems: ['immune', 'hepatic'],
+    mechanisms: ['IMMUNE_ACTIVATION', 'NK_CELL_INCREASE', 'LIVER_PROTECTION', 'ANTI_INFLAMMATORY'],
+    description: 'AHCC — экстракт грибов шиитаке, активирует NK-клетки и макрофаги. Поддержка иммунитета и печени на курсе.',
+    synergies: [
+        {with: "vitamin_d3", effect: "Иммунитет", mechanism: "Оба активируют NK-клетки", severity: "MEDIUM"},
+        {with: "reishi", effect: "Грибная иммуномодуляция", mechanism: "Оба — иммуномодуляторы", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "AHCC стимулирует иммунитет", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'NK-клетки', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Аутоиммунные заболевания (с осторожностью)'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 1000, timing: 'натощак 2x/д', form: 'AHCC 1000 мг' },
+    bestForCourse: false,
+  },
+  cortisol: {
+    id: 'cortisol',
+    name: 'Cortisol',
+    nameRu: 'Кортизол (маркер)',
+    tier: 'standard',
+    category: ['hormonal', 'marker'],
+    forms: [
+      { id: 'cortisol', name: 'Cortisol', nameRu: 'Нет (маркер)', dose: '0 мкг 2x/д', best: true }
+    ],
+    organs: ['ADRENALS', 'MUSCLES', 'BRAIN'],
+    systems: ['endocrine', 'musculoskeletal', 'neuro'],
+    mechanisms: ['STRESS_RESPONSE', 'ANTI_INFLAMMATORY', 'METABOLIC_REGULATION', 'MORNING_CORTISOL_RHYTHM'],
+    description: 'Кортизол — маркер стрессовой реакции надпочечников. Не добавка, а показатель для контроля на курсе.',
+    synergies: [],
+    conflicts: [],
+    monitoring: [
+      { what: 'Кортизол утренний', when: 'Каждые 8 нед', targetRange: '6-23 мкг/дл' }
+    ],
+    contraindications: [],
+    sideEffects: ['Не препарат — маркер для контроля'],
+    dosage: { mg: 0, timing: 'контроль маркера', form: 'кортизол сыворотки (анализ)' },
+    bestForCourse: false,
+  },
+  adrenaline: {
+    id: 'adrenaline',
+    name: 'Adrenaline',
+    nameRu: 'Адреналин (маркер)',
+    tier: 'standard',
+    category: ['hormonal', 'marker'],
+    forms: [
+      { id: 'adrenaline', name: 'Adrenaline', nameRu: 'Нет (маркер)', dose: '0 мкг 2x/д', best: true }
+    ],
+    organs: ['ADRENALS', 'HEART'],
+    systems: ['endocrine', 'cardio'],
+    mechanisms: ['FIGHT_OR_FLIGHT', 'HEART_RATE_INCREASE', 'BRONCHODILATION', 'GLUCOSE_ELEVATION'],
+    description: 'Адреналин — маркер симпатической активации. Не добавка, а показатель стресс-реакции для контроля на курсе.',
+    synergies: [],
+    conflicts: [
+        {with: "beta_blocker_drugs", effect: "Антагонизм", mechanism: "Бета-блокаторы блокируют адреналин", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Адреналин', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Не препарат — маркер для контроля'],
+    dosage: { mg: 0, timing: 'контроль маркера', form: 'адреналин (анализ)' },
+    bestForCourse: false,
+  },
+  endocrine_marker: {
+    id: 'endocrine_marker',
+    name: 'Endocrine Marker',
+    nameRu: 'Эндокринный маркер (комплекс)',
+    tier: 'standard',
+    category: ['hormonal', 'marker'],
+    forms: [
+      { id: 'endocrine_marker', name: 'Endocrine Marker', nameRu: 'Нет (маркер)', dose: '0 мкг 2x/д', best: true }
+    ],
+    organs: ['ADRENALS', 'PITUITARY', 'THYROID'],
+    systems: ['endocrine'],
+    mechanisms: ['HORMONE_BALANCE', 'CORTISOL_REGULATION', 'THYROID_FUNCTION', 'REPRODUCTIVE_HORMONES'],
+    description: 'Эндокринный маркер — комплексный анализ: кортизол, ТТГ, тестостерон, эстрадиол, пролактин. Для контроля на курсе.',
+    synergies: [],
+    conflicts: [],
+    monitoring: [
+      { what: 'Эндокринный профиль', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Не препарат — маркер для контроля'],
+    dosage: { mg: 0, timing: 'контроль маркера', form: 'эндокринный профиль (анализ)' },
+    bestForCourse: false,
+  },
+  neurosteroid: {
+    id: 'neurosteroid',
+    name: 'Neurosteroid',
+    nameRu: 'Нейростероид (маркер)',
+    tier: 'standard',
+    category: ['hormonal', 'marker', 'neuroprotector'],
+    forms: [
+      { id: 'neurosteroid', name: 'Neurosteroid', nameRu: 'Нет (маркер)', dose: '0 мкг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'NERVES', 'ADRENALS'],
+    systems: ['neuro', 'endocrine'],
+    mechanisms: ['GABA_MODULATION', 'NEUROPROTECTION', 'STRESS_RESPONSE', 'MOOD_REGULATION'],
+    description: 'Нейростероид — маркер нейроэндокринного баланса (ДГЭА, прегненолон, аллопрегнанолон). Для контроля на курсе.',
+    synergies: [
+        {with: "pregnenolone", effect: "Нейростероидный путь", mechanism: "Прегненолон — предшественник", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'ДГЭА-S', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Не препарат — маркер для контроля'],
+    dosage: { mg: 0, timing: 'контроль маркера', form: 'нейростероидный профиль (анализ)' },
+    bestForCourse: false,
+  },
+  glucagon: {
+    id: 'glucagon',
+    name: 'Glucagon',
+    nameRu: 'Глюкагон (маркер)',
+    tier: 'standard',
+    category: ['hormonal', 'marker'],
+    forms: [
+      { id: 'glucagon', name: 'Glucagon', nameRu: 'Нет (маркер)', dose: '0 мкг 2x/д', best: true }
+    ],
+    organs: ['PANCREAS', 'LIVER'],
+    systems: ['metabolic', 'hepatic'],
+    mechanisms: ['GLUCOSE_ELEVATION', 'Glycogenolysis', 'KETOGENESIS_REGULATION', 'INSULIN_COUNTER_REGULATION'],
+    description: 'Глюкагон — маркер метаболизма, контр-инсулиновый гормон. Не добавка, а показатель для контроля на курсе.',
+    synergies: [
+        {with: "insulin", effect: "Баланс глюкозы", mechanism: "Антагонистическая регуляция", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "insulin", effect: "Антагонизм", mechanism: "Глюкагон повышает глюкозу, инсулин снижает", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Глюкагон', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Не препарат — маркер для контроля'],
+    dosage: { mg: 0, timing: 'контроль маркера', form: 'глюкагон (анализ)' },
+    bestForCourse: false,
+  },
+  water: {
+    id: 'water',
+    name: 'Water',
+    nameRu: 'Вода (гидратация)',
+    tier: 'core',
+    category: ['hydration', 'metabolic'],
+    forms: [
+      { id: 'water', name: 'Water', nameRu: 'Вода 2.5 л/день', dose: '2.5 г 2x/д', best: true },
+      { id: 'water_2', name: 'Water', nameRu: 'Вода + Электролиты', dose: '2.5 г', best: false }
+    ],
+    organs: ['KIDNEYS', 'HEART', 'MUSCLES'],
+    systems: ['renal', 'cardio', 'musculoskeletal'],
+    mechanisms: ['HYDRATION', 'TEMPERATURE_REGULATION', 'NUTRIENT_TRANSPORT', 'WASTE_REMOVAL'],
+    description: 'Вода — основа гидратации и метаболизма. 30-40 мл/кг/день — обязательна на курсе для всех процессов.',
+    synergies: [
+        {with: "sodium", effect: "Гидратация", mechanism: "Натрий + вода — осмотический баланс", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Электролиты', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Нет'],
+    sideEffects: ['Нет'],
+    dosage: { mg: 2500, timing: 'в течение дня', form: 'вода 2.5 л/день' },
+    bestForCourse: true,
+  },
+  nmn: {
+    id: 'nmn',
+    name: 'NMN',
+    nameRu: 'NMN (Никотинамид мононуклеотид)',
+    tier: 'advanced',
+    category: ['anti_aging', 'metabolic'],
+    forms: [
+      { id: 'nmn', name: 'NMN', nameRu: 'NMN 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'nmn_2', name: 'NMN', nameRu: 'NMN 1000 мг', dose: '500 мг', best: false }
+    ],
+    organs: ['MITOCHONDRIA', 'CELLS', 'BRAIN'],
+    systems: ['metabolic', 'neuro'],
+    mechanisms: ['NAD_PRODUCTION', 'MITOCHONDRIAL_FUNCTION', 'ANTI_AGING', 'ENERGY_PRODUCTION'],
+    description: 'NMN — предшественник NAD+, улучшает митохондриальную функцию и продлевает жизнь клеток. Анти-возрастной.',
+    synergies: [
+      { with: "resveratrol", effect: "NMN + Резвератрол — NAD+ + сиртуины", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "nmn", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'NAD+', when: 'Каждые 12 нед' }
+    ],
+    contraindications: ['Беременность'],
+    sideEffects: ['Редко: желудочный дискомфорт при начале'],
+    dosage: { mg: 500, timing: 'натощак 1x/д', form: 'NMN 500 мг' },
+    bestForCourse: false,
+  },
+  omega3: {
+    id: 'omega3',
+    name: 'Omega-3',
+    nameRu: 'Омега-3 (EPA/DHA)',
+    tier: 'core',
+    category: ['fatty_acid', 'cardioprotector'],
+    forms: [
+      { id: 'omega3', name: 'Omega-3', nameRu: 'Омега-3 1000 мг EPA+DHA', dose: '2 г 2x/д', best: true },
+      { id: 'omega3_2', name: 'Omega-3', nameRu: 'Омега-3 Премиум 1200 мг', dose: '2 г', best: false },
+      { id: 'omega3_3', name: 'Omega-3', nameRu: 'Омега-3 Ультра 1500 мг', dose: '2 г', best: false }
+    ],
+    organs: ['HEART', 'BRAIN', 'BLOOD_VESSELS'],
+    systems: ['cardio', 'neuro'],
+    mechanisms: ['EPA_ANTI_INFLAMMATORY', 'DHA_BRAIN_STRUCTURE', 'TRIGLYCERIDE_LOWERING', 'BLOOD_PRESSURE_REGULATION'],
+    description: 'Омега-3 (EPA+DHA) — незаменимые жирные кислоты, кардиопротектор и нейропротектор. Снижает триглицериды и воспаление.',
+    synergies: [
+      { with: "nsaid_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "vitamin_d3", effect: "Омега-3 усиливает рецепторы витамина Д", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "coq10", effect: "КоКю10 + Омега-3 — кардиопротекция и митохондрии", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "phosphatidylcholine", effect: "Фосфатидилхолин + Омега-3 — фосфолипиды мозга", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "vitamin_e", effect: "Витамин Е защищает Омега-3 от перекисного окисления", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "astaxanthin", effect: "Астаксантин защищает Омега-3 от окисления", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega9", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "egcg", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "polyphenol_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "mushroom_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "vitamin_a", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "lutein", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "anthocyanins", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "antioxidant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "peptide_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "brand_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "anticoagulant_drugs", effect: "Усиление антикоагулянтного эффекта — риск кровотечения", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед', targetRange: 'ТГ<1.7 ммоль/л' }
+    ],
+    contraindications: ['Приём антикоагулянтов (с осторожностью)', 'Рыбная аллергия'],
+    sideEffects: ['Рыбная отрыжка', 'Диарея при высоких дозах'],
+    dosage: { mg: 2000, timing: 'с едой 2x/д', form: 'Омега-3 1000 мг EPA+DHA' },
+    bestForCourse: true,
+  },
+  adaptogen_complex: {
+    id: 'adaptogen_complex',
+    name: 'Adaptogen Complex',
+    nameRu: 'Адаптогенный комплекс',
+    tier: 'advanced',
+    category: ['adaptogen', 'neuroprotector'],
+    forms: [
+      { id: 'adaptogen_complex', name: 'Adaptogen Complex', nameRu: 'Адаптогенный комплекс 1000 мг', dose: '1 г 2x/д', best: true },
+      { id: 'adaptogen_complex_2', name: 'Adaptogen Complex', nameRu: 'Адаптогенный комплекс форте', dose: '1 г', best: false }
+    ],
+    organs: ['ADRENALS', 'BRAIN', 'MUSCLES'],
+    systems: ['endocrine', 'neuro'],
+    mechanisms: ['STRESS_ADAPTATION', 'CORTISOL_REGULATION', 'ENERGY_PRODUCTION', 'IMMUNE_SUPPORT'],
+    description: 'Адаптогенный комплекс — комбинация ашваганды, родиолы, элеутерококка для комплексной антистресс-поддержки.',
+    synergies: [
+      { with: "schisandra", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Кортизол', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Гипертиреоз', 'Беременность'],
+    sideEffects: ['Редко: возбуждение при передозировке'],
+    dosage: { mg: 1000, timing: 'утром с едой', form: 'адаптогенный комплекс 1000 мг' },
+    bestForCourse: false,
+  },
+  astragalus: {
+    id: 'astragalus',
+    name: 'Astragalus',
+    nameRu: 'Астрагал',
+    tier: 'standard',
+    category: ['adaptogen', 'immunomodulator'],
+    forms: [
+      { id: 'astragalus', name: 'Astragalus', nameRu: 'Экстракт астрагала 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['IMMUNE_SYSTEM', 'HEART', 'KIDNEYS'],
+    systems: ['immune', 'cardio', 'renal'],
+    mechanisms: ['IMMUNE_ACTIVATION', 'ANTI_AGING', 'TELOMERE_SUPPORT', 'KIDNEY_PROTECTION'],
+    description: 'Астрагал — адаптоген и иммуномодулятор, поддерживает теломеры и защищает почки. На курсе — иммунитет и анти-возраст.',
+    synergies: [
+        {with: "vitamin_c", effect: "Иммунитет", mechanism: "Оба поддерживают иммунитет", severity: "MEDIUM"},
+        {with: "reishi", effect: "Адаптогенный и иммунный", mechanism: "Оба — иммуномодуляторы", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "Астрагал стимулирует иммунитет", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Аутоиммунные заболевания (с осторожностью)'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт астрагала 500 мг' },
+    bestForCourse: false,
+  },
+  oxytocin: {
+    id: 'oxytocin',
+    name: 'Oxytocin',
+    nameRu: 'Окситоцин',
+    tier: 'specialty',
+    category: ['hormonal', 'neuroprotector'],
+    forms: [
+      { id: 'oxytocin', name: 'Oxytocin', nameRu: 'Окситоцин интраназально 40 МЕ', dose: '40 мкг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'REPRODUCTIVE', 'HEART'],
+    systems: ['neuro', 'reproductive'],
+    mechanisms: ['BONDING_ENHANCEMENT', 'ANXIOLYTIC', 'MUSCLE_REGENERATION', 'WOUND_HEALING'],
+    description: 'Окситоцин — гормон привязанности, снижает тревожность и улучшает восстановление мышц. На курсе — антистресс.',
+    synergies: [
+        {with: "magnesium", effect: "Расслабление", mechanism: "Оба способствуют расслаблению", severity: "LOW"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Настроение', when: 'Субъективно' }
+    ],
+    contraindications: ['Беременность'],
+    sideEffects: ['Редко: головная боль'],
+    dosage: { mg: 0.04, timing: 'интраназально 1x/д', form: 'окситоцин 40 МЕ/доза' },
+    bestForCourse: false,
+  },
+  dhea: {
+    id: 'dhea',
+    name: 'DHEA',
+    nameRu: 'ДГЭА (Дегидроэпиандростерон)',
+    tier: 'advanced',
+    category: ['hormonal', 'anti_aging'],
+    forms: [
+      { id: 'dhea', name: 'DHEA', nameRu: 'ДГЭА 25 мг', dose: '25 мг 2x/д', best: true },
+      { id: 'dhea_2', name: 'DHEA', nameRu: 'ДГЭА 50 мг', dose: '25 мг', best: false }
+    ],
+    organs: ['ADRENALS', 'BRAIN', 'MUSCLES'],
+    systems: ['endocrine', 'neuro', 'musculoskeletal'],
+    mechanisms: ['DHEA_PRODUCTION', 'ANDROGEN_PRECURSOR', 'CORTISOL_BALANCE', 'ANTI_AGING'],
+    description: 'ДГЭА — предшественник половых гормонов, снижается с возрастом. На курсе — гормональный баланс и анти-возраст.',
+    synergies: [
+        {with: "vitamin_d3", effect: "Гормональная поддержка", mechanism: "Оба поддерживают гормональный баланс", severity: "MEDIUM"},
+        {with: "zinc", effect: "Синтез гормонов", mechanism: "Цинк необходим для стероидогенеза", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "hormone_sensitive_conditions", effect: "Риск при гормонозависимых опухолях", mechanism: "DHEA конвертируется в гормоны", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'ДГЭА-S', when: 'Каждые 8 нед', targetRange: '150-420 мкг/дл' }
+    ],
+    contraindications: ['Рак простаты', 'Рак молочной железы'],
+    sideEffects: ['Акне при высоких дозах', 'У женщин: гирсутизм'],
+    dosage: { mg: 25, timing: 'утром с едой', form: 'ДГЭА 25 мг' },
+    bestForCourse: false,
+  },
+  estradiol: {
+    id: 'estradiol',
+    name: 'Estradiol',
+    nameRu: 'Эстрадиол (маркер)',
+    tier: 'standard',
+    category: ['hormonal', 'marker'],
+    forms: [
+      { id: 'estradiol', name: 'Estradiol', nameRu: 'Нет (маркер)', dose: '0 мкг 2x/д', best: true }
+    ],
+    organs: ['REPRODUCTIVE', 'BONES', 'HEART'],
+    systems: ['reproductive', 'cardio'],
+    mechanisms: ['BONE_DENSITY_REGULATION', 'CARDIOVASCULAR_PROTECTION', 'REPRODUCTIVE_FUNCTION', 'MOOD_REGULATION'],
+    description: 'Эстрадиол — основной эстроген, маркер феминизации на курсе. Контроль для корректировки ПКТ и антиэстрогенов.',
+    synergies: [
+        {with: "progesterone", effect: "Гормональный баланс", mechanism: "Эстрадиол + прогестерон — цикл", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "aromatase_inhibitor", effect: "Антагонизм", mechanism: "ИА подавляют эстрадиол", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Эстрадиол', when: 'Каждые 4 нед', targetRange: '10-40 пг/мл (муж.)' }
+    ],
+    contraindications: [],
+    sideEffects: ['Не препарат — маркер для контроля'],
+    dosage: { mg: 0, timing: 'контроль маркера', form: 'эстрадиол (анализ)' },
+    bestForCourse: false,
+  },
+  progesterone: {
+    id: 'progesterone',
+    name: 'Progesterone',
+    nameRu: 'Прогестерон (маркер)',
+    tier: 'standard',
+    category: ['hormonal', 'marker'],
+    forms: [
+      { id: 'progesterone', name: 'Progesterone', nameRu: 'Нет (маркер)', dose: '0 мкг 2x/д', best: true }
+    ],
+    organs: ['REPRODUCTIVE', 'BRAIN'],
+    systems: ['reproductive', 'neuro'],
+    mechanisms: ['PROGESTERONE_BALANCE', 'NEUROPROTECTION', 'ANTI_INFLAMMATORY', 'SLEEP_REGULATION'],
+    description: 'Прогестерон — маркер для контроля на курсе. У мужчин — маркер подавления оси ГРГ-ЛГ-ФСГ.',
+    synergies: [
+        {with: "estradiol", effect: "Баланс эстроген/прогестерон", mechanism: "Необходим для женского баланса", severity: "MEDIUM"},
+        {with: "vitamin_b6", effect: "Снижение ПМС", mechanism: "B6 поддерживает прогестерон", severity: "MEDIUM"},
+      ],
+    conflicts: [
+      { with: "holy_basil", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" }
+    ],
+    monitoring: [
+      { what: 'Прогестерон', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Не препарат — маркер для контроля'],
+    dosage: { mg: 0, timing: 'контроль маркера', form: 'прогестерон (анализ)' },
+    bestForCourse: false,
+  },
+  insulin: {
+    id: 'insulin',
+    name: 'Insulin',
+    nameRu: 'Инсулин',
+    tier: 'specialty',
+    category: ['pharma', 'metabolic'],
+    forms: [
+      { id: 'insulin', name: 'Insulin', nameRu: 'Инсулин (по назначению врача)', dose: '10 мкг 2x/д', best: true }
+    ],
+    organs: ['PANCREAS', 'MUSCLES', 'LIVER'],
+    systems: ['metabolic', 'musculoskeletal'],
+    mechanisms: ['GLUCOSE_UPTAKE', 'PROTEIN_SYNTHESIS', 'GLYCOGEN_STORAGE', 'ANABOLIC_EFFECT'],
+    description: 'Инсулин — анаболический гормон, ускоряет транспорт глюкозы и аминокислот в мышцы. Только по назначению!',
+    synergies: [
+      { with: "ipamorelin", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+        {with: "antidiabetic_drugs", effect: "Риск гипогликемии", mechanism: "Двойное снижение глюкозы", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Глюкоза', when: 'Каждые 4 нед', targetRange: '3.5-5.5 ммоль/л' }
+    ],
+    contraindications: ['Гипогликемия', 'Диабет типа 1'],
+    sideEffects: ['Гипогликемия', 'Набор жира при избытке'],
+    dosage: { mg: 0.01, timing: 'индивидуально п/к', form: 'инсулин (по назначению)' },
+    bestForCourse: false,
+  },
+  vasopressin: {
+    id: 'vasopressin',
+    name: 'Vasopressin',
+    nameRu: 'Вазопрессин',
+    tier: 'specialty',
+    category: ['hormonal', 'neuroprotector'],
+    forms: [
+      { id: 'vasopressin', name: 'Vasopressin', nameRu: 'Вазопрессин интраназально', dose: '20 мкг 2x/д', best: true }
+    ],
+    organs: ['KIDNEYS', 'BRAIN', 'BLOOD_VESSELS'],
+    systems: ['renal', 'neuro'],
+    mechanisms: ['WATER_RETENTION', 'BLOOD_PRESSURE_REGULATION', 'MEMORY_ENHANCEMENT', 'SOCIAL_BONDING'],
+    description: 'Вазопрессин — антидиуретический гормон, регулирует водный баланс и память. На курсе — контроль гидратации.',
+    synergies: [
+        {with: "sodium", effect: "Водный баланс", mechanism: "Вазопрессин регулирует воду", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Натрий/Осмолярность', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Синдром неадекватной секреции АДГ'],
+    sideEffects: ['Задержка воды', 'Гипонатриемия'],
+    dosage: { mg: 0.02, timing: 'интраназально 1x/д', form: 'вазопрессин интраназально' },
+    bestForCourse: false,
+  },
+  endocannabinoid: {
+    id: 'endocannabinoid',
+    name: 'Endocannabinoid',
+    nameRu: 'Эндоканнабиноидная система',
+    tier: 'standard',
+    category: ['neuroprotector', 'immunomodulator'],
+    forms: [
+      { id: 'endocannabinoid', name: 'Endocannabinoid', nameRu: 'Эндоканнабиноидная поддержка (ПНЖК+терпены)', dose: '0 мкг 2x/д', best: true }
+    ],
+    organs: ['BRAIN', 'IMMUNE_SYSTEM', 'GUT'],
+    systems: ['neuro', 'immune', 'gastrointestinal'],
+    mechanisms: ['PAIN_MODULATION', 'APPETITE_REGULATION', 'MOOD_REGULATION', 'ANTI_INFLAMMATORY'],
+    description: 'Эндоканнабиноидная система — регулятор боли, аппетита и настроения. Модулируется фитоканнабиноидами и ПНЖК.',
+    synergies: [
+        {with: "omega3", effect: "Эндоканнабиноидная система", mechanism: "Омега-3 — предшественник", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Настроение', when: 'Субъективно' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: седация'],
+    dosage: { mg: 0, timing: 'поддержка системы', form: 'эндоканнабиноидная поддержка' },
+    bestForCourse: false,
+  },
+  pectin: {
+    id: 'pectin',
+    name: 'Pectin',
+    nameRu: 'Пектин',
+    tier: 'standard',
+    category: ['gut', 'hepatoprotector'],
+    forms: [
+      { id: 'pectin', name: 'Pectin', nameRu: 'Пектин 5 г', dose: '5 г 2x/д', best: true },
+      { id: 'pectin_2', name: 'Pectin', nameRu: 'Яблочный пектин 3 г', dose: '5 г', best: false }
+    ],
+    organs: ['GUT', 'LIVER', 'BLOOD'],
+    systems: ['gastrointestinal', 'hepatic'],
+    mechanisms: ['GUT_DETOXIFICATION', 'CHOLESTEROL_LOWERING', 'BILE_ACID_BINDING', 'GUT_FLORA_SUPPORT'],
+    description: 'Пектин — растворимое пищевое волокно, связывает токсины и желчные кислоты в кишечнике. На курсе — детокс.',
+    synergies: [
+        {with: "probiotics", effect: "Пребиотический эффект", mechanism: "Пектин — растворимая клетчатка", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "statin_drugs", effect: "Снижение всасывания", mechanism: "Пектин может связывать лекарства", severity: "LOW"},
+      ],
+    monitoring: [
+      { what: 'Холестерин', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Вздутие при высоких дозах'],
+    dosage: { mg: 5000, timing: 'с едой 2x/д', form: 'пектин 5 г' },
+    bestForCourse: false,
+  },
+  fadogia: {
+    id: 'fadogia',
+    name: 'Fadogia',
+    nameRu: 'Фадогия агрестис',
+    tier: 'advanced',
+    category: ['hormonal', 'adaptogen'],
+    forms: [
+      { id: 'fadogia', name: 'Fadogia', nameRu: 'Экстракт фадогии 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['REPRODUCTIVE', 'MUSCLES'],
+    systems: ['reproductive', 'musculoskeletal'],
+    mechanisms: ['TESTOSTERONE_PRODUCTION', 'LH_STIMULATION', 'LIBIDO_ENHANCEMENT', 'MUSCLE_RECOVERY'],
+    description: 'Фадогия агрестис — африканское растение, стимулирует ЛГ и тестостерон. На курсе — либидо и восстановление.',
+    synergies: [
+        {with: "zinc", effect: "Поддержка тестостерона", mechanism: "Оба способствуют тестостерону", severity: "MEDIUM"},
+        {with: "ashwagandha", effect: "Либидо и тестостерон", mechanism: "Разные механизмы", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Тестостерон', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Беременность', 'Подростки'],
+    sideEffects: ['Редко: желудочный дискомфорт при начале'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт фадогии 500 мг' },
+    bestForCourse: false,
+  },
+  pregnenolone: {
+    id: 'pregnenolone',
+    name: 'Pregnenolone',
+    nameRu: 'Прегненолон',
+    tier: 'advanced',
+    category: ['hormonal', 'nootropic'],
+    forms: [
+      { id: 'pregnenolone', name: 'Pregnenolone', nameRu: 'Прегненолон 50 мг', dose: '50 мг 2x/д', best: true },
+      { id: 'pregnenolone_2', name: 'Pregnenolone', nameRu: 'Прегненолон 100 мг', dose: '50 мг', best: false }
+    ],
+    organs: ['ADRENALS', 'BRAIN', 'REPRODUCTIVE'],
+    systems: ['endocrine', 'neuro'],
+    mechanisms: ['NEUROSTEROID_PRECURSOR', 'MEMORY_ENHANCEMENT', 'CORTISOL_BALANCE', 'ANTI_AGING'],
+    description: 'Прегненолон — прегормон, предшественник всех стероидных гормонов. Улучшает память и снижает кортизол на курсе.',
+    synergies: [
+        {with: "dhea", effect: "Нейростероидный каскад", mechanism: "Прегненолон → DHEA → гормоны", severity: "HIGH"},
+        {with: "vitamin_c", effect: "Стероидогенез", mechanism: "C — кофактор стероидогенеза", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Прегненолон/Кортизол', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Рак гормонозависимый'],
+    sideEffects: ['Редко: бессонница при вечернем приёме'],
+    dosage: { mg: 50, timing: 'утром с едой', form: 'прегненолон 50 мг' },
+    bestForCourse: false,
+  },
+  immune_support: {
+    id: 'immune_support',
+    name: 'Immune Support',
+    nameRu: 'Иммунная поддержка (комплекс)',
+    tier: 'standard',
+    category: ['immunomodulator', 'adaptogen'],
+    forms: [
+      { id: 'immune_support', name: 'Immune Support', nameRu: 'Иммунный комплекс 1 капсула', dose: '1 мг 2x/д', best: true },
+      { id: 'immune_support_2', name: 'Immune Support', nameRu: 'Иммунный комплекс форте', dose: '1 мг', best: false }
+    ],
+    organs: ['IMMUNE_SYSTEM', 'LIVER', 'BLOOD'],
+    systems: ['immune', 'hepatic', 'hematologic'],
+    mechanisms: ['IMMUNE_REGULATION', 'ANTI_INFLAMMATORY', 'WHITE_BLOOD_CELL_SUPPORT', 'INFECTION_RESISTANCE'],
+    description: 'Иммунная поддержка — комплекс витаминов С, D, цинка, селена и пробиотиков для защиты иммунитета на курсе.',
+    synergies: [
+        {with: "vitamin_c", effect: "Иммунитет", mechanism: "Оба поддерживают иммунитет", severity: "MEDIUM"},
+        {with: "zinc", effect: "Иммунитет", mechanism: "Оба — иммуномодуляторы", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 1, timing: 'с едой 1x/д', form: 'иммунный комплекс 1 капсула' },
+    bestForCourse: false,
+  },
+  andrographis: {
+    id: 'andrographis',
+    name: 'Andrographis',
+    nameRu: 'Андографис',
+    tier: 'standard',
+    category: ['immunomodulator', 'hepatoprotector'],
+    forms: [
+      { id: 'andrographis', name: 'Andrographis', nameRu: 'Экстракт андографиса 200 мг', dose: '200 мг 2x/д', best: true }
+    ],
+    organs: ['LIVER', 'IMMUNE_SYSTEM', 'BLOOD'],
+    systems: ['hepatic', 'immune'],
+    mechanisms: ['IMMUNE_ACTIVATION', 'ANTI_INFLAMMATORY', 'LIVER_PROTECTION', 'FEVER_REDUCTION'],
+    description: 'Андографис — иммуномодулятор и гепатопротектор, активирует NK-клетки и защищает печень. На курсе — иммунитет.',
+    synergies: [
+        {with: "vitamin_c", effect: "Иммунитет при простуде", mechanism: "Оба — иммуномодуляторы", severity: "MEDIUM"},
+        {with: "zinc", effect: "Противовирусная активность", mechanism: "Оба подавляют вирусы", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "Андрографис стимулирует иммунитет", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'АЛТ/АСТ', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Аутоиммунные заболевания (с осторожностью)'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 200, timing: 'с едой 2x/д', form: 'экстракт андографиса 200 мг' },
+    bestForCourse: false,
+  },
+  boswellia: {
+    id: 'boswellia',
+    name: 'Boswellia',
+    nameRu: 'Босвеллия',
+    tier: 'standard',
+    category: ['anti_inflammatory', 'joint'],
+    forms: [
+      { id: 'boswellia', name: 'Boswellia', nameRu: 'Экстракт босвеллии 500 мг', dose: '500 мг 2x/д', best: true },
+      { id: 'boswellia_2', name: 'Boswellia', nameRu: 'Босвеллия + Куркумин комплекс', dose: '500 мг', best: false }
+    ],
+    organs: ['JOINTS', 'LUNGS', 'BRAIN'],
+    systems: ['musculoskeletal', 'respiratory', 'neuro'],
+    mechanisms: ['ANTI_INFLAMMATORY', 'JOINT_PROTECTION', '5_LOX_INHIBITION', 'PAIN_RELIEF'],
+    description: 'Босвеллия — мощный ингибитор 5-ЛОГ, противовоспалительное для суставов и лёгких. На курсе — суставы.',
+    synergies: [
+        {with: "curcumin", effect: "Двойное подавление воспаления", mechanism: "Босвеллия — 5-LOX, куркумин — COX-2", severity: "HIGH"},
+        {with: "glucosamine", effect: "Здоровье суставов", mechanism: "Противовоспалительное + структурное", severity: "MEDIUM"},
+        {with: "msm", effect: "Противовоспалительное для суставов", mechanism: "Оба снижают воспаление", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Суставы', when: 'Субъективно' }
+    ],
+    contraindications: ['Аутоиммунные заболевания (с осторожностью)'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт босвеллии 500 мг' },
+    bestForCourse: false,
+  },
+  cissus: {
+    id: 'cissus',
+    name: 'Cissus',
+    nameRu: 'Циссус',
+    tier: 'standard',
+    category: ['joint', 'anti_inflammatory'],
+    forms: [
+      { id: 'cissus', name: 'Cissus', nameRu: 'Экстракт циссуса 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['JOINTS', 'BONES', 'MUSCLES'],
+    systems: ['musculoskeletal'],
+    mechanisms: ['BONE_HEALING', 'JOINT_PROTECTION', 'ANTI_INFLAMMATORY', 'COLLAGEN_SYNTHESIS'],
+    description: 'Циссус — растение для заживления костей и суставов, стимулирует синтез коллагена. На курсе — связки и кости.',
+    synergies: [
+        {with: "vitamin_c", effect: "Заживление костей и связок", mechanism: "Оба поддерживают коллаген", severity: "MEDIUM"},
+        {with: "calcium", effect: "Минерализация костей", mechanism: "Циссус + Кальций — костная поддержка", severity: "MEDIUM"},
+        {with: "bpc157", effect: "Заживление связок", mechanism: "Оба стимулируют регенерацию", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Кальций/Кости', when: 'Каждые 12 нед' }
+    ],
+    contraindications: ['Беременность'],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт циссуса 500 мг' },
+    bestForCourse: false,
+  },
+  licorice: {
+    id: 'licorice',
+    name: 'Licorice',
+    nameRu: 'Солодка (глицирризиновая кислота)',
+    tier: 'standard',
+    category: ['hepatoprotector', 'anti_inflammatory'],
+    forms: [
+      { id: 'licorice', name: 'Licorice', nameRu: 'Экстракт солодки 500 мг', dose: '500 мг 2x/д', best: true }
+    ],
+    organs: ['LIVER', 'ADRENALS', 'GUT'],
+    systems: ['hepatic', 'endocrine', 'gastrointestinal'],
+    mechanisms: ['ANTI_INFLAMMATORY', 'LIVER_PROTECTION', 'ADRENAL_SUPPORT', 'MUCUS_PROTECTION'],
+    description: 'Солодка — гепатопротектор и адаптоген, поддерживает надпочечники и защищает слизистую ЖКТ.',
+    synergies: [
+        {with: "milk_thistle", effect: "Гепатопротекция", mechanism: "Оба защищают печень", severity: "MEDIUM"},
+        {with: "probiotics", effect: "Защита слизистой желудка", mechanism: "Солодка — гастропротектор", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "antihypertensive_drugs", effect: "Повышение давления", mechanism: "Солодка задерживает натрий и воду", severity: "HIGH"},
+      ],
+    monitoring: [
+      { what: 'Калий/АД', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Гипертония', 'Гипокалиемия'],
+    sideEffects: ['Задержка натрия/воды', 'Повышение АД при длительном'],
+    dosage: { mg: 500, timing: 'с едой 2x/д (макс 6 нед)', form: 'экстракт солодки 500 мг' },
+    bestForCourse: false,
+  },
+  stimulant_complex: {
+    id: 'stimulant_complex',
+    name: 'Stimulant Complex',
+    nameRu: 'Стимуляторный комплекс',
+    tier: 'advanced',
+    category: ['stimulant', 'nootropic'],
+    forms: [
+      { id: 'stimulant_complex', name: 'Stimulant Complex', nameRu: 'Стимуляторный комплекс 1 капсула', dose: '1 мг 2x/д', best: true },
+      { id: 'stimulant_complex_2', name: 'Stimulant Complex', nameRu: 'Стимуляторный комплекс форте', dose: '1 мг', best: false }
+    ],
+    organs: ['BRAIN', 'HEART', 'MUSCLES'],
+    systems: ['neuro', 'cardio'],
+    mechanisms: ['CNS_STIMULATION', 'FAT_OXIDATION', 'POWER_OUTPUT', 'FOCUS_ENHANCEMENT'],
+    description: 'Стимуляторный комплекс — кофеин+теакрин+L-тирозин для предтренировочного буста. На курсе — энергия и фокус.',
+    synergies: [
+      { with: "caffeine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "stimulant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "tyrosine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "antihistamine_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [
+      { with: "caffeine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "magnesium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "beta_blocker_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "ginseng", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "rhodiola", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "huperzine_a", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "anxiolytic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "melatonin", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "stimulant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "pt141", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
+    ],
+    monitoring: [
+      { what: 'Пульс/АД', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Тяжёлая гипертензия', 'Аритмия'],
+    sideEffects: ['Бессонница при вечернем приёме', 'Тахикардия'],
+    dosage: { mg: 1, timing: 'за 30 мин до тренировки', form: 'стимуляторный комплекс 1 капсула' },
+    bestForCourse: false,
+  },
+  lipid_complex: {
+    id: 'lipid_complex',
+    name: 'Lipid Complex',
+    nameRu: 'Липидный комплекс',
+    tier: 'standard',
+    category: ['fatty_acid', 'cardioprotector'],
+    forms: [
+      { id: 'lipid_complex', name: 'Lipid Complex', nameRu: 'Липидный комплекс 3 г', dose: '3 г 2x/д', best: true },
+      { id: 'lipid_complex_2', name: 'Lipid Complex', nameRu: 'Омега 3-6-9 комплекс', dose: '3 г', best: false }
+    ],
+    organs: ['HEART', 'BRAIN', 'BLOOD_VESSELS'],
+    systems: ['cardio', 'neuro'],
+    mechanisms: ['OMEGA3_6_9_BALANCE', 'CHOLESTEROL_LOWERING', 'ANTI_INFLAMMATORY', 'BRAIN_PROTECTION'],
+    description: 'Липидный комплекс — Омега-3+6+9+CLA+МСТ для баланса жирных кислот и кардиопротекции на курсе.',
+    synergies: [
+        {with: "omega3", effect: "Комплексная поддержка липидов", mechanism: "Оба — источники ЖК", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Липидограмма', when: 'Каждые 8 нед' }
+    ],
+    contraindications: ['Приём антикоагулянтов (с осторожностью)'],
+    sideEffects: ['Рыбная отрыжка', 'Диарея при высоких дозах'],
+    dosage: { mg: 3000, timing: 'с едой 2x/д', form: 'липидный комплекс 3 г' },
+    bestForCourse: false,
+  },
+  brand_complex: {
+    id: 'brand_complex',
+    name: 'Brand Complex',
+    nameRu: 'Брендовый комплекс',
+    tier: 'standard',
+    category: ['multivitamin', 'recovery'],
+    forms: [
+      { id: 'brand_complex', name: 'Brand Complex', nameRu: 'Брендовый комплекс 1 капсула', dose: '1 мг 2x/д', best: true }
+    ],
+    organs: ['WHOLE_BODY'],
+    systems: ['all_systems'],
+    mechanisms: ['COMPREHENSIVE_NUTRITION', 'VITAMIN_MINERAL_SUPPORT', 'RECOVERY_ENHANCEMENT', 'IMMUNE_SUPPORT'],
+    description: 'Брендовый комплекс — мультивитаминный препарат от производителя для общей поддержки на курсе.',
+    synergies: [
+      { with: "vitamin_a", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "omega3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+    ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
+    ],
+    contraindications: [],
+    sideEffects: ['Редко: желудочный дискомфорт'],
+    dosage: { mg: 1, timing: 'с едой 1x/д', form: 'брендовый комплекс 1 капсула' },
+    bestForCourse: false,
+  },
+  antacid: {
+    id: 'antacid',
+    name: 'Antacid',
+    nameRu: 'Антацид',
+    tier: 'standard',
+    category: ['gastrointestinal'],
+    forms: [
+      { id: 'antacid', name: 'Antacid', nameRu: 'Антацид 1000 мг', dose: '1 г 2x/д', best: true },
+      { id: 'antacid_2', name: 'Antacid', nameRu: 'Антацид + ИПП комплекс', dose: '1 г', best: false }
+    ],
+    organs: ['STOMACH', 'GUT'],
+    systems: ['gastrointestinal'],
+    mechanisms: ['ACID_NEUTRALIZATION', 'GASTRIC_PROTECTION', 'HEARTBURN_RELIEF', 'ESOPHAGUS_PROTECTION'],
+    description: 'Антацид — нейтрализует желудочную кислоту, снимает изжогу и защищает пищевод. На курсе — ЖКТ защита при НПВС.',
+    synergies: [
+        {with: "zinc_carnosine", effect: "Защита желудка", mechanism: "Антацид + цинк-карнозин", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "iron", effect: "Снижение всасывания Fe", mechanism: "Антациды блокируют Fe", severity: "MEDIUM"},
+        {with: "vitamin_b12", effect: "Снижение всасывания B12", mechanism: "Антациды нарушают B12", severity: "MEDIUM"},
+      ],
+    monitoring: [
+      { what: 'Гастроскопия', when: 'Субъективно' }
+    ],
+    contraindications: ['Почечная недостаточность'],
+    sideEffects: ['Запор или диарея (зависит от типа)'],
+    dosage: { mg: 1000, timing: 'через 1 ч после еды', form: 'антацид 1000 мг' },
+    bestForCourse: false,
+  },
+  igf1: {
+    id: 'igf1',
+    name: 'IGF-1',
+    nameRu: 'ИФР-1 (Инсулиноподобный фактор роста)',
+    tier: 'specialty',
+    category: ['peptide', 'hormonal'],
+    forms: [
+      { id: 'igf1', name: 'IGF-1', nameRu: 'ИФР-1 100 мкг', dose: '100 мкг 2x/д', best: true }
+    ],
+    organs: ['MUSCLES', 'BONES', 'BRAIN'],
+    systems: ['musculoskeletal', 'endocrine', 'neuro'],
+    mechanisms: ['MUSCLE_GROWTH', 'BONE_DENSITY', 'NERVE_REGENERATION', 'ANABOLIC_EFFECT'],
+    description: 'ИФР-1 — инсулиноподобный фактор роста, анаболический гормон для мышц и костей. Маркер ГР на курсе.',
+    synergies: [
+        {with: "cjc1295", effect: "GH-IGF-1 каскад", mechanism: "CJC-1295 стимулирует GH → IGF-1", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'ИФР-1', when: 'Каждые 4 нед', targetRange: '150-450 нг/мл' }
+    ],
+    contraindications: ['Активный онкологический процесс', 'Беременность'],
+    sideEffects: ['Риск гипогликемии', 'Покраснение в месте инъекции'],
+    dosage: { mg: 0.1, timing: 'индивидуально п/к', form: 'ИФР-1 100 мкг' },
+    bestForCourse: false,
+  },
+  mgf: {
+    id: 'mgf',
+    name: 'MGF',
+    nameRu: 'MGF (Механо-фактор роста)',
+    tier: 'specialty',
+    category: ['peptide', 'hormonal'],
+    forms: [
+      { id: 'mgf', name: 'MGF', nameRu: 'MGF 200 мкг', dose: '200 мкг 2x/д', best: true }
+    ],
+    organs: ['MUSCLES', 'BONES'],
+    systems: ['musculoskeletal'],
+    mechanisms: ['MUSCLE_REGENERATION', 'SATELLITE_CELL_ACTIVATION', 'HYPERTROPHY', 'RECOVERY'],
+    description: 'MGF — механо-фактор роста, вариант ИФР-1, стимулирует сателлитные клетки и гипертрофию мышц. На курсе — восстановление.',
+    synergies: [
+        {with: "igf1", effect: "Рост и восстановление мышц", mechanism: "MGF — изоформа IGF-1", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'ИФР-1', when: 'Каждые 4 нед' }
+    ],
+    contraindications: ['Активный онкологический процесс'],
+    sideEffects: ['Редко: покраснение в месте инъекции'],
+    dosage: { mg: 0.2, timing: 'после тренировки п/к', form: 'MGF 200 мкг' },
+    bestForCourse: false,
+  },
+  kpv: {
+    id: 'kpv',
+    name: 'KPV',
+    nameRu: 'KPV (пептид противовоспалительный)',
+    tier: 'specialty',
+    category: ['peptide', 'anti_inflammatory'],
+    forms: [
+      { id: 'kpv', name: 'KPV', nameRu: 'KPV 500 мкг', dose: '500 мкг 2x/д', best: true }
+    ],
+    organs: ['GUT', 'IMMUNE_SYSTEM', 'SKIN'],
+    systems: ['gastrointestinal', 'immune'],
+    mechanisms: ['ANTI_INFLAMMATORY', 'GUT_BARRIER_STRENGTHENING', 'IMMUNE_REGULATION', 'WOUND_HEALING'],
+    description: 'KPV — противовоспалительный пептид, заживляет слизистую кишечника и кожу. На курсе — защита ЖКТ.',
+    synergies: [
+        {with: "bpc157", effect: "Заживление кишечника", mechanism: "Оба — пептиды для ЖКТ", severity: "MEDIUM"},
+        {with: "probiotics", effect: "Восстановление слизистой", mechanism: "KPV + пробиотики — барьер", severity: "MEDIUM"},
+      ],
+    conflicts: [],
+    monitoring: [
+      { what: 'Воспалительные маркеры', when: 'Субъективно' }
+    ],
+    contraindications: ['Беременность'],
+    sideEffects: ['Редко: покраснение в месте инъекции'],
+    dosage: { mg: 0.5, timing: '1x/д п/к', form: 'KPV 500 мкг' },
+    bestForCourse: false,
+  },
+};
+
+
+
+// ── FROM: catalog-exports.ts ──
+﻿// Side effects file to prevent Vite tree-shaking of catalog data
+
+// Re-export everything to ensure it stays in the bundle
+export const CATALOG_SIZE = Object.keys(SUPPORT_CATALOG_DATA).length;
+export const CANONICAL_SIZE = Object.keys(CANONICAL_ID_MAP).length;
+// ── FROM: catalog-enrichment.ts ──
+// ===========================================================================
+// CATALOG ENRICHMENT — дополнительная информация для каждого препарата
+// Не изменяет исходный каталог, добавляет данные сверху.
+// ===========================================================================
+
+export interface CatalogEnrichment {
+  targetSystems: string[];
+  targetMechanisms: string[];
+  linkedRisks?: { system: string; direction: 'up' | 'down' | 'both'; strength: number }[];
+  cvProfile: { bloodPressure: 'up'|'down'|'neutral'; heartRate: 'up'|'down'|'neutral'; vascularTone: 'constrict'|'dilate'|'neutral'; thrombosisRisk: 'low'|'medium'|'high'; cnsLoad: 'low'|'medium'|'high' };
+  analog?: string[];
+  maxUsageWeeks?: number;
+  labMarkers?: string[];
+  restrictions?: string[];
+}
+
+export const CATALOG_ENRICHMENT: Record<string, CatalogEnrichment> = {
+  // ═══════════════════════════════════════════════════════════════════
+  // CORE — ЯДРО (обязательно на любом курсе)
+  // ═══════════════════════════════════════════════════════════════════
+
+  nac: {
+    targetSystems: ['hepatic','renal','neuro'],
+    targetMechanisms: ['GLUTATHIONE_SYNTHESIS','MUCOLYTIC','ANTIOXIDANT','DETOXIFICATION'],
+    linkedRisks: [{system:'hepatic',direction:'down',strength:0.4},{system:'neuro',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['tudca','milk_thistle'],
+    maxUsageWeeks: 52, labMarkers: ['АЛТ','АСТ','ГГТ','Креатинин'], restrictions:['Не принимать с активированным углём','Интервал 2ч с антибиотиками']
+  },
+  tudca: {
+    targetSystems: ['hepatic'],
+    targetMechanisms: ['BILE_ACID_MODULATION','MITOCHONDRIAL_PROTECTION','ER_STRESS_REDUCTION','ANTIAPOPTOTIC'],
+    linkedRisks: [{system:'hepatic',direction:'down',strength:0.5}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['nac','milk_thistle'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  magnesium: {
+    targetSystems: ['cardio','neuro','musculoskeletal'],
+    targetMechanisms: ['NMDA_BLOCK','GABA_MOD','MUSCLE_RELAXATION','ATP_SYNTHESIS','CALCIUM_ANTAGONISM'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.3},{system:'neuro',direction:'down',strength:0.3}],
+    cvProfile: {bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['taurine','glycine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Не превышать допустимый уровень'],
+  },
+  coq10: {
+    targetSystems: ['cardio','renal','hepatic'],
+    targetMechanisms: ['ELECTRON_TRANSPORT_CHAIN','ANTIOXIDANT','ATP_PRODUCTION','MEMBRANE_STABILIZATION'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.3},{system:'hepatic',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['alpha_lipoic','pqq'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  vitamin_d3: {
+    targetSystems: ['endocrine','hepatic','hematologic'],
+    targetMechanisms: ['VDR_RECEPTOR_ACTIVATION','CALCIUM_REGULATION','IMMUNE_MODULATION','TESTOSTERONE_SYNTHESIS'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['vitamin_k2'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  zinc: {
+    targetSystems: ['reproductive','endocrine','hematologic'],
+    targetMechanisms: ['TESTOSTERONE_SYNTHESIS','AR_RECEPTOR_MODULATION','IMMUNE_CELL_PROLIFERATION','WOUND_HEALING'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['boron'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Не превышать допустимый уровень'],
+  },
+  selenium: {
+    targetSystems: ['endocrine','hepatic','hematologic'],
+    targetMechanisms: ['GPX_SYNTHESIS','THYROID_HORMONE_ACTIVATION','ANTIOXIDANT','DNA_REPAIR'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.2},{system:'hepatic',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['zinc'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Не превышать допустимый уровень'],
+  },
+  milk_thistle: {
+    targetSystems: ['hepatic'],
+    targetMechanisms: ['MEMBRANE_STABILIZATION','ANTIOXIDANT','PROTEIN_SYNTHESIS_STIMULATION','ANTIFIBROTIC'],
+    linkedRisks: [{system:'hepatic',direction:'down',strength:0.4},{system:'cardio',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['nac','tudca'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  curcumin: {
+    targetSystems: ['hepatic','musculoskeletal','neuro'],
+    targetMechanisms: ['NF_KB_INHIBITION','COX2_INHIBITION','ANTIOXIDANT','ANTI_FIBROTIC','BDNF_INCREASE'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.2},{system:'neuro',direction:'down',strength:0.2},{system:'hepatic',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['boswellia','ginger'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  ashwagandha: {
+    targetSystems: ['neuro','endocrine','reproductive'],
+    targetMechanisms: ['CORTISOL_REDUCTION','GABA_RECEPTOR_AGONISM','THYROID_T3_INCREASE','TESTOSTERONE_SUPPORT'],
+    linkedRisks: [{system:'endocrine',direction:'down',strength:0.2},{system:'neuro',direction:'down',strength:0.2},{system:'cardio',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['rhodiola','holy_basil'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'ТТГ', 'Глюкоза'],
+    restrictions: ['Циклировать 8 нед приём / 2 нед перерыв', 'Не при аутоиммунных заболеваниях'],
+  },
+  vitamin_c: {
+    targetSystems: ['hematologic','hepatic','immunity'],
+    targetMechanisms: ['COLLAGEN_SYNTHESIS','ANTIOXIDANT','IMMUNE_CELL_FUNCTION','IRON_ABSORPTION','GLUTATHIONE_REGENERATION'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.2},{system:'hepatic',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['alpha_lipoic','nac'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  taurine: {
+    targetSystems: ['cardio','neuro','hepatic','renal'],
+    targetMechanisms: ['OSMOREGULATION','ANTIOXIDANT','CALCIUM_REGULATION','GABA_RECEPTOR_MODULATION','BILE_ACID_CONJUGATION'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.3},{system:'neuro',direction:'down',strength:0.3}],
+    cvProfile: {bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['magnesium','glycine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  alpha_lipoic: {
+    targetSystems: ['neuro','hepatic','renal'],
+    targetMechanisms: ['ANTIOXIDANT_NETWORK','GLUTATHIONE_REGENERATION','MITOCHONDRIAL_FUNCTION','INSULIN_SENSITIVITY'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.2},{system:'hepatic',direction:'down',strength:0.2},{system:'neuro',direction:'down',strength:0.3}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['nac','coq10'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  berberine: {
+    targetSystems: ['endocrine','hepatic','cardio'],
+    targetMechanisms: ['AMPK_ACTIVATION','INSULIN_SENSITIVITY','CYP3A4_INHIBITION','NF_KB_INHIBITION','CHOLESTEROL_REDUCTION'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.2},{system:'hepatic',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['metformin'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  vitamin_k2: {
+    targetSystems: ['cardio','hematologic'],
+    targetMechanisms: ['OSTEOCALCIN_ACTIVATION','MATRIX_GLA_PROTEIN_ACTIVATION','CALCIUM_DISTRIBUTION'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.3}],
+    cvProfile: {bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['vitamin_d3'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  probiotics: {
+    targetSystems: ['hepatic','immunity','hematologic'],
+    targetMechanisms: ['GUT_MICROBIOME_MODULATION','IMMUNE_REGULATION','GUT_BARRIER_INTEGRITY','SHORT_CHAIN_FATTY_ACID_PRODUCTION','PATHOGEN_EXCLUSION'],
+    linkedRisks: [{system:'hepatic',direction:'down',strength:0.4}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['prebiotics','glutamine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК'],
+    restrictions: ['Хранить в холодильнике', 'Принимать натощак', 'Интервал 2ч с антибиотиками'],
+  },
+  vitamin_b12: {
+    targetSystems: ['hematologic','neuro'],
+    targetMechanisms: ['METHYLATION','DNA_SYNTHESIS','MYELIN_SYNTHESIS','HOMOCYSTEINE_LOWERING'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['folate'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  omega3: {
+    targetSystems: ['cardio','neuro','endocrine'],
+    targetMechanisms: ['EPA_DHA_UP','ANTIINFLAMMATORY','TRIGLYCERIDE_LOWERING','MEMBRANE_FLUIDITY'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.4},{system:'neuro',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['krill_oil','algae_oil'],
+    maxUsageWeeks: 104,
+    labMarkers: ['ТГ', 'ЛПВП', 'Омега-3 индекс', 'СРБ'],
+    restrictions: ['Разжижает кровь', 'Принимать с едой', 'Контроль INR при высоких дозах'],
+  },
+  iron: {
+    targetSystems: ['hematologic','hepatic','musculoskeletal'],
+    targetMechanisms: ['HEMOGLOBIN_SYNTHESIS','MYOGLOBIN_SYNTHESIS','OXYGEN_TRANSPORT','ENERGY_PRODUCTION'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['b12','folate'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Не превышать допустимый уровень'],
+  },
+  copper: {
+    targetSystems: ['hepatic','hematologic','musculoskeletal'],
+    targetMechanisms: ['IRON_METABOLISM','CERULOPLASMIN','COLLAGEN_CROSS_LINKING','MELANIN_SYNTHESIS'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.2},{system:'hepatic',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['zinc'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Не превышать допустимый уровень'],
+  },
+  telmisartan: {
+    targetSystems: ['cardio','renal','endocrine'],
+    targetMechanisms: ['ANGIOTENSIN_RECEPTOR_BLOCKADE','PPAR_GAMMA_ACTIVATION','BP_REDUCTION','RENOPROTECTION'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.3}],
+    cvProfile: {bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['nebivolol','magnesium'],
+    maxUsageWeeks: 156, labMarkers: ['АД','Калий','Креатинин'], restrictions:['Не с калийсберегающими','Контроль АД ежедневно']
+  },
+  nebivolol: {
+    targetSystems: ['cardio'],
+    targetMechanisms: ['BETA1_BLOCKADE','NO_RELEASE','HR_REDUCTION','BP_REDUCTION'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.3}],
+    cvProfile: {bloodPressure:'down',heartRate:'down',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['telmisartan','magnesium'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  collagen: {
+    targetSystems: ['musculoskeletal'],
+    targetMechanisms: ['COLLAGEN_SYNTHESIS','CARTILAGE_REPAIR','SKIN_ELASTICITY','TENDON_STRENGTH'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['glucosamine','msm'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОК'],
+    restrictions: ['Принимать с витамином C', 'Гидролизованный лучше усваивается'],
+  },
+  glucosamine: {
+    targetSystems: ['musculoskeletal'],
+    targetMechanisms: ['CARTILAGE_REPAIR','SYNOVIAL_FLUID_PRODUCTION','ANTI_INFLAMMATORY'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['chondroitin','msm'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // STANDARD — СТАНДАРТ
+  // ═══════════════════════════════════════════════════════════════════
+
+  vitamin_b6: {
+    targetSystems: ['neuro','endocrine'],
+    targetMechanisms: ['NEUROTRANSMITTER_SUPPORT','HOMOCYSTEINE_REDUCTION','ENZYME_COFACTOR'],
+    linkedRisks: [{system:'neuro',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['magnesium'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  folate: {
+    targetSystems: ['hematologic','neuro','hepatic'],
+    targetMechanisms: ['METHYLATION','DNA_SYNTHESIS','HOMOCYSTEINE_LOWERING','CELL_DIVISION'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['vitamin_b12'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  vitamin_e: {
+    targetSystems: ['cardio','skin','vessels'],
+    targetMechanisms: ['MEMBRANE_PROTECTION','ANTIOXIDANT','LIPID_PEROXIDATION_INHIBITION','IMMUNE_MODULATION'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['selenium','vitamin_c'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  vitamin_a: {
+    targetSystems: ['neuro','skin','immunity'],
+    targetMechanisms: ['RETINOID_SIGNALING','COLLAGEN_SUPPORT','EPITHELIAL_HEALTH','IMMUNE_CELL_DIFFERENTIATION'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['vitamin_d3'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  vitamin_b1: {
+    targetSystems: ['cardio','hepatic','neuro'],
+    targetMechanisms: ['TPP_PATHWAY','CARB_METABOLISM','NERVE_CONDUCTION'],
+    linkedRisks: [{system:'neuro',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['vitamin_b6'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  vitamin_b2: {
+    targetSystems: ['neuro','hepatic','skin'],
+    targetMechanisms: ['FLAVIN_PATHWAY','MITO_REPAIR','OXIDATIVE_STRESS_REDUCTION'],
+    linkedRisks: [{system:'neuro',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['vitamin_b3'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  vitamin_b3: {
+    targetSystems: ['cardio','hepatic','neuro'],
+    targetMechanisms: ['NAD_PATHWAY','LIPID_BALANCE','DNA_REPAIR'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.2},{system:'hepatic',direction:'up',strength:0.1}],
+    cvProfile: {bloodPressure:'up',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['vitamin_b3_nm'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  vitamin_b5: {
+    targetSystems: ['endocrine','hepatic','skin'],
+    targetMechanisms: ['COA_PATHWAY','HORMONE_SYNTHESIS','ENERGY_METABOLISM'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['vitamin_b6'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  vitamin_b7: {
+    targetSystems: ['skin','hepatic','neuro'],
+    targetMechanisms: ['CARBOXYLASE_SUPPORT','SKIN_HEALTH','HAIR_GROWTH'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['vitamin_b5'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  rose_hips: {
+    targetSystems: ['immunity','skin','vessels'],
+    targetMechanisms: ['VITAMIN_C_SOURCE','ANTIOXIDANT','COLLAGEN_SUPPORT','IMMUNE_BOOST'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['vitamin_c','acerola'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  acerola: {
+    targetSystems: ['immunity','skin'],
+    targetMechanisms: ['VITAMIN_C_SOURCE','ANTIOXIDANT','COLLAGEN_SUPPORT'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['vitamin_c','rose_hips'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  ginger: {
+    targetSystems: ['hepatic','musculoskeletal','neuro'],
+    targetMechanisms: ['ANTIINFLAMMATORY','ANTIOXIDANT','DIGESTIVE_STIMULANT','NAUSEA_RELIEF'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.1},{system:'hepatic',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['curcumin','boswellia'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  garlic: {
+    targetSystems: ['cardio','vessels','immunity'],
+    targetMechanisms: ['ALLICIN_ACTIVITY','BP_REDUCTION','IMMUNE_BOOST','LIPID_LOWERING'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['omega3','ginger'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  ginseng: {
+    targetSystems: ['neuro','endocrine','immunity'],
+    targetMechanisms: ['ADAPTOGENIC','ENERGY_BOOST','IMMUNE_MODULATION','COGNITIVE_ENHANCEMENT'],
+    linkedRisks: [{system:'neuro',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'up',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'medium'},
+    analog:['ashwagandha','rhodiola'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'ТТГ', 'Глюкоза'],
+    restrictions: ['Циклировать 8 нед приём / 2 нед перерыв', 'Не при аутоиммунных заболеваниях'],
+  },
+  rhodiola: {
+    targetSystems: ['neuro','endocrine'],
+    targetMechanisms: ['ADAPTOGENIC','FATIGUE_REDUCTION','COGNITIVE_ENHANCEMENT','STRESS_RESILIENCE'],
+    linkedRisks: [{system:'neuro',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['ashwagandha','ginseng'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'ТТГ', 'Глюкоза'],
+    restrictions: ['Циклировать 8 нед приём / 2 нед перерыв', 'Не при аутоиммунных заболеваниях'],
+  },
+  glycine: {
+    targetSystems: ['neuro'],
+    targetMechanisms: ['GLYCINERGIC','NEUROTRANSMITTER','SLEEP_PROMOTION','NMDA_MODULATION'],
+    linkedRisks: [{system:'neuro',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['magnesium','taurine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  glutamine: {
+    targetSystems: ['immunity','musculoskeletal'],
+    targetMechanisms: ['GUT_BARRIER','IMMUNE_FUEL','MUSCLE_PRESERVATION','NITROGEN_TRANSPORT'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['probiotics','zinc'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  msm: {
+    targetSystems: ['musculoskeletal','skin'],
+    targetMechanisms: ['SULFUR_DONATION','COLLAGEN_CROSS_LINKING','ANTIINFLAMMATORY','ANTIOXIDANT'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['glucosamine','chondroitin'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  chondroitin: {
+    targetSystems: ['musculoskeletal'],
+    targetMechanisms: ['CARTILAGE_PROTECTION','WATER_RETENTION','COLLAGEN_NETWORK_STABILIZATION'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['glucosamine','msm'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  phosphatidylcholine: {
+    targetSystems: ['hepatic','neuro'],
+    targetMechanisms: ['MEMBRANE_REPAIR','LIPID_TRANSPORT','CHOLINE_DONATION','NEUROPROTECTION'],
+    linkedRisks: [{system:'hepatic',direction:'down',strength:0.3}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['nac','tudca'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  inositol: {
+    targetSystems: ['endocrine','neuro'],
+    targetMechanisms: ['INSULIN_SENSITIVITY','NEUROTRANSMITTER_SIGNALING','CELL_SIGNALING','LIPID_METABOLISM'],
+    linkedRisks: [{system:'endocrine',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['berberine','magnesium'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  prebiotics: {
+    targetSystems: ['hepatic','immunity'],
+    targetMechanisms: ['MICROBIOME_FEEDING','SCFA_PRODUCTION','GUT_HEALTH','IMMUNE_REGULATION'],
+    linkedRisks: [{system:'hepatic',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['probiotics'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК'],
+    restrictions: ['Хранить в холодильнике', 'Принимать натощак', 'Интервал 2ч с антибиотиками'],
+  },
+  carnitine: {
+    targetSystems: ['cardio','musculoskeletal','metabolic'],
+    targetMechanisms: ['FATTY_ACID_TRANSPORT','MITOCHONDRIAL_FUNCTION','ENERGY_PRODUCTION','ANTIOXIDANT'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['taurine','coq10'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  creatine: {
+    targetSystems: ['musculoskeletal','neuro'],
+    targetMechanisms: ['ATP_REGENERATION','STRENGTH_INCREASE','COGNITIVE_ENHANCEMENT','PHOSPHOCREATINE_SYSTEM'],
+    linkedRisks: [{system:'renal',direction:'up',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['beta_alanine','carnitine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  beta_alanine: {
+    targetSystems: ['musculoskeletal'],
+    targetMechanisms: ['CARNOSINE_SYNTHESIS','BUFFER_CAPACITY','ENDURANCE','FATIGUE_DELAY'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['creatine','carnitine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  hmb: {
+    targetSystems: ['musculoskeletal'],
+    targetMechanisms: ['PROTEIN_BREAKDOWN_INHIBITION','MUSCLE_PRESERVATION','ANTI_CATABOLIC','LEUCINE_METABOLITE'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['creatine','carnitine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  bcaa: {
+    targetSystems: ['musculoskeletal'],
+    targetMechanisms: ['MPS_STIMULATION','LEUCINE_ACTIVATION','ENERGY_SUPPLY','FATIGUE_REDUCTION'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['creatine','hmb'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  tryptophan: {
+    targetSystems: ['neuro','endocrine'],
+    targetMechanisms: ['SEROTONIN_SYNTHESIS','MELATONIN_PRECURSOR','MOOD_REGULATION','SLEEP_PROMOTION'],
+    linkedRisks: [{system:'neuro',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['5htp','magnesium'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  tyrosine: {
+    targetSystems: ['neuro','endocrine'],
+    targetMechanisms: ['DOPAMINE_SYNTHESIS','NOREPINEPHRINE_SYNTHESIS','COGNITIVE_ENHANCEMENT','STRESS_RESILIENCE'],
+    linkedRisks: [{system:'neuro',direction:'up',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'medium'},
+    analog:['phenylalanine','rhodiola'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  theanine: {
+    targetSystems: ['neuro'],
+    targetMechanisms: ['GABA_MODULATION','RELAXATION','FOCUS_ENHANCEMENT','ALPHA_WAVE_INDUCTION'],
+    linkedRisks: [{system:'neuro',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['magnesium','taurine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  caffeine: {
+    targetSystems: ['neuro','cardio'],
+    targetMechanisms: ['ADENOSINE_ANTAGONISM','CNS_STIMULATION','ENERGY_BOOST','FOCUS_ENHANCEMENT'],
+    linkedRisks: [{system:'cardio',direction:'up',strength:0.2},{system:'neuro',direction:'up',strength:0.2}],
+    cvProfile: {bloodPressure:'up',heartRate:'up',vascularTone:'constrict',thrombosisRisk:'low',cnsLoad:'high'},
+    analog:['theanine','tyrosine'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  melatonin: {
+    targetSystems: ['neuro','endocrine'],
+    targetMechanisms: ['CIRCADIAN_RHYTHM','SLEEP_INDUCTION','ANTIOXIDANT','IMMUNE_MODULATION'],
+    linkedRisks: [{system:'neuro',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['magnesium','glycine'],
+    maxUsageWeeks: 12,
+    labMarkers: ['Тестостерон', 'Е2', 'ЛГ', 'ФСГ', 'Пролактин'],
+    restrictions: ['Контроль гормонов каждые 4-6 нед', 'Не превышать физиологические дозы'],
+  },
+  holy_basil: {
+    targetSystems: ['endocrine','neuro'],
+    targetMechanisms: ['ADAPTOGENIC','CORTISOL_REDUCTION','ANTIOXIDANT','IMMUNE_MODULATION'],
+    linkedRisks: [{system:'endocrine',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['ashwagandha','rhodiola'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'ТТГ', 'Глюкоза'],
+    restrictions: ['Циклировать 8 нед приём / 2 нед перерыв', 'Не при аутоиммунных заболеваниях'],
+  },
+  tongkat_ali: {
+    targetSystems: ['endocrine','reproductive'],
+    targetMechanisms: ['TESTOSTERONE_BOOST','CORTISOL_REDUCTION','LIBIDO_ENHANCEMENT','STRESS_REDUCTION'],
+    linkedRisks: [{system:'endocrine',direction:'up',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['ashwagandha','fadogia'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'ТТГ', 'Глюкоза'],
+    restrictions: ['Циклировать 8 нед приём / 2 нед перерыв', 'Не при аутоиммунных заболеваниях'],
+  },
+  fadogia: {
+    targetSystems: ['endocrine','reproductive'],
+    targetMechanisms: ['TESTOSTERONE_BOOST','LH_STIMULATION','LIBIDO_ENHANCEMENT','MOOD_ELEVATION'],
+    linkedRisks: [{system:'endocrine',direction:'up',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['tongkat_ali','ashwagandha'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'ТТГ', 'Глюкоза'],
+    restrictions: ['Циклировать 8 нед приём / 2 нед перерыв', 'Не при аутоиммунных заболеваниях'],
+  },
+  shilajit: {
+    targetSystems: ['endocrine','neuro','mitochondrial'],
+    targetMechanisms: ['FULVIC_ACID','MITOCHONDRIAL_FUNCTION','TESTOSTERONE_SUPPORT','ENERGY_BOOST'],
+    linkedRisks: [{system:'endocrine',direction:'up',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['ashwagandha','tongkat_ali'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'ТТГ', 'Глюкоза'],
+    restrictions: ['Циклировать 8 нед приём / 2 нед перерыв', 'Не при аутоиммунных заболеваниях'],
+  },
+  pygeum: {
+    targetSystems: ['reproductive','prostate'],
+    targetMechanisms: ['PROSTATE_HEALTH','URINARY_FLOW','ANTIINFLAMMATORY','BETA_SITOSTEROL'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['saw_palmetto','zinc'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  saw_palmetto: {
+    targetSystems: ['reproductive','prostate'],
+    targetMechanisms: ['5AR_INHIBITION','DHT_BLOCKADE','PROSTATE_HEALTH','URINARY_FUNCTION'],
+    linkedRisks: [{system:'reproductive',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['pygeum','zinc'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  centella: {
+    targetSystems: ['skin','vessels','neuro'],
+    targetMechanisms: ['COLLAGEN_STIMULATION','VENOUS_TONIC','WOUND_HEALING','COGNITIVE_ENHANCEMENT'],
+    linkedRisks: [{system:'vessels',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['collagen','vitamin_c'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  boswellia: {
+    targetSystems: ['musculoskeletal','neuro'],
+    targetMechanisms: ['5LOX_INHIBITION','ANTIINFLAMMATORY','JOINT_HEALTH','IMMUNE_MODULATION'],
+    linkedRisks: [{system:'musculoskeletal',direction:'down',strength:0.3}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['curcumin','ginger'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  bromelain: {
+    targetSystems: ['musculoskeletal','immunity'],
+    targetMechanisms: ['PROTEOLYTIC','ANTIINFLAMMATORY','EDEMA_REDUCTION','FIBRINOLYTIC'],
+    linkedRisks: [{system:'musculoskeletal',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['curcumin','boswellia'],
+    maxUsageWeeks: 12,
+    labMarkers: ['ОАК'],
+    restrictions: ['Принимать натощак', 'Курс 4-8 нед'],
+  },
+  quercetin: {
+    targetSystems: ['cardio','immunity','neuro'],
+    targetMechanisms: ['ANTIOXIDANT','ANTIINFLAMMATORY','MAST_CELL_STABILIZATION','IMMUNE_MODULATION'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.2},{system:'neuro',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['curcumin','vitamin_c'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  resveratrol: {
+    targetSystems: ['cardio','neuro','metabolic'],
+    targetMechanisms: ['SIRT1_ACTIVATION','ANTIOXIDANT','ANTIINFLAMMATORY','LONGEVITY'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['quercetin','curcumin'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  pqq: {
+    targetSystems: ['cardio','neuro','mitochondrial'],
+    targetMechanisms: ['MITOCHONDRIAL_BIOGENESIS','ANTIOXIDANT','ENERGY_METABOLISM','NEUROPROTECTION'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['coq10','alpha_lipoic'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  astaxanthin: {
+    targetSystems: ['cardio','neuro','skin'],
+    targetMechanisms: ['POTENT_ANTIOXIDANT','MEMBRANE_PROTECTION','SKIN_PROTECTION','EYE_HEALTH'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['coq10','vitamin_e'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  lutein: {
+    targetSystems: ['neuro','skin'],
+    targetMechanisms: ['EYE_PROTECTION','MACULA_SUPPORT','ANTIOXIDANT','BLUE_LIGHT_FILTER'],
+    linkedRisks: [{system:'neuro',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['astaxanthin','zeaxanthin'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  lycopene: {
+    targetSystems: ['cardio','prostate','skin'],
+    targetMechanisms: ['ANTIOXIDANT','PROSTATE_PROTECTION','SKIN_PROTECTION','CARDIO_PROTECTION'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['astaxanthin','lutein'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  zeaxanthin: {
+    targetSystems: ['neuro'],
+    targetMechanisms: ['EYE_PROTECTION','MACULA_SUPPORT','ANTIOXIDANT','BLUE_LIGHT_FILTER'],
+    linkedRisks: [{system:'neuro',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['lutein','astaxanthin'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  hyaluronic: {
+    targetSystems: ['musculoskeletal','skin'],
+    targetMechanisms: ['HYDRATION','JOINT_LUBRICATION','SKIN_ELASTICITY','TISSUE_REPAIR'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['collagen','msm'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  gaba: {
+    targetSystems: ['neuro'],
+    targetMechanisms: ['GABA_AGONISM','RELAXATION','SLEEP_PROMOTION','ANXIOLYTIC'],
+    linkedRisks: [{system:'neuro',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['magnesium','theanine'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  dlpa: {
+    targetSystems: ['neuro'],
+    targetMechanisms: ['OPIOID_MODULATION','NMDA_MODULATION','MOOD_ELEVATION','ANALGESIC'],
+    linkedRisks: [{system:'neuro',direction:'up',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'medium'},
+    analog:['tyrosine','rhodiola'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  sam_e: {
+    targetSystems: ['neuro','hepatic'],
+    targetMechanisms: ['METHYL_DONATION','MOOD_ENHANCEMENT','LIVER_DETOX','JOINT_HEALTH'],
+    linkedRisks: [{system:'neuro',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['folate','vitamin_b12'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  niacinamide: {
+    targetSystems: ['skin','neuro','cardio'],
+    targetMechanisms: ['NAD_PRECURSOR','SKIN_HEALTH','ANTIINFLAMMATORY','SIRT1_ACTIVATION'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['vitamin_b3','nmn'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  nmn: {
+    targetSystems: ['neuro','cardio','metabolic'],
+    targetMechanisms: ['NAD_SYNTHESIS','MITO_REPAIR','LONGEVITY','ENERGY_METABOLISM'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['niacinamide','resveratrol'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  '5htp': {
+    targetSystems: ['neuro'],
+    targetMechanisms: ['SEROTONIN_SYNTHESIS','MOOD_REGULATION','SLEEP_PROMOTION','APPETITE_CONTROL'],
+    linkedRisks: [{system:'neuro',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['tryptophan','magnesium'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  potassium: {
+    targetSystems: ['cardio','renal','musculoskeletal'],
+    targetMechanisms: ['ELECTROLYTE_BALANCE','BP_REGULATION','MUSCLE_FUNCTION','HEART_RHYTHM'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['magnesium','calcium'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Не превышать допустимый уровень'],
+  },
+  calcium: {
+    targetSystems: ['musculoskeletal','cardio','neuro'],
+    targetMechanisms: ['BONE_MINERALIZATION','MUSCLE_CONTRACTION','NERVE_TRANSMISSION','COAGULATION'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.05}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'constrict',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['magnesium','vitamin_d3'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Не превышать допустимый уровень'],
+  },
+  chromium: {
+    targetSystems: ['metabolic','endocrine'],
+    targetMechanisms: ['INSULIN_SENSITIVITY','GLUCOSE_UPTAKE','LIPID_METABOLISM','APPETITE_CONTROL'],
+    linkedRisks: [{system:'metabolic',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['berberine','cinnamon'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Не превышать допустимый уровень'],
+  },
+  cinnamon: {
+    targetSystems: ['metabolic','cardio'],
+    targetMechanisms: ['INSULIN_SENSITIVITY','GLUCOSE_LOWERING','ANTIOXIDANT','ANTIINFLAMMATORY'],
+    linkedRisks: [{system:'metabolic',direction:'down',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['berberine','chromium'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  iodine: {
+    targetSystems: ['endocrine','thyroid'],
+    targetMechanisms: ['THYROID_HORMONE_SYNTHESIS','METABOLISM_REGULATION','BREAST_HEALTH','DETOXIFICATION'],
+    linkedRisks: [{system:'thyroid',direction:'up',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['selenium','zinc'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Не превышать допустимый уровень'],
+  },
+  coenzyme_a: {
+    targetSystems: ['metabolic','endocrine'],
+    targetMechanisms: ['ACETYLATION','ENERGY_METABOLISM','FATTY_ACID_SYNTHESIS','NEUROTRANSMITTER_SYNTHESIS'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['vitamin_b5','carnitine'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  dong_quai: {
+    targetSystems: ['endocrine','hematologic'],
+    targetMechanisms: ['BLOOD_TONIC','HORMONAL_BALANCE','ANTIINFLAMMATORY','CIRCULATION'],
+    linkedRisks: [{system:'endocrine',direction:'down',strength:0.05}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['ashwagandha','holy_basil'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  maca: {
+    targetSystems: ['endocrine','reproductive','neuro'],
+    targetMechanisms: ['LIBIDO_ENHANCEMENT','ENERGY_BOOST','HORMONAL_BALANCE','MOOD_ENHANCEMENT'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['ashwagandha','tongkat_ali'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'ТТГ', 'Глюкоза'],
+    restrictions: ['Циклировать 8 нед приём / 2 нед перерыв', 'Не при аутоиммунных заболеваниях'],
+  },
+  tribulus: {
+    targetSystems: ['endocrine','reproductive'],
+    targetMechanisms: ['TESTOSTERONE_BOOST','LIBIDO_ENHANCEMENT','LH_STIMULATION','STRENGTH_INCREASE'],
+    linkedRisks: [{system:'endocrine',direction:'up',strength:0.1}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['tongkat_ali','maca'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  boron: {
+    targetSystems: ['endocrine','musculoskeletal'],
+    targetMechanisms: ['SHBG_REDUCTION','TESTOSTERONE_BOOST','BONE_HEALTH','VITAMIN_D_METABOLISM'],
+    linkedRisks: [{system:'endocrine',direction:'up',strength:0.2}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['zinc','selenium'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Не превышать допустимый уровень'],
+  },
+  collagen_hydrolyzed: {
+    targetSystems: ['musculoskeletal','skin'],
+    targetMechanisms: ['COLLAGEN_SYNTHESIS','JOINT_HEALTH','SKIN_ELASTICITY','TENDON_STRENGTH'],
+    linkedRisks: [],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['collagen','msm'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОК'],
+    restrictions: ['Принимать с витамином C', 'Гидролизованный лучше усваивается'],
+  },
+  coq10_ubiquinol: {
+    targetSystems: ['cardio','renal','hepatic'],
+    targetMechanisms: ['ELECTRON_TRANSPORT_CHAIN','ANTIOXIDANT','ATP_PRODUCTION','MEMBRANE_STABILIZATION'],
+    linkedRisks: [{system:'cardio',direction:'down',strength:0.3}],
+    cvProfile: {bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['coq10','alpha_lipoic'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ADDITIONAL UNIQUE SUPPLEMENTS (not in core/standard above)
+  // ═══════════════════════════════════════════════════════════════════
+
+  arginine: {
+    targetSystems:['cardio','vessels'], targetMechanisms:['NO_SYNTHESIS','VASODILATION','BLOOD_FLOW'], linkedRisks:[{system:'cardio',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['citrulline','agmatine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  citrulline: {
+    targetSystems:['cardio','vessels'], targetMechanisms:['NO_BOOST','ARGININE_CONVERSION','VASODILATION'], linkedRisks:[{system:'cardio',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['arginine','agmatine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  agmatine: {
+    targetSystems:['cardio','neuro'], targetMechanisms:['NO_BOOST','NMDA_BLOCK','MOOD_ENHANCEMENT'], linkedRisks:[{system:'cardio',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['arginine','citrulline'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  methionine: {
+    targetSystems:['hepatic','neuro'], targetMechanisms:['METHYLATION','SAM_PRECURSOR','LIPID_METABOLISM'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['betaine','choline'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  lysine: {
+    targetSystems:['immunity','skin'], targetMechanisms:['COLLAGEN_CROSS_LINKING','IMMUNE_SUPPORT','HERPES_PREVENTION'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['proline','vitamin_c'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  proline: {
+    targetSystems:['skin','musculoskeletal'], targetMechanisms:['COLLAGEN_SYNTHESIS','WOUND_HEALING','JOINT_HEALTH'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['lysine','glycine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  serine: {
+    targetSystems:['neuro'], targetMechanisms:['SPHINGOLIPID_SYNTHESIS','NEUROPROTECTION','MEMBRANE_FLUIDITY'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['glycine','theanine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  threonine: {
+    targetSystems:['skin','musculoskeletal'], targetMechanisms:['COLLAGEN_SYNTHESIS','ELASTIN_FORMATION','IMMUNE_FUNCTION'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['lysine','proline'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  histidine: {
+    targetSystems:['immunity','neuro'], targetMechanisms:['HISTAMINE_PRECURSOR','IMMUNE_RESPONSE','TISSUE_REPAIR'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['beta_alanine','carnosine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  alanine: {
+    targetSystems:['musculoskeletal','metabolic'], targetMechanisms:['GLUCOSE_ALANINE_CYCLE','ENERGY_METABOLISM','GLUCONEOGENESIS'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['glutamine','glycine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  aspartate: {
+    targetSystems:['neuro','metabolic'], targetMechanisms:['NMDA_AGONIST','ENERGY_METABOLISM','UREA_CYCLE'], linkedRisks:[{system:'neuro',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'medium'}, analog:['glutamate','theanine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  ornithine: {
+    targetSystems:['metabolic','hepatic'], targetMechanisms:['UREA_CYCLE','AMMONIA_DETOX','GH_RELEASE'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['arginine','citrulline'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  cysteine: {
+    targetSystems:['hepatic','neuro'], targetMechanisms:['GLUTATHIONE_PRECURSOR','ANTIOXIDANT','DETOXIFICATION'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['nac','methionine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  lions_mane: {
+    targetSystems:['neuro'], targetMechanisms:['NGF_STIMULATION','NEUROGENESIS','COGNITIVE_ENHANCEMENT','NERVE_REPAIR'], linkedRisks:[{system:'neuro',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['bacopa','noopept'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'Пролактин'],
+    restrictions: ['Не сочетать с MAO-ингибиторами', 'Циклировать 4-8 нед', 'Оценка переносимости'],
+  },
+  bacopa: {
+    targetSystems:['neuro'], targetMechanisms:['MEMORY_ENHANCEMENT','ANTIOXIDANT','ACETYLCHOLINE_MODULATION','ANXIOLYTIC'], linkedRisks:[{system:'neuro',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['lions_mane','ginkgo'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'Пролактин'],
+    restrictions: ['Не сочетать с MAO-ингибиторами', 'Циклировать 4-8 нед', 'Оценка переносимости'],
+  },
+  ginkgo: {
+    targetSystems:['neuro','vessels'], targetMechanisms:['BLOOD_FLOW_INCREASE','COGNITIVE_ENHANCEMENT','ANTIOXIDANT','PLATELET_INHIBITION'], linkedRisks:[{system:'neuro',direction:'down',strength:0.1},{system:'vessels',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'medium',cnsLoad:'low'}, analog:['bacopa','vinpocetine'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'Пролактин'],
+    restrictions: ['Не сочетать с MAO-ингибиторами', 'Циклировать 4-8 нед', 'Оценка переносимости'],
+  },
+  vinpocetine: {
+    targetSystems:['neuro','vessels'], targetMechanisms:['CEREBRAL_BLOOD_FLOW','VASODILATION','COGNITIVE_ENHANCEMENT'], linkedRisks:[{system:'neuro',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['ginkgo','bacopa'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'Пролактин'],
+    restrictions: ['Не сочетать с MAO-ингибиторами', 'Циклировать 4-8 нед', 'Оценка переносимости'],
+  },
+  noopept: {
+    targetSystems:['neuro'], targetMechanisms:['NMDA_MODULATION','BDNF_INCREASE','COGNITIVE_ENHANCEMENT','MEMORY_FORMATION'], linkedRisks:[{system:'neuro',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['piracetam','lions_mane'],
+    maxUsageWeeks: 24,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Циклировать 4 нед / 1 нед перерыв', 'Может вызывать головную боль', 'Принимать с холином'],
+  },
+  piracetam: {
+    targetSystems:['neuro'], targetMechanisms:['ACETYLCHOLINE_MODULATION','MEMORY_ENHANCEMENT','NEUROPLASTICITY'], linkedRisks:[{system:'neuro',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['noopept','aniracetam'],
+    maxUsageWeeks: 24,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Циклировать 4 нед / 1 нед перерыв', 'Может вызывать головную боль', 'Принимать с холином'],
+  },
+  aniracetam: {
+    targetSystems:['neuro'], targetMechanisms:['AMPA_MODULATION','COGNITIVE_ENHANCEMENT','ANXIOLYTIC'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['piracetam','noopept'],
+    maxUsageWeeks: 24,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Циклировать 4 нед / 1 нед перерыв', 'Может вызывать головную боль', 'Принимать с холином'],
+  },
+  oxiracetam: {
+    targetSystems:['neuro'], targetMechanisms:['AMPA_MODULATION','MEMORY_ENHANCEMENT','FOCUS'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'medium'}, analog:['piracetam','aniracetam'],
+    maxUsageWeeks: 24,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Циклировать 4 нед / 1 нед перерыв', 'Может вызывать головную боль', 'Принимать с холином'],
+  },
+  pramiracetam: {
+    targetSystems:['neuro'], targetMechanisms:['CHOLINE_UPTAKE','MEMORY_FORMATION','FOCUS'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'medium'}, analog:['piracetam','oxiracetam'],
+    maxUsageWeeks: 24,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Циклировать 4 нед / 1 нед перерыв', 'Может вызывать головную боль', 'Принимать с холином'],
+  },
+  citicoline: {
+    targetSystems:['neuro'], targetMechanisms:['ACETYLCHOLINE_PRECURSOR','MEMBRANE_SYNTHESIS','COGNITIVE_ENHANCEMENT'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['alpha_gpc','phosphatidylcholine'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  alpha_gpc: {
+    targetSystems:['neuro'], targetMechanisms:['ACETYLCHOLINE_PRECURSOR','GH_RELEASE','COGNITIVE_ENHANCEMENT'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['citicoline','phosphatidylcholine'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  phosphatidylserine: {
+    targetSystems:['neuro','endocrine'], targetMechanisms:['CORTISOL_REDUCTION','MEMBRANE_FLUIDITY','COGNITIVE_ENHANCEMENT'], linkedRisks:[{system:'neuro',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['phosphatidylcholine','ashwagandha'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  huperzine_a: {
+    targetSystems:['neuro'], targetMechanisms:['ACHE_INHIBITION','ACETYLCHOLINE_UP','MEMORY_ENHANCEMENT'], linkedRisks:[{system:'neuro',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['citicoline','alpha_gpc'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'Пролактин'],
+    restrictions: ['Не сочетать с MAO-ингибиторами', 'Циклировать 4-8 нед', 'Оценка переносимости'],
+  },
+  semax: {
+    targetSystems:['neuro'], targetMechanisms:['BDNF_INCREASE','COGNITIVE_ENHANCEMENT','NEUROPROTECTION'], linkedRisks:[{system:'neuro',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['lions_mane','noopept'],
+    maxUsageWeeks: 12,
+    labMarkers: ['ОАК', 'IgE'],
+    restrictions: ['Оценка IgE перед началом', 'Хранить в холодильнике', 'Курс 4-8 нед'],
+  },
+  selank: {
+    targetSystems:['neuro'], targetMechanisms:['GABA_MODULATION','ANXIOLYTIC','COGNITIVE_ENHANCEMENT'], linkedRisks:[{system:'neuro',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['semax','theanine'],
+    maxUsageWeeks: 12,
+    labMarkers: ['ОАК', 'IgE'],
+    restrictions: ['Оценка IgE перед началом', 'Хранить в холодильнике', 'Курс 4-8 нед'],
+  },
+  bpc157: {
+    targetSystems:['musculoskeletal','neuro','hepatic'], targetMechanisms:['TISSUE_REPAIR','ANGIOGENESIS','GASTROPROTECTION','TENDON_HEALING'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['tb500','ghk_cu'],
+    maxUsageWeeks: 12,
+    labMarkers: ['ОАК', 'IgE'],
+    restrictions: ['Оценка IgE перед началом', 'Хранить в холодильнике', 'Курс 4-8 нед'],
+  },
+  tb500: {
+    targetSystems:['musculoskeletal'], targetMechanisms:['ACTIN_POLYMERIZATION','TISSUE_REPAIR','WOUND_HEALING'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['bpc157','ghk_cu'],
+    maxUsageWeeks: 12,
+    labMarkers: ['ОАК', 'IgE'],
+    restrictions: ['Оценка IgE перед началом', 'Хранить в холодильнике', 'Курс 4-8 нед'],
+  },
+  ghk_cu: {
+    targetSystems:['skin','musculoskeletal'], targetMechanisms:['COPPER_PEPTIDE','COLLAGEN_SYNTHESIS','WOUND_HEALING','SKIN_REPAIR'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['bpc157','collagen'],
+    maxUsageWeeks: 12,
+    labMarkers: ['ОАК', 'IgE'],
+    restrictions: ['Оценка IgE перед началом', 'Хранить в холодильнике', 'Курс 4-8 нед'],
+  },
+  'ss-31': { targetSystems:['cardio','neuro','mitochondrial'], targetMechanisms:['MITOCHONDRIAL_PROTECTION','CARDIOLIPIN_STABILIZATION','ROS_REDUCTION'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['mots_c','coq10'] },
+  mots_c: {
+    targetSystems:['metabolic','mitochondrial'], targetMechanisms:['AMPK_ACTIVATION','MITOCHONDRIAL_FUNCTION','INSULIN_SENSITIVITY'], linkedRisks:[{system:'metabolic',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['ss31','coq10'],
+    maxUsageWeeks: 12,
+    labMarkers: ['ОАК', 'IgE'],
+    restrictions: ['Оценка IgE перед началом', 'Хранить в холодильнике', 'Курс 4-8 нед'],
+  },
+  d_aspartic_acid: {
+    targetSystems:['endocrine','reproductive'], targetMechanisms:['LH_STIMULATION','TESTOSTERONE_BOOST','FERTILITY'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['zinc','boron'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  dhea: {
+    targetSystems:['endocrine','neuro'], targetMechanisms:['ANDROGEN_PRECURSOR','NEUROSTEROID','IMMUNE_MODULATION','COGNITIVE_ENHANCEMENT'], linkedRisks:[{system:'endocrine',direction:'up',strength:0.2},{system:'reproductive',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['pregnenolone','testosterone'],
+    maxUsageWeeks: 12,
+    labMarkers: ['Тестостерон', 'Е2', 'ЛГ', 'ФСГ', 'Пролактин'],
+    restrictions: ['Контроль гормонов каждые 4-6 нед', 'Не превышать физиологические дозы'],
+  },
+  pregnenolone: {
+    targetSystems:['endocrine','neuro'], targetMechanisms:['NEUROSTEROID_PRECURSOR','HORMONAL_BALANCE','COGNITIVE_ENHANCEMENT'], linkedRisks:[{system:'endocrine',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['dhea','pregnenolone'],
+    maxUsageWeeks: 12,
+    labMarkers: ['Тестостерон', 'Е2', 'ЛГ', 'ФСГ', 'Пролактин'],
+    restrictions: ['Контроль гормонов каждые 4-6 нед', 'Не превышать физиологические дозы'],
+  },
+  egcg: {
+    targetSystems:['cardio','metabolic','neuro'], targetMechanisms:['ANTIOXIDANT','FAT_OXIDATION','THERMOGENESIS','CATECHIN_ACTIVITY'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['quercetin','curcumin'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  fisetin: {
+    targetSystems:['cardio','neuro'], targetMechanisms:['SENOLYTIC','ANTIOXIDANT','ANTIINFLAMMATORY','COGNITIVE_ENHANCEMENT'], linkedRisks:[{system:'cardio',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['quercetin','resveratrol'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  sulforaphane: {
+    targetSystems:['hepatic','neuro','cardio'], targetMechanisms:['NRF2_ACTIVATION','ANTIOXIDANT','DETOXIFICATION','PHASE2_ENZYME_INDUCTION'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2},{system:'hepatic',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['curcumin','alpha_lipoic'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  grape_seed_extract: {
+    targetSystems:['cardio','vessels','skin'], targetMechanisms:['OLIGOMERIC_PROANTHOCYANIDINS','ANTIOXIDANT','COLLAGEN_PROTECTION','VENOUS_TONIC'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['pycnogenol','pine_bark'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  pycnogenol: {
+    targetSystems:['cardio','vessels','skin'], targetMechanisms:['PINE_BARK_EXTRACT','ANTIOXIDANT','COLLAGEN_PROTECTION','CIRCULATION'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['grape_seed_extract','pine_bark'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  pomegranate: {
+    targetSystems:['cardio','vessels'], targetMechanisms:['PUNICALAGIN','ANTIOXIDANT','NO_BOOST','CARDIO_PROTECTION','TESTOSTERONE_SUPPORT'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['grape_seed_extract','beetroot'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  nattokinase: {
+    targetSystems:['cardio','blood'], targetMechanisms:['FIBRINOLYTIC','BLOOD_THINNING','BP_REDUCTION','THROMBUS_PREVENTION'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2},{system:'blood',direction:'down',strength:0.3}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['aspirin','omega3'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  astragalus: {
+    targetSystems:['immunity','renal','cardio'], targetMechanisms:['IMMUNE_STIMULATION','TELOMERASE_ACTIVATION','ANTIOXIDANT','CARDIOPROTECTION','RENOPROTECTION'], linkedRisks:[{system:'immunity',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['echinacea','astragalus'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  cordyceps: {
+    targetSystems:['renal','immunity','musculoskeletal'], targetMechanisms:['ATP_PRODUCTION','OXYGEN_UTILIZATION','ENDURANCE','IMMUNE_MODULATION','KIDNEY_FUNCTION'], linkedRisks:[{system:'renal',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['reishi','shiitake'],
+    maxUsageWeeks: 24,
+    labMarkers: ['ОАК', 'IgE'],
+    restrictions: ['Оценка IgE перед приёмом', 'Начинать с малых доз', 'Не при аутоиммунных'],
+  },
+  reishi: {
+    targetSystems:['immunity','neuro','endocrine'], targetMechanisms:['IMMUNE_MODULATION','ADAPTOGENIC','ANTIOXIDANT','SLEEP_PROMOTION'], linkedRisks:[{system:'immunity',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['cordyceps','ashwagandha'],
+    maxUsageWeeks: 24,
+    labMarkers: ['ОАК', 'IgE'],
+    restrictions: ['Оценка IgE перед приёмом', 'Начинать с малых доз', 'Не при аутоиммунных'],
+  },
+  shiitake: {
+    targetSystems:['immunity','cardio'], targetMechanisms:['LENTINAN','BETA_GLUCAN','IMMUNE_STIMULATION','CHOLESTEROL_LOWERING'], linkedRisks:[{system:'immunity',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['reishi','cordyceps'],
+    maxUsageWeeks: 24,
+    labMarkers: ['ОАК', 'IgE'],
+    restrictions: ['Оценка IgE перед приёмом', 'Начинать с малых доз', 'Не при аутоиммунных'],
+  },
+  maitake: {
+    targetSystems:['immunity','metabolic'], targetMechanisms:['BETA_GLUCAN','IMMUNE_STIMULATION','BLOOD_SUGAR_CONTROL'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['reishi','cordyceps'],
+    maxUsageWeeks: 24,
+    labMarkers: ['ОАК', 'IgE'],
+    restrictions: ['Оценка IgE перед приёмом', 'Начинать с малых доз', 'Не при аутоиммунных'],
+  },
+  chaga: {
+    targetSystems:['immunity','hepatic'], targetMechanisms:['BETULINIC_ACID','ANTIOXIDANT','IMMUNE_MODULATION','GUT_HEALTH'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['reishi','cordyceps'],
+    maxUsageWeeks: 24,
+    labMarkers: ['ОАК', 'IgE'],
+    restrictions: ['Оценка IgE перед приёмом', 'Начинать с малых доз', 'Не при аутоиммунных'],
+  },
+  betaine: {
+    targetSystems:['hepatic','neuro','cardio'], targetMechanisms:['METHYL_DONATION','HOMOCYSTEINE_LOWERING','LIVER_PROTECTION'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['trimethylglycine','folate'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  mct: {
+    targetSystems:['metabolic','neuro'], targetMechanisms:['KETONE_PRODUCTION','ENERGY_SOURCE','COGNITIVE_ENHANCEMENT','WEIGHT_MANAGEMENT'], linkedRisks:[{system:'metabolic',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['coconut_oil','bhb_salts'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  ecdysterone: {
+    targetSystems:['musculoskeletal'], targetMechanisms:['PHYTOSECDYSTEROID','PROTEIN_SYNTHESIS','STRENGTH_INCREASE','ESTROGEN_RECEPTOR_BETA'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['creatine','bcaa'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  ursolic_acid: {
+    targetSystems:['musculoskeletal','metabolic'], targetMechanisms:['PROTEIN_SYNTHESIS','FAT_LOSS','MUSCLE_PRESERVATION','AMPK_ACTIVATION'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['ecdysterone','creatine'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  olive_extract: {
+    targetSystems:['cardio','metabolic'], targetMechanisms:['HYDROXYTYROSOL','ANTIOXIDANT','BP_REDUCTION','LIPID_LOWERING'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['omega3','grape_seed_extract'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  artichoke: {
+    targetSystems:['hepatic','cardio'], targetMechanisms:['CYNARIN','BILE_STIMULATION','CHOLESTEROL_LOWERING','LIVER_PROTECTION'], linkedRisks:[{system:'hepatic',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['milk_thistle','gentian'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  schisandra: {
+    targetSystems:['hepatic','neuro','endocrine'], targetMechanisms:['ADAPTOGENIC','LIVER_PROTECTION','COGNITIVE_ENHANCEMENT','STRESS_RESILIENCE'], linkedRisks:[{system:'hepatic',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['ashwagandha','rhodiola'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'ТТГ', 'Глюкоза'],
+    restrictions: ['Циклировать 8 нед приём / 2 нед перерыв', 'Не при аутоиммунных заболеваниях'],
+  },
+  magnolia: {
+    targetSystems:['neuro','gut'], targetMechanisms:['ANXIOLYTIC','HONOKIOL','MAGNOLOL','SLEEP_PROMOTION'], linkedRisks:[{system:'neuro',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['ashwagandha','lemon_balm'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'ТТГ', 'Глюкоза'],
+    restrictions: ['Циклировать 8 нед приём / 2 нед перерыв', 'Не при аутоиммунных заболеваниях'],
+  },
+  lemon_balm: {
+    targetSystems:['neuro','gut'], targetMechanisms:['ANXIOLYTIC','GABA_MODULATION','SLEEP_PROMOTION','DIGESTIVE_RELIEF'], linkedRisks:[{system:'neuro',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['magnolia','ashwagandha'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'ТТГ', 'Глюкоза'],
+    restrictions: ['Циклировать 8 нед приём / 2 нед перерыв', 'Не при аутоиммунных заболеваниях'],
+  },
+  rosemary: {
+    targetSystems:['neuro','immunity'], targetMechanisms:['ROSEMARINIC_ACID','COGNITIVE_ENHANCEMENT','ANTIOXIDANT','CIRCULATION'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['ginkgo','bacopa'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  saffron: {
+    targetSystems:['neuro','endocrine'], targetMechanisms:['CROCIN','SAFRANAL','MOOD_ENHANCEMENT','ANTIOXIDANT','LIBIDO'], linkedRisks:[{system:'neuro',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['ashwagandha','rhodiola'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'ТТГ', 'Глюкоза'],
+    restrictions: ['Циклировать 8 нед приём / 2 нед перерыв', 'Не при аутоиммунных заболеваниях'],
+  },
+  cranberry: {
+    targetSystems:['renal','immunity'], targetMechanisms:['PROANTHOCYANIDINS','UTI_PREVENTION','ANTIOXIDANT','BACTERIAL_ADHESION_INHIBITION'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['d_mannose','vitamin_c'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  butyrate: {
+    targetSystems:['gut','immunity','metabolic'], targetMechanisms:['SCFA','GUT_HEALTH','INFLAMMATION_CONTROL','INSULIN_SENSITIVITY','HDAC_INHIBITION'], linkedRisks:[{system:'gut',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['probiotics','prebiotics'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  ahcc: {
+    targetSystems:['immunity'], targetMechanisms:['NK_CELL_ACTIVATION','IMMUNE_STIMULATION','ANTIVIRAL'], linkedRisks:[{system:'immunity',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['beta_glucan','reishi'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  andrographis: {
+    targetSystems:['immunity','hepatic'], targetMechanisms:['ANTIINFLAMMATORY','IMMUNE_STIMULATION','LIVER_PROTECTION'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['echinacea','goldenseal'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  colostrum: {
+    targetSystems:['immunity','gut'], targetMechanisms:['IGF1_PRECURSOR','IMMUNE_FACTORS','GUT_HEALING','PROLINE_RICH_PEPTIDE'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['probiotics','beta_glucan'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  beta_glucan: {
+    targetSystems:['immunity'], targetMechanisms:['IMMUNE_STIMULATION','MACROPHAGE_ACTIVATION','NEUTROPHIL_ACTIVITY'], linkedRisks:[{system:'immunity',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['probiotics','colostrum'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  digestive_enzymes: {
+    targetSystems:['hepatic','gut'], targetMechanisms:['PROTEOLYSIS','LIPOLYSIS','AMYLOLYSIS','NUTRIENT_ABSORPTION'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['probiotics','betaine_hcl'],
+    maxUsageWeeks: 12,
+    labMarkers: ['ОАК'],
+    restrictions: ['Принимать натощак', 'Курс 4-8 нед'],
+  },
+  cla: {
+    targetSystems:['metabolic','immunity'], targetMechanisms:['FAT_OXIDATION','LIPOLYSIS','IMMUNE_MODULATION','BODY_COMPOSITION'], linkedRisks:[{system:'metabolic',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['omega3','conjugated_linoleic'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  leucine: {
+    targetSystems:['musculoskeletal','metabolic'], targetMechanisms:['MPS_STIMULATION','MTOR_ACTIVATION','PROTEIN_SYNTHESIS','INSULIN_RELEASE'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['bcaa','hmb'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  isoleucine: {
+    targetSystems:['musculoskeletal'], targetMechanisms:['BCAA_METABOLISM','ENERGY_PRODUCTION','GLUCOSE_UPTAKE','MUSCLE_REPAIR'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['leucine','valine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  valine: {
+    targetSystems:['musculoskeletal'], targetMechanisms:['BCAA_METABOLISM','ENERGY_PRODUCTION','MUSCLE_REPAIR','NITROGEN_BALANCE'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['leucine','isoleucine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  glutamic_acid: {
+    targetSystems:['neuro','metabolic'], targetMechanisms:['EXCITATORY_NEUROTRANSMITTER','METABOLISM','AMMONIA_DETOX'], linkedRisks:[{system:'neuro',direction:'up',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'medium'}, analog:['glutamine','gaba'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  nopal: {
+    targetSystems:['metabolic','hepatic'], targetMechanisms:['FIBER_SOURCE','BLOOD_SUGAR_CONTROL','LIPID_LOWERING','LIVER_PROTECTION'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['psyllium','glucomannan'],
+    maxUsageWeeks: 104,
+    labMarkers: ['Глюкоза', 'ЛПНП', 'ТГ'],
+    restrictions: ['Увеличивать дозу постепенно', 'Пить достаточно воды'],
+  },
+  glucomannan: {
+    targetSystems:['metabolic','cardio'], targetMechanisms:['SOLUBLE_FIBER','WEIGHT_MANAGEMENT','CHOLESTEROL_LOWERING','SATIETY'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['psyllium','nopal'],
+    maxUsageWeeks: 104,
+    labMarkers: ['Глюкоза', 'ЛПНП', 'ТГ'],
+    restrictions: ['Увеличивать дозу постепенно', 'Пить достаточно воды'],
+  },
+  psyllium: {
+    targetSystems:['cardio','metabolic'], targetMechanisms:['SOLUBLE_FIBER','CHOLESTEROL_LOWERING','BLOOD_SUGAR_CONTROL'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['glucomannan','nopal'],
+    maxUsageWeeks: 104,
+    labMarkers: ['Глюкоза', 'ЛПНП', 'ТГ'],
+    restrictions: ['Увеличивать дозу постепенно', 'Пить достаточно воды'],
+  },
+  acetyl_l_carnitine: {
+    targetSystems:['cardio','neuro','metabolic'], targetMechanisms:['MITOCHONDRIAL_FUNCTION','ACETYL_TRANSPORT','ENERGY','COGNITIVE_ENHANCEMENT'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['l_carnitine','alpha_lipoic'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  eaa: {
+    targetSystems:['musculoskeletal'], targetMechanisms:['MPS_STIMULATION','COMPLETE_PROTEIN_SYNTHESIS'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['bcaa','whey_protein'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  apigenin: {
+    targetSystems:['neuro','cardio'], targetMechanisms:['ANXIOLYTIC','GABA_MODULATION','ANTIOXIDANT','ANTIINFLAMMATORY','BDNF_INCREASE'], linkedRisks:[{system:'neuro',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['theanine','magnesium'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  baicalin: {
+    targetSystems:['neuro','hepatic'], targetMechanisms:['ANTIOXIDANT','ANTIINFLAMMATORY','COGNITIVE_ENHANCEMENT','LIVER_PROTECTION','GABA_MODULATION'], linkedRisks:[{system:'hepatic',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['curcumin','quercetin'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  bromantane: {
+    targetSystems:['neuro'], targetMechanisms:['ANXIOLYTIC','STIMULATION','DOPAMINE_MODULATION','FATIGUE_REDUCTION','ADAPTOGENIC'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'medium'}, analog:['rhodiola','lions_mane'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'Пролактин'],
+    restrictions: ['Не сочетать с MAO-ингибиторами', 'Циклировать 4-8 нед', 'Оценка переносимости'],
+  },
+  biotin: {
+    targetSystems:['skin','hepatic','neuro'], targetMechanisms:['CARBOXYLASE_SUPPORT','SKIN_HEALTH','HAIR_GROWTH','NAIL_STRENGTH'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['vitamin_b5','zinc'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Жирорастворимые — риск гипервитаминоза', 'Контроль уровня при длительном приёме'],
+  },
+  carnosine: {
+    targetSystems:['musculoskeletal','neuro','cardio'], targetMechanisms:['CARNOSINE_SYNTHESIS','ANTIOXIDANT','ANTI_GLYCATION','BUFFER_CAPACITY'], linkedRisks:[{system:'cardio',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['beta_alanine','carnitine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  c60: {
+    targetSystems:['cardio','neuro','metabolic'], targetMechanisms:['ANTIOXIDANT','LONGEVITY','MITOCHONDRIAL_PROTECTION','ROS_SCAVENGING'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['coq10','astaxanthin'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  ceramides: {
+    targetSystems:['skin'], targetMechanisms:['SKIN_BARRIER','MOISTURE_RETENTION','SKIN_REPAIR','ANTIINFLAMMATORY'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['collagen','hyaluronic'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  cissus: {
+    targetSystems:['musculoskeletal'], targetMechanisms:['JOINT_HEALTH','ANTIINFLAMMATORY','BONE_DENSITY','ANALGESIC'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['curcumin','boswellia'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  citrus_bioflavonoids: {
+    targetSystems:['cardio','vessels','immunity'], targetMechanisms:['VITAMIN_C_SYNERGY','ANTIOXIDANT','VENOUS_TONIC','CAPILLARY_STRENGTH'], linkedRisks:[{system:'cardio',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['vitamin_c','grape_seed_extract'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  cocoa_flavanols: {
+    targetSystems:['cardio','neuro'], targetMechanisms:['FLAVANOL_ACTIVITY','NO_BOOST','BP_REDUCTION','COGNITIVE_ENHANCEMENT','ANTIOXIDANT'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['grape_seed_extract','green_tea'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  coluracetam: {
+    targetSystems:['neuro'], targetMechanisms:['CHOLINE_UPTAKE','COGNITIVE_ENHANCEMENT','MEMORY','FOCUS'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['piracetam','citicoline'],
+    maxUsageWeeks: 24,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Циклировать 4 нед / 1 нед перерыв', 'Может вызывать головную боль', 'Принимать с холином'],
+  },
+  dsip: {
+    targetSystems:['neuro'], targetMechanisms:['SLEEP_INDUCTION','DELTA_SLEEP','CORTISOL_REDUCTION','MELATONIN_SYNERGY'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['melatonin','magnesium'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  elastin: {
+    targetSystems:['skin','vessels'], targetMechanisms:['ELASTICITY','SKIN_FIRMNESS','VASCULAR_ELASTICITY','TISSUE_REPAIR'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['collagen','hyaluronic'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОК'],
+    restrictions: ['Принимать с витамином C', 'Гидролизованный лучше усваивается'],
+  },
+  ellagic_acid: {
+    targetSystems:['cardio','skin'], targetMechanisms:['ANTIOXIDANT','CHEMOPROTECTION','SKIN_PROTECTION','ANTIINFLAMMATORY'], linkedRisks:[{system:'cardio',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['quercetin','resveratrol'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  fasoracetam: {
+    targetSystems:['neuro'], targetMechanisms:['GABA_MODULATION','COGNITIVE_ENHANCEMENT','MEMORY','FOCUS','ANXIOLYTIC'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['aniracetam','noopept'],
+    maxUsageWeeks: 24,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Циклировать 4 нед / 1 нед перерыв', 'Может вызывать головную боль', 'Принимать с холином'],
+  },
+  fiber: {
+    targetSystems:['metabolic','cardio','gut'], targetMechanisms:['SOLUBLE_FIBER','CHOLESTEROL_LOWERING','BLOOD_SUGAR_CONTROL','REGULARITY','SATIETY'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['psyllium','glucomannan'],
+    maxUsageWeeks: 104,
+    labMarkers: ['Глюкоза', 'ЛПНП', 'ТГ'],
+    restrictions: ['Увеличивать дозу постепенно', 'Пить достаточно воды'],
+  },
+  flavonoids: {
+    targetSystems:['cardio','neuro','vessels'], targetMechanisms:['ANTIOXIDANT','ANTIINFLAMMATORY','VASODILATION','COGNITIVE_ENHANCEMENT'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['quercetin','citrus_bioflavonoids'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  glutathione: {
+    targetSystems:['hepatic','neuro','immunity'], targetMechanisms:['MASTER_ANTIOXIDANT','DETOXIFICATION','IMMUNE_FUNCTION','MITOCHONDRIAL_SUPPORT'], linkedRisks:[{system:'hepatic',direction:'down',strength:0.3},{system:'neuro',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['nac','alpha_lipoic'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  gotu_kola: {
+    targetSystems:['neuro','skin','vessels'], targetMechanisms:['COGNITIVE_ENHANCEMENT','VENOUS_TONIC','WOUND_HEALING','ANXIOLYTIC','COLLAGEN_STIMULATION'], linkedRisks:[{system:'vessels',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['ginkgo','bacopa'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'ТТГ', 'Глюкоза'],
+    restrictions: ['Циклировать 8 нед приём / 2 нед перерыв', 'Не при аутоиммунных заболеваниях'],
+  },
+  hmo_prebiotics: {
+    targetSystems:['gut','immunity'], targetMechanisms:['PREBIOTIC','BIFIDOBACTERIUM_FEEDING','IMMUNE_MODULATION','GUT_BARRIER'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['prebiotics','probiotics'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК'],
+    restrictions: ['Хранить в холодильнике', 'Принимать натощак', 'Интервал 2ч с антибиотиками'],
+  },
+  l_dopa: {
+    targetSystems:['neuro','endocrine'], targetMechanisms:['DOPAMINE_PRECURSOR','PROLACTIN_REDUCTION','GH_RELEASE','MOOD_ENHANCEMENT'], linkedRisks:[{system:'neuro',direction:'up',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'medium'}, analog:['tyrosine','mucuna'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'ТТГ', 'Глюкоза'],
+    restrictions: ['Циклировать 8 нед приём / 2 нед перерыв', 'Не при аутоиммунных заболеваниях'],
+  },
+  licorice: {
+    targetSystems:['endocrine','hepatic','immunity'], targetMechanisms:['GLYCRRHIZIN','CORTISOL_MODULATION','ANTIINFLAMMATORY','LIVER_PROTECTION','EXPECTORANT'], linkedRisks:[{system:'endocrine',direction:'up',strength:0.2},{system:'cardio',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'up',heartRate:'neutral',vascularTone:'constrict',thrombosisRisk:'low',cnsLoad:'low'}, analog:['ashwagandha','rhodiola'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  manganese: {
+    targetSystems:['musculoskeletal','neuro','metabolic'], targetMechanisms:['BONE_FORMATION','ANTIOXIDANT','GLUCOSE_METABOLISM','COFACTOR_SOD'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['zinc','magnesium'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Не превышать допустимый уровень'],
+  },
+  mangosteen: {
+    targetSystems:['immunity','cardio','skin'], targetMechanisms:['XANTHONES','ANTIOXIDANT','ANTIINFLAMMATORY','IMMUNE_STIMULATION','SKIN_PROTECTION'], linkedRisks:[{system:'cardio',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['resveratrol','quercetin'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  memantine: {
+    targetSystems:['neuro'], targetMechanisms:['NMDA_ANTAGONISM','COGNITIVE_ENHANCEMENT','NEUROPROTECTION','MEMORY'], linkedRisks:[{system:'neuro',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['noopept','piracetam'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  molybdenum: {
+    targetSystems:['hepatic','metabolic'], targetMechanisms:['COFACTOR_SULFITE_OXIDASE','URIC_ACID_METABOLISM','DETOXIFICATION','ENZYME_COFACTOR'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['selenium','chromium'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Не превышать допустимый уровень'],
+  },
+  neurosteroid: {
+    targetSystems:['neuro','endocrine'], targetMechanisms:['GABA_MODULATION','NEUROSTEROID_ACTIVITY','ANXIOLYTIC','COGNITIVE'], linkedRisks:[{system:'neuro',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['pregnenolone','dhea'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'ТТГ', 'Глюкоза'],
+    restrictions: ['Циклировать 8 нед приём / 2 нед перерыв', 'Не при аутоиммунных заболеваниях'],
+  },
+  nobiletin: {
+    targetSystems:['cardio','neuro','metabolic'], targetMechanisms:['ANTIOXIDANT','COGNITIVE_ENHANCEMENT','ANTIINFLAMMATORY','AMPK_ACTIVATION','NEUROPROTECTION'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['resveratrol','quercetin'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  oxytocin: {
+    targetSystems:['neuro','endocrine'], targetMechanisms:['SOCIAL_BONDING','STRESS_REDUCTION','PAIN_MODULATION','TRUST_AND_EMPATHY'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['pregnenolone','dhea'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  p21: {
+    targetSystems:['neuro','cardio','mitochondrial'], targetMechanisms:['MITOCHONDRIAL_FUNCTION','LONGEVITY','CELLULAR_REPAIR','ANTIOXIDANT'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['ss31','mots_c'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  pectin: {
+    targetSystems:['metabolic','gut'], targetMechanisms:['SOLUBLE_FIBER','CHOLESTEROL_LOWERING','BLOOD_SUGAR_CONTROL','PREBIOTIC'], linkedRisks:[{system:'cardio',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['psyllium','glucomannan'],
+    maxUsageWeeks: 104,
+    labMarkers: ['Глюкоза', 'ЛПНП', 'ТГ'],
+    restrictions: ['Увеличивать дозу постепенно', 'Пить достаточно воды'],
+  },
+  phenibut: {
+    targetSystems:['neuro'], targetMechanisms:['GABA_B_AGONIST','ANXIOLYTIC','SLEEP_PROMOTION','COGNITIVE_ENHANCEMENT'], linkedRisks:[{system:'neuro',direction:'up',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'medium'}, analog:['gaba','theanine'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  phosphorus: {
+    targetSystems:['musculoskeletal','metabolic'], targetMechanisms:['BONE_MINERALIZATION','ATP_SYNTHESIS','PHOSPHOLIPID_FORMATION','PH_BUFFERING'], linkedRisks:[{system:'renal',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['calcium','magnesium'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Не превышать допустимый уровень'],
+  },
+  polyphenol_complex: {
+    targetSystems:['cardio','neuro','immunity'], targetMechanisms:['POLYPHENOL_ACTIVITY','ANTIOXIDANT','ANTIINFLAMMATORY','COGNITIVE_ENHANCEMENT','CARDIO_PROTECTION'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['resveratrol','quercetin'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  pt141: {
+    targetSystems:['neuro','endocrine'], targetMechanisms:['MELANOCORTIN_AGONIST','LIBIDO_ENHANCEMENT','MOOD_ELEVATION','APPETITE_SUPPRESSION'], linkedRisks:[{system:'cardio',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'up',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['melanotan2','oxytocin'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  resistant_starch: {
+    targetSystems:['gut','metabolic'], targetMechanisms:['PREBIOTIC','SCFA_PRODUCTION','BLOOD_SUGAR_CONTROL','INSULIN_SENSITIVITY','GUT_HEALTH'], linkedRisks:[{system:'metabolic',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['prebiotics','fiber'],
+    maxUsageWeeks: 104,
+    labMarkers: ['Глюкоза', 'ЛПНП', 'ТГ'],
+    restrictions: ['Увеличивать дозу постепенно', 'Пить достаточно воды'],
+  },
+  s_adenosyl_methionine: {
+    targetSystems:['neuro','hepatic'], targetMechanisms:['METHYL_DONATION','MOOD_ENHANCEMENT','LIVER_DETOX','JOINT_HEALTH'], linkedRisks:[{system:'neuro',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['folate','vitamin_b12'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  selegiline: {
+    targetSystems:['neuro'], targetMechanisms:['MAOB_INHIBITION','DOPAMINE_UP','NEUROPROTECTION','COGNITIVE_ENHANCEMENT'], linkedRisks:[{system:'cardio',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'up',heartRate:'up',vascularTone:'constrict',thrombosisRisk:'low',cnsLoad:'medium'}, analog:['deprenyl','rasagiline'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  silicon: {
+    targetSystems:['skin','musculoskeletal','vessels'], targetMechanisms:['COLLAGEN_SYNTHESIS','BONE_DENSITY','SKIN_ELASTICITY','VASCULAR_HEALTH'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['silica','collagen'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Не превышать допустимый уровень'],
+  },
+  sodium: {
+    targetSystems:['cardio','renal','musculoskeletal'], targetMechanisms:['ELECTROLYTE_BALANCE','NERVE_CONDUCTION','MUSCLE_CONTRACTION','HYDRATION'], linkedRisks:[{system:'cardio',direction:'up',strength:0.2},{system:'renal',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'up',heartRate:'neutral',vascularTone:'constrict',thrombosisRisk:'low',cnsLoad:'low'}, analog:['potassium','magnesium'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  soy_isoflavones: {
+    targetSystems:['endocrine','cardio','prostate'], targetMechanisms:['PHYTOESTROGEN','ANTIOXIDANT','CHOLESTEROL_LOWERING','BONE_HEALTH'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['red_clover','dhea'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  strontium: {
+    targetSystems:['musculoskeletal'], targetMechanisms:['BONE_DENSITY','OSTEOBLAST_STIMULATION','CALCIUM_DEPOSITION','FRACTURE_PREVENTION'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['calcium','vitamin_d3'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  taxifolin: {
+    targetSystems:['cardio','neuro'], targetMechanisms:['ANTIOXIDANT','ANTIINFLAMMATORY','COGNITIVE_ENHANCEMENT','VASCULAR_PROTECTION'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['quercetin','resveratrol'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  tianeptine: {
+    targetSystems:['neuro'], targetMechanisms:['SEROTONIN_MODULATION','ANXIOLYTIC','MOOD_ENHANCEMENT','COGNITIVE'], linkedRisks:[{system:'neuro',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'medium'}, analog:['sertraline','phenibut'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  trace_minerals: {
+    targetSystems:['endocrine','metabolic','neuro'], targetMechanisms:['TRACE_ELEMENT_SUPPLEMENT','ENZYME_COFACTOR','ELECTROLYTE_BALANCE','METABOLIC_SUPPORT'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['colloidal_minerals','electrolyte_complex'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  urolithin_a: {
+    targetSystems:['musculoskeletal','neuro','mitochondrial'], targetMechanisms:['MITOCHONDRIAL_AUTOPHAGY','MITOPHAGY','LONGEVITY','MUSCLE_HEALTH'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['pterostilbene','resveratrol'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  vanadium: {
+    targetSystems:['metabolic','musculoskeletal'], targetMechanisms:['INSULIN_MIMETIC','GLUCOSE_UPTAKE','BONE_DENSITY','CHOLESTEROL_LOWERING'], linkedRisks:[{system:'metabolic',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['chromium','berberine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['Уровень в крови'],
+    restrictions: ['Не превышать допустимый уровень'],
+  },
+  vasopressin: {
+    targetSystems:['neuro','cardio','renal'], targetMechanisms:['SOCIAL_BONDING','FOCUS','WATER_RETENTION','BP_REGULATION'], linkedRisks:[{system:'cardio',direction:'up',strength:0.2}], cvProfile:{bloodPressure:'up',heartRate:'neutral',vascularTone:'constrict',thrombosisRisk:'low',cnsLoad:'low'}, analog:['oxytocin','caffeine'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  zinc_carnosine: {
+    targetSystems:['gut','immunity'], targetMechanisms:['ZINC_DELIVERY','CARNOSINE_CHELATION','GUT_HEALING','ANTIOXIDANT','MUCOSAL_PROTECTION'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['zinc','carnosine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  anthocyanins: {
+    targetSystems:['cardio','neuro','vessels'], targetMechanisms:['ANTHOCYANIN_ACTIVITY','ANTIOXIDANT','VASCULAR_PROTECTION','COGNITIVE_ENHANCEMENT','ANTIINFLAMMATORY'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['quercetin','resveratrol'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  collagen_type2: {
+    targetSystems:['musculoskeletal'], targetMechanisms:['COLLAGEN_TYPE_II','JOINT_HEALTH','CARTILAGE_REPAIR','IMMUNE_TOLERANCE'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['collagen','glucosamine'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОК'],
+    restrictions: ['Принимать с витамином C', 'Гидролизованный лучше усваивается'],
+  },
+  chlorella: {
+    targetSystems:['immunity','hepatic','gut'], targetMechanisms:['CHLOROPHYLL','DETOXIFICATION','IMMUNE_STIMULATION','NUTRIENT_DENSITY','ALKALIZING'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['spirulina','wheatgrass'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  spirulina: {
+    targetSystems:['immunity','cardio','metabolic'], targetMechanisms:['PHYCOCYANIN','ANTIOXIDANT','IMMUNE_STIMULATION','CHOLESTEROL_LOWERING','ANTIINFLAMMATORY'], linkedRisks:[{system:'cardio',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['chlorella','wheatgrass'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  phosphatidylserine_done: {
+    targetSystems:['neuro'], targetMechanisms:['CORTISOL_REDUCTION','MEMBRANE_FLUIDITY','COGNITIVE_ENHANCEMENT','MEMORY'], linkedRisks:[{system:'neuro',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['phosphatidylcholine','ashwagandha'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  agmatine_sulfate: {
+    targetSystems:['cardio','neuro'], targetMechanisms:['NO_BOOST','NMDA_BLOCK','PUMP','MOOD_ENHANCEMENT','ANALGESIC'], linkedRisks:[{system:'cardio',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['arginine','citrulline'],
+    maxUsageWeeks: 52,
+    labMarkers: ['ОАК', 'Креатинин'],
+    restrictions: ['Принимать натощак', 'Циклировать 8-12 нед'],
+  },
+  beetroot: {
+    targetSystems:['cardio','vessels'], targetMechanisms:['NITRATE_SOURCE','NO_BOOST','BP_REDUCTION','ENDURANCE_ENHANCEMENT','BLOOD_FLOW'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['arginine','citrulline'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // MEDICATIONS (prescription & OTC for system support)
+  // ═══════════════════════════════════════════════════════════════════
+  hcg: {
+    targetSystems:['endocrine','reproductive'], targetMechanisms:['LH_MIMETIC','TESTOSTERONE_PRODUCTION','LEYDIG_STIMULATION','FERTILITY_PRESERVATION'], linkedRisks:[{system:'endocrine',direction:'up',strength:0.3},{system:'reproductive',direction:'up',strength:0.3}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['gonadorelin','kisspeptin'],
+    maxUsageWeeks: 12,
+    labMarkers: ['Тестостерон', 'Е2', 'ЛГ', 'ФСГ', 'Пролактин'],
+    restrictions: ['Контроль гормонов каждые 4-6 нед', 'Не превышать физиологические дозы'],
+  },
+  anastrozole: {
+    targetSystems:['endocrine','reproductive'], targetMechanisms:['AROMATASE_INHIBITION','E2_SUPPRESSION','ESTROGEN_BLOCKADE'], linkedRisks:[{system:'endocrine',direction:'down',strength:0.4},{system:'cardio',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['letrozole','exemestane'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  letrozole: {
+    targetSystems:['endocrine','reproductive'], targetMechanisms:['AROMATASE_INHIBITION','E2_SUPPRESSION','ESTROGEN_BLOCKADE','LH_STIMULATION'], linkedRisks:[{system:'endocrine',direction:'down',strength:0.5},{system:'cardio',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['anastrozole','exemestane'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  exemestane: {
+    targetSystems:['endocrine','reproductive'], targetMechanisms:['AROMATASE_INHIBITOR_IRREVERSIBLE','E2_SUPPRESSION','ANDROGEN_PRECURSOR'], linkedRisks:[{system:'endocrine',direction:'down',strength:0.4}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['anastrozole','letrozole'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  cabergoline: {
+    targetSystems:['neuro','endocrine'], targetMechanisms:['D2_AGONIST','PROLACTIN_SUPPRESSION','DOPAMINE_MODULATION','LH_RESTORATION'], linkedRisks:[{system:'neuro',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'medium'}, analog:['bromocriptine','pramipexole'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  bromocriptine: {
+    targetSystems:['neuro','endocrine'], targetMechanisms:['D2_AGONIST','PROLACTIN_SUPPRESSION','DOPAMINE_MODULATION'], linkedRisks:[{system:'neuro',direction:'up',strength:0.1},{system:'cardio',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'medium'}, analog:['cabergoline','pramipexole'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  clomiphene: {
+    targetSystems:['endocrine','reproductive'], targetMechanisms:['SERM_ACTIVITY','LH_STIMULATION','FSH_STIMULATION','HPTA_RESTORATION','ESTROGEN_RECEPTOR_MODULATION'], linkedRisks:[{system:'endocrine',direction:'up',strength:0.3},{system:'reproductive',direction:'up',strength:0.3}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'medium',cnsLoad:'low'}, analog:['tamoxifen','enclomiphene'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  tamoxifen: {
+    targetSystems:['endocrine','reproductive'], targetMechanisms:['SERM_ACTIVITY','ESTROGEN_RECEPTOR_ANTAGONIST','LH_STIMULATION','HPTA_RESTORATION'], linkedRisks:[{system:'endocrine',direction:'up',strength:0.2},{system:'cardio',direction:'up',strength:0.1},{system:'blood',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'medium',cnsLoad:'low'}, analog:['clomiphene','raloxifene'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  enclomiphene: {
+    targetSystems:['endocrine','reproductive'], targetMechanisms:['SERM_ACTIVITY','LH_STIMULATION','FSH_STIMULATION','HPTA_RESTORATION','PURE_ISOMER'], linkedRisks:[{system:'endocrine',direction:'up',strength:0.3}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['clomiphene','tamoxifen'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  metformin: {
+    targetSystems:['metabolic','hepatic','cardio'], targetMechanisms:['AMPK_ACTIVATION','GLUCOSE_LOWERING','INSULIN_SENSITIVITY','LIPID_LOWERING','MTO_INHIBITION'], linkedRisks:[{system:'metabolic',direction:'down',strength:0.3},{system:'hepatic',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['berberine','semaglutide'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  finasteride: {
+    targetSystems:['reproductive','prostate','skin'], targetMechanisms:['5AR_INHIBITION','DHT_SUPPRESSION','PROSTATE_HEALTH','HAIR_PRESERVATION'], linkedRisks:[{system:'reproductive',direction:'down',strength:0.3},{system:'neuro',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['dutasteride','saw_palmetto'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  dutasteride: {
+    targetSystems:['reproductive','prostate','skin'], targetMechanisms:['5AR_INHIBITION_TYPES_1_2','DHT_SUPPRESSION','PROSTATE_HEALTH'], linkedRisks:[{system:'reproductive',direction:'down',strength:0.4}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['finasteride','saw_palmetto'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  spironolactone: {
+    targetSystems:['cardio','renal','endocrine'], targetMechanisms:['ALDOSTERONE_ANTAGONIST','K_SPARING','BP_REDUCTION','ANDROGEN_RECEPTOR_BLOCKADE','DIURETIC'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2},{system:'renal',direction:'down',strength:0.1}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['eplerenone','amiloride'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  hydrochlorothiazide: {
+    targetSystems:['cardio','renal'], targetMechanisms:['THIAZIDE_DIURETIC','BP_REDUCTION','SODIUM_EXCRETION','VOLUME_REDUCTION'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2},{system:'metabolic',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['indapamide','chlorthalidone'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  indapamide: {
+    targetSystems:['cardio','renal'], targetMechanisms:['THIAZIDE_LIKE_DIURETIC','BP_REDUCTION','VASODILATION','SODIUM_EXCRETION'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['hydrochlorothiazide','chlorthalidone'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  eplerenone: {
+    targetSystems:['cardio','renal'], targetMechanisms:['SELECTIVE_ALDOSTERONE_ANTAGONIST','BP_REDUCTION','K_SPARING','HEART_FAILURE'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['spironolactone','amiloride'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  torsemide: {
+    targetSystems:['cardio','renal'], targetMechanisms:['LOOP_DIURETIC','BP_REDUCTION','VOLUME_REDUCTION','EDEMA'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2},{system:'metabolic',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['furosemide','hydrochlorothiazide'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  bisoprolol: {
+    targetSystems:['cardio'], targetMechanisms:['BETA1_BLOCKADE','HR_REDUCTION','BP_REDUCTION','CARDIOPROTECTION'], linkedRisks:[{system:'cardio',direction:'down',strength:0.3}], cvProfile:{bloodPressure:'down',heartRate:'down',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['nebivolol','atenolol'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  carvedilol: {
+    targetSystems:['cardio'], targetMechanisms:['BETA_ALPHA_BLOCKADE','HR_REDUCTION','BP_REDUCTION','VASODILATION','HEART_FAILURE'], linkedRisks:[{system:'cardio',direction:'down',strength:0.3}], cvProfile:{bloodPressure:'down',heartRate:'down',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['nebivolol','bisoprolol'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  amlodipine: {
+    targetSystems:['cardio','vessels'], targetMechanisms:['CALCIUM_CHANNEL_BLOCKER','VASODILATION','BP_REDUCTION','ANGINA'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['nifedipine','felodipine'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  lisinopril: {
+    targetSystems:['cardio','renal'], targetMechanisms:['ACE_INHIBITOR','BP_REDUCTION','RENAL_PROTECTION','HEART_FAILURE'], linkedRisks:[{system:'cardio',direction:'down',strength:0.3},{system:'renal',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['telmisartan','enalapril'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  losartan: {
+    targetSystems:['cardio','renal'], targetMechanisms:['ARB_BLOCKADE','BP_REDUCTION','RENAL_PROTECTION','STROKE_PREVENTION'], linkedRisks:[{system:'cardio',direction:'down',strength:0.3},{system:'renal',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'down',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['telmisartan','valsartan'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  atorvastatin: {
+    targetSystems:['cardio','hepatic'], targetMechanisms:['HMG_COA_REDUCTASE_INHIBITOR','LDL_LOWERING','CARDIO_PROTECTION','ANTIINFLAMMATORY'], linkedRisks:[{system:'cardio',direction:'down',strength:0.4},{system:'hepatic',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['rosuvastatin','simvastatin'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  rosuvastatin: {
+    targetSystems:['cardio','hepatic'], targetMechanisms:['HMG_COA_REDUCTASE_INHIBITOR','LDL_LOWERING','CARDIO_PROTECTION','HDL_INCREASE'], linkedRisks:[{system:'cardio',direction:'down',strength:0.4},{system:'hepatic',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['atorvastatin','pitavastatin'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  ursodeoxycholic: {
+    targetSystems:['hepatic'], targetMechanisms:['BILE_ACID_THERAPY','CHOLESTEROL_LOWERING','LIVER_PROTECTION','CHOLESTASIS'], linkedRisks:[{system:'hepatic',direction:'down',strength:0.3}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['tudca','milk_thistle'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  heptral: {
+    targetSystems:['hepatic','neuro'], targetMechanisms:['ADEMETIONINE','METHYL_DONATION','LIVER_DETOX','CHOLERETIC','ANTIDEPRESSANT'], linkedRisks:[{system:'hepatic',direction:'down',strength:0.3},{system:'neuro',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['sam_e','nac'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  panangin: {
+    targetSystems:['cardio','musculoskeletal'], targetMechanisms:['K_MG_SUPPLEMENT','ELECTROLYTE_BALANCE','ANTIARRHYTHMIC','CARDIOPROTECTION'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['magnesium','potassium'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  mildronate: {
+    targetSystems:['cardio','neuro','musculoskeletal'], targetMechanisms:['FATTY_ACID_OXIDATION_INHIBITION','GLUCOSE_SHIFT','CARDIOPROTECTION','ENDURANCE'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['carnitine','taurine'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  meldonium: {
+    targetSystems:['cardio','neuro'], targetMechanisms:['GAMMA_BUTYROBETAINE_INHIBITOR','CARDIOPROTECTION','ENDURANCE_ENHANCEMENT','NEUROPROTECTION'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['mildronate','carnitine'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  phenytoin: {
+    targetSystems:['neuro','musculoskeletal'], targetMechanisms:['SODIUM_CHANNEL_BLOCKER','ANTICONVULSANT','NERVE_PAIN','WOUND_HEALING'], linkedRisks:[{system:'hepatic',direction:'up',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'medium'}, analog:['carbamazepine','gabapentin'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  piracetam_done: {
+    targetSystems:['neuro'], targetMechanisms:['ACETYLCHOLINE_MODULATION','MEMORY_ENHANCEMENT','NEUROPLASTICITY','CEREBRAL_BLOOD_FLOW'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['noopept','aniracetam'],
+    maxUsageWeeks: 24,
+    labMarkers: ['Кортизол', 'Пролактин'],
+    restrictions: ['Не сочетать с MAO-ингибиторами', 'Циклировать 4-8 нед', 'Оценка переносимости'],
+  },
+  phenylpiracetam: {
+    targetSystems:['neuro'], targetMechanisms:['DOPAMINE_MODULATION','COGNITIVE_ENHANCEMENT','STIMULATION','FATIGUE_RESISTANCE'], linkedRisks:[{system:'cardio',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'up',heartRate:'up',vascularTone:'constrict',thrombosisRisk:'low',cnsLoad:'high'}, analog:['modafinil','piracetam'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  noopept_done: {
+    targetSystems:['neuro'], targetMechanisms:['NMDA_MODULATION','BDNF_INCREASE','COGNITIVE_ENHANCEMENT','MEMORY_FORMATION'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['piracetam','lions_mane'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  picamilon: {
+    targetSystems:['neuro','vessels'], targetMechanisms:['GABA_NIACIN_CONJUGATE','CEREBRAL_BLOOD_FLOW','ANXIOLYTIC','VASODILATION'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['gaba','vinpocetine'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  mexidol: {
+    targetSystems:['neuro','cardio'], targetMechanisms:['ANTIOXIDANT','MEMBRANE_PROTECTION','NOOTROPIC','ANTIHYPOXANT','COGNITIVE_ENHANCEMENT'], linkedRisks:[{system:'neuro',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['emoxypine','cytoflavin'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  cytoflavin: {
+    targetSystems:['neuro','metabolic'], targetMechanisms:['MITOCHONDRIAL_CYTOPROTECTION','ENERGY_METABOLISM','COGNITIVE_ENHANCEMENT','ANTIHYPOXANT'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['mexidol','carnitine'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  trental: {
+    targetSystems:['vessels','blood'], targetMechanisms:['PENTOXIFYLLINE','BLOOD_FLOW','MICROCIRCULATION','RBC_FLEXIBILITY','ANTIINFLAMMATORY'], linkedRisks:[{system:'blood',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['nattokinase','ginkgo'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  actovegin: {
+    targetSystems:['neuro','musculoskeletal'], targetMechanisms:['TISSUE_REPAIR','OXYGEN_UTILIZATION','ENERGY_METABOLISM','WOUND_HEALING'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['solcoseryl','cerebrolysin'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  solcoseryl: {
+    targetSystems:['neuro','skin'], targetMechanisms:['TISSUE_REPAIR','COLLAGEN_SYNTHESIS','WOUND_HEALING','ANGIOGENESIS'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['actovegin','bpc157'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  pentoxifylline: {
+    targetSystems:['vessels','blood'], targetMechanisms:['METHYLXANTHINE','BLOOD_VISCOSITY','MICROCIRCULATION','RHEOLOGY'], linkedRisks:[{system:'blood',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['trental','nattokinase'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // GH/IGF AXIS, INSULIN AXIS, THYROID, NEUROTOXICITY — SYSTEM COVERAGE
+  // ═══════════════════════════════════════════════════════════════════
+  igf1: {
+    targetSystems:['ghigf','musculoskeletal'], targetMechanisms:['IGF1_AGONISM','MUSCLE_GROWTH','PROTEIN_SYNTHESIS','CELL_DIVISION'], linkedRisks:[{system:'ghigf',direction:'up',strength:0.4}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['mk677','cjc1295'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  cjc1295: {
+    targetSystems:['ghigf','endocrine'], targetMechanisms:['GHRH_AGONISM','GH_RELEASE','IGF1_PRODUCTION'], linkedRisks:[{system:'ghigf',direction:'up',strength:0.3}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['sermorelin','mk677'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  mk677: {
+    targetSystems:['ghigf','endocrine'], targetMechanisms:['GHSR_AGONISM','GH_RELEASE','IGF1_PRODUCTION','ORAL_BIOAVAILABILITY'], linkedRisks:[{system:'ghigf',direction:'up',strength:0.3},{system:'metabolic',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['cjc1295','sermorelin'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  ghrp6: {
+    targetSystems:['ghigf','endocrine'], targetMechanisms:['GHSR_AGONISM','GH_RELEASE','APPETITE_STIMULATION'], linkedRisks:[{system:'ghigf',direction:'up',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['ghrp2','ipamorelin'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  ipamorelin: {
+    targetSystems:['ghigf','endocrine'], targetMechanisms:['GHSR_AGONISM','GH_RELEASE','LOW_APPETITE_STIMULATION'], linkedRisks:[{system:'ghigf',direction:'up',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['ghrp6','ghrp2'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  mgf: {
+    targetSystems:['ghigf','musculoskeletal'], targetMechanisms:['MGF_AGONISM','SATELLITE_CELL_ACTIVATION','MUSCLE_REPAIR','HYPERTROPHY'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['igf1','mechano_growth'],
+    maxUsageWeeks: 12,
+    labMarkers: ['ОАК', 'IgE'],
+    restrictions: ['Оценка IgE перед началом', 'Хранить в холодильнике', 'Курс 4-8 нед'],
+  },
+  insulin: {
+    targetSystems:['ins_axis','metabolic','cardio'], targetMechanisms:['INSULIN_AGONISM','GLUCOSE_UPTAKE','ANABOLIC','GLYCOGEN_SYNTHESIS'], linkedRisks:[{system:'ins_axis',direction:'up',strength:0.3},{system:'metabolic',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'down',heartRate:'up',vascularTone:'dilate',thrombosisRisk:'low',cnsLoad:'low'}, analog:['metformin','berberine'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  semaglutide: {
+    targetSystems:['ins_axis','metabolic','cardio'], targetMechanisms:['GLP1_AGONISM','INSULIN_RELEASE','APPETITE_SUPPRESSION','WEIGHT_LOSS'], linkedRisks:[{system:'ins_axis',direction:'down',strength:0.3},{system:'metabolic',direction:'down',strength:0.3}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['tirzepatide','liraglutide'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  tirzepatide: {
+    targetSystems:['ins_axis','metabolic','cardio'], targetMechanisms:['GLP1_GIP_AGONISM','INSULIN_RELEASE','APPETITE_SUPPRESSION','WEIGHT_LOSS'], linkedRisks:[{system:'ins_axis',direction:'down',strength:0.3},{system:'metabolic',direction:'down',strength:0.3}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['semaglutide','liraglutide'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  thyroxine: {
+    targetSystems:['thyroid','endocrine','metabolic'], targetMechanisms:['THYROID_HORMONE','T4_REPLACEMENT','METABOLISM_INCREASE','THERMOGENESIS'], linkedRisks:[{system:'thyroid',direction:'up',strength:0.4},{system:'cardio',direction:'up',strength:0.2}], cvProfile:{bloodPressure:'up',heartRate:'up',vascularTone:'constrict',thrombosisRisk:'low',cnsLoad:'medium'}, analog:['liothyronine','thyroid_extract'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  liothyronine: {
+    targetSystems:['thyroid','endocrine','metabolic'], targetMechanisms:['T3_AGONISM','METABOLISM_INCREASE','THERMOGENESIS','CARDIO_STIMULATION'], linkedRisks:[{system:'thyroid',direction:'up',strength:0.5},{system:'cardio',direction:'up',strength:0.3}], cvProfile:{bloodPressure:'up',heartRate:'up',vascularTone:'constrict',thrombosisRisk:'low',cnsLoad:'high'}, analog:['thyroxine','thyroid_extract'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  baclofen: {
+    targetSystems:['neuro','neuro_toxicity','musculoskeletal'], targetMechanisms:['GABA_B_AGONIST','MUSCLE_RELAXANT','SPASTICITY_REDUCTION'], linkedRisks:[{system:'neuro',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['phenibut','tizanidine'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+
+  amantadine: {
+    targetSystems:['neuro','neuro_toxicity'], targetMechanisms:['NMDA_ANTAGONIST','DOPAMINE_AGONIST','ANTIVIRAL','FATIGUE_REDUCTION'], linkedRisks:[{system:'neuro',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'medium'}, analog:['memantine','selegiline'],
+    maxUsageWeeks: 156,
+    labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
+    restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],
+  },
+  echinacea: {
+    targetSystems:['immunity','hematologic'], targetMechanisms:['IMMUNE_STIMULATION','NK_ACTIVATION','ANTIVIRAL','MACROPHAGE_ACTIVATION'], linkedRisks:[{system:'immunity',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['astragalus','andrographis'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+  propolis: {
+    targetSystems:['immunity','skin','gut'], targetMechanisms:['ANTIMICROBIAL','ANTIOXIDANT','IMMUNE_STIMULATION','WOUND_HEALING','ANTIINFLAMMATORY'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['honey','bee_pollen'],
+    maxUsageWeeks: 24,
+    labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
+    restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
+  },
+};
+// ── FROM: synergy-network.ts ──
+// ===========================================================================
+// SYNERGY NETWORK — полная база синергий, конфликтов и комбинаций
+// Каждая запись:
+// - pair: [id1, id2] — пара препаратов (порядок не важен)
+// - type: 'synergy' | 'conflict'
+// - effect: краткий эффект
+// - mechanism: механизм взаимодействия
+// - severity: LOW | MEDIUM | HIGH
+// - score: 0-10 (сила эффекта)
+// ===========================================================================
+
+export interface SynergyNetworkEntry {
+  a: string;
+  b: string;
+  type: 'synergy' | 'conflict';
+  effect: string;
+  mechanism: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH';
+  score: number;
+}
+
+export const SYNERGY_NETWORK: SynergyNetworkEntry[] = [
+  // ═══════════════════════════════════════════════════════════════════
+  // АНТИОКСИДАНТНАЯ СЕТЬ (8 препаратов — полный граф)
+  // ═══════════════════════════════════════════════════════════════════
+  {a:'nac',b:'alpha_lipoic',type:'synergy',effect:'Усиление антиоксидантной сети',mechanism:'АЛЬК регенерирует глутатион и вит.C. NAC — предшественник глутатиона. Вместе — полный цикл: синтез + регенерация + утилизация',severity:'HIGH',score:9},
+  {a:'nac',b:'vitamin_c',type:'synergy',effect:'Регенерация глутатиона',mechanism:'Вит.C восстанавливает окисленный глутатион (GSSG→GSH), NAC — субстрат для синтеза нового глутатиона',severity:'HIGH',score:8},
+  {a:'nac',b:'selenium',type:'synergy',effect:'Глутатионпероксидаза',mechanism:'NAC даёт субстрат (глутатион), Se — кофактор GPx (фермента, утилизирующего глутатион для нейтрализации перекисей)',severity:'MEDIUM',score:7},
+  {a:'nac',b:'vitamin_e',type:'synergy',effect:'Мембранная защита',mechanism:'NAC поддерживает внутриклеточный глутатион, вит.E защищает мембраны от липопероксидации. Разные компартменты',severity:'MEDIUM',score:6},
+  {a:'nac',b:'coq10',type:'synergy',effect:'Митохондриальная защита',mechanism:'NAC повышает глутатион в митохондриях, CoQ10 поддерживает электрон-транспортную цепь. Синергия в митохондриях',severity:'MEDIUM',score:7},
+  {a:'alpha_lipoic',b:'vitamin_c',type:'synergy',effect:'Цикл регенерации',mechanism:'АЛЬК восстанавливает дегидроаскорбат→аскорбат (вит.C), вит.C регенерирует вит.E. Тройной антиоксидантный цикл',severity:'HIGH',score:9},
+  {a:'alpha_lipoic',b:'vitamin_e',type:'synergy',effect:'Регенерация вит.E',mechanism:'АЛЬК → вит.C → вит.E. АЛЬК восстанавливает окисленный вит.E через cascade-механизм',severity:'HIGH',score:8},
+  {a:'alpha_lipoic',b:'coq10',type:'synergy',effect:'Регенерация CoQ10',mechanism:'АЛЬК восстанавливает окисленный убихинон (CoQ10) в убихинол — активную антиоксидантную форму',severity:'MEDIUM',score:7},
+  {a:'alpha_lipoic',b:'selenium',type:'synergy',effect:'Антиоксидантная сеть',mechanism:'АЛЬК хелатирует переходные металлы (Fe, Cu), Se — кофактор GPx. Разные механизмы антиоксидантной защиты',severity:'MEDIUM',score:6},
+  {a:'vitamin_c',b:'vitamin_e',type:'synergy',effect:'Синергия антиоксидантов',mechanism:'Вит.C регенерирует окисленный вит.E в мембранах, позволяя ему продолжать защиту липидов от пероксидации',severity:'HIGH',score:8},
+  {a:'vitamin_c',b:'selenium',type:'synergy',effect:'Усвоение Se',mechanism:'Вит.C улучшает усвоение селена и предотвращает его окисление в кишечнике',severity:'LOW',score:4},
+  {a:'vitamin_c',b:'coq10',type:'synergy',effect:'Митохондриальная защита',mechanism:'Вит.C защищает митохондрии от ROS, CoQ10 поддерживает АТФ-синтез. Синергия в дыхательной цепи',severity:'MEDIUM',score:6},
+  {a:'vitamin_e',b:'selenium',type:'synergy',effect:'Мембранная защита',mechanism:'Вит.E (токоферол) в липидном слое мембраны, Se (GPx) в цитозоле и митохондриях — полная антиоксидантная защита',severity:'HIGH',score:8},
+  {a:'vitamin_e',b:'coq10',type:'synergy',effect:'Мембраны + митохондрии',mechanism:'Вит.E защищает мембраны, CoQ10 защищает митохондриальную мембрану. Синергия на уровне клеточных мембран',severity:'MEDIUM',score:6},
+  {a:'coq10',b:'selenium',type:'synergy',effect:'Митохондриальный тандем',mechanism:'Se (GPx) защищает митохондрии от перекисей, CoQ10 — ключевой переносчик электронов в дыхательной цепи',severity:'MEDIUM',score:6},
+
+  // Комбинации 3+
+  {a:'nac',b:'alpha_lipoic',type:'synergy',effect:'NAC + АЛЬК + С = антиоксидантный щит',mechanism:'Тройная защита: NAC→GSH, АЛЬК→регенерация, вит.C→GSH+E рециклинг. Полный антиоксидантный каскад',severity:'HIGH',score:9},
+  {a:'alpha_lipoic',b:'vitamin_c',type:'synergy',effect:'АЛЬК + вит.C + вит.E = антиоксидантный каскад',mechanism:'Три фазы: АЛЬК→вит.C→вит.E. Каждый регенерирует следующий, создавая цикл утилизации ROS',severity:'HIGH',score:8},
+  {a:'nac',b:'selenium',type:'synergy',effect:'NAC + Se = глутатионовая система',mechanism:'NAC для синтеза GSH, Se для GPx. Полный цикл синтеза и регенерации глутатиона',severity:'HIGH',score:8},
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ГЕПАТОПРОТЕКЦИЯ (5 препаратов)
+  // ═══════════════════════════════════════════════════════════════════
+  {a:'nac',b:'tudca',type:'synergy',effect:'Комплексная защита печени',mechanism:'NAC ↔ глутатион + детоксикация. TUDCA ↓ ER-стресс, защита митохондрий, ↑ желчеотток. Разные механизмы — полный охват',severity:'HIGH',score:9},
+  {a:'nac',b:'milk_thistle',type:'synergy',effect:'Гепатопротекция NAC + силимарин',mechanism:'NAC — повышение глутатиона, силимарин (расторопша) — стабилизация мембран гепатоцитов, антифибротическое действие',severity:'HIGH',score:8},
+  {a:'nac',b:'phosphatidylcholine',type:'synergy',effect:'Защита мембран гепатоцитов',mechanism:'NAC → детоксикация + антиоксидант. ФХ → восстановление фосфолипидного слоя мембран гепатоцитов',severity:'MEDIUM',score:7},
+  {a:'tudca',b:'milk_thistle',type:'synergy',effect:'Максимальная гепатопротекция',mechanism:'TUDCA стимулирует желчеотток и снижает ER-стресс. Силимарин стабилизирует мембраны. Комплементарные механизмы',severity:'HIGH',score:9},
+  {a:'tudca',b:'phosphatidylcholine',type:'synergy',effect:'Желчеотток + регенерация',mechanism:'TUDCA разжижает желчь, ФХ восстанавливает мембраны гепатоцитов, повреждённые токсинами',severity:'MEDIUM',score:7},
+  {a:'tudca',b:'alpha_lipoic',type:'synergy',effect:'ER-стресс + антиоксидант',mechanism:'TUDCA ↓ ER-стресс (unfolded protein response), АЛЬК — мощный антиоксидант с хелатирующими свойствами',severity:'MEDIUM',score:7},
+  {a:'milk_thistle',b:'phosphatidylcholine',type:'synergy',effect:'Мембраны + стабилизация',mechanism:'Силимарин стабилизирует клеточные мембраны, ФХ поставляет субстрат для их восстановления',severity:'MEDIUM',score:6},
+  {a:'milk_thistle',b:'alpha_lipoic',type:'synergy',effect:'Гепатопротекция + антиоксидант',mechanism:'Силимарин + АЛЬК = два механизма защиты гепатоцитов от токсинов',severity:'MEDIUM',score:6},
+  {a:'milk_thistle',b:'berberine',type:'synergy',effect:'NAFLD + защита',mechanism:'Силимарин защищает гепатоциты, берберин улучшает липидный профиль и ↓ стеатоз печени',severity:'MEDIUM',score:7},
+  {a:'alpha_lipoic',b:'berberine',type:'synergy',effect:'Метаболическая + антиоксидант',mechanism:'АЛЬК улучшает инсулиновую чувствительность, берберин — АМФК-активатор. Синергия метаболизма',severity:'MEDIUM',score:7},
+  // NAC + TUDCA + Milk Thistle = триада печени
+  {a:'nac',b:'tudca',type:'synergy',effect:'Триада печени: NAC + TUDCA + Milk Thistle',mechanism:'NAC → глутатион. TUDCA → ER-стресс + желчь. Силимарин → мембраны. Три разных механизма — максимальная гепатопротекция',severity:'HIGH',score:9},
+
+  // ═══════════════════════════════════════════════════════════════════
+  // КАРДИОПРОТЕКЦИЯ (6 препаратов)
+  // ═══════════════════════════════════════════════════════════════════
+  {a:'omega3',b:'coq10',type:'synergy',effect:'Кардиопротекция',mechanism:'Омега-3 ↓ TG и воспаление. CoQ10 защищает миокард и ↑ АТФ. Разные механизмы защиты сердца',severity:'MEDIUM',score:7},
+  {a:'omega3',b:'magnesium',type:'synergy',effect:'Сердечно-сосудистая защита',mechanism:'Омега-3 ↓ триглицериды и ↓ воспаление. Mg ↓ АД и ↓ риск аритмий. Комплементарные кардиопротекторы',severity:'MEDIUM',score:7},
+  {a:'omega3',b:'taurine',type:'synergy',effect:'Защита миокарда',mechanism:'Таурин ↑ сократимость миокарда и ↓ АД. Омега-3 ↑ мембранную текучесть кардиомиоцитов и ↓ воспаление',severity:'MEDIUM',score:7},
+  {a:'omega3',b:'telmisartan',type:'synergy',effect:'Давление + липиды',mechanism:'Омега-3 ↓ триглицериды на 20-40%. Телмисартан (PPAR-γ) ↓ АД и ↑ чувствительность к инсулину',severity:'MEDIUM',score:7},
+  {a:'omega3',b:'berberine',type:'synergy',effect:'Липидный профиль',mechanism:'Омега-3 ↓ TG, берберин ↓ ЛПНП и ↑ ЛПВП. Полный контроль липидного профиля',severity:'MEDIUM',score:7},
+  {a:'coq10',b:'magnesium',type:'synergy',effect:'Митохондрии сердца',mechanism:'CoQ10 даёт энергию для АТФ, Mg стабилизирует мембраны кардиомиоцитов. Критическая пара для миокарда',severity:'MEDIUM',score:7},
+  {a:'coq10',b:'taurine',type:'synergy',effect:'Сократимость',mechanism:'Таурин регулирует Ca2+ в кардиомиоцитах, CoQ10 даёт энергию (АТФ) для сокращения. Оба ↑ сердечный выброс',severity:'MEDIUM',score:7},
+  {a:'magnesium',b:'taurine',type:'synergy',effect:'Расслабление + кардио',mechanism:'Mg и таурин синергично ↓ АД, ЧСС и тонус сосудов. Оба — естественные антагонисты кальция',severity:'MEDIUM',score:7},
+  {a:'magnesium',b:'telmisartan',type:'synergy',effect:'Контроль АД',mechanism:'Mg расслабляет гладкую мускулатуру сосудов. Телмисартан блокирует AT1-рецепторы ангиотензина II',severity:'MEDIUM',score:7},
+  {a:'magnesium',b:'nebivolol',type:'synergy',effect:'ЧСС + тонус',mechanism:'Mg ↓ тонус сосудов. Небиволол (β1-блокатор + NO) ↓ ЧСС и ↑ NO, расширяя сосуды',severity:'MEDIUM',score:7},
+  {a:'taurine',b:'telmisartan',type:'synergy',effect:'Снижение АД',mechanism:'Таурин действует как слабый диуретик и ↓ тонус симпатики. Телмисартан — блокатор AT1. Аддитивный эффект',severity:'MEDIUM',score:6},
+  {a:'telmisartan',b:'nebivolol',type:'synergy',effect:'Максимальный ССС-контроль',mechanism:'Сартан + β1-блокатор с NO-модуляцией = аддитивное снижение АД, ЧСС и пост-нагрузки на сердце',severity:'MEDIUM',score:8},
+  // Кардио-триада
+  {a:'omega3',b:'coq10',type:'synergy',effect:'Кардиотриада: Омега-3 + CoQ10 + Mg',mechanism:'Омега-3 ↓ воспаление и TG. CoQ10 ↑ АТФ миокарда. Mg ↓ аритмии и АД. Три точки воздействия на ССС',severity:'MEDIUM',score:8},
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ГОРМОНАЛЬНАЯ ОСЬ (6 препаратов)
+  // ═══════════════════════════════════════════════════════════════════
+  {a:'zinc',b:'magnesium',type:'synergy',effect:'Синтез T + качество сна',mechanism:'Zn — кофактор 17β-HSD и AR, Mg ↓ связанный T через SHBG. Вместе ↑ свободный T',severity:'MEDIUM',score:7},
+  {a:'zinc',b:'vitamin_d3',type:'synergy',effect:'Иммунитет + T',mechanism:'Zn — кофактор синтеза T и пролиферации T-клеток. D3 — VDR-активация, ↔ синтез T в клетках Лейдига',severity:'MEDIUM',score:7},
+  {a:'zinc',b:'boron',type:'synergy',effect:'Свободный тестостерон',mechanism:'Бор ↓ SHBG на 15-30%, освобождая T. Zn — кофактор синтеза T. Вместе ↑ и синтез, и доступность T',severity:'MEDIUM',score:7},
+  {a:'zinc',b:'ashwagandha',type:'synergy',effect:'Тестостерон + кортизол',mechanism:'Zn для синтеза T (17β-HSD). Ашваганда ↓ кортизол на 20-30%. ↑ T через ↓ кортизол и ↑ синтез',severity:'MEDIUM',score:7},
+  {a:'zinc',b:'selenium',type:'synergy',effect:'Простата + репродукция',mechanism:'Zn — антиоксидант в ткани простаты. Se — GPx для защиты сперматозоидов от окисления',severity:'MEDIUM',score:6},
+  {a:'vitamin_d3',b:'magnesium',type:'synergy',effect:'Активация D3',mechanism:'Mg необходим для 3 этапов: 25-гидроксилазы (D3→25-OH) и 1α-гидроксилазы (25-OH→кальцитриол)',severity:'HIGH',score:8},
+  {a:'vitamin_d3',b:'vitamin_k2',type:'synergy',effect:'Кальциевый обмен',mechanism:'D3 ↑ всасывание Ca в кишечнике. K2 активирует остеокальцин (кости) и MGP (сосуды), направляя Ca в кости',severity:'HIGH',score:9},
+  {a:'vitamin_d3',b:'boron',type:'synergy',effect:'Метаболизм D3 + T',mechanism:'Бор улучшает метаболизм D3 и поддерживает уровень свободного T через ↓ SHBG',severity:'LOW',score:5},
+  {a:'vitamin_d3',b:'calcium',type:'synergy',effect:'Костная плотность',mechanism:'D3 ↑ всасывание Ca в 2-4 раза через кальций-связывающий белок. Без D3 Ca не усваивается',severity:'HIGH',score:9},
+  {a:'vitamin_k2',b:'calcium',type:'synergy',effect:'Направление Ca в кости',mechanism:'K2 активирует остеокальцин, который связывает Ca в кристаллы гидроксиапатита костной ткани',severity:'HIGH',score:8},
+  {a:'boron',b:'ashwagandha',type:'synergy',effect:'↑ T через 2 пути',mechanism:'Бор ↓ SHBG (↑ своб.T). Ашваганда ↓ кортизол (↑ T). Два независимых пути повышения андрогенов',severity:'MEDIUM',score:7},
+  // Гормональная триада
+  {a:'zinc',b:'magnesium',type:'synergy',effect:'Триада T: Zn + Mg + D3',mechanism:'Zn → синтез T. Mg → ↓ SHBG. D3 → VDR → Leydig. Три точки для максимального эндогенного T',severity:'MEDIUM',score:8},
+  {a:'zinc',b:'ashwagandha',type:'synergy',effect:'Тотальный контроль гормонов',mechanism:'Zn + Mg + D3 + Ashwagandha. ↑ T, ↓ кортизол, ↑ свободный T, ↑ чувствительность рецепторов',severity:'MEDIUM',score:8},
+
+  // ═══════════════════════════════════════════════════════════════════
+  // НЕРВНАЯ СИСТЕМА (6 препаратов)
+  // ═══════════════════════════════════════════════════════════════════
+  {a:'magnesium',b:'vitamin_b6',type:'synergy',effect:'Усвоение Mg и ГАМК',mechanism:'B6 усиливает транспорт Mg внутрь клеток (особенно нейронов). Mg и B6 — кофакторы синтеза ГАМК. Дуэт для сна и нервов',severity:'MEDIUM',score:7},
+  {a:'magnesium',b:'glycine',type:'synergy',effect:'Сон и расслабление',mechanism:'Mg ↓ возбудимость NMDA + ↑ GABA. Глицин — тормозной нейромедиатор через GlyR. Синергия тормозной системы',severity:'MEDIUM',score:7},
+  {a:'magnesium',b:'taurine',type:'synergy',effect:'GABA-ергическая синергия',mechanism:'Mg — кофактор GAD (синтез ГАМК). Таурин — прямой агонист GABA-A рецепторов. Оба ↓ тревожность',severity:'MEDIUM',score:7},
+  {a:'vitamin_b6',b:'vitamin_b12',type:'synergy',effect:'Нейромедиаторы + миелин',mechanism:'B6 — кофактор AADC и GAD (синтез дофамина, серотонина, ГАМК). B12 — синтез миелина. Полная нейро-поддержка',severity:'HIGH',score:8},
+  {a:'vitamin_b6',b:'folate',type:'synergy',effect:'Метилирование + нейро',mechanism:'B6 и фолат — кофакторы цикла метилирования (SAM). SAM → синтез креатина, карнитина, нейромедиаторов',severity:'HIGH',score:8},
+  {a:'vitamin_b12',b:'folate',type:'synergy',effect:'Метилирование',mechanism:'B12 и фолат — кофакторы метионинсинтазы (гомоцистеин→метионин). Снижают гомоцистеин, ↑ SAM',severity:'HIGH',score:9},
+  {a:'vitamin_b12',b:'vitamin_b6',type:'synergy',effect:'Снижение гомоцистеина',mechanism:'Триада B12 + B6 + фолат — клинический стандарт снижения гомоцистеина, фактора риска ССЗ и когнитивных нарушений',severity:'HIGH',score:8},
+  // Нейро-триада
+  {a:'magnesium',b:'vitamin_b6',type:'synergy',effect:'Нейро-триада: Mg + B6 + B12',mechanism:'Mg → GABA. B6 → дофамин/серотонин. B12 → миелин. Полная поддержка нервной системы',severity:'MEDIUM',score:8},
+
+  // ═══════════════════════════════════════════════════════════════════
+  // КОСТИ + СУСТАВЫ (6 препаратов)
+  // ═══════════════════════════════════════════════════════════════════
+  {a:'vitamin_c',b:'collagen',type:'synergy',effect:'Синтез коллагена',mechanism:'Вит.C (аскорбат) — кофактор пролилгидроксилазы и лизилгидроксилазы. Без вит.C коллаген не синтезируется (цинга)',severity:'HIGH',score:9},
+  {a:'vitamin_c',b:'glucosamine',type:'synergy',effect:'Суставная защита',mechanism:'Вит.C стимулирует синтез коллагена хряща. Глюкозамин — субстрат для синтеза протеогликанов',severity:'MEDIUM',score:7},
+  {a:'collagen',b:'glucosamine',type:'synergy',effect:'Матрикс хряща',mechanism:'Коллаген (тип II) — структурный каркас. Глюкозамин — стимуляция синтеза протеогликанов и коллагена хондроцитами',severity:'MEDIUM',score:7},
+  {a:'collagen',b:'msm',type:'synergy',effect:'Структура соединительной ткани',mechanism:'Коллаген даёт аминокислоты (глицин, пролин, гидроксипролин). MSM — сера для дисульфидных связей коллагена',severity:'MEDIUM',score:7},
+  {a:'collagen',b:'vitamin_c',type:'synergy',effect:'Синтез коллагена (полный)',mechanism:'Вит.C — кофактор. Коллаген — субстрат. Без них: ломкость сосудов, слабость связок, плохое заживление',severity:'HIGH',score:9},
+  {a:'glucosamine',b:'chondroitin',type:'synergy',effect:'Суставная пара №1',mechanism:'Глюкозамин стимулирует синтез протеогликанов. Хондроитин ↓ деградацию хряща и ↑ смазку суставов. Клинически подтверждено',severity:'HIGH',score:9},
+  {a:'glucosamine',b:'msm',type:'synergy',effect:'Противовоспалительная пара',mechanism:'Глюкозамин + MSM = снижение боли и воспаления в суставах. MSM ↓ NF-kB и ↑ глутатион',severity:'MEDIUM',score:7},
+  // Суставная триада
+  {a:'collagen',b:'glucosamine',type:'synergy',effect:'Суставная триада',mechanism:'Коллаген (каркас) + глюкозамин (синтез) + вит.C (кофактор) + MSM (сера) = полный суставной комплекс',severity:'HIGH',score:9},
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ИММУНИТЕТ (5 препаратов)
+  // ═══════════════════════════════════════════════════════════════════
+  {a:'vitamin_c',b:'zinc',type:'synergy',effect:'Иммунный дуэт',mechanism:'Вит.C ↑ хемотаксис нейтрофилов и апоптоз. Zn ↑ пролиферацию T-клеток и активность NK. Критическая пара',severity:'MEDIUM',score:7},
+  {a:'vitamin_d3',b:'zinc',type:'synergy',effect:'Иммунитет + T',mechanism:'D3 модулирует Th1/Th2 баланс и ↓ воспаление. Zn — кофактор тимулина и T-клеток. Оба ↑ T',severity:'MEDIUM',score:7},
+  {a:'probiotics',b:'vitamin_d3',type:'synergy',effect:'Иммунитет кишечника',mechanism:'Пробиотики → бактериальный барьер + IgA. D3 → кателицидин + β-дефенсин. Комплексная защита слизистых',severity:'MEDIUM',score:7},
+  {a:'probiotics',b:'prebiotics',type:'synergy',effect:'Синбиотик',mechanism:'Пребиотики (клетчатка, инулин) — питание для пробиотиков. Вместе эффективность выше на 50-100%',severity:'HIGH',score:9},
+  {a:'probiotics',b:'glutamine',type:'synergy',effect:'Кишечный барьер',mechanism:'Глютамин — питание энтероцитов (↑ ворсинки). Пробиотики — микробиом (↑ барьер + IgA). Вместе ↓ проницаемость',severity:'MEDIUM',score:7},
+
+  // ═══════════════════════════════════════════════════════════════════
+  // КРОВЬ (5 препаратов)
+  // ═══════════════════════════════════════════════════════════════════
+  {a:'iron',b:'vitamin_c',type:'synergy',effect:'Всасывание Fe',mechanism:'Вит.C восстанавливает Fe3+→Fe2+ в кишечнике. Увеличивает абсорбцию в 3-6 раз. Клинический стандарт при анемии',severity:'HIGH',score:9},
+  {a:'iron',b:'copper',type:'synergy',effect:'Транспорт Fe',mechanism:'Cu — кофактор церулоплазмина, который окисляет Fe2+→Fe3+ для включения в трансферрин. Без Cu Fe не транспортируется',severity:'MEDIUM',score:7},
+  {a:'iron',b:'folate',type:'synergy',effect:'Эритропоэз',mechanism:'Fe — гемоглобин. Фолат — синтез ДНК в эритробластах. Оба кофакторы продукции эритроцитов',severity:'MEDIUM',score:7},
+  {a:'iron',b:'vitamin_b12',type:'synergy',effect:'Эритропоэз',mechanism:'Fe — гем. B12 — синтез ДНК в эритробластах. Дефицит B12 → мегалобластная анемия',severity:'MEDIUM',score:7},
+  {a:'folate',b:'vitamin_b12',type:'synergy',effect:'Гемопоэз',mechanism:'Фолат и B12 — кофакторы синтеза тимидилата и ДНК. Критическая пара для деления клеток костного мозга',severity:'HIGH',score:9},
+
+  // ═══════════════════════════════════════════════════════════════════
+  // STRESS / SLEEP (3 препарата)
+  // ═══════════════════════════════════════════════════════════════════
+  {a:'ashwagandha',b:'magnesium',type:'synergy',effect:'Стресс + сон',mechanism:'Ашваганда ↓ кортизол на 20-30% через HPA-ось. Mg ↓ возбудимость NMDA+↑ GABA. Полный контроль стресса',severity:'HIGH',score:8},
+  {a:'ashwagandha',b:'glycine',type:'synergy',effect:'Расслабление ЦНС',mechanism:'Ашваганда ↓ кортизол и ↑ GABA. Глицин — тормозной нейромедиатор. Синергия седативного эффекта',severity:'MEDIUM',score:6},
+  {a:'glycine',b:'magnesium',type:'synergy',effect:'Сон',mechanism:'Глицин ↓ температуру тела и ↑ качество сна. Mg ↓ кортизол и ↑ GABA. Вместе — мощная пара для сна',severity:'MEDIUM',score:7},
+
+  // ═══════════════════════════════════════════════════════════════════
+  // КОНФЛИКТЫ
+  // ═══════════════════════════════════════════════════════════════════
+  {a:'zinc',b:'copper',type:'conflict',effect:'Антагонизм Zn/Cu',mechanism:'Высокие дозы Zn (50+ мг) индуцируют металлотионеин, связывающий Cu. → дефицит Cu при длит.приёме. Соотношение Zn:Cu = 10:1',severity:'HIGH',score:8},
+  {a:'zinc',b:'iron',type:'conflict',effect:'Конкуренция за DMT1',mechanism:'Zn и Fe конкурируют за общий транспортёр DMT1 в энтероцитах. Интервал приёма ≥ 2ч',severity:'MEDIUM',score:6},
+  {a:'iron',b:'calcium',type:'conflict',effect:'Блокада Fe Ca',mechanism:'Ca блокирует DMT1-транспортёр Fe в кишечнике. Не принимать вместе. Интервал ≥ 2ч',severity:'MEDIUM',score:7},
+  {a:'iron',b:'magnesium',type:'conflict',effect:'Конкуренция',mechanism:'Fe и Mg конкурируют за всасывание в тонком кишечнике. Интервал 1-2ч',severity:'MEDIUM',score:5},
+  {a:'magnesium',b:'calcium',type:'conflict',effect:'Конкуренция за транспорт',mechanism:'Mg и Ca конкурируют за общие транспортёры. Принимать раздельно с интервалом 1-2ч',severity:'LOW',score:4},
+  {a:'vitamin_k2',b:'anticoagulants',type:'conflict',effect:'Антагонизм с варфарином',mechanism:'K2 активирует факторы свёртывания (II,VII,IX,X). Варфарин их блокирует. K2 ↓ эффективность варфарина',severity:'HIGH',score:9},
+  {a:'curcumin',b:'anticoagulants',type:'conflict',effect:'Усиление антикоагуляции',mechanism:'Куркумин ↓ агрегацию тромбоцитов через ингибирование тромбоксана. Усиливает эффект антикоагулянтов',severity:'MEDIUM',score:7},
+  {a:'curcumin',b:'iron',type:'conflict',effect:'Хелация железа',mechanism:'Куркумин хелатирует Fe3+, снижая его всасывание. Полезно при гемохроматозе, вредно при анемии',severity:'MEDIUM',score:6},
+  {a:'coq10',b:'warfarin',type:'conflict',effect:'↓ антикоагуляции',mechanism:'CoQ10 структурно похож на вит.K, может снижать антикоагулянтный эффект варфарина',severity:'MEDIUM',score:6},
+  {a:'vitamin_e',b:'anticoagulants',type:'conflict',effect:'↑ риск кровотечений',mechanism:'Высокие дозы вит.E (>600 МЕ) ↓ агрегацию тромбоцитов через протеинкиназу C',severity:'MEDIUM',score:6},
+  {a:'aspirin',b:'anticoagulants',type:'conflict',effect:'Риск ЖК-кровотечения',mechanism:'Аспирин (необратимая блокада COX-1) + антикоагулянты = высокий риск желудочно-кишечных кровотечений',severity:'HIGH',score:9},
+  {a:'aspirin',b:'ibuprofen',type:'conflict',effect:'ЖКТ-токсичность',mechanism:'НПВС + аспирин = синергия ульцерогенного эффекта → язва желудка',severity:'HIGH',score:8},
+  {a:'probiotics',b:'antibiotics',type:'conflict',effect:'Уничтожение пробиотиков',mechanism:'Антибиотики широкого спектра убивают живые штаммы пробиотиков. Интервал приёма ≥ 3ч',severity:'HIGH',score:8},
+  {a:'berberine',b:'cyp3a4_substrates',type:'conflict',effect:'Ингибитор CYP3A4',mechanism:'Берберин подавляет CYP3A4 → ↑ концентрация многих ЛС (статины, бензодиазепины, антидепрессанты). Осторожно!',severity:'HIGH',score:8},
+  {a:'berberine',b:'antidiabetic_drugs',type:'conflict',effect:'Гипогликемия',mechanism:'Берберин (AMPK) + гипогликемические → риск гипогликемии. Контроль сахара',severity:'MEDIUM',score:7},
+  {a:'ashwagandha',b:'thyroid_drugs',type:'conflict',effect:'↑ T3/T4',mechanism:'Ашваганда ↑ конверсию T4→T3, усиливая эффект тиреоидных гормонов',severity:'MEDIUM',score:6},
+  {a:'telmisartan',b:'potassium_supplements',type:'conflict',effect:'Гиперкалиемия',mechanism:'Телмисартан ↓ экскрецию K+ почками → риск гиперкалиемии с K-добавками',severity:'MEDIUM',score:7},
+  {a:'telmisartan',b:'nsaid_drugs',type:'conflict',effect:'↓ гипотензивного эффекта',mechanism:'НПВС блокируют синтез простагландинов, снижая гипотензивный эффект сартанов',severity:'MEDIUM',score:6},
+  {a:'nebivolol',b:'verapamil',type:'conflict',effect:'Брадикардия',mechanism:'β1-блокатор + верапамил (Ca-блокатор) → риск тяжёлой брадикардии и AV-блокады',severity:'HIGH',score:9},
+  {a:'omega3',b:'anticoagulants',type:'conflict',effect:'↑ риска кровотечений',mechanism:'Высокие дозы Омега-3 (>4г/д) ↓ агрегацию тромбоцитов → ↑ риск с антикоагулянтами',severity:'MEDIUM',score:6},
+];
+
+// ── FROM: support-stacks.ts ──
+export interface SupportStack {
+  id: string;
+  name?: string;
+  effects: string[];
+  substances: string[];
+  synergyScore: number;
+  description: string;
+  dosages?: Record<string, { morning?: number; afternoon?: number; evening?: number; night?: number; unit: string }>;
+  synergy_notes?: string;
+  timing?: string;
+  goalTags?: string[];
+}
+
+export const EFFECT_LABELS_ru: Record<string, string> = {
+  energy: '⚡ Энергия', focus: '🎯 Фокус', anti_stress: '🧘 Антистресс',
+  mood: '😊 Настроение', fat_loss: '🔥 Жиросжигание', mitochondria: '🧬 Митохондрии',
+  recovery: '🔄 Восстановление', sleep: '😴 Сон', hormone_balance: '⚖ Гормоны',
+  immune_boost: '🛡 Иммунитет', gi_healing: '🫃 ЖКТ', detox: '🧹 Детокс',
+  anti_inflammation: '💢 Противовоспаление', cardio_support: '❤️ Кардио',
+  liver_support: '🫁 Печень', insulin_sensitivity: '📉 Инсулин',
+  muscle_growth: '💪 Рост мышц', gh_igf_axis: '📈 GH/IGF',
+  memory: '🧠 Память', thyroid_support: '🦋 Щитовидка',
+  bone_support: '🦴 Кости', hydration: '💧 Гидратация', absorption: '📥 Абсорбция',
+  antioxidant: '🧪 Антиоксидант', nootropic: '🧠 Ноотроп', vision: '👁 Зрение',
+  skin: '✨ Кожа', joint: '🦵 Суставы', liver_detox: '🍃 Детокс печени',
+  kidney: '🫘 Почки', lung: '🫁 Лёгкие', blood: '🩸 Кровь',
+  adrenal: '🌀 Надпочечники', male_health: '♂️ Мужское здоровье',
+  female_health: '♀️ Женское здоровье', prenatal: '🤰 Пренатальное',
+  antiaging: '⏳ Антивозрастное', methylation: '🔄 Метилирование',
+  nerve: '🧠 Нервы', tendon: '🦵 Сухожилия', probiotics: '🦠 Микробиом',
+  collagen: '🧶 Коллаген', electrolyte: '💧 Электролиты',
+  anemia: '🩸 Анемия', coagulation: '🩸 Свёртываемость',
+  lymphatic: '♻️ Лимфа', dopamine: '🧠 Дофамин', serotonin: '🧠 Серотонин',
+  gaba: '🧠 GABA', appetite: '🍽 Аппетит', pain: '💊 Боль',
+  libido: '🔥 Либидо', hair: '💇 Волосы', nails: '💅 Ногти',
+  pancreas: '🍬 Поджелудочная', allergy: '🤧 Аллергия',
+  antimicrobial: '🦠 Антимикробное', antiviral: '🦠 Противовирусное',
+};
+
+const L: Record<string, string> = {
+  // === Original 40 ===
+  caffeine:'Кофеин',l_theanine:'L-Теанин',rhodiola:'Родиола',
+  acetyl_l_carnitine:'АЛКАР',mots_c:'MOTS-c',coq10:'CoQ10',
+  omega3:'Омега-3',berberine:'Берберин',metformin:'Метформин',
+  curcumin:'Куркумин',vitamin_c:'Витамин C',quercetin:'Кверцетин',
+  sulforaphane:'Сульфорафан',nac:'NAC',reishi:'Рейши',bpc157:'BPC-157',
+  egcg:'EGCG',glycine:'Глицин',taurine:'Таурин',magnesium:'Магний',
+  vitamin_b6:'Витамин B6',l_glutamine:'L-Глутамин',melatonin:'Мелатонин',
+  apigenin:'Апигенин',gh:'GH',igf1:'IGF-1',creatine:'Креатин',
+  beta_alanine:'Бета-аланин',piracetam:'Пирацетам',noopept:'Ноопепт',
+  alpha_gpc:'Альфа-GPC',huperzine_a:'Гуперзин A',bacopa:'Бакопа',
+  ginseng:'Женьшень',modafinil:'Модафинил',l_tyrosine:'L-Тирозин',
+  dhea:'DHEA',ashwagandha:'Ашваганда',cordyceps:'Кордицепс',
+  selank:'Селанк',ss31:'SS-31',phenylpiracetam:'Фенилпирацетам',
+  astaxanthin:'Астаксантин',milk_thistle:'Расторопша',
+  electrolyte_mix:'Электролиты',iodine:'Йод',potassium:'Калий',
+  vitamin_k2:'Витамин K2',piperine:'Пиперин',vitamin_d:'Витамин D',
+  eaa:'EAA',chaga:'Чага',bifidobacterium:'Бифидобактерии',
+  lactobacillus:'Лактобактерии',saccharomyces_boulardii:'S. boulardii',
+  l_carnitine:'L-Карнитин',
+
+  // === NEW: vitamins & minerals (from ALL_SUBSTANCES) ===
+  vitamin_a:'Витамин A',vitamin_b1:'B1 (Тиамин)',vitamin_b2:'B2 (Рибофлавин)',
+  vitamin_b3:'B3 (Ниацин)',vitamin_b5:'B5 (Пантотеновая)',vitamin_b7:'B7 (Биотин)',
+  vitamin_b9:'B9 (Фолиевая)',vitamin_b12:'B12 (Метилкобаламин)',
+  vitamin_e:'Витамин E',vitamin_k1:'Витамин K1',
+  zinc:'Цинк',selenium:'Селен',copper:'Медь',manganese:'Марганец',
+  chromium:'Хром',molybdenum:'Молибден',iron:'Железо',calcium:'Кальций',
+  silicon:'Кремний',vanadium:'Ванадий',boron:'Бор',
+
+  // === NEW: amino acids & proteins ===
+  l_arginine:'L-Аргинин',l_citrulline:'L-Цитруллин',l_ornithine:'L-Орнитин',
+  l_lysine:'L-Лизин',l_methionine:'L-Метионин',l_threonine:'L-Треонин',
+  l_tryptophan:'L-Триптофан',l_valine:'L-Валин',l_leucine:'L-Лейцин',
+  l_isoleucine:'L-Изолейцин',l_histidine:'L-Гистидин',l_proline:'L-Пролин',
+  l_serine:'L-Серин',l_asparagine:'L-Аспарагин',l_glutamic:'L-Глутаминовая',
+  l_carnosine:'L-Карнозин',l_theanine_extra:'L-Теанин (доп)',
+  glutathione:'Глутатион',n_acetyl_cysteine:'N-Ацетилцистеин',
+  bcaa:'BCAA',whey:'Сывороточный протеин',casein:'Казеин',
+
+  // === NEW: adaptogens & herbs ===
+  holy_basil:'Туласи (Священный базилик)',schisandra:'Лимонник',
+  eleuthero:'Элеутерококк',astragalus:'Астрагал',echinacea:'Эхинацея',
+  gingko:'Гинкго Билоба',gotu_kola:'Готу Кола',feverfew:'Пиретрум',
+  valerian:'Валериана',passionflower:'Страстоцвет',hop:'Хмель',
+  lemon_balm:'Мелисса',st_johns_wort:'Зверобой',kava:'Кава',
+  maca:'Мака',tribulus:'Трибулус',tongkat_ali:'Тонгкат Али',
+  fadogia:'Фадогия',shilajit:'Шиладжит',mucuna:'Мекуна (L-ДОФА)',
+  guggul:'Гуггул',boswellia:'Босвеллия',cat_claw:'Кошка коготь',
+
+  // === NEW: mushrooms ===
+  lion_mane:'Львиная грива',maitake:'Майтаке',shiitake:'Шиитаке',
+  tremella:'Тремелла',cordyceps_mil:'Кордицепс Militaris',
+  agarikon:'Агарикон',polyporus:'Полипорус',poria:'Пория',
+
+  // === NEW: nootropics & brain ===
+  aniracetam:'Анирацетам',oxiracetam:'Оксирацетам',pramiracetam:'Прамирацетам',
+  fasoracetam:'Фасорацетам',coluracetam:'Колурацетам',
+  dmnea:'DMNEA',dmha:'DMHA',higenamine:'Хигенамин',
+  racetam_base:'Рацетам',nefiracetam:'Нефирацетам',
+  semax:'Семакс',cerebrolysin:'Церебролизин',p21:'P21',
+  cortexin:'Кортексин',picamilon:'Пикамилон',phenibut:'Фенибут',
+  noopept_extra:'Ноопепт (доп)',idebenone:'Идебенон',
+  agmatine:'Агматин',uridine:'Уридин',choline:'Холин',
+  citicoline:'Цитиколин',dmae:'DMAE',centrophenoxine:'Центрофеноксин',
+
+  // === NEW: metabolic & mitochondrial ===
+  ala:'Альфа-Липоевая',r_ala:'R-Альфа-Липоевая',pqq:'PQQ',
+  nmn:'NMN',nr:'Никотинамид Рибоусид',nad:'NAD+',
+  d_ribose:'D-Рибоза',shilajit_fulvic:'Фульвовая кислота',
+  carnitine:'L-Карнитин',gpl:'GPL-Карнитин',acetyl_carnitine:'Ацетил-Карнитин',
+
+  // === NEW: digestive & GI ===
+  digestive_enzymes:'Пищеварительные ферменты',betaine_hcl:'Бетаин HCl',
+  pepsin:'Пепсин',pancreatin:'Панкреатин',bromelain:'Бромелайн',
+  papain:'Папаин',serrapeptase:'Серрапептаза',nattokinase:'Наттокиназа',
+  slippery_elm:'Вяз скользкий',marshmallow_root:'Корень алтея',
+  aloe_vera:'Алоэ Вера',licorice:'Солодка',deglycyrrhizinated_licorice:'DGL',
+  peppermint_oil:'Мятное масло',ginger:'Имбирь',fennel:'Фенхель',
+  caraway:'Тмин',artichoke:'Артишок',gentian:'Горечавка',
+  milk_thistle_extract:'Расторопша экстракт',tudca:'TUDCA',
+
+  // === NEW: cardiovascular ===
+  coq10_ubiquinone:'Убихинон',coq10_ubiquinol:'Убихинол',
+  pyrroloquinoline_quinone:'PQQ',hawthorn:'Боярышник',garlic:'Чеснок',
+  cayenne:'Кайенский перец',gingko_biloba:'Гинкго Билоба',
+  resveratrol:'Ресвератрол',pterostilbene:'Птеростильбен',
+  magnesium_taurate:'Магния таурат',magnesium_glycinate:'Магния глицинат',
+  magnesium_citrate:'Магния цитрат',magnesium_malate:'Магния малат',
+  potassium_citrate:'Калия цитрат',potassium_chloride:'Калия хлорид',
+  taurine_extra:'Таурин (доп)',l_arginine_extra:'Аргинин (доп)',
+
+  // === NEW: joint & bone ===
+  glucosamine:'Глюкозамин',chondroitin:'Хондроитин',msm:'MSM',
+  hyaluronic:'Гиалуроновая кислота',collagen_i_iii:'Коллаген I+III',
+  collagen_ii:'Коллаген II',collagen_hydro:'Гидролизат коллагена',
+  eggshell_membrane:'Мембрана яйца',cissus:'Циссус',horsetail:'Хвощ полевой',
+  bamboo_silica:'Бамбук кремний',vitamin_d3:'D3 5000',
+
+  // === NEW: immune & antimicrobial ===
+  propolis:'Прополис',bee_pollen:'Пыльца',royal_jelly:'Маточное молочко',
+  colostrum:'Колострум',beta_glucan:'Бета-Глюкан',
+  lactoferrin:'Лактоферрин',transfer_factor:'Трансфер фактор',
+  monolauren:'Монолаурин',oregano_oil:'Масло орегано',
+  olive_leaf:'Лист оливы',grapefruit_seed:'Экстракт грейпфрута',
+  colloidal_silver:'Коллоидное серебро',vitamin_c_liposomal:'Витамин C липосомальный',
+
+  // === NEW: hormonal & thyroid ===
+  ashwagandha_ksm66:'KSM-66',ashwagandha_sensoril:'Сенсорил',
+  tyrosine:'L-Тирозин',thyroid_glandular:'Тиреоид железа',
+  iodine_potassium:'Йод (калия йодид)',selenomethionine:'Селенометионин',
+  zinc_picolinate:'Цинка пиколинат',zinc_bisglycinate:'Цинка бисглицинат',
+  dhea_extra:'DHEA (доп)',pregnenolone:'Прегненолон',
+  keto_dhea:'7-Кето DHEA',androstenedione:'Андростендион',
+
+  // === NEW: sleep & relaxation ===
+  magnesium_theronate:'Магния треонат',gaba:'GABA',phenibut_extra:'Фенибут (доп)',
+  l_theanine_sun:'L-Теанин Sun',h5_htp:'5-HTP',tryptophan:'Триптофан',
+  chamomile:'Ромашка',lavender:'Лаванда',skullcap:'Шлемник',
+  california_poppy:'Калифорнийский мак',ashwagandha_kSM66:'KSM-66',
+
+  // === NEW: nootropic peptides ===
+  semax_extra:'Семакс (доп)',selank_extra:'Селанк (доп)',dihexa:'Дигекса',
+  noopept_peptide:'Ноопепт',cerebrolysin_extra:'Церебролизин (доп)',
+  p21_extra:'P21 (доп)',epitalon:'Эпиталон',
+};
+
+export function getStackSubstanceLabel(id: string): string {
+  if (!id) return '—';
+  if (L[id]) return L[id];
+  const catEntry = SUPPORT_CATALOG_DATA[id];
+  if (catEntry) return catEntry.nameRu || catEntry.name;
+  return id.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+}
+
+// Map each effect to substances that support it (100+ substances across 30+ effects)
+const EFFECT_SUBSTANCES: Record<string, string[]> = {
+  energy: ['caffeine','theanine','rhodiola','l_carnitine','coq10','creatine','taurine','ginseng','cordyceps','vitamin_b12','iron','l_carnitine','beta_alanine','creatine','caffeine','caffeine','stimulant_complex','pqq','nmn','nmn'],
+  focus: ['caffeine','theanine','alpha_gpc','huperzine_a','noopept','piracetam','pramiracetam','modafinil','tyrosine','aniracetam','oxiracetam','pramiracetam','fasoracetam','ginkgo','citicoline','caffeine','caffeine'],
+  anti_stress: ['ashwagandha','rhodiola','theanine','magnesium','glycine','taurine','selank','bacopa','apigenin','holy_basil','lemon_balm','lemon_balm','gaba','theanine','magnesium','magnesium','lemon_balm'],
+  mood: ['tryptophan','x5htp','ashwagandha','rhodiola','tyrosine','selank','saffron','saffron','l_dopa','gaba','phenibut','agmatine','citicoline','magnesium'],
+  fat_loss: ['mots_c','l_carnitine','coq10','egcg','berberine','metformin','caffeine','tyrosine','cissus','berberine','l_carnitine','choline','stimulant_complex','caffeine','stimulant_complex'],
+  mitochondria: ['mots_c','pqq','coq10','ss31','nmn','nmn','nmn','creatine','alpha_lipoic','shilajit','pqq','coq10'],
+  recovery: ['bpc157','glutamine','curcumin','creatine','beta_alanine','collagen','eaa','eaa','bcaa','vitamin_c','zinc','magnesium','fadogia','shilajit','l_carnitine'],
+  sleep: ['melatonin','glycine','taurine','magnesium','apigenin','gaba','x5htp','tryptophan','apigenin','lemon_balm','lemon_balm','magnolia','lemon_balm','lemon_balm','magnesium','phenibut'],
+  hormone_balance: ['vitamin_b6','ashwagandha','dhea','zinc','magnesium','boron','vitamin_d3','iodine','pregnenolone','fadogia','fadogia','fadogia','maca','shilajit'],
+  immune_boost: ['vitamin_c','quercetin','sulforaphane','reishi','vitamin_d3','zinc','andrographis','astragalus','astragalus','beta_glucan','zinc_carnosine','colostrum','vitamin_c'],
+  gi_healing: ['bpc157','glutamine','curcumin','glutamine','licorice','glutamine','glutamine','digestive_enzymes','ginger','artichoke','tudca'],
+  detox: ['nac','milk_thistle','curcumin','sulforaphane','glutathione','alpha_lipoic','alpha_lipoic','vitamin_c','fiber','fiber','fiber','calcium'],
+  anti_inflammation: ['curcumin','omega3','quercetin','ginger','boswellia','ginger','curcumin','resveratrol','astaxanthin','cissus','boswellia','nattokinase'],
+  cardio_support: ['omega3','coq10','cordyceps','electrolyte_complex','potassium','magnesium','coq10','garlic','resveratrol','pterostilbene','arginine','citrulline','telmisartan','nebivolol','taurine'],
+  liver_support: ['nac','milk_thistle','curcumin','tudca','artichoke','alpha_lipoic','selenium','vitamin_b6','vitamin_b12','folate','astragalus','schisandra'],
+  insulin_sensitivity: ['berberine','metformin','mots_c','chromium','cinnamon','alpha_lipoic','magnesium','vitamin_d3','egcg','berberine','berberine','vanadium'],
+  muscle_growth: ['cjc1295','igf1','creatine','beta_alanine','eaa','bcaa','eaa','hmb','arginine','citrulline','fadogia','fadogia','ecdysterone','turkey_tail'],
+  gh_igf_axis: ['cjc1295','igf1','mots_c','melatonin','gaba','l_dopa','l_dopa','fadogia','fadogia','ipamorelin','cjc1295','ipamorelin','cjc1295'],
+  memory: ['alpha_gpc','huperzine_a','l_carnitine','bacopa','noopept','piracetam','pramiracetam','citicoline','phosphatidylserine','ginkgo','lions_mane','citicoline'],
+  thyroid_support: ['iodine','selenium','zinc','vitamin_d3','vitamin_b12','tyrosine','ashwagandha','tyrosine','copper','manganese','levothyroxine','magnesium'],
+  bone_support: ['vitamin_d3','vitamin_k2','calcium','magnesium','boron','silicon','vitamin_c','collagen','silicon','silicon','msm','glucosamine'],
+  hydration: ['electrolyte_complex','potassium','magnesium','calcium','sodium','taurine','creatine','electrolyte_complex','trace_minerals'],
+  absorption: ['curcumin','ginger','ginger','ginger','digestive_enzymes','betaine','artichoke','gentian','milk_thistle'],
+  antioxidant: ['vitamin_c','vitamin_e','selenium','curcumin','astaxanthin','quercetin','resveratrol','egcg','glutathione','alpha_lipoic','coq10','glutathione'],
+  nootropic: ['piracetam','aniracetam','oxiracetam','pramiracetam','noopept','pramiracetam','alpha_gpc','citicoline','ginkgo','bacopa','lions_mane','semax','cerebrolysin'],
+  vision: ['vitamin_a','lutein','lutein','astaxanthin','vitamin_c','vitamin_e','zinc','lutein','ginkgo','quercetin'],
+  skin: ['collagen','vitamin_c','vitamin_e','biotin','zinc','silicon','collagen','astaxanthin','glutamine','vitamin_a','vitamin_b3'],
+  joint: ['glucosamine','glucosamine','msm','collagen','collagen','cissus','ginger','curcumin','omega3','vitamin_d3','calcium'],
+  kidney: ['astragalus','cranberry','astragalus','astragalus','potassium','magnesium','vitamin_b6','omega3','probiotics','curcumin'],
+  lung: ['vitamin_c','quercetin','ginger','nac','omega3','magnesium','vitamin_d3','cordyceps','reishi','andrographis'],
+  blood: ['iron','vitamin_b12','folate','vitamin_c','copper','vitamin_b6','vitamin_k2','omega3','nac','beta_alanine'],
+  male_health: ['zinc','fadogia','fadogia','fadogia','maca','boron','ashwagandha','vitamin_d3','dhea','pregnenolone','shilajit'],
+  antiaging: ['nmn','nmn','nmn','pqq','coq10','resveratrol','pterostilbene','astaxanthin','cjc1295','igf1','ss31','selank'],
+  methylation: ['vitamin_b12','folate','vitamin_b6','betaine','phosphatidylcholine','methionine','zinc','magnesium','selenium','molybdenum'],
+  probiotics: ['probiotics','probiotics','probiotics','prebiotics','prebiotics','colostrum','collagen','glutamine'],
+  collagen: ['collagen','collagen','collagen','vitamin_c','silicon','collagen','msm','collagen'],
+  electrolyte: ['electrolyte_complex','potassium','magnesium','calcium','sodium','trace_minerals','electrolyte_complex'],
+  libido: ['maca','fadogia','fadogia','fadogia','zinc','boron','ashwagandha','dhea','shilajit','arginine','stimulant_complex'],
+  hair: ['biotin','zinc','silicon','vitamin_d3','vitamin_e','collagen','msm','saw_palmetto','saw_palmetto','caffeine'],
+  pain: ['curcumin','boswellia','ginger','magnesium','boswellia','cissus','boswellia','boswellia','magnolia','gaba'],
+  dopamine: ['tyrosine','l_dopa','rhodiola','bromantane','l_carnitine','citicoline','phosphatidylserine','theanine','ginkgo','citicoline'],
+  serotonin: ['x5htp','tryptophan','saffron','ashwagandha','magnesium','vitamin_b6','saffron','rhodiola','selank'],
+  gaba: ['gaba','phenibut','magnesium','taurine','glycine','theanine','magnolia','apigenin','lemon_balm','gaba'],
+  allergy: ['quercetin','vitamin_c','ginger','saw_palmetto','quercetin','vitamin_d3','zinc','probiotics','omega3'],
+};
+
+// Generate all valid stack combinations (200+)
+function generateStacks(): SupportStack[] {
+  const stacks: SupportStack[] = [];
+  let idCounter = 0;
+
+  // Helper: produce a numeric synergy score based on number of substances and effect overlap
+  const calcSynergy = (substances: string[], effects: string[]): number => {
+    const base = substances.length * 1.5 + effects.length * 1.2;
+    // Synergy bonus: more substances covering the same effect = higher synergy potential
+    let overlapBonus = 0;
+    const allSubsForEffects = effects.flatMap(e => EFFECT_SUBSTANCES[e] || []);
+    for (const sub of substances) {
+      overlapBonus += allSubsForEffects.filter(s => s === sub).length * 0.3;
+    }
+    return parseFloat((Math.min(40, base + overlapBonus + Math.random() * 0.8)).toFixed(1));
+  };
+
+  const safeId = (parts: string[]): string => {
+    const base = parts.join('_').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 60);
+    return `${base}_${idCounter++}`;
+  };
+
+  const genDesc = (effects: string[], substances: string[], score: number): string => {
+    const effStr = effects.map(e => (EFFECT_LABELS_ru[e]||e).replace(/^.{1,2}\s/,'')).join(', ');
+    const subStr = substances.map(s => getStackSubstanceLabel(s)).join(', ');
+    let desc = `Стек для ${effStr}. Состав: ${subStr}.`;
+    if (score > 15) desc += ' Высокая синергия компонентов.';
+    else if (score > 10) desc += ' Хорошая совместимость компонентов.';
+    else desc += ' Сбалансированная базовая комбинация.';
+    if (substances.length >= 8) desc += ' Расширенный комплекс.';
+    return desc;
+  };
+
+  // Phase 1: For each effect, generate 3-substance combos (every combination of 3 from pool)
+  for (const [effect, subs] of Object.entries(EFFECT_SUBSTANCES)) {
+    if (subs.length < 3) continue;
+    const pool = [...new Set(subs)];
+    // Generate up to 6 combos for each effect
+    const maxCombos = Math.min(6, pool.length);
+    for (let a = 0; a < pool.length - 2 && stacks.length < 250; a += 2) {
+      for (let b = a + 1; b < pool.length - 1 && stacks.length < 250; b += 2) {
+        for (let c = b + 1; c < pool.length && stacks.length < 250; c += 2) {
+          const combo = [pool[a], pool[b], pool[c]];
+          const score = calcSynergy(combo, [effect]);
+          stacks.push({
+            id: safeId([effect, ...combo]),
+            effects: [effect],
+            substances: combo,
+            synergyScore: score,
+            description: genDesc([effect], combo, score),
+          });
+        }
+      }
+    }
+  }
+
+  // Phase 2: Multi-effect combos (2-4 effects with 3-5 substances each)
+  const effectGroups = Object.keys(EFFECT_SUBSTANCES);
+  const multiEffectSizes = [2, 3, 4, 5];
+  const counts = [3, 4, 5];
+
+  for (let groupSize of [2, 3, 4]) {
+    for (let ei = 0; ei < effectGroups.length - groupSize + 1 && stacks.length < 350; ei += 3) {
+      const groupEffects = effectGroups.slice(ei, ei + groupSize);
+      // Collect pool of substances that cover at least 2 effects in this group
+      const subCounts: Record<string, number> = {};
+      for (const ef of groupEffects) {
+        for (const s of (EFFECT_SUBSTANCES[ef] || [])) {
+          subCounts[s] = (subCounts[s] || 0) + 1;
+        }
+      }
+      // Prefer substances covering multiple effects
+      const ranked = Object.entries(subCounts)
+        .filter(([_, count]) => count >= 2)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([s]) => s);
+
+      if (ranked.length < groupSize) continue;
+      const subCount = Math.min(ranked.length, counts[Math.floor(ei / 4) % counts.length]);
+      const combo = ranked.slice(0, subCount);
+      const score = calcSynergy(combo, groupEffects);
+      stacks.push({
+        id: safeId([...groupEffects]),
+        effects: groupEffects,
+        substances: combo,
+        synergyScore: score,
+        description: genDesc(groupEffects, combo, score),
+      });
+    }
+  }
+
+  // Phase 3: Named/premium stacks — combine 5-10 substances across 3-7 effects
+  const premiumSets: { effects: string[]; substances: string[] }[] = [
+    { effects: ['energy','focus','mood','anti_stress'], substances: ['caffeine','theanine','rhodiola','tyrosine','alpha_gpc','magnesium'] },
+    { effects: ['sleep','recovery','hormone_balance','anti_stress'], substances: ['melatonin','glycine','magnesium','ashwagandha','zinc','vitamin_b6','apigenin'] },
+    { effects: ['immune_boost','anti_inflammation','detox','liver_support'], substances: ['vitamin_c','quercetin','sulforaphane','nac','curcumin','milk_thistle','selenium'] },
+    { effects: ['gi_healing','anti_inflammation','recovery','immune_boost'], substances: ['bpc157','glutamine','curcumin','reishi','quercetin','tudca'] },
+    { effects: ['focus','memory','nootropic','mood'], substances: ['alpha_gpc','huperzine_a','noopept','bacopa','theanine','citicoline','lions_mane','phosphatidylserine'] },
+    { effects: ['fat_loss','insulin_sensitivity','energy','mitochondria'], substances: ['berberine','mots_c','coq10','l_carnitine','chromium','egcg','caffeine','pqq'] },
+    { effects: ['cardio_support','anti_inflammation','detox','antioxidant'], substances: ['omega3','coq10','curcumin','nac','resveratrol','astaxanthin','garlic','magnesium'] },
+    { effects: ['muscle_growth','recovery','gh_igf_axis','energy'], substances: ['creatine','beta_alanine','eaa','cjc1295','igf1','glutamine','zinc','l_carnitine'] },
+    { effects: ['thyroid_support','hormone_balance','energy','mood'], substances: ['iodine','selenium','zinc','tyrosine','ashwagandha','vitamin_d3','magnesium','dhea'] },
+    { effects: ['male_health','libido','hormone_balance','energy'], substances: ['fadogia','maca','boron','zinc','ashwagandha','vitamin_d3','shilajit'] },
+    { effects: ['antiaging','mitochondria','antioxidant','methylation'], substances: ['nmn','pqq','coq10','resveratrol','astaxanthin','vitamin_b12','folate','ss31'] },
+    { effects: ['bone_support','joint','collagen','anti_inflammation'], substances: ['vitamin_d3','vitamin_k2','calcium','magnesium','glucosamine','msm','collagen','collagen','boron'] },
+    { effects: ['sleep','gaba','serotonin','anti_stress'], substances: ['melatonin','gaba','x5htp','magnesium','theanine','glycine','apigenin','lemon_balm'] },
+    { effects: ['energy','focus','dopamine','mood'], substances: ['tyrosine','l_dopa','rhodiola','caffeine','theanine','l_carnitine','phosphatidylserine'] },
+    { effects: ['immune_boost','gi_healing','detox','probiotics'], substances: ['probiotics','prebiotics','glutamine','colostrum','vitamin_d3','zinc','sulforaphane'] },
+    { effects: ['liver_support','detox','antioxidant','anti_inflammation'], substances: ['nac','tudca','milk_thistle','artichoke','curcumin','selenium','alpha_lipoic','schisandra'] },
+    { effects: ['hydration','electrolyte','cardio_support','energy'], substances: ['electrolyte_complex','potassium','magnesium','sodium','taurine','cordyceps','creatine'] },
+    { effects: ['memory','nootropic','focus','anti_stress'], substances: ['piracetam','aniracetam','alpha_gpc','bacopa','theanine','phosphatidylserine','ginkgo'] },
+    { effects: ['fat_loss','cardio_support','insulin_sensitivity','detox'], substances: ['egcg','berberine','omega3','l_carnitine','garlic','chromium'] },
+    { effects: ['lung','immune_boost','anti_inflammation','detox'], substances: ['vitamin_c','quercetin','nac','omega3','vitamin_d3','reishi','cordyceps'] },
+    { effects: ['skin','collagen','antioxidant','hydration'], substances: ['collagen','vitamin_c','collagen','astaxanthin','biotin','zinc','vitamin_e','silicon'] },
+    { effects: ['kidney','detox','hydration','electrolyte'], substances: ['astragalus','cranberry','potassium','magnesium','vitamin_b6'] },
+    { effects: ['blood','anemia','methylation','energy'], substances: ['iron','vitamin_b12','folate','vitamin_c','copper','vitamin_b6'] },
+    { effects: ['allergy','anti_inflammation','immune_boost','lung'], substances: ['quercetin','vitamin_c','vitamin_d3','zinc','omega3'] },
+    { effects: ['pain','anti_inflammation','joint','recovery'], substances: ['curcumin','boswellia','magnesium','msm','glucosamine'] },
+    { effects: ['dopamine','serotonin','mood','focus'], substances: ['tyrosine','x5htp','rhodiola','theanine','phosphatidylserine','tryptophan'] },
+    { effects: ['prenatal','methylation','bone_support','immune_boost'], substances: ['vitamin_b12','folate','vitamin_d3','calcium','iron','zinc','iodine','omega3','phosphatidylcholine'] },
+    { effects: ['hair','skin','nails','collagen'], substances: ['biotin','zinc','silicon','collagen','msm','vitamin_d3','vitamin_e','astaxanthin'] },
+    { effects: ['vision','antioxidant','anti_inflammation','brain'], substances: ['lutein','astaxanthin','vitamin_c','zinc','ginkgo','quercetin'] },
+    { effects: ['thyroid_support','blood','hormone_balance','energy'], substances: ['iron','vitamin_c','selenium','iodine','zinc','copper','vitamin_b12','folate','vitamin_a'] },
+    { effects: ['cancer_prevention','antioxidant','immune_boost','detox'], substances: ['sulforaphane','curcumin','egcg','resveratrol','vitamin_d3','quercetin','selenium','astragalus'] },
+    { effects: ['anxiety','gaba','anti_stress','sleep'], substances: ['theanine','magnesium','ashwagandha','gaba','apigenin','lemon_balm','magnolia'] },
+    { effects: ['fertility','hormone_balance','antioxidant','energy'], substances: ['zinc','selenium','vitamin_d3','coq10','l_carnitine','ashwagandha','maca','folate'] },
+    { effects: ['neuroprotection','nootropic','antioxidant','mitochondria'], substances: ['lions_mane','citicoline','alpha_gpc','coq10','omega3','phosphatidylserine','bacopa','ginkgo'] },
+    { effects: ['gut_healing','probiotics','anti_inflammation','immune_boost'], substances: ['probiotics','glutamine','zinc_carnosine','colostrum','prebiotics','butyrate','bpc157','kpv'] },
+    { effects: ['antiaging_cellular','mitophagy','nad_boost','sirtuin'], substances: ['nmn','resveratrol','pterostilbene','urolithin_a','fisetin','pqq','coq10','ss31'] },
+    { effects: ['testosterone_boost','libido','muscle_growth','recovery'], substances: ['fadogia','ashwagandha','zinc','vitamin_d3','boron','dhea','shilajit','maca'] },
+    { effects: ['estrogen_balance','bone_support','mood','skin'], substances: ['vitamin_d3','vitamin_k2','calcium','magnesium','omega3','boron','maca','folate'] },
+    { effects: ['cholesterol','cardio_support','liver_support','antioxidant'], substances: ['omega3','berberine','red_yeast_rice','coq10','niacin','garlic','artichoke','curcumin'] },
+  ];
+    for (const ps of premiumSets) {
+    if (stacks.length >= 200) break;
+    const pscore = calcSynergy(ps.substances, ps.effects);
+    stacks.push({
+      id: safeId([...ps.effects]),
+      effects: ps.effects,
+      substances: ps.substances,
+      synergyScore: pscore,
+      description: genDesc(ps.effects, ps.substances, pscore),
+    });
+  }
+
+  // Phase 4: Fill remaining slots with random combos from top substances
+  const allSubs = [...new Set(Object.values(EFFECT_SUBSTANCES).flat())];
+  while (stacks.length < 200) {
+    const size = 3 + (stacks.length % 4);
+    const shuffled = [...allSubs].sort(() => Math.random() - 0.5).slice(0, size);
+    const effectCount = 1 + (stacks.length % 3);
+    const shuffledEffects = [...effectGroups].sort(() => Math.random() - 0.5).slice(0, effectCount);
+    const fscore = calcSynergy(shuffled, shuffledEffects);
+    stacks.push({
+      id: safeId([...shuffledEffects, ...shuffled]),
+      effects: shuffledEffects,
+      substances: shuffled,
+      synergyScore: fscore,
+      description: genDesc(shuffledEffects, shuffled, fscore),
+    });
+  }
+
+  // Phase 5: Organ & system stacks (various sizes: 2-4 to 30-35)
+  const organGroups: { key: string; label: string; effects: string[]; sizeRange: [number,number] }[] = [
+    { key:'organ_cardio',label:'Сердце и сосуды',effects:['cardio_support','hydration','electrolyte','anti_inflammation','antioxidant'], sizeRange:[3,12] },
+    { key:'organ_liver',label:'Печень и детокс',effects:['liver_support','liver_detox','detox','antioxidant','anti_inflammation'], sizeRange:[3,12] },
+    { key:'organ_kidney',label:'Почки',effects:['kidney','hydration','electrolyte','detox','anti_inflammation'], sizeRange:[2,8] },
+    { key:'organ_lung',label:'Лёгкие и дыхание',effects:['lung','immune_boost','anti_inflammation','detox','antioxidant'], sizeRange:[2,8] },
+    { key:'organ_brain',label:'Мозг и когниция',effects:['nootropic','memory','focus','mood','dopamine','serotonin','gaba','anti_stress'], sizeRange:[3,15] },
+    { key:'organ_bones',label:'Кости и суставы',effects:['bone_support','joint','collagen','anti_inflammation','antioxidant'], sizeRange:[3,10] },
+    { key:'organ_skin',label:'Кожа, волосы, ногти',effects:['skin','hair','nails','collagen','hydration','antioxidant'], sizeRange:[2,8] },
+    { key:'organ_thyroid',label:'Щитовидная железа',effects:['thyroid_support','hormone_balance','energy','mood','antioxidant'], sizeRange:[2,7] },
+    { key:'organ_pancreas',label:'Поджелудочная и инсулин',effects:['pancreas','insulin_sensitivity','fat_loss','mitochondria','energy'], sizeRange:[2,7] },
+    { key:'organ_blood',label:'Кровь и анемия',effects:['blood','anemia','coagulation','methylation','energy'], sizeRange:[2,8] },
+    { key:'organ_immune',label:'Иммунная система',effects:['immune_boost','antimicrobial','antiviral','allergy','lung','antioxidant'], sizeRange:[3,12] },
+    { key:'organ_gi',label:'ЖКТ и микробиом',effects:['gi_healing','probiotics','detox','anti_inflammation','immuneboost'], sizeRange:[3,10] },
+    { key:'organ_hormones',label:'Гормональный баланс',effects:['hormone_balance','adrenal','thyroid_support','mood','energy','libido'], sizeRange:[3,12] },
+    { key:'organ_male',label:'Мужское здоровье',effects:['male_health','libido','hormone_balance','energy','recovery','muscle_growth'], sizeRange:[3,12] },
+    { key:'organ_female',label:'Женское здоровье',effects:['female_health','prenatal','hormone_balance','mood','bone_support','skin'], sizeRange:[3,12] },
+    { key:'organ_multi_metab',label:'Метаболизм и энергия',effects:['energy','mitochondria','fat_loss','insulin_sensitivity','thyroid_support','muscle_growth'], sizeRange:[5,20] },
+    { key:'organ_multi_antiaging',label:'Антивозрастной комплекс',effects:['antiaging','mitochondria','antioxidant','methylation','skin','bone_support','nootropic','hormone_balance'], sizeRange:[8,35] },
+    { key:'organ_multi_recovery',label:'Восстановление и сон',effects:['recovery','sleep','gaba','serotonin','anti_stress','anti_inflammation','joint','muscle_growth'], sizeRange:[5,20] },
+  ];
+
+  for (const og of organGroups) {
+    // Collect all substances for these effects, weighted by how many effects they cover
+    const subWeight: Record<string, number> = {};
+    for (const ef of og.effects) {
+      for (const s of (EFFECT_SUBSTANCES[ef] || [])) {
+        subWeight[s] = (subWeight[s] || 0) + 1;
+      }
+    }
+    const ranked = Object.entries(subWeight).sort((a,b) => b[1]-a[1]).map(([s]) => s);
+    if (ranked.length < 2) continue;
+
+    // Generate stacks of different sizes for this organ
+    const sizeSteps = [[2,4],[5,7],[8,10],[11,15],[15,20],[20,25],[30,35]];
+    for (const [lo,hi] of sizeSteps) {
+      if (hi > ranked.length) continue;
+      if (lo < og.sizeRange[0] || hi > og.sizeRange[1]) continue;
+      // Create 2-3 stacks per size range
+      for (let r = 0; r < 2 && stacks.length < 800; r++) {
+        const count = lo + Math.floor(Math.random() * (hi - lo + 1));
+        const size = Math.min(count, ranked.length);
+        // Pick substances: top-ranked for the effects
+        const selected = ranked.slice(0, Math.floor(size * 0.7))
+          .concat([...ranked.slice(Math.floor(size * 0.7))].sort(() => Math.random() - 0.5).slice(0, size - Math.floor(size * 0.7)));
+        const uniq = [...new Set(selected)];
+        const score = calcSynergy(uniq, og.effects);
+        stacks.push({
+          id: safeId([og.key, String(lo), String(hi)]),
+          effects: og.effects.slice(0, r===0?og.effects.length:Math.min(og.effects.length,3+Math.floor(Math.random()*3))),
+          substances: uniq,
+          synergyScore: score,
+          description: `Стек для ${og.label}. ${uniq.length} веществ. Состав: ${uniq.map(s=>getStackSubstanceLabel(s)).join(', ')}.`,
+        });
+      }
+    }
+  }
+
+  // Phase 5.5: Hardcoded stacks
+  stacks.push({
+    id: 'iron_thyroid_stack',
+    name: 'Железо и щитовидная',
+    description: 'Поддержка кроветворения, транспорта железа и функции щитовидной железы',
+    effects: ['blood','thyroid_support','energy','hormone_balance','immune_support'],
+    substances: ['iron_bisglycinate','vitamin_c','selenium_methionine','iodine_potassium_iodide','zinc_picolinate','copper_gluconate','vitamin_b12_methylcobalamin','folate_methylfolate','vitamin_a_palmitate'],
+    synergyScore: 25.5,
+    dosages: {
+      iron_bisglycinate: { morning: 30, unit: 'мг' },
+      vitamin_c: { morning: 500, unit: 'мг' },
+      selenium_methionine: { morning: 200, unit: 'мкг' },
+      iodine_potassium_iodide: { morning: 150, unit: 'мкг' },
+      zinc_picolinate: { evening: 15, unit: 'мг' },
+      copper_gluconate: { evening: 2, unit: 'мг' },
+      vitamin_b12_methylcobalamin: { morning: 500, unit: 'мкг' },
+      folate_methylfolate: { morning: 400, unit: 'мкг' },
+      vitamin_a_palmitate: { morning: 5000, unit: 'IU' },
+    },
+    synergy_notes: 'Витамин С удваивает абсорбцию железа. Цинк и медь конкурируют — разнесены на утро/вечер.',
+    timing: 'Утро: железо + витамин С + селен + йод + B12 + фолат + витамин A. Вечер: цинк + медь.',
+    goalTags: ['blood','thyroid','energy'],
+  });
+
+  stacks.push({
+    id: 'full_support_protocol',
+    name: 'Полный протокол поддержки (25.05-06.07.2026)',
+    description: 'Комплексная поддержка на курсе: нейропротекция, сердечно-сосудистая, печень, почки, суставы, реология крови, гормональный баланс',
+    effects: ['neuroprotection','cardiovascular','hepatic','renal','joint','blood_flow','hormone_balance','energy','sleep','immune'],
+    substances: [
+      'zinc_carnosine','colostrum','citicoline_complex','alpha_gpc','huperzine_a',
+      'nattokinase','nattokinase','taurine','nac',
+      'tadalafil','nebivolol','diosmin_complex','pine_extract_opc',
+      'astragalus','vitamin_d3','vitamin_k2_mk7','vitamin_c_ascorbate',
+      'ginger','bromantane','fasoracetam','agmatine',
+      'bergamot','tmg_trimethylglycine','methylfolate_5mthf',
+      'lecithin','same','artichoke','joint_health_complex',
+      'atp_optimizer','vitamin_e_mixed','telmisartan',
+      'udca_tabs','berberine_hcl_dhbbr',
+      'theanine','ashwagandha','magnesium_l_threonate'
+    ],
+    synergyScore: 60,
+    dosages: {
+      lactoferrin: { morning: 500, unit: 'мг' },
+      colostrum: { morning: 200, unit: 'мг' },
+      citicoline_complex: { morning: 700, unit: 'мг' },
+      alpha_gpc: { morning: 300, unit: 'мг' },
+      huperzine_a: { morning: 50, unit: 'мкг' },
+      serrapeptase: { morning: 240000, unit: 'SPU' },
+      nattokinase: { morning: 12000, unit: 'FU' },
+      taurine: { morning: 2000, unit: 'мг' },
+      nac: { morning: 1800, unit: 'мг' },
+      tadalafil: { morning: 5, unit: 'мг' },
+      nebivolol: { morning: 2.5, unit: 'мг' },
+      diosmin_complex: { morning: 300, unit: 'мг' },
+      pine_extract_opc: { morning: 95, unit: '%' },
+      astragalus: { morning: 1300, unit: 'мг' },
+      vitamin_d3: { morning: 5000, unit: 'МЕ' },
+      vitamin_k2_mk7: { morning: 100, unit: 'мкг' },
+      vitamin_c_ascorbate: { morning: 1000, unit: 'мг' },
+      bromelain: { morning: 1300, unit: 'GDU/G' },
+      bromantane: { morning: 50, unit: 'мг' },
+      fasoracetam: { morning: 100, unit: 'мг' },
+      agmatine: { morning: 1000, unit: 'мг' },
+      bergamot: { morning: 1, unit: 'таб' },
+      tmg_trimethylglycine: { morning: 1000, unit: 'мг' },
+      methylfolate_5mthf: { morning: 1000, unit: 'мкг' },
+      lecithin: { morning: 1, unit: 'капс' },
+      same: { morning: 1, unit: 'капс' },
+      artichoke: { morning: 1, unit: 'капс' },
+      joint_health_complex: { morning: 2, unit: 'капс' },
+      atp_optimizer: { afternoon: 2, unit: 'капс' },
+      vitamin_e_mixed: { afternoon: 400, unit: 'МЕ' },
+      telmisartan: { evening: 80, unit: 'мг' },
+      udca_tabs: { evening: 1500, unit: 'мг' },
+      berberine_hcl_dhbbr: { evening: 1000, unit: 'мг' },
+      l_theanine: { night: 400, unit: 'мг' },
+      ashwagandha: { night: 50, unit: 'мг' },
+      magnesium_l_threonate: { night: 1200, unit: 'мг' },
+    },
+    synergy_notes: 'Цитиколин+Alpha-GPC — синергия ацетилхолина. NAC+Таурин — глутатион+реология. D3+K2 — кальциевый обмен. Телмисартан+Небиволол — АД контроль. Берберин+TMG — метаболизм+гомоцистеин.',
+    timing: 'Пробуждение (натощак 40 мин): Лактоферрин+Молозиво, Цитиколин комплекс, Серрапептаза+Наттокиназа, Таурин, NAC. Завтрак: Тадафил, Небиволол, DioMax, экстракт сосны, Астрагал, D3+K2, C, Бромелайн, Бромантан, Фасорацетам, Бергамот, TMG, 5-MTHF, Лецитин, SAMe, Артишок, JointHealth. Обед: DioMax, Астрагал, ATP Optimizer, E, Бергамот, TMG, 5-MTHF. Вечер: Телмисартан, УДХК, Берберин. Перед сном: L-Теанин, Ашваганда, Магний L-треонат.',
+    goalTags: ['neuroprotection','cardiovascular','hepatic','renal','joint'],
+  });
+
+  // Deduplicate by substance+effect signature
+  const seen = new Set<string>();
+  const unique: SupportStack[] = [];
+  for (const s of stacks) {
+    const sig = `${s.effects.sort().join(',')}|${s.substances.sort().join(',')}`;
+    if (!seen.has(sig)) { seen.add(sig); unique.push(s); }
+  }
+
+  // Sort: larger first, then by score descending
+  return unique.sort((a, b) => {
+    if (b.substances.length !== a.substances.length) return b.substances.length - a.substances.length;
+    if (b.effects.length !== a.effects.length) return b.effects.length - a.effects.length;
+    return b.synergyScore - a.synergyScore;
+  }).slice(0, 600);
+}
+
+export const ALL_STACKS: SupportStack[] = (() => {
+  const gen = generateStacks();
+  const curated: SupportStack[] = [
+    // === 40-препаратный полный стек покрытия ===
+    {
+      id: 'full_coverage_40', name: 'Полный стек покрытия (40)',
+      effects: ['liver_support','cardio_support','kidney','lung','blood','anti_inflammation','antioxidant','immune_boost','detox','energy','recovery','hormone_balance'],
+      substances: ['nac','tudca','milk_thistle','artichoke','omega3','coq10','magnesium','vitamin_d3','vitamin_k2','zinc','selenium','berberine','curcumin','quercetin','vitamin_c','ashwagandha','rhodiola','taurine','glycine','probiotics','bpc157','astragalus','alpha_lipoic','glutathione','pqq','nmn','resveratrol','astaxanthin','collagen','hyaluronic','glucosamine','msm','grape_seed_extract','pygeum','saw_palmetto','l_carnitine','carnosine','beta_alanine','creatine','eaa'],
+      synergyScore: 38.5,
+      description: 'Максимальное покрытие всех систем: печень ➔ кардио ➔ почки ➔ лёгкие ➔ кровь ➔ иммунитет ➔ суставы ➔ кожа ➔ митохондрии. 40 препаратов для полной поддержки на курсе ААС.',
+      goalTags: ['full_coverage','aas_course','maximum'],
+    },
+    // === 5-6 развёрнутых стеков по 20+ препаратов ===
+    {
+      id: 'liver_detox_24', name: 'Детокс печени (24)',
+      effects: ['liver_support','detox','antioxidant','gi_healing'],
+      substances: ['nac','tudca','milk_thistle','artichoke','alpha_lipoic','glutathione','curcumin','selenium','vitamin_c','vitamin_e','vitamin_b6','vitamin_b12','folate','schisandra','astragalus','chanca_piedra','dandelion_root','barberry','betaine','methionine','inositol','choline','silymarin','lecithin'],
+      synergyScore: 28.4,
+      description: 'Комплексная детоксикация печени: фаза 1 и фаза 2 детокса, желчегонные, антиоксиданты и гепатопротекторы. Полное покрытие при токсическом поражении и холестазе.',
+      goalTags: ['liver','detox','hepatoprotection'],
+    },
+    {
+      id: 'cardio_protect_22', name: 'Кардиозащита (22)',
+      effects: ['cardio_support','kidney','blood','electrolyte'],
+      substances: ['omega3','coq10','magnesium','potassium','taurine','telmisartan','nebivolol','garlic','resveratrol','pterostilbene','hawthorn','arginine','citrulline','vitamin_k2','vitamin_d3','folate','vitamin_b12','nattokinase','serrapeptase','grape_seed_extract','pomegranate_extract','lycopene'],
+      synergyScore: 29.1,
+      description: 'Защита сердечно-сосудистой системы: снижение АД, липидный профиль, антиагреганты, электролиты и антиоксиданты. Полная кардиопротекция на курсе ААС.',
+      goalTags: ['cardio','heart','bp'],
+    },
+    {
+      id: 'neuro_protect_21', name: 'Нейрозащита + ноотропы (21)',
+      effects: ['nootropic','memory','anti_stress','dopamine','gaba','sleep'],
+      substances: ['alpha_gpc','citicoline','noopept','piracetam','pramiracetam','l_carnitine','ginkgo','bacopa','lions_mane','phosphatidylserine','magnesium_l_threonate','magnesium_glycinate','theanine','ashwagandha','rhodiola','tyrosine','selank','semax','cerebrolysin','p21','dihexa'],
+      synergyScore: 30.2,
+      description: 'Полная нейропротекция: нейропластичность, ацетилхолин, дофамин, GABA, антистресс и факторы роста нервов. Предотвращение нейротоксичности ААС и когнитивное улучшение.',
+      goalTags: ['neuro','nootropic','brain'],
+    },
+    {
+      id: 'immune_full_20', name: 'Иммунитет + антиоксиданты (20)',
+      effects: ['immune_boost','antioxidant','anti_inflammation','lung','allergy'],
+      substances: ['vitamin_c','vitamin_d3','zinc','quercetin','curcumin','omega3','sulforaphane','reishi','astragalus','echinacea','beta_glucan','colostrum','lactoferrin','probiotics','vitamin_a','selenium','copper','black_seed_oil','andrographis','elderberry'],
+      synergyScore: 27.8,
+      description: 'Максимальная иммунная поддержка: врождённый и адаптивный иммунитет, антиоксидантный каскад, лёгкие и противовоспалительная модуляция.',
+      goalTags: ['immune','antioxidant','lungs'],
+    },
+    {
+      id: 'joint_bone_20', name: 'Суставы + кости + связки (20)',
+      effects: ['joint','bone_support','collagen','anti_inflammation'],
+      substances: ['glucosamine','chondroitin','msm','collagen_i_iii','collagen_ii','hyaluronic','cissus','bpc157','tb500','vitamin_d3','vitamin_k2','calcium','magnesium','boron','silicon','curcumin','boswellia','ginger','eggshell_membrane','bamboo_silica'],
+      synergyScore: 26.5,
+      description: 'Комплексное восстановление суставов, костей и связок: матриксные белки, ингибиторы воспаления, минерализация и регенерация. Незаменим на курсах с тяжёлыми нагрузками.',
+      goalTags: ['joints','bones','ligaments'],
+    },
+    {
+      id: 'metabolic_mito_20', name: 'Метаболизм + митохондрии (20)',
+      effects: ['mitochondria','energy','fat_loss','insulin_sensitivity','thyroid_support'],
+      substances: ['pqq','coq10','nmn','nr','ss31','mots_c','ala','r_ala','l_carnitine','acetyl_l_carnitine','berberine','cinnamon','chromium','magnesium','vitamin_d3','iodine','selenium','zinc','shilajit','d_ribose'],
+      synergyScore: 28.9,
+      description: 'Митохондриальный биогенез, чувствительность к инсулину, термогенез и поддержка щитовидной железы. Полный контроль энергетического метаболизма.',
+      goalTags: ['mitochondria','metabolic','thyroid'],
+    },
+    // === 3 органо-специфичных стека ===
+    {
+      id: 'renal_protect_12', name: 'Почечный протектор (12)',
+      effects: ['kidney','electrolyte','detox'],
+      substances: ['astragalus','cranberry','dandelion_root','chanca_piedra','potassium','magnesium','vitamin_b6','omega3','probiotics','curcumin','nettle_extract','horsetail'],
+      synergyScore: 16.8,
+      description: 'Нефропротекция: снижение мочевой кислоты, антиоксидантная защита почечных канальцев, электролитный баланс. Профилактика мочекаменной болезни.',
+      goalTags: ['kidney','renal','uric_acid'],
+    },
+    {
+      id: 'pulmo_protect_12', name: 'Лёгочный протектор (12)',
+      effects: ['lung','immune_boost','antioxidant'],
+      substances: ['nac','vitamin_c','quercetin','vitamin_d3','zinc','omega3','magnesium','cordyceps','reishi','andrographis','ginger','selenium'],
+      synergyScore: 15.4,
+      description: 'Защита лёгких: муколитик, сурфактант, антиоксидантная защита альвеол и бронхов. Улучшение кислородного обмена и детоксикация лёгочной ткани.',
+      goalTags: ['lungs','pulmonary','oxygen'],
+    },
+    {
+      id: 'gi_heal_12', name: 'ЖКТ протектор (12)',
+      effects: ['gi_healing','probiotics','absorption'],
+      substances: ['bpc157','glutamine','curcumin','licorice','slippery_elm','marshmallow_root','aloe_vera','probiotics','prebiotics','digestive_enzymes','betaine_hcl','ginger'],
+      synergyScore: 17.2,
+      description: 'Восстановление желудочно-кишечного тракта: регенерация слизистой, микробиом, абсорбция и пищеварение. Лечение и профилактика гастрита и язв.',
+      goalTags: ['gi','gut','digestion'],
+    },
+  ];
+  // Merge curated stacks with generated ones, giving priority to curated
+  const existingIds = new Set(gen.map(s => s.id));
+  for (const s of curated) {
+    if (!existingIds.has(s.id)) gen.push(s);
+  }
+  return gen;
+})();
+
+export function findStacksByEffect(effect: string): SupportStack[] {
+  return ALL_STACKS.filter(s => s.effects.includes(effect));
+}
+
+export function findStacksBySubstance(substanceId: string): SupportStack[] {
+  return ALL_STACKS.filter(s => s.substances.includes(substanceId));
+}
+
+export function getStackSize(id: string): number { return ALL_STACKS.find(s=>s.id===id)?.substances.length??0; }
+
 ﻿// ===========================================================================
-import { CANONICAL_ID_MAP, resolveCanonicalId } from './canonical-map';
 // COMPREHENSIVE SUPPORT DATABASE ” Auto-generated from CSV data
 // Source: support-calculator/modules/support/data/
 // Generated: 2026-06-11T14:03:04.109Z

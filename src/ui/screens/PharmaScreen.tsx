@@ -5,7 +5,7 @@ import { calculateDose } from '../../engines/dosage.engine';
 import { simulateCourse, steadyStatePeak, steadyStateTrough, eliminationConstant } from '../../engines/pk-pd.engine';
 import { calculateMultiSubstancePKPD } from '../../engines/pkpd-superposition.engine';
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
-import { PHARMA_DETAILS, type PharmaDetail } from '../../data/pharma-details';
+import { PHARMA_DETAILS, type PharmaDetail } from '../../data/support-database';
 import type { PharmaSubstance, CourseEntry, PD } from '../../core/types';
 import { SYRINGE_SPECS, DRUG_THRESHOLDS } from '../../core/constants';
 import { SYNERGY_PAIRS, type SynergyPair } from '../../engines/support.engine';

@@ -8,16 +8,16 @@ import { updateProfile, getProfile } from '../../core/profile-manager';
 import { SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { SUPPORT_BASE_COVERAGE } from '../../core/constants';
-import { INTERACTIONS_DB } from '../../data/interactions';
+import { INTERACTIONS_DB } from '../../data/support-database';
 import { ALL_SUBSTANCES, ALL_INTERACTIONS, type SupportSubstance, type SupportInteraction } from '../../data/support-database';
-import { getSubstanceTier, TIER_LABELS } from '../../data/substance-tiers';
+import { getSubstanceTier, TIER_LABELS } from '../../data/support-database';
 import { getBpRiskLevel } from '../../core/bp-hr-data';
-import { SUPPORT_CATALOG_DATA, ORGAN_LABELS as CATALOG_ORGAN_LABELS, SYSTEM_LABELS_CATALOG, CATEGORY_LABELS as CATALOG_CATEGORY_LABELS, TIER_LABELS_CATALOG, type SupportCatalogEntry } from '../../data/support-catalog';
+import { SUPPORT_CATALOG_DATA, ORGAN_LABELS as CATALOG_ORGAN_LABELS, SYSTEM_LABELS_CATALOG, CATEGORY_LABELS as CATALOG_CATEGORY_LABELS, TIER_LABELS_CATALOG, type SupportCatalogEntry } from '../../data/support-database';
 
-import { CANONICAL_ID_MAP } from '../../data/catalog-exports';
-import { SUBSTANCE_ANALOGS, SUBSTANCE_ENHANCERS, PHASE_MODS, DEFAULT_DOSAGES, getPhaseLevel, type SupportPhase } from '../../data/support-levels';
+import { CANONICAL_ID_MAP } from '../../data/support-database';
+import { SUBSTANCE_ANALOGS, SUBSTANCE_ENHANCERS, PHASE_MODS, DEFAULT_DOSAGES, getPhaseLevel, type SupportPhase } from '../../data/support-database';
 import { FertilityPCTScreen } from './FertilityPCTScreen';
-import { ALL_STACKS, EFFECT_LABELS_ru, findStacksByEffect, getSubstanceLabel as getStackSubLabel, type SupportStack } from '../../data/support-stacks';
+import { ALL_STACKS, EFFECT_LABELS_ru, findStacksByEffect, getStackSubstanceLabel as getStackSubLabel, type SupportStack } from '../../data/support-database';
 import {
   PEPTIDE_DB, PEPTIDE_LIST, PEPTIDE_SYNERGY, PEPTIDE_CONFLICTS, PEPTIDE_GOAL_PROFILES,
   computeDilution, computeEffectiveDose, computePK, computePeptideRisks,

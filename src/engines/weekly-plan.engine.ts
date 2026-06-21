@@ -35,7 +35,7 @@ const ORGAN_LABELS: Record<string, string> = {
   gut: 'ЖКТ', lungs: 'Лёгкие', skin: 'Кожа', eyes: 'Глаза',
 };
 
-import { MECHANISM_LABELS } from '../data/mechanism-labels';
+import { MECHANISM_LABELS } from '../data/support-database';
 
 export interface SupplementPlanEntry {
   substanceId: string;

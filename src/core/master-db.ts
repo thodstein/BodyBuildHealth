@@ -1,13 +1,13 @@
-import { EFFECTS_DB } from '../data/effects';
-import { MECHANISMS_DB } from '../data/mechanisms';
-import { RECOMMENDATIONS_DB } from '../data/recommendations';
-import { RISKS_DB } from '../data/risks';
+import { EFFECTS_DB } from '../data/support-database';
+import { MECHANISMS_DB } from '../data/support-database';
+import { RECOMMENDATIONS_DB } from '../data/support-database';
+import { RISKS_DB } from '../data/support-database';
 import { AXES_DB } from './data/axes';
 import { BANDS_DB } from './data/bands';
 import { CATEGORIES_DB } from './data/categories';
 import { HORMONAL_AXES_DB } from './data/hormonal-axes';
 import { INTERACTION_LINKS_DB } from './data/interaction-links';
-import { INTERACTIONS_DB } from '../data/interactions';
+import { INTERACTIONS_DB } from '../data/support-database';
 import substancesJson from '../substances.json';
 import interactionsJson from '../interactions.json';
 import type { 

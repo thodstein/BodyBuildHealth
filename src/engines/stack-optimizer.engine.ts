@@ -1,5 +1,5 @@
 import { SUPPORT_BASE_COVERAGE, RISK_SYSTEMS, ALL_RISK_SYSTEMS, COVERAGE_ID_ALIAS } from '../core/constants';
-import { SUPPORT_CATALOG_DATA } from '../data/support-catalog';
+import { SUPPORT_CATALOG_DATA } from '../data/support-database';
 import {
   ALL_SUBSTANCES,
   ALL_INTERACTIONS,

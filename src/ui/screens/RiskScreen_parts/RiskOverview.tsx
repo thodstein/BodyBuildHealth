@@ -2,8 +2,8 @@
 import { ALL_RISK_SYSTEMS, DRUG_THRESHOLDS } from '../../../core/constants';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { SYSTEM_INFO } from '../../../core/risk-info';
-import { RISKS_DB, RISK_SYSTEM_MAP } from '../../../data/risks';
-import { RECOMMENDATIONS_DB } from '../../../data/recommendations';
+import { RISKS_DB, RISK_SYSTEM_MAP } from '../../../data/support-database';
+import { RECOMMENDATIONS_DB } from '../../../data/support-database';
 import type { RiskResult } from '../../../core/types';
 import { getRiskColor } from '../../../core/utils/risk-colors';
 import type { AggregatedRisk } from '../../../engines/risk.engine';
