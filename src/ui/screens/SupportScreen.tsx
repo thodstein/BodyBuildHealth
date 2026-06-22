@@ -48,7 +48,7 @@ import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.en
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'mixcalc' | 'plan' | 'reports' | 'neuro' | 'joints' | 'acne';
-type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research' | 'favorites' | 'supportstacks';
+type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research' | 'favorites' | 'supportstacks' | 'protocols';
 
 const INTERACTION_TYPE_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
   synergy: { label: 'Синергия', emoji: '🔗', color: '#22c55e' },
@@ -2517,6 +2517,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           { id:'generator', label:'Генератор', icon:'🧩' },
           { id:'info', label:'Инфо', icon:'📚' },
           { id:'hormonal', label:'Гормоны', icon:'⚕️' },
+          { id:'protocols', label:'Протоколы', icon:'📋' },
         ].map(item => (
           <button key={item.id} onClick={() => {
             setSection(item.id as any);
@@ -2525,6 +2526,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             if (item.id === 'generator') { setTab('calculator'); setSupportView('calc'); }
             if (item.id === 'info') { setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); }
             if (item.id === 'hormonal') { setTab('fertility-pct'); setSupportView('calc'); }
+            if (item.id === 'protocols') { setProtocolTab('pct'); }
           }} style={{
             flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2,
             padding:'4px 0', background:'transparent', border:'none', cursor:'pointer',
@@ -2827,34 +2829,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
                 <span style={{ color:'var(--accent)', fontSize:18, opacity:0.6 }}>→</span>
               </div>
-               <div style={{
-                display:'flex', flexDirection:'column', gap:8, padding:'14px 16px', borderRadius:16,
-                background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)',
-              }}>
-                {/* Banner warning */}
-                <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)', display:'flex', alignItems:'center', gap:6 }}>
-                  <span style={{ fontSize:12, flexShrink:0 }}>⚠️</span>
-                  <span style={{ fontSize:8, color:'rgba(255,255,255,0.6)', lineHeight:1.3 }}>Информация ознакомительная. Схемы назначаются специалистом.</span>
-                </div>
-                {/* Title */}
-                <div style={{ fontSize:13, fontWeight:700, color:'#8b5cf6' }}>📋 Примерные протоколы поддержки</div>
-                {/* 7 unified sub-tabs */}
-                <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                  {[
-                    { id:'pct', label:'ПКТ', color:'#8b5cf6' },
-                    { id:'fertility', label:'Фертильность', color:'#ec4899' },
-                    { id:'hrt', label:'ГЗТ', color:'#f59e0b' },
-                    { id:'neuro', label:'Нейро', color:'#06b6d4' },
-                    { id:'joints', label:'Суставы', color:'#22c55e' },
-                    { id:'acne', label:'Акне', color:'#ef4444' },
-                  ].map(t => (
-                    <button key={t.id} onClick={() => { setSection('protocols'); setProtocolTab(t.id as any); }} style={{
-                      padding:'5px 10px', borderRadius:12, fontSize:9, fontWeight:600, cursor:'pointer', border:'none',
-                      background:t.color+'18', color:t.color,
-                    }}>{t.label}</button>
-                  ))}
-                </div>
-              </div>
+
               <div onClick={() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
                 background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', color:'var(--text)', transition:'all 0.2s',
