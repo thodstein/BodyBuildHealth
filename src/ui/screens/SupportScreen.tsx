@@ -3273,9 +3273,20 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 {(catalogSubTab === 'type' || !catalogSubTab) && (
                 /* По типам (default) */
                 <div>
-                  {/* Type sub-filter pills */}
+                  {/* Type sub-filter pills by category groups */}
                   <div style={{ display:'flex', gap:3, marginBottom:6, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                    {[['','🔍 Все'],['vitamin','💊 Витамины'],['mineral','🧂 Минералы'],['herb','🌿 Травы'],['amino_acid','🧬 Аминокислоты'],['fatty_acid','🐟 Жирные к-ты'],['peptide','🧬 Пептиды'],['mushroom','🍄 Грибы'],['polyphenol','🫐 Полифенолы'],['antioxidant','🛡️ Антиоксиданты'],['enzyme','⚙️ Ферменты'],['probiotic','🦠 Пробиотики'],['adaptogen','🌿 Адаптогены'],['nootropic','🧠 Ноотропы'],['hormone','⚖️ Гормоны']].filter(([k]) => k === '' || groupedSubstances.some(g => g.items.some((s:any) => (s.type||'').toLowerCase() === k))).map(([k,l]) => (
+                    {[['','🔍 Все'],
+                      ['gi','🫃 ЖКТ'],['liver','🫁 Печень'],['cardio','❤️ Сердце'],
+                      ['herbs','🌿 Травы/растения'],['joints','🦴 Суставы'],['vitamins','💊 Витамины'],
+                      ['minerals','🧂 Минералы'],['antiaging','🕰 Антивозраст'],
+                      ['immune','🛡️ Иммунитет'],['fatty_acids','🐟 Липидные'],
+                      ['antioxidants','🛡️ Антиоксиданты'],
+                      ['amino_acids','🧬 Аминокислоты'],['peptides','🧬 Пептиды'],
+                      ['mushrooms','🍄 Грибы'],['nootropics','🧠 Ноотропы'],
+                      ['adaptogens','🌿 Адаптогены'],['hormones','⚖️ Гормоны'],
+                      ['enzymes','⚙️ Ферменты'],['probiotics','🦠 Пробиотики'],
+                      ['electrolytes','⚡ Электролиты'],['other','📦 Другое'],
+                    ].filter(([k]) => k === '' || groupedSubstances.some(g => g.cat === k)).map(([k,l]) => (
                       <button key={k} onClick={() => setCatalogTypeFilter(k)} style={{
                         padding:'4px 10px', borderRadius:12, fontSize:8, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
                         background: catalogTypeFilter === k ? 'var(--accent)' : 'var(--bg-secondary)',
@@ -3285,7 +3296,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     ))}
                   </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                  {(groupedSubstances||[]).filter(g => !catalogTypeFilter || g.items.some((s:any) => (s.type||'').toLowerCase() === catalogTypeFilter)).map(group => {
+                  {(groupedSubstances||[]).filter(g => !catalogTypeFilter || g.cat === catalogTypeFilter).map(group => {
                     const catInfo = getCategoryInfo(group.cat);
                     const isExpanded = expandedCategories[group.cat] ?? (group.count <= 5);
                     return (
@@ -3786,10 +3797,23 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                   // Also check PHARMA_DB for pharma substance IDs (use targetSystems)
                                   const pharm = PHARMA_DB?.[subId];
                                   if (pharm && pharm.targetSystems) {
+                                    const PHARMA_SYS_TO_ORG: Record<string, string> = {
+                                      cardio: 'heart_vessels', heart: 'heart_vessels', vessels: 'heart_vessels',
+                                      hepatic: 'liver', liver: 'liver',
+                                      neuro: 'brain_nerves', neuro_toxicity: 'brain_nerves', brain: 'brain_nerves', cns: 'brain_nerves',
+                                      endocrine: 'endocrine', thyroid: 'endocrine', pancreas: 'endocrine', adrenal: 'endocrine',
+                                      reproductive: 'reproductive', prostate: 'reproductive', gonads: 'reproductive',
+                                      hematologic: 'blood', blood: 'blood',
+                                      musculoskeletal: 'muscles', muscle: 'muscles',
+                                      skin: 'skin_hair',
+                                      ghigf: 'endocrine', ins_axis: 'endocrine', metabolic: 'mitochondria',
+                                      immunity: 'immune', immune: 'immune',
+                                      renal: 'kidneys', kidney: 'kidneys',
+                                      gi: 'gi', gastrointestinal: 'gi', gut: 'gi',
+                                    };
                                     return pharm.targetSystems.some((o: string) => {
-                                      const norm = (o||'').trim().toUpperCase();
-                                      const mapping = ORGAN_CATEGORY_MAP[norm];
-                                      return mapping?.key === synergyOrganFilter;
+                                      const key = PHARMA_SYS_TO_ORG[o.toLowerCase().trim()];
+                                      return key === synergyOrganFilter;
                                     });
                                   }
                                   return false;
@@ -4563,17 +4587,24 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     })()}
                     {enhancedSubs.length >= 2 && (
                       <button onClick={() => {
-                        const stack = {
-                          id: 'custom_' + Date.now(),
-                          name: `Кастомный стек (${enhancedSubs.length} в-в)`,
-                          substances: enhancedSubs,
-                          effects: [],
-                          synergyScore: 80,
-                          description: 'Собран вручную из каталога поддержки',
-                        };
-                        alert('✅ Стек готов к использованию');
+                        const name = prompt('Название стека:', `Стек ${enhancedSubs.length} веществ`);
+                        if (!name) return;
+                        const mix = { id:'custom_'+Date.now(), name, substances: enhancedSubs, created: new Date().toISOString() };
+                        try {
+                          const arr = JSON.parse(localStorage.getItem('he_support_mixes')||'[]');
+                          arr.unshift(mix);
+                          localStorage.setItem('he_support_mixes', JSON.stringify(arr));
+                          // Also build dose info from catalog
+                          const doseLines: string[] = [];
+                          enhancedSubs.forEach(sid => {
+                            const entry = SUPPORT_CATALOG_DATA[sid];
+                            if (entry?.dosage) doseLines.push(`${entry.nameRu||sid}: ${entry.dosage.mg}мг ${entry.dosage.timing}${entry.dosage.form?' ('+entry.dosage.form+')':''}`);
+                          });
+                          alert(`✅ Стек "${name}" сохранён!\n\nСостав (${enhancedSubs.length} веществ):\n${enhancedSubs.map(sid => { const s=ALL_SUBSTANCES.find(x=>x.id===sid); return '• '+(s?.name||sid); }).join('\n')}\n${doseLines.length>0?'\n📋 Дозировки:\n'+doseLines.join('\n'):''}\n\n💾 Сохранено в Миксы`);
+                          setFavRefresh(p=>p+1);
+                        } catch(e) { alert('Ошибка сохранения'); }
                       }} style={{ width:'100%', padding:'10px', borderRadius:8, cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:11, border:'none' }}>
-                        Собрать стек
+                        🧬 Собрать и сохранить стек
                       </button>
                     )}
                     <div style={{ marginTop:8 }}>
