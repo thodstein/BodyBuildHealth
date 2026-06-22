@@ -1801,64 +1801,66 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     })) as SupportSubstance[];
   }, []);
 
+  // Shared normCat — normalize category names to group keys
+  const normCat = (cat: string): string => {
+    const organCatToGroup: Record<string,string> = {
+      hepatoprotector:'liver',cardioprotector:'cardio',neuroprotector:'neuro',
+      immunomodulator:'immune',immune:'immune',joint:'joints',bone:'bone',
+      respiratory:'lung',eye_protector:'eye',renal:'kidney',skin:'skin',
+      beauty:'skin',urinary_protector:'kidney',anticoagulant:'blood',
+      thyroid:'thyroid',bile_acid:'liver',choleretic:'liver',lipid:'cardio',
+      anabolic:'muscle',hematologic:'blood',antimicrobial:'immune',
+      recovery:'recovery',marker:'other',nsaid:'antiinflammatory',
+      electrolyte:'electrolyte',multivitamin:'vitamins',gut:'gi',
+      gastrointestinal:'gi',antioxidant:'antioxidants',antiinflammatory:'antiinflammatory',
+      anti_inflammatory:'antiinflammatory',anxiolytic:'anxiolytic',
+      antidepressant:'mood',antiviral:'immune',antibiotic:'immune',
+      pain:'analgesic',analgesic:'analgesic',stress:'adaptogens',
+      glucose:'metabolism',metabolism:'metabolism',metabolic:'metabolism',
+      antiaging:'antiaging',antiglycation:'antiaging',no_organ:'other',
+    };
+    const normed = (cat||'').toLowerCase().replace(/[^a-z0-9_]/g,'');
+    if (organCatToGroup[normed]) return organCatToGroup[normed];
+    const m: Record<string,string> = {
+      amino_acid:'amino_acids',aminoacids:'amino_acids',
+      vitamin:'vitamins',vitamin_:'vitamins',
+      mineral:'minerals',mineral_:'minerals',
+      herb:'herbs',herbal:'herbs',
+      peptide:'peptides',peptid:'peptides',
+      nootropic:'nootropics',nootrop:'nootropics',
+      adaptogen:'adaptogens',adaptog:'adaptogens',
+      hormone:'hormones',hormon:'hormones',
+      enzyme:'enzymes',
+      probiotic:'probiotics',prebiot:'probiotics',
+      fatty_acid:'fatty_acids',lipids:'fatty_acids',
+      mushroom:'mushrooms',fungus:'mushrooms',fungi:'mushrooms',
+      electrolyte:'electrolytes',
+    };
+    const c = (cat||'').toLowerCase().replace(/[^a-z0-9_]/g,'');
+    if (m[c]) return m[c];
+    for (const [k,v] of Object.entries(m)) if (c.includes(k)||k.includes(c)) return v;
+    return cat;
+  };
+  // Shared complex-matcher (used by groupedSubstances + OrganGroupedSubstances)
+  const matchComplex = (s: SupportSubstance): boolean => {
+    if (isComplexId(s.id)) return true;
+    const firstCat = (s.categories||[])[0] || '';
+    const nc = normCat(firstCat);
+    if (nc === 'complex' || nc === 'other') return true;
+    if ((s.organs||[]).some(o => (o||'').trim().toUpperCase() === 'WHOLE_BODY')) return true;
+    if (['antiinflammatory','anxiolytic','antiaging','metabolism','antioxidants','adaptogens','mood','recovery','electrolytes'].includes(nc)) return true;
+    if ((s.id||'').toLowerCase().includes('_stack') || (s.id||'').toLowerCase().includes('_protocol') || (s.id||'').toLowerCase().includes('_pct')) return true;
+    if (s.type === 'complex') return true;
+    return false;
+  };
+
   const groupedSubstances = useMemo(() => {
-    const normCat = (cat: string): string => {
-      // Organ-based categories → map to proper group labels
-      const organCatToGroup: Record<string,string> = {
-        hepatoprotector:'liver',cardioprotector:'cardio',neuroprotector:'neuro',
-        immunomodulator:'immune',immune:'immune',joint:'joints',bone:'bone',
-        respiratory:'lung',eye_protector:'eye',renal:'kidney',skin:'skin',
-        beauty:'skin',urinary_protector:'kidney',anticoagulant:'blood',
-        thyroid:'thyroid',bile_acid:'liver',choleretic:'liver',lipid:'cardio',
-        anabolic:'muscle',hematologic:'blood',antimicrobial:'immune',
-        recovery:'recovery',marker:'other',nsaid:'antiinflammatory',
-        electrolyte:'electrolyte',multivitamin:'vitamins',gut:'gi',
-        gastrointestinal:'gi',antioxidant:'antioxidants',antiinflammatory:'antiinflammatory',
-        anti_inflammatory:'antiinflammatory',anxiolytic:'anxiolytic',
-        antidepressant:'mood',antiviral:'immune',antibiotic:'immune',
-        pain:'analgesic',analgesic:'analgesic',stress:'adaptogens',
-        glucose:'metabolism',metabolism:'metabolism',metabolic:'metabolism',
-        antiaging:'antiaging',antiglycation:'antiaging',no_organ:'other',
-      };
-      const normed = (cat||'').toLowerCase().replace(/[^a-z0-9_]/g,'');
-      if (organCatToGroup[normed]) return organCatToGroup[normed];
-      const m: Record<string,string> = {
-        amino_acid:'amino_acids',aminoacids:'amino_acids',
-        vitamin:'vitamins',vitamin_:'vitamins',
-        mineral:'minerals',mineral_:'minerals',
-        herb:'herbs',herbal:'herbs',
-        peptide:'peptides',peptid:'peptides',
-        nootropic:'nootropics',nootrop:'nootropics',
-        adaptogen:'adaptogens',adaptog:'adaptogens',
-        hormone:'hormones',hormon:'hormones',
-        enzyme:'enzymes',
-        probiotic:'probiotics',prebiot:'probiotics',
-        fatty_acid:'fatty_acids',lipids:'fatty_acids',
-        mushroom:'mushrooms',fungus:'mushrooms',fungi:'mushrooms',
-        electrolyte:'electrolytes',
-      };
-      const c = (cat||'').toLowerCase().replace(/[^a-z0-9_]/g,'');
-      if (m[c]) return m[c];
-      for (const [k,v] of Object.entries(m)) if (c.includes(k)||k.includes(c)) return v;
-      return cat;
-    };
-    const matchesComplexesTab = (s: SupportSubstance): boolean => {
-      if (isComplexId(s.id)) return true;
-      const firstCat = (s.categories||[])[0] || '';
-      const nc = normCat(firstCat);
-      // Only true complexes/combos go here — NOT antiinflammatory, adaptogens, antioxidants, etc.
-      if (nc === 'complex' || nc === 'other' || firstCat === 'complex' || firstCat === 'other') return true;
-      if ((s.organs||[]).some(o => (o||'').trim().toUpperCase() === 'WHOLE_BODY')) return true;
-      return false;
-    };
-    const groups: Record<string, SupportSubstance[]> = {};
-    // Use 289 curated catalog entries directly
+    // Use shared matchComplex for filtering
     let filtered = catalogSubstances;
-    // Apply tier filter
     if (catalogSubTab === 'complexes') {
-      filtered = filtered.filter(s => matchesComplexesTab(s));
+      filtered = filtered.filter(s => matchComplex(s));
     } else {
-      filtered = filtered.filter(s => !matchesComplexesTab(s));
+      filtered = filtered.filter(s => !matchComplex(s));
     }
     if (supportTierFilter !== 'all') {
       filtered = filtered.filter(s => getSubstanceTier(s.id) === supportTierFilter);
@@ -1874,8 +1876,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         (s.mechanisms||[]).some(m => (m||'').toLowerCase().includes(sq))
       );
     }
+    const groups: Record<string, SupportSubstance[]> = {};
     for (const sub of filtered) {
-      const primaryCat = sub.type || normCat((sub.categories||[])[0] || 'other');
+      const primaryCat = normCat(sub.type) || normCat((sub.categories||[])[0] || 'other');
       if (!groups[primaryCat]) groups[primaryCat] = [];
       groups[primaryCat].push(sub);
     }
@@ -1906,7 +1909,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         return { cat, items, count: items.length, classBadges, classItems };
       })
       .sort((a, b) => b.count - a.count);
-  }, [searchQuery, supportTierFilter, catalogSubstances]);
+  }, [searchQuery, supportTierFilter, catalogSubTab, catalogSubstances]);
 
   // Organ-based grouping for catalog sub-tab
   // Phase 5.12: Comprehensive 16-category organ mapping
@@ -2012,8 +2015,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       ? catalogSubstances.filter(s =>
           (s.name||'').toLowerCase().includes(searchQuery.toLowerCase()) ||
           (s.id||'').toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      : catalogSubstances;
+        ).filter(s => !matchComplex(s)) // skip complexes in organ view
+      : catalogSubstances.filter(s => !matchComplex(s)); // skip complexes in organ view
     for (const sub of filtered) {
       const organs = sub.organs || [];
       usedKeys.clear();
@@ -3105,7 +3108,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   { icon:'🧬', title:'Пептидный калькулятор', desc:'Расчёт дозировок, баков, разведения и протоколов пептидов', color:'#a78bfa', action:() => { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); } },
                   { icon:'ℹ️', title:'Общая информация', desc:'Каталог веществ, синергии, готовые стеки и взаимодействия', color:'#60a5fa', action:() => { setCalcView('info'); setInfoView('catalog'); } },
                   { icon:'🔬', title:'Исследования', desc:'Научная база исследований по всем веществам поддержки', color:'#f59e0b', action:() => { setCalcView('info'); setInfoView('research'); } },
-                  { icon:'🧮', title:'Генератор стеков', desc:'Автоматический подбор стека по органам, целям и биомаркерам', color:'#ec4899', action:() => { setSection('generator'); setTab('main'); setSupportView('calc'); setCalcView('stackcalc'); } },
+                   { icon:'🧮', title:'Генератор стеков', desc:'Автоматический подбор стека по органам, целям и биомаркерам', color:'#ec4899', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('supportstacks'); setStackSubTab('generator'); } },
                   { icon:'📂', title:'Мои стеки', desc:'Сохранённые персональные стеки с оценкой синергий и конфликтов', color:'#22c55e', action:() => { setSection('generator'); setTab('main'); setSupportView('calc'); setCalcView('mystacks'); } },
                   { icon:'⚡', title:'Тренировочные миксы', desc:'Пре-/интра-/пост-тренировочные стеки для пампа, силы и восстановления', color:'#f97316', action:() => setCalcView('mixcalc') },
                   { icon:'📅', title:'План поддержки', desc:'Дневной, недельный и месячный план приёма по тайм-слотам', color:'#84cc16', action:() => { setSection('generator'); setTab('main'); setSupportView('calc'); setCalcView('plan'); } },
@@ -5703,44 +5706,45 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             </div>
           )}
 
-          {/* Content: Joints → full-screen view navigation */}
+          {/* Content: Joints → inline joints */}
           {protocolTab === 'joints' && (
             <div style={{ paddingBottom: 70 }}>
-              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'24px 14px', border:'1px solid var(--border)', textAlign:'center' }}>
-                <div style={{ fontSize:28, marginBottom:8 }}>🦴</div>
-                <div style={{ fontSize:15, fontWeight:700, color:'#22c55e', marginBottom:6 }}>Калькулятор поддержки суставов</div>
-                <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.4, marginBottom:14, padding:'0 12px' }}>
-                  Полный калькулятор риска проблем с суставами с протоколами и рекомендациями по фармакологической поддержке
+              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:8 }}>🦴 Калькулятор поддержки суставов</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
+                  <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Боль в суставах (0-10)</div><input type="range" min="0" max="10" value={jointPain} onChange={e => setJointPain(Number(e.target.value))} style={{ width:'100%' }} /><div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right' }}>{jointPain}/10</div></div>
+                  <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>История травм (0-5)</div><input type="range" min="0" max="5" value={injuryHistory} onChange={e => setInjuryHistory(Number(e.target.value))} style={{ width:'100%' }} /><div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right' }}>{injuryHistory}/5</div></div>
+                  <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Тренировочная нагрузка (0-5)</div><input type="range" min="0" max="5" value={trainLoad} onChange={e => setTrainLoad(Number(e.target.value))} style={{ width:'100%' }} /><div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right' }}>{trainLoad}/5</div></div>
                 </div>
-                <button onClick={() => setCalcView('joints')} style={{
-                  padding:'12px 24px', borderRadius:14, border:'none', cursor:'pointer',
-                  background:'linear-gradient(135deg,#22c55e,#16a34a)', color:'#fff',
-                  fontWeight:800, fontSize:12
-                }}>🦴 Открыть калькулятор →</button>
-                <div style={{ marginTop:10, fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}>
-                  Оценка боли · история травм · нагрузка · протоколы поддержки · анализы
+                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
+                  <span style={{ fontSize:20 }}>🦴</span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:9, color:'var(--text-dim)' }}>Риск проблем с суставами</div>
+                    <div style={{ fontSize:16, fontWeight:800, color: jointScore > 70 ? '#ef4444' : jointScore > 40 ? '#f59e0b' : '#22c55e' }}>{jointScore}%</div>
+                  </div>
+                  <div style={{ fontSize:10, color:'var(--text-dim)' }}>{jointScore > 70 ? '🔴 Высокий' : jointScore > 40 ? '🟡 Средний' : '🟢 Низкий'}</div>
+                </div>
+                <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:8, lineHeight:1.4, padding:'6px 8px', background:'rgba(245,158,11,0.06)', borderRadius:6, border:'1px solid rgba(245,158,11,0.12)' }}>
+                  📋 Протокол: Глюкозамин 1500мг + Хондроитин 1200мг + MSM 3000мг + Коллаген II типа 10г + Босвеллия 500мг + BPC-157 500мкг/д. Курс 8-12 недель.
                 </div>
               </div>
             </div>
           )}
 
-          {/* Content: Acne → full-screen view navigation */}
+          {/* Content: Acne → inline acne */}
           {protocolTab === 'acne' && (
             <div style={{ paddingBottom: 70 }}>
-              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'24px 14px', border:'1px solid var(--border)', textAlign:'center' }}>
-                <div style={{ fontSize:28, marginBottom:8 }}>🔴</div>
-                <div style={{ fontSize:15, fontWeight:700, color:'#ef4444', marginBottom:6 }}>Протокол акне на курсе</div>
-                <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.4, marginBottom:14, padding:'0 12px' }}>
-                  Полный протокол борьбы с акне: ниацинамид, ретиноиды, солярий, системные препараты, гигиена и уход
+              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:8 }}>🔴 Протокол акне на курсе</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:8 }}>
+                  {['Ниацинамид 500мг 2р/д','Медь 2мг (отдельно от цинка)','Цинк 50мг (пиколинат, на ночь)','Солярий 2р/нед по 5 мин','Клендовит гель локально','Клензит-С (адапален+клиндамицин)','Верошпирон 50мг (только при гормональном акне)'].map((item, i) => (
+                    <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
+                      <span style={{ fontSize:10 }}>💊</span>
+                      <span style={{ fontSize:9, color:'var(--text-light)' }}>{item}</span>
+                    </div>
+                  ))}
                 </div>
-                <button onClick={() => setCalcView('acne')} style={{
-                  padding:'12px 24px', borderRadius:14, border:'none', cursor:'pointer',
-                  background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff',
-                  fontWeight:800, fontSize:12
-                }}>🔴 Открыть протокол →</button>
-                <div style={{ marginTop:10, fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}>
-                  Базовые средства · местная терапия · системные препараты · солярий · гигиена · ретиноиды
-                </div>
+                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>• При Верошпироне — исключить добавки калия<br/>• Солярий ≤ 2 раза/нед по 5 мин<br/>• Клендовит+Клензит-С только локально<br/>• При сильном акне — дерматолог, системные ретиноиды</div>
               </div>
             </div>
           )}
@@ -5875,228 +5879,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       )}
         </div>
       )}
-
-
-      {/* ===== STACKCALC IN CALC VIEW ===== */}
-      {section === 'generator' && tab === 'main' && supportView === 'calc' && calcView === 'stackcalc' && (
-        <div style={{ padding:'0 0 70px' }}>
-          {safeRender('calc_stackcalc', () => {
-            const MECH_ROLE_LABELS: Record<string, string> = {
-              antioxidant: 'Антиоксидант', anti_inflammatory: 'Противовоспал.', liver_protection: 'Гепатопротектор',
-              hepatoprotective: 'Гепатопротектор', kidney_protection: 'Нефропротектор', nephroprotective: 'Нефропротектор',
-              neuroprotective: 'Нейропротектор', brain_support: 'Поддержка мозга', cognitive: 'Когнитивный',
-              cardio_protection: 'Кардиопротектор', cardioprotective: 'Кардиопротектор', hypotensive: 'Снижает АД',
-              lipid_lowering: 'Снижает липиды', endocrine_support: 'Поддержка гормонов', hormonal: 'Гормональный',
-              immune_support: 'Иммуномодулятор', immunomodulator: 'Иммуномодулятор', anti_catabolic: 'Антикатаболик',
-              anabolic: 'Анаболик', energy: 'Энергия', mitochondrial: 'Митохондрии', adaptogen: 'Адаптоген',
-              stress_reduction: 'Стресс-протектор', nootropic: 'Ноотроп', detoxification: 'Детокс',
-              anti_estrogenic: 'Антиэстроген', anti_aging: 'Антивозрастной', gastrointestinal: 'Поддержка ЖКТ',
-              digestive: 'Пищеварение', probiotic: 'Пробиотик', bone_health: 'Кости', joint_health: 'Суставы',
-              skin_health: 'Кожа', hair_health: 'Волосы', blood_sugar: 'Сахар крови', insulin_sensitizer: 'Инсулин.сенс.',
-              thyroid_support: 'Щитовидка', eye_health: 'Зрение', respiratory: 'Дыхание', anti_coagulant: 'Антикоагулянт',
-              circulation: 'Циркуляция', libido: 'Либидо', testosterone: 'Тестостерон', fertility: 'Фертильность',
-              general: 'Общая поддержка', metabolic: 'Метаболизм', sleep: 'Сон', mood: 'Настроение',
-              anti_estrogen: 'Антиэстроген', aromatase_inhibitor: 'Ингиб. ароматазы', dopamine: 'Дофамин',
-              gaba: 'ГАМК', serotonin: 'Серотонин', glucocorticoid: 'Глюкокортикоид', anticoagulant: 'Антикоагулянт',
-              antiplatelet: 'Антиагрегант', vasodilator: 'Вазодилататор', nitric_oxide: 'Оксид азота',
-              hpta_support: 'HPTA', liver_detox: 'Детокс печени', bile: 'Желчегонное', pancreatic: 'Поджелудочная',
-              gut_health: 'Кишечник', microbiome: 'Микробиом', prebiotic: 'Пребиотик', antimicrobial: 'Антимикробн.',
-              antifungal: 'Противогрибк.', antiviral: 'Противовирусн.', anticancer: 'Противораков.',
-              chemoprotective: 'Химопротектор', radioprotective: 'Радиопротектор', anti_allergic: 'Антиаллерген',
-              antihistamine: 'Антигистамин', expectorant: 'Отхаркивающее', mucolytic: 'Муколитик',
-              bronchodilator: 'Бронходилататор', anti_asthmatic: 'Против астмы', anti_arthritic: 'Против артрита',
-              analgesic: 'Анальгетик', anti_spasmodic: 'Спазмолитик', muscle_relaxant: 'Миорелаксант',
-              wound_healing: 'Заживление', anti_scar: 'Против рубцов', collagen: 'Коллаген',
-              anti_cellulite: 'Против целлюлита', lymphatic: 'Лимфа', diuretic: 'Диуретик',
-              anti_edema: 'Против отёков', vein_tonic: 'Венотоник', anti_varicose: 'Против варикоза',
-              anti_hemorrhoidal: 'Против геморроя', anti_ulcer: 'Против язвы', anti_reflux: 'Против рефлюкса',
-              anti_emetic: 'Противорвотн.', anti_nausea: 'Против тошноты', appetite: 'Аппетит',
-              anti_obesity: 'Против ожирения', thermogenic: 'Термогеник', fat_burner: 'Жиросжигатель',
-              lipolytic: 'Липолитик', anti_lipid: 'Антилипидный', hypoglycemic: 'Гипогликемический',
-              anti_diabetic: 'Противодиабетический', anti_glycation: 'Антигликация', anti_cataract: 'Против катаракты',
-              anti_glaucoma: 'Против глаукомы', retinal: 'Сетчатка', macular: 'Макула',
-              hearing: 'Слух', anti_tinnitus: 'Против шума', anti_vertigo: 'Против головокружения',
-              anti_migraine: 'Против мигрени', anti_convulsant: 'Противосудорожн.',
-              anti_parkinson: 'Против Паркинсона', anti_alzheimer: 'Против Альцгеймера',
-              anti_depressant: 'Антидепрессант', anti_anxiety: 'Против тревоги', anti_psychotic: 'Антипсихотик',
-              sedative: 'Седативное', hypnotic: 'Снотворное', stimulant: 'Стимулятор',
-              anti_fatigue: 'Против усталости', performance: 'Производительность', endurance: 'Выносливость',
-              recovery: 'Восстановление', muscle_building: 'Мышечный рост', strength: 'Сила',
-              anti_osteoporotic: 'Против остеопороза', chondroprotective: 'Хондропротектор',
-              anti_gout: 'Против подагры', uricosuric: 'Урикозурик', anti_rheumatic: 'Против ревматизма',
-              detox: 'Детокс', heavy_metal: 'Тяжёлые металлы', chelation: 'Хелатор',
-              anti_radiation: 'Против радиации', anti_mutation: 'Против мутаций', dna_repair: 'ДНК-репарация',
-              telomere: 'Теломеры', stem_cell: 'Стволовые клетки', growth_factor: 'Фактор роста',
-              anti_apoptotic: 'Антиапоптоз', autophagy: 'Аутофагия', sirtuin: 'Сиртуин', nad: 'NAD+',
-              ampk: 'AMPK', mtor: 'mTOR', longevity: 'Долголетие', rejuvenation: 'Омоложение',
-              anti_cancer: 'Противораковый', anti_tumor: 'Противоопухолевый', anti_angiogenic: 'Антиангиогенез',
-              pro_apoptotic: 'Проапоптоз', anti_metastatic: 'Антиметастатический', anti_mutagenic: 'Антимутагенный',
-            };
-            const organList = [
-              {key:'cardio',label:'❤️ Сердце/Сосуды',organs:['heart','vessels','cardiovascular']},
-              {key:'liver',label:'🫁 Печень',organs:['liver','hepatobiliary']},
-              {key:'kidney',label:'🫘 Почки',organs:['kidney','renal','urinary']},
-              {key:'lung',label:'🫁 Лёгкие',organs:['lung','respiratory']},
-              {key:'brain',label:'🧠 Мозг',organs:['brain','cns','neurons','cognitive']},
-              {key:'bones',label:'🦴 Кости/Суставы',organs:['bone','joint','skeletal']},
-              {key:'skin',label:'✨ Кожа/Волосы',organs:['skin','hair','nails','dermal']},
-              {key:'thyroid',label:'🦋 Щитовидка',organs:['thyroid','endocrine']},
-              {key:'pancreas',label:'🍬 Поджелудочная',organs:['pancreas','insulin','glucose']},
-              {key:'blood',label:'🩸 Кровь',organs:['blood','hematologic','marrow']},
-              {key:'immune',label:'🛡 Иммунитет',organs:['immune','lymphatic','thymus']},
-              {key:'gi',label:'🫃 ЖКТ',organs:['gi','stomach','intestine','colon','microbiome']},
-              {key:'hormones',label:'⚖ Гормоны',organs:['endocrine','adrenal','pituitary','gonads']},
-              {key:'male',label:'♂️ Мужское',organs:['prostate','testes','male_reproductive']},
-              {key:'female',label:'♀️ Женское',organs:['ovary','uterus','female_reproductive']},
-              {key:'antiaging',label:'⏳ Антивозраст',organs:['cells','mitochondria','telomere']},
-              {key:'energy',label:'⚡ Энергия',organs:['mitochondria','muscle','metabolic']},
-              {key:'recovery',label:'🔄 Восстановление',organs:['muscle','tendon','soft_tissue']},
-            ];
-            const toggleOrgan = (key:string) => setStackCalcOrgans(prev=>prev.includes(key)?prev.filter(k=>k!==key):[...prev,key]);
-            const selectAll = () => setStackCalcOrgans(organList.map(o=>o.key));
-            const clearAll = () => { setStackCalcOrgans([]); setStackCalcMech([]); };
-            const selectedOrgans = organList.filter(o=>stackCalcOrgans.includes(o.key)).flatMap(o=>o.organs);
-            const toggleMech = (m:string) => setStackCalcMech(prev=>prev.includes(m)?prev.filter(x=>x!==m):[...prev,m]);
-const [lo,hi]=stackCalcSize.split('-').map(Number);
-              const generate = () => {
-                const candidates:Array<{sub:typeof ALL_SUBSTANCES[0];score:number;organHits:number;mechHits:number}> = [];
-                for (const sub of ALL_SUBSTANCES) {
-                  if (!sub.name||!sub.mechanisms||!sub.mechanisms.length) continue;
-                  if (sub.mechanisms.length === 1 && (sub.mechanisms[0] === 'general' || sub.mechanisms[0] === 'antioxidant')) continue;
-                  let score = 0; let organHits = 0; let mechHits = 0;
-                 const subOrgans = ((sub.organs||[]) as string[]).map((o:any)=>(o||'').toLowerCase());
-                 if (selectedOrgans.length>0) {
-                   for (const o of selectedOrgans) {
-                     if (subOrgans.some(so=>so.includes(o.toLowerCase())||o.toLowerCase().includes(so))) { score+=2; organHits++; }
-                   }
-                 } else { organHits = 1; score += 1; }
-                 if (stackCalcMech.length>0) {
-                   for (const m of stackCalcMech) {
-                     if ((sub.mechanisms||[]).some(sm=>(sm||'').toLowerCase().includes(m.toLowerCase()))) { score+=1; mechHits++; }
-                   }
-                 } else { mechHits = 1; score += 1; }
-                 if (score>0) candidates.push({sub,score,organHits,mechHits});
-               }
-               candidates.sort((a,b)=>(b.score-a.score) || (Math.random()-0.5));
-               const allCandidates = candidates.slice(0, Math.min(50, candidates.length));
-               const findSynergies = (subs: string[]) => {
-                 const synergies:any[] = []; const conflicts:any[] = [];
-                 for (let a=0;a<subs.length;a++) { for (let b=a+1;b<subs.length;b++) {
-                   const key = `${subs[a]}||${subs[b]}`;
-                   const found = conflictLookup.get(key);
-                   if (found&&found.type==='synergy') synergies.push({a:subs[a],b:subs[b],effect:found.effect,severity:found.severity,mechanisms:found.mechanisms||[]});
-                   else if (found&&found.type!=='synergy') conflicts.push({a:subs[a],b:subs[b],effect:found.effect,severity:found.severity});
-                 }}
-                 return {synergies,conflicts};
-               };
-               const buildStack = (startIdx: number, size: number, tag: string, tagDesc: string) => {
-                 const subset = allCandidates.slice(startIdx, startIdx + size);
-                 const subs = subset.map(s=>s.sub.id);
-                 const {synergies,conflicts} = findSynergies(subs);
-                 const allMechs = new Set<string>();
-                 subset.forEach(s=>((s.sub.mechanisms||[]) as string[]).forEach((m:any)=>allMechs.add(m)));
-                 const totalScore = Math.min(100, Math.round(size*3 + synergies.length*5 - conflicts.length*3));
-                 const organNames = stackCalcOrgans.length > 0 ? organList.filter(o=>stackCalcOrgans.includes(o.key)).map(o=>o.label.replace(/^[^\s]+\s/,'')).join(', ') : 'общая поддержка';
-                 return { tag, tagDesc, substances: subs, descriptions: subset.map(s=>s.sub.name||s.sub.id), scores: subset.map(s=>s.score), organHits: subset.map(s=>s.organHits), mechHits: subset.map(s=>s.mechHits), synergies, conflicts, mechs: [...allMechs], totalScore, stackDesc: `${tagDesc} для ${organNames}: ${subs.length} веществ, ${synergies.length} синергий, ${conflicts.length} конфликтов. Оценка: ${totalScore}/100`, subDetails: subset.map(s => ({ id: s.sub.id, name: s.sub.name || s.sub.id, mechanisms: (s.sub.mechanisms || []) as string[], description: s.sub.description || '' })) };
-               };
-               const stacks: any[] = [];
-               const [lo2,hi2] = [2, Math.min(hi, Math.max(lo, allCandidates.length))];
-               stacks.push(buildStack(0, Math.min(hi2, allCandidates.length), '🎯 Оптимальный', 'Стек с максимальным покрытием'));
-               if (allCandidates.length > 5) stacks.push(buildStack(0, Math.min(lo2 + 2, allCandidates.length), '⚡ Минимальный', 'Минимальный набор'));
-               if (allCandidates.length > 10) { const midStart = Math.floor(allCandidates.length * 0.2); stacks.push(buildStack(midStart, Math.min(hi2, allCandidates.length - midStart), '🔄 Альтернативный', 'Другие механизмы')); }
-               if (allCandidates.length > 3) {
-                 const synergyOnly = allCandidates.filter(c => { const subId = c.sub.id; return allCandidates.some(other => other.sub.id !== subId && (conflictLookup.get(`${subId}||${other.sub.id}`)?.type === 'synergy' || conflictLookup.get(`${other.sub.id}||${subId}`)?.type === 'synergy')); });
-                 if (synergyOnly.length >= 3) {
-                   const synSubs = synergyOnly.slice(0, Math.min(hi, synergyOnly.length));
-                   const synIds = synSubs.map(s=>s.sub.id);
-                   const {synergies: synS, conflicts: synC} = findSynergies(synIds);
-                   const synMechs = new Set<string>(); synSubs.forEach(s=>((s.sub.mechanisms||[]) as string[]).forEach((m:any)=>synMechs.add(m)));
-                   stacks.push({ tag: '⊕ Синергетический', tagDesc: 'Максимальное количество синергий', substances: synIds, descriptions: synSubs.map(s=>s.sub.name||s.sub.id), scores: synSubs.map(s=>s.score), organHits: synSubs.map(s=>s.organHits), mechHits: synSubs.map(s=>s.mechHits), synergies: synS, conflicts: synC, mechs: [...synMechs], totalScore: Math.min(100, Math.round(synIds.length*3 + synS.length*8 - synC.length*3)), stackDesc: `Стек с ${synS.length} синергиями — максимальный усилительный эффект`, subDetails: synSubs.map(s => ({ id: s.sub.id, name: s.sub.name || s.sub.id, mechanisms: (s.sub.mechanisms || []) as string[], description: s.sub.description || '' })) });
-                 }
-               }
-               setGeneratedStacks(stacks);
-               if (stacks.length > 0) setGeneratedStack(stacks[0]);
-             };
-            return <div>
-              <div style={{fontSize:13,fontWeight:700,color:'var(--accent)',marginBottom:4}}>🧮 Генератор стеков</div>
-              <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:6}}>Выберите органы, механизмы и размер — стек генерируется из базы веществ поддержки с учётом синергий и конфликтов</div>
-              <div style={{marginBottom:6}}>
-                <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
-                  <span style={{fontSize:9,fontWeight:600,color:'var(--text-light)'}}>Органы:</span>
-                  <button onClick={selectAll} style={{fontSize:7,padding:'2px 6px',borderRadius:4,cursor:'pointer',background:'rgba(0,230,138,0.1)',border:'1px solid rgba(0,230,138,0.2)',color:'#00e68a'}}>Все</button>
-                  {stackCalcOrgans.length>0&&<button onClick={clearAll} style={{fontSize:7,padding:'2px 6px',borderRadius:4,cursor:'pointer',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.15)',color:'#f87171'}}>✕</button>}
-                  <span style={{fontSize:8,color:'var(--text-dim)',marginLeft:4}}>{stackCalcOrgans.length}/{organList.length}</span>
-                </div>
-                <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
-                  {organList.map(o=><button key={o.key} onClick={()=>toggleOrgan(o.key)} style={{padding:'2px 5px',borderRadius:6,fontSize:7,cursor:'pointer',whiteSpace:'nowrap',background:stackCalcOrgans.includes(o.key)?'var(--accent)':'var(--bg-secondary)',color:stackCalcOrgans.includes(o.key)?'#000':'var(--text-dim)',border:`1px solid ${stackCalcOrgans.includes(o.key)?'var(--accent)':'var(--border)'}`}}>{o.label}</button>)}
-                </div>
-              </div>
-              {stackCalcOrgans.length > 0 && availableMechs.length>0&&<div style={{marginBottom:6}}>
-                <div style={{fontSize:9,fontWeight:600,color:'var(--text-light)',marginBottom:3}}>Механизмы ({availableMechs.length}):</div>
-                <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
-                  {availableMechs.slice(0,40).map(m=><button key={m} onClick={()=>toggleMech(m)} style={{padding:'1px 4px',borderRadius:6,fontSize:6,cursor:'pointer',whiteSpace:'nowrap',background:stackCalcMech.includes(m)?'#8b5cf6':'var(--bg-secondary)',color:stackCalcMech.includes(m)?'#fff':'var(--text-dim)',border:`1px solid ${stackCalcMech.includes(m)?'#8b5cf6':'var(--border)'}`}}>{MECH_TRANSLATIONS_RU[m] || m.replace(/_/g, ' ')}</button>)}
-
-                </div>
-              </div>}
-              {stackCalcOrgans.length === 0 && (
-                <div style={{marginBottom:6,padding:8,borderRadius:8,background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)',textAlign:'center',fontSize:9,color:'var(--text-dim)'}}>
-                  Выберите орган для отображения механизмов
-                </div>
-              )}
-              <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:4}}>
-                <span style={{fontSize:9,fontWeight:600,color:'var(--text-light)'}}>Размер:</span>
-                {['2-4','5-7','8-10','11-15','15-20','20-25','30-35'].map(s=><button key={s} onClick={()=>setStackCalcSize(s)} style={{padding:'2px 5px',borderRadius:6,fontSize:7,cursor:'pointer',background:stackCalcSize===s?'var(--accent)':'var(--bg-secondary)',color:stackCalcSize===s?'#000':'var(--text-dim)',border:`1px solid ${stackCalcSize===s?'var(--accent)':'var(--border)'}`}}>{s}</button>)}
-              </div>
-              <button onClick={generate} style={{width:'100%',padding:'10px',borderRadius:12,fontWeight:800,fontSize:14,cursor:'pointer',background:'var(--accent)',border:'none',color:'#000',marginBottom:6}}>⚡ Сгенерировать</button>
-              {generatedStacks.length > 0 && (
-                <div style={{marginBottom:6}}>
-                  <div style={{display:'flex',gap:4,overflowX:'auto',marginBottom:4}}>
-                    {generatedStacks.map((st:any,si:number)=>(
-                      <button key={si} onClick={()=>setGeneratedStack(st)} style={{padding:'3px 8px',borderRadius:8,fontSize:8,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap',background:generatedStack===st?'var(--accent)':'var(--bg-secondary)',color:generatedStack===st?'#000':'var(--text-dim)',border:`1px solid ${generatedStack===st?'var(--accent)':'var(--border)'}`}}>
-                        {st.tag} · {st.substances.length} шт
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {generatedStack&&<div style={{background:'rgba(0,230,138,0.04)',borderRadius:10,padding:8,border:'1px solid rgba(0,230,138,0.12)'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
-                  <div style={{fontSize:11,fontWeight:700,color:'var(--accent)'}}>{generatedStack.tag || 'Стек'} · {generatedStack.substances.length} веществ</div>
-                  <div style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:6,background:generatedStack.totalScore>=70?'rgba(34,197,94,0.12)':generatedStack.totalScore>=40?'rgba(234,179,8,0.12)':'rgba(239,68,68,0.12)',color:generatedStack.totalScore>=70?'#4ade80':generatedStack.totalScore>=40?'#facc15':'#f87171'}}>{generatedStack.totalScore}/100</div>
-                </div>
-                {generatedStack.stackDesc && <div style={{fontSize:8,color:'var(--text-dim)',marginBottom:4,lineHeight:1.4}}>{generatedStack.stackDesc}</div>}
-                <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:4}}>
-                  {generatedStack.descriptions.map((n:string,i:number)=><span key={i} style={{fontSize:8,padding:'2px 8px',borderRadius:6,background:'rgba(139,92,246,0.1)',color:'#a78bfa',border:'1px solid rgba(139,92,246,0.15)'}}>{n}<span style={{marginLeft:3,opacity:0.5,fontSize:7}}>+{generatedStack.scores[i]}</span></span>)}
-                </div>
-                {generatedStack.subDetails && generatedStack.subDetails.length > 0 && (
-                  <details style={{marginBottom:4}}>
-                    <summary style={{fontSize:8,fontWeight:600,color:'var(--text-light)',cursor:'pointer',marginBottom:3}}>📋 Детали веществ ({generatedStack.subDetails.length})</summary>
-                    <div style={{display:'flex',flexDirection:'column',gap:3}}>
-                      {generatedStack.subDetails.map((sd:any,si:number)=>(
-                        <div key={si} style={{padding:'4px 8px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
-                          <div style={{fontSize:9,fontWeight:600,color:'var(--text-light)',marginBottom:2}}>{sd.name}</div>
-                          <div style={{display:'flex',flexWrap:'wrap',gap:2,marginBottom:2}}>
-                            {sd.mechanisms && sd.mechanisms.length > 0 && sd.mechanisms.slice(0,3).map((m:string,mi:number)=>{
-                              const role = MECH_ROLE_LABELS[m.toLowerCase().replace(/\s+/g,'_')] || MECH_ROLE_LABELS[m] || '';
-                              return <span key={mi} style={{fontSize:7,padding:'1px 5px',borderRadius:4,background:role?'rgba(0,230,138,0.1)':'rgba(139,92,246,0.08)',color:role?'#00e68a':'#a78bfa',fontWeight:role?600:400}}>{role || MECH_TRANSLATIONS_RU[m] || m.replace(/_/g, ' ')}</span>;
-                            })}
-                          </div>
-                          {sd.description && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3}}>{sd.description}</div>}
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                )}
-                {generatedStack.mechs.length>0&&<div style={{marginBottom:3}}><div style={{fontSize:7,fontWeight:600,color:'var(--text-dim)',marginBottom:2}}>⚙️ Механизмы:</div><div style={{display:'flex',flexWrap:'wrap',gap:2}}>{generatedStack.mechs.map((m:string,i:number)=><span key={i} style={{fontSize:6,padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa'}}>{MECH_TRANSLATIONS_RU[m] || m.replace(/_/g, ' ')}</span>)}</div></div>}
-                {generatedStack.synergies.length>0&&<details style={{marginBottom:3}}><summary style={{fontSize:7,fontWeight:600,color:'#22c55e',cursor:'pointer'}}>⊕ Синергии ({generatedStack.synergies.length})</summary>{generatedStack.synergies.map((s:any,i:number)=><div key={i} style={{fontSize:7,color:'var(--text-dim)',padding:'2px 0'}}><b style={{color:'#4ade80'}}>{getStackSubLabel(s.a)} + {getStackSubLabel(s.b)}</b>: {s.effect} [{s.severity}]{s.mechanisms&&s.mechanisms.length>0&&<span style={{fontSize:6,color:'#a78bfa',marginLeft:4}}>→ {s.mechanisms.map((mx: string) => MECH_TRANSLATIONS_RU[mx] || mx.replace(/_/g, ' ')).join(', ')}</span>}</div>)}</details>}
-                {generatedStack.conflicts.length>0&&<details><summary style={{fontSize:7,fontWeight:600,color:'#ef4444',cursor:'pointer'}}>⚠ Конфликты ({generatedStack.conflicts.length})</summary>{generatedStack.conflicts.map((c:any,i:number)=><div key={i} style={{fontSize:7,color:'#f87171',padding:'2px 0'}}><b>{getStackSubLabel(c.a)} + {getStackSubLabel(c.b)}</b>: {c.effect} [{c.severity}]</div>)}</details>}
-              </div>}
-              {!generatedStack&&stackCalcOrgans.length===0&&<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:10,background:'var(--bg-secondary)',borderRadius:10,border:'1px solid var(--border)'}}>Выберите органы/системы и нажмите «Сгенерировать»</div>}
-            </div>;
-          })}
-        </div>
-      )}
-
 
 
       {/* ===== MIX CALCULATOR: Training Mix ===== */}
@@ -8163,4 +7945,3 @@ const StackBuilderSection: React.FC = () => {
     </div>}
   </div>);
 };
-
