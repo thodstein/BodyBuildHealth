@@ -949,7 +949,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [section, setSection] = useState<'home'|'generator'|'protocols'|'info'>('home');
   const [genTab, setGenTab] = useState<'calculator'|'stackgen'|'mystacks'|'plan'|'reports'|'info'>('calculator');
   const [protocolTab, setProtocolTab] = useState<'pct'|'fertility'|'hrt'|'neuro'|'joints'|'acne'|'peptides'>('pct');
-  const [infoTab, setInfoTab] = useState<'peptides'|'catalog'|'synergies'|'readystacks'|'interactions'|'research'|'mixcalc'|'neuro'|'joints'|'acne'>('catalog');
+  const [infoTab, setInfoTab] = useState<string>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
   const [systemFilter, setSystemFilter] = useState<string>('all');
@@ -1741,12 +1741,25 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
   const groupedSubstances = useMemo(() => {
     const normCat = (cat: string): string => {
-      // Organ-based categories → map to 'other' for type view (they belong in organ view)
-      const organCats = ['gut','gastrointestinal','cardioprotector','hepatoprotector','neuroprotector',
-        'immunomodulator','immune','joint','bone','respiratory','eye_protector','renal','skin','beauty',
-        'urinary_protector','anticoagulant','thyroid','bile_acid','choleretic','lipid','anabolic',
-        'hematologic','antimicrobial','recovery','marker','nsaid','electrolyte','multivitamin'];
-      if (organCats.includes(cat) || organCats.some(oc => cat.includes(oc))) return 'other';
+      // Organ-based categories → map to proper group labels
+      const organCatToGroup: Record<string,string> = {
+        hepatoprotector:'liver',cardioprotector:'cardio',neuroprotector:'neuro',
+        immunomodulator:'immune',immune:'immune',joint:'joints',bone:'bone',
+        respiratory:'lung',eye_protector:'eye',renal:'kidney',skin:'skin',
+        beauty:'skin',urinary_protector:'kidney',anticoagulant:'blood',
+        thyroid:'thyroid',bile_acid:'liver',choleretic:'liver',lipid:'cardio',
+        anabolic:'muscle',hematologic:'blood',antimicrobial:'immune',
+        recovery:'recovery',marker:'other',nsaid:'antiinflammatory',
+        electrolyte:'electrolyte',multivitamin:'vitamins',gut:'gi',
+        gastrointestinal:'gi',antioxidant:'antioxidants',antiinflammatory:'antiinflammatory',
+        anti_inflammatory:'antiinflammatory',anxiolytic:'anxiolytic',
+        antidepressant:'mood',antiviral:'immune',antibiotic:'immune',
+        pain:'analgesic',analgesic:'analgesic',stress:'adaptogens',
+        glucose:'metabolism',metabolism:'metabolism',metabolic:'metabolism',
+        antiaging:'antiaging',antiglycation:'antiaging',no_organ:'other',
+      };
+      const normed = (cat||'').toLowerCase().replace(/[^a-z0-9_]/g,'');
+      if (organCatToGroup[normed]) return organCatToGroup[normed];
       const m: Record<string,string> = {
         amino_acid:'amino_acids',aminoacids:'amino_acids',
         vitamin:'vitamins',vitamin_:'vitamins',
@@ -1905,7 +1918,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     GUT: { key: 'gi', label: 'ЖКТ и пищеварение', emoji: '🫃' },
     BLOOD_VESSELS: { key: 'heart_vessels', label: 'Сердце и сосуды', emoji: '❤️' },
     VASCULAR: { key: 'heart_vessels', label: 'Сердце и сосуды', emoji: '❤️' },
-    WHOLE_BODY: { key: 'other', label: 'Общее', emoji: '🔬' },
+    WHOLE_BODY: { key: 'complexes', label: 'Комплексы', emoji: '🧩' },
     BONE: { key: 'joints_bones', label: 'Суставы и кости', emoji: '🦴' },
     URINARY_TRACT: { key: 'kidneys', label: 'Почки и мочевыводящие', emoji: '🫘' },
     liver: { key: 'liver', label: 'Печень', emoji: '🫁' },
@@ -2786,9 +2799,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   peptides: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); },
                   catalog: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); setSection('home'); },
                   synergies: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('synergies'); setSection('home'); },
-                  readystacks: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('stacks'); setSection('home'); },
+                  supportstacks: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('supportstacks'); setSection('home'); },
                   interactions: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('interactions'); setSection('home'); },
                   research: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); setSection('home'); },
+                  favorites: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('favorites'); setSection('home'); },
 
                   mixcalc: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); },
                   neuro: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('neuro'); },
@@ -2840,6 +2854,28 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Каталог, синергии, взаимодействия, исследования, калькуляторы</div>
                 </div>
                 <span style={{ color:'#60a5fa', fontSize:18, opacity:0.6 }}>→</span>
+              </div>
+              {/* Примерные протоколы поддержки cards */}
+              <div style={{ display:'flex', flexDirection:'column', gap:6, padding:'12px 14px', borderRadius:16, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'#8b5cf6' }}>📋 Примерные протоколы поддержки</div>
+                <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                  {[
+                    { id:'pct', label:'ПКТ', color:'#8b5cf6', emoji:'🔄' },
+                    { id:'fertility', label:'Фертильность', color:'#ec4899', emoji:'👶' },
+                    { id:'hrt', label:'ГЗТ', color:'#f59e0b', emoji:'⚕️' },
+                    { id:'neuro', label:'Нейро', color:'#06b6d4', emoji:'🧠' },
+                    { id:'joints', label:'Суставы', color:'#22c55e', emoji:'🦴' },
+                    { id:'acne', label:'Акне', color:'#ef4444', emoji:'🔴' },
+                  ].map(p => (
+                    <div key={p.id} onClick={() => { setSection('protocols'); setProtocolTab(p.id as any); }} style={{
+                      display:'flex', alignItems:'center', gap:6, padding:'5px 10px', borderRadius:10, cursor:'pointer',
+                      background:p.color+'15', border:'1px solid '+p.color+'30', color:p.color, fontSize:10, fontWeight:600,
+                    }}>
+                      <span>{p.emoji}</span>
+                      <span>{p.label}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
         </div>
@@ -3126,7 +3162,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                         <div style={{ flex:1 }}>
                                           <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
                                           <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
-                                            {(sub?.categories||[]).slice(0,3).map(c => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c||''}</span>)}
+                                      {(sub?.categories||[]).slice(0,3).map(c => { const ci = getCategoryInfo(c); return <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{ci.label||c||''}</span>; })}
                                       {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m||''}</span>)}
                                           </div>
                                         </div>
@@ -3285,6 +3321,28 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     }}>{st === 'all' ? '♾️ Все' : st === 'synergies' ? '🤝 Синергии' : st === 'conflicts' ? '🔴 Конфликты' : st === 'cautions' ? '🟡 Осторожности' : '🧮 Калькулятор'}</button>
                   ))}
                 </div>
+
+                {/* ════ Severity, Count, Organ filter pills ════ */}
+                {synergySubTab !== 'calculator' && (<>
+                  <div style={{ fontSize:7, color:'var(--text-dim)', fontWeight:600, marginBottom:3 }}>По эффективности:</div>
+                  <div style={{ display:'flex', gap:3, marginBottom:4, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+                    {[['all','Все'],['LOW','Низкая'],['MEDIUM','Средняя'],['HIGH','Высокая']].map(([v,l]) => (
+                      <button key={v} onClick={() => setInfoSynergySeverity(v)} style={{ padding:'3px 8px', borderRadius:8, fontSize:7, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', background: infoSynergySeverity === v ? 'var(--accent)' : 'transparent', color: infoSynergySeverity === v ? '#000' : 'var(--text-dim)', border:`1px solid ${infoSynergySeverity === v ? 'var(--accent)' : 'var(--border)'}` }}>{l}</button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize:7, color:'var(--text-dim)', fontWeight:600, marginBottom:3 }}>По количеству веществ:</div>
+                  <div style={{ display:'flex', gap:3, marginBottom:4, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+                    {[[0,'Любое'],[2,'2'],[3,'3'],[5,'5'],[10,'10+']].map(([v,l]) => (
+                      <button key={String(v)} onClick={() => setSynergyCountFilter(v as number)} style={{ padding:'3px 8px', borderRadius:8, fontSize:7, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', background: synergyCountFilter === v ? 'var(--accent)' : 'transparent', color: synergyCountFilter === v ? '#000' : 'var(--text-dim)', border:`1px solid ${synergyCountFilter === v ? 'var(--accent)' : 'var(--border)'}` }}>{l}</button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize:7, color:'var(--text-dim)', fontWeight:600, marginBottom:3 }}>По органам:</div>
+                  <div style={{ display:'flex', gap:3, marginBottom:6, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+                    {[['','Все'], ...Object.entries(ORGAN_CATEGORY_MAP).filter(([k,v],i,a)=>a.findIndex(x=>x[1].key===v.key)===i).map(([k,v])=>[v.key,v.emoji+v.label])].map(([v,l]) => (
+                      <button key={String(v)} onClick={() => setSynergyOrganFilter(v as string)} style={{ padding:'3px 8px', borderRadius:8, fontSize:7, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', background: synergyOrganFilter === v ? 'var(--accent)' : 'transparent', color: synergyOrganFilter === v ? '#000' : 'var(--text-dim)', border:`1px solid ${synergyOrganFilter === v ? 'var(--accent)' : 'var(--border)'}` }}>{l}</button>
+                    ))}
+                  </div>
+                </>)}
 
                 {synergySubTab === 'calculator' ? (
                   /* ─── КАЛЬКУЛЯТОР ВЗАИМОДЕЙСТВИЙ ─── */
@@ -3519,39 +3577,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     {/* Search bar BELOW sub-tabs */}
                     <div style={{ marginBottom:6 }}>
                       <input value={synergySearch} onChange={e => setSynergySearch(e.target.value)} placeholder="🔍 Поиск по веществу/эффекту..." style={{ width:'100%', padding:'7px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
-                    </div>
-                    {/* Count filter */}
-                    <div style={{ display:'flex', gap:4, marginBottom:6, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                      {[{v:0,l:'Все'},{v:2,l:'2 в-ва'},{v:3,l:'3+ в-ва'},{v:5,l:'5+ в-в'}].map(opt => (
-                        <button key={opt.v} onClick={() => setSynergyCountFilter(opt.v)} style={{
-                          padding:'3px 8px', borderRadius:8, fontSize:8, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer',
-                          background: synergyCountFilter === opt.v ? 'var(--accent)' : 'transparent',
-                          color: synergyCountFilter === opt.v ? '#000' : 'var(--text-dim)',
-                          border: `1px solid ${synergyCountFilter === opt.v ? 'var(--accent)' : 'var(--border)'}`,
-                        }}>{opt.l}</button>
-                      ))}
-                    </div>
-                    {/* Severity filter */}
-                    <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                      {(['all','LOW','MEDIUM','HIGH'] as const).map(s => (
-                        <button key={s} onClick={() => { setInfoSynergySeverity(s); setSynergyPage(1); }} style={{
-                          padding:'4px 8px', borderRadius:10, fontSize:8, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                          background: infoSynergySeverity === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'transparent',
-                          color: infoSynergySeverity === s ? '#000' : 'var(--text-dim)',
-                          border: `1px solid ${infoSynergySeverity === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'var(--border)'}`,
-                        }}>{s === 'all' ? '♾️ Все' : `${INTERACTION_SEVERITY_LABELS[s]?.label||s}`}</button>
-                      ))}
-                    </div>
-                    {/* Organ filter */}
-                    <div style={{ display:'flex', gap:4, marginBottom:6, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                      {[['','♾️ Все'],['heart_vessels','❤️ Сердце'],['liver','🫁 Печень'],['kidneys','🫘 Почки'],['brain_nerves','🧠 Нервы'],['joints_bones','🦴 Суставы'],['immune','🛡️ Иммунитет'],['gi','🫃 ЖКТ'],['endocrine','🦋 Эндокринная'],['skin_hair','✨ Кожа'],['eyes','👁️ Глаза'],['reproductive','🧬 Репродуктивная'],['blood','🩸 Кровь'],['lungs','🫁 Лёгкие'],['muscles','💪 Мышцы'],['mitochondria','⚡ Энергия']].map(([key, label]) => (
-                        <button key={key} onClick={() => setSynergyOrganFilter(key)} style={{
-                          padding:'3px 8px', borderRadius:8, fontSize:7, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer',
-                          background: synergyOrganFilter === key ? 'var(--accent)' : 'transparent',
-                          color: synergyOrganFilter === key ? '#000' : 'var(--text-dim)',
-                          border: `1px solid ${synergyOrganFilter === key ? 'var(--accent)' : 'var(--border)'}`,
-                        }}>{label}</button>
-                      ))}
                     </div>
                     {/* Mechanism filter */}
                     <div style={{ display:'flex', gap:4, marginBottom:6, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>

@@ -8,7 +8,7 @@ interface Props { onNavigate?: (screen: ScreenId) => void; }
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   return (
     <div style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', display:'flex', flexDirection:'column', overflow:'hidden', background:'#000' }}>
-      <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', objectPosition:'center' }} />
+      <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center' }} />
       <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(0,0,0,0.1) 30%, rgba(0,0,0,0.7) 100%)' }} />
       <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'0 16px 24px' }}>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
