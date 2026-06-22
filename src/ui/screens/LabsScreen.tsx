@@ -175,6 +175,7 @@ export const LabsScreen: React.FC = () => {
   });
   const [addError, setAddError] = useState('');
   const [labReportGenerated, setLabReportGenerated] = useState(false);
+  const [selectedArchivedLabReport, setSelectedArchivedLabReport] = useState<any>(null);
   const [labArchive, setLabArchive] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_lab_reports') || '[]'); } catch { return []; }
   });
@@ -1187,10 +1188,23 @@ export const LabsScreen: React.FC = () => {
           {labArchive.length > 0 && (
             <div>
               <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginBottom:4 }}>📦 Архив ({labArchive.length})</div>
-              {labArchive.slice(0,5).map((r:any) => (
-                <div key={r.id} style={{ borderRadius:8, padding:8, marginBottom:4, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.03)', fontSize:9, display:'flex', justifyContent:'space-between' }}>
-                  <span style={{ color:'#00e68a', fontWeight:700 }}>{r.date}</span>
-                  <span style={{ color:'rgba(255,255,255,0.5)' }}>{r.totalMarkers} марк.</span>
+              {labArchive.slice(0,20).map((r:any) => (
+                <div key={r.id} onClick={() => setSelectedArchivedLabReport(selectedArchivedLabReport?.id === r.id ? null : r)} style={{ borderRadius:8, padding:8, marginBottom:4, background: selectedArchivedLabReport?.id === r.id ? 'rgba(0,230,138,0.08)' : 'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.03)', fontSize:9, cursor:'pointer' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between' }}>
+                    <span style={{ color:'#00e68a', fontWeight:700 }}>{r.date}</span>
+                    <span style={{ color:'rgba(255,255,255,0.5)' }}>{r.totalMarkers} марк. · {r.abnormalCount || 0} откл.</span>
+                  </div>
+                  {selectedArchivedLabReport?.id === r.id && (
+                    <div style={{ marginTop:6, padding:6, background:'rgba(0,0,0,0.15)', borderRadius:6 }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#00e68a', marginBottom:4 }}>📋 Отчёт от {r.date}</div>
+                      {(r.labs||[]).map((l:any, i:number) => (
+                        <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:8, padding:'1px 0', color:'rgba(255,255,255,0.85)' }}>
+                          <span>{l.name || l.code}</span>
+                          <span>{l.value} {l.unit}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

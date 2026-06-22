@@ -9,7 +9,7 @@ import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indic
 import { calculateIndices } from '../../engines/clinical-indices.engine';
 import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../core/constants';
 
-type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'reports' | 'contacts' | 'bp_diary' | 'measurements' | 'diaries';
+type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'analytics' | 'contacts' | 'bp_diary' | 'measurements' | 'diaries';
 type ProfilePage = 'hero' | 'tabs';
 
 const SPORT_TYPES = [
@@ -392,6 +392,8 @@ export const ProfileScreen: React.FC = () => {
   const [bpDiastolic, setBpDiastolic] = useState('');
   const [bpHr, setBpHr] = useState('');
   const [reportTab, setReportTab] = useState<'current' | 'archive'>('current');
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'reports' | 'progress'>('reports');
+  const [selectedArchiveItem, setSelectedArchiveItem] = useState<any>(null);
   const [showCustomReport, setShowCustomReport] = useState(false);
   const [customReportBlocks, setCustomReportBlocks] = useState<Record<string, boolean>>({
     profile: true, training: true, nutrition: true, labs: true,
@@ -589,7 +591,7 @@ export const ProfileScreen: React.FC = () => {
     { id: 'overview', label: 'Обзор' }, { id: 'anthropometry', label: 'Тело' },
     { id: 'sleep', label: 'Сон' }, { id: 'lifestyle', label: 'Образ жизни' },
     { id: 'diet', label: 'Питание' }, { id: 'injuries', label: 'Травмы' },
-    { id: 'progress', label: 'Прогресс' }, { id: 'reports', label: 'Отчёты' },
+    { id: 'analytics', label: 'Аналитика' },
     { id: 'bp_diary', label: 'Давление' }, { id: 'measurements', label: 'Замеры' }, { id: 'diaries', label: 'Дневники' }, { id: 'contacts', label: 'Контакты' }
   ];
 
@@ -629,8 +631,7 @@ export const ProfileScreen: React.FC = () => {
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
                 { id: 'overview', icon: '📋', title: 'Сведения о пользователе', desc: 'Обзор, антропометрия, сон, образ жизни, питание, травмы', color: '#00e68a' },
-                { id: 'reports', icon: '📊', title: 'Отчёты', desc: 'Для тренера, врача и общий отчёт с копированием и отправкой', color: '#3b82f6' },
-                { id: 'progress', icon: '📈', title: 'Прогресс', desc: 'Отслеживание веса, замеров и целей', color: '#f59e0b' },
+                { id: 'analytics', icon: '📊', title: 'Аналитика', desc: 'Отчёты для тренера/врача, дневник прогресса, дневники по категориям', color: '#3b82f6' },
                 { id: 'contacts', icon: '📞', title: 'Контакты и друзья', desc: 'Список друзей, шаринг, поддержка и контакты', color: '#8b5cf6' },
               ].map(card => (
                 <button key={card.id} onClick={() => { setPage('tabs'); setTab(card.id as ProfileTab); }} style={{
@@ -1595,8 +1596,8 @@ export const ProfileScreen: React.FC = () => {
           </>
           )}
 
-          {/* ═══ REPORTS TAB ═══ */}
-           {tab === 'reports' && (() => {
+          {/* ═══ ANALYTICS TAB ═══ */}
+           {tab === 'analytics' && (() => {
              const bmiVal = settings.weight && settings.height ? (settings.weight / Math.pow(settings.height / 100, 2)).toFixed(1) : '—';
             const lbmVal = settings.weight && settings.bodyFat ? (settings.weight * (1 - settings.bodyFat / 100)).toFixed(1) : '—';
             const ffmiVal = lbmVal !== '—' && settings.height ? (parseFloat(lbmVal) / Math.pow(settings.height / 100, 2) + 6.1 * (1.8 - settings.height / 100)).toFixed(1) : '—';
@@ -1777,9 +1778,73 @@ export const ProfileScreen: React.FC = () => {
 
             return (
               <div>
+                {/* Analytics sub-tabs: Отчёты / Дневник прогресса */}
+                <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+                  {[['reports','📄 Отчёты'],['progress','📈 Дневник прогресса']].map(([id,label]) => (
+                    <button key={id} onClick={() => setAnalyticsSubTab(id as any)} style={{
+                      padding:'6px 14px', borderRadius:16, fontSize:10, fontWeight:700, cursor:'pointer', border:'none',
+                      background: analyticsSubTab === id ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+                      color: analyticsSubTab === id ? '#000' : 'rgba(255,255,255,0.85)',
+                    }}>{label}</button>
+                  ))}
+                </div>
+                {analyticsSubTab === 'progress' ? (
+                  /* PROGRESS CONTENT (inlined from old progress tab) */
+                  <div>
+                    <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                        <span style={{ fontSize:20 }}>⚖️</span>
+                        <div>
+                          <div style={{ fontSize:11, fontWeight:700, color:'var(--text-light)' }}>Вес</div>
+                          <div style={{ fontSize:18, fontWeight:800, color:'var(--accent)' }}>{settings.weight || '—'} <span style={{ fontSize:10, color:'var(--text-dim)', fontWeight:400 }}>кг</span></div>
+                        </div>
+                        <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:4 }}>
+                          <span style={{ fontSize:9, color:'var(--text-dim)' }}>Цель:</span>
+                          <input type="number" value={settings.targetWeight || ''} onChange={e => save({ targetWeight: Number(e.target.value) })} style={{ width:50, padding:'3px 6px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, textAlign:'center' }} />
+                          <span style={{ fontSize:9, color:'var(--text-dim)' }}>кг</span>
+                        </div>
+                      </div>
+                      {weightLog.length > 0 && <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Записей: {weightLog.length} | Мин: {Math.min(...weightLog.map(w=>w.weight)).toFixed(1)} | Тек: {weightLog[weightLog.length-1].weight.toFixed(1)} | Макс: {Math.max(...weightLog.map(w=>w.weight)).toFixed(1)}</div>}
+                      {weightLog.length > 2 && <div style={{ width:'100%', height:40, marginBottom:4 }}>
+                        <svg width="100%" height="40" viewBox="0 0 100 40" preserveAspectRatio="none">
+                          <defs><linearGradient id="wgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#00e68a" stopOpacity="0.3"/><stop offset="100%" stopColor="#00e68a" stopOpacity="0"/></linearGradient></defs>
+                          <polyline fill="none" stroke="#00e68a" strokeWidth="1.5" points={weightLog.map((w,i)=>`${(i/(weightLog.length-1))*100},${(1-(w.weight-Math.min(...weightLog.map(w=>w.weight)))/Math.max(1,Math.max(...weightLog.map(w=>w.weight))-Math.min(...weightLog.map(w=>w.weight))))*35}`).join(' ')}/>
+                          <polygon fill="url(#wgrad)" points={`0,35 ${weightLog.map((w,i)=>`${(i/(weightLog.length-1))*100},${(1-(w.weight-Math.min(...weightLog.map(w=>w.weight)))/Math.max(1,Math.max(...weightLog.map(w=>w.weight))-Math.min(...weightLog.map(w=>w.weight))))*35}`).join(' ')} 100,35`}/>
+                        </svg>
+                      </div>}
+                    </div>
+                    <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa', marginBottom:8 }}>📏 Замеры тела</div>
+                      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:4, marginBottom:8 }}>
+                        {[['waist','Талия',settings.waistCm],['chest','Грудь',settings.chestCm],['bicep','Бицепс',settings.bicepCm],['thigh','Бедро',settings.thighCm],['hip','Бёдра',settings.hipCm],['neck','Шея',settings.neckCm]].map(([key,label,val]) => (
+                          <div key={key} style={{ padding:'6px', borderRadius:6, background:'rgba(167,139,250,0.04)', border:'1px solid rgba(167,139,250,0.08)', textAlign:'center' }}>
+                            <div style={{ fontSize:8, color:'var(--text-dim)' }}>{label}</div>
+                            <div style={{ fontSize:13, fontWeight:700, color:'#a78bfa' }}>{val || '—'}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <button onClick={() => {
+                        const meas = getMeasurementsLog();
+                        meas.push({ date: new Date().toISOString().split('T')[0], waistCm: settings.waistCm || 0, chestCm: settings.chestCm || 0, bicepCm: settings.bicepCm || 0, thighCm: settings.thighCm || 0, hipCm: settings.hipCm || 0, bodyFat: settings.bodyFat || 0, neckCm: settings.neckCm || 0, forearmCm: 0 });
+                        localStorage.setItem('he_measurements_log', JSON.stringify(meas.slice(-30)));
+                      }} style={{ width:'100%', padding:'7px', borderRadius:8, border:'none', cursor:'pointer', background:'rgba(167,139,250,0.1)', color:'#a78bfa', fontWeight:700, fontSize:10 }}>💾 Сохранить текущие замеры</button>
+                    </div>
+                    <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🏋️ FFMI</div>
+                      <div style={{ fontSize:22, fontWeight:800, color:'#fff' }}>{ffmiVal}<span style={{ fontSize:10, color:'var(--text-dim)', fontWeight:400, marginLeft:4 }}>кг/м²</span></div>
+                      <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>{ffmiCategory || '—'}</div>
+                      <div style={{ marginTop:6, position:'relative', height:6, background:'rgba(255,255,255,0.06)', borderRadius:3 }}>
+                        <div style={{ position:'absolute', top:-8, left:'15%', fontSize:7, color:'var(--text-dim)' }}>15</div>
+                        <div style={{ position:'absolute', top:-8, left:'35%', fontSize:7, color:'var(--text-dim)' }}>20</div>
+                        <div style={{ position:'absolute', top:-8, left:'55%', fontSize:7, color:'var(--text-dim)' }}>25</div>
+                        <div style={{ position:'absolute', top:-8, left:'75%', fontSize:7, color:'var(--text-dim)' }}>30</div>
+                        {ffmiVal !== '—' && <div style={{ position:'absolute', bottom:-2, left:`${Math.min(90, Math.max(1, parseFloat(ffmiVal) * 3))}%`, width:8, height:8, borderRadius:'50%', background:'var(--accent)', transform:'translateX(-50%)' }} />}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                <div>
                 <div style={{ marginBottom:10 }}>
-                  <h3 style={{ margin:'0 0 4px', fontSize:15, fontWeight:800, color:'#fff' }}>📄 Отчёты</h3>
-                  <p style={{ fontSize:10, color:'rgba(255,255,255,0.7)', margin:'0 0 8px' }}>Текущие отчёты по всем блокам и архив</p>
                   <div style={{ display:'flex', gap:4 }}>
                     <button onClick={() => setReportTab('current')} style={{
                       padding:'6px 14px', borderRadius:16, fontSize:10, fontWeight:700, cursor:'pointer',
@@ -1983,7 +2048,7 @@ export const ProfileScreen: React.FC = () => {
                       {allArchives.length > 0 ? (
                         <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                           {allArchives.slice(0, 50).map((r: any, i: number) => (
-                            <div key={r.id || i} style={{ borderRadius:10, padding:10, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.03)' }}>
+                            <div key={r.id || i} onClick={() => setSelectedArchiveItem(selectedArchiveItem?.id === r.id ? null : r)} style={{ borderRadius:10, padding:10, background: selectedArchiveItem?.id === r.id ? 'rgba(0,230,138,0.06)' : 'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.03)', cursor:'pointer' }}>
                               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                                 <div>
                                   <span style={{ fontSize:11, fontWeight:700, color:'#00e68a' }}>{r.block}</span>
@@ -1998,6 +2063,16 @@ export const ProfileScreen: React.FC = () => {
                                   raw: {Math.round(r.overallRaw)}% · net: {Math.round(r.overallNet)}% · систем: {r.systems?.length || 0}
                                 </div>
                               )}
+                              {r.compounds && (
+                                <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginTop:2 }}>
+                                  {r.compoundCount} преп. · {r.totalWeeks} нед · риск {Math.round(r.risk)}%
+                                </div>
+                              )}
+                              {selectedArchiveItem?.id === r.id && (
+                                <div style={{ marginTop:6, padding:8, background:'rgba(0,0,0,0.15)', borderRadius:6, fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4, whiteSpace:'pre-wrap', maxHeight:300, overflowY:'auto' }}>
+                                  {JSON.stringify(r, null, 2).slice(0, 2000)}
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -2009,7 +2084,9 @@ export const ProfileScreen: React.FC = () => {
                     </div>
                   );
                 })()}
-              </div>);
+              </div>
+            )}
+          </div>);
           })()}
 
           {/* ═══ BP/HR DIARY ═══ */}
@@ -2196,13 +2273,13 @@ export const ProfileScreen: React.FC = () => {
                   { icon:'🥗', title:'Питания', desc:'Продукты, калории, белки/жиры/углеводы. OCR сканирование, штрихкоды, рецепты.', color:'#22c55e', tab:'diet' },
                   { icon:'🍽', title:'Приёмов пищи', desc:'Завтрак, обед, ужин, перекусы. Дневное/недельное меню, корзина продуктов.', color:'#f59e0b', tab:'diet' },
                   { icon:'📏', title:'Замеров тела', desc:'Вес, обхваты (талия, грудь, бицепс, бедро), % жира. Фото прогресса с разных ракурсов.', color:'#a855f7', tab:'measurements' },
-                  { icon:'🩸', title:'Анализов', desc:'Результаты анализов, референсные диапазоны, отклонения, динамика по датам.', color:'#ef4444', tab:'reports' },
+                  { icon:'🩸', title:'Анализов', desc:'Результаты анализов, референсные диапазоны, отклонения, динамика по датам.', color:'#ef4444', tab:'analytics' },
                   { icon:'💊', title:'Курса', desc:'Препараты, дозировки, фазы. Календарь приёма, корзина покупок.', color:'#ec4899', tab:'overview' },
                   { icon:'🧪', title:'Поддержки', desc:'БАДы, протоколы, стеки, синергии. Недельный план приёма.', color:'#06b6d4', tab:'overview' },
                   { icon:'❤️', title:'Давления', desc:'Систолическое/диастолическое давление, пульс. Дневник на день/неделю/месяц.', color:'#f43f5e', tab:'bp_diary' },
                   { icon:'🛌', title:'Сна', desc:'Продолжительность, качество, пробуждения. Корреляция с тренировками.', color:'#8b5cf6', tab:'sleep' },
-                  { icon:'📊', title:'Отчётов', desc:'Полные отчёты по всем блокам: тренировки, анализы, риски, курс. Архив.', color:'#84cc16', tab:'reports' },
-                  { icon:'⚠️', title:'Рисков', desc:'Оценка рисков по системам, Монте-Карло, клинические модели, MDSS.', color:'#f97316', tab:'reports' },
+                  { icon:'📊', title:'Отчётов', desc:'Полные отчёты по всем блокам: тренировки, анализы, риски, курс. Архив.', color:'#84cc16', tab:'analytics' },
+                  { icon:'⚠️', title:'Рисков', desc:'Оценка рисков по системам, Монте-Карло, клинические модели, MDSS.', color:'#f97316', tab:'analytics' },
                   { icon:'🩺', title:'Травм', desc:'Журнал травм, реабилитация, ограничения движений, восстановление.', color:'#14b8a6', tab:'injuries' },
                 ].map((d, i) => (
                   <div key={i} onClick={() => { try { if (d.tab) setTab(d.tab as ProfileTab); } catch(e) { console.warn('[Diary] nav:', e); } }} style={{

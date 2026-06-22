@@ -41,6 +41,19 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const [copySource, setCopySource] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [mealPresets, setMealPresets] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_meal_presets') || '[]'); } catch { return []; } });
+  // Bug 27: Food patterns & triggers
+  const [foodPatterns, setFoodPatterns] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('he_food_patterns') || '{}'); } catch { return {}; } });
+  const [foodTriggers, setFoodTriggers] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('he_food_triggers') || '{}'); } catch { return {}; } });
+  const savePatterns = (date: string, patterns: string[]) => {
+    const upd = { ...foodPatterns, [date]: patterns };
+    setFoodPatterns(upd);
+    localStorage.setItem('he_food_patterns', JSON.stringify(upd));
+  };
+  const saveTriggers = (date: string, triggers: string[]) => {
+    const upd = { ...foodTriggers, [date]: triggers };
+    setFoodTriggers(upd);
+    localStorage.setItem('he_food_triggers', JSON.stringify(upd));
+  };
   const ocrFileRef = useRef<HTMLInputElement>(null);
   const ocrCameraRef = useRef<HTMLInputElement>(null);
 
@@ -432,6 +445,97 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 })}
               </div>
             )}
+
+            {/* Diet stability index & correlations */}
+            {(() => {
+              try {
+                const entries = Object.entries(diaryData).filter(([date]) => date <= selectedDate).slice(-30);
+                if (entries.length < 3) return null;
+                const kcalValues: number[] = [];
+                const sleepDepDays: string[] = [];
+                entries.forEach(([date, day]: [string, any]) => {
+                  const total = Object.values(day?.meals || {}).reduce((s: number, items: any) => s + (items as any[]).reduce((ss: number, i: any) => ss + (i.kcal||0), 0), 0);
+                  kcalValues.push(total);
+                  if ((foodTriggers[date]||[]).includes('sleep_dep')) sleepDepDays.push(date);
+                });
+                const avg = kcalValues.reduce((s, v) => s + v, 0) / kcalValues.length;
+                const variance = kcalValues.reduce((s, v) => s + Math.pow(v - avg, 2), 0) / kcalValues.length;
+                const stdDev = Math.sqrt(variance);
+                const stabilityIndex = Math.max(0, Math.min(100, Math.round(100 - (stdDev / avg) * 100)));
+                // Sleep deprivation correlation
+                let sleepDepAvgKcal = 0;
+                let normalAvgKcal = 0;
+                let sleepDepCount = 0, normalCount = 0;
+                entries.forEach(([date, day]: [string, any]) => {
+                  const total = Object.values(day?.meals || {}).reduce((s: number, items: any) => s + (items as any[]).reduce((ss: number, i: any) => ss + (i.kcal||0), 0), 0);
+                  if ((foodTriggers[date]||[]).includes('sleep_dep')) { sleepDepAvgKcal += total; sleepDepCount++; }
+                  else { normalAvgKcal += total; normalCount++; }
+                });
+                sleepDepAvgKcal = sleepDepCount > 0 ? sleepDepAvgKcal / sleepDepCount : 0;
+                normalAvgKcal = normalCount > 0 ? normalAvgKcal / normalCount : 0;
+                const kcalDiff = sleepDepAvgKcal > 0 && normalAvgKcal > 0 ? Math.round((sleepDepAvgKcal - normalAvgKcal) / normalAvgKcal * 100) : 0;
+                return (
+                  <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#22c55e', marginBottom:4 }}>📊 Индекс стабильности диеты</div>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                      <span style={{ fontSize:8, color:'rgba(255,255,255,0.85)' }}>Стабильность:</span>
+                      <span style={{ fontSize:13, fontWeight:800, color: stabilityIndex >= 70 ? '#22c55e' : stabilityIndex >= 50 ? '#f59e0b' : '#ef4444' }}>{stabilityIndex}%</span>
+                    </div>
+                    <div style={{ width:'100%', height:4, borderRadius:2, background:'rgba(255,255,255,0.06)', marginBottom:4 }}>
+                      <div style={{ height:'100%', borderRadius:2, width:`${stabilityIndex}%`, background: stabilityIndex >= 70 ? '#22c55e' : stabilityIndex >= 50 ? '#f59e0b' : '#ef4444', transition:'width 0.5s' }} />
+                    </div>
+                    {kcalDiff !== 0 && <div style={{ fontSize:8, color: kcalDiff > 0 ? '#f59e0b' : '#22c55e' }}>
+                      {sleepDepCount > 0 ? `В дни недосыпа калории ${kcalDiff > 0 ? '+' : ''}${kcalDiff}%` : 'Нет данных по недосыпу'}
+                    </div>}
+                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginTop:1 }}>
+                      {entries.length} дней · Среднее {Math.round(avg)} ккал · σ={Math.round(stdDev)}
+                    </div>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
+
+            {/* Food patterns & triggers */}
+            <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.15)' }}>
+              <div style={{ fontSize:9, fontWeight:700, color:'#a78bfa', marginBottom:3 }}>📊 Пищевые паттерны</div>
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:4 }}>
+                {['evening_over','morning_under','binge_day'].map(p => {
+                  const labels: Record<string,string> = { evening_over:'🌙 Переедание вечером', morning_under:'🌅 Недоедание утром', binge_day:'🔥 Срывной день' };
+                  const active = (foodPatterns[selectedDate]||[]).includes(p);
+                  return (
+                    <button key={p} onClick={() => {
+                      const current = foodPatterns[selectedDate] || [];
+                      const upd = active ? current.filter(x => x !== p) : [...current, p];
+                      savePatterns(selectedDate, upd);
+                    }} style={{
+                      padding:'3px 8px', borderRadius:10, fontSize:8, fontWeight:600, cursor:'pointer', border:'1px solid',
+                      background: active ? 'rgba(167,139,250,0.15)' : 'transparent',
+                      color: active ? '#a78bfa' : 'rgba(255,255,255,0.6)',
+                      borderColor: active ? 'rgba(167,139,250,0.3)' : 'rgba(255,255,255,0.08)',
+                    }}>{labels[p]}</button>
+                  );
+                })}
+              </div>
+              <div style={{ fontSize:9, fontWeight:700, color:'#f59e0b', marginBottom:3 }}>⚠️ Триггеры переедания</div>
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                {['stress','alcohol','sleep_dep','social'].map(t => {
+                  const labels: Record<string,string> = { stress:'😰 Стресс', alcohol:'🍷 Алкоголь', sleep_dep:'😴 Недосып', social:'🎉 Событие' };
+                  const active = (foodTriggers[selectedDate]||[]).includes(t);
+                  return (
+                    <button key={t} onClick={() => {
+                      const current = foodTriggers[selectedDate] || [];
+                      const upd = active ? current.filter(x => x !== t) : [...current, t];
+                      saveTriggers(selectedDate, upd);
+                    }} style={{
+                      padding:'3px 8px', borderRadius:10, fontSize:8, fontWeight:600, cursor:'pointer', border:'1px solid',
+                      background: active ? 'rgba(245,158,11,0.15)' : 'transparent',
+                      color: active ? '#f59e0b' : 'rgba(255,255,255,0.6)',
+                      borderColor: active ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)',
+                    }}>{labels[t]}</button>
+                  );
+                })}
+              </div>
+            </div>
 
             {Object.keys(dayMeals).length === 0 ? (
               <div style={{ textAlign:'center', padding:20, color:'rgba(255,255,255,0.8)', fontSize:10 }}>

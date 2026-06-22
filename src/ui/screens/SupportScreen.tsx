@@ -21,8 +21,8 @@ import {
   PEPTIDE_DB, PEPTIDE_LIST, PEPTIDE_SYNERGY, PEPTIDE_CONFLICTS, PEPTIDE_GOAL_PROFILES,
   computeDilution, computeEffectiveDose, computePK, computePeptideRisks,
   scorePeptideStack, generatePeptideProtocol, getPeptideSynergiesFor, getPeptideConflictsFor,
-  ROUTE_LABELS, SYRINGE_TYPES, type PeptideInfo, type DilutionInput, type DilutionResult,
-  type BioavailabilityResult, type PKResult,
+  ROUTE_LABELS, SYRINGE_TYPES,   type PeptideInfo, type DilutionInput, type DilutionResult,
+  type BioavailabilityResult, type PKInput, type PKResult,
 } from '../../engines/peptide-calculator.engine';
 import {
   interpretLabs, computeRiskByModel, generateMechanismReport,
@@ -50,7 +50,7 @@ import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.en
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'mixcalc' | 'plan' | 'reports' | 'neuro' | 'joints' | 'acne';
-type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research' | 'favorites' | 'supportstacks' | 'protocols';
+type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research' | 'favorites' | 'supportstacks';
 
 const INTERACTION_TYPE_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
   synergy: { label: 'Синергия', emoji: '🔗', color: '#22c55e' },
@@ -149,7 +149,7 @@ const CATEGORY_LABELS: Record<string, { label: string; emoji: string }> = {
   joints: { label: 'Суставы', emoji: '🦴' },
   blood: { label: 'Кровь', emoji: '💉' },
   detox: { label: 'Детокс', emoji: '🧹' },
-  antiaging: { label: 'Антивозрастное', emoji: '⏳' },
+  antiaging: { label: 'Антивозраст', emoji: '⏳' },
   epigenetic: { label: 'Эпигенетика', emoji: '🧬' },
   methylation: { label: 'Метилирование', emoji: '🔄' },
   DNA: { label: 'ДНК', emoji: '🧬' },
@@ -159,6 +159,7 @@ const CATEGORY_LABELS: Record<string, { label: string; emoji: string }> = {
   calming: { label: 'Успокаивающие', emoji: '🧘' },
   anxiolytic: { label: 'Противотревожные', emoji: '🧘' },
   antiinflammatory: { label: 'Противовоспалительные', emoji: '🔥' },
+  anti_inflammatory: { label: 'Противовоспалительные', emoji: '🔥' },
   antiviral: { label: 'Противовирусные', emoji: '🦠' },
   antimicrobial: { label: 'Антимикробные', emoji: '🦠' },
   antibiotic: { label: 'Антибиотики', emoji: '💊' },
@@ -949,10 +950,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [supportView, setSupportView] = useState<SupportView>('main');
   const [calcView, setCalcView] = useState<CalcView>('main');
   const [infoView, setInfoView] = useState<InfoView>('main');
-  const [section, setSection] = useState<'home'|'generator'|'hormonal'|'info'>('home');
+  const [section, setSection] = useState<'home'|'generator'|'protocols'|'info'>('home');
   const [genTab, setGenTab] = useState<'calculator'|'stackgen'|'mystacks'|'plan'|'reports'|'info'>('calculator');
-  const [hormonalTab, setHormonalTab] = useState<'pct'|'fertility'|'hrt'>('pct');
-  const [infoTab, setInfoTab] = useState<'peptides'|'catalog'|'synergies'|'readystacks'|'interactions'|'research'|'mixcalc'|'neuro'|'joints'|'acne'|'protocols'>('catalog');
+  const [protocolTab, setProtocolTab] = useState<'pct'|'fertility'|'hrt'|'neuro'|'joints'|'acne'|'peptides'>('pct');
+  const [infoTab, setInfoTab] = useState<'peptides'|'catalog'|'synergies'|'readystacks'|'interactions'|'research'|'mixcalc'|'neuro'|'joints'|'acne'>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
   const [systemFilter, setSystemFilter] = useState<string>('all');
@@ -1043,8 +1044,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   };
   const goHome = () => { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); setInfoView('catalog'); };
   const goBack = () => {
-    // Fix: hormonal section → full reset to home
-    if (section === 'hormonal') { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); setInfoView('catalog'); return; }
+    if (section === 'protocols') { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); setInfoView('catalog'); return; }
     if (calcView !== 'main') {
       if (section === 'generator') {
         setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main');
@@ -1079,6 +1079,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [synergyPage, setSynergyPage] = useState<number>(1);
   const [synergySearch, setSynergySearch] = useState('');
   const [synergyCountFilter, setSynergyCountFilter] = useState<number>(0);
+  const [synergyOrganFilter, setSynergyOrganFilter] = useState<string>('');
   const [synergyMechFilter, setSynergyMechFilter] = useState<string>('');
   const SYNERGY_PAGE_SIZE = 30;
   const [interactionPage, setInteractionPage] = useState<number>(1);
@@ -1109,7 +1110,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [pepDoseUnit, setPepDoseUnit] = useState<'mg' | 'mcg'>('mcg');
   const [pepSyringe, setPepSyringe] = useState<string>('U100_1ml');
   const [pepRoute, setPepRoute] = useState('sc');
-  const [pepSchedule, setPepSchedule] = useState(['Mon', 'Wed', 'Fri']);
+  const [pepSchedule, setPepSchedule] = useState(['Пн', 'Ср', 'Пт']);
   const [pepTotalDays, setPepTotalDays] = useState(30);
   const [pepResult, setPepResult] = useState<{ dilution: DilutionResult; effective: BioavailabilityResult; pk: PKResult } | null>(null);
   const [pepProtocol, setPepProtocol] = useState<ReturnType<typeof generatePeptideProtocol> | null>(null);
@@ -1437,7 +1438,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
   // Interaction checker state
   const [interactTab, setInteractTab] = useState<'support' | 'pharma'>('support');
-  const [interactionIds, setInteractionIds] = useState<string[]>(['', '', '', '', '', '', '', '', '', '']);
+  const [interactionIds, setInteractionIds] = useState<string[]>(['', '']);
   const [interactionSearch, setInteractionSearch] = useState('');
   const [interactionSearchIdx, setInteractionSearchIdx] = useState<number>(0);
   const [pharmaInteractIds, setPharmaInteractIds] = useState<string[]>(['', '']);
@@ -1477,6 +1478,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [editingStackNotes, setEditingStackNotes] = useState<string | null>(null);
   const [editNotesText, setEditNotesText] = useState('');
   const [expandedStack, setExpandedStack] = useState<string | null>(null);
+  const [favRefresh, setFavRefresh] = useState(0);
   const [showSavedPicker, setShowSavedPicker] = useState(false);
   const [researchSource, setResearchSource] = useState<'pubmed' | 'pubchem' | 'scholar' | 'fda' | 'pharma'>('pubmed');
   const [pubchemResults, setPubchemResults] = useState<any[]>([]);
@@ -1539,12 +1541,12 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     for (const [id, sub] of Object.entries(PHARMA_DB)) {
       if ((sub.name||'').toLowerCase().includes(ql) || id.toLowerCase().includes(ql) || (sub.class||'').toLowerCase().includes(ql)) {
         const detail = getPharmaDetail(id);
-        results.push({ name: sub.name, id: sub.id, cls: sub.class, desc: (detail?.description || sub.description || SUPPORT_CLASS_LABELS[sub.class] || '').slice(0, 120) });
+        results.push({ name: sub.name, id: sub.id, cls: sub.class, desc: (detail?.description || sub.description || SUPPORT_CLASS_LABELS[sub.class] || '') });
       }
     }
     for (const sub of ALL_SUBSTANCES) {
       if ((sub.name||'').toLowerCase().includes(ql) || (sub.id||'').toLowerCase().includes(ql) || (sub.categories||[]).some(c => (c||'').toLowerCase().includes(ql))) {
-        results.push({ name: sub.name || sub.id, id: sub.id, cls: sub.type || 'supplement', desc: (sub.description || '').slice(0, 120) });
+        results.push({ name: sub.name || sub.id, id: sub.id, cls: sub.type || 'supplement', desc: (sub.description || '') });
       }
     }
     setPharmaSearchResults(results.slice(0, 30));
@@ -1718,6 +1720,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
   // Interaction checker
   const addInteraction = () => { if (interactionIds.length < 10) setInteractionIds([...interactionIds, '']); };
+  const maxInteractionsReached = interactionIds.length >= 10;
   const removeInteraction = (idx: number) => setInteractionIds(interactionIds.filter((_, i) => i !== idx));
   const updateInteraction = (idx: number, value: string) => {
     const updated = [...interactionIds];
@@ -1726,39 +1729,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   };
   const validInteractionIds = interactionIds.filter(Boolean);
   
-  const supportInteractions = useMemo(() => {
-    if (validInteractionIds.length < 2) return null;
-    const subs: Record<string, string> = {};
-    validInteractionIds.forEach(id => {
-      const s = allSupport.find(x => x.id === id);
-      if (s) subs[id] = s.name;
-    });
-    try {
-      const norm = (s: string) => s.replace(/_/g,'').toLowerCase();
-      const matchId = (interactKey: string, subId: string, subName: string): boolean => {
-        const a = norm(interactKey);
-        const b = norm(subId);
-        const c = norm(subName);
-        return a === b || a.includes(b) || b.includes(a) || a === c || a.includes(c) || c.includes(a);
-      };
-      return ALL_INTERACTIONS.filter(i => {
-        if (!i || !i.substanceA || !i.substanceB) return false;
-        const matched: string[] = [];
-        validInteractionIds.forEach(id => {
-          const s = allSupport.find(x => x.id === id);
-          if (matchId(i.substanceA, id, s?.name || '')) matched.push('a');
-          if (matchId(i.substanceB, id, s?.name || '')) matched.push('b');
-        });
-        return matched.includes('a') && matched.includes('b');
-      });
-    } catch { return []; }
-  }, [interactionIds, allSupport]);
-
-  const hasSupportInteractions = supportInteractions && supportInteractions.length > 0;
-  const supportSynergiesList = supportInteractions?.filter(i => i.type === 'synergy') ?? [];
-  const supportConflicts = supportInteractions?.filter(i => i.type === 'conflict') ?? [];
-  const supportCautions = supportInteractions?.filter(i => i.type === 'caution') ?? [];
-
   // Group ALL_SUBSTANCES by primary category for catalog
   const catalogSubstances = useMemo(() => {
     return Object.values(SUPPORT_CATALOG_DATA).map(entry => ({
@@ -2205,16 +2175,39 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     return [...fromDB, ...dedupedEngine, ...pharmaFromEngine];
   }, [CATALOG_IDS]);
 
-  const filteredInteractions = useMemo(() => {
-    let list = mergedInteractions;
-    if (interactionTypeFilter !== 'all') {
-      list = list.filter(i => i.type === interactionTypeFilter);
-    }
-    if (interactionSeverityFilter !== 'all') {
-      list = list.filter(i => i.severity === interactionSeverityFilter);
-    }
-    return list;
-  }, [interactionTypeFilter, interactionSeverityFilter, mergedInteractions]);
+  // Interaction calculator memo (uses mergedInteractions)
+  const supportInteractions = useMemo(() => {
+    if (validInteractionIds.length < 2) return null;
+    const subs: Record<string, string> = {};
+    validInteractionIds.forEach(id => {
+      const s = allSupport.find(x => x.id === id);
+      if (s) subs[id] = s.name;
+    });
+    try {
+      const norm = (s: string) => s.replace(/_/g,'').toLowerCase();
+      const matchId = (interactKey: string, subId: string, subName: string): boolean => {
+        const a = norm(interactKey);
+        const b = norm(subId);
+        const c = norm(subName);
+        return a === b || a.includes(b) || b.includes(a) || a === c || a.includes(c) || c.includes(a);
+      };
+      return mergedInteractions.filter((i: any) => {
+        if (!i || !i.substanceA || !i.substanceB) return false;
+        const matched: string[] = [];
+        validInteractionIds.forEach(id => {
+          const s = allSupport.find(x => x.id === id);
+          if (matchId(i.substanceA, id, s?.name || '')) matched.push('a');
+          if (matchId(i.substanceB, id, s?.name || '')) matched.push('b');
+        });
+        return matched.includes('a') && matched.includes('b');
+      });
+    } catch { return []; }
+  }, [interactionIds, allSupport, mergedInteractions]);
+
+  const hasSupportInteractions = supportInteractions && supportInteractions.length > 0;
+  const supportSynergiesList = supportInteractions?.filter(i => i.type === 'synergy') ?? [];
+  const supportConflicts = supportInteractions?.filter(i => i.type === 'conflict') ?? [];
+  const supportCautions = supportInteractions?.filter(i => i.type === 'caution') ?? [];
 
   // Grouped stacks by size
   const groupedStacks = useMemo(() => {
@@ -2250,6 +2243,115 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       (s.substances||[]).some(sid => (getStackSubLabel(sid)||'').toLowerCase().includes(q))
     );
   }, [stackSearch]);
+
+  // Stack sub-tab state
+  const [stackSubTab, setStackSubTab] = useState<string>('readystacks');
+
+  // Replacement calculator state
+  const [replaceSearch, setReplaceSearch] = useState('');
+  const [replaceSelectedSub, setReplaceSelectedSub] = useState<string | null>(null);
+  const [replaceResults, setReplaceResults] = useState<Array<{id:string;score:number;reason:string;pros:string[];cons:string[]}>>([]);
+
+  // Search calculator state
+  const [searchOrgan, setSearchOrgan] = useState('');
+  const [searchMech, setSearchMech] = useState('');
+  const [searchEffect, setSearchEffect] = useState('');
+  const [searchResults, setSearchResults] = useState<Array<{id:string;name:string;type:'substance'|'stack'|'complex';score:number;reason:string;pros:string[];cons:string[];substanceCount?:number}>>([]);
+
+  // Helper: find substance by ID
+  const findSubstance = (id: string): any => ALL_SUBSTANCES.find(s => s.id === id);
+
+  // Helper: get substance name
+  const getSubstanceName = (id: string): string => {
+    const sub = findSubstance(id);
+    return sub?.name || PHARMA_DB[id]?.name || id.replace(/_/g, ' ');
+  };
+
+  // Replacement logic: find substances with similar mechanisms/organs/categories
+  const findReplacements = (id: string) => {
+    const source = findSubstance(id);
+    if (!source) return [];
+    const results: Array<{id:string;score:number;reason:string;pros:string[];cons:string[]}> = [];
+    const sourceMechs = new Set((source.mechanisms||[]).map((m:string) => m.toLowerCase()));
+    const sourceOrgs = new Set((source.organs||[]).map((o:string) => o.toLowerCase()));
+    const sourceCats = new Set((source.categories||[]).map((c:string) => c.toLowerCase()));
+    for (const sub of ALL_SUBSTANCES) {
+      if (sub.id === id || !sub.mechanisms || sub.mechanisms.length === 0) continue;
+      const targetMechs = new Set(sub.mechanisms.map((m:string) => m.toLowerCase()));
+      const targetOrgs = new Set((sub.organs||[]).map((o:string) => o.toLowerCase()));
+      const targetCats = new Set((sub.categories||[]).map((c:string) => c.toLowerCase()));
+      // Calculate overlap scores
+      let mechOverlap = 0, orgOverlap = 0, catOverlap = 0;
+      for (const m of targetMechs) if (sourceMechs.has(m)) mechOverlap++;
+      for (const o of targetOrgs) if (sourceOrgs.has(o)) orgOverlap++;
+      for (const c of targetCats) if (sourceCats.has(c)) catOverlap++;
+      const totalScore = (sourceMechs.size > 0 ? (mechOverlap / Math.max(1, sourceMechs.size)) * 50 : 0) +
+        (sourceOrgs.size > 0 ? (orgOverlap / Math.max(1, sourceOrgs.size)) * 30 : 0) +
+        (sourceCats.size > 0 ? (catOverlap / Math.max(1, sourceCats.size)) * 20 : 0);
+      if (totalScore > 20) {
+        const reasonParts: string[] = [];
+        const pros: string[] = [];
+        const cons: string[] = [];
+        if (mechOverlap > 0) reasonParts.push(`совпадает ${mechOverlap} механизм(ов)`);
+        if (orgOverlap > 0) reasonParts.push(`действует на те же органы (${orgOverlap})`);
+        if (catOverlap > 0) pros.push(`из категории ${sub.categories?.[0] || '—'}`);
+        if ((sub.mechanisms||[]).length > (source.mechanisms||[]).length) pros.push('больше механизмов');
+        if ((sub.mechanisms||[]).length < (source.mechanisms||[]).length) cons.push('меньше механизмов');
+        if (!sub.organs || sub.organs.length === 0) cons.push('нет данных по органам');
+        results.push({ id: sub.id, score: Math.round(totalScore), reason: reasonParts.join('; ') || 'частичное совпадение', pros, cons });
+      }
+    }
+    return results.sort((a,b) => b.score - a.score);
+  };
+
+  // Search logic: find substances/stacks/complexes by organ+mechanism+effect
+  const doSearch = (organ: string, mech: string, effect: string) => {
+    const results: Array<{id:string;name:string;type:'substance'|'stack'|'complex';score:number;reason:string;pros:string[];cons:string[];substanceCount?:number}> = [];
+    const eq = effect.toLowerCase().trim();
+    // Search ALL_SUBSTANCES
+    for (const sub of ALL_SUBSTANCES) {
+      let score = 0;
+      const reasons: string[] = [];
+      // Check organ match
+      if (organ) {
+        const subOrgs = (sub.organs||[]).map((o:string) => { const m = ORGAN_CATEGORY_MAP[o.toUpperCase().trim()]; return m?.key || o.toLowerCase(); });
+        if (subOrgs.includes(organ)) { score += 40; reasons.push('совпадает орган'); }
+      }
+      // Check mechanism match
+      if (mech) {
+        if ((sub.mechanisms||[]).includes(mech)) { score += 40; reasons.push('совпадает механизм'); }
+      }
+      // Check effect/description match
+      if (eq) {
+        const searchText = ((sub.name||'') + ' ' + (sub.description||'') + ' ' + (sub.categories||[]).join(' ')).toLowerCase();
+        if (searchText.includes(eq)) { score += 20; reasons.push('совпадает описание/категория'); }
+      }
+      if (score > 0) {
+        const pros: string[] = [];
+        const cons: string[] = [];
+        if (sub.mechanisms && sub.mechanisms.length > 0) pros.push(`${sub.mechanisms.length} механизмов`);
+        if (sub.organs && sub.organs.length > 0) pros.push(`действует на ${sub.organs.length} органов`);
+        if (!sub.organs || sub.organs.length === 0) cons.push('нет данных по органам');
+        results.push({ id: sub.id, name: sub.name || sub.id, type: 'substance', score: Math.min(100, score), reason: reasons.join('; ') || 'соответствует критериям', pros, cons });
+      }
+    }
+    // Search ALL_STACKS
+    for (const stack of ALL_STACKS) {
+      let score = 0;
+      const reasons: string[] = [];
+      if (eq) {
+        const searchText = ((stack.name||'') + ' ' + (stack.description||'') + ' ' + (stack.effects||[]).join(' ')).toLowerCase();
+        if (searchText.includes(eq)) { score += 20; reasons.push('совпадает с запросом'); }
+      }
+      if (score > 0 || (!organ && !mech && eq)) {
+        const subNames = (stack.substances||[]).map(sid => getSubstanceName(sid)).join(', ');
+        if (!organ && !mech && !eq) continue;
+        if (!score) score = 30;
+        results.push({ id: stack.id, name: stack.name || stack.id, type: 'stack', score: Math.min(100, score), reason: reasons.concat([`${stack.substances.length} веществ`]).join('; ') || `стек из ${stack.substances.length} веществ`, pros: [`синергия ${stack.synergyScore}%`, ...(stack.effects||[]).slice(0,3)], cons: [], substanceCount: stack.substances.length });
+      }
+    }
+    return results.sort((a,b) => b.score - a.score);
+  };
 
   // Resolve substance name from ID (used in interactions) — Map for O(1)
   const substanceNameMap = useMemo(() => {
@@ -2538,10 +2640,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       if (!aDesc && !bDesc && aMechs.length === 0 && bMechs.length === 0) return null;
                       return (
                         <div style={{ marginTop:3, padding:'4px 6px', background:'rgba(34,197,94,0.04)', borderRadius:4, border:'1px solid rgba(34,197,94,0.08)' }}>
-                          {aDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#4ade80'}}>{aName}</b>: {aDesc.slice(0,100)}{aDesc.length>100?'...':''}</div>}
-                          {aMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1,marginBottom:2}}>{aMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(74,222,128,0.1)',color:'#4ade80'}}>{m}</span>)}</div>}
-                          {bDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#4ade80'}}>{bName}</b>: {bDesc.slice(0,100)}{bDesc.length>100?'...':''}</div>}
-                          {bMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1}}>{bMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(74,222,128,0.1)',color:'#4ade80'}}>{m}</span>)}</div>}
+                          {aDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#4ade80'}}>{aName}</b>: {aDesc}</div>}
+                          {aMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1,marginBottom:2}}>{aMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(74,222,128,0.1)',color:'#4ade80'}}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m}</span>)}</div>}
+                          {bDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#4ade80'}}>{bName}</b>: {bDesc}</div>}
+                          {bMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1}}>{bMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(74,222,128,0.1)',color:'#4ade80'}}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m}</span>)}</div>}
                         </div>
                       );
                     })()}
@@ -2598,10 +2700,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       if (!aDesc && !bDesc && aMechs.length === 0 && bMechs.length === 0) return null;
                       return (
                         <div style={{ marginTop:3, padding:'4px 6px', background:'rgba(239,68,68,0.04)', borderRadius:4, border:'1px solid rgba(239,68,68,0.08)' }}>
-                          {aDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#f87171'}}>{aName}</b>: {aDesc.slice(0,100)}{aDesc.length>100?'...':''}</div>}
-                          {aMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1,marginBottom:2}}>{aMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(248,113,113,0.1)',color:'#f87171'}}>{m}</span>)}</div>}
-                          {bDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#f87171'}}>{bName}</b>: {bDesc.slice(0,100)}{bDesc.length>100?'...':''}</div>}
-                          {bMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1}}>{bMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(248,113,113,0.1)',color:'#f87171'}}>{m}</span>)}</div>}
+                          {aDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#f87171'}}>{aName}</b>: {aDesc}</div>}
+                          {aMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1,marginBottom:2}}>{aMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(248,113,113,0.1)',color:'#f87171'}}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m}</span>)}</div>}
+                          {bDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#f87171'}}>{bName}</b>: {bDesc}</div>}
+                          {bMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1}}>{bMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(248,113,113,0.1)',color:'#f87171'}}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m}</span>)}</div>}
                         </div>
                       );
                     })()}
@@ -2630,7 +2732,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['mixcalc','💪 Тренировочные миксы','joints','acne','peptides'].includes(calcView) || section === 'generator' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['mixcalc','💪 Тренировочные миксы','joints','acne','peptides'].includes(calcView) || section === 'generator' || section === 'protocols' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (with back/home) ===== */}
       {section === 'generator' && (
@@ -2662,8 +2764,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         </div>
       )}
 
-      {/* ===== HORMONAL HEADER (back/home only) ===== */}
-      {section === 'hormonal' && (
+      {/* ===== PROTOCOLS HEADER (back/home only) ===== */}
+      {section === 'protocols' && (
         <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
           <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center', overflowX:'auto' }}>
             <button onClick={goBack} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
@@ -2680,7 +2782,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['synergies','Взаимодействие препаратов'],['protocols','📋 Протоколы'],['favorites','Избранное'],['supportstacks','Стеки поддержки'],['research','Исследования']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['synergies','Взаимодействие препаратов'],['favorites','Избранное'],['supportstacks','Стеки поддержки'],['research','Исследования']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 const a: Record<string,()=>void> = {
                   peptides: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); },
@@ -2689,7 +2791,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   readystacks: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('stacks'); setSection('home'); },
                   interactions: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('interactions'); setSection('home'); },
                   research: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); setSection('home'); },
-                  protocols: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('protocols'); setSection('home'); },
+
                   mixcalc: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); },
                   neuro: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('neuro'); },
                   joints: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('joints'); },
@@ -2740,17 +2842,17 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
                 {/* Title */}
                 <div style={{ fontSize:13, fontWeight:700, color:'#8b5cf6' }}>📋 Примерные протоколы поддержки</div>
-                {/* 6 sub-tabs */}
+                {/* 7 unified sub-tabs */}
                 <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
                   {[
-                    { id:'pct', label:'ПКТ', color:'#8b5cf6', action:() => { setSection('hormonal'); setTab('fertility-pct'); setHormonalTab('pct'); setSupportView('fertility'); setCalcView('main'); } },
-                    { id:'fertility', label:'Фертильность', color:'#ec4899', action:() => { setSection('hormonal'); setTab('fertility-pct'); setHormonalTab('fertility'); setSupportView('fertility'); setCalcView('main'); } },
-                    { id:'hrt', label:'ГЗТ', color:'#f59e0b', action:() => { setSection('hormonal'); setTab('fertility-pct'); setHormonalTab('hrt'); setSupportView('fertility'); setCalcView('main'); } },
-                    { id:'neuro', label:'Нейро', color:'#06b6d4', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('neuro'); } },
-                    { id:'joints', label:'Суставы', color:'#22c55e', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('joints'); } },
-                    { id:'acne', label:'Акне', color:'#ef4444', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('acne'); } },
+                    { id:'pct', label:'ПКТ', color:'#8b5cf6' },
+                    { id:'fertility', label:'Фертильность', color:'#ec4899' },
+                    { id:'hrt', label:'ГЗТ', color:'#f59e0b' },
+                    { id:'neuro', label:'Нейро', color:'#06b6d4' },
+                    { id:'joints', label:'Суставы', color:'#22c55e' },
+                    { id:'acne', label:'Акне', color:'#ef4444' },
                   ].map(t => (
-                    <button key={t.id} onClick={t.action} style={{
+                    <button key={t.id} onClick={() => { setSection('protocols'); setProtocolTab(t.id as any); }} style={{
                       padding:'5px 10px', borderRadius:12, fontSize:9, fontWeight:600, cursor:'pointer', border:'none',
                       background:t.color+'18', color:t.color,
                     }}>{t.label}</button>
@@ -2887,6 +2989,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     </div>
                                   </div>
                                   <button onClick={e => { e.stopPropagation(); if (sub?.id && !enhancedSubs.includes(sub.id)) setEnhancedSubs(prev => [...prev, sub.id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(sub?.id||'') ? '✓' : '+ Мой стек'}</button>
+                                  <button onClick={e => { e.stopPropagation(); try { let f:string[]=JSON.parse(localStorage.getItem('he_support_favorites')||'[]');const idx=f.indexOf(sub?.id||'');if(idx>=0)f.splice(idx,1);else f.push(sub?.id||'');localStorage.setItem('he_support_favorites',JSON.stringify(f));setFavRefresh(p=>p+1);}catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(()=>{try{return JSON.parse(localStorage.getItem('he_support_favorites')||'[]').includes(sub?.id||'')?'#fbbf24':'var(--text-dim)';}catch{return 'var(--text-dim)';}})() }}>★</button>
                                   <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
                                 </div>
                                 {isSelected && sub && (
@@ -2907,11 +3010,11 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                       <div style={{ marginBottom:3 }}>
                                         <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Органы-мишени:</div>
                                         <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                                          {(sub.organs||[]).map(o => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{o||''}</span>)}
-                                        </div>
-                                      </div>
-                                    )}
-                                    {SUPPLEMENT_DESCRIPTIONS[sub.id] && (
+                                           {[...new Set(sub.organs||[])].map(o => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{o||''}</span>)}
+                                         </div>
+                                       </div>
+                                     )}
+                                     {SUPPLEMENT_DESCRIPTIONS[sub.id] && (
                                       <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(0,230,138,0.05)', borderRadius:4, border:'1px solid rgba(0,230,138,0.1)' }}>
                                         <div style={{ fontSize:8, color:'#00e68a', fontWeight:600, marginBottom:1 }}>📋 Подробнее:</div>
                                         <div style={{ fontSize:9, color:'rgba(255,255,255,0.9)', lineHeight:1.4 }}>{SUPPLEMENT_DESCRIPTIONS[sub.id]}</div>
@@ -2956,6 +3059,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                         <div style={{ fontSize:8, color:'var(--text-dim)' }}>{(sub.categories||[]).slice(0,2).join(', ')}</div>
                                       </div>
                                       <button onClick={e => { e.stopPropagation(); if (!enhancedSubs.includes(id)) setEnhancedSubs(prev => [...prev, id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(id) ? '✓' : '+ Мой стек'}</button>
+                                      <button onClick={e => { e.stopPropagation(); try { let f:string[]=JSON.parse(localStorage.getItem('he_support_favorites')||'[]');const idx=f.indexOf(id);if(idx>=0)f.splice(idx,1);else f.push(id);localStorage.setItem('he_support_favorites',JSON.stringify(f));setFavRefresh(p=>p+1);}catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(()=>{try{return JSON.parse(localStorage.getItem('he_support_favorites')||'[]').includes(id)?'#fbbf24':'var(--text-dim)';}catch{return 'var(--text-dim)';}})() }}>★</button>
                                       <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
                                     </div>
                                     {isSelected && (
@@ -3056,6 +3160,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                           </div>
                                         </div>
                                         <button onClick={e => { e.stopPropagation(); if (sub?.id && !enhancedSubs.includes(sub.id)) setEnhancedSubs(prev => [...prev, sub.id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(sub?.id||'') ? '✓' : '+ Мой стек'}</button>
+                                        <button onClick={e => { e.stopPropagation(); try { let f:string[]=JSON.parse(localStorage.getItem('he_support_favorites')||'[]');const idx=f.indexOf(sub?.id||'');if(idx>=0)f.splice(idx,1);else f.push(sub?.id||'');localStorage.setItem('he_support_favorites',JSON.stringify(f));setFavRefresh(p=>p+1);}catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(()=>{try{return JSON.parse(localStorage.getItem('he_support_favorites')||'[]').includes(sub?.id||'')?'#fbbf24':'var(--text-dim)';}catch{return 'var(--text-dim)';}})() }}>★</button>
                                         <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
                                       </div>
                                       {selectedSub === sub?.id && sub && (
@@ -3078,12 +3183,12 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                             <div style={{ marginBottom:3 }}>
                                               <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Органы-мишени:</div>
                                               <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                                                {(sub.organs||[]).map(o => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{o||''}</span>)}
-                                              </div>
-                                            </div>
-                                          )}
-                                          {sub.deficiency && sub.deficiency !== 'NONE' && (
-                                            <div style={{ fontSize:9, color:'#f59e0b', marginTop:2 }}>⚠ Дефицит: {sub.deficiency}</div>
+                                                 {[...new Set(sub.organs||[])].map(o => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{o||''}</span>)}
+                                               </div>
+                                             </div>
+                                           )}
+                                           {sub.deficiency && sub.deficiency !== 'NONE' && (
+                                             <div style={{ fontSize:9, color:'#f59e0b', marginTop:2 }}>⚠ Дефицит: {sub.deficiency}</div>
                                           )}
                                           {SUPPLEMENT_DESCRIPTIONS[sub.id] && (
                                             <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(0,230,138,0.05)', borderRadius:4, border:'1px solid rgba(0,230,138,0.1)' }}>
@@ -3131,6 +3236,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                       </div>
                                     </div>
                                     <button onClick={e => { e.stopPropagation(); if (sub?.id && !enhancedSubs.includes(sub.id)) setEnhancedSubs(prev => [...prev, sub.id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(sub?.id||'') ? '✓' : '+ Мой стек'}</button>
+                                    <button onClick={e => { e.stopPropagation(); try { let f:string[]=JSON.parse(localStorage.getItem('he_support_favorites')||'[]');const idx=f.indexOf(sub?.id||'');if(idx>=0)f.splice(idx,1);else f.push(sub?.id||'');localStorage.setItem('he_support_favorites',JSON.stringify(f));setFavRefresh(p=>p+1);}catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(()=>{try{return JSON.parse(localStorage.getItem('he_support_favorites')||'[]').includes(sub?.id||'')?'#fbbf24':'var(--text-dim)';}catch{return 'var(--text-dim)';}})() }}>★</button>
                                     <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
                                   </div>
                                   {selectedSub === sub?.id && sub && (
@@ -3149,18 +3255,18 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                           </div>
                                         </div>
                                       )}
-                                      {(sub.organs||[]).length > 0 && (
-                                        <div style={{ marginBottom:3 }}>
-                                          <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Органы-мишени:</div>
-                                          <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                                            {(sub.organs||[]).map(o => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{o||''}</span>)}
-                                          </div>
-                                        </div>
-                                      )}
-                                      {sub.deficiency && sub.deficiency !== 'NONE' && (
-                                        <div style={{ fontSize:9, color:'#f59e0b', marginTop:2 }}>⚠ Дефицит: {sub.deficiency}</div>
-                                      )}
-                                      {SUPPLEMENT_DESCRIPTIONS[sub.id] && (
+{(sub.organs||[]).length > 0 && (
+                                         <div style={{ marginBottom:3 }}>
+                                           <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Органы-мишени:</div>
+                                           <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                                             {[...new Set(sub.organs||[])].map(o => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{o||''}</span>)}
+                                           </div>
+                                         </div>
+                                       )}
+                                       {sub.deficiency && sub.deficiency !== 'NONE' && (
+                                         <div style={{ fontSize:9, color:'#f59e0b', marginTop:2 }}>⚠ Дефицит: {sub.deficiency}</div>
+                                       )}
+                                       {SUPPLEMENT_DESCRIPTIONS[sub.id] && (
                                         <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(0,230,138,0.05)', borderRadius:4, border:'1px solid rgba(0,230,138,0.1)' }}>
                                           <div style={{ fontSize:8, color:'#00e68a', fontWeight:600, marginBottom:1 }}>📋 Подробнее:</div>
                                           <div style={{ fontSize:9, color:'rgba(255,255,255,0.9)', lineHeight:1.4 }}>{SUPPLEMENT_DESCRIPTIONS[sub.id]}</div>
@@ -3255,7 +3361,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                               </div>
                             );
                           })}
-                          <button onClick={addInteraction} style={{ padding:'8px', borderRadius:8, fontSize:10, fontWeight:600, cursor:'pointer', background:'rgba(0,230,138,0.06)', border:'1px dashed rgba(0,230,138,0.3)', color:'#00e68a' }}>+ Добавить препарат</button>
+                          <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4 }}>
+                            <button onClick={addInteraction} disabled={maxInteractionsReached} style={{ flex:1, padding:'8px', borderRadius:8, fontSize:10, fontWeight:600, cursor: maxInteractionsReached ? 'not-allowed' : 'pointer', background:'rgba(0,230,138,0.06)', border:'1px dashed rgba(0,230,138,0.3)', color: maxInteractionsReached ? '#666' : '#00e68a', opacity: maxInteractionsReached ? 0.5 : 1 }}>+ ДОБАВИТЬ ПРЕПАРАТ</button>
+                            <span style={{ fontSize:9, color:'var(--text-dim)' }}>{interactionIds.length}/10</span>
+                          </div>
                         </div>
                         {validInteractionIds.length<2 && <div style={{ textAlign:'center', padding:'20px 12px', background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)' }}><div style={{ fontSize:20, marginBottom:4 }}>⚡</div><div style={{ fontSize:10, color:'var(--text-dim)' }}>Выберите минимум 2 препарата</div></div>}
                         {validInteractionIds.length>=2 && !hasSupportInteractions && <div style={{ textAlign:'center', padding:'10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)' }}><span style={{ fontSize:10, color:'#4caf50', fontWeight:600 }}>✓ Конфликтов не обнаружено</span></div>}
@@ -3336,7 +3445,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                               </div>
                             );
                           })}
-                          <button onClick={() => setPharmaInteractIds(prev => [...prev, ''])} style={{ padding:'8px', borderRadius:8, fontSize:10, fontWeight:600, cursor:'pointer', background:'rgba(59,130,246,0.06)', border:'1px dashed rgba(59,130,246,0.3)', color:'#60a5fa' }}>+ Добавить препарат</button>
+                          <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4 }}>
+                            <button onClick={() => setPharmaInteractIds(prev => prev.length < 10 ? [...prev, ''] : prev)} disabled={pharmaInteractIds.length >= 10} style={{ flex:1, padding:'8px', borderRadius:8, fontSize:10, fontWeight:600, cursor: pharmaInteractIds.length >= 10 ? 'not-allowed' : 'pointer', background:'rgba(59,130,246,0.06)', border:'1px dashed rgba(59,130,246,0.3)', color: pharmaInteractIds.length >= 10 ? '#666' : '#60a5fa', opacity: pharmaInteractIds.length >= 10 ? 0.5 : 1 }}>+ ДОБАВИТЬ ПРЕПАРАТ</button>
+                            <span style={{ fontSize:9, color:'var(--text-dim)' }}>{pharmaInteractIds.length}/10</span>
+                          </div>
                         </div>
                         {(() => {
                           const validIds = pharmaInteractIds.filter(Boolean);
@@ -3344,6 +3456,19 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                             return <div style={{ textAlign:'center', padding:'20px 12px', background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)' }}><div style={{ fontSize:20, marginBottom:4 }}>💉</div><div style={{ fontSize:10, color:'var(--text-dim)' }}>Выберите минимум 2 препарата</div></div>;
                           }
                           try {
+                            // Search mergedInteractions for pharma-related pairs
+                            const pharmaInteractions = mergedInteractions.filter((i: any) => {
+                              const aInPharma = validIds.some(id => 
+                                id.toLowerCase() === (i.substanceA||'').toLowerCase() || 
+                                id.toLowerCase() === (i.substanceB||'').toLowerCase()
+                              );
+                              const bInPharma = validIds.some(id => 
+                                id.toLowerCase() === (i.substanceB||'').toLowerCase() || 
+                                id.toLowerCase() === (i.substanceA||'').toLowerCase()
+                              );
+                              return aInPharma && bInPharma && aInPharma !== bInPharma;
+                            });
+                            // Also check hardcoded pharma interactions
                             const course = validIds.map((sid, i) => ({
                               id: `pharma_int_${i}`,
                               substanceId: sid,
@@ -3354,15 +3479,48 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                               endWeek: 12,
                             }));
                             const alerts = checkDrugInteractions(course);
-                            if (!alerts.length) {
+                            const totalFound = pharmaInteractions.length + alerts.length;
+                            if (totalFound === 0) {
                               return <div style={{ textAlign:'center', padding:'10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)' }}><span style={{ fontSize:10, color:'#4caf50', fontWeight:600 }}>✓ Конфликтов не обнаружено</span></div>;
                             }
                             return (
                               <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                                {/* Merged interactions results */}
+                                {pharmaInteractions.map((i: any) => {
+                                  const typeInfo = INTERACTION_TYPE_LABELS[i.type] || { label:i.type, emoji:'🔗', color:'#888' };
+                                  const sevInfo = INTERACTION_SEVERITY_LABELS[i.severity] || { label:i.severity, color:'#888' };
+                                  const aName = resolveSubName(i.substanceA) || i.substanceA;
+                                  const bName = resolveSubName(i.substanceB) || i.substanceB;
+                                  return (
+                                    <div key={i.interactionId} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:`1px solid ${typeInfo.color}33` }}>
+                                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                                        <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap', flex:1 }}>
+                                          <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)' }}>{aName}</span>
+                                          <span style={{ fontSize:10, color:typeInfo.color, fontWeight:700 }}>{i.type === 'synergy' ? '+' : '×'}</span>
+                                          <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)' }}>{bName}</span>
+                                        </div>
+                                        <div style={{ display:'flex', gap:3 }}>
+                                          <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:typeInfo.color+'22', color:typeInfo.color, fontWeight:600 }}>{typeInfo.label}</span>
+                                          <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevInfo.color+'22', color:sevInfo.color }}>{sevInfo.label}</span>
+                                        </div>
+                                      </div>
+                                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginTop:1 }}>{showEffect(i)}</div>
+                                      {i.mechanisms && i.mechanisms.length > 0 && (
+                                        <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                                          {i.mechanisms.map((m: string, mi: number) => (
+                                            <span key={mi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m}</span>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {i.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:1 }}>{i.notes}</div>}
+                                    </div>
+                                  );
+                                })}
+                                {/* Hardcoded pharma alerts */}
                                 {alerts.map((alert, ai) => {
                                   const color = alert.type === 'critical' ? '#ef4444' : alert.type === 'warning' ? '#f59e0b' : '#60a5fa';
                                   return (
-                                    <div key={ai} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:`1px solid ${color}33` }}>
+                                    <div key={`alert_${ai}`} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:`1px solid ${color}33` }}>
                                       <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
                                         <span style={{ fontSize:10, fontWeight:700, color }}>{alert.type === 'critical' ? '🔴' : alert.type === 'warning' ? '🟡' : '🔵'}</span>
                                         <span style={{ fontSize:9, padding:'1px 5px', borderRadius:3, background:color+'22', color, fontWeight:600 }}>
@@ -3413,6 +3571,17 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         }}>{s === 'all' ? '♾️ Все' : `${INTERACTION_SEVERITY_LABELS[s]?.label||s}`}</button>
                       ))}
                     </div>
+                    {/* Organ filter */}
+                    <div style={{ display:'flex', gap:4, marginBottom:6, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+                      {[['','♾️ Все'],['heart_vessels','❤️ Сердце'],['liver','🫁 Печень'],['kidneys','🫘 Почки'],['brain_nerves','🧠 Нервы'],['joints_bones','🦴 Суставы'],['immune','🛡️ Иммунитет'],['gi','🫃 ЖКТ'],['endocrine','🦋 Эндокринная'],['skin_hair','✨ Кожа'],['eyes','👁️ Глаза'],['reproductive','🧬 Репродуктивная'],['blood','🩸 Кровь'],['lungs','🫁 Лёгкие'],['muscles','💪 Мышцы'],['mitochondria','⚡ Энергия']].map(([key, label]) => (
+                        <button key={key} onClick={() => setSynergyOrganFilter(key)} style={{
+                          padding:'3px 8px', borderRadius:8, fontSize:7, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer',
+                          background: synergyOrganFilter === key ? 'var(--accent)' : 'transparent',
+                          color: synergyOrganFilter === key ? '#000' : 'var(--text-dim)',
+                          border: `1px solid ${synergyOrganFilter === key ? 'var(--accent)' : 'var(--border)'}`,
+                        }}>{label}</button>
+                      ))}
+                    </div>
                     {/* Mechanism filter */}
                     <div style={{ display:'flex', gap:4, marginBottom:6, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
                       {(() => {
@@ -3440,26 +3609,32 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                            const typeMap: Record<string, string> = { synergies: 'synergy', conflicts: 'conflict', cautions: 'caution' };
                            list = list.filter((i: any) => i.type === typeMap[synergySubTab]);
                          }
-                           if (synergyCountFilter > 0) {
+                            if (synergyCountFilter > 0) {
+                              list = list.filter((i: any) => {
+                                let count = 0;
+                                if (i.substanceA) count++;
+                                if (i.substanceB) count++;
+                                return count >= synergyCountFilter;
+                              });
+                            }
+                           if (synergyOrganFilter) {
                              list = list.filter((i: any) => {
-                               // Count substances from notes (look for "+" separator patterns or explicit count)
-                               const notes = i.notes || '';
-                               const countMatch = notes.match(/(\d+)\s*[+]?\s*компонент/);
-                               if (countMatch) return parseInt(countMatch[1]) >= synergyCountFilter;
-                               // Count "+" signs that indicate substance lists (e.g. "A + B + C + ...")
-                               const plusCount = (notes.match(/\s\+[\s]/g) || []).length + 1;
-                               if (plusCount > 1) return plusCount >= synergyCountFilter;
-                               // Fallback: count defined substance fields
-                               let count = 0;
-                               if (i.substanceA) count++;
-                               if (i.substanceB) count++;
-                               return count >= synergyCountFilter;
+                               const checkOrg = (subId: string) => {
+                                 const sub = ALL_SUBSTANCES.find(s => s.id === subId);
+                                 if (!sub || !sub.organs) return false;
+                                 return sub.organs.some(o => {
+                                   const norm = (o||'').trim().toUpperCase();
+                                   const mapping = ORGAN_CATEGORY_MAP[norm];
+                                   return mapping?.key === synergyOrganFilter;
+                                 });
+                               };
+                               return checkOrg(i.substanceA) || checkOrg(i.substanceB);
                              });
                            }
-                          if (synergyMechFilter) {
-                            list = list.filter((i: any) => (i.mechanisms||[]).includes(synergyMechFilter));
-                          }
-                          if (synergySearch) {
+                           if (synergyMechFilter) {
+                             list = list.filter((i: any) => (i.mechanisms||[]).includes(synergyMechFilter));
+                           }
+                           if (synergySearch) {
                              const sq = synergySearch.toLowerCase();
                              list = list.filter((i: any) => (i.effect||'').toLowerCase().includes(sq) || (i.substanceA||'').toLowerCase().includes(sq) || (i.substanceB||'').toLowerCase().includes(sq) || (i.notes||'').toLowerCase().includes(sq));
                           }
@@ -3521,7 +3696,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                           <div key={sid} style={{ fontSize:7, color:'var(--text-dim)', padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.04)', lineHeight:1.4 }}>
                                             <b style={{ color:'#a78bfa' }}>{getStackSubLabel(sid)}</b>
                                             {cat && <span style={{ marginLeft:4, opacity:0.6 }}>· {getCategoryInfo(cat).label}</span>}
-                                            {subInfo?.description && <div style={{ opacity:0.7 }}>{subInfo.description.slice(0, 80)}</div>}
+                                            {subInfo?.description && <div style={{ opacity:0.7 }}>{subInfo.description}</div>}
                                           </div>
                                         );
                                       })}
@@ -3568,7 +3743,13 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
               </div>
             )}
-            {renderView(infoView, 'favorites', () =>
+            {renderView(infoView, 'favorites', () => {
+              let favIds: string[] = [];
+              try { favIds = JSON.parse(localStorage.getItem('he_support_favorites') || '[]'); } catch {}
+              const [favSearch, setFavSearch] = useState('');
+              const favSubstances = favIds.map(id => ALL_SUBSTANCES.find(s => s.id === id)).filter(Boolean);
+              const filtered = favSearch ? favSubstances.filter(s => (s?.name||'').toLowerCase().includes(favSearch.toLowerCase())) : favSubstances;
+              return (
               <div>
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
                   {[['mystacks','📂 Мои стеки'],['plan','📋 План'],['reports','📊 Отчеты']].map(([id,label]) => (
@@ -3580,54 +3761,250 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     }}>{label}</button>
                   ))}
                 </div>
-                <div style={{ fontSize:10, color:'var(--text-dim)', margin:'4px 0 8px', textAlign:'center' }}>
-                  {(calcView as string) === 'mystacks' && 'Сохранённые стеки с оценкой синергий и конфликтов'}
-                  {(calcView as string) === 'plan' && 'Недельный план приёма поддержки'}
-                  {(calcView as string) === 'reports' && 'Отчёты по поддержке'}
-                </div>
+                <input value={favSearch} onChange={e => setFavSearch(e.target.value)}
+                  placeholder="🔍 Поиск в избранном..."
+                  style={{ width:'100%', padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box', marginBottom:8 }} />
+                {filtered.length === 0 ? (
+                  <div style={{ padding:24, textAlign:'center' }}>
+                    <div style={{ fontSize:24, marginBottom:6 }}>⭐</div>
+                    <div style={{ fontSize:11, color:'var(--text-dim)' }}>Нет избранных препаратов.</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>Добавьте из каталога ➕</div>
+                  </div>
+                ) : (
+                  filtered.map((s: any) => (
+                    <div key={s.id} style={{ display:'flex', alignItems:'center', gap:4, padding:'8px 10px', background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)', marginBottom:4 }}>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{s.name||s.id}</div>
+                        <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:2 }}>
+                          {(s.categories||[]).slice(0,3).map((c: string) => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c}</span>)}
+                        </div>
+                      </div>
+                      <button onClick={() => {
+                        try {
+                          let f: string[] = JSON.parse(localStorage.getItem('he_support_favorites') || '[]');
+                          const idx = f.indexOf(s.id);
+                          if (idx >= 0) f.splice(idx, 1);
+                          localStorage.setItem('he_support_favorites', JSON.stringify(f));
+                          setFavRefresh(prev => prev + 1);
+                        } catch {}
+                      }} style={{ padding:'3px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontWeight:600, whiteSpace:'nowrap', flexShrink:0 }}>★ Убрать</button>
+                    </div>
+                  ))
+                )}
               </div>
-            )}
+              );
+            })}
             {renderView(infoView, 'supportstacks', () =>
               <div>
+                {/* Sub-tabs: Все стеки / Замена / Поиск */}
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  {[['stackcalc','🧮 Калькулятор стеков'],['readystacks','📦 Предлагаемые стеки'],['mixcalc','💪 Тренировочные миксы']].map(([id,label]) => (
+                  {[['readystacks','📦 Все стеки'],['replace','🔄 Замена'],['search','🔍 Поиск']].map(([id,label]) => (
                     <button key={id} onClick={() => {
-                      if (id === 'readystacks') { setInfoTab('readystacks'); setCalcView('info'); setInfoView('stacks'); }
-                      else if (id === 'stackcalc') setCalcView('stackcalc');
-                      else if (id === 'mixcalc') setCalcView('mixcalc');
+                      setStackSubTab(id);
                     }} style={{
                       padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                      background: (id === 'readystacks' && infoView === 'stacks') || (id === 'stackcalc' && (calcView as string) === 'stackcalc') ? 'var(--accent)' : 'var(--bg-secondary)',
-                      color: (id === 'readystacks' && infoView === 'stacks') || (id === 'stackcalc' && (calcView as string) === 'stackcalc') ? '#000' : 'var(--text-dim)',
-                      border: '1px solid ' + ((id === 'readystacks' && infoView === 'stacks') || (id === 'stackcalc' && (calcView as string) === 'stackcalc') ? 'var(--accent)' : 'var(--border)'),
+                      background: stackSubTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
+                      color: stackSubTab === id ? '#000' : 'var(--text-dim)',
+                      border: '1px solid ' + (stackSubTab === id ? 'var(--accent)' : 'var(--border)'),
                     }}>{label}</button>
                   ))}
                 </div>
+
+                {/* All Stacks view */}
+                {stackSubTab === 'readystacks' && (
+                <div style={{ padding:'0 4px' }}>
+                  <input value={stackSearch} onChange={e => setStackSearch(e.target.value)}
+                    placeholder="🔍 Поиск стеков..."
+                    style={{ width:'100%', padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box', marginBottom:8 }} />
+                  {(stackSearch ? filteredStacks : ALL_STACKS).length === 0 ? (
+                    <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Ничего не найдено</div>
+                  ) : (
+                    (stackSearch ? [{key:'search',label:'Результаты поиска',stacks:filteredStacks}] : groupedStacks).map(group => (
+                      <div key={group.key} style={{ marginBottom:8 }}>
+                        <div style={{ fontSize:10, fontWeight:700, color:'var(--text-dim)', marginBottom:4, padding:'0 2px' }}>{group.label}</div>
+                        {group.stacks.map(stack => {
+                          const isExpanded = expandedStack === stack.id;
+                          const detail = stackDetailMap.get(stack.id);
+                          return (
+                            <div key={stack.id} style={{ marginBottom:4, background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)', overflow:'hidden' }}>
+                              <div onClick={() => setExpandedStack(isExpanded ? null : stack.id)} style={{ padding:'8px 10px', cursor:'pointer' }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                                  <div style={{ flex:1, fontSize:11, fontWeight:700, color:'var(--accent)' }}>{stack.name || stack.id}</div>
+                                  <span style={{ fontSize:9, color:'var(--text-dim)', background:'rgba(255,255,255,0.05)', padding:'2px 6px', borderRadius:4 }}>{stack.substances.length} в-в</span>
+                                  <span style={{ fontSize:9, color:'#00e68a', fontWeight:600 }}>{stack.synergyScore}%</span>
+                                  <span style={{ fontSize:10, color:'var(--text-dim)', transform:isExpanded ? 'rotate(180deg)' : 'none' }}>▼</span>
+                                </div>
+                                <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:4 }}>
+                                  {(stack.effects||[]).map(e => (
+                                    <span key={e} style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{EFFECT_LABELS_ru[e] || e}</span>
+                                  ))}
+                                </div>
+                              </div>
+                              {isExpanded && (
+                                <div style={{ padding:'0 10px 10px', borderTop:'1px solid var(--border)' }}>
+                                  {stack.description && <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)', lineHeight:1.4, marginTop:6, marginBottom:6 }}>{stack.description}</div>}
+                                  <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}>Состав:</div>
+                                  {stack.substances.map(sid => {
+                                    const sub = ALL_SUBSTANCES.find(x => x.id === sid);
+                                    return (
+                                      <div key={sid} style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 6px', fontSize:9, borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
+                                        <span style={{ color:'var(--text-light)', flex:1 }}>{getStackSubLabel(sid)}</span>
+                                        {sub?.description && <span style={{ color:'rgba(255,255,255,0.4)', fontSize:7.5 }}>{sub.description.slice ? sub.description.slice(0,80) : sub.description}</span>}
+                                      </div>
+                                    );
+                                  })}
+                                  {detail && detail.synergies.length > 0 && (
+                                    <div style={{ marginTop:6 }}>
+                                      <div style={{ fontSize:8, color:'#22c55e', marginBottom:3 }}>⊕ Синергии ({detail.synergies.length}):</div>
+                                      {detail.synergies.slice(0,5).map((s,i) => (
+                                        <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.6)', lineHeight:1.4 }}>• {s.aName} + {s.bName} — {s.effect}</div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {(() => {
+                                    const conflicts: Array<{a:string;b:string;effect:string}> = [];
+                                    for (let a = 0; a < stack.substances.length; a++) {
+                                      for (let b = a + 1; b < stack.substances.length; b++) {
+                                        const key = `${stack.substances[a]}||${stack.substances[b]}`;
+                                        const rev = `${stack.substances[b]}||${stack.substances[a]}`;
+                                        const intx = conflictLookup.get(key) || conflictLookup.get(rev);
+                                        if (intx && intx.type === 'conflict') {
+                                          conflicts.push({ a: stack.substances[a], b: stack.substances[b], effect: intx.effect });
+                                        }
+                                      }
+                                    }
+                                    if (conflicts.length > 0) return (
+                                      <div style={{ marginTop:6 }}>
+                                        <div style={{ fontSize:8, color:'#ef4444', marginBottom:3 }}>⊖ Конфликты ({conflicts.length}):</div>
+                                        {conflicts.slice(0,3).map((c,i) => (
+                                          <div key={i} style={{ fontSize:8, color:'#f87171', lineHeight:1.4 }}>• {getStackSubLabel(c.a)} + {getStackSubLabel(c.b)} — {c.effect}</div>
+                                        ))}
+                                      </div>
+                                    );
+                                    return null;
+                                  })()}
+                                  <button onClick={e => { e.stopPropagation();
+                                    SUPPORT_LEVELS[supportLevel] = { ...SUPPORT_LEVELS[supportLevel], subs: [...(SUPPORT_LEVELS[supportLevel]?.subs || []), ...stack.substances.filter(sid => !(SUPPORT_LEVELS[supportLevel]?.subs||[]).includes(sid))] };
+                                    alert(`✅ Добавлено в план`);
+                                  }} style={{ width:'100%', padding:'6px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(0,230,138,0.1)', color:'#00e68a', fontWeight:700, fontSize:10, marginTop:6 }}>+ В план</button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))
+                  )}
+                </div>
+                )}
+
+                {/* REPLACEMENT CALCULATOR */}
+                {stackSubTab === 'replace' && (
+                  <div style={{ padding:'0 4px' }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'#a78bfa', marginBottom:6 }}>🔄 Калькулятор замены препарата</div>
+                    <div style={{ position:'relative', marginBottom:8 }}>
+                      <input value={replaceSearch} onChange={e => setReplaceSearch(e.target.value)}
+                        placeholder="🔍 Введите название препарата для замены..."
+                        style={{ width:'100%', padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
+                      {replaceSearch && replaceResults.length === 0 && (
+                        <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:150, overflowY:'auto', marginTop:1 }}>
+                          {ALL_SUBSTANCES.filter(s => (s.name||'').toLowerCase().includes(replaceSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(replaceSearch.toLowerCase())).slice(0,8).map(s => (
+                            <div key={s.id} onClick={() => { setReplaceSelectedSub(s.id); setReplaceSearch(s.name); setReplaceResults(findReplacements(s.id)); }} style={{ padding:'7px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid var(--border)' }}>
+                              <span style={{ fontWeight:600, color:'var(--text)' }}>{s.name}</span>
+                              <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>{s.id}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {replaceSelectedSub && (
+                      <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.15)' }}>
+                        <div style={{ fontSize:10, fontWeight:700, color:'#a78bfa' }}>{getSubstanceName(replaceSelectedSub)}</div>
+                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>Механизмы: {(findSubstance(replaceSelectedSub)?.mechanisms||[]).map((m:string)=>MECH_LABELS[m]||MECH_TRANSLATIONS_RU[m]||m).join(', ') || '—'}</div>
+                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>Органы: {(findSubstance(replaceSelectedSub)?.organs||[]).join(', ') || '—'}</div>
+                      </div>
+                    )}
+                    {replaceResults.length > 0 && (
+                      <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Найдено замен: {replaceResults.length}</div>
+                    )}
+                    {replaceResults.filter(r => r.id !== replaceSelectedSub).slice(0,20).map(r => (
+                      <div key={r.id} style={{ marginBottom:4, padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                          <span style={{ fontWeight:700, fontSize:10, color:'#00e68a' }}>{getSubstanceName(r.id)}</span>
+                          <span style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background:r.score >= 70 ? 'rgba(34,197,94,0.15)' : r.score >= 40 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)', color:r.score >= 70 ? '#22c55e' : r.score >= 40 ? '#f59e0b' : '#ef4444', fontWeight:700 }}>{r.score}%</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', marginBottom:2 }}>{r.reason}</div>
+                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>
+                          {r.pros.length > 0 && <span style={{ color:'#22c55e' }}>+ {r.pros.join(', ')}</span>}
+                          {r.cons.length > 0 && <span style={{ color:'#ef4444', marginLeft:6 }}>− {r.cons.join(', ')}</span>}
+                        </div>
+                        <button onClick={() => {
+                          if (!enhancedSubs.includes(r.id)) setEnhancedSubs(prev => [...prev, r.id]);
+                        }} style={{ marginTop:4, padding:'3px 8px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(0,230,138,0.1)', color:'#00e68a', fontSize:8, fontWeight:600 }}>+ Добавить в стек</button>
+                      </div>
+                    ))}
+                    {replaceSelectedSub && replaceResults.length === 0 && (
+                      <div style={{ padding:16, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Замен не найдено. Попробуйте другой препарат.</div>
+                    )}
+                  </div>
+                )}
+
+                {/* SEARCH CALCULATOR */}
+                {stackSubTab === 'search' && (
+                  <div style={{ padding:'0 4px' }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🔍 Поиск препарата/стека/комплекса</div>
+                    <div style={{ marginBottom:6 }}>
+                      <label style={{ fontSize:8, color:'var(--text-dim)', marginBottom:2, display:'block' }}>Орган-мишень</label>
+                      <select value={searchOrgan} onChange={e => setSearchOrgan(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
+                        <option value="">Любой</option>
+                        {[...new Set(Object.values(ORGAN_CATEGORY_MAP).map(v => v.key))].map(k => (
+                          <option key={k} value={k}>{ORGAN_CATEGORY_MAP[Object.entries(ORGAN_CATEGORY_MAP).find(([,v]) => v.key === k)?.[0] || '']?.label || k}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ marginBottom:6 }}>
+                      <label style={{ fontSize:8, color:'var(--text-dim)', marginBottom:2, display:'block' }}>Механизм действия</label>
+                      <select value={searchMech} onChange={e => setSearchMech(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
+                        <option value="">Любой</option>
+                        {[...new Set(ALL_SUBSTANCES.flatMap(s => s.mechanisms||[]))].filter(Boolean).sort().slice(0,30).map(m => (
+                          <option key={m} value={m}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ marginBottom:8 }}>
+                      <label style={{ fontSize:8, color:'var(--text-dim)', marginBottom:2, display:'block' }}>Эффект/проблема</label>
+                      <input value={searchEffect} onChange={e => setSearchEffect(e.target.value)} placeholder="Например: защита печени, антиоксидант, энергия..." style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
+                    </div>
+                    <button onClick={() => setSearchResults(doSearch(searchOrgan, searchMech, searchEffect))} disabled={!searchOrgan && !searchMech && !searchEffect.trim()} style={{ width:'100%', padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'#fff', fontWeight:700, fontSize:10, marginBottom:8, opacity:(!searchOrgan && !searchMech && !searchEffect.trim()) ? 0.5 : 1 }}>🔍 НАЙТИ</button>
+                    {searchResults.length > 0 && (
+                      <div>
+                        <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Найдено: {searchResults.length}</div>
+                        {searchResults.slice(0,30).map(r => (
+                          <div key={r.id} style={{ marginBottom:4, padding:'8px 10px', borderRadius:8, background: r.type === 'stack' ? 'rgba(0,230,138,0.04)' : r.type === 'complex' ? 'rgba(139,92,246,0.04)' : 'var(--bg-secondary)', border:'1px solid var(--border)' }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                              <div>
+                                <span style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background: r.type === 'stack' ? 'rgba(0,230,138,0.1)' : r.type === 'complex' ? 'rgba(139,92,246,0.1)' : 'rgba(59,130,246,0.1)', color: r.type === 'stack' ? '#00e68a' : r.type === 'complex' ? '#a78bfa' : '#60a5fa', fontWeight:600, marginRight:4 }}>{r.type === 'stack' ? 'СТЕК' : r.type === 'complex' ? 'КОМПЛЕКС' : 'ПРЕПАРАТ'}</span>
+                                <span style={{ fontWeight:700, fontSize:10, color:'var(--text-light)' }}>{r.name}</span>
+                              </div>
+                              <span style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background: r.score >= 70 ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', color: r.score >= 70 ? '#22c55e' : '#f59e0b', fontWeight:700 }}>{r.score}%</span>
+                            </div>
+                            <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', lineHeight:1.3 }}>{r.reason}</div>
+                            {r.type === 'stack' && r.substanceCount && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2 }}>{r.substanceCount} веществ</div>}
+                            {r.pros && r.pros.length > 0 && <div style={{ fontSize:8, color:'#22c55e', marginTop:2 }}>+ {r.pros.join(', ')}</div>}
+                            {r.cons && r.cons.length > 0 && <div style={{ fontSize:8, color:'#ef4444' }}>− {r.cons.join(', ')}</div>}
+                            {r.type === 'substance' && <button onClick={() => { if (!enhancedSubs.includes(r.id)) setEnhancedSubs(prev => [...prev, r.id]); }} style={{ marginTop:4, padding:'3px 8px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(0,230,138,0.1)', color:'#00e68a', fontSize:8, fontWeight:600 }}>+ Добавить в стек</button>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {searchResults.length === 0 && (searchOrgan || searchMech || searchEffect.trim()) && (
+                      <div style={{ padding:16, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Ничего не найдено. Попробуйте изменить параметры поиска.</div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
-            {renderView(infoView, 'protocols', () =>
-              <div>
-                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  {[['neuro','🧠 Нейротоксичность'],['joints','🦴 Суставы'],['acne','🔴 Акне'],['peptides','🧬 Пептиды']].map(([id,label]) => (
-                    <button key={id} onClick={() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView(id as CalcView); }} style={{
-                      padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                      background: (section==='home' && calcView === id) ? 'var(--accent)' : 'var(--bg-secondary)',
-                      color: (section==='home' && calcView === id) ? '#000' : 'var(--text-dim)',
-                      border: '1px solid ' + ((section==='home' && calcView === id) ? 'var(--accent)' : 'var(--border)'),
-                    }}>{label}</button>
-                  ))}
-                </div>
-                <div style={{ fontSize:10, color:'var(--text-dim)', margin: '4px 0 8px' }}>
-                  {(calcView as string) === 'neuro' && 'Детальные механизмы нейротоксичности ААС и протокол нейропротекции'}
-                  {(calcView as string) === 'joints' && 'Калькулятор поддержки суставов, анализы и протоколы'}
-                  {(calcView as string) === 'acne' && 'Анти-прыщ протокол: ниацинамид, ретиноиды, солярий, гигиена'}
-                  {(calcView as string) === 'peptides' && 'Пептидный калькулятор, протоколы, PK/PD'}
-                </div>
-                <div style={{ fontSize:9, color:'var(--text-dim)', padding:6, background:'var(--bg-secondary)', borderRadius:8, marginTop:4 }}>
-                  Выберите протокол для просмотра. Доступны: Нейротоксичность, Суставы, Акне, Пептидный калькулятор.
-                </div>
-              </div>
-            )}
+
             {renderView(infoView, 'research', () => (
                 <div>
                   <div style={{fontSize:13,fontWeight:700,color:'var(--accent)',marginBottom:4}}>🔬 Поиск исследований</div>
@@ -3965,7 +4342,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         </div>
       )}
 
-      {section === 'hormonal' && tab === 'main' && supportView === 'fertility' && (
+      {section === 'protocols' && (
         <div style={{ padding:'0 12px 12px' }}>
           {/* Warning Card */}
           <div style={{ margin:'12px 0 10px', padding:'22px 18px', borderRadius:16,
@@ -3981,19 +4358,237 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             </div>
           </div>
 
-          {/* Sub-tab pills */}
+          {/* Unified protocol sub-tab pills (7 protocols) */}
           <div style={{ display:'flex', gap:4, padding:'4px 0 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['pct','ПКТ'],['fertility','Фертильность'],['hrt','ГЗТ']].map(([id,label]) => (
-              <button key={id} onClick={() => { setHormonalTab(id as any); setTab('fertility-pct'); }} style={{
+            {[['pct','ПКТ','#8b5cf6'],['fertility','Фертильность','#ec4899'],['hrt','ГЗТ','#f59e0b'],['neuro','Нейро','#06b6d4'],['joints','Суставы','#22c55e'],['acne','Акне','#ef4444'],['peptides','Пептиды','#a78bfa']].map(([id,label,color]) => (
+              <button key={id} onClick={() => setProtocolTab(id as any)} style={{
                 padding:'7px 16px', borderRadius:22, fontSize:12, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                background: hormonalTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: hormonalTab === id ? '#000' : 'var(--text-dim)',
-                border: '1px solid ' + (hormonalTab === id ? 'var(--accent)' : 'var(--border)'),
+                background: protocolTab === id ? color : 'var(--bg-secondary)',
+                color: protocolTab === id ? '#000' : 'var(--text-dim)',
+                border: '1px solid ' + (protocolTab === id ? color : 'var(--border)'),
               }}>{label}</button>
             ))}
           </div>
 
-          <FertilityPCTScreen initialTab={hormonalTab === 'pct' ? 'pct-plan' : hormonalTab === 'hrt' ? 'hrt' : undefined} restrictToMode={hormonalTab} />
+          {/* Content: PCT / Fertility / HRT → FertilityPCTScreen */}
+          {(['pct','fertility','hrt'] as string[]).includes(protocolTab) && (
+            <FertilityPCTScreen initialTab={protocolTab === 'pct' ? 'pct-plan' : protocolTab === 'hrt' ? 'hrt' : undefined} restrictToMode={protocolTab as 'pct' | 'fertility' | 'hrt'} />
+          )}
+
+          {/* Content: Neuro → inline neurotoxicity */}
+          {protocolTab === 'neuro' && (
+            <div style={{ paddingBottom: 70 }}>
+              <div style={{ marginBottom:12 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#ec4899', marginBottom:6 }}>🧠 Нейротоксичность — калькулятор</div>
+                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
+                  {[['calc','🧮 Калькулятор'],['mechanisms','⚙️ Механизмы'],['support','📋 Протокол']].map(([id,label]) => (
+                    <button key={id} onClick={() => setNeuroTab(id as any)} style={{
+                      padding:'5px 10px', borderRadius:14, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                      background: neuroTab === id ? '#ec4899' : 'var(--bg-secondary)',
+                      color: neuroTab === id ? '#000' : 'var(--text-dim)',
+                      border: '1px solid ' + (neuroTab === id ? '#ec4899' : 'var(--border)'),
+                    }}>{label}</button>
+                  ))}
+                </div>
+                {neuroTab === 'calc' && (
+                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
+                    {/* Compound selection */}
+                    {uniqueCompounds.length > 0 && <div style={{ marginBottom:8 }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'var(--text-light)', marginBottom:4 }}>Выберите соединения из курса:</div>
+                      {uniqueCompounds.map(c => (
+                        <label key={c.cls} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 0', fontSize:10, cursor:'pointer' }}>
+                          <input type="checkbox" checked={neuroSelected.includes(c.cls)} onChange={() => setNeuroSelected(prev => prev.includes(c.cls) ? prev.filter(x => x !== c.cls) : [...prev, c.cls])} />
+                          <span style={{ color:'var(--accent)', fontWeight:600 }}>{c.name}</span>
+                          <span style={{ color:'var(--text-dim)', marginLeft:'auto' }}>{c.doseWeekly} мг/нед</span>
+                        </label>
+                      ))}
+                    </div>}
+                    {uniqueCompounds.length === 0 && <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8, padding:8, background:'rgba(245,158,11,0.08)', borderRadius:6, border:'1px solid rgba(245,158,11,0.2)' }}>⚠ Нет активных соединений. Добавьте препараты в курсе.</div>}
+                    {/* Duration / Age inputs */}
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
+                      <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Длительность курса (нед)</div><input type="number" value={neuroDuration} onChange={e => setNeuroDuration(Math.max(1, Number(e.target.value)))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }} /></div>
+                      <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Возраст</div><input type="number" value={neuroAge} onChange={e => setNeuroAge(Math.max(18, Number(e.target.value)))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }} /></div>
+                    </div>
+                    {/* Score */}
+                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.15)', marginBottom:8 }}>
+                      <span style={{ fontSize:20 }}>🧠</span>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:9, color:'var(--text-dim)' }}>Нейротоксичность</div>
+                        <div style={{ fontSize:16, fontWeight:800, color: neuroScore > 70 ? '#ef4444' : neuroScore > 40 ? '#f59e0b' : '#22c55e' }}>{neuroScore}%</div>
+                      </div>
+                      <div style={{ fontSize:10, color:'var(--text-dim)' }}>{neuroScore > 70 ? '🔴 Высокий риск' : neuroScore > 40 ? '🟡 Средний риск' : '🟢 Низкий риск'}</div>
+                    </div>
+                    {/* Dose inputs per compound */}
+                    {neuroSelected.length > 0 && <div style={{ marginBottom:8 }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'var(--text-light)', marginBottom:4 }}>Дозы (мг/нед):</div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                        {neuroSelected.map(cls => <div key={cls} style={{ display:'flex', alignItems:'center', gap:6, fontSize:10 }}><span style={{ width:80, color:'var(--text-dim)' }}>{cls}</span><input type="number" value={neuroDoses[cls] || 0} onChange={e => setNeuroDoses(prev => ({...prev, [cls]: Number(e.target.value)}))} style={{ flex:1, padding:'4px 6px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10 }} /></div>)}
+                      </div>
+                    </div>}
+                  </div>
+                )}
+                {neuroTab === 'mechanisms' && (
+                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#ec4899', marginBottom:6 }}>⚙️ Механизмы нейротоксичности ААС</div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {[
+                        { title:'Гематоэнцефалический барьер (ГЭБ)', desc:'Андрогены повышают проницаемость ГЭБ через下调 клаудинов-5 — нейтрофилы и цитокины проникают в паренхиму' },
+                        { title:'Андрогеновые рецепторы (AR)', desc:'AR экспрессируются в гиппокампе, префронтальной коре, миндалине — активация → апоптоз нейронов через каспазу-3' },
+                        { title:'Эстрогеновые рецепторы (ER)', desc:'Ароматизация тестостерона в E2 → активация ERβ — нейропротективный эффект. При подавлении ароматазы — утрата защиты' },
+                        { title:'Нейровоспаление', desc:'Активация микроглии через TLR4 → IL-6, TNF-α → нейрональное повреждение. 17-α алкилированные оралы — наиболее нейротоксичны' },
+                        { title:'Глутаматная эксайтотоксичность', desc:'ААС повышают глутамат в синаптической щели через抑制 EAAT2 → NMDA-рецепторы → Ca2+ influx → митохондриальная дисфункция' },
+                        { title:'Митопатический стресс', desc:'Андрогены ингибируют комплекс I-IV дыхательной цепи → ↑ ROS → повреждение митохондриальной ДНК нейронов' },
+                      ].map(m => (
+                        <div key={m.title} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.08)' }}>
+                          <div style={{ fontSize:10, fontWeight:700, color:'#f472b6', marginBottom:2 }}>{m.title}</div>
+                          <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>{m.desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {neuroTab === 'support' && (
+                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:6 }}>📋 Протокол нейропротекции</div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:8 }}>
+                      {supportStack.map((item, i) => (
+                        <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 8px', borderRadius:6, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.08)' }}>
+                          <span style={{ fontSize:9, color:'var(--accent)', fontWeight:700, minWidth:120 }}>{item.name}</span>
+                          <span style={{ fontSize:9, color:'#f59e0b', fontWeight:600 }}>{item.dose} {item.unit}</span>
+                          <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:'auto' }}>{item.timing}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.4, padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.1)' }}>
+                      ⚠ Дозы зависят от степени нейротоксичности. Титровать под контролем самочувствия и анализов (пролактин, кортизол, ГГТ, АЛТ/АСТ).
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Content: Joints → inline joints */}
+          {protocolTab === 'joints' && (
+            <div style={{ paddingBottom: 70 }}>
+              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:8 }}>🦴 Калькулятор поддержки суставов</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
+                  <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Боль в суставах (0-10)</div><input type="range" min="0" max="10" value={jointPain} onChange={e => setJointPain(Number(e.target.value))} style={{ width:'100%' }} /><div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right' }}>{jointPain}/10</div></div>
+                  <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>История травм (0-5)</div><input type="range" min="0" max="5" value={injuryHistory} onChange={e => setInjuryHistory(Number(e.target.value))} style={{ width:'100%' }} /><div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right' }}>{injuryHistory}/5</div></div>
+                  <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Тренировочная нагрузка (0-5)</div><input type="range" min="0" max="5" value={trainLoad} onChange={e => setTrainLoad(Number(e.target.value))} style={{ width:'100%' }} /><div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right' }}>{trainLoad}/5</div></div>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
+                  <span style={{ fontSize:20 }}>🦴</span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:9, color:'var(--text-dim)' }}>Риск проблем с суставами</div>
+                    <div style={{ fontSize:16, fontWeight:800, color: jointScore > 70 ? '#ef4444' : jointScore > 40 ? '#f59e0b' : '#22c55e' }}>{jointScore}%</div>
+                  </div>
+                  <div style={{ fontSize:10, color:'var(--text-dim)' }}>{jointScore > 70 ? '🔴 Высокий' : jointScore > 40 ? '🟡 Средний' : '🟢 Низкий'}</div>
+                </div>
+                <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:8, lineHeight:1.4, padding:'6px 8px', background:'rgba(245,158,11,0.06)', borderRadius:6, border:'1px solid rgba(245,158,11,0.12)' }}>
+                  📋 Протокол: Глюкозамин 1500мг + Хондроитин 1200мг + MSM 3000мг + Коллаген II типа 10г + Босвеллия 500мг + BPC-157 500мкг/д. Курс 8-12 недель.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Content: Acne → inline acne */}
+          {protocolTab === 'acne' && (
+            <div style={{ paddingBottom: 70 }}>
+              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:8 }}>🔴 Протокол акне на курсе</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:8 }}>
+                  {['Ниацинамид 500мг 2р/д','Медь 2мг (отдельно от цинка)','Цинк 50мг (пиколинат, на ночь)','Солярий 2р/нед по 5 мин','Клендовит гель локально','Клензит-С (адапален+клиндамицин)','Верошпирон 50мг (только при гормональном акне)'].map((item, i) => (
+                    <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
+                      <span style={{ fontSize:10 }}>💊</span>
+                      <span style={{ fontSize:9, color:'var(--text-light)' }}>{item}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>• При Верошпироне — исключить добавки калия<br/>• Солярий ≤ 2 раза/нед по 5 мин<br/>• Клендовит+Клензит-С только локально<br/>• При сильном акне — дерматолог, системные ретиноиды</div>
+              </div>
+            </div>
+          )}
+
+          {/* Content: Peptides → inline peptide calculator */}
+          {protocolTab === 'peptides' && (
+            <div style={{ paddingBottom: 70 }}>
+              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa', marginBottom:6 }}>🧬 Пептидный калькулятор</div>
+                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
+                  {[['peptides','Пептиды'],['growth','Гормон роста']].map(([id,label]) => (
+                    <button key={id} onClick={() => setPepTab(id as any)} style={{
+                      padding:'5px 10px', borderRadius:14, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                      background: pepTab === id ? '#a78bfa' : 'var(--bg-secondary)',
+                      color: pepTab === id ? '#000' : 'var(--text-dim)',
+                      border: '1px solid ' + (pepTab === id ? '#a78bfa' : 'var(--border)'),
+                    }}>{label}</button>
+                  ))}
+                </div>
+                {pepTab === 'peptides' && (
+                  <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
+                    <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Препарат</div><select value={peptideId} onChange={e => setPeptideId(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }}><option value="cjc1295">CJC-1295 DAC</option><option value="ipamorelin">Ipamorelin</option><option value="ghrp2">GHRP-2</option><option value="ghrp6">GHRP-6</option><option value="hexarelin">Hexarelin</option><option value="tesamorelin">Tesamorelin</option><option value="sermorelin">Sermorelin</option></select></div>
+                    <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Количество в флаконе</div><div style={{ display:'flex', gap:4 }}><input type="number" value={pepAmount} onChange={e => setPepAmount(Number(e.target.value))} style={{ flex:1, padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }} /><select value={pepAmountUnit} onChange={e => setPepAmountUnit(e.target.value as any)} style={{ width:60, padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }}><option value="mg">мг</option><option value="mcg">мкг</option></select></div></div>
+                    <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Объём разведения (мл)</div><input type="number" step="0.1" min="0.1" max="10" value={pepDilution} onChange={e => setPepDilution(Number(e.target.value))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }} /></div>
+                    <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Разовая доза</div><div style={{ display:'flex', gap:4 }}><input type="number" value={pepDose} onChange={e => setPepDose(Number(e.target.value))} style={{ flex:1, padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }} /><select value={pepDoseUnit} onChange={e => setPepDoseUnit(e.target.value as any)} style={{ width:60, padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }}><option value="mcg">мкг</option><option value="mg">мг</option></select></div></div>
+                    <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Шприц</div><select value={pepSyringe} onChange={e => setPepSyringe(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }}><option value="U100_1ml">U100 1мл</option><option value="U100_05ml">U100 0.5мл</option><option value="U100_03ml">U100 0.3мл</option><option value="U40_1ml">U40 1мл</option></select></div>
+                    <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Путь введения</div><select value={pepRoute} onChange={e => setPepRoute(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }}><option value="sc">Подкожно (SC)</option><option value="im">Внутримышечно (IM)</option></select></div>
+                    <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Длительность (дни)</div><input type="number" min="1" max="365" value={pepTotalDays} onChange={e => setPepTotalDays(Number(e.target.value))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }} /></div>
+                    <div>
+                      <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>📅 График дозирования</div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                        {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(day => {
+                          const active = pepSchedule.includes(day);
+                          return (<button key={day} onClick={() => setPepSchedule(active ? pepSchedule.filter(d => d !== day) : [...pepSchedule, day])} style={{ padding:'6px 10px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer', background: active ? 'var(--accent)' : 'var(--bg-secondary)', color: active ? '#000' : 'var(--text-dim)', border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}` }}>{day}</button>);
+                        })}
+                      </div>
+                    </div>
+                    <button onClick={() => {
+                      const pepInfo = PEPTIDE_DB[peptideId];
+                      const dilInput: DilutionInput = { amountValue: pepAmount, amountUnit: pepAmountUnit as 'mg' | 'mcg', dilutionVolumeMl: pepDilution, doseValue: pepDose, doseUnit: pepDoseUnit as 'mg' | 'mcg', syringeType: pepSyringe as any };
+                      const dilResult = computeDilution(dilInput);
+                      const doseMcg = pepDoseUnit === 'mg' ? pepDose * 1000 : pepDose;
+                      const bio = pepInfo?.bioavailability?.[pepRoute] || pepInfo?.bioavailability?.sc || { min: 50, max: 80, avg: 65 };
+                      const bioResult = computeEffectiveDose(doseMcg, bio);
+                      const pkInput: PKInput = { doseMcg, bioAvg: bio.avg, tHalfHours: pepInfo?.tHalfHours || 24, scheduleDays: pepSchedule, totalDays: pepTotalDays };
+                      const pkResult = computePK(pkInput);
+                      setPepResult({ dilution: dilResult, effective: bioResult, pk: pkResult });
+                      const proto = generatePeptideProtocol('muscle_gain');
+                      setPepProtocol(proto);
+                    }} style={{ padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#a78bfa,#7c3aed)', color:'#fff', fontWeight:700, fontSize:11 }}>🧮 РАССЧИТАТЬ</button>
+                  </div>
+                )}
+                {pepTab === 'growth' && (
+                  <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
+                    <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Препарат ГР</div><select value={growthId || 'jintropin'} onChange={e => setGrowthId(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }}><option value="jintropin">Джинтропин</option><option value="ansomon">Ансомон</option><option value="hygetropin">Хайгетропин</option><option value="somatin">Соматин</option><option value="neotropin">Неотропин</option></select></div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', padding:'6px 8px', background:'rgba(167,139,250,0.06)', borderRadius:6, border:'1px solid rgba(167,139,250,0.12)' }}>🔄 Данный модуль в разработке. Полный PK/PD калькулятор будет в версии 10.0.</div>
+                  </div>
+                )}
+                {/* Results */}
+                {pepResult && (
+                  <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:6 }}>
+                    <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.15)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#c4b5fd', marginBottom:4 }}>💉 Разведение</div>
+                      <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>Доза: {pepResult.dilution.doseMcg} мкг | Концентрация: {pepResult.dilution.concentrationMcgPerMl} мкг/мл | Объём дозы: {pepResult.dilution.doseVolumeMl.toFixed(2)} мл | Единиц в шприце: {pepResult.dilution.syringeUnitsDisplay} | Доз на флакон: {pepResult.dilution.dosesPerVial.toFixed(1)}</div>
+                    </div>
+                    <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(251,191,36,0.06)', border:'1px solid rgba(251,191,36,0.15)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#fcd34d', marginBottom:4 }}>📊 Биодоступность</div>
+                      <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>Эффективная доза: мин {pepResult.effective.effectiveMinMcg} мкг / средняя {pepResult.effective.effectiveAvgMcg} мкг / макс {pepResult.effective.effectiveMaxMcg} мкг</div>
+                    </div>
+                    {pepResult.pk && <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(52,211,153,0.06)', border:'1px solid rgba(52,211,153,0.15)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#34d399', marginBottom:4 }}>📈 Фармакокинетика</div>
+                      <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>Cmax: {pepResult.pk.maxConcentration.toFixed(1)} | T½: {pepResult.pk.halfLifeDays.toFixed(1)} дн | Cavg: {pepResult.pk.avgConcentration.toFixed(1)} | Равновес: день {pepResult.pk.steadyStateDay}</div>
+                    </div>}
+                    {pepProtocol && <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#4ade80', marginBottom:4 }}>📋 Протокол</div>
+                      <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>Цель: {pepProtocol.goal} | Синергия: {pepProtocol.synergyScore.toFixed(1)} | Компонентов: {pepProtocol.peptides.length}</div>
+                    </div>}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -4066,7 +4661,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                 <div style={{ marginBottom: 4 }}>
                                   <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>Органы-мишени:</div>
                                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                                    {sub.organs.map(o => (
+                                    {[...new Set(sub.organs||[])].map(o => (
                                       <span key={o} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(59,130,246,0.08)', color: '#60a5fa' }}>{o}</span>
                                     ))}
                                   </div>
@@ -4097,7 +4692,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                           </span>
                                           {' '}{pName} — {i.type === 'synergy' ? 'синергия' : i.type === 'conflict' ? 'конфликт' : 'осторожно'}
                                           {i.severity && <span style={{ opacity: 0.6 }}> · {i.severity}</span>}
-                                          {i.notes && <div style={{ opacity: 0.5 }}>{i.notes.slice(0, 60)}</div>}
+                                          {i.notes && <div style={{ opacity: 0.5 }}>{i.notes}</div>}
                                         </div>
                                       );
                                     })}
@@ -4824,6 +5419,50 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   }} style={{ padding:'8px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', cursor:'pointer', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.9)', fontWeight:600, fontSize:11 }}>📋</button>
                 </div>
                 {planSaved && <div style={{ textAlign:'center', fontSize:10, color:'#22c55e', marginTop:4 }}>✅ План сохранён</div>}
+
+                {/* 💾 СОХРАНИТЬ ПЛАН в he_saved_support_plans */}
+                <button onClick={() => {
+                  try {
+                    const planData = { level:supportLevel, subs, dosages, levelLabel:SUPPORT_LEVELS[supportLevel]?.label };
+                    const existing = JSON.parse(localStorage.getItem('he_saved_support_plans') || '[]');
+                    existing.push({ id: Date.now(), date: new Date().toISOString(), plan: planData });
+                    localStorage.setItem('he_saved_support_plans', JSON.stringify(existing));
+                    alert('План сохранён!');
+                    setPlanSaved(true);
+                  } catch {}
+                }} style={{ width:'100%', padding:'10px', borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:12, marginTop:6 }}>💾 СОХРАНИТЬ ПЛАН</button>
+
+                {/* Мои планы */}
+                <div style={{ marginTop:8 }}>
+                  <h3 style={{ margin:'0 0 6px', fontSize:13, fontWeight:700, color:'var(--accent)' }}>📋 Мои планы</h3>
+                  {(() => {
+                    let savedPlans: any[] = [];
+                    try { savedPlans = JSON.parse(localStorage.getItem('he_saved_support_plans') || '[]'); } catch {}
+                    if (savedPlans.length === 0) return <p style={{ fontSize:10, color:'var(--text-dim)' }}>Нет сохранённых планов.</p>;
+                    return [...savedPlans].reverse().map((sp, i) => {
+                      const p = sp.plan || {};
+                      const pSubs = p.subs || [];
+                      return (
+                        <div key={sp.id || i} style={{ padding:'8px 10px', marginBottom:4, background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)' }}>
+                          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                            <div>
+                              <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{p.levelLabel || p.level || 'План'} · {pSubs.length} препаратов</div>
+                              <div style={{ fontSize:8, color:'var(--text-dim)' }}>{new Date(sp.date).toLocaleDateString('ru-RU')}</div>
+                            </div>
+                            <button onClick={() => {
+                              try {
+                                let savedPlans: any[] = JSON.parse(localStorage.getItem('he_saved_support_plans') || '[]');
+                                const updated = savedPlans.filter((x:any) => x.id !== sp.id);
+                                localStorage.setItem('he_saved_support_plans', JSON.stringify(updated));
+                                window.location.reload();
+                              } catch {}
+                            }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
               </>
             );
           })()}
@@ -5809,7 +6448,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.12)', fontSize:10 }}>
                     <span style={{ color:'#8b5cf6', fontWeight:600 }}>⚡ Рекомендованный уровень:</span>{' '}
                     <b style={{ color:'#8b5cf6' }}>{SUPPORT_LEVELS[autoLevel as string]?.label || autoLevel}</b>
-                    <span style={{ color:'var(--text-dim)', fontSize:9 }}> — {SUPPORT_LEVELS[autoLevel as string]?.desc?.slice(0, 60) || 'Автоматически определённый уровень поддержки'}</span>
+                    <span style={{ color:'var(--text-dim)', fontSize:9 }}> — {SUPPORT_LEVELS[autoLevel as string]?.desc || 'Автоматически определённый уровень поддержки'}</span>
                   </div>
                   {/* Explanation of risk calculation */}
                   <details style={{ marginTop:6 }}>
@@ -6713,38 +7352,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
         </div>
       )}
 
-      {/* ===== FERTILITY/PCT TAB ===== */}
-      {section === 'hormonal' && tab === 'fertility-pct' && (
-        <div style={{ padding:'0 12px 12px' }}>
-          {/* Warning Card */}
-          <div style={{ margin:'12px 0 10px', padding:'22px 18px', borderRadius:16,
-            background:'linear-gradient(135deg, rgba(239,68,68,0.10) 0%, rgba(245,158,11,0.06) 100%)',
-            border:'2px solid rgba(239,68,68,0.30)',
-            boxShadow:'0 6px 28px rgba(239,68,68,0.15)',
-          }}>
-            <div style={{ fontSize:15, fontWeight:800, color:'#ef4444', marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
-              <span style={{ fontSize:22 }}>⚠️</span> ВАЖНАЯ ИНФОРМАЦИЯ
-            </div>
-            <div style={{ fontSize:14, lineHeight:1.7, color:'rgba(255,255,255,0.92)', fontWeight:500 }}>
-              Информация в данном блоке является ознакомительной, выбор конкретной схемы восстановления и лечения, интерпретация анализов и динамики восстановления должен производиться исключительно специалистом под конкретный случай конкретного человека. Настоятельно рекомендуем обратиться к специалисту для решения данных вопросов.
-            </div>
-          </div>
 
-          {/* Sub-tab pills */}
-          <div style={{ display:'flex', gap:4, padding:'4px 0 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['pct','ПКТ'],['fertility','Фертильность'],['hrt','ГЗТ']].map(([id,label]) => (
-              <button key={id} onClick={() => setHormonalTab(id as any)} style={{
-                padding:'7px 16px', borderRadius:22, fontSize:12, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                background: hormonalTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: hormonalTab === id ? '#000' : 'var(--text-dim)',
-                border: '1px solid ' + (hormonalTab === id ? 'var(--accent)' : 'var(--border)'),
-              }}>{label}</button>
-            ))}
-          </div>
-
-          <FertilityPCTScreen initialTab={hormonalTab === 'pct' ? 'pct-plan' : hormonalTab === 'hrt' ? 'hrt' : undefined} restrictToMode={hormonalTab} />
-        </div>
-      )}
 
       {/* ===== MODAL OVERLAY ===== */}
       {showModal && (

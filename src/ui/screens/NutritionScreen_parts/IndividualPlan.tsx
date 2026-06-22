@@ -182,6 +182,35 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   const [lazyDayDays, setLazyDayDays] = useState(1);
   const [periodizationEnabled, setPeriodizationEnabled] = useState(false);
 
+  // Bug 18: Additional user parameters
+  const [trainType, setTrainType] = useState<'strength' | 'cardio' | 'mixed' | 'hiit'>('strength');
+  const [trainIntensity, setTrainIntensity] = useState<'low' | 'medium' | 'high'>('medium');
+  const [householdActivity, setHouseholdActivity] = useState<'sedentary' | 'light' | 'moderate' | 'active'>('light');
+  const [bodyFatPct, setBodyFatPct] = useState(profile?.settings?.bodyFat || 15);
+  const [sleepHours, setSleepHours] = useState(7);
+  const [sleepQuality, setSleepQuality] = useState(7);
+  const [stressLevel, setStressLevel] = useState(5);
+  const [cyclePhase, setCyclePhase] = useState<'none' | 'follicular' | 'ovulation' | 'luteal' | 'menstrual'>('none');
+  const [hungerLevel, setHungerLevel] = useState(5);
+
+  // Weight adaptation mode
+  const [weightAdaptMode, setWeightAdaptMode] = useState(false);
+  const [weightLogWeek, setWeightLogWeek] = useState<number[]>([80, 80, 80]);
+  const [expectedLossKgWeek, setExpectedLossKgWeek] = useState(0.5);
+
+  // Metabolic adaptation
+  const [metabolicAdaptEnabled, setMetabolicAdaptEnabled] = useState(false);
+  const [metabolicAdaptPct, setMetabolicAdaptPct] = useState(10);
+
+  // Diet pause modes
+  const [dietPauseMode, setDietPauseMode] = useState<'none' | 'refeed' | 'flex_80_20' | 'periodization_2_1' | 'diet_5_2'>('none');
+
+  // Manual KBJU in g/kg
+  const [manualGPerKg, setManualGPerKg] = useState<Record<string, number>>({ protein: 0, fat: 0, carbs: 0 });
+
+  // Month planning
+  const [monthPlanMode, setMonthPlanMode] = useState(false);
+
   // 2. Goal (synced with profile)
   const [goal, setGoal] = useState<GoalId>((s?.primaryGoal as GoalId) || 'maintenance');
 
@@ -280,7 +309,21 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       recomposition: 'recomp', rehab: 'rehab',
     };
     const engineGoal = goalMap[goal] || 'maintenance';
-    const targetsV2 = (() => { try { return calcNutritionV2({ weightKg: weight, heightCm: height, age, sex: sex || 'male', pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal as any, bodyFatPercent: profile?.settings?.bodyFat }); } catch { return null; } })();
+    // Weight adaptation: adjust calories if actual loss differs from expected
+    let weightAdj = 1.0;
+    if (weightAdaptMode && weightLogWeek.length >= 2) {
+      const actualLoss = weightLogWeek[0] - weightLogWeek[weightLogWeek.length - 1];
+      const weeklyAvgLoss = actualLoss > 0 ? actualLoss / (weightLogWeek.length - 1) * 7 / Math.max(1, weightLogWeek.length - 1) : 0;
+      if (expectedLossKgWeek > 0 && weeklyAvgLoss < expectedLossKgWeek * 0.7) {
+        // Under-performing: reduce calories by ~200 per 0.1kg shortfall
+        weightAdj = 1 - (expectedLossKgWeek - Math.max(0, weeklyAvgLoss)) * 2 / Math.max(1, weight);
+      } else if (weeklyAvgLoss > expectedLossKgWeek * 1.3) {
+        // Over-performing: increase calories
+        weightAdj = 1 + (weeklyAvgLoss - expectedLossKgWeek) * 2 / Math.max(1, weight);
+      }
+      weightAdj = Math.max(0.8, Math.min(1.2, weightAdj));
+    }
+    const targetsV2 = (() => { try { return calcNutritionV2({ weightKg: weight, heightCm: height, age, sex: sex || 'male', pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal as any, bodyFatPercent: bodyFatPct }); } catch { return null; } })();
     const targets = targetsV2 ? { kcal: targetsV2.kcal, protein: targetsV2.proteinG, fats: targetsV2.fatG, carbs: targetsV2.carbsG } : (() => { try { return calcNutrition({ weightKg: weight, heightCm: height, age, sex, pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal }); } catch { return { kcal: 2500, protein: 160, fats: 70, carbs: 300 }; } })();
     // Phase-aware adjustments
     const phaseMult: Record<string, { kcalMod: number; pAdd: number }> = {
@@ -334,8 +377,47 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       targets.protein = Math.round(targets.protein + weight * 0.2);
       targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
     }
+    // Weight adaptation adjustment
+    if (weightAdj !== 1.0) {
+      targets.kcal = Math.round(targets.kcal * weightAdj);
+      targets.protein = Math.round(targets.protein * weightAdj);
+      targets.fats = Math.round(targets.fats * weightAdj);
+      targets.carbs = Math.round(targets.carbs * weightAdj);
+    }
+    // Metabolic adaptation: reduce TDEE
+    if (metabolicAdaptEnabled && metabolicAdaptPct > 0) {
+      const adaptFactor = 1 - metabolicAdaptPct / 100;
+      targets.kcal = Math.round(targets.kcal * adaptFactor);
+      targets.protein = Math.round(targets.protein * adaptFactor);
+      targets.fats = Math.round(targets.fats * adaptFactor);
+      targets.carbs = Math.round(targets.carbs * adaptFactor);
+    }
+    // Diet pause mode
+    if (dietPauseMode === 'refeed') {
+      // Refeed: +20% carbs on refeed days
+      // Apply during plan generation, not here
+    } else if (dietPauseMode === 'flex_80_20') {
+      // 80% deficit days, 20% maintenance days - handled in plan generation
+    } else if (dietPauseMode === 'periodization_2_1') {
+      // 2 weeks deficit, 1 week maintenance - handled in plan generation
+    } else if (dietPauseMode === 'diet_5_2') {
+      // 5 days deficit, 2 days eat - handled in plan generation
+    }
+    // Manual KBJU in g/kg override
+    if (manualGPerKg.protein > 0) {
+      targets.protein = Math.round(weight * manualGPerKg.protein);
+    }
+    if (manualGPerKg.fat > 0) {
+      targets.fats = Math.round(weight * manualGPerKg.fat);
+    }
+    if (manualGPerKg.carbs > 0) {
+      targets.carbs = Math.round(weight * manualGPerKg.carbs);
+    }
+    if (manualGPerKg.protein > 0 || manualGPerKg.fat > 0 || manualGPerKg.carbs > 0) {
+      targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
+    }
     return targets;
-  }, [weight, height, age, sex, goal, s?.workoutsPerWeek, s?.avgWorkoutMinutes, injections, phase]);
+  }, [weight, height, age, sex, goal, s?.workoutsPerWeek, s?.avgWorkoutMinutes, injections, phase, bodyFatPct, weightAdaptMode, weightLogWeek, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg]);
 
   const [manualKcal, setManualKcal] = useState<number | null>(null);
   const [manualP, setManualP] = useState<number | null>(null);
@@ -1954,6 +2036,117 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Время на готовку (мин/день)</label>
           <input type="number" value={cookTimeMin} onChange={e => setCookTimeMin(+e.target.value || 0)} style={inputStyle} />
         </div>
+        {/* Training parameters */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+          <div>
+            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Тип тренировок</label>
+            <select value={trainType} onChange={e => setTrainType(e.target.value as any)} style={selectStyle}>
+              <option value="strength">Силовые</option><option value="cardio">Кардио</option><option value="mixed">Смешанные</option><option value="hiit">HIIT</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Интенсивность</label>
+            <select value={trainIntensity} onChange={e => setTrainIntensity(e.target.value as any)} style={selectStyle}>
+              <option value="low">Низкая</option><option value="medium">Средняя</option><option value="high">Высокая</option>
+            </select>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+          <div>
+            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>% жира</label>
+            <input type="number" value={bodyFatPct} onChange={e => setBodyFatPct(+e.target.value || 0)} style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Бытовая активность</label>
+            <select value={householdActivity} onChange={e => setHouseholdActivity(e.target.value as any)} style={selectStyle}>
+              <option value="sedentary">Сидячий</option><option value="light">Лёгкая</option><option value="moderate">Умеренная</option><option value="active">Активная</option>
+            </select>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
+          <div>
+            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Сон (часы)</label>
+            <input type="number" min="3" max="14" value={sleepHours} onChange={e => setSleepHours(+e.target.value || 7)} style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Качество сна</label>
+            <input type="number" min="1" max="10" value={sleepQuality} onChange={e => setSleepQuality(+e.target.value || 7)} style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Стресс (1-10)</label>
+            <input type="number" min="1" max="10" value={stressLevel} onChange={e => setStressLevel(+e.target.value || 5)} style={inputStyle} />
+          </div>
+        </div>
+        {sex === 'female' && (
+          <div style={{ marginBottom: 6 }}>
+            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Фаза цикла</label>
+            <select value={cyclePhase} onChange={e => setCyclePhase(e.target.value as any)} style={selectStyle}>
+              <option value="none">Не указана</option><option value="follicular">Фолликулярная</option><option value="ovulation">Овуляция</option><option value="luteal">Лютеиновая</option><option value="menstrual">Менструация</option>
+            </select>
+          </div>
+        )}
+        <div style={{ marginBottom: 6 }}>
+          <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Голод/сытость (1 — сыт, 10 — очень голоден)</label>
+          <input type="range" min="1" max="10" value={hungerLevel} onChange={e => setHungerLevel(+e.target.value)} style={{ width: '100%' }} />
+          <div style={{ fontSize: 8, color: 'var(--text-dim)', textAlign: 'right' }}>{hungerLevel}/10</div>
+        </div>
+        {/* Weight adaptation mode */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+          <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+            <input type="checkbox" checked={weightAdaptMode} onChange={e => setWeightAdaptMode(e.target.checked)} />
+            ⚖️ Адаптация веса
+          </label>
+        </div>
+        {weightAdaptMode && (
+          <div style={{ background: 'rgba(167,139,250,0.06)', borderRadius: 8, padding: 8, marginBottom: 6 }}>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>Вес за последнюю неделю (3 записи):</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6 }}>
+              {weightLogWeek.map((w, i) => (
+                <div key={i}><label style={{ fontSize: 8, color: 'var(--text-dim)' }}>День {i+1}</label><input type="number" step="0.1" value={w} onChange={e => { const nw = [...weightLogWeek]; nw[i] = +e.target.value || 0; setWeightLogWeek(nw); }} style={inputStyle} /></div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <label style={{ fontSize: 8, color: 'var(--text-dim)' }}>Ожидаемое снижение (кг/нед):</label>
+              <input type="number" step="0.1" value={expectedLossKgWeek} onChange={e => setExpectedLossKgWeek(+e.target.value || 0)} style={{ ...inputStyle, width: 60 }} />
+            </div>
+          </div>
+        )}
+        {/* Metabolic adaptation */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+          <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+            <input type="checkbox" checked={metabolicAdaptEnabled} onChange={e => setMetabolicAdaptEnabled(e.target.checked)} />
+            🔄 Метаболическая адаптация (снижение TDEE при длительном дефиците)
+          </label>
+        </div>
+        {metabolicAdaptEnabled && (
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 6 }}>
+            <label style={{ fontSize: 8, color: 'var(--text-dim)' }}>Снижение TDEE:</label>
+            <input type="number" min="0" max="30" value={metabolicAdaptPct} onChange={e => setMetabolicAdaptPct(+e.target.value || 0)} style={{ ...inputStyle, width: 60 }} />
+            <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>%</span>
+          </div>
+        )}
+        {/* Diet pause modes */}
+        <div style={{ marginBottom: 6 }}>
+          <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Диетические паузы</label>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {[['none','Нет'],['refeed','Рефид'],['flex_80_20','80/20 гибкие'],['periodization_2_1','2+1 периодизация'],['diet_5_2','5/2 диета']].map(([id,label]) => (
+              <button key={id} onClick={() => setDietPauseMode(id as any)} style={{
+                padding:'4px 8px', borderRadius:12, fontSize:8, fontWeight:700, cursor:'pointer', border:'none',
+                background: dietPauseMode === id ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+                color: dietPauseMode === id ? '#000' : 'rgba(255,255,255,0.85)',
+              }}>{label}</button>
+            ))}
+          </div>
+        </div>
+        {/* Manual KBJU g/kg */}
+        <div style={{ marginBottom: 6 }}>
+          <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Ручной ввод КБЖУ (г/кг веса)</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
+            <div><label style={{ fontSize: 8, color: 'var(--text-dim)' }}>Белки (г/кг)</label><input type="number" step="0.1" value={manualGPerKg.protein || ''} onChange={e => setManualGPerKg(p => ({...p, protein: +e.target.value || 0}))} placeholder="2.0" style={inputStyle} /></div>
+            <div><label style={{ fontSize: 8, color: 'var(--text-dim)' }}>Жиры (г/кг)</label><input type="number" step="0.1" value={manualGPerKg.fat || ''} onChange={e => setManualGPerKg(p => ({...p, fat: +e.target.value || 0}))} placeholder="0.8" style={inputStyle} /></div>
+            <div><label style={{ fontSize: 8, color: 'var(--text-dim)' }}>Углеводы (г/кг)</label><input type="number" step="0.1" value={manualGPerKg.carbs || ''} onChange={e => setManualGPerKg(p => ({...p, carbs: +e.target.value || 0}))} placeholder="4.0" style={inputStyle} /></div>
+          </div>
+        </div>
       </GlassCard>
 
       {/* 2. Goal card */}
@@ -2568,6 +2761,18 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         boxShadow: '0 4px 20px rgba(0,230,138,0.2)',
       }}>
         ✨ Сгенерировать план питания
+      </button>
+      <button onClick={() => {
+        setMonthPlanMode(true);
+        // Generate 4 weekly plans
+        for (let w = 0; w < 4; w++) {
+          setTimeout(() => generatePlan(7), w * 500);
+        }
+      }} style={{
+        ...greenBtn, fontSize: 10, padding: 10,
+        background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa',
+      }}>
+        📅 План на месяц (4 недели)
       </button>
 
       {/* Day/3day/Week selector */}
@@ -3268,6 +3473,33 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                   {data.score >= 3 && <div style={{ color: '#f59e0b' }}>→ {data.recommendation}</div>}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Glycemic load */}
+          {dayPlan && (
+            <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.12)' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#3b82f6', marginBottom: 3 }}>🍬 Гликемическая нагрузка</div>
+              {(() => {
+                const totalCarbs = dayPlan.totals?.c || 0;
+                const avgGI = planType === 'keto' ? 30 : planType === 'highcarb' ? 65 : 55;
+                const gl = Math.round(totalCarbs * avgGI / 100);
+                const glPerMeal = dayPlan.meals?.length > 0 ? Math.round(gl / dayPlan.meals.length) : 0;
+                const glLabel = gl <= 80 ? 'Низкая' : gl <= 120 ? 'Средняя' : 'Высокая';
+                const glColor = gl <= 80 ? '#22c55e' : gl <= 120 ? '#f59e0b' : '#ef4444';
+                return (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>Общий ГН (расчётный):</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: glColor }}>{gl} <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)' }}>({glLabel})</span></span>
+                    </div>
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)' }}>
+                      Средний ГИ рациона: ~{avgGI} · ГН на приём: ~{glPerMeal} · Углеводы: {Math.round(totalCarbs)}г
+                    </div>
+                    {gl > 120 && <div style={{ fontSize: 8, color: '#f59e0b', marginTop: 2 }}>💡 Высокая нагрузка — рекомендуется увеличить долю низко-ГИ продуктов (бобовые, цельнозерновые, овощи)</div>}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

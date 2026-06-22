@@ -3152,7 +3152,7 @@ export const TrainingScreen: React.FC = () => {
                 avgIntensity,
                 goal, level, daysPerWeek, splitType, periodizationType, mesoLength,
               };
-              const updated = [...trainingArchive, report];
+              const updated = [report, ...trainingArchive].slice(0, 20);
               setTrainingArchive(updated);
               localStorage.setItem('he_training_reports', JSON.stringify(updated));
               try { localStorage.setItem('he_training_report_current', JSON.stringify(report)); } catch {}
