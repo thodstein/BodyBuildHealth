@@ -2429,7 +2429,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         const subNames = (stack.substances||[]).map(sid => getSubstanceName(sid)).join(', ');
         if (!organ && !mech && !eq) continue;
         if (!score) score = 30;
-        results.push({ id: stack.id, name: stack.name || stack.id, type: 'stack', score: Math.min(100, score), reason: reasons.concat([`${stack.substances.length} веществ`]).join('; ') || `стек из ${stack.substances.length} веществ`, pros: [`синергия ${stack.synergyScore}%`, ...(stack.effects||[]).slice(0,3)], cons: [], substanceCount: stack.substances.length });
+        results.push({ id: stack.id, name: getStackDisplayName(stack), type: 'stack', score: Math.min(100, score), reason: reasons.concat([`${stack.substances.length} веществ`]).join('; ') || `стек из ${stack.substances.length} веществ`, pros: [`синергия ${stack.synergyScore}%`, ...(stack.effects||[]).slice(0,3)], cons: [], substanceCount: stack.substances.length });
       }
     }
     return results.sort((a,b) => b.score - a.score);
@@ -2458,6 +2458,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       if (EFFECT_LABELS[eff]) return EFFECT_LABELS[eff];
     }
     return eff || '';
+  };
+
+  const getStackDisplayName = (stack: any): string => {
+    if (stack.name) return stack.name;
+    const effs = (stack.effects||[]).map((e: string) => (EFFECT_LABELS_ru[e]||e).replace(/^[^\s]+\s/,'')).filter(Boolean);
+    const prefix = effs.length > 0 ? effs.slice(0,2).join(' + ') : 'Стек';
+    const cnt = (stack.substances||[]).length;
+    return `${prefix} (${cnt} веществ)`;
   };
 
   const safeRender = (label: string, fn: () => React.ReactNode): React.ReactNode => {
@@ -3984,7 +3992,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           <div key={stack.id} style={{ marginBottom:8, background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)', overflow:'hidden' }}>
                             <div onClick={() => setExpandedStack(isExpanded ? null : stack.id)} style={{ padding:'10px 12px', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'flex-start', borderBottom: isExpanded ? '1px solid var(--border)' : 'none' }}>
                               <div style={{ flex:1 }}>
-                                <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>{stack.name}</div>
+                                <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>{getStackDisplayName(stack)}</div>
                                 <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{stack.date ? new Date(stack.date).toLocaleDateString('ru') : ''} · {stack.subs.length} добавок</div>
                                 {(stack as any).notes && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{(stack as any).notes}</div>}
                               </div>
@@ -4231,13 +4239,17 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         return { id, name:sub?.name||id, dose:dos.mg+'мг', timing:dos.timing, categories:sub?.categories||[], mechanisms:sub?.mechanisms||[] };
                       });
                       const report = {
+                        id: Date.now().toString(),
                         date: new Date().toISOString(), level:supportLevel, items:planItems,
-                        substanceCount: ALL_SUBSTANCES.length, interactionCount: ALL_INTERACTIONS.length
+                        substanceCount: ALL_SUBSTANCES.length, interactionCount: ALL_INTERACTIONS.length,
+                        timestamp: Date.now()
                       };
                       const archive = JSON.parse(localStorage.getItem('he_support_reports_archive') || '[]');
-                      archive.push(report);
+                      archive.unshift(report);
                       localStorage.setItem('he_support_reports_archive', JSON.stringify(archive));
-                      localStorage.setItem('he_nutrition_report_current', JSON.stringify(report));
+                      localStorage.setItem('he_support_report_current', JSON.stringify(report));
+                      try { localStorage.setItem('he_support_reports', JSON.stringify(archive.slice(0, 20))); } catch {}
+                      try { localStorage.setItem('he_profile_support_reports', JSON.stringify(archive.slice(0, 10))); } catch {}
                       setReportGenerated(true);
                     }} style={{ width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:11 }}>📊 Сгенерировать отчёт</button>
 
@@ -4249,7 +4261,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       return (
                         <div style={{ marginTop:8 }}>
                           <div style={{ fontSize:10, fontWeight:600, color:'var(--text-dim)', marginBottom:4 }}>Архив отчётов</div>
-                          {[...archive].reverse().slice(0,10).map((r, i) => (
+                          {archive.slice(0,10).map((r, i) => (
                             <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', marginBottom:4, background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)' }}>
                               <div>
                                 <div style={{ fontSize:9, color:'var(--text-light)' }}>Отчёт {r.level || ''} · {r.items?.length || 0} препаратов</div>
@@ -4258,8 +4270,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                               <button onClick={() => {
                                 try {
                                   const arch: any[] = JSON.parse(localStorage.getItem('he_support_reports_archive') || '[]');
-                                  const rev = [...arch].reverse();
-                                  const realIdx = arch.indexOf(rev[i]);
+                                  const realIdx = arch.findIndex((x: any) => x.id === r.id);
                                   if (realIdx >= 0) { arch.splice(realIdx, 1); localStorage.setItem('he_support_reports_archive', JSON.stringify(arch)); window.location.reload(); }
                                 } catch {}
                               }} style={{ padding:'3px 6px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
@@ -4308,7 +4319,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                             <div key={stack.id} style={{ marginBottom:4, background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)', overflow:'hidden' }}>
                               <div onClick={() => setExpandedStack(isExpanded ? null : stack.id)} style={{ padding:'8px 10px', cursor:'pointer' }}>
                                 <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                                  <div style={{ flex:1, fontSize:11, fontWeight:700, color:'var(--accent)' }}>{stack.name || stack.id}</div>
+                                  <div style={{ flex:1, fontSize:11, fontWeight:700, color:'var(--accent)' }}>{getStackDisplayName(stack)}</div>
                                   <span style={{ fontSize:9, color:'var(--text-dim)', background:'rgba(255,255,255,0.05)', padding:'2px 6px', borderRadius:4 }}>{stack.substances.length} в-в</span>
                                   <span style={{ fontSize:9, color:'#00e68a', fontWeight:600 }}>{stack.synergyScore}%</span>
                                   <span style={{ fontSize:10, color:'var(--text-dim)', transform:isExpanded ? 'rotate(180deg)' : 'none' }}>▼</span>
@@ -4489,7 +4500,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Готовые стеки для быстрого старта:</div>
                       {ALL_STACKS.slice(0,3).map(stack => (
                         <div key={stack.id} onClick={() => { stack.substances.forEach(sid => { if (!enhancedSubs.includes(sid)) setEnhancedSubs(prev => [...prev, sid]); }); }} style={{ padding:'8px 10px', background:'var(--bg-secondary)', borderRadius:8, marginBottom:4, border:'1px solid var(--border)', cursor:'pointer' }}>
-                          <div style={{ fontSize:10, fontWeight:600, color:'var(--accent)' }}>{stack.name}</div>
+                          <div style={{ fontSize:10, fontWeight:600, color:'var(--accent)' }}>{getStackDisplayName(stack)}</div>
                           <div style={{ fontSize:8, color:'var(--text-dim)' }}>{stack.substances.length} веществ • {stack.synergyScore}% синергии</div>
                         </div>
                       ))}
@@ -7516,7 +7527,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                                 setShowSavedPicker(false);
                               }}
                             >
-                              <div style={{ fontSize:12, fontWeight:700, color:'var(--text-light)' }}>{stack.name}</div>
+                              <div style={{ fontSize:12, fontWeight:700, color:'var(--text-light)' }}>{getStackDisplayName(stack)}</div>
                               <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>{new Date(stack.date).toLocaleDateString('ru-RU')} · {totalItems} препаратов</div>
                               <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:4 }}>
                                 {(stack.subs || []).slice(0,8).map((id: string) => {

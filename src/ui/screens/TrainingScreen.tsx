@@ -3154,7 +3154,7 @@ export const TrainingScreen: React.FC = () => {
               };
               const updated = [report, ...trainingArchive].slice(0, 20);
               setTrainingArchive(updated);
-              localStorage.setItem('he_training_reports', JSON.stringify(updated));
+              try { localStorage.setItem('he_training_reports', JSON.stringify(updated)); } catch {}
               try { localStorage.setItem('he_training_report_current', JSON.stringify(report)); } catch {}
               setTrainingReportGenerated(true);
             }} style={{

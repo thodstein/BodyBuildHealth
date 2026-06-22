@@ -303,7 +303,7 @@ export const PharmaScreen: React.FC = () => {
             const ph = PHARMA_DB[c.substanceId];
             return { id: c.substanceId, name: ph?.name || c.substanceId, cls: ph?.class || 'other', dose: c.doseValue, freq: c.frequency, start: c.startWeek, end: c.endWeek, unit: c.doseUnit };
           });
-          const report = { id: Date.now().toString(), date: new Date().toISOString().slice(0, 10), generatedAt: new Date().toISOString(), compounds, compoundCount: compounds.length, totalWeeks: compounds.length ? Math.max(...compounds.map((c:any) => c.end || c.endWeek || 0)) : 0, totalDoseMg: compounds.reduce((s: number, c: any) => s + (c.dose || 0), 0), risk: linked.risk?.overallRaw || 0, pctPlanned: compounds.some((c: any) => c.cls === 'serm' || c.cls === 'pct_gonadotropin'), timestamp: Date.now() };
+          const report = { id: Date.now().toString(), date: new Date().toISOString().slice(0, 10), generatedAt: new Date().toISOString(), compounds, compoundCount: compounds.length, totalWeeks: compounds.length ? Math.max(...compounds.map((c:any) => c.end || c.endWeek || 0)) : 0, totalDoseMg: compounds.reduce((s: number, c: any) => s + (c.dose || 0) * ((c.end || c.endWeek || 0) - (c.start || c.startWeek || 0) + 1), 0), risk: linked.risk?.overallRaw || 0, pctPlanned: compounds.some((c: any) => c.cls === 'serm' || c.cls === 'pct_gonadotropin'), timestamp: Date.now() };
           saveArchive(report);
           try { localStorage.setItem('he_pharma_report_current', JSON.stringify(report)); } catch {}
           setCourseReportGenerated(true);

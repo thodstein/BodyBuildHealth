@@ -898,7 +898,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
       {/* Generate + save button */}
       <button onClick={() => {
         try {
-          const report = { id: Date.now().toString(), date: new Date().toISOString().slice(0,10), kcal: Math.round(totals.kcal), protein: Math.round(totals.p), fat: Math.round(totals.f), carbs: Math.round(totals.c), items: data.length, timestamp: Date.now() };
+          const report = { id: Date.now().toString(), date: new Date().toISOString().slice(0,10), kcal: Math.round(totals.kcal), protein: Math.round(totals.p), fat: Math.round(totals.f), carbs: Math.round(totals.c), items: data.length, timestamp: Date.now(), overallGrade: '—', kbjuPct: { kcal: 0, protein: 0, fat: 0, carbs: 0 }, mealCount: data.length, dietQuality: { score: 0, label: '—' }, risks: [], recommendations: [], plan: { days: [] } };
           const archive = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]');
           archive.unshift(report);
           localStorage.setItem('he_nutrition_report_archive', JSON.stringify(archive.slice(0, 20)));

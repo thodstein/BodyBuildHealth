@@ -210,6 +210,8 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
   // Month planning
   const [monthPlanMode, setMonthPlanMode] = useState(false);
+  const [monthPlan, setMonthPlan] = useState<any[]>([]);
+  const [selectedWeek, setSelectedWeek] = useState(0);
 
   // 2. Goal (synced with profile)
   const [goal, setGoal] = useState<GoalId>((s?.primaryGoal as GoalId) || 'maintenance');
@@ -715,7 +717,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   };
 
   // ─── Generate Plan ───
-  const generatePlan = (days: 1 | 3 | 7) => {
+  const generatePlan = (days: 1 | 3 | 7, weekIndex?: number) => {
     setPlanDays(days);
     const nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
     const budgetFilter = (id: BudgetLevel): number[] => {
@@ -1140,12 +1142,21 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
     if (days >= 7) {
       const week = Array.from({ length: 7 }, (_, i) => buildDay(i, trainingDays[i]));
-      setWeekPlan({ days: week, totals: {
+      const weekData = { days: week, totals: {
         kcal: week.reduce((s,d) => s + d.totals.kcal, 0),
         p: week.reduce((s,d) => s + d.totals.p, 0),
         f: week.reduce((s,d) => s + d.totals.f, 0),
         c: week.reduce((s,d) => s + d.totals.c, 0),
-      }});
+      }};
+      if (weekIndex !== undefined) {
+        const mPlan = [...monthPlan];
+        mPlan[weekIndex] = weekData;
+        setMonthPlan(mPlan);
+        if (weekIndex === 0) setWeekPlan(weekData);
+      } else {
+        setMonthPlan([]);
+        setWeekPlan(weekData);
+      }
     }
 
     // Shopping list — grouped by category
@@ -1760,11 +1771,13 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     });
     setNutritionReport(rep);
     setActiveReports(prev => prev.includes('nutrition') ? prev : [...prev, 'nutrition']);
-    // Save to archive
+    // Save to archive + current
     try {
       const arch = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]');
       arch.unshift(rep);
       localStorage.setItem('he_nutrition_report_archive', JSON.stringify(arch.slice(0, 50)));
+      localStorage.setItem('he_nutrition_report_current', JSON.stringify(rep));
+      try { localStorage.setItem('he_profile_nutrition_reports', JSON.stringify(arch.slice(0, 20))); } catch {}
     } catch {}
   };
 
@@ -2775,9 +2788,9 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       </button>
       <button onClick={() => {
         setMonthPlanMode(true);
-        // Generate 4 weekly plans
+        setMonthPlan([]);
         for (let w = 0; w < 4; w++) {
-          setTimeout(() => generatePlan(7), w * 500);
+          setTimeout(() => generatePlan(7, w), w * 500);
         }
       }} style={{
         ...greenBtn, fontSize: 10, padding: 10,
@@ -2893,7 +2906,26 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       )}
 
       {generated && planDays === 7 && weekPlan && (
-        <GlassCard title="Недельный план" icon="📋" color="#00e68a" style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
+        <GlassCard title={monthPlanMode ? `Месячный план — Неделя ${selectedWeek + 1} / 4` : 'Недельный план'} icon="📋" color="#00e68a" style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
+          {monthPlanMode && monthPlan.length > 0 && (
+            <div style={{ display:'flex', gap:4, marginBottom:8, justifyContent:'center' }}>
+              {monthPlan.map((_, wi) => (
+                <button key={wi} onClick={() => {
+                  setSelectedWeek(wi);
+                  if (monthPlan[wi]) setWeekPlan(monthPlan[wi]);
+                }} style={{
+                  padding:'5px 12px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
+                  background: selectedWeek === wi ? 'linear-gradient(135deg,#a78bfa,#7c3aed)' : '#202023',
+                  color: selectedWeek === wi ? '#fff' : 'rgba(255,255,255,0.85)',
+                  border: selectedWeek === wi ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                }}>Н{wi + 1}</button>
+              ))}
+              <button onClick={() => { setMonthPlanMode(false); setMonthPlan([]); }} style={{
+                padding:'5px 8px', borderRadius:8, fontSize:8, cursor:'pointer',
+                background:'transparent', color:'rgba(255,255,255,0.5)', border:'1px solid rgba(255,255,255,0.06)',
+              }}>✕</button>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.1)' }}>
             <span style={{ color: '#00e68a', fontWeight: 700 }}>📊 За неделю: {Math.round(weekPlan.totals.kcal)} ккал</span>
             <span style={{ color: 'rgba(255,255,255,0.85)' }}>Среднее: {Math.round(weekPlan.totals.kcal / 7)} ккал/день</span>
