@@ -1007,7 +1007,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [infoView, setInfoView] = useState<InfoView>('main');
   const [section, setSection] = useState<'home'|'generator'|'protocols'|'info'>('home');
   const [genTab, setGenTab] = useState<'calculator'|'info'>('calculator');
-  const [protocolTab, setProtocolTab] = useState<'pct'|'fertility'|'hrt'|'neuro'|'joints'|'acne'|'peptides'>('pct');
+  const [protocolTab, setProtocolTab] = useState<'pct'|'fertility'|'hrt'|'neuro'|'joints'|'acne'>('pct');
   const [infoTab, setInfoTab] = useState<string>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
@@ -1846,9 +1846,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       if (isComplexId(s.id)) return true;
       const firstCat = (s.categories||[])[0] || '';
       const nc = normCat(firstCat);
-      if (nc === 'complex' || nc === 'other') return true;
+      // Only true complexes/combos go here — NOT antiinflammatory, adaptogens, antioxidants, etc.
+      if (nc === 'complex' || nc === 'other' || firstCat === 'complex' || firstCat === 'other') return true;
       if ((s.organs||[]).some(o => (o||'').trim().toUpperCase() === 'WHOLE_BODY')) return true;
-      if (['antiinflammatory','anxiolytic','antiaging','metabolism','antioxidants','adaptogens','mood','recovery','electrolytes'].includes(nc)) return true;
       return false;
     };
     const groups: Record<string, SupportSubstance[]> = {};
@@ -2971,7 +2971,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['calculator','Калькулятор'],['info','О подборе']].map(([id,label]) => (
+            {[['calculator','🧮 Калькулятор'],['info','📖 О подборе']].map(([id,label]) => (
               <button key={id} onClick={() => { setGenTab(id as any); 
               const a: Record<string,()=>void> = {
                 calculator: ()=>{ setTab('calculator'); setSupportView('calc'); },
@@ -3077,7 +3077,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(139,92,246,0.15)', fontSize:24 }}>📋</div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:15, fontWeight:800, marginBottom:4, color:'#8b5cf6' }}>Примерные протоколы поддержки</div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>ПКТ · Фертильность · ГЗТ · Нейро · Суставы · Акне · Пептиды</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>ПКТ · Фертильность · ГЗТ · Нейро · Суставы · Акне</div>
                 </div>
                 <span style={{ color:'#8b5cf6', fontSize:18, opacity:0.6 }}>→</span>
               </div>
@@ -5592,9 +5592,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             </div>
           </div>
 
-          {/* Unified protocol sub-tab pills (7 protocols) */}
+          {/* Unified protocol sub-tab pills (6 protocols — peptides removed) */}
           <div style={{ display:'flex', gap:4, padding:'4px 0 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['pct','ПКТ','#8b5cf6'],['fertility','Фертильность','#ec4899'],['hrt','ГЗТ','#f59e0b'],['neuro','Нейро','#06b6d4'],['joints','Суставы','#22c55e'],['acne','Акне','#ef4444'],['peptides','Пептиды','#a78bfa']].map(([id,label,color]) => (
+            {[['pct','ПКТ','#8b5cf6'],['fertility','Фертильность','#ec4899'],['hrt','ГЗТ','#f59e0b'],['neuro','Нейро','#06b6d4'],['joints','Суставы','#22c55e'],['acne','Акне','#ef4444']].map(([id,label,color]) => (
               <button key={id} onClick={() => setProtocolTab(id as any)} style={{
                 padding:'7px 16px', borderRadius:22, fontSize:12, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
                 background: protocolTab === id ? color : 'var(--bg-secondary)',
@@ -5609,7 +5609,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <FertilityPCTScreen initialTab={protocolTab === 'pct' ? 'pct-plan' : protocolTab === 'hrt' ? 'hrt' : undefined} restrictToMode={protocolTab as 'pct' | 'fertility' | 'hrt'} />
           )}
 
-          {/* Content: Neuro → inline neurotoxicity */}
+          {/* Content: Neuro → inline neurotoxicity (full version) */}
           {protocolTab === 'neuro' && (
             <div style={{ paddingBottom: 70 }}>
               <div style={{ marginBottom:12 }}>
@@ -5624,35 +5624,34 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     }}>{label}</button>
                   ))}
                 </div>
-                {neuroTab === 'calc' && (
+                {neuroTab === 'calc' && (<>
                   <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
-                    {/* Compound selection */}
-                    {uniqueCompounds.length > 0 && <div style={{ marginBottom:8 }}>
+                    {uniqueCompounds.length > 0 ? (<div style={{ marginBottom:8 }}>
                       <div style={{ fontSize:10, fontWeight:700, color:'var(--text-light)', marginBottom:4 }}>Выберите соединения из курса:</div>
                       {uniqueCompounds.map(c => (
                         <label key={c.cls} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 0', fontSize:10, cursor:'pointer' }}>
                           <input type="checkbox" checked={neuroSelected.includes(c.cls)} onChange={() => setNeuroSelected(prev => prev.includes(c.cls) ? prev.filter(x => x !== c.cls) : [...prev, c.cls])} />
                           <span style={{ color:'var(--accent)', fontWeight:600 }}>{c.name}</span>
-                          <span style={{ color:'var(--text-dim)', marginLeft:'auto' }}>{c.doseWeekly} мг/нед</span>
+                          <span style={{ color:'var(--text-dim)', marginLeft:'auto', fontSize:9 }}>{c.doseWeekly} мг/нед</span>
                         </label>
                       ))}
-                    </div>}
-                    {uniqueCompounds.length === 0 && <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8, padding:8, background:'rgba(245,158,11,0.08)', borderRadius:6, border:'1px solid rgba(245,158,11,0.2)' }}>⚠ Нет активных соединений. Добавьте препараты в курсе.</div>}
-                    {/* Duration / Age inputs */}
+                    </div>) : (
+                      <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8, padding:8, background:'rgba(245,158,11,0.08)', borderRadius:6, border:'1px solid rgba(245,158,11,0.2)' }}>
+                        ⚠ Нет активных соединений. Добавьте препараты во вкладке Фарма.
+                      </div>
+                    )}
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
                       <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Длительность курса (нед)</div><input type="number" value={neuroDuration} onChange={e => setNeuroDuration(Math.max(1, Number(e.target.value)))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }} /></div>
                       <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Возраст</div><input type="number" value={neuroAge} onChange={e => setNeuroAge(Math.max(18, Number(e.target.value)))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }} /></div>
                     </div>
-                    {/* Score */}
                     <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.15)', marginBottom:8 }}>
                       <span style={{ fontSize:20 }}>🧠</span>
                       <div style={{ flex:1 }}>
                         <div style={{ fontSize:9, color:'var(--text-dim)' }}>Нейротоксичность</div>
                         <div style={{ fontSize:16, fontWeight:800, color: neuroScore > 70 ? '#ef4444' : neuroScore > 40 ? '#f59e0b' : '#22c55e' }}>{neuroScore}%</div>
                       </div>
-                      <div style={{ fontSize:10, color:'var(--text-dim)' }}>{neuroScore > 70 ? '🔴 Высокий риск' : neuroScore > 40 ? '🟡 Средний риск' : '🟢 Низкий риск'}</div>
+                      <div style={{ fontSize:10, fontWeight:700, color: neuroScore > 70 ? '#f87171' : neuroScore > 40 ? '#fbbf24' : '#4ade80' }}>{neuroScore > 70 ? '🔴 Высокий' : neuroScore > 40 ? '🟡 Средний' : '🟢 Низкий'}</div>
                     </div>
-                    {/* Dose inputs per compound */}
                     {neuroSelected.length > 0 && <div style={{ marginBottom:8 }}>
                       <div style={{ fontSize:9, fontWeight:700, color:'var(--text-light)', marginBottom:4 }}>Дозы (мг/нед):</div>
                       <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
@@ -5660,18 +5659,20 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       </div>
                     </div>}
                   </div>
-                )}
+                </>)}
                 {neuroTab === 'mechanisms' && (
                   <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
                     <div style={{ fontSize:11, fontWeight:700, color:'#ec4899', marginBottom:6 }}>⚙️ Механизмы нейротоксичности ААС</div>
                     <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                       {[
-                        { title:'Гематоэнцефалический барьер (ГЭБ)', desc:'Андрогены повышают проницаемость ГЭБ через下调 клаудинов-5 — нейтрофилы и цитокины проникают в паренхиму' },
-                        { title:'Андрогеновые рецепторы (AR)', desc:'AR экспрессируются в гиппокампе, префронтальной коре, миндалине — активация → апоптоз нейронов через каспазу-3' },
+                        { title:'Гематоэнцефалический барьер (ГЭБ)', desc:'Андрогены повышают проницаемость ГЭБ через подавление клаудинов-5 — нейтрофилы и цитокины проникают в паренхиму мозга' },
+                        { title:'Андрогеновые рецепторы (AR)', desc:'AR экспрессируются в гиппокампе, префронтальной коре, миндалине. Гиперактивация → апоптоз нейронов через каспазу-3' },
                         { title:'Эстрогеновые рецепторы (ER)', desc:'Ароматизация тестостерона в E2 → активация ERβ — нейропротективный эффект. При подавлении ароматазы — утрата защиты' },
                         { title:'Нейровоспаление', desc:'Активация микроглии через TLR4 → IL-6, TNF-α → нейрональное повреждение. 17-α алкилированные оралы — наиболее нейротоксичны' },
-                        { title:'Глутаматная эксайтотоксичность', desc:'ААС повышают глутамат в синаптической щели через抑制 EAAT2 → NMDA-рецепторы → Ca2+ influx → митохондриальная дисфункция' },
+                        { title:'Глутаматная эксайтотоксичность', desc:'ААС повышают глутамат в синаптической щели → NMDA-рецепторы → Ca²⁺ influx → митохондриальная дисфункция' },
                         { title:'Митопатический стресс', desc:'Андрогены ингибируют комплекс I-IV дыхательной цепи → ↑ ROS → повреждение митохондриальной ДНК нейронов' },
+                        { title:'BDNF подавление', desc:'Нандролон и станозолол снижают BDNF в гиппокампе на 30-50%. Нарушение CREB-BDNF-TrkB каскада → атрофия дендритов' },
+                        { title:'Дофаминовая система', desc:'Изменение экспрессии D2-рецепторов в стриатуме → ангедония, агрессия, импульсивность. Мезокортикальный путь нарушен' },
                       ].map(m => (
                         <div key={m.title} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.08)' }}>
                           <div style={{ fontSize:10, fontWeight:700, color:'#f472b6', marginBottom:2 }}>{m.title}</div>
@@ -5702,127 +5703,49 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             </div>
           )}
 
-          {/* Content: Joints → inline joints */}
+          {/* Content: Joints → full-screen view navigation */}
           {protocolTab === 'joints' && (
             <div style={{ paddingBottom: 70 }}>
-              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:8 }}>🦴 Калькулятор поддержки суставов</div>
-                <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
-                  <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Боль в суставах (0-10)</div><input type="range" min="0" max="10" value={jointPain} onChange={e => setJointPain(Number(e.target.value))} style={{ width:'100%' }} /><div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right' }}>{jointPain}/10</div></div>
-                  <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>История травм (0-5)</div><input type="range" min="0" max="5" value={injuryHistory} onChange={e => setInjuryHistory(Number(e.target.value))} style={{ width:'100%' }} /><div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right' }}>{injuryHistory}/5</div></div>
-                  <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Тренировочная нагрузка (0-5)</div><input type="range" min="0" max="5" value={trainLoad} onChange={e => setTrainLoad(Number(e.target.value))} style={{ width:'100%' }} /><div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right' }}>{trainLoad}/5</div></div>
+              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'24px 14px', border:'1px solid var(--border)', textAlign:'center' }}>
+                <div style={{ fontSize:28, marginBottom:8 }}>🦴</div>
+                <div style={{ fontSize:15, fontWeight:700, color:'#22c55e', marginBottom:6 }}>Калькулятор поддержки суставов</div>
+                <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.4, marginBottom:14, padding:'0 12px' }}>
+                  Полный калькулятор риска проблем с суставами с протоколами и рекомендациями по фармакологической поддержке
                 </div>
-                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
-                  <span style={{ fontSize:20 }}>🦴</span>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:9, color:'var(--text-dim)' }}>Риск проблем с суставами</div>
-                    <div style={{ fontSize:16, fontWeight:800, color: jointScore > 70 ? '#ef4444' : jointScore > 40 ? '#f59e0b' : '#22c55e' }}>{jointScore}%</div>
-                  </div>
-                  <div style={{ fontSize:10, color:'var(--text-dim)' }}>{jointScore > 70 ? '🔴 Высокий' : jointScore > 40 ? '🟡 Средний' : '🟢 Низкий'}</div>
-                </div>
-                <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:8, lineHeight:1.4, padding:'6px 8px', background:'rgba(245,158,11,0.06)', borderRadius:6, border:'1px solid rgba(245,158,11,0.12)' }}>
-                  📋 Протокол: Глюкозамин 1500мг + Хондроитин 1200мг + MSM 3000мг + Коллаген II типа 10г + Босвеллия 500мг + BPC-157 500мкг/д. Курс 8-12 недель.
+                <button onClick={() => setCalcView('joints')} style={{
+                  padding:'12px 24px', borderRadius:14, border:'none', cursor:'pointer',
+                  background:'linear-gradient(135deg,#22c55e,#16a34a)', color:'#fff',
+                  fontWeight:800, fontSize:12
+                }}>🦴 Открыть калькулятор →</button>
+                <div style={{ marginTop:10, fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}>
+                  Оценка боли · история травм · нагрузка · протоколы поддержки · анализы
                 </div>
               </div>
             </div>
           )}
 
-          {/* Content: Acne → inline acne */}
+          {/* Content: Acne → full-screen view navigation */}
           {protocolTab === 'acne' && (
             <div style={{ paddingBottom: 70 }}>
-              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:8 }}>🔴 Протокол акне на курсе</div>
-                <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:8 }}>
-                  {['Ниацинамид 500мг 2р/д','Медь 2мг (отдельно от цинка)','Цинк 50мг (пиколинат, на ночь)','Солярий 2р/нед по 5 мин','Клендовит гель локально','Клензит-С (адапален+клиндамицин)','Верошпирон 50мг (только при гормональном акне)'].map((item, i) => (
-                    <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
-                      <span style={{ fontSize:10 }}>💊</span>
-                      <span style={{ fontSize:9, color:'var(--text-light)' }}>{item}</span>
-                    </div>
-                  ))}
+              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'24px 14px', border:'1px solid var(--border)', textAlign:'center' }}>
+                <div style={{ fontSize:28, marginBottom:8 }}>🔴</div>
+                <div style={{ fontSize:15, fontWeight:700, color:'#ef4444', marginBottom:6 }}>Протокол акне на курсе</div>
+                <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.4, marginBottom:14, padding:'0 12px' }}>
+                  Полный протокол борьбы с акне: ниацинамид, ретиноиды, солярий, системные препараты, гигиена и уход
                 </div>
-                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>• При Верошпироне — исключить добавки калия<br/>• Солярий ≤ 2 раза/нед по 5 мин<br/>• Клендовит+Клензит-С только локально<br/>• При сильном акне — дерматолог, системные ретиноиды</div>
+                <button onClick={() => setCalcView('acne')} style={{
+                  padding:'12px 24px', borderRadius:14, border:'none', cursor:'pointer',
+                  background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff',
+                  fontWeight:800, fontSize:12
+                }}>🔴 Открыть протокол →</button>
+                <div style={{ marginTop:10, fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}>
+                  Базовые средства · местная терапия · системные препараты · солярий · гигиена · ретиноиды
+                </div>
               </div>
             </div>
           )}
 
-          {/* Content: Peptides → inline peptide calculator */}
-          {protocolTab === 'peptides' && (
-            <div style={{ paddingBottom: 70 }}>
-              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa', marginBottom:6 }}>🧬 Пептидный калькулятор</div>
-                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
-                  {[['peptides','Пептиды'],['growth','Гормон роста']].map(([id,label]) => (
-                    <button key={id} onClick={() => setPepTab(id as any)} style={{
-                      padding:'5px 10px', borderRadius:14, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                      background: pepTab === id ? '#a78bfa' : 'var(--bg-secondary)',
-                      color: pepTab === id ? '#000' : 'var(--text-dim)',
-                      border: '1px solid ' + (pepTab === id ? '#a78bfa' : 'var(--border)'),
-                    }}>{label}</button>
-                  ))}
-                </div>
-                {pepTab === 'peptides' && (
-                  <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
-                    <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Препарат</div><select value={peptideId} onChange={e => setPeptideId(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }}><option value="cjc1295">CJC-1295 DAC</option><option value="ipamorelin">Ipamorelin</option><option value="ghrp2">GHRP-2</option><option value="ghrp6">GHRP-6</option><option value="hexarelin">Hexarelin</option><option value="tesamorelin">Tesamorelin</option><option value="sermorelin">Sermorelin</option></select></div>
-                    <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Количество в флаконе</div><div style={{ display:'flex', gap:4 }}><input type="number" value={pepAmount} onChange={e => setPepAmount(Number(e.target.value))} style={{ flex:1, padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }} /><select value={pepAmountUnit} onChange={e => setPepAmountUnit(e.target.value as any)} style={{ width:60, padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }}><option value="mg">мг</option><option value="mcg">мкг</option></select></div></div>
-                    <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Объём разведения (мл)</div><input type="number" step="0.1" min="0.1" max="10" value={pepDilution} onChange={e => setPepDilution(Number(e.target.value))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }} /></div>
-                    <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Разовая доза</div><div style={{ display:'flex', gap:4 }}><input type="number" value={pepDose} onChange={e => setPepDose(Number(e.target.value))} style={{ flex:1, padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }} /><select value={pepDoseUnit} onChange={e => setPepDoseUnit(e.target.value as any)} style={{ width:60, padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }}><option value="mcg">мкг</option><option value="mg">мг</option></select></div></div>
-                    <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Шприц</div><select value={pepSyringe} onChange={e => setPepSyringe(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }}><option value="U100_1ml">U100 1мл</option><option value="U100_05ml">U100 0.5мл</option><option value="U100_03ml">U100 0.3мл</option><option value="U40_1ml">U40 1мл</option></select></div>
-                    <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Путь введения</div><select value={pepRoute} onChange={e => setPepRoute(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }}><option value="sc">Подкожно (SC)</option><option value="im">Внутримышечно (IM)</option></select></div>
-                    <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Длительность (дни)</div><input type="number" min="1" max="365" value={pepTotalDays} onChange={e => setPepTotalDays(Number(e.target.value))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }} /></div>
-                    <div>
-                      <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>📅 График дозирования</div>
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                        {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(day => {
-                          const active = pepSchedule.includes(day);
-                          return (<button key={day} onClick={() => setPepSchedule(active ? pepSchedule.filter(d => d !== day) : [...pepSchedule, day])} style={{ padding:'6px 10px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer', background: active ? 'var(--accent)' : 'var(--bg-secondary)', color: active ? '#000' : 'var(--text-dim)', border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}` }}>{day}</button>);
-                        })}
-                      </div>
-                    </div>
-                    <button onClick={() => {
-                      const pepInfo = PEPTIDE_DB[peptideId];
-                      const dilInput: DilutionInput = { amountValue: pepAmount, amountUnit: pepAmountUnit as 'mg' | 'mcg', dilutionVolumeMl: pepDilution, doseValue: pepDose, doseUnit: pepDoseUnit as 'mg' | 'mcg', syringeType: pepSyringe as any };
-                      const dilResult = computeDilution(dilInput);
-                      const doseMcg = pepDoseUnit === 'mg' ? pepDose * 1000 : pepDose;
-                      const bio = pepInfo?.bioavailability?.[pepRoute] || pepInfo?.bioavailability?.sc || { min: 50, max: 80, avg: 65 };
-                      const bioResult = computeEffectiveDose(doseMcg, bio);
-                      const pkInput: PKInput = { doseMcg, bioAvg: bio.avg, tHalfHours: pepInfo?.tHalfHours || 24, scheduleDays: pepSchedule, totalDays: pepTotalDays };
-                      const pkResult = computePK(pkInput);
-                      setPepResult({ dilution: dilResult, effective: bioResult, pk: pkResult });
-                      const proto = generatePeptideProtocol('muscle_gain');
-                      setPepProtocol(proto);
-                    }} style={{ padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#a78bfa,#7c3aed)', color:'#fff', fontWeight:700, fontSize:11 }}>🧮 РАССЧИТАТЬ</button>
-                  </div>
-                )}
-                {pepTab === 'growth' && (
-                  <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
-                    <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Препарат ГР</div><select value={growthId || 'jintropin'} onChange={e => setGrowthId(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }}><option value="jintropin">Джинтропин</option><option value="ansomon">Ансомон</option><option value="hygetropin">Хайгетропин</option><option value="somatin">Соматин</option><option value="neotropin">Неотропин</option></select></div>
-                    <div style={{ fontSize:9, color:'var(--text-dim)', padding:'6px 8px', background:'rgba(167,139,250,0.06)', borderRadius:6, border:'1px solid rgba(167,139,250,0.12)' }}>🔄 Данный модуль в разработке. Полный PK/PD калькулятор будет в версии 10.0.</div>
-                  </div>
-                )}
-                {/* Results */}
-                {pepResult && (
-                  <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:6 }}>
-                    <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.15)' }}>
-                      <div style={{ fontSize:10, fontWeight:700, color:'#c4b5fd', marginBottom:4 }}>💉 Разведение</div>
-                      <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>Доза: {pepResult.dilution.doseMcg} мкг | Концентрация: {pepResult.dilution.concentrationMcgPerMl} мкг/мл | Объём дозы: {pepResult.dilution.doseVolumeMl.toFixed(2)} мл | Единиц в шприце: {pepResult.dilution.syringeUnitsDisplay} | Доз на флакон: {pepResult.dilution.dosesPerVial.toFixed(1)}</div>
-                    </div>
-                    <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(251,191,36,0.06)', border:'1px solid rgba(251,191,36,0.15)' }}>
-                      <div style={{ fontSize:10, fontWeight:700, color:'#fcd34d', marginBottom:4 }}>📊 Биодоступность</div>
-                      <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>Эффективная доза: мин {pepResult.effective.effectiveMinMcg} мкг / средняя {pepResult.effective.effectiveAvgMcg} мкг / макс {pepResult.effective.effectiveMaxMcg} мкг</div>
-                    </div>
-                    {pepResult.pk && <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(52,211,153,0.06)', border:'1px solid rgba(52,211,153,0.15)' }}>
-                      <div style={{ fontSize:10, fontWeight:700, color:'#34d399', marginBottom:4 }}>📈 Фармакокинетика</div>
-                      <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>Cmax: {pepResult.pk.maxConcentration.toFixed(1)} | T½: {pepResult.pk.halfLifeDays.toFixed(1)} дн | Cavg: {pepResult.pk.avgConcentration.toFixed(1)} | Равновес: день {pepResult.pk.steadyStateDay}</div>
-                    </div>}
-                    {pepProtocol && <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
-                      <div style={{ fontSize:10, fontWeight:700, color:'#4ade80', marginBottom:4 }}>📋 Протокол</div>
-                      <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>Цель: {pepProtocol.goal} | Синергия: {pepProtocol.synergyScore.toFixed(1)} | Компонентов: {pepProtocol.peptides.length}</div>
-                    </div>}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          {/* Peptides tab removed — peptide calculator available via info → peptides */}
         </div>
       )}
 
