@@ -1781,14 +1781,23 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       for (const [k,v] of Object.entries(m)) if (c.includes(k)||k.includes(c)) return v;
       return cat;
     };
+    const matchesComplexesTab = (s: SupportSubstance): boolean => {
+      if (isComplexId(s.id)) return true;
+      const firstCat = (s.categories||[])[0] || '';
+      const nc = normCat(firstCat);
+      if (nc === 'complex' || nc === 'other') return true;
+      if ((s.organs||[]).some(o => (o||'').trim().toUpperCase() === 'WHOLE_BODY')) return true;
+      if (['antiinflammatory','anxiolytic','antiaging','metabolism','antioxidants','adaptogens','mood','recovery','electrolytes'].includes(nc)) return true;
+      return false;
+    };
     const groups: Record<string, SupportSubstance[]> = {};
     // Use 289 curated catalog entries directly
     let filtered = catalogSubstances;
     // Apply tier filter
     if (catalogSubTab === 'complexes') {
-      filtered = filtered.filter(s => isComplexId(s.id));
+      filtered = filtered.filter(s => matchesComplexesTab(s));
     } else {
-      filtered = filtered.filter(s => !isComplexId(s.id));
+      filtered = filtered.filter(s => !matchesComplexesTab(s));
     }
     if (supportTierFilter !== 'all') {
       filtered = filtered.filter(s => getSubstanceTier(s.id) === supportTierFilter);
@@ -1919,7 +1928,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     GUT: { key: 'gi', label: 'ЖКТ и пищеварение', emoji: '🫃' },
     BLOOD_VESSELS: { key: 'heart_vessels', label: 'Сердце и сосуды', emoji: '❤️' },
     VASCULAR: { key: 'heart_vessels', label: 'Сердце и сосуды', emoji: '❤️' },
-    WHOLE_BODY: { key: 'complexes', label: 'Комплексы', emoji: '🧩' },
+    WHOLE_BODY: { key: 'whole_body_skip', label: 'Комплексы', emoji: '🧩' },
     BONE: { key: 'joints_bones', label: 'Суставы и кости', emoji: '🦴' },
     URINARY_TRACT: { key: 'kidneys', label: 'Почки и мочевыводящие', emoji: '🫘' },
     liver: { key: 'liver', label: 'Печень', emoji: '🫁' },
@@ -1948,16 +1957,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       const organs = sub.organs || [];
       usedKeys.clear();
       if (organs.length === 0) {
-        const key = 'other';
-        if (!groups[key]) groups[key] = { key, label:'Прочее', emoji:'📦', items:[], count:0 };
-        groups[key].items.push(sub);
-        groups[key].count++;
-        continue;
+        continue; // skip items without organs
       }
       for (const org of organs) {
         const normOrg = (org||'').trim();
         const mapping = ORGAN_CATEGORY_MAP[normOrg];
         if (mapping) {
+          if (mapping.key === 'whole_body_skip') continue; // skip complexes in organ view
           if (usedKeys.has(mapping.key)) continue;
           usedKeys.add(mapping.key);
           if (!groups[mapping.key]) groups[mapping.key] = { key: mapping.key, label: mapping.label, emoji: mapping.emoji, items: [], count: 0 };
@@ -3612,10 +3618,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                  return sub.organs.some(o => {
                                    const norm = (o||'').trim().toUpperCase();
                                    const mapping = ORGAN_CATEGORY_MAP[norm];
-                                   return mapping?.key === synergyOrganFilter;
-                                 });
-                               };
-                               return checkOrg(i.substanceA) || checkOrg(i.substanceB);
+                                    return mapping?.key === synergyOrganFilter;
+                                  });
+                                };
+                                return checkOrg(i.substanceA) || checkOrg(i.substanceB);
                              });
                            }
                            if (synergyMechFilter) {
@@ -3738,8 +3744,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               return (
               <div>
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  {[['mystacks','📂 Мои стеки'],['plan','📋 План'],['reports','📊 Отчеты']].map(([id,label]) => (
-                    <button key={id} onClick={() => setCalcView(id as CalcView)} style={{
+                  {[['mystacks','📂 Мои стеки','generator'],['plan','📋 План','generator'],['reports','📊 Отчеты','generator']].map(([id,label,sectionTarget]) => (
+                    <button key={id} onClick={() => { setSection(sectionTarget as any); setTab('main'); setSupportView('calc'); setCalcView(id as CalcView); }} style={{
                       padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
                       background: calcView === id ? 'var(--accent)' : 'var(--bg-secondary)',
                       color: calcView === id ? '#000' : 'var(--text-dim)',
@@ -3784,7 +3790,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               <div>
                 {/* Sub-tabs: Все стеки / Замена / Поиск */}
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  {[['readystacks','📦 Все стеки'],['replace','🔄 Замена'],['search','🔍 Поиск']].map(([id,label]) => (
+                  {[['readystacks','📦 Все стеки'],['generator','⚡ Генератор стеков'],['replace','🔀 Подбор замены'],['search','🔍 Поиск препарата']].map(([id,label]) => (
                     <button key={id} onClick={() => {
                       setStackSubTab(id);
                     }} style={{
@@ -3884,107 +3890,290 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
                 )}
 
-                {/* REPLACEMENT CALCULATOR */}
-                {stackSubTab === 'replace' && (
+                {stackSubTab === 'generator' && (
                   <div style={{ padding:'0 4px' }}>
-                    <div style={{ fontSize:12, fontWeight:700, color:'#a78bfa', marginBottom:6 }}>🔄 Калькулятор замены препарата</div>
-                    <div style={{ position:'relative', marginBottom:8 }}>
-                      <input value={replaceSearch} onChange={e => setReplaceSearch(e.target.value)}
-                        placeholder="🔍 Введите название препарата для замены..."
-                        style={{ width:'100%', padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
-                      {replaceSearch && replaceResults.length === 0 && (
-                        <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:150, overflowY:'auto', marginTop:1 }}>
-                          {ALL_SUBSTANCES.filter(s => (s.name||'').toLowerCase().includes(replaceSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(replaceSearch.toLowerCase())).slice(0,8).map(s => (
-                            <div key={s.id} onClick={() => { setReplaceSelectedSub(s.id); setReplaceSearch(s.name); setReplaceResults(findReplacements(s.id)); }} style={{ padding:'7px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid var(--border)' }}>
-                              <span style={{ fontWeight:600, color:'var(--text)' }}>{s.name}</span>
-                              <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>{s.id}</span>
+                    <div style={{ marginBottom:10, background:'linear-gradient(135deg,rgba(0,230,138,0.08),rgba(0,180,100,0.04))', borderRadius:12, padding:'14px 12px', border:'1px solid rgba(0,230,138,0.12)' }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:'#00e68a', marginBottom:4 }}>⚡ Генератор стеков</div>
+                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', lineHeight:1.4 }}>Соберите индивидуальный стек поддержки из базы {ALL_SUBSTANCES.length} веществ с проверкой синергий и конфликтов</div>
+                    </div>
+                    <div style={{ marginBottom:8, background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)', padding:'10px 12px' }}>
+                      <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:6 }}>Выбранные препараты ({enhancedSubs.length})</div>
+                      {enhancedSubs.length === 0 ? (
+                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', textAlign:'center', padding:10 }}>Нажмите + в каталоге или калькуляторе замены</div>
+                      ) : (
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                          {enhancedSubs.map(sid => {
+                            const sub = ALL_SUBSTANCES.find(x => x.id === sid);
+                            return (
+                              <div key={sid} style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'3px 8px', borderRadius:6, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.12)' }}>
+                                <span style={{ fontSize:9, color:'#00e68a', fontWeight:600 }}>{sub?.name || sid.replace(/_/g,' ')}</span>
+                                <span onClick={() => setEnhancedSubs(prev => prev.filter(x => x !== sid))} style={{ fontSize:10, cursor:'pointer', color:'rgba(255,255,255,0.3)' }}>×</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <input value={stackSearch} onChange={e => setStackSearch(e.target.value)}
+                        placeholder="🔍 Добавить препарат по названию..."
+                        style={{ width:'100%', padding:'8px 10px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, boxSizing:'border-box', marginTop:6 }} />
+                      {stackSearch && (
+                        <div style={{ marginTop:4, maxHeight:120, overflowY:'auto' }}>
+                          {ALL_SUBSTANCES.filter(s => (s.name||'').toLowerCase().includes(stackSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(stackSearch.toLowerCase())).slice(0,5).map(s => (
+                            <div key={s.id} onClick={() => { if (!enhancedSubs.includes(s.id)) setEnhancedSubs(prev => [...prev, s.id]); setStackSearch(''); }} style={{ padding:'6px 8px', borderRadius:4, cursor:'pointer', fontSize:9, borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                              <span style={{ color:'var(--text-light)', fontWeight:600 }}>{s.name}</span>
+                              <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>{s.id}</span>
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
-                    {replaceSelectedSub && (
-                      <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.15)' }}>
-                        <div style={{ fontSize:10, fontWeight:700, color:'#a78bfa' }}>{getSubstanceName(replaceSelectedSub)}</div>
-                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>Механизмы: {(findSubstance(replaceSelectedSub)?.mechanisms||[]).map((m:string)=>MECH_LABELS[m]||MECH_TRANSLATIONS_RU[m]||m).join(', ') || '—'}</div>
-                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>Органы: {(findSubstance(replaceSelectedSub)?.organs||[]).join(', ') || '—'}</div>
-                      </div>
+                    {enhancedSubs.length >= 2 && (() => {
+                      const checked: Array<{a:string;b:string;type:string;effect:string;severity:string}> = [];
+                      for (let i = 0; i < enhancedSubs.length; i++) {
+                        for (let j = i + 1; j < enhancedSubs.length; j++) {
+                          const key = `${enhancedSubs[i]}||${enhancedSubs[j]}`;
+                          const rev = `${enhancedSubs[j]}||${enhancedSubs[i]}`;
+                          const intx = conflictLookup.get(key) || conflictLookup.get(rev);
+                          if (intx) checked.push({ a: enhancedSubs[i], b: enhancedSubs[j], type: intx.type, effect: intx.effect, severity: intx.severity });
+                          const syn = SYNERGY_PAIRS.find(sp => (sp.substanceA === enhancedSubs[i] && sp.substanceB === enhancedSubs[j]) || (sp.substanceA === enhancedSubs[j] && sp.substanceB === enhancedSubs[i]));
+                          if (syn) checked.push({ a: enhancedSubs[i], b: enhancedSubs[j], type: 'synergy', effect: syn.mechanism, severity: syn.strength >= 7 ? 'HIGH' : syn.strength >= 4 ? 'MEDIUM' : 'LOW' });
+                        }
+                      }
+                      const synergies = checked.filter(c => c.type === 'synergy');
+                      const conflicts = checked.filter(c => c.type === 'conflict' || c.type === 'caution');
+                      return (
+                        <div style={{ marginBottom:8 }}>
+                          {synergies.length > 0 && (
+                            <div style={{ marginBottom:6, background:'rgba(34,197,94,0.04)', borderRadius:10, border:'1px solid rgba(34,197,94,0.1)', padding:'8px 10px' }}>
+                              <div style={{ fontSize:9, fontWeight:600, color:'#22c55e', marginBottom:4 }}>⊕ Синергии ({synergies.length})</div>
+                              {synergies.map((s,i) => (
+                                <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.4, padding:'2px 0' }}>
+                                  • {getStackSubLabel(s.a)} + {getStackSubLabel(s.b)} — {s.effect}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {conflicts.length > 0 && (
+                            <div style={{ background:'rgba(239,68,68,0.04)', borderRadius:10, border:'1px solid rgba(239,68,68,0.1)', padding:'8px 10px' }}>
+                              <div style={{ fontSize:9, fontWeight:600, color:'#ef4444', marginBottom:4 }}>⊖ Конфликты ({conflicts.length})</div>
+                              {conflicts.map((c,i) => (
+                                <div key={i} style={{ fontSize:8, color:'#f87171', lineHeight:1.4, padding:'2px 0' }}>
+                                  • {getStackSubLabel(c.a)} + {getStackSubLabel(c.b)} — {c.effect}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    {enhancedSubs.length >= 2 && (
+                      <button onClick={() => {
+                        const stack = {
+                          id: 'custom_' + Date.now(),
+                          name: `Кастомный стек (${enhancedSubs.length} в-в)`,
+                          substances: enhancedSubs,
+                          effects: [],
+                          synergyScore: 80,
+                          description: 'Собран вручную из каталога поддержки',
+                        };
+                        alert('✅ Стек готов к использованию');
+                      }} style={{ width:'100%', padding:'10px', borderRadius:8, cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:11, border:'none' }}>
+                        Собрать стек
+                      </button>
                     )}
+                    <div style={{ marginTop:8 }}>
+                      <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Готовые стеки для быстрого старта:</div>
+                      {ALL_STACKS.slice(0,3).map(stack => (
+                        <div key={stack.id} onClick={() => { stack.substances.forEach(sid => { if (!enhancedSubs.includes(sid)) setEnhancedSubs(prev => [...prev, sid]); }); }} style={{ padding:'8px 10px', background:'var(--bg-secondary)', borderRadius:8, marginBottom:4, border:'1px solid var(--border)', cursor:'pointer' }}>
+                          <div style={{ fontSize:10, fontWeight:600, color:'var(--accent)' }}>{stack.name}</div>
+                          <div style={{ fontSize:8, color:'var(--text-dim)' }}>{stack.substances.length} веществ • {stack.synergyScore}% синергии</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* REPLACEMENT CALCULATOR — Apple-style cards */}
+                {stackSubTab === 'replace' && (
+                  <div style={{ padding:'0 4px' }}>
+                    <div style={{ marginBottom:10, background:'linear-gradient(135deg,rgba(167,139,250,0.08),rgba(139,92,246,0.04))', borderRadius:12, padding:'14px 12px', border:'1px solid rgba(167,139,250,0.12)' }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>🔀 Подбор замены</div>
+                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', lineHeight:1.3 }}>Найдите аналоги и альтернативы любому препарату поддержки по механизму действия и эффекту</div>
+                    </div>
+
+                    {/* Selection card */}
+                    <div style={{ marginBottom:10, background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)', overflow:'hidden' }}>
+                      <div style={{ padding:'10px 12px' }}>
+                        <div style={{ fontSize:9, fontWeight:600, color:'var(--text-dim)', marginBottom:6 }}>ВЫБЕРИТЕ ПРЕПАРАТ</div>
+                        <div style={{ position:'relative' }}>
+                          <input value={replaceSearch} onChange={e => { setReplaceSearch(e.target.value); if (e.target.value.length >= 2) setReplaceResults(findReplacements(e.target.value)); }} placeholder="🔍 Начните вводить название..."
+                            autoComplete="off"
+                            style={{ width:'100%', padding:'10px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
+                          {replaceSearch.length >= 2 && (
+                            <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:8, maxHeight:180, overflowY:'auto', marginTop:2, boxShadow:'0 4px 12px rgba(0,0,0,0.2)' }}>
+                              {ALL_SUBSTANCES.filter(s => (s.name||'').toLowerCase().includes(replaceSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(replaceSearch.toLowerCase())).slice(0,6).map(s => (
+                                <div key={s.id} onClick={() => { setReplaceSelectedSub(s.id); setReplaceSearch(s.name || s.id); setReplaceResults(findReplacements(s.id)); }} style={{ padding:'8px 10px', cursor:'pointer', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                                  <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{s.name}</div>
+                                  <div style={{ fontSize:7, color:'var(--text-dim)' }}>{(s.categories||[]).slice(0,3).join(' • ') || s.id}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Selected substance detail */}
+                      {replaceSelectedSub && (
+                        <div style={{ padding:'8px 12px 10px', borderTop:'1px solid var(--border)', background:'rgba(167,139,250,0.03)' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                            <span style={{ fontSize:16 }}>🧪</span>
+                            <div>
+                              <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa' }}>{getSubstanceName(replaceSelectedSub)}</div>
+                              <div style={{ fontSize:8, color:'var(--text-dim)' }}>{(findSubstance(replaceSelectedSub)?.organs||[]).join(', ') || '—'}</div>
+                            </div>
+                          </div>
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
+                            {(findSubstance(replaceSelectedSub)?.mechanisms||[]).slice(0,4).map((m:string,i:number) => (
+                              <span key={i} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(167,139,250,0.1)', color:'#a78bfa', border:'1px solid rgba(167,139,250,0.15)' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Results */}
                     {replaceResults.length > 0 && (
-                      <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Найдено замен: {replaceResults.length}</div>
-                    )}
-                    {replaceResults.filter(r => r.id !== replaceSelectedSub).slice(0,20).map(r => (
-                      <div key={r.id} style={{ marginBottom:4, padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                          <span style={{ fontWeight:700, fontSize:10, color:'#00e68a' }}>{getSubstanceName(r.id)}</span>
-                          <span style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background:r.score >= 70 ? 'rgba(34,197,94,0.15)' : r.score >= 40 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)', color:r.score >= 70 ? '#22c55e' : r.score >= 40 ? '#f59e0b' : '#ef4444', fontWeight:700 }}>{r.score}%</span>
-                        </div>
-                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', marginBottom:2 }}>{r.reason}</div>
-                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>
-                          {r.pros.length > 0 && <span style={{ color:'#22c55e' }}>+ {r.pros.join(', ')}</span>}
-                          {r.cons.length > 0 && <span style={{ color:'#ef4444', marginLeft:6 }}>− {r.cons.join(', ')}</span>}
-                        </div>
-                        <button onClick={() => {
-                          if (!enhancedSubs.includes(r.id)) setEnhancedSubs(prev => [...prev, r.id]);
-                        }} style={{ marginTop:4, padding:'3px 8px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(0,230,138,0.1)', color:'#00e68a', fontSize:8, fontWeight:600 }}>+ Добавить в стек</button>
+                      <div style={{ marginBottom:6, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                        <span style={{ fontSize:9, color:'var(--text-dim)' }}>Найдено замен: <b style={{color:'#a78bfa'}}>{replaceResults.length}</b></span>
                       </div>
-                    ))}
+                    )}
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {replaceResults.filter(r => r.id !== replaceSelectedSub).slice(0,20).map(r => {
+                        const matches = r.score >= 70 ? 'high' : r.score >= 40 ? 'med' : 'low';
+                        const accentColor = matches === 'high' ? '#22c55e' : matches === 'med' ? '#f59e0b' : '#ef4444';
+                        const bgColor = matches === 'high' ? 'rgba(34,197,94,0.04)' : matches === 'med' ? 'rgba(245,158,11,0.04)' : 'rgba(239,68,68,0.04)';
+                        const borderColor = matches === 'high' ? 'rgba(34,197,94,0.12)' : matches === 'med' ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)';
+                        return (
+                          <div key={r.id} style={{ background:bgColor, borderRadius:12, border:'1px solid '+borderColor, overflow:'hidden' }}>
+                            <div style={{ padding:'10px 12px' }}>
+                              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                  <span style={{ fontSize:10, fontWeight:700, color:'var(--text-light)' }}>{getSubstanceName(r.id)}</span>
+                                  {(() => {
+                                    const sub = ALL_SUBSTANCES.find(x => x.id === r.id);
+                                    if (!sub) return null;
+                                    const tier = getSubstanceTier(sub.id);
+                                    const tierLabel = tier === 'core' ? 'ЯДРО' : tier === 'standard' ? 'СТАНДАРТ' : tier === 'advanced' ? 'ПРОДВИНУТЫЙ' : tier === 'specialty' ? 'РЕЦЕПТ' : null;
+                                    return tierLabel ? <span style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background:'rgba(255,255,255,0.06)', color:'var(--text-dim)', marginLeft:4 }}>{tierLabel}</span> : null;
+                                  })()}
+                                </div>
+                                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                                  <span style={{ fontSize:7, padding:'2px 6px', borderRadius:4, background:accentColor+'22', color:accentColor, fontWeight:700 }}>{r.score}%</span>
+                                </div>
+                              </div>
+                              <div style={{ fontSize:8, color:'rgba(255,255,255,0.65)', lineHeight:1.3, marginBottom:4 }}>{r.reason}</div>
+                              <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:4 }}>
+                                {(ALL_SUBSTANCES.find(x => x.id === r.id)?.mechanisms||[]).slice(0,4).map((m:string,mi:number) => (
+                                  <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background:accentColor+'15', color:accentColor, border:'1px solid '+accentColor+'20' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m}</span>
+                                ))}
+                              </div>
+                              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                                {r.pros.length > 0 && <span style={{ fontSize:7, color:'#22c55e', fontWeight:500 }}>✓ {r.pros.slice(0,3).join(', ')}</span>}
+                                {r.cons.length > 0 && <span style={{ fontSize:7, color:'#ef4444', fontWeight:500 }}>✗ {r.cons.slice(0,3).join(', ')}</span>}
+                              </div>
+                              <button onClick={() => { if (!enhancedSubs.includes(r.id)) setEnhancedSubs(prev => [...prev, r.id]); }} style={{ marginTop:6, padding:'5px 12px', borderRadius:6, border:'1px solid rgba(0,230,138,0.2)', cursor:'pointer', background:'rgba(0,230,138,0.06)', color:'#00e68a', fontSize:8, fontWeight:700, width:'100%' }}>+ Добавить в стек</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                     {replaceSelectedSub && replaceResults.length === 0 && (
-                      <div style={{ padding:16, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Замен не найдено. Попробуйте другой препарат.</div>
+                      <div style={{ padding:20, textAlign:'center', background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)' }}>
+                        <div style={{ fontSize:24, marginBottom:4 }}>🔍</div>
+                        <div style={{ fontSize:10, color:'var(--text-dim)' }}>Замен не найдено для <b style={{color:'var(--text-light)'}}>{getSubstanceName(replaceSelectedSub)}</b></div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:4 }}>Попробуйте другой препарат или используйте Поиск препарата</div>
+                      </div>
                     )}
                   </div>
                 )}
 
-                {/* SEARCH CALCULATOR */}
+                {/* SEARCH CALCULATOR — Apple-style cards */}
                 {stackSubTab === 'search' && (
                   <div style={{ padding:'0 4px' }}>
-                    <div style={{ fontSize:12, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🔍 Поиск препарата/стека/комплекса</div>
-                    <div style={{ marginBottom:6 }}>
-                      <label style={{ fontSize:8, color:'var(--text-dim)', marginBottom:2, display:'block' }}>Орган-мишень</label>
-                      <select value={searchOrgan} onChange={e => setSearchOrgan(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
-                        <option value="">Любой</option>
-                        {[...new Set(Object.values(ORGAN_CATEGORY_MAP).map(v => v.key))].map(k => (
-                          <option key={k} value={k}>{ORGAN_CATEGORY_MAP[Object.entries(ORGAN_CATEGORY_MAP).find(([,v]) => v.key === k)?.[0] || '']?.label || k}</option>
-                        ))}
-                      </select>
+                    <div style={{ marginBottom:10, background:'linear-gradient(135deg,rgba(59,130,246,0.08),rgba(37,99,235,0.04))', borderRadius:12, padding:'14px 12px', border:'1px solid rgba(59,130,246,0.12)' }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:'#60a5fa', marginBottom:2 }}>🔍 Поиск препарата</div>
+                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', lineHeight:1.3 }}>Найдите препараты, стеки и комплексы по органу-мишени, механизму действия или эффекту</div>
                     </div>
-                    <div style={{ marginBottom:6 }}>
-                      <label style={{ fontSize:8, color:'var(--text-dim)', marginBottom:2, display:'block' }}>Механизм действия</label>
-                      <select value={searchMech} onChange={e => setSearchMech(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
-                        <option value="">Любой</option>
-                        {[...new Set(ALL_SUBSTANCES.flatMap(s => s.mechanisms||[]))].filter(Boolean).sort().slice(0,30).map(m => (
-                          <option key={m} value={m}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div style={{ marginBottom:8 }}>
-                      <label style={{ fontSize:8, color:'var(--text-dim)', marginBottom:2, display:'block' }}>Эффект/проблема</label>
-                      <input value={searchEffect} onChange={e => setSearchEffect(e.target.value)} placeholder="Например: защита печени, антиоксидант, энергия..." style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
-                    </div>
-                    <button onClick={() => setSearchResults(doSearch(searchOrgan, searchMech, searchEffect))} disabled={!searchOrgan && !searchMech && !searchEffect.trim()} style={{ width:'100%', padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'#fff', fontWeight:700, fontSize:10, marginBottom:8, opacity:(!searchOrgan && !searchMech && !searchEffect.trim()) ? 0.5 : 1 }}>🔍 НАЙТИ</button>
-                    {searchResults.length > 0 && (
+
+                    {/* Filters card */}
+                    <div style={{ marginBottom:10, background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)', padding:'10px 12px' }}>
+                      <div style={{ fontSize:9, fontWeight:600, color:'var(--text-dim)', marginBottom:8 }}>ПАРАМЕТРЫ ПОИСКА</div>
+                      <div style={{ marginBottom:6 }}>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:2 }}>Орган-мишень</div>
+                        <select value={searchOrgan} onChange={e => setSearchOrgan(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
+                          <option value="">Любой</option>
+                          {[...new Set(Object.values(ORGAN_CATEGORY_MAP).map(v => v.key))].map(k => {
+                            const firstKey = Object.entries(ORGAN_CATEGORY_MAP).find(([,v]) => v.key === k)?.[0] || '';
+                            return <option key={k} value={k}>{ORGAN_CATEGORY_MAP[firstKey]?.label || k}</option>;
+                          })}
+                        </select>
+                      </div>
+                      <div style={{ marginBottom:6 }}>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:2 }}>Механизм действия</div>
+                        <select value={searchMech} onChange={e => setSearchMech(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
+                          <option value="">Любой</option>
+                          {[...new Set(ALL_SUBSTANCES.flatMap(s => s.mechanisms||[]))].filter(Boolean).sort().slice(0,30).map(m => (
+                            <option key={m} value={m}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m}</option>
+                          ))}
+                        </select>
+                      </div>
                       <div>
-                        <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Найдено: {searchResults.length}</div>
-                        {searchResults.slice(0,30).map(r => (
-                          <div key={r.id} style={{ marginBottom:4, padding:'8px 10px', borderRadius:8, background: r.type === 'stack' ? 'rgba(0,230,138,0.04)' : r.type === 'complex' ? 'rgba(139,92,246,0.04)' : 'var(--bg-secondary)', border:'1px solid var(--border)' }}>
-                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                              <div>
-                                <span style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background: r.type === 'stack' ? 'rgba(0,230,138,0.1)' : r.type === 'complex' ? 'rgba(139,92,246,0.1)' : 'rgba(59,130,246,0.1)', color: r.type === 'stack' ? '#00e68a' : r.type === 'complex' ? '#a78bfa' : '#60a5fa', fontWeight:600, marginRight:4 }}>{r.type === 'stack' ? 'СТЕК' : r.type === 'complex' ? 'КОМПЛЕКС' : 'ПРЕПАРАТ'}</span>
-                                <span style={{ fontWeight:700, fontSize:10, color:'var(--text-light)' }}>{r.name}</span>
-                              </div>
-                              <span style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background: r.score >= 70 ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', color: r.score >= 70 ? '#22c55e' : '#f59e0b', fontWeight:700 }}>{r.score}%</span>
-                            </div>
-                            <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', lineHeight:1.3 }}>{r.reason}</div>
-                            {r.type === 'stack' && r.substanceCount && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2 }}>{r.substanceCount} веществ</div>}
-                            {r.pros && r.pros.length > 0 && <div style={{ fontSize:8, color:'#22c55e', marginTop:2 }}>+ {r.pros.join(', ')}</div>}
-                            {r.cons && r.cons.length > 0 && <div style={{ fontSize:8, color:'#ef4444' }}>− {r.cons.join(', ')}</div>}
-                            {r.type === 'substance' && <button onClick={() => { if (!enhancedSubs.includes(r.id)) setEnhancedSubs(prev => [...prev, r.id]); }} style={{ marginTop:4, padding:'3px 8px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(0,230,138,0.1)', color:'#00e68a', fontSize:8, fontWeight:600 }}>+ Добавить в стек</button>}
-                          </div>
-                        ))}
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:2 }}>Эффект/проблема</div>
+                        <input value={searchEffect} onChange={e => setSearchEffect(e.target.value)} placeholder="Например: защита печени, антиоксидант..." style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
+                      </div>
+                      <button onClick={() => setSearchResults(doSearch(searchOrgan, searchMech, searchEffect))} disabled={!searchOrgan && !searchMech && !searchEffect.trim()} style={{ width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'#fff', fontWeight:700, fontSize:11, marginTop:8, opacity:(!searchOrgan && !searchMech && !searchEffect.trim()) ? 0.5 : 1, transition:'opacity 0.2s' }}>
+                        🔍 НАЙТИ
+                      </button>
+                    </div>
+
+                    {/* Results */}
+                    {searchResults.length > 0 && (
+                      <div style={{ marginBottom:6, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                        <span style={{ fontSize:9, color:'var(--text-dim)' }}>Найдено: <b style={{color:'#60a5fa'}}>{searchResults.length}</b></span>
                       </div>
                     )}
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {searchResults.slice(0,30).map(r => {
+                        const typeColor = r.type === 'stack' ? '#00e68a' : r.type === 'complex' ? '#a78bfa' : '#60a5fa';
+                        const typeBg = r.type === 'stack' ? 'rgba(0,230,138,0.04)' : r.type === 'complex' ? 'rgba(167,139,250,0.04)' : 'rgba(59,130,246,0.04)';
+                        const typeBorder = r.type === 'stack' ? 'rgba(0,230,138,0.12)' : r.type === 'complex' ? 'rgba(167,139,250,0.12)' : 'rgba(59,130,246,0.12)';
+                        return (
+                          <div key={r.id} style={{ background:typeBg, borderRadius:12, border:'1px solid '+typeBorder, overflow:'hidden' }}>
+                            <div style={{ padding:'10px 12px' }}>
+                              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:3 }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                                  <span style={{ fontSize:7, padding:'2px 6px', borderRadius:3, background:typeColor+'22', color:typeColor, fontWeight:700 }}>{r.type === 'stack' ? 'СТЕК' : r.type === 'complex' ? 'КОМПЛЕКС' : 'ПРЕПАРАТ'}</span>
+                                  <span style={{ fontSize:10, fontWeight:700, color:'var(--text-light)' }}>{r.name}</span>
+                                </div>
+                                <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:r.score >= 70 ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', color:r.score >= 70 ? '#22c55e' : '#f59e0b', fontWeight:700 }}>{r.score}%</span>
+                              </div>
+                              <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', lineHeight:1.3 }}>{r.reason}</div>
+                              {r.type === 'stack' && r.substanceCount && <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:3 }}>{r.substanceCount} веществ</div>}
+                              {r.pros && r.pros.length > 0 && <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginTop:3 }}>{r.pros.slice(0,4).map((p,i) => <span key={i} style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background:'rgba(34,197,94,0.1)', color:'#22c55e' }}>✓ {p}</span>)}</div>}
+                              {r.type === 'substance' && (
+                                <button onClick={() => { if (!enhancedSubs.includes(r.id)) setEnhancedSubs(prev => [...prev, r.id]); }} style={{ marginTop:6, padding:'5px 12px', borderRadius:6, border:'1px solid rgba(0,230,138,0.2)', cursor:'pointer', background:'rgba(0,230,138,0.06)', color:'#00e68a', fontSize:8, fontWeight:700, width:'100%' }}>+ Добавить в стек</button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                     {searchResults.length === 0 && (searchOrgan || searchMech || searchEffect.trim()) && (
-                      <div style={{ padding:16, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Ничего не найдено. Попробуйте изменить параметры поиска.</div>
+                      <div style={{ padding:20, textAlign:'center', background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)' }}>
+                        <div style={{ fontSize:24, marginBottom:4 }}>🔍</div>
+                        <div style={{ fontSize:10, color:'var(--text-dim)' }}>Ничего не найдено</div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:4 }}>Попробуйте изменить параметры поиска</div>
+                      </div>
                     )}
                   </div>
                 )}

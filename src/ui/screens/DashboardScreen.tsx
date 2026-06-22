@@ -10,7 +10,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
     <div style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', display:'flex', flexDirection:'column', overflow:'hidden', background:'#000' }}>
       <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', objectPosition:'center' }} />
       <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.85) 100%)' }} />
-      <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'0 16px 24px' }}>
+      <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'center', padding:'0 16px 60px' }}>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
           {[
             { id:'profile' as ScreenId, icon:'👤', label:'Профиль', color:'#a78bfa' },
