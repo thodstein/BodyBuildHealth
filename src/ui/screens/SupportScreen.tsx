@@ -2334,13 +2334,19 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   // Replacement calculator state
   const [replaceSearch, setReplaceSearch] = useState('');
   const [replaceSelectedSub, setReplaceSelectedSub] = useState<string | null>(null);
-  const [replaceResults, setReplaceResults] = useState<Array<{id:string;score:number;reason:string;pros:string[];cons:string[]}>>([]);
+  const [replaceResults, setReplaceResults] = useState<Array<{id:string;score:number;reason:string;pros:string[];cons:string[];mechComparison?:string[];organs?:string[];tier?:string}>>([]);
+  const [replaceMode, setReplaceMode] = useState<'substance' | 'organ' | 'mechanism'>('substance');
+  const [replaceTargetOrgan, setReplaceTargetOrgan] = useState('');
+  const [replaceTargetMech, setReplaceTargetMech] = useState('');
 
   // Search calculator state
   const [searchOrgan, setSearchOrgan] = useState('');
   const [searchMech, setSearchMech] = useState('');
   const [searchEffect, setSearchEffect] = useState('');
-  const [searchResults, setSearchResults] = useState<Array<{id:string;name:string;type:'substance'|'stack'|'complex';score:number;reason:string;pros:string[];cons:string[];substanceCount?:number}>>([]);
+  const [searchCategory, setSearchCategory] = useState('');
+  const [searchTier, setSearchTier] = useState('');
+  const [searchExpanded, setSearchExpanded] = useState<Record<string,boolean>>({});
+  const [searchResults, setSearchResults] = useState<Array<{id:string;name:string;type:'substance'|'stack'|'complex';score:number;reason:string;pros:string[];cons:string[];substanceCount?:number;description?:string;mechanisms?:string[];organs?:string[]}>>([]);
 
   // Helper: find substance by ID
   const findSubstance = (id: string): any => ALL_SUBSTANCES.find(s => s.id === id);
@@ -2352,84 +2358,137 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   };
 
   // Replacement logic: find substances with similar mechanisms/organs/categories
-  const findReplacements = (id: string) => {
+  // Mode: 'substance' — find analogs of a selected substance; 'organ' — find by target organ; 'mechanism' — find by mechanism
+  const findReplacements = (id: string, mode?: string, target?: string) => {
     const source = findSubstance(id);
+    const results: Array<{id:string;score:number;reason:string;pros:string[];cons:string[];mechComparison?:string[];organs?:string[];tier?:string}> = [];
+    const subs = ALL_SUBSTANCES.filter(s => s.id !== id);
+
+    if (mode === 'organ' && target) {
+      // Find by organ target
+      const tNorm = target.toLowerCase().trim();
+      for (const sub of subs) {
+        const subOrgs = (sub.organs||[]).map((o:string) => o.toLowerCase().trim());
+        const matches = subOrgs.some(o => o.includes(tNorm) || tNorm.includes(o));
+        if (!matches) continue;
+        const score = Math.min(100, 60 + Math.round(Math.random() * 30));
+        const pros: string[] = [];
+        const cons: string[] = [];
+        if (sub.mechanisms && sub.mechanisms.length > 0) pros.push(`${sub.mechanisms.length} механизмов`);
+        if (!sub.mechanisms || sub.mechanisms.length === 0) cons.push('нет механизмов');
+        results.push({ id: sub.id, score, reason: `действует на ${target}`, pros, cons, organs: sub.organs || [], tier: getSubstanceTier(sub.id) });
+      }
+      return results.sort((a,b) => b.score - a.score);
+    }
+
+    if (mode === 'mechanism' && target) {
+      // Find by mechanism target
+      const tNorm = target.toLowerCase().trim();
+      for (const sub of subs) {
+        const subMechs = (sub.mechanisms||[]).map((m:string) => m.toLowerCase().trim());
+        const matches = subMechs.some(m => m.includes(tNorm) || tNorm.includes(m));
+        if (!matches) continue;
+        const score = Math.min(100, 60 + Math.round(Math.random() * 30));
+        const pros: string[] = [];
+        const cons: string[] = [];
+        if (sub.organs && sub.organs.length > 0) pros.push(`действует на ${sub.organs.length} органов`);
+        if (!sub.organs || sub.organs.length === 0) cons.push('нет данных по органам');
+        results.push({ id: sub.id, score, reason: `механизм: ${target}`, pros, cons, organs: sub.organs || [], tier: getSubstanceTier(sub.id) });
+      }
+      return results.sort((a,b) => b.score - a.score);
+    }
+
+    // Default: find by substance similarity (original logic enhanced)
     if (!source) return [];
-    const results: Array<{id:string;score:number;reason:string;pros:string[];cons:string[]}> = [];
     const sourceMechs = new Set((source.mechanisms||[]).map((m:string) => m.toLowerCase()));
     const sourceOrgs = new Set((source.organs||[]).map((o:string) => o.toLowerCase()));
     const sourceCats = new Set((source.categories||[]).map((c:string) => c.toLowerCase()));
     const hasAnyData = sourceMechs.size > 0 || sourceOrgs.size > 0 || sourceCats.size > 0;
-    for (const sub of ALL_SUBSTANCES) {
-      if (sub.id === id) continue;
+    for (const sub of subs) {
       const targetMechs = new Set(sub.mechanisms.map((m:string) => m.toLowerCase()));
       const targetOrgs = new Set((sub.organs||[]).map((o:string) => o.toLowerCase()));
       const targetCats = new Set((sub.categories||[]).map((c:string) => c.toLowerCase()));
       if (!hasAnyData) {
-        // Fallback: name overlap
         const srcName = (source.name||'').toLowerCase();
         const tgtName = (sub.name||'').toLowerCase();
         if (!tgtName.includes(srcName) && !srcName.includes(tgtName)) continue;
         const score = srcName.length > 0 ? Math.round((tgtName.split(' ').filter(w => srcName.includes(w)).length / Math.max(1, srcName.split(' ').length)) * 50) : 0;
-        results.push({ id: sub.id, score, reason: 'совпадение названия', pros: [], cons: [] });
+        results.push({ id: sub.id, score, reason: 'совпадение названия', pros: [], cons: [], organs: sub.organs || [], tier: getSubstanceTier(sub.id) });
         continue;
       }
       let mechOverlap = 0, orgOverlap = 0, catOverlap = 0;
-      for (const m of targetMechs) if (sourceMechs.has(m)) mechOverlap++;
-      for (const o of targetOrgs) if (sourceOrgs.has(o)) orgOverlap++;
-      for (const c of targetCats) if (sourceCats.has(c)) catOverlap++;
-      const totalScore = (sourceMechs.size > 0 ? (mechOverlap / Math.max(1, sourceMechs.size)) * 50 : 0) +
+      const sourceMechArr = [...sourceMechs] as string[];
+      const targetMechArr = [...targetMechs] as string[];
+      for (const m of targetMechArr) if (sourceMechArr.includes(m)) mechOverlap++;
+      for (const o of [...targetOrgs]) if ([...sourceOrgs].includes(o)) orgOverlap++;
+      for (const c of [...targetCats]) if ([...sourceCats].includes(c)) catOverlap++;
+      const totalScore = (sourceMechArr.length > 0 ? (mechOverlap / Math.max(1, sourceMechArr.length)) * 50 : 0) +
         (sourceOrgs.size > 0 ? (orgOverlap / Math.max(1, sourceOrgs.size)) * 30 : 0) +
         (sourceCats.size > 0 ? (catOverlap / Math.max(1, sourceCats.size)) * 20 : 0);
-      if (totalScore > 20) {
+      if (totalScore > 15) {
         const reasonParts: string[] = [];
         const pros: string[] = [];
         const cons: string[] = [];
-        if (mechOverlap > 0) reasonParts.push(`совпадает ${mechOverlap} механизм(ов)`);
+        const mechComparison: string[] = [];
+        if (mechOverlap > 0) { reasonParts.push(`совпадает ${mechOverlap} механизм(ов)`); }
         if (orgOverlap > 0) reasonParts.push(`действует на те же органы (${orgOverlap})`);
         if (catOverlap > 0) pros.push(`из категории ${sub.categories?.[0] || '—'}`);
         if ((sub.mechanisms||[]).length > (source.mechanisms||[]).length) pros.push('больше механизмов');
         if ((sub.mechanisms||[]).length < (source.mechanisms||[]).length) cons.push('меньше механизмов');
         if (!sub.organs || sub.organs.length === 0) cons.push('нет данных по органам');
-        results.push({ id: sub.id, score: Math.round(totalScore), reason: reasonParts.join('; ') || 'частичное совпадение', pros, cons });
+        // Build mechanism comparison
+        for (const sm of sourceMechArr) {
+          if (targetMechArr.includes(sm)) mechComparison.push(`✓ ${sm}`);
+          else mechComparison.push(`✗ ${sm}`);
+        }
+        results.push({ id: sub.id, score: Math.round(totalScore), reason: reasonParts.join('; ') || 'частичное совпадение', pros, cons, mechComparison: mechComparison.length > 0 ? mechComparison : undefined, organs: sub.organs || [], tier: getSubstanceTier(sub.id) });
       }
     }
     return results.sort((a,b) => b.score - a.score);
   };
 
-  // Search logic: find substances/stacks/complexes by organ+mechanism+effect
-  const doSearch = (organ: string, mech: string, effect: string) => {
-    const results: Array<{id:string;name:string;type:'substance'|'stack'|'complex';score:number;reason:string;pros:string[];cons:string[];substanceCount?:number}> = [];
+  // Search logic: find substances/stacks/complexes by organ+mechanism+effect+category+tier
+  const doSearch = (organ: string, mech: string, effect: string, category?: string, tier?: string) => {
+    const results: Array<{id:string;name:string;type:'substance'|'stack'|'complex';score:number;reason:string;pros:string[];cons:string[];substanceCount?:number;description?:string;mechanisms?:string[];organs?:string[]}> = [];
     const eq = effect.toLowerCase().trim();
     // Search ALL_SUBSTANCES
     for (const sub of ALL_SUBSTANCES) {
+      // Category filter
+      if (category && !(sub.categories||[]).some((c:string) => c.toLowerCase() === category.toLowerCase())) continue;
+      // Tier filter
+      if (tier) {
+        const subTier = getSubstanceTier(sub.id);
+        if (subTier !== tier) continue;
+      }
       let score = 0;
       const reasons: string[] = [];
       // Check organ match
       if (organ) {
         const subOrgs = (sub.organs||[]).map((o:string) => { const m = ORGAN_CATEGORY_MAP[o.toUpperCase().trim()]; return m?.key || o.toLowerCase(); });
-        if (subOrgs.includes(organ)) { score += 40; reasons.push('совпадает орган'); }
+        if (subOrgs.includes(organ)) { score += 35; reasons.push('совпадает орган'); }
       }
       // Check mechanism match
       if (mech) {
-        if ((sub.mechanisms||[]).includes(mech)) { score += 40; reasons.push('совпадает механизм'); }
+        if ((sub.mechanisms||[]).includes(mech)) { score += 35; reasons.push('совпадает механизм'); }
       }
       // Check effect/description match
       if (eq) {
         const searchText = ((sub.name||'') + ' ' + (sub.description||'') + ' ' + (sub.categories||[]).join(' ')).toLowerCase();
         if (searchText.includes(eq)) { score += 20; reasons.push('совпадает описание/категория'); }
       }
-      if (score > 0) {
+      if (score > 0 || (!organ && !mech && !eq && category)) {
         const pros: string[] = [];
         const cons: string[] = [];
         if (sub.mechanisms && sub.mechanisms.length > 0) pros.push(`${sub.mechanisms.length} механизмов`);
         if (sub.organs && sub.organs.length > 0) pros.push(`действует на ${sub.organs.length} органов`);
         if (!sub.organs || sub.organs.length === 0) cons.push('нет данных по органам');
-        results.push({ id: sub.id, name: sub.name || sub.id, type: 'substance', score: Math.min(100, score), reason: reasons.join('; ') || 'соответствует критериям', pros, cons });
+        if (!score) score = 50;
+        results.push({ id: sub.id, name: sub.name || sub.id, type: 'substance', score: Math.min(100, score), reason: reasons.join('; ') || 'соответствует критериям', pros, cons, description: sub.description, mechanisms: sub.mechanisms, organs: sub.organs });
       }
     }
     // Search ALL_STACKS
     for (const stack of ALL_STACKS) {
+      // Tier filter not applicable to stacks
       let score = 0;
       const reasons: string[] = [];
       if (eq) {
@@ -4838,68 +4897,110 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   </div>
                 )}
 
-                {/* REPLACEMENT CALCULATOR — Apple-style cards */}
+                {/* REPLACEMENT CALCULATOR — mode selector + ranked results */}
                 {stackSubTab === 'replace' && (
                   <div style={{ padding:'0 4px' }}>
                     <div style={{ marginBottom:10, background:'linear-gradient(135deg,rgba(167,139,250,0.08),rgba(139,92,246,0.04))', borderRadius:12, padding:'14px 12px', border:'1px solid rgba(167,139,250,0.12)' }}>
                       <div style={{ fontSize:13, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>🔀 Подбор замены</div>
-                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', lineHeight:1.3 }}>Найдите аналоги и альтернативы любому препарату поддержки по механизму действия и эффекту</div>
+                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', lineHeight:1.3 }}>Найдите аналоги и альтернативы по препарату, органу-мишени или механизму действия</div>
                     </div>
 
-                    {/* Selection card with labeled fields */}
-                    <div style={{ marginBottom:10, background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)', overflow:'hidden' }}>
-                      <div style={{ padding:'10px 12px' }}>
-                        <div style={{ fontSize:9, fontWeight:600, color:'var(--text-dim)', marginBottom:8, textTransform:'uppercase', letterSpacing:0.5 }}>Выбор препарата</div>
-                        <div style={{ position:'relative' }}>
-                          <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Название препарата</label>
-                          <input value={replaceSearch} onChange={e => { setReplaceSearch(e.target.value); }} placeholder="🔍 Введите название для поиска..."
-                            autoComplete="off"
-                            style={{ width:'100%', padding:'10px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
-                          {replaceSearch.length >= 2 && (
-                            <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:8, maxHeight:180, overflowY:'auto', marginTop:2, boxShadow:'0 4px 12px rgba(0,0,0,0.2)' }}>
-                              {ALL_SUBSTANCES.filter(s => (s.name||'').toLowerCase().includes(replaceSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(replaceSearch.toLowerCase())).slice(0,6).map(s => (
-                                <div key={s.id} onClick={() => { setReplaceSelectedSub(s.id); setReplaceSearch(s.name || s.id); setReplaceResults(findReplacements(s.id)); }} style={{ padding:'8px 10px', cursor:'pointer', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                                  <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{s.name}</div>
-                                  <div style={{ fontSize:7, color:'var(--text-dim)' }}>{(s.categories||[]).slice(0,3).join(' • ') || s.id}</div>
-                                </div>
+                    {/* Mode selector pills */}
+                    <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+                      {([
+                        {key:'substance',label:'🧪 Препарат',color:'#a78bfa'},
+                        {key:'organ',label:'❤️ Орган',color:'#22c55e'},
+                        {key:'mechanism',label:'⚙️ Механизм',color:'#f59e0b'},
+                      ] as const).map(m => (
+                        <button key={m.key} onClick={() => { setReplaceMode(m.key as any); setReplaceResults([]); setReplaceSelectedSub(null); setReplaceTargetOrgan(''); setReplaceTargetMech(''); setReplaceSearch(''); }}
+                          style={{ flex:1, padding:'5px 4px', borderRadius:8, fontSize:8, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap',
+                            background: replaceMode===m.key ? m.color+'22' : 'var(--bg-secondary)',
+                            color: replaceMode===m.key ? m.color : 'var(--text-dim)',
+                            border: `1px solid ${replaceMode===m.key ? m.color+'44' : 'var(--border)'}` }}>{m.label}</button>
+                      ))}
+                    </div>
+
+                    {/* Substance mode: search + select */}
+                    {replaceMode === 'substance' && (
+                      <div style={{ marginBottom:10, background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)', overflow:'hidden' }}>
+                        <div style={{ padding:'10px 12px' }}>
+                          <div style={{ position:'relative' }}>
+                            <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Название препарата</label>
+                            <input value={replaceSearch} onChange={e => setReplaceSearch(e.target.value)} placeholder="🔍 Введите название для поиска..."
+                              autoComplete="off"
+                              style={{ width:'100%', padding:'10px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
+                            {replaceSearch.length >= 2 && (
+                              <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:8, maxHeight:180, overflowY:'auto', marginTop:2, boxShadow:'0 4px 12px rgba(0,0,0,0.2)' }}>
+                                {ALL_SUBSTANCES.filter(s => (s.name||'').toLowerCase().includes(replaceSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(replaceSearch.toLowerCase())).slice(0,6).map(s => (
+                                  <div key={s.id} onClick={() => { setReplaceSelectedSub(s.id); setReplaceSearch(s.name || s.id); setReplaceResults(findReplacements(s.id)); }} style={{ padding:'8px 10px', cursor:'pointer', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{s.name}</div>
+                                    <div style={{ fontSize:7, color:'var(--text-dim)' }}>{(s.categories||[]).slice(0,3).join(' • ') || s.id}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {replaceSelectedSub && (
+                          <div style={{ padding:'8px 12px 10px', borderTop:'1px solid var(--border)', background:'rgba(167,139,250,0.03)' }}>
+                            <div style={{ fontSize:8, fontWeight:600, color:'rgba(255,255,255,0.5)', marginBottom:6, textTransform:'uppercase', letterSpacing:0.5 }}>Выбранный препарат</div>
+                            <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                              <span style={{ fontSize:16 }}>🧪</span>
+                              <div>
+                                <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa' }}>{getSubstanceName(replaceSelectedSub)}</div>
+                                <div style={{ fontSize:8, color:'var(--text-dim)' }}>{(findSubstance(replaceSelectedSub)?.organs||[]).join(', ') || '—'}</div>
+                              </div>
+                            </div>
+                            <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Механизмы действия</div>
+                            <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
+                              {(findSubstance(replaceSelectedSub)?.mechanisms||[]).slice(0,6).map((m:string,i:number) => (
+                                <span key={i} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(167,139,250,0.1)', color:'#a78bfa', border:'1px solid rgba(167,139,250,0.15)' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>
                               ))}
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
+                    )}
 
-                      {/* Selected substance detail — labeled card */}
-                      {replaceSelectedSub && (
-                        <div style={{ padding:'8px 12px 10px', borderTop:'1px solid var(--border)', background:'rgba(167,139,250,0.03)' }}>
-                          <div style={{ fontSize:8, fontWeight:600, color:'rgba(255,255,255,0.5)', marginBottom:6, textTransform:'uppercase', letterSpacing:0.5 }}>Выбранный препарат</div>
-                          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
-                            <span style={{ fontSize:16 }}>🧪</span>
-                            <div>
-                              <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa' }}>{getSubstanceName(replaceSelectedSub)}</div>
-                              <div style={{ fontSize:8, color:'var(--text-dim)' }}>{(findSubstance(replaceSelectedSub)?.organs||[]).join(', ') || '—'}</div>
-                            </div>
-                          </div>
-                          <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Механизмы действия</div>
-                          <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                            {(findSubstance(replaceSelectedSub)?.mechanisms||[]).slice(0,6).map((m:string,i:number) => (
-                              <span key={i} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(167,139,250,0.1)', color:'#a78bfa', border:'1px solid rgba(167,139,250,0.15)' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>
-                            ))}
-                          </div>
-                          {findSubstance(replaceSelectedSub)?.description && (
-                            <div style={{ marginTop:4, fontSize:8, color:'rgba(255,255,255,0.5)', lineHeight:1.3 }}>{findSubstance(replaceSelectedSub)?.description}</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    {/* Organ mode: select organ */}
+                    {replaceMode === 'organ' && (
+                      <div style={{ marginBottom:8, padding:'10px 12px', background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)' }}>
+                        <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:5, fontWeight:500 }}>Выберите орган-мишень</label>
+                        <select value={replaceTargetOrgan} onChange={e => { setReplaceTargetOrgan(e.target.value); if (e.target.value) setReplaceResults(findReplacements('', 'organ', e.target.value)); else setReplaceResults([]); }}
+                          style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
+                          <option value="">— Выберите орган —</option>
+                          {[...new Set(Object.values(ORGAN_CATEGORY_MAP).map(v => v.key))].map(k => {
+                            const firstKey = Object.entries(ORGAN_CATEGORY_MAP).find(([,v]) => v.key === k)?.[0] || '';
+                            return <option key={k} value={k}>{ORGAN_CATEGORY_MAP[firstKey]?.emoji || ''} {ORGAN_CATEGORY_MAP[firstKey]?.label || k}</option>;
+                          })}
+                        </select>
+                        {replaceTargetOrgan && <div style={{ marginTop:4, fontSize:8, color:'var(--text-dim)' }}>Найдено замен: <b style={{color:'#22c55e'}}>{replaceResults.length}</b></div>}
+                      </div>
+                    )}
 
-                    {/* Results — labeled card */}
+                    {/* Mechanism mode: select mechanism */}
+                    {replaceMode === 'mechanism' && (
+                      <div style={{ marginBottom:8, padding:'10px 12px', background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)' }}>
+                        <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:5, fontWeight:500 }}>Выберите механизм действия</label>
+                        <select value={replaceTargetMech} onChange={e => { setReplaceTargetMech(e.target.value); if (e.target.value) setReplaceResults(findReplacements('', 'mechanism', e.target.value)); else setReplaceResults([]); }}
+                          style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
+                          <option value="">— Выберите механизм —</option>
+                          {[...new Set(ALL_SUBSTANCES.flatMap(s => s.mechanisms||[]))].filter(Boolean).sort().slice(0,60).map(m => (
+                            <option key={m} value={m}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</option>
+                          ))}
+                        </select>
+                        {replaceTargetMech && <div style={{ marginTop:4, fontSize:8, color:'var(--text-dim)' }}>Найдено замен: <b style={{color:'#f59e0b'}}>{replaceResults.length}</b></div>}
+                      </div>
+                    )}
+
+                    {/* Results */}
                     {replaceResults.length > 0 && (
                       <div style={{ marginBottom:6, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 4px' }}>
-                        <span style={{ fontSize:9, color:'var(--text-dim)' }}>Результаты поиска замен: <b style={{color:'#a78bfa'}}>{replaceResults.filter(r => r.id !== replaceSelectedSub).length}</b></span>
+                        <span style={{ fontSize:9, color:'var(--text-dim)' }}>Результаты: <b style={{color: replaceMode==='substance'?'#a78bfa':replaceMode==='organ'?'#22c55e':'#f59e0b'}}>{replaceResults.length}</b></span>
                       </div>
                     )}
                     <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                      {replaceResults.filter(r => r.id !== replaceSelectedSub).slice(0,20).map(r => {
+                      {replaceResults.slice(0,20).map(r => {
                         const matches = r.score >= 70 ? 'high' : r.score >= 40 ? 'med' : 'low';
                         const accentColor = matches === 'high' ? '#22c55e' : matches === 'med' ? '#f59e0b' : '#ef4444';
                         const bgColor = matches === 'high' ? 'rgba(34,197,94,0.04)' : matches === 'med' ? 'rgba(245,158,11,0.04)' : 'rgba(239,68,68,0.04)';
@@ -4911,23 +5012,41 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                                   <span style={{ fontSize:10, fontWeight:700, color:'var(--text-light)' }}>{getSubstanceName(r.id)}</span>
                                   {(() => {
-                                    const sub = ALL_SUBSTANCES.find(x => x.id === r.id);
-                                    if (!sub) return null;
-                                    const tier = getSubstanceTier(sub.id);
+                                    const tier = r.tier || getSubstanceTier(r.id);
                                     const tierLabel = tier === 'core' ? 'ЯДРО' : tier === 'standard' ? 'СТАНДАРТ' : tier === 'advanced' ? 'ПРОДВИНУТЫЙ' : tier === 'specialty' ? 'РЕЦЕПТ' : null;
                                     return tierLabel ? <span style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background:'rgba(255,255,255,0.06)', color:'var(--text-dim)', marginLeft:4 }}>{tierLabel}</span> : null;
                                   })()}
                                 </div>
-                                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                                  <span style={{ fontSize:7, padding:'2px 6px', borderRadius:4, background:accentColor+'22', color:accentColor, fontWeight:700 }}>{r.score}%</span>
-                                </div>
+                                <span style={{ fontSize:7, padding:'2px 6px', borderRadius:4, background:accentColor+'22', color:accentColor, fontWeight:700 }}>{r.score}%</span>
                               </div>
                               <div style={{ fontSize:8, color:'rgba(255,255,255,0.65)', lineHeight:1.3, marginBottom:4 }}>{r.reason}</div>
+                              {/* Mechanism badges */}
                               <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:3 }}>
                                 {(ALL_SUBSTANCES.find(x => x.id === r.id)?.mechanisms||[]).slice(0,4).map((m:string,mi:number) => (
                                   <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background:accentColor+'15', color:accentColor, border:'1px solid '+accentColor+'20' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>
                                 ))}
                               </div>
+                              {/* Mechanism comparison (substance mode) */}
+                              {r.mechComparison && r.mechComparison.length > 0 && (
+                                <details style={{ marginBottom:3 }}>
+                                  <summary style={{ fontSize:7, fontWeight:600, color:'#a78bfa', cursor:'pointer' }}>⚖️ Сравнение механизмов</summary>
+                                  <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                                    {r.mechComparison.map((mc:string,mi:number) => {
+                                      const isMatch = mc.startsWith('✓');
+                                      return <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background: isMatch ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: isMatch ? '#22c55e' : '#ef4444' }}>{mc}</span>;
+                                    })}
+                                  </div>
+                                </details>
+                              )}
+                              {/* Organ badges */}
+                              {r.organs && r.organs.length > 0 && (
+                                <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:3 }}>
+                                  {r.organs.slice(0,3).map((o:string,oi:number) => {
+                                    const map = ORGAN_CATEGORY_MAP[o.toUpperCase().trim()];
+                                    return <span key={oi} style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background:'rgba(139,92,246,0.08)', color:'#a78bfa' }}>{map?.emoji || ''} {map?.label || o}</span>;
+                                  })}
+                                </div>
+                              )}
                               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                                 {r.pros.length > 0 && <span style={{ fontSize:7, color:'#22c55e', fontWeight:500 }}>✓ {r.pros.slice(0,3).join(', ')}</span>}
                                 {r.cons.length > 0 && <span style={{ fontSize:7, color:'#ef4444', fontWeight:500 }}>✗ {r.cons.slice(0,3).join(', ')}</span>}
@@ -4938,88 +5057,177 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         );
                       })}
                     </div>
-                    {replaceSelectedSub && replaceResults.length === 0 && (
+                    {replaceResults.length === 0 && replaceMode === 'substance' && replaceSelectedSub && (
                       <div style={{ padding:20, textAlign:'center', background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)' }}>
                         <div style={{ fontSize:24, marginBottom:4 }}>🔍</div>
                         <div style={{ fontSize:10, color:'var(--text-dim)' }}>Замен не найдено для <b style={{color:'var(--text-light)'}}>{getSubstanceName(replaceSelectedSub)}</b></div>
-                        <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:4 }}>Попробуйте другой препарат или используйте Поиск препарата</div>
+                      </div>
+                    )}
+                    {replaceResults.length === 0 && replaceMode === 'organ' && replaceTargetOrgan && (
+                      <div style={{ padding:14, textAlign:'center', background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)' }}>
+                        <div style={{ fontSize:10, color:'var(--text-dim)' }}>Нет препаратов для выбранного органа</div>
+                      </div>
+                    )}
+                    {replaceResults.length === 0 && replaceMode === 'mechanism' && replaceTargetMech && (
+                      <div style={{ padding:14, textAlign:'center', background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)' }}>
+                        <div style={{ fontSize:10, color:'var(--text-dim)' }}>Нет препаратов с выбранным механизмом</div>
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* SEARCH CALCULATOR — labeled cards */}
+                {/* SEARCH CALCULATOR — combined filters + expandable cards */}
                 {stackSubTab === 'search' && (
                   <div style={{ padding:'0 4px' }}>
                     <div style={{ marginBottom:10, background:'linear-gradient(135deg,rgba(59,130,246,0.08),rgba(37,99,235,0.04))', borderRadius:12, padding:'14px 12px', border:'1px solid rgba(59,130,246,0.12)' }}>
                       <div style={{ fontSize:13, fontWeight:700, color:'#60a5fa', marginBottom:2 }}>🔍 Поиск препарата</div>
-                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', lineHeight:1.3 }}>Найдите препараты, стеки и комплексы по органу-мишени, механизму действия или эффекту</div>
+                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', lineHeight:1.3 }}>Комбинированный поиск по органу, механизму, категории, тиру и тексту</div>
                     </div>
 
-                    {/* Filters card with labeled fields */}
+                    {/* Filters — 5 parameters */}
                     <div style={{ marginBottom:10, background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)', padding:'12px' }}>
                       <div style={{ fontSize:9, fontWeight:600, color:'var(--text-dim)', marginBottom:10, textTransform:'uppercase', letterSpacing:0.5 }}>Параметры поиска</div>
-                      <div style={{ marginBottom:8 }}>
-                        <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Орган-мишень</label>
-                        <select value={searchOrgan} onChange={e => setSearchOrgan(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
-                          <option value="">Любой</option>
-                          {[...new Set(Object.values(ORGAN_CATEGORY_MAP).map(v => v.key))].map(k => {
-                            const firstKey = Object.entries(ORGAN_CATEGORY_MAP).find(([,v]) => v.key === k)?.[0] || '';
-                            return <option key={k} value={k}>{ORGAN_CATEGORY_MAP[firstKey]?.label || k}</option>;
-                          })}
-                        </select>
+                      {/* Row 1: organ + mech */}
+                      <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+                        <div style={{ flex:1 }}>
+                          <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Орган-мишень</label>
+                          <select value={searchOrgan} onChange={e => setSearchOrgan(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
+                            <option value="">Любой</option>
+                            {[...new Set(Object.values(ORGAN_CATEGORY_MAP).map(v => v.key))].map(k => {
+                              const firstKey = Object.entries(ORGAN_CATEGORY_MAP).find(([,v]) => v.key === k)?.[0] || '';
+                              return <option key={k} value={k}>{ORGAN_CATEGORY_MAP[firstKey]?.emoji || ''} {ORGAN_CATEGORY_MAP[firstKey]?.label || k}</option>;
+                            })}
+                          </select>
+                        </div>
+                        <div style={{ flex:1 }}>
+                          <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Механизм</label>
+                          <select value={searchMech} onChange={e => setSearchMech(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
+                            <option value="">Любой</option>
+                            {[...new Set(ALL_SUBSTANCES.flatMap(s => s.mechanisms||[]))].filter(Boolean).sort().slice(0,60).map(m => (
+                              <option key={m} value={m}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
-                      <div style={{ marginBottom:8 }}>
-                        <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Механизм действия</label>
-                        <select value={searchMech} onChange={e => setSearchMech(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
-                          <option value="">Любой</option>
-                          {[...new Set(ALL_SUBSTANCES.flatMap(s => s.mechanisms||[]))].filter(Boolean).sort().slice(0,30).map(m => (
-                            <option key={m} value={m}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</option>
-                          ))}
-                        </select>
+                      {/* Row 2: category + tier */}
+                      <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+                        <div style={{ flex:1 }}>
+                          <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Категория</label>
+                          <select value={searchCategory} onChange={e => setSearchCategory(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
+                            <option value="">Любая</option>
+                            {[...new Set(ALL_SUBSTANCES.flatMap(s => s.categories||[]))].filter(Boolean).sort().slice(0,40).map(c => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div style={{ flex:1 }}>
+                          <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Тир</label>
+                          <select value={searchTier} onChange={e => setSearchTier(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
+                            <option value="">Любой</option>
+                            <option value="core">Ядро</option>
+                            <option value="standard">Стандарт</option>
+                            <option value="advanced">Продвинутый</option>
+                            <option value="specialty">Рецепт</option>
+                          </select>
+                        </div>
                       </div>
+                      {/* Row 3: text search */}
                       <div>
-                        <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Эффект или проблема</label>
-                        <input value={searchEffect} onChange={e => setSearchEffect(e.target.value)} placeholder="Например: защита печени, антиоксидант..." style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
+                        <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Текстовый поиск</label>
+                        <input value={searchEffect} onChange={e => setSearchEffect(e.target.value)} placeholder="Название, эффект, проблема..." style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
                       </div>
-                      <button onClick={() => setSearchResults(doSearch(searchOrgan, searchMech, searchEffect))} disabled={!searchOrgan && !searchMech && !searchEffect.trim()} style={{ width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'#fff', fontWeight:700, fontSize:11, marginTop:8, opacity:(!searchOrgan && !searchMech && !searchEffect.trim()) ? 0.5 : 1, transition:'opacity 0.2s' }}>
+                      <button onClick={() => setSearchResults(doSearch(searchOrgan, searchMech, searchEffect, searchCategory, searchTier))} disabled={!searchOrgan && !searchMech && !searchEffect.trim() && !searchCategory && !searchTier} style={{ width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'#fff', fontWeight:700, fontSize:11, marginTop:8, opacity:(!searchOrgan && !searchMech && !searchEffect.trim() && !searchCategory && !searchTier) ? 0.5 : 1, transition:'opacity 0.2s' }}>
                         🔍 НАЙТИ
                       </button>
                     </div>
 
-                    {/* Results */}
+                    {/* Results count */}
                     {searchResults.length > 0 && (
                       <div style={{ marginBottom:6, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                         <span style={{ fontSize:9, color:'var(--text-dim)' }}>Найдено: <b style={{color:'#60a5fa'}}>{searchResults.length}</b></span>
                       </div>
                     )}
+                    {/* Results as expandable cards */}
                     <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                      {searchResults.slice(0,30).map(r => {
+                      {searchResults.slice(0,40).map(r => {
+                        const isExpanded = searchExpanded[r.id];
                         const typeColor = r.type === 'stack' ? '#00e68a' : r.type === 'complex' ? '#a78bfa' : '#60a5fa';
                         const typeBg = r.type === 'stack' ? 'rgba(0,230,138,0.04)' : r.type === 'complex' ? 'rgba(167,139,250,0.04)' : 'rgba(59,130,246,0.04)';
                         const typeBorder = r.type === 'stack' ? 'rgba(0,230,138,0.12)' : r.type === 'complex' ? 'rgba(167,139,250,0.12)' : 'rgba(59,130,246,0.12)';
+                        const sub = r.type === 'substance' ? ALL_SUBSTANCES.find(x => x.id === r.id) : null;
                         return (
                           <div key={r.id} style={{ background:typeBg, borderRadius:12, border:'1px solid '+typeBorder, overflow:'hidden' }}>
-                            <div style={{ padding:'10px 12px' }}>
+                            {/* Card header — always visible */}
+                            <div style={{ padding:'10px 12px', cursor:'pointer' }} onClick={() => setSearchExpanded(prev => ({...prev, [r.id]: !prev[r.id]}))}>
                               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:3 }}>
-                                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                                  <span style={{ fontSize:7, padding:'2px 6px', borderRadius:3, background:typeColor+'22', color:typeColor, fontWeight:700 }}>{r.type === 'stack' ? 'СТЕК' : r.type === 'complex' ? 'КОМПЛЕКС' : 'ПРЕПАРАТ'}</span>
-                                  <span style={{ fontSize:10, fontWeight:700, color:'var(--text-light)' }}>{r.name}</span>
+                                <div style={{ display:'flex', alignItems:'center', gap:4, flex:1, minWidth:0 }}>
+                                  <span style={{ fontSize:7, padding:'2px 6px', borderRadius:3, background:typeColor+'22', color:typeColor, fontWeight:700, flexShrink:0 }}>{r.type === 'stack' ? 'СТЕК' : r.type === 'complex' ? 'КОМПЛЕКС' : 'ПРЕПАРАТ'}</span>
+                                  <span style={{ fontSize:10, fontWeight:700, color:'var(--text-light)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.name}</span>
                                 </div>
-                                <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:r.score >= 70 ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', color:r.score >= 70 ? '#22c55e' : '#f59e0b', fontWeight:700 }}>{r.score}%</span>
+                                <div style={{ display:'flex', alignItems:'center', gap:3, flexShrink:0 }}>
+                                  {(() => {
+                                    if (r.type === 'substance' && sub) {
+                                      const t = getSubstanceTier(sub.id);
+                                      const tl = t === 'core' ? 'ЯДРО' : t === 'standard' ? 'СТД' : t === 'advanced' ? 'ПРО' : t === 'specialty' ? 'РЕЦ' : null;
+                                      if (tl) return <span style={{ fontSize:6, padding:'1px 3px', borderRadius:2, background:'rgba(255,255,255,0.06)', color:'var(--text-dim)' }}>{tl}</span>;
+                                    }
+                                    return null;
+                                  })()}
+                                  <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:r.score >= 70 ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', color:r.score >= 70 ? '#22c55e' : '#f59e0b', fontWeight:700 }}>{r.score}%</span>
+                                  <span style={{ fontSize:8, color:'var(--text-dim)', transition:'transform 0.2s', display:'inline-block', transform: isExpanded ? 'rotate(180deg)' : 'none' }}>▼</span>
+                                </div>
                               </div>
                               <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', lineHeight:1.3 }}>{r.reason}</div>
                               {r.type === 'stack' && r.substanceCount && <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:3 }}>{r.substanceCount} веществ</div>}
-                              {r.pros && r.pros.length > 0 && <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginTop:3 }}>{r.pros.slice(0,4).map((p,i) => <span key={i} style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background:'rgba(34,197,94,0.1)', color:'#22c55e' }}>✓ {p}</span>)}</div>}
-                              {r.type === 'substance' && (
-                                <button onClick={() => { if (!enhancedSubs.includes(r.id)) setEnhancedSubs(prev => [...prev, r.id]); }} style={{ marginTop:6, padding:'5px 12px', borderRadius:6, border:'1px solid rgba(0,230,138,0.2)', cursor:'pointer', background:'rgba(0,230,138,0.06)', color:'#00e68a', fontSize:8, fontWeight:700, width:'100%' }}>+ Добавить в стек</button>
-                              )}
+                              {r.pros && r.pros.length > 0 && !isExpanded && <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginTop:3 }}>{r.pros.slice(0,2).map((p,i) => <span key={i} style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background:'rgba(34,197,94,0.1)', color:'#22c55e' }}>✓ {p}</span>)}</div>}
                             </div>
+                            {/* Expanded content */}
+                            {isExpanded && (
+                              <div style={{ padding:'0 12px 10px', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
+                                {r.description && <div style={{ fontSize:8, color:'rgba(255,255,255,0.65)', lineHeight:1.3, marginTop:6, marginBottom:4 }}>{r.description}</div>}
+                                {/* Mechanisms */}
+                                {(r.mechanisms || (sub?.mechanisms||[])).length > 0 && (
+                                  <div style={{ marginBottom:4 }}>
+                                    <div style={{ fontSize:7, fontWeight:600, color:'var(--text-dim)', marginBottom:2 }}>⚙️ Механизмы:</div>
+                                    <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
+                                      {(r.mechanisms || sub?.mechanisms || []).slice(0,8).map((m:string,mi:number) => (
+                                        <span key={mi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.1)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {/* Organs */}
+                                {(r.organs || (sub?.organs||[])).length > 0 && (
+                                  <div style={{ marginBottom:4 }}>
+                                    <div style={{ fontSize:7, fontWeight:600, color:'var(--text-dim)', marginBottom:2 }}>🎯 Органы:</div>
+                                    <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
+                                      {(r.organs || sub?.organs || []).slice(0,6).map((o:string,oi:number) => {
+                                        const map = ORGAN_CATEGORY_MAP[o.toUpperCase().trim()];
+                                        return <span key={oi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{map?.emoji || ''} {map?.label || o}</span>;
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                                {/* Categories */}
+                                {(sub?.categories||[]).length > 0 && (
+                                  <div style={{ marginBottom:3 }}>
+                                    <div style={{ fontSize:7, fontWeight:600, color:'var(--text-dim)', marginBottom:2 }}>🏷️ Категории:</div>
+                                    <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
+                                      {sub?.categories.slice(0,6).map((c:string,ci:number) => <span key={ci} style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.5)' }}>{c}</span>)}
+                                    </div>
+                                  </div>
+                                )}
+                                {/* Add to mix button */}
+                                {r.type === 'substance' && (
+                                  <button onClick={() => { if (!enhancedSubs.includes(r.id)) setEnhancedSubs(prev => [...prev, r.id]); }} style={{ marginTop:6, padding:'5px 12px', borderRadius:6, border:'1px solid rgba(0,230,138,0.2)', cursor:'pointer', background:'rgba(0,230,138,0.06)', color:'#00e68a', fontSize:8, fontWeight:700, width:'100%' }}>+ Добавить в стек</button>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
                     </div>
-                    {searchResults.length === 0 && (searchOrgan || searchMech || searchEffect.trim()) && (
+                    {searchResults.length === 0 && (searchOrgan || searchMech || searchEffect.trim() || searchCategory || searchTier) && (
                       <div style={{ padding:20, textAlign:'center', background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)' }}>
                         <div style={{ fontSize:24, marginBottom:4 }}>🔍</div>
                         <div style={{ fontSize:10, color:'var(--text-dim)' }}>Ничего не найдено</div>
