@@ -1457,6 +1457,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [planView, setPlanView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [planSaved, setPlanSaved] = useState(false);
   const [planSubTab, setPlanSubTab] = useState<'active' | 'archive'>('active');
+  const [favSearch, setFavSearch] = useState('');
   const [archivedPlans, setArchivedPlans] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('supportPlanArchive') || '[]'); } catch { return []; }
   });
@@ -2855,27 +2856,17 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
                 <span style={{ color:'#60a5fa', fontSize:18, opacity:0.6 }}>→</span>
               </div>
-              {/* Примерные протоколы поддержки cards */}
-              <div style={{ display:'flex', flexDirection:'column', gap:6, padding:'12px 14px', borderRadius:16, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-                <div style={{ fontSize:12, fontWeight:700, color:'#8b5cf6' }}>📋 Примерные протоколы поддержки</div>
-                <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                  {[
-                    { id:'pct', label:'ПКТ', color:'#8b5cf6', emoji:'🔄' },
-                    { id:'fertility', label:'Фертильность', color:'#ec4899', emoji:'👶' },
-                    { id:'hrt', label:'ГЗТ', color:'#f59e0b', emoji:'⚕️' },
-                    { id:'neuro', label:'Нейро', color:'#06b6d4', emoji:'🧠' },
-                    { id:'joints', label:'Суставы', color:'#22c55e', emoji:'🦴' },
-                    { id:'acne', label:'Акне', color:'#ef4444', emoji:'🔴' },
-                  ].map(p => (
-                    <div key={p.id} onClick={() => { setSection('protocols'); setProtocolTab(p.id as any); }} style={{
-                      display:'flex', alignItems:'center', gap:6, padding:'5px 10px', borderRadius:10, cursor:'pointer',
-                      background:p.color+'15', border:'1px solid '+p.color+'30', color:p.color, fontSize:10, fontWeight:600,
-                    }}>
-                      <span>{p.emoji}</span>
-                      <span>{p.label}</span>
-                    </div>
-                  ))}
+              {/* Примерные протоколы поддержки — одна кнопка */}
+              <div onClick={() => { setSection('protocols'); setProtocolTab('pct'); }} style={{
+                display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
+                background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', color:'var(--text)', transition:'all 0.2s',
+              }}>
+                <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(139,92,246,0.15)', fontSize:24 }}>📋</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:15, fontWeight:800, marginBottom:4, color:'#8b5cf6' }}>Примерные протоколы поддержки</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>ПКТ · Фертильность · ГЗТ · Нейро · Суставы · Акне · Пептиды</div>
                 </div>
+                <span style={{ color:'#8b5cf6', fontSize:18, opacity:0.6 }}>→</span>
               </div>
             </div>
         </div>
@@ -3742,7 +3733,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             {renderView(infoView, 'favorites', () => {
               let favIds: string[] = [];
               try { favIds = JSON.parse(localStorage.getItem('he_support_favorites') || '[]'); } catch {}
-              const [favSearch, setFavSearch] = useState('');
               const favSubstances = favIds.map(id => ALL_SUBSTANCES.find(s => s.id === id)).filter(Boolean);
               const filtered = favSearch ? favSubstances.filter(s => (s?.name||'').toLowerCase().includes(favSearch.toLowerCase())) : favSubstances;
               return (

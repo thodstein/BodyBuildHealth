@@ -8,8 +8,8 @@ interface Props { onNavigate?: (screen: ScreenId) => void; }
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   return (
     <div style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', display:'flex', flexDirection:'column', overflow:'hidden', background:'#000' }}>
-      <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center' }} />
-      <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(0,0,0,0.1) 30%, rgba(0,0,0,0.7) 100%)' }} />
+      <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', objectPosition:'center' }} />
+      <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.85) 100%)' }} />
       <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'0 16px 24px' }}>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
           {[
@@ -19,8 +19,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
           ].map(c => (
             <button key={c.id} onClick={() => onNavigate?.(c.id)} style={{
               display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:6,
-              aspectRatio:'1', borderRadius:14, cursor:'pointer', border:'none',
-              background:'rgba(255,255,255,0.1)',
+              aspectRatio:'1', borderRadius:14, cursor:'pointer', border:'1px solid rgba(255,255,255,0.04)',
+              background:'rgba(24,24,27,0.15)',
               color:'#fff', transition:'all 0.2s',
             }}>
               <span style={{ fontSize:32 }}>{c.icon}</span>
