@@ -11910,7 +11910,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     name: 'Endocannabinoid',
     nameRu: 'Эндоканнабиноидная система',
     tier: 'standard',
-    category: ['neuroprotector', 'immunomodulator'],
+    category: ['immunomodulator'],
     forms: [
       { id: 'endocannabinoid', name: 'Endocannabinoid', nameRu: 'Эндоканнабиноидная поддержка (ПНЖК+терпены)', dose: '0 мкг 2x/д', best: true }
     ],

@@ -3604,32 +3604,29 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         </GlassCard>
       )}
 
-      {/* 20-22: Separate calculators */}
-      <div style={{ display: 'flex', gap: 4 }}>
-        <button onClick={() => generateCheatMeal()} style={{
-          flex: 1, padding: 10, borderRadius: 10, cursor: 'pointer', textAlign: 'center',
-          background: '#202023', border: '1px solid rgba(255,255,255,0.06)',
-          color: '#f59e0b', fontWeight: 700, fontSize: 10,
-          transition: 'all 0.15s',
-        }}>
-          🍔 Читмил
-        </button>
-        <button onClick={() => generateCarbload()} style={{
-          flex: 1, padding: 10, borderRadius: 10, cursor: 'pointer', textAlign: 'center',
-          background: '#202023', border: '1px solid rgba(255,255,255,0.06)',
-          color: '#f97316', fontWeight: 700, fontSize: 10,
-          transition: 'all 0.15s',
-        }}>
-          🍚 Углев. загрузка
-        </button>
-        <button onClick={() => generateBUTCH()} style={{
-          flex: 1, padding: 10, borderRadius: 10, cursor: 'pointer', textAlign: 'center',
-          background: '#202023', border: '1px solid rgba(255,255,255,0.06)',
-          color: '#3b82f6', fontWeight: 700, fontSize: 10,
-          transition: 'all 0.15s',
-        }}>
-          ⤴️⤵️ БУЧ
-        </button>
+      {/* 20-22: Special calculators — styled cards */}
+      <div style={{ marginTop:4, display:'flex', flexDirection:'column', gap:6 }}>
+        <div style={{ fontSize:9, fontWeight:700, color:'var(--text-dim)', textTransform:'uppercase', letterSpacing:0.5, marginBottom:2 }}>⚡ Специальные режимы</div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+          <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
+            <button onClick={() => generateCheatMeal()} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)', color:'#f59e0b', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+              🍔 Читмил
+            </button>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:4, lineHeight:1.2 }}>Один приём пищи с повышенной калорийностью</div>
+          </div>
+          <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
+            <button onClick={() => generateCarbload()} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.2)', color:'#f97316', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+              🍚 Углев. загрузка
+            </button>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:4, lineHeight:1.2 }}>Повышение углеводов на 1-2 дня</div>
+          </div>
+          <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
+            <button onClick={() => generateBUTCH()} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.2)', color:'#3b82f6', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+              ⤴️⤵️ БУЧ
+            </button>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:4, lineHeight:1.2 }}>Белково-углеводное чередование</div>
+          </div>
+        </div>
       </div>
 
       {cheatMealPlan && (
@@ -3729,10 +3726,39 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         </GlassCard>
       )}
 
-      {/* 22. Recommendations */}
-      <button onClick={generateRecommendations} style={{ ...greenBtn, background: 'linear-gradient(135deg,#a855f7,#d946ef)' }}>
-        💡 Выдать рекомендации
-      </button>
+      {/* 22-23: Advanced cards */}
+      <div style={{ marginTop:4, display:'flex', flexDirection:'column', gap:6 }}>
+        <div style={{ fontSize:9, fontWeight:700, color:'var(--text-dim)', textTransform:'uppercase', letterSpacing:0.5, marginBottom:2 }}>🎯 Расширенные инструменты</div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+          <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
+            <button onClick={generateRecommendations} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.2)', color:'#a855f7', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+              💡 Выдать рекомендации
+            </button>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:4, lineHeight:1.2 }}>Персональные советы по питанию</div>
+          </div>
+          {generated && dayPlan && (
+            <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
+              <div style={{ display:'flex', gap:4, marginBottom:4 }}>
+                {([1, 3, 7] as const).map(n => (
+                  <button key={n} onClick={() => setMealPrepDays(n)} style={{
+                    flex:1, padding:'5px', borderRadius:6, cursor:'pointer', textAlign:'center',
+                    background: mealPrepDays === n ? 'rgba(6,182,212,0.15)' : 'transparent',
+                    border: mealPrepDays === n ? '1px solid rgba(6,182,212,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                    color: mealPrepDays === n ? '#06b6d4' : 'rgba(255,255,255,0.6)',
+                    fontWeight:600, fontSize:8,
+                  }}>
+                    {n === 1 ? '1 день' : n === 3 ? '3 дня' : 'Неделя'}
+                  </button>
+                ))}
+              </div>
+              <button onClick={generateMealPrep} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(6,182,212,0.08)', border:'1px solid rgba(6,182,212,0.2)', color:'#06b6d4', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+                👨‍🍳 Meal Prep
+              </button>
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:4, lineHeight:1.2 }}>План приготовления на несколько дней</div>
+            </div>
+          )}
+        </div>
+      </div>
       {recommendations.length > 0 && (
         <GlassCard title="Рекомендации" icon="💡" color="#a855f7" style={{ border: '1px solid rgba(168,85,247,0.15)' }}>
           {recommendations.map((r, i) => (
@@ -3743,26 +3769,6 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         </GlassCard>
       )}
 
-      {/* 23. Meal prep plan */}
-      {generated && dayPlan && (
-        <div style={{ marginBottom: 4 }}>
-          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
-            {([1, 3, 7] as const).map(n => (
-              <button key={n} onClick={() => setMealPrepDays(n)} style={{
-                flex: 1, padding: '6px', borderRadius: 8, cursor: 'pointer', textAlign: 'center',
-                background: mealPrepDays === n ? 'linear-gradient(135deg,#06b6d4,#0e7490)' : '#202023',
-                border: 'none', color: mealPrepDays === n ? '#000' : 'rgba(255,255,255,0.85)',
-                fontWeight: 700, fontSize: 9,
-              }}>
-                {n === 1 ? '1 день' : n === 3 ? '3 дня' : 'Неделя'}
-              </button>
-            ))}
-          </div>
-          <button onClick={generateMealPrep} style={{ ...greenBtn, background: 'linear-gradient(135deg,#06b6d4,#0e7490)' }}>
-            👨‍🍳 Составить план готовки (Meal Prep)
-          </button>
-        </div>
-      )}
       {mealPrepPlan && (
         <GlassCard title="План готовки" icon="👨‍🍳" color="#06b6d4" style={{ border: '1px solid rgba(6,182,212,0.15)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontWeight: 700, color: '#06b6d4', marginBottom: 6 }}>
