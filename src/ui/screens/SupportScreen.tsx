@@ -1,27 +1,25 @@
 ﻿import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, findSupportByGoal, searchSupport, getSubstanceInfo, getSupportDatabaseStats, type SupportInput, type SynergyPair, type SupplementTarget, type OrganSynergy } from '../../engines/support.engine';
-import { decodeGarbled, cleanDesc, cleanSynergy, isReadableText } from '../../utils/text-sanitizer';
-import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
+import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, findSupportByGoal, getSupportDatabaseStats, type SupportInput, type SupplementTarget } from '../../engines/support.engine';
+import { decodeGarbled, cleanDesc } from '../../utils/text-sanitizer';
+import { ALL_RISK_SYSTEMS } from '../../core/constants';
 import { PHARMA_DB, getPharmaDetail } from '../../core/pharma-database';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
 import { updateProfile, getProfile } from '../../core/profile-manager';
 import { SYSTEM_INFO_ALL } from '../../core/risk-info';
-import { getRiskColor } from '../../core/utils/risk-colors';
-import { SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { ALL_SUBSTANCES, ALL_INTERACTIONS, type SupportSubstance, type SupportInteraction } from '../../data/support-database';
 import { getSubstanceTier, TIER_LABELS } from '../../data/support-database';
 import { getBpRiskLevel } from '../../core/bp-hr-data';
 import { SUPPORT_CATALOG_DATA, CATALOG_ENRICHMENT, MECHANISM_LABELS, ORGAN_LABELS as CATALOG_ORGAN_LABELS, SYSTEM_LABELS_CATALOG, CATEGORY_LABELS as CATALOG_CATEGORY_LABELS, TIER_LABELS_CATALOG, type SupportCatalogEntry } from '../../data/support-database';
 
 import { CANONICAL_ID_MAP } from '../../data/support-database';
-import { SUBSTANCE_ANALOGS, SUBSTANCE_ENHANCERS, PHASE_MODS, DEFAULT_DOSAGES, getPhaseLevel, type SupportPhase } from '../../data/support-database';
+import { SUBSTANCE_ANALOGS, PHASE_MODS, DEFAULT_DOSAGES, getPhaseLevel, type SupportPhase } from '../../data/support-database';
 import { FertilityPCTScreen } from './FertilityPCTScreen';
 import { ALL_STACKS, EFFECT_LABELS_ru, findStacksByEffect, getStackSubstanceLabel as getStackSubLabel, type SupportStack } from '../../data/support-database';
 import {
-  PEPTIDE_DB, PEPTIDE_LIST, PEPTIDE_SYNERGY, PEPTIDE_CONFLICTS, PEPTIDE_GOAL_PROFILES,
-  computeDilution, computeEffectiveDose, computePK, computePeptideRisks,
-  scorePeptideStack, generatePeptideProtocol, getPeptideSynergiesFor, getPeptideConflictsFor,
-  ROUTE_LABELS, SYRINGE_TYPES,   type PeptideInfo, type DilutionInput, type DilutionResult,
+  PEPTIDE_DB, PEPTIDE_LIST,
+  computeDilution, computeEffectiveDose, computePK,
+  generatePeptideProtocol,
+  ROUTE_LABELS, SYRINGE_TYPES,  type PeptideInfo, type DilutionInput, type DilutionResult,
   type BioavailabilityResult, type PKInput, type PKResult,
 } from '../../engines/peptide-calculator.engine';
 import {
@@ -30,14 +28,14 @@ import {
   RISK_MODEL_LABELS, type RiskModelType, type LabCompositeResult,
 } from '../../engines/lab-analysis.engine';
 import {
-  generateWeeklyPlan, RISK_METHODS, computeBasicRisk, computeOverallRisk,
+  generateWeeklyPlan,
   type RiskCalcMethod, type WeeklyPlan, type SupplementPlanEntry, type DailySchedule,
 } from '../../engines/weekly-plan.engine';
 import { generateRecommendations, quickRec, type Recommendation, type RecInput } from '../../engines/recommendation-engine-v2';
 import { fuseDecisions, shouldTrainToday, type FusedDecision } from '../../engines/decision-fusion.engine';
-import { optimizeStack as newOptimizeStack, deriveSystemCoverage, getSubstanceName, describeStack, type StackResult as OptimizerStackResult, type StackSynergyInfo } from '../../engines/stack-optimizer.engine';
-import { generateStack, selectBestStack, type StackResult } from '../../engines/stack-builder.engine';
-import { ReportEngine, type ReportInput } from '../../engines/report-engine';
+import { optimizeStack as newOptimizeStack, getSubstanceName, type StackResult as OptimizerStackResult } from '../../engines/stack-optimizer.engine';
+import { generateStack, type StackResult } from '../../engines/stack-builder.engine';
+import { ReportEngine } from '../../engines/report-engine';
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
 import type { CourseEntry } from '../../core/types';
 import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.engine';
@@ -6111,7 +6109,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               text += `  • ${i.name} — ${i.dose} | ${i.with}\n`;
             });
           });
-          const synCount = calcResult?.synergies?.length ?? 0;
+          const synCount = supportResult?.metadata?.effectiveMechanisms?.length ?? mergedInteractions.filter((i:any)=>i.type==='synergy').length;
           if (synCount > 0) text += `\n✅ Синергий: ${synCount}\n`;
           text += `\n═══════════════════════════════\n`;
           text += `body-build-health.vercel.app\n`;

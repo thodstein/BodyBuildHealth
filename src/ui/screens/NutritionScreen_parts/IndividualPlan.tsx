@@ -324,7 +324,10 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       weightAdj = Math.max(0.8, Math.min(1.2, weightAdj));
     }
     const targetsV2 = (() => { try { return calcNutritionV2({ weightKg: weight, heightCm: height, age, sex: sex || 'male', pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal as any, bodyFatPercent: bodyFatPct }); } catch { return null; } })();
-    const targets = targetsV2 ? { kcal: targetsV2.kcal, protein: targetsV2.proteinG, fats: targetsV2.fatG, carbs: targetsV2.carbsG } : (() => { try { return calcNutrition({ weightKg: weight, heightCm: height, age, sex, pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal }); } catch { return { kcal: 2500, protein: 160, fats: 70, carbs: 300 }; } })();
+    const baseBmr = targetsV2?.bmrMethod ? 0 : 0; // will capture from calcNutrition fallback
+    const baseTdeeV2 = targetsV2?.baseTdee || 0;
+    const adjV2 = targetsV2?.adjustment || 0;
+    const targets = targetsV2 ? { bmr: baseTdeeV2 > 0 ? Math.round(baseTdeeV2 / (pal || 1.2)) : 0, tdee: baseTdeeV2 || Math.round(targetsV2.kcal - adjV2), kcal: targetsV2.kcal, protein: targetsV2.proteinG, fats: targetsV2.fatG, carbs: targetsV2.carbsG, adjustment: adjV2 } : (() => { try { const r = calcNutrition({ weightKg: weight, heightCm: height, age, sex, pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal }); return { bmr: r.bmr, tdee: r.tdee, kcal: r.kcal, protein: r.protein, fats: r.fats, carbs: r.carbs, adjustment: r.kcal - r.tdee }; } catch { return { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300, adjustment: 0 }; } })();
     // Phase-aware adjustments
     const phaseMult: Record<string, { kcalMod: number; pAdd: number }> = {
       course:      { kcalMod: 1.0,  pAdd: 0.3 },
@@ -2358,6 +2361,14 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               })}
             </div>;
             })()}
+            {/* BMR / TDEE info */}
+            {calcTargets.bmr > 0 && (
+              <div style={{ display:'flex', gap:6, marginBottom:6, fontSize:8, color:'rgba(255,255,255,0.6)' }}>
+                <span>BMR: <b style={{color:'#00e68a'}}>{calcTargets.bmr}</b> ккал</span>
+                <span>TDEE: <b style={{color:'#60a5fa'}}>{calcTargets.tdee}</b> ккал</span>
+                {calcTargets.adjustment !== 0 && <span>Коррекция: <b style={{color: calcTargets.adjustment > 0 ? '#f59e0b' : '#22c55e'}}>{calcTargets.adjustment > 0 ? '+' : ''}{calcTargets.adjustment}</b> ккал</span>}
+              </div>
+            )}
             {/* Macro distribution bar */}
             {(() => {
               const nm = NUTRITION_LEVELS.find(n => n.id === nutrLevel)?.mult || 1.0;

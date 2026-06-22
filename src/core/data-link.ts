@@ -5,7 +5,7 @@ import { db } from './db';
 import { UCUM_MAP, ALL_RISK_SYSTEMS } from './constants';
 import { calcReadiness } from '../engines/readiness.engine';
 import { calculateRisks } from '../engines/risk.engine';
-import { calculateSupport, generateSupportStack, type SupportInput } from '../engines/support.engine';
+import { calculateSupport, type SupportInput } from '../engines/support.engine';
 import { interpretLabs, type LabCompositeResult } from '../engines/lab-analysis.engine';
 import type { ReadinessScores, RiskCalculationResult } from './types';
 

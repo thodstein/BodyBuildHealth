@@ -1045,10 +1045,45 @@ export const NutritionScreen: React.FC = () => {
     } catch {}
   }, []);
 
-  const avgWeeklyKcal = useMemo(() => foodEntries.reduce((s, e) => s + e.kcal, 0) / Math.max(1, foodEntries.length / 7), [foodEntries]);
-  const avgWeeklyProtein = useMemo(() => foodEntries.reduce((s, e) => s + e.p, 0) / Math.max(1, foodEntries.length / 7), [foodEntries]);
-  const avgWeeklyFat = useMemo(() => foodEntries.reduce((s, e) => s + e.f, 0) / Math.max(1, foodEntries.length / 7), [foodEntries]);
-  const avgWeeklyCarbs = useMemo(() => foodEntries.reduce((s, e) => s + e.c, 0) / Math.max(1, foodEntries.length / 7), [foodEntries]);
+  // Daily aggregates: group food entries by date for correct weekly averages and charts
+  const dailyAggregates = useMemo(() => {
+    const days = Object.entries(dailyLogs).sort(([a], [b]) => a.localeCompare(b));
+    return days.map(([date, entries]) => ({
+      date,
+      kcal: entries.reduce((s, e) => s + (e.kcal || 0), 0),
+      protein: entries.reduce((s, e) => s + (e.p || 0), 0),
+      fat: entries.reduce((s, e) => s + (e.f || 0), 0),
+      carbs: entries.reduce((s, e) => s + (e.c || 0), 0),
+    }));
+  }, [dailyLogs]);
+
+  const avgWeeklyKcal = useMemo(() => {
+    if (dailyAggregates.length === 0) return 0;
+    return dailyAggregates.reduce((s, d) => s + d.kcal, 0) / dailyAggregates.length;
+  }, [dailyAggregates]);
+  const avgWeeklyProtein = useMemo(() => {
+    if (dailyAggregates.length === 0) return 0;
+    return dailyAggregates.reduce((s, d) => s + d.protein, 0) / dailyAggregates.length;
+  }, [dailyAggregates]);
+  const avgWeeklyFat = useMemo(() => {
+    if (dailyAggregates.length === 0) return 0;
+    return dailyAggregates.reduce((s, d) => s + d.fat, 0) / dailyAggregates.length;
+  }, [dailyAggregates]);
+  const avgWeeklyCarbs = useMemo(() => {
+    if (dailyAggregates.length === 0) return 0;
+    return dailyAggregates.reduce((s, d) => s + d.carbs, 0) / dailyAggregates.length;
+  }, [dailyAggregates]);
+
+  // Chart data arrays (7/14/30 day ranges)
+  const chartKcalData = useMemo(() => {
+    return dailyAggregates.slice(-30).map(d => d.kcal);
+  }, [dailyAggregates]);
+  const chartProteinData = useMemo(() => {
+    return dailyAggregates.slice(-30).map(d => d.protein);
+  }, [dailyAggregates]);
+  const chartLabels = useMemo(() => {
+    return dailyAggregates.slice(-30).map(d => d.date.slice(5));
+  }, [dailyAggregates]);
 
   const cartCount = useMemo(() => { try { return JSON.parse(localStorage.getItem('he_nutrition_carts') || '[]').reduce((s:number,st:any) => s + (st.items?.length || 0), 0); } catch { return 0; } }, [tab]);
 
@@ -1066,7 +1101,7 @@ export const NutritionScreen: React.FC = () => {
   const renderContent = () => {
     switch (tab) {
       case 'diary': return <NutritionDiary foodEntries={foodEntries} targets={macroTargets} />;
-      case 'charts': return <Suspense fallback={<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Загрузка графиков...</div>}><NutritionCharts kcalData={[avgWeeklyKcal]} proteinData={[avgWeeklyProtein]} labels={['']} dailyLogs={dailyLogs} /></Suspense>;
+      case 'charts': return <Suspense fallback={<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Загрузка графиков...</div>}><NutritionCharts kcalData={chartKcalData} proteinData={chartProteinData} labels={chartLabels} dailyLogs={dailyLogs} /></Suspense>;
       case 'mealplan': return <IndividualPlan profile={linked.profile} course={linked.course} />;
       case 'cart': return <CartTab />;
       case 'restaurant': return <RestaurantTab />;

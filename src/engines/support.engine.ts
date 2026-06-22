@@ -2173,18 +2173,6 @@ export function findSupportByGoal(
   return scored.slice(0, maxResults).map(s => ({ substance: s.substance, relevanceScore: s.score }));
 }
 
-export function getSubstanceInfo(id: string): SupportSubstance | undefined {
-  return getSubstance(id);
-}
-
-export function searchSupport(query: string): SupportSubstance[] {
-  return searchSubstances(query);
-}
-
-export function getSupportSubstancesByCategory(category: string): SupportSubstance[] {
-  return findSubstancesByCategory(category);
-}
-
 export function getSupportDatabaseStats() {
   return {
     totalSubstances: ALL_SUBSTANCES.length,

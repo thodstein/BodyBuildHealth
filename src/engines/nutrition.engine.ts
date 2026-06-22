@@ -1,5 +1,5 @@
 import { NutritionInput, NutritionTargets, FoodItem } from '../core/types';
-import { FOOD_DB, RATION_TIERS, getTopByProtein, getTopByCarbs, getTopByFat } from '../core/nutrition-database';
+import { FOOD_DB } from '../core/nutrition-database';
 
 const PHARMA_INTERACTIONS: Record<string, { note: string; foods: string[] }> = {
   'кленбутерол': { note: 'Снижает K/Mg/Таурин. Добавьте курагу, гречку, магний 400 мг, таурин 2 г.', foods: ['buckwheat', 'banana', 'potato_boiled', 'nuts_mix'] },
@@ -11,51 +11,7 @@ const PHARMA_INTERACTIONS: Record<string, { note: string; foods: string[] }> = {
   'мелоксикам': { note: 'Менее токсичен для ЖКТ чем диклофенак, но всё равно нужна защита.', foods: ['apple', 'kefir', 'broccoli'] },
 };
 
-const GOAL_COMMENTS: Record<string, { title: string; protein: string; fats: string; carbs: string; timing: string }> = {
-  bulk: {
-    title: 'Набор массы',
-    protein: 'Белок 1.8-2.2 г/кг — стимуляция mTOR и синтеза мышц. Лейцин (whey, яйца, говядина) — ключевой триггер.',
-    fats: 'Жиры 0.9-1.1 г/кг — минимум для гормонов (тестостерон, лептин). Ниже 0.8 — риск падения T.',
-    carbs: 'Углеводы заполняют остаток — энергия для тренировок, восстановление гликогена. +15% в тренировочные дни.',
-    timing: 'Завтрак: белки + медленные углеводы. После тренировки: быстрый белок + быстрые углеводы (рис/банан). Перед сном: казеин/творог.'
-  },
-  cut: {
-    title: 'Похудение / Сушка',
-    protein: 'Белок 2.2-2.6 г/кг — защита мышц в дефиците. Каждый приём — 30-40 г белка.',
-    fats: 'Жиры 0.7-0.9 г/кг — минимум для гормонов. Не ниже 0.7 — падение тестостерона и либидо.',
-    carbs: 'Углеводы минимальные — только вокруг тренировки и завтрак. -15% в дни отдыха.',
-    timing: 'Утро: белки +少量 углеводы. До тренировки: лёгкий белок. После тренировки: белок + углеводы. Вечер: белки + жиры, мин. углеводов.'
-  },
-  maintenance: {
-    title: 'Поддержание',
-    protein: 'Белок 1.6-2.0 г/кг — поддержание сухой массы и восстановление.',
-    fats: 'Жиры 0.8-1.0 г/кг — баланс для гормонов и здоровья.',
-    carbs: 'Углеводы по остатку — поддержание уровня энергии и гликогена.',
-    timing: '3-4 приёма пищи. Белок в каждом приёме. Углеводы равномерно с акцентом на обед.'
-  },
-  recomp: {
-    title: 'Рекомпозиция',
-    protein: 'Белок 1.8-2.2 г/кг — одновременно рост мышц и потеря жира. Высокий белок критичен.',
-    fats: 'Жиры 0.8-1.0 г/кг — поддержание гормонального фона.',
-    carbs: 'Тренировочные дни выше (+8%), дни отдыха ниже (-5%). Макроциклирование обязательно.',
-    timing: 'Тренировочный день: углеводы вокруг тренировки. День отдыха: белки + жиры, минимум углеводов.'
-  },
-  rehab: {
-    title: 'Восстановление',
-    protein: 'Белок 2.0-2.4 г/кг — усиленное восстановление тканей, иммунитет, антикатаболизм.',
-    fats: 'Жиры 0.9-1.1 г/кг — анти-воспалительные (Омега-3, оливковое масло) приоритет.',
-    carbs: 'Углеводы mod +7% — энергия для восстановления, не для набора.',
-    timing: '3-5 приёмов. Акцент на антиоксиданты (ягоды, овощи), Омега-3 (рыба). Перед сном — казеин.'
-  },
-  strength: {
-    title: 'Силовой период',
-    protein: 'Белок 2.0-2.4 г/кг — поддержка ЦНС и связок при тяжёлых нагрузках.',
-    fats: 'Жиры 1.0-1.2 г/кг — стабильные гормоны при пиковых нагрузках.',
-    carbs: 'Углеводы high — энергообеспечение максимальных силовых усилий.',
-    timing: 'Перед тренировкой: белки + углеводы за 2 ч. После тренировки: быстрый белок + углеводы. Перед сном: казеин.'
-  },
-};
-
+// Timing labels used in nutrition advice
 const TIMING_LABELS: Record<string, string> = {
   morning: 'Завтрак (7:00-9:00)',
   lunch: 'Обед (12:00-14:00)',
@@ -63,24 +19,6 @@ const TIMING_LABELS: Record<string, string> = {
   before_sleep: 'Перед сном (21:00-22:00)',
   any: 'Любое время',
 };
-
-export interface RationTierData {
-  level: 'basic' | 'mid' | 'max';
-  label: string;
-  desc: string;
-  foods: { category: string; items: typeof FOOD_DB }[];
-}
-
-export interface NutritionAdviceData {
-  goalComment: typeof GOAL_COMMENTS[string] | null;
-  deficits: { label: string; current: number; target: number; unit: string; pct: number; isLow: boolean }[];
-  pharmaNotes: { drug: string; note: string; foods: { id: string; name: string; reason: string }[] }[];
-  rationTiers: RationTierData[];
-  topProtein: typeof FOOD_DB;
-  topCarbs: typeof FOOD_DB;
-  topFats: typeof FOOD_DB;
-  timingAdvice: { period: string; foods: string }[];
-}
 
 export function calcNutrition(i: NutritionInput): NutritionTargets {
   const bmrKatch = i.bodyFatPercent ? 370 + 21.6 * (i.weightKg * (100 - i.bodyFatPercent) / 100) : 0;
@@ -131,82 +69,3 @@ export function generateNutritionAdvice(target: NutritionTargets, actual?: { kca
   return txt;
 }
 
-export function generateStructuredAdvice(
-  target: NutritionTargets,
-  goal: string,
-  actual?: { kcal: number; pro: number; fiber: number; water: number },
-  drugs?: string[]
-): NutritionAdviceData {
-  const catLabels: Record<string, string> = {
-    protein: 'Белки', carb: 'Углеводы', fat: 'Жиры', dairy: 'Молочные', veg_fruit: 'Овощи/Фрукты', grain: 'Злаки', supplement: 'Добавки'
-  };
-  const tierLabels: Record<string, { label: string; desc: string }> = {
-    basic: { label: 'Базовый', desc: 'Минимум для закрытия потребности. Доступно и дёшево.' },
-    mid: { label: 'Средний', desc: 'Оптимальное соотношение цена/качество. Больше микроэлементов.' },
-    max: { label: 'Максимум', desc: 'Максимальная питательная плотность. Премиум-продукты.' },
-  };
-  const tiers: ('basic' | 'mid' | 'max')[] = ['basic', 'mid', 'max'];
-  const rationTiers: RationTierData[] = tiers.map(t => ({
-    level: t,
-    label: tierLabels[t].label,
-    desc: tierLabels[t].desc,
-    foods: Object.entries(RATION_TIERS).map(([cat, tierData]) => {
-      const ids = tierData[t as 'basic' | 'mid' | 'max'] || [];
-      const items = ids.map(id => FOOD_DB.find(f => f.id === id.trim())).filter((f): f is typeof FOOD_DB[number] => !!f);
-      return { category: catLabels[cat] || cat, items };
-    }).filter(c => c.items.length > 0),
-  }));
-
-  const deficits: NutritionAdviceData['deficits'] = [];
-  if (actual) {
-    const rows: { label: string; current: number; target: number; unit: string }[] = [
-      { label: 'Ккалории', current: actual.kcal, target: target.kcal, unit: 'ккал' },
-      { label: 'Белки', current: actual.pro, target: target.protein, unit: 'г' },
-      { label: 'Клетчатка', current: actual.fiber || 0, target: target.fiber, unit: 'г' },
-      { label: 'Вода', current: Math.round((actual.water || 0) * 10) / 10, target: target.water, unit: 'л' },
-    ];
-    for (const r of rows) {
-      const pct = r.target > 0 ? Math.round((r.current / r.target) * 100) : 0;
-      deficits.push({ ...r, pct, isLow: pct < 80 });
-    }
-  }
-
-  const pharmaNotes: NutritionAdviceData['pharmaNotes'] = [];
-  if (drugs?.length) {
-    drugs.forEach(d => {
-      const key = Object.keys(PHARMA_INTERACTIONS).find(k => d.toLowerCase().includes(k));
-      if (key) {
-        const inter = PHARMA_INTERACTIONS[key];
-        const foodItems = inter.foods.map(fId => {
-          const food = FOOD_DB.find(f => f.id === fId);
-          return food ? { id: food.id, name: food.name, reason: food.pharmaNote || '' } : { id: fId, name: fId, reason: '' };
-        });
-        pharmaNotes.push({ drug: key, note: inter.note, foods: foodItems });
-      }
-    });
-  }
-
-  const goalData = GOAL_COMMENTS[goal] || null;
-  const timingAdvice: NutritionAdviceData['timingAdvice'] = [];
-  if (goalData) {
-    timingAdvice.push({ period: TIMING_LABELS['morning'], foods: 'Белки + медленные углеводы (овсянка, яйца, хлеб ржаной)' });
-    if (['bulk', 'strength', 'recomp'].includes(goal)) {
-      timingAdvice.push({ period: TIMING_LABELS['after_train'], foods: 'Сывороточный протеин + быстрые углеводы (банан, рис)' });
-    }
-    timingAdvice.push({ period: TIMING_LABELS['lunch'], foods: 'Белки + жиры + овощи (мясо/рыба, масло, брокколи)' });
-    if (['cut', 'recomp', 'maintenance'].includes(goal)) {
-      timingAdvice.push({ period: TIMING_LABELS['before_sleep'], foods: 'Казеин / творог — антикатаболизм на 6-8 часов' });
-    }
-  }
-
-  return {
-    goalComment: goalData,
-    deficits,
-    pharmaNotes,
-    rationTiers,
-    topProtein: getTopByProtein(8),
-    topCarbs: getTopByCarbs(8),
-    topFats: getTopByFat(6),
-    timingAdvice,
-  };
-}
