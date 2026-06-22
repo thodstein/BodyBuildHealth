@@ -257,6 +257,27 @@ const ORGAN_MECHANISMS: Record<string, string[]> = {
 
 const getCategoryInfo = (cat: string): { label: string; emoji: string } => {
   const safeCat = cat || 'Без категории';
+  const TYPE_LABELS: Record<string, { label: string; emoji: string }> = {
+    vitamin: { label: '💊 Витамины', emoji: '💊' },
+    mineral: { label: '🧂 Минералы', emoji: '🧂' },
+    amino_acid: { label: '🧬 Аминокислоты', emoji: '🧬' },
+    herb: { label: '🌿 Травы и растения', emoji: '🌿' },
+    hormone: { label: '⚖️ Гормоны', emoji: '⚖️' },
+    peptide: { label: '🧬 Пептиды', emoji: '🧬' },
+    antioxidant: { label: '🛡️ Антиоксиданты', emoji: '🛡️' },
+    enzyme: { label: '⚙️ Ферменты', emoji: '⚙️' },
+    probiotic: { label: '🦠 Пробиотики', emoji: '🦠' },
+    fatty_acid: { label: '🐟 Жирные кислоты', emoji: '🐟' },
+    nootropic: { label: '🧠 Ноотропы', emoji: '🧠' },
+    adaptogen: { label: '🌿 Адаптогены', emoji: '🌿' },
+    mineral_complex: { label: '🧂 Минеральные комплексы', emoji: '🧂' },
+    vitamin_mineral: { label: '💊 Витаминно-минеральные', emoji: '💊' },
+    mushroom: { label: '🍄 Грибы', emoji: '🍄' },
+    polyphenol: { label: '🫐 Полифенолы', emoji: '🫐' },
+    pharma: { label: '💊 Фармакология', emoji: '💊' },
+    supplement: { label: '💪 Добавки', emoji: '💪' },
+    no_organ: { label: '📦 Другое', emoji: '📦' },
+  };
   const GROUP_LABELS: Record<string, { label: string; emoji: string }> = {
     liver: { label: '🫁 Печень', emoji: '🫁' },
     cardio: { label: '❤️ Сердце и сосуды', emoji: '❤️' },
@@ -295,7 +316,7 @@ const getCategoryInfo = (cat: string): { label: string; emoji: string } => {
     analgesic: { label: '💊 Обезболивающее', emoji: '💊' },
     other: { label: '📦 Другое', emoji: '📦' },
   };
-  return CATEGORY_LABELS[safeCat] || GROUP_LABELS[safeCat] || (TYPE_LABELS_RU[safeCat] ? { label: TYPE_LABELS_RU[safeCat], emoji: '📦' } : { label: safeCat, emoji: '📦' });
+  return CATEGORY_LABELS[safeCat] || TYPE_LABELS[safeCat] || GROUP_LABELS[safeCat] || (TYPE_LABELS_RU[safeCat] ? { label: TYPE_LABELS_RU[safeCat], emoji: '📦' } : { label: safeCat, emoji: '📦' });
 };
 
 const TYPE_LABELS_RU: Record<string, string> = {
@@ -1854,7 +1875,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       );
     }
     for (const sub of filtered) {
-      const primaryCat = normCat((sub.categories||[])[0] || 'other');
+      const primaryCat = sub.type || normCat((sub.categories||[])[0] || 'other');
       if (!groups[primaryCat]) groups[primaryCat] = [];
       groups[primaryCat].push(sub);
     }
@@ -2610,7 +2631,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       const list = filtered || [];
       const currentTab = tab || 'all';
       const synergies = currentTab === 'synergies' || currentTab === 'all' ? list.filter((i:any) => i?.type === 'synergy') : [];
-      const conflicts = currentTab === 'conflicts' || currentTab === 'all' ? list.filter((i:any) => i?.type === 'conflict') : [];
+      const conflicts = currentTab === 'conflicts' || currentTab === 'all' ? list.filter((i:any) => i?.type === 'conflict' || i?.type === 'caution') : [];
       const cautions = currentTab === 'cautions' || currentTab === 'all' ? list.filter((i:any) => i?.type === 'caution') : [];
       const synTotal = synergies.length;
       const confTotal = conflicts.length;
@@ -2712,7 +2733,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         ))}
                       </div>
                     )}
-                    {interaction?.notes && !(/^[A-Z0-9_]+$/.test(interaction?.effect||'')) && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:2 }}>{interaction.notes}</div>}
+                    {interaction?.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:2 }}>{interaction.notes}</div>}
                   </div>
                 );
               }, i))}
@@ -2776,7 +2797,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         })}
                       </div>
                     )}
-                    {interaction?.notes && !(/^[A-Z0-9_]+$/.test(interaction?.effect||'')) && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:2 }}>{interaction?.notes}</div>}
+                    {interaction?.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:2 }}>{interaction?.notes}</div>}
                   </div>
                 );
               }, i))}
@@ -3707,6 +3728,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                 <div style={{ fontSize:7, color:'var(--text-dim)' }}>{stack.substances.length} веществ</div>
                                 {expandedMed === stack.id && safeRender('stack_'+stack.id, () =>
                                   <div style={{ marginTop:4, padding:'6px 8px', background:'rgba(0,0,0,0.15)', borderRadius:8 }}>
+                                    {/* Description */}
+                                    {stack.description && <div style={{ marginBottom:4, fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4, padding:'4px 6px', background:'rgba(0,230,138,0.04)', borderRadius:4, border:'1px solid rgba(0,230,138,0.08)' }}>{stack.description}</div>}
+                                    {/* Goal tags */}
+                                    {stack.goalTags && stack.goalTags.length > 0 && <div style={{ marginBottom:4, display:'flex', flexWrap:'wrap', gap:2 }}>{stack.goalTags.map(t => <span key={t} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(59,130,246,0.1)', color:'#60a5fa', fontWeight:500 }}>#{t}</span>)}</div>}
                                     {/* Positive effects */}
                                     <div style={{ marginBottom:4 }}>
                                       <div style={{ fontSize:8, fontWeight:700, color:'#22c55e', marginBottom:3 }}>⊕ Положительные эффекты</div>
@@ -3718,6 +3743,30 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                         ))}
                                       </div>
                                     </div>
+                                    {/* Why this stack works */}
+                                    {(() => {
+                                      const subs = stack.substances.map(sid => ALL_SUBSTANCES.find(s => s.id === sid)).filter(Boolean);
+                                      const allMechs = new Set<string>();
+                                      subs.forEach(s => { if (s?.mechanisms) s.mechanisms.forEach(m => allMechs.add(m)); });
+                                      const uniqueMechs = [...allMechs].filter(m => subs.filter(s => (s?.mechanisms||[]).includes(m)).length >= Math.min(2, subs.length));
+                                      if (uniqueMechs.length === 0) return null;
+                                      return (
+                                        <div style={{ marginBottom:4, padding:'4px 6px', background:'rgba(139,92,246,0.04)', borderRadius:4, border:'1px solid rgba(139,92,246,0.08)' }}>
+                                          <div style={{ fontSize:8, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>⚙️ Почему стек работает</div>
+                                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', lineHeight:1.3 }}>
+                                            {subs.length} компонента работают совместно через <b style={{color:'#a78bfa'}}>{uniqueMechs.length}</b> ключевых механизмов: {uniqueMechs.map(m => MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m).join(', ')}.
+                                            {subs.length >= 3 && ` Комбинация обеспечивает multi-target эффект, недостижимый при приёме каждого вещества по отдельности.`}
+                                          </div>
+                                        </div>
+                                      );
+                                    })()}
+                                    {/* Synergy notes */}
+                                    {(stack as any).synergy_notes && (
+                                      <div style={{ marginBottom:4, padding:'4px 6px', background:'rgba(34,197,94,0.04)', borderRadius:4, border:'1px solid rgba(34,197,94,0.08)' }}>
+                                        <div style={{ fontSize:8, fontWeight:700, color:'#22c55e', marginBottom:1 }}>⊕ Синергия стека</div>
+                                        <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', lineHeight:1.3 }}>{(stack as any).synergy_notes}</div>
+                                      </div>
+                                    )}
                                     {/* Substance breakdown */}
                                     <div style={{ marginBottom:4 }}>
                                       <div style={{ fontSize:8, fontWeight:700, color:'var(--text-light)', marginBottom:2 }}>🧬 Компоненты</div>
@@ -4205,7 +4254,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     return (
                                       <div key={sid} style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 6px', fontSize:9, borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
                                         <span style={{ color:'var(--text-light)', flex:1 }}>{getStackSubLabel(sid)}</span>
-                                        {sub?.description && <span style={{ color:'rgba(255,255,255,0.4)', fontSize:7.5 }}>{sub.description.slice ? sub.description.slice(0,80) : sub.description}</span>}
+                                        {sub?.description && <span style={{ color:'rgba(255,255,255,0.4)', fontSize:7.5 }}>{sub.description.slice ? sub.description.slice(0,150) : sub.description}</span>}
                                       </div>
                                     );
                                   })}
@@ -6410,7 +6459,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                                 <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{d.timing}</td>
                                 <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub.name}</td>
                                 <td style={{ padding:'3px 5px', color:'#00e68a' }}>{d.mg} мг</td>
-                                <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{sub.description?.slice(0,30) || ''}</td>
+                                <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{sub.description?.slice(0,80) || ''}</td>
                               </tr>
                             );
                           })}
@@ -7418,7 +7467,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   return (
                     <div key={id} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.1)', fontSize:10 }}>
                       <div style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</div>
-                      {sub.description && <div style={{ fontSize:8, color:'var(--text-dim)' }}>{sub.description?.slice(0,80)}</div>}
+                      {sub.description && <div style={{ fontSize:8, color:'var(--text-dim)' }}>{sub.description?.slice(0,200)}</div>}
                     </div>
                   );
                 })}
