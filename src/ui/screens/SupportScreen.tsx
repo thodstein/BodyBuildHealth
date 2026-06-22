@@ -257,7 +257,45 @@ const ORGAN_MECHANISMS: Record<string, string[]> = {
 
 const getCategoryInfo = (cat: string): { label: string; emoji: string } => {
   const safeCat = cat || 'Без категории';
-  return CATEGORY_LABELS[safeCat] || (TYPE_LABELS_RU[safeCat] ? { label: TYPE_LABELS_RU[safeCat], emoji: '📦' } : { label: safeCat, emoji: '📦' });
+  const GROUP_LABELS: Record<string, { label: string; emoji: string }> = {
+    liver: { label: '🫁 Печень', emoji: '🫁' },
+    cardio: { label: '❤️ Сердце и сосуды', emoji: '❤️' },
+    neuro: { label: '🧠 Нервная система', emoji: '🧠' },
+    immune: { label: '🛡️ Иммунитет', emoji: '🛡️' },
+    kidney: { label: '🫘 Почки', emoji: '🫘' },
+    joints: { label: '🦴 Суставы', emoji: '🦴' },
+    bone: { label: '🦴 Кости', emoji: '🦴' },
+    skin: { label: '🧴 Кожа', emoji: '🧴' },
+    lung: { label: '🫁 Лёгкие', emoji: '🫁' },
+    eye: { label: '👁 Глаза', emoji: '👁' },
+    blood: { label: '🩸 Кровь', emoji: '🩸' },
+    thyroid: { label: '🦋 Щитовидная железа', emoji: '🦋' },
+    muscle: { label: '💪 Мышцы', emoji: '💪' },
+    recovery: { label: '🔄 Восстановление', emoji: '🔄' },
+    gi: { label: '🫃 ЖКТ', emoji: '🫃' },
+    vitamins: { label: '💊 Витамины', emoji: '💊' },
+    minerals: { label: '🧂 Минералы', emoji: '🧂' },
+    amino_acids: { label: '🧬 Аминокислоты', emoji: '🧬' },
+    herbs: { label: '🌿 Травы', emoji: '🌿' },
+    peptides: { label: '🧬 Пептиды', emoji: '🧬' },
+    nootropics: { label: '🧠 Ноотропы', emoji: '🧠' },
+    adaptogens: { label: '🌿 Адаптогены', emoji: '🌿' },
+    hormones: { label: '⚖️ Гормоны', emoji: '⚖️' },
+    enzymes: { label: '⚙️ Ферменты', emoji: '⚙️' },
+    probiotics: { label: '🦠 Пробиотики', emoji: '🦠' },
+    fatty_acids: { label: '🐟 Жирные кислоты', emoji: '🐟' },
+    mushrooms: { label: '🍄 Грибы', emoji: '🍄' },
+    electrolytes: { label: '⚡ Электролиты', emoji: '⚡' },
+    antioxidants: { label: '🛡️ Антиоксиданты', emoji: '🛡️' },
+    antiinflammatory: { label: '🔥 Противовоспалительное', emoji: '🔥' },
+    anxiolytic: { label: '😌 Противотревожное', emoji: '😌' },
+    antiaging: { label: '🕰 Антивозрастное', emoji: '🕰' },
+    metabolism: { label: '⚡ Метаболизм', emoji: '⚡' },
+    mood: { label: '😊 Настроение', emoji: '😊' },
+    analgesic: { label: '💊 Обезболивающее', emoji: '💊' },
+    other: { label: '📦 Другое', emoji: '📦' },
+  };
+  return CATEGORY_LABELS[safeCat] || GROUP_LABELS[safeCat] || (TYPE_LABELS_RU[safeCat] ? { label: TYPE_LABELS_RU[safeCat], emoji: '📦' } : { label: safeCat, emoji: '📦' });
 };
 
 const TYPE_LABELS_RU: Record<string, string> = {
@@ -1456,6 +1494,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [pubMedLoading, setPubMedLoading] = useState(false);
   const [planView, setPlanView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [planSaved, setPlanSaved] = useState(false);
+  const [reportGenerated, setReportGenerated] = useState(false);
   const [planSubTab, setPlanSubTab] = useState<'active' | 'archive'>('active');
   const [favSearch, setFavSearch] = useState('');
   const [archivedPlans, setArchivedPlans] = useState<any[]>(() => {
@@ -1476,6 +1515,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [editNotesText, setEditNotesText] = useState('');
   const [expandedStack, setExpandedStack] = useState<string | null>(null);
   const [favRefresh, setFavRefresh] = useState(0);
+  const [favTab, setFavTab] = useState<string>('favorites');
   const [showSavedPicker, setShowSavedPicker] = useState(false);
   const [researchSource, setResearchSource] = useState<'pubmed' | 'pubchem' | 'scholar' | 'fda' | 'pharma'>('pubmed');
   const [pubchemResults, setPubchemResults] = useState<any[]>([]);
@@ -2418,10 +2458,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       const subsInteractions = (interactions||[]).filter(i =>
         i && i.substanceA && i.substanceB && (matchesCatId(i.substanceA, subId) || matchesCatId(i.substanceB, subId))
       ).slice(0, 5);
-      return subsInteractions.length > 0 ? (
+      return (
         <div style={{ marginTop:4 }}>
           <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:1 }}>Взаимодействия:</div>
-          {subsInteractions.map(i => {
+          {subsInteractions.length > 0 ? subsInteractions.map(i => {
             if (!i) return null;
             const isA = matchesCatId(i.substanceA, subId);
             const partner = isA ? i.substanceB : i.substanceA;
@@ -2434,9 +2474,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 {i.notes && <span style={{ opacity:0.6 }}>: {(i.notes||'').slice(0,40)}</span>}
               </div>
             );
-          })}
+          }) : <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', fontStyle:'italic', padding:'1px 0', lineHeight:1.2 }}>Нет зарегистрированных взаимодействий. Проверьте совместимость индивидуально.</div>}
         </div>
-      ) : null;
+      );
     } catch (e) { return null; }
   }
 // Helper to render SUPPORT_CATALOG_DATA for a substance
@@ -3604,10 +3644,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                          }
                             if (synergyCountFilter > 0) {
                               list = list.filter((i: any) => {
-                                let count = 0;
-                                if (i.substanceA) count++;
-                                if (i.substanceB) count++;
-                                return count >= synergyCountFilter;
+                                const countA = mergedInteractions.filter((x: any) => x.substanceA === i.substanceA || x.substanceB === i.substanceA).length;
+                                const countB = mergedInteractions.filter((x: any) => x.substanceA === i.substanceB || x.substanceB === i.substanceB).length;
+                                return Math.max(countA, countB) >= synergyCountFilter;
                               });
                             }
                            if (synergyOrganFilter) {
@@ -3744,44 +3783,369 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               return (
               <div>
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  {[['mystacks','📂 Мои стеки','generator'],['plan','📋 План','generator'],['reports','📊 Отчеты','generator']].map(([id,label,sectionTarget]) => (
-                    <button key={id} onClick={() => { setSection(sectionTarget as any); setTab('main'); setSupportView('calc'); setCalcView(id as CalcView); }} style={{
+                  {[['favorites','⭐ Избранное'],['mystacks','📂 Мои стеки'],['plan','📋 План'],['reports','📊 Отчеты']].map(([id,label]) => (
+                    <button key={id} onClick={() => setFavTab(id)} style={{
                       padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                      background: calcView === id ? 'var(--accent)' : 'var(--bg-secondary)',
-                      color: calcView === id ? '#000' : 'var(--text-dim)',
-                      border: '1px solid ' + (calcView === id ? 'var(--accent)' : 'var(--border)'),
+                      background: favTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
+                      color: favTab === id ? '#000' : 'var(--text-dim)',
+                      border: '1px solid ' + (favTab === id ? 'var(--accent)' : 'var(--border)'),
                     }}>{label}</button>
                   ))}
                 </div>
-                <input value={favSearch} onChange={e => setFavSearch(e.target.value)}
-                  placeholder="🔍 Поиск в избранном..."
-                  style={{ width:'100%', padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box', marginBottom:8 }} />
-                {filtered.length === 0 ? (
-                  <div style={{ padding:24, textAlign:'center' }}>
-                    <div style={{ fontSize:24, marginBottom:6 }}>⭐</div>
-                    <div style={{ fontSize:11, color:'var(--text-dim)' }}>Нет избранных препаратов.</div>
-                    <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>Добавьте из каталога ➕</div>
-                  </div>
-                ) : (
-                  filtered.map((s: any) => (
-                    <div key={s.id} style={{ display:'flex', alignItems:'center', gap:4, padding:'8px 10px', background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)', marginBottom:4 }}>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{s.name||s.id}</div>
-                        <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:2 }}>
-                          {(s.categories||[]).slice(0,3).map((c: string) => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c}</span>)}
-                        </div>
-                      </div>
-                      <button onClick={() => {
-                        try {
-                          let f: string[] = JSON.parse(localStorage.getItem('he_support_favorites') || '[]');
-                          const idx = f.indexOf(s.id);
-                          if (idx >= 0) f.splice(idx, 1);
-                          localStorage.setItem('he_support_favorites', JSON.stringify(f));
-                          setFavRefresh(prev => prev + 1);
-                        } catch {}
-                      }} style={{ padding:'3px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontWeight:600, whiteSpace:'nowrap', flexShrink:0 }}>★ Убрать</button>
+
+                {/* === FAVORITES TAB === */}
+                {favTab === 'favorites' && (
+                <div>
+                  <input value={favSearch} onChange={e => setFavSearch(e.target.value)}
+                    placeholder="🔍 Поиск в избранном..."
+                    style={{ width:'100%', padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box', marginBottom:8 }} />
+                  {filtered.length === 0 ? (
+                    <div style={{ padding:24, textAlign:'center' }}>
+                      <div style={{ fontSize:24, marginBottom:6 }}>⭐</div>
+                      <div style={{ fontSize:11, color:'var(--text-dim)' }}>Нет избранных препаратов.</div>
+                      <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>Добавьте из каталога ➕</div>
                     </div>
-                  ))
+                  ) : (
+                    filtered.map((s: any) => (
+                      <div key={s.id} style={{ display:'flex', alignItems:'center', gap:4, padding:'8px 10px', background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)', marginBottom:4 }}>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{s.name||s.id}</div>
+                          <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:2 }}>
+                            {(s.categories||[]).slice(0,3).map((c: string) => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c}</span>)}
+                          </div>
+                        </div>
+                        <button onClick={() => {
+                          try {
+                            let f: string[] = JSON.parse(localStorage.getItem('he_support_favorites') || '[]');
+                            const idx = f.indexOf(s.id);
+                            if (idx >= 0) f.splice(idx, 1);
+                            localStorage.setItem('he_support_favorites', JSON.stringify(f));
+                            setFavRefresh(prev => prev + 1);
+                          } catch {}
+                        }} style={{ padding:'3px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontWeight:600, whiteSpace:'nowrap', flexShrink:0 }}>★ Убрать</button>
+                      </div>
+                    ))
+                  )}
+                </div>
+                )}
+
+                {/* === MYSTACKS TAB === */}
+                {favTab === 'mystacks' && (
+                  <div style={{ padding:'0 0 80px' }}>
+                    <div className="card" style={{ marginBottom:10, padding:10, background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)' }}>
+                      <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>💾 Сохранить текущий стек</div>
+                      <div style={{ display:'flex', gap:6 }}>
+                        <input value={stackName} onChange={e=>setStackName(e.target.value)} placeholder="Название стека..."
+                          style={{ flex:1, padding:'6px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10 }} />
+                        <button onClick={() => {
+                          if (!stackName.trim()) { alert('Введите название'); return; }
+                          const level = SUPPORT_LEVELS[supportLevel];
+                          if (!level?.subs || level.subs.length === 0) { alert('Нет препаратов в калькуляторе'); return; }
+                          const newStack = { id: 'stack_'+Date.now(), name: stackName.trim(), date: new Date().toISOString(), subs: [...level.subs], dosages: { ...(level.dosages||{}) }, notes: '' };
+                          const updated = [...savedStacks, newStack];
+                          setSavedStacks(updated);
+                          localStorage.setItem('savedStacks', JSON.stringify(updated));
+                          setStackName('');
+                        }} style={{ padding:'6px 12px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:10 }}>Сохранить</button>
+                      </div>
+                    </div>
+                    {savedStacks.length === 0 ? (
+                      <div style={{ textAlign:'center', padding:24, background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)' }}>
+                        <div style={{ fontSize:28, marginBottom:6 }}>📂</div>
+                        <div style={{ fontSize:12, color:'var(--text-dim)' }}>Нет сохранённых стеков</div>
+                      </div>
+                    ) : (
+                      savedStacks.map(stack => {
+                        const isExpanded = expandedStack === stack.id;
+                        return (
+                          <div key={stack.id} style={{ marginBottom:8, background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)', overflow:'hidden' }}>
+                            <div onClick={() => setExpandedStack(isExpanded ? null : stack.id)} style={{ padding:'10px 12px', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'flex-start', borderBottom: isExpanded ? '1px solid var(--border)' : 'none' }}>
+                              <div style={{ flex:1 }}>
+                                <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>{stack.name}</div>
+                                <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{stack.date ? new Date(stack.date).toLocaleDateString('ru') : ''} · {stack.subs.length} добавок</div>
+                                {(stack as any).notes && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{(stack as any).notes}</div>}
+                              </div>
+                              <span style={{ fontSize:12, color:'var(--text-dim)', flexShrink:0 }}>{isExpanded ? '▲' : '▼'}</span>
+                            </div>
+                            {isExpanded && (
+                              <div style={{ padding:'0 12px 10px' }}>
+                                <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:8 }}>
+                                  {stack.subs.map(id => {
+                                    const sub = ALL_SUBSTANCES.find(s => s.id === id);
+                                    const pharma = PHARMA_DB[id];
+                                    const name = sub?.name || pharma?.name || id.replace(/_/g, ' ');
+                                    const dosage = stack.dosages?.[id];
+                                    const desc = sub?.description || pharma?.description || '';
+                                    return (
+                                      <div key={id} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.1)' }}>
+                                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                          <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{name}</span>
+                                          {dosage && <span style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>{dosage.timing || ''} {dosage.mg ? `${dosage.mg}мг` : ''}</span>}
+                                        </div>
+                                        {desc && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{desc}</div>}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <div style={{ display:'flex', gap:4 }}>
+                                  <button onClick={() => {
+                                    try { localStorage.setItem('savedStacks', JSON.stringify(savedStacks.filter(s => s.id !== stack.id))); setSavedStacks(prev => prev.filter(s => s.id !== stack.id)); } catch {}
+                                  }} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444', fontWeight:600 }}>✕ Удалить</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+
+                {/* === PLAN TAB === */}
+                {favTab === 'plan' && (
+                  <div style={{ padding:'0 0 80px' }}>
+                    <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+                      <button onClick={() => setPlanSubTab('active')} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'active' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'active' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'active' ? 'var(--accent)' : 'var(--border)'}` }}>✅ Действующий план</button>
+                      <button onClick={() => setPlanSubTab('archive')} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'archive' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'archive' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'archive' ? 'var(--accent)' : 'var(--border)'}` }}>📦 Архив ({archivedPlans.length})</button>
+                    </div>
+
+                    {planSubTab === 'active' && (() => {
+                      const level = SUPPORT_LEVELS[supportLevel];
+                      const subs = level?.subs || [];
+                      const dosages = level?.dosages || {};
+                      const getInfo = (id: string) => {
+                        const sub = ALL_SUBSTANCES.find(s => s.id === id);
+                        const d = dosages[id];
+                        return { id, name: sub?.name || id.replace(/_/g, ' '), mg: d?.mg ?? 0, timing: d?.timing || '', desc: sub?.description || '' };
+                      };
+                      return (
+                        <>
+                          <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>📋 Действующий план поддержки</div>
+                          <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8 }}>Уровень: {level?.label || supportLevel}</div>
+
+                          {/* Action buttons */}
+                          <div style={{ display:'flex', gap:4, marginBottom:10, flexWrap:'wrap' }}>
+                            <button onClick={() => {
+                              const saved = localStorage.getItem('savedStacks');
+                              if (!saved || JSON.parse(saved).length === 0) { alert('Нет сохранённых стеков'); return; }
+                              const stacks = JSON.parse(saved);
+                              const names = stacks.map((s: any,i: number) => `${i+1}. ${s.name || ''}`).join('\n');
+                              const idx = parseInt(prompt(`Выберите стек:\n${names}`) || '-1') - 1;
+                              if (idx < 0 || idx >= stacks.length) return;
+                              const stack = stacks[idx];
+                              const stackSubs = (stack.subs || []).filter((id: string) => !subs.includes(id));
+                              if (stackSubs.length === 0) { alert('Все препараты уже в плане'); return; }
+                              const newDosages = { ...dosages };
+                              stackSubs.forEach((id: string) => {
+                                const d = stack.dosages?.[id];
+                                if (d) newDosages[id] = typeof d === 'number' ? { mg: d, timing: '' } : d;
+                              });
+                              SUPPORT_LEVELS[supportLevel] = { ...level, subs: [...subs, ...stackSubs], dosages: newDosages };
+                              window.location.reload();
+                            }} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', fontWeight:600 }}>📦 Из моих стеков</button>
+                            <button onClick={() => {
+                              const items = subs.map((id: string) => { const info = getInfo(id); return { id, name: info.name, dose: info.mg, timing: info.timing }; });
+                              const existing = JSON.parse(localStorage.getItem('supportCart') || '[]');
+                              localStorage.setItem('supportCart', JSON.stringify([...existing, ...items]));
+                              setCartItems([...cartItems, ...items]);
+                              alert('✅ Добавлено в корзину');
+                            }} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor:'pointer', background:'rgba(255,152,0,0.15)', border:'1px solid rgba(255,152,0,0.3)', color:'#ff9800', fontWeight:600 }}>🛒 В корзину</button>
+                          </div>
+
+                          {/* Timing table */}
+                          {subs.length > 0 && (
+                            <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
+                              <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', marginBottom:6 }}>📋 Таблица приёма</div>
+                              <table style={{ width:'100%', fontSize:8, borderCollapse:'collapse' }}>
+                                <thead><tr style={{ background:'rgba(0,0,0,0.1)' }}>
+                                  <th style={{ padding:'3px 5px', textAlign:'left' }}>Время</th>
+                                  <th style={{ padding:'3px 5px', textAlign:'left' }}>Препарат</th>
+                                  <th style={{ padding:'3px 5px', textAlign:'left' }}>Доза</th>
+                                </tr></thead>
+                                <tbody>
+                                  {subs.map((id: string) => {
+                                    const sub = ALL_SUBSTANCES.find(s => s.id === id);
+                                    const d = dosages[id];
+                                    if (!sub || !d) return null;
+                                    return (
+                                      <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
+                                        <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{d.timing || '—'}</td>
+                                        <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub.name || id.replace(/_/g, ' ')}</td>
+                                        <td style={{ padding:'3px 5px', color:'#00e68a' }}>{d.mg >= 1000 && id !== 'omega3' ? `${(d.mg/1000).toFixed(d.mg%1000===0?0:1)}г` : `${d.mg}мг`}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                          {subs.length === 0 && <div style={{ fontSize:10, color:'var(--text-dim)' }}>Нет препаратов в плане. Сначала выполните расчёт в калькуляторе.</div>}
+
+                          {/* Save plan */}
+                          <div style={{ display:'flex', gap:6, marginTop:6 }}>
+                            <button onClick={() => {
+                              const plan = { level:supportLevel, date:new Date().toISOString(), subs, dosages, label:level?.label||supportLevel };
+                              const existing = JSON.parse(localStorage.getItem('he_saved_support_plans') || '[]');
+                              existing.push({ id:Date.now(), date:new Date().toISOString(), plan });
+                              localStorage.setItem('he_saved_support_plans', JSON.stringify(existing));
+                              setPlanSaved(true);
+                            }} style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:11 }}>💾 Сохранить план</button>
+                          </div>
+                          {planSaved && <div style={{ textAlign:'center', fontSize:10, color:'#22c55e', marginTop:4 }}>✅ План сохранён</div>}
+
+                          {/* My plans */}
+                          {(() => {
+                            let savedPlans: any[] = [];
+                            try { savedPlans = JSON.parse(localStorage.getItem('he_saved_support_plans') || '[]'); } catch {}
+                            if (savedPlans.length === 0) return null;
+                            return (
+                              <div style={{ marginTop:8 }}>
+                                <div style={{ fontSize:11, fontWeight:700, color:'var(--accent)', marginBottom:4 }}>📋 Мои планы</div>
+                                {[...savedPlans].reverse().map((sp, i) => {
+                                  const p = sp.plan || {};
+                                  const pSubs = p.subs || [];
+                                  return (
+                                    <div key={sp.id || i} style={{ padding:'6px 10px', marginBottom:4, background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                      <div>
+                                        <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{p.levelLabel || 'План'} · {pSubs.length} препаратов</div>
+                                        <div style={{ fontSize:8, color:'var(--text-dim)' }}>{new Date(sp.date).toLocaleDateString('ru-RU')}</div>
+                                      </div>
+                                      <button onClick={() => {
+                                        try {
+                                          let saved: any[] = JSON.parse(localStorage.getItem('he_saved_support_plans') || '[]');
+                                          localStorage.setItem('he_saved_support_plans', JSON.stringify(saved.filter((x:any) => x.id !== sp.id)));
+                                          window.location.reload();
+                                        } catch {}
+                                      }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
+                        </>
+                      );
+                    })()}
+
+                    {/* Archive */}
+                    {planSubTab === 'archive' && (
+                      <div>
+                        <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>📦 Архив планов</div>
+                        {archivedPlans.length === 0 ? (
+                          <div style={{ fontSize:10, color:'var(--text-dim)' }}>Архив пуст. При сохранении нового плана старый автоматически перемещается в архив.</div>
+                        ) : (
+                          [...archivedPlans].reverse().map((plan, idx) => {
+                            const planId = `arch_${idx}_${plan.archivedAt || plan.date}`;
+                            const isExpanded = expandedArchiveId === planId;
+                            const planSubs = plan.subs || [];
+                            const planDosages = plan.dosages || {};
+                            return (
+                              <div key={planId} style={{ marginBottom:8, background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)', overflow:'hidden' }}>
+                                <div onClick={() => setExpandedArchiveId(isExpanded ? null : planId)} style={{ padding:'8px 12px', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom: isExpanded ? '1px solid var(--border)' : 'none' }}>
+                                  <div>
+                                    <div style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{plan.label || 'План'}</div>
+                                    <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>{new Date(plan.archivedAt || plan.date).toLocaleDateString('ru-RU')} · {planSubs.length} препаратов</div>
+                                  </div>
+                                  <span style={{ fontSize:12, color:'var(--text-dim)' }}>{isExpanded ? '▲' : '▼'}</span>
+                                </div>
+                                {isExpanded && (
+                                  <div style={{ padding:'8px 12px' }}>
+                                    {planSubs.length > 0 && (
+                                      <table style={{ width:'100%', fontSize:8, borderCollapse:'collapse' }}>
+                                        <thead><tr style={{ background:'rgba(0,0,0,0.1)' }}>
+                                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Препарат</th>
+                                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Доза</th>
+                                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Время</th>
+                                        </tr></thead>
+                                        <tbody>
+                                          {planSubs.map((id: string) => {
+                                            const sub = ALL_SUBSTANCES.find((s: any) => s.id === id);
+                                            const d = planDosages[id];
+                                            return (
+                                              <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
+                                                <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub?.name || id.replace(/_/g, ' ')}</td>
+                                                <td style={{ padding:'3px 5px', color:'#00e68a' }}>{d?.mg ? `${d.mg}мг` : '—'}</td>
+                                                <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{d?.timing || '—'}</td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    )}
+                                    <button onClick={() => {
+                                      const archive = JSON.parse(localStorage.getItem('supportPlanArchive') || '[]');
+                                      const key = [...archivedPlans].reverse()[idx];
+                                      const realIdx = archivedPlans.indexOf(key);
+                                      if (realIdx >= 0) { archive.splice(realIdx, 1); localStorage.setItem('supportPlanArchive', JSON.stringify(archive)); setArchivedPlans(archive); }
+                                    }} style={{ marginTop:6, padding:'4px 10px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑 Удалить из архива</button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* === REPORTS TAB === */}
+                {favTab === 'reports' && (
+                  <div style={{ paddingBottom:80 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)', marginBottom:4 }}>📊 Отчёты поддержки</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8, lineHeight:1.3 }}>Полный отчёт по рискам, поддержке, взаимодействиям и курсу. Сохраняется в архив.</div>
+
+                    <button onClick={() => {
+                      const profile = linked.profile;
+                      const course = linked.course || [];
+                      const weightKg = profile?.settings?.weight ?? 80;
+                      const age = profile?.settings?.age ?? 30;
+                      const sex = profile?.settings?.sex ?? 'male';
+                      const levelSubIds = SUPPORT_LEVELS[supportLevel]?.subs || [];
+                      const planItems = levelSubIds.map((id:string) => {
+                        const sub = ALL_SUBSTANCES.find((s:any) => s.id === id);
+                        const dos = { mg:500, timing:'с едой' };
+                        return { id, name:sub?.name||id, dose:dos.mg+'мг', timing:dos.timing, categories:sub?.categories||[], mechanisms:sub?.mechanisms||[] };
+                      });
+                      const report = {
+                        date: new Date().toISOString(), level:supportLevel, items:planItems,
+                        substanceCount: ALL_SUBSTANCES.length, interactionCount: ALL_INTERACTIONS.length
+                      };
+                      const archive = JSON.parse(localStorage.getItem('he_support_reports_archive') || '[]');
+                      archive.push(report);
+                      localStorage.setItem('he_support_reports_archive', JSON.stringify(archive));
+                      localStorage.setItem('he_nutrition_report_current', JSON.stringify(report));
+                      setReportGenerated(true);
+                    }} style={{ width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:11 }}>📊 Сгенерировать отчёт</button>
+
+                    {/* Archive */}
+                    {(() => {
+                      let archive: any[] = [];
+                      try { archive = JSON.parse(localStorage.getItem('he_support_reports_archive') || '[]'); } catch {}
+                      if (archive.length === 0) return null;
+                      return (
+                        <div style={{ marginTop:8 }}>
+                          <div style={{ fontSize:10, fontWeight:600, color:'var(--text-dim)', marginBottom:4 }}>Архив отчётов</div>
+                          {[...archive].reverse().slice(0,10).map((r, i) => (
+                            <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', marginBottom:4, background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)' }}>
+                              <div>
+                                <div style={{ fontSize:9, color:'var(--text-light)' }}>Отчёт {r.level || ''} · {r.items?.length || 0} препаратов</div>
+                                <div style={{ fontSize:8, color:'var(--text-dim)' }}>{new Date(r.date).toLocaleDateString('ru-RU')}</div>
+                              </div>
+                              <button onClick={() => {
+                                try {
+                                  const arch: any[] = JSON.parse(localStorage.getItem('he_support_reports_archive') || '[]');
+                                  const rev = [...arch].reverse();
+                                  const realIdx = arch.indexOf(rev[i]);
+                                  if (realIdx >= 0) { arch.splice(realIdx, 1); localStorage.setItem('he_support_reports_archive', JSON.stringify(arch)); window.location.reload(); }
+                                } catch {}
+                              }} style={{ padding:'3px 6px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 )}
               </div>
               );
@@ -3928,37 +4292,54 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       )}
                     </div>
                     {enhancedSubs.length >= 2 && (() => {
-                      const checked: Array<{a:string;b:string;type:string;effect:string;severity:string}> = [];
+                      const checked: Array<{a:string;b:string;type:string;effect:string;severity:string;synergyType?:string;affectedSystems?:string[];clinicalNote?:string;mechanisms?:string[]}> = [];
                       for (let i = 0; i < enhancedSubs.length; i++) {
                         for (let j = i + 1; j < enhancedSubs.length; j++) {
                           const key = `${enhancedSubs[i]}||${enhancedSubs[j]}`;
                           const rev = `${enhancedSubs[j]}||${enhancedSubs[i]}`;
                           const intx = conflictLookup.get(key) || conflictLookup.get(rev);
-                          if (intx) checked.push({ a: enhancedSubs[i], b: enhancedSubs[j], type: intx.type, effect: intx.effect, severity: intx.severity });
+                          if (intx) checked.push({ a: enhancedSubs[i], b: enhancedSubs[j], type: intx.type, effect: intx.effect, severity: intx.severity, mechanisms: intx.mechanisms });
                           const syn = SYNERGY_PAIRS.find(sp => (sp.substanceA === enhancedSubs[i] && sp.substanceB === enhancedSubs[j]) || (sp.substanceA === enhancedSubs[j] && sp.substanceB === enhancedSubs[i]));
-                          if (syn) checked.push({ a: enhancedSubs[i], b: enhancedSubs[j], type: 'synergy', effect: syn.mechanism, severity: syn.strength >= 7 ? 'HIGH' : syn.strength >= 4 ? 'MEDIUM' : 'LOW' });
+                          if (syn) checked.push({ a: enhancedSubs[i], b: enhancedSubs[j], type: 'synergy', effect: syn.mechanism, severity: syn.strength >= 0.7 ? 'HIGH' : syn.strength >= 0.4 ? 'MEDIUM' : 'LOW', synergyType: syn.synergyType, affectedSystems: syn.affectedSystems, clinicalNote: syn.clinicalNote });
                         }
                       }
                       const synergies = checked.filter(c => c.type === 'synergy');
                       const conflicts = checked.filter(c => c.type === 'conflict' || c.type === 'caution');
+                      const synergyTypes: Record<string,string> = { additive:'Аддитивное', synergistic:'Синергистическое', potentiative:'Потенциирующее', complementary:'Комплементарное' };
                       return (
                         <div style={{ marginBottom:8 }}>
                           {synergies.length > 0 && (
                             <div style={{ marginBottom:6, background:'rgba(34,197,94,0.04)', borderRadius:10, border:'1px solid rgba(34,197,94,0.1)', padding:'8px 10px' }}>
                               <div style={{ fontSize:9, fontWeight:600, color:'#22c55e', marginBottom:4 }}>⊕ Синергии ({synergies.length})</div>
-                              {synergies.map((s,i) => (
-                                <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.4, padding:'2px 0' }}>
-                                  • {getStackSubLabel(s.a)} + {getStackSubLabel(s.b)} — {s.effect}
-                                </div>
-                              ))}
+                              {synergies.map((s,i) => {
+                                const aname = getStackSubLabel(s.a);
+                                const bname = getStackSubLabel(s.b);
+                                const stype = s.synergyType ? synergyTypes[s.synergyType] || s.synergyType : '';
+                                return (
+                                  <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.75)', lineHeight:1.5, padding:'3px 0', borderBottom: i < synergies.length-1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                                    <div style={{ fontWeight:600, color:'#4ade80' }}>• {aname} + {bname}{stype ? <span style={{ fontSize:7, color:'#a78bfa', marginLeft:4, fontWeight:400 }}>[{stype}]</span> : ''}<span style={{ fontSize:7, marginLeft:4, padding:'1px 3px', borderRadius:2, background: s.severity==='HIGH'?'rgba(34,197,94,0.2)':'rgba(34,197,94,0.1)', color:'#22c55e' }}>{s.severity}</span></div>
+                                    <div style={{ fontSize:7.5, color:'rgba(255,255,255,0.65)', marginTop:1 }}>{s.effect}</div>
+                                    {s.affectedSystems && s.affectedSystems.length > 0 && (
+                                      <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:1 }}>Системы: {s.affectedSystems.join(', ')}</div>
+                                    )}
+                                    {s.clinicalNote && (
+                                      <div style={{ fontSize:7, fontStyle:'italic', color:'#fbbf24', marginTop:1 }}>💡 {s.clinicalNote}</div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                           {conflicts.length > 0 && (
                             <div style={{ background:'rgba(239,68,68,0.04)', borderRadius:10, border:'1px solid rgba(239,68,68,0.1)', padding:'8px 10px' }}>
                               <div style={{ fontSize:9, fontWeight:600, color:'#ef4444', marginBottom:4 }}>⊖ Конфликты ({conflicts.length})</div>
                               {conflicts.map((c,i) => (
-                                <div key={i} style={{ fontSize:8, color:'#f87171', lineHeight:1.4, padding:'2px 0' }}>
-                                  • {getStackSubLabel(c.a)} + {getStackSubLabel(c.b)} — {c.effect}
+                                <div key={i} style={{ fontSize:8, color:'#f87171', lineHeight:1.5, padding:'3px 0', borderBottom: i < conflicts.length-1 ? '1px solid rgba(239,68,68,0.08)' : 'none' }}>
+                                  <div style={{ fontWeight:600 }}>• {getStackSubLabel(c.a)} + {getStackSubLabel(c.b)}<span style={{ fontSize:7, marginLeft:4, padding:'1px 3px', borderRadius:2, background: c.severity==='HIGH'?'rgba(239,68,68,0.2)':'rgba(239,68,68,0.1)', color:'#ef4444' }}>{c.severity||''}</span></div>
+                                  <div style={{ fontSize:7.5, color:'rgba(255,255,255,0.65)', marginTop:1 }}>{c.effect}</div>
+                                  {c.mechanisms && c.mechanisms.length > 0 && (
+                                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:1 }}>Механизмы: {c.mechanisms.map((mx:string) => MECH_TRANSLATIONS_RU[mx]||mx).join(', ')}</div>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -5114,109 +5495,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
         </div>
       )}
 
-      {/* ===== MYSTACKS IN CALC VIEW ===== */}
-      {section === 'generator' && tab === 'main' && supportView === 'calc' && calcView === 'mystacks' && (
-        <div style={{ padding:'0 0 80px' }}>
-          <h2 style={{ margin:'0 0 6px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>📂 Мои стеки</h2>
-          <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Сохранённые стеки поддержки из калькулятора. Выберите уровень, рассчитайте и сохраните.</p>
-          <div className="card" style={{ marginBottom:10, padding:10 }}>
-            <h4 style={{ margin:'0 0 6px', fontSize:12, color:'var(--text)' }}>💾 Сохранить текущий стек</h4>
-            <div style={{ display:'flex', gap:6 }}>
-              <input value={stackName} onChange={e=>setStackName(e.target.value)} placeholder="Название стека..."
-                style={{ flex:1, padding:'6px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }} />
-              <button onClick={saveCurrentStack} style={{ padding:'6px 12px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg, #00e68a, #00c853)', color:'#000', fontWeight:700, fontSize:10 }}>
-                Сохранить ({SUPPORT_LEVELS[supportLevel]?.subs?.length || 0} шт)
-              </button>
-            </div>
-          </div>
-          {savedStacks.length === 0 ? (
-            <div className="card" style={{ textAlign:'center', padding:24 }}>
-              <div style={{ fontSize:28, marginBottom:6 }}>📂</div>
-              <div style={{ fontSize:12, color:'var(--text-dim)' }}>Нет сохранённых стеков</div>
-              <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:4 }}>Рассчитайте стек в калькуляторе и нажмите «Сохранить»</div>
-            </div>
-          ) : (
-            savedStacks.map(stack => {
-              const isExpanded = expandedStack === stack.id;
-              return (
-                <div key={stack.id} style={{ marginBottom:8, background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)', overflow:'hidden' }}>
-                  <div onClick={() => setExpandedStack(isExpanded ? null : stack.id)} style={{ padding:'10px 12px', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'flex-start', borderBottom: isExpanded ? '1px solid var(--border)' : 'none' }}>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>{stack.name}</div>
-                      <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{new Date(stack.date).toLocaleDateString('ru')} · {stack.subs.length} добавок</div>
-                      {(stack as any).description && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{(stack as any).description}</div>}
-                    </div>
-                    <span style={{ fontSize:12, color:'var(--text-dim)', flexShrink:0 }}>{isExpanded ? '▲' : '▼'}</span>
-                  </div>
-                  {isExpanded && (
-                    <div style={{ padding:'0 12px 10px' }}>
-                      {/* Notes editing */}
-                      {editingStackNotes === stack.id ? (
-                        <div style={{ marginBottom:6, display:'flex', gap:3 }}>
-                          <input value={editNotesText} onChange={e => setEditNotesText(e.target.value)} placeholder="Заметка к стеку..."
-                            style={{ flex:1, padding:'3px 6px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-primary)', color:'var(--text)', fontSize:8 }} />
-                          <button onClick={() => {
-                            const updated = savedStacks.map(s => s.id === stack.id ? { ...s, notes: editNotesText } : s);
-                            setSavedStacks(updated);
-                            localStorage.setItem('savedStacks', JSON.stringify(updated));
-                            setEditingStackNotes(null);
-                          }} style={{ padding:'3px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:8 }}>OK</button>
-                        </div>
-                      ) : (
-                        stack.notes && <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6, padding:'3px 6px', borderRadius:4, background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)' }}>📝 {stack.notes}</div>
-                      )}
 
-                      {/* Full substance list with descriptions */}
-                      <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                        {stack.subs.map(id => {
-                          const sub = ALL_SUBSTANCES.find(s => s.id === id);
-                          const pharma = PHARMA_DB[id];
-                          const name = sub?.name || pharma?.name || id.replace(/_/g, ' ');
-                          const dosage = stack.dosages?.[id];
-                          const description = sub?.description || pharma?.description || '';
-                          return (
-                            <div key={id} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.1)' }}>
-                              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                                <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{name}</span>
-                                {dosage && <span style={{ fontSize:9, color:'#00e68a' }}>{dosage.mg >= 1000 && id !== 'omega3' ? `${(dosage.mg/1000).toFixed(dosage.mg%1000===0?0:1)}г` : `${dosage.mg}мг`}</span>}
-                              </div>
-                              {description && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{description}</div>}
-                              {sub?.mechanisms && sub.mechanisms.length > 0 && (
-                                <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-                                  {sub.mechanisms.slice(0,3).map((m: string) => (
-                                    <span key={m} style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.1)', color:'#8b5cf6' }}>{m}</span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Action buttons */}
-                      <div style={{ display:'flex', gap:4, marginTop:8 }}>
-                        <button onClick={() => { setEditingStackNotes(editingStackNotes === stack.id ? null : stack.id); setEditNotesText(stack.notes || ''); }} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa', fontWeight:600 }}>✏️ Редактировать</button>
-                        <button onClick={() => {
-                          const items = stack.subs.map((id: string) => {
-                            const sub = ALL_SUBSTANCES.find(s => s.id === id);
-                            const d = stack.dosages?.[id];
-                            return { id, name: sub?.name || id, dose: d?.mg || 0, timing: d?.timing || '' };
-                          });
-                          const existing = JSON.parse(localStorage.getItem('supportCart') || '[]');
-                          localStorage.setItem('supportCart', JSON.stringify([...existing, ...items]));
-                          setCartItems([...cartItems, ...items]);
-                          alert('✅ Добавлено в корзину');
-                        }} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(255,152,0,0.1)', border:'1px solid rgba(255,152,0,0.3)', color:'#ff9800', fontWeight:600 }}>🛒 В корзину</button>
-                        <button onClick={() => deleteStack(stack.id)} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444', fontWeight:600, marginLeft:'auto' }}>✕ Удалить</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
 
       {/* ===== MIX CALCULATOR: Training Mix ===== */}
       {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'mixcalc' && (
@@ -5407,562 +5686,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
         </div>
       )}
 
-      {/* ===== SUPPORT PLAN VIEW (Active + Archive) ===== */}
-      {section === 'generator' && tab === 'main' && supportView === 'calc' && calcView === 'plan' && (
-        <div style={{ padding:'0 0 80px' }}>
-          <div style={{ display:'flex', gap:6, marginBottom:8 }}>
-            <button onClick={() => setPlanSubTab('active')} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'active' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'active' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'active' ? 'var(--accent)' : 'var(--border)'}` }}>✅ Действующий план</button>
-            <button onClick={() => setPlanSubTab('archive')} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'archive' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'archive' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'archive' ? 'var(--accent)' : 'var(--border)'}` }}>📦 Архив ({archivedPlans.length})</button>
-          </div>
 
-          {planSubTab === 'active' && (() => {
-            const level = SUPPORT_LEVELS[supportLevel];
-            const subs = level?.subs || [];
-            const dosages = level?.dosages || {};
-            const getInfo = (id: string) => {
-              const sub = ALL_SUBSTANCES.find(s => s.id === id);
-              const d = dosages[id];
-              return { id, name: sub?.name || id.replace(/_/g, ' '), mg: d?.mg ?? 0, timing: d?.timing || '', desc: sub?.description || '' };
-            };
-            return (
-              <>
-                <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>📅 Действующий план поддержки</h2>
-                <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 10px' }}>Уровень: {level?.label || supportLevel}</p>
-
-                {/* Action buttons */}
-                <div style={{ display:'flex', gap:4, marginBottom:10, flexWrap:'wrap' }}>
-                  <button onClick={() => {
-                    const name = prompt('Название препарата:');
-                    if (!name) return;
-                    const dose = prompt('Дозировка (мг):', '500');
-                    if (!dose) return;
-                    const timing = prompt('Время приёма (утро/день/вечер):', 'с едой');
-                    const id = 'manual_' + Date.now();
-                    const newSub = { id, type: 'vitamin' as const, name, description: 'Добавлен вручную', mechanisms: [], categories: [] as string[] };
-                    (ALL_SUBSTANCES as any).push(newSub);
-                    const newDosages = { ...dosages, [id]: { mg: parseInt(dose), timing: timing || 'с едой' } };
-                    const newLevel = { ...level, subs: [...subs, id], dosages: newDosages };
-                    SUPPORT_LEVELS[supportLevel] = newLevel;
-                    window.location.reload();
-                  }} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor:'pointer', background:'rgba(96,165,250,0.15)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa', fontWeight:600 }}>➕ Добавить препарат</button>
-                  <button onClick={() => {
-                    const saved = localStorage.getItem('savedStacks');
-                    if (!saved || JSON.parse(saved).length === 0) { alert('Нет сохранённых стеков'); return; }
-                    const stacks = JSON.parse(saved);
-                    const names = stacks.map((s: any,i: number) => `${i+1}. ${s.name || 'Стек '+(i+1)}`).join('\n');
-                    const idx = parseInt(prompt(`Выберите стек:\n${names}`) || '-1') - 1;
-                    if (idx < 0 || idx >= stacks.length) return;
-                    const stack = stacks[idx];
-                    const stackSubs = (stack.substanceIds || stack.subs || []).filter((id: string) => !subs.includes(id));
-                    if (stackSubs.length === 0) { alert('Все препараты уже в плане'); return; }
-                    const newDosages = { ...dosages };
-                    stackSubs.forEach((id: string) => {
-                      const d = stack.dosages?.[id] || stack.doses?.[id];
-                      if (d) newDosages[id] = typeof d === 'number' ? { mg: d, timing: 'с едой' } : d;
-                    });
-                    const newLevel = { ...level, subs: [...subs, ...stackSubs], dosages: newDosages };
-                    SUPPORT_LEVELS[supportLevel] = newLevel;
-                    window.location.reload();
-                  }} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', fontWeight:600 }}>📦 Из моих стеков</button>
-                  <button onClick={() => {
-                    const items = subs.map((id: string) => {
-                      const info = getInfo(id);
-                      return { id, name: info.name, dose: info.mg, timing: info.timing };
-                    });
-                    const existing = JSON.parse(localStorage.getItem('supportCart') || '[]');
-                    localStorage.setItem('supportCart', JSON.stringify([...existing, ...items]));
-                    setCartItems([...cartItems, ...items]);
-                    alert('✅ Добавлено в корзину');
-                  }} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor:'pointer', background:'rgba(255,152,0,0.15)', border:'1px solid rgba(255,152,0,0.3)', color:'#ff9800', fontWeight:600 }}>🛒 В корзину</button>
-                </div>
-
-                {/* Timing table */}
-                {subs.length > 0 && (
-                  <>
-                    <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
-                      <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', marginBottom:6 }}>📋 Таблица приёма</div>
-                      <table style={{ width:'100%', fontSize:8, borderCollapse:'collapse' }}>
-                        <thead><tr style={{ background:'rgba(0,0,0,0.1)' }}>
-                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Время</th>
-                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Препарат</th>
-                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Доза</th>
-                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Описание</th>
-                        </tr></thead>
-                        <tbody>
-                          {subs.map((id: string) => {
-                            const sub = ALL_SUBSTANCES.find(s => s.id === id);
-                            const d = dosages[id];
-                            if (!sub || !d) return null;
-                            return (
-                              <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
-                                <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{d.timing}</td>
-                                <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub.name || id.replace(/_/g, ' ')}</td>
-                                <td style={{ padding:'3px 5px', color:'#00e68a' }}>{d.mg >= 1000 && id !== 'omega3' ? `${(d.mg/1000).toFixed(d.mg%1000===0?0:1)}г` : `${d.mg}мг`}</td>
-                                <td style={{ padding:'3px 5px', color:'var(--text-dim)', fontSize:7.5 }}>{sub.description?.slice(0,50) || ''}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Mechanisms table */}
-                    <div style={{ marginBottom:10, fontSize:8, color:'var(--text-dim)' }}>
-                      <div style={{ fontWeight:700, color:'#8b5cf6', marginBottom:4, fontSize:9 }}>🧬 Механизмы, препараты и синергии</div>
-                      <table style={{ width:'100%', fontSize:7.5, borderCollapse:'collapse' }}>
-                        <thead><tr style={{ background:'rgba(139,92,246,0.08)' }}>
-                          <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Препарат</th>
-                          <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Механизм</th>
-                          <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Синергии</th>
-                        </tr></thead>
-                        <tbody>
-                          {subs.map((id: string) => {
-                            const sub = ALL_SUBSTANCES.find((s: any) => s.id === id);
-                            if (!sub) return null;
-                            const mechanisms = (sub.mechanisms || []).slice(0, 3);
-                            const syns = ALL_INTERACTIONS.filter((int: any) => 
-                              (int.substanceA === id || int.substanceB === id) && int.type === 'synergy'
-                            ).slice(0, 2);
-                            const conflicts = ALL_INTERACTIONS.filter((int: any) => 
-                              (int.substanceA === id || int.substanceB === id) && int.type === 'conflict'
-                            ).slice(0, 1);
-                            return (
-                              <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
-                                <td style={{ padding:'3px 4px', fontWeight:600, color:'var(--text-light)' }}>{sub.name || id.replace(/_/g, ' ')}</td>
-                                <td style={{ padding:'3px 4px', color:'var(--text-dim)' }}>
-                                  {mechanisms.length > 0 ? mechanisms.map((m: string) => (
-                                    <div key={m} style={{ lineHeight:1.3, marginBottom:1 }}>• {m.length > 50 ? m.slice(0,50)+'…' : m}</div>
-                                  )) : <span style={{ color:'rgba(255,255,255,0.3)' }}>—</span>}
-                                </td>
-                                <td style={{ padding:'3px 4px' }}>
-                                  {syns.map((s: any, j: number) => {
-                                    const partner = ALL_SUBSTANCES.find((x: any) => x.id === (s.substanceA === id ? s.substanceB : s.substanceA));
-                                    return (
-                                      <div key={j} style={{ color:'#22c55e', lineHeight:1.3 }}>⊕ {partner?.name || '?'} — {s.effect?.slice(0,35)}</div>
-                                    );
-                                  })}
-                                  {conflicts.length > 0 && conflicts.map((c: any, j: number) => {
-                                    const partner = ALL_SUBSTANCES.find((x: any) => x.id === (c.substanceA === id ? c.substanceB : c.substanceA));
-                                    return (
-                                      <div key={`c${j}`} style={{ color:'#ef4444', lineHeight:1.3 }}>⊖ {partner?.name || '?'} — {c.effect?.slice(0,35)}</div>
-                                    );
-                                  })}
-                                  {syns.length === 0 && conflicts.length === 0 && <span style={{ color:'rgba(255,255,255,0.3)' }}>—</span>}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
-                )}
-                {subs.length === 0 && <p style={{ fontSize:10, color:'var(--text-dim)' }}>Нет препаратов в плане. Сначала выполните расчёт в калькуляторе поддержки.</p>}
-
-                {/* Save plan button — moves old plan to archive */}
-                <button onClick={() => {
-                  const existing = localStorage.getItem('supportPlans');
-                  if (existing) {
-                    const oldPlan = JSON.parse(existing);
-                    const archive = JSON.parse(localStorage.getItem('supportPlanArchive') || '[]');
-                    archive.push({ ...oldPlan, archivedAt: new Date().toISOString(), label: level?.label || supportLevel });
-                    localStorage.setItem('supportPlanArchive', JSON.stringify(archive));
-                    setArchivedPlans([...archivedPlans, { ...oldPlan, archivedAt: new Date().toISOString(), label: level?.label || supportLevel }]);
-                  }
-                  const plan = { period:'daily', date:new Date().toISOString(), level:supportLevel, subs, dosages, levelLabel:level?.label };
-                  localStorage.setItem('supportPlans', JSON.stringify(plan));
-                  setPlanSaved(true);
-                }} style={{ width:'100%', padding:'10px', borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:12 }}>💾 Сохранить план (старый → архив)</button>
-                <div style={{ display:'flex', gap:6, marginTop:6 }}>
-                  <button onClick={() => {
-                    const level = SUPPORT_LEVELS[supportLevel];
-                    if (!level) return;
-                    const id = 'stack_' + Date.now();
-                    const newStack = { id, name: 'План: ' + (level?.label || supportLevel) + ' ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), subs, dosages: dosages || {}, notes: '' };
-                    const updated = [...savedStacks, newStack];
-                    setSavedStacks(updated);
-                    localStorage.setItem('savedStacks', JSON.stringify(updated));
-                    setPlanSaved(true);
-                  }} style={{ flex:1, padding:'8px', borderRadius:10, border:'1px solid rgba(139,92,246,0.3)', cursor:'pointer', background:'rgba(139,92,246,0.08)', color:'#8b5cf6', fontWeight:700, fontSize:11 }}>📂 В Мои стеки</button>
-                  <button onClick={() => {
-                    const planText = 'План поддержки (' + (level?.label || supportLevel) + '):\n' + subs.map((s: string) => {
-                      const sub = ALL_SUBSTANCES.find((x: any) => x.id === s);
-                      const dose = (dosages || {})[s];
-                      return '• ' + (sub?.name || s) + (dose ? ' — ' + dose.mg + ' мг' : '');
-                    }).join('\n');
-                    navigator.clipboard?.writeText(planText);
-                  }} style={{ padding:'8px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', cursor:'pointer', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.9)', fontWeight:600, fontSize:11 }}>📋</button>
-                </div>
-                {planSaved && <div style={{ textAlign:'center', fontSize:10, color:'#22c55e', marginTop:4 }}>✅ План сохранён</div>}
-
-                {/* 💾 СОХРАНИТЬ ПЛАН в he_saved_support_plans */}
-                <button onClick={() => {
-                  try {
-                    const planData = { level:supportLevel, subs, dosages, levelLabel:SUPPORT_LEVELS[supportLevel]?.label };
-                    const existing = JSON.parse(localStorage.getItem('he_saved_support_plans') || '[]');
-                    existing.push({ id: Date.now(), date: new Date().toISOString(), plan: planData });
-                    localStorage.setItem('he_saved_support_plans', JSON.stringify(existing));
-                    alert('План сохранён!');
-                    setPlanSaved(true);
-                  } catch {}
-                }} style={{ width:'100%', padding:'10px', borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:12, marginTop:6 }}>💾 СОХРАНИТЬ ПЛАН</button>
-
-                {/* Мои планы */}
-                <div style={{ marginTop:8 }}>
-                  <h3 style={{ margin:'0 0 6px', fontSize:13, fontWeight:700, color:'var(--accent)' }}>📋 Мои планы</h3>
-                  {(() => {
-                    let savedPlans: any[] = [];
-                    try { savedPlans = JSON.parse(localStorage.getItem('he_saved_support_plans') || '[]'); } catch {}
-                    if (savedPlans.length === 0) return <p style={{ fontSize:10, color:'var(--text-dim)' }}>Нет сохранённых планов.</p>;
-                    return [...savedPlans].reverse().map((sp, i) => {
-                      const p = sp.plan || {};
-                      const pSubs = p.subs || [];
-                      return (
-                        <div key={sp.id || i} style={{ padding:'8px 10px', marginBottom:4, background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)' }}>
-                          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                            <div>
-                              <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{p.levelLabel || p.level || 'План'} · {pSubs.length} препаратов</div>
-                              <div style={{ fontSize:8, color:'var(--text-dim)' }}>{new Date(sp.date).toLocaleDateString('ru-RU')}</div>
-                            </div>
-                            <button onClick={() => {
-                              try {
-                                let savedPlans: any[] = JSON.parse(localStorage.getItem('he_saved_support_plans') || '[]');
-                                const updated = savedPlans.filter((x:any) => x.id !== sp.id);
-                                localStorage.setItem('he_saved_support_plans', JSON.stringify(updated));
-                                window.location.reload();
-                              } catch {}
-                            }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </>
-            );
-          })()}
-
-          {/* ===== ARCHIVE VIEW ===== */}
-          {planSubTab === 'archive' && (
-            <div>
-              <h3 style={{ margin:'0 0 8px', fontSize:14, fontWeight:700, color:'var(--accent)' }}>📦 Архив планов</h3>
-              {archivedPlans.length === 0 ? (
-                <p style={{ fontSize:10, color:'var(--text-dim)' }}>Архив пуст. При сохранении нового плана старый автоматически перемещается в архив.</p>
-              ) : (
-                [...archivedPlans].reverse().map((plan, idx) => {
-                  const planId = `arch_${idx}_${plan.archivedAt || plan.date}`;
-                  const isExpanded = expandedArchiveId === planId;
-                  const planSubs = plan.subs || [];
-                  const planDosages = plan.dosages || {};
-                  return (
-                    <div key={planId} style={{ marginBottom:8, background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)', overflow:'hidden' }}>
-                      <div onClick={() => setExpandedArchiveId(isExpanded ? null : planId)} style={{ padding:'10px 12px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', borderBottom: isExpanded ? '1px solid var(--border)' : 'none' }}>
-                        <div>
-                          <div style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{plan.label || plan.level || 'План'} {plan.levelLabel ? `(${plan.levelLabel})` : ''}</div>
-                          <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>{new Date(plan.archivedAt || plan.date).toLocaleDateString('ru-RU')} · {planSubs.length} препаратов</div>
-                        </div>
-                        <span style={{ fontSize:12, color:'var(--text-dim)' }}>{isExpanded ? '▲' : '▼'}</span>
-                      </div>
-                      {isExpanded && (
-                        <div style={{ padding:'8px 12px' }}>
-                          {planSubs.length > 0 && (
-                            <table style={{ width:'100%', fontSize:8, borderCollapse:'collapse' }}>
-                              <thead><tr style={{ background:'rgba(0,0,0,0.1)' }}>
-                                <th style={{ padding:'3px 5px', textAlign:'left' }}>Препарат</th>
-                                <th style={{ padding:'3px 5px', textAlign:'left' }}>Доза</th>
-                                <th style={{ padding:'3px 5px', textAlign:'left' }}>Время</th>
-                              </tr></thead>
-                              <tbody>
-                                {planSubs.map((id: string) => {
-                                  const sub = ALL_SUBSTANCES.find((s: any) => s.id === id);
-                                  const d = planDosages[id];
-                                  return (
-                                    <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
-                                      <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub?.name || id.replace(/_/g, ' ')}</td>
-                                      <td style={{ padding:'3px 5px', color:'#00e68a' }}>{d?.mg ? `${d.mg}мг` : '—'}</td>
-                                      <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{d?.timing || '—'}</td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          )}
-                          {planSubs.length === 0 && <div style={{ fontSize:9, color:'var(--text-dim)' }}>Нет данных о препаратах</div>}
-                          <div style={{ display:'flex', gap:4, marginTop:8 }}>
-                            <button onClick={() => {
-                              const archive = JSON.parse(localStorage.getItem('supportPlanArchive') || '[]');
-                              const key = [...archivedPlans].reverse()[idx];
-                              const realIdx = archivedPlans.indexOf(key);
-                              if (realIdx >= 0) {
-                                archive.splice(realIdx, 1);
-                                localStorage.setItem('supportPlanArchive', JSON.stringify(archive));
-                                setArchivedPlans(archive);
-                              }
-                            }} style={{ padding:'4px 10px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑 Удалить</button>
-                            <button onClick={() => {
-                              const items = planSubs.map((id: string) => {
-                                const sub = ALL_SUBSTANCES.find((s: any) => s.id === id);
-                                const d = planDosages[id];
-                                return { id, name: sub?.name || id, dose: d?.mg || 0, timing: d?.timing || '' };
-                              });
-                              const existing = JSON.parse(localStorage.getItem('supportCart') || '[]');
-                              localStorage.setItem('supportCart', JSON.stringify([...existing, ...items]));
-                              setCartItems([...cartItems, ...items]);
-                              alert('✅ Добавлено в корзину');
-                            }} style={{ padding:'4px 10px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(255,152,0,0.1)', border:'1px solid rgba(255,152,0,0.3)', color:'#ff9800' }}>🛒 В корзину</button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ===== SUPPORT REPORTS ===== */}
-      {section === 'generator' && tab === 'main' && supportView === 'calc' && calcView === 'reports' && (() => {
-        return (
-          <div style={{ paddingBottom:80 }}>
-            <h3 style={{ fontSize:14, fontWeight:800, color:'#fff', margin:'0 0 6px' }}>📊 Отчёты поддержки</h3>
-            <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 10px', lineHeight:1.3 }}>
-              Полный отчёт по рискам, поддержке, взаимодействиям и курсу. Сохраняется в архив.
-            </p>
-
-            {/* Generate Button */}
-            <button onClick={() => {
-              const profile = linked.profile;
-              const course = linked.course || [];
-              const weightKg = profile?.settings?.weight ?? 80;
-              const age = profile?.settings?.age ?? 30;
-              const sex = profile?.settings?.sex ?? 'male';
-              const r = supportResult;
-              const mr = mechanismReport;
-              const tp = timedPlan;
-              const weekly = weeklyPlan;
-              const dbInt = dbInteractions;
-
-              // Risk assessment per system — use calcResult for consistency with calculator
-              const systemLabels: Record<string,{name:string,emoji:string}> = {
-                cardio:{name:'Сердце',emoji:'❤️'}, hepatic:{name:'Печень',emoji:'🧪'}, renal:{name:'Почки',emoji:'🫘'},
-                neuro:{name:'Нейро',emoji:'🧠'}, endocrine:{name:'Эндокринная',emoji:'🔄'}, hematologic:{name:'Кровь',emoji:'🩸'},
-                reproductive:{name:'Репродуктивная',emoji:'🧬'}, musculoskeletal:{name:'КМС',emoji:'💪'},
-              };
-              const sysBreakdown = calcResult?.riskAssessment?.systemBreakdown || {};
-              const risks = Object.keys(sysBreakdown).length > 0 ? Object.entries(sysBreakdown).map(([k,v]) => { const sys = v as { raw: number; net: number }; return { system:systemLabels[k]?.name||k, emoji:systemLabels[k]?.emoji||'⚕️', raw:sys.raw, net:sys.net }; }) : [];
-              const overallRaw = risks.length ? Math.round(Math.max(...risks.map(r=>r.raw))) : 0;
-              const overallNet = risks.length ? Math.round(Math.max(...risks.map(r=>r.net))) : 0;
-
-              // Course compounds
-              const compounds = course.map(c => {
-                const ph = PHARMA_DB[c.substanceId];
-                return { id:c.substanceId, name:ph?.name||c.substanceId, cls:ph?.class||'other', dose:c.doseValue, freq:c.frequency, start:c.startWeek, end:c.endWeek };
-              });
-
-              // Support plan from effectiveLevel (with phase adjustments)
-              const levelSubIds = effectiveLevel?.subs || SUPPORT_LEVELS[supportLevel]?.subs || [];
-              const planItems = levelSubIds.map((id:string) => {
-                const sub = ALL_SUBSTANCES.find((s:any) => s.id === id);
-                const dos = DEFAULT_DOSAGES[id] || { mg:500, timing:'с едой' };
-                return { id, name:sub?.name||id, dose:dos.mg+'мг', timing:dos.timing, categories:sub?.categories||[], mechanisms:sub?.mechanisms||[] };
-              });
-
-              // Interactions
-              const allInteractions = [
-                ...(dbInt?.synergies||[]).map((i:any) => ({ ...i, type:'synergy' })),
-                ...(dbInt?.conflicts||[]).map((i:any) => ({ ...i, type:'conflict' })),
-                ...(dbInt?.cautions||[]).map((i:any) => ({ ...i, type:'caution' })),
-              ];
-              const synergyCount = dbInt?.synergies?.length || 0;
-              const conflictCount = dbInt?.conflicts?.length || 0;
-
-              // Recommendations
-              const recs: string[] = [];
-              if (overallNet >= 70) recs.push('🔴 Высокий риск — необходима поддержка всех систем');
-              else if (overallNet >= 50) recs.push('🟡 Средний риск — усиленная поддержка');
-              else recs.push('🟢 Низкий риск — базовая поддержка');
-              if (compounds.some((c:any)=>c.cls==='aas'||c.cls==='aan'||c.cls==='sarm'||c.cls==='prohormone')) recs.push('💊 Анаболические соединения — контроль липидов, печени, ГГЯ');
-              if (compounds.some((c:any)=>c.cls==='other')) recs.push('📋 Дополнительные соединения — проверка взаимодействий');
-              if (conflictCount > 0) recs.push('⚡ Обнаружены конфликты — проверьте взаимодействия');
-              if (planItems.length === 0) recs.push('🧩 Поддержка не выбрана — выберите уровень в Калькуляторе');
-
-              // Overall grade
-              const penalty = (overallNet > 70 ? 2 : overallNet > 50 ? 1 : 0) + (conflictCount > 0 ? 1 : 0) + (compounds.length > 3 ? 1 : 0);
-              const gradeScore = Math.max(0, 10 - penalty);
-              const grade = gradeScore >= 8 ? 'A' : gradeScore >= 6 ? 'B' : gradeScore >= 4 ? 'C' : 'D';
-
-              const report = {
-                date: new Date().toISOString(),
-                profile: { age, weight: weightKg, sex },
-                compounds,
-                risks, overallRaw, overallNet,
-                plan: { level: SUPPORT_LEVELS[supportLevel]?.label || 'Не выбран', items: planItems },
-                interactions: { count:allInteractions.length, synergyCount, conflictCount, list:allInteractions },
-                mechanismReport: mr ? { systems:Object.keys(mr).length } : null,
-                timedPlan: tp ? true : false,
-                weeklyPlan: weekly ? true : false,
-                overallGrade: grade,
-                recommendations: recs,
-              };
-
-              // Save to archive
-              const prev = JSON.parse(localStorage.getItem('he_support_reports') || '[]');
-              const updated = [report, ...prev].slice(0, 30);
-              localStorage.setItem('he_support_reports', JSON.stringify(updated));
-              setSupportReports(updated);
-              setSupportReportCurrent(report);
-
-              // Push to Profile
-              try {
-                const profileReports = JSON.parse(localStorage.getItem('he_profile_support_reports') || '[]');
-                profileReports.unshift({ date: report.date, grade, overallNet, compoundsCount: report.compounds.length, supportCount: report.plan.items.length });
-                localStorage.setItem('he_profile_support_reports', JSON.stringify(profileReports.slice(0, 30)));
-              } catch(e) {}
-            }} style={{
-              padding:'10px 20px', borderRadius:10, fontSize:12, fontWeight:700, cursor:'pointer', width:'100%', marginBottom:12,
-              background: 'var(--accent)', border:'none', color:'#000',
-            }}>
-              🚀 Сгенерировать отчёт
-            </button>
-
-            {/* Current Report */}
-            {supportReportCurrent && (
-              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'var(--accent)', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
-                  📄 Текущий отчёт
-                  <span style={{ fontSize:8, color:'var(--text-dim)', fontWeight:400 }}>{new Date(supportReportCurrent.date).toLocaleString('ru-RU')}</span>
-                </div>
-
-                {/* Grade */}
-                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.06)' }}>
-                  <div style={{ fontSize:24, fontWeight:800, color:supportReportCurrent.overallGrade === 'A' ? '#00e68a' : supportReportCurrent.overallGrade === 'B' ? '#22c55e' : supportReportCurrent.overallGrade === 'C' ? '#f59e0b' : '#ef4444' }}>{supportReportCurrent.overallGrade}</div>
-                  <div style={{ flex:1, fontSize:9, color:'var(--text-dim)' }}>
-                    Общая оценка поддержки · Риск: {supportReportCurrent.overallNet}/100 · {supportReportCurrent.compounds.length} соединений · {supportReportCurrent.plan.items.length} препаратов поддержки
-                  </div>
-                </div>
-
-                {/* Profile */}
-                <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' }}>
-                  <div style={{ padding:'3px 8px', borderRadius:6, background:'rgba(255,255,255,0.04)', fontSize:8, color:'var(--text-dim)' }}>👤 {supportReportCurrent.profile.age} лет</div>
-                  <div style={{ padding:'3px 8px', borderRadius:6, background:'rgba(255,255,255,0.04)', fontSize:8, color:'var(--text-dim)' }}>⚖️ {supportReportCurrent.profile.weight} кг</div>
-                  <div style={{ padding:'3px 8px', borderRadius:6, background:'rgba(255,255,255,0.04)', fontSize:8, color:'var(--text-dim)' }}>⚧ {supportReportCurrent.profile.sex === 'male' ? 'Муж' : 'Жен'}</div>
-                </div>
-
-                {/* Compounds */}
-                {supportReportCurrent.compounds.length > 0 && (
-                  <div style={{ marginBottom:8 }}>
-                    <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4 }}>💊 Соединения на курсе</div>
-                    <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
-                      {supportReportCurrent.compounds.map((c:any,i:number) => (
-                        <span key={i} style={{ padding:'2px 6px', borderRadius:4, fontSize:7, background:'rgba(167,139,250,0.08)', color:'#a78bfa', border:'1px solid rgba(167,139,250,0.15)' }}>{c.name}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Risks */}
-                {supportReportCurrent.risks.length > 0 && (
-                  <div style={{ marginBottom:8 }}>
-                    <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4 }}>📊 Риски по системам</div>
-                    <div style={{ display:'flex', gap:4, overflowX:'auto', paddingBottom:2 }}>
-                      {supportReportCurrent.risks.map((r:any,i:number) => (
-                        <div key={i} style={{ flexShrink:0, padding:'4px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.12)', minWidth:50, textAlign:'center' }}>
-                          <div style={{ fontSize:10 }}>{r.emoji}</div>
-                          <div style={{ fontSize:7, color:'var(--text-dim)' }}>{r.system}</div>
-                          <div style={{ fontSize:11, fontWeight:700, color:r.net >= 70 ? '#ef4444' : r.net >= 50 ? '#f59e0b' : '#22c55e' }}>{r.net}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Support Plan — detailed table */}
-                {supportReportCurrent.plan.items.length > 0 && (
-                  <div style={{ marginBottom:8 }}>
-                    <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4 }}>🧩 План поддержки · {supportReportCurrent.plan.level}</div>
-                    <div style={{ overflowX:'auto' }}>
-                      <table style={{ width:'100%', borderCollapse:'collapse', fontSize:7 }}>
-                        <thead>
-                          <tr style={{ color:'var(--text-dim)', borderBottom:'1px solid var(--border)' }}>
-                            <th style={{ padding:'3px 4px', textAlign:'left', fontWeight:600 }}>Препарат</th>
-                            <th style={{ padding:'3px 4px', textAlign:'left', fontWeight:600 }}>Цель</th>
-                            <th style={{ padding:'3px 4px', textAlign:'left', fontWeight:600 }}>Доза</th>
-                            <th style={{ padding:'3px 4px', textAlign:'left', fontWeight:600 }}>Приём</th>
-                            <th style={{ padding:'3px 4px', textAlign:'left', fontWeight:600 }}>Механизм</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {supportReportCurrent.plan.items.map((s:any,i:number) => (
-                            <tr key={i} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                              <td style={{ padding:'4px 4px', color:'#00e68a', fontWeight:600, whiteSpace:'nowrap' }}>{s.name}</td>
-                              <td style={{ padding:'4px 4px', color:'var(--accent)', whiteSpace:'nowrap', fontSize:8 }}>
-                                {(s.categories || []).slice(0, 2).map((c:string) => CATALOG_CATEGORY_LABELS[c] || c).join(', ')}
-                              </td>
-                              <td style={{ padding:'4px 4px', color:'var(--text-light)', whiteSpace:'nowrap' }}>{s.dose}</td>
-                              <td style={{ padding:'4px 4px', color:'var(--text-dim)', whiteSpace:'nowrap' }}>{s.timing}</td>
-                              <td style={{ padding:'4px 4px', color:'var(--text-dim)' }}>
-                                {(s.mechanisms || []).slice(0, 3).join(', ')}
-                                {(s.mechanisms || []).length > 3 && <span style={{ color:'var(--text-dim)', fontSize:6 }}> +{(s.mechanisms||[]).length-3}</span>}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* Interactions */}
-                {supportReportCurrent.interactions.count > 0 && (
-                  <div style={{ marginBottom:8 }}>
-                    <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4 }}>⚡ Взаимодействия</div>
-                    <div style={{ display:'flex', gap:6, fontSize:8, color:'var(--text-dim)' }}>
-                      <span>Всего: {supportReportCurrent.interactions.count}</span>
-                      <span style={{ color:'#22c55e' }}>⊕ Синергии: {supportReportCurrent.interactions.synergyCount}</span>
-                      <span style={{ color:'#ef4444' }}>⊖ Конфликты: {supportReportCurrent.interactions.conflictCount}</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Recommendations */}
-                {supportReportCurrent.recommendations.length > 0 && (
-                  <div style={{ background:'rgba(255,152,0,0.04)', borderRadius:8, padding:'6px 8px', border:'1px solid rgba(255,152,0,0.1)' }}>
-                    <div style={{ fontSize:9, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>💡 Рекомендации</div>
-                    {supportReportCurrent.recommendations.map((r:string,i:number) => (
-                      <div key={i} style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4, marginBottom:1 }}>• {r}</div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Archive */}
-            <div style={{ fontSize:11, fontWeight:700, color:'var(--text)', marginBottom:6 }}>📦 Архив отчётов ({supportReports.length})</div>
-            {supportReports.length === 0 && (
-              <div style={{ padding:'14px', borderRadius:10, background:'var(--bg-secondary)', border:'1px solid var(--border)', fontSize:9, color:'var(--text-dim)', textAlign:'center' }}>
-                Пока нет отчётов. Нажмите «Сгенерировать отчёт» для создания первого отчёта.
-              </div>
-            )}
-            {supportReports.map((rep:any, idx:number) => (
-              <div key={idx} onClick={() => setSupportReportCurrent(rep)} style={{
-                padding:'8px 10px', borderRadius:8, marginBottom:4, cursor:'pointer',
-                background: supportReportCurrent === rep ? 'rgba(0,230,138,0.06)' : 'var(--bg-secondary)',
-                border: '1px solid ' + (supportReportCurrent === rep ? 'rgba(0,230,138,0.2)' : 'var(--border)'),
-                display:'flex', alignItems:'center', gap:8,
-              }}>
-                <div style={{ fontSize:16, fontWeight:800, color:rep.overallGrade === 'A' ? '#00e68a' : rep.overallGrade === 'B' ? '#22c55e' : rep.overallGrade === 'C' ? '#f59e0b' : '#ef4444', width:24, textAlign:'center' }}>{rep.overallGrade}</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:9, fontWeight:600, color:'var(--text)' }}>{rep.compounds.length} соединений · {rep.plan.items.length} в поддержке</div>
-                  <div style={{ fontSize:8, color:'var(--text-dim)' }}>{new Date(rep.date).toLocaleString('ru-RU')} · Риск {rep.overallNet}/100</div>
-                </div>
-                <span style={{ fontSize:8, color:'var(--accent)' }}>→</span>
-              </div>
-            ))}
-          </div>
-        );
-      })()}
 
       {/* ===== SUPPORT CALCULATOR — FULL DATA-INTEGRATED OVERHAUL ===== */}
       {section === 'generator' && ((tab === 'main' && supportView === 'calc' && calcView === 'calculator') || tab === 'calculator') && (() => {
