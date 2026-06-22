@@ -427,8 +427,6 @@ const MECH_LABELS: Record<string,string> = { ...MECHANISM_LABELS,
   'SULFITE_OXIDASE': 'Сульфитоксидаза', 'DETOX': 'Детоксикация',
   'BONE_METABOLISM': 'Костный метаболизм', 'TESTOSTERONE_SUPPORT': 'Поддержка тестостерона',
 };
-const WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
 const SUPPORT_MED_DETAIL: Record<string, {
   description: string;
   mechanism: string;
