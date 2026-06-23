@@ -1960,19 +1960,21 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       .sort((a, b) => b.count - a.count);
   }, [searchQuery, supportTierFilter, catalogSubstances]);
 
-  // Type-only grouping for "По типам" tab (without organ/function groups)
-  const TYPE_GROUPS = new Set(['vitamins','minerals','amino_acids','fatty_acids','herbs','mushrooms','peptides','hormones','enzymes','probiotics','electrolytes','polyphenols','antimicrobial','nootropics','adaptogens','antioxidants','supplement']);
+  // Type-only grouping for "По типам" tab — все распределено, без polyphenols/supplement как отдельных групп
+  const TYPE_GROUPS = new Set(['vitamins','minerals','amino_acids','fatty_acids','herbs','mushrooms','peptides','hormones','enzymes','probiotics','electrolytes','antimicrobial','nootropics','adaptogens','antioxidants']);
   const ORGAN_TO_TYPE: Record<string, string> = {
-    antioxidant:'antioxidants',mitochondrial:'antioxidants',cardioprotector:'antioxidants',
-    eye_protector:'antioxidants',anti_aging:'antioxidants',antiinflammatory:'antioxidants',
-    anti_inflammatory:'antioxidants',skin:'antioxidants',beauty:'antioxidants',
+    antioxidant:'antioxidants',polyphenol:'antioxidants',mitochondrial:'antioxidants',
+    cardioprotector:'antioxidants',eye_protector:'antioxidants',anti_aging:'antioxidants',
+    antiinflammatory:'antioxidants',anti_inflammatory:'antioxidants',skin:'antioxidants',
+    beauty:'antioxidants',recovery:'antioxidants',marker:'antioxidants',
     neuroprotector:'nootropics',anxiolytic:'nootropics',antidepressant:'nootropics',
-    immunomodulator:'supplement',metabolic:'supplement',marker:'supplement',
-    anticoagulant:'supplement',thyroid:'supplement',urinary_protector:'supplement',
-    hematologic:'supplement',recovery:'supplement',bone:'supplement',
-    nsaid:'supplement',electrolyte:'electrolytes',lipid:'fatty_acids',
-    multivitamin:'vitamins',gut:'probiotics',gastrointestinal:'probiotics',
-    joint:'supplement',hepatoprotector:'herbs',immune:'antimicrobial',
+    immunomodulator:'antimicrobial',anticoagulant:'antimicrobial',urinary_protector:'antimicrobial',
+    nsaid:'antimicrobial',immune:'antimicrobial',
+    metabolic:'hormones',thyroid:'hormones',
+    lipid:'fatty_acids',bone:'minerals',electrolyte:'electrolytes',
+    multivitamin:'vitamins',hematologic:'vitamins',
+    gut:'probiotics',gastrointestinal:'probiotics',
+    joint:'herbs',hepatoprotector:'herbs',
   };
   const findTypeKey = (sub: SupportSubstance): string => {
     for (const cat of (sub.categories||[])) {
@@ -1986,7 +1988,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       if (ORGAN_TO_TYPE[raw]) return ORGAN_TO_TYPE[raw];
     }
     if (ORGAN_TO_TYPE[sub.type]) return ORGAN_TO_TYPE[sub.type];
-    return 'supplement';
+    return 'antioxidants';
   };
   const typeGroupedSubstances = useMemo(() => {
     const all = groupedSubstances.flatMap(g => g.items);

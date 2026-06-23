@@ -4827,32 +4827,6 @@ potassium: {
     dosage: { mg: 300, timing: 'с едой 2x/д', form: 'цитрат калия' },
     bestForCourse: true,
   },
-electrolyte_complex: {
-    id: 'electrolyte_complex', name: 'Electrolyte Complex', nameRu: 'Электролитный комплекс', tier: 'core',
-    category: ['mineral', 'cardioprotector'],
-    forms: [
-      { id: 'electrolyte_complex', name: 'Electrolyte Complex', nameRu: 'Электролитный комплекс (K+Mg+Ca+Na)', dose: '1 порция 2x/д с едой', best: true },
-    ],
-    organs: ['HEART', 'MUSCLES', 'KIDNEYS'],
-    systems: ['cardio', 'renal', 'metabolic'],
-    mechanisms: ['ELECTROLYTE_BALANCE', 'FLUID_REGULATION', 'MUSCLE_FUNCTION', 'HEART_RHYTHM'],
-    description: 'Комплекс электролитов (K, Na, Mg, Ca) — критичен на курсе ААС для поддержания ритма сердца, мышечной функции и гидратации. Особенно важен при диуретиках.',
-    synergies: [
-      { with: 'magnesium', effect: 'Максимальная кардиопротекция', mechanism: 'К+Mg — координация ритма сердца и мембранного потенциала', severity: 'HIGH' },
-      { with: 'taurine', effect: 'Усиление калий-натриевого насоса', mechanism: 'Таурин усиливает функцию Na+/K+-АТФазы', severity: 'MEDIUM' },
-    ],
-    conflicts: [
-      { with: 'ace_inhibitor_drugs', effect: 'Риск гиперкалиемии', mechanism: 'ИАПФ + калий — опасное повышение калия', severity: 'HIGH' },
-    ],
-    monitoring: [
-      { what: 'Калий', when: 'Каждые 4 нед', targetRange: '3.5-5.0 ммоль/л' },
-      { what: 'Магний', when: 'Каждые 4 нед', targetRange: '>0.75 ммоль/л' },
-    ],
-    contraindications: ['Гиперкалиемия', 'Почечная недостаточность'],
-    sideEffects: ['Редко: диарея при высоких дозах Mg'],
-    dosage: { mg: 1, timing: '2x/д с едой', form: 'электролитный комплекс (K+Mg+Ca+Na)' },
-    bestForCourse: true,
-  },
 vitamin_b6: {
     id: 'vitamin_b6', name: 'Vitamin B6', nameRu: 'Витамин В6 (Пиридоксин)', tier: 'core',
     category: ['vitamin', 'neuroprotector'],
@@ -5220,34 +5194,6 @@ pqq: {
     sideEffects: ['Редко: бессонница при приёме вечером', 'Головная боль'],
     dosage: { mg: 20, timing: 'утро с едой', form: 'PQQ динатриевая соль' },
     bestForCourse: false,
-  },
-vitamin_complex: {
-    id: 'vitamin_complex',
-    name: 'Vitamin Complex',
-    nameRu: 'Витаминный комплекс',
-    tier: 'standard',
-    category: ['vitamin', 'metabolic'],
-    forms: [
-      { id: 'vitamin_complex', name: 'Vitamin Complex', nameRu: 'Мультивитаминный комплекс для мужчин', dose: '1 мг', best: true },
-      { id: 'vitamin_complex_2', name: 'Vitamin Complex', nameRu: 'Мультивитаминный комплекс спорт', dose: '1 мг', best: false }
-    ],
-    organs: ['LIVER', 'BRAIN', 'IMMUNE_SYSTEM'],
-    systems: ['hepatic', 'neuro', 'immune', 'metabolic'],
-    mechanisms: ['MICRONUTRIENT_REPLETION', 'COFACTOR_SUPPORT', 'ANTIOXIDANT_NETWORK', 'METHYLATION'],
-    description: 'Мультивитаминный комплекс — базовая добавка для покрытия дефицитов. На курсе ААС потребность в витаминах возрастает на 30-50%.',
-    synergies: [
-        {with: "mineral_complex", effect: "Полное покрытие микронутриентов", mechanism: "Витамины + минералы — кофакторы", severity: "HIGH"},
-        {with: "omega3", effect: "Базовая поддержка", mechanism: "Жирорастворимые нужны омега-3", severity: "MEDIUM"},
-      ],
-    conflicts: [],
-    monitoring: [
-      { what: 'ОАК', when: 'Каждые 8 нед' },
-      { what: 'Ферритин', when: 'Каждые 12 нед', targetRange: '30-150 нг/мл' }
-    ],
-    contraindications: ['Гипервитаминоз А или D', 'Гемохроматоз (формы с железом)'],
-    sideEffects: ['Окрашивание мочи (В2)', 'Тошнота натощак'],
-    dosage: { mg: 1, timing: 'утро с едой', form: 'капсулы мультивитаминов' },
-    bestForCourse: true,
   },
 pterostilbene: {
     id: 'pterostilbene',
@@ -7941,41 +7887,6 @@ cortexin: {
     dosage: { mg: 10, timing: 'в/м 1x/д', form: 'Кортексин 10 мг' },
     bestForCourse: false,
   },
-peptide_complex: {
-    id: 'peptide_complex',
-    name: 'Peptide Complex',
-    nameRu: 'Пептидный комплекс',
-    tier: 'advanced',
-    category: ['peptide', 'adaptogen'],
-    forms: [
-      { id: 'peptide_complex', name: 'Peptide Complex', nameRu: 'Пептидный комплекс 5 мг', dose: '5 мг 2x/д', best: true },
-      { id: 'peptide_complex_2', name: 'Peptide Complex', nameRu: 'Пептидный комплекс (BPC+TB+GHK) 5 мл', dose: '5 мг', best: false }
-    ],
-    organs: ['MUSCLES', 'JOINTS', 'BRAIN'],
-    systems: ['musculoskeletal', 'neuro'],
-    mechanisms: ['TISSUE_RECOVERY', 'IMMUNE_MODULATION', 'NEUROPROTECTION', 'ANTI_AGING'],
-    description: 'Пептидный комплекс — комбинация восстановительных пептидов для комплексной поддержки организма на курсе.',
-    synergies: [
-      { with: "polyphenol_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "lycopene", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "chaga", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "amino_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "peptide_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "cordyceps", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "ss31", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "alpha_ketoglutarate", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "vitamin_a", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "omega3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
-    ],
-    conflicts: [],
-    monitoring: [
-      { what: 'Контроль суставов', when: 'Субъективно' }
-    ],
-    contraindications: ['Беременность', 'Онкология'],
-    sideEffects: ['Редко: покраснение в месте инъекции'],
-    dosage: { mg: 5, timing: '1x/д п/к', form: 'Пептидный комплекс 5 мг' },
-    bestForCourse: false,
-  },
 elastin: {
     id: 'elastin',
     name: 'Elastin',
@@ -8238,37 +8149,6 @@ phenylalanine: {
     dosage: { mg: 500, timing: 'натощак 2x/д', form: 'DL-Фенилаланин 500 мг' },
     bestForCourse: false,
   },
-amino_complex: {
-    id: 'amino_complex',
-    name: 'Amino Complex',
-    nameRu: 'Аминокислотный комплекс',
-    tier: 'standard',
-    category: ['amino', 'recovery'],
-    forms: [
-      { id: 'amino_complex', name: 'Amino Complex', nameRu: 'Аминокислотный комплекс 5 г', dose: '5 г 2x/д', best: true },
-      { id: 'amino_complex_2', name: 'Amino Complex', nameRu: 'BCAA+ЕАА комплекс 3 г', dose: '5 г', best: false }
-    ],
-    organs: ['MUSCLES', 'LIVER', 'BRAIN'],
-    systems: ['musculoskeletal', 'hepatic'],
-    mechanisms: ['MUSCLE_RECOVERY', 'LIVER_PROTECTION', 'NITROGEN_BALANCE', 'PROTEIN_SYNTHESIS'],
-    description: 'Аминокислотный комплекс — полный спектр незаменимых и заменимых аминокислот для восстановления и защиты на курсе.',
-    synergies: [
-      { with: "polyphenol_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "lycopene", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "chaga", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "amino_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "peptide_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "aspartate", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
-    ],
-    conflicts: [],
-    monitoring: [
-      { what: 'Общий белок', when: 'Каждые 8 нед' }
-    ],
-    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
-    sideEffects: ['Редко: желудочный дискомфорт'],
-    dosage: { mg: 5000, timing: 'с едой 2x/д', form: 'Аминокислотный комплекс 5 г' },
-    bestForCourse: false,
-  },
 glutamate: {
     id: 'glutamate',
     name: 'Glutamate',
@@ -8429,36 +8309,6 @@ shiitake: {
     contraindications: ['Аутоиммунные заболевания (с осторожностью)'],
     sideEffects: ['Редко: кожная сыпь'],
     dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'экстракт шиитаке' },
-    bestForCourse: false,
-  },
-mushroom_complex: {
-    id: 'mushroom_complex',
-    name: 'Mushroom Complex',
-    nameRu: 'Грибной комплекс',
-    tier: 'advanced',
-    category: ['mushroom', 'adaptogen', 'immunomodulator'],
-    forms: [
-      { id: 'mushroom_complex', name: 'Mushroom Complex', nameRu: 'Грибной комплекс 1000 мг', dose: '1 г 2x/д', best: true },
-      { id: 'mushroom_complex_2', name: 'Mushroom Complex', nameRu: 'Грибной комплекс 6-в-1 500 мг', dose: '1 г', best: false }
-    ],
-    organs: ['IMMUNE_SYSTEM', 'LIVER', 'BRAIN'],
-    systems: ['immune', 'hepatic', 'neuro'],
-    mechanisms: ['IMMUNE_REGULATION', 'STRESS_ADAPTATION', 'ANTI_INFLAMMATORY', 'NEUROPROTECTION'],
-    description: 'Грибной комплекс — комбинация 6+ лекарственных грибов (рейши, чага, кордицепс, майтаке, шиитаке, хвост индейки). Комплексная поддержка.',
-    synergies: [
-      { with: "omega9", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "omega3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "egcg", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "polyphenol_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "mushroom_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
-    ],
-    conflicts: [],
-    monitoring: [
-      { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
-    ],
-    contraindications: ['Аутоиммунные заболевания (с осторожностью)'],
-    sideEffects: ['Редко: желудочный дискомфорт'],
-    dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'грибной комплекс экстракт' },
     bestForCourse: false,
   },
 agaricus: {
@@ -8709,33 +8559,6 @@ c60: {
     dosage: { mg: 1, timing: 'с едой 1x/д', form: 'C60 в оливковом масле 1 мг' },
     bestForCourse: false,
   },
-antioxidant_complex: {
-    id: 'antioxidant_complex',
-    name: 'Antioxidant Complex',
-    nameRu: 'Антиоксидантный комплекс',
-    tier: 'standard',
-    category: ['antioxidant', 'anti_aging'],
-    forms: [
-      { id: 'antioxidant_complex', name: 'Antioxidant Complex', nameRu: 'Антиоксидантный комплекс 1 капсула', dose: '1 мг 2x/д', best: true },
-      { id: 'antioxidant_complex_2', name: 'Antioxidant Complex', nameRu: 'Антиоксидантный комплекс форте', dose: '1 мг', best: false }
-    ],
-    organs: ['CELLS', 'LIVER', 'HEART'],
-    systems: ['hepatic', 'cardio'],
-    mechanisms: ['ANTIOXIDANT_NETWORK', 'OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION', 'ANTI_AGING'],
-    description: 'Антиоксидантный комплекс — комбинация витаминов С, Е, А, селена, АЛЬК для комплексной антиоксидантной защиты.',
-    synergies: [
-      { with: "vitamin_a", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "omega3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
-    ],
-    conflicts: [],
-    monitoring: [
-      { what: 'Окислительный стресс', when: 'Субъективно' }
-    ],
-    contraindications: ['Приём химиотерапии (без разрешения врача)', 'Беременность'],
-    sideEffects: ['Редко: желудочный дискомфорт'],
-    dosage: { mg: 1, timing: 'с едой 1x/д', form: 'антиоксидантный комплекс капсула' },
-    bestForCourse: false,
-  },
 nrf2_activator: {
     id: 'nrf2_activator',
     name: 'Nrf2 Activator',
@@ -8788,41 +8611,6 @@ olive_extract: {
     contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 250, timing: 'с едой 1x/д', form: 'экстракт оливы 250 мг' },
-    bestForCourse: false,
-  },
-polyphenol_complex: {
-    id: 'polyphenol_complex',
-    name: 'Polyphenol Complex',
-    nameRu: 'Полифенольный комплекс',
-    tier: 'standard',
-    category: ['antioxidant', 'cardioprotector'],
-    forms: [
-      { id: 'polyphenol_complex', name: 'Polyphenol Complex', nameRu: 'Полифенольный комплекс 500 мг', dose: '500 мг 2x/д', best: true }
-    ],
-    organs: ['HEART', 'BRAIN', 'BLOOD_VESSELS'],
-    systems: ['cardio', 'neuro'],
-    mechanisms: ['ANTIOXIDANT', 'ANTI_INFLAMMATORY', 'MICROCIRCULATION', 'BRAIN_PROTECTION'],
-    description: 'Полифенольный комплекс — комбинация 10+ полифенолов для сосудистой и нейропротекции. На курсе — антиоксидантный щит.',
-    synergies: [
-      { with: "lycopene", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "polyphenol_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "chaga", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "amino_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "peptide_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "olive_extract", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "flavonoids", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "omega9", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "omega3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "egcg", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "mushroom_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
-    ],
-    conflicts: [],
-    monitoring: [
-      { what: 'Липидограмма', when: 'Каждые 8 нед' }
-    ],
-    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
-    sideEffects: ['Редко: желудочный дискомфорт'],
-    dosage: { mg: 500, timing: 'с едой 1x/д', form: 'полифенольный комплекс 500 мг' },
     bestForCourse: false,
   },
 citrus_bioflavonoids: {
@@ -10146,18 +9934,18 @@ meloxicam: {
   },
 ppi_drugs: {
     id: 'ppi_drugs',
-    name: 'PPI Drugs',
-    nameRu: 'ИПП (Омепразол/Пантопразол)',
+    name: 'Omeprazole',
+    nameRu: 'Омепразол',
     tier: 'specialty',
     category: ['pharma', 'gastrointestinal'],
     forms: [
-      { id: 'ppi_drugs', name: 'PPI Drugs', nameRu: 'Омепразол 20 мг', dose: '20 мг 2x/д', best: true },
-      { id: 'ppi_drugs_2', name: 'PPI Drugs', nameRu: 'Пантопразол 40 мг', dose: '20 мг', best: false }
+      { id: 'ppi_drugs', name: 'Omeprazole', nameRu: 'Омепразол 20 мг', dose: '20 мг 1x/д', best: true },
+      { id: 'ppi_drugs_2', name: 'Pantoprazole', nameRu: 'Пантопразол 40 мг', dose: '40 мг', best: false }
     ],
     organs: ['STOMACH', 'GUT'],
     systems: ['gastrointestinal'],
     mechanisms: ['PROTON_PUMP_INHIBITION', 'GASTRIC_PROTECTION', 'ACID_REDUCTION', 'ULCER_PREVENTION'],
-    description: 'Ингибиторы протонной помпы — снижают кислотность желудка, предотвращают язвы и рефлюкс. На курсе — защита ЖКТ.',
+    description: 'Омепразол — ингибитор протонной помпы, снижает кислотность желудка. На курсе — защита ЖКТ от НПВП и ААС.',
     synergies: [
       { with: "probiotics", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
@@ -10203,44 +9991,20 @@ spironolactone: {
     dosage: { mg: 50, timing: 'с едой 1x/д', form: 'спиронолактон 50 мг' },
     bestForCourse: false,
   },
-pharma_drugs: {
-    id: 'pharma_drugs',
-    name: 'Pharma Drugs',
-    nameRu: 'Фарма-препараты (комплекс)',
-    tier: 'specialty',
-    category: ['pharma', 'recovery'],
-    forms: [
-      { id: 'pharma_drugs', name: 'Pharma Drugs', nameRu: 'Фарма-комплекс индивидуальный', dose: '1 мг 2x/д', best: true }
-    ],
-    organs: ['LIVER', 'HEART', 'KIDNEYS'],
-    systems: ['hepatic', 'cardio', 'renal'],
-    mechanisms: ['MULTI_ORGAN_PROTECTION', 'RISK_REDUCTION', 'COURSE_SUPPORT', 'PCT_PREPARATION'],
-    description: 'Фарма-препараты — комплексная поддержка на курсе: ИПП, кардиопротекторы, гепатопротекторы. Индивидуальный подбор.',
-    synergies: [],
-    conflicts: [
-      { with: "prebiotics", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
-    ],
-    monitoring: [
-      { what: 'Биохимия крови', when: 'Каждые 4 нед' }
-    ],
-    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
-    sideEffects: ['Индивидуально'],
-    dosage: { mg: 1, timing: 'индивидуально', form: 'фарма-комплекс' },
-    bestForCourse: false,
-  },
+
 antidepressant_drugs: {
     id: 'antidepressant_drugs',
-    name: 'Antidepressant Drugs',
-    nameRu: 'Антидепрессанты',
+    name: 'Fluoxetine',
+    nameRu: 'Флуоксетин',
     tier: 'specialty',
     category: ['pharma', 'neuroprotector'],
     forms: [
-      { id: 'antidepressant_drugs', name: 'Antidepressant Drugs', nameRu: 'Антидепрессант (по назначению врача)', dose: '1 мг 2x/д', best: true }
+      { id: 'antidepressant_drugs', name: 'Fluoxetine', nameRu: 'Флуоксетин 20 мг', dose: '20 мг 1x/д', best: true }
     ],
     organs: ['BRAIN', 'NERVES', 'ADRENALS'],
     systems: ['neuro'],
     mechanisms: ['SEROTONIN_MODULATION', 'NOREPINEPHRINE_MODULATION', 'MOOD_REGULATION', 'ANXIOLYTIC'],
-    description: 'Антидепрессанты — СИОЗС/СИОЗСН для стабилизации настроения на ПКТ. Только по назначению врача.',
+    description: 'Флуоксетин — СИОЗС, ингибитор обратного захвата серотонина. На ПКТ — стабилизация настроения. Только по назначению врача.',
     synergies: [],
     conflicts: [
       { with: "x5htp", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
@@ -10261,17 +10025,17 @@ antidepressant_drugs: {
   },
 anxiolytic_drugs: {
     id: 'anxiolytic_drugs',
-    name: 'Anxiolytic Drugs',
-    nameRu: 'Анксиолитики',
+    name: 'Buspirone',
+    nameRu: 'Буспирон',
     tier: 'specialty',
     category: ['pharma', 'neuroprotector'],
     forms: [
-      { id: 'anxiolytic_drugs', name: 'Anxiolytic Drugs', nameRu: 'Анксиолитик (по назначению врача)', dose: '1 мг 2x/д', best: true }
+      { id: 'anxiolytic_drugs', name: 'Buspirone', nameRu: 'Буспирон 10 мг', dose: '10 мг 2x/д', best: true }
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
     mechanisms: ['GABA_MODULATION', 'ANXIOLYTIC', 'MUSCLE_RELAXATION', 'SLEEP_REGULATION'],
-    description: 'Анксиолитики — бензодиазепины или небензодиазепиновые препараты для снижения тревожности. Только по назначению.',
+    description: 'Буспирон — анксиолитик, частичный агонист 5-HT1A. На курсе — снижение тревожности без седации. Только по назначению.',
     synergies: [
       { with: "melatonin", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "ashwagandha", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
@@ -10291,17 +10055,17 @@ anxiolytic_drugs: {
   },
 antipsychotic_drugs: {
     id: 'antipsychotic_drugs',
-    name: 'Antipsychotic Drugs',
-    nameRu: 'Антипсихотики',
+    name: 'Quetiapine',
+    nameRu: 'Кветиапин',
     tier: 'specialty',
     category: ['pharma', 'neuroprotector'],
     forms: [
-      { id: 'antipsychotic_drugs', name: 'Antipsychotic Drugs', nameRu: 'Антипсихотик (по назначению врача)', dose: '1 мг 2x/д', best: true }
+      { id: 'antipsychotic_drugs', name: 'Quetiapine', nameRu: 'Кветиапин 25 мг', dose: '25 мг 1x/д', best: true }
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
     mechanisms: ['DOPAMINE_ANTAGONISM', 'PSYCHOSIS_PREVENTION', 'MOOD_STABILIZATION', 'PROLACTIN_INCREASE'],
-    description: 'Антипсихотики — для предотвращения психоза на высоких дозах ААС. Только по назначению врача.',
+    description: 'Кветиапин — атипичный антипсихотик. На курсе — контроль психотических симптомов. Только по назначению врача.',
     synergies: [],
     conflicts: [
       { with: "phosphatidylcholine", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
@@ -10316,17 +10080,17 @@ antipsychotic_drugs: {
   },
 anticonvulsant_drugs: {
     id: 'anticonvulsant_drugs',
-    name: 'Anticonvulsant Drugs',
-    nameRu: 'Противоэпилептические препараты',
+    name: 'Gabapentin',
+    nameRu: 'Габапентин',
     tier: 'specialty',
     category: ['pharma', 'neuroprotector'],
     forms: [
-      { id: 'anticonvulsant_drugs', name: 'Anticonvulsant Drugs', nameRu: 'Противоэпилептический (по назначению врача)', dose: '1 мг 2x/д', best: true }
+      { id: 'anticonvulsant_drugs', name: 'Gabapentin', nameRu: 'Габапентин 300 мг', dose: '300 мг 3x/д', best: true }
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
     mechanisms: ['SEIZURE_PREVENTION', 'NEUROPROTECTION', 'MOOD_STABILIZATION', 'NERVE_PAIN_RELIEF'],
-    description: 'Противоэпилептические препараты — предотвращают судороги и нейропатию на курсе. Только по назначению.',
+    description: 'Габапентин — противоэпилептическое, аналог GABA. На курсе — нейропротекция и контроль нейропатии. Только по назначению.',
     synergies: [],
     conflicts: [
       { with: "folate", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
@@ -10366,17 +10130,17 @@ ketamine: {
   },
 antidiabetic_drugs: {
     id: 'antidiabetic_drugs',
-    name: 'Antidiabetic Drugs',
-    nameRu: 'Противодиабетические препараты',
+    name: 'Metformin',
+    nameRu: 'Метформин',
     tier: 'specialty',
     category: ['pharma', 'metabolic'],
     forms: [
-      { id: 'antidiabetic_drugs', name: 'Antidiabetic Drugs', nameRu: 'Противодиабетический (по назначению врача)', dose: '1 мг 2x/д', best: true }
+      { id: 'antidiabetic_drugs', name: 'Metformin', nameRu: 'Метформин', dose: '500-2000 мг/сут', best: true }
     ],
     organs: ['PANCREAS', 'LIVER', 'MUSCLES'],
     systems: ['metabolic', 'hepatic'],
     mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_LOWERING', 'HBA1C_REDUCTION', 'METABOLIC_PROTECTION'],
-    description: 'Противодиабетические препараты — метформин, СГЛТ2-ингибиторы и др. для контроля глюкозы на курсе.',
+    description: 'Метформин — AMPK-активатор, снижает глюкозу и инсулинорезистентность. На курсе ААС контролирует метаболический профиль.',
     synergies: [],
     conflicts: [
       { with: "mct", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
@@ -10391,13 +10155,13 @@ antidiabetic_drugs: {
   },
 thyroid_drugs: {
     id: 'thyroid_drugs',
-    name: 'Thyroid Drugs',
-    nameRu: 'Тиреоидные препараты',
+    name: 'Levothyroxine',
+    nameRu: 'Левотироксин',
     tier: 'specialty',
     category: ['pharma', 'hormonal'],
     forms: [
-      { id: 'thyroid_drugs', name: 'Thyroid Drugs', nameRu: 'Левотироксин (по назначению)', dose: '1 мг 2x/д', best: true },
-      { id: 'thyroid_drugs_2', name: 'Thyroid Drugs', nameRu: 'Лиотиронин (по назначению)', dose: '1 мг', best: false }
+      { id: 'thyroid_drugs', name: 'Levothyroxine', nameRu: 'Левотироксин 50 мкг', dose: '50 мкг 1x/д', best: true },
+      { id: 'thyroid_drugs_2', name: 'Liothyronine', nameRu: 'Лиотиронин 25 мкг', dose: '25 мкг', best: false }
     ],
     organs: ['THYROID', 'BRAIN', 'HEART'],
     systems: ['endocrine', 'cardio', 'neuro'],
@@ -10421,17 +10185,17 @@ thyroid_drugs: {
   },
 corticosteroid_drugs: {
     id: 'corticosteroid_drugs',
-    name: 'Corticosteroid Drugs',
-    nameRu: 'Глюкокортикоиды',
+    name: 'Prednisolone',
+    nameRu: 'Преднизолон',
     tier: 'specialty',
     category: ['pharma', 'anti_inflammatory'],
     forms: [
-      { id: 'corticosteroid_drugs', name: 'Corticosteroid Drugs', nameRu: 'Глюкокортикоид (по назначению врача)', dose: '1 мг 2x/д', best: true }
+      { id: 'corticosteroid_drugs', name: 'Prednisolone', nameRu: 'Преднизолон 5 мг', dose: '5 мг 1x/д', best: true }
     ],
     organs: ['ADRENALS', 'JOINTS', 'IMMUNE_SYSTEM'],
     systems: ['endocrine', 'musculoskeletal', 'immune'],
     mechanisms: ['ANTI_INFLAMMATORY', 'IMMUNOSUPPRESSION', 'CORTISOL_REPLACEMENT', 'EDEMA_REDUCTION'],
-    description: 'Глюкокортикоиды — преднизолон, дексаметазон для снятия воспаления. Только краткосрочно на курсе.',
+    description: 'Преднизолон — глюкокортикостероид. На курсе — краткосрочно при воспалении. Только по назначению.',
     synergies: [
       { with: "curcumin", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
@@ -10541,18 +10305,18 @@ anticoagulant_drugs: {
   },
 ace_inhibitor_drugs: {
     id: 'ace_inhibitor_drugs',
-    name: 'ACE Inhibitor Drugs',
-    nameRu: 'ИАПФ',
+    name: 'Enalapril',
+    nameRu: 'Эналаприл',
     tier: 'specialty',
     category: ['pharma', 'cardioprotector'],
     forms: [
-      { id: 'ace_inhibitor_drugs', name: 'ACE Inhibitor Drugs', nameRu: 'Эналаприл 10 мг', dose: '10 мг 2x/д', best: true },
-      { id: 'ace_inhibitor_drugs_2', name: 'ACE Inhibitor Drugs', nameRu: 'Рамиприл 5 мг', dose: '10 мг', best: false }
+      { id: 'ace_inhibitor_drugs', name: 'Enalapril', nameRu: 'Эналаприл 10 мг', dose: '10 мг 1x/д', best: true },
+      { id: 'ace_inhibitor_drugs_2', name: 'Ramipril', nameRu: 'Рамиприл 5 мг', dose: '5 мг', best: false }
     ],
     organs: ['HEART', 'BLOOD_VESSELS', 'KIDNEYS'],
     systems: ['cardio', 'renal'],
     mechanisms: ['ACE_INHIBITION', 'BLOOD_PRESSURE_LOWERING', 'RENAL_PROTECTION', 'REMODELING_PREVENTION'],
-    description: 'ИАПФ — эналаприл/рамиприл, снижают АД и защищают почки. На курсе — кардиопротекция при гипертензии.',
+    description: 'Эналаприл — ИАПФ, снижает АД, защищает почки. На курсе — кардиопротекция при гипертензии.',
     synergies: [],
     conflicts: [
       { with: "potassium", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
@@ -10620,18 +10384,18 @@ ccb_drugs: {
   },
 beta_blocker_drugs: {
     id: 'beta_blocker_drugs',
-    name: 'Beta Blocker Drugs',
-    nameRu: 'Бета-блокаторы',
+    name: 'Bisoprolol',
+    nameRu: 'Бисопролол',
     tier: 'specialty',
     category: ['pharma', 'cardioprotector'],
     forms: [
-      { id: 'beta_blocker_drugs', name: 'Beta Blocker Drugs', nameRu: 'Бисопролол 5 мг', dose: '5 мг 2x/д', best: true },
-      { id: 'beta_blocker_drugs_2', name: 'Beta Blocker Drugs', nameRu: 'Метопролол 50 мг', dose: '5 мг', best: false }
+      { id: 'beta_blocker_drugs', name: 'Bisoprolol', nameRu: 'Бисопролол 5 мг', dose: '5 мг 1x/д', best: true },
+      { id: 'beta_blocker_drugs_2', name: 'Metoprolol', nameRu: 'Метопролол 50 мг', dose: '50 мг', best: false }
     ],
     organs: ['HEART', 'BLOOD_VESSELS', 'LUNGS'],
     systems: ['cardio'],
     mechanisms: ['BETA_RECEPTOR_BLOCKADE', 'HEART_RATE_REDUCTION', 'BLOOD_PRESSURE_LOWERING', 'ARRHYTHMIA_PREVENTION'],
-    description: 'Бета-блокаторы — бисопролол/метопролол, снижают ЧСС и АД. На курсе — контроль пульса и АД.',
+    description: 'Бисопролол — β1-селективный блокатор, снижает ЧСС и АД. На курсе — контроль пульса.',
     synergies: [
         {with: "coq10", effect: "Защита сердца", mechanism: "Бета-блокаторы + CoQ10", severity: "MEDIUM"},
       ],
@@ -10736,13 +10500,13 @@ antibiotic_drugs: {
   },
 antihistamine_drugs: {
     id: 'antihistamine_drugs',
-    name: 'Antihistamine Drugs',
-    nameRu: 'Антигистаминные препараты',
+    name: 'Cetirizine',
+    nameRu: 'Цетиризин',
     tier: 'standard',
     category: ['pharma', 'immunomodulator'],
     forms: [
-      { id: 'antihistamine_drugs', name: 'Antihistamine Drugs', nameRu: 'Цетиризин 10 мг', dose: '10 мг 2x/д', best: true },
-      { id: 'antihistamine_drugs_2', name: 'Antihistamine Drugs', nameRu: 'Лоратадин 10 мг', dose: '10 мг', best: false }
+      { id: 'antihistamine_drugs', name: 'Cetirizine', nameRu: 'Цетиризин 10 мг', dose: '10 мг 1x/д', best: true },
+      { id: 'antihistamine_drugs_2', name: 'Loratadine', nameRu: 'Лоратадин 10 мг', dose: '10 мг', best: false }
     ],
     organs: ['IMMUNE_SYSTEM', 'LUNGS', 'SKIN'],
     systems: ['immune'],
@@ -10826,17 +10590,17 @@ levothyroxine: {
   },
 antithyroid_drugs: {
     id: 'antithyroid_drugs',
-    name: 'Antithyroid Drugs',
-    nameRu: 'Антитиреоидные препараты',
+    name: 'Thiamazole',
+    nameRu: 'Тиамазол',
     tier: 'specialty',
     category: ['pharma', 'hormonal'],
     forms: [
-      { id: 'antithyroid_drugs', name: 'Antithyroid Drugs', nameRu: 'Тиамазол 10 мг', dose: '10 мг 2x/д', best: true }
+      { id: 'antithyroid_drugs', name: 'Thiamazole', nameRu: 'Тиамазол 10 мг', dose: '10 мг 2x/д', best: true }
     ],
     organs: ['THYROID'],
     systems: ['endocrine'],
     mechanisms: ['THYROID_HORMONE_SYNTHESIS_INHIBITION', 'T3_T4_LOWERING', 'HYPERTHYROIDISM_TREATMENT', 'METABOLIC_RATE_REDUCTION'],
-    description: 'Антитиреоидные препараты — тирозол/пропилтиоурацил для лечения гипертиреоза. Только по назначению.',
+    description: 'Тиамазол — тиреостатик, ингибирует синтез тиреоидных гормонов. При гипертиреозе на курсе. Только по назначению.',
     synergies: [],
     conflicts: [
       { with: "iodine", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
@@ -11339,32 +11103,6 @@ omega3: {
     dosage: { mg: 2000, timing: 'с едой 2x/д', form: 'Омега-3 1000 мг EPA+DHA' },
     bestForCourse: true,
   },
-adaptogen_complex: {
-    id: 'adaptogen_complex',
-    name: 'Adaptogen Complex',
-    nameRu: 'Адаптогенный комплекс',
-    tier: 'advanced',
-    category: ['adaptogen', 'neuroprotector'],
-    forms: [
-      { id: 'adaptogen_complex', name: 'Adaptogen Complex', nameRu: 'Адаптогенный комплекс 1000 мг', dose: '1 г 2x/д', best: true },
-      { id: 'adaptogen_complex_2', name: 'Adaptogen Complex', nameRu: 'Адаптогенный комплекс форте', dose: '1 г', best: false }
-    ],
-    organs: ['ADRENALS', 'BRAIN', 'MUSCLES'],
-    systems: ['endocrine', 'neuro'],
-    mechanisms: ['STRESS_ADAPTATION', 'CORTISOL_REGULATION', 'ENERGY_PRODUCTION', 'IMMUNE_SUPPORT'],
-    description: 'Адаптогенный комплекс — комбинация ашваганды, родиолы, элеутерококка для комплексной антистресс-поддержки.',
-    synergies: [
-      { with: "schisandra", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
-    ],
-    conflicts: [],
-    monitoring: [
-      { what: 'Кортизол', when: 'Каждые 8 нед' }
-    ],
-    contraindications: ['Гипертиреоз', 'Беременность'],
-    sideEffects: ['Редко: возбуждение при передозировке'],
-    dosage: { mg: 1000, timing: 'утром с едой', form: 'адаптогенный комплекс 1000 мг' },
-    bestForCourse: false,
-  },
 astragalus: {
     id: 'astragalus',
     name: 'Astragalus',
@@ -11556,17 +11294,17 @@ vasopressin: {
   },
 endocannabinoid: {
     id: 'endocannabinoid',
-    name: 'Endocannabinoid',
-    nameRu: 'Эндоканнабиноидная система',
+    name: 'Palmitoylethanolamide (PEA)',
+    nameRu: 'Пальмитоилэтаноламид (PEA)',
     tier: 'standard',
     category: ['immunomodulator'],
     forms: [
-      { id: 'endocannabinoid', name: 'Endocannabinoid', nameRu: 'Эндоканнабиноидная поддержка (ПНЖК+терпены)', dose: '0 мкг 2x/д', best: true }
+      { id: 'endocannabinoid', name: 'PEA', nameRu: 'PEA 400 мг', dose: '400 мг 2x/д', best: true }
     ],
     organs: ['BRAIN', 'IMMUNE_SYSTEM', 'GUT'],
     systems: ['neuro', 'immune', 'gastrointestinal'],
     mechanisms: ['PAIN_MODULATION', 'APPETITE_REGULATION', 'MOOD_REGULATION', 'ANTI_INFLAMMATORY'],
-    description: 'Эндоканнабиноидная система — регулятор боли, аппетита и настроения. Модулируется фитоканнабиноидами и ПНЖК.',
+    description: 'PEA — эндогенный амид жирной кислоты, агонист PPAR-α. Модулирует эндоканнабиноидную систему, снижает боль и воспаление.',
     synergies: [
         {with: "omega3", effect: "Эндоканнабиноидная система", mechanism: "Омега-3 — предшественник", severity: "MEDIUM"},
       ],
@@ -11796,98 +11534,6 @@ licorice: {
     contraindications: ['Гипертония', 'Гипокалиемия'],
     sideEffects: ['Задержка натрия/воды', 'Повышение АД при длительном'],
     dosage: { mg: 500, timing: 'с едой 2x/д (макс 6 нед)', form: 'экстракт солодки 500 мг' },
-    bestForCourse: false,
-  },
-stimulant_complex: {
-    id: 'stimulant_complex',
-    name: 'Stimulant Complex',
-    nameRu: 'Стимуляторный комплекс',
-    tier: 'advanced',
-    category: ['stimulant', 'nootropic'],
-    forms: [
-      { id: 'stimulant_complex', name: 'Stimulant Complex', nameRu: 'Стимуляторный комплекс 1 капсула', dose: '1 мг 2x/д', best: true },
-      { id: 'stimulant_complex_2', name: 'Stimulant Complex', nameRu: 'Стимуляторный комплекс форте', dose: '1 мг', best: false }
-    ],
-    organs: ['BRAIN', 'HEART', 'MUSCLES'],
-    systems: ['neuro', 'cardio'],
-    mechanisms: ['CNS_STIMULATION', 'FAT_OXIDATION', 'POWER_OUTPUT', 'FOCUS_ENHANCEMENT'],
-    description: 'Стимуляторный комплекс — кофеин+теакрин+L-тирозин для предтренировочного буста. На курсе — энергия и фокус.',
-    synergies: [
-      { with: "caffeine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "stimulant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "tyrosine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "antihistamine_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
-    ],
-    conflicts: [
-      { with: "caffeine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
-      { with: "magnesium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
-      { with: "beta_blocker_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
-      { with: "ginseng", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
-      { with: "rhodiola", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
-      { with: "huperzine_a", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
-      { with: "anxiolytic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
-      { with: "melatonin", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
-      { with: "stimulant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
-      { with: "pt141", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
-    ],
-    monitoring: [
-      { what: 'Пульс/АД', when: 'Каждые 8 нед' }
-    ],
-    contraindications: ['Тяжёлая гипертензия', 'Аритмия'],
-    sideEffects: ['Бессонница при вечернем приёме', 'Тахикардия'],
-    dosage: { mg: 1, timing: 'за 30 мин до тренировки', form: 'стимуляторный комплекс 1 капсула' },
-    bestForCourse: false,
-  },
-lipid_complex: {
-    id: 'lipid_complex',
-    name: 'Lipid Complex',
-    nameRu: 'Липидный комплекс',
-    tier: 'standard',
-    category: ['fatty_acid', 'cardioprotector'],
-    forms: [
-      { id: 'lipid_complex', name: 'Lipid Complex', nameRu: 'Липидный комплекс 3 г', dose: '3 г 2x/д', best: true },
-      { id: 'lipid_complex_2', name: 'Lipid Complex', nameRu: 'Омега 3-6-9 комплекс', dose: '3 г', best: false }
-    ],
-    organs: ['HEART', 'BRAIN', 'BLOOD_VESSELS'],
-    systems: ['cardio', 'neuro'],
-    mechanisms: ['OMEGA3_6_9_BALANCE', 'CHOLESTEROL_LOWERING', 'ANTI_INFLAMMATORY', 'BRAIN_PROTECTION'],
-    description: 'Липидный комплекс — Омега-3+6+9+CLA+МСТ для баланса жирных кислот и кардиопротекции на курсе.',
-    synergies: [
-        {with: "omega3", effect: "Комплексная поддержка липидов", mechanism: "Оба — источники ЖК", severity: "MEDIUM"},
-      ],
-    conflicts: [],
-    monitoring: [
-      { what: 'Липидограмма', when: 'Каждые 8 нед' }
-    ],
-    contraindications: ['Приём антикоагулянтов (с осторожностью)'],
-    sideEffects: ['Рыбная отрыжка', 'Диарея при высоких дозах'],
-    dosage: { mg: 3000, timing: 'с едой 2x/д', form: 'липидный комплекс 3 г' },
-    bestForCourse: false,
-  },
-brand_complex: {
-    id: 'brand_complex',
-    name: 'Brand Complex',
-    nameRu: 'Брендовый комплекс',
-    tier: 'standard',
-    category: ['multivitamin', 'recovery'],
-    forms: [
-      { id: 'brand_complex', name: 'Brand Complex', nameRu: 'Брендовый комплекс 1 капсула', dose: '1 мг 2x/д', best: true }
-    ],
-    organs: ['WHOLE_BODY'],
-    systems: ['all_systems'],
-    mechanisms: ['COMPREHENSIVE_NUTRITION', 'VITAMIN_MINERAL_SUPPORT', 'RECOVERY_ENHANCEMENT', 'IMMUNE_SUPPORT'],
-    description: 'Брендовый комплекс — мультивитаминный препарат от производителя для общей поддержки на курсе.',
-    synergies: [
-      { with: "vitamin_a", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "omega3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
-    ],
-    conflicts: [],
-    monitoring: [
-      { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
-    ],
-    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
-    sideEffects: ['Редко: желудочный дискомфорт'],
-    dosage: { mg: 1, timing: 'с едой 1x/д', form: 'брендовый комплекс 1 капсула' },
     bestForCourse: false,
   },
 antacid: {
