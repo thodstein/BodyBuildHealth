@@ -1556,6 +1556,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [stackCalcSize, setStackCalcSize] = useState<string>('5-7');
   const [stackCalcOrgans, setStackCalcOrgans] = useState<string[]>([]);
   const [stackCalcMech, setStackCalcMech] = useState<string[]>([]);
+  const [stackCalcMode, setStackCalcMode] = useState<'auto'|'manual'>('auto');
   const [generatedStack, setGeneratedStack] = useState<any>(null);
   const [generatedStacks, setGeneratedStacks] = useState<any[]>([]);
   const [pubMedQuery, setPubMedQuery] = useState('');
@@ -3219,7 +3220,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   { icon:'🔬', title:'Исследования', desc:'Научная база исследований по всем веществам поддержки', color:'#f59e0b', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); } },
                    { icon:'🧮', title:'Генератор стеков', desc:'Автоматический подбор стека по органам, целям и биомаркерам', color:'#ec4899', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('supportstacks'); setStackSubTab('generator'); } },
                   { icon:'📂', title:'Мои стеки', desc:'Сохранённые персональные стеки с оценкой синергий и конфликтов', color:'#22c55e', action:() => { setSection('generator'); setTab('main'); setSupportView('calc'); setCalcView('mystacks'); } },
-                  { icon:'⚡', title:'Тренировочные миксы', desc:'Пре-/интра-/пост-тренировочные стеки для пампа, силы и восстановления', color:'#f97316', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('supportstacks'); setStackSubTab('mixcalc'); } },
                   { icon:'📅', title:'План поддержки', desc:'Дневной, недельный и месячный план приёма по тайм-слотам', color:'#84cc16', action:() => { setSection('generator'); setTab('main'); setSupportView('calc'); setCalcView('plan'); } },
                   { icon:'🧠', title:'Нейротоксичность', desc:'Детальные механизмы нейротоксичности ААС и протокол нейропротекции', color:'#ec4899', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('neuro'); } },
                   { icon:'🦴', title:'Суставы и связки', desc:'Калькулятор поддержки суставов, анализы и протоколы', color:'#f59e0b', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('joints'); } },
@@ -4527,7 +4527,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               <div>
                 {/* Sub-tabs: Все стеки / Миксы / Генератор / Замена / Поиск */}
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  {[['readystacks','📦 Все стеки'],['mixes','🧬 Миксы'],['generator','⚡ Генератор стеков'],['replace','🔀 Подбор замены'],['search','🔍 Поиск препарата'],['mixcalc','⚡ Тренировочные миксы']].map(([id,label]) => (
+                  {[['readystacks','📦 Все стеки'],['mixes','🧬 Генератор миксов'],['generator','⚡ Генератор стеков'],['replace','🔀 Генератор замены'],['search','🔍 Генератор поиска'],['mixcalc','⚡ Тренировочные миксы']].map(([id,label]) => (
                     <button key={id} onClick={() => {
                       setStackSubTab(id);
                     }} style={{
@@ -4823,7 +4823,18 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           <span style={{fontSize:9,fontWeight:600,color:'var(--text-light)'}}>Размер:</span>
                           {['2-4','5-7','8-10','11-15','15-20','20-25','30-35'].map(s=><button key={s} onClick={()=>setStackCalcSize(s)} style={{padding:'2px 5px',borderRadius:6,fontSize:7,cursor:'pointer',background:stackCalcSize===s?'var(--accent)':'var(--bg-secondary)',color:stackCalcSize===s?'#000':'var(--text-dim)',border:`1px solid ${stackCalcSize===s?'var(--accent)':'var(--border)'}`}}>{s}</button>)}
                         </div>
-                        <button onClick={generate} style={{width:'100%',padding:'10px',borderRadius:12,fontWeight:800,fontSize:14,cursor:'pointer',background:'var(--accent)',border:'none',color:'#000',marginBottom:6}}>⚡ Сгенерировать</button>
+                        {/* Mode toggle: auto / manual */}
+                        <div style={{display:'flex',gap:4,marginBottom:6}}>
+                          <button onClick={()=>setStackCalcMode('auto')} style={{flex:1,padding:'6px',borderRadius:8,fontSize:9,fontWeight:700,cursor:'pointer',background:stackCalcMode==='auto'?'var(--accent)':'var(--bg-secondary)',color:stackCalcMode==='auto'?'#000':'var(--text-dim)',border:`1px solid ${stackCalcMode==='auto'?'var(--accent)':'var(--border)'}`}}>⚡ Авто</button>
+                          <button onClick={()=>setStackCalcMode('manual')} style={{flex:1,padding:'6px',borderRadius:8,fontSize:9,fontWeight:700,cursor:'pointer',background:stackCalcMode==='manual'?'var(--accent)':'var(--bg-secondary)',color:stackCalcMode==='manual'?'#000':'var(--text-dim)',border:`1px solid ${stackCalcMode==='manual'?'var(--accent)':'var(--border)'}`}}>✋ Ручной</button>
+                        </div>
+                        {stackCalcMode==='manual'&&<div style={{marginBottom:6,background:'var(--bg-secondary)',borderRadius:8,border:'1px solid var(--border)',padding:'8px 10px'}}>
+                          <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:4}}>Выбранные препараты ({enhancedSubs.length})</div>
+                          {enhancedSubs.length===0?<div style={{fontSize:9,color:'rgba(255,255,255,0.4)',textAlign:'center',padding:10}}>Начните добавлять вещества</div>:<div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:4}}>{enhancedSubs.map(sid=>{const sub=catalogSubstances.find(x=>x.id===sid);return <div key={sid} style={{display:'inline-flex',alignItems:'center',gap:3,padding:'2px 6px',borderRadius:6,background:'rgba(139,92,246,0.08)',border:'1px solid rgba(139,92,246,0.15)'}}><span style={{fontSize:9,color:'#a78bfa',fontWeight:600}}>{sub?.name||sid.replace(/_/g,' ')}</span><span onClick={()=>setEnhancedSubs(prev=>prev.filter(x=>x!==sid))} style={{fontSize:10,cursor:'pointer',color:'rgba(255,255,255,0.3)'}}>×</span></div>})}</div>}
+                          <input value={stackSearch} onChange={e=>setStackSearch(e.target.value)} placeholder="🔍 Добавить препарат..." style={{width:'100%',padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg)',color:'var(--text)',fontSize:10,boxSizing:'border-box',marginTop:4}} />
+                          {stackSearch&&<div style={{marginTop:3,maxHeight:100,overflowY:'auto'}}>{catalogSubstances.filter(s=>(s.name||'').toLowerCase().includes(stackSearch.toLowerCase())||(s.id||'').toLowerCase().includes(stackSearch.toLowerCase())).slice(0,5).map(s=><div key={s.id} onClick={()=>{if(!enhancedSubs.includes(s.id))setEnhancedSubs(prev=>[...prev,s.id]);setStackSearch('')}} style={{padding:'4px 6px',borderRadius:4,cursor:'pointer',fontSize:9,borderBottom:'1px solid rgba(255,255,255,0.04)'}}><span style={{fontWeight:600,color:'var(--text-light)'}}>{s.name}</span><span style={{fontSize:7,color:'var(--text-dim)',marginLeft:4}}>{s.id}</span></div>)}</div>}
+                        </div>}
+                        <button onClick={generate} style={{width:'100%',padding:'10px',borderRadius:12,fontWeight:800,fontSize:14,cursor:'pointer',background:'var(--accent)',border:'none',color:'#000',marginBottom:6}}>⚡ {stackCalcMode==='auto'?'Сгенерировать':'Собрать стек'}</button>
                         {generatedStacks.length > 0 && (
                           <div style={{marginBottom:6}}>
                             <div style={{display:'flex',gap:4,overflowX:'auto',marginBottom:4}}>
@@ -4842,7 +4853,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           </div>
                           {generatedStack.stackDesc && <div style={{fontSize:8,color:'var(--text-dim)',marginBottom:4,lineHeight:1.4}}>{generatedStack.stackDesc}</div>}
                           <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:4}}>
-                            {generatedStack.descriptions.map((n:string,i:number)=><span key={i} style={{fontSize:8,padding:'2px 8px',borderRadius:6,background:'rgba(139,92,246,0.1)',color:'#a78bfa',border:'1px solid rgba(139,92,246,0.15)'}}>{n}<span style={{marginLeft:3,opacity:0.5,fontSize:7}}>+{generatedStack.scores[i]}</span></span>)}
+                            {generatedStack.substances.map((sid:string,i:number)=>{const n=generatedStack.descriptions[i];return <span key={sid} style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:8,padding:'2px 8px',borderRadius:6,background:'rgba(139,92,246,0.1)',color:'#a78bfa',border:'1px solid rgba(139,92,246,0.15)'}}>{n}<span style={{opacity:0.5,fontSize:7}}>+{generatedStack.scores[i]}</span><span onClick={(e)=>{e.stopPropagation();const reps=findReplacements(sid);if(reps.length>0){const rep=reps[0];const idx=generatedStack.substances.indexOf(sid);if(idx>-1){const newSubs=[...generatedStack.substances];newSubs[idx]=rep.id;const newDesc=[...generatedStack.descriptions];newDesc[idx]=getSubstanceName(rep.id);setGeneratedStack({...generatedStack,substances:newSubs,descriptions:newDesc})}}}} style={{fontSize:7,padding:'1px 4px',borderRadius:3,cursor:'pointer',background:'rgba(249,115,22,0.15)',color:'#fb923c'}}>🔀</span></span>})}
                           </div>
                           {generatedStack.subDetails && generatedStack.subDetails.length > 0 && (
                             <details style={{marginBottom:4}}>
@@ -4873,12 +4884,12 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   </div>
                 )}
 
-                {/* MIXES — custom mix builder */}
+                {/* MIXES — Генератор миксов */}
                 {stackSubTab === 'mixes' && (
                   <div style={{ padding:'0 4px' }}>
                     <div style={{ marginBottom:10, background:'linear-gradient(135deg,rgba(236,72,153,0.08),rgba(219,39,119,0.04))', borderRadius:12, padding:'14px 12px', border:'1px solid rgba(236,72,153,0.12)' }}>
-                      <div style={{ fontSize:13, fontWeight:700, color:'#ec4899', marginBottom:2 }}>🧬 Миксы — соберите свой набор</div>
-                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', lineHeight:1.3 }}>Создавайте, сохраняйте и делитесь персональными комбинациями препаратов поддержки</div>
+                      <div style={{ fontSize:13, fontWeight:700, color:'#ec4899', marginBottom:2 }}>🧬 Генератор миксов</div>
+                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', lineHeight:1.3 }}>Создавайте персональные комбинации с анализом синергий, конфликтов и охвата органов</div>
                     </div>
                     {/* Saved mixes */}
                     {(() => {
@@ -4902,38 +4913,49 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       );
                     })()}
                     {/* Mix builder */}
-                    <div style={{ marginBottom:8, background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)', padding:'10px 12px' }}>
-                      <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Выбранные препараты ({enhancedSubs.length})</div>
+                    <div style={{ marginBottom:8, background:'rgba(24,24,27,0.15)', borderRadius:10, border:'1px solid rgba(255,255,255,0.04)', padding:'10px 12px' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                        <span style={{ fontSize:10, fontWeight:700, color:'var(--text-light)' }}>🧪 Состав микса ({enhancedSubs.length})</span>
+                        {enhancedSubs.length > 0 && (
+                          <span onClick={()=>setEnhancedSubs([])} style={{ fontSize:8, cursor:'pointer', color:'#ef4444', padding:'2px 6px', borderRadius:4, background:'rgba(239,68,68,0.08)' }}>Очистить</span>
+                        )}
+                      </div>
                       {enhancedSubs.length === 0 ? (
-                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', textAlign:'center', padding:10 }}>Начните добавлять вещества в микс</div>
+                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', textAlign:'center', padding:12, background:'var(--bg-secondary)', borderRadius:8, border:'1px dashed var(--border)', marginBottom:6 }}>Начните добавлять вещества через поиск ниже</div>
                       ) : (
-                        <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                        <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:6 }}>
                           {enhancedSubs.map(sid => {
                             const sub = catalogSubstances.find(x => x.id === sid);
+                            const dosage = sub && (sub as any).dosage;
                             return (
-                              <div key={sid} style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'3px 8px', borderRadius:6, background:'rgba(236,72,153,0.08)', border:'1px solid rgba(236,72,153,0.15)' }}>
-                                <span style={{ fontSize:9, color:'#ec4899', fontWeight:600 }}>{sub?.name || sid.replace(/_/g,' ')}</span>
-                                <span onClick={() => setEnhancedSubs(prev => prev.filter(x => x !== sid))} style={{ fontSize:10, cursor:'pointer', color:'rgba(255,255,255,0.3)' }}>×</span>
+                              <div key={sid} style={{ display:'flex', alignItems:'center', gap:4, padding:'5px 8px', borderRadius:6, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.12)' }}>
+                                <span style={{ flex:1, fontSize:9, color:'#ec4899', fontWeight:600 }}>{sub?.name || sid.replace(/_/g,' ')}</span>
+                                {dosage && <span style={{ fontSize:7, color:'var(--text-dim)' }}>{dosage.timing}{dosage.mg ? ` ${dosage.mg}мг` : ''}</span>}
+                                <span onClick={() => setEnhancedSubs(prev => prev.filter(x => x !== sid))} style={{ fontSize:10, cursor:'pointer', color:'rgba(255,255,255,0.3)', padding:'0 4px' }}>×</span>
                               </div>
                             );
                           })}
                         </div>
                       )}
                       <input value={stackSearch} onChange={e => setStackSearch(e.target.value)}
-                        placeholder="🔍 Добавить препарат..."
-                        style={{ width:'100%', padding:'8px 10px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, boxSizing:'border-box', marginTop:6 }} />
+                        placeholder="🔍 Поиск препарата для добавления..."
+                        style={{ width:'100%', padding:'8px 10px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
                       {stackSearch && (
-                        <div style={{ marginTop:4, maxHeight:120, overflowY:'auto' }}>
-                          {catalogSubstances.filter(s => (s.name||'').toLowerCase().includes(stackSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(stackSearch.toLowerCase())).slice(0,6).map(s => (
-                            <div key={s.id} onClick={() => { if (!enhancedSubs.includes(s.id)) setEnhancedSubs(prev => [...prev, s.id]); setStackSearch(''); }} style={{ padding:'6px 8px', borderRadius:4, cursor:'pointer', fontSize:9, borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                              <span style={{ fontWeight:600, color:'var(--text-light)' }}>{s.name}</span>
-                              <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>{s.id}</span>
-                            </div>
-                          ))}
+                        <div style={{ marginTop:4, maxHeight:140, overflowY:'auto', background:'var(--bg)', borderRadius:6, border:'1px solid var(--border)' }}>
+                          {catalogSubstances.filter(s => (s.name||'').toLowerCase().includes(stackSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(stackSearch.toLowerCase())).slice(0,8).map(s => {
+                            const sd = (s as any).dosage;
+                            return (
+                              <div key={s.id} onClick={() => { if (!enhancedSubs.includes(s.id)) setEnhancedSubs(prev => [...prev, s.id]); setStackSearch(''); }} style={{ display:'flex', alignItems:'center', gap:4, padding:'6px 8px', cursor:'pointer', fontSize:9, borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                                <span style={{ flex:1, fontWeight:600, color:'var(--text-light)' }}>{s.name}</span>
+                                {sd && <span style={{ fontSize:7, color:'var(--text-dim)' }}>{sd.timing}{sd.mg ? ` ${sd.mg}мг` : ''}</span>}
+                                <span style={{ fontSize:7, color:'var(--accent)' }}>+</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
-                    {/* Synergy/conflict analysis */}
+                    {/* Analysis cards */}
                     {enhancedSubs.length >= 2 && (() => {
                       const checked: Array<{a:string;b:string;type:string;effect:string;severity:string;synergyType?:string;affectedSystems?:string[];clinicalNote?:string;mechanisms?:string[];notes?:string}> = [];
                       for (let i = 0; i < enhancedSubs.length; i++) {
@@ -4948,42 +4970,45 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       }
                       const synergies = checked.filter(c => c.type === 'synergy');
                       const conflicts = checked.filter(c => c.type === 'conflict' || c.type === 'caution');
+                      const allOrgans = new Set<string>();
+                      enhancedSubs.forEach(sid => {
+                        const sub = catalogSubstances.find(x => x.id === sid);
+                        if (sub && sub.organs) (sub.organs as string[]).forEach(o => allOrgans.add(o.toLowerCase()));
+                      });
+                      const organCoverage = [...allOrgans].slice(0, 8);
                       return (
-                        <div style={{ marginBottom:8 }}>
-                          {synergies.length > 0 && (
-                            <div style={{ marginBottom:6, background:'rgba(34,197,94,0.04)', borderRadius:10, border:'1px solid rgba(34,197,94,0.1)', padding:'8px 10px' }}>
-                              <div style={{ fontSize:9, fontWeight:600, color:'#22c55e', marginBottom:4 }}>⊕ Синергии ({synergies.length})</div>
-                              {synergies.map((s,i) => {
-                                const aname = getStackSubLabel(s.a);
-                                const bname = getStackSubLabel(s.b);
-                                return (
-                                  <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.75)', lineHeight:1.5, padding:'4px 0', borderBottom: i < synergies.length-1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                                    <div style={{ fontWeight:600, color:'#4ade80' }}>• {aname} + {bname} <span style={{ fontSize:7, marginLeft:4, padding:'1px 3px', borderRadius:2, background: s.severity==='HIGH'?'rgba(34,197,94,0.2)':'rgba(34,197,94,0.1)', color:'#22c55e' }}>{s.severity}</span></div>
-                                    <div style={{ fontSize:7.5, color:'rgba(255,255,255,0.65)', marginTop:1 }}>{s.effect}</div>
-                                    {s.affectedSystems && s.affectedSystems.length > 0 && (
-                                      <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-                                        {s.affectedSystems.map((ms:string,mi:number) => <span key={mi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECH_TRANSLATIONS_RU[ms] || MECH_LABELS[ms] || ms.replace(/_/g,' ')}</span>)}
-                                      </div>
-                                    )}
-                                    {s.clinicalNote && <div style={{ fontSize:7, fontStyle:'italic', color:'#fbbf24', marginTop:1 }}>💡 {s.clinicalNote}</div>}
-                                  </div>
-                                );
-                              })}
+                        <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
+                          {/* Organ coverage */}
+                          {organCoverage.length > 0 && (
+                            <div style={{ background:'rgba(139,92,246,0.04)', borderRadius:8, border:'1px solid rgba(139,92,246,0.1)', padding:'8px 10px' }}>
+                              <div style={{ fontSize:8, fontWeight:600, color:'#a78bfa', marginBottom:3 }}>🎯 Охват органов ({organCoverage.length})</div>
+                              <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
+                                {organCoverage.map((o,i) => (
+                                  <span key={i} style={{ fontSize:7, padding:'1px 5px', borderRadius:4, background:'rgba(139,92,246,0.1)', color:'#a78bfa' }}>{ORGAN_CATEGORY_MAP[o]?.emoji || ''} {MECH_TRANSLATIONS_RU[o] || o.replace(/_/g,' ')}</span>
+                                ))}
+                              </div>
                             </div>
                           )}
+                          {/* Synergies */}
+                          {synergies.length > 0 && (
+                            <div style={{ background:'rgba(34,197,94,0.04)', borderRadius:8, border:'1px solid rgba(34,197,94,0.1)', padding:'8px 10px' }}>
+                              <div style={{ fontSize:8, fontWeight:600, color:'#22c55e', marginBottom:3 }}>⊕ Синергии ({synergies.length})</div>
+                              {synergies.map((s,i) => (
+                                <div key={i} style={{ fontSize:7.5, color:'rgba(255,255,255,0.75)', lineHeight:1.4, padding:'3px 0', borderBottom: i < synergies.length-1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                                  <div style={{ fontWeight:600, color:'#4ade80' }}>{getStackSubLabel(s.a)} + {getStackSubLabel(s.b)} <span style={{ fontSize:6, marginLeft:3, padding:'1px 3px', borderRadius:2, background: s.severity==='HIGH'?'rgba(34,197,94,0.2)':'rgba(34,197,94,0.1)', color:'#22c55e' }}>{s.severity}</span></div>
+                                  <div style={{ color:'rgba(255,255,255,0.6)', marginTop:1 }}>{s.effect}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {/* Conflicts */}
                           {conflicts.length > 0 && (
-                            <div style={{ background:'rgba(239,68,68,0.04)', borderRadius:10, border:'1px solid rgba(239,68,68,0.1)', padding:'8px 10px' }}>
-                              <div style={{ fontSize:9, fontWeight:600, color:'#ef4444', marginBottom:4 }}>⊖ Конфликты ({conflicts.length})</div>
+                            <div style={{ background:'rgba(239,68,68,0.04)', borderRadius:8, border:'1px solid rgba(239,68,68,0.1)', padding:'8px 10px' }}>
+                              <div style={{ fontSize:8, fontWeight:600, color:'#ef4444', marginBottom:3 }}>⊖ Конфликты ({conflicts.length})</div>
                               {conflicts.map((c,i) => (
-                                <div key={i} style={{ fontSize:8, color:'#f87171', lineHeight:1.5, padding:'4px 0', borderBottom: i < conflicts.length-1 ? '1px solid rgba(239,68,68,0.08)' : 'none' }}>
-                                  <div style={{ fontWeight:600 }}>• {getStackSubLabel(c.a)} + {getStackSubLabel(c.b)}<span style={{ fontSize:7, marginLeft:4, padding:'1px 3px', borderRadius:2, background: c.severity==='HIGH'?'rgba(239,68,68,0.2)':'rgba(239,68,68,0.1)', color:'#ef4444' }}>{c.severity||''}</span></div>
-                                  <div style={{ fontSize:7.5, color:'rgba(255,255,255,0.65)', marginTop:1 }}>{c.effect}</div>
-                                  {c.mechanisms && c.mechanisms.length > 0 && (
-                                    <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-                                      {c.mechanisms.map((mx:string,xi:number) => <span key={xi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(239,68,68,0.12)', color:'#f87171', border:'1px solid rgba(239,68,68,0.15)' }}>{MECH_TRANSLATIONS_RU[mx]||mx.replace(/_/g,' ')}</span>)}
-                                    </div>
-                                  )}
-                                  {c.notes && <div style={{ fontSize:7, fontStyle:'italic', color:'#f59e0b', marginTop:1 }}>📋 {c.notes}</div>}
+                                <div key={i} style={{ fontSize:7.5, color:'#f87171', lineHeight:1.4, padding:'3px 0', borderBottom: i < conflicts.length-1 ? '1px solid rgba(239,68,68,0.06)' : 'none' }}>
+                                  <div style={{ fontWeight:600 }}>{getStackSubLabel(c.a)} + {getStackSubLabel(c.b)} <span style={{ fontSize:6, marginLeft:3, padding:'1px 3px', borderRadius:2, background: c.severity==='HIGH'?'rgba(239,68,68,0.2)':'rgba(239,68,68,0.1)', color:'#ef4444' }}>{c.severity||''}</span></div>
+                                  <div style={{ color:'rgba(255,255,255,0.6)', marginTop:1 }}>{c.effect}</div>
                                 </div>
                               ))}
                             </div>
@@ -4991,8 +5016,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         </div>
                       );
                     })()}
-                    {/* Save mix */}
-                    <div style={{ display:'flex', gap:4, marginTop:4 }}>
+                    {/* Save + Clear buttons */}
+                    <div style={{ display:'flex', gap:4 }}>
                       {enhancedSubs.length >= 2 && (
                         <button onClick={() => {
                           const name = prompt('Название микса:', `Микс ${enhancedSubs.length} веществ`);
@@ -5007,6 +5032,11 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         }} style={{ flex:1, padding:'8px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(236,72,153,0.1)', border:'1px solid rgba(236,72,153,0.25)', color:'#ec4899' }}>💾 Сохранить микс</button>
                       )}
                     </div>
+                    {enhancedSubs.length === 0 && (
+                      <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:10, background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)' }}>
+                        Добавьте 2+ вещества, чтобы увидеть анализ синергий и конфликтов
+                      </div>
+                    )}
                   </div>
                 )}
 
