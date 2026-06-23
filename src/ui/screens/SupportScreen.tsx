@@ -5722,201 +5722,334 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <FertilityPCTScreen initialTab={protocolTab === 'pct' ? 'pct-plan' : protocolTab === 'hrt' ? 'hrt' : undefined} restrictToMode={protocolTab as 'pct' | 'fertility' | 'hrt'} />
           )}
 
-          {/* Content: Neuro → inline neurotoxicity (full version) */}
+          {/* Content: Neuro → full enhanced (inline, full-screen level) */}
           {protocolTab === 'neuro' && (
             <div style={{ paddingBottom: 70 }}>
-              <div style={{ marginBottom:12 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#ec4899', marginBottom:6 }}>🧠 Нейротоксичность — калькулятор</div>
-                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
-                  {[['calc','🧮 Калькулятор'],['mechanisms','⚙️ Механизмы'],['support','📋 Протокол']].map(([id,label]) => (
-                    <button key={id} onClick={() => setNeuroTab(id as any)} style={{
-                      padding:'5px 10px', borderRadius:14, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                      background: neuroTab === id ? '#ec4899' : 'var(--bg-secondary)',
-                      color: neuroTab === id ? '#000' : 'var(--text-dim)',
-                      border: '1px solid ' + (neuroTab === id ? '#ec4899' : 'var(--border)'),
-                    }}>{label}</button>
-                  ))}
-                </div>
-                {neuroTab === 'calc' && (<>
-                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
-                    {uniqueCompounds.length > 0 ? (<div style={{ marginBottom:8 }}>
-                      <div style={{ fontSize:10, fontWeight:700, color:'var(--text-light)', marginBottom:4 }}>Выберите соединения из курса:</div>
-                      {uniqueCompounds.map(c => (
-                        <label key={c.cls} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 0', fontSize:10, cursor:'pointer' }}>
-                          <input type="checkbox" checked={neuroSelected.includes(c.cls)} onChange={() => setNeuroSelected(prev => prev.includes(c.cls) ? prev.filter(x => x !== c.cls) : [...prev, c.cls])} />
-                          <span style={{ color:'var(--accent)', fontWeight:600 }}>{c.name}</span>
-                          <span style={{ color:'var(--text-dim)', marginLeft:'auto', fontSize:9 }}>{c.doseWeekly} мг/нед</span>
-                        </label>
-                      ))}
-                    </div>) : (
-                      <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8, padding:8, background:'rgba(245,158,11,0.08)', borderRadius:6, border:'1px solid rgba(245,158,11,0.2)' }}>
-                        ⚠ Нет активных соединений. Добавьте препараты во вкладке Фарма.
-                      </div>
-                    )}
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
-                      <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Длительность курса (нед)</div><input type="number" value={neuroDuration} onChange={e => setNeuroDuration(Math.max(1, Number(e.target.value)))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }} /></div>
-                      <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Возраст</div><input type="number" value={neuroAge} onChange={e => setNeuroAge(Math.max(18, Number(e.target.value)))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11 }} /></div>
+              <div style={{ fontSize:11, fontWeight:700, color:'#ec4899', marginBottom:6 }}>🧠 Нейротоксичность ААС</div>
+              <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Механизмы нейротоксичности, калькулятор риска и многоуровневый протокол нейропротекции.</p>
+              <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
+                {[
+                  { id:'calc', label:'🧮 Калькулятор' },
+                  { id:'mechanisms', label:'🔬 Механизмы' },
+                  { id:'support', label:'💊 Протокол' },
+                ].map(t => (
+                  <button key={t.id} onClick={() => setNeuroTab(t.id as any)} style={{
+                    padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
+                    background: neuroTab === t.id ? '#ec4899' : 'var(--bg-secondary)',
+                    color: neuroTab === t.id ? '#000' : 'var(--text-dim)',
+                    border: '1px solid ' + (neuroTab === t.id ? '#ec4899' : 'var(--border)'),
+                  }}>{t.label}</button>
+                ))}
+              </div>
+              {neuroTab === 'calc' && (<>
+                <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
+                  {uniqueCompounds.length > 0 ? (<div style={{ marginBottom:8 }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'var(--text-light)', marginBottom:4 }}>💊 Соединения курса</div>
+                    {uniqueCompounds.map((c, i) => {
+                      const isSel = neuroSelected.includes(c.cls);
+                      const ph = (PHARMA_DB as any)[c.substanceId];
+                      const neuroToxPd = ph?.pd?.neuro_toxicity ?? 0;
+                      return (
+                        <div key={i} style={{ padding:'6px 8px', borderRadius:6, marginBottom:4, background:isSel?'rgba(236,72,153,0.08)':'rgba(255,255,255,0.02)', border:'1px solid '+(isSel?'rgba(236,72,153,0.25)':'var(--border)') }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                            <label style={{ display:'flex', alignItems:'center', gap:6, flex:1, cursor:'pointer', fontSize:9, userSelect:'none' }}>
+                              <input type="checkbox" checked={isSel} onChange={() => setNeuroSelected(prev=>prev.includes(c.cls)?prev.filter(x=>x!==c.cls):[...prev,c.cls])} style={{ accentColor:'#ec4899' }} />
+                              <span style={{ color:'var(--text-light)', fontWeight:600 }}>{c.name}</span>
+                              <span style={{ fontSize:7, color:'var(--text-dim)', background:'rgba(255,255,255,0.05)', padding:'1px 4px', borderRadius:3 }}>PD:{neuroToxPd}</span>
+                            </label>
+                            {isSel && (
+                              <div style={{ display:'flex', alignItems:'center', gap:3 }}>
+                                <input type="number" value={neuroDoses[c.cls]||''} onChange={e=>setNeuroDoses(prev=>({...prev,[c.cls]:Number(e.target.value)||0}))} style={{ width:55, padding:'3px 5px', borderRadius:4, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:9, textAlign:'center' }} />
+                                <span style={{ fontSize:7, color:'var(--text-dim)' }}>мг/нед</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>) : (
+                    <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8, padding:8, background:'rgba(245,158,11,0.08)', borderRadius:6, border:'1px solid rgba(245,158,11,0.2)' }}>
+                      ⚠ Нет активных соединений. Добавьте препараты во вкладке Фарма.
                     </div>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.15)', marginBottom:8 }}>
-                      <span style={{ fontSize:20 }}>🧠</span>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontSize:9, color:'var(--text-dim)' }}>Нейротоксичность</div>
-                        <div style={{ fontSize:16, fontWeight:800, color: neuroScore > 70 ? '#ef4444' : neuroScore > 40 ? '#f59e0b' : '#22c55e' }}>{neuroScore}%</div>
-                      </div>
-                      <div style={{ fontSize:10, fontWeight:700, color: neuroScore > 70 ? '#f87171' : neuroScore > 40 ? '#fbbf24' : '#4ade80' }}>{neuroScore > 70 ? '🔴 Высокий' : neuroScore > 40 ? '🟡 Средний' : '🟢 Низкий'}</div>
-                    </div>
-                    {neuroSelected.length > 0 && <div style={{ marginBottom:8 }}>
-                      <div style={{ fontSize:9, fontWeight:700, color:'var(--text-light)', marginBottom:4 }}>Дозы (мг/нед):</div>
-                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                        {neuroSelected.map(cls => <div key={cls} style={{ display:'flex', alignItems:'center', gap:6, fontSize:10 }}><span style={{ width:80, color:'var(--text-dim)' }}>{cls}</span><input type="number" value={neuroDoses[cls] || 0} onChange={e => setNeuroDoses(prev => ({...prev, [cls]: Number(e.target.value)}))} style={{ flex:1, padding:'4px 6px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10 }} /></div>)}
-                      </div>
-                    </div>}
+                  )}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
+                    <div><div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:2 }}>⏱ Длительность курса (нед)</div><input type="number" value={neuroDuration} onChange={e=>setNeuroDuration(Math.max(1,Math.min(52,Number(e.target.value)||1)))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'rgba(0,0,0,0.15)', color:'var(--text)', fontSize:12, fontWeight:700, textAlign:'center', boxSizing:'border-box' }} /></div>
+                    <div><div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:2 }}>🎂 Возраст</div><input type="number" value={neuroAge} onChange={e=>setNeuroAge(Math.max(18,Math.min(80,Number(e.target.value)||18)))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'rgba(0,0,0,0.15)', color:'var(--text)', fontSize:12, fontWeight:700, textAlign:'center', boxSizing:'border-box' }} /></div>
                   </div>
-                </>)}
-                {neuroTab === 'mechanisms' && (
-                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:'#ec4899', marginBottom:6 }}>⚙️ Механизмы нейротоксичности ААС</div>
-                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  <div style={{ background: (neuroScore>70?'#ef4444':neuroScore>40?'#f59e0b':'#22c55e')+'18', borderRadius:12, padding:14, marginBottom:8, border:'2px solid '+(neuroScore>70?'#ef4444':neuroScore>40?'#f59e0b':'#22c55e')+'44', textAlign:'center' }}>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Общий индекс нейротоксичности</div>
+                    <div style={{ fontSize:36, fontWeight:800, color:neuroScore>70?'#ef4444':neuroScore>40?'#f59e0b':'#22c55e', lineHeight:1 }}>{neuroScore}</div>
+                    <div style={{ fontSize:12, fontWeight:700, color:neuroScore>70?'#ef4444':neuroScore>40?'#f59e0b':'#22c55e', marginTop:4 }}>{neuroScore>70?'🔴 Критический':neuroScore>40?'🟡 Средний':'🟢 Низкий'}</div>
+                    <div style={{ marginTop:6, height:5, borderRadius:3, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
+                      <div style={{ width:neuroScore+'%', height:'100%', borderRadius:3, background:'linear-gradient(90deg, #22c55e, #f59e0b 50%, #f97316 70%, #ef4444)', transition:'width 0.5s' }} />
+                    </div>
+                  </div>
+                  {/* Symptoms reference */}
+                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:10, marginBottom:8, border:'1px solid var(--border)' }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'#ef4444', marginBottom:4 }}>🩺 Симптомы нейротоксичности</div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      {['Депрессия','Тревожность','Агрессия','Нарушение сна','Когнитивное снижение','Потеря памяти','Ангедония','Импульсивность','Спутанность сознания','Эмоц. нестабильность'].map((s,i)=>(<span key={i} style={{fontSize:7,padding:'3px 7px',borderRadius:10,background:'rgba(239,68,68,0.08)',color:'#fca5a5',border:'1px solid rgba(239,68,68,0.15)'}}>⚠ {s}</span>))}
+                    </div>
+                  </div>
+                  {/* Monitoring */}
+                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:10, border:'1px solid var(--border)' }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>📊 Мониторинг</div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                       {[
-                        { title:'Гематоэнцефалический барьер (ГЭБ)', desc:'Андрогены повышают проницаемость ГЭБ через подавление клаудинов-5 — нейтрофилы и цитокины проникают в паренхиму мозга' },
-                        { title:'Андрогеновые рецепторы (AR)', desc:'AR экспрессируются в гиппокампе, префронтальной коре, миндалине. Гиперактивация → апоптоз нейронов через каспазу-3' },
-                        { title:'Эстрогеновые рецепторы (ER)', desc:'Ароматизация тестостерона в E2 → активация ERβ — нейропротективный эффект. При подавлении ароматазы — утрата защиты' },
-                        { title:'Нейровоспаление', desc:'Активация микроглии через TLR4 → IL-6, TNF-α → нейрональное повреждение. 17-α алкилированные оралы — наиболее нейротоксичны' },
-                        { title:'Глутаматная эксайтотоксичность', desc:'ААС повышают глутамат в синаптической щели → NMDA-рецепторы → Ca²⁺ influx → митохондриальная дисфункция' },
-                        { title:'Митопатический стресс', desc:'Андрогены ингибируют комплекс I-IV дыхательной цепи → ↑ ROS → повреждение митохондриальной ДНК нейронов' },
-                        { title:'BDNF подавление', desc:'Нандролон и станозолол снижают BDNF в гиппокампе на 30-50%. Нарушение CREB-BDNF-TrkB каскада → атрофия дендритов' },
-                        { title:'Дофаминовая система', desc:'Изменение экспрессии D2-рецепторов в стриатуме → ангедония, агрессия, импульсивность. Мезокортикальный путь нарушен' },
-                      ].map(m => (
-                        <div key={m.title} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.08)' }}>
-                          <div style={{ fontSize:10, fontWeight:700, color:'#f472b6', marginBottom:2 }}>{m.title}</div>
-                          <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>{m.desc}</div>
+                        { label:'BDNF (нейротрофический фактор мозга)', desc:'Маркер нейропластичности', target:'> 20 нг/мл' },
+                        { label:'Нейропсихологическая оценка', desc:'Тесты памяти, внимания', target:'Каждые 3-6 мес' },
+                        { label:'Кортизол (утренний)', desc:'Гиперкортизолемия усугубляет', target:'10-20 мкг/дл' },
+                        { label:'Пролактин', desc:'Гиперпролактинемия → депрессия', target:'< 15 нг/мл' },
+                      ].map((m,i)=>(
+                        <div key={i} style={{ padding:'4px 6px', borderRadius:6, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.08)' }}>
+                          <div style={{ display:'flex', justifyContent:'space-between' }}>
+                            <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{m.label}</span>
+                            <span style={{ fontSize:7, fontWeight:600, color:'#60a5fa' }}>{m.target}</span>
+                          </div>
+                          <div style={{ fontSize:7, color:'var(--text-dim)' }}>{m.desc}</div>
                         </div>
                       ))}
                     </div>
                   </div>
-                )}
-                {neuroTab === 'support' && (
-                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
+                </div>
+              </>)}
+              {neuroTab === 'mechanisms' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#ec4899', marginBottom:6 }}>🧠 Фундаментальные механизмы</div>
+                    <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.12)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#f472b6', marginBottom:2 }}>🔬 Гематоэнцефалический барьер (ГЭБ)</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>Стероиды свободно проникают через ГЭБ. При супрафизиологических дозах ААС — нейротоксический каскад через повышение проницаемости (подавление клаудинов-5).</div>
+                    </div>
+                    <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.12)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#f472b6', marginBottom:2 }}>🎯 Андрогенные и эстрогенные рецепторы мозга</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>AR-гиперстимуляция → окислительный стресс нейронов. ER-опосредованная нейропротекция утрачена при подавлении ароматазы.</div>
+                    </div>
+                    <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.12)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#f472b6', marginBottom:2 }}>⚡ Негормональные механизмы</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>ГАМК-подавление, NMDA-эксайтотоксичность, митохондриальная дисфункция, BDNF-подавление, ионные каналы Ca²⁺.</div>
+                    </div>
+                  </div>
+                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#ec4899', marginBottom:6 }}>🔬 Детальные механизмы</div>
+                    {[
+                      { title:'ГАМК-ергическая дисфункция', desc:'ААС повышают ГАМК-ергический тормозной тон через нейростероиды → подавление ГнРГ. Дисрегуляция GABA-A вызывает тревожность, депрессию при отмене.' },
+                      { title:'Окислительный стресс', desc:'Истощение глутатиона в гиппокампе, перекисное окисление липидов. Супероксид-дисмутаза снижена при нандролоне и станозололе.' },
+                      { title:'Нейровоспаление', desc:'Активация микроглии через TLR4 → TNF-α, IL-1β, IL-6. NF-κB путь активирован. Хроническое воспаление в гиппокампе.' },
+                      { title:'BDNF подавление', desc:'Нандролон и станозолол снижают BDNF на 30-50%. Нарушение CREB-BDNF-TrkB каскада → атрофия дендритных шипиков.' },
+                      { title:'Глутаматная эксайтотоксичность', desc:'ААС повышают глутамат → NMDA-рецепторы → Ca²⁺ influx → митохондриальная дисфункция → апоптоз.' },
+                      { title:'Нарушение ГЭБ', desc:'Тренболон накапливается в гиппокампе, повышая проницаемость. Нарушение окклюдина, клаудина-5.' },
+                      { title:'Апоптоз нейронов', desc:'Каспаза-3 в CA1/CA3 гиппокампа. Фрагментация ДНК. Сдвиг Bax/Bcl-2 в проапоптотический путь.' },
+                      { title:'Дофаминовая система', desc:'Изменение D2-рецепторов в стриатуме → ангедония, агрессия. Мезокортикальный путь нарушен.' },
+                    ].map((m,i)=>(
+                      <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:4, background:'rgba(236,72,153,0.03)', border:'1px solid rgba(236,72,153,0.08)' }}>
+                        <div style={{ fontSize:9, fontWeight:700, color:'#f472b6', marginBottom:2 }}>{m.title}</div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>{m.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Classification */}
+                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
                     <div style={{ fontSize:11, fontWeight:700, color:'#f97316', marginBottom:6 }}>⚠️ Классификация нейротоксичности ААС</div>
                     {[
-                      { name:'Тренболон', score:10, color:'#ef4444', desc:'ГЭБ проницаемость + окислительный стресс + глутамат' },
-                      { name:'Нандролон', score:8, color:'#ef4444', desc:'Снижение BDNF, нейровоспаление' },
-                      { name:'Станозолол', score:7, color:'#f97316', desc:'ГАМК-дисфункция, BDNF подавление' },
-                      { name:'Метандиенон', score:6, color:'#f97316', desc:'Эстрогеновая активность, гепатотоксичность' },
-                      { name:'Болденон', score:5, color:'#f59e0b', desc:'Гематокрит + эритроцитоз → гипоксия' },
-                      { name:'Тестостерон (>500 мг)', score:4, color:'#f59e0b', desc:'Дозозависимая AR-гиперстимуляция' },
-                      { name:'Оксандролон', score:3, color:'#22c55e', desc:'Низкая андрогенность, ГЭБ ограничен' },
-                      { name:'Мастерон', score:3, color:'#22c55e', desc:'DHT-нейростероидные эффекты' },
-                      { name:'Примоболан', score:2, color:'#22c55e', desc:'Минимальная нейротоксичность' },
-                    ].map(drug => (
-                      <div key={drug.name} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                        <span style={{ flex:1, fontSize:9, color:'var(--text-light)' }}>{drug.name}</span>
-                        <span style={{ fontSize:8, color:'var(--text-dim)', maxWidth:120, textAlign:'right', lineHeight:1.2 }}>{drug.desc}</span>
-                        <span style={{ fontSize:10, fontWeight:800, color:drug.color, width:30, textAlign:'center' }}>{drug.score}/10</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📊 Мониторинг</div>
-                    {[
-                      { label:'BDNF', desc:'Нейротрофический фактор мозга', target:'> 20 нг/мл' },
-                      { label:'Кортизол (утренний)', desc:'Гиперкортизолемия усугубляет нейротоксичность', target:'10-20 мкг/дл' },
-                      { label:'Пролактин', desc:'Гиперпролактинемия → депрессия', target:'< 15 нг/мл' },
-                      { label:'Витамин B12', desc:'Дефицит → нейропатия', target:'> 400 пг/мл' },
-                    ].map(m => (
-                      <div key={m.label} style={{ padding:'4px 6px', borderRadius:6, marginBottom:3, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.1)' }}>
-                        <div style={{ display:'flex', justifyContent:'space-between' }}>
-                          <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{m.label}</span>
-                          <span style={{ fontSize:8, fontWeight:600, color:'#60a5fa' }}>{m.target}</span>
+                      { name:'Тренболон', score:10, color:'#ef4444', desc:'ГЭБ + окисл. стресс + глутамат' },
+                      { name:'Нандролон', score:8, color:'#ef4444', desc:'BDNF подавление, нейровоспаление' },
+                      { name:'Станозолол', score:7, color:'#f97316', desc:'ГАМК-дисфункция, BDNF ↓' },
+                      { name:'Метандиенон', score:6, color:'#f97316', desc:'Эстрогеновая активность' },
+                      { name:'Болденон', score:5, color:'#f59e0b', desc:'Гематокрит → гипоксия мозга' },
+                      { name:'Тестостерон (>500 мг)', score:4, color:'#f59e0b', desc:'AR-гиперстимуляция' },
+                      { name:'Оксандролон', score:3, color:'#22c55e', desc:'Низкая андрогенность' },
+                      { name:'Мастерон', score:3, color:'#22c55e', desc:'DHT-нейростероиды' },
+                      { name:'Примоболан', score:2, color:'#22c55e', desc:'Мин. нейротоксичность' },
+                    ].map((drug,i)=>(
+                      <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                        <span style={{ flex:1, fontSize:8, color:'var(--text-light)' }}>{drug.name}</span>
+                        <span style={{ fontSize:7, color:'var(--text-dim)', maxWidth:100, textAlign:'right', lineHeight:1.1 }}>{drug.desc}</span>
+                        <span style={{ fontSize:9, fontWeight:800, color:drug.color, width:24, textAlign:'center' }}>{drug.score}</span>
+                        <div style={{ width:50, height:3, borderRadius:2, background:'rgba(255,255,255,0.06)', overflow:'hidden' }}>
+                          <div style={{ width:drug.score*10+'%', height:'100%', borderRadius:2, background:drug.color }} />
                         </div>
-                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>{m.desc}</div>
                       </div>
                     ))}
                   </div>
-                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:6 }}>💊 Многоуровневая нейропротекция</div>
+                </div>
+              )}
+              {neuroTab === 'support' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:4 }}>💊 Многоуровневая нейропротекция</div>
+                    <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Начинайте с ядра, добавляйте уровни по мере повышения риска.</p>
                     {[
-                      { tier:'ЯДРО', color:'#22c55e', items:[
-                        { name:'NAC', dose:'1200-2400 мг/день', note:'Предшественник глутатиона, защита нейронов от окисл. стресса' },
-                        { name:'Omega-3', dose:'3-5 г/день', note:'Нейропротекция через резолвины, антивоспалительное' },
-                        { name:'Mg L-Threonate', dose:'1000-2000 мг/день', note:'Единственная форма Mg проходящая ГЭБ, NMDA-модуляция' },
+                      { tier:'ЯДРО', label:'Обязательно всем на курсе', color:'#22c55e', items:[
+                        { name:'NAC', dose:'1200-2400 мг/день', note:'Предшественник глутатиона, защита нейронов от окислительного стресса' },
+                        { name:'Omega-3 (EPA+DHA)', dose:'3-5 г/день', note:'Нейропротекция через резолвины, антивоспалительное, поддержка мембран' },
+                        { name:'Magnesium L-Threonate', dose:'1000-2000 мг/день', note:'Единственная форма Mg через ГЭБ, NMDA-модуляция' },
+                        { name:'Таурин', dose:'2-3 г/день', note:'ГАМК-агонист, осморегуляция нейронов, анти-эксайтотоксичность' },
+                        { name:'Глицин', dose:'3 г/день', note:'Тормозной нейромедиатор, улучшение сна, модуляция NMDA' },
                       ]},
-                      { tier:'СТАНДАРТ', color:'#f59e0b', items:[
-                        { name:'Lion&#39;s Mane', dose:'1000-3000 мг/день', note:'NGF, миелинизация, нейрогенез гиппокампа' },
-                        { name:'CoQ10', dose:'200-400 мг/день', note:'Митохондриальная защита, антиоксидант' },
-                        { name:'B-комплекс', dose:'1 капс/день', note:'Метилирование, синтез нейротрансмиттеров' },
+                      { tier:'БАЗА', label:'При дозах >500 мг/нед', color:'#f59e0b', items:[
+                        { name:'Alpha-Lipoic Acid (ALA)', dose:'600 мг/день', note:'Митохондриальный антиоксидант, регенерирует глутатион и вит.C/E' },
+                        { name:'CoQ10 (убихинол)', dose:'200-400 мг/день', note:'ЭТЦ митохондрий, снижение перекисного окисления нейронов' },
+                        { name:'Pregnenolone', dose:'10-30 мг/день', note:'Нейростероид, восполняет подавленный синтез, улучшает когницию' },
+                        { name:'Агмантин', dose:'1-2 г/день', note:'Модулятор NMDA, NO-донатор, нейропротекция через полиамины' },
+                        { name:'Альфа-GPC', dose:'300-600 мг/день', note:'Высокобиодоступный холин, синтез ацетилхолина' },
                       ]},
-                      { tier:'ПРОДВИНУТЫЙ', color:'#f97316', items:[
-                        { name:'ALA', dose:'600-1200 мг/день', note:'Регенерация глутатиона, хелатор металлов' },
-                        { name:'PQQ', dose:'20-40 мг/день', note:'Биогенез митохондрий, NGF' },
+                      { tier:'УСИЛЕНИЕ', label:'При тренболоне/нандролоне', color:'#f97316', items:[
+                        { name:'Lion\'s Mane (ежовик)', dose:'1-3 г/день', note:'Стимуляция NGF, нейрогенез в гиппокампе, миелинизация' },
+                        { name:'DHEA', dose:'25-50 мг/день', note:'Нейростероид, восстановление GABA-A модуляции, снижение депрессии' },
+                        { name:'Phosphatidylserine', dose:'300-600 мг/день', note:'Фосфолипид мембран, поддержка текучести, снижение кортизола' },
+                        { name:'Ginkgo Biloba', dose:'120-240 мг/день', note:'Церебральный кровоток, антиоксидант, ингибитор PAF' },
+                        { name:'Бромантан', dose:'50-100 мг/день', note:'Актопротектор, нейропротекция, повышение работоспособности' },
+                        { name:'Фасорацетам', dose:'100-200 мг/день', note:'AMPA-модулятор, регуляция глутамата, улучшение памяти' },
+                        { name:'Гуперзин А', dose:'50-100 мкг/день', note:'Ингибитор ацетилхолинэстеразы, повышение ацетилхолина' },
                       ]},
-                    ].map(t => (
-                      <div key={t.tier} style={{ marginBottom:6 }}>
-                        <div style={{ fontSize:9, fontWeight:700, color:t.color, marginBottom:3 }}>▸ {t.tier}</div>
-                        {t.items.map(it => (
-                          <div key={it.name} style={{ display:'flex', gap:4, padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
-                            <span style={{ fontSize:8, color:'var(--accent)', fontWeight:600, minWidth:90 }}>{it.name}</span>
-                            <span style={{ fontSize:8, color:'#f59e0b', minWidth:90 }}>{it.dose}</span>
-                            <span style={{ fontSize:7, color:'var(--text-dim)', flex:1 }}>{it.note}</span>
+                      { tier:'МАКСИМУМ', label:'При нейросимптомах', color:'#ef4444', items:[
+                        { name:'Bacopa Monnieri', dose:'300-600 мг/день', note:'Улучшение памяти, дендритное ветвление, антиоксидант' },
+                        { name:'L-Theanine', dose:'200-400 мг/день', note:'ГАМК-модуляция, повышение альфа-волн, снижение тревоги' },
+                        { name:'Citicoline', dose:'500-1000 мг/день', note:'Цитидин+холин, синтез ацетилхолина, стабилизация мембран' },
+                        { name:'Noopept', dose:'10-30 мг/день', note:'Повышение BDNF и NGF, улучшение памяти и когниций' },
+                        { name:'Семакс', dose:'1-3 мг/день', note:'Нейропептид, повышение BDNF, нейрогенез, ноотроп' },
+                        { name:'Кортексин', dose:'10 мг/день', note:'Полипептиды коры мозга, нейропротекция, нейрорепарация' },
+                      ]},
+                    ].map((tier,ti)=>(
+                      <div key={ti} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:tier.color+'0a', border:'1px solid '+tier.color+'22' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:4 }}>
+                          <span style={{ fontSize:8, fontWeight:800, padding:'1px 6px', borderRadius:4, background:tier.color+'22', color:tier.color }}>{tier.tier}</span>
+                          <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{tier.label}</span>
+                        </div>
+                        {tier.items.map((item,ii)=>(
+                          <div key={ii} style={{ padding:'4px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)' }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                              <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{item.name}</span>
+                              <span style={{ fontSize:8, fontWeight:700, color:tier.color }}>{item.dose}</span>
+                            </div>
+                            <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.3 }}>{item.note}</div>
                           </div>
                         ))}
                       </div>
                     ))}
                   </div>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Content: Joints → full protocol */}
+          {/* Content: Joints → full enhanced (inline, full-screen level) */}
           {protocolTab === 'joints' && (
             <div style={{ paddingBottom: 70 }}>
-              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:8 }}>🦴 Калькулятор поддержки суставов</div>
-                <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
-                  <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Боль в суставах (0-10)</div><input type="range" min="0" max="10" value={jointPain} onChange={e => setJointPain(Number(e.target.value))} style={{ width:'100%' }} /><div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right' }}>{jointPain}/10</div></div>
-                  <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>История травм (0-5)</div><input type="range" min="0" max="5" value={injuryHistory} onChange={e => setInjuryHistory(Number(e.target.value))} style={{ width:'100%' }} /><div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right' }}>{injuryHistory}/5</div></div>
-                  <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Тренировочная нагрузка (0-5)</div><input type="range" min="0" max="5" value={trainLoad} onChange={e => setTrainLoad(Number(e.target.value))} style={{ width:'100%' }} /><div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right' }}>{trainLoad}/5</div></div>
+              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🦴 Калькулятор суставов и связок</div>
+                <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Оценка риска суставной патологии и многоуровневая поддержка хрящевой и соединительной ткани.</p>
+                {/* Risk Inputs */}
+                <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:8 }}>
+                  <div>
+                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
+                      <span style={{ fontSize:8, color:'var(--text-dim)' }}>🦵 Боль в суставах</span>
+                      <span style={{ fontSize:9, fontWeight:700, color: jointScore<20?'#22c55e':jointScore<40?'#f59e0b':jointScore<60?'#f97316':'#ef4444' }}>{jointPain}/10</span>
+                    </div>
+                    <input type="range" min="0" max="10" value={jointPain} onChange={e=>setJointPain(Number(e.target.value))} style={{ width:'100%', accentColor:jointScore<20?'#22c55e':jointScore<40?'#f59e0b':jointScore<60?'#f97316':'#ef4444' }} />
+                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, color:'var(--text-dim)' }}><span>Нет боли</span><span>Умеренная</span><span>Сильная</span></div>
+                  </div>
+                  <div>
+                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
+                      <span style={{ fontSize:8, color:'var(--text-dim)' }}>🏥 Травмы в анамнезе</span>
+                      <span style={{ fontSize:9, fontWeight:700, color: jointScore<20?'#22c55e':jointScore<40?'#f59e0b':jointScore<60?'#f97316':'#ef4444' }}>{injuryHistory}/5</span>
+                    </div>
+                    <input type="range" min="0" max="5" value={injuryHistory} onChange={e=>setInjuryHistory(Number(e.target.value))} style={{ width:'100%' }} />
+                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, color:'var(--text-dim)' }}><span>Нет</span><span>Растяжения</span><span>Разрывы</span></div>
+                  </div>
+                  <div>
+                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
+                      <span style={{ fontSize:8, color:'var(--text-dim)' }}>🏋️ Тренировочная нагрузка</span>
+                      <span style={{ fontSize:9, fontWeight:700, color: jointScore<20?'#22c55e':jointScore<40?'#f59e0b':jointScore<60?'#f97316':'#ef4444' }}>{trainLoad}/5</span>
+                    </div>
+                    <input type="range" min="0" max="5" value={trainLoad} onChange={e=>setTrainLoad(Number(e.target.value))} style={{ width:'100%' }} />
+                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, color:'var(--text-dim)' }}><span>Лёгкая</span><span>Умеренная</span><span>Тяжёлые веса</span></div>
+                  </div>
                 </div>
-                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)', marginBottom:8 }}>
-                  <span style={{ fontSize:20 }}>🦴</span>
-                  <div style={{ flex:1 }}><div style={{ fontSize:9, color:'var(--text-dim)' }}>Риск проблем с суставами</div><div style={{ fontSize:16, fontWeight:800, color: jointScore > 70 ? '#ef4444' : jointScore > 40 ? '#f59e0b' : '#22c55e' }}>{jointScore}%</div></div>
-                  <div style={{ fontSize:10, color:'var(--text-dim)' }}>{jointScore > 70 ? '🔴 Высокий' : jointScore > 40 ? '🟡 Средний' : '🟢 Низкий'}</div>
+                {/* Score */}
+                <div style={{ background: (jointScore<20?'#22c55e':jointScore<40?'#f59e0b':jointScore<60?'#f97316':'#ef4444')+'18', borderRadius:12, padding:12, marginBottom:8, border:'2px solid '+(jointScore<20?'#22c55e':jointScore<40?'#f59e0b':jointScore<60?'#f97316':'#ef4444')+'44', textAlign:'center' }}>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Индекс риска суставов</div>
+                  <div style={{ fontSize:32, fontWeight:800, color:jointScore<20?'#22c55e':jointScore<40?'#f59e0b':jointScore<60?'#f97316':'#ef4444', lineHeight:1 }}>{jointScore}</div>
+                  <div style={{ fontSize:10, fontWeight:700, color:jointScore<20?'#22c55e':jointScore<40?'#f59e0b':jointScore<60?'#f97316':'#ef4444', marginTop:2 }}>{jointScore<20?'🟢 Норма':jointScore<40?'🟡 Умеренный':jointScore<60?'🟠 Высокий':'🔴 Критический'}</div>
+                  <div style={{ marginTop:6, height:4, borderRadius:2, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
+                    <div style={{ width:jointScore+'%', height:'100%', borderRadius:2, background:'linear-gradient(90deg, #22c55e, #f59e0b 40%, #f97316 60%, #ef4444)', transition:'width 0.5s' }} />
+                  </div>
+                </div>
+                {/* Required Analyses */}
+                <div style={{ background:'var(--bg-secondary)', borderRadius:8, padding:8, marginBottom:8, border:'1px solid var(--border)' }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>🧪 Рекомендуемые анализы</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                    {[
+                      { name:'Ревматоидный фактор (RF)', range:'< 14 МЕ/мл' },
+                      { name:'С-реактивный белок (CRP)', range:'< 3 мг/л' },
+                      { name:'Мочевая кислота', range:'200-420 мкмоль/л' },
+                      { name:'25-OH Витамин D', range:'50-80 нг/мл' },
+                      { name:'Кальций общий', range:'2.15-2.55 ммоль/л' },
+                      { name:'Антитела к коллагену II типа', range:'< 20 ЕД/мл' },
+                    ].map((a,i)=>(
+                      <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', borderRadius:4, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.08)', fontSize:8 }}>
+                        <span style={{ color:'var(--text-light)' }}>{a.name}</span>
+                        <span style={{ fontWeight:600, color:'#60a5fa' }}>{a.range}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Imaging */}
+                <div style={{ background:'var(--bg-secondary)', borderRadius:8, padding:8, marginBottom:8, border:'1px solid var(--border)' }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#a855f7', marginBottom:4 }}>🔬 Инструментальные исследования</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                    {[
+                      { name:'УЗИ суставов (B-режим)', purpose:'Выпот, синовит, эрозии', when:'Боль/отёк ≥2 нед' },
+                      { name:'МРТ сустава', purpose:'Хрящ, мениски, связки', when:'Боль >4 нед' },
+                      { name:'Рентгенография', purpose:'Суставная щель, остеофиты', when:'Перелом/остеоартрит' },
+                    ].map((e,i)=>(
+                      <div key={i} style={{ padding:'4px 6px', borderRadius:4, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.08)', fontSize:8 }}>
+                        <span style={{ fontWeight:600, color:'#a855f7' }}>{e.name}</span>
+                        <span style={{ color:'var(--text-dim)', marginLeft:4 }}>— {e.purpose}</span>
+                        <div style={{ fontSize:7, color:'#a855f7', opacity:0.7 }}>Показание: {e.when}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 {/* Multi-tier protocol */}
-                <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:6 }}>💊 Протокол поддержки суставов</div>
-                <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8, lineHeight:1.3, padding:'6px 8px', background:'rgba(245,158,11,0.04)', borderRadius:6, border:'1px solid rgba(245,158,11,0.1)' }}>
-                  📋 Базовый: Глюкозамин 1500мг + Хондроитин 1200мг + MSM 3000мг + Коллаген II типа 10г + Босвеллия 500мг. Курс 8-12 недель.
-                </div>
+                <div style={{ fontSize:10, fontWeight:700, color:'#22c55e', marginBottom:4 }}>💊 Многоуровневая поддержка суставов</div>
+                <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Эскалационный протокол: начните с ядра, добавляйте уровни пропорционально риску.</p>
                 {[
-                  { tier:'ЯДРО', label:'Обязательно при нагрузках', color:'#22c55e', items:[
-                    { name:'Глюкозамин + Хондроитин', dose:'1500+1200 мг/день', note:'Строительные блоки хряща, стимуляция синтеза протеогликанов' },
-                    { name:'MSM (метилсульфонилметан)', dose:'2-4 г/день', note:'Органическая сера, противовоспалительное, снижение оксидативного стресса' },
-                    { name:'Коллаген II типа + Витамин C', dose:'10 г + 1 г/день', note:'Субстрат для синтеза коллагена хряща, витамин C как кофактор' },
+                  { tier:'ЯДРО', label:'Обязательный минимум', color:'#22c55e', items:[
+                    { name:'Коллаген II типа (UC-II)', dose:'40 мг/день', note:'Нативный неденатурированный коллаген, оральная толерантность' },
+                    { name:'Витамин C', dose:'500-1000 мг/день', note:'Кофактор синтеза коллагена, гидроксилирование пролина' },
+                    { name:'Витамин D3 + K2', dose:'5000 МЕ + 100 мкг/день', note:'Кальциевый обмен, минерализация костной ткани' },
                   ]},
-                  { tier:'СТАНДАРТ', label:'При болях и дискомфорте', color:'#f59e0b', items:[
-                    { name:'Куркумин 95% + пиперин', dose:'500-1000 мг/день', note:'Ингибирование COX-2, NF-kB, снижение IL-1beta, TNF-alpha' },
-                    { name:'Босвеллия (AKBA 65%)', dose:'300-500 мг/день', note:'Ингибирование 5-липоксигеназы, снижение лейкотриенов' },
-                    { name:'Омега-3 (EPA+DHA)', dose:'3-5 г/день', note:'Резолвины, протектины — активное разрешение воспаления' },
+                  { tier:'БАЗА', label:'При умеренном риске', color:'#f59e0b', items:[
+                    { name:'Глюкозамин сульфат', dose:'1500 мг/день', note:'Субстрат гликозаминогликанов, стимуляция протеогликанов' },
+                    { name:'Хондроитин сульфат', dose:'800-1200 мг/день', note:'Ингибирование MMP-3/13, удержание воды в матриксе' },
+                    { name:'MSM', dose:'2000-3000 мг/день', note:'Органическая сера, дисульфидные мостики коллагена' },
+                    { name:'Omega-3 (EPA+DHA)', dose:'3-5 г/день', note:'Резолвины, разрешение воспаления в синовиальной жидкости' },
                   ]},
-                  { tier:'ПРОДВИНУТЫЙ', label:'При травмах и высоком риске', color:'#f97316', items:[
-                    { name:'Гиалуроновая кислота', dose:'200-300 мг/день', note:'Синовиальная жидкость, вязкоэластичность, смазка суставов' },
-                    { name:'BPC-157', dose:'250-500 мкг/день', note:'Заживление сухожилий/связок, ангиогенез, модуляция коллагена' },
+                  { tier:'УСИЛЕНИЕ', label:'При высоком риске', color:'#f97316', items:[
+                    { name:'Гиалуроновая кислота', dose:'200-300 мг/день', note:'Синовиальная жидкость, вязкоэластичность, смазка' },
+                    { name:'Куркумин + пиперин', dose:'500-1000 мг/день', note:'Ингибирование COX-2, NF-kB, снижение IL-1beta' },
+                    { name:'Босвеллия (AKBA)', dose:'300-500 мг/день', note:'Ингибирование 5-липоксигеназы, снижение лейкотриенов' },
+                  ]},
+                  { tier:'МАКСИМУМ', label:'При критическом риске', color:'#ef4444', items:[
+                    { name:'BPC-157', dose:'250-500 мкг/день', note:'Заживление сухожилий/связок, ангиогенез через VEGF' },
                     { name:'TB-500', dose:'2.5-5 мг/нед', note:'Полимеризация актина, миграция клеток, регенерация' },
+                    { name:'Секретагоги ГР', dose:'100-300 мкг/день', note:'Пульсирующая секреция ГР, регенерация хряща' },
                   ]},
-                ].map(t => (
-                  <div key={t.tier} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:`${t.color}0a`, border:`1px solid ${t.color}22` }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
-                      <span style={{ fontSize:8, fontWeight:800, padding:'1px 6px', borderRadius:4, background:`${t.color}22`, color:t.color }}>{t.tier}</span>
-                      <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{t.label}</span>
+                ].map((tier,ti)=>(
+                  <div key={ti} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:tier.color+'0a', border:'1px solid '+tier.color+'22' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:3 }}>
+                      <span style={{ fontSize:8, fontWeight:800, padding:'1px 6px', borderRadius:4, background:tier.color+'22', color:tier.color }}>{tier.tier}</span>
+                      <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{tier.label}</span>
                     </div>
-                    {t.items.map(it => (
-                      <div key={it.name} style={{ display:'flex', gap:4, padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
-                        <span style={{ fontSize:8, color:'var(--text-light)', fontWeight:600, minWidth:100 }}>{it.name}</span>
-                        <span style={{ fontSize:8, color:t.color, minWidth:90 }}>{it.dose}</span>
-                        <span style={{ fontSize:7, color:'var(--text-dim)', flex:1, lineHeight:1.2 }}>{it.note}</span>
+                    {tier.items.map((item,ii)=>(
+                      <div key={ii} style={{ padding:'4px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                          <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{item.name}</span>
+                          <span style={{ fontSize:8, fontWeight:700, color:tier.color }}>{item.dose}</span>
+                        </div>
+                        <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.3 }}>{item.note}</div>
                       </div>
                     ))}
                   </div>
@@ -5925,52 +6058,67 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             </div>
           )}
 
-          {/* Content: Acne → full protocol */}
+          {/* Content: Acne → full enhanced (inline, full-screen level) */}
           {protocolTab === 'acne' && (
             <div style={{ paddingBottom: 70 }}>
-              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:8 }}>🔴 Анти-прыщ протокол</div>
+              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:4 }}>🔴 Анти-прыщ протокол</div>
+                <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Протокол борьбы с акне на курсе ААС: системная и локальная терапия.</p>
                 {/* Daily protocol */}
-                <div style={{ fontSize:10, fontWeight:700, color:'var(--text-light)', marginBottom:6 }}>⚙️ Ежедневный протокол</div>
+                <div style={{ fontSize:9, fontWeight:700, color:'var(--text-light)', marginBottom:4 }}>⚙️ Ежедневный протокол</div>
                 {[
-                  { n:'Ниацинамид (Витамин B3)', d:'500-1000 мг', t:'На ночь', note:'Регулирует выработку себума, антивоспалительное, уменьшает покраснения' },
-                  { n:'Медь', d:'1-2 мг', t:'На ночь (отдельно от цинка)', note:'Кофактор лизил-оксидазы. Сшивка коллагена. Не смешивать с цинком.' },
+                  { n:'Ниацинамид (Витамин B3)', d:'500-1000 мг', t:'На ночь', note:'Регулирует себум, антивоспалительное, уменьшает покраснения' },
+                  { n:'Медь', d:'1-2 мг', t:'На ночь (отдельно от цинка)', note:'Кофактор лизил-оксидазы, сшивка коллагена. Не смешивать с цинком.' },
                   { n:'Цинк (пиколинат)', d:'50 мг', t:'На ночь', note:'Антивоспалительное, антибактериальное, ингибирует 5-альфа-редуктазу' },
-                  { n:'Солярий', d:'2 раза/нед × 5 мин', t:'День', note:'UV-B подсушивает акне, антибактериальный эффект. Не более 5 минут.' },
-                  { n:'Клендовит гель', d:'Тонкий слой', t:'Утро локально', note:'Клиндамицин — антибиотик локально. Только на зону акне.' },
-                  { n:'Клензит-С', d:'Тонкий слой', t:'На ночь локально', note:'Адапален (ретиноид) + клиндамицин. Открывает комедоны.' },
-                  { n:'Верошпирон (Спиронолактон)', d:'50 мг', t:'Утро', note:'Антиандроген. Только при гормональном акне. Контролировать калий!' },
-                ].map((r,i) => (
-                  <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.12)', fontSize:10, marginBottom:6 }}>
+                  { n:'Солярий', d:'2 раза/нед × 5 мин', t:'День', note:'UV-B подсушивает акне. Не более 5 минут.' },
+                  { n:'Клендовит гель', d:'Тонкий слой', t:'Утро локально', note:'Клиндамицин+адапален. Только на зону акне.' },
+                  { n:'Клензит-С', d:'Тонкий слой', t:'На ночь локально', note:'Адапален (ретиноид) + клиндамицин, открывает комедоны.' },
+                  { n:'Верошпирон (Спиронолактон)', d:'50 мг', t:'Утро', note:'Антиандроген. Только при гормональном акне. Контроль калия!' },
+                ].map((r,i)=>(
+                  <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.12)', fontSize:9, marginBottom:4 }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
                       <span style={{ fontWeight:700, color:'var(--text-light)' }}>{r.n}</span>
-                      <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                        <span style={{ fontSize:9, fontWeight:700, color:'#ef4444' }}>{r.d}</span>
-                        <span style={{ fontSize:8, color:'var(--text-dim)', padding:'1px 6px', borderRadius:4, background:'rgba(255,255,255,0.04)' }}>{r.t}</span>
+                      <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                        <span style={{ fontSize:8, fontWeight:700, color:'#ef4444' }}>{r.d}</span>
+                        <span style={{ fontSize:7, color:'var(--text-dim)', padding:'1px 5px', borderRadius:4, background:'rgba(255,255,255,0.04)' }}>{r.t}</span>
                       </div>
                     </div>
-                    <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>{r.note}</div>
+                    <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.3 }}>{r.note}</div>
                   </div>
                 ))}
-                {/* Hygiene section */}
-                <div style={{ marginTop:8, padding:'10px', borderRadius:8, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.12)' }}>
-                  <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>🧼 Гигиена и уход</div>
-                  <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
+                {/* Analyses */}
+                <div style={{ marginTop:6, padding:'8px', borderRadius:6, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.08)' }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#ec4899', marginBottom:3 }}>🧪 Необходимые анализы крови</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                    {['Тестостерон общий/свободный','DHT','Эстрадиол (E2)','ЛГ/ФСГ','Пролактин','DHEA-S','Кортизол','SHBG','Калий (K+)','Глюкоза/Инсулин/HOMA-IR'].map((a,i)=>(
+                      <span key={i} style={{ fontSize:7, padding:'2px 6px', borderRadius:4, background:'rgba(236,72,153,0.06)', color:'#f472b6', border:'1px solid rgba(236,72,153,0.12)' }}>{a}</span>
+                    ))}
+                  </div>
+                </div>
+                {/* Instrumental */}
+                <div style={{ marginTop:6, padding:'8px', borderRadius:6, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.08)' }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#a855f7', marginBottom:3 }}>🔬 Инструментальные исследования</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                    {['УЗИ кожи (20-50 МГц)','Себуметрия','Дерматоскопия','Микробиология (C.acnes)'].map((e,i)=>(
+                      <span key={i} style={{ fontSize:7, padding:'2px 6px', borderRadius:4, background:'rgba(168,85,247,0.06)', color:'#c084fc', border:'1px solid rgba(168,85,247,0.12)' }}>{e}</span>
+                    ))}
+                  </div>
+                </div>
+                {/* Hygiene */}
+                <div style={{ marginTop:6, padding:'8px', borderRadius:6, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.12)' }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#60a5fa', marginBottom:3 }}>🧼 Гигиена и уход</div>
+                  <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.4 }}>
                     • Минимум <b style={{color:'#ef4444'}}>1 раз в день</b> тщательное мытьё с очищением пор от себума<br/>
                     • На курсе ААС выработка кожного сала резко возрастает → поры забиваются<br/>
-                    • Клензит-С содержит антибактериальный компонент + адапален для открытия комедонов<br/>
-                    • Клендовит — только локально на зону акне, не на всё лицо<br/>
+                    • Клензит-С + Клендовит — только локально, не на всё лицо<br/>
                     • При сильном акне — дерматолог, системные ретиноиды (Изотретиноин)
                   </div>
                 </div>
-                {/* Important notes */}
-                <div style={{ marginTop:6, padding:'8px 10px', borderRadius:6, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
-                  <div style={{ fontSize:9, fontWeight:700, color:'#f59e0b', marginBottom:2 }}>⚠️ Важные примечания</div>
-                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>
-                    • При Верошпироне — исключить добавки калия и калий-сберегающие продукты<br/>
-                    • Солярий ≤ 2 раза/нед по 5 мин — избыток UV повышает риск меланомы<br/>
-                    • Цинк и медь принимать РАЗДЕЛЬНО (конкуренция за всасывание) — цинк на ночь, медь утром<br/>
-                    • При неэффективности через 4-6 недель — консультация дерматолога
+                {/* Important */}
+                <div style={{ marginTop:6, padding:'8px', borderRadius:6, background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.12)' }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#f59e0b', marginBottom:2 }}>⚠️ Важно</div>
+                  <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.4 }}>
+                    • При Верошпироне — исключить добавки калия<br/>• Солярий ≤ 2 раза/нед по 5 мин<br/>• Цинк и медь — РАЗДЕЛЬНО (цинк на ночь, медь утром)<br/>• При неэффективности 4-6 нед — дерматолог
                   </div>
                 </div>
               </div>
