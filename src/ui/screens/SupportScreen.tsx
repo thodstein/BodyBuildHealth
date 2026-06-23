@@ -2616,7 +2616,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       const subId = sub.id;
       const subsInteractions = (interactions||[]).filter(i =>
         i && i.substanceA && i.substanceB && (matchesCatId(i.substanceA, subId) || matchesCatId(i.substanceB, subId))
-      ).slice(0, 5);
+      ).slice(0, 10);
       return (
         <div style={{ marginTop:4 }}>
           <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:1 }}>Взаимодействия:</div>
@@ -5926,7 +5926,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                               {(() => {
                                 const subsInteractions = mergedInteractions.filter(i =>
                                   i.substanceA === sub.id || i.substanceB === sub.id
-                                ).slice(0, 6);
+                                ).slice(0, 12);
                                 return subsInteractions.length > 0 ? (
                                   <div style={{ marginTop: 4 }}>
                                     <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>Взаимодействия:</div>
