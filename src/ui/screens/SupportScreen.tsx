@@ -1139,9 +1139,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     // Try partial match by first word
     const firstWord = key.split(/[\s-(]+/)[0];
     if (firstWord && PROTOCOL_IDS[firstWord]) return PROTOCOL_IDS[firstWord];
-    // Fallback to ALL_SUBSTANCES search
+    // Fallback to catalogSubstances search
     const terms = [key, ...key.split(/[\s-]+/).filter((t:string)=>t.length>2)];
-    const found = ALL_SUBSTANCES.find((s:any) => {
+    const found = catalogSubstances.find((s:any) => {
       const sn = ((s.name||'')+'').toLowerCase(); const sid = ((s.id||'')+'').toLowerCase();
       return terms.some(t => sid.includes(t) || sid.replace(/_/g,'').includes(t) || sn.includes(t));
     });
@@ -1520,7 +1520,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     try {
       const supps = (effectiveLevel?.subs || SUPPORT_LEVELS[level]?.subs || []).map(id => {
         const dos = (effectiveLevel?.dosages || SUPPORT_LEVELS[level]?.dosages || {})[id] || DEFAULT_DOSAGES[id] || { mg: 500, timing: 'с едой' };
-        const subInfo = ALL_SUBSTANCES.find(s => s.id === id);
+        const subInfo = catalogSubstances.find(s => s.id === id);
         const doseUnit = dos.mg >= 5000 ? 'g' : 'mg';
         return { id, name: subInfo?.name || id, doseMg: dos.mg, doseUnit: doseUnit as 'mg' | 'g' | 'mcg' | 'IU', notes: dos.timing };
       });
@@ -1651,7 +1651,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         results.push({ name: sub.name, id: sub.id, cls: sub.class, desc: (detail?.description || sub.description || SUPPORT_CLASS_LABELS[sub.class] || '') });
       }
     }
-    for (const sub of ALL_SUBSTANCES) {
+    for (const sub of catalogSubstances) {
       if ((sub.name||'').toLowerCase().includes(ql) || (sub.id||'').toLowerCase().includes(ql) || (sub.categories||[]).some(c => (c||'').toLowerCase().includes(ql))) {
         results.push({ name: sub.name || sub.id, id: sub.id, cls: sub.type || 'supplement', desc: (sub.description || '') });
       }
@@ -1836,7 +1836,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   };
   const validInteractionIds = interactionIds.filter(Boolean);
   
-  // Group ALL_SUBSTANCES by primary category for catalog
+  // Group catalogSubstances by primary category for catalog
   const catalogSubstances = useMemo(() => {
     return Object.values(SUPPORT_CATALOG_DATA).map(entry => ({
       id: entry.id,
@@ -2208,7 +2208,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       const synergies: any[] = [];
       for (let a = 0; a < stack.substances.length; a++) {
         const sa = stack.substances[a];
-        const subA = ALL_SUBSTANCES.find(s => s.id === sa);
+        const subA = catalogSubstances.find(s => s.id === sa);
         if (subA?.mechanisms) subA.mechanisms.forEach(m => allMechs.add(m));
         for (let b = a + 1; b < stack.substances.length; b++) {
           const sb = stack.substances[b];
@@ -2231,11 +2231,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   }, [conflictLookup]);
 
   // Merge ALL_INTERACTIONS + SYNERGY_PAIRS for synergies tab (with null filter + dedup + catalog filter)
-  // Pre-compute the set of ALL substance IDs from interactions + catalog + ALL_SUBSTANCES
+  // Pre-compute the set of ALL substance IDs from interactions + catalog + catalogSubstances
   const allSubstanceIds = useMemo(() => {
     const s = new Set<string>();
     CATALOG_IDS.forEach(id => s.add(id));
-    ALL_SUBSTANCES.forEach((sub: any) => s.add((sub.id||'').toLowerCase()));
+    catalogSubstances.forEach((sub: any) => s.add((sub.id||'').toLowerCase()));
     ALL_INTERACTIONS.forEach((i: any) => {
       ['A','B','C','D','E','F'].forEach(f => {
         const sid = i[`substance${f}`];
@@ -2310,7 +2310,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const supportInteractions = useMemo(() => {
     if (validInteractionIds.length < 2) return null;
     const subs: Record<string, string> = {};
-    const allSubs = [...allSupport, ...ALL_SUBSTANCES.filter(x => !allSupport.find(s => s.id === x.id))];
+    const allSubs = [...allSupport, ...catalogSubstances.filter(x => !allSupport.find(s => s.id === x.id))];
     validInteractionIds.forEach(id => {
       const s = allSubs.find(x => x.id === id);
       if (s) subs[id] = s.name || s.id;
@@ -2403,7 +2403,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [searchResults, setSearchResults] = useState<Array<{id:string;name:string;type:'substance'|'stack'|'complex';score:number;reason:string;pros:string[];cons:string[];substanceCount?:number;description?:string;mechanisms?:string[];organs?:string[]}>>([]);
 
   // Helper: find substance by ID
-  const findSubstance = (id: string): any => ALL_SUBSTANCES.find(s => s.id === id);
+  const findSubstance = (id: string): any => catalogSubstances.find(s => s.id === id);
 
   // Helper: get substance name
   const getSubstanceName = (id: string): string => {
@@ -2416,7 +2416,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const findReplacements = (id: string, mode?: string, target?: string) => {
     const source = findSubstance(id);
     const results: Array<{id:string;score:number;reason:string;pros:string[];cons:string[];mechComparison?:string[];organs?:string[];tier?:string}> = [];
-    const subs = ALL_SUBSTANCES.filter(s => s.id !== id);
+    const subs = catalogSubstances.filter(s => s.id !== id);
 
     if (mode === 'organ' && target) {
       // Find by organ target
@@ -2505,8 +2505,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const doSearch = (organ: string, mech: string, effect: string, category?: string, tier?: string) => {
     const results: Array<{id:string;name:string;type:'substance'|'stack'|'complex';score:number;reason:string;pros:string[];cons:string[];substanceCount?:number;description?:string;mechanisms?:string[];organs?:string[]}> = [];
     const eq = effect.toLowerCase().trim();
-    // Search ALL_SUBSTANCES
-    for (const sub of ALL_SUBSTANCES) {
+    // Search catalogSubstances
+    for (const sub of catalogSubstances) {
       // Category filter
       if (category && !(sub.categories||[]).some((c:string) => c.toLowerCase() === category.toLowerCase())) continue;
       // Tier filter
@@ -2562,7 +2562,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   // Resolve substance name from ID (used in interactions) — Map for O(1)
   const substanceNameMap = useMemo(() => {
     const m = new Map<string, string>();
-    for (const s of ALL_SUBSTANCES) m.set(s.id, s.name);
+    for (const s of catalogSubstances) m.set(s.id, s.name);
     return m;
   }, []);
   const resolveSubName = (id: string): string => {
@@ -2849,8 +2849,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     </div>
                     <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>⊕ {showEffect(interaction)}</div>
                     {(() => {
-                      const subAInfo = ALL_SUBSTANCES.find(s => s.id === interaction?.substanceA);
-                      const subBInfo = ALL_SUBSTANCES.find(s => s.id === interaction?.substanceB);
+                      const subAInfo = catalogSubstances.find(s => s.id === interaction?.substanceA);
+                      const subBInfo = catalogSubstances.find(s => s.id === interaction?.substanceB);
                       const aDesc = subAInfo?.description || '';
                       const bDesc = subBInfo?.description || '';
                       const aMechs = (subAInfo?.mechanisms || []).slice(0, 3);
@@ -2909,8 +2909,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     </div>
                     <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>⊖ {showEffect(interaction)}</div>
                     {(() => {
-                      const subAInfo = ALL_SUBSTANCES.find(s => s.id === interaction?.substanceA) || (PHARMA_DB[interaction?.substanceA] ? { id: interaction?.substanceA, name: PHARMA_DB[interaction?.substanceA]?.name, description: PHARMA_DB[interaction?.substanceA]?.description || '', mechanisms: PHARMA_DB[interaction?.substanceA]?.mechanisms || [] } : null);
-                      const subBInfo = ALL_SUBSTANCES.find(s => s.id === interaction?.substanceB) || (PHARMA_DB[interaction?.substanceB] ? { id: interaction?.substanceB, name: PHARMA_DB[interaction?.substanceB]?.name, description: PHARMA_DB[interaction?.substanceB]?.description || '', mechanisms: PHARMA_DB[interaction?.substanceB]?.mechanisms || [] } : null);
+                      const subAInfo = catalogSubstances.find(s => s.id === interaction?.substanceA) || (PHARMA_DB[interaction?.substanceA] ? { id: interaction?.substanceA, name: PHARMA_DB[interaction?.substanceA]?.name, description: PHARMA_DB[interaction?.substanceA]?.description || '', mechanisms: PHARMA_DB[interaction?.substanceA]?.mechanisms || [] } : null);
+                      const subBInfo = catalogSubstances.find(s => s.id === interaction?.substanceB) || (PHARMA_DB[interaction?.substanceB] ? { id: interaction?.substanceB, name: PHARMA_DB[interaction?.substanceB]?.name, description: PHARMA_DB[interaction?.substanceB]?.description || '', mechanisms: PHARMA_DB[interaction?.substanceB]?.mechanisms || [] } : null);
                       const aDesc = subAInfo?.description || '';
                       const bDesc = subBInfo?.description || '';
                       const aMechs = ((subAInfo?.mechanisms || []) as string[]).slice(0, 3);
@@ -2973,8 +2973,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     </div>
                     <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>⚠ {showEffect(interaction)}</div>
                     {(() => {
-                      const subAInfo = ALL_SUBSTANCES.find(s => s.id === interaction?.substanceA) || (PHARMA_DB[interaction?.substanceA] ? { id: interaction?.substanceA, name: PHARMA_DB[interaction?.substanceA]?.name, description: PHARMA_DB[interaction?.substanceA]?.description || '', mechanisms: PHARMA_DB[interaction?.substanceA]?.mechanisms || [] } : null);
-                      const subBInfo = ALL_SUBSTANCES.find(s => s.id === interaction?.substanceB) || (PHARMA_DB[interaction?.substanceB] ? { id: interaction?.substanceB, name: PHARMA_DB[interaction?.substanceB]?.name, description: PHARMA_DB[interaction?.substanceB]?.description || '', mechanisms: PHARMA_DB[interaction?.substanceB]?.mechanisms || [] } : null);
+                      const subAInfo = catalogSubstances.find(s => s.id === interaction?.substanceA) || (PHARMA_DB[interaction?.substanceA] ? { id: interaction?.substanceA, name: PHARMA_DB[interaction?.substanceA]?.name, description: PHARMA_DB[interaction?.substanceA]?.description || '', mechanisms: PHARMA_DB[interaction?.substanceA]?.mechanisms || [] } : null);
+                      const subBInfo = catalogSubstances.find(s => s.id === interaction?.substanceB) || (PHARMA_DB[interaction?.substanceB] ? { id: interaction?.substanceB, name: PHARMA_DB[interaction?.substanceB]?.name, description: PHARMA_DB[interaction?.substanceB]?.description || '', mechanisms: PHARMA_DB[interaction?.substanceB]?.mechanisms || [] } : null);
                       const aDesc = subAInfo?.description || '';
                       const bDesc = subBInfo?.description || '';
                       const aMechs = ((subAInfo?.mechanisms || []) as string[]).slice(0, 3);
@@ -3191,7 +3191,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           {/* Content */}
           <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
             <div style={{fontSize:7,color:'rgba(255,255,255,0.2)',textAlign:'center',marginBottom:4}}>
-              build:2026-06-15 | subs:{ALL_SUBSTANCES.length} | int:{ALL_INTERACTIONS.length} | stacks:{ALL_STACKS.length} | tab:{calcView}/{infoView}
+              build:2026-06-15 | subs:{catalogSubstances.length} | int:{ALL_INTERACTIONS.length} | stacks:{ALL_STACKS.length} | tab:{calcView}/{infoView}
             </div>
             {renderView(infoView, 'catalog', () =>
               <div>
@@ -3659,7 +3659,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                       <input value={interactionSearchIdx===idx ? interactionSearch : ''} placeholder="🔍 Введите название..." onFocus={() => { setInteractionSearchIdx(idx); setInteractionSearch(''); }} onChange={e => { setInteractionSearchIdx(idx); setInteractionSearch(e.target.value); }} style={{ width:'100%', padding:'7px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
                                       {interactionSearch && interactionSearchIdx===idx && (
                                         <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:150, overflowY:'auto', marginTop:1 }}>
-                                          {[...allSupport, ...ALL_SUBSTANCES.filter(x => !allSupport.find(s => s.id === x.id))].filter(s => (s.name||s.id||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0,10).map(s => (
+                                          {[...allSupport, ...catalogSubstances.filter(x => !allSupport.find(s => s.id === x.id))].filter(s => (s.name||s.id||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0,10).map(s => (
                                             <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractionSearch(''); setInteractionSearchIdx(-1); }} style={{ padding:'7px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid var(--border)' }}>
                                               <span style={{ fontWeight:600, color:'var(--text)' }}>{s.name}</span>
                                               <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>{s.id}</span>
@@ -3900,8 +3900,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                              if (synergyOrganFilter) {
                                list = list.filter((i: any) => {
                                  const checkOrg = (subId: string) => {
-                                   // Try ALL_SUBSTANCES first
-                                   const sub = ALL_SUBSTANCES.find(s => s.id === subId);
+                                   // Try catalogSubstances first
+                                   const sub = catalogSubstances.find(s => s.id === subId);
                                    if (sub && sub.organs && sub.organs.length > 0) {
                                      return sub.organs.some((o: string) => {
                                        const norm = (o||'').trim().toUpperCase();
@@ -4030,7 +4030,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     </div>
                                     {/* Why this stack works — detailed */}
                                     {(() => {
-                                      const subs = stack.substances.map(sid => ALL_SUBSTANCES.find(s => s.id === sid)).filter(Boolean) as any[];
+                                      const subs = stack.substances.map(sid => catalogSubstances.find(s => s.id === sid)).filter(Boolean) as any[];
                                       const allMechs = new Set<string>();
                                       subs.forEach(s => { if (s?.mechanisms) s.mechanisms.forEach((m:string) => allMechs.add(m)); });
                                       const uniqueMechs = [...allMechs].filter(m => subs.filter(s => (s?.mechanisms||[]).includes(m)).length >= Math.min(2, subs.length));
@@ -4081,7 +4081,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     <div style={{ marginBottom:4 }}>
                                       <div style={{ fontSize:8, fontWeight:700, color:'var(--text-light)', marginBottom:2 }}>🧬 Компоненты</div>
                                       {stack.substances.map(sid => {
-                                        const subInfo = ALL_SUBSTANCES.find(s => s.id === sid);
+                                        const subInfo = catalogSubstances.find(s => s.id === sid);
                                         const cat = subInfo?.categories?.[0];
                                         return (
                                           <div key={sid} style={{ fontSize:7, color:'var(--text-dim)', padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.04)', lineHeight:1.4 }}>
@@ -4137,7 +4137,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             {renderView(infoView, 'favorites', () => {
               let favIds: string[] = [];
               try { favIds = JSON.parse(localStorage.getItem('he_support_favorites') || '[]'); } catch {}
-              const favSubstances = favIds.map(id => ALL_SUBSTANCES.find(s => s.id === id)).filter(Boolean);
+              const favSubstances = favIds.map(id => catalogSubstances.find(s => s.id === id)).filter(Boolean);
               const filtered = favSearch ? favSubstances.filter(s => (s?.name||'').toLowerCase().includes(favSearch.toLowerCase())) : favSubstances;
               return (
               <div>
@@ -4230,7 +4230,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                               <div style={{ padding:'0 12px 10px' }}>
                                 <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:8 }}>
                                   {stack.subs.map(id => {
-                                    const sub = ALL_SUBSTANCES.find(s => s.id === id);
+                                    const sub = catalogSubstances.find(s => s.id === id);
                                     const pharma = PHARMA_DB[id];
                                     const name = sub?.name || pharma?.name || id.replace(/_/g, ' ');
                                     const dosage = stack.dosages?.[id];
@@ -4273,7 +4273,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       const subs = level?.subs || [];
                       const dosages = level?.dosages || {};
                       const getInfo = (id: string) => {
-                        const sub = ALL_SUBSTANCES.find(s => s.id === id);
+                        const sub = catalogSubstances.find(s => s.id === id);
                         const d = dosages[id];
                         return { id, name: sub?.name || id.replace(/_/g, ' '), mg: d?.mg ?? 0, timing: d?.timing || '', desc: sub?.description || '' };
                       };
@@ -4323,7 +4323,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                 </tr></thead>
                                 <tbody>
                                   {subs.map((id: string) => {
-                                    const sub = ALL_SUBSTANCES.find(s => s.id === id);
+                                    const sub = catalogSubstances.find(s => s.id === id);
                                     const d = dosages[id];
                                     if (!sub || !d) return null;
                                     return (
@@ -4418,7 +4418,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                         </tr></thead>
                                         <tbody>
                                           {planSubs.map((id: string) => {
-                                            const sub = ALL_SUBSTANCES.find((s: any) => s.id === id);
+                                            const sub = catalogSubstances.find((s: any) => s.id === id);
                                             const d = planDosages[id];
                                             return (
                                               <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
@@ -4462,14 +4462,14 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       const sex = profile?.settings?.sex ?? 'male';
                       const levelSubIds = SUPPORT_LEVELS[supportLevel]?.subs || [];
                       const planItems = levelSubIds.map((id:string) => {
-                        const sub = ALL_SUBSTANCES.find((s:any) => s.id === id);
+                        const sub = catalogSubstances.find((s:any) => s.id === id);
                         const dos = { mg:500, timing:'с едой' };
                         return { id, name:sub?.name||id, dose:dos.mg+'мг', timing:dos.timing, categories:sub?.categories||[], mechanisms:sub?.mechanisms||[] };
                       });
                       const report = {
                         id: Date.now().toString(),
                         date: new Date().toISOString(), level:supportLevel, items:planItems,
-                        substanceCount: ALL_SUBSTANCES.length, interactionCount: ALL_INTERACTIONS.length,
+                        substanceCount: catalogSubstances.length, interactionCount: ALL_INTERACTIONS.length,
                         timestamp: Date.now()
                       };
                       const archive = JSON.parse(localStorage.getItem('he_support_reports_archive') || '[]');
@@ -4568,7 +4568,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                   {stack.description && <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)', lineHeight:1.4, marginTop:6, marginBottom:6 }}>{stack.description}</div>}
                                   <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}>Состав и механизмы:</div>
                                   {stack.substances.map(sid => {
-                                    const sub = ALL_SUBSTANCES.find(x => x.id === sid);
+                                    const sub = catalogSubstances.find(x => x.id === sid);
                                     return (
                                       <div key={sid} style={{ padding:'4px 6px', marginBottom:3, borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.04)' }}>
                                         <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:9 }}>
@@ -4701,7 +4701,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       const availableMechs = (() => {
                         if (stackCalcOrgans.length === 0) return [];
                         const mechSet = new Set<string>();
-                        for (const sub of ALL_SUBSTANCES) {
+                        for (const sub of catalogSubstances) {
                           if (!sub.mechanisms) continue;
                           const subOrgs = ((sub.organs||[]) as string[]).map((o:any)=>(o||'').toLowerCase());
                           for (const o of selectedOrgans) {
@@ -4715,8 +4715,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       })();
                       const [lo,hi]=stackCalcSize.split('-').map(Number);
                       const generate = () => {
-                        const candidates:Array<{sub:typeof ALL_SUBSTANCES[0];score:number;organHits:number;mechHits:number}> = [];
-                        for (const sub of ALL_SUBSTANCES) {
+                        const candidates:Array<{sub:typeof catalogSubstances[0];score:number;organHits:number;mechHits:number}> = [];
+                        for (const sub of catalogSubstances) {
                           if (!sub.name||!sub.mechanisms||!sub.mechanisms.length) continue;
                           if (sub.mechanisms.length === 1 && (sub.mechanisms[0] === 'general' || sub.mechanisms[0] === 'antioxidant')) continue;
                           let score = 0; let organHits = 0; let mechHits = 0;
@@ -4775,7 +4775,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       };
                       return <div>
                         <div style={{fontSize:13,fontWeight:700,color:'var(--accent)',marginBottom:4}}>🧮 Генератор стеков</div>
-                        <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:6}}>Выберите органы, механизмы и размер — стек генерируется из базы {ALL_SUBSTANCES.length} веществ с учётом синергий и конфликтов</div>
+                        <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:6}}>Выберите органы, механизмы и размер — стек генерируется из базы {catalogSubstances.length} веществ с учётом синергий и конфликтов</div>
                         <div style={{marginBottom:6}}>
                           <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
                             <span style={{fontSize:9,fontWeight:600,color:'var(--text-light)'}}>Органы:</span>
@@ -4888,7 +4888,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       ) : (
                         <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
                           {enhancedSubs.map(sid => {
-                            const sub = ALL_SUBSTANCES.find(x => x.id === sid);
+                            const sub = catalogSubstances.find(x => x.id === sid);
                             return (
                               <div key={sid} style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'3px 8px', borderRadius:6, background:'rgba(236,72,153,0.08)', border:'1px solid rgba(236,72,153,0.15)' }}>
                                 <span style={{ fontSize:9, color:'#ec4899', fontWeight:600 }}>{sub?.name || sid.replace(/_/g,' ')}</span>
@@ -4903,7 +4903,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         style={{ width:'100%', padding:'8px 10px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, boxSizing:'border-box', marginTop:6 }} />
                       {stackSearch && (
                         <div style={{ marginTop:4, maxHeight:120, overflowY:'auto' }}>
-                          {ALL_SUBSTANCES.filter(s => (s.name||'').toLowerCase().includes(stackSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(stackSearch.toLowerCase())).slice(0,6).map(s => (
+                          {catalogSubstances.filter(s => (s.name||'').toLowerCase().includes(stackSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(stackSearch.toLowerCase())).slice(0,6).map(s => (
                             <div key={s.id} onClick={() => { if (!enhancedSubs.includes(s.id)) setEnhancedSubs(prev => [...prev, s.id]); setStackSearch(''); }} style={{ padding:'6px 8px', borderRadius:4, cursor:'pointer', fontSize:9, borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
                               <span style={{ fontWeight:600, color:'var(--text-light)' }}>{s.name}</span>
                               <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>{s.id}</span>
@@ -5023,7 +5023,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                               style={{ width:'100%', padding:'10px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
                             {replaceSearch.length >= 2 && (
                               <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:8, maxHeight:180, overflowY:'auto', marginTop:2, boxShadow:'0 4px 12px rgba(0,0,0,0.2)' }}>
-                                {ALL_SUBSTANCES.filter(s => (s.name||'').toLowerCase().includes(replaceSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(replaceSearch.toLowerCase())).slice(0,6).map(s => (
+                                {catalogSubstances.filter(s => (s.name||'').toLowerCase().includes(replaceSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(replaceSearch.toLowerCase())).slice(0,6).map(s => (
                                   <div key={s.id} onClick={() => { setReplaceSelectedSub(s.id); setReplaceSearch(s.name || s.id); setReplaceResults(findReplacements(s.id)); }} style={{ padding:'8px 10px', cursor:'pointer', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
                                     <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{s.name}</div>
                                     <div style={{ fontSize:7, color:'var(--text-dim)' }}>{(s.categories||[]).slice(0,3).join(' • ') || s.id}</div>
@@ -5077,7 +5077,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         <select value={replaceTargetMech} onChange={e => { setReplaceTargetMech(e.target.value); if (e.target.value) setReplaceResults(findReplacements('', 'mechanism', e.target.value)); else setReplaceResults([]); }}
                           style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
                           <option value="">— Выберите механизм —</option>
-                          {[...new Set(ALL_SUBSTANCES.flatMap(s => s.mechanisms||[]))].filter(Boolean).sort().slice(0,60).map(m => (
+                          {[...new Set(catalogSubstances.flatMap(s => s.mechanisms||[]))].filter(Boolean).sort().slice(0,60).map(m => (
                             <option key={m} value={m}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</option>
                           ))}
                         </select>
@@ -5114,7 +5114,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                               <div style={{ fontSize:8, color:'rgba(255,255,255,0.65)', lineHeight:1.3, marginBottom:4 }}>{r.reason}</div>
                               {/* Mechanism badges */}
                               <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:3 }}>
-                                {(ALL_SUBSTANCES.find(x => x.id === r.id)?.mechanisms||[]).slice(0,4).map((m:string,mi:number) => (
+                                {(catalogSubstances.find(x => x.id === r.id)?.mechanisms||[]).slice(0,4).map((m:string,mi:number) => (
                                   <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background:accentColor+'15', color:accentColor, border:'1px solid '+accentColor+'20' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>
                                 ))}
                               </div>
@@ -5195,7 +5195,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Механизм</label>
                           <select value={searchMech} onChange={e => setSearchMech(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
                             <option value="">Любой</option>
-                            {[...new Set(ALL_SUBSTANCES.flatMap(s => s.mechanisms||[]))].filter(Boolean).sort().slice(0,60).map(m => (
+                            {[...new Set(catalogSubstances.flatMap(s => s.mechanisms||[]))].filter(Boolean).sort().slice(0,60).map(m => (
                               <option key={m} value={m}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</option>
                             ))}
                           </select>
@@ -5207,7 +5207,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Категория</label>
                           <select value={searchCategory} onChange={e => setSearchCategory(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
                             <option value="">Любая</option>
-                            {[...new Set(ALL_SUBSTANCES.flatMap(s => s.categories||[]))].filter(Boolean).sort().slice(0,40).map(c => (
+                            {[...new Set(catalogSubstances.flatMap(s => s.categories||[]))].filter(Boolean).sort().slice(0,40).map(c => (
                               <option key={c} value={c}>{c}</option>
                             ))}
                           </select>
@@ -5246,7 +5246,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         const typeColor = r.type === 'stack' ? '#00e68a' : r.type === 'complex' ? '#a78bfa' : '#60a5fa';
                         const typeBg = r.type === 'stack' ? 'rgba(0,230,138,0.04)' : r.type === 'complex' ? 'rgba(167,139,250,0.04)' : 'rgba(59,130,246,0.04)';
                         const typeBorder = r.type === 'stack' ? 'rgba(0,230,138,0.12)' : r.type === 'complex' ? 'rgba(167,139,250,0.12)' : 'rgba(59,130,246,0.12)';
-                        const sub = r.type === 'substance' ? ALL_SUBSTANCES.find(x => x.id === r.id) : null;
+                        const sub = r.type === 'substance' ? catalogSubstances.find(x => x.id === r.id) : null;
                         return (
                           <div key={r.id} style={{ background:typeBg, borderRadius:12, border:'1px solid '+typeBorder, overflow:'hidden' }}>
                             {/* Card header — always visible */}
@@ -5590,7 +5590,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
               <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>4. Подбор веществ по механизмам</h3>
               <p style={{ margin:0 }}>
-                Каждое вещество в базе ALL_SUBSTANCES имеет один или несколько механизмов действия (из 553+ возможных). Для каждой системы подбираются вещества, которые:
+                Каждое вещество в базе catalogSubstances имеет один или несколько механизмов действия (из 553+ возможных). Для каждой системы подбираются вещества, которые:
               </p>
               <ol style={{ paddingLeft:16, margin:'4px 0' }} type="a">
                 <li><b>Покрывают проблемные механизмы</b> — например, при высоком гематокрите добавляются вещества с механизмами крови (Ω-3, наттокиназа)</li>
@@ -6361,7 +6361,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           subs.forEach(id => {
             const dosing = dosages[id];
             if (!dosing) return;
-            const subInfo = ALL_SUBSTANCES.find(s => s.id === id);
+            const subInfo = catalogSubstances.find(s => s.id === id);
             const t = timingMap[id] || { slot: 2, with: 'С едой', note: dosing.timing || '' };
             const wbDose = getWeightDosing(id, dosing.mg);
             const doseStr = dosing.mg >= 5000 ? `${dosing.mg / 1000} г` : `${dosing.mg} мг`;
@@ -6917,7 +6917,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           <tbody>
                             {effectiveLevel.subs.map((id: string) => {
                               const sub = allSupport.find((s: any) => s.id === id);
-                              const subDb = ALL_SUBSTANCES.find((s: any) => s.id === id);
+                              const subDb = catalogSubstances.find((s: any) => s.id === id);
                               if (!sub) return null;
                               const mechanisms = (subDb?.mechanisms || []).slice(0, 3);
                               const syns = ALL_INTERACTIONS.filter((int: any) => 
@@ -6936,13 +6936,13 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                             </td>
                             <td style={{ padding:'3px 4px' }}>
                               {syns.map((s: any, j: number) => {
-                                const partner = ALL_SUBSTANCES.find((x: any) => x.id === (s.substanceA === id ? s.substanceB : s.substanceA));
+                                const partner = catalogSubstances.find((x: any) => x.id === (s.substanceA === id ? s.substanceB : s.substanceA));
                                 return (
                                   <div key={j} style={{ color:'#22c55e', lineHeight:1.3 }}>⊕ {partner?.name || '?'} — {s.effect?.slice(0,35)}</div>
                                 );
                               })}
                               {conflicts.length > 0 && conflicts.map((c: any, j: number) => {
-                                const partner = ALL_SUBSTANCES.find((x: any) => x.id === (c.substanceA === id ? c.substanceB : c.substanceA));
+                                const partner = catalogSubstances.find((x: any) => x.id === (c.substanceA === id ? c.substanceB : c.substanceA));
                                 return (
                                   <div key={`c${j}`} style={{ color:'#ef4444', lineHeight:1.3 }}>⊖ {partner?.name || '?'} — {c.effect?.slice(0,35)}</div>
                                 );
@@ -7863,7 +7863,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                               <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>{new Date(stack.date).toLocaleDateString('ru-RU')} · {totalItems} препаратов</div>
                               <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:4 }}>
                                 {(stack.subs || []).slice(0,8).map((id: string) => {
-                                  const sub = ALL_SUBSTANCES.find(s => s.id === id);
+                                  const sub = catalogSubstances.find(s => s.id === id);
                                   return <span key={id} style={{ fontSize:8, padding:'1px 5px', borderRadius:4, background:'rgba(139,92,246,0.08)', color:'#a78bfa' }}>{sub?.name || id}</span>;
                                 })}
                                 {totalItems > 8 && <span style={{ fontSize:8, color:'var(--text-dim)' }}>+{totalItems-8}</span>}
