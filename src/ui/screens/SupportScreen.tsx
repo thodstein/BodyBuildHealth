@@ -1619,7 +1619,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [neuroTab, setNeuroTab] = useState<'calc' | 'mechanisms' | 'support'>('calc');
 
   // Catalog sub-tab
-  const [catalogSubTab, setCatalogSubTab] = useState<'type' | 'organ' | 'tier' | 'complexes'>('type');
+  const [catalogSubTab, setCatalogSubTab] = useState<'type' | 'organ' | 'tier'>('type');
   const isComplexId = (id: string) => {
     const low = id.toLowerCase();
     return low.includes('complex') || low.includes('_blend') || low.includes('_mix') || low.endsWith('_combo');
@@ -1840,57 +1840,16 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const catalogSubstances = useMemo(() => {
     const allSubsMap = new Map<string, SupportSubstance>();
     for (const s of ALL_SUBSTANCES) allSubsMap.set(s.id.toLowerCase(), s);
-    const TYPE_ORDER = new Set([
-      'vitamin','mineral','amino_acid','herb','hormone','peptide','enzyme','probiotic',
-      'fatty_acid','mushroom','electrolyte','antioxidant','polyphenol','nootropic','adaptogen'
-    ]);
-    // Fallback: functional categories → type groups (for categories that don't match TYPE_ORDER)
-    const FUNC_TO_TYPE: Record<string,string> = {
-      gastrointestinal:'probiotics',gut:'probiotics',digestive:'enzymes',
-      hepatoprotector:'antioxidants',liver:'antioxidants',
-      cardioprotector:'antioxidants',cardio:'antioxidants',
-      joint:'amino_acids',joints:'amino_acids',bone:'minerals',
-      immunomodulator:'adaptogens',immune:'adaptogens',
-      antimicrobial:'herbs',antibacterial:'herbs',antibiotic:'herbs',
-      anti_inflammatory:'antioxidants',nsaid:'herbs',
-      anxiolytic:'adaptogens',antidepressant:'adaptogens',mood:'adaptogens',
-      analgesic:'herbs',anti_spasmodic:'herbs',muscle_relaxant:'herbs',
-      respiratory:'herbs',lung:'herbs',pulmonary:'herbs',
-      nephroprotective:'antioxidants',renal:'antioxidants',kidney:'antioxidants',
-      neuroprotector:'nootropics',neuro:'nootropics',brain:'nootropics',
-      eye:'antioxidants',eye_protector:'vitamins',
-      skin:'vitamins',hair:'vitamins',beauty:'vitamins',
-      thyroid:'hormones',endocrine:'hormones',
-      blood:'vitamins',hematologic:'vitamins',anticoagulant:'herbs',
-      metabolic:'peptides',glucose:'herbs',insulin:'herbs',
-      electrolyte:'electrolytes',electrolytes:'electrolytes',
-      recovery:'amino_acids',muscle:'amino_acids',
-      no_organ:'other',other:'other',supplement:'other',marker:'other',
-    };
     return Object.values(SUPPORT_CATALOG_DATA).map(entry => {
       const allSub = allSubsMap.get((entry.id||'').toLowerCase());
-      const cats = (entry.category && entry.category.length > 0) ? entry.category : (allSub?.categories || []);
-      let bestType = '';
-      for (const c of cats) {
-        const normed = (c||'').toLowerCase().replace(/[^a-z0-9_]/g,'');
-        if (TYPE_ORDER.has(normed)) { bestType = c; break; }
-      }
-      if (!bestType) {
-        // Try fallback mapping for functional categories
-        for (const c of cats) {
-          const normed = (c||'').toLowerCase().replace(/[^a-z0-9_]/g,'');
-          if (FUNC_TO_TYPE[normed]) { bestType = FUNC_TO_TYPE[normed]; break; }
-        }
-      }
-      if (!bestType) bestType = cats[0] || '';
       return {
         id: entry.id,
         name: entry.nameRu || allSub?.name || entry.name || entry.id,
-        categories: cats,
+        categories: (entry.category && entry.category.length > 0) ? entry.category : (allSub?.categories || []),
         mechanisms: (entry.mechanisms && entry.mechanisms.length > 0) ? entry.mechanisms : (allSub?.mechanisms || []),
         organs: (entry.organs && entry.organs.length > 0) ? entry.organs : (allSub?.organs || []),
         description: entry.description || allSub?.description || '',
-        type: bestType || allSub?.type || 'supplement',
+        type: (entry.category||[])[0] || allSub?.type || 'supplement',
         deficiency: allSub?.deficiency || '',
       };
     }) as SupportSubstance[];
@@ -1952,13 +1911,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   };
 
   const groupedSubstances = useMemo(() => {
-    // Use shared matchComplex for filtering
     let filtered = catalogSubstances;
-    if (catalogSubTab === 'complexes') {
-      filtered = filtered.filter(s => matchComplex(s));
-    } else {
-      filtered = filtered.filter(s => !matchComplex(s));
-    }
     if (supportTierFilter !== 'all') {
       filtered = filtered.filter(s => getSubstanceTier(s.id) === supportTierFilter);
     }
@@ -2006,7 +1959,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         return { cat, items, count: items.length, classBadges, classItems };
       })
       .sort((a, b) => b.count - a.count);
-  }, [searchQuery, supportTierFilter, catalogSubTab, catalogSubstances]);
+  }, [searchQuery, supportTierFilter, catalogSubstances]);
 
   // Organ-based grouping for catalog sub-tab
   // Phase 5.12: Comprehensive 16-category organ mapping
@@ -2112,8 +2065,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       ? catalogSubstances.filter(s =>
           (s.name||'').toLowerCase().includes(searchQuery.toLowerCase()) ||
           (s.id||'').toLowerCase().includes(searchQuery.toLowerCase())
-        ).filter(s => !matchComplex(s)) // skip complexes in organ view
-      : catalogSubstances.filter(s => !matchComplex(s)); // skip complexes in organ view
+        )
+      : catalogSubstances;
     for (const sub of filtered) {
       const organs = sub.organs || [];
       usedKeys.clear();
@@ -3242,16 +3195,16 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             {renderView(infoView, 'catalog', () =>
               <div>
                 {/* Sub-tabs: По типам / По органам / По уровням */}
-                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
-                  {(['type','organ','tier','complexes'] as const).map(t => (
-                    <button key={t} onClick={() => setCatalogSubTab(t)} style={{
-                      padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
-                      background: catalogSubTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
-                      color: catalogSubTab === t ? '#000' : 'var(--text-dim)',
-                      border: `1px solid ${catalogSubTab === t ? 'var(--accent)' : 'var(--border)'}`,
-                    }}>{t === 'type' ? '📋 По типам' : t === 'organ' ? '🫀 По органам' : t === 'tier' ? '⚡ По уровням' : '🧩 Комплексы'}</button>
-                  ))}
-                </div>
+                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
+                   {(['type','organ','tier'] as const).map(t => (
+                     <button key={t} onClick={() => setCatalogSubTab(t)} style={{
+                       padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
+                       background: catalogSubTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
+                       color: catalogSubTab === t ? '#000' : 'var(--text-dim)',
+                       border: `1px solid ${catalogSubTab === t ? 'var(--accent)' : 'var(--border)'}`,
+                     }}>{t === 'type' ? '📋 По типам' : t === 'organ' ? '🫀 По органам' : t === 'tier' ? '⚡ По уровням' : ''}</button>
+                   ))}
+                 </div>
                 <div style={{ display:'flex', gap:6, marginBottom:8, alignItems:'center' }}>
                   <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-light)', fontSize:12 }} />
                 </div>
@@ -3397,52 +3350,23 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     })}
                   </div>
                 )}
-                {catalogSubTab === 'complexes' && (
-                  /* Комплексы */
-                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                    {(() => {
-                      const complexItems = catalogSubstances.filter(s => isComplexId(s.id));
-                      return complexItems.length > 0 ? (
-                        complexItems.map(sub => {
-                          const isSelected = selectedSub === sub?.id;
-                          return (
-                            <div key={sub?.id||'x'} style={{ background:'var(--bg-secondary)', borderRadius:10, overflow:'hidden', border:'1px solid var(--border)' }}>
-                              <div onClick={() => setSelectedSub(isSelected ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'8px 10px', cursor:'pointer' }}>
-                                <div style={{ flex:1 }}>
-                                  <div style={{ fontSize:10, fontWeight:700, color:'#8b5cf6', lineHeight:1.3 }}>🧩 {sub?.name||(sub?.id||'').replace(/_/g,' ')}</div>
-                                  <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:2 }}>
-                                    {(sub?.categories||[]).slice(0,3).map(c => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.08)', color:'#a78bfa' }}>{c||''}</span>)}
-                                  </div>
-                                </div>
-                                <span style={{ fontSize:9, color:'var(--text-dim)', fontWeight:600 }}>{complexItems.length}</span>
-                              </div>
-                              {isSelected && sub && (
-                                <div style={{ padding:'6px 10px 8px', background:'rgba(0,0,0,0.15)' }}>
-                                  {catDetailInteractions(sub, ALL_INTERACTIONS)}
-                                  {renderCatalogDetail(sub.id || (sub as any)?.id)}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
-                      ) : <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Комплексы не найдены</div>;
-                    })()}
-                  </div>
-                )}
+                {/* Complexes tab removed — all substances now in type/organ/tier views */}
                 {(catalogSubTab === 'type' || !catalogSubTab) && (
                 /* По типам (default) */
                 <div>
-                  {/* Type sub-tabs: ТОЛЬКО типы веществ */}
+                  {/* Type sub-tabs */}
                   <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
                     {[['','🔍 Все'],
                       ['vitamins','💊 Витамины'],['minerals','🧂 Минералы'],['amino_acids','🧬 Аминокислоты'],
-                      ['fatty_acids','🐟 Липидные'],['herbs','🌿 Травы и растения'],['mushrooms','🍄 Грибы'],
+                      ['fatty_acids','🐟 Липидные'],['herbs','🌿 Травы/растения'],['mushrooms','🍄 Грибы'],
                       ['peptides','🧬 Пептиды'],['hormones','⚖️ Гормоны'],['enzymes','⚙️ Ферменты'],
                       ['probiotics','🦠 Пробиотики'],['electrolytes','⚡ Электролиты'],
                       ['antioxidants','🛡️ Антиоксиданты'],['polyphenols','🫐 Полифенолы'],
                       ['nootropics','🧠 Ноотропы'],['adaptogens','🌿 Адаптогены'],
-                      ['antiaging','🕰 Антивозраст'],['antimicrobial','🦠 Антимикробные'],
-                      ['other','📦 Другое'],
+                      ['antiaging','🕰 Антивозраст'],['immune','🛡️ Иммунитет'],
+                      ['gi','🫃 ЖКТ'],['liver','🫁 Защита печени'],
+                      ['cardio','❤️ Сердце/сосуды'],['joints','🦴 Суставы'],
+                      ['antimicrobial','🦠 Антимикробные'],['other','📦 Другое'],
                     ].filter(([k]) => k === '' || groupedSubstances.some(g => g.cat === k)).map(([k,l]) => (
                       <button key={k} onClick={() => setCatalogTypeFilter(k)} style={{
                         padding:'7px 14px', borderRadius:18, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
