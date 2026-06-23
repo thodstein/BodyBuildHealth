@@ -1063,7 +1063,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [systemFilter, setSystemFilter] = useState<string>('all');
   const [supportClassFilter, setSupportClassFilter] = useState<string>('all');
   const [supportTierFilter, setSupportTierFilter] = useState<string>('all');
-  const [catalogTypeFilter, setCatalogTypeFilter] = useState<string>('');
   const [supportLevel, setSupportLevel] = useState<'basic' | 'mid' | 'max' | 'boost'>('mid');
   const [manualLevelSelected, setManualLevelSelected] = useState(false);
   const [boostEnabled, setBoostEnabled] = useState(false);
@@ -3352,32 +3351,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 )}
                 {/* Complexes tab removed — all substances now in type/organ/tier views */}
                 {(catalogSubTab === 'type' || !catalogSubTab) && (
-                /* По типам (default) */
-                <div>
-                  {/* Type sub-tabs */}
-                  <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                    {[['','🔍 Все'],
-                      ['vitamins','💊 Витамины'],['minerals','🧂 Минералы'],['amino_acids','🧬 Аминокислоты'],
-                      ['fatty_acids','🐟 Липидные'],['herbs','🌿 Травы/растения'],['mushrooms','🍄 Грибы'],
-                      ['peptides','🧬 Пептиды'],['hormones','⚖️ Гормоны'],['enzymes','⚙️ Ферменты'],
-                      ['probiotics','🦠 Пробиотики'],['electrolytes','⚡ Электролиты'],
-                      ['antioxidants','🛡️ Антиоксиданты'],['polyphenols','🫐 Полифенолы'],
-                      ['nootropics','🧠 Ноотропы'],['adaptogens','🌿 Адаптогены'],
-                      ['antiaging','🕰 Антивозраст'],['immune','🛡️ Иммунитет'],
-                      ['gi','🫃 ЖКТ'],['liver','🫁 Защита печени'],
-                      ['cardio','❤️ Сердце/сосуды'],['joints','🦴 Суставы'],
-                      ['antimicrobial','🦠 Антимикробные'],['other','📦 Другое'],
-                    ].filter(([k]) => k === '' || groupedSubstances.some(g => g.cat === k)).map(([k,l]) => (
-                      <button key={k} onClick={() => setCatalogTypeFilter(k)} style={{
-                        padding:'7px 14px', borderRadius:18, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
-                        background: catalogTypeFilter === k ? 'var(--accent)' : 'var(--bg-secondary)',
-                        color: catalogTypeFilter === k ? '#000' : 'var(--text-dim)',
-                        border: `1px solid ${catalogTypeFilter === k ? 'var(--accent)' : 'var(--border)'}`,
-                      }}>{l}</button>
-                    ))}
-                  </div>
+                /* По типам (default) — сортировка по типу вещества */
                 <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                  {(groupedSubstances||[]).filter(g => !catalogTypeFilter || g.cat === catalogTypeFilter).map(group => {
+                  {(groupedSubstances||[]).map(group => {
                     const catInfo = getCategoryInfo(group.cat);
                     const isExpanded = expandedCategories[group.cat] ?? (group.count <= 5);
                     return (
@@ -3553,7 +3529,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     );
                   })}
                   {(groupedSubstances||[]).length === 0 && <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:11 }}>Ничего не найдено</div>}
-                </div>
                 </div>
                 )}
               </div>
