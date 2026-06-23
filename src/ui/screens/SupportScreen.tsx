@@ -3711,17 +3711,26 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                         </div>
                                       )}
                                       {i.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:1 }}>{i.notes}</div>}
-                                          {(() => {
-                                            const catA = SUPPORT_CATALOG_DATA[i.substanceA as string];
-                                            const catB = SUPPORT_CATALOG_DATA[i.substanceB as string];
-                                            const parts: string[] = [];
-                                            if (catA?.contraindications?.length) parts.push(`${aName}: противопоказания — ${catA.contraindications.slice(0,3).join(', ')}`);
-                                            if (catB?.contraindications?.length) parts.push(`${bName}: противопоказания — ${catB.contraindications.slice(0,3).join(', ')}`);
-                                            if (catA?.sideEffects?.length) parts.push(`${aName}: побочные — ${catA.sideEffects.slice(0,2).join(', ')}`);
-                                            if (catB?.sideEffects?.length) parts.push(`${bName}: побочные — ${catB.sideEffects.slice(0,2).join(', ')}`);
-                                            if (parts.length === 0) return null;
-                                            return <div style={{ marginTop:2, fontSize:7, color:'#f59e0b', lineHeight:1.2 }}>📋 Особые указания: {parts.join('; ')}</div>;
-                                          })()}
+                                           {(() => {
+                                             const catA = SUPPORT_CATALOG_DATA[i.substanceA as string];
+                                             const catB = SUPPORT_CATALOG_DATA[i.substanceB as string];
+                                             const entries: {label:string,items:string[],color:string}[] = [];
+                                             if (catA?.contraindications?.length) entries.push({label:`Противопоказания ${aName}`,items:catA.contraindications.slice(0,5),color:'#ef4444'});
+                                             if (catB?.contraindications?.length) entries.push({label:`Противопоказания ${bName}`,items:catB.contraindications.slice(0,5),color:'#ef4444'});
+                                             if (catA?.sideEffects?.length) entries.push({label:`Побочные ${aName}`,items:catA.sideEffects.slice(0,4),color:'#f59e0b'});
+                                             if (catB?.sideEffects?.length) entries.push({label:`Побочные ${bName}`,items:catB.sideEffects.slice(0,4),color:'#f59e0b'});
+                                             if (catA?.dosage) entries.push({label:`Дозировка ${aName}`,items:[`${catA.dosage.mg}${catA.dosage.mg>=1000?'г':'мг'} · ${catA.dosage.timing||''}${catA.dosage.form?' · '+catA.dosage.form:''}`],color:'#60a5fa'});
+                                             if (catB?.dosage) entries.push({label:`Дозировка ${bName}`,items:[`${catB.dosage.mg}${catB.dosage.mg>=1000?'г':'мг'} · ${catB.dosage.timing||''}${catB.dosage.form?' · '+catB.dosage.form:''}`],color:'#60a5fa'});
+                                             if (entries.length === 0) return null;
+                                             return <div style={{ marginTop:3, display:'flex', flexDirection:'column', gap:1 }}>
+                                               <div style={{ fontSize:7, color:'#f59e0b', fontWeight:600, marginBottom:1 }}>📋 Особые указания:</div>
+                                               {entries.map((e,ei)=>(
+                                                 <div key={ei} style={{ fontSize:7, color:'rgba(255,255,255,0.65)', lineHeight:1.3, padding:'1px 0' }}>
+                                                   <span style={{ color:e.color, fontWeight:600 }}>{e.label}:</span> {e.items.join(', ')}
+                                                 </div>
+                                               ))}
+                                             </div>;
+                                           })()}
                                     </div>
                                   );
                                 })}
