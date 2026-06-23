@@ -1838,16 +1838,22 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   
   // Group catalogSubstances by primary category for catalog
   const catalogSubstances = useMemo(() => {
-    return Object.values(SUPPORT_CATALOG_DATA).map(entry => ({
-      id: entry.id,
-      name: entry.nameRu || entry.name || entry.id,
-      categories: entry.category || [],
-      mechanisms: entry.mechanisms || [],
-      organs: entry.organs || [],
-      description: entry.description || '',
-      type: (entry.category||[])[0] || 'supplement',
-      deficiency: '',
-    })) as SupportSubstance[];
+    // Build a quick lookup from ALL_SUBSTANCES for enrichment
+    const allSubsMap = new Map<string, SupportSubstance>();
+    for (const s of ALL_SUBSTANCES) allSubsMap.set(s.id.toLowerCase(), s);
+    return Object.values(SUPPORT_CATALOG_DATA).map(entry => {
+      const allSub = allSubsMap.get((entry.id||'').toLowerCase());
+      return {
+        id: entry.id,
+        name: entry.nameRu || allSub?.name || entry.name || entry.id,
+        categories: (entry.category && entry.category.length > 0) ? entry.category : (allSub?.categories || []),
+        mechanisms: (entry.mechanisms && entry.mechanisms.length > 0) ? entry.mechanisms : (allSub?.mechanisms || []),
+        organs: (entry.organs && entry.organs.length > 0) ? entry.organs : (allSub?.organs || []),
+        description: entry.description || allSub?.description || '',
+        type: (entry.category||[])[0] || allSub?.type || 'supplement',
+        deficiency: allSub?.deficiency || '',
+      };
+    }) as SupportSubstance[];
   }, []);
 
   // Shared normCat — normalize category names to group keys
@@ -4572,10 +4578,20 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                   ))}
                                 </div>
                               </div>
-                              {isExpanded && (
-                                <div style={{ padding:'0 10px 10px', borderTop:'1px solid var(--border)' }}>
-                                  {stack.description && <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)', lineHeight:1.4, marginTop:6, marginBottom:6 }}>{stack.description}</div>}
-                                  <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}>Состав и механизмы:</div>
+                               {isExpanded && (
+                                 <div style={{ padding:'0 10px 10px', borderTop:'1px solid var(--border)' }}>
+                                   {stack.description && <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)', lineHeight:1.4, marginTop:6, marginBottom:6 }}>{stack.description}</div>}
+                                   {detail && detail.mechs && detail.mechs.length > 0 && (
+                                     <div style={{ marginBottom:4 }}>
+                                       <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>⚙️ Механизмы стека ({detail.mechs.length}):</div>
+                                       <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
+                                         {detail.mechs.slice(0,20).map((m:string,i:number)=>(
+                                           <span key={i} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.1)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>
+                                         ))}
+                                       </div>
+                                     </div>
+                                   )}
+                                   <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}>Состав:</div>
                                   {stack.substances.map(sid => {
                                     const sub = catalogSubstances.find(x => x.id === sid);
                                     return (

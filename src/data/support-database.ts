@@ -4976,7 +4976,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     ],
     conflicts: [],
     monitoring: [],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: тяжесть в желудке при приёме натощак'],
     dosage: { mg: 10000, timing: 'с едой (мг, гидролизат)', form: 'гидролизат' },
     bestForCourse: true,
@@ -5287,7 +5287,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Тиамин в крови', when: 'Каждые 12 нед', targetRange: '>70 нмоль/л' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: аллергия при в/в введении', 'При высоких дозах — бессонница'],
     dosage: { mg: 100, timing: 'утро с едой', form: 'тиамин или бенфотиамин' },
     bestForCourse: false,
@@ -5313,7 +5313,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Рибофлавин в моче', when: 'Каждые 12 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Окрашивание мочи в жёлтый', 'Редко: зуд кожи'],
     dosage: { mg: 10, timing: 'с едой', form: 'рибофлавин или R-5-P' },
     bestForCourse: false,
@@ -5368,7 +5368,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Кортизол утром', when: 'Каждые 8 нед', targetRange: '6-23 мкг/дл' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: диарея при высоких дозах'],
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'пантотенат или пантетин' },
     bestForCourse: false,
@@ -5394,7 +5394,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Биотин в крови', when: 'Каждые 12 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: акне при высоких дозах', 'Мешает лабораторным тестам'],
     dosage: { mg: 5, timing: 'с едой', form: 'биотин капсулы' },
     bestForCourse: false,
@@ -5484,7 +5484,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Гомоцистеин', when: 'Каждые 8 нед', targetRange: '<15 мкмоль/л' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Окрашивание мочи (В2)', 'Тошнота натощак', 'При высоких дозах B6 — нейропатия'],
     dosage: { mg: 50, timing: 'утро с едой', form: 'капсулы B-50 или B-100' },
     bestForCourse: true,
@@ -5743,7 +5743,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
       { what: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<50 Ед/л' },
       { what: 'УЗИ печени', when: 'Каждые 12 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Диарея при высоких дозах', 'Редко: тошнота'],
     dosage: { mg: 1200, timing: 'с едой 2x/д', form: 'PPC (полиенилфосфатидилхолин) или лецитин' },
     bestForCourse: true,
@@ -5856,7 +5856,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Свободный тестостерон', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: тошнота при высоких дозах'],
     dosage: { mg: 3, timing: 'с едой', form: 'бор цитрат или глицинат' },
     bestForCourse: false,
@@ -5884,7 +5884,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Костная плотность', when: 'Каждые 12 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: диарея при высоких дозах'],
     dosage: { mg: 10, timing: 'с едой', form: 'ортокремниевая кислота или экстракт хвоща' },
     bestForCourse: false,
@@ -5982,7 +5982,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Марганец в крови', when: 'Каждые 12 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: нейротоксичность при высоких дозах'],
     dosage: { mg: 5, timing: 'с едой', form: 'марганца глицинат' },
     bestForCourse: false,
@@ -6152,7 +6152,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Микроэлементы в волосах', when: 'Каждые 12 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Гемохроматоз', 'Почечная недостаточность'],
     sideEffects: ['Редко: тошнота натощак'],
     dosage: { mg: 1, timing: 'с едой', form: 'хелатный комплекс микроэлементов' },
     bestForCourse: false,
@@ -6180,7 +6180,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
       { what: 'Глюкоза натощак', when: 'Каждые 8 нед', targetRange: '<6.1 ммоль/л' },
       { what: 'Инсулин натощак', when: 'Каждые 8 нед', targetRange: '<12 мкЕд/мл' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: тошнота', 'Головная боль при высоких дозах'],
     dosage: { mg: 0.2, timing: 'с едой', form: 'хрома пиколинат или хелат' },
     bestForCourse: false,
@@ -6210,7 +6210,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Общий минеральный статус', when: 'Каждые 12 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Гипервитаминоз', 'Аллергия на компоненты'],
     sideEffects: ['Металлический привкус', 'Редко: тошнота'],
     dosage: { mg: 15, timing: 'натощак', form: 'коллоидная жидкая форма' },
     bestForCourse: false,
@@ -6268,7 +6268,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Кожные покровы', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: диарея', 'Рыбная отрыжка'],
     dosage: { mg: 500, timing: 'с едой', form: 'масло энотеры или бурачника' },
     bestForCourse: false,
@@ -6295,7 +6295,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Кожа/слизистые', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: диарея'],
     dosage: { mg: 250, timing: 'с едой', form: 'масло облепихи или пальмитолеат' },
     bestForCourse: false,
@@ -6325,7 +6325,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед', targetRange: 'ЛПНП<3.0' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: диарея при избытке'],
     dosage: { mg: 1, timing: 'с едой', form: 'оливковое масло или авокадо' },
     bestForCourse: false,
@@ -6353,7 +6353,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
       { what: 'Жировая масса', when: 'Каждые 4 нед' },
       { what: 'Инсулин натощак', when: 'Каждые 8 нед', targetRange: '<12 мкЕд/мл' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Диарея', 'Тошнота', 'Редко: инсулинорезистентность при высоких дозах'],
     dosage: { mg: 3000, timing: 'с едой 2x/д', form: 'CLA капсулы (т10ц12+ц9т11 изомеры)' },
     bestForCourse: false,
@@ -6410,7 +6410,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Кожа/суставы', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: диарея при высоких дозах'],
     dosage: { mg: 1, timing: 'с едой', form: 'церамиды (экстракт или синтетические)' },
     bestForCourse: false,
@@ -6438,7 +6438,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Калпротектин', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: тошнота', 'Диарея при высоких дозах'],
     dosage: { mg: 1500, timing: 'с едой 2x/д', form: 'бутират натрия или кальция' },
     bestForCourse: false,
@@ -6468,7 +6468,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Качество сна', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: тошнота при высоких дозах'],
     dosage: { mg: 3000, timing: 'на ночь или 2x/д', form: 'глицин порошок или капсулы' },
     bestForCourse: false,
@@ -6495,7 +6495,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Качество сна', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: сонливость при высоких дозах'],
     dosage: { mg: 200, timing: 'на ночь или утром', form: 'Л-теанин капсулы' },
     bestForCourse: false,
@@ -6525,7 +6525,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Тирозин в плазме', when: 'Каждые 12 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Тошнота натощак при высоких дозах'],
     dosage: { mg: 500, timing: 'натощак утром', form: 'Л-тирозин капсулы' },
     bestForCourse: false,
@@ -6621,7 +6621,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Тревожность/сон', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: покалывание кожи', 'Сонливость'],
     dosage: { mg: 500, timing: 'на ночь', form: 'ГАМК капсулы или порошок' },
     bestForCourse: false,
@@ -6675,7 +6675,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Карнозин в мышцах', when: 'Каждые 12 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Парестезия (покалывание кожи)', 'Редко: тошнота'],
     dosage: { mg: 3200, timing: '2x/д с едой', form: 'бета-аланин порошок или капсулы' },
     bestForCourse: false,
@@ -6701,7 +6701,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Артериальное давление', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: тошнота при высоких дозах'],
     dosage: { mg: 6000, timing: 'натощак, 30 мин до тренировки', form: 'Л-цитруллин или цитруллин малат' },
     bestForCourse: false,
@@ -6729,7 +6729,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Артериальное давление', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: тошнота', 'Диарея при высоких дозах'],
     dosage: { mg: 3000, timing: 'натощак или на ночь', form: 'Л-аргинин капсулы или порошок' },
     bestForCourse: false,
@@ -6754,7 +6754,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Настроение/памп', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: тошнота при высоких дозах'],
     dosage: { mg: 1000, timing: 'натощак или 2x/д', form: 'агматин сульфат' },
     bestForCourse: false,
@@ -6783,7 +6783,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Мышечная масса', when: 'Каждые 4 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: тошнота при натощак'],
     dosage: { mg: 10000, timing: 'до или после тренировки', form: 'BCAA порошок (лейцин:изолейцин:валин 2:1:1)' },
     bestForCourse: false,
@@ -6810,7 +6810,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Мышечная масса', when: 'Каждые 4 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: тошнота при натощак'],
     dosage: { mg: 3000, timing: '2x/д с едой', form: 'HMB кальций порошок или капсулы' },
     bestForCourse: false,
@@ -6836,7 +6836,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Глутатион в крови', when: 'Каждые 8 нед', targetRange: '>600 мкмоль/л' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: аллергия при в/в введении'],
     dosage: { mg: 500, timing: 'натощак', form: 'липосомальный глутатион или NAC+витамин С' },
     bestForCourse: false,
@@ -6863,7 +6863,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Мышечная масса', when: 'Каждые 4 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: тошнота натощак'],
     dosage: { mg: 10000, timing: 'до или после тренировки', form: 'EAA порошок' },
     bestForCourse: false,
@@ -6889,7 +6889,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Свободный тестостерон', when: 'Каждые 2 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: головная боль', 'Тошнота'],
     dosage: { mg: 3000, timing: 'утро натощак, курс 12-15 дней', form: 'D-аспарагиновая кислота порошок' },
     bestForCourse: false,
@@ -6944,7 +6944,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Мышечная выносливость', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: покалывание кожи (от бета-аланина)'],
     dosage: { mg: 1000, timing: '2x/д с едой', form: 'карнозин капсулы' },
     bestForCourse: false,
@@ -6969,7 +6969,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Глюкоза натощак', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: тошнота при высоких дозах'],
     dosage: { mg: 2000, timing: 'с едой', form: 'аланин порошок' },
     bestForCourse: false,
@@ -7022,7 +7022,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Кортизол утром', when: 'Каждые 4 нед', targetRange: '6-23 мкг/дл' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: бессонница при приёме вечером'],
     dosage: { mg: 300, timing: 'с едой 2x/д', form: 'фосфатидилсерин из соевого лецитина' },
     bestForCourse: false,
@@ -7166,7 +7166,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Память/фокус', when: 'Субъективно (4-12 нед)' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Тошнота при натощак', 'Разжижение стула'],
     dosage: { mg: 300, timing: 'с едой 2x/д', form: 'экстракт бакопы (50% бакозидов)' },
     bestForCourse: false,
@@ -7192,7 +7192,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Когниция/память', when: 'Субъективно (4-12 нед)' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: аллергия при грибковой непереносимости'],
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт ежовика (50% эринацинов)' },
     bestForCourse: false,
@@ -7220,7 +7220,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'VO2max', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: диарея при высоких дозах'],
     dosage: { mg: 500, timing: 'утро с едой', form: 'экстракт кордицепса (7% кордицепина)' },
     bestForCourse: false,
@@ -7246,7 +7246,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Либидо/энергия', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Метеоризм при начале', 'Редко: бессонница при приёме вечером'],
     dosage: { mg: 1500, timing: 'с едой', form: 'порошок или экстракт маки (желатинизированный)' },
     bestForCourse: false,
@@ -7276,7 +7276,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Кортизол/сахар', when: 'Каждые 4 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: диарея при высоких дозах'],
     dosage: { mg: 400, timing: 'с едой 2x/д', form: 'экстракт туласи (2% урсоловой кислоты)' },
     bestForCourse: false,
@@ -7303,7 +7303,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Когниция/кожа', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: головная боль при высоких дозах'],
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт готу колы' },
     bestForCourse: false,
@@ -7329,7 +7329,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Мышечная масса', when: 'Каждые 4 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: тошнота'],
     dosage: { mg: 400, timing: 'с едой (с белком)', form: 'экдистерон (95%)' },
     bestForCourse: false,
@@ -7357,7 +7357,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Тестостерон общий', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: аллергия'],
     dosage: { mg: 250, timing: 'с едой', form: 'мумиё очищенное или экстракт' },
     bestForCourse: false,
@@ -7383,7 +7383,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: бессонница при приёме вечером'],
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт шизандры (9% схизандринов)' },
     bestForCourse: false,
@@ -7413,7 +7413,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Тошнота/воспаление', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: изжога при высоких дозах'],
     dosage: { mg: 1000, timing: 'с едой', form: 'имбиря экстракт (5% джинджеролов)' },
     bestForCourse: false,
@@ -7442,7 +7442,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Окислительный стресс', when: 'Каждые 12 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: лососёвый оттенок кожи'],
     dosage: { mg: 12, timing: 'с едой (жирорастворимый)', form: 'астаксантин из Haematococcus' },
     bestForCourse: false,
@@ -7560,7 +7560,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Окислительный стресс', when: 'Каждые 12 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Тошнота при натощак'],
     dosage: { mg: 20, timing: 'натощак или с едой', form: 'экстракт проростков брокколи' },
     bestForCourse: false,
@@ -7838,7 +7838,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Сон (соно-графия)', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: покраснение в месте инъекции'],
     dosage: { mg: 1, timing: 'на ночь п/к', form: 'DSIP 1 мг' },
     bestForCourse: false,
@@ -7863,7 +7863,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: покраснение в месте инъекции'],
     dosage: { mg: 0.001, timing: '1x/д п/к', form: 'P21 1 мг' },
     bestForCourse: false,
@@ -7915,7 +7915,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: покраснение в месте инъекции'],
     dosage: { mg: 5, timing: '1x/д п/к', form: 'Хьюманин 5 мг' },
     bestForCourse: false,
@@ -8347,7 +8347,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Кожа/суставы', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: аллергия'],
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'эластин пептиды' },
     bestForCourse: false,
@@ -8425,7 +8425,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'L-Серин 500 мг' },
     bestForCourse: false,
@@ -8451,7 +8451,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Кожа/суставы', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'L-Пролин 500 мг' },
     bestForCourse: false,
@@ -8476,7 +8476,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Аммиак', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'L-Аспартат 500 мг' },
     bestForCourse: false,
@@ -8503,7 +8503,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Аммиак', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 500, timing: 'натощак на ночь', form: 'L-Орнитин 500 мг' },
     bestForCourse: false,
@@ -8528,7 +8528,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Общий белок', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'L-Треонин 500 мг' },
     bestForCourse: false,
@@ -8614,7 +8614,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Общий белок', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 5000, timing: 'с едой 2x/д', form: 'Аминокислотный комплекс 5 г' },
     bestForCourse: false,
@@ -8666,7 +8666,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Аммиак', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'Альфа-кетоглутарат 1 г' },
     bestForCourse: false,
@@ -8885,7 +8885,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Офтальмолог', when: 'Каждые 12 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: кожный зуд при высоких дозах'],
     dosage: { mg: 20, timing: 'с едой 1x/д', form: 'лютеин 20 мг' },
     bestForCourse: false,
@@ -8947,7 +8947,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Офтальмолог', when: 'Каждые 12 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: аллергия'],
     dosage: { mg: 200, timing: 'с едой 1x/д', form: 'антоцианы экстракт 200 мг' },
     bestForCourse: false,
@@ -9029,7 +9029,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: аллергия на какао'],
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'какао-флаванолы 500 мг' },
     bestForCourse: false,
@@ -9081,7 +9081,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Окислительный стресс', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Приём химиотерапии (без разрешения врача)', 'Беременность'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 1, timing: 'с едой 1x/д', form: 'антиоксидантный комплекс капсула' },
     bestForCourse: false,
@@ -9135,7 +9135,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 250, timing: 'с едой 1x/д', form: 'экстракт оливы 250 мг' },
     bestForCourse: false,
@@ -9170,7 +9170,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'полифенольный комплекс 500 мг' },
     bestForCourse: false,
@@ -9198,7 +9198,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: аллергия на цитрусовые'],
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'цитрусовые биофлавоноиды 500 мг' },
     bestForCourse: false,
@@ -9225,7 +9225,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'флавоноиды комплекс 500 мг' },
     bestForCourse: false,
@@ -9251,7 +9251,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'АЛТ/АСТ', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 250, timing: 'с едой 1x/д', form: 'эллаговая кислота 250 мг' },
     bestForCourse: false,
@@ -9277,7 +9277,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'КФК', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 150, timing: 'с едой 2x/д', form: 'урсоловая кислота 150 мг' },
     bestForCourse: false,
@@ -9411,7 +9411,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Окислительный стресс', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: аллергия'],
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'экстракт мангостина 500 мг' },
     bestForCourse: false,
@@ -9491,7 +9491,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Глюкоза натощак', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 100, timing: 'с едой 1x/д', form: 'нобилетин 100 мг' },
     bestForCourse: false,
@@ -9568,7 +9568,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: аллергия'],
     dosage: { mg: 100, timing: 'с едой 1x/д', form: 'таксифолин 100 мг' },
     bestForCourse: false,
@@ -9621,7 +9621,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: аллергия'],
     dosage: { mg: 200, timing: 'с едой 1x/д', form: 'экстракт розмарина 200 мг' },
     bestForCourse: false,
@@ -9674,7 +9674,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'ПСА', when: 'Каждые 12 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Аллергия на рыбу', 'Приём антикоагулянтов'],
     sideEffects: ['Редко: аллергия'],
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'экстракт граната 500 мг' },
     bestForCourse: false,
@@ -9832,7 +9832,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: бессонница при вечернем приёме'],
     dosage: { mg: 800, timing: 'с едой 2x/д', form: 'оксирацетам 800 мг' },
     bestForCourse: false,
@@ -9882,7 +9882,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: головная боль'],
     dosage: { mg: 50, timing: 'натощак 2x/д', form: 'фасорацетам 50 мг' },
     bestForCourse: false,
@@ -9907,7 +9907,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: головная боль'],
     dosage: { mg: 20, timing: 'натощак 2x/д', form: 'колурацетам 20 мг' },
     bestForCourse: false,
@@ -9959,7 +9959,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: головная боль при начале'],
     dosage: { mg: 250, timing: 'с едой 2x/д', form: 'цитиколин 250 мг' },
     bestForCourse: false,
@@ -9985,7 +9985,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: головная боль при начале'],
     dosage: { mg: 300, timing: 'с едой 2x/д', form: 'Альфа-ГФХ 300 мг' },
     bestForCourse: false,
@@ -10573,7 +10573,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Биохимия крови', when: 'Каждые 4 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Индивидуально'],
     dosage: { mg: 1, timing: 'индивидуально', form: 'фарма-комплекс' },
     bestForCourse: false,
@@ -11219,7 +11219,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Микрофлора', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: вздутие при начале'],
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'постбиотик комплекс 500 мг' },
     bestForCourse: false,
@@ -11271,7 +11271,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Глюкоза натощак', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Вздутие при начале'],
     dosage: { mg: 20000, timing: 'с едой 1x/д', form: 'резистентный крахмал 20 г' },
     bestForCourse: false,
@@ -11299,7 +11299,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: вздутие'],
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'бета-глюкан 500 мг' },
     bestForCourse: false,
@@ -11354,7 +11354,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Микрофлора', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: вздутие при начале'],
     dosage: { mg: 1000, timing: 'с едой 1x/д', form: 'HMO пребиотик 1 г' },
     bestForCourse: false,
@@ -11379,7 +11379,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'КФК', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 1000, timing: 'с едой 1x/д', form: 'лактат натрия 1000 мг' },
     bestForCourse: false,
@@ -11433,7 +11433,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Гастроскопия', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Острый панкреатит', 'Язвенная болезнь'],
     sideEffects: ['Редко: тошнота'],
     dosage: { mg: 75, timing: 'с едой 2x/д', form: 'цинк-карнозин 75 мг' },
     bestForCourse: false,
@@ -11512,7 +11512,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Кортизол утренний', when: 'Каждые 8 нед', targetRange: '6-23 мкг/дл' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Не препарат — маркер для контроля'],
     dosage: { mg: 0, timing: 'контроль маркера', form: 'кортизол сыворотки (анализ)' },
     bestForCourse: false,
@@ -11537,7 +11537,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Адреналин', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Не препарат — маркер для контроля'],
     dosage: { mg: 0, timing: 'контроль маркера', form: 'адреналин (анализ)' },
     bestForCourse: false,
@@ -11560,7 +11560,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Эндокринный профиль', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Не препарат — маркер для контроля'],
     dosage: { mg: 0, timing: 'контроль маркера', form: 'эндокринный профиль (анализ)' },
     bestForCourse: false,
@@ -11585,7 +11585,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'ДГЭА-S', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Не препарат — маркер для контроля'],
     dosage: { mg: 0, timing: 'контроль маркера', form: 'нейростероидный профиль (анализ)' },
     bestForCourse: false,
@@ -11612,7 +11612,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Глюкагон', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Не препарат — маркер для контроля'],
     dosage: { mg: 0, timing: 'контроль маркера', form: 'глюкагон (анализ)' },
     bestForCourse: false,
@@ -11820,7 +11820,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Эстрадиол', when: 'Каждые 4 нед', targetRange: '10-40 пг/мл (муж.)' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Не препарат — маркер для контроля'],
     dosage: { mg: 0, timing: 'контроль маркера', form: 'эстрадиол (анализ)' },
     bestForCourse: false,
@@ -11848,7 +11848,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Прогестерон', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Не препарат — маркер для контроля'],
     dosage: { mg: 0, timing: 'контроль маркера', form: 'прогестерон (анализ)' },
     bestForCourse: false,
@@ -11925,7 +11925,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Настроение', when: 'Субъективно' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: седация'],
     dosage: { mg: 0, timing: 'поддержка системы', form: 'эндоканнабиноидная поддержка' },
     bestForCourse: false,
@@ -11953,7 +11953,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Холестерин', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Вздутие при высоких дозах'],
     dosage: { mg: 5000, timing: 'с едой 2x/д', form: 'пектин 5 г' },
     bestForCourse: false,
@@ -12033,7 +12033,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 1, timing: 'с едой 1x/д', form: 'иммунный комплекс 1 капсула' },
     bestForCourse: false,
@@ -12236,7 +12236,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     monitoring: [
       { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
     ],
-    contraindications: [],
+    contraindications: ['Индивидуальная непереносимость', 'Беременность и лактация'],
     sideEffects: ['Редко: желудочный дискомфорт'],
     dosage: { mg: 1, timing: 'с едой 1x/д', form: 'брендовый комплекс 1 капсула' },
     bestForCourse: false,
