@@ -1960,6 +1960,64 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       .sort((a, b) => b.count - a.count);
   }, [searchQuery, supportTierFilter, catalogSubstances]);
 
+  // Type-only grouping for "По типам" tab (without organ/function groups)
+  const TYPE_GROUPS = new Set(['vitamins','minerals','amino_acids','fatty_acids','herbs','mushrooms','peptides','hormones','enzymes','probiotics','electrolytes','polyphenols','antimicrobial','nootropics','adaptogens','antioxidants','supplement']);
+  const ORGAN_TO_TYPE: Record<string, string> = {
+    antioxidant:'antioxidants',mitochondrial:'antioxidants',cardioprotector:'antioxidants',
+    eye_protector:'antioxidants',anti_aging:'antioxidants',antiinflammatory:'antioxidants',
+    anti_inflammatory:'antioxidants',skin:'antioxidants',beauty:'antioxidants',
+    neuroprotector:'nootropics',anxiolytic:'nootropics',antidepressant:'nootropics',
+    immunomodulator:'supplement',metabolic:'supplement',marker:'supplement',
+    anticoagulant:'supplement',thyroid:'supplement',urinary_protector:'supplement',
+    hematologic:'supplement',recovery:'supplement',bone:'supplement',
+    nsaid:'supplement',electrolyte:'electrolytes',lipid:'fatty_acids',
+    multivitamin:'vitamins',gut:'probiotics',gastrointestinal:'probiotics',
+    joint:'supplement',hepatoprotector:'herbs',immune:'antimicrobial',
+  };
+  const findTypeKey = (sub: SupportSubstance): string => {
+    for (const cat of (sub.categories||[])) {
+      const n = normCat(cat);
+      if (TYPE_GROUPS.has(n)) return n;
+    }
+    const nt = normCat(sub.type);
+    if (TYPE_GROUPS.has(nt)) return nt;
+    for (const cat of (sub.categories||[])) {
+      const raw = cat.toLowerCase().replace(/[^a-z0-9_]/g,'');
+      if (ORGAN_TO_TYPE[raw]) return ORGAN_TO_TYPE[raw];
+    }
+    if (ORGAN_TO_TYPE[sub.type]) return ORGAN_TO_TYPE[sub.type];
+    return 'supplement';
+  };
+  const typeGroupedSubstances = useMemo(() => {
+    const all = groupedSubstances.flatMap(g => g.items);
+    const groups: Record<string, SupportSubstance[]> = {};
+    for (const sub of all) {
+      const k = findTypeKey(sub);
+      if (!groups[k]) groups[k] = [];
+      groups[k].push(sub);
+    }
+    return Object.entries(groups).map(([cat, items]) => {
+      const classMap: Record<string, SupportSubstance[]> = {};
+      for (const sub of items) {
+        const searchStr = ((sub.name||'') + ' ' + (sub.id||'')).toLowerCase();
+        for (const [key, info] of Object.entries(CLASS_BASE_NAMES)) {
+          if (info.match.test(searchStr)) {
+            if (!classMap[key]) classMap[key] = [];
+            classMap[key].push(sub);
+            break;
+          }
+        }
+      }
+      const classBadges = Object.entries(classMap)
+        .map(([clsKey, clsItems]) => ({ clsKey, label: CLASS_BASE_NAMES[clsKey]?.label || clsKey, emoji: CLASS_BASE_NAMES[clsKey]?.emoji || '📦', count: clsItems.length }))
+        .sort((a, b) => b.count - a.count);
+      const classItems = Object.fromEntries(
+        Object.entries(classMap).filter(([, clsItems]) => clsItems.length >= 3)
+      );
+      return { cat, items, count: items.length, classBadges, classItems };
+    }).sort((a, b) => b.count - a.count);
+  }, [groupedSubstances]);
+
   // Organ-based grouping for catalog sub-tab
   // Phase 5.12: Comprehensive 16-category organ mapping
   const ORGAN_CATEGORY_MAP: Record<string, { key: string; label: string; emoji: string }> = {
@@ -3351,9 +3409,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 )}
                 {/* Complexes tab removed — all substances now in type/organ/tier views */}
                 {(catalogSubTab === 'type' || !catalogSubTab) && (
-                /* По типам (default) — сортировка по типу вещества */
+                /* По типам — все 280 препаратов, сгруппированы по типу (без органов/функций) */
                 <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                  {(groupedSubstances||[]).map(group => {
+                  {(typeGroupedSubstances||[]).map(group => {
                     const catInfo = getCategoryInfo(group.cat);
                     const isExpanded = expandedCategories[group.cat] ?? (group.count <= 5);
                     return (
