@@ -1838,22 +1838,49 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   
   // Group catalogSubstances by primary category for catalog
   const catalogSubstances = useMemo(() => {
-    // Build a quick lookup from ALL_SUBSTANCES for enrichment
     const allSubsMap = new Map<string, SupportSubstance>();
     for (const s of ALL_SUBSTANCES) allSubsMap.set(s.id.toLowerCase(), s);
-    // Type-priority categories: prefer actual substance type over functional/organ category
     const TYPE_ORDER = new Set([
       'vitamin','mineral','amino_acid','herb','hormone','peptide','enzyme','probiotic',
       'fatty_acid','mushroom','electrolyte','antioxidant','polyphenol','nootropic','adaptogen'
     ]);
+    // Fallback: functional categories → type groups (for categories that don't match TYPE_ORDER)
+    const FUNC_TO_TYPE: Record<string,string> = {
+      gastrointestinal:'probiotics',gut:'probiotics',digestive:'enzymes',
+      hepatoprotector:'antioxidants',liver:'antioxidants',
+      cardioprotector:'antioxidants',cardio:'antioxidants',
+      joint:'amino_acids',joints:'amino_acids',bone:'minerals',
+      immunomodulator:'adaptogens',immune:'adaptogens',
+      antimicrobial:'herbs',antibacterial:'herbs',antibiotic:'herbs',
+      anti_inflammatory:'antioxidants',nsaid:'herbs',
+      anxiolytic:'adaptogens',antidepressant:'adaptogens',mood:'adaptogens',
+      analgesic:'herbs',anti_spasmodic:'herbs',muscle_relaxant:'herbs',
+      respiratory:'herbs',lung:'herbs',pulmonary:'herbs',
+      nephroprotective:'antioxidants',renal:'antioxidants',kidney:'antioxidants',
+      neuroprotector:'nootropics',neuro:'nootropics',brain:'nootropics',
+      eye:'antioxidants',eye_protector:'vitamins',
+      skin:'vitamins',hair:'vitamins',beauty:'vitamins',
+      thyroid:'hormones',endocrine:'hormones',
+      blood:'vitamins',hematologic:'vitamins',anticoagulant:'herbs',
+      metabolic:'peptides',glucose:'herbs',insulin:'herbs',
+      electrolyte:'electrolytes',electrolytes:'electrolytes',
+      recovery:'amino_acids',muscle:'amino_acids',
+      no_organ:'other',other:'other',supplement:'other',marker:'other',
+    };
     return Object.values(SUPPORT_CATALOG_DATA).map(entry => {
       const allSub = allSubsMap.get((entry.id||'').toLowerCase());
       const cats = (entry.category && entry.category.length > 0) ? entry.category : (allSub?.categories || []);
-      // Pick best type: first match from TYPE_ORDER, else first category, else allSub.type
       let bestType = '';
       for (const c of cats) {
         const normed = (c||'').toLowerCase().replace(/[^a-z0-9_]/g,'');
         if (TYPE_ORDER.has(normed)) { bestType = c; break; }
+      }
+      if (!bestType) {
+        // Try fallback mapping for functional categories
+        for (const c of cats) {
+          const normed = (c||'').toLowerCase().replace(/[^a-z0-9_]/g,'');
+          if (FUNC_TO_TYPE[normed]) { bestType = FUNC_TO_TYPE[normed]; break; }
+        }
       }
       if (!bestType) bestType = cats[0] || '';
       return {
