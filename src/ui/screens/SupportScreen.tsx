@@ -5911,7 +5911,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             </div>
           )}
 
-          {/* Content: Joints → inline joints */}
+          {/* Content: Joints → full protocol */}
           {protocolTab === 'joints' && (
             <div style={{ paddingBottom: 70 }}>
               <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
@@ -5921,35 +5921,99 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>История травм (0-5)</div><input type="range" min="0" max="5" value={injuryHistory} onChange={e => setInjuryHistory(Number(e.target.value))} style={{ width:'100%' }} /><div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right' }}>{injuryHistory}/5</div></div>
                   <div><div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>Тренировочная нагрузка (0-5)</div><input type="range" min="0" max="5" value={trainLoad} onChange={e => setTrainLoad(Number(e.target.value))} style={{ width:'100%' }} /><div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right' }}>{trainLoad}/5</div></div>
                 </div>
-                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)', marginBottom:8 }}>
                   <span style={{ fontSize:20 }}>🦴</span>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:9, color:'var(--text-dim)' }}>Риск проблем с суставами</div>
-                    <div style={{ fontSize:16, fontWeight:800, color: jointScore > 70 ? '#ef4444' : jointScore > 40 ? '#f59e0b' : '#22c55e' }}>{jointScore}%</div>
-                  </div>
+                  <div style={{ flex:1 }}><div style={{ fontSize:9, color:'var(--text-dim)' }}>Риск проблем с суставами</div><div style={{ fontSize:16, fontWeight:800, color: jointScore > 70 ? '#ef4444' : jointScore > 40 ? '#f59e0b' : '#22c55e' }}>{jointScore}%</div></div>
                   <div style={{ fontSize:10, color:'var(--text-dim)' }}>{jointScore > 70 ? '🔴 Высокий' : jointScore > 40 ? '🟡 Средний' : '🟢 Низкий'}</div>
                 </div>
-                <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:8, lineHeight:1.4, padding:'6px 8px', background:'rgba(245,158,11,0.06)', borderRadius:6, border:'1px solid rgba(245,158,11,0.12)' }}>
-                  📋 Протокол: Глюкозамин 1500мг + Хондроитин 1200мг + MSM 3000мг + Коллаген II типа 10г + Босвеллия 500мг + BPC-157 500мкг/д. Курс 8-12 недель.
+                {/* Multi-tier protocol */}
+                <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:6 }}>💊 Протокол поддержки суставов</div>
+                <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8, lineHeight:1.3, padding:'6px 8px', background:'rgba(245,158,11,0.04)', borderRadius:6, border:'1px solid rgba(245,158,11,0.1)' }}>
+                  📋 Базовый: Глюкозамин 1500мг + Хондроитин 1200мг + MSM 3000мг + Коллаген II типа 10г + Босвеллия 500мг. Курс 8-12 недель.
                 </div>
+                {[
+                  { tier:'ЯДРО', label:'Обязательно при нагрузках', color:'#22c55e', items:[
+                    { name:'Глюкозамин + Хондроитин', dose:'1500+1200 мг/день', note:'Строительные блоки хряща, стимуляция синтеза протеогликанов' },
+                    { name:'MSM (метилсульфонилметан)', dose:'2-4 г/день', note:'Органическая сера, противовоспалительное, снижение оксидативного стресса' },
+                    { name:'Коллаген II типа + Витамин C', dose:'10 г + 1 г/день', note:'Субстрат для синтеза коллагена хряща, витамин C как кофактор' },
+                  ]},
+                  { tier:'СТАНДАРТ', label:'При болях и дискомфорте', color:'#f59e0b', items:[
+                    { name:'Куркумин 95% + пиперин', dose:'500-1000 мг/день', note:'Ингибирование COX-2, NF-kB, снижение IL-1beta, TNF-alpha' },
+                    { name:'Босвеллия (AKBA 65%)', dose:'300-500 мг/день', note:'Ингибирование 5-липоксигеназы, снижение лейкотриенов' },
+                    { name:'Омега-3 (EPA+DHA)', dose:'3-5 г/день', note:'Резолвины, протектины — активное разрешение воспаления' },
+                  ]},
+                  { tier:'ПРОДВИНУТЫЙ', label:'При травмах и высоком риске', color:'#f97316', items:[
+                    { name:'Гиалуроновая кислота', dose:'200-300 мг/день', note:'Синовиальная жидкость, вязкоэластичность, смазка суставов' },
+                    { name:'BPC-157', dose:'250-500 мкг/день', note:'Заживление сухожилий/связок, ангиогенез, модуляция коллагена' },
+                    { name:'TB-500', dose:'2.5-5 мг/нед', note:'Полимеризация актина, миграция клеток, регенерация' },
+                  ]},
+                ].map(t => (
+                  <div key={t.tier} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:`${t.color}0a`, border:`1px solid ${t.color}22` }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                      <span style={{ fontSize:8, fontWeight:800, padding:'1px 6px', borderRadius:4, background:`${t.color}22`, color:t.color }}>{t.tier}</span>
+                      <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{t.label}</span>
+                    </div>
+                    {t.items.map(it => (
+                      <div key={it.name} style={{ display:'flex', gap:4, padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
+                        <span style={{ fontSize:8, color:'var(--text-light)', fontWeight:600, minWidth:100 }}>{it.name}</span>
+                        <span style={{ fontSize:8, color:t.color, minWidth:90 }}>{it.dose}</span>
+                        <span style={{ fontSize:7, color:'var(--text-dim)', flex:1, lineHeight:1.2 }}>{it.note}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* Content: Acne → inline acne */}
+          {/* Content: Acne → full protocol */}
           {protocolTab === 'acne' && (
             <div style={{ paddingBottom: 70 }}>
               <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:8 }}>🔴 Протокол акне на курсе</div>
-                <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:8 }}>
-                  {['Ниацинамид 500мг 2р/д','Медь 2мг (отдельно от цинка)','Цинк 50мг (пиколинат, на ночь)','Солярий 2р/нед по 5 мин','Клендовит гель локально','Клензит-С (адапален+клиндамицин)','Верошпирон 50мг (только при гормональном акне)'].map((item, i) => (
-                    <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
-                      <span style={{ fontSize:10 }}>💊</span>
-                      <span style={{ fontSize:9, color:'var(--text-light)' }}>{item}</span>
+                <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:8 }}>🔴 Анти-прыщ протокол</div>
+                {/* Daily protocol */}
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--text-light)', marginBottom:6 }}>⚙️ Ежедневный протокол</div>
+                {[
+                  { n:'Ниацинамид (Витамин B3)', d:'500-1000 мг', t:'На ночь', note:'Регулирует выработку себума, антивоспалительное, уменьшает покраснения' },
+                  { n:'Медь', d:'1-2 мг', t:'На ночь (отдельно от цинка)', note:'Кофактор лизил-оксидазы. Сшивка коллагена. Не смешивать с цинком.' },
+                  { n:'Цинк (пиколинат)', d:'50 мг', t:'На ночь', note:'Антивоспалительное, антибактериальное, ингибирует 5-альфа-редуктазу' },
+                  { n:'Солярий', d:'2 раза/нед × 5 мин', t:'День', note:'UV-B подсушивает акне, антибактериальный эффект. Не более 5 минут.' },
+                  { n:'Клендовит гель', d:'Тонкий слой', t:'Утро локально', note:'Клиндамицин — антибиотик локально. Только на зону акне.' },
+                  { n:'Клензит-С', d:'Тонкий слой', t:'На ночь локально', note:'Адапален (ретиноид) + клиндамицин. Открывает комедоны.' },
+                  { n:'Верошпирон (Спиронолактон)', d:'50 мг', t:'Утро', note:'Антиандроген. Только при гормональном акне. Контролировать калий!' },
+                ].map((r,i) => (
+                  <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.12)', fontSize:10, marginBottom:6 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                      <span style={{ fontWeight:700, color:'var(--text-light)' }}>{r.n}</span>
+                      <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                        <span style={{ fontSize:9, fontWeight:700, color:'#ef4444' }}>{r.d}</span>
+                        <span style={{ fontSize:8, color:'var(--text-dim)', padding:'1px 6px', borderRadius:4, background:'rgba(255,255,255,0.04)' }}>{r.t}</span>
+                      </div>
                     </div>
-                  ))}
+                    <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>{r.note}</div>
+                  </div>
+                ))}
+                {/* Hygiene section */}
+                <div style={{ marginTop:8, padding:'10px', borderRadius:8, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.12)' }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>🧼 Гигиена и уход</div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
+                    • Минимум <b style={{color:'#ef4444'}}>1 раз в день</b> тщательное мытьё с очищением пор от себума<br/>
+                    • На курсе ААС выработка кожного сала резко возрастает → поры забиваются<br/>
+                    • Клензит-С содержит антибактериальный компонент + адапален для открытия комедонов<br/>
+                    • Клендовит — только локально на зону акне, не на всё лицо<br/>
+                    • При сильном акне — дерматолог, системные ретиноиды (Изотретиноин)
+                  </div>
                 </div>
-                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>• При Верошпироне — исключить добавки калия<br/>• Солярий ≤ 2 раза/нед по 5 мин<br/>• Клендовит+Клензит-С только локально<br/>• При сильном акне — дерматолог, системные ретиноиды</div>
+                {/* Important notes */}
+                <div style={{ marginTop:6, padding:'8px 10px', borderRadius:6, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#f59e0b', marginBottom:2 }}>⚠️ Важные примечания</div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>
+                    • При Верошпироне — исключить добавки калия и калий-сберегающие продукты<br/>
+                    • Солярий ≤ 2 раза/нед по 5 мин — избыток UV повышает риск меланомы<br/>
+                    • Цинк и медь принимать РАЗДЕЛЬНО (конкуренция за всасывание) — цинк на ночь, медь утром<br/>
+                    • При неэффективности через 4-6 недель — консультация дерматолога
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -7431,8 +7495,15 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
               ))}
             </div>
-          </div>
-          </>)}
+                  </div>
+                  {/* Symptoms reference */}
+                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:4 }}>🩺 Симптомы нейротоксичности</div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      {['Депрессия','Тревожность','Агрессия','Нарушение сна','Когнитивное снижение','Потеря памяти','Ангедония','Импульсивность','Спутанность','Эмоц. нестабильность'].map((s,i)=>(<span key={i} style={{fontSize:8,padding:'3px 7px',borderRadius:10,background:'rgba(239,68,68,0.08)',color:'#fca5a5',border:'1px solid rgba(239,68,68,0.15)'}}>⚠ {s}</span>))}
+                    </div>
+                  </div>
+                </>)}
 
           {neuroTab === 'mechanisms' && (
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
