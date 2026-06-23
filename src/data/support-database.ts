@@ -63,7 +63,7 @@ export const INTERACTIONS_DB: Interaction[] = [
   { id: "INT_GINSENG_STIMULANTS", substanceA: "GINSENG", substanceB: "STIMULANTS", type: "caution", effect: "OVERSTIMULATION", mechanisms: ["ADRENAL_UP"], severity: "MEDIUM", notes: "Риск тревоги и тахикардии" },
   { id: "INT_GINSENG_ANTICOAG", substanceA: "GINSENG", substanceB: "ANTICOAGULANTS", type: "caution", effect: "BLEED_RISK", mechanisms: ["PLATELETS_MOD"], severity: "MEDIUM", notes: "Возможное усиление кровоточивости" },
   { id: "INT_ASHWAGANDHA_BENZOS", substanceA: "ASHWAGANDHA", substanceB: "BENZODIAZEPINES", type: "synergy", effect: "SEDATION_UP", mechanisms: ["GABA_MOD"], severity: "MEDIUM", notes: "Суммарная седация и расслабление" },
-  { id: "INT_ASHWAGANDHA_THYROID", substanceA: "ASHWAGANDHA", substanceB: "THYROID_DRUGS", type: "caution", effect: "THYROID_MOD", mechanisms: ["T3_T4_MOD"], severity: "MEDIUM", notes: "Может усиливать или менять эффект тиреоидных препаратов" },
+  { id: "INT_ASHWAGANDHA_THYROID", substanceA: "ASHWAGANDHA", substanceB: "pharma", type: "caution", effect: "THYROID_MOD", mechanisms: ["T3_T4_MOD"], severity: "MEDIUM", notes: "Может усиливать или менять эффект тиреоидных препаратов" },
   { id: "INT_RHODIOLA_STIMULANTS", substanceA: "RHODIOLA", substanceB: "STIMULANTS", type: "caution", effect: "OVERSTIMULATION", mechanisms: ["NE_UP", "DA_UP"], severity: "MEDIUM", notes: "Риск тревоги и тахикардии" },
   { id: "INT_RHODIOLA_SSRIS", substanceA: "RHODIOLA", substanceB: "SSRIs", type: "caution", effect: "SEROTONIN_UP", mechanisms: ["SEROTONIN_MOD"], severity: "MEDIUM", notes: "Потенциальное усиление серотонинергики" },
   { id: "INT_LITHIUM_SODIUM", substanceA: "LITHIUM", substanceB: "SODIUM", type: "conflict", effect: "LITHIUM_LEVEL_SHIFT", mechanisms: ["RENAL_CLEARANCE"], severity: "HIGH", notes: "Изменение натрия меняет уровень лития" },
@@ -97,7 +97,7 @@ export const INTERACTIONS_DB: Interaction[] = [
   { id: "INT_RACETAMS_GABA", substanceA: "RACETAMS", substanceB: "GABA", type: "caution", effect: "MOOD_SHIFT", mechanisms: ["GABA_MOD"], severity: "LOW", notes: "Непредсказуемый эффект на настроение" },
   { id: "INT_RACETAMS_PIRACETAM_CAFFEINE", substanceA: "PIRACETAM", substanceB: "CAFFEINE", type: "synergy", effect: "FOCUS_UP", mechanisms: ["NEURO_UP"], severity: "LOW", notes: "Лёгкая стимуляция + когнитивный буст" },
   { id: "INT_LCARNITINE_CAFFEINE", substanceA: "L_CARNITINE", substanceB: "CAFFEINE", type: "synergy", effect: "FAT_BURN_UP", mechanisms: ["FAT_OX_UP"], severity: "LOW", notes: "Усиление липолиза" },
-  { id: "INT_LCARNITINE_THYROID", substanceA: "L_CARNITINE", substanceB: "THYROID_DRUGS", type: "conflict", effect: "THYROID_MOD", mechanisms: ["T3_T4_MOD"], severity: "MEDIUM", notes: "Может снижать действие тиреоидных гормонов" },
+  { id: "INT_LCARNITINE_THYROID", substanceA: "L_CARNITINE", substanceB: "pharma", type: "conflict", effect: "THYROID_MOD", mechanisms: ["T3_T4_MOD"], severity: "MEDIUM", notes: "Может снижать действие тиреоидных гормонов" },
   { id: "INT_COQ10_STATINS", substanceA: "COQ10", substanceB: "STATINS", type: "synergy", effect: "MUSCLE_PROTECT", mechanisms: ["MITO_UP"], severity: "LOW", notes: "Снижение риска миопатии" },
   { id: "INT_COQ10_WARFARIN", substanceA: "COQ10", substanceB: "WARFARIN", type: "caution", effect: "ANTICOAG_MOD", mechanisms: ["COAGULATION_MOD"], severity: "MEDIUM", notes: "Может ослаблять антикоагуляцию" },
   { id: "INT_BERBERINE_METFORMIN", substanceA: "BERBERINE", substanceB: "METFORMIN", type: "synergy", effect: "GLUCOSE_DOWN", mechanisms: ["AMPK_UP"], severity: "MEDIUM", notes: "Сильное снижение сахара" },
@@ -143,11 +143,11 @@ export const INTERACTIONS_DB: Interaction[] = [
   { id: "INT_CALCIUM_PPI", substanceA: "CALCIUM", substanceB: "PPI", type: "conflict", effect: "ABSORB_DOWN", mechanisms: ["PH_UP"], severity: "MEDIUM", notes: "Снижение всасывания кальция" },
   { id: "INT_CALCIUM_IRON", substanceA: "CALCIUM", substanceB: "IRON", type: "conflict", effect: "ABSORB_DOWN", mechanisms: ["COMPETE_ABSORB"], severity: "MEDIUM", notes: "Кальций мешает железу" },
   { id: "INT_SELENIUM_VITC", substanceA: "SELENIUM", substanceB: "VITAMIN_C", type: "caution", effect: "REDOX_SHIFT", mechanisms: ["ANTIOX_MOD"], severity: "LOW", notes: "Изменение антиоксидантного баланса" },
-  { id: "INT_SELENIUM_THYROID", substanceA: "SELENIUM", substanceB: "THYROID_DRUGS", type: "synergy", effect: "THYROID_UP", mechanisms: ["T3_T4_UP"], severity: "LOW", notes: "Поддержка щитовидки" },
+  { id: "INT_SELENIUM_THYROID", substanceA: "SELENIUM", substanceB: "pharma", type: "synergy", effect: "THYROID_UP", mechanisms: ["T3_T4_UP"], severity: "LOW", notes: "Поддержка щитовидки" },
   { id: "INT_SELENIUM_ZINC", substanceA: "SELENIUM", substanceB: "ZINC", type: "synergy", effect: "IMMUNE_UP", mechanisms: ["ANTIOX_UP"], severity: "LOW", notes: "Иммунная синергия" },
-  { id: "INT_IODINE_THYROID", substanceA: "IODINE", substanceB: "THYROID_DRUGS", type: "caution", effect: "THYROID_SHIFT", mechanisms: ["T3_T4_MOD"], severity: "MEDIUM", notes: "Может менять дозировку гормонов" },
+  { id: "INT_IODINE_THYROID", substanceA: "IODINE", substanceB: "pharma", type: "caution", effect: "THYROID_SHIFT", mechanisms: ["T3_T4_MOD"], severity: "MEDIUM", notes: "Может менять дозировку гормонов" },
   { id: "INT_IODINE_LITHIUM", substanceA: "IODINE", substanceB: "LITHIUM", type: "conflict", effect: "THYROID_MOD", mechanisms: ["THYROID_UP"], severity: "MEDIUM", notes: "Йод влияет на щитовидку при литии" },
-  { id: "INT_IODINE_ANTITHYROID", substanceA: "IODINE", substanceB: "ANTITHYROID_DRUGS", type: "conflict", effect: "OPPOSITE_EFFECTS", mechanisms: ["T3_T4_UP", "T3_T4_DOWN"], severity: "MEDIUM", notes: "Противонаправленные эффекты" },
+  { id: "INT_IODINE_ANTITHYROID", substanceA: "IODINE", substanceB: "pharma", type: "conflict", effect: "OPPOSITE_EFFECTS", mechanisms: ["T3_T4_UP", "T3_T4_DOWN"], severity: "MEDIUM", notes: "Противонаправленные эффекты" },
   { id: "INT_ADAPTOGENS_STIMULANTS", substanceA: "ADAPTOGENS", substanceB: "STIMULANTS", type: "caution", effect: "STRESS_AXIS_MOD", mechanisms: ["HPA_MOD"], severity: "LOW", notes: "Может менять реакцию на стимуляторы" },
   { id: "INT_ADAPTOGENS_BENZOS", substanceA: "ADAPTOGENS", substanceB: "BENZODIAZEPINES", type: "caution", effect: "SEDATION_MOD", mechanisms: ["GABA_MOD"], severity: "LOW", notes: "Суммарная релаксация" },
   { id: "INT_ADAPTOGENS_SSRI", substanceA: "ADAPTOGENS", substanceB: "SSRIs", type: "caution", effect: "SEROTONIN_MOD", mechanisms: ["SEROTONIN_UP"], severity: "LOW", notes: "Мягкая серотонинергическая модуляция" }
@@ -280,7 +280,7 @@ export const INTERACTION_LINKS_DB: InteractionLink[] = [
   { id: "LINK_LCARNITINE_CAFFEINE_A", interactionId: "INT_LCARNITINE_CAFFEINE", substance: "L_CARNITINE", role: "A" },
   { id: "LINK_LCARNITINE_CAFFEINE_B", interactionId: "INT_LCARNITINE_CAFFEINE", substance: "CAFFEINE", role: "B" },
   { id: "LINK_LCARNITINE_THYROID_A", interactionId: "INT_LCARNITINE_THYROID", substance: "L_CARNITINE", role: "A" },
-  { id: "LINK_LCARNITINE_THYROID_B", interactionId: "INT_LCARNITINE_THYROID", substance: "THYROID_DRUGS", role: "B" },
+  { id: "LINK_LCARNITINE_THYROID_B", interactionId: "INT_LCARNITINE_THYROID", substance: "pharma", role: "B" },
   { id: "LINK_COQ10_STATINS_A", interactionId: "INT_COQ10_STATINS", substance: "COQ10", role: "A" },
   { id: "LINK_COQ10_STATINS_B", interactionId: "INT_COQ10_STATINS", substance: "STATINS", role: "B" },
   { id: "LINK_COQ10_WARFARIN_A", interactionId: "INT_COQ10_WARFARIN", substance: "COQ10", role: "A" },
@@ -372,15 +372,15 @@ export const INTERACTION_LINKS_DB: InteractionLink[] = [
   { id: "LINK_SELENIUM_VITC_A", interactionId: "INT_SELENIUM_VITC", substance: "SELENIUM", role: "A" },
   { id: "LINK_SELENIUM_VITC_B", interactionId: "INT_SELENIUM_VITC", substance: "VITAMIN_C", role: "B" },
   { id: "LINK_SELENIUM_THYROID_A", interactionId: "INT_SELENIUM_THYROID", substance: "SELENIUM", role: "A" },
-  { id: "LINK_SELENIUM_THYROID_B", interactionId: "INT_SELENIUM_THYROID", substance: "THYROID_DRUGS", role: "B" },
+  { id: "LINK_SELENIUM_THYROID_B", interactionId: "INT_SELENIUM_THYROID", substance: "pharma", role: "B" },
   { id: "LINK_SELENIUM_ZINC_A", interactionId: "INT_SELENIUM_ZINC", substance: "SELENIUM", role: "A" },
   { id: "LINK_SELENIUM_ZINC_B", interactionId: "INT_SELENIUM_ZINC", substance: "ZINC", role: "B" },
   { id: "LINK_IODINE_THYROID_A", interactionId: "INT_IODINE_THYROID", substance: "IODINE", role: "A" },
-  { id: "LINK_IODINE_THYROID_B", interactionId: "INT_IODINE_THYROID", substance: "THYROID_DRUGS", role: "B" },
+  { id: "LINK_IODINE_THYROID_B", interactionId: "INT_IODINE_THYROID", substance: "pharma", role: "B" },
   { id: "LINK_IODINE_LITHIUM_A", interactionId: "INT_IODINE_LITHIUM", substance: "IODINE", role: "A" },
   { id: "LINK_IODINE_LITHIUM_B", interactionId: "INT_IODINE_LITHIUM", substance: "LITHIUM", role: "B" },
   { id: "LINK_IODINE_ANTITHYROID_A", interactionId: "INT_IODINE_ANTITHYROID", substance: "IODINE", role: "A" },
-  { id: "LINK_IODINE_ANTITHYROID_B", interactionId: "INT_IODINE_ANTITHYROID", substance: "ANTITHYROID_DRUGS", role: "B" },
+  { id: "LINK_IODINE_ANTITHYROID_B", interactionId: "INT_IODINE_ANTITHYROID", substance: "pharma", role: "B" },
   { id: "LINK_ADAPTOGENS_STIMULANTS_A", interactionId: "INT_ADAPTOGENS_STIMULANTS", substance: "ADAPTOGENS", role: "A" },
   { id: "LINK_ADAPTOGENS_STIMULANTS_B", interactionId: "INT_ADAPTOGENS_STIMULANTS", substance: "STIMULANTS", role: "B" },
   { id: "LINK_ADAPTOGENS_BENZOS_A", interactionId: "INT_ADAPTOGENS_BENZOS", substance: "ADAPTOGENS", role: "A" },
@@ -3119,216 +3119,216 @@ export const CANONICAL_ID_MAP: Record<string, string> = {
   "PHARMA_CAFFEINE": "caffeine",
   "PHARMA_DICLOFENAC": "diclofenac",
   "PHARMA_MELOXICAM": "meloxicam",
-  "PHARMA_OMEPRAZOLE": "ppi_drugs",
+  "PHARMA_OMEPRAZOLE": "pharma",
   "PHARMA_SPIRONOLACTONE": "spironolactone",
   "PHARMA_NIACIN": "vitamin_b3",
   "PHARMA_OMEGA3_RX": "omega3",
   "PHARMA_NMN": "nmn",
   "PHARMA_NR": "nmn",
-  "PHARMA_VINCAMINE": "pharma_drugs",
-  "PHARMA_NICERGOLINE": "pharma_drugs",
-  "PHARMA_CINNARIZINE": "pharma_drugs",
-  "PHARMA_FLUNARIZINE": "pharma_drugs",
-  "PHARMA_RASAGILINE": "pharma_drugs",
-  "PHARMA_AMPAKINE_SUN": "pharma_drugs",
-  "PHARMA_AMPAKINE_FAR": "pharma_drugs",
-  "PHARMA_PROGLUMETACIN": "pharma_drugs",
-  "PHARMA_CORTEXIN": "pharma_drugs",
-  "PHARMA_ACTOVEGIN": "pharma_drugs",
-  "PHARMA_MEXIDOL": "pharma_drugs",
-  "PHARMA_EMOXYPINE": "pharma_drugs",
-  "PHARMA_PICAMILON": "pharma_drugs",
-  "PHARMA_PANTOGAM": "ppi_drugs",
-  "PHARMA_PANTOCALCIN": "ppi_drugs",
-  "PHARMA_FENIBUT": "pharma_drugs",
-  "PHARMA_BACLOFEN": "pharma_drugs",
-  "PHARMA_CYTOFLAVIN": "pharma_drugs",
-  "PHARMA_MELDONIUM": "pharma_drugs",
-  "PHARMA_TRIMETAZIDINE": "pharma_drugs",
-  "PHARMA_NICOTINAMIDE": "pharma_drugs",
-  "PHARMA_THEOBROMINE": "pharma_drugs",
-  "PHARMA_SULBUTIAMINE": "pharma_drugs",
-  "PHARMA_TYROSINE": "pharma_drugs",
-  "PHARMA_SERTRALINE": "antidepressant_drugs",
-  "PHARMA_FLUOXETINE": "antidepressant_drugs",
-  "PHARMA_PAROXETINE": "antidepressant_drugs",
-  "PHARMA_ESCITALOPRAM": "antidepressant_drugs",
-  "PHARMA_CITALOPRAM": "antidepressant_drugs",
-  "PHARMA_FLUVOXAMINE": "antidepressant_drugs",
-  "PHARMA_VENLAFAXINE": "antidepressant_drugs",
-  "PHARMA_DESVENLAFAXINE": "antidepressant_drugs",
-  "PHARMA_DULOXETINE": "antidepressant_drugs",
-  "PHARMA_MILNACIPRAN": "antidepressant_drugs",
-  "PHARMA_BUPROPION": "antidepressant_drugs",
-  "PHARMA_MIRTAZAPINE": "antidepressant_drugs",
-  "PHARMA_TRAZODONE": "antidepressant_drugs",
-  "PHARMA_AGOMELATINE": "antidepressant_drugs",
-  "PHARMA_VORTIOXETINE": "antidepressant_drugs",
-  "PHARMA_AMITRIPTYLINE": "antidepressant_drugs",
-  "PHARMA_IMIPRAMINE": "antidepressant_drugs",
-  "PHARMA_CLOMIPRAMINE": "antidepressant_drugs",
-  "PHARMA_MAOI_SELEGILINE": "antidepressant_drugs",
-  "PHARMA_MAOI_TRANYLCYPROMINE": "antidepressant_drugs",
-  "PHARMA_BUSPIRONE": "anxiolytic_drugs",
-  "PHARMA_HYDROXYZINE": "anxiolytic_drugs",
-  "PHARMA_PREGABALIN": "anxiolytic_drugs",
-  "PHARMA_GABAPENTIN": "anxiolytic_drugs",
-  "PHARMA_DIAZEPAM": "anxiolytic_drugs",
-  "PHARMA_LORAZEPAM": "anxiolytic_drugs",
-  "PHARMA_ALPRAZOLAM": "anxiolytic_drugs",
-  "PHARMA_CLONAZEPAM": "anxiolytic_drugs",
-  "PHARMA_ETIZOLAM": "anxiolytic_drugs",
-  "PHARMA_PROPRANOLOL": "pharma_drugs",
-  "PHARMA_QUETIAPINE_LOW": "antipsychotic_drugs",
-  "PHARMA_OLANZAPINE": "antipsychotic_drugs",
-  "PHARMA_RISPERIDONE": "antipsychotic_drugs",
-  "PHARMA_ARIPIPRAZOLE": "antipsychotic_drugs",
-  "PHARMA_LAMOTRIGINE": "anticonvulsant_drugs",
-  "PHARMA_VALPROATE": "anticonvulsant_drugs",
+  "PHARMA_VINCAMINE": "pharma",
+  "PHARMA_NICERGOLINE": "pharma",
+  "PHARMA_CINNARIZINE": "pharma",
+  "PHARMA_FLUNARIZINE": "pharma",
+  "PHARMA_RASAGILINE": "pharma",
+  "PHARMA_AMPAKINE_SUN": "pharma",
+  "PHARMA_AMPAKINE_FAR": "pharma",
+  "PHARMA_PROGLUMETACIN": "pharma",
+  "PHARMA_CORTEXIN": "pharma",
+  "PHARMA_ACTOVEGIN": "pharma",
+  "PHARMA_MEXIDOL": "pharma",
+  "PHARMA_EMOXYPINE": "pharma",
+  "PHARMA_PICAMILON": "pharma",
+  "PHARMA_PANTOGAM": "pharma",
+  "PHARMA_PANTOCALCIN": "pharma",
+  "PHARMA_FENIBUT": "pharma",
+  "PHARMA_BACLOFEN": "pharma",
+  "PHARMA_CYTOFLAVIN": "pharma",
+  "PHARMA_MELDONIUM": "pharma",
+  "PHARMA_TRIMETAZIDINE": "pharma",
+  "PHARMA_NICOTINAMIDE": "pharma",
+  "PHARMA_THEOBROMINE": "pharma",
+  "PHARMA_SULBUTIAMINE": "pharma",
+  "PHARMA_TYROSINE": "pharma",
+  "PHARMA_SERTRALINE": "pharma",
+  "PHARMA_FLUOXETINE": "pharma",
+  "PHARMA_PAROXETINE": "pharma",
+  "PHARMA_ESCITALOPRAM": "pharma",
+  "PHARMA_CITALOPRAM": "pharma",
+  "PHARMA_FLUVOXAMINE": "pharma",
+  "PHARMA_VENLAFAXINE": "pharma",
+  "PHARMA_DESVENLAFAXINE": "pharma",
+  "PHARMA_DULOXETINE": "pharma",
+  "PHARMA_MILNACIPRAN": "pharma",
+  "PHARMA_BUPROPION": "pharma",
+  "PHARMA_MIRTAZAPINE": "pharma",
+  "PHARMA_TRAZODONE": "pharma",
+  "PHARMA_AGOMELATINE": "pharma",
+  "PHARMA_VORTIOXETINE": "pharma",
+  "PHARMA_AMITRIPTYLINE": "pharma",
+  "PHARMA_IMIPRAMINE": "pharma",
+  "PHARMA_CLOMIPRAMINE": "pharma",
+  "PHARMA_MAOI_SELEGILINE": "pharma",
+  "PHARMA_MAOI_TRANYLCYPROMINE": "pharma",
+  "PHARMA_BUSPIRONE": "pharma",
+  "PHARMA_HYDROXYZINE": "pharma",
+  "PHARMA_PREGABALIN": "pharma",
+  "PHARMA_GABAPENTIN": "pharma",
+  "PHARMA_DIAZEPAM": "pharma",
+  "PHARMA_LORAZEPAM": "pharma",
+  "PHARMA_ALPRAZOLAM": "pharma",
+  "PHARMA_CLONAZEPAM": "pharma",
+  "PHARMA_ETIZOLAM": "pharma",
+  "PHARMA_PROPRANOLOL": "pharma",
+  "PHARMA_QUETIAPINE_LOW": "pharma",
+  "PHARMA_OLANZAPINE": "pharma",
+  "PHARMA_RISPERIDONE": "pharma",
+  "PHARMA_ARIPIPRAZOLE": "pharma",
+  "PHARMA_LAMOTRIGINE": "pharma",
+  "PHARMA_VALPROATE": "pharma",
   "PHARMA_LITHIUM": "lithium",
   "PHARMA_KETAMINE": "ketamine",
   "PHARMA_ESKETAMINE": "ketamine",
-  "PHARMA_CARBAMAZEPINE": "anticonvulsant_drugs",
-  "PHARMA_TOPIRAMATE": "anticonvulsant_drugs",
-  "PHARMA_PROCHLORPERAZINE": "pharma_drugs",
-  "PHARMA_CYPROHEPTADINE": "pharma_drugs",
-  "PHARMA_BETAHISTINE": "pharma_drugs",
-  "PHARMA_MIANESIN": "pharma_drugs",
-  "PHARMA_TIZANIDINE": "pharma_drugs",
-  "PHARMA_GLUCOBAY": "pharma_drugs",
-  "PHARMA_PIOGLITAZONE": "antidiabetic_drugs",
-  "PHARMA_ROSIGLITAZONE": "antidiabetic_drugs",
-  "PHARMA_SITAGLIPTIN": "antidiabetic_drugs",
-  "PHARMA_VILDAGLIPTIN": "antidiabetic_drugs",
-  "PHARMA_LINAGLIPTIN": "antidiabetic_drugs",
-  "PHARMA_EXENATIDE": "antidiabetic_drugs",
-  "PHARMA_LIRAGLUTIDE": "antidiabetic_drugs",
-  "PHARMA_INSULIN_HUMAN": "antidiabetic_drugs",
-  "PHARMA_INSULIN_ANALOG_FAST": "antidiabetic_drugs",
-  "PHARMA_INSULIN_ANALOG_LONG": "antidiabetic_drugs",
-  "PHARMA_LEVOTHYROXINE": "thyroid_drugs",
-  "PHARMA_LIOTHYRONINE": "thyroid_drugs",
-  "PHARMA_PTU": "thyroid_drugs",
-  "PHARMA_METHIMAZOLE": "thyroid_drugs",
-  "PHARMA_HYDROCORTISONE": "corticosteroid_drugs",
-  "PHARMA_PREDNISOLONE": "corticosteroid_drugs",
-  "PHARMA_DEXAMETHASONE": "corticosteroid_drugs",
-  "PHARMA_FLUDROCORTISONE": "pharma_drugs",
-  "PHARMA_TESTOSTERONE_GEL": "pharma_drugs",
-  "PHARMA_TESTOSTERONE_UNDECANOATE": "pharma_drugs",
-  "PHARMA_DHT_GEL": "pharma_drugs",
-  "PHARMA_ESTRADIOL": "pharma_drugs",
-  "PHARMA_ESTRADIOL_PATCH": "pharma_drugs",
-  "PHARMA_PROGESTERONE": "pharma_drugs",
-  "PHARMA_DYDROGESTERONE": "pharma_drugs",
-  "PHARMA_BROMOCRIPTINE": "pharma_drugs",
-  "PHARMA_GNRH_AGONIST": "pharma_drugs",
-  "PHARMA_GNRH_ANTAGONIST": "pharma_drugs",
-  "PHARMA_GH": "pharma_drugs",
-  "PHARMA_IGF1": "pharma_drugs",
-  "PHARMA_DESMOPRESSIN": "pharma_drugs",
-  "PHARMA_ORLISTAT": "pharma_drugs",
-  "PHARMA_ACETAZOLAMIDE": "pharma_drugs",
-  "PHARMA_THYROID_DESICCATED": "thyroid_drugs",
-  "PHARMA_MIFEPRISTONE": "pharma_drugs",
-  "PHARMA_KETOCONAZOLE_HORM": "pharma_drugs",
-  "PHARMA_MITOTANE": "pharma_drugs",
-  "PHARMA_ATORVASTATIN": "statin_drugs",
-  "PHARMA_ROSUVASTATIN": "statin_drugs",
-  "PHARMA_SIMVASTATIN": "statin_drugs",
-  "PHARMA_EZETIMIBE": "pharma_drugs",
-  "PHARMA_FENOFIBRATE": "pharma_drugs",
-  "PHARMA_GEMFIBROZIL": "pharma_drugs",
-  "PHARMA_CLOPIDOGREL": "antiplatelet_drugs",
-  "PHARMA_TICAGRELOR": "antiplatelet_drugs",
-  "PHARMA_PRASUGREL": "antiplatelet_drugs",
-  "PHARMA_WARFARIN": "anticoagulant_drugs",
-  "PHARMA_APIXABAN": "anticoagulant_drugs",
-  "PHARMA_RIVAROXABAN": "anticoagulant_drugs",
-  "PHARMA_ENALAPRIL": "ace_inhibitor_drugs",
-  "PHARMA_LISINOPRIL": "ace_inhibitor_drugs",
-  "PHARMA_RAMIPRIL": "ace_inhibitor_drugs",
-  "PHARMA_LOSARTAN": "arb_drugs",
-  "PHARMA_VALSARTAN": "arb_drugs",
-  "PHARMA_AMLODIPINE": "ccb_drugs",
-  "PHARMA_NIFEDIPINE": "ccb_drugs",
-  "PHARMA_VERAPAMIL": "ccb_drugs",
-  "PHARMA_METOPROLOL": "beta_blocker_drugs",
-  "PHARMA_BISOPROLOL": "beta_blocker_drugs",
-  "PHARMA_CARVEDILOL": "beta_blocker_drugs",
-  "PHARMA_DIGOXIN": "pharma_drugs",
-  "PHARMA_FUROSEMIDE": "diuretic_drugs",
-  "PHARMA_HYDROCHLOROTHIAZIDE": "diuretic_drugs",
-  "PHARMA_SPIRONOLACTONE_CARDIO": "pharma_drugs",
-  "PHARMA_ESOMEPRAZOLE": "ppi_drugs",
-  "PHARMA_PANTOPRAZOLE": "ppi_drugs",
-  "PHARMA_RANITIDINE": "pharma_drugs",
-  "PHARMA_FAMOTIDINE": "pharma_drugs",
-  "PHARMA_DOMPERIDONE": "pharma_drugs",
-  "PHARMA_METOCLOPRAMIDE": "pharma_drugs",
-  "PHARMA_ITOPRIDE": "pharma_drugs",
-  "PHARMA_TRIMEBUTINE": "pharma_drugs",
-  "PHARMA_MACROGOL": "pharma_drugs",
-  "PHARMA_MESALAZINE": "pharma_drugs",
-  "PHARMA_SULFASALAZINE": "pharma_drugs",
-  "PHARMA_PREDNISONE_GI": "corticosteroid_drugs",
-  "PHARMA_AZATHIOPRINE": "immunosuppressant_drugs",
-  "PHARMA_METHOTREXATE": "immunosuppressant_drugs",
-  "PHARMA_CYCLOSPORINE": "immunosuppressant_drugs",
-  "PHARMA_TACROLIMUS": "pharma_drugs",
-  "PHARMA_ADALIMUMAB": "immunosuppressant_drugs",
-  "PHARMA_INFLIXIMAB": "immunosuppressant_drugs",
-  "PHARMA_ETANERCEPT": "immunosuppressant_drugs",
-  "PHARMA_TOFACITINIB": "antibiotic_drugs",
-  "PHARMA_BARICITINIB": "antibiotic_drugs",
-  "PHARMA_CETIRIZINE": "antihistamine_drugs",
-  "PHARMA_LEVOCETIRIZINE": "antibiotic_drugs",
-  "PHARMA_LORATADINE": "antihistamine_drugs",
-  "PHARMA_DESLORATADINE": "antihistamine_drugs",
-  "PHARMA_FEXOFENADINE": "antihistamine_drugs",
-  "PHARMA_RUPATADINE": "antihistamine_drugs",
-  "PHARMA_KETOTIFEN": "antihistamine_drugs",
-  "PHARMA_AZELASTINE": "antihistamine_drugs",
-  "PHARMA_MONTELUKAST": "pharma_drugs",
-  "PHARMA_ZAFIRLUKAST": "pharma_drugs",
-  "PHARMA_IBUPROFEN": "nsaid_drugs",
-  "PHARMA_NAPROXEN": "nsaid_drugs",
-  "PHARMA_KETOPROFEN": "nsaid_drugs",
-  "PHARMA_CELECOXIB": "nsaid_drugs",
-  "PHARMA_ETORICOXIB": "nsaid_drugs",
-  "PHARMA_NIMESULIDE": "nsaid_drugs",
-  "PHARMA_PARACETAMOL": "nsaid_drugs",
-  "PHARMA_METAMIZOLE": "nsaid_drugs",
-  "PHARMA_KETOROLAC": "nsaid_drugs",
-  "PHARMA_PREDNISONE": "corticosteroid_drugs",
-  "PHARMA_METHYLPREDNISOLONE": "corticosteroid_drugs",
-  "PHARMA_CYCLOFOSPHAMIDE": "immunosuppressant_drugs",
-  "PHARMA_MYCOFENOLATE": "pharma_drugs",
-  "PHARMA_INTERFERON_ALPHA": "pharma_drugs",
-  "PHARMA_INTERFERON_BETA": "pharma_drugs",
-  "PHARMA_OSeltamivir": "pharma_drugs",
-  "PHARMA_ZANAMIVIR": "pharma_drugs",
-  "PHARMA_ACYCLOVIR": "immunosuppressant_drugs",
-  "PHARMA_VALACYCLOVIR": "immunosuppressant_drugs",
-  "PHARMA_AMOXICILLIN": "antibiotic_drugs",
-  "PHARMA_AUGMENTIN": "antibiotic_drugs",
-  "PHARMA_AMPICILLIN": "antibiotic_drugs",
-  "PHARMA_CEFTRIAXONE": "antibiotic_drugs",
-  "PHARMA_CEFIXIME": "antibiotic_drugs",
-  "PHARMA_CEFUROXIME": "antibiotic_drugs",
-  "PHARMA_AZITHROMYCIN": "antibiotic_drugs",
-  "PHARMA_CLARITHROMYCIN": "antibiotic_drugs",
-  "PHARMA_DOXYCYCLINE": "antibiotic_drugs",
-  "PHARMA_TETRACYCLINE": "antibiotic_drugs",
-  "PHARMA_CIPROFLOXACIN": "antibiotic_drugs",
-  "PHARMA_LEVOFLOXACIN": "antibiotic_drugs",
-  "PHARMA_MOXIFLOXACIN": "pharma_drugs",
-  "PHARMA_METRONIDAZOLE": "antibiotic_drugs",
-  "PHARMA_TINIDAZOLE": "antibiotic_drugs",
-  "PHARMA_LINEZOLID": "antibiotic_drugs",
-  "PHARMA_VANCOMYCIN": "antibiotic_drugs",
-  "PHARMA_RIFAMPICIN": "antibiotic_drugs",
-  "PHARMA_ISONIAZID": "antibiotic_drugs",
+  "PHARMA_CARBAMAZEPINE": "pharma",
+  "PHARMA_TOPIRAMATE": "pharma",
+  "PHARMA_PROCHLORPERAZINE": "pharma",
+  "PHARMA_CYPROHEPTADINE": "pharma",
+  "PHARMA_BETAHISTINE": "pharma",
+  "PHARMA_MIANESIN": "pharma",
+  "PHARMA_TIZANIDINE": "pharma",
+  "PHARMA_GLUCOBAY": "pharma",
+  "PHARMA_PIOGLITAZONE": "pharma",
+  "PHARMA_ROSIGLITAZONE": "pharma",
+  "PHARMA_SITAGLIPTIN": "pharma",
+  "PHARMA_VILDAGLIPTIN": "pharma",
+  "PHARMA_LINAGLIPTIN": "pharma",
+  "PHARMA_EXENATIDE": "pharma",
+  "PHARMA_LIRAGLUTIDE": "pharma",
+  "PHARMA_INSULIN_HUMAN": "pharma",
+  "PHARMA_INSULIN_ANALOG_FAST": "pharma",
+  "PHARMA_INSULIN_ANALOG_LONG": "pharma",
+  "PHARMA_LEVOTHYROXINE": "pharma",
+  "PHARMA_LIOTHYRONINE": "pharma",
+  "PHARMA_PTU": "pharma",
+  "PHARMA_METHIMAZOLE": "pharma",
+  "PHARMA_HYDROCORTISONE": "pharma",
+  "PHARMA_PREDNISOLONE": "pharma",
+  "PHARMA_DEXAMETHASONE": "pharma",
+  "PHARMA_FLUDROCORTISONE": "pharma",
+  "PHARMA_TESTOSTERONE_GEL": "pharma",
+  "PHARMA_TESTOSTERONE_UNDECANOATE": "pharma",
+  "PHARMA_DHT_GEL": "pharma",
+  "PHARMA_ESTRADIOL": "pharma",
+  "PHARMA_ESTRADIOL_PATCH": "pharma",
+  "PHARMA_PROGESTERONE": "pharma",
+  "PHARMA_DYDROGESTERONE": "pharma",
+  "PHARMA_BROMOCRIPTINE": "pharma",
+  "PHARMA_GNRH_AGONIST": "pharma",
+  "PHARMA_GNRH_ANTAGONIST": "pharma",
+  "PHARMA_GH": "pharma",
+  "PHARMA_IGF1": "pharma",
+  "PHARMA_DESMOPRESSIN": "pharma",
+  "PHARMA_ORLISTAT": "pharma",
+  "PHARMA_ACETAZOLAMIDE": "pharma",
+  "PHARMA_THYROID_DESICCATED": "pharma",
+  "PHARMA_MIFEPRISTONE": "pharma",
+  "PHARMA_KETOCONAZOLE_HORM": "pharma",
+  "PHARMA_MITOTANE": "pharma",
+  "PHARMA_ATORVASTATIN": "pharma",
+  "PHARMA_ROSUVASTATIN": "pharma",
+  "PHARMA_SIMVASTATIN": "pharma",
+  "PHARMA_EZETIMIBE": "pharma",
+  "PHARMA_FENOFIBRATE": "pharma",
+  "PHARMA_GEMFIBROZIL": "pharma",
+  "PHARMA_CLOPIDOGREL": "pharma",
+  "PHARMA_TICAGRELOR": "pharma",
+  "PHARMA_PRASUGREL": "pharma",
+  "PHARMA_WARFARIN": "pharma",
+  "PHARMA_APIXABAN": "pharma",
+  "PHARMA_RIVAROXABAN": "pharma",
+  "PHARMA_ENALAPRIL": "pharma",
+  "PHARMA_LISINOPRIL": "pharma",
+  "PHARMA_RAMIPRIL": "pharma",
+  "PHARMA_LOSARTAN": "pharma",
+  "PHARMA_VALSARTAN": "pharma",
+  "PHARMA_AMLODIPINE": "pharma",
+  "PHARMA_NIFEDIPINE": "pharma",
+  "PHARMA_VERAPAMIL": "pharma",
+  "PHARMA_METOPROLOL": "pharma",
+  "PHARMA_BISOPROLOL": "pharma",
+  "PHARMA_CARVEDILOL": "pharma",
+  "PHARMA_DIGOXIN": "pharma",
+  "PHARMA_FUROSEMIDE": "pharma",
+  "PHARMA_HYDROCHLOROTHIAZIDE": "pharma",
+  "PHARMA_SPIRONOLACTONE_CARDIO": "pharma",
+  "PHARMA_ESOMEPRAZOLE": "pharma",
+  "PHARMA_PANTOPRAZOLE": "pharma",
+  "PHARMA_RANITIDINE": "pharma",
+  "PHARMA_FAMOTIDINE": "pharma",
+  "PHARMA_DOMPERIDONE": "pharma",
+  "PHARMA_METOCLOPRAMIDE": "pharma",
+  "PHARMA_ITOPRIDE": "pharma",
+  "PHARMA_TRIMEBUTINE": "pharma",
+  "PHARMA_MACROGOL": "pharma",
+  "PHARMA_MESALAZINE": "pharma",
+  "PHARMA_SULFASALAZINE": "pharma",
+  "PHARMA_PREDNISONE_GI": "pharma",
+  "PHARMA_AZATHIOPRINE": "pharma",
+  "PHARMA_METHOTREXATE": "pharma",
+  "PHARMA_CYCLOSPORINE": "pharma",
+  "PHARMA_TACROLIMUS": "pharma",
+  "PHARMA_ADALIMUMAB": "pharma",
+  "PHARMA_INFLIXIMAB": "pharma",
+  "PHARMA_ETANERCEPT": "pharma",
+  "PHARMA_TOFACITINIB": "pharma",
+  "PHARMA_BARICITINIB": "pharma",
+  "PHARMA_CETIRIZINE": "pharma",
+  "PHARMA_LEVOCETIRIZINE": "pharma",
+  "PHARMA_LORATADINE": "pharma",
+  "PHARMA_DESLORATADINE": "pharma",
+  "PHARMA_FEXOFENADINE": "pharma",
+  "PHARMA_RUPATADINE": "pharma",
+  "PHARMA_KETOTIFEN": "pharma",
+  "PHARMA_AZELASTINE": "pharma",
+  "PHARMA_MONTELUKAST": "pharma",
+  "PHARMA_ZAFIRLUKAST": "pharma",
+  "PHARMA_IBUPROFEN": "pharma",
+  "PHARMA_NAPROXEN": "pharma",
+  "PHARMA_KETOPROFEN": "pharma",
+  "PHARMA_CELECOXIB": "pharma",
+  "PHARMA_ETORICOXIB": "pharma",
+  "PHARMA_NIMESULIDE": "pharma",
+  "PHARMA_PARACETAMOL": "pharma",
+  "PHARMA_METAMIZOLE": "pharma",
+  "PHARMA_KETOROLAC": "pharma",
+  "PHARMA_PREDNISONE": "pharma",
+  "PHARMA_METHYLPREDNISOLONE": "pharma",
+  "PHARMA_CYCLOFOSPHAMIDE": "pharma",
+  "PHARMA_MYCOFENOLATE": "pharma",
+  "PHARMA_INTERFERON_ALPHA": "pharma",
+  "PHARMA_INTERFERON_BETA": "pharma",
+  "PHARMA_OSeltamivir": "pharma",
+  "PHARMA_ZANAMIVIR": "pharma",
+  "PHARMA_ACYCLOVIR": "pharma",
+  "PHARMA_VALACYCLOVIR": "pharma",
+  "PHARMA_AMOXICILLIN": "pharma",
+  "PHARMA_AUGMENTIN": "pharma",
+  "PHARMA_AMPICILLIN": "pharma",
+  "PHARMA_CEFTRIAXONE": "pharma",
+  "PHARMA_CEFIXIME": "pharma",
+  "PHARMA_CEFUROXIME": "pharma",
+  "PHARMA_AZITHROMYCIN": "pharma",
+  "PHARMA_CLARITHROMYCIN": "pharma",
+  "PHARMA_DOXYCYCLINE": "pharma",
+  "PHARMA_TETRACYCLINE": "pharma",
+  "PHARMA_CIPROFLOXACIN": "pharma",
+  "PHARMA_LEVOFLOXACIN": "pharma",
+  "PHARMA_MOXIFLOXACIN": "pharma",
+  "PHARMA_METRONIDAZOLE": "pharma",
+  "PHARMA_TINIDAZOLE": "pharma",
+  "PHARMA_LINEZOLID": "pharma",
+  "PHARMA_VANCOMYCIN": "pharma",
+  "PHARMA_RIFAMPICIN": "pharma",
+  "PHARMA_ISONIAZID": "pharma",
   "HORM_CORTISOL": "cortisol",
   "HORM_CORTISONE": "cortisol",
   "HORM_ADRENALINE": "adrenaline",
@@ -3972,7 +3972,7 @@ export const CANONICAL_ID_MAP: Record<string, string> = {
   "ACTIVITY": "stimulant_complex",
   "TG_DOWN": "omega3",
   "TG_UP": "lipid_complex",
-  "T3_T4_DOWN": "antithyroid_drugs",
+  "T3_T4_DOWN": "pharma",
   "T3_T4_UP": "levothyroxine",
   "WATER": "water",
   "NEURO_CITICOLINE_COGNIZIN": "citicoline",
@@ -4399,7 +4399,7 @@ milk_thistle: {
       { with: 'tudca', effect: 'Максимальная гепатопротекция', mechanism: 'TUDCA + силимарин = полный охват', severity: 'HIGH' },
     ],
     conflicts: [
-        {with: "statin_drugs", effect: "Изменение метаболизма статинов", mechanism: "Силимарин ингибирует CYP3A4", severity: "MEDIUM"},
+        {with: "pharma", effect: "Изменение метаболизма статинов", mechanism: "Силимарин ингибирует CYP3A4", severity: "MEDIUM"},
       ],
     monitoring: [
       { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
@@ -4530,7 +4530,7 @@ alpha_lipoic: {
       { with: 'vitamin_c', effect: 'Регенерация витамина E', mechanism: 'АЛЬК → вит. C → вит. E', severity: 'MEDIUM' },
     ],
     conflicts: [
-        {with: "thyroid_drugs", effect: "Снижение T3", mechanism: "АЛЬК может снижать T3", severity: "MEDIUM"},
+        {with: "pharma", effect: "Снижение T3", mechanism: "АЛЬК может снижать T3", severity: "MEDIUM"},
       ],
     monitoring: [],
     contraindications: ['Тяжёлая почечная недостаточность', 'Беременность'],
@@ -4605,7 +4605,7 @@ probiotics: {
       { with: 'vitamin_d3', effect: 'Усиление иммунитета', mechanism: 'Пробиотики + D3 = синергичная иммунная модуляция', severity: 'MEDIUM' },
     ],
     conflicts: [
-        {with: "antibiotic_drugs", effect: "Уничтожение пробиотиков", mechanism: "Антибиотики убивают штаммы", severity: "HIGH"},
+        {with: "pharma", effect: "Уничтожение пробиотиков", mechanism: "Антибиотики убивают штаммы", severity: "HIGH"},
       ],
     monitoring: [],
     contraindications: ['Тяжёлый иммунодефицит', 'Центральный венозный катетер (риск бактериемии)'],
@@ -4652,7 +4652,7 @@ glucosamine: {
       { with: 'collagen', effect: 'Восстановление суставов', mechanism: 'Коллаген + глюкозамин = полный набор для хряща', severity: 'MEDIUM' },
     ],
     conflicts: [
-        {with: "antidiabetic_drugs", effect: "Инсулинорезистентность", mechanism: "Глюкозамин может ухудшать", severity: "LOW"},
+        {with: "pharma", effect: "Инсулинорезистентность", mechanism: "Глюкозамин может ухудшать", severity: "LOW"},
       ],
     monitoring: [],
     contraindications: ['Аллергия на моллюсков (для хондроитина из моллюсков)', 'С осторожностью при диабете'],
@@ -4961,7 +4961,7 @@ vitamin_b3: {
       { with: "pterostilbene", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-        {with: "statin_drugs", effect: "Риск миопатии", mechanism: "Ниацин + статины — мышцы", severity: "HIGH"},
+        {with: "pharma", effect: "Риск миопатии", mechanism: "Ниацин + статины — мышцы", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед', targetRange: 'ЛПНП<3.0 ЛПВП>1.0' }
@@ -5044,8 +5044,8 @@ folate: {
       { with: "folate", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-      { with: "immunosuppressant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
-      { with: "anticonvulsant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
     monitoring: [
       { what: 'Гомоцистеин', when: 'Каждые 8 нед', targetRange: '<15 мкмоль/л' },
@@ -5077,7 +5077,7 @@ vitamin_e: {
       { with: "astaxanthin", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-        {with: "anticoagulant_drugs", effect: "Усиление антикоагуляции", mechanism: "E снижает агрегацию тромбоцитов", severity: "MEDIUM"},
+        {with: "pharma", effect: "Усиление антикоагуляции", mechanism: "E снижает агрегацию тромбоцитов", severity: "MEDIUM"},
       ],
     monitoring: [
       { what: 'Витамин Е в крови', when: 'Каждые 12 нед', targetRange: '12-46 мкмоль/л' }
@@ -5301,7 +5301,7 @@ l_carnitine: {
       { with: "lions_mane", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-      { with: "thyroid_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
     ],
     monitoring: [
       { what: 'ТМАО', when: 'Каждые 12 нед', targetRange: '<5 мкмоль/л' },
@@ -5332,7 +5332,7 @@ phosphatidylcholine: {
       { with: "omega3", effect: "Фосфатидилхолин + Омега-3 — фосфолипиды мозга", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-      { with: "antipsychotic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
     ],
     monitoring: [
       { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
@@ -5363,7 +5363,7 @@ prebiotics: {
       { with: "probiotics", effect: "Синбиотик — пребиотики питают пробиотики", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-      { with: "pharma_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
       { with: "colloidal_minerals", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
     monitoring: [
@@ -5506,15 +5506,15 @@ calcium: {
       { with: "silicon", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "calcium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "glycine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "diuretic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
       { with: "iron", effect: "Кальций блокирует всасывание железа", mechanism: "Комбинированное действие", severity: "HIGH" },
       { with: "magnesium", effect: "Избыток кальция блокирует магний", mechanism: "Комбинированное действие", severity: "HIGH" },
-      { with: "ppi_drugs", effect: "ИПП снижают всасывание кальция", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "pharma", effect: "ИПП снижают всасывание кальция", mechanism: "Комбинированное действие", severity: "HIGH" },
       { with: "magnesium", effect: "Избыток кальция блокирует магний", mechanism: "Комбинированное действие", severity: "LOW" },
       { with: "iron", effect: "Кальций блокирует всасывание железа", mechanism: "Комбинированное действие", severity: "LOW" },
-      { with: "diuretic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
     ],
     monitoring: [
       { what: 'Кальций общий', when: 'Каждые 12 нед', targetRange: '2.1-2.6 ммоль/л' }
@@ -5601,9 +5601,9 @@ iodine: {
       { with: "selenium", effect: "Йод + Селен — щитовидная железа", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-      { with: "thyroid_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
       { with: "lithium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
-      { with: "antithyroid_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
     ],
     monitoring: [
       { what: 'ТТГ', when: 'Каждые 8 нед', targetRange: '0.4-4.0 мЕд/л' },
@@ -5634,7 +5634,7 @@ lithium: {
       ],
     conflicts: [
       { with: "sodium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
-      { with: "nsaid_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
       { with: "iodine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
       { with: "magnesium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
@@ -5800,7 +5800,7 @@ colloidal_minerals: {
       ],
     conflicts: [
       { with: "prebiotics", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
-      { with: "ppi_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
       { with: "magnesium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
     monitoring: [
@@ -5973,7 +5973,7 @@ mct: {
         {with: "coq10", effect: "Энергетический метаболизм", mechanism: "МСТ — топливо, CoQ10 — АТФ", severity: "LOW"},
       ],
     conflicts: [
-      { with: "antidiabetic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
       { with: "electrolyte_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
     monitoring: [
@@ -6115,7 +6115,7 @@ tyrosine: {
       { with: "rhodiola", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-      { with: "antidepressant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
       { with: "l_dopa", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
     monitoring: [
@@ -6147,7 +6147,7 @@ tryptophan: {
       ],
     conflicts: [
       { with: "x5htp", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
-      { with: "antidepressant_drugs", effect: "СИОЗС + Триптофан — риск серотонинового синдрома", mechanism: "Комбинированное действие", severity: "HIGH" }
+      { with: "pharma", effect: "СИОЗС + Триптофан — риск серотонинового синдрома", mechanism: "Комбинированное действие", severity: "HIGH" }
     ],
     monitoring: [
       { what: 'Качество сна', when: 'Субъективно' }
@@ -6175,7 +6175,7 @@ x5htp: {
       { with: "magnesium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-      { with: "antidepressant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
       { with: "tryptophan", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
     monitoring: [
@@ -6203,15 +6203,15 @@ gaba: {
     description: 'ГАМК — главный тормозной нейромедиатор. Снижает тревожность и улучшает сон. Плохо проникает ГГБ.',
     synergies: [
       { with: "magnesium", effect: "Магний — кофактор ГАМК-рецепторов", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "anxiolytic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "ashwagandha", effect: "Ашваганда потенцирует ГАМК", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "theanine", effect: "Теанин потенцирует ГАМК-рецепторы", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
       { with: "melatonin", effect: "Мелатонин + ГАМК — двойное расслабление", mechanism: "Комбинированное действие", severity: "HIGH" },
-      { with: "nsaid_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
-      { with: "anxiolytic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
-      { with: "antidepressant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
       { with: "gaba", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" }
     ],
     monitoring: [
@@ -6320,7 +6320,7 @@ arginine: {
       { with: "citrulline", effect: "Цитруллин рециклирует аргинин → больше NO", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-        {with: "antiviral_drugs", effect: "Взаимодействие", mechanism: "Аргинин может усиливать репликацию вирусов", severity: "LOW"},
+        {with: "pharma", effect: "Взаимодействие", mechanism: "Аргинин может усиливать репликацию вирусов", severity: "LOW"},
       ],
     monitoring: [
       { what: 'Артериальное давление', when: 'Каждые 8 нед' }
@@ -6508,7 +6508,7 @@ phenibut: {
         {with: "theanine", effect: "Фокус без седации", mechanism: "Разные GABA-механизмы", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "sedative_drugs", effect: "Опасная седация", mechanism: "Фенибут + бензодиазепины", severity: "HIGH"},
+        {with: "pharma", effect: "Опасная седация", mechanism: "Фенибут + бензодиазепины", severity: "HIGH"},
         {with: "alcohol", effect: "Депрессия ЦНС", mechanism: "Оба — депрессанты ЦНС", severity: "HIGH"},
       ],
     monitoring: [
@@ -6670,7 +6670,7 @@ s_adenosyl_methionine: {
         {with: "curcumin", effect: "Противовоспалительное + антидепрессивное", mechanism: "Оба модулируют воспаление", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "antidepressant_drugs", effect: "Серотониновый синдром", mechanism: "SAMe + СИОЗС", severity: "HIGH"},
+        {with: "pharma", effect: "Серотониновый синдром", mechanism: "SAMe + СИОЗС", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Настроение', when: 'Субъективно' },
@@ -6700,7 +6700,7 @@ ginseng: {
     ],
     conflicts: [
       { with: "stimulant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
-      { with: "anticoagulant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
     monitoring: [
       { what: 'Кортизол утром', when: 'Каждые 4 нед', targetRange: '6-23 мкг/дл' }
@@ -6730,7 +6730,7 @@ rhodiola: {
     ],
     conflicts: [
       { with: "stimulant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
-      { with: "antidepressant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
     monitoring: [
       { what: 'Утомление/фокус', when: 'Субъективно' }
@@ -6865,9 +6865,9 @@ holy_basil: {
       { with: "soy_isoflavones", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-      { with: "antidepressant_drugs", effect: "Туласи потенцирует антидепрессанты", mechanism: "Комбинированное действие", severity: "HIGH" },
+      { with: "pharma", effect: "Туласи потенцирует антидепрессанты", mechanism: "Комбинированное действие", severity: "HIGH" },
       { with: "progesterone", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
-      { with: "anticoagulant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
     ],
     monitoring: [
       { what: 'Кортизол/сахар', when: 'Каждые 4 нед' }
@@ -6999,12 +6999,12 @@ ginger: {
     mechanisms: ['ANTI_INFLAMMATORY', 'NAUSEA_RELIEF', 'DIGESTION_ENHANCEMENT', 'MUSCLE_RECOVERY'],
     description: 'Имбирь — противовоспалительное и противорвотное. Джинджеролы ингибируют COX-2 и LOX. На курсе помогает с тошнотой.',
     synergies: [
-      { with: "nsaid_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "arb_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "curcumin", effect: "Имбирь + Куркумин — двойное противовоспалительное", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-      { with: "anticoagulant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
     monitoring: [
       { what: 'Тошнота/воспаление', when: 'Субъективно' }
@@ -7058,11 +7058,11 @@ resveratrol: {
     mechanisms: ['SIRT1_ACTIVATION', 'ANTIOXIDANT', 'ANTI_INFLAMMATORY', 'NRF2_ACTIVATION'],
     description: 'Ресвератрол — активатор SIRT1 и NRF2. Биодоступность около 20 процентов, птеростильбен предпочтительнее.',
     synergies: [
-      { with: "statin_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "nmn", effect: "Резвератрол + NMN — NAD+ + сиртуины", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-      { with: "anticoagulant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед', targetRange: 'ЛПНП<3.0' }
@@ -7087,13 +7087,13 @@ quercetin: {
     mechanisms: ['ANTI_INFLAMMATORY', 'ANTIHISTAMINE', 'SENOLYTIC', 'NRF2_ACTIVATION'],
     description: 'Кверцетин — флавоноид с противовоспалительным и антигистаминным действием. Сенолитик.',
     synergies: [
-      { with: "antihistamine_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "vitamin_c", effect: "Кверцетин + Витамин С — антиоксидантная синергия", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "anthocyanins", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-      { with: "antibiotic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
-      { with: "immunosuppressant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
     ],
     monitoring: [
       { what: 'Окислительный стресс', when: 'Каждые 12 нед' }
@@ -7177,11 +7177,11 @@ melatonin: {
     description: 'Мелатонин — гормон сна, мощный антиоксидант. На курсе улучшает восстановление.',
     synergies: [
       { with: "magnesium", effect: "Мелатонин + Магний — расслабление + сон", mechanism: "Комбинированное действие", severity: "MEDIUM" },
-      { with: "anxiolytic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
       { with: "gaba", effect: "Мелатонин + ГАМК — двойное расслабление", mechanism: "Комбинированное действие", severity: "HIGH" },
-      { with: "antidepressant_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
       { with: "stimulant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" }
     ],
     monitoring: [
@@ -7211,7 +7211,7 @@ ginkgo: {
       { with: "vinpocetine", effect: "Гинкго + Винпоцетин — двойной мозговой кровоток", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-        {with: "anticoagulant_drugs", effect: "Риск кровотечения", mechanism: "Гинкго снижает агрегацию тромбоцитов", severity: "HIGH"},
+        {with: "pharma", effect: "Риск кровотечения", mechanism: "Гинкго снижает агрегацию тромбоцитов", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Когниция/память', when: 'Субъективно' }
@@ -7560,7 +7560,7 @@ thymosin_alpha1: {
         {with: "zinc", effect: "Т-клеточный иммунитет", mechanism: "Оба поддерживают Т-лимфоциты", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "Тимозин стимулирует иммунитет", severity: "MEDIUM"},
+        {with: "pharma", effect: "Антагонизм", mechanism: "Тимозин стимулирует иммунитет", severity: "MEDIUM"},
       ],
     monitoring: [
       { what: 'Иммунограмма', when: 'Каждые 8 нед' }
@@ -7799,7 +7799,7 @@ glp1: {
         {with: "berberine", effect: "Контроль глюкозы и аппетита", mechanism: "Оба снижают аппетит и глюкозу", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "antidiabetic_drugs", effect: "Риск гипогликемии", mechanism: "Двойное снижение глюкозы", severity: "HIGH"},
+        {with: "pharma", effect: "Риск гипогликемии", mechanism: "Двойное снижение глюкозы", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Глюкоза натощак', when: 'Каждые 4 нед' }
@@ -8139,7 +8139,7 @@ phenylalanine: {
         {with: "vitamin_c", effect: "Синтез норадреналина", mechanism: "C — кофактор дофамин-бета-гидроксилазы", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "maoi_drugs", effect: "Гипертонический криз", mechanism: "Фенилаланин + ИМАО = опасно", severity: "HIGH"},
+        {with: "pharma", effect: "Гипертонический криз", mechanism: "Фенилаланин + ИМАО = опасно", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -8221,7 +8221,7 @@ reishi: {
         {with: "turkey_tail", effect: "Максимальная иммуномодуляция", mechanism: "Разные бета-глюканы", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "Рейши стимулирует иммунитет", severity: "MEDIUM"},
+        {with: "pharma", effect: "Антагонизм", mechanism: "Рейши стимулирует иммунитет", severity: "MEDIUM"},
       ],
     monitoring: [
       { what: 'АЛТ/АСТ', when: 'Каждые 8 нед' }
@@ -8471,7 +8471,7 @@ grape_seed_extract: {
         {with: "curcumin", effect: "Противовоспалительное", mechanism: "Оба подавляют NF-kB", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "anticoagulant_drugs", effect: "Усиление антикоагуляции", mechanism: "Снижает агрегацию тромбоцитов", severity: "MEDIUM"},
+        {with: "pharma", effect: "Усиление антикоагуляции", mechanism: "Снижает агрегацию тромбоцитов", severity: "MEDIUM"},
       ],
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед' }
@@ -8499,7 +8499,7 @@ pycnogenol: {
         {with: "vitamin_e", effect: "Защита сосудов и кожи", mechanism: "Оба — антиоксиданты", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "anticoagulant_drugs", effect: "Антикоагуляция", mechanism: "Снижает агрегацию тромбоцитов", severity: "MEDIUM"},
+        {with: "pharma", effect: "Антикоагуляция", mechanism: "Снижает агрегацию тромбоцитов", severity: "MEDIUM"},
       ],
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед' }
@@ -8631,7 +8631,7 @@ citrus_bioflavonoids: {
         {with: "quercetin", effect: "Противовоспалительное", mechanism: "Оба — флавоноиды", severity: "MEDIUM"},
       ],
     conflicts: [
-      { with: "statin_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
     ],
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед' }
@@ -8738,7 +8738,7 @@ magnolia: {
         {with: "magnesium", effect: "Улучшение сна", mechanism: "Оба — расслабление", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "sedative_drugs", effect: "Усиление седации", mechanism: "Магнолол потенцирует седативные", severity: "MEDIUM"},
+        {with: "pharma", effect: "Усиление седации", mechanism: "Магнолол потенцирует седативные", severity: "MEDIUM"},
       ],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -8819,7 +8819,7 @@ garlic: {
         {with: "omega3", effect: "Кардиопротекция", mechanism: "Оба снижают холестерин", severity: "MEDIUM"},
       ],
     conflicts: [
-      { with: "anticoagulant_drugs", effect: "Чеснок потенцирует антикоагулянты", mechanism: "Комбинированное действие", severity: "LOW" }
+      { with: "pharma", effect: "Чеснок потенцирует антикоагулянты", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед' }
@@ -8872,7 +8872,7 @@ nattokinase: {
         {with: "omega3", effect: "Антитромботическое", mechanism: "Оба снижают риск тромбов", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "anticoagulant_drugs", effect: "Риск кровотечения", mechanism: "Наттокиназа + антикоагулянты", severity: "HIGH"},
+        {with: "pharma", effect: "Риск кровотечения", mechanism: "Наттокиназа + антикоагулянты", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Фибриноген', when: 'Каждые 8 нед' }
@@ -8899,7 +8899,7 @@ grapefruit_seed: {
         {with: "probiotics", effect: "Антимикробное + пробиотическое", mechanism: "Экстракт грейпфрута — антимикробное", severity: "LOW"},
       ],
     conflicts: [
-        {with: "statin_drugs", effect: "Ингибирование CYP3A4", mechanism: "Бергамоттин ингибирует CYP3A4", severity: "HIGH"},
+        {with: "pharma", effect: "Ингибирование CYP3A4", mechanism: "Бергамоттин ингибирует CYP3A4", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Микрофлора', when: 'Субъективно' }
@@ -9136,7 +9136,7 @@ cranberry: {
       { with: "probiotics", effect: "Клюква + Пробиотики — МП защита", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-        {with: "anticoagulant_drugs", effect: "Усиление антикоагуляции", mechanism: "Клюква + варфарин", severity: "HIGH"},
+        {with: "pharma", effect: "Усиление антикоагуляции", mechanism: "Клюква + варфарин", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Общий анализ мочи', when: 'Каждые 8 нед' }
@@ -9445,7 +9445,7 @@ vinpocetine: {
       { with: "ginkgo", effect: "Винпоцетин + Гинкго — мозговой кровоток", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-        {with: "anticoagulant_drugs", effect: "Риск кровотечения", mechanism: "Винпоцетин + антикоагулянты", severity: "MEDIUM"},
+        {with: "pharma", effect: "Риск кровотечения", mechanism: "Винпоцетин + антикоагулянты", severity: "MEDIUM"},
       ],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -9473,7 +9473,7 @@ modafinil: {
         {with: "l_tyrosine", effect: "Бодрость и фокус", mechanism: "Модафинил + тирозин — дофамин", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "antihypertensive_drugs", effect: "Повышение давления", mechanism: "Модафинил может повышать АД", severity: "MEDIUM"},
+        {with: "pharma", effect: "Повышение давления", mechanism: "Модафинил может повышать АД", severity: "MEDIUM"},
       ],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -9500,8 +9500,8 @@ selegiline: {
         {with: "l_tyrosine", effect: "Дофаминергическая синергия", mechanism: "Селегилин ингибирует MAO-B", severity: "HIGH"},
       ],
     conflicts: [
-        {with: "maoi_drugs", effect: "Серотониновый синдром", mechanism: "Двойное ингибирование MAO", severity: "HIGH"},
-        {with: "antidepressant_drugs", effect: "Серотониновый синдром", mechanism: "Селегилин + СИОЗС", severity: "HIGH"},
+        {with: "pharma", effect: "Серотониновый синдром", mechanism: "Двойное ингибирование MAO", severity: "HIGH"},
+        {with: "pharma", effect: "Серотониновый синдром", mechanism: "Селегилин + СИОЗС", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Дофамин', when: 'Каждые 8 нед' }
@@ -9581,8 +9581,8 @@ tianeptine: {
         {with: "omega3", effect: "Нейропротекция", mechanism: "Оба поддерживают нейропластичность", severity: "LOW"},
       ],
     conflicts: [
-        {with: "maoi_drugs", effect: "Серотониновый синдром", mechanism: "Тианептин + ИМАО = опасно", severity: "HIGH"},
-        {with: "antidepressant_drugs", effect: "Серотониновый синдром", mechanism: "Тианептин + СИОЗС", severity: "HIGH"},
+        {with: "pharma", effect: "Серотониновый синдром", mechanism: "Тианептин + ИМАО = опасно", severity: "HIGH"},
+        {with: "pharma", effect: "Серотониновый синдром", mechanism: "Тианептин + СИОЗС", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Настроение', when: 'Субъективно' }
@@ -9662,7 +9662,7 @@ lemon_balm: {
         {with: "magnesium", effect: "Анксиолитический эффект", mechanism: "Оба усиливают GABA", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "sedative_drugs", effect: "Усиление седации", mechanism: "Мелисса потенцирует седативные", severity: "MEDIUM"},
+        {with: "pharma", effect: "Усиление седации", mechanism: "Мелисса потенцирует седативные", severity: "MEDIUM"},
       ],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -9690,7 +9690,7 @@ saffron: {
         {with: "curcumin", effect: "Противовоспалительное + антидепрессивное", mechanism: "Оба модулируют серотонин", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "antidepressant_drugs", effect: "Серотониновый синдром", mechanism: "Шафран + СИОЗС", severity: "HIGH"},
+        {with: "pharma", effect: "Серотониновый синдром", mechanism: "Шафран + СИОЗС", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Настроение', when: 'Субъективно' }
@@ -9747,7 +9747,7 @@ semaglutide: {
         {with: "berberine", effect: "Контроль глюкозы и веса", mechanism: "Оба снижают аппетит", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "antidiabetic_drugs", effect: "Риск гипогликемии", mechanism: "Двойное снижение глюкозы", severity: "HIGH"},
+        {with: "pharma", effect: "Риск гипогликемии", mechanism: "Двойное снижение глюкозы", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Глюкоза натощак', when: 'Каждые 4 нед', targetRange: '3.5-5.5 ммоль/л' }
@@ -9893,7 +9893,7 @@ diclofenac: {
         {with: "omeprazole", effect: "Защита желудка при НПВС", mechanism: "ИПП предотвращает НПВС-гастропатию", severity: "HIGH"},
       ],
     conflicts: [
-        {with: "anticoagulant_drugs", effect: "Риск кровотечения", mechanism: "НПВС + антикоагулянты", severity: "HIGH"},
+        {with: "pharma", effect: "Риск кровотечения", mechanism: "НПВС + антикоагулянты", severity: "HIGH"},
         {with: "lithium", effect: "Токсичность лития", mechanism: "НПВС снижают выведение Li", severity: "HIGH"},
       ],
     monitoring: [
@@ -9922,7 +9922,7 @@ meloxicam: {
         {with: "omeprazole", effect: "Защита ЖКТ", mechanism: "ИПП при НПВС", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "anticoagulant_drugs", effect: "Риск кровотечения", mechanism: "НПВС + антикоагулянты", severity: "HIGH"},
+        {with: "pharma", effect: "Риск кровотечения", mechanism: "НПВС + антикоагулянты", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Креатинин', when: 'Каждые 2 нед' }
@@ -9981,7 +9981,7 @@ spironolactone: {
         {with: "saw_palmetto", effect: "Антиандрогенный эффект", mechanism: "Оба подавляют андрогены", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "ace_inhibitor_drugs", effect: "Риск гиперкалиемии", mechanism: "Спиронолактон + ИАПФ = калий", severity: "HIGH"},
+        {with: "pharma", effect: "Риск гиперкалиемии", mechanism: "Спиронолактон + ИАПФ = калий", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Калий', when: 'Каждые 2 нед', targetRange: '4.0-5.0 ммоль/л' }
@@ -10118,7 +10118,7 @@ ketamine: {
     description: 'Кетамин — NMDA-антагонист с быстрым антидепрессивным действием. Только в клинике под наблюдением.',
     synergies: [],
     conflicts: [
-        {with: "antidepressant_drugs", effect: "Риск серотонинового синдрома", mechanism: "Кетамин + СИОЗС", severity: "MEDIUM"},
+        {with: "pharma", effect: "Риск серотонинового синдрома", mechanism: "Кетамин + СИОЗС", severity: "MEDIUM"},
       ],
     monitoring: [
       { what: 'Настроение', when: 'Субъективно' }
@@ -10129,13 +10129,13 @@ ketamine: {
     bestForCourse: false,
   },
 antidiabetic_drugs: {
-    id: 'antidiabetic_drugs',
+    id: 'pharma',
     name: 'Metformin',
     nameRu: 'Метформин',
     tier: 'specialty',
     category: ['pharma', 'metabolic'],
     forms: [
-      { id: 'antidiabetic_drugs', name: 'Metformin', nameRu: 'Метформин', dose: '500-2000 мг/сут', best: true }
+      { id: 'pharma', name: 'Metformin', nameRu: 'Метформин', dose: '500-2000 мг/сут', best: true }
     ],
     organs: ['PANCREAS', 'LIVER', 'MUSCLES'],
     systems: ['metabolic', 'hepatic'],
@@ -10154,13 +10154,13 @@ antidiabetic_drugs: {
     bestForCourse: false,
   },
 thyroid_drugs: {
-    id: 'thyroid_drugs',
+    id: 'pharma',
     name: 'Levothyroxine',
     nameRu: 'Левотироксин',
     tier: 'specialty',
     category: ['pharma', 'hormonal'],
     forms: [
-      { id: 'thyroid_drugs', name: 'Levothyroxine', nameRu: 'Левотироксин 50 мкг', dose: '50 мкг 1x/д', best: true },
+      { id: 'pharma', name: 'Levothyroxine', nameRu: 'Левотироксин 50 мкг', dose: '50 мкг 1x/д', best: true },
       { id: 'thyroid_drugs_2', name: 'Liothyronine', nameRu: 'Лиотиронин 25 мкг', dose: '25 мкг', best: false }
     ],
     organs: ['THYROID', 'BRAIN', 'HEART'],
@@ -10202,7 +10202,7 @@ corticosteroid_drugs: {
     conflicts: [
         {with: "calcium", effect: "Остеопороз", mechanism: "Кортикостероиды вымывают Ca", severity: "HIGH"},
         {with: "vitamin_d3", effect: "Дефицит D3", mechanism: "Кортикостероиды снижают D3", severity: "MEDIUM"},
-        {with: "nsaid_drugs", effect: "Риск язвы", mechanism: "КС + НПВС = язва желудка", severity: "HIGH"},
+        {with: "pharma", effect: "Риск язвы", mechanism: "КС + НПВС = язва желудка", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Кортизол', when: 'Каждые 4 нед' }
@@ -10258,7 +10258,7 @@ antiplatelet_drugs: {
     description: 'Антиагреганты — аспирин/клопидогрел для предотвращения тромбов. На курсе — защита сосудов при эритроцитозе.',
     synergies: [],
     conflicts: [
-        {with: "nsaid_drugs", effect: "Риск кровотечения", mechanism: "Двойное подавление тромбоцитов", severity: "HIGH"},
+        {with: "pharma", effect: "Риск кровотечения", mechanism: "Двойное подавление тромбоцитов", severity: "HIGH"},
         {with: "omega3", effect: "Усиление антиагрегантного эффекта", mechanism: "Омега-3 снижает агрегацию", severity: "MEDIUM"},
         {with: "ginger", effect: "Усиление эффекта", mechanism: "Имбирь ингибирует тромбоциты", severity: "MEDIUM"},
       ],
@@ -10526,13 +10526,13 @@ antihistamine_drugs: {
     bestForCourse: false,
   },
 nsaid_drugs: {
-    id: 'nsaid_drugs',
+    id: 'pharma',
     name: 'NSAID Drugs',
     nameRu: 'НПВС',
     tier: 'specialty',
     category: ['pharma', 'anti_inflammatory'],
     forms: [
-      { id: 'nsaid_drugs', name: 'NSAID Drugs', nameRu: 'Ибупрофен 400 мг', dose: '400 мг 2x/д', best: true },
+      { id: 'pharma', name: 'NSAID Drugs', nameRu: 'Ибупрофен 400 мг', dose: '400 мг 2x/д', best: true },
       { id: 'nsaid_drugs_2', name: 'NSAID Drugs', nameRu: 'Напроксен 250 мг', dose: '400 мг', best: false }
     ],
     organs: ['JOINTS', 'MUSCLES', 'STOMACH'],
@@ -10708,7 +10708,7 @@ beta_glucan: {
         {with: "zinc", effect: "Иммунитет", mechanism: "Оба — врождённый иммунитет", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "Стимулирует иммунитет", severity: "MEDIUM"},
+        {with: "pharma", effect: "Антагонизм", mechanism: "Стимулирует иммунитет", severity: "MEDIUM"},
       ],
     monitoring: [
       { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
@@ -10898,7 +10898,7 @@ ahcc: {
         {with: "reishi", effect: "Грибная иммуномодуляция", mechanism: "Оба — иммуномодуляторы", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "AHCC стимулирует иммунитет", severity: "MEDIUM"},
+        {with: "pharma", effect: "Антагонизм", mechanism: "AHCC стимулирует иммунитет", severity: "MEDIUM"},
       ],
     monitoring: [
       { what: 'NK-клетки', when: 'Каждые 8 нед' }
@@ -10946,7 +10946,7 @@ adrenaline: {
     description: 'Адреналин — маркер симпатической активации. Не добавка, а показатель стресс-реакции для контроля на курсе.',
     synergies: [],
     conflicts: [
-        {with: "beta_blocker_drugs", effect: "Антагонизм", mechanism: "Бета-блокаторы блокируют адреналин", severity: "HIGH"},
+        {with: "pharma", effect: "Антагонизм", mechanism: "Бета-блокаторы блокируют адреналин", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Адреналин', when: 'Каждые 8 нед' }
@@ -11074,7 +11074,7 @@ omega3: {
     mechanisms: ['EPA_ANTI_INFLAMMATORY', 'DHA_BRAIN_STRUCTURE', 'TRIGLYCERIDE_LOWERING', 'BLOOD_PRESSURE_REGULATION'],
     description: 'Омега-3 (EPA+DHA) — незаменимые жирные кислоты, кардиопротектор и нейропротектор. Снижает триглицериды и воспаление.',
     synergies: [
-      { with: "nsaid_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
+      { with: "pharma", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "vitamin_d3", effect: "Омега-3 усиливает рецепторы витамина Д", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "coq10", effect: "КоКю10 + Омега-3 — кардиопротекция и митохондрии", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "phosphatidylcholine", effect: "Фосфатидилхолин + Омега-3 — фосфолипиды мозга", mechanism: "Комбинированное действие", severity: "MEDIUM" },
@@ -11093,7 +11093,7 @@ omega3: {
       { with: "brand_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-      { with: "anticoagulant_drugs", effect: "Усиление антикоагулянтного эффекта — риск кровотечения", mechanism: "Комбинированное действие", severity: "LOW" }
+      { with: "pharma", effect: "Усиление антикоагулянтного эффекта — риск кровотечения", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед', targetRange: 'ТГ<1.7 ммоль/л' }
@@ -11121,7 +11121,7 @@ astragalus: {
         {with: "reishi", effect: "Адаптогенный и иммунный", mechanism: "Оба — иммуномодуляторы", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "Астрагал стимулирует иммунитет", severity: "MEDIUM"},
+        {with: "pharma", effect: "Антагонизм", mechanism: "Астрагал стимулирует иммунитет", severity: "MEDIUM"},
       ],
     monitoring: [
       { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
@@ -11257,7 +11257,7 @@ insulin: {
       { with: "ipamorelin", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-        {with: "antidiabetic_drugs", effect: "Риск гипогликемии", mechanism: "Двойное снижение глюкозы", severity: "HIGH"},
+        {with: "pharma", effect: "Риск гипогликемии", mechanism: "Двойное снижение глюкозы", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Глюкоза', when: 'Каждые 4 нед', targetRange: '3.5-5.5 ммоль/л' }
@@ -11335,7 +11335,7 @@ pectin: {
         {with: "probiotics", effect: "Пребиотический эффект", mechanism: "Пектин — растворимая клетчатка", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "statin_drugs", effect: "Снижение всасывания", mechanism: "Пектин может связывать лекарства", severity: "LOW"},
+        {with: "pharma", effect: "Снижение всасывания", mechanism: "Пектин может связывать лекарства", severity: "LOW"},
       ],
     monitoring: [
       { what: 'Холестерин', when: 'Каждые 8 нед' }
@@ -11443,7 +11443,7 @@ andrographis: {
         {with: "zinc", effect: "Противовирусная активность", mechanism: "Оба подавляют вирусы", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "Андрографис стимулирует иммунитет", severity: "MEDIUM"},
+        {with: "pharma", effect: "Антагонизм", mechanism: "Андрографис стимулирует иммунитет", severity: "MEDIUM"},
       ],
     monitoring: [
       { what: 'АЛТ/АСТ', when: 'Каждые 8 нед' }
@@ -11526,7 +11526,7 @@ licorice: {
         {with: "probiotics", effect: "Защита слизистой желудка", mechanism: "Солодка — гастропротектор", severity: "MEDIUM"},
       ],
     conflicts: [
-        {with: "antihypertensive_drugs", effect: "Повышение давления", mechanism: "Солодка задерживает натрий и воду", severity: "HIGH"},
+        {with: "pharma", effect: "Повышение давления", mechanism: "Солодка задерживает натрий и воду", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Калий/АД', when: 'Каждые 4 нед' }
@@ -13897,10 +13897,10 @@ export const SYNERGY_NETWORK: SynergyNetworkEntry[] = [
   {a:'aspirin',b:'ibuprofen',type:'conflict',effect:'ЖКТ-токсичность',mechanism:'НПВС + аспирин = синергия ульцерогенного эффекта → язва желудка',severity:'HIGH',score:8},
   {a:'probiotics',b:'antibiotics',type:'conflict',effect:'Уничтожение пробиотиков',mechanism:'Антибиотики широкого спектра убивают живые штаммы пробиотиков. Интервал приёма ≥ 3ч',severity:'HIGH',score:8},
   {a:'berberine',b:'cyp3a4_substrates',type:'conflict',effect:'Ингибитор CYP3A4',mechanism:'Берберин подавляет CYP3A4 → ↑ концентрация многих ЛС (статины, бензодиазепины, антидепрессанты). Осторожно!',severity:'HIGH',score:8},
-  {a:'berberine',b:'antidiabetic_drugs',type:'conflict',effect:'Гипогликемия',mechanism:'Берберин (AMPK) + гипогликемические → риск гипогликемии. Контроль сахара',severity:'MEDIUM',score:7},
-  {a:'ashwagandha',b:'thyroid_drugs',type:'conflict',effect:'↑ T3/T4',mechanism:'Ашваганда ↑ конверсию T4→T3, усиливая эффект тиреоидных гормонов',severity:'MEDIUM',score:6},
+  {a:'berberine',b:'pharma',type:'conflict',effect:'Гипогликемия',mechanism:'Берберин (AMPK) + гипогликемические → риск гипогликемии. Контроль сахара',severity:'MEDIUM',score:7},
+  {a:'ashwagandha',b:'pharma',type:'conflict',effect:'↑ T3/T4',mechanism:'Ашваганда ↑ конверсию T4→T3, усиливая эффект тиреоидных гормонов',severity:'MEDIUM',score:6},
   {a:'telmisartan',b:'potassium_supplements',type:'conflict',effect:'Гиперкалиемия',mechanism:'Телмисартан ↓ экскрецию K+ почками → риск гиперкалиемии с K-добавками',severity:'MEDIUM',score:7},
-  {a:'telmisartan',b:'nsaid_drugs',type:'conflict',effect:'↓ гипотензивного эффекта',mechanism:'НПВС блокируют синтез простагландинов, снижая гипотензивный эффект сартанов',severity:'MEDIUM',score:6},
+  {a:'telmisartan',b:'pharma',type:'conflict',effect:'↓ гипотензивного эффекта',mechanism:'НПВС блокируют синтез простагландинов, снижая гипотензивный эффект сартанов',severity:'MEDIUM',score:6},
   {a:'nebivolol',b:'verapamil',type:'conflict',effect:'Брадикардия',mechanism:'β1-блокатор + верапамил (Ca-блокатор) → риск тяжёлой брадикардии и AV-блокады',severity:'HIGH',score:9},
   {a:'omega3',b:'anticoagulants',type:'conflict',effect:'↑ риска кровотечений',mechanism:'Высокие дозы Омега-3 (>4г/д) ↓ агрегацию тромбоцитов → ↑ риск с антикоагулянтами',severity:'MEDIUM',score:6},
 
@@ -14951,7 +14951,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
 { id:'TELMISARTAN', name:'Телмисартан', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'TESTOSTERONE', name:'TESTOSTERONE', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'THEANINE', name:'THEANINE', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
-{ id:'THYROID_DRUGS', name:'THYROID DRUGS', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
+{ id:'pharma', name:'THYROID DRUGS', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'TONGKAT_ALI', name:'Тонгкат али', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'TRIBULUS', name:'TRIBULUS', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'TRYPTOPHAN', name:'Триптофан', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
@@ -15336,7 +15336,7 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'INT_GINSENG_STIMULANTS', substanceA: 'GINSENG', substanceB: 'STIMULANTS', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'ПЕРЕСТИМУЛЯЦИЯ: женьшень (↑ TH + ↓ МАО + ↑ NO) + стимуляторы = риск ↑ АД, ЧСС', mechanisms: ['TH_ACTIVATION', 'MAO_INHIBITION', 'NO_RELEASE', 'CARDIOVASCULAR_LOAD'], severity: 'MEDIUM' as 'synergy' | 'conflict' | 'caution', notes: 'Женьшень 200-400 мг + кофеин 50-100 мг: индивидуально. ↑ доз → ↑ тревога. Контроль АД/ЧСС' },
   { interactionId: 'INT_GINSENG_ANTICOAG', substanceA: 'GINSENG', substanceB: 'ANTICOAGULANTS', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'ГИПОГЛИКЕМИЯ: женьшень ↓ агрегацию тромбоцитов через ↓ TXA2 → ↑ МНО', mechanisms: ['PLATELET_AGGREGATION_DOWN', 'COAGULATION_MODULATION', 'INR_ELEVATION', 'BLEEDING_RISK'], severity: 'MEDIUM' as 'synergy' | 'conflict' | 'caution', notes: 'Контроль МНО при приёме женьшеня >1 г/сут. Панаксозиды ↓ тромбоксан A2. Отмена за 7 дней до хирургии' },
   { interactionId: 'INT_ASHWAGANDHA_BENZOS', substanceA: 'ASHWAGANDHA', substanceB: 'BENZODIAZEPINES', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'SEDATION_UP', mechanisms: ['GABA_MOD'], severity: 'MEDIUM', notes: 'Суммарная седация и расслабление Контроль: самочувствие, клинические маркеры 1р/4-12нед.' },
-  { interactionId: 'INT_ASHWAGANDHA_THYROID', substanceA: 'ASHWAGANDHA', substanceB: 'THYROID_DRUGS', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: '↑ T3: ашваганда ↑ DIO1/DIO2 → ↑ конверсия T4→T3 на 10-20%', mechanisms: ['THYROID_STIMULATION', 'T4_T3_CONVERSION', 'HORMONAL_SHIFT', 'DOSE_ADJUSTMENT'], severity: 'MEDIUM' as 'synergy' | 'conflict' | 'caution', notes: 'Ашваганда 300-600 мг на тироксине: контроль ТТГ через 4 нед. Возможно ↓ T4 на 10-20%. Противопоказано при гипертиреозе' },
+  { interactionId: 'INT_ASHWAGANDHA_THYROID', substanceA: 'ASHWAGANDHA', substanceB: 'pharma', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: '↑ T3: ашваганда ↑ DIO1/DIO2 → ↑ конверсия T4→T3 на 10-20%', mechanisms: ['THYROID_STIMULATION', 'T4_T3_CONVERSION', 'HORMONAL_SHIFT', 'DOSE_ADJUSTMENT'], severity: 'MEDIUM' as 'synergy' | 'conflict' | 'caution', notes: 'Ашваганда 300-600 мг на тироксине: контроль ТТГ через 4 нед. Возможно ↓ T4 на 10-20%. Противопоказано при гипертиреозе' },
   { interactionId: 'INT_RHODIOLA_STIMULANTS', substanceA: 'RHODIOLA', substanceB: 'STIMULANTS', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: '↑ NE: родиола ↓ МАО-А + ↑ TH → ↑ дофамин и NE + стимуляторы = риск перегрузки', mechanisms: ['MAO_A_INHIBITION', 'TH_UPREGULATION', 'CATECHOLAMINE_ELEVATION', 'OVERSTIMULATION'], severity: 'MEDIUM' as 'synergy' | 'conflict' | 'caution', notes: 'Родиола 200-400 мг + кофеин: ↓ тревогу (адаптоген). Высокие дозы (>600 мг) + стимуляторы → риск тревоги Контроль: самочувствие, клинические маркеры 1р/4-12нед.' },
   { interactionId: 'INT_RHODIOLA_SSRIS', substanceA: 'RHODIOLA', substanceB: 'SSRIs', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: '5-HT + DA: родиола (↓ МАО-А + ↓ КОМТ) + СИОЗС (SERT-блок) = риск ↑ серотонина', mechanisms: ['MAO_A_INHIBITION', 'COMT_INHIBITION', 'SEROTONIN_ELEVATION', 'MOOD_MODULATION'], severity: 'MEDIUM' as 'synergy' | 'conflict' | 'caution', notes: 'Безопасно в низких дозах (родиола 200 мг). ↑ тревоги/бессонницы → ↓ дозу. Не комбинировать с ИМАО Контроль: самочувствие, клинические маркеры 1р/4-12нед.' },
   { interactionId: 'INT_LITHIUM_SODIUM', substanceA: 'LITHIUM', substanceB: 'SODIUM', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: '↑ ЛИТИЯ: ↓ Na⁺ → ↑ реабсорбция Na⁺ в проксимальных канальцах → ↑ пассивная реабсорбция Li → ↑ Li плазмы', mechanisms: ['NA_K_ATPASE_COMPETITION', 'PROXIMAL_TUBULE_REABSORPTION', 'LITHIUM_ACCUMULATION', 'NEUROTOXICITY'], severity: 'HIGH' as 'synergy' | 'conflict' | 'caution', notes: 'Почему: Li⁺ реабсорбируется в проксимальных канальцах почек через Na⁺/H⁺-антипортер (NHE3) вместе с Na⁺. При ↓ Na⁺ (обезвоживание, диуретики, ↓ соли) почки ↑ реабсорбцию Na⁺ → ↑ пассивную реабсорбцию Li⁺ → ↑ Li плазмы на 50-100%. Симптомы: тошнота, атаксия, спутанность, судороги. Контроль: Li, Na сыв., осмолярность. Профилактика: Na 3-5 г/сут, гидратация 2+ л/сут' },
@@ -15370,7 +15370,7 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'INT_RACETAMS_GABA', substanceA: 'RACETAMS', substanceB: 'GABA', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'НЕПРЕДСКАЗУЕМЫЙ ЭФФЕКТ: рацетамы (↑ глутамат/AMPA) + ГАМК (↓ ЦНС) = взаимное нивелирование', mechanisms: ['AMPA_STIMULATION', 'GABA_INHIBITION', 'NEUROTRANSMITTER_IMBALANCE', 'MOOD_CHANGE'], severity: 'LOW' as 'synergy' | 'conflict' | 'caution', notes: 'Может ↓ эффект обоих. Интервал: рацетамы утром, ГАМК вечером. Или выбрать один Контроль: самочувствие, клинические маркеры 1р/4-12нед.' },
   { interactionId: 'INT_RACETAMS_PIRACETAM_CAFFEINE', substanceA: 'PIRACETAM', substanceB: 'CAFFEINE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'FOCUS_UP', mechanisms: ['NEURO_UP'], severity: 'LOW', notes: 'Лёгкая стимуляция + когнитивный буст Контроль: самочувствие, клинические маркеры 1р/4-12нед.' },
   { interactionId: 'INT_LCARNITINE_CAFFEINE', substanceA: 'L_CARNITINE', substanceB: 'CAFFEINE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'FAT_BURN_UP', mechanisms: ['FAT_OX_UP'], severity: 'LOW', notes: 'Усиление липолиза Контроль: самочувствие, клинические маркеры 1р/4-12нед.' },
-  { interactionId: 'INT_LCARNITINE_THYROID', substanceA: 'L_CARNITINE', substanceB: 'THYROID_DRUGS', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: '↑ T3: L-карнитин ↓ Т3-рецепторы в клетках → антагонизм с тиреоидными гормонами', mechanisms: ['T3_RECEPTOR_BLOCKADE', 'THYROID_HORMONE_ANTAGONISM', 'THYROID_DRUG_COUNTERACT', 'METABOLIC_RATE_DOWN'], severity: 'MEDIUM' as 'synergy' | 'conflict' | 'caution', notes: 'Почему: L-карнитин (и его ацетильная форма) ↓ связывание T3 с ядерными TR-α и TR-β рецепторами в клетках-мишенях (печень, мышцы, жировая ткань) → ↓ транскрипцию T3-зависимых генов (Na+/K+-АТФаза, UCP-2/3, миозин). L-карнитин 4 г/сут ↓ эффект T3 на 30-50%. На тироксине: может потребоваться ↑ доза T4 на 25-50%. Контроль: ТТГ, FT4, FT3, симптомы. Интервал: карнитин 4+ ч от T4' },
+  { interactionId: 'INT_LCARNITINE_THYROID', substanceA: 'L_CARNITINE', substanceB: 'pharma', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: '↑ T3: L-карнитин ↓ Т3-рецепторы в клетках → антагонизм с тиреоидными гормонами', mechanisms: ['T3_RECEPTOR_BLOCKADE', 'THYROID_HORMONE_ANTAGONISM', 'THYROID_DRUG_COUNTERACT', 'METABOLIC_RATE_DOWN'], severity: 'MEDIUM' as 'synergy' | 'conflict' | 'caution', notes: 'Почему: L-карнитин (и его ацетильная форма) ↓ связывание T3 с ядерными TR-α и TR-β рецепторами в клетках-мишенях (печень, мышцы, жировая ткань) → ↓ транскрипцию T3-зависимых генов (Na+/K+-АТФаза, UCP-2/3, миозин). L-карнитин 4 г/сут ↓ эффект T3 на 30-50%. На тироксине: может потребоваться ↑ доза T4 на 25-50%. Контроль: ТТГ, FT4, FT3, симптомы. Интервал: карнитин 4+ ч от T4' },
   { interactionId: 'INT_COQ10_STATINS', substanceA: 'COQ10', substanceB: 'STATINS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'МИОПРОТЕКЦИЯ: статины (ингибиторы HMG-CoA-редуктазы → ↓ холестерин + ↓ CoQ10) + CoQ10 (↑ убихинон в митохондриях мышц) = ↓ риска миопатии', mechanisms: ['MITOCHONDRIAL_PROTECTION', 'ATP_PRODUCTION', 'MUSCLE_RECOVERY', 'COQ10_REPLENISHMENT'], severity: 'HIGH' as 'synergy' | 'conflict' | 'caution', notes: 'CoQ10 200-400 мг/сут при приёме статинов. Убихинол (активная форма) предпочтительнее. Контроль: креатинкиназа, миалгия. Механизм: статины ↓ мевалонатный путь → ↓ синтез CoQ10 + ↓ малых ГТФаз → митохондриальная дисфункция. CoQ10 восполняет пул убихинона в мышечных митохондриях' },
   { interactionId: 'INT_COQ10_WARFARIN', substanceA: 'COQ10', substanceB: 'WARFARIN', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: '↓ МНО: CoQ10 структурно схож с вит.K → может антагонизировать варфарин', mechanisms: ['COAGULATION_MODULATION', 'VKOR_ACTIVATION', 'INR_LOWERING', 'THROMBOEMBOLISM'], severity: 'MEDIUM' as 'synergy' | 'conflict' | 'caution', notes: 'Почему: CoQ10 (убихинон) структурно похож на вит.K и может ↓ связывание варфарина с VKORC1 → ↑ рециклинг K1 → ↑ γ-карбоксилирование факторов свёртывания → ↓ МНО на 0.3-0.5. Клинически: небольшие колебания МНО. Контроль: МНО еженедельно 1 мес после добавления CoQ10. Дозу варфарина корректировать ±15%' },
   { interactionId: 'INT_BERBERINE_METFORMIN', substanceA: 'BERBERINE', substanceB: 'METFORMIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'ГИПОГЛИКЕМИЯ: берберин (AMPK-активатор, ↓ глюконеогенез, ↓ SREBP-1c) + метформин (AMPK-активатор, ↓ глюкозу) = потенцирование гипогликемии', mechanisms: ['AMPK_ACTIVATION', 'GLUCOSE_LOWERING', 'GLUCONEOGENESIS_INHIBITION', 'INSULIN_SENSITIVITY'], severity: 'HIGH' as 'synergy' | 'conflict' | 'caution', notes: 'Берберин 500 мг 2x/д с едой + метформин 500-2000 мг/сут с едой. Контроль: глюкоза, HbA1c каждые 4 нед. Риск гипогликемии (глюкоза < 70 мг/дл). Интервал: при сахаре >200 мг/дл. Цикл берберина: 8 нед, 2 нед перерыв. Мониторинг: глюкометр при симптомах гипогликемии' },
@@ -15416,9 +15416,9 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'INT_CALCIUM_PPI', substanceA: 'CALCIUM', substanceB: 'PPI', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: '↓ КАЛЬЦИЯ: ИПП ↑ pH желудка → ↓ растворение CaCO₃ → ↓ всасывание Ca; ↓ pH-зависимый TRPV5/6', mechanisms: ['PH_ALTERATION', 'CALCIUM_CARBONATE_DISSOLUTION', 'TRPV5_TRPV6_INHIBITION', 'OSTEOPOROSIS_RISK'], severity: 'MEDIUM' as 'synergy' | 'conflict' | 'caution', notes: 'Почему: CaCO₃ требует pH <4.5 для растворения в желудке. ИПП ↑ pH до 4-6 → ↓ растворение CaCO₃ на 70% → ↓ абсорбция. Длительно (>1 года) ↑ риск остеопороза и переломов (OR 1.25-1.5). Решение: принимать Ca цитрат (pH-независимый) + интервал 2 ч до/после ИПП. Дополнительно: Mg, K₂, D₃. Контроль: DEXA сканирование каждые 1-2 года' },
   { interactionId: 'INT_CALCIUM_IRON', substanceA: 'CALCIUM', substanceB: 'IRON', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'КОНКУРЕНЦИЯ: Ca²⁺ блокирует DMT-1 транспортер для Fe²⁺ → ↓ Fe на 50-70%', mechanisms: ['DMT1_COMPETITION', 'CATION_ANTAGONISM', 'IRON_BLOCK', 'MINERAL_INTERFERENCE'], severity: 'MEDIUM' as 'synergy' | 'conflict' | 'caution', notes: 'Интервал: Fe с вит.C натощак → 2ч → Ca с едой. Fe >100 мг одномоментно ↓ Ca на 20% Контроль: самочувствие, клинические маркеры 1р/4-12нед.' },
   { interactionId: 'INT_SELENIUM_VITC', substanceA: 'SELENIUM', substanceB: 'VITAMIN_C', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: '↑ СЕЛЕНА: вит.C ↓ Se-зависимых белков через ↓ GPx синтеза + ↑ Se почечный клиренс', mechanisms: ['GPX_REGULATION', 'SELENOPROTEIN_MODULATION', 'RENAL_SE_LOSS', 'REDOX_SHIFT'], severity: 'LOW' as 'synergy' | 'conflict' | 'caution', notes: 'Почему: вит.C (аскорбат 1000+ мг/сут) ↓ транскрипцию селенопротеинов (GPx, SeP) в печени через ↓ активации транскрипционного фактора TCF/Lef. ↑ почечный клиренс Se через ↓ реабсорбцию Se в проксимальных канальцах. Клинически: незначимый эффект при Se 200-400 мкг/сут. Контроль: Se сыв. при высокодозовой C (>2000 мг/сут)' },
-  { interactionId: 'INT_SELENIUM_THYROID', substanceA: 'SELENIUM', substanceB: 'THYROID_DRUGS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'THYROID_UP', mechanisms: ['T3_T4_UP'], severity: 'LOW', notes: 'Поддержка щитовидки Контроль: самочувствие, клинические маркеры 1р/4-12нед.' },
+  { interactionId: 'INT_SELENIUM_THYROID', substanceA: 'SELENIUM', substanceB: 'pharma', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'THYROID_UP', mechanisms: ['T3_T4_UP'], severity: 'LOW', notes: 'Поддержка щитовидки Контроль: самочувствие, клинические маркеры 1р/4-12нед.' },
   { interactionId: 'INT_SELENIUM_ZINC', substanceA: 'SELENIUM', substanceB: 'ZINC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'IMMUNE_UP', mechanisms: ['ANTIOX_UP'], severity: 'LOW', notes: 'Иммунная синергия Контроль: самочувствие, клинические маркеры 1р/4-12нед.' },
-  { interactionId: 'INT_IODINE_THYROID', substanceA: 'IODINE', substanceB: 'THYROID_DRUGS', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: '↑ T4/T3: йод ↓ TPO-активность при избытке (Wolff-Chaikoff) → риск ↑/↓ T гормонов', mechanisms: ['WOLFF_CHAIKOFF', 'THYROID_MODULATION', 'HORMONE_FLUCTUATION', 'DOSE_ADJUSTMENT'], severity: 'MEDIUM' as 'synergy' | 'conflict' | 'caution', notes: 'Йод 200-500 мкг/сут: безопасно. >1000 мкг/сут: риск тиреоидита. Контроль: ТТГ, FT4, FT3' },
+  { interactionId: 'INT_IODINE_THYROID', substanceA: 'IODINE', substanceB: 'pharma', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: '↑ T4/T3: йод ↓ TPO-активность при избытке (Wolff-Chaikoff) → риск ↑/↓ T гормонов', mechanisms: ['WOLFF_CHAIKOFF', 'THYROID_MODULATION', 'HORMONE_FLUCTUATION', 'DOSE_ADJUSTMENT'], severity: 'MEDIUM' as 'synergy' | 'conflict' | 'caution', notes: 'Йод 200-500 мкг/сут: безопасно. >1000 мкг/сут: риск тиреоидита. Контроль: ТТГ, FT4, FT3' },
   { interactionId: 'INT_IODINE_LITHIUM', substanceA: 'IODINE', substanceB: 'LITHIUM', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'ГИПОТИРЕОЗ: Li ↓ выброс T4 из щитовидки + йод ↓ TPO → синергия → риск гипотиреоза', mechanisms: ['THYROID_INHIBITION', 'T4_RELEASE_BLOCK', 'HYPOTHYROIDISM', 'GOITER'], severity: 'MEDIUM' as 'synergy' | 'conflict' | 'caution', notes: 'Контроль: ТТГ, FT4 каждые 4 нед при комбинации. Добавка T4 по необходимости' },
   { interactionId: 'INT_IODINE_ANTITHYROID', substanceA: 'IODINE', substanceB: 'ANTITHYROID_DRUGS', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'ПРОТИВОФАЗА: йод (↑ T4/T3) + тиреостатики (↓ TPO, ↓ T4/T3) = взаимное гашение', mechanisms: ['THYROID_ANTAGONISM', 'TPO_INHIBITION', 'HORMONE_BLOCK', 'OPPOSITE_EFFECTS'], severity: 'MEDIUM' as 'synergy' | 'conflict' | 'caution', notes: 'Не комбинировать. Йод при тиреотоксикозе только под контролем эндокринолога Контроль: самочувствие, клинические маркеры 1р/4-12нед.' },
   { interactionId: 'INT_ADAPTOGENS_STIMULANTS', substanceA: 'ADAPTOGENS', substanceB: 'STIMULANTS', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'МОДУЛЯЦИЯ: адаптогены (ашваганда, родиола) ↓ HPA-ось → ↓ кортизол → ↓ тревогу от стимуляторов', mechanisms: ['HPA_AXIS_MODULATION', 'CORTISOL_REDUCTION', 'ANXIOLYTIC', 'DRUG_INTERACTION'], severity: 'LOW' as 'synergy' | 'conflict' | 'caution', notes: 'Мягкое снижение тревоги от стимуляторов. Безопасно, полезно. Родиола 200 мг + кофеин 100 мг Контроль: самочувствие, клинические маркеры 1р/4-12нед.' },
