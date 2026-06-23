@@ -175,6 +175,7 @@ export const PharmaScreen: React.FC = () => {
   const [courseSub, setCourseSub] = useState<'course' | 'mapper' | 'diagnostics' | 'reports'>('course');
   const linked = useDataLink();
   const [courseReportGenerated, setCourseReportGenerated] = useState(false);
+  useEffect(() => { try { if (localStorage.getItem('he_pharma_report_current')) setCourseReportGenerated(true); } catch {} }, []);
   const [courseArchive, setCourseArchive] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_course_reports') || '[]'); } catch { return []; }
   });

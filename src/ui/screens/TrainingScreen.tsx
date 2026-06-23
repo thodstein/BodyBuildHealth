@@ -113,6 +113,7 @@ export const TrainingScreen: React.FC = () => {
   const [trainingOutput, setTrainingOutput] = useState<TrainingOutput | null>(null);
   const [macrocycle, setMacrocycle] = useState<MacrocyclePlan | null>(null);
   const [trainingReportGenerated, setTrainingReportGenerated] = useState(false);
+  useEffect(() => { try { if (localStorage.getItem('he_training_report_current')) setTrainingReportGenerated(true); } catch {} }, []);
   const [trainingArchive, setTrainingArchive] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_training_reports') || '[]'); } catch { return []; }
   });

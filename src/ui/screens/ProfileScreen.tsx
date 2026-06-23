@@ -377,7 +377,7 @@ const SleepDiary: React.FC<{ settings: any; save: (data: any) => void }> = ({ se
   );
 };
 
-export const ProfileScreen: React.FC = () => {
+export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> = ({ onNavigate }) => {
   const profile = useProfileRefresh();
   const [tab, setTab] = useState<ProfileTab>('overview');
   const [page, setPage] = useState<ProfilePage>('hero');
@@ -2274,15 +2274,15 @@ export const ProfileScreen: React.FC = () => {
                   { icon:'🍽', title:'Приёмов пищи', desc:'Завтрак, обед, ужин, перекусы. Дневное/недельное меню, корзина продуктов.', color:'#f59e0b', tab:'diet' },
                   { icon:'📏', title:'Замеров тела', desc:'Вес, обхваты (талия, грудь, бицепс, бедро), % жира. Фото прогресса с разных ракурсов.', color:'#a855f7', tab:'measurements' },
                   { icon:'🩸', title:'Анализов', desc:'Результаты анализов, референсные диапазоны, отклонения, динамика по датам.', color:'#ef4444', tab:'analytics' },
-                  { icon:'💊', title:'Курса', desc:'Препараты, дозировки, фазы. Календарь приёма, корзина покупок.', color:'#ec4899', tab:'overview' },
-                  { icon:'🧪', title:'Поддержки', desc:'БАДы, протоколы, стеки, синергии. Недельный план приёма.', color:'#06b6d4', tab:'overview' },
+                  { icon:'💊', title:'Курса', desc:'Препараты, дозировки, фазы. Календарь приёма, корзина покупок.', color:'#ec4899', tab:'overview', navScreen:'pharma' },
+                  { icon:'🧪', title:'Поддержки', desc:'БАДы, протоколы, стеки, синергии. Недельный план приёма.', color:'#06b6d4', tab:'overview', navScreen:'support' },
                   { icon:'❤️', title:'Давления', desc:'Систолическое/диастолическое давление, пульс. Дневник на день/неделю/месяц.', color:'#f43f5e', tab:'bp_diary' },
                   { icon:'🛌', title:'Сна', desc:'Продолжительность, качество, пробуждения. Корреляция с тренировками.', color:'#8b5cf6', tab:'sleep' },
                   { icon:'📊', title:'Отчётов', desc:'Полные отчёты по всем блокам: тренировки, анализы, риски, курс. Архив.', color:'#84cc16', tab:'analytics' },
-                  { icon:'⚠️', title:'Рисков', desc:'Оценка рисков по системам, Монте-Карло, клинические модели, MDSS.', color:'#f97316', tab:'analytics' },
+                  { icon:'⚠️', title:'Рисков', desc:'Оценка рисков по системам, Монте-Карло, клинические модели, MDSS.', color:'#f97316', tab:'analytics', navScreen:'risks' },
                   { icon:'🩺', title:'Травм', desc:'Журнал травм, реабилитация, ограничения движений, восстановление.', color:'#14b8a6', tab:'injuries' },
                 ].map((d, i) => (
-                  <div key={i} onClick={() => { try { if (d.tab) setTab(d.tab as ProfileTab); } catch(e) { console.warn('[Diary] nav:', e); } }} style={{
+                  <div key={i} onClick={() => { try { if ((d as any).navScreen && onNavigate) onNavigate((d as any).navScreen); else if (d.tab) setTab(d.tab as ProfileTab); } catch(e) { console.warn('[Diary] nav:', e); } }} style={{
                     display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, cursor:'pointer',
                     background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)',
                   }}>

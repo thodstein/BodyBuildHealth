@@ -380,7 +380,7 @@ const TYPE_LABELS_RU: Record<string, string> = {
   other: 'Другое', supplement: 'Добавки',
   polyphenol: 'Полифенолы', fungi: 'Грибы', metabiotic: 'Метабиотики',
   paraprobiotic: 'Парапробиотики', postbiotic: 'Постбиотики', prebiotic: 'Пребиотики',
-  symbiotic: 'Симбиотики', pharma: 'Фарма', complex: 'Комплексы',
+  symbiotic: 'Симбиотики',   pharma: 'Фармакологические препараты', complex: 'Комплексы',
   brand: 'Бренды', calcium: 'Кальций', magnesium: 'Магний', zinc: 'Цинк',
   iron: 'Железо', potassium: 'Калий', sodium: 'Натрий', selenium: 'Селен',
   iodine: 'Йод', chromium: 'Хром', manganese: 'Марганец', copper: 'Медь',
@@ -1844,7 +1844,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       const allSub = allSubsMap.get((entry.id||'').toLowerCase());
       return {
         id: entry.id,
-        name: entry.nameRu || allSub?.name || entry.name || entry.id,
+        name: entry.nameRu ? (entry.name && entry.name !== entry.nameRu ? `${entry.nameRu} (${entry.name})` : entry.nameRu) : (allSub?.name || entry.name || entry.id),
         categories: entry.category || [],
         mechanisms: (entry.mechanisms && entry.mechanisms.length > 0) ? entry.mechanisms : (allSub?.mechanisms || []),
         organs: (entry.organs && entry.organs.length > 0) ? entry.organs : (allSub?.organs || []),
@@ -1962,15 +1962,15 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   }, [searchQuery, supportTierFilter, catalogSubstances]);
 
   // Type-only grouping for "По типам" tab — все распределено, без polyphenols/supplement как отдельных групп
-  const TYPE_GROUPS = new Set(['vitamins','minerals','amino_acids','fatty_acids','herbs','mushrooms','peptides','hormones','enzymes','probiotics','electrolytes','antimicrobial','nootropics','adaptogens','antioxidants']);
+  const TYPE_GROUPS = new Set(['vitamins','minerals','amino_acids','fatty_acids','herbs','mushrooms','peptides','hormones','enzymes','probiotics','electrolytes','nootropics','adaptogens','antioxidants','pharma']);
   const ORGAN_TO_TYPE: Record<string, string> = {
     antioxidant:'antioxidants',polyphenol:'antioxidants',mitochondrial:'antioxidants',
     cardioprotector:'antioxidants',eye_protector:'antioxidants',anti_aging:'antioxidants',
     antiinflammatory:'antioxidants',anti_inflammatory:'antioxidants',skin:'antioxidants',
     beauty:'antioxidants',recovery:'antioxidants',marker:'antioxidants',
     neuroprotector:'nootropics',anxiolytic:'nootropics',antidepressant:'nootropics',
-    immunomodulator:'antimicrobial',anticoagulant:'antimicrobial',urinary_protector:'antimicrobial',
-    nsaid:'antimicrobial',immune:'antimicrobial',
+    immunomodulator:'antioxidants',anticoagulant:'antioxidants',urinary_protector:'herbs',
+    nsaid:'antioxidants',immune:'herbs',
     metabolic:'hormones',thyroid:'hormones',
     lipid:'fatty_acids',bone:'minerals',electrolyte:'electrolytes',
     multivitamin:'vitamins',hematologic:'vitamins',

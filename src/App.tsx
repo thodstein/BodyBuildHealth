@@ -150,7 +150,7 @@ export default function App() {
       case 'risks': return <RiskScreen key={key} />;
       case 'nutrition': return <NutritionScreen key={key} />;
       case 'marketplace': return <MarketplaceScreen key={key} />;
-      case 'profile': return <ProfileScreen key={key} />;
+      case 'profile': return <ProfileScreen key={key} onNavigate={handleNavigate} />;
       case 'articles': return <ArticlesScreen key={key} />;
       default: return <DashboardScreen key={key} onNavigate={handleNavigate} />;
     }

@@ -8887,7 +8887,7 @@ grapefruit_seed: {
     name: 'Grapefruit Seed',
     nameRu: 'Экстракт грейпфрутовых косточек',
     tier: 'standard',
-    category: ['antimicrobial', 'immunomodulator'],
+    category: ['immunomodulator', 'gut'],
     forms: [
       { id: 'grapefruit_seed', name: 'Grapefruit Seed', nameRu: 'Экстракт грейпфрутовых косточек 250 мг', dose: '250 мг 2x/д', best: true }
     ],
@@ -10474,7 +10474,7 @@ antibiotic_drugs: {
     name: 'Antibiotic Drugs',
     nameRu: 'Антибиотики',
     tier: 'specialty',
-    category: ['pharma', 'antimicrobial'],
+    category: ['pharma', 'immunomodulator'],
     forms: [
       { id: 'antibiotic_drugs', name: 'Antibiotic Drugs', nameRu: 'Антибиотик (по назначению врача)', dose: '1 мг 2x/д', best: true }
     ],
@@ -11700,6 +11700,93 @@ kpv: {
     dosage: { mg: 1000, timing: '2x/д', form: 'капс' },
     bestForCourse: true,
     synergies: [], conflicts: [], monitoring: [], contraindications: [], sideEffects: [],
+  },
+  NAC: {
+    id: 'NAC',
+    name: 'N-Acetylcysteine',
+    nameRu: 'N-Ацетилцистеин (NAC)',
+    tier: 'core',
+    category: ['antioxidant', 'hepatoprotector', 'mucolytic'],
+    forms: [
+      { id: 'nac_600', name: 'NAC 600mg', nameRu: 'NAC 600 мг', dose: '600 мг 2x/д', best: true },
+      { id: 'nac_1000', name: 'NAC 1000mg', nameRu: 'NAC 1000 мг', dose: '1000 мг/д', best: false },
+      { id: 'nac_effervescent', name: 'NAC Effervescent', nameRu: 'NAC шипучий', dose: '600 мг 2x/д', best: false }
+    ],
+    organs: ['LIVER', 'LUNGS', 'BLOOD', 'KIDNEYS'],
+    systems: ['hepatic', 'respiratory', 'hematologic', 'renal'],
+    mechanisms: ['ANTIOXIDANT', 'GLUTATHIONE_PRECURSOR', 'MUCUS_REGULATION', 'HEPATIC_PROTECTION', 'CHELATION', 'DETOXIFICATION'],
+    description: 'N-Ацетилцистеин — предшественник глутатиона, мощный антиоксидант и гепатопротектор. Снижает окислительный стресс, защищает печень при приёме ААС, разжижает мокроту.',
+    dosage: { mg: 1200, timing: 'натощак, 2x/д', form: 'капс/шип' },
+    bestForCourse: true,
+    synergies: [
+      { with: 'TUDCA', effect: 'Гепатопротекторный стек', mechanism: 'NAC + TUDCA синергия', severity: 'HIGH' },
+      { with: 'vitamin_c', effect: 'Усиление антиоксидантной защиты', mechanism: 'Рециклинг глутатиона', severity: 'MEDIUM' },
+      { with: 'selenium', effect: 'Кофактор глутатионпероксидазы', mechanism: 'Селен необходим для GPX', severity: 'MEDIUM' },
+      { with: 'lipoic_acid', effect: 'Антиоксидантный каскад', mechanism: 'ALA рециклирует глутатион', severity: 'MEDIUM' },
+      { with: 'milk_thistle', effect: 'Синергия гепатопротекторов', mechanism: 'Разные пути защиты печени', severity: 'MEDIUM' }
+    ],
+    conflicts: [
+      { with: 'activated_charcoal', effect: 'Снижение абсорбции NAC', mechanism: 'Адсорбция', severity: 'HIGH' },
+      { with: 'anticoagulant_drugs', effect: 'Потенцирование антикоагуляции', mechanism: 'Усиление эффекта', severity: 'MEDIUM' }
+    ],
+    monitoring: [
+      { what: 'Печёночные ферменты (АЛТ, АСТ)', when: 'Каждые 4 нед', targetRange: 'В пределах нормы' },
+      { what: 'Уровень глутатиона (эритроциты)', when: 'Каждые 8 нед', targetRange: '> 600 мкмоль/л' }
+    ],
+    contraindications: [
+      'Бронхиальная астма (с осторожностью)',
+      'Язвенная болезнь желудка (обострение)',
+      'Беременность (с осторожностью)'
+    ],
+    sideEffects: [
+      'Тошнота/рвота (при высоких дозах >3 г/д)',
+      'Диарея',
+      'Головная боль',
+      'Кожные аллергические реакции'
+    ]
+  },
+  TUDCA: {
+    id: 'TUDCA',
+    name: 'Tauroursodeoxycholic Acid',
+    nameRu: 'Тауроурсодезоксихолевая кислота (TUDCA)',
+    tier: 'core',
+    category: ['hepatoprotector', 'choleretic', 'antioxidant'],
+    forms: [
+      { id: 'tudca_250', name: 'TUDCA 250mg', nameRu: 'TUDCA 250 мг', dose: '250 мг 2x/д', best: true },
+      { id: 'tudca_500', name: 'TUDCA 500mg', nameRu: 'TUDCA 500 мг', dose: '500 мг/д', best: false }
+    ],
+    organs: ['LIVER', 'GALLBLADDER', 'PANCREAS'],
+    systems: ['hepatic', 'gastrointestinal', 'metabolic'],
+    mechanisms: ['BILE_ACID_MODULATION', 'ANTIAPOPTOTIC', 'PROTEIN_FOLDING', 'CHOLERETIC', 'MITOCHONDRIAL_PROTECTION', 'ENDOPLASMIC_RETICULUM_STABILIZATION'],
+    description: 'TUDCA — гидрофильная конъюгированная желчная кислота, защищает гепатоциты от токсического действия гидрофобных желчных кислот. Снижает ER-стресс, обладает антиапоптотическим действием.',
+    dosage: { mg: 500, timing: 'перед едой, 2x/д', form: 'капс' },
+    bestForCourse: true,
+    synergies: [
+      { with: 'NAC', effect: 'Мощный гепатопротекторный стек', mechanism: 'NAC + TUDCA', severity: 'HIGH' },
+      { with: 'milk_thistle', effect: 'Дополнительная защита печени', mechanism: 'Разные механизмы', severity: 'MEDIUM' },
+      { with: 'lipoic_acid', effect: 'Митохондриальная защита', mechanism: 'ALA + TUDCA', severity: 'MEDIUM' },
+      { with: 'vitamin_e', effect: 'Антиоксидантная поддержка', mechanism: 'TUDCA + Витамин E', severity: 'LOW' }
+    ],
+    conflicts: [
+      { with: 'bile_acid_drugs', effect: 'Конкуренция за рецепторы', mechanism: 'TUDCA может снижать эффективность других желчных кислот', severity: 'MEDIUM' },
+      { with: 'aluminium_antacids', effect: 'Снижение абсорбции', mechanism: 'Связывание', severity: 'MEDIUM' }
+    ],
+    monitoring: [
+      { what: 'Печёночные ферменты (АЛТ, АСТ, ГГТ, ЩФ)', when: 'Каждые 4 нед', targetRange: 'В пределах нормы' },
+      { what: 'Билирубин общий и прямой', when: 'Каждые 8 нед', targetRange: '< 1.2 мг/дл' },
+      { what: 'УЗИ печени/желчного пузыря', when: 'Каждые 12 нед', targetRange: 'Без патологии' }
+    ],
+    contraindications: [
+      'Полная обструкция желчевыводящих путей',
+      'Острый холецистит',
+      'Тяжёлая печёночная недостаточность (Child-Pugh C)'
+    ],
+    sideEffects: [
+      'Диарея (наиболее частый)',
+      'Дискомфорт в правом подреберье',
+      'Тошнота',
+      'Крапивница (редко)'
+    ]
   },
 };
 

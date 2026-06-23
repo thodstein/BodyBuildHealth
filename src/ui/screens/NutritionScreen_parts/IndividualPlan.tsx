@@ -1441,9 +1441,10 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
   const generateMealPrep = () => {
     const prepSource = mealPrepDays === 1 ? dayPlan : mealPrepDays === 3 ? threeDayPlan : weekPlan;
-    if (!prepSource) { generatePlan(mealPrepDays as 1|3|7); if (!prepSource) return; }
-    const days = mealPrepDays === 1 ? [dayPlan] : mealPrepDays === 3 ? threeDayPlan.days : weekPlan.days;
-    if (!days) return;
+    if (!prepSource) { generatePlan(mealPrepDays as 1|3|7); return; }
+    const src = mealPrepDays === 1 ? dayPlan : mealPrepDays === 3 ? threeDayPlan : weekPlan;
+    const days = mealPrepDays === 1 ? [src] : src?.days || [src];
+    if (!days || days.length === 0) return;
     const steps: MealPrepStep[] = [];
     let stepNum = 1;
     const allItems = days.flatMap((d: any) => d.meals.flatMap((m: any) => m.items.map((it: any) => ({ ...it, mealLabel: m.label, mealTime: m.time }))));
@@ -1546,6 +1547,9 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   const [riskReport, setRiskReport] = useState<{ systems: Record<string, { score: number; impact: string; recommendation: string }>; totalRisk: string; summary: string } | null>(null);
   const [drugCompatReport, setDrugCompatReport] = useState<{ interactions: { drug: string; food: string; effect: string; severity: 'low' | 'medium' | 'high' }[]; warnings: string[] } | null>(null);
   const [nutritionReport, setNutritionReport] = useState<NutritionReport | null>(null);
+  useEffect(() => {
+    try { const saved = localStorage.getItem('he_nutrition_report_current'); if (saved) { setNutritionReport(JSON.parse(saved)); setActiveReports(prev => prev.includes('nutrition') ? prev : [...prev, 'nutrition']); } } catch {}
+  }, []);
 
   const generateAllergenReport = () => {
     if (!dayPlan) return;
@@ -1758,7 +1762,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       time: m.time || '',
     }));
     const rep = generateNutritionReport({
-      meals, totals: { kcal: dayPlan.totals.kcal, p: dayPlan.totals.p, f: dayPlan.totals.f, c: dayPlan.totals.c },
+      meals, totals: { kcal: dayPlan?.totals?.kcal || 0, p: dayPlan?.totals?.p || 0, f: dayPlan?.totals?.f || 0, c: dayPlan?.totals?.c || 0 },
       targets: { kcal: planTargets.kcal, protein: planTargets.protein, fats: planTargets.fats, carbs: planTargets.carbs },
       userWeight: getProfileSafe()?.settings?.weight || 80,
       userTDEE: planTargets.kcal,

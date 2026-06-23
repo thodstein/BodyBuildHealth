@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, REQUIRED_LABS_PER_PHASE, UCUM_MAP } from '../../core/constants';
 import type { RiskResult, LabPoint } from '../../core/types';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
@@ -175,6 +175,7 @@ export const LabsScreen: React.FC = () => {
   });
   const [addError, setAddError] = useState('');
   const [labReportGenerated, setLabReportGenerated] = useState(false);
+  useEffect(() => { try { if (localStorage.getItem('he_labs_report_current')) setLabReportGenerated(true); } catch {} }, []);
   const [selectedArchivedLabReport, setSelectedArchivedLabReport] = useState<any>(null);
   const [labArchive, setLabArchive] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_lab_reports') || '[]'); } catch { return []; }

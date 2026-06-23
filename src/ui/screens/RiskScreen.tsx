@@ -104,6 +104,7 @@ export const RiskScreen: React.FC = () => {
   const globalNoLabs = forceNoLabs || globalNoLabsState;
   const noLabsSystems = noLabsSystemsState;
   const [riskReportGenerated, setRiskReportGenerated] = useState(false);
+  useEffect(() => { try { if (localStorage.getItem('he_risks_report_current')) setRiskReportGenerated(true); } catch {} }, []);
   const [riskArchive, setRiskArchive] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_risk_reports') || '[]'); } catch { return []; }
   });
