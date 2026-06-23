@@ -1152,7 +1152,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (calcView !== 'main') {
       if (section === 'generator') {
         setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main');
-      } else if (['mixcalc','💪 Тренировочные миксы','joints','acne','peptides'].includes(calcView)) {
+      } else if (['joints','acne','peptides'].includes(calcView)) {
         setCalcView('info'); setInfoView('catalog'); setInfoTab('catalog');
         if (calcView === 'peptides') setSection('home');
       } else if (calcView === 'info') {
@@ -3073,7 +3073,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['mixcalc','💪 Тренировочные миксы','joints','acne','peptides'].includes(calcView) || section === 'generator' || section === 'protocols' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['joints','acne','peptides'].includes(calcView) || section === 'generator' || section === 'protocols' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (with back/home) ===== */}
       {section === 'generator' && (
@@ -3112,7 +3112,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       )}
 
       {/* ===== INFO HEADER (back/home + pills) ===== */}
-      {(section === 'info' || calcView === 'info' || ['mixcalc','💪 Тренировочные миксы','joints','acne','peptides'].includes(calcView)) && (
+      {(section === 'info' || calcView === 'info' || ['joints','acne','peptides'].includes(calcView)) && (
         <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
           <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center', overflowX:'auto' }}>
             <button onClick={goBack} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
@@ -3130,7 +3130,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   research: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); setSection('home'); },
                   favorites: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('favorites'); setSection('home'); },
 
-                  mixcalc: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); },
+                  mixcalc: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('supportstacks'); setStackSubTab('mixcalc'); },
                   neuro: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('neuro'); },
                   joints: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('joints'); },
                   acne: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('acne'); },
@@ -3219,7 +3219,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   { icon:'🔬', title:'Исследования', desc:'Научная база исследований по всем веществам поддержки', color:'#f59e0b', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); } },
                    { icon:'🧮', title:'Генератор стеков', desc:'Автоматический подбор стека по органам, целям и биомаркерам', color:'#ec4899', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('supportstacks'); setStackSubTab('generator'); } },
                   { icon:'📂', title:'Мои стеки', desc:'Сохранённые персональные стеки с оценкой синергий и конфликтов', color:'#22c55e', action:() => { setSection('generator'); setTab('main'); setSupportView('calc'); setCalcView('mystacks'); } },
-                  { icon:'⚡', title:'Тренировочные миксы', desc:'Пре-/интра-/пост-тренировочные стеки для пампа, силы и восстановления', color:'#f97316', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); } },
+                  { icon:'⚡', title:'Тренировочные миксы', desc:'Пре-/интра-/пост-тренировочные стеки для пампа, силы и восстановления', color:'#f97316', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('supportstacks'); setStackSubTab('mixcalc'); } },
                   { icon:'📅', title:'План поддержки', desc:'Дневной, недельный и месячный план приёма по тайм-слотам', color:'#84cc16', action:() => { setSection('generator'); setTab('main'); setSupportView('calc'); setCalcView('plan'); } },
                   { icon:'🧠', title:'Нейротоксичность', desc:'Детальные механизмы нейротоксичности ААС и протокол нейропротекции', color:'#ec4899', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('neuro'); } },
                   { icon:'🦴', title:'Суставы и связки', desc:'Калькулятор поддержки суставов, анализы и протоколы', color:'#f59e0b', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('joints'); } },
@@ -4527,7 +4527,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               <div>
                 {/* Sub-tabs: Все стеки / Миксы / Генератор / Замена / Поиск */}
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  {[['readystacks','📦 Все стеки'],['mixes','🧬 Миксы'],['generator','⚡ Генератор стеков'],['replace','🔀 Подбор замены'],['search','🔍 Поиск препарата']].map(([id,label]) => (
+                  {[['readystacks','📦 Все стеки'],['mixes','🧬 Миксы'],['generator','⚡ Генератор стеков'],['replace','🔀 Подбор замены'],['search','🔍 Поиск препарата'],['mixcalc','⚡ Тренировочные миксы']].map(([id,label]) => (
                     <button key={id} onClick={() => {
                       setStackSubTab(id);
                     }} style={{
@@ -5349,6 +5349,188 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     )}
                   </div>
                 )}
+
+                {/* TRAINING MIXES sub-tab */}
+                {stackSubTab === 'mixcalc' && (() => {
+                  const hasCourse = (linked.course || []).length > 0;
+                  const isOnCycle = hasCourse;
+                  const bw = linked.profile?.settings?.weight ?? 80;
+                  const multiplier = isOnCycle ? 1.25 : 1.0;
+                  const isPre = mixTiming === 'pre';
+                  const isIntra = mixTiming === 'intra';
+                  const isPost = mixTiming === 'post';
+
+                  const preStack = [
+                    { name:'Кофеин (безводный)', dose: `${(Math.min(6, 3 + (mixGoal==='focus'?3:0) + (mixGoal==='endurance'?1:0)) * bw * multiplier / 1000).toFixed(2)} г`, note:'За 30-45 мин до. Стимуляция ЦНС, липолиз' },
+                    { name:'L-Цитруллин малат', dose: `${(8 * multiplier).toFixed(1)} г`, note:'За 45-60 мин до. Оксид азота, памп' },
+                    { name:'Бета-аланин', dose:'3.2 г', note:'За 30 мин до. Буфер молочной кислоты' },
+                    { name:'L-Аргинин (опционально)', dose:`${(5 * multiplier).toFixed(1)} г`, note:'За 30 мин до. Усиливает памп' },
+                    { name:'L-Тирозин', dose:`${(2 * multiplier).toFixed(1)} г`, note:'За 30 мин до. Фокус, дофамин' },
+                    { name:'Таурин', dose:`${(2 * multiplier).toFixed(1)} г`, note:'За 30 мин до. Осморегуляция, антиоксидант' },
+                  ];
+
+                  const durationHrs = mixGoal === 'endurance' ? 2 : 1.5;
+                  const intraStack = [
+                    { name:'Натрий (Na⁺)', dose: `${Math.round(750 * durationHrs)} мг`, note:'Каждые 15-20 мин с водой. Гидратация' },
+                    { name:'Калий (K⁺)', dose: `${Math.round(300 * durationHrs)} мг`, note:'Каждые 15-20 мин. Предотвращение судорог' },
+                    { name:'Магний (Mg²⁺)', dose: `${Math.round(150 * durationHrs)} мг`, note:'Каждые 30 мин. Судороги, расслабление' },
+                    { name:'Циклический декстрин (HBCD)', dose: `${Math.round(45 * durationHrs)} г`, note:'Каждые 15-20 мин. Быстрый углевод, низкий GI' },
+                    { name:'EAA (BCAA 2:1:1)', dose: `${(10 * multiplier).toFixed(1)} г`, note:'Каждые 30 мин. Анти-катаболизм' },
+                    { name:'L-Глютамин', dose:`${(5 * multiplier).toFixed(1)} г`, note:'Каждые 30 мин. Кишечник, иммунитет' },
+                  ];
+
+                  const postStack = [
+                    { name:'Сывороточный протеин (изолят)', dose: `${(0.4 * bw).toFixed(0)} г`, note:'Сразу после. Быстрое усвоение' },
+                    { name:'Креатин моногидрат', dose:'5 г', note:'Сразу после. Восполнение фосфокреатина' },
+                    { name:'HMB (β-гидрокси-β-метилбутират)', dose: isOnCycle ? '3 г' : '— (натуральный тренинг)', note:'Сразу после. Анти-катаболизм' },
+                    { name:'L-Глютамин', dose:`${(5 * multiplier).toFixed(0)} г`, note:'Сразу после. Иммунитет, гликоген' },
+                    { name:'Цинк + Магний (ZMA)', dose:'30 мг Zn + 450 мг Mg', note:'За 30-60 мин до сна. Тестостерон, сон' },
+                    { name:'Витамин C', dose:'500 мг', note:'Сразу после. Кортизол, антиоксидант' },
+                  ];
+
+                  const activeStack = isPre ? preStack : isIntra ? intraStack : postStack;
+                  const stackTitle = isPre ? '⚡ Пре-тренировочный стек' : isIntra ? '💧 Интра-тренировочный стек' : '🍗 Пост-тренировочный стек';
+                  const timingLabel = isPre ? 'За 30-60 мин до тренировки' : isIntra ? 'Во время тренировки (каждые 15-20 мин)' : 'Сразу после тренировки';
+
+                  const glycemicCompounds = ['HGH','insulin','metformin','berberine','semaglutide','tirzepatide'];
+                  const userGlycemic = (linked.course || []).filter(c => glycemicCompounds.some(g => (c.substanceId||'').toLowerCase().includes(g.toLowerCase())));
+                  const hasGlycemic = userGlycemic.length > 0;
+
+                  return (
+                  <div style={{ padding:'0 4px' }}>
+                    <div style={{ marginBottom:10, background:'linear-gradient(135deg,rgba(249,115,22,0.08),rgba(234,88,12,0.04))', borderRadius:12, padding:'14px 12px', border:'1px solid rgba(249,115,22,0.12)' }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:'#f97316', marginBottom:2 }}>⚡ Тренировочные миксы</div>
+                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', lineHeight:1.3 }}>Пре-/интра-/пост-тренировочные стеки для пампа, силы и восстановления</div>
+                    </div>
+                    {/* Parameters */}
+                    <div className="card" style={{ marginBottom:10, padding:10 }}>
+                      <h4 style={{ margin:'0 0 8px', fontSize:11, color:'var(--text)' }}>🎯 Параметры</h4>
+                      <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' }}>
+                        <div style={{ flex:'1 1 45%', minWidth:100 }}>
+                          <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Цель</div>
+                          <select value={mixGoal} onChange={e=>setMixGoal(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
+                            <option value="pump">💪 Памп</option>
+                            <option value="endurance">🏃 Выносливость</option>
+                            <option value="strength">🏋️ Сила</option>
+                            <option value="recovery">🔄 Восстановление</option>
+                            <option value="focus">🧠 Фокус</option>
+                          </select>
+                        </div>
+                        <div style={{ flex:'1 1 45%', minWidth:100 }}>
+                          <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Время приёма</div>
+                          <select value={mixTiming} onChange={e=>setMixTiming(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
+                            <option value="pre">⚡ Пре-тренировка</option>
+                            <option value="intra">💧 Интра-тренировка</option>
+                            <option value="post">🍗 Пост-тренировка</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{ marginBottom:8 }}>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Вес тела (кг)</div>
+                        <input type="number" value={bw} readOnly
+                          style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
+                      </div>
+                    </div>
+
+                    {isOnCycle && (
+                      <div className="card" style={{ padding:'8px 10px', marginBottom:10, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', fontSize:9, color:'#a78bfa' }}>
+                        🔬 На курсе: дозы повышены ×{multiplier}. Активные вещества: {(linked.course||[]).map(c=>c.substanceId).join(', ')}
+                      </div>
+                    )}
+
+                    <div className="card" style={{ marginBottom:10, padding:12, background:'linear-gradient(135deg, rgba(0,230,138,0.04), rgba(139,92,246,0.04))', border:'1px solid var(--glass-border)' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                        <span style={{ fontSize:18 }}>{isPre ? '⚡' : isIntra ? '💧' : '🍗'}</span>
+                        <div>
+                          <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>{stackTitle}</div>
+                          <div style={{ fontSize:8, color:'var(--text-dim)' }}>{timingLabel}</div>
+                        </div>
+                        {isOnCycle && <span style={{ marginLeft:'auto', fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(139,92,246,0.15)', color:'#a78bfa' }}>×{multiplier}</span>}
+                      </div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                        {activeStack.map((item,i)=>(
+                          <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--accent)', flexShrink:0 }} />
+                            <div style={{ flex:1, fontSize:10 }}>
+                              <span style={{ color:'var(--text-light)' }}>{item.name}</span>
+                              <span style={{ color:'var(--text-dim)', fontSize:8, marginLeft:4 }}>— {item.note}</span>
+                            </div>
+                            <span style={{ fontSize:10, fontWeight:600, color:'#00e68a', whiteSpace:'nowrap' }}>{item.dose}</span>
+                            <button onClick={() => { const id = resolveProtoId(item.name); if (id && !enhancedSubs.includes(id)) setEnhancedSubs(prev => [...prev, id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:8, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'rgba(0,230,138,0.7)' }}>+ Стек</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {hasGlycemic && isIntra && (
+                      <div className="card" style={{ padding:10, marginBottom:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.15)' }}>
+                        <div style={{ fontSize:10, fontWeight:700, color:'#f87171', marginBottom:4 }}>⚠ Внимание: гликемические взаимодействия</div>
+                        <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>
+                          У вас на курсе: <b>{userGlycemic.map(c=>c.substanceId).join(', ')}</b>. Эти вещества влияют на уровень глюкозы.
+                          Контролируйте глюкометром каждые 30 мин. При гипогликемии — увеличьте HBCD на 15-20 г.
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="card" style={{ padding:10, marginBottom:8 }}>
+                      <h4 style={{ margin:'0 0 6px', fontSize:11, color:'var(--text)' }}>📋 Все три стека (обзор)</h4>
+                      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                        {[
+                          { label:'⚡ Пре', items:preStack.slice(0,4).map(i=>`${i.name.split('(')[0].trim()}: ${i.dose}`).join(' · ') },
+                          { label:'💧 Интра', items:intraStack.slice(0,4).map(i=>`${i.name.split('(')[0].trim()}: ${i.dose}`).join(' · ') },
+                          { label:'🍗 Пост', items:postStack.slice(0,4).map(i=>`${i.name.split('(')[0].trim()}: ${i.dose}`).join(' · ') },
+                        ].map((grp, gi) => (
+                          <div key={gi} style={{ padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
+                            <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:3 }}>{grp.label}-тренировочный</div>
+                            <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>{grp.items}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="card" style={{ padding:12, marginBottom:8, border:'1px solid rgba(236,72,153,0.2)' }}>
+                      <h4 style={{ margin:'0 0 8px', fontSize:11, color:'#ec4899' }}>💉 Пептиды/Гормоны к тренировке</h4>
+                      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                        {[
+                          { key:'insulin', label:'Инсулин', val:mixInsulin, set:setMixInsulin, timing:mixInsulinTiming, setTiming:setMixInsulinTiming, defaultUnit:'ЕД', note:'Только под глюкометром! +30г быстрых углеводов' },
+                          { key:'mgf', label:'MGF (PEG-MGF)', val:mixMGF, set:setMixMGF, timing:mixMGFTiming, setTiming:setMixMGFTiming, defaultUnit:'мкг', note:'Локально в целевую мышцу за 15 мин до тренировки' },
+                          { key:'igf', label:'IGF-1 (LR3/DES)', val:mixIGF, set:setMixIGF, timing:mixIGFTiming, setTiming:setMixIGFTiming, defaultUnit:'мкг', note:'Системно/локально. DES — немедленно, LR3 — за 20 мин' },
+                          { key:'gh', label:'ГР (HGH/rHGH)', val:mixGH, set:setMixGH, timing:mixGHTiming, setTiming:setMixGHTiming, defaultUnit:'МЕ', note:'За 30-60 мин до для жиросжигания. Пост — для восстановления' },
+                        ].map((p) => (
+                          <div key={p.key} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.1)' }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                              <span style={{ fontSize:10, fontWeight:700, color:'var(--text-light)' }}>{p.label}</span>
+                              <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                                <span style={{ fontSize:8, color:'var(--text-dim)' }}>{p.defaultUnit}</span>
+                                <input type="number" min="0" max="100" step="0.5" value={p.val} onChange={e => p.set(Math.max(0, Number(e.target.value) || 0))} placeholder="0" style={{ width:60, padding:'4px 6px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-primary)', color:'var(--text)', fontSize:10, textAlign:'center' }} />
+                              </div>
+                            </div>
+                            <div style={{ display:'flex', gap:4 }}>
+                              <button onClick={() => p.setTiming('pre')} style={{ padding:'2px 8px', borderRadius:4, fontSize:8, fontWeight:600, cursor:'pointer', border:'none', background:p.timing==='pre'?'#ec4899':'var(--bg-secondary)', color:p.timing==='pre'?'#000':'var(--text-dim)' }}>До тренировки</button>
+                              <button onClick={() => p.setTiming('post')} style={{ padding:'2px 8px', borderRadius:4, fontSize:8, fontWeight:600, cursor:'pointer', border:'none', background:p.timing==='post'?'#ec4899':'var(--bg-secondary)', color:p.timing==='post'?'#000':'var(--text-dim)' }}>После тренировки</button>
+                            </div>
+                            {p.val > 0 && <div style={{ fontSize:7, color:'#ec4899', marginTop:2, opacity:0.7 }}>{p.note}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="card" style={{ padding:10 }}>
+                      <h4 style={{ margin:'0 0 4px', fontSize:10, color:'var(--text-dim)' }}>📝 Рекомендации</h4>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>
+                        • Все дозы рассчитаны на вес <b>{bw} кг</b>{isOnCycle ? ' (на курсе ×1.25)' : ' (натуральный тренинг ×1.0)'}.<br/>
+                        • Пейте воду: 500 мл за 2 ч до + 200-300 мл каждые 15-20 мин во время тренировки.<br/>
+                        • Общий объём жидкости интра-тренировки: ~{(durationHrs * 0.9).toFixed(1)} л для {bw} кг.<br/>
+                        • Избегайте жиров и клетчатки за 2 ч до тренировки — замедляют всасывание.<br/>
+                        • Пост-тренировочный приём — в течение 30 мин после завершения (анаболическое окно).<br/>
+                        • При использовании инсулина/метформина: обязательно глюкометр + быстрые углеводы под рукой.
+                      </div>
+                    </div>
+                    {/* Back to stacks */}
+                    <button onClick={() => setStackSubTab('readystacks')} style={{ width:'100%', marginTop:10, padding:'8px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)' }}>← Назад к стекам</button>
+                  </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -6253,192 +6435,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       )}
 
 
-      {/* ===== MIX CALCULATOR: Training Mix ===== */}
-      {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'mixcalc' && (() => {
-        const hasCourse = (linked.course || []).length > 0;
-        const isOnCycle = hasCourse;
-        const bw = linked.profile?.settings?.weight ?? 80;
-        const multiplier = isOnCycle ? 1.25 : 1.0;
-        const isPre = mixTiming === 'pre';
-        const isIntra = mixTiming === 'intra';
-        const isPost = mixTiming === 'post';
-
-        const preStack = [
-          { name:'Кофеин (безводный)', dose: `${(Math.min(6, 3 + (mixGoal==='focus'?3:0) + (mixGoal==='endurance'?1:0)) * bw * multiplier / 1000).toFixed(2)} г`, note:'За 30-45 мин до. Стимуляция ЦНС, липолиз' },
-          { name:'L-Цитруллин малат', dose: `${(8 * multiplier).toFixed(1)} г`, note:'За 45-60 мин до. Оксид азота, памп' },
-          { name:'Бета-аланин', dose:'3.2 г', note:'За 30 мин до. Буфер молочной кислоты' },
-          { name:'L-Аргинин (опционально)', dose:`${(5 * multiplier).toFixed(1)} г`, note:'За 30 мин до. Усиливает памп' },
-          { name:'L-Тирозин', dose:`${(2 * multiplier).toFixed(1)} г`, note:'За 30 мин до. Фокус, дофамин' },
-          { name:'Таурин', dose:`${(2 * multiplier).toFixed(1)} г`, note:'За 30 мин до. Осморегуляция, антиоксидант' },
-        ];
-
-        const durationHrs = mixGoal === 'endurance' ? 2 : 1.5;
-        const intraStack = [
-          { name:'Натрий (Na⁺)', dose: `${Math.round(750 * durationHrs)} мг`, note:'Каждые 15-20 мин с водой. Гидратация' },
-          { name:'Калий (K⁺)', dose: `${Math.round(300 * durationHrs)} мг`, note:'Каждые 15-20 мин. Предотвращение судорог' },
-          { name:'Магний (Mg²⁺)', dose: `${Math.round(150 * durationHrs)} мг`, note:'Каждые 30 мин. Судороги, расслабление' },
-          { name:'Циклический декстрин (HBCD)', dose: `${Math.round(45 * durationHrs)} г`, note:'Каждые 15-20 мин. Быстрый углевод, низкий GI' },
-          { name:'EAA (BCAA 2:1:1)', dose: `${(10 * multiplier).toFixed(1)} г`, note:'Каждые 30 мин. Анти-катаболизм' },
-          { name:'L-Глютамин', dose:`${(5 * multiplier).toFixed(1)} г`, note:'Каждые 30 мин. Кишечник, иммунитет' },
-        ];
-
-        const postStack = [
-          { name:'Сывороточный протеин (изолят)', dose: `${(0.4 * bw).toFixed(0)} г`, note:'Сразу после. Быстрое усвоение' },
-          { name:'Креатин моногидрат', dose:'5 г', note:'Сразу после. Восполнение фосфокреатина' },
-          { name:'HMB (β-гидрокси-β-метилбутират)', dose: isOnCycle ? '3 г' : '— (натуральный тренинг)', note:'Сразу после. Анти-катаболизм' },
-          { name:'L-Глютамин', dose:`${(5 * multiplier).toFixed(0)} г`, note:'Сразу после. Иммунитет, гликоген' },
-          { name:'Цинк + Магний (ZMA)', dose:'30 мг Zn + 450 мг Mg', note:'За 30-60 мин до сна. Тестостерон, сон' },
-          { name:'Витамин C', dose:'500 мг', note:'Сразу после. Кортизол, антиоксидант' },
-        ];
-
-        const activeStack = isPre ? preStack : isIntra ? intraStack : postStack;
-        const stackTitle = isPre ? '⚡ Пре-тренировочный стек' : isIntra ? '💧 Интра-тренировочный стек' : '🍗 Пост-тренировочный стек';
-        const timingLabel = isPre ? 'За 30-60 мин до тренировки' : isIntra ? 'Во время тренировки (каждые 15-20 мин)' : 'Сразу после тренировки';
-
-        const glycemicCompounds = ['HGH','insulin','metformin','berberine','semaglutide','tirzepatide'];
-        const userGlycemic = (linked.course || []).filter(c => glycemicCompounds.some(g => (c.substanceId||'').toLowerCase().includes(g.toLowerCase())));
-        const hasGlycemic = userGlycemic.length > 0;
-
-        return safeRender('mixcalc', () => (
-        <div style={{ padding:'0 0 80px' }}>
-          <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>⚡ Миксы для тренировки</h2>
-          <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Калькулятор пре-/интра-/пост-тренировочных стеков</p>
-
-          {/* --- Parameters --- */}
-          <div className="card" style={{ marginBottom:10, padding:10 }}>
-            <h4 style={{ margin:'0 0 8px', fontSize:11, color:'var(--text)' }}>🎯 Параметры</h4>
-            <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' }}>
-              <div style={{ flex:'1 1 45%', minWidth:100 }}>
-                <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Цель</div>
-                <select value={mixGoal} onChange={e=>setMixGoal(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
-                  <option value="pump">💪 Памп</option>
-                  <option value="endurance">🏃 Выносливость</option>
-                  <option value="strength">🏋️ Сила</option>
-                  <option value="recovery">🔄 Восстановление</option>
-                  <option value="focus">🧠 Фокус</option>
-                </select>
-              </div>
-              <div style={{ flex:'1 1 45%', minWidth:100 }}>
-                <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Время приёма</div>
-                <select value={mixTiming} onChange={e=>setMixTiming(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
-                  <option value="pre">⚡ Пре-тренировка</option>
-                  <option value="intra">💧 Интра-тренировка</option>
-                  <option value="post">🍗 Пост-тренировка</option>
-                </select>
-              </div>
-            </div>
-            <div style={{ marginBottom:8 }}>
-              <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Вес тела (кг)</div>
-              <input type="number" value={bw} readOnly
-                style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
-            </div>
-          </div>
-
-          {/* On-cycle notice */}
-          {isOnCycle && (
-            <div className="card" style={{ padding:'8px 10px', marginBottom:10, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', fontSize:9, color:'#a78bfa' }}>
-              🔬 На курсе: дозы повышены ×{multiplier}. Активные вещества: {(linked.course||[]).map(c=>c.substanceId).join(', ')}
-            </div>
-          )}
-
-          {/* Stack Card */}
-          <div className="card" style={{ marginBottom:10, padding:12, background:'linear-gradient(135deg, rgba(0,230,138,0.04), rgba(139,92,246,0.04))', border:'1px solid var(--glass-border)' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-              <span style={{ fontSize:18 }}>{isPre ? '⚡' : isIntra ? '💧' : '🍗'}</span>
-              <div>
-                <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>{stackTitle}</div>
-                <div style={{ fontSize:8, color:'var(--text-dim)' }}>{timingLabel}</div>
-              </div>
-              {isOnCycle && <span style={{ marginLeft:'auto', fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(139,92,246,0.15)', color:'#a78bfa' }}>×{multiplier}</span>}
-            </div>
-
-            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-              {activeStack.map((item,i)=>(
-                <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--accent)', flexShrink:0 }} />
-                  <div style={{ flex:1, fontSize:10 }}>
-                    <span style={{ color:'var(--text-light)' }}>{item.name}</span>
-                    <span style={{ color:'var(--text-dim)', fontSize:8, marginLeft:4 }}>— {item.note}</span>
-                  </div>
-                  <span style={{ fontSize:10, fontWeight:600, color:'#00e68a', whiteSpace:'nowrap' }}>{item.dose}</span>
-                  <button onClick={() => { const id = resolveProtoId(item.name); if (id && !enhancedSubs.includes(id)) setEnhancedSubs(prev => [...prev, id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:8, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'rgba(0,230,138,0.7)' }}>+ Стек</button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Glycemic interactions note */}
-          {hasGlycemic && isIntra && (
-            <div className="card" style={{ padding:10, marginBottom:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.15)' }}>
-              <div style={{ fontSize:10, fontWeight:700, color:'#f87171', marginBottom:4 }}>⚠ Внимание: гликемические взаимодействия</div>
-              <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>
-                У вас на курсе: <b>{userGlycemic.map(c=>c.substanceId).join(', ')}</b>. Эти вещества влияют на уровень глюкозы в крови.
-                Контролируйте глюкометром уровень сахара каждые 30 мин. При гипогликемии — увеличьте дозу HBCD на 15-20 г.
-                Рассмотрите замену HBCD на мальтодекстрин с более высоким GI для быстрого подъёма глюкозы.
-              </div>
-            </div>
-          )}
-
-          {/* All stacks overview */}
-          <div className="card" style={{ padding:10, marginBottom:8 }}>
-            <h4 style={{ margin:'0 0 6px', fontSize:11, color:'var(--text)' }}>📋 Все три стека (обзор)</h4>
-            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {[
-                { label:'⚡ Пре', items:preStack.slice(0,4).map(i=>`${i.name.split('(')[0].trim()}: ${i.dose}`).join(' · ') },
-                { label:'💧 Интра', items:intraStack.slice(0,4).map(i=>`${i.name.split('(')[0].trim()}: ${i.dose}`).join(' · ') },
-                { label:'🍗 Пост', items:postStack.slice(0,4).map(i=>`${i.name.split('(')[0].trim()}: ${i.dose}`).join(' · ') },
-              ].map((grp, gi) => (
-                <div key={gi} style={{ padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
-                  <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:3 }}>{grp.label}-тренировочный</div>
-                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>{grp.items}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Peptide/GH/Insulin inputs */}
-          <div className="card" style={{ padding:12, marginBottom:8, border:'1px solid rgba(236,72,153,0.2)' }}>
-            <h4 style={{ margin:'0 0 8px', fontSize:11, color:'#ec4899' }}>💉 Пептиды/Гормоны к тренировке</h4>
-            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {[
-                { key:'insulin', label:'Инсулин', val:mixInsulin, set:setMixInsulin, timing:mixInsulinTiming, setTiming:setMixInsulinTiming, defaultUnit:'ЕД', note:'Только под глюкометром! +30г быстрых углеводов' },
-                { key:'mgf', label:'MGF (PEG-MGF)', val:mixMGF, set:setMixMGF, timing:mixMGFTiming, setTiming:setMixMGFTiming, defaultUnit:'мкг', note:'Локально в целевую мышцу за 15 мин до тренировки' },
-                { key:'igf', label:'IGF-1 (LR3/DES)', val:mixIGF, set:setMixIGF, timing:mixIGFTiming, setTiming:setMixIGFTiming, defaultUnit:'мкг', note:'Системно/локально. DES — немедленно, LR3 — за 20 мин' },
-                { key:'gh', label:'ГР (HGH/rHGH)', val:mixGH, set:setMixGH, timing:mixGHTiming, setTiming:setMixGHTiming, defaultUnit:'МЕ', note:'За 30-60 мин до для жиросжигания. Пост — для восстановления' },
-              ].map((p) => (
-                <div key={p.key} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.1)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
-                    <span style={{ fontSize:10, fontWeight:700, color:'var(--text-light)' }}>{p.label}</span>
-                    <div style={{ display:'flex', gap:4, alignItems:'center' }}>
-                      <span style={{ fontSize:8, color:'var(--text-dim)' }}>{p.defaultUnit}</span>
-                      <input type="number" min="0" max="100" step="0.5" value={p.val} onChange={e => p.set(Math.max(0, Number(e.target.value) || 0))} placeholder="0" style={{ width:60, padding:'4px 6px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-primary)', color:'var(--text)', fontSize:10, textAlign:'center' }} />
-                    </div>
-                  </div>
-                  <div style={{ display:'flex', gap:4 }}>
-                    <button onClick={() => p.setTiming('pre')} style={{ padding:'2px 8px', borderRadius:4, fontSize:8, fontWeight:600, cursor:'pointer', border:'none', background:p.timing==='pre'?'#ec4899':'var(--bg-secondary)', color:p.timing==='pre'?'#000':'var(--text-dim)' }}>До тренировки</button>
-                    <button onClick={() => p.setTiming('post')} style={{ padding:'2px 8px', borderRadius:4, fontSize:8, fontWeight:600, cursor:'pointer', border:'none', background:p.timing==='post'?'#ec4899':'var(--bg-secondary)', color:p.timing==='post'?'#000':'var(--text-dim)' }}>После тренировки</button>
-                  </div>
-                  {p.val > 0 && <div style={{ fontSize:7, color:'#ec4899', marginTop:2, opacity:0.7 }}>{p.note}</div>}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div className="card" style={{ padding:10 }}>
-            <h4 style={{ margin:'0 0 4px', fontSize:10, color:'var(--text-dim)' }}>📝 Рекомендации</h4>
-            <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>
-              • Все дозы рассчитаны на вес <b>{bw} кг</b>{isOnCycle ? ' (на курсе ×1.25)' : ' (натуральный тренинг ×1.0)'}.<br/>
-              • Пейте воду: 500 мл за 2 ч до + 200-300 мл каждые 15-20 мин во время тренировки.<br/>
-              • Общий объём жидкости интра-тренировки: ~{(durationHrs * 0.9).toFixed(1)} л для {bw} кг.<br/>
-              • Избегайте жиров и клетчатки за 2 ч до тренировки — замедляют всасывание.<br/>
-              • Пост-тренировочный приём — в течение 30 мин после завершения (анаболическое окно).<br/>
-              • При использовании инсулина/метформина: обязательно глюкометр + быстрые углеводы под рукой.
-            </div>
-          </div>
-        </div>
-        ));
-      })()}
+      {/* ===== MIX CALCULATOR moved to supportstacks → mixcalc sub-tab ===== */}
 
 
 

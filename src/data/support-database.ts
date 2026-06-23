@@ -11640,7 +11640,67 @@ kpv: {
     sideEffects: ['Редко: покраснение в месте инъекции'],
     dosage: { mg: 0.5, timing: '1x/д п/к', form: 'KPV 500 мкг' },
     bestForCourse: false,
-  }
+  },
+  "PHARMA_ANASTROZOLE": {
+    id: 'PHARMA_ANASTROZOLE', name: 'Anastrozole', nameRu: 'Анастразол',
+    tier: 'specialty', category: ['hormonal', 'pharma'],
+    forms: [{ id: 'pharma_anastrozole', name: 'Anastrozole', nameRu: 'Анастразол 1 мг', dose: '1 мг 1x/д', best: true }],
+    organs: ['ENDOCRINE', 'REPRODUCTIVE', 'LIVER'],
+    systems: ['endocrine', 'reproductive', 'hepatic'],
+    mechanisms: ['AROMATASE_INHIBITION', 'E2_SUPPRESSION', 'LIPID_PROFILE_ALTERATION'],
+    description: 'Ингибитор ароматазы — снижает конверсию андрогенов в эстрогены. Применяется для контроля E2 на курсе ААС. Взаимодействие с липидным профилем.',
+    dosage: { mg: 1, timing: '1x/д', form: 'таб' },
+    bestForCourse: true,
+    synergies: [], conflicts: [], monitoring: [], contraindications: [], sideEffects: ['Снижение ЛПВП', 'Артралгия', 'Головная боль'],
+  },
+  "PHARMA_LETROZOLE": {
+    id: 'PHARMA_LETROZOLE', name: 'Letrozole', nameRu: 'Летрозол',
+    tier: 'specialty', category: ['hormonal', 'pharma'],
+    forms: [{ id: 'pharma_letrozole', name: 'Letrozole', nameRu: 'Летрозол 2.5 мг', dose: '2.5 мг 1x/д', best: true }],
+    organs: ['ENDOCRINE', 'REPRODUCTIVE', 'LIVER', 'BONES'],
+    systems: ['endocrine', 'reproductive', 'hepatic', 'musculoskeletal'],
+    mechanisms: ['AROMATASE_INHIBITION', 'E2_SUPPRESSION', 'IGF1_DECREASE'],
+    description: 'Мощный ингибитор ароматазы III поколения. Блокирует превращение андрогенов в эстрогены в жировой и мышечной ткани. Применяется при гинекомастии и контроле E2.',
+    dosage: { mg: 2.5, timing: '1x/д', form: 'таб' },
+    bestForCourse: true,
+    synergies: [], conflicts: [], monitoring: [], contraindications: [], sideEffects: ['Снижение ЛПВП', 'Артралгия', 'Остеопороз при длительном приёме'],
+  },
+  "PHARMA_CLOMIPHENE": {
+    id: 'PHARMA_CLOMIPHENE', name: 'Clomiphene', nameRu: 'Кломифен',
+    tier: 'specialty', category: ['hormonal', 'pharma'],
+    forms: [{ id: 'pharma_clomiphene', name: 'Clomiphene', nameRu: 'Кломифен 50 мг', dose: '50 мг 1x/д', best: true }],
+    organs: ['ENDOCRINE', 'PITUITARY', 'REPRODUCTIVE', 'LIVER'],
+    systems: ['endocrine', 'reproductive', 'neuro'],
+    mechanisms: ['SERM_ACTIVITY', 'LH_STIMULATION', 'FSH_STIMULATION', 'HPTA_RESTORATION'],
+    description: 'Селективный модулятор эстрогеновых рецепторов (SERM). Блокирует ER в гипоталамусе → повышение GnRH → стимуляция ЛГ/ФСГ. Применяется для ПКТ и восстановления HPTA.',
+    dosage: { mg: 50, timing: '1x/д', form: 'таб' },
+    bestForCourse: true,
+    synergies: [], conflicts: [], monitoring: [], contraindications: [], sideEffects: ['Нарушение зрения', 'Головная боль', 'Желудочно-кишечные расстройства'],
+  },
+  "PHARMA_ENCLOMIPHENE": {
+    id: 'PHARMA_ENCLOMIPHENE', name: 'Enclomiphene', nameRu: 'Энкломифен',
+    tier: 'specialty', category: ['hormonal', 'pharma'],
+    forms: [{ id: 'pharma_enclomiphene', name: 'Enclomiphene', nameRu: 'Энкломифен 25 мг', dose: '25 мг 1x/д', best: true }],
+    organs: ['ENDOCRINE', 'PITUITARY', 'REPRODUCTIVE'],
+    systems: ['endocrine', 'reproductive', 'neuro'],
+    mechanisms: ['SERM_ACTIVITY', 'LH_STIMULATION', 'HPTA_RESTORATION'],
+    description: 'Чистый изомер кломифена (транс-изомер). Без цитратного компонента, меньше побочных эффектов. Высокая эффективность в ПКТ и восстановлении эндогенного тестостерона.',
+    dosage: { mg: 25, timing: '1x/д', form: 'таб' },
+    bestForCourse: true,
+    synergies: [], conflicts: [], monitoring: [], contraindications: [], sideEffects: ['Меньше побочных по сравнению с кломифеном', 'Редко: головная боль'],
+  },
+  "IMMUNE_LACTOFERRIN": {
+    id: 'IMMUNE_LACTOFERRIN', name: 'Lactoferrin', nameRu: 'Лактоферрин',
+    tier: 'core', category: ['immune', 'antioxidant', 'pharma'],
+    forms: [{ id: 'immune_lactoferrin', name: 'Lactoferrin', nameRu: 'Лактоферрин 500 мг', dose: '500 мг 2x/д', best: true }],
+    organs: ['IMMUNE_SYSTEM', 'GUT', 'BLOOD'],
+    systems: ['immune', 'gastrointestinal', 'hematologic'],
+    mechanisms: ['IMMUNE_MODULATION', 'IRON_CHELATION', 'ANTIMICROBIAL', 'ANTI_INFLAMMATORY', 'GUT_BARRIER_STRENGTHENING'],
+    description: 'Железосвязывающий гликопротеин из молозива. Связывает свободное железо → подавляет рост патогенов. Модулирует иммунный ответ, снижает системное воспаление, защищает барьер кишечника.',
+    dosage: { mg: 1000, timing: '2x/д', form: 'капс' },
+    bestForCourse: true,
+    synergies: [], conflicts: [], monitoring: [], contraindications: [], sideEffects: [],
+  },
 };
 
 
@@ -14057,7 +14117,7 @@ export const SYNERGY_NETWORK: SynergyNetworkEntry[] = [
   // ═══════════════════════════════════════════════════════════════════
   // РЕПРОДУКТИВНАЯ (1-3) 5 связок
   // ═══════════════════════════════════════════════════════════════════
-  {a:'hcg',b:'clomiphene',type:'synergy',effect:'HPTA-восстановление: тестикулы + гипофиз',mechanism:'ХГЧ (гонадотропин) — агонист LHCGR на клетках Лейдига, ↑ внутритестикулярный T, ↓ атрофию яичек. Кломифен — SERM, блокатор ERα в гипоталамусе, ↑ GnRH, ↑ ЛГ/ФСГ. Синергия: ХГЧ стимулирует яички (клетки Лейдига), кломифен стимулирует гипофиз (↑ ЛГ) = восстановление HPTA с обеих сторон оси',severity:'HIGH',score:9},
+  {a:'hcg',b:'pharma_clomiphene',type:'synergy',effect:'HPTA-восстановление: тестикулы + гипофиз',mechanism:'ХГЧ (гонадотропин) — агонист LHCGR на клетках Лейдига, ↑ внутритестикулярный T, ↓ атрофию яичек. Кломифен — SERM, блокатор ERα в гипоталамусе, ↑ GnRH, ↑ ЛГ/ФСГ. Синергия: ХГЧ стимулирует яички (клетки Лейдига), кломифен стимулирует гипофиз (↑ ЛГ) = восстановление HPTA с обеих сторон оси',severity:'HIGH',score:9},
   {a:'zinc',b:'pygeum',type:'synergy',effect:'Простата: 5αR + антипролиферация',mechanism:'Цинк — ↓ 5α-редуктазу, ↓ DHT, ↑ апоптоз клеток простаты, антимикробный в простатическом секрете. Пигеум (африканская слива) — ↓ воспаление простаты, ↓ пролиферацию фибробластов, ↑ мочеиспускание. Синергия: Zn ↓ DHT-зависимую пролиферацию, пигеум ↓ воспаление и улучшает уродинамику',severity:'MEDIUM',score:7},
   {a:'saw_palmetto',b:'beta_sitosterol',type:'synergy',effect:'ДГТ-блокада + антиэстроген',mechanism:'Пальма сабаль (пальметто) — ↓ 5αR (типы 1 и 2), ↓ DHT, ↓ пролиферацию простаты. Бета-ситостерол — ↑ β-ситостерол, ↓ воспаление простаты, ↑ эстроген-рецептор β (ERβ), антипролиферативный. Синергия: пальметто ↓ DHT, ситостерол ↓ воспаление через ERβ = двойная защита простаты при ААС-курсе',severity:'MEDIUM',score:7},
 ];
@@ -14871,7 +14931,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
 { id:'CINNAMON', name:'CINNAMON', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'CITICOLINE', name:'Цитиколин', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'CITRULLINE', name:'CITRULLINE', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
-{ id:'CLOMIPHENE', name:'CLOMIPHENE', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
+{ id:'PHARMA_CLOMIPHENE', name:'Кломифен (Clomiphene)', type:'pharma', description:'Серм для ПКТ и восстановления HPTA. Блокирует ER в гипоталамусе → повышение GnRH → ЛГ/ФСГ.', mechanisms:['SERM_ACTIVITY','LH_STIMULATION','FSH_STIMULATION','HPTA_RESTORATION'], organs:['endocrine','pituitary','reproductive'], categories:['hormonal','pct'], deficiency:'' },
 { id:'COLLAGEN', name:'Коллаген', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'COLOSTRUM', name:'COLOSTRUM', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'COPPER', name:'Медь', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
@@ -14882,7 +14942,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
 { id:'D_ASPARTIC_ACID', name:'D ASPARTIC ACID', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'ECHINACEA', name:'ECHINACEA', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'EGCG', name:'EGCG (зелёный чай)', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
-{ id:'ENCLOMIPHENE', name:'ENCLOMIPHENE', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
+{ id:'PHARMA_ENCLOMIPHENE', name:'Энкломифен (Enclomiphene)', type:'pharma', description:'Чистый транс-изомер кломифена. Меньше побочных, эффективен для ПКТ.', mechanisms:['SERM_ACTIVITY','LH_STIMULATION','HPTA_RESTORATION'], organs:['endocrine','pituitary','reproductive'], categories:['hormonal','pct'], deficiency:'' },
 { id:'FADOGIA', name:'FADOGIA', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'FINASTERIDE', name:'FINASTERIDE', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'FOLATE', name:'Фолат', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
@@ -14902,7 +14962,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
 { id:'INSULIN', name:'INSULIN', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'IODINE', name:'Йод', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'IRON', name:'Железо', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
-{ id:'LACTOFERRIN', name:'LACTOFERRIN', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
+{ id:'IMMUNE_LACTOFERRIN', name:'Лактоферрин', type:'supplement', description:'Железосвязывающий гликопротеин. Связывает свободное железо → подавляет патогены, модулирует иммунитет.', mechanisms:['IMMUNE_MODULATION','IRON_CHELATION','ANTIMICROBIAL','ANTI_INFLAMMATORY'], organs:['immune','gut','blood'], categories:['immune','antioxidant'], deficiency:'' },
 { id:'LECITHIN', name:'LECITHIN', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'LIONS_MANE', name:'Ежовик гребенчатый', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
 { id:'LITHIUM', name:'LITHIUM', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
@@ -16037,7 +16097,7 @@ export const ALL_INTERACTIONS = ([
   // ═══════════════════════════════════════════════════════════════════
   // РЕПРОДУКТИВНАЯ — синергии
   // ═══════════════════════════════════════════════════════════════════
-  { interactionId: 'SYN_REP_001', substanceA: 'HCG', substanceB: 'CLOMIPHENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Восстановление HPTA: тестикулы + гипофиз', mechanisms: ['LH_MIMETIC', 'LEYDIG_STIMULATION', 'SERM_ACTIVITY', 'LH_FSH_STIMULATION'], severity: 'HIGH', notes: 'ХГЧ стимулирует клетки Лейдига. Кломифен ↑ GnRH/ЛГ. Синергия: восстановление оси с обеих сторон Контроль: самочувствие 1р/4-8нед.' },
+  { interactionId: 'SYN_REP_001', substanceA: 'HCG', substanceB: 'PHARMA_CLOMIPHENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Восстановление HPTA: тестикулы + гипофиз', mechanisms: ['LH_MIMETIC', 'LEYDIG_STIMULATION', 'SERM_ACTIVITY', 'LH_FSH_STIMULATION'], severity: 'HIGH', notes: 'ХГЧ стимулирует клетки Лейдига. Кломифен ↑ GnRH/ЛГ. Синергия: восстановление оси с обеих сторон Контроль: самочувствие 1р/4-8нед.' },
   { interactionId: 'SYN_REP_002', substanceA: 'ZINC', substanceB: 'PYGEUM', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Простата: антипролиферация + уродинамика', mechanisms: ['5AR_INHIBITION', 'PROSTATE_HEALTH', 'URINARY_FLOW', 'ANTIINFLAMMATORY'], severity: 'MEDIUM', notes: 'Zn ↓ DHT через 5αR. Пигеум ↓ воспаление простаты и ↑ мочеиспускание Прием: Zn 25-50 мг. Контроль: самочувствие 1р/4-8нед.' },
   { interactionId: 'SYN_REP_003', substanceA: 'SAW_PALMETTO', substanceB: 'ZINC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'DHT-блокада + гормональный фон', mechanisms: ['5AR_INHIBITION', 'DHT_BLOCKADE', 'TESTOSTERONE_SYNTHESIS', 'PROSTATE_HEALTH'], severity: 'MEDIUM', notes: 'Пальметто ↓ DHT. Zn ↓ ароматазу. Синергия: ↓ DHT + ↑ T Прием: Zn 25-50 мг. Контроль: самочувствие 1р/4-8нед.' },
 
@@ -16242,7 +16302,7 @@ export const ALL_INTERACTIONS = ([
   // ═══════════════════════════════════════════════════════════════════
   // РЕПРОДУКТИВНАЯ доп. стеки
   // ═══════════════════════════════════════════════════════════════════
-  { interactionId: 'SYN_REP_007', substanceA: 'HCG', substanceB: 'ENCLOMIPHENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'ПКТ pure: тестикулы + чистый SERM', mechanisms: ['LH_MIMETIC', 'SERM_ACTIVITY', 'LEYDIG_STIMULATION', 'HPTA_RESTORATION'], severity: 'HIGH', notes: 'ХГЧ → клетки Лейдига. Энкломифен = чистый изомер кломифена. Синергия: восстановление HPTA без побочных Контроль: самочувствие 1р/4-8нед.' },
+  { interactionId: 'SYN_REP_007', substanceA: 'HCG', substanceB: 'PHARMA_ENCLOMIPHENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'ПКТ pure: тестикулы + чистый SERM', mechanisms: ['LH_MIMETIC', 'SERM_ACTIVITY', 'LEYDIG_STIMULATION', 'HPTA_RESTORATION'], severity: 'HIGH', notes: 'ХГЧ → клетки Лейдига. Энкломифен = чистый изомер кломифена. Синергия: восстановление HPTA без побочных Контроль: самочувствие 1р/4-8нед.' },
   { interactionId: 'SYN_REP_008', substanceA: 'D_ASPARTIC_ACID', substanceB: 'ZINC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'ЛГ + T: аспартат + стероидогенез', mechanisms: ['LH_STIMULATION', 'TESTOSTERONE_BOOST', 'STEROIDOGENESIS', 'FERTILITY'], severity: 'MEDIUM', notes: 'DAA ↑ ЛГ. Zn ↑ CYP11A1 и ↓ ароматазу. Бор ↓ SHBG. Синергия: ↑ T по трём механизмам Прием: Zn 25-50 мг. Контроль: самочувствие 1р/4-8нед.' },
   { interactionId: 'SYN_REP_009', substanceA: 'MACA', substanceB: 'ZINC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Либидо + T: мака + цинк', mechanisms: ['LIBIDO_ENHANCEMENT', 'TESTOSTERONE_SUPPORT', 'ENERGY_BOOST', 'HORMONAL_BALANCE'], severity: 'MEDIUM', notes: 'Мака ↑ либидо и энергию. Zn ↑ T. Ашваганда ↓ кортизол. Три механизма репродуктивной поддержки Прием: Zn 25-50 мг. Контроль: самочувствие 1р/4-8нед.' },
   { interactionId: 'SYN_REP_010', substanceA: 'TRIBULUS', substanceB: 'ZINC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'ЛГ + T + L-аргинин: гормоны + NO', mechanisms: ['LH_STIMULATION', 'TESTOSTERONE_BOOST', 'NO_SYNTHESIS', 'STRENGTH_INCREASE'], severity: 'MEDIUM', notes: 'Трибулус ↑ ЛГ. Zn ↑ T. Цитруллин ↑ NO. Синергия: гормоны + кровоток Прием: Zn 25-50 мг. Контроль: самочувствие 1р/4-8нед.' },
@@ -16372,7 +16432,7 @@ export const ALL_INTERACTIONS = ([
   // ═══════════════════════════════════════════════════════════════════
   { interactionId: 'SYN_REP_011', substanceA: 'TONGKAT_ALI', substanceB: 'ZINC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'T-бустер: ЛГ + стероидогенез + SHBG', mechanisms: ['TESTOSTERONE_BOOST', 'LH_STIMULATION', 'CORTISOL_REDUCTION', 'LIBIDO_ENHANCEMENT'], severity: 'MEDIUM', notes: 'Тонгкат ↑ T + ↓ кортизол. Zn ↑ CYP. Бор ↓ SHBG. Три механизма ↑ T Прием: тонгкат 200-400 мг + Zn 25-50 мг. Контроль: самочувствие 1р/4-8нед.' },
   { interactionId: 'SYN_REP_012', substanceA: 'MACA', substanceB: 'ASHWAGANDHA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Либидо + кортизол: мака + адаптоген', mechanisms: ['LIBIDO_ENHANCEMENT', 'CORTISOL_REDUCTION', 'ENERGY_BOOST', 'STRESS_RESILIENCE'], severity: 'MEDIUM', notes: 'Мака ↑ либидо + энергия. Ашваганда ↓ кортизол. Синергия: желание + возможность Прием: ашваганда 300-600 мг. Контроль: самочувствие 1р/4-8нед.' },
-  { interactionId: 'SYN_REP_013', substanceA: 'ENCLOMIPHENE', substanceB: 'HCG', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'HPTA: гипофиз + тестикулы + ЛГ + T', mechanisms: ['LH_STIMULATION', 'LEYDIG_STIMULATION', 'HPTA_RESTORATION', 'SERM_ACTIVITY'], severity: 'HIGH', notes: 'Энкломифен ↑ ЛГ/ФСГ (гипофиз). ХГЧ → ЛГ-миметик (тестикулы). Синергия: восстановление HPTA с обеих сторон Контроль: самочувствие 1р/4-8нед.' },
+  { interactionId: 'SYN_REP_013', substanceA: 'PHARMA_ENCLOMIPHENE', substanceB: 'HCG', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'HPTA: гипофиз + тестикулы + ЛГ + T', mechanisms: ['LH_STIMULATION', 'LEYDIG_STIMULATION', 'HPTA_RESTORATION', 'SERM_ACTIVITY'], severity: 'HIGH', notes: 'Энкломифен ↑ ЛГ/ФСГ (гипофиз). ХГЧ → ЛГ-миметик (тестикулы). Синергия: восстановление HPTA с обеих сторон Контроль: самочувствие 1р/4-8нед.' },
   { interactionId: 'SYN_REP_014', substanceA: 'BORON', substanceB: 'ZINC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'SHBG + ароматаза: свободный T + DHT', mechanisms: ['SHBG_REDUCTION', 'AROMATASE_INHIBITION', 'FREE_TESTOSTERONE', 'BONE_HEALTH'], severity: 'MEDIUM', notes: 'Бор ↓ SHBG + ↑ 25(OH)D. Zn ↓ ароматазу + ↑ T. D3 ↑ AR. Тройной контроль свободного T Прием: бор 3-6 мг + Zn 25-50 мг.' },
   { interactionId: 'SYN_REP_015', substanceA: 'FADOGIA', substanceB: 'TONGKAT_ALI', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Африканский дуэт: ЛГ + кортизол + T', mechanisms: ['TESTOSTERONE_BOOST', 'LH_STIMULATION', 'CORTISOL_REDUCTION', 'LIBIDO_ENHANCEMENT'], severity: 'MEDIUM', notes: 'Фадогия ↑ ЛГ. Тонгкат ↑ T + ↓ кортизол. Цинк ↑ стероидогенез. Три T-бустера Прием: тонгкат 200-400 мг. Контроль: самочувствие 1р/4-8нед.' },
   { interactionId: 'SYN_REP_016', substanceA: 'SHILAJIT', substanceB: 'ASHWAGANDHA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Адаптогены + T: фульвовая к-та + withaferin', mechanisms: ['TESTOSTERONE_SUPPORT', 'MITOCHONDRIAL_FUNCTION', 'CORTISOL_REDUCTION', 'ENERGY_BOOST'], severity: 'MEDIUM', notes: 'Шиладжит ↑ митохондрии + T. Ашваганда ↓ кортизол + ↑ T3. Синергия: энергия + гормоны Прием: ашваганда 300-600 мг. Контроль: самочувствие 1р/4-8нед.' },
@@ -16392,7 +16452,7 @@ export const ALL_INTERACTIONS = ([
   // ═══════════════════════════════════════════════════════════════════
   // ИММУНИТЕТ доп²
   // ═══════════════════════════════════════════════════════════════════
-  { interactionId: 'SYN_IMM_015', substanceA: 'LACTOFERRIN', substanceB: 'ZINC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Железо + иммунитет: лактоферрин + Т-клетки', mechanisms: ['IRON_CHELATION', 'ANTIMICROBIAL', 'T_CELL_ACTIVATION', 'IMMUNE_MODULATION'], severity: 'MEDIUM', notes: 'Лактоферрин ↓ свободное Fe (антимикробно). Zn ↑ T-клетки. ОАК + ферритин. Синергия иммунитета Прием: Zn 25-50 мг. Контроль: самочувствие 1р/4-8нед.' },
+  { interactionId: 'SYN_IMM_015', substanceA: 'IMMUNE_LACTOFERRIN', substanceB: 'ZINC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Железо + иммунитет: лактоферрин + Т-клетки', mechanisms: ['IRON_CHELATION', 'ANTIMICROBIAL', 'T_CELL_ACTIVATION', 'IMMUNE_MODULATION'], severity: 'MEDIUM', notes: 'Лактоферрин ↓ свободное Fe (антимикробно). Zn ↑ T-клетки. ОАК + ферритин. Синергия иммунитета Прием: Zn 25-50 мг. Контроль: самочувствие 1р/4-8нед.' },
   { interactionId: 'SYN_IMM_016', substanceA: 'BETA_GLUCAN', substanceB: 'VITAMIN_D3', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Макрофаги + кателицидин: врождённый иммунитет', mechanisms: ['MACROPHAGE_ACTIVATION', 'ANTIMICROBIAL_PEPTIDE', 'TLR2_ACTIVATION', 'VDR_ACTIVATION'], severity: 'MEDIUM', notes: 'β-глюкан ↑ макрофаги + нейтрофилы. D3 ↑ кателицидин. Синергия: два врождённых пути Прием: D3 2000-5000 МЕ. Контроль: самочувствие 1р/4-8нед.' },
   { interactionId: 'SYN_IMM_017', substanceA: 'ECHINACEA', substanceB: 'PROPOLIS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Антимикробный дуэт: NK + прополис', mechanisms: ['NK_ACTIVATION', 'ANTIMICROBIAL', 'IMMUNE_STIMULATION', 'ANTIVIRAL'], severity: 'MEDIUM', notes: 'Эхинацея ↑ NK + макрофаги. Прополис ↑ антимикробно. Вит.C ↑ лейкоциты. Синергия простуды Контроль: самочувствие 1р/4-8нед.' },
   { interactionId: 'SYN_IMM_018', substanceA: 'ANDROGRAPHIS', substanceB: 'ECHINACEA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Травяной иммунитет: NF-κB + NK', mechanisms: ['IMMUNE_STIMULATION', 'ANTIINFLAMMATORY', 'NF_KB_INHIBITION', 'LYMPHOCYTE_ACTIVATION'], severity: 'MEDIUM', notes: 'Андрографис ↓ NF-κB. Эхинацея ↑ NK. Бузина ↑ цитокины. Синергия: воспаление + иммунитет Контроль: самочувствие 1р/4-8нед.' },
