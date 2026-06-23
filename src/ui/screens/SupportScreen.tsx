@@ -232,6 +232,54 @@ const MECH_TRANSLATIONS_RU: Record<string, string> = {
   'cofactor': 'Кофактор', 'coenzyme': 'Коэнзим', 'electron_transport': 'Транспорт электронов',
   'oxygen_transport': 'Транспорт кислорода', 'wound_healing': 'Заживление ран',
   'tissue_repair': 'Регенерация тканей', 'anti_fibrotic': 'Антифибротическое',
+  // Phase 6+: expanded mechanism translations
+  'anti_aging': 'Антивозрастное', 'DNA_repair': 'Репарация ДНК', 'telomere_protection': 'Защита теломер',
+  'stem_cell_activation': 'Активация стволовых клеток', 'autophagy': 'Аутофагия', 'senolytic': 'Сенолитик',
+  'sirtuin_activation': 'Активация сиртуинов', 'NAD_booster': 'Повышение NAD+', 'AMPK_activation': 'Активация AMPK',
+  'mTOR_inhibition': 'Ингибирование mTOR', 'mitochondrial_biogenesis': 'Биогенез митохондрий',
+  'cognitive_enhancer': 'Улучшение когнитивных функций', 'memory_enhancer': 'Улучшение памяти',
+  'focus_enhancer': 'Улучшение концентрации', 'BDNF_booster': 'Повышение BDNF',
+  'NGF_booster': 'Повышение NGF', 'acetylcholine_precursor': 'Предшественник ацетилхолина',
+  'dopamine_modulator': 'Модулятор дофамина', 'serotonin_modulator': 'Модулятор серотонина',
+  'GABA_modulator': 'Модулятор ГАМК', 'glutamate_modulator': 'Модулятор глутамата',
+  'blood_sugar_control': 'Контроль сахара', 'insulin_sensitivity': 'Чувствительность к инсулину',
+  'carb_blocker': 'Блокатор углеводов', 'fat_blocker': 'Блокатор жиров',
+  'appetite_suppressant': 'Подавление аппетита', 'metabolic_booster': 'Ускорение метаболизма',
+  'thyroid_support': 'Поддержка щитовидной', 'testosterone_booster': 'Повышение тестостерона',
+  'estrogen_modulator': 'Модулятор эстрогена', 'DHT_blocker': 'Блокатор ДГТ',
+  'prolactin_modulator': 'Модулятор пролактина', 'SHBG_modulator': 'Модулятор ГСПГ',
+  'libido_enhancer': 'Усиление либидо', 'fertility_support': 'Поддержка фертильности',
+  'sperm_quality': 'Качество спермы', 'prostate_health': 'Здоровье простаты',
+  'joint_protection': 'Защита суставов', 'cartilage_repair': 'Восстановление хряща',
+  'bone_density': 'Плотность костей', 'muscle_protein_synthesis': 'Синтез мышечного белка',
+  'muscle_recovery': 'Восстановление мышц', 'endurance_enhancer': 'Повышение выносливости',
+  'strength_enhancer': 'Повышение силы', 'VO2_max': 'МПК (VO2max)',
+  'lactate_buffer': 'Буфер лактата', 'nitric_oxide_booster': 'Повышение оксида азота',
+  'blood_flow': 'Улучшение кровотока', 'vasodilation': 'Расширение сосудов',
+  'blood_pressure_lowering': 'Снижение давления', 'cholesterol_lowering': 'Снижение холестерина',
+  'triglyceride_lowering': 'Снижение триглицеридов', 'HDL_increase': 'Повышение ЛПВП',
+  'LDL_lowering': 'Снижение ЛПНП', 'homocysteine_lowering': 'Снижение гомоцистеина',
+  'liver_detox': 'Детокс печени', 'liver_regeneration': 'Регенерация печени',
+  'bile_flow': 'Отток желчи', 'gallbladder_support': 'Поддержка желчного',
+  'glutathione_synthesis': 'Синтез глутатиона', 'heavy_metal_detox': 'Детокс тяжёлых металлов',
+  'kidney_protection': 'Защита почек', 'uric_acid_lowering': 'Снижение мочевой кислоты',
+  'diuretic_natural': 'Природный диуретик', 'gut_health': 'Здоровье кишечника',
+  'microbiome_support': 'Поддержка микробиома', 'digestive_enzyme': 'Пищеварительный фермент',
+  'gut_barrier': 'Кишечный барьер', 'IBS_relief': 'Облегчение СРК',
+  'antimicrobial': 'Антимикробное', 'antibacterial': 'Антибактериальное',
+  'antiviral': 'Противовирусное', 'antifungal': 'Противогрибковое',
+  'antiparasitic': 'Противопаразитарное', 'immune_booster': 'Усиление иммунитета',
+  'anti_allergic': 'Противоаллергическое', 'antihistamine': 'Антигистаминное',
+  'mast_cell_stabilizer': 'Стабилизатор тучных клеток', 'anti_cancer': 'Противораковое',
+  'skin_health': 'Здоровье кожи', 'hair_growth': 'Рост волос',
+  'nail_strength': 'Укрепление ногтей', 'hydration': 'Гидратация',
+  'UV_protection': 'Защита от УФ', 'acne_treatment': 'Лечение акне',
+  'eye_health': 'Здоровье глаз', 'vision_support': 'Поддержка зрения',
+  'macular_protection': 'Защита макулы', 'cataract_prevention': 'Профилактика катаракты',
+  'stress_reduction': 'Снижение стресса', 'anxiety_relief': 'Облегчение тревоги',
+  'mood_stabilizer': 'Стабилизация настроения', 'sleep_quality': 'Качество сна',
+  'circadian_rhythm': 'Циркадный ритм', 'melatonin_precursor': 'Предшественник мелатонина',
+  'general': 'Общее действие', 'other': 'Прочее', 'energy': 'Энергия',
 };
 
 const ORGAN_MECHANISMS: Record<string, string[]> = {
@@ -274,6 +322,7 @@ const getCategoryInfo = (cat: string): { label: string; emoji: string } => {
     vitamin_mineral: { label: '💊 Витаминно-минеральные', emoji: '💊' },
     mushroom: { label: '🍄 Грибы', emoji: '🍄' },
     polyphenol: { label: '🫐 Полифенолы', emoji: '🫐' },
+    antimicrobial: { label: '🦠 Антимикробные', emoji: '🦠' },
     pharma: { label: '💊 Фармакология', emoji: '💊' },
     supplement: { label: '💪 Добавки', emoji: '💪' },
     no_organ: { label: '📦 Другое', emoji: '📦' },
@@ -1835,6 +1884,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       fatty_acid:'fatty_acids',lipids:'fatty_acids',
       mushroom:'mushrooms',fungus:'mushrooms',fungi:'mushrooms',
       electrolyte:'electrolytes',
+      polyphenol:'polyphenols',flavonoid:'polyphenols',polyphenols:'polyphenols',
+      antimicrobial:'antimicrobial',antibacterial:'antimicrobial',
     };
     const c = (cat||'').toLowerCase().replace(/[^a-z0-9_]/g,'');
     if (m[c]) return m[c];
@@ -3336,19 +3387,20 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 /* По типам (default) */
                 <div>
                   {/* Type sub-filter pills by category groups */}
-                  <div style={{ display:'flex', gap:3, marginBottom:6, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                    {[['','🔍 Все'],
-                      ['gi','🫃 ЖКТ'],['liver','🫁 Печень'],['cardio','❤️ Сердце'],
-                      ['herbs','🌿 Травы/растения'],['joints','🦴 Суставы'],['vitamins','💊 Витамины'],
-                      ['minerals','🧂 Минералы'],['antiaging','🕰 Антивозраст'],
-                      ['immune','🛡️ Иммунитет'],['fatty_acids','🐟 Липидные'],
-                      ['antioxidants','🛡️ Антиоксиданты'],
-                      ['amino_acids','🧬 Аминокислоты'],['peptides','🧬 Пептиды'],
-                      ['mushrooms','🍄 Грибы'],['nootropics','🧠 Ноотропы'],
-                      ['adaptogens','🌿 Адаптогены'],['hormones','⚖️ Гормоны'],
-                      ['enzymes','⚙️ Ферменты'],['probiotics','🦠 Пробиотики'],
-                      ['electrolytes','⚡ Электролиты'],['other','📦 Другое'],
-                    ].filter(([k]) => k === '' || groupedSubstances.some(g => g.cat === k)).map(([k,l]) => (
+                   <div style={{ display:'flex', gap:3, marginBottom:6, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+                     {[['','🔍 Все'],
+                       ['gi','🫃 ЖКТ'],['liver','🫁 Печень'],['cardio','❤️ Сердце'],
+                       ['herbs','🌿 Травы/растения'],['joints','🦴 Суставы'],['vitamins','💊 Витамины'],
+                       ['minerals','🧂 Минералы'],['antiaging','🕰 Антивозраст'],
+                       ['immune','🛡️ Иммунитет'],['fatty_acids','🐟 Липидные'],
+                       ['antioxidants','🛡️ Антиоксиданты'],['polyphenols','🫐 Полифенолы'],
+                       ['amino_acids','🧬 Аминокислоты'],['peptides','🧬 Пептиды'],
+                       ['mushrooms','🍄 Грибы'],['nootropics','🧠 Ноотропы'],
+                       ['adaptogens','🌿 Адаптогены'],['hormones','⚖️ Гормоны'],
+                       ['enzymes','⚙️ Ферменты'],['probiotics','🦠 Пробиотики'],
+                       ['electrolytes','⚡ Электролиты'],['antimicrobial','🦠 Антимикробные'],
+                       ['other','📦 Другое'],
+                     ].filter(([k]) => k === '' || groupedSubstances.some(g => g.cat === k)).map(([k,l]) => (
                       <button key={k} onClick={() => setCatalogTypeFilter(k)} style={{
                         padding:'4px 10px', borderRadius:12, fontSize:8, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
                         background: catalogTypeFilter === k ? 'var(--accent)' : 'var(--bg-secondary)',
@@ -3845,44 +3897,76 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                 return Math.max(countA, countB) >= synergyCountFilter;
                               });
                             }
-                            if (synergyOrganFilter) {
-                              list = list.filter((i: any) => {
-                                const checkOrg = (subId: string) => {
-                                  const sub = ALL_SUBSTANCES.find(s => s.id === subId);
-                                  if (sub && sub.organs) {
-                                    return sub.organs.some((o: string) => {
-                                      const norm = (o||'').trim().toUpperCase();
-                                      const mapping = ORGAN_CATEGORY_MAP[norm];
-                                      return mapping?.key === synergyOrganFilter;
-                                    });
-                                  }
-                                  // Also check PHARMA_DB for pharma substance IDs (use targetSystems)
-                                  const pharm = PHARMA_DB?.[subId];
-                                  if (pharm && pharm.targetSystems) {
-                                    const PHARMA_SYS_TO_ORG: Record<string, string> = {
-                                      cardio: 'heart_vessels', heart: 'heart_vessels', vessels: 'heart_vessels',
-                                      hepatic: 'liver', liver: 'liver',
-                                      neuro: 'brain_nerves', neuro_toxicity: 'brain_nerves', brain: 'brain_nerves', cns: 'brain_nerves',
-                                      endocrine: 'endocrine', thyroid: 'endocrine', pancreas: 'endocrine', adrenal: 'endocrine',
-                                      reproductive: 'reproductive', prostate: 'reproductive', gonads: 'reproductive',
-                                      hematologic: 'blood', blood: 'blood',
-                                      musculoskeletal: 'muscles', muscle: 'muscles',
-                                      skin: 'skin_hair',
-                                      ghigf: 'endocrine', ins_axis: 'endocrine', metabolic: 'mitochondria',
-                                      immunity: 'immune', immune: 'immune',
-                                      renal: 'kidneys', kidney: 'kidneys',
-                                      gi: 'gi', gastrointestinal: 'gi', gut: 'gi',
-                                    };
-                                    return pharm.targetSystems.some((o: string) => {
-                                      const key = PHARMA_SYS_TO_ORG[o.toLowerCase().trim()];
-                                      return key === synergyOrganFilter;
-                                    });
-                                  }
-                                  return false;
-                                };
-                                return checkOrg(i.substanceA) || checkOrg(i.substanceB);
-                             });
-                           }
+                             if (synergyOrganFilter) {
+                               list = list.filter((i: any) => {
+                                 const checkOrg = (subId: string) => {
+                                   // Try ALL_SUBSTANCES first
+                                   const sub = ALL_SUBSTANCES.find(s => s.id === subId);
+                                   if (sub && sub.organs && sub.organs.length > 0) {
+                                     return sub.organs.some((o: string) => {
+                                       const norm = (o||'').trim().toUpperCase();
+                                       const mapping = ORGAN_CATEGORY_MAP[norm];
+                                       return mapping?.key === synergyOrganFilter;
+                                     });
+                                   }
+                                   // Try PHARMA_DB exact match
+                                   const pharm = PHARMA_DB?.[subId];
+                                   if (pharm && pharm.targetSystems) {
+                                     const sysToOrg: Record<string, string> = {
+                                       cardio: 'heart_vessels', heart: 'heart_vessels', vessels: 'heart_vessels',
+                                       hepatic: 'liver', liver: 'liver',
+                                       neuro: 'brain_nerves', neuro_toxicity: 'brain_nerves', brain: 'brain_nerves', cns: 'brain_nerves',
+                                       endocrine: 'endocrine', thyroid: 'endocrine', pancreas: 'endocrine', adrenal: 'endocrine', pituitary: 'endocrine',
+                                       reproductive: 'reproductive', prostate: 'reproductive', gonads: 'reproductive', testes: 'reproductive', ovaries: 'reproductive',
+                                       hematologic: 'blood', blood: 'blood',
+                                       musculoskeletal: 'muscles', muscle: 'muscles', joints: 'joints_bones', bone: 'joints_bones', skeletal: 'joints_bones',
+                                       skin: 'skin_hair', hair: 'skin_hair', dermal: 'skin_hair',
+                                       ghigf: 'endocrine', ins_axis: 'endocrine', metabolic: 'mitochondria', mitochondria: 'mitochondria',
+                                       immunity: 'immune', immune: 'immune',
+                                       renal: 'kidneys', kidney: 'kidneys', urinary: 'kidneys',
+                                       gi: 'gi', gastrointestinal: 'gi', gut: 'gi', stomach: 'gi', intestine: 'gi',
+                                       respiratory: 'lungs', lung: 'lungs', pulmonary: 'lungs',
+                                     };
+                                     return pharm.targetSystems.some((o: string) => {
+                                       const key = sysToOrg[o.toLowerCase().trim()];
+                                       return key === synergyOrganFilter;
+                                     });
+                                   }
+                                   // Fallback: try to find PHARMA_DB entry by partial ID match (base name without ester)
+                                   if (subId) {
+                                     const pharmKeys = Object.keys(PHARMA_DB);
+                                     const baseLower = subId.toLowerCase();
+                                     for (const pk of pharmKeys) {
+                                       if (pk.includes(baseLower) || baseLower.includes(pk)) {
+                                         const pfall = PHARMA_DB[pk];
+                                         if (pfall?.targetSystems) {
+                                           const sysToOrg2: Record<string, string> = {
+                                             cardio: 'heart_vessels', heart: 'heart_vessels', vessels: 'heart_vessels',
+                                             hepatic: 'liver', liver: 'liver',
+                                             neuro: 'brain_nerves', neuro_toxicity: 'brain_nerves', brain: 'brain_nerves', cns: 'brain_nerves',
+                                             endocrine: 'endocrine', thyroid: 'endocrine', pancreas: 'endocrine', adrenal: 'endocrine',
+                                             reproductive: 'reproductive', prostate: 'reproductive', gonads: 'reproductive', testes: 'reproductive',
+                                             hematologic: 'blood', blood: 'blood',
+                                             musculoskeletal: 'muscles', muscle: 'muscles', joints: 'joints_bones', bone: 'joints_bones',
+                                             skin: 'skin_hair', hair: 'skin_hair',
+                                             ghigf: 'endocrine', ins_axis: 'endocrine', metabolic: 'mitochondria',
+                                             immunity: 'immune', immune: 'immune',
+                                             renal: 'kidneys', kidney: 'kidneys',
+                                             gi: 'gi', gastrointestinal: 'gi', gut: 'gi',
+                                           };
+                                           return pfall.targetSystems.some((o: string) => {
+                                             const key = sysToOrg2[o.toLowerCase().trim()];
+                                             return key === synergyOrganFilter;
+                                           });
+                                         }
+                                       }
+                                     }
+                                   }
+                                   return false;
+                                 };
+                                 return checkOrg(i.substanceA) || checkOrg(i.substanceB);
+                              });
+                            }
                             if (synergySearch) {
                              const sq = synergySearch.toLowerCase();
                              list = list.filter((i: any) => (i.effect||'').toLowerCase().includes(sq) || (i.substanceA||'').toLowerCase().includes(sq) || (i.substanceB||'').toLowerCase().includes(sq) || (i.notes||'').toLowerCase().includes(sq));
@@ -4450,7 +4534,12 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   <input value={stackSearch} onChange={e => setStackSearch(e.target.value)}
                     placeholder="🔍 Поиск стеков..."
                     style={{ width:'100%', padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box', marginBottom:8 }} />
-                  {(stackSearch ? filteredStacks : ALL_STACKS).length === 0 ? (
+                  <div style={{ display:'flex', gap:3, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+                    {[[0,'♾️ Все'],[1,'1-3 в-ва'],[4,'4-7 в-в'],[8,'8-10 в-в'],[11,'10+ в-в']].map(([v,l]) => (
+                      <button key={String(v)} onClick={() => setStackFilterCount(v as number)} style={{ padding:'3px 8px', borderRadius:8, fontSize:7, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', background: stackFilterCount === v ? 'var(--accent)' : 'transparent', color: stackFilterCount === v ? '#000' : 'var(--text-dim)', border:`1px solid ${stackFilterCount === v ? 'var(--accent)' : 'var(--border)'}` }}>{l}</button>
+                    ))}
+                  </div>
+                  {(stackSearch || stackFilterCount > 0 ? filteredStacks : ALL_STACKS).length === 0 ? (
                     <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Ничего не найдено</div>
                   ) : (
                     (stackSearch ? [{key:'search',label:'Результаты поиска',stacks:filteredStacks}] : groupedStacks).map(group => (
