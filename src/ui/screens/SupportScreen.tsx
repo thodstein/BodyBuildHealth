@@ -1845,7 +1845,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       return {
         id: entry.id,
         name: entry.nameRu || allSub?.name || entry.name || entry.id,
-        categories: (entry.category && entry.category.length > 0) ? entry.category : (allSub?.categories || []),
+        categories: entry.category || [],
         mechanisms: (entry.mechanisms && entry.mechanisms.length > 0) ? entry.mechanisms : (allSub?.mechanisms || []),
         organs: (entry.organs && entry.organs.length > 0) ? entry.organs : (allSub?.organs || []),
         description: entry.description || allSub?.description || '',

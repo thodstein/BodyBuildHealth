@@ -4271,352 +4271,7 @@ export const TIER_LABELS_CATALOG: Record<string, { label: string; emoji: string;
 
 
 export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
-  nac: {
-    id: "nac",
-    name: "NAC",
-    nameRu: "N-Ацетилцистеин",
-    tier: "core",
-    category: [
-      "antioxidant",
-      "hepatoprotector",
-      "respiratory"
-    ],
-    forms: [
-      {
-        id: "nac",
-        name: "NAC 600mg",
-        nameRu: "NAC 600 мг",
-        dose: "600 мг натощак",
-        best: true
-      },
-      {
-        id: "AA_NAC",
-        name: "NAC Premium",
-        nameRu: "NAC Премиум",
-        dose: "600 мг 2x/д",
-        best: false
-      },
-      {
-        id: "AA_NAC_PREMIUM",
-        name: "NAC Premium+",
-        nameRu: "NAC Премиум+",
-        dose: "900 мг натощак",
-        best: false
-      }
-    ],
-    organs: [
-      "LIVER",
-      "LUNGS",
-      "KIDNEYS",
-      "BRAIN"
-    ],
-    systems: [
-      "hepatic",
-      "neuro",
-      "renal"
-    ],
-    mechanisms: [
-      "GLUTATHIONE_SYNTHESIS",
-      "MUCOLYTIC",
-      "ANTIOXIDANT",
-      "DETOXIFICATION"
-    ],
-    description: "N-Ацетилцистеин — предшественник глутатиона, главного антиоксиданта организма. Разжижает слизь, защищает печень от токсинов, снижает окислительный стресс. Обязателен на любом курсе.",
-    synergies: [
-      {
-        with: "vitamin_c",
-        effect: "Регенерация глутатиона",
-        mechanism: "Витамин C восстанавливает окисленный глутатион",
-        severity: "HIGH"
-      },
-      {
-        with: "alpha_lipoic",
-        effect: "Усиление антиоксидантной сети",
-        mechanism: "АЛЬК регенерирует глутатион и витамин C",
-        severity: "HIGH"
-      },
-      {
-        with: "selenium",
-        effect: "Глутатионпероксидаза",
-        mechanism: "Селен — кофактор GPx",
-        severity: "MEDIUM"
-      },
-      {
-        with: "milk_thistle",
-        effect: "Синергия гепатопротекции",
-        mechanism: "Разные механизмы защиты гепатоцитов",
-        severity: "MEDIUM"
-      }
-    ],
-    conflicts: [
-      {
-        with: "charcoal",
-        effect: "Снижение абсорбции",
-        mechanism: "Активированный уголь связывает NAC",
-        severity: "MEDIUM"
-      },
-      {
-        with: "nitroglycerin",
-        effect: "Гипотония",
-        mechanism: "Усиление вазодилатации",
-        severity: "HIGH"
-      }
-    ],
-    monitoring: [
-      {
-        what: "АЛТ/АСТ",
-        when: "Каждые 4 нед",
-        targetRange: "<40 Ед/л"
-      },
-      {
-        what: "ГГТП",
-        when: "Каждые 6 нед",
-        targetRange: "<50 Ед/л"
-      }
-    ],
-    contraindications: [
-      "Язвенная болезнь",
-      "Бронхиальная астма (с осторожностью)"
-    ],
-    sideEffects: [
-      "Тошнота натощак",
-      "Изжога",
-      "Редко: кожная сыпь"
-    ],
-    dosage: {
-      mg: 1200,
-      timing: "натощак, 2x/д",
-      form: "капсулы"
-    },
-    bestForCourse: true
-  },
-  tudca: {
-    id: "tudca",
-    name: "TUDCA",
-    nameRu: "Тауроурсодезоксихолевая кислота",
-    tier: "core",
-    category: [
-      "hepatoprotector",
-      "bile_acid",
-      "choleretic"
-    ],
-    forms: [
-      {
-        id: "tudca",
-        name: "TUDCA 250mg",
-        nameRu: "TUDCA 250 мг",
-        dose: "500 мг перед едой 2x/д",
-        best: true
-      }
-    ],
-    organs: [
-      "LIVER",
-      "GALLBLADDER",
-      "KIDNEYS"
-    ],
-    systems: [
-      "hepatic",
-      "renal"
-    ],
-    mechanisms: [
-      "BILE_FLOW_STIMULATION",
-      "MITOCHONDRIAL_PROTECTION",
-      "ER_STRESS_REDUCTION",
-      "ANTI_APOPTOTIC"
-    ],
-    description: "TUDCA — урсодезоксихолевая кислота с таурином. Стимулирует желчеотток, защищает митохондрии гепатоцитов, подавляет ER-стресс. Один из важнейших гепатопротекторов.",
-    synergies: [
-      {
-        with: "milk_thistle",
-        effect: "Синергия гепатопротекции",
-        mechanism: "Силимарин стабилизирует мембраны, TUDCA стимулирует желчеотток",
-        severity: "HIGH"
-      },
-      {
-        with: "phosphatidylcholine",
-        effect: "Защита мембран",
-        mechanism: "ФХ + TUDCA = комплексная защита гепатоцитов",
-        severity: "MEDIUM"
-      },
-      {
-        with: "nac",
-        effect: "Комплексная защита печени",
-        mechanism: "NAC повышает глутатион, TUDCA защищает желчные пути",
-        severity: "MEDIUM"
-      }
-    ],
-    conflicts: [
-        {with: "charcoal", effect: "Снижение абсорбции", mechanism: "Уголь связывает желчные кислоты", severity: "LOW"},
-      ],
-    monitoring: [
-      {
-        what: "АЛТ/АСТ",
-        when: "Каждые 4 нед",
-        targetRange: "<40 Ед/л"
-      },
-      {
-        what: "ГГТП",
-        when: "Каждые 4 нед",
-        targetRange: "<50 Ед/л"
-      },
-      {
-        what: "Билирубин",
-        when: "Каждые 6 нед",
-        targetRange: "<20 мкмоль/л"
-      }
-    ],
-    contraindications: [
-      "Желчнокаменная болезнь (с осторожностью)",
-      "Острый холецистит",
-      "Обструкция желчных путей"
-    ],
-    sideEffects: [
-      "Диарея при высоких дозах",
-      "Редко: боли в правом подреберье"
-    ],
-    dosage: {
-      mg: 1000,
-      timing: "перед едой, 2x/д",
-      form: "капсулы"
-    },
-    bestForCourse: true
-  },
-  magnesium: {
-    id: "magnesium",
-    name: "Magnesium",
-    nameRu: "Магний",
-    tier: "core",
-    category: [
-      "mineral",
-      "neuroprotector",
-      "cardioprotector"
-    ],
-    forms: [
-      {
-        id: "magnesium",
-        name: "Magnesium Bisglycinate",
-        nameRu: "Магний бисглицинат",
-        dose: "400 мг на ночь",
-        best: true
-      },
-      {
-        id: "MIN_MG_CITRATE",
-        name: "Magnesium Citrate",
-        nameRu: "Магний цитрат",
-        dose: "400 мг",
-        best: false
-      },
-      {
-        id: "MIN_MG_THREONATE",
-        name: "Magnesium L-Threonate",
-        nameRu: "Магний L-треонат",
-        dose: "200 мг (для мозга)",
-        best: false
-      },
-      {
-        id: "MIN_MG_MALATE",
-        name: "Magnesium Malate",
-        nameRu: "Магний малат",
-        dose: "400 мг (для мышц)",
-        best: false
-      },
-      {
-        id: "MIN_MG_OXIDE",
-        name: "Magnesium Oxide",
-        nameRu: "Магний оксид",
-        dose: "400 мг (низкая усвояемость)",
-        best: false,
-        notes: "Низкая биодоступность (~4%)"
-      }
-    ],
-    organs: [
-      "BRAIN",
-      "HEART",
-      "MUSCLES",
-      "NERVES"
-    ],
-    systems: [
-      "neuro",
-      "cardio",
-      "musculoskeletal"
-    ],
-    mechanisms: [
-      "GABA_RECEPTOR_MODULATION",
-      "NMDA_ANTAGONISM",
-      "MUSCLE_RELAXATION",
-      "ATP_PRODUCTION",
-      "INSULIN_SENSITIVITY",
-      "BLOOD_PRESSURE_REGULATION"
-    ],
-    description: "Магний — эссенциальный минерал, участвующий в 300+ ферментных реакциях. Успокаивает нервную систему (GABA), расслабляет мышцы, снижает давление, улучшает сон. Бисглицинат — лучшая форма.",
-    synergies: [
-      {
-        with: "vitamin_b6",
-        effect: "Улучшение усвоения Mg",
-        mechanism: "B6 усиливает транспорт Магний в клетки",
-        severity: "MEDIUM"
-      },
-      {
-        with: "taurine",
-        effect: "Синергия расслабления",
-        mechanism: "Таурин + Магний = кардиопротекция и расслабление мышц",
-        severity: "MEDIUM"
-      },
-      {
-        with: "vitamin_d3",
-        effect: "Взаимное усвоение",
-        mechanism: "Магний необходим для активации витамина D",
-        severity: "MEDIUM"
-      },
-      {
-        with: "zinc",
-        effect: "Баланс минералов",
-        mechanism: "Сбалансированный приём Цинк и Mg",
-        severity: "LOW"
-      }
-    ],
-    conflicts: [
-      {
-        with: "calcium_high",
-        effect: "Конкуренция за всасывание",
-        mechanism: "Кальций и Магний конкурируют за транспортёры",
-        severity: "LOW"
-      },
-      {
-        with: "iron",
-        effect: "Раздельный приём",
-        mechanism: "Магний снижает всасывание железа при одновременном приёме",
-        severity: "LOW"
-      }
-    ],
-    monitoring: [
-      {
-        what: "Магний сыворотки",
-        when: "Каждые 8 нед",
-        targetRange: "0.75-0.95 ммоль/л"
-      },
-      {
-        what: "Магний эритроцитов",
-        when: "При возможности",
-        targetRange: ">1.8 ммоль/л"
-      }
-    ],
-    contraindications: [
-      "Тяжёлая почечная недостаточность (ClCr<30)",
-      "Атриовентрикулярная блокада"
-    ],
-    sideEffects: [
-      "Диарея при высоких дозах (цитрат/оксид)",
-      "Сонливость при приёме на ночь"
-    ],
-    dosage: {
-      mg: 400,
-      timing: "на ночь (бисглицинат)",
-      form: "бисглицинат"
-    },
-    bestForCourse: true
-  },
-  coq10: {
+coq10: {
     id: 'coq10', name: 'CoQ10 (Ubiquinol)', nameRu: 'Коэнзим Q10 (Убихинол)',
     tier: 'core', category: ['antioxidant', 'cardioprotector', 'mitochondrial'],
     forms: [
@@ -4644,7 +4299,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 200, timing: 'с едой (убихинол)', form: 'убихинол' },
     bestForCourse: true,
   },
-  vitamin_d3: {
+vitamin_d3: {
     id: 'vitamin_d3', name: 'Vitamin D3', nameRu: 'Витамин D3',
     tier: 'core', category: ['vitamin', 'hormonal', 'immunomodulator'],
     forms: [
@@ -4672,7 +4327,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5000, timing: 'с едой (МЕ)', form: 'капсулы' },
     bestForCourse: true,
   },
-  zinc: {
+zinc: {
     id: 'zinc', name: 'Zinc', nameRu: 'Цинк',
     tier: 'core', category: ['mineral', 'immunomodulator', 'hormonal'],
     forms: [
@@ -4702,7 +4357,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 30, timing: 'на ночь (пиколинат)', form: 'пиколинат' },
     bestForCourse: true,
   },
-  selenium: {
+selenium: {
     id: 'selenium', name: 'Selenium', nameRu: 'Селен',
     tier: 'core', category: ['mineral', 'antioxidant', 'thyroid'],
     forms: [
@@ -4728,7 +4383,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 200, timing: 'с едой (мкг)', form: 'метионин' },
     bestForCourse: true,
   },
-  milk_thistle: {
+milk_thistle: {
     id: 'milk_thistle', name: 'Milk Thistle (Silymarin)', nameRu: 'Расторопша (Силимарин)',
     tier: 'core', category: ['hepatoprotector', 'antioxidant', 'herb'],
     forms: [
@@ -4754,7 +4409,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 600, timing: 'с едой, 2x/д', form: 'капсулы' },
     bestForCourse: true,
   },
-  curcumin: {
+curcumin: {
     id: 'curcumin', name: 'Curcumin + Piperine', nameRu: 'Куркумин + Пиперин',
     tier: 'core', category: ['polyphenol', 'antiinflammatory', 'antioxidant'],
     forms: [
@@ -4784,7 +4439,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'с пиперином, с едой', form: 'капсулы + пиперин' },
     bestForCourse: true,
   },
-  ashwagandha: {
+ashwagandha: {
     id: 'ashwagandha', name: 'Ashwagandha KSM-66', nameRu: 'Ашваганда KSM-66',
     tier: 'core', category: ['adaptogen', 'antiinflammatory', 'hormonal'],
     forms: [
@@ -4811,7 +4466,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 600, timing: 'вечер (KSM-66)', form: 'KSM-66' },
     bestForCourse: true,
   },
-  vitamin_c: {
+vitamin_c: {
     id: 'vitamin_c', name: 'Vitamin C', nameRu: 'Витамин C (Аскорбиновая кислота)',
     tier: 'core', category: ['vitamin', 'antioxidant', 'immunomodulator'],
     forms: [
@@ -4837,7 +4492,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'натощак', form: 'порошок/таблетки' },
     bestForCourse: true,
   },
-  taurine: {
+taurine: {
     id: 'taurine', name: 'Taurine', nameRu: 'Таурин',
     tier: 'core', category: ['amino', 'cardioprotector', 'neuroprotector'],
     forms: [
@@ -4858,7 +4513,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 2000, timing: 'натощак', form: 'порошок' },
     bestForCourse: true,
   },
-  alpha_lipoic: {
+alpha_lipoic: {
     id: 'alpha_lipoic', name: 'Alpha-Lipoic Acid (R-ALA)', nameRu: 'АЛЬК R-форма',
     tier: 'core', category: ['antioxidant', 'neuroprotector', 'metabolic'],
     forms: [
@@ -4883,7 +4538,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 300, timing: 'натощак (R-форма)', form: 'R-форма' },
     bestForCourse: true,
   },
-  berberine: {
+berberine: {
     id: 'berberine', name: 'Berberine', nameRu: 'Берберин',
     tier: 'core', category: ['antioxidant', 'metabolic', 'cardioprotector'],
     forms: [
@@ -4908,7 +4563,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой, 2x/д', form: 'HCl' },
     bestForCourse: true,
   },
-  vitamin_k2: {
+vitamin_k2: {
     id: 'vitamin_k2', name: 'Vitamin K2 (MK-7)', nameRu: 'Витамин K2 (МК-7)',
     tier: 'core', category: ['vitamin', 'cardioprotector', 'bone'],
     forms: [
@@ -4931,7 +4586,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 200, timing: 'с едой (мкг)', form: 'МК-7' },
     bestForCourse: true,
   },
-  probiotics: {
+probiotics: {
     id: 'probiotics', name: 'Probiotics', nameRu: 'Пробиотики',
     tier: 'standard', category: ['probiotic', 'immunomodulator', 'hepatoprotector'],
     forms: [
@@ -4958,7 +4613,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 20, timing: 'натощак (млрд КОЕ)', form: 'капсулы' },
     bestForCourse: true,
   },
-  collagen: {
+collagen: {
     id: 'collagen', name: 'Collagen Hydrolysate', nameRu: 'Коллаген гидролизат',
     tier: 'standard', category: ['amino', 'joint', 'beauty'],
     forms: [
@@ -4981,7 +4636,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 10000, timing: 'с едой (мг, гидролизат)', form: 'гидролизат' },
     bestForCourse: true,
   },
-  glucosamine: {
+glucosamine: {
     id: 'glucosamine', name: 'Glucosamine', nameRu: 'Глюкозамин',
     tier: 'standard', category: ['amino', 'joint'],
     forms: [
@@ -5005,7 +4660,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1500, timing: 'с едой', form: 'сульфат' },
     bestForCourse: false,
   },
-  telmisartan: {
+telmisartan: {
     id: 'telmisartan', name: 'Telmisartan', nameRu: 'Тельмисартан',
     tier: 'specialty', category: ['pharma', 'cardioprotector', 'metabolic'],
     forms: [
@@ -5033,7 +4688,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 40, timing: 'утро (КАД контроль!)', form: 'таблетки' },
     bestForCourse: true,
   },
-  nebivolol: {
+nebivolol: {
     id: 'nebivolol', name: 'Nebivolol', nameRu: 'Небиволол',
     tier: 'specialty', category: ['pharma', 'cardioprotector'],
     forms: [
@@ -5060,12 +4715,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5, timing: 'утро (ЧСС контроль!)', form: 'таблетки' },
     bestForCourse: true,
   },
-
-
-
-
-
-  iron: {
+iron: {
     id: 'iron', name: 'Iron', nameRu: 'Железо', tier: 'core',
     category: ['mineral', 'hematologic'],
     forms: [
@@ -5095,7 +4745,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 18, timing: 'натощак или с витамином С', form: 'бисглицинат железа (хелат)' },
     bestForCourse: true,
   },
-  copper: {
+copper: {
     id: 'copper', name: 'Copper', nameRu: 'Медь', tier: 'standard',
     category: ['mineral', 'antioxidant'],
     forms: [
@@ -5121,7 +4771,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 2, timing: 'с едой', form: 'медь бисглицинат' },
     bestForCourse: true,
   },
-  vitamin_b12: {
+vitamin_b12: {
     id: 'vitamin_b12', name: 'Vitamin B12', nameRu: 'Витамин В12 (Кобаламин)', tier: 'core',
     category: ['vitamin', 'hematologic'],
     forms: [
@@ -5152,7 +4802,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'с едой или натощак (метилкобаламин)', form: 'метилкобаламин (сублингвальный)' },
     bestForCourse: true,
   },
-  potassium: {
+potassium: {
     id: 'potassium', name: 'Potassium', nameRu: 'Калий', tier: 'core',
     category: ['mineral', 'cardioprotector'],
     forms: [
@@ -5177,7 +4827,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 300, timing: 'с едой 2x/д', form: 'цитрат калия' },
     bestForCourse: true,
   },
-  electrolyte_complex: {
+electrolyte_complex: {
     id: 'electrolyte_complex', name: 'Electrolyte Complex', nameRu: 'Электролитный комплекс', tier: 'core',
     category: ['mineral', 'cardioprotector'],
     forms: [
@@ -5203,7 +4853,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: '2x/д с едой', form: 'электролитный комплекс (K+Mg+Ca+Na)' },
     bestForCourse: true,
   },
-  vitamin_b6: {
+vitamin_b6: {
     id: 'vitamin_b6', name: 'Vitamin B6', nameRu: 'Витамин В6 (Пиридоксин)', tier: 'core',
     category: ['vitamin', 'neuroprotector'],
     forms: [
@@ -5230,7 +4880,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 50, timing: 'с едой (P-5-P) или натощак', form: 'пиридоксаль-5-фосфат (P-5-P)' },
     bestForCourse: true,
   },
-  vitamin_a: {
+vitamin_a: {
     id: 'vitamin_a',
     name: 'Vitamin A',
     nameRu: 'Витамин А (Ретинол)',
@@ -5266,7 +4916,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'с едой (жирорастворимый)', form: 'капсулы ретинола пальмитат' },
     bestForCourse: false,
   },
-  vitamin_b1: {
+vitamin_b1: {
     id: 'vitamin_b1',
     name: 'Vitamin B1',
     nameRu: 'Витамин В1 (Тиамин)',
@@ -5292,7 +4942,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 100, timing: 'утро с едой', form: 'тиамин или бенфотиамин' },
     bestForCourse: false,
   },
-  vitamin_b2: {
+vitamin_b2: {
     id: 'vitamin_b2',
     name: 'Vitamin B2',
     nameRu: 'Витамин В2 (Рибофлавин)',
@@ -5318,7 +4968,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 10, timing: 'с едой', form: 'рибофлавин или R-5-P' },
     bestForCourse: false,
   },
-  vitamin_b3: {
+vitamin_b3: {
     id: 'vitamin_b3',
     name: 'Vitamin B3',
     nameRu: 'Витамин В3 (Ниацин)',
@@ -5347,7 +4997,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой', form: 'ниацин или ниацинамид' },
     bestForCourse: true,
   },
-  vitamin_b5: {
+vitamin_b5: {
     id: 'vitamin_b5',
     name: 'Vitamin B5',
     nameRu: 'Витамин В5 (Пантотеновая к-та)',
@@ -5373,7 +5023,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'пантотенат или пантетин' },
     bestForCourse: false,
   },
-  biotin: {
+biotin: {
     id: 'biotin',
     name: 'Biotin',
     nameRu: 'Биотин (Витамин В7)',
@@ -5399,7 +5049,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5, timing: 'с едой', form: 'биотин капсулы' },
     bestForCourse: false,
   },
-  folate: {
+folate: {
     id: 'folate',
     name: 'Folate',
     nameRu: 'Фолат (Витамин В9)',
@@ -5432,7 +5082,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.8, timing: 'с едой', form: 'метилфолат (5-MTHF)' },
     bestForCourse: true,
   },
-  vitamin_e: {
+vitamin_e: {
     id: 'vitamin_e',
     name: 'Vitamin E',
     nameRu: 'Витамин Е (Токоферол)',
@@ -5463,7 +5113,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 200, timing: 'с едой (жирорастворимый)', form: 'смешанные токоферолы' },
     bestForCourse: true,
   },
-  vitamin_b_complex: {
+vitamin_b_complex: {
     id: 'vitamin_b_complex',
     name: 'Vitamin B Complex',
     nameRu: 'Витамин В-Комплекс',
@@ -5489,7 +5139,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 50, timing: 'утро с едой', form: 'капсулы B-50 или B-100' },
     bestForCourse: true,
   },
-  inositol: {
+inositol: {
     id: 'inositol',
     name: 'Inositol',
     nameRu: 'Инозитол (Мио-инозитол)',
@@ -5517,7 +5167,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 2000, timing: '2x/д с едой', form: 'мио-инозитол или смесь 40:1' },
     bestForCourse: false,
   },
-  betaine: {
+betaine: {
     id: 'betaine',
     name: 'Betaine',
     nameRu: 'Бетаин (Триметилглицин)',
@@ -5545,7 +5195,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 3000, timing: 'с едой 2x/д', form: 'бетаин HCl или безводный бетаин' },
     bestForCourse: false,
   },
-  pqq: {
+pqq: {
     id: 'pqq',
     name: 'PQQ',
     nameRu: 'Пирролохинолинхинон (PQQ)',
@@ -5571,7 +5221,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 20, timing: 'утро с едой', form: 'PQQ динатриевая соль' },
     bestForCourse: false,
   },
-  vitamin_complex: {
+vitamin_complex: {
     id: 'vitamin_complex',
     name: 'Vitamin Complex',
     nameRu: 'Витаминный комплекс',
@@ -5599,7 +5249,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'утро с едой', form: 'капсулы мультивитаминов' },
     bestForCourse: true,
   },
-  pterostilbene: {
+pterostilbene: {
     id: 'pterostilbene',
     name: 'Pterostilbene',
     nameRu: 'Птеростильбен',
@@ -5625,7 +5275,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 250, timing: 'утро с едой', form: 'птеростильбен капсулы' },
     bestForCourse: false,
   },
-  saw_palmetto: {
+saw_palmetto: {
     id: 'saw_palmetto',
     name: 'Saw Palmetto',
     nameRu: 'Сереноа ползучая (Пальметто)',
@@ -5655,7 +5305,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 320, timing: 'с едой 2x/д', form: 'экстракт сереноа 85-95% жирных кислот' },
     bestForCourse: true,
   },
-  hcg: {
+hcg: {
     id: 'hcg',
     name: 'HCG',
     nameRu: 'ХГЧ (Хорионический гонадотропин)',
@@ -5684,7 +5334,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: '2x/нед, схема 3/1 (3 нед приема, 1 нед отдых)', form: 'ХГЧ лиофилизат (реконструкция)' },
     bestForCourse: true,
   },
-  l_carnitine: {
+l_carnitine: {
     id: 'l_carnitine',
     name: 'L-Carnitine',
     nameRu: 'Л-Карнитин',
@@ -5716,7 +5366,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 2000, timing: 'натощак, 30 мин до тренировки', form: 'Л-карнитин тартрат или АЛК' },
     bestForCourse: true,
   },
-  phosphatidylcholine: {
+phosphatidylcholine: {
     id: 'phosphatidylcholine',
     name: 'Phosphatidylcholine',
     nameRu: 'Фосфатидилхолин (Лецитин/PPC)',
@@ -5748,7 +5398,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1200, timing: 'с едой 2x/д', form: 'PPC (полиенилфосфатидилхолин) или лецитин' },
     bestForCourse: true,
   },
-  prebiotics: {
+prebiotics: {
     id: 'prebiotics',
     name: 'Prebiotics',
     nameRu: 'Пребиотики',
@@ -5778,7 +5428,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5000, timing: 'с едой, начать с 2-3 г', form: 'порошок пребиотического комплекса' },
     bestForCourse: true,
   },
-  glutamine: {
+glutamine: {
     id: 'glutamine',
     name: 'Glutamine',
     nameRu: 'Глутамин (Л-Глутамин)',
@@ -5807,7 +5457,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5000, timing: 'натощак или после тренировки', form: 'Л-глутамин порошок' },
     bestForCourse: true,
   },
-  molybdenum: {
+molybdenum: {
     id: 'molybdenum',
     name: 'Molybdenum',
     nameRu: 'Молибден',
@@ -5835,7 +5485,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.1, timing: 'с едой', form: 'молибден цитрат' },
     bestForCourse: false,
   },
-  boron: {
+boron: {
     id: 'boron',
     name: 'Boron',
     nameRu: 'Бор',
@@ -5861,7 +5511,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 3, timing: 'с едой', form: 'бор цитрат или глицинат' },
     bestForCourse: false,
   },
-  silicon: {
+silicon: {
     id: 'silicon',
     name: 'Silicon',
     nameRu: 'Кремний',
@@ -5889,7 +5539,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 10, timing: 'с едой', form: 'ортокремниевая кислота или экстракт хвоща' },
     bestForCourse: false,
   },
-  calcium: {
+calcium: {
     id: 'calcium',
     name: 'Calcium',
     nameRu: 'Кальций',
@@ -5928,7 +5578,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой (2x/д)', form: 'цитрат или карбонат кальция' },
     bestForCourse: true,
   },
-  sodium: {
+sodium: {
     id: 'sodium',
     name: 'Sodium',
     nameRu: 'Натрий',
@@ -5958,7 +5608,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой', form: 'натрия хлорид или цитрат' },
     bestForCourse: false,
   },
-  manganese: {
+manganese: {
     id: 'manganese',
     name: 'Manganese',
     nameRu: 'Марганец',
@@ -5987,7 +5637,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5, timing: 'с едой', form: 'марганца глицинат' },
     bestForCourse: false,
   },
-  iodine: {
+iodine: {
     id: 'iodine',
     name: 'Iodine',
     nameRu: 'Йод',
@@ -6018,7 +5668,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.15, timing: 'с едой', form: 'йодид калия или ламинария' },
     bestForCourse: false,
   },
-  lithium: {
+lithium: {
     id: 'lithium',
     name: 'Lithium',
     nameRu: 'Литий (микродозы)',
@@ -6050,7 +5700,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'утро', form: 'оротат лития или аспартат' },
     bestForCourse: false,
   },
-  vanadium: {
+vanadium: {
     id: 'vanadium',
     name: 'Vanadium',
     nameRu: 'Ванадий',
@@ -6076,7 +5726,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.1, timing: 'с едой', form: 'ванадила сульфат или BMV' },
     bestForCourse: false,
   },
-  phosphorus: {
+phosphorus: {
     id: 'phosphorus',
     name: 'Phosphorus',
     nameRu: 'Фосфор',
@@ -6105,7 +5755,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой', form: 'дикальцийфосфат или фосфат калия' },
     bestForCourse: false,
   },
-  msm: {
+msm: {
     id: 'msm',
     name: 'MSM',
     nameRu: 'МСМ (Метилсульфонилметан)',
@@ -6131,7 +5781,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1500, timing: 'с едой 2x/д', form: 'МСМ капсулы или порошок' },
     bestForCourse: false,
   },
-  trace_minerals: {
+trace_minerals: {
     id: 'trace_minerals',
     name: 'Trace Minerals',
     nameRu: 'Комплекс микроэлементов',
@@ -6157,7 +5807,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'с едой', form: 'хелатный комплекс микроэлементов' },
     bestForCourse: false,
   },
-  chromium: {
+chromium: {
     id: 'chromium',
     name: 'Chromium',
     nameRu: 'Хром',
@@ -6185,7 +5835,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.2, timing: 'с едой', form: 'хрома пиколинат или хелат' },
     bestForCourse: false,
   },
-  colloidal_minerals: {
+colloidal_minerals: {
     id: 'colloidal_minerals',
     name: 'Colloidal Minerals',
     nameRu: 'Коллоидные минералы',
@@ -6215,7 +5865,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 15, timing: 'натощак', form: 'коллоидная жидкая форма' },
     bestForCourse: false,
   },
-  strontium: {
+strontium: {
     id: 'strontium',
     name: 'Strontium',
     nameRu: 'Стронций',
@@ -6245,7 +5895,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.68, timing: 'на ночь (отдельно от Ca)', form: 'стронция ренелат' },
     bestForCourse: false,
   },
-  omega6: {
+omega6: {
     id: 'omega6',
     name: 'Omega-6',
     nameRu: 'Омега-6 (GLA)',
@@ -6273,7 +5923,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой', form: 'масло энотеры или бурачника' },
     bestForCourse: false,
   },
-  omega7: {
+omega7: {
     id: 'omega7',
     name: 'Omega-7',
     nameRu: 'Омега-7 (Пальмитолеиновая к-та)',
@@ -6300,7 +5950,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 250, timing: 'с едой', form: 'масло облепихи или пальмитолеат' },
     bestForCourse: false,
   },
-  omega9: {
+omega9: {
     id: 'omega9',
     name: 'Omega-9',
     nameRu: 'Омега-9 (Олеиновая к-та)',
@@ -6330,7 +5980,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'с едой', form: 'оливковое масло или авокадо' },
     bestForCourse: false,
   },
-  cla: {
+cla: {
     id: 'cla',
     name: 'CLA',
     nameRu: 'КЛА (Конъюгированная линолевая к-та)',
@@ -6358,7 +6008,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 3000, timing: 'с едой 2x/д', form: 'CLA капсулы (т10ц12+ц9т11 изомеры)' },
     bestForCourse: false,
   },
-  mct: {
+mct: {
     id: 'mct',
     name: 'MCT Oil',
     nameRu: 'МСТ Масло',
@@ -6388,7 +6038,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 15000, timing: 'с едой (старт с 5 мл)', form: 'МСТ масло (С8>С10)' },
     bestForCourse: false,
   },
-  ceramides: {
+ceramides: {
     id: 'ceramides',
     name: 'Ceramides',
     nameRu: 'Церамиды',
@@ -6415,7 +6065,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'с едой', form: 'церамиды (экстракт или синтетические)' },
     bestForCourse: false,
   },
-  butyrate: {
+butyrate: {
     id: 'butyrate',
     name: 'Butyrate',
     nameRu: 'Бутират (Масляная кислота)',
@@ -6443,7 +6093,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1500, timing: 'с едой 2x/д', form: 'бутират натрия или кальция' },
     bestForCourse: false,
   },
-  glycine: {
+glycine: {
     id: 'glycine',
     name: 'Glycine',
     nameRu: 'Глицин',
@@ -6473,7 +6123,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 3000, timing: 'на ночь или 2x/д', form: 'глицин порошок или капсулы' },
     bestForCourse: false,
   },
-  theanine: {
+theanine: {
     id: 'theanine',
     name: 'L-Theanine',
     nameRu: 'Л-Теанин',
@@ -6500,7 +6150,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 200, timing: 'на ночь или утром', form: 'Л-теанин капсулы' },
     bestForCourse: false,
   },
-  tyrosine: {
+tyrosine: {
     id: 'tyrosine',
     name: 'L-Tyrosine',
     nameRu: 'Л-Тирозин',
@@ -6530,7 +6180,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'натощак утром', form: 'Л-тирозин капсулы' },
     bestForCourse: false,
   },
-  tryptophan: {
+tryptophan: {
     id: 'tryptophan',
     name: 'L-Tryptophan',
     nameRu: 'Л-Триптофан',
@@ -6561,7 +6211,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'на ночь или натощак', form: 'Л-триптофан капсулы' },
     bestForCourse: false,
   },
-  x5htp: {
+x5htp: {
     id: 'x5htp',
     name: '5-HTP',
     nameRu: '5-HTP (5-Гидрокситриптофан)',
@@ -6590,7 +6240,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 100, timing: 'на ночь или 2x/д', form: '5-HTP капсулы' },
     bestForCourse: false,
   },
-  gaba: {
+gaba: {
     id: 'gaba',
     name: 'GABA',
     nameRu: 'ГАМК (Гамма-аминомасляная кислота)',
@@ -6626,7 +6276,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'на ночь', form: 'ГАМК капсулы или порошок' },
     bestForCourse: false,
   },
-  creatine: {
+creatine: {
     id: 'creatine',
     name: 'Creatine',
     nameRu: 'Креатин',
@@ -6652,7 +6302,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5000, timing: 'с едой или после тренировки', form: 'креатин моногидрат' },
     bestForCourse: true,
   },
-  beta_alanine: {
+beta_alanine: {
     id: 'beta_alanine',
     name: 'Beta-Alanine',
     nameRu: 'Бета-Аланин',
@@ -6680,7 +6330,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 3200, timing: '2x/д с едой', form: 'бета-аланин порошок или капсулы' },
     bestForCourse: false,
   },
-  citrulline: {
+citrulline: {
     id: 'citrulline',
     name: 'L-Citrulline',
     nameRu: 'Л-Цитруллин',
@@ -6706,7 +6356,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 6000, timing: 'натощак, 30 мин до тренировки', form: 'Л-цитруллин или цитруллин малат' },
     bestForCourse: false,
   },
-  arginine: {
+arginine: {
     id: 'arginine',
     name: 'L-Arginine',
     nameRu: 'Л-Аргинин',
@@ -6734,7 +6384,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 3000, timing: 'натощак или на ночь', form: 'Л-аргинин капсулы или порошок' },
     bestForCourse: false,
   },
-  agmatine: {
+agmatine: {
     id: 'agmatine',
     name: 'Agmatine',
     nameRu: 'Агматин',
@@ -6759,7 +6409,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'натощак или 2x/д', form: 'агматин сульфат' },
     bestForCourse: false,
   },
-  bcaa: {
+bcaa: {
     id: 'bcaa',
     name: 'BCAA',
     nameRu: 'BCAA (Аминокислоты с разветвлённой цепью)',
@@ -6788,7 +6438,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 10000, timing: 'до или после тренировки', form: 'BCAA порошок (лейцин:изолейцин:валин 2:1:1)' },
     bestForCourse: false,
   },
-  hmb: {
+hmb: {
     id: 'hmb',
     name: 'HMB',
     nameRu: 'HMB (Бета-гидрокси-бета-метилмасляная кислота)',
@@ -6815,7 +6465,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 3000, timing: '2x/д с едой', form: 'HMB кальций порошок или капсулы' },
     bestForCourse: false,
   },
-  glutathione: {
+glutathione: {
     id: 'glutathione',
     name: 'Glutathione',
     nameRu: 'Глутатион',
@@ -6841,7 +6491,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'натощак', form: 'липосомальный глутатион или NAC+витамин С' },
     bestForCourse: false,
   },
-  eaa: {
+eaa: {
     id: 'eaa',
     name: 'EAA',
     nameRu: 'EAA (Незаменимые аминокислоты)',
@@ -6868,7 +6518,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 10000, timing: 'до или после тренировки', form: 'EAA порошок' },
     bestForCourse: false,
   },
-  d_aspartic_acid: {
+d_aspartic_acid: {
     id: 'd_aspartic_acid',
     name: 'D-Aspartic Acid',
     nameRu: 'D-Аспарагиновая кислота',
@@ -6894,7 +6544,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 3000, timing: 'утро натощак, курс 12-15 дней', form: 'D-аспарагиновая кислота порошок' },
     bestForCourse: false,
   },
-  phenibut: {
+phenibut: {
     id: 'phenibut',
     name: 'Phenibut',
     nameRu: 'Фенибут',
@@ -6923,7 +6573,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 250, timing: 'на ночь или 2x/д, курс 2-4 нед', form: 'фенибут 250 мг' },
     bestForCourse: false,
   },
-  carnosine: {
+carnosine: {
     id: 'carnosine',
     name: 'Carnosine',
     nameRu: 'Карнозин',
@@ -6949,7 +6599,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: '2x/д с едой', form: 'карнозин капсулы' },
     bestForCourse: false,
   },
-  alanine: {
+alanine: {
     id: 'alanine',
     name: 'Alanine',
     nameRu: 'Аланин',
@@ -6974,7 +6624,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 2000, timing: 'с едой', form: 'аланин порошок' },
     bestForCourse: false,
   },
-  l_dopa: {
+l_dopa: {
     id: 'l_dopa',
     name: 'L-DOPA',
     nameRu: 'Леводопа (L-DOPA)',
@@ -7001,7 +6651,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'натощак, курс 5-7 дней', form: 'Л-ДОФА (экстракт мукуны) капсулы' },
     bestForCourse: false,
   },
-  phosphatidylserine: {
+phosphatidylserine: {
     id: 'phosphatidylserine',
     name: 'Phosphatidylserine',
     nameRu: 'Фосфатидилсерин',
@@ -7027,7 +6677,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 300, timing: 'с едой 2x/д', form: 'фосфатидилсерин из соевого лецитина' },
     bestForCourse: false,
   },
-  methionine: {
+methionine: {
     id: 'methionine',
     name: 'Methionine',
     nameRu: 'Метионин',
@@ -7054,7 +6704,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой', form: 'метионин капсулы' },
     bestForCourse: false,
   },
-  s_adenosyl_methionine: {
+s_adenosyl_methionine: {
     id: 's_adenosyl_methionine',
     name: 'SAMe',
     nameRu: 'SAMe (S-Аденозилметионин)',
@@ -7085,7 +6735,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 400, timing: 'натощак 2x/д', form: 'SAMe энтеросолюбильный' },
     bestForCourse: false,
   },
-  ginseng: {
+ginseng: {
     id: 'ginseng',
     name: 'Ginseng',
     nameRu: 'Женьшень (Panax Ginseng)',
@@ -7114,7 +6764,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 200, timing: 'утро с едой', form: 'экстракт женьшеня (5% гинзенозидов)' },
     bestForCourse: false,
   },
-  rhodiola: {
+rhodiola: {
     id: 'rhodiola',
     name: 'Rhodiola',
     nameRu: 'Родиола розовая',
@@ -7144,7 +6794,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 300, timing: 'утро натощак', form: 'экстракт родиолы (3% розавин)' },
     bestForCourse: false,
   },
-  bacopa: {
+bacopa: {
     id: 'bacopa',
     name: 'Bacopa',
     nameRu: 'Бакопа моньери',
@@ -7171,7 +6821,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 300, timing: 'с едой 2x/д', form: 'экстракт бакопы (50% бакозидов)' },
     bestForCourse: false,
   },
-  lions_mane: {
+lions_mane: {
     id: 'lions_mane',
     name: 'Lions Mane',
     nameRu: 'Ежовик гребенчатый',
@@ -7197,7 +6847,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт ежовика (50% эринацинов)' },
     bestForCourse: false,
   },
-  cordyceps: {
+cordyceps: {
     id: 'cordyceps',
     name: 'Cordyceps',
     nameRu: 'Кордицепс',
@@ -7225,7 +6875,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'утро с едой', form: 'экстракт кордицепса (7% кордицепина)' },
     bestForCourse: false,
   },
-  maca: {
+maca: {
     id: 'maca',
     name: 'Maca',
     nameRu: 'Мака (Лепидиум мейени)',
@@ -7251,7 +6901,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1500, timing: 'с едой', form: 'порошок или экстракт маки (желатинизированный)' },
     bestForCourse: false,
   },
-  holy_basil: {
+holy_basil: {
     id: 'holy_basil',
     name: 'Holy Basil',
     nameRu: 'Туласи (Святой базилик)',
@@ -7281,7 +6931,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 400, timing: 'с едой 2x/д', form: 'экстракт туласи (2% урсоловой кислоты)' },
     bestForCourse: false,
   },
-  gotu_kola: {
+gotu_kola: {
     id: 'gotu_kola',
     name: 'Gotu Kola',
     nameRu: 'Готу Кола',
@@ -7308,7 +6958,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт готу колы' },
     bestForCourse: false,
   },
-  ecdysterone: {
+ecdysterone: {
     id: 'ecdysterone',
     name: 'Ecdysterone',
     nameRu: 'Экдистерон',
@@ -7334,7 +6984,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 400, timing: 'с едой (с белком)', form: 'экдистерон (95%)' },
     bestForCourse: false,
   },
-  shilajit: {
+shilajit: {
     id: 'shilajit',
     name: 'Shilajit',
     nameRu: 'Мумиё (Шиладжит)',
@@ -7362,7 +7012,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 250, timing: 'с едой', form: 'мумиё очищенное или экстракт' },
     bestForCourse: false,
   },
-  schisandra: {
+schisandra: {
     id: 'schisandra',
     name: 'Schisandra',
     nameRu: 'Лимонник китайский (Шизандра)',
@@ -7388,7 +7038,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт шизандры (9% схизандринов)' },
     bestForCourse: false,
   },
-  ginger: {
+ginger: {
     id: 'ginger',
     name: 'Ginger',
     nameRu: 'Имбирь',
@@ -7418,7 +7068,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'с едой', form: 'имбиря экстракт (5% джинджеролов)' },
     bestForCourse: false,
   },
-  astaxanthin: {
+astaxanthin: {
     id: 'astaxanthin',
     name: 'Astaxanthin',
     nameRu: 'Астаксантин',
@@ -7447,7 +7097,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 12, timing: 'с едой (жирорастворимый)', form: 'астаксантин из Haematococcus' },
     bestForCourse: false,
   },
-  resveratrol: {
+resveratrol: {
     id: 'resveratrol',
     name: 'Resveratrol',
     nameRu: 'Ресвератрол',
@@ -7476,7 +7126,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой', form: 'транс-ресвератрол' },
     bestForCourse: false,
   },
-  quercetin: {
+quercetin: {
     id: 'quercetin',
     name: 'Quercetin',
     nameRu: 'Кверцетин',
@@ -7507,7 +7157,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой (с жирами)', form: 'кверцетин' },
     bestForCourse: false,
   },
-  egcg: {
+egcg: {
     id: 'egcg',
     name: 'EGCG',
     nameRu: 'EGCG',
@@ -7539,7 +7189,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 400, timing: 'натощак или с едой', form: 'EGCG экстракт' },
     bestForCourse: false,
   },
-  sulforaphane: {
+sulforaphane: {
     id: 'sulforaphane',
     name: 'Sulforaphane',
     nameRu: 'Сульфорафан',
@@ -7565,7 +7215,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 20, timing: 'натощак или с едой', form: 'экстракт проростков брокколи' },
     bestForCourse: false,
   },
-  melatonin: {
+melatonin: {
     id: 'melatonin',
     name: 'Melatonin',
     nameRu: 'Мелатонин',
@@ -7596,7 +7246,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 3, timing: 'на ночь за 30 мин до сна', form: 'мелатонин капсулы' },
     bestForCourse: false,
   },
-  ginkgo: {
+ginkgo: {
     id: 'ginkgo',
     name: 'Ginkgo Biloba',
     nameRu: 'Гинкго Билоба',
@@ -7625,7 +7275,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 120, timing: 'с едой 2x/д', form: 'экстракт гинкго' },
     bestForCourse: false,
   },
-  cjc1295: {
+cjc1295: {
     id: 'cjc1295',
     name: 'CJC-1295',
     nameRu: 'CJC-1295 (с модагриком)',
@@ -7654,7 +7304,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 2, timing: '1x/нед п/к', form: 'CJC-1295 2 мг' },
     bestForCourse: false,
   },
-  ipamorelin: {
+ipamorelin: {
     id: 'ipamorelin',
     name: 'Ipamorelin',
     nameRu: 'Ипаморелин',
@@ -7682,7 +7332,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.1, timing: '2-3x/д п/к', form: 'Ипаморелин 100 мкг' },
     bestForCourse: false,
   },
-  ghrp2: {
+ghrp2: {
     id: 'ghrp2',
     name: 'GHRP-2',
     nameRu: 'GHRP-2',
@@ -7710,7 +7360,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.1, timing: '2-3x/д п/к', form: 'GHRP-2 100 мкг' },
     bestForCourse: false,
   },
-  ghrp6: {
+ghrp6: {
     id: 'ghrp6',
     name: 'GHRP-6',
     nameRu: 'GHRP-6',
@@ -7738,7 +7388,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.1, timing: '2-3x/д п/к', form: 'GHRP-6 100 мкг' },
     bestForCourse: false,
   },
-  follistatin: {
+follistatin: {
     id: 'follistatin',
     name: 'Follistatin',
     nameRu: 'Фоллистатин',
@@ -7763,7 +7413,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: '2x/нед п/к', form: 'Фоллистатин 1 мг' },
     bestForCourse: false,
   },
-  semax: {
+semax: {
     id: 'semax',
     name: 'Semax',
     nameRu: 'Семакс',
@@ -7790,7 +7440,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.0003, timing: '2x/д интраназально', form: 'Семакс 0.3 мг/капли' },
     bestForCourse: true,
   },
-  selank: {
+selank: {
     id: 'selank',
     name: 'Selank',
     nameRu: 'Селанк',
@@ -7816,7 +7466,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.0003, timing: '2-3x/д интраназально', form: 'Селанк 0.3 мг/капли' },
     bestForCourse: false,
   },
-  dsip: {
+dsip: {
     id: 'dsip',
     name: 'DSIP',
     nameRu: 'DSIP (Дельта-сон-индуцирующий пептид)',
@@ -7843,7 +7493,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'на ночь п/к', form: 'DSIP 1 мг' },
     bestForCourse: false,
   },
-  p21: {
+p21: {
     id: 'p21',
     name: 'P21',
     nameRu: 'P21 (Пептид 21)',
@@ -7868,7 +7518,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.001, timing: '1x/д п/к', form: 'P21 1 мг' },
     bestForCourse: false,
   },
-  mots_c: {
+mots_c: {
     id: 'mots_c',
     name: 'MOTS-c',
     nameRu: 'MOTS-c',
@@ -7894,7 +7544,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 10, timing: '1x/д п/к', form: 'MOTS-c 10 мг' },
     bestForCourse: false,
   },
-  humanin: {
+humanin: {
     id: 'humanin',
     name: 'Humanin',
     nameRu: 'Хьюманин',
@@ -7920,7 +7570,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5, timing: '1x/д п/к', form: 'Хьюманин 5 мг' },
     bestForCourse: false,
   },
-  ss31: {
+ss31: {
     id: 'ss31',
     name: 'SS-31',
     nameRu: 'SS-31 (Элампирад)',
@@ -7946,7 +7596,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: '1x/д п/к', form: 'SS-31 1 мг' },
     bestForCourse: false,
   },
-  thymosin_alpha1: {
+thymosin_alpha1: {
     id: 'thymosin_alpha1',
     name: 'Thymosin Alpha-1',
     nameRu: 'Тимозин Альфа-1',
@@ -7974,7 +7624,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1.6, timing: '2x/нед п/к', form: 'Тимозин Альфа-1 1.6 мг' },
     bestForCourse: false,
   },
-  ghk_cu: {
+ghk_cu: {
     id: 'ghk_cu',
     name: 'GHK-Cu',
     nameRu: 'GHK-Cu (Глицил-гистидил-лизин-медь)',
@@ -8002,7 +7652,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 2, timing: '1x/д п/к или наружно', form: 'GHK-Cu 2 мг' },
     bestForCourse: false,
   },
-  bpc157: {
+bpc157: {
     id: 'bpc157',
     name: 'BPC-157',
     nameRu: 'BPC-157 (Пептид защиты тела)',
@@ -8031,7 +7681,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.25, timing: '2x/д п/к или перорально', form: 'BPC-157 250 мкг' },
     bestForCourse: true,
   },
-  tb500: {
+tb500: {
     id: 'tb500',
     name: 'TB-500',
     nameRu: 'TB-500 (Тимозин Бета-4)',
@@ -8059,7 +7709,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5, timing: '2x/нед п/к', form: 'TB-500 5 мг' },
     bestForCourse: true,
   },
-  melanotan1: {
+melanotan1: {
     id: 'melanotan1',
     name: 'Melanotan-1',
     nameRu: 'Меланотан-1',
@@ -8084,7 +7734,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: '1x/д п/к', form: 'Меланотан-1 1 мг' },
     bestForCourse: false,
   },
-  melanotan2: {
+melanotan2: {
     id: 'melanotan2',
     name: 'Melanotan-2',
     nameRu: 'Меланотан-2',
@@ -8109,7 +7759,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.5, timing: '1x/д п/к (титровать)', form: 'Меланотан-2 0.5 мг' },
     bestForCourse: false,
   },
-  pt141: {
+pt141: {
     id: 'pt141',
     name: 'PT-141',
     nameRu: 'PT-141 (Бремеланотид)',
@@ -8136,7 +7786,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 2, timing: 'за 30 мин до п/к', form: 'PT-141 2 мг' },
     bestForCourse: false,
   },
-  gonadorelin: {
+gonadorelin: {
     id: 'gonadorelin',
     name: 'Gonadorelin',
     nameRu: 'Гонадорелин',
@@ -8161,7 +7811,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.1, timing: '2-3x/д п/к', form: 'Гонадорелин 100 мкг' },
     bestForCourse: false,
   },
-  kisspeptin: {
+kisspeptin: {
     id: 'kisspeptin',
     name: 'Kisspeptin',
     nameRu: 'Киссептин',
@@ -8186,7 +7836,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.1, timing: '1x/д п/к', form: 'Киссептин 100 мкг' },
     bestForCourse: false,
   },
-  glp1: {
+glp1: {
     id: 'glp1',
     name: 'GLP-1',
     nameRu: 'ГПП-1 (Глюкагоноподобный пептид-1)',
@@ -8213,7 +7863,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.5, timing: '1-2x/д п/к', form: 'ГПП-1 0.5 мг' },
     bestForCourse: false,
   },
-  gip: {
+gip: {
     id: 'gip',
     name: 'GIP',
     nameRu: 'ГИП (Глюкозозависимый инсулинотропный полипептид)',
@@ -8238,7 +7888,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.5, timing: '1x/д п/к', form: 'ГИП 0.5 мг' },
     bestForCourse: false,
   },
-  cerebrolysin: {
+cerebrolysin: {
     id: 'cerebrolysin',
     name: 'Cerebrolysin',
     nameRu: 'Церебролизин',
@@ -8265,7 +7915,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5, timing: 'в/м или в/в 1x/д', form: 'Церебролизин 5 мл' },
     bestForCourse: false,
   },
-  cortexin: {
+cortexin: {
     id: 'cortexin',
     name: 'Cortexin',
     nameRu: 'Кортексин',
@@ -8291,7 +7941,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 10, timing: 'в/м 1x/д', form: 'Кортексин 10 мг' },
     bestForCourse: false,
   },
-  peptide_complex: {
+peptide_complex: {
     id: 'peptide_complex',
     name: 'Peptide Complex',
     nameRu: 'Пептидный комплекс',
@@ -8326,7 +7976,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5, timing: '1x/д п/к', form: 'Пептидный комплекс 5 мг' },
     bestForCourse: false,
   },
-  elastin: {
+elastin: {
     id: 'elastin',
     name: 'Elastin',
     nameRu: 'Эластин',
@@ -8352,7 +8002,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'эластин пептиды' },
     bestForCourse: false,
   },
-  histidine: {
+histidine: {
     id: 'histidine',
     name: 'Histidine',
     nameRu: 'Гистидин',
@@ -8378,7 +8028,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'натощак 2x/д', form: 'L-Гистидин 1000 мг' },
     bestForCourse: false,
   },
-  cysteine: {
+cysteine: {
     id: 'cysteine',
     name: 'Cysteine',
     nameRu: 'Цистеин',
@@ -8405,7 +8055,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'натощак 2x/д', form: 'N-Ацетилцистеин 600 мг' },
     bestForCourse: true,
   },
-  serine: {
+serine: {
     id: 'serine',
     name: 'Serine',
     nameRu: 'Серин',
@@ -8430,7 +8080,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'L-Серин 500 мг' },
     bestForCourse: false,
   },
-  proline: {
+proline: {
     id: 'proline',
     name: 'Proline',
     nameRu: 'Пролин',
@@ -8456,7 +8106,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'L-Пролин 500 мг' },
     bestForCourse: false,
   },
-  aspartate: {
+aspartate: {
     id: 'aspartate',
     name: 'Aspartate',
     nameRu: 'Аспартат',
@@ -8481,7 +8131,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'L-Аспартат 500 мг' },
     bestForCourse: false,
   },
-  ornithine: {
+ornithine: {
     id: 'ornithine',
     name: 'Ornithine',
     nameRu: 'Орнитин',
@@ -8508,7 +8158,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'натощак на ночь', form: 'L-Орнитин 500 мг' },
     bestForCourse: false,
   },
-  threonine: {
+threonine: {
     id: 'threonine',
     name: 'Threonine',
     nameRu: 'Треонин',
@@ -8533,7 +8183,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'L-Треонин 500 мг' },
     bestForCourse: false,
   },
-  lysine: {
+lysine: {
     id: 'lysine',
     name: 'Lysine',
     nameRu: 'Лизин',
@@ -8560,7 +8210,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'натощак 2x/д', form: 'L-Лизин 1000 мг' },
     bestForCourse: false,
   },
-  phenylalanine: {
+phenylalanine: {
     id: 'phenylalanine',
     name: 'Phenylalanine',
     nameRu: 'Фенилаланин',
@@ -8588,7 +8238,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'натощак 2x/д', form: 'DL-Фенилаланин 500 мг' },
     bestForCourse: false,
   },
-  amino_complex: {
+amino_complex: {
     id: 'amino_complex',
     name: 'Amino Complex',
     nameRu: 'Аминокислотный комплекс',
@@ -8619,7 +8269,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5000, timing: 'с едой 2x/д', form: 'Аминокислотный комплекс 5 г' },
     bestForCourse: false,
   },
-  glutamate: {
+glutamate: {
     id: 'glutamate',
     name: 'Glutamate',
     nameRu: 'Глутамат',
@@ -8646,7 +8296,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'L-Глутамат 500 мг' },
     bestForCourse: false,
   },
-  alpha_ketoglutarate: {
+alpha_ketoglutarate: {
     id: 'alpha_ketoglutarate',
     name: 'Alpha-Ketoglutarate',
     nameRu: 'Альфа-кетоглутарат',
@@ -8671,7 +8321,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'Альфа-кетоглутарат 1 г' },
     bestForCourse: false,
   },
-  reishi: {
+reishi: {
     id: 'reishi',
     name: 'Reishi',
     nameRu: 'Рейши (Ганодерма)',
@@ -8701,7 +8351,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'экстракт рейши' },
     bestForCourse: false,
   },
-  chaga: {
+chaga: {
     id: 'chaga',
     name: 'Chaga',
     nameRu: 'Чага',
@@ -8730,7 +8380,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'экстракт чаги' },
     bestForCourse: false,
   },
-  maitake: {
+maitake: {
     id: 'maitake',
     name: 'Maitake',
     nameRu: 'Майтаке',
@@ -8756,7 +8406,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'экстракт майтаке' },
     bestForCourse: false,
   },
-  shiitake: {
+shiitake: {
     id: 'shiitake',
     name: 'Shiitake',
     nameRu: 'Шиитаке',
@@ -8781,7 +8431,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'экстракт шиитаке' },
     bestForCourse: false,
   },
-  mushroom_complex: {
+mushroom_complex: {
     id: 'mushroom_complex',
     name: 'Mushroom Complex',
     nameRu: 'Грибной комплекс',
@@ -8811,7 +8461,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'грибной комплекс экстракт' },
     bestForCourse: false,
   },
-  agaricus: {
+agaricus: {
     id: 'agaricus',
     name: 'Agaricus',
     nameRu: 'Агарикус (Бразильский гриб)',
@@ -8836,7 +8486,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'экстракт агарикуса' },
     bestForCourse: false,
   },
-  turkey_tail: {
+turkey_tail: {
     id: 'turkey_tail',
     name: 'Turkey Tail',
     nameRu: 'Хвост индейки (Траметес)',
@@ -8863,7 +8513,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'экстракт хвоста индейки' },
     bestForCourse: false,
   },
-  lutein: {
+lutein: {
     id: 'lutein',
     name: 'Lutein',
     nameRu: 'Лютеин',
@@ -8890,7 +8540,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 20, timing: 'с едой 1x/д', form: 'лютеин 20 мг' },
     bestForCourse: false,
   },
-  lycopene: {
+lycopene: {
     id: 'lycopene',
     name: 'Lycopene',
     nameRu: 'Ликопин',
@@ -8922,7 +8572,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 15, timing: 'с едой 1x/д', form: 'ликопин 15 мг' },
     bestForCourse: false,
   },
-  anthocyanins: {
+anthocyanins: {
     id: 'anthocyanins',
     name: 'Anthocyanins',
     nameRu: 'Антоцианы',
@@ -8952,7 +8602,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 200, timing: 'с едой 1x/д', form: 'антоцианы экстракт 200 мг' },
     bestForCourse: false,
   },
-  grape_seed_extract: {
+grape_seed_extract: {
     id: 'grape_seed_extract',
     name: 'Grape Seed Extract',
     nameRu: 'Экстракт косточек винограда',
@@ -8981,7 +8631,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 200, timing: 'с едой 1x/д', form: 'экстракт косточек винограда 200 мг' },
     bestForCourse: false,
   },
-  pycnogenol: {
+pycnogenol: {
     id: 'pycnogenol',
     name: 'Pycnogenol',
     nameRu: 'Пикногенол',
@@ -9009,7 +8659,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 100, timing: 'с едой 1x/д', form: 'пикногенол 100 мг' },
     bestForCourse: false,
   },
-  cocoa_flavanols: {
+cocoa_flavanols: {
     id: 'cocoa_flavanols',
     name: 'Cocoa Flavanols',
     nameRu: 'Какао-флаванолы',
@@ -9034,7 +8684,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'какао-флаванолы 500 мг' },
     bestForCourse: false,
   },
-  c60: {
+c60: {
     id: 'c60',
     name: 'C60',
     nameRu: 'C60 (Фуллерен)',
@@ -9059,7 +8709,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'с едой 1x/д', form: 'C60 в оливковом масле 1 мг' },
     bestForCourse: false,
   },
-  antioxidant_complex: {
+antioxidant_complex: {
     id: 'antioxidant_complex',
     name: 'Antioxidant Complex',
     nameRu: 'Антиоксидантный комплекс',
@@ -9086,7 +8736,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'с едой 1x/д', form: 'антиоксидантный комплекс капсула' },
     bestForCourse: false,
   },
-  nrf2_activator: {
+nrf2_activator: {
     id: 'nrf2_activator',
     name: 'Nrf2 Activator',
     nameRu: 'Nrf2-активатор',
@@ -9112,7 +8762,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 20, timing: 'с едой 1x/д', form: 'Nrf2-активатор 20 мг' },
     bestForCourse: false,
   },
-  olive_extract: {
+olive_extract: {
     id: 'olive_extract',
     name: 'Olive Extract',
     nameRu: 'Экстракт оливы (гидрокситирозол)',
@@ -9140,7 +8790,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 250, timing: 'с едой 1x/д', form: 'экстракт оливы 250 мг' },
     bestForCourse: false,
   },
-  polyphenol_complex: {
+polyphenol_complex: {
     id: 'polyphenol_complex',
     name: 'Polyphenol Complex',
     nameRu: 'Полифенольный комплекс',
@@ -9175,7 +8825,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'полифенольный комплекс 500 мг' },
     bestForCourse: false,
   },
-  citrus_bioflavonoids: {
+citrus_bioflavonoids: {
     id: 'citrus_bioflavonoids',
     name: 'Citrus Bioflavonoids',
     nameRu: 'Цитрусовые биофлавоноиды',
@@ -9203,7 +8853,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'цитрусовые биофлавоноиды 500 мг' },
     bestForCourse: false,
   },
-  flavonoids: {
+flavonoids: {
     id: 'flavonoids',
     name: 'Flavonoids',
     nameRu: 'Флавоноиды',
@@ -9230,7 +8880,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'флавоноиды комплекс 500 мг' },
     bestForCourse: false,
   },
-  ellagic_acid: {
+ellagic_acid: {
     id: 'ellagic_acid',
     name: 'Ellagic Acid',
     nameRu: 'Эллаговая кислота',
@@ -9256,7 +8906,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 250, timing: 'с едой 1x/д', form: 'эллаговая кислота 250 мг' },
     bestForCourse: false,
   },
-  ursolic_acid: {
+ursolic_acid: {
     id: 'ursolic_acid',
     name: 'Ursolic Acid',
     nameRu: 'Урсоловая кислота',
@@ -9282,7 +8932,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 150, timing: 'с едой 2x/д', form: 'урсоловая кислота 150 мг' },
     bestForCourse: false,
   },
-  magnolia: {
+magnolia: {
     id: 'magnolia',
     name: 'Magnolia',
     nameRu: 'Магнолия (хонокиол)',
@@ -9310,7 +8960,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 200, timing: 'на ночь 1x/д', form: 'экстракт магнолии 200 мг' },
     bestForCourse: false,
   },
-  gentian: {
+gentian: {
     id: 'gentian',
     name: 'Gentian',
     nameRu: 'Горечавка',
@@ -9336,7 +8986,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 250, timing: 'за 15 мин до еды', form: 'экстракт горечавки 250 мг' },
     bestForCourse: false,
   },
-  artichoke: {
+artichoke: {
     id: 'artichoke',
     name: 'Artichoke',
     nameRu: 'Артишок',
@@ -9362,7 +9012,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт артишока 500 мг' },
     bestForCourse: false,
   },
-  garlic: {
+garlic: {
     id: 'garlic',
     name: 'Garlic',
     nameRu: 'Чеснок (аллицин)',
@@ -9391,7 +9041,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'с едой 1x/д', form: 'чесночный экстракт 1000 мг' },
     bestForCourse: false,
   },
-  mangosteen: {
+mangosteen: {
     id: 'mangosteen',
     name: 'Mangosteen',
     nameRu: 'Мангостин',
@@ -9416,7 +9066,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'экстракт мангостина 500 мг' },
     bestForCourse: false,
   },
-  nattokinase: {
+nattokinase: {
     id: 'nattokinase',
     name: 'Nattokinase',
     nameRu: 'Наттокиназа',
@@ -9444,7 +9094,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 2000, timing: 'натощак 1x/д', form: 'наттокиназа 2000 FU' },
     bestForCourse: false,
   },
-  grapefruit_seed: {
+grapefruit_seed: {
     id: 'grapefruit_seed',
     name: 'Grapefruit Seed',
     nameRu: 'Экстракт грейпфрутовых косточек',
@@ -9471,7 +9121,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 250, timing: 'с едой 2x/д', form: 'экстракт грейпфрутовых косточек 250 мг' },
     bestForCourse: false,
   },
-  nobiletin: {
+nobiletin: {
     id: 'nobiletin',
     name: 'Nobiletin',
     nameRu: 'Нобилетин',
@@ -9496,7 +9146,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 100, timing: 'с едой 1x/д', form: 'нобилетин 100 мг' },
     bestForCourse: false,
   },
-  fisetin: {
+fisetin: {
     id: 'fisetin',
     name: 'Fisetin',
     nameRu: 'Физетин',
@@ -9522,7 +9172,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 100, timing: 'с едой 2x/д', form: 'физетин 100 мг' },
     bestForCourse: false,
   },
-  baicalin: {
+baicalin: {
     id: 'baicalin',
     name: 'Baicalin',
     nameRu: 'Байкалин',
@@ -9547,7 +9197,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 200, timing: 'с едой 2x/д', form: 'байкалин 200 мг' },
     bestForCourse: false,
   },
-  taxifolin: {
+taxifolin: {
     id: 'taxifolin',
     name: 'Taxifolin',
     nameRu: 'Таксифолин (Дигидрокверцетин)',
@@ -9573,7 +9223,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 100, timing: 'с едой 1x/д', form: 'таксифолин 100 мг' },
     bestForCourse: false,
   },
-  soy_isoflavones: {
+soy_isoflavones: {
     id: 'soy_isoflavones',
     name: 'Soy Isoflavones',
     nameRu: 'Соевые изофлавоны',
@@ -9600,7 +9250,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 100, timing: 'с едой 1x/д', form: 'соевые изофлавоны 100 мг' },
     bestForCourse: false,
   },
-  rosemary: {
+rosemary: {
     id: 'rosemary',
     name: 'Rosemary',
     nameRu: 'Розмарин (карнозиновая кислота)',
@@ -9626,7 +9276,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 200, timing: 'с едой 1x/д', form: 'экстракт розмарина 200 мг' },
     bestForCourse: false,
   },
-  cinnamon: {
+cinnamon: {
     id: 'cinnamon',
     name: 'Cinnamon',
     nameRu: 'Корица (коричный альдегид)',
@@ -9652,7 +9302,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'с едой 2x/д', form: 'корица экстракт 1000 мг' },
     bestForCourse: false,
   },
-  pomegranate: {
+pomegranate: {
     id: 'pomegranate',
     name: 'Pomegranate',
     nameRu: 'Гранат (эллаговая кислота)',
@@ -9679,7 +9329,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'экстракт граната 500 мг' },
     bestForCourse: false,
   },
-  cranberry: {
+cranberry: {
     id: 'cranberry',
     name: 'Cranberry',
     nameRu: 'Клюква (проантоцианидины)',
@@ -9708,7 +9358,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт клюквы 500 мг' },
     bestForCourse: false,
   },
-  urolithin_a: {
+urolithin_a: {
     id: 'urolithin_a',
     name: 'Urolithin A',
     nameRu: 'Уролитин А',
@@ -9734,7 +9384,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'уролитин А 500 мг' },
     bestForCourse: false,
   },
-  bile_acids: {
+bile_acids: {
     id: 'bile_acids',
     name: 'Bile Acids',
     nameRu: 'Жёлчные кислоты (урсодезоксихолевая)',
@@ -9760,7 +9410,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 250, timing: 'с едой 2x/д', form: 'урсодезоксихолевая кислота 250 мг' },
     bestForCourse: false,
   },
-  piracetam: {
+piracetam: {
     id: 'piracetam',
     name: 'Piracetam',
     nameRu: 'Пирацетам',
@@ -9786,7 +9436,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1600, timing: 'с едой 2x/д', form: 'пирацетам 800 мг' },
     bestForCourse: false,
   },
-  aniracetam: {
+aniracetam: {
     id: 'aniracetam',
     name: 'Aniracetam',
     nameRu: 'Анирацетам',
@@ -9812,7 +9462,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 750, timing: 'с едой 2x/д', form: 'анирацетам 750 мг' },
     bestForCourse: false,
   },
-  oxiracetam: {
+oxiracetam: {
     id: 'oxiracetam',
     name: 'Oxiracetam',
     nameRu: 'Оксирацетам',
@@ -9837,7 +9487,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 800, timing: 'с едой 2x/д', form: 'оксирацетам 800 мг' },
     bestForCourse: false,
   },
-  pramiracetam: {
+pramiracetam: {
     id: 'pramiracetam',
     name: 'Pramiracetam',
     nameRu: 'Прамирацетам',
@@ -9862,7 +9512,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 400, timing: 'с едой 2x/д', form: 'прамирацетам 400 мг' },
     bestForCourse: false,
   },
-  fasoracetam: {
+fasoracetam: {
     id: 'fasoracetam',
     name: 'Fasoracetam',
     nameRu: 'Фасорацетам',
@@ -9887,7 +9537,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 50, timing: 'натощак 2x/д', form: 'фасорацетам 50 мг' },
     bestForCourse: false,
   },
-  coluracetam: {
+coluracetam: {
     id: 'coluracetam',
     name: 'Coluracetam',
     nameRu: 'Колурацетам',
@@ -9912,7 +9562,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 20, timing: 'натощак 2x/д', form: 'колурацетам 20 мг' },
     bestForCourse: false,
   },
-  noopept: {
+noopept: {
     id: 'noopept',
     name: 'Noopept',
     nameRu: 'Ноопепт',
@@ -9937,7 +9587,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 10, timing: 'с едой 2x/д', form: 'ноопепт 10 мг' },
     bestForCourse: false,
   },
-  citicoline: {
+citicoline: {
     id: 'citicoline',
     name: 'Citicoline',
     nameRu: 'Цитиколин (ЦДФ-холин)',
@@ -9964,7 +9614,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 250, timing: 'с едой 2x/д', form: 'цитиколин 250 мг' },
     bestForCourse: false,
   },
-  alpha_gpc: {
+alpha_gpc: {
     id: 'alpha_gpc',
     name: 'Alpha-GPC',
     nameRu: 'Альфа-ГФХ (Альфа-глицерофосфохолин)',
@@ -9990,7 +9640,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 300, timing: 'с едой 2x/д', form: 'Альфа-ГФХ 300 мг' },
     bestForCourse: false,
   },
-  vinpocetine: {
+vinpocetine: {
     id: 'vinpocetine',
     name: 'Vinpocetine',
     nameRu: 'Винпоцетин',
@@ -10017,7 +9667,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 10, timing: 'с едой 2x/д', form: 'винпоцетин 10 мг' },
     bestForCourse: false,
   },
-  modafinil: {
+modafinil: {
     id: 'modafinil',
     name: 'Modafinil',
     nameRu: 'Модафинил',
@@ -10045,7 +9695,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 100, timing: 'утром 1x/д', form: 'модафинил 100 мг' },
     bestForCourse: false,
   },
-  selegiline: {
+selegiline: {
     id: 'selegiline',
     name: 'Selegiline',
     nameRu: 'Селегилин',
@@ -10073,7 +9723,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5, timing: 'утром 1x/д', form: 'селегилин 5 мг' },
     bestForCourse: false,
   },
-  memantine: {
+memantine: {
     id: 'memantine',
     name: 'Memantine',
     nameRu: 'Мемантин',
@@ -10100,7 +9750,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5, timing: 'с едой 1x/д', form: 'мемантин 5 мг' },
     bestForCourse: false,
   },
-  bromantane: {
+bromantane: {
     id: 'bromantane',
     name: 'Bromantane',
     nameRu: 'Бромантан',
@@ -10126,7 +9776,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 50, timing: 'утром 1x/д', form: 'бромантан 50 мг' },
     bestForCourse: false,
   },
-  tianeptine: {
+tianeptine: {
     id: 'tianeptine',
     name: 'Tianeptine',
     nameRu: 'Тианептин',
@@ -10154,7 +9804,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 12.5, timing: 'утром 1x/д', form: 'тианептин 12.5 мг' },
     bestForCourse: false,
   },
-  huperzine_a: {
+huperzine_a: {
     id: 'huperzine_a',
     name: 'Huperzine A',
     nameRu: 'Гуперзин А',
@@ -10181,7 +9831,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 100, timing: 'с едой 1x/д', form: 'гуперзин А 100 мкг' },
     bestForCourse: false,
   },
-  apigenin: {
+apigenin: {
     id: 'apigenin',
     name: 'Apigenin',
     nameRu: 'Апигенин',
@@ -10207,7 +9857,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 50, timing: 'на ночь 1x/д', form: 'апигенин 50 мг' },
     bestForCourse: false,
   },
-  lemon_balm: {
+lemon_balm: {
     id: 'lemon_balm',
     name: 'Lemon Balm',
     nameRu: 'Мелисса (мелисса лекарственная)',
@@ -10234,7 +9884,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'на ночь 1x/д', form: 'экстракт мелиссы 500 мг' },
     bestForCourse: false,
   },
-  saffron: {
+saffron: {
     id: 'saffron',
     name: 'Saffron',
     nameRu: 'Шафран (крокин)',
@@ -10262,7 +9912,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 30, timing: 'с едой 1x/д', form: 'шафран экстракт 30 мг' },
     bestForCourse: false,
   },
-  metformin: {
+metformin: {
     id: 'metformin',
     name: 'Metformin',
     nameRu: 'Метформин',
@@ -10291,7 +9941,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'метформин 500 мг' },
     bestForCourse: false,
   },
-  semaglutide: {
+semaglutide: {
     id: 'semaglutide',
     name: 'Semaglutide',
     nameRu: 'Семаглутид',
@@ -10319,7 +9969,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.25, timing: '1x/нед п/к', form: 'семаглутид 0.25 мг' },
     bestForCourse: false,
   },
-  finasteride: {
+finasteride: {
     id: 'finasteride',
     name: 'Finasteride',
     nameRu: 'Финастерид',
@@ -10347,7 +9997,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: '1x/д', form: 'финастерид 1 мг' },
     bestForCourse: false,
   },
-  cabergoline: {
+cabergoline: {
     id: 'cabergoline',
     name: 'Cabergoline',
     nameRu: 'Каберголин',
@@ -10374,7 +10024,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.0005, timing: '2x/нед', form: 'каберголин 0.5 мг' },
     bestForCourse: false,
   },
-  testosterone: {
+testosterone: {
     id: 'testosterone',
     name: 'Testosterone',
     nameRu: 'Тестостерон',
@@ -10407,7 +10057,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 200, timing: '1x/нед в/м', form: 'тестостерон энантат 200 мг' },
     bestForCourse: false,
   },
-  caffeine: {
+caffeine: {
     id: 'caffeine',
     name: 'Caffeine',
     nameRu: 'Кофеин',
@@ -10438,7 +10088,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 200, timing: 'утром за 30 мин до тренировки', form: 'кофеин 200 мг' },
     bestForCourse: false,
   },
-  diclofenac: {
+diclofenac: {
     id: 'diclofenac',
     name: 'Diclofenac',
     nameRu: 'Диклофенак',
@@ -10466,7 +10116,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 50, timing: 'с едой 2x/д (макс 5 дн)', form: 'диклофенак 50 мг' },
     bestForCourse: false,
   },
-  meloxicam: {
+meloxicam: {
     id: 'meloxicam',
     name: 'Meloxicam',
     nameRu: 'Мелоксикам',
@@ -10494,7 +10144,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 7.5, timing: 'с едой 1x/д (макс 7 дн)', form: 'мелоксикам 7.5 мг' },
     bestForCourse: false,
   },
-  ppi_drugs: {
+ppi_drugs: {
     id: 'ppi_drugs',
     name: 'PPI Drugs',
     nameRu: 'ИПП (Омепразол/Пантопразол)',
@@ -10525,7 +10175,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 20, timing: 'утром натощак 1x/д', form: 'омепразол 20 мг' },
     bestForCourse: false,
   },
-  spironolactone: {
+spironolactone: {
     id: 'spironolactone',
     name: 'Spironolactone',
     nameRu: 'Спиронолактон',
@@ -10553,7 +10203,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 50, timing: 'с едой 1x/д', form: 'спиронолактон 50 мг' },
     bestForCourse: false,
   },
-  pharma_drugs: {
+pharma_drugs: {
     id: 'pharma_drugs',
     name: 'Pharma Drugs',
     nameRu: 'Фарма-препараты (комплекс)',
@@ -10578,7 +10228,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'индивидуально', form: 'фарма-комплекс' },
     bestForCourse: false,
   },
-  antidepressant_drugs: {
+antidepressant_drugs: {
     id: 'antidepressant_drugs',
     name: 'Antidepressant Drugs',
     nameRu: 'Антидепрессанты',
@@ -10609,7 +10259,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'индивидуально', form: 'антидепрессант (по назначению)' },
     bestForCourse: false,
   },
-  anxiolytic_drugs: {
+anxiolytic_drugs: {
     id: 'anxiolytic_drugs',
     name: 'Anxiolytic Drugs',
     nameRu: 'Анксиолитики',
@@ -10639,7 +10289,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'индивидуально', form: 'анксиолитик (по назначению)' },
     bestForCourse: false,
   },
-  antipsychotic_drugs: {
+antipsychotic_drugs: {
     id: 'antipsychotic_drugs',
     name: 'Antipsychotic Drugs',
     nameRu: 'Антипсихотики',
@@ -10664,7 +10314,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'индивидуально', form: 'антипсихотик (по назначению)' },
     bestForCourse: false,
   },
-  anticonvulsant_drugs: {
+anticonvulsant_drugs: {
     id: 'anticonvulsant_drugs',
     name: 'Anticonvulsant Drugs',
     nameRu: 'Противоэпилептические препараты',
@@ -10689,7 +10339,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'индивидуально', form: 'противоэпилептический (по назначению)' },
     bestForCourse: false,
   },
-  ketamine: {
+ketamine: {
     id: 'ketamine',
     name: 'Ketamine',
     nameRu: 'Кетамин',
@@ -10714,7 +10364,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.5, timing: 'в клинике 1x/нед в/в', form: 'кетамин 0.5 мг/кг в/в' },
     bestForCourse: false,
   },
-  antidiabetic_drugs: {
+antidiabetic_drugs: {
     id: 'antidiabetic_drugs',
     name: 'Antidiabetic Drugs',
     nameRu: 'Противодиабетические препараты',
@@ -10739,7 +10389,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'индивидуально', form: 'противодиабетический (по назначению)' },
     bestForCourse: false,
   },
-  thyroid_drugs: {
+thyroid_drugs: {
     id: 'thyroid_drugs',
     name: 'Thyroid Drugs',
     nameRu: 'Тиреоидные препараты',
@@ -10769,7 +10419,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'индивидуально', form: 'тиреоидный препарат (по назначению)' },
     bestForCourse: false,
   },
-  corticosteroid_drugs: {
+corticosteroid_drugs: {
     id: 'corticosteroid_drugs',
     name: 'Corticosteroid Drugs',
     nameRu: 'Глюкокортикоиды',
@@ -10798,7 +10448,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'индивидуально', form: 'глюкокортикоид (по назначению)' },
     bestForCourse: false,
   },
-  statin_drugs: {
+statin_drugs: {
     id: 'statin_drugs',
     name: 'Statin Drugs',
     nameRu: 'Статины',
@@ -10828,7 +10478,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 20, timing: 'на ночь 1x/д', form: 'аторвастатин 20 мг' },
     bestForCourse: false,
   },
-  antiplatelet_drugs: {
+antiplatelet_drugs: {
     id: 'antiplatelet_drugs',
     name: 'Antiplatelet Drugs',
     nameRu: 'Антиагреганты',
@@ -10856,7 +10506,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 100, timing: 'с едой 1x/д', form: 'аспирин 100 мг' },
     bestForCourse: false,
   },
-  anticoagulant_drugs: {
+anticoagulant_drugs: {
     id: 'anticoagulant_drugs',
     name: 'Anticoagulant Drugs',
     nameRu: 'Антикоагулянты',
@@ -10889,7 +10539,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'индивидуально', form: 'антикоагулянт (по назначению)' },
     bestForCourse: false,
   },
-  ace_inhibitor_drugs: {
+ace_inhibitor_drugs: {
     id: 'ace_inhibitor_drugs',
     name: 'ACE Inhibitor Drugs',
     nameRu: 'ИАПФ',
@@ -10916,7 +10566,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 10, timing: '1x/д', form: 'эналаприл 10 мг' },
     bestForCourse: false,
   },
-  arb_drugs: {
+arb_drugs: {
     id: 'arb_drugs',
     name: 'ARB Drugs',
     nameRu: 'БРА (Сартаны)',
@@ -10944,7 +10594,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 50, timing: '1x/д', form: 'лозартан 50 мг' },
     bestForCourse: false,
   },
-  ccb_drugs: {
+ccb_drugs: {
     id: 'ccb_drugs',
     name: 'CCB Drugs',
     nameRu: 'БКК (Блокаторы кальциевых каналов)',
@@ -10968,7 +10618,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5, timing: '1x/д', form: 'амлодипин 5 мг' },
     bestForCourse: false,
   },
-  beta_blocker_drugs: {
+beta_blocker_drugs: {
     id: 'beta_blocker_drugs',
     name: 'Beta Blocker Drugs',
     nameRu: 'Бета-блокаторы',
@@ -10997,7 +10647,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5, timing: '1x/д', form: 'бисопролол 5 мг' },
     bestForCourse: false,
   },
-  diuretic_drugs: {
+diuretic_drugs: {
     id: 'diuretic_drugs',
     name: 'Diuretic Drugs',
     nameRu: 'Диуретики',
@@ -11028,7 +10678,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'индивидуально', form: 'диуретик (по назначению)' },
     bestForCourse: false,
   },
-  immunosuppressant_drugs: {
+immunosuppressant_drugs: {
     id: 'immunosuppressant_drugs',
     name: 'Immunosuppressant Drugs',
     nameRu: 'Иммунодепрессанты',
@@ -11055,7 +10705,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'индивидуально', form: 'иммунодепрессант (по назначению)' },
     bestForCourse: false,
   },
-  antibiotic_drugs: {
+antibiotic_drugs: {
     id: 'antibiotic_drugs',
     name: 'Antibiotic Drugs',
     nameRu: 'Антибиотики',
@@ -11084,7 +10734,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'индивидуально', form: 'антибиотик (по назначению)' },
     bestForCourse: false,
   },
-  antihistamine_drugs: {
+antihistamine_drugs: {
     id: 'antihistamine_drugs',
     name: 'Antihistamine Drugs',
     nameRu: 'Антигистаминные препараты',
@@ -11111,7 +10761,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 10, timing: '1x/д', form: 'цетиризин 10 мг' },
     bestForCourse: false,
   },
-  nsaid_drugs: {
+nsaid_drugs: {
     id: 'nsaid_drugs',
     name: 'NSAID Drugs',
     nameRu: 'НПВС',
@@ -11143,7 +10793,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 400, timing: 'с едой (макс 5 дн)', form: 'ибупрофен 400 мг' },
     bestForCourse: false,
   },
-  levothyroxine: {
+levothyroxine: {
     id: 'levothyroxine',
     name: 'Levothyroxine',
     nameRu: 'Левотироксин',
@@ -11174,7 +10824,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.05, timing: 'натощак за 30 мин до еды 1x/д', form: 'левотироксин 50 мкг' },
     bestForCourse: false,
   },
-  antithyroid_drugs: {
+antithyroid_drugs: {
     id: 'antithyroid_drugs',
     name: 'Antithyroid Drugs',
     nameRu: 'Антитиреоидные препараты',
@@ -11199,7 +10849,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 10, timing: 'с едой 2x/д', form: 'тиамазол 10 мг' },
     bestForCourse: false,
   },
-  postbiotics: {
+postbiotics: {
     id: 'postbiotics',
     name: 'Postbiotics',
     nameRu: 'Постбиотики',
@@ -11224,7 +10874,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'постбиотик комплекс 500 мг' },
     bestForCourse: false,
   },
-  paraprobiotics: {
+paraprobiotics: {
     id: 'paraprobiotics',
     name: 'Paraprobiotics',
     nameRu: 'Парабиотики',
@@ -11249,7 +10899,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'парабиотик комплекс 500 мг' },
     bestForCourse: false,
   },
-  resistant_starch: {
+resistant_starch: {
     id: 'resistant_starch',
     name: 'Resistant Starch',
     nameRu: 'Резистентный крахмал',
@@ -11276,7 +10926,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 20000, timing: 'с едой 1x/д', form: 'резистентный крахмал 20 г' },
     bestForCourse: false,
   },
-  beta_glucan: {
+beta_glucan: {
     id: 'beta_glucan',
     name: 'Beta Glucan',
     nameRu: 'Бета-глюкан',
@@ -11304,7 +10954,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 1x/д', form: 'бета-глюкан 500 мг' },
     bestForCourse: false,
   },
-  fiber: {
+fiber: {
     id: 'fiber',
     name: 'Fiber',
     nameRu: 'Клетчатка (пищевые волокна)',
@@ -11333,7 +10983,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 10000, timing: 'с едой 2x/д', form: 'псиллиум 5 г' },
     bestForCourse: false,
   },
-  hmo_prebiotics: {
+hmo_prebiotics: {
     id: 'hmo_prebiotics',
     name: 'HMO Prebiotics',
     nameRu: 'Олигосахариды грудного молока',
@@ -11359,7 +11009,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'с едой 1x/д', form: 'HMO пребиотик 1 г' },
     bestForCourse: false,
   },
-  lactate: {
+lactate: {
     id: 'lactate',
     name: 'Lactate',
     nameRu: 'Лактат (молочная кислота)',
@@ -11384,7 +11034,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'с едой 1x/д', form: 'лактат натрия 1000 мг' },
     bestForCourse: false,
   },
-  digestive_enzymes: {
+digestive_enzymes: {
     id: 'digestive_enzymes',
     name: 'Digestive Enzymes',
     nameRu: 'Пищеварительные ферменты',
@@ -11411,7 +11061,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'пищеварительные ферменты 500 мг' },
     bestForCourse: false,
   },
-  zinc_carnosine: {
+zinc_carnosine: {
     id: 'zinc_carnosine',
     name: 'Zinc Carnosine',
     nameRu: 'Цинк-карнозин',
@@ -11438,7 +11088,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 75, timing: 'с едой 2x/д', form: 'цинк-карнозин 75 мг' },
     bestForCourse: false,
   },
-  colostrum: {
+colostrum: {
     id: 'colostrum',
     name: 'Colostrum',
     nameRu: 'Молозиво',
@@ -11465,7 +11115,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 3000, timing: 'с едой 2x/д', form: 'молозиво 3 г' },
     bestForCourse: false,
   },
-  ahcc: {
+ahcc: {
     id: 'ahcc',
     name: 'AHCC',
     nameRu: 'AHCC (Активированный гексозный коррелят)',
@@ -11494,7 +11144,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'натощак 2x/д', form: 'AHCC 1000 мг' },
     bestForCourse: false,
   },
-  cortisol: {
+cortisol: {
     id: 'cortisol',
     name: 'Cortisol',
     nameRu: 'Кортизол (маркер)',
@@ -11517,7 +11167,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0, timing: 'контроль маркера', form: 'кортизол сыворотки (анализ)' },
     bestForCourse: false,
   },
-  adrenaline: {
+adrenaline: {
     id: 'adrenaline',
     name: 'Adrenaline',
     nameRu: 'Адреналин (маркер)',
@@ -11542,7 +11192,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0, timing: 'контроль маркера', form: 'адреналин (анализ)' },
     bestForCourse: false,
   },
-  endocrine_marker: {
+endocrine_marker: {
     id: 'endocrine_marker',
     name: 'Endocrine Marker',
     nameRu: 'Эндокринный маркер (комплекс)',
@@ -11565,7 +11215,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0, timing: 'контроль маркера', form: 'эндокринный профиль (анализ)' },
     bestForCourse: false,
   },
-  neurosteroid: {
+neurosteroid: {
     id: 'neurosteroid',
     name: 'Neurosteroid',
     nameRu: 'Нейростероид (маркер)',
@@ -11590,7 +11240,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0, timing: 'контроль маркера', form: 'нейростероидный профиль (анализ)' },
     bestForCourse: false,
   },
-  glucagon: {
+glucagon: {
     id: 'glucagon',
     name: 'Glucagon',
     nameRu: 'Глюкагон (маркер)',
@@ -11617,8 +11267,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0, timing: 'контроль маркера', form: 'глюкагон (анализ)' },
     bestForCourse: false,
   },
-  
-  nmn: {
+nmn: {
     id: 'nmn',
     name: 'NMN',
     nameRu: 'NMN (Никотинамид мононуклеотид)',
@@ -11645,7 +11294,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'натощак 1x/д', form: 'NMN 500 мг' },
     bestForCourse: false,
   },
-  omega3: {
+omega3: {
     id: 'omega3',
     name: 'Omega-3',
     nameRu: 'Омега-3 (EPA/DHA)',
@@ -11690,7 +11339,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 2000, timing: 'с едой 2x/д', form: 'Омега-3 1000 мг EPA+DHA' },
     bestForCourse: true,
   },
-  adaptogen_complex: {
+adaptogen_complex: {
     id: 'adaptogen_complex',
     name: 'Adaptogen Complex',
     nameRu: 'Адаптогенный комплекс',
@@ -11716,7 +11365,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'утром с едой', form: 'адаптогенный комплекс 1000 мг' },
     bestForCourse: false,
   },
-  astragalus: {
+astragalus: {
     id: 'astragalus',
     name: 'Astragalus',
     nameRu: 'Астрагал',
@@ -11744,7 +11393,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт астрагала 500 мг' },
     bestForCourse: false,
   },
-  oxytocin: {
+oxytocin: {
     id: 'oxytocin',
     name: 'Oxytocin',
     nameRu: 'Окситоцин',
@@ -11769,7 +11418,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.04, timing: 'интраназально 1x/д', form: 'окситоцин 40 МЕ/доза' },
     bestForCourse: false,
   },
-  dhea: {
+dhea: {
     id: 'dhea',
     name: 'DHEA',
     nameRu: 'ДГЭА (Дегидроэпиандростерон)',
@@ -11798,7 +11447,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 25, timing: 'утром с едой', form: 'ДГЭА 25 мг' },
     bestForCourse: false,
   },
-  estradiol: {
+estradiol: {
     id: 'estradiol',
     name: 'Estradiol',
     nameRu: 'Эстрадиол (маркер)',
@@ -11825,7 +11474,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0, timing: 'контроль маркера', form: 'эстрадиол (анализ)' },
     bestForCourse: false,
   },
-  progesterone: {
+progesterone: {
     id: 'progesterone',
     name: 'Progesterone',
     nameRu: 'Прогестерон (маркер)',
@@ -11853,7 +11502,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0, timing: 'контроль маркера', form: 'прогестерон (анализ)' },
     bestForCourse: false,
   },
-  insulin: {
+insulin: {
     id: 'insulin',
     name: 'Insulin',
     nameRu: 'Инсулин',
@@ -11880,7 +11529,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.01, timing: 'индивидуально п/к', form: 'инсулин (по назначению)' },
     bestForCourse: false,
   },
-  vasopressin: {
+vasopressin: {
     id: 'vasopressin',
     name: 'Vasopressin',
     nameRu: 'Вазопрессин',
@@ -11905,7 +11554,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.02, timing: 'интраназально 1x/д', form: 'вазопрессин интраназально' },
     bestForCourse: false,
   },
-  endocannabinoid: {
+endocannabinoid: {
     id: 'endocannabinoid',
     name: 'Endocannabinoid',
     nameRu: 'Эндоканнабиноидная система',
@@ -11930,7 +11579,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0, timing: 'поддержка системы', form: 'эндоканнабиноидная поддержка' },
     bestForCourse: false,
   },
-  pectin: {
+pectin: {
     id: 'pectin',
     name: 'Pectin',
     nameRu: 'Пектин',
@@ -11958,7 +11607,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 5000, timing: 'с едой 2x/д', form: 'пектин 5 г' },
     bestForCourse: false,
   },
-  fadogia: {
+fadogia: {
     id: 'fadogia',
     name: 'Fadogia',
     nameRu: 'Фадогия агрестис',
@@ -11984,7 +11633,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт фадогии 500 мг' },
     bestForCourse: false,
   },
-  pregnenolone: {
+pregnenolone: {
     id: 'pregnenolone',
     name: 'Pregnenolone',
     nameRu: 'Прегненолон',
@@ -12011,7 +11660,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 50, timing: 'утром с едой', form: 'прегненолон 50 мг' },
     bestForCourse: false,
   },
-  immune_support: {
+immune_support: {
     id: 'immune_support',
     name: 'Immune Support',
     nameRu: 'Иммунная поддержка (комплекс)',
@@ -12038,7 +11687,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'с едой 1x/д', form: 'иммунный комплекс 1 капсула' },
     bestForCourse: false,
   },
-  andrographis: {
+andrographis: {
     id: 'andrographis',
     name: 'Andrographis',
     nameRu: 'Андографис',
@@ -12066,7 +11715,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 200, timing: 'с едой 2x/д', form: 'экстракт андографиса 200 мг' },
     bestForCourse: false,
   },
-  boswellia: {
+boswellia: {
     id: 'boswellia',
     name: 'Boswellia',
     nameRu: 'Босвеллия',
@@ -12094,7 +11743,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт босвеллии 500 мг' },
     bestForCourse: false,
   },
-  cissus: {
+cissus: {
     id: 'cissus',
     name: 'Cissus',
     nameRu: 'Циссус',
@@ -12121,7 +11770,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д', form: 'экстракт циссуса 500 мг' },
     bestForCourse: false,
   },
-  licorice: {
+licorice: {
     id: 'licorice',
     name: 'Licorice',
     nameRu: 'Солодка (глицирризиновая кислота)',
@@ -12149,7 +11798,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 500, timing: 'с едой 2x/д (макс 6 нед)', form: 'экстракт солодки 500 мг' },
     bestForCourse: false,
   },
-  stimulant_complex: {
+stimulant_complex: {
     id: 'stimulant_complex',
     name: 'Stimulant Complex',
     nameRu: 'Стимуляторный комплекс',
@@ -12189,7 +11838,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'за 30 мин до тренировки', form: 'стимуляторный комплекс 1 капсула' },
     bestForCourse: false,
   },
-  lipid_complex: {
+lipid_complex: {
     id: 'lipid_complex',
     name: 'Lipid Complex',
     nameRu: 'Липидный комплекс',
@@ -12215,7 +11864,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 3000, timing: 'с едой 2x/д', form: 'липидный комплекс 3 г' },
     bestForCourse: false,
   },
-  brand_complex: {
+brand_complex: {
     id: 'brand_complex',
     name: 'Brand Complex',
     nameRu: 'Брендовый комплекс',
@@ -12241,7 +11890,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1, timing: 'с едой 1x/д', form: 'брендовый комплекс 1 капсула' },
     bestForCourse: false,
   },
-  antacid: {
+antacid: {
     id: 'antacid',
     name: 'Antacid',
     nameRu: 'Антацид',
@@ -12270,7 +11919,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 1000, timing: 'через 1 ч после еды', form: 'антацид 1000 мг' },
     bestForCourse: false,
   },
-  igf1: {
+igf1: {
     id: 'igf1',
     name: 'IGF-1',
     nameRu: 'ИФР-1 (Инсулиноподобный фактор роста)',
@@ -12295,7 +11944,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.1, timing: 'индивидуально п/к', form: 'ИФР-1 100 мкг' },
     bestForCourse: false,
   },
-  mgf: {
+mgf: {
     id: 'mgf',
     name: 'MGF',
     nameRu: 'MGF (Механо-фактор роста)',
@@ -12320,7 +11969,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0.2, timing: 'после тренировки п/к', form: 'MGF 200 мкг' },
     bestForCourse: false,
   },
-  kpv: {
+kpv: {
     id: 'kpv',
     name: 'KPV',
     nameRu: 'KPV (пептид противовоспалительный)',
@@ -12345,7 +11994,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     sideEffects: ['Редко: покраснение в месте инъекции'],
     dosage: { mg: 0.5, timing: '1x/д п/к', form: 'KPV 500 мкг' },
     bestForCourse: false,
-  },
+  }
 };
 
 
