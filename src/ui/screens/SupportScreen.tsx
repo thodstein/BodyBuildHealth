@@ -1841,16 +1841,29 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     // Build a quick lookup from ALL_SUBSTANCES for enrichment
     const allSubsMap = new Map<string, SupportSubstance>();
     for (const s of ALL_SUBSTANCES) allSubsMap.set(s.id.toLowerCase(), s);
+    // Type-priority categories: prefer actual substance type over functional/organ category
+    const TYPE_ORDER = new Set([
+      'vitamin','mineral','amino_acid','herb','hormone','peptide','enzyme','probiotic',
+      'fatty_acid','mushroom','electrolyte','antioxidant','polyphenol','nootropic','adaptogen'
+    ]);
     return Object.values(SUPPORT_CATALOG_DATA).map(entry => {
       const allSub = allSubsMap.get((entry.id||'').toLowerCase());
+      const cats = (entry.category && entry.category.length > 0) ? entry.category : (allSub?.categories || []);
+      // Pick best type: first match from TYPE_ORDER, else first category, else allSub.type
+      let bestType = '';
+      for (const c of cats) {
+        const normed = (c||'').toLowerCase().replace(/[^a-z0-9_]/g,'');
+        if (TYPE_ORDER.has(normed)) { bestType = c; break; }
+      }
+      if (!bestType) bestType = cats[0] || '';
       return {
         id: entry.id,
         name: entry.nameRu || allSub?.name || entry.name || entry.id,
-        categories: (entry.category && entry.category.length > 0) ? entry.category : (allSub?.categories || []),
+        categories: cats,
         mechanisms: (entry.mechanisms && entry.mechanisms.length > 0) ? entry.mechanisms : (allSub?.mechanisms || []),
         organs: (entry.organs && entry.organs.length > 0) ? entry.organs : (allSub?.organs || []),
         description: entry.description || allSub?.description || '',
-        type: (entry.category||[])[0] || allSub?.type || 'supplement',
+        type: bestType || allSub?.type || 'supplement',
         deficiency: allSub?.deficiency || '',
       };
     }) as SupportSubstance[];
@@ -3392,23 +3405,20 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 {(catalogSubTab === 'type' || !catalogSubTab) && (
                 /* По типам (default) */
                 <div>
-                  {/* Type sub-filter pills by category groups */}
-                   <div style={{ display:'flex', gap:3, marginBottom:6, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                     {[['','🔍 Все'],
-                       ['gi','🫃 ЖКТ'],['liver','🫁 Печень'],['cardio','❤️ Сердце'],
-                       ['herbs','🌿 Травы/растения'],['joints','🦴 Суставы'],['vitamins','💊 Витамины'],
-                       ['minerals','🧂 Минералы'],['antiaging','🕰 Антивозраст'],
-                       ['immune','🛡️ Иммунитет'],['fatty_acids','🐟 Липидные'],
-                       ['antioxidants','🛡️ Антиоксиданты'],['polyphenols','🫐 Полифенолы'],
-                       ['amino_acids','🧬 Аминокислоты'],['peptides','🧬 Пептиды'],
-                       ['mushrooms','🍄 Грибы'],['nootropics','🧠 Ноотропы'],
-                       ['adaptogens','🌿 Адаптогены'],['hormones','⚖️ Гормоны'],
-                       ['enzymes','⚙️ Ферменты'],['probiotics','🦠 Пробиотики'],
-                       ['electrolytes','⚡ Электролиты'],['antimicrobial','🦠 Антимикробные'],
-                       ['other','📦 Другое'],
-                     ].filter(([k]) => k === '' || groupedSubstances.some(g => g.cat === k)).map(([k,l]) => (
+                  {/* Type sub-tabs: ТОЛЬКО типы веществ */}
+                  <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+                    {[['','🔍 Все'],
+                      ['vitamins','💊 Витамины'],['minerals','🧂 Минералы'],['amino_acids','🧬 Аминокислоты'],
+                      ['fatty_acids','🐟 Липидные'],['herbs','🌿 Травы и растения'],['mushrooms','🍄 Грибы'],
+                      ['peptides','🧬 Пептиды'],['hormones','⚖️ Гормоны'],['enzymes','⚙️ Ферменты'],
+                      ['probiotics','🦠 Пробиотики'],['electrolytes','⚡ Электролиты'],
+                      ['antioxidants','🛡️ Антиоксиданты'],['polyphenols','🫐 Полифенолы'],
+                      ['nootropics','🧠 Ноотропы'],['adaptogens','🌿 Адаптогены'],
+                      ['antiaging','🕰 Антивозраст'],['antimicrobial','🦠 Антимикробные'],
+                      ['other','📦 Другое'],
+                    ].filter(([k]) => k === '' || groupedSubstances.some(g => g.cat === k)).map(([k,l]) => (
                       <button key={k} onClick={() => setCatalogTypeFilter(k)} style={{
-                        padding:'4px 10px', borderRadius:12, fontSize:8, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
+                        padding:'7px 14px', borderRadius:18, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
                         background: catalogTypeFilter === k ? 'var(--accent)' : 'var(--bg-secondary)',
                         color: catalogTypeFilter === k ? '#000' : 'var(--text-dim)',
                         border: `1px solid ${catalogTypeFilter === k ? 'var(--accent)' : 'var(--border)'}`,
@@ -5800,20 +5810,74 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   </div>
                 )}
                 {neuroTab === 'support' && (
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                   <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:6 }}>📋 Протокол нейропротекции</div>
-                    <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:8 }}>
-                      {supportStack.map((item, i) => (
-                        <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 8px', borderRadius:6, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.08)' }}>
-                          <span style={{ fontSize:9, color:'var(--accent)', fontWeight:700, minWidth:120 }}>{item.name}</span>
-                          <span style={{ fontSize:9, color:'#f59e0b', fontWeight:600 }}>{item.dose} {item.unit}</span>
-                          <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:'auto' }}>{item.timing}</span>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#f97316', marginBottom:6 }}>⚠️ Классификация нейротоксичности ААС</div>
+                    {[
+                      { name:'Тренболон', score:10, color:'#ef4444', desc:'ГЭБ проницаемость + окислительный стресс + глутамат' },
+                      { name:'Нандролон', score:8, color:'#ef4444', desc:'Снижение BDNF, нейровоспаление' },
+                      { name:'Станозолол', score:7, color:'#f97316', desc:'ГАМК-дисфункция, BDNF подавление' },
+                      { name:'Метандиенон', score:6, color:'#f97316', desc:'Эстрогеновая активность, гепатотоксичность' },
+                      { name:'Болденон', score:5, color:'#f59e0b', desc:'Гематокрит + эритроцитоз → гипоксия' },
+                      { name:'Тестостерон (>500 мг)', score:4, color:'#f59e0b', desc:'Дозозависимая AR-гиперстимуляция' },
+                      { name:'Оксандролон', score:3, color:'#22c55e', desc:'Низкая андрогенность, ГЭБ ограничен' },
+                      { name:'Мастерон', score:3, color:'#22c55e', desc:'DHT-нейростероидные эффекты' },
+                      { name:'Примоболан', score:2, color:'#22c55e', desc:'Минимальная нейротоксичность' },
+                    ].map(drug => (
+                      <div key={drug.name} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                        <span style={{ flex:1, fontSize:9, color:'var(--text-light)' }}>{drug.name}</span>
+                        <span style={{ fontSize:8, color:'var(--text-dim)', maxWidth:120, textAlign:'right', lineHeight:1.2 }}>{drug.desc}</span>
+                        <span style={{ fontSize:10, fontWeight:800, color:drug.color, width:30, textAlign:'center' }}>{drug.score}/10</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📊 Мониторинг</div>
+                    {[
+                      { label:'BDNF', desc:'Нейротрофический фактор мозга', target:'> 20 нг/мл' },
+                      { label:'Кортизол (утренний)', desc:'Гиперкортизолемия усугубляет нейротоксичность', target:'10-20 мкг/дл' },
+                      { label:'Пролактин', desc:'Гиперпролактинемия → депрессия', target:'< 15 нг/мл' },
+                      { label:'Витамин B12', desc:'Дефицит → нейропатия', target:'> 400 пг/мл' },
+                    ].map(m => (
+                      <div key={m.label} style={{ padding:'4px 6px', borderRadius:6, marginBottom:3, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.1)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between' }}>
+                          <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{m.label}</span>
+                          <span style={{ fontSize:8, fontWeight:600, color:'#60a5fa' }}>{m.target}</span>
                         </div>
-                      ))}
-                    </div>
-                    <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.4, padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.1)' }}>
-                      ⚠ Дозы зависят от степени нейротоксичности. Титровать под контролем самочувствия и анализов (пролактин, кортизол, ГГТ, АЛТ/АСТ).
-                    </div>
+                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>{m.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:6 }}>💊 Многоуровневая нейропротекция</div>
+                    {[
+                      { tier:'ЯДРО', color:'#22c55e', items:[
+                        { name:'NAC', dose:'1200-2400 мг/день', note:'Предшественник глутатиона, защита нейронов от окисл. стресса' },
+                        { name:'Omega-3', dose:'3-5 г/день', note:'Нейропротекция через резолвины, антивоспалительное' },
+                        { name:'Mg L-Threonate', dose:'1000-2000 мг/день', note:'Единственная форма Mg проходящая ГЭБ, NMDA-модуляция' },
+                      ]},
+                      { tier:'СТАНДАРТ', color:'#f59e0b', items:[
+                        { name:'Lion&#39;s Mane', dose:'1000-3000 мг/день', note:'NGF, миелинизация, нейрогенез гиппокампа' },
+                        { name:'CoQ10', dose:'200-400 мг/день', note:'Митохондриальная защита, антиоксидант' },
+                        { name:'B-комплекс', dose:'1 капс/день', note:'Метилирование, синтез нейротрансмиттеров' },
+                      ]},
+                      { tier:'ПРОДВИНУТЫЙ', color:'#f97316', items:[
+                        { name:'ALA', dose:'600-1200 мг/день', note:'Регенерация глутатиона, хелатор металлов' },
+                        { name:'PQQ', dose:'20-40 мг/день', note:'Биогенез митохондрий, NGF' },
+                      ]},
+                    ].map(t => (
+                      <div key={t.tier} style={{ marginBottom:6 }}>
+                        <div style={{ fontSize:9, fontWeight:700, color:t.color, marginBottom:3 }}>▸ {t.tier}</div>
+                        {t.items.map(it => (
+                          <div key={it.name} style={{ display:'flex', gap:4, padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
+                            <span style={{ fontSize:8, color:'var(--accent)', fontWeight:600, minWidth:90 }}>{it.name}</span>
+                            <span style={{ fontSize:8, color:'#f59e0b', minWidth:90 }}>{it.dose}</span>
+                            <span style={{ fontSize:7, color:'var(--text-dim)', flex:1 }}>{it.note}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
                   </div>
                 )}
               </div>
