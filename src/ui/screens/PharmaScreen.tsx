@@ -177,7 +177,7 @@ export const PharmaScreen: React.FC = () => {
   const [courseReportGenerated, setCourseReportGenerated] = useState(false);
   useEffect(() => { try { if (localStorage.getItem('he_pharma_report_current')) setCourseReportGenerated(true); } catch {} }, []);
   const [courseArchive, setCourseArchive] = useState<any[]>(() => {
-    try { return JSON.parse(localStorage.getItem('he_course_reports') || '[]'); } catch { return []; }
+    try { return JSON.parse(localStorage.getItem('he_pharma_reports') || '[]'); } catch { return []; }
   });
 
   // Filter to show only pharma substances (exclude support classes)
@@ -296,7 +296,7 @@ export const PharmaScreen: React.FC = () => {
         const saveArchive = (report: any) => {
           const updated = [report, ...courseArchive].slice(0, 20);
           setCourseArchive(updated);
-          try { localStorage.setItem('he_course_reports', JSON.stringify(updated)); } catch {}
+          try { localStorage.setItem('he_pharma_reports', JSON.stringify(updated)); } catch {}
         };
         const generateReport = () => {
           const course = linked.course || [];
@@ -315,7 +315,7 @@ export const PharmaScreen: React.FC = () => {
             <p style={{ fontSize:10, color:'rgba(255,255,255,0.7)', margin:'0 0 12px' }}>Полный отчёт по препаратам, дозам, фазам и рискам</p>
             <div style={{ display:'flex', gap:6, marginBottom:12 }}>
               <button onClick={generateReport} style={{ padding:'8px 16px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:12, background:'var(--accent)', color:'#000', border:'none', flex:1 }}>📄 Сгенерировать отчёт</button>
-              <button onClick={() => { try { localStorage.removeItem('he_course_reports'); localStorage.removeItem('he_pharma_report_current'); setCourseArchive([]); setCourseReportGenerated(false); } catch {} }} style={{ padding:'8px 12px', borderRadius:10, cursor:'pointer', fontWeight:600, fontSize:11, background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.2)' }}>🗑 Очистить архив</button>
+              <button onClick={() => { try { localStorage.removeItem('he_pharma_reports'); localStorage.removeItem('he_pharma_report_current'); setCourseArchive([]); setCourseReportGenerated(false); } catch {} }} style={{ padding:'8px 12px', borderRadius:10, cursor:'pointer', fontWeight:600, fontSize:11, background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.2)' }}>🗑 Очистить архив</button>
             </div>
             {courseReportGenerated && (
               <div style={{ borderRadius:12, padding:14, marginBottom:10, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>

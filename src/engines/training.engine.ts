@@ -1,6 +1,6 @@
 import { TrainingInput, TrainingOutput, Exercise } from '../core/types';
 import { EXERCISE_CATALOG, getExercisesByGroup, canReplace, getSubstitutes, getExerciseById } from '../core/exercise-catalog';
-import { RIR_MATRIX, MesocyclePhase, calculateWeeklyProgression, generateWeeklyPlan, getProgressionRationale } from './rir-matrix.engine';
+import { RIR_MATRIX, MesocyclePhase, mesocyclePhaseForWeek, calculateWeeklyProgression, generateWeeklyPlan, getProgressionRationale } from './rir-matrix.engine';
 
 export { EXERCISE_CATALOG as EXERCISE_DB, getExercisesByGroup as selectExercises, canReplace, getSubstitutes, getExerciseById };
 
@@ -63,17 +63,17 @@ export function calcExercisePrescription(
   weekNumber: number = 1,
   totalWeeks: number = 12
 ): { sets: number; reps: string; rir: number; dropSet: boolean; dropSetReps: string; backoffSet: boolean; rest: number; progressionNote: string } {
-  // Определение текущей фазы
-  let phase: MesocyclePhase = 'base';
-  if (weekNumber >= totalWeeks - 2) phase = 'peak';
-  else if (weekNumber >= totalWeeks - 5) phase = 'build';
-  else if (weekNumber % 4 === 0 && weekNumber > 0) phase = 'deload';
+  // AUD-FIX-6: пропорциональные границы фаз (фикс коротких циклов 4-6 нед)
+  const phase: MesocyclePhase = mesocyclePhaseForWeek(weekNumber, totalWeeks);
+  // AUD-FIX-7: согласованный deload — phase==='deload' (нед %4 в base) и параметр isDeload
+  // теперь эквивалентны. Раньше phase='deload' не снижал объём/RIR и не убирал интенс-техники.
+  const effectiveDeload = isDeload || phase === 'deload';
   
   // RIR из матрицы
   const goalRir = RIR_MATRIX[goal]?.[level]?.[phase] ?? 2;
   const baseSets = level === 'beginner' ? 3 : level === 'intermediate' ? 3 : 4;
   let sets = Math.max(2, Math.round(baseSets * volumeMultiplier * (isWeakGroup ? 1.2 : 1.0)));
-  if (isDeload) sets = Math.max(2, Math.round(sets * 0.6));
+  if (effectiveDeload) sets = Math.max(2, Math.round(sets * 0.6));
 
   const repRanges: Record<string, [number, number]> = {
     strength: [3, 6], hypertrophy: [8, 12], bulk: [6, 10], cut: [10, 15],
@@ -83,18 +83,18 @@ export function calcExercisePrescription(
   if (exercise.type === 'compound') { range[0] = Math.max(3, range[0] - 2); range[1] = Math.max(6, range[1] - 2); }
   const reps = `${range[0]}-${range[1]}`;
 
-  let rir = isDeload ? 4 : goalRir;
-  if (isWeakGroup && !isDeload) rir = Math.max(0, rir - 1);
+  let rir = effectiveDeload ? 4 : goalRir;
+  if (isWeakGroup && !effectiveDeload) rir = Math.max(0, rir - 1);
 
-  const dropSet = !isDeload && exercise.type === 'isolation' && (goal === 'hypertrophy' || goal === 'bulk');
+  const dropSet = !effectiveDeload && exercise.type === 'isolation' && (goal === 'hypertrophy' || goal === 'bulk');
   const dropSetReps = dropSet ? `${Math.max(4, range[0] - 2)}-${range[1]}` : '';
-  const backoffSet = !isDeload && exercise.type === 'compound' && (goal === 'strength' || goal === 'hypertrophy');
+  const backoffSet = !effectiveDeload && exercise.type === 'compound' && (goal === 'strength' || goal === 'hypertrophy');
 
   const rest = exercise.type === 'compound'
     ? (goal === 'strength' ? 180 : 120)
     : (goal === 'cut' ? 45 : 60);
 
-  const progressionNote = !isDeload ? ` | Нед ${weekNumber}: +2.5-5% весов или +1 сет на группу` : '';
+  const progressionNote = !effectiveDeload ? ` | Нед ${weekNumber}: +2.5-5% весов или +1 сет на группу` : '';
 
   return { sets, reps, rir, dropSet, dropSetReps: dropSet ? `${Math.max(4, range[0] - 2)}-${range[1]}` : '', backoffSet, rest, progressionNote };
 }

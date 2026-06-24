@@ -197,35 +197,36 @@ export function useDataLink(): LinkedData {
     };
     try {
       const genetics = s.genetics ?? {};
+      // Compute support coverage first, then pass to risk calculation
+      const supportIds = (s.currentSupplements ?? []).map(sup => sup.id).filter(Boolean);
+      let coverage: Record<string, number> = {};
+      try {
+        const supportResult = calculateSupport({
+          substances: supportIds,
+          labs: labs.slice(-10).map(l => ({ code: l.code, value: l.value })),
+          demographics: { age: s.age ?? 30, weight: s.weight ?? 80, sex: s.sex ?? 'male' },
+          genetics,
+          nutritionFactor: s.nutritionFactor ?? 0.8,
+          trainingFactor: s.trainingFactor ?? 0.7,
+          drugDoses: Object.fromEntries(Object.entries(activeDrugs).map(([k, v]) => [k, v.dosePerWeek])),
+        });
+        if (supportResult.systemSupport) {
+          Object.entries(supportResult.systemSupport).forEach(([k, v]) => {
+            coverage[k] = v / 100;
+            for (let m = 1; m <= 9; m++) coverage[`${k}_${m}`] = v / 100;
+          });
+        }
+      } catch {}
       const riskResult = calculateRisks({
         genetics,
         nutritionFactor: s.nutritionFactor ?? 0.8,
         trainingFactor: s.trainingFactor ?? 0.7,
         activeDrugs,
-        supportCoverage: {},
+        supportCoverage: coverage,
       });
-      const supportIds = (s.currentSupplements ?? []).map(sup => sup.id).filter(Boolean);
-      const result = calculateSupport({
-        substances: supportIds,
-        labs: labs.slice(-10).map(l => ({ code: l.code, value: l.value })),
-        demographics: { age: s.age ?? 30, weight: s.weight ?? 80, sex: s.sex ?? 'male' },
-        genetics,
-        nutritionFactor: s.nutritionFactor ?? 0.8,
-        trainingFactor: s.trainingFactor ?? 0.7,
-        drugDoses: Object.fromEntries(Object.entries(activeDrugs).map(([k, v]) => [k, v.dosePerWeek])),
-      });
-      const coverage: Record<string, number> = {};
-      if (result.systemSupport) {
-        Object.entries(result.systemSupport).forEach(([k, v]) => {
-          // Also distribute to mechanism-level keys for risk.engine.ts lookup
-          coverage[k] = v / 100; // system-level (0-1)
-          for (let m = 1; m <= 9; m++) coverage[`${k}_${m}`] = v / 100; // mechanism-level
-        });
-      }
       return { ...riskResult, coverageMap: coverage } as RiskCalculationResult;
     } catch (e) {
       console.warn('Risk calculation failed:', e);
-      // Return basic fallback with default 50% coverage for all systems
       const fallbackCoverage: Record<string, number> = {};
       for (const sys of ALL_RISK_SYSTEMS) {
         fallbackCoverage[sys] = 0.5;

@@ -2,6 +2,7 @@ import { renderAuthModule } from './ui/auth-module';
 import { db } from './core/db';
 import { registry } from './core/data/registry';
 import { initPWA } from './core/pwa-manager';
+import { onViewportChanged, hapticImpact } from './core/telegram';
 import { initCloudSync } from './core/cloud-sync';
 import { processQueue } from './core/sync-queue';
 import { initEncryption } from './core/db-encryption';
@@ -65,6 +66,11 @@ function fixMobileViewport() {
   setVH();
   window.addEventListener('resize', setVH);
   window.addEventListener('orientationchange', () => setTimeout(setVH, 100));
+  // AGENTS.md: Telegram viewportChanged — перерасчёт высоты при открытии клавиатуры (раньше window-resize)
+  onViewportChanged((height) => {
+    document.documentElement.style.setProperty('--vh', `${height * 0.01}px`);
+    document.documentElement.style.setProperty('--app-height', `${height}px`);
+  });
 }
 
 function showBootstrapError(msg: string) {

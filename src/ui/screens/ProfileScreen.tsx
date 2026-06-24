@@ -2035,12 +2035,14 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   try {
                     const labReports = JSON.parse(localStorage.getItem('he_lab_reports') || '[]');
                     const riskReports = JSON.parse(localStorage.getItem('he_risk_reports') || '[]');
-                    const courseReports = JSON.parse(localStorage.getItem('he_course_reports') || '[]');
+                    const courseReports = JSON.parse(localStorage.getItem('he_pharma_reports') || '[]');
                     const trainingReports = JSON.parse(localStorage.getItem('he_training_reports') || '[]');
+                    const nutritionReports = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]');
                     allArchives.push(...labReports.map((r:any) => ({ ...r, block:'Лаборатория' })));
                     allArchives.push(...riskReports.map((r:any) => ({ ...r, block:'Риски' })));
                     allArchives.push(...courseReports.map((r:any) => ({ ...r, block:'Курс' })));
                     allArchives.push(...trainingReports.map((r:any) => ({ ...r, block:'Тренировки' })));
+                    allArchives.push(...nutritionReports.map((r:any) => ({ ...r, block:'Питание' })));
                     allArchives.sort((a,b) => b.timestamp - a.timestamp);
                   } catch {}
                   return (

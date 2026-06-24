@@ -1,0 +1,188 @@
+﻿/**
+ * SessionPlayer.tsx — T3: экран выполнения СРЦ/BB-плана (Этап INT1).
+ * REUSE workout-logger.engine: startSession → addExerciseToSession → logSet → finishSession.
+ * Mobile-first, dark theme. Принимает нормализованный план (дни → упражнения → целевые сеты).
+ */
+import React, { useMemo, useState } from 'react';
+import {
+  startSession, addExerciseToSession, logSet, finishSession,
+  getLastSession, getRecentPRs, type WorkoutSession,
+} from '../../../engines/workout-logger.engine';
+import { computeSessionMetrics } from './sessionMetrics';
+import { hapticImpact, hapticNotify } from '../../../core/telegram';
+
+const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 12, margin: '6px 0' };
+const ACCENT = '#00e68a';
+const BTN: React.CSSProperties = { background: ACCENT, color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 14, minHeight: 44 };
+const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: ACCENT, border: `1px solid ${ACCENT}` };
+const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const };
+const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, margin: '4px 0 2px' };
+const H: React.CSSProperties = { color: '#fff', fontSize: 14, fontWeight: 600, margin: '4px 0 6px' };
+const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 1.4 };
+const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' };
+
+export interface PlayerSet { weight: number; reps: number; rir: number }
+export interface PlayerExercise {
+  name: string;
+  muscleGroup: string;
+  targetSets: PlayerSet[];
+  // LMS-поля для метрик (Этап D1). Передаются из плана; иначе — эвристика.
+  pm?: number;       // предельный максимум упражнения (кг)
+  coef?: number;     // Коэф. тяжести (1.2 / 1.0 / 0.3)
+  mnosz?: number;    // Множ (множитель нагрузки)
+  group?: string;    // группа LMS (ЖМ/ПР/ТГ/Ср)
+}
+export interface PlayerDay { label: string; exercises: PlayerExercise[] }
+
+export interface SessionPlayerProps {
+  days: PlayerDay[];
+  weekNumber: number;
+  focus: string;
+}
+
+export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, focus }) => {
+  const [dayIdx, setDayIdx] = useState(0);
+  const [session, setSession] = useState<WorkoutSession | null>(null);
+  const [done, setDone] = useState<WorkoutSession | null>(null);
+  // фактический ввод текущего подхода: [exerciseIndex][setIndex] -> {weight,reps}
+  const [actual, setActual] = useState<Record<string, { weight: number; reps: number }>>({});
+  const [exDone, setExDone] = useState<Record<string, boolean>>({});
+
+  const day = days[dayIdx] || days[0];
+  const last = useMemo(() => getLastSession(), [done]);
+  const prs = useMemo(() => getRecentPRs(3), [done]);
+
+  const begin = () => {
+    if (!day) return;
+    let s = startSession(focus || day.label, weekNumber);
+    day.exercises.forEach(ex => {
+      s = addExerciseToSession(s, { id: ex.name, name: ex.name, pattern: ex.muscleGroup, muscleGroup: ex.muscleGroup });
+    });
+    setSession(s);
+    setDone(null);
+    setActual({});
+    setExDone({});
+  };
+
+  const keyFor = (ei: number, si: number) => `${ei}_${si}`;
+
+  const logOne = (ei: number, si: number) => {
+    if (!session || !day) return;
+    hapticImpact('light');
+    const t = day.exercises[ei].targetSets[si];
+    const a = actual[keyFor(ei, si)] || { weight: t.weight, reps: t.reps };
+    let s = logSet(session, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: 0, rir: t.rir, notes: '' });
+    setSession(s);
+    setActual(prev => ({ ...prev, [keyFor(ei, si)]: a }));
+    // пометить следующий подход/упражнение активным — UI сам покажет статус
+  };
+
+  const finish = () => {
+    if (!session) return;
+    hapticNotify('success');
+    const finished = finishSession(session, `${focus} — ${day?.label}`);
+    setDone(finished);
+    setSession(null);
+  };
+
+  // Плановые метрики дня
+  const planned = useMemo(() => {
+    if (!day) return { sets: 0, volume: 0 };
+    let sets = 0, vol = 0;
+    day.exercises.forEach(ex => ex.targetSets.forEach(t => { sets++; vol += t.weight * t.reps; }));
+    return { sets, volume: Math.round(vol) };
+  }, [day]);
+
+  // Фактические метрики сессии
+  const factVol = useMemo(() => {
+    if (!session) return { volume: 0, sets: 0 };
+    let v = 0, n = 0;
+    session.exercises.forEach(ex => ex.sets.forEach(s => { v += s.weightKg * s.reps; n++; }));
+    return { volume: Math.round(v), sets: n };
+  }, [session]);
+
+  // D1: LMS-метрики фактической сессии (Тоннаж/КПШ/Инт.отн/УОИ/Инт.Ф+Б) — считаются для done-состояния
+  const lms = useMemo(() => computeSessionMetrics(done, day), [done, day]);
+
+  if (days.length === 0) return <div style={SMALL}>Нет дней в плане.</div>;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+        {days.map((d, i) => (
+          <button key={i} style={i === dayIdx ? BTN : BTN_GHOST} onClick={() => setDayIdx(i)}>{d.label}</button>
+        ))}
+      </div>
+
+      {!session && !done && (
+        <button style={{ ...BTN, width: '100%' }} onClick={begin}>▶ Начать тренировку — {day.label} (нед {weekNumber})</button>
+      )}
+
+      {session && (
+        <div style={CARD}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={H}>🏃 {day.label}</div>
+            <button style={BTN} onClick={finish}>⏹ Завершить</button>
+          </div>
+          <div style={{ ...SMALL, marginBottom: 6 }}>План: {planned.sets} сетов / {planned.volume} кг·пов · Факт: {factVol.sets} сетов / {factVol.volume} кг·пов</div>
+          {day.exercises.map((ex, ei) => (
+            <div key={ei} style={{ marginTop: 8, padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>{ex.name} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>({ex.muscleGroup})</span></div>
+              {ex.targetSets.map((t, si) => {
+                const k = keyFor(ei, si);
+                const a = actual[k] || { weight: t.weight, reps: t.reps };
+                const logged = !!actual[k];
+                return (
+                  <div key={si} style={{ ...ROW, flexWrap: 'wrap', gap: 6 }}>
+                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, width: 52 }}>Сет {si + 1}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, width: 90 }}>цель {t.weight}кг×{t.reps}@RIR{t.rir}</span>
+                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                      <input style={{ ...IN, width: 64 }} type="number" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { weight: +e.target.value, reps: a.reps } }))} aria-label="вес" />
+                      <input style={{ ...IN, width: 52 }} type="number" value={a.reps} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: +e.target.value } }))} aria-label="повт" />
+                      <button style={logged ? BTN_GHOST : BTN} onClick={() => logOne(ei, si)}>{logged ? '✓' : 'OK'}</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {done && (
+        <div style={CARD}>
+          <div style={H}>✅ Тренировка завершена</div>
+          <div style={SMALL}>{done.date} · {done.startTime}–{done.endTime} · фокус: {done.focus}</div>
+          <div style={ROW}><span>Сессий записано всего:</span><span style={{ color: ACCENT }}>{getLastSession() ? 'сохранено в дневник' : '—'}</span></div>
+          <div style={ROW}><span>Объём факт vs план:</span><span style={{ color: ACCENT }}>{factVol.volume} / {planned.volume} кг·пов</span></div>
+          <div style={ROW}><span>Сеты факт vs план:</span><span style={{ color: ACCENT }}>{factVol.sets} / {planned.sets}</span></div>
+          <div style={{ ...SMALL, marginTop: 8 }}>Реализация объёма: {planned.volume > 0 ? Math.round(factVol.volume / planned.volume * 100) : 0}%</div>
+          {lms && (
+            <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)' }}>
+              <div style={{ ...LABEL, color: ACCENT }}>📊 LMS-метрики сессии ({lms.exerciseCount} упр.)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 6 }}>
+                <div style={SMALL}>Тоннаж: <b style={{ color: '#fff' }}>{Math.round(lms.metrics.tonnage)}</b> кг</div>
+                <div style={SMALL}>КПШ: <b style={{ color: '#fff' }}>{lms.metrics.kpsh}</b></div>
+                <div style={SMALL}>Инт.отн: <b style={{ color: '#fff' }}>{lms.metrics.relIntensity.toFixed(3)}</b></div>
+                <div style={SMALL}>УОИ: <b style={{ color: '#fff' }}>{lms.metrics.uoi.toFixed(3)}</b></div>
+                <div style={SMALL}>Инт.Ф+Б: <b style={{ color: '#fff' }}>{Math.round(lms.metrics.intFB)}</b></div>
+                <div style={SMALL}>Ср.вес: <b style={{ color: '#fff' }}>{Math.round(lms.metrics.avgWeight)}</b> кг · {lms.minutes} мин</div>
+              </div>
+            </div>
+          )}
+          {prs.length > 0 && <div style={{ marginTop: 8 }}><div style={LABEL}>🏆 Последние PR:</div>{prs.map((p, i) => <div key={i} style={SMALL}>• {p.exercise}: {p.weight}кг×{p.reps} ({p.date})</div>)}</div>}
+          <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); }}>← Новая тренировка</button>
+        </div>
+      )}
+
+      {!session && !done && last && (
+        <div style={{ ...CARD, marginTop: 8 }}>
+          <div style={LABEL}>⏱ Последняя сессия</div>
+          <div style={SMALL}>{last.date} {last.startTime}–{last.endTime} · {last.focus} · {last.exercises.length} упр.</div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SessionPlayer;

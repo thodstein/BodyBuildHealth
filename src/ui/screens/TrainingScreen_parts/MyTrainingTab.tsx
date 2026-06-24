@@ -1,0 +1,193 @@
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { EXERCISE_CATALOG, getExercisesByGroup } from '../../../core/exercise-catalog';
+import { calcTraining, calcExercisePrescription, EXERCISE_DB, TRAINING_SPLITS, TRAINING_LEVEL_CONFIGS, LEVEL_VOLUMES } from '../../../engines/training.engine';
+import { generateMacrocycle, generateBlockPlan, getCurrentWeekPlan, BLOCK_SEQUENCES, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../../engines/training-periodization.engine';
+import { selectSplit, getSplitOptions, type SplitCandidate } from '../../../engines/split-selector.engine';
+import { selectProgressionRule } from '../../../engines/progression.engine';
+import { RIR_MATRIX, generateWeeklyPlan } from '../../../engines/rir-matrix.engine';
+import { StrengthDiary, type StrengthStats, type WeeklyProgress, type ProgressionAlert } from '../../../engines/strength-diary.engine';
+import type { WorkoutLog } from '../../../core/types';
+import { generateWarmup } from '../../../engines/warmup.engine';
+import { generateCooldown } from '../../../engines/cooldown.engine';
+import { selectSetScheme } from '../../../engines/set-scheme.engine';
+import { selectTempo, formatTempo } from '../../../engines/tempo.engine';
+import { useDataLink } from '../../../core/data-link';
+import type { TrainingInput, TrainingOutput, Exercise, MovementPattern } from '../../../core/types';
+import { computeAnalytics, type AnalyticsSnapshot, type WeeklyBreakdown } from '../../../engines/analytics-engine';
+import { computeConstraints } from '../../../engines/training-constraints.engine';
+import { generatePeriodization, getPhaseParams } from '../../../engines/cycle-periodization.engine';
+import { getTrainingMethods, getMethodsByCategory, getVolumeReferences, getVolumeByMuscle, getSplitVisuals, type TrainingMethod } from '../../../engines/training-methodology.engine';
+import { buildVisualDashboard, computeWeeklyChart, computeMuscleVolume, computeProgression, type VizSessionData } from '../../../engines/training-visualization.engine';
+import { getProgramById, getProgramsByGoal, FULL_PROGRAM_LIBRARY } from '../../../engines/complete-program-library.engine';
+import { generateWeeklyReport, analyzeMeasurements, loadMeasurements, saveMeasurement, type BodyMeasurement } from '../../../engines/log-analytics-progression.engine';
+import { getExerciseBio } from '../../../data/exercise-biomechanics-db';
+import { getStrengthLevel, getNextLevelTarget } from '../../../engines/performance-analytics.engine';
+import { computeStructuredAnalytics } from '../../../engines/structured-analytics.engine';
+import {
+  WARMUP_LABELS, GOALS, LEVELS, MUSCLE_GROUPS, GROUP_LABELS, EQUIP_LABELS, JOINT_LABELS,
+  PHASE_LABELS, PHASE_HINTS, TAB_GROUPS, TAB_LABELS,
+  type TrainingTab, type TrainingPage, type TrainingGroup,
+} from './shared';
+
+
+export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: number; reps: number; rir: number }[]; setCustomExercises: React.Dispatch<React.SetStateAction<{ name: string; sets: number; reps: number; rir: number }[]>>; goal?: string; level?: string; daysPerWeek?: number; mesoLength?: number }> = ({ customExercises, setCustomExercises, goal = 'bulk', level = 'intermediate', daysPerWeek = 4, mesoLength = 6 }) => {
+  const [newExName, setNewExName] = useState('');
+  const [newExSets, setNewExSets] = useState(3);
+  const [newExReps, setNewExReps] = useState(10);
+  const [newExRir, setNewExRir] = useState(2);
+  const [savedPlans, setSavedPlans] = useState<{ id: string; name: string; date: string; exercises: { name: string; sets: number; reps: number; rir: number }[] }[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); } catch { return []; } });
+  const [planName, setPlanName] = useState('');
+  const [savedCycles, setSavedCycles] = useState<{ id: string; name: string; date: string; weeks: number; goal: string; level: string; days: number }[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingCycles') || '[]'); } catch { return []; } });
+  const [cycleName, setCycleName] = useState('');
+  const [subTab, setSubTab] = useState<'exercises'|'plans'|'cycles'>('exercises');
+
+  const addExercise = () => {
+    if (!newExName.trim()) return;
+    setCustomExercises(prev => [...prev, { name: newExName.trim(), sets: newExSets, reps: newExReps, rir: newExRir }]);
+    setNewExName('');
+  };
+
+  const savePlan = () => {
+    if (customExercises.length === 0) return;
+    const plan = { id: 'plan_' + Date.now(), name: planName || 'План ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), exercises: [...customExercises] };
+    const updated = [...savedPlans, plan];
+    setSavedPlans(updated);
+    localStorage.setItem('myTrainingPlans', JSON.stringify(updated));
+    setPlanName('');
+  };
+
+  const deletePlan = (id: string) => {
+    const updated = savedPlans.filter(p => p.id !== id);
+    setSavedPlans(updated);
+    localStorage.setItem('myTrainingPlans', JSON.stringify(updated));
+  };
+
+  const loadPlan = (plan: { exercises: { name: string; sets: number; reps: number; rir: number }[] }) => {
+    setCustomExercises(plan.exercises);
+  };
+
+  const saveCycle = () => {
+    const cycle = { id: 'cycle_' + Date.now(), name: cycleName || 'Цикл ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), weeks: mesoLength, goal, level, days: daysPerWeek };
+    const updated = [...savedCycles, cycle];
+    setSavedCycles(updated);
+    localStorage.setItem('myTrainingCycles', JSON.stringify(updated));
+    setCycleName('');
+  };
+
+  const deleteCycle = (id: string) => {
+    const updated = savedCycles.filter(c => c.id !== id);
+    setSavedCycles(updated);
+    localStorage.setItem('myTrainingCycles', JSON.stringify(updated));
+  };
+
+  const groupOptions = [...new Set(EXERCISE_DB.map(e => e.group || '').filter(Boolean))].sort();
+
+  return (
+    <div>
+      <div style={{fontSize:14,fontWeight:700,color:'var(--accent)',marginBottom:4}}>⭐ Моя тренировка</div>
+      <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:8}}>Пользовательские упражнения, планы и циклы</div>
+
+      <div style={{display:'flex',gap:4,marginBottom:8}}>
+        {(['exercises','plans','cycles'] as const).map(t => (
+          <button key={t} onClick={()=>setSubTab(t)} style={{padding:'6px 12px',borderRadius:8,fontSize:10,fontWeight:600,cursor:'pointer',background:subTab===t?'var(--accent)':'var(--bg-secondary)',color:subTab===t?'#000':'var(--text-dim)',border:subTab===t?'1px solid var(--accent)':'1px solid var(--border)'}}>
+            {t==='exercises'?'🏋️ Упражнения':t==='plans'?'📋 Планы':'🔄 Циклы'}
+          </button>
+        ))}
+      </div>
+
+      {subTab === 'exercises' ? (
+        <div>
+          <div className="card" style={{padding:10,marginBottom:8}}>
+            <h4 style={{margin:'0 0 6px',fontSize:12}}>➕ Добавить упражнение</h4>
+            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:4,marginBottom:4}}>
+              <div style={{fontSize:7,color:'var(--text-dim)',paddingLeft:2}}>Упражнение</div>
+              <div style={{fontSize:7,color:'var(--text-dim)',paddingLeft:2}}>Сеты</div>
+              <div style={{fontSize:7,color:'var(--text-dim)',paddingLeft:2}}>Повторы</div>
+              <div style={{fontSize:7,color:'var(--text-dim)',paddingLeft:2}}>RIR</div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:4,marginBottom:6}}>
+              <input value={newExName} onChange={e=>setNewExName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addExercise()} placeholder="Название упражнения" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
+              <input type="number" min="1" max="10" value={newExSets} onChange={e=>setNewExSets(parseFloat(e.target.value) || 0)} placeholder="Напр. 3" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box',textAlign:'center'}} />
+              <input type="number" min="1" max="30" value={newExReps} onChange={e=>setNewExReps(parseFloat(e.target.value) || 0)} placeholder="Напр. 10" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box',textAlign:'center'}} />
+              <input type="number" min="0" max="4" value={newExRir} onChange={e=>setNewExRir(parseFloat(e.target.value) || 0)} placeholder="0-4" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box',textAlign:'center'}} />
+            </div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:6}}>
+              <span style={{fontSize:7,color:'var(--text-dim)',padding:'2px 4px',alignSelf:'center'}}>Категория:</span>
+              {groupOptions.slice(0,12).map(g=><button key={g} onClick={()=>setNewExName(g+' → ')} style={{padding:'2px 6px',borderRadius:4,fontSize:7,cursor:'pointer',background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text-dim)'}}>{GROUP_LABELS[g] || g}</button>)}
+            </div>
+            <button onClick={addExercise} style={{width:'100%',padding:6,borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:11}}>Добавить</button>
+          </div>
+
+          {customExercises.length > 0 ? (
+            <div className="card" style={{padding:10,marginBottom:8}}>
+              <h4 style={{margin:'0 0 6px',fontSize:12}}>📝 Мои упражнения ({customExercises.length})</h4>
+              <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                {customExercises.map((ex,i) => (
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 8px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:10,fontWeight:600,color:'var(--text-light)'}}>{ex.name}</div>
+                      <div style={{fontSize:8,color:'var(--text-dim)'}}>{ex.sets}×{ex.reps} @ RIR {ex.rir}</div>
+                    </div>
+                    <button onClick={()=>setCustomExercises(prev=>prev.filter((_,j)=>j!==i))} style={{padding:'2px 6px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:9,cursor:'pointer'}}>✕</button>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:'flex',gap:4,marginTop:6}}>
+                <input value={planName} onChange={e=>setPlanName(e.target.value)} placeholder="Название плана..." style={{flex:1,padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:10,boxSizing:'border-box'}} />
+                <button onClick={savePlan} style={{padding:'6px 12px',borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:10}}>💾 Сохранить план</button>
+                <button onClick={()=>setCustomExercises([])} style={{padding:'6px 12px',borderRadius:6,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:10,cursor:'pointer'}}>Очистить</button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : subTab === 'plans' ? (
+        <div>
+          {savedPlans.length === 0 && <div className="card" style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Нет сохранённых планов</div>}
+          {savedPlans.map(plan => (
+            <div key={plan.id} className="card" style={{padding:10,marginBottom:6}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:'var(--text-light)'}}>{plan.name}</div>
+                  <div style={{fontSize:8,color:'var(--text-dim)'}}>{new Date(plan.date).toLocaleDateString('ru')} · {plan.exercises.length} упр.</div>
+                </div>
+                <div style={{display:'flex',gap:4}}>
+                  <button onClick={()=>loadPlan(plan)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(0,230,138,0.2)',background:'rgba(0,230,138,0.08)',color:'var(--accent)',fontSize:8,cursor:'pointer'}}>Загрузить</button>
+                  <button onClick={()=>setCustomExercises(prev=>[...prev, ...plan.exercises])} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(139,92,246,0.2)',background:'rgba(139,92,246,0.08)',color:'#8b5cf6',fontSize:8,cursor:'pointer'}}>➕ В мою</button>
+                  <button onClick={()=>deletePlan(plan.id)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:8,cursor:'pointer'}}>Удалить</button>
+                </div>
+              </div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
+                {plan.exercises.map((ex,i) => (
+                  <span key={i} style={{fontSize:7,padding:'2px 6px',borderRadius:4,background:'rgba(0,230,138,0.06)',border:'1px solid rgba(0,230,138,0.12)',color:'var(--text-light)'}}>{ex.name} {ex.sets}×{ex.reps}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div>
+          <div className="card" style={{padding:10,marginBottom:8}}>
+            <h4 style={{margin:'0 0 6px',fontSize:12}}>🔄 Новый цикл</h4>
+            <div style={{display:'flex',gap:4,marginBottom:6}}>
+              <input value={cycleName} onChange={e=>setCycleName(e.target.value)} placeholder="Название цикла..." style={{flex:1,padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
+              <button onClick={saveCycle} style={{padding:'6px 12px',borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:10}}>💾 Сохранить</button>
+            </div>
+            <div style={{fontSize:8,color:'var(--text-dim)'}}>Цикл создаётся на основе текущих настроек плана</div>
+          </div>
+          {savedCycles.length === 0 && <div className="card" style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Нет сохранённых циклов</div>}
+          {savedCycles.map(cycle => (
+            <div key={cycle.id} className="card" style={{padding:10,marginBottom:6}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:'var(--text-light)'}}>{cycle.name}</div>
+                  <div style={{fontSize:8,color:'var(--text-dim)'}}>{new Date(cycle.date).toLocaleDateString('ru')} · {cycle.weeks} нед · {cycle.days} д/н</div>
+                </div>
+                <button onClick={()=>deleteCycle(cycle.id)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:8,cursor:'pointer'}}>Удалить</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};

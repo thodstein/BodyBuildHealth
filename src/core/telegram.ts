@@ -19,3 +19,24 @@ export function initTelegramWebApp() {
 
   (window as any).__TELEGRAM_THEME__ = tg.themeParams || {};
 }
+/** Haptic-фидбек (AGENTS.md: обязательно использовать). Безопасен вне Telegram. */
+export type HapticStyle = 'light' | 'medium' | 'heavy' | 'rigid' | 'soft';
+export type HapticNotify = 'success' | 'warning' | 'error';
+export function hapticImpact(style: HapticStyle = 'light'): void {
+  try { (window as any).Telegram?.WebApp?.HapticFeedback?.impactOccurred(style); } catch { /* no-op */ }
+}
+export function hapticNotify(type: HapticNotify = 'success'): void {
+  try { (window as any).Telegram?.WebApp?.HapticFeedback?.notificationOccurred(type); } catch { /* no-op */ }
+}
+export function hapticSelection(): void {
+  try { (window as any).Telegram?.WebApp?.HapticFeedback?.selectionChanged(); } catch { /* no-op */ }
+}
+/** Подписка на viewportChanged (AGENTS.md: перерасчёт высоты при открытии клавиатуры). */
+export function onViewportChanged(cb: (height: number) => void): () => void {
+  const tg = (window as any).Telegram?.WebApp;
+  if (!tg?.onEvent) return () => {};
+  const handler = (e: any) => cb(tg.viewportHeight || window.innerHeight);
+  try { tg.onEvent('viewportChanged', handler); } catch { /* no-op */ }
+  return () => { try { tg.offEvent('viewportChanged', handler); } catch { /* no-op */ } };
+}
+

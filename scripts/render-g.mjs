@@ -1,0 +1,48 @@
+﻿import puppeteer from 'puppeteer-core';
+const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const pageerrors = [];
+const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox','--disable-gpu','--window-size=420,860'], defaultViewport: { width: 420, height: 860 } });
+const page = await browser.newPage();
+page.on('pageerror', e => pageerrors.push(e.message));
+await page.goto('http://localhost:4174/', { waitUntil: 'networkidle2', timeout: 45000 });
+await page.waitForFunction(() => !document.querySelector('.screen-loading'), { timeout: 30000 }).catch(()=>{});
+await new Promise(r=>setTimeout(r,2000));
+const clickText = async (t)=>{ try{ const el=await page.evaluateHandle((x)=>{const a=[...document.querySelectorAll('button,a,div[role=button],li,h2,h3')];return a.find(e=>(e.innerText||'').includes(x))||null;},t); const n=el.asElement(); if(n){await n.click();return true;} }catch(e){} return false; };
+const clickBtn = async (re)=>{ try{ return await page.evaluate((r)=>{const b=[...document.querySelectorAll('button')].find(x=>new RegExp(r).test(x.innerText));if(b){b.click();return b.innerText;}return null;},re);}catch(e){return null;} };
+const body = async (n=900)=> (await page.evaluate(()=>document.body.innerText)).replace(/\n{2,}/g,'\n').slice(0,n);
+
+await clickText('Тренинг'); await new Promise(r=>setTimeout(r,1000));
+await clickText('Планирование'); await new Promise(r=>setTimeout(r,1200));
+await clickBtn('Сгенерировать план'); await new Promise(r=>setTimeout(r,2500));
+const t1 = await body(600);
+console.log('=== after generate (week 1) ==='); console.log(t1);
+console.log('Неделя 1/12:', /Неделя 1 \/ 12/.test(t1));
+console.log('phase label:', /База|Накопление|Пик|Разгрузка/.test(t1));
+console.log('PM на неделю:', /ПМ на неделю/.test(t1));
+console.log('day table:', /День 1/.test(t1));
+console.log('setStr (NxRxкг %):', /\d+x\d+x\d+кг \(\d+%\)/.test(t1));
+console.log('Итоги мезо:', /Итоги мезоцикла/.test(t1));
+console.log('Что дальше:', /Что дальше/.test(t1));
+// navigate to week 6
+await clickBtn('▶'); await new Promise(r=>setTimeout(r,800));
+await clickBtn('▶'); await new Promise(r=>setTimeout(r,800));
+await clickBtn('▶'); await new Promise(r=>setTimeout(r,800));
+await clickBtn('▶'); await new Promise(r=>setTimeout(r,800));
+await clickBtn('▶'); await new Promise(r=>setTimeout(r,1200));
+const t6 = await body(400);
+console.log('=== week 6 ==='); console.log(t6.slice(0,300));
+console.log('Неделя 6/12:', /Неделя 6 \/ 12/.test(t6));
+// charts: 4 canvases
+await clickBtn('📊 График'); await new Promise(r=>setTimeout(r,1500));
+const canvases = await page.evaluate(()=>document.querySelectorAll('canvas').length);
+const ct = await body(400);
+console.log('=== CHARTS === canvases:', canvases);
+console.log(ct.slice(0,350));
+console.log('4 charts titles:', /Тоннаж по неделям/.test(ct) && /КПШ по неделям/.test(ct) && /Инт\.отн \+ УОИ/.test(ct) && /Инт\.Ф\+Б/.test(ct));
+await page.screenshot({path:'scripts/render-12-plan-week6.png'});
+await page.screenshot({path:'scripts/render-13-charts-4.png'});
+await browser.close();
+console.log('=== PAGE ERRORS:', pageerrors.length, '===');
+pageerrors.slice(0,8).forEach(e=>console.log('  PE:', e.slice(0,200)));
+console.log(pageerrors.length===0 ? '✅ NO PAGE ERRORS' : '❌ ERRORS');
+console.log('G_VERIFY_DONE');

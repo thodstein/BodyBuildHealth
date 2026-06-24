@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Ultimate Calculators Engine — Complete calculation module
  *
  * Strength:     Epley, Brzycki, Lander, Lombardi, O'Conner, Wathen, Mayhew
@@ -12,6 +12,8 @@
  *
  * @module ultimate-calculators-engine
  */
+import { mrvPerGroup as _mrvPerGroup, mevPerGroup as _mevPerGroup } from './volume-landmarks.engine';
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1RM CALCULATORS
@@ -378,24 +380,13 @@ export function expectedWeeklyGain(level: 'novice' | 'intermediate' | 'advanced'
 // VOLUME LANDMARKS
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Нормализация уровня: проект использует 'beginner', здесь исторически 'novice'.
+// AUD-FIX: ранее 'beginner' падал в else (1.2 = enhanced) → новичку пере prescribing объёма.
+// AUD-FIX-2: mrvPerGroup/mevPerGroup делегируют к единому источнику volume-landmarks.engine.ts
 export function mrvPerGroup(level: string): Record<string, { min: number; max: number }> {
-  const mult = level === 'novice' ? 0.6 : level === 'intermediate' ? 0.8 : level === 'advanced' ? 1.0 : 1.2;
-  return {
-    chest: { min: Math.round(10 * mult), max: Math.round(20 * mult) },
-    back: { min: Math.round(14 * mult), max: Math.round(25 * mult) },
-    quads: { min: Math.round(10 * mult), max: Math.round(20 * mult) },
-    hamstrings: { min: Math.round(8 * mult), max: Math.round(16 * mult) },
-    shoulders: { min: Math.round(6 * mult), max: Math.round(14 * mult) },
-    biceps: { min: Math.round(6 * mult), max: Math.round(12 * mult) },
-    triceps: { min: Math.round(6 * mult), max: Math.round(12 * mult) },
-  };
+  return _mrvPerGroup(level);
 }
 
 export function mevPerGroup(level: string): Record<string, number> {
-  const mult = level === 'novice' ? 0.5 : level === 'intermediate' ? 0.7 : 1.0;
-  return {
-    chest: Math.round(6 * mult), back: Math.round(8 * mult), quads: Math.round(6 * mult),
-    hamstrings: Math.round(4 * mult), shoulders: Math.round(4 * mult),
-    biceps: Math.round(2 * mult), triceps: Math.round(2 * mult),
-  };
+  return _mevPerGroup(level);
 }

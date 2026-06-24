@@ -12,6 +12,7 @@ import { db } from '../../core/db';
 import { LabsResults } from './LabsScreen_parts/LabsResults';
 import { LabsSchedule } from './LabsScreen_parts/LabsSchedule';
 import { LabsInvestigations } from './LabsScreen_parts/LabsInvestigations';
+import { LabsOverview } from './LabsScreen_parts/LabsOverview';
 import { processUploadedFile, saveParsedLabs, type ParsedLabValue, type OCRResult } from '../../core/ocr-engine';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 
@@ -130,6 +131,7 @@ const MAIN_LAB_TABS: { id: MainLabTab; label: string; icon: string }[] = [
 type MainLabTab = 'hero' | 'lab' | 'investigations' | 'risks' | 'reports';
 
 const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
+  { id: 'overview', label: 'Обзор', icon: '📊' },
   { id: 'current', label: 'Текущие', icon: '🔬' },
   { id: 'archive', label: 'Архив', icon: '📦' },
   { id: 'catalog', label: 'Каталог', icon: '📖' },
@@ -138,7 +140,7 @@ const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
   { id: 'reports', label: 'Отчёты', icon: '📄' },
 ];
 
-type LabSubTab = 'hero' | 'current' | 'archive' | 'catalog' | 'chart' | 'schedule' | 'reports';
+type LabSubTab = 'hero' | 'overview' | 'current' | 'archive' | 'catalog' | 'chart' | 'schedule' | 'reports';
 
 export const LabsScreen: React.FC = () => {
   const linked = useDataLink();
@@ -557,6 +559,18 @@ export const LabsScreen: React.FC = () => {
               </button>
             ))}
           </div>
+
+          {/* ≡≡≡ OVERVIEW TAB ≡≡≡ */}
+      {subTab === 'overview' && (
+        <div style={{ padding: '10px 0' }}>
+          <LabsOverview
+            labs={currentLabs}
+            hasLabs={!!hasLabs}
+            forceNoLabs={globalNoLabs}
+            setForceNoLabs={(v: boolean) => { setGlobalNoLabs(v); if (v) setNoLabsSystemsState([]); notifyDataChange(); }}
+          />
+        </div>
+      )}
 
           {/* ≡≡≡ CURRENT LABS TAB ≡≡≡ */}
       {subTab === 'current' && (

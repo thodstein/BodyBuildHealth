@@ -35,8 +35,8 @@ const addToCart = (id: string, name: string, dose: string) => {
 };
 
 const s: Record<string, React.CSSProperties> = {
-  card: { background: 'rgba(24,24,27,0.15)', borderRadius: 14, padding: 16, marginBottom: 12, border: '1px solid rgba(255,255,255,0.04)' },
-  row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 },
+  card: { background: 'rgba(24,24,27,0.15)', borderRadius: 14, padding: 20, marginBottom: 12, border: '1px solid rgba(255,255,255,0.04)' },
+  row: { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 },
   label: { fontSize: 11, fontWeight: 700, opacity: 0.75, marginBottom: 4, letterSpacing: '0.2px', color: 'rgba(255,255,255,0.85)' },
   input: { width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.2)', color: '#fff', fontSize: 15, boxSizing: 'border-box' as const, outline: 'none', transition: 'border 0.2s' },
   btn: { padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.85)', fontSize: 12, cursor: 'pointer' },
@@ -189,7 +189,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
   const areaPoints = polyline + ` ${toX(maxWeek)},${toY(0)} ${toX(0)},${toY(0)}`;
 
   const field = (label: string, val: string, set: React.Dispatch<React.SetStateAction<string>>, placeholder: string, step = '0.1') => (
-    <div style={{ marginBottom: 2 }}>
+    <div style={{ marginBottom: 6 }}>
       <div style={s.label}>{label}</div>
       <input type="number" step={step} value={val || ''} onChange={e => set(e.target.value)} placeholder={placeholder} style={s.input} />
     </div>

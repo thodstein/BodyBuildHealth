@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { FOOD_DB } from '../../core/nutrition-database';
 import { useDataLink, derivePAL } from '../../core/data-link';
 import { getRecipes } from '../../engines/nutrition-periodization.engine';
@@ -9,6 +9,9 @@ import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { IndividualPlan } from './NutritionScreen_parts/IndividualPlan';
 import { NutritionReference } from './NutritionScreen_parts/NutritionReference';
 import { addToCart, getCarts, saveCarts, getActiveStoreId, setActiveStoreId, CART_CAT_LABELS, CartStore, CartItemEnhanced } from '../../core/nutrition-utils';
+import { NutritionCustomFood } from './NutritionScreen_parts/NutritionCustomFood';
+import { NutritionOverview } from './NutritionScreen_parts/NutritionOverview';
+import { ProductUsefulnessPlanner } from './NutritionScreen_parts/ProductUsefulnessPlanner';
 
 const NutritionCharts = lazy(() => import('./NutritionScreen_parts/NutritionCharts').then(m => ({ default: m.NutritionCharts })));
 import { generateNutritionReport, NutritionReport } from '../../engines/nutrition-report.engine';
@@ -18,14 +21,14 @@ import { getQualityLabel } from '../../engines/nutrition-quality.engine';
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
 type NutritionPage = 'hero' | 'tabs';
 type NutritionSection = 'diary' | 'planning' | 'overview' | 'analytics' | 'all';
-type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info';
+type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info' | 'customfood' | 'overview' | 'usefulness';
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
-  overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant'],
+  overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness'],
   analytics: ['charts', 'reports'],
-  diary: ['diary', 'charts', 'reports'],
-  planning: ['mealplan', 'reference', 'info'],
-  all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant'],
+  diary: ['diary', 'charts', 'reports', 'usefulness'],
+  planning: ['mealplan', 'reference', 'info', 'usefulness'],
+  all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness'],
 };
 
 const TAB_LABELS: Record<string, string> = {
@@ -34,6 +37,7 @@ const TAB_LABELS: Record<string, string> = {
   restaurant: '🍽 Ресторан',
   favorites: '⭐ Избранное', catalog: '📦 Каталог',
   reference: '📖 Справочник', recipes: '🍳 Рецепты', reports: '📊 Отчёты', info: 'ℹ️ Инфо',
+  usefulness: '🧮 Полезность',
 };
 
 const cardBg = { background: '#18181b', borderRadius: 18, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 16px rgba(0,0,0,0.2)' };
@@ -548,7 +552,8 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
     <button onClick={onClick} style={{ padding:'5px 12px', borderRadius:8, fontSize:9, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: isActive ? 700 : 400 }}>{children}</button>
   );
   const saveReportToArchive = (report: NutritionReport) => {
-    const updated = [report, ...archiveReports].slice(0, 50);
+    const currentArchive = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]');
+    const updated = [report, ...currentArchive].slice(0, 50);
     setArchiveReports(updated);
     localStorage.setItem('he_nutrition_report_archive', JSON.stringify(updated));
     try {
@@ -1102,7 +1107,7 @@ export const NutritionScreen: React.FC = () => {
     switch (tab) {
       case 'diary': return <NutritionDiary foodEntries={foodEntries} targets={macroTargets} />;
       case 'charts': return <Suspense fallback={<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Загрузка графиков...</div>}><NutritionCharts kcalData={chartKcalData} proteinData={chartProteinData} labels={chartLabels} dailyLogs={dailyLogs} /></Suspense>;
-      case 'mealplan': return <IndividualPlan profile={linked.profile} course={linked.course} />;
+      case 'mealplan': try { return <IndividualPlan profile={linked.profile} course={linked.course} />; } catch (e) { console.error('IndividualPlan crash:', e); return <div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>⚠️ Ошибка загрузки плана питания. Попробуйте обновить страницу.</div>; }
       case 'cart': return <CartTab />;
       case 'restaurant': return <RestaurantTab />;
       case 'favorites': return <FavoritesTab />;
@@ -1110,7 +1115,16 @@ export const NutritionScreen: React.FC = () => {
       case 'reference': return <ReferenceTab />;
       case 'recipes': return <RecipesTab />;
       case 'reports': return <ReportsTab foodEntries={foodEntries} profile={linked.profile} targets={macroTargets} />;
+      case 'customfood': return <NutritionCustomFood />;
+      case 'overview': return <NutritionOverview
+        profile={linked.profile}
+        avgWeeklyKcal={avgWeeklyKcal}
+        avgWeeklyProtein={avgWeeklyProtein}
+        avgWeeklyFat={avgWeeklyFat}
+        avgWeeklyCarbs={avgWeeklyCarbs}
+      />;
       case 'info': return <InfoTab />;
+      case 'usefulness': return <ProductUsefulnessPlanner />;
       default: return null;
     }
   };

@@ -1,4 +1,4 @@
-import { db } from '../core/db';
+﻿import { db } from '../core/db';
 import type { StrengthLogEntry, WorkoutLog } from '../core/types';
 
 export interface StrengthStats {
@@ -230,8 +230,12 @@ export class StrengthDiary {
    * Calculate 1RM from weight and reps (Epley formula)
    */
   estimate1RM(weight: number, reps: number): number {
-    if (reps === 1) return weight;
-    return Math.round(weight * (1 + reps / 30) * 10) / 10;
+    // AUD-FIX-5: blend (Epley <=10, Brzycki >10, зажим <=15) — синхронно с progression.estimate1RM
+    if (reps <= 1) return weight;
+    if (weight <= 0) return 0;
+    if (reps <= 10) return Math.round(weight * (1 + reps / 30) * 10) / 10;
+    const r = Math.min(reps, 15);
+    return Math.round((weight * 36) / (37 - r) * 10) / 10;
   }
 
   /**

@@ -241,6 +241,25 @@ if (shouldApplyPenalty && finalResult.systemBreakdown) {
 - **Report support plan**: добавлена колонка "Цель" с отображением категорий поддержки
 - `tsc --noEmit` ✓, `vite build` ✓
 
+## Session Summary (Jun 23)
+### Done
+- **support-database.ts**: 20+ SUPPORT_CATALOG_DATA entries re-added (DIOSMIN, BERGAMOT, SERRAPEPTASE, PAPAIN, BROMELAIN, PHARMA_TADALAFIL, LUMBROKINASE, HORSE_CHESTNUT, INOSINE, NARINGIN, PHARMA_CABERGOLINE, NATTOKINASE, HESPERIDIN, CITRUS_BIOFLAVONOIDS, BROMANTANE, FASORACETAM, AGMATINE, TMG, SAME, VITAMIN_B1, COLOSTRUM, PYCNOGENOL). Full descriptions, mechanisms, organs, forms, synergies, conflicts, monitoring, contraindications, sideEffects.
+- **support-database.ts**: 19 ALL_SUBSTANCES entries added for the same ids.
+- **support-database.ts**: name-mapping entries (`const L`) added for all new substances.
+- **support-database.ts**: PHARMA_ANASTROZOLE + PHARMA_LETROZOLE added to ALL_SUBSTANCES array.
+- **support-database.ts**: PHARMA_ANASTROZOLE/PHARMA_LETROZOLE/IMMUNE_LACTOFERRIN enriched in SUPPORT_CATALOG_DATA with synergies, conflicts, monitoring, contraindications.
+- **support-database.ts**: BROMELAIN, FOLATE, LECITHIN, PHOSPHATIDYLSERINE, PHOSPHATIDYLCHOLINE, ARTICHOKE, VITAMIN_E, BERBERINE, L_THEANINE, GLYCINE, ASTRAGALUS added to SUPPORT_CATALOG_DATA (were incorrectly placed in CATALOG_ENRICHMENT → moved to correct location).
+- **SupportScreen.tsx** — TYPE_GROUPS/LABELS/name/organ mapping fixes from previous session verified intact.
+- `tsc --noEmit` ✓, `vite build` ✓
+
+### Critical Fixes
+- Fixed: orphan catalog entries were inserted into CATALOG_ENRICHMENT instead of SUPPORT_CATALOG_DATA by script (wrong insertion point detection). Moved all 11 entries to correct location.
+- Fixed: `const L` (name-mapping object) was intact — earlier Node.js search was misleading (found `ALL_SUBSTANCES` inside a comment, not the actual const).
+- ALL_SUBSTANCES array is intact (original entries preserved, new entries appended).
+
+### Blocked
+- None
+
 ## Session Summary (Jun 20 — Part 2)
 ### Critical Bugs Fixed
 - **Строки поиска**: 6 файлов (TrainingScreen, SubstancesScreen, NutritionScreen×2, NutritionDiary) — добавлена null-safety `(e.name||'').toLowerCase()` — ошибка TypeError при пустых данных
@@ -359,5 +378,33 @@ $env:NODE_OPTIONS='--max-old-space-size=2048'; npx vite build
 ### 🔴 ЧТО ДЕЛАТЬ СЛЕДУЮЩИМ ШАГОМ
 * (Технический список конкретных модулей или функций, которые необходимо дописать или подключить в следующем сообщении, чтобы приложение гарантированно заработало на телефоне).
 
+## 6a. Лимит размера файлов
+**ВСЕ файлы должны быть не более 1500 строк.** Любой файл, превышающий этот лимит, должен быть разбит на более мелкие логические модули без потери информации и функциональности. Каждый вынесенный модуль обязан быть импортирован в родительский файл и сохранён в той же папке с суффиксом, отражающим его содержимое (например, `SupportModals.tsx`, `SupportData.tsx`).
+
 ## 7. Профессиональная объективность
 * Агент обязан приоритизировать техническую точность, мобильную адаптивность и правдивость над вежливостью. Скрытие недоработок кода, сиротские (неподключенные) файлы или создание избыточных модулей считается критической ошибкой.
+
+## 8. Интеграция новых препаратов/веществ (Обязательная полнота)
+При добавлении любого нового препарата или вещества в базу данных (support-database.ts, pharma-database.ts и т.д.) Агент ОБЯЗАН обеспечить **полное заполнение всей информации**:
+
+1. **Полная карточка препарата** — все поля SUPPORT_CATALOG_DATA: id, name, typeEn, ru, description, mechanisms, targetOrgans, dosageForms, timingDosage, duration, contraindications, sideEffects, monitoring, tier, categories, source, researchLinks, activeSubstance, halfLife, bioavailability, metabolism, excretion, synonyms.
+2. **Описание** — развёрнутое русскоязычное описание (50-300 символов), механизм действия, показания.
+3. **Взаимодействия** — заполнить `synergies` (с указанием типа, эффекта, механизма) и `conflicts` в карточке каталога.
+4. **Синергии и антисинергии** — добавить записи в ALL_INTERACTIONS (`support-substances.ts`) для всех известных клинически значимых пар (не менее 2-3 на вещество).
+5. **Конфликты и особые указания** — внести противопоказания (contraindications), особые указания (specialInstructions), мониторинг (monitoring).
+6. **Анализы/лабораторный контроль** — указать labMarkers, какие маркеры отслеживать, с какой периодичностью.
+7. **Маппинги** — добавить вещество во все необходимые структуры:
+   - ALL_SUBSTANCES (`support-substances.ts`)
+   - L mapping (`name-mapping` в `support-synergy-stacks.ts`)
+   - CATALOG_ENRICHMENT (`support-enrichment.ts`) — если нужны дополнительные поля обогащения
+   - При необходимости — в `pharma-database.ts`, `drug-mapper.engine.ts`, `interaction-engine.ts`.
+8. **Полная интеграция во все разделы приложения** — препарат должен быть виден и функционален в:
+   - Каталоге (поиск, фильтрация по категории/типу)
+   - Детальном просмотре (все поля, синергии, взаимодействия)
+   - Калькуляторе поддержки (расчёт доз, проверка конфликтов)
+   - Отчётах (генерация плана с новым веществом)
+   - Рисках (если вещество влияет на риски — добавить в risk-engine)
+   - Взаимодействиях (ALL_INTERACTIONS)
+9. **Валидация** — после внесения изменений обязательно запустить `tsc --noEmit` и `vite build`. Все ошибки типизации и сборки исправить до завершения задачи.
+
+**Нарушение этих правил считается критической ошибкой.** Недозаполненные карточки, отсутствие в ALL_INTERACTIONS или пропущенные маппинги недопустимы.

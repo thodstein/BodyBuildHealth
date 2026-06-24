@@ -113,6 +113,24 @@ export interface WeeklyProgression {
   notes: string[];
 }
 
+/**
+ * AUD-FIX-6: пропорциональные границы фаз мезоцикла.
+ * Фикс бага: фиксированные смещения (totalWeeks-2 / totalWeeks-5) ломали короткие
+ * циклы (4-6 нед): фаза base пропускалась, peak был непропорционально длинным.
+ * Теперь base≈45%, build≈30%, peak≈25% от длины цикла; deload — каждый 4-й нед в base.
+ */
+export function mesocyclePhaseForWeek(weekNumber: number, totalWeeks: number): MesocyclePhase {
+  const tw = Math.max(1, totalWeeks);
+  const peakWeeks = Math.max(1, Math.round(tw * 0.25));
+  const buildWeeks = Math.max(1, Math.round(tw * 0.30));
+  const peakStart = tw - peakWeeks + 1;
+  const buildStart = Math.max(1, peakStart - buildWeeks);
+  if (weekNumber >= peakStart) return 'peak';
+  if (weekNumber >= buildStart) return 'build';
+  if (weekNumber > 0 && weekNumber % 4 === 0) return 'deload';
+  return 'base';
+}
+
 export function calculateWeeklyProgression(
   input: TrainingInput,
   weekNumber: number,
@@ -120,23 +138,9 @@ export function calculateWeeklyProgression(
 ): WeeklyProgression {
   const { goal, level, weakPoints, recovery, fatigue } = input;
   
-  // Определение фазы макроксикла
-  let phase: MesocyclePhase = 'base';
-  let phaseName = MesoPhaseConfigs.base.description;
-  
-  if (weekNumber >= totalWeeks - 2) {
-    phase = 'peak';
-    phaseName = MesoPhaseConfigs.peak.description;
-  } else if (weekNumber >= totalWeeks - 5) {
-    phase = 'build';
-    phaseName = MesoPhaseConfigs.build.description;
-  } else if (weekNumber % 4 === 0 && weekNumber > 0) {
-    phase = 'deload';
-    phaseName = MesoPhaseConfigs.deload.description;
-  } else {
-    phase = 'base';
-    phaseName = MesoPhaseConfigs.base.description;
-  }
+  // Определение фазы макроксикла (AUD-FIX-6: пропорциональные границы)
+  const phase: MesocyclePhase = mesocyclePhaseForWeek(weekNumber, totalWeeks);
+  const phaseName = MesoPhaseConfigs[phase].description;
 
   // Базовый RIR из матрицы
   let rirBase = RIR_MATRIX[goal]?.[level]?.[phase] ?? 2;

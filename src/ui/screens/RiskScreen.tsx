@@ -104,7 +104,7 @@ export const RiskScreen: React.FC = () => {
   const globalNoLabs = forceNoLabs || globalNoLabsState;
   const noLabsSystems = noLabsSystemsState;
   const [riskReportGenerated, setRiskReportGenerated] = useState(false);
-  useEffect(() => { try { if (localStorage.getItem('he_risks_report_current')) setRiskReportGenerated(true); } catch {} }, []);
+  useEffect(() => { try { if (localStorage.getItem('he_risk_report_current')) setRiskReportGenerated(true); } catch {} }, []);
   const [riskArchive, setRiskArchive] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_risk_reports') || '[]'); } catch { return []; }
   });
@@ -373,7 +373,7 @@ export const RiskScreen: React.FC = () => {
         timestamp: Date.now(),
       };
       saveArchive(report);
-      try { localStorage.setItem('he_risks_report_current', JSON.stringify(report)); } catch {}
+      try { localStorage.setItem('he_risk_report_current', JSON.stringify(report)); } catch {}
       setRiskReportGenerated(true);
     };
 
@@ -387,7 +387,7 @@ export const RiskScreen: React.FC = () => {
             padding:'8px 16px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:12,
             background:'var(--accent)', color:'#000', border:'none', flex:1,
           }}>📄 Сгенерировать отчёт</button>
-          <button onClick={() => { try { localStorage.removeItem('he_risk_reports'); localStorage.removeItem('he_risks_report_current'); setRiskArchive([]); setRiskReportGenerated(false); } catch {} }}
+          <button onClick={() => { try { localStorage.removeItem('he_risk_reports'); localStorage.removeItem('he_risk_report_current'); setRiskArchive([]); setRiskReportGenerated(false); } catch {} }}
             style={{ padding:'8px 12px', borderRadius:10, cursor:'pointer', fontWeight:600, fontSize:11,
               background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.2)' }}>
             🗑 Очистить архив

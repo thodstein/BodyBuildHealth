@@ -1,4 +1,4 @@
-import type { StrengthLogEntry, WorkoutLog } from '../core/types';
+﻿import type { StrengthLogEntry, WorkoutLog } from '../core/types';
 
 export interface ProgressionRule {
   type: 'linear' | 'double' | 'undulating' | 'conjugate';
@@ -60,8 +60,12 @@ export function selectProgressionRule(level: string): ProgressionRule {
 }
 
 export function estimate1RM(weight: number, reps: number): number {
-  if (reps === 1) return weight;
-  return Math.round(weight * (1 + reps / 30) * 10) / 10;
+  // AUD-FIX-5: реп-диапазонный blend (Epley <=10reps, Brzycki >10reps, зажим reps<=15)
+  if (reps <= 1) return weight;
+  if (weight <= 0) return 0;
+  if (reps <= 10) return Math.round(weight * (1 + reps / 30) * 10) / 10;
+  const r = Math.min(reps, 15);
+  return Math.round((weight * 36) / (37 - r) * 10) / 10;
 }
 
 export function calcSuggestedWeight(
@@ -169,9 +173,13 @@ export function getDeloadRecommendation(
   if (weeksSinceDeload >= 8) return { shouldDeload: true, reason: `${weeksSinceDeload} недель без делаода — плановый делоад` };
   if (currentRPE >= 9.5) return { shouldDeload: true, reason: `RPE ${currentRPE} ≥ 9.5 на последних тренировках — делоад` };
 
-  const plateauExercises = logs.filter((l, i, arr) => {
+  // AUD-FIX-4: сравнение plateau в хронологическом порядке (было — в порядке вставки).
+  const chrono = [...logs].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const plateauExercises = chrono.filter((l, i, arr) => {
     if (i === 0) return false;
-    return Math.abs(l.estimated1RM - arr[i - 1].estimated1RM) < 0.5;
+    const cur = l.estimated1RM ?? 0;
+    const prev = arr[i - 1].estimated1RM ?? 0;
+    return Math.abs(cur - prev) < 0.5;
   });
   if (plateauExercises.length >= 3) return { shouldDeload: true, reason: `Плато по ${plateauExercises.length} упражнениям — делоад для суперкомпенсации` };
 
