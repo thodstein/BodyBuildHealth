@@ -10,6 +10,7 @@ import {
 } from '../../../engines/workout-logger.engine';
 import { computeSessionMetrics } from './sessionMetrics';
 import { hapticImpact, hapticNotify } from '../../../core/telegram';
+import { velocityLoss, velocityLossZone, thresholdForIntent, type VBTIntent } from '../../../engines/pro/vbt.engine';
 
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -47,6 +48,9 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   // фактический ввод текущего подхода: [exerciseIndex][setIndex] -> {weight,reps}
   const [actual, setActual] = useState<Record<string, { weight: number; reps: number }>>({});
   const [exDone, setExDone] = useState<Record<string, boolean>>({});
+  // P11: VBT-ввод скорости штанги (м/с) на сет + авторегуляция по потере скорости
+  const [vel, setVel] = useState<Record<string, number>>({});
+  const [vbtIntent, setVbtIntent] = useState<VBTIntent>('strength');
 
   const day = days[dayIdx] || days[0];
   const last = useMemo(() => getLastSession(), [done]);
@@ -139,11 +143,31 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
                     <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                       <input style={{ ...IN, width: 64 }} type="number" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { weight: +e.target.value, reps: a.reps } }))} aria-label="вес" />
                       <input style={{ ...IN, width: 52 }} type="number" value={a.reps} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: +e.target.value } }))} aria-label="повт" />
+                      <input style={{ ...IN, width: 48 }} type="number" step="0.01" placeholder="v" value={vel[k] ?? ""} onChange={e => setVel(p => ({ ...p, [k]: +e.target.value }))} aria-label="скорость м/с" />
                       <button style={logged ? BTN_GHOST : BTN} onClick={() => logOne(ei, si)}>{logged ? '✓' : 'OK'}</button>
                     </div>
                   </div>
                 );
               })}
+              {/* P11: VBT-авторегуляция по потере скорости (если введены скорости) */}
+              {(() => {
+                const vels = ex.targetSets.map((t, si) => vel[keyFor(ei, si)]).filter(v => v && v > 0);
+                if (vels.length < 2) return null;
+                const thr = thresholdForIntent(vbtIntent);
+                const vl = velocityLoss(vels, thr);
+                if (!vl) return null;
+                const zone = velocityLossZone(vl.lossPct);
+                return <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, background: vl.exceeded ? 'rgba(239,68,68,0.1)' : 'rgba(0,230,138,0.08)', border: '1px solid ' + (vl.exceeded ? 'rgba(239,68,68,0.3)' : 'rgba(0,230,138,0.2)') }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: vl.exceeded ? '#ef4444' : ACCENT }}>⚡ VBT: потеря скорости {vl.lossPct}% ({vl.bestVelocity}→{vl.lastVelocity} м/с, порог {thr}%)</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>{vl.exceeded ? '🔴 СТОП — порог превышен, заканчивайте сет' : '🟢 ещё ~' + vl.remainingReps + ' повторов до порога'} · {zone}</div>
+                </div>;
+              })()}
+              <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>VBT-интент:</span>
+                {(['strength','hypertrophy','power_heavy','speed'] as VBTIntent[]).map(it => (
+                  <button key={it} onClick={() => setVbtIntent(it)} style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: vbtIntent===it?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: vbtIntent===it?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.02)', color: vbtIntent===it?'#00e68a':'var(--text-dim)' }}>{it}</button>
+                ))}
+              </div>
             </div>
           ))}
         </div>

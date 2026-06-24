@@ -26,6 +26,7 @@ import { StrengthDiary } from '../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../core/types';
 import { AnalyticsTab } from './TrainingScreen_parts/AnalyticsTab';
 import { VisualTab } from './TrainingScreen_parts/VisualTab';
+import { ProMetricsPanel } from './SRCBBScreen_parts/ProMetricsPanel';
 type Mode = 'src' | 'bb';
 
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: '12px', margin: '6px 0' };
@@ -127,7 +128,7 @@ export const SRCBBScreen: React.FC = () => {
 
   const togglePed = (p: PED) => setPeds(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
   // ── INT: sub-tabs План/Блины/Выполнение + нормализаторы плана для execution-слоя ──
-  const [view, setView] = useState<'plan' | 'plates' | 'run' | 'autoreg' | 'peak' | 'recovery' | 'safety' | 'demo' | 'programs' | 'methods' | 'analytics' | 'charts'>('plan');
+  const [view, setView] = useState<'plan' | 'plates' | 'run' | 'autoreg' | 'peak' | 'recovery' | 'safety' | 'demo' | 'programs' | 'methods' | 'analytics' | 'prometrics' | 'charts'>('plan');
 
   const srcDays: PlayerDay[] = useMemo(() => {
     if (!builtSrc) return [];
@@ -192,7 +193,7 @@ export const SRCBBScreen: React.FC = () => {
         <button style={mode === 'bb' ? BTN : BTN_GHOST} onClick={() => setMode('bb')} disabled={mode === 'bb'}>💪 Бодибилдинг</button>
       </div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        {([['plan', '📋 План'], ['plates', '🧮 Блины'], ['run', '▶ Выполнение'], ['autoreg', '🧠 Авторег'], ['peak', '🏁 Пик'], ['recovery', '🔋 Восст'], ['safety', '🛡 Безоп'], ['demo', '🎬 Демо'], ['programs', '📚 Программы'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['charts', '📊 График']] as const).map(([v, l]) => (
+        {([['plan', '📋 План'], ['plates', '🧮 Блины'], ['run', '▶ Выполнение'], ['autoreg', '🧠 Авторег'], ['peak', '🏁 Пик'], ['recovery', '🔋 Восст'], ['safety', '🛡 Безоп'], ['demo', '🎬 Демо'], ['programs', '📚 Программы'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 Pro-метрики'], ['charts', '📊 График']] as const).map(([v, l]) => (
           <button key={v} style={view === v ? BTN : BTN_GHOST} onClick={() => setView(v)}>{l}</button>
         ))}
       </div>
@@ -394,6 +395,7 @@ export const SRCBBScreen: React.FC = () => {
         <MethodsTab linked={linked} trainingOutput={null} diaryStats={[] as any} historyWorkouts={[] as any} goal={mode === 'src' ? goal : bbGoal} level={mode === 'src' ? level : bbLevel} daysPerWeek={mode === 'src' ? days : bbDays} recovery={linked.readiness?.recovery ?? 80} fatigue={linked.readiness?.fatigue ?? 30} appliedMethods={appliedMethods} onToggleMethod={(name, cat) => setAppliedMethods(prev => { const n = { ...prev }; if (n[cat] === name) delete n[cat]; else n[cat] = name; return n; })} onApplyComposition={() => { const keys = Object.keys(appliedMethods); if (keys.length > 0) { const h = deriveHints(appliedMethods); setMethodHints(h); setMethodNote(`✓ Применена методология: ${h.label}${h.volumeMult !== 1 ? ' · объём×' + h.volumeMult : ''}${h.technique ? ' · техн: ' + h.technique : ''}`); } else { setMethodHints({ volumeMult: 1, technique: null, label: '' }); setMethodNote('Выберите методики (по одной из категории)'); } }} />
       </>)}
       {view === 'analytics' && (<><AnalyticsTab sessions={historyWorkouts} /><VisualTab sessions={historyWorkouts} /></>)}
+      {view === 'prometrics' && <ProMetricsPanel />}
       {view === 'charts' && <TrainingMetricsChart lms={lmsChart} bb={bbChart} />}
     </div>
   );

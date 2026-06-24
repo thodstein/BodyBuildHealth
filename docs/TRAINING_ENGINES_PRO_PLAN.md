@@ -78,10 +78,10 @@
 - Sticking points (углы суставов) присед/жим/тяга, bar path analysis, weakness → corrective exercises.
 - Верификация: «провал в 2/3 жима» → трицепс/дожим-ассистенты.
 
-### P11 — VBT-ввод в дневнике + bar-speed
+### P11 — VBT-ввод в дневнике + bar-speed  ✅ ГОТОВО (render-верификация PASS, tsc+vite ✓)
 - Дневник: ввод bar speed (ручной/устройство) → VBT-авторегуляция (P2/P4). Расширение strength-diary + SessionPlayer.
 
-### P12 — Интеграция и UI
+### P12 — Интеграция и UI  ✅ ГОТОВО (render-верификация PASS, tsc+vite ✓)
 - Аналитика-вью: графики training-load/ACWR/fitness-fatigue/relative-strength.
 - Авторег-панель: суточная корректировка плана (P4) + velocity-таргеты (P2).
 - Wire fitness-fatigue → readiness → auto-deload.

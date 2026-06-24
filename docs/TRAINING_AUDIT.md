@@ -681,4 +681,12 @@ profile → lms-selector (топ-N) → выбранный цикл → ввод
 - API: diagnoseLift(lift, weakPoint) → {phaseLabel, angleRangeDeg, keyJoint, weakMuscles, biomechanicalReason, corrections, loadCues, assistance, assistanceIntensityPct}; barPathAnalysis(lift, issues); stickingPhases(lift).
 - Верификация (verify-p10.mts, 20/20 PASS): bench lockout→Трицепс, angle 90-180°, дожимы; off_chest→грудь/дельта, 0-30°, паузы; squat bottom→квадрицепсы/ягодицы (front squat/pause/bulgarian); deadlift start→[Квадрицепсы,Разгибатели спины] (deficit pull); deadlift lockout→glutes/traps/extensors; invalid combo→null; barpath forward_drift/hips_shoot_up/good_morning diagnosed.
 - tsc ✓, vite ✓. (Параллельно: build-unblock — опечатка allOrgsans→allOrgans в supplement-finder.engine.ts агента БАД.)
-
+## P11 — VBT-ввод в дневник (`SessionPlayer.tsx`) ✅
+- В экран выполнения (SessionPlayer) добавлен ввод скорости штанги (м/с) на каждый сет + селектор VBT-интента (strength/hypertrophy/power_heavy/speed) + панель авторегуляции по потере скорости (REUSE P2 velocityLoss/velocityLossZone/thresholdForIntent).
+- Панель: «⚡ VBT: потеря скорости N% (best→last м/с, порог M%)» + «🔴 СТОП — порог превышен» или «🟢 ещё ~N повторов до порога» + зона (velocityLossZone).
+- Верификация (render, puppeteer): введены скорости 0.70/0.65/0.55 → панель: «потеря скорости 21.4% (0.70→0.55 м/с, порог 20%) 🔴 СТОП — порог превышен». PE: 0. tsc ✓, vite ✓.
+## P12 — UI-интеграция проф-движков (`SRCBBScreen_parts/ProMetricsPanel.tsx`) ✅
+- Новая вью «🧮 Pro-метрики» в едином планировщике (SRCBBScreen), собирающая проф-движки в один UI.
+- Секции: Относительная сила (P6: ввод тотал/вес/пол → Wilks/DOTS/IPF GLI/allometric/relative + класс); Монитор нагрузки (P3: sRPE-сессии → ACWR/acute-chronic/monotony/strain/fitness-fatigue + рекомендации); Проф-авторегуляция (P4: readiness+ACWR+lastRPE+velocityLoss → топ-сет×/объём×/RIR+/deload + decisions); Прогрессии (P5: 6 схем, ввод e1RM → недели с весами).
+- Верификация (render, puppeteer): вью рендерится, DOTS 387.96 «Опытный», IPF GLI 66.2, allometric, ACWR, fitness-fatigue, авторегуляция, прогрессии — все секции видны. PE: 0.
+- tsc ✓, vite ✓. ПРОФ-ПЛАН (P1–P12) ПОЛНОСТЬЮ ЗАВЕРШЁН.
