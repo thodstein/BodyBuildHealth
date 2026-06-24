@@ -76,7 +76,7 @@ export interface MacrocycleInput {
   injuries: string[];
   experience: 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
   currentWeek?: number;
-  periodizationType?: 'auto' | 'linear' | 'undulating' | 'block';
+  periodizationType?: 'auto' | 'linear' | 'undulating' | 'block' | 'conjugate';
   cycleType?: string;
   blockSequence?: import('../core/types').BlockDefinition[];
 }

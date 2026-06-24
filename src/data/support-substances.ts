@@ -1,4 +1,5 @@
 import { resolveCanonicalId } from './support-meta';
+import { INTERACTIONS_DB } from './support-interactions-db';
 
 export interface SupportSubstance {
   id: string;
@@ -280,8 +281,17 @@ export function isGhostId(id: string): boolean {
   return GHOST_IDS.has(id);
 }
 
-// Empty interaction/risk arrays (data moved to support-interactions-db.ts)
-export const ALL_INTERACTIONS: SupportInteraction[] = [];
+// Mapped from INTERACTIONS_DB (support-interactions-db.ts) — field `id` → `interactionId`
+export const ALL_INTERACTIONS: SupportInteraction[] = INTERACTIONS_DB.map(i => ({
+  interactionId: i.id,
+  substanceA: i.substanceA,
+  substanceB: i.substanceB,
+  type: i.type,
+  effect: i.effect,
+  mechanisms: i.mechanisms,
+  severity: i.severity,
+  notes: i.notes,
+}));
 export const ALL_RISKS: SupportRisk[] = [];
 
 // Aliases for backward compatibility

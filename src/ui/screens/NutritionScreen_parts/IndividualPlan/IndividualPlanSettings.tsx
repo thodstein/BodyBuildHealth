@@ -1525,8 +1525,34 @@ export const IndividualPlanSettings: React.FC = () => {
 
       {(cyclingMode === 'cheatmeal' || cyclingMode === 'carbload') && (
         <GlassCard title={cyclingMode === 'cheatmeal' ? 'Читмил' : 'Углеводная загрузка'} icon="📅">
-          <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>День тяжёлой тренировки:</label>
-          <input type="date" value={heavyTrainDay} onChange={e => setHeavyTrainDay(e.target.value)} style={inputStyle} />
+          <div style={{ marginTop: 4, padding: '8px 10px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.12)' }}>
+            <div style={{ fontSize: 9, fontWeight: 600, color: '#60a5fa', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+              📅 Выберите день тяжёлой тренировки:
+            </div>
+            <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+              {DAY_LABELS.map((label, idx) => {
+                const isHeavy = trainingDays[idx];
+                return (
+                  <button key={idx} onClick={() => {
+                    setTrainingDays(trainingDays.map((_, i) => i === idx));
+                  }} style={{
+                    width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
+                    border: isHeavy ? '2px solid #22c55e' : '2px solid #3f3f46',
+                    background: isHeavy ? 'rgba(34,197,94,0.2)' : '#202023',
+                    color: isHeavy ? '#22c55e' : 'rgba(255,255,255,0.85)',
+                    fontSize: 10, fontWeight: isHeavy ? 800 : 500,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.15s',
+                  }}>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>
+              🏋️ Тяжёлая тренировка: {trainingDays.map((d,i) => d ? DAY_LABELS[i] : null).filter(Boolean).join(', ')}
+            </div>
+          </div>
         </GlassCard>
       )}
 

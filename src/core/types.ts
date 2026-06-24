@@ -772,7 +772,7 @@ export interface TrainingInput {
   rir?: number;
   exercises?: Exercise[];
   splitType?: string;
-  periodizationType?: 'auto' | 'linear' | 'undulating' | 'block';
+  periodizationType?: 'auto' | 'linear' | 'undulating' | 'block' | 'conjugate';
   cycleType?: string;
   blockSequence?: BlockDefinition[];
 }

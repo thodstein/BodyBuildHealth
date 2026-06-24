@@ -63,7 +63,7 @@ export const TrainingScreen: React.FC = () => {
   const [splitCandidates, setSplitCandidates] = useState<SplitCandidate[]>([]);
   const [showSplitPicker, setShowSplitPicker] = useState(false);
   const [cycleType, setCycleType] = useState('auto');
-  const [periodizationType, setPeriodizationType] = useState<'auto' | 'linear' | 'undulating' | 'block'>('auto');
+  const [periodizationType, setPeriodizationType] = useState<'auto' | 'linear' | 'undulating' | 'block' | 'conjugate'>('auto');
   const [mesoLength, setMesoLength] = useState(12);
   const [recovery, setRecovery] = useState(Math.round((readiness?.recovery ?? 70) / 10));
   const [fatigue, setFatigue] = useState(Math.round((readiness?.fatigue ?? 30) / 10));

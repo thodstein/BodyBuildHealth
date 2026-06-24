@@ -26,8 +26,8 @@ type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catal
 const SECTION_TABS: Record<NutritionSection, string[]> = {
   overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness'],
   analytics: ['charts', 'reports'],
-  diary: ['diary', 'charts', 'reports', 'usefulness'],
-  planning: ['mealplan', 'reference', 'info', 'usefulness'],
+  diary: ['diary', 'charts', 'reports'],
+  planning: ['mealplan', 'catalog', 'reference', 'info', 'usefulness'],
   all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness'],
 };
 
