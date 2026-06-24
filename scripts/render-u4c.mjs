@@ -1,0 +1,24 @@
+﻿import puppeteer from 'puppeteer-core';
+const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox','--disable-gpu','--window-size=420,860'], defaultViewport: { width: 420, height: 860 } });
+const page = await browser.newPage();
+await page.goto('http://localhost:4174/', { waitUntil: 'networkidle2', timeout: 45000 });
+await page.waitForFunction(() => !document.querySelector('.screen-loading'), { timeout: 30000 }).catch(()=>{});
+await new Promise(r=>setTimeout(r,2000));
+const clickText = async (t)=>{ try{ const el=await page.evaluateHandle((x)=>{const a=[...document.querySelectorAll('button,a,div[role=button],li,h2,h3')];return a.find(e=>(e.innerText||'').includes(x))||null;},t); const n=el.asElement(); if(n){await n.click();return true;} }catch(e){} return false; };
+const clickBtn = async (re)=>{ try{ return await page.evaluate((r)=>{const b=[...document.querySelectorAll('button')].find(x=>new RegExp(r).test(x.innerText));if(b){b.click();return b.innerText;}return null;},re);}catch(e){return null;} };
+await clickText('Тренинг'); await new Promise(r=>setTimeout(r,1000));
+await clickText('Планирование'); await new Promise(r=>setTimeout(r,1200));
+await clickBtn('Сгенерировать план'); await new Promise(r=>setTimeout(r,2500));
+await clickBtn('✏️ Правка плана'); await new Promise(r=>setTimeout(r,1000));
+// edit first 3 вес inputs to distinct values to see which propagates
+await page.evaluate(()=>{ const inps=[...document.querySelectorAll('input[type=number][aria-label="вес"]')]; const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set; inps.slice(0,3).forEach((inp,i)=>{ s.call(inp, String(90+i)); inp.dispatchEvent(new Event('input',{bubbles:true})); }); return inps.length; });
+await new Promise(r=>setTimeout(r,900));
+await clickBtn('✓ Готово'); await new Promise(r=>setTimeout(r,1000));
+await clickBtn('▶ Выполнение'); await new Promise(r=>setTimeout(r,1500));
+const run = await page.evaluate(()=>document.body.innerText);
+const targetLines = run.split('\n').filter(l=>/цель/.test(l)).slice(0,6);
+console.log('=== Выполнение target lines ==='); targetLines.forEach(l=>console.log('  ',l.trim()));
+console.log('has 90/91/92:', /90кг|91кг|92кг/.test(run));
+await browser.close();
+console.log('U4_PROP_DONE');

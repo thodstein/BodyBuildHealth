@@ -460,7 +460,9 @@ function generateWeekDays(
         const groupExercises = getExercisesByGroup(group);
 
         const isWeak = weakPoints.includes(group);
-        const shuffleArr = <T,>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5);
+        // U6: детерминированный «shuffle» — стабильный хэш(id+group), без Math.random.
+        const _hash = (str: string) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+        const shuffleArr = <T,>(arr: T[]): T[] => [...arr].sort((a, b) => _hash(group + ((a as any).id || (a as any).name || '')) - _hash(group + ((b as any).id || (b as any).name || '')));
 
         // Adjust compound/isolation ratio based on compoundPriority
         const compoundCount = isDeload ? 1 : Math.max(1, Math.round(compoundPriority * 2.5));

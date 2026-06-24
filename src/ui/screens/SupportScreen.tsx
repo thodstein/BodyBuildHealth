@@ -64,6 +64,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [systemFilter, setSystemFilter] = useState<string>('all');
   const [supportClassFilter, setSupportClassFilter] = useState<string>('all');
   const [supportTierFilter, setSupportTierFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [supportLevel, setSupportLevel] = useState<'basic' | 'mid' | 'max' | 'boost'>('mid');
   const [manualLevelSelected, setManualLevelSelected] = useState(false);
   const [boostEnabled, setBoostEnabled] = useState(false);
@@ -916,6 +917,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (supportTierFilter !== 'all') {
       filtered = filtered.filter(s => getSubstanceTier(s.id) === supportTierFilter);
     }
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter(s => (s.categories||[]).some(c => c === categoryFilter));
+    }
     // Apply search query
     if (searchQuery) {
       const sq = searchQuery.toLowerCase();
@@ -960,7 +964,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         return { cat, items, count: items.length, classBadges, classItems };
       })
       .sort((a, b) => b.count - a.count);
-  }, [searchQuery, supportTierFilter, catalogSubstances]);
+  }, [searchQuery, supportTierFilter, categoryFilter, catalogSubstances]);
 
   // Type-only grouping for "По типам" tab — все распределено, без polyphenols/supplement как отдельных групп
   const TYPE_GROUPS = new Set(['vitamins','minerals','amino_acids','fatty_acids','herbs','mushrooms','peptides','hormones','enzymes','probiotics','electrolytes','nootropics','adaptogens','antioxidants','pharma']);
@@ -1761,6 +1765,41 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         </div>
       )}
 
+      {entry.targetOrgan && (
+        <div style={{ marginTop: 3 }}>
+          <div style={{ fontSize: 7, color: '#f59e0b', fontWeight: 600, marginBottom: 1 }}>🎯 Орган-мишень:</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.9)', lineHeight: 1.3 }}>{entry.targetOrgan}</div>
+        </div>
+      )}
+
+      {entry.organMechanism && (
+        <div style={{ marginTop: 3 }}>
+          <div style={{ fontSize: 7, color: '#60a5fa', fontWeight: 600, marginBottom: 1 }}>🔬 Физиология органа:</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.9)', lineHeight: 1.3 }}>{entry.organMechanism}</div>
+        </div>
+      )}
+
+      {entry.mechanismOfAction && (
+        <div style={{ marginTop: 3 }}>
+          <div style={{ fontSize: 7, color: '#a78bfa', fontWeight: 600, marginBottom: 1 }}>🧬 Механизм действия (молекулярный):</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.9)', lineHeight: 1.3 }}>{entry.mechanismOfAction}</div>
+        </div>
+      )}
+
+      {entry.clinicalEffect && (
+        <div style={{ marginTop: 3 }}>
+          <div style={{ fontSize: 7, color: '#00e68a', fontWeight: 600, marginBottom: 1 }}>✅ Клинический эффект:</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.9)', lineHeight: 1.3 }}>{entry.clinicalEffect}</div>
+        </div>
+      )}
+
+      {entry.bestForm && (
+        <div style={{ marginTop: 3, padding: '4px 6px', borderRadius: 6, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)' }}>
+          <div style={{ fontSize: 7, color: '#00e68a', fontWeight: 600, marginBottom: 1 }}>🏆 Лучшая форма:</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>{entry.bestForm}</div>
+        </div>
+      )}
+
       {/* Enrichment data */}
       {(() => {
         const enrich = CATALOG_ENRICHMENT[canonicalId] || CATALOG_ENRICHMENT[subId];
@@ -2221,6 +2260,20 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                  </div>
                 <div style={{ display:'flex', gap:6, marginBottom:8, alignItems:'center' }}>
                   <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-light)', fontSize:12 }} />
+                </div>
+                {/* Category filter pills */}
+                <div style={{ display:'flex', gap:3, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+                  {[['all','🔍 Все'],['vitamin','💊 Витамины'],['mineral','⚡ Минералы'],['amino','🧬 АК'],['fatty_acid','🐟 ЖК'],['antioxidant','🛡️ Антиоксиданты'],['nootropic','🧠 Ноотропы'],['adaptogen','🌿 Адаптогены'],['herb','🌿 Травы'],['mushroom','🍄 Грибы'],['peptide','🧬 Пептиды'],['hormonal','⚖️ Гормоны'],['pharma','💊 Фарма'],['cardioprotector','❤️ Сердце'],['hepatoprotector','🫁 Печень'],['neuroprotector','🧠 Нейро'],['immunomodulator','🛡️ Иммунитет'],['gut','🫁 ЖКТ'],['joint','🦴 Суставы'],['anti_inflammatory','🔥 Воспаление'],['metabolic','⚡ Метаболизм']].map(([key, label]) => {
+                    const isSel = categoryFilter === key;
+                    return (
+                      <button key={key} onClick={() => setCategoryFilter(isSel ? 'all' : key)} style={{
+                        padding:'3px 8px', borderRadius:10, fontSize:8, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap',
+                        background: isSel ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+                        color: isSel ? '#000' : 'rgba(255,255,255,0.7)',
+                        border: `1px solid ${isSel ? 'var(--accent)' : 'rgba(255,255,255,0.08)'}`,
+                      }}>{label}</button>
+                    );
+                  })}
                 </div>
                 {/* Tier filter buttons */}
                 <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>

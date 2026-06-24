@@ -583,4 +583,91 @@ profile → lms-selector (топ-N) → выбранный цикл → ввод
   → 4 графика → Демо → Сессия (старт/лог/завершение → LMS-метрики) → Конструктор → др. экраны.
   **PAGE ERRORS: 0** на всём потоке (только supabase WS — нет DNS в headless, не фатально).
 - Все чекбоксы TRAINING_BLOCK_PLAN.md закрыты (E1 удалён из плана как территория агента питание).
+# Этап U — объединение планировщиков (ПЛ + ББ) — ЗАВЕРШЁН
+
+> Архитектура (подтверждена пользователем): ЕДИНЫЙ планировщик = SRCBBScreen с двумя трассами
+> **ПЛ (СРЦ/сила)** и **ББ (бодибилдинг)**. Наполнение старого конструктора подключено аддитивно
+> (старое не сломано). Ручная правка — слой поверх сгенерированного плана. Всё верифицировано runtime-рендером
+> (puppeteer-core + Chrome, headless), 0 page-errors на всём потоке.
+
+## U1 — Методики: одна из каждой категории
+- Было: `appliedMethod: string` (одна total, выбор заменял предыдущую). Стало: `appliedMethods: Record<категория,метод>` + композиция-бар + чипы + «Применить». Render: 2 из 6 категорий одновременно. ✓
+
+## U2/U3 — наполнение старого автомата в единый планировщик (аддитивно)
+- 📚 Программы (140 готовых: 5/3/1, nSuns, SS, PPL…) — вью в SRCBBScreen (reuse ProgramsTab). ✓
+- 🧠 Методики (44 метода, 6 категорий, композиция) — вью в SRCBBScreen (reuse MethodsTab + useDataLink). ✓
+
+## U4 — ручная правка поверх сгенерированного плана
+- ✏️ Правка: inline-редактор сетов/весов/повторов/подходов каждого workSet. Оверлей `srcEdits` по позиции сета.
+- Правка недели 1 применяется к «Выполнение» (SessionPlayer). Render: Присед 81.6→95 → «цель 95кг×6» в сессии. ✓
+
+## U5 — выбор упражнений из каталога (536) в план
+- ＋ Добавить упражнение: пикер по группам (Грудь/Спина/Ноги/Плечи/Руки/Кор) → select из EXERCISE_CATALOG → схема (подходы×пов×вес) → добавить в день.
+- Добавленные («＋ добавлено») редактируются inline, удаляются (✕), применяются к «Выполнение». Render: «Жим штанги лёжа» добавлен → виден в сессии. ✓
+
+## U6 — фикс детерминизма циклов
+- Убран `Math.random` jitter в `generatePlan` (recovery/fatigue берутся как есть, nutrition=8).
+- `training-periodization.engine`: выбор упражнений стал детерминированным (стабильный FNV-хэш(id+group) вместо random-shuffle). Циклы воспроизводимы при тех же параметрах. ✓
+
+## U7 — связь методик с планом (безопасный оверлей)
+- Композиция методик влияет на план: `methodHints` — volume-метод → объём×(GVT 1.3 / MEV 0.8), intensity/technique-метод → техника (cluster/rest_pause/slow_eccentric/myo/dropset).
+- Объём-множитель применяется к BB-графику (оверлей, движок не трогаем); бейдж «🧩 {методология}» на плане.
+- Render: «German Volume Training (GVT) · объём×1.3». ✓
+
+## U8 — аналитика/визуализация дневника в едином планировщике
+- 📈 Аналитика — вью в SRCBBScreen (reuse AnalyticsTab + VisualTab), загрузка сессий через StrengthDiary.getWorkoutLogs.
+- Render: пустые состояния корректны («Нет данных… запишите тренировки»), 0 ошибок. ✓
+
+## Финал этапа U
+- tsc --noEmit: EXIT 0 (весь репо). vite build: ✓. Runtime-рендер: 0 page-errors.
+- Все 8 пунктов U закрыты. TRAINING_BLOCK_PLAN.md: 0 незакрытых чекбоксов.
+- Единый планировщик (ПЛ + ББ) теперь содержит: План (12 нед, навигация, фазы, PM-прогрессия, «что дальше»),
+  Блины, Выполнение, Авторег, Пик, Восст, Безоп, Демо (536 упр.), Программы (140), Методики (44, композиция),
+  Аналитика дневника, График (4). + ручная правка поверх + добавление упражнений из каталога.
+# Проф-движки — этап PRO (расширение до проф. уровня)
+
+## P1 — Канонический e1RM (`src/engines/pro/estimate1rm.engine.ts`) ✅
+- UNIFY: 7 формул (Epley, Brzycki, Lander, Lombardi, Mayhew, O'Conner, Wathen) в одном модуле + консенсус (медиана применимых по диапазону повторений) + load-velocity e1RM (LVP-таблица squat/bench/deadlift, расширится в P2).
+- API: estimate1RMFormula, estimate1RMConsensus, estimate1RM (back-compat), estimate1RMFromVelocity, velocityForPct.
+- Бэкворд-совместимо: существующий progression.estimate1RM (Epley≤10/Brzycki>10 blend) не трогается — проф-фичи используют новый канонический модуль.
+- Верификация (verify-p1.mts, 16/16 PASS): 100×8→125.1 (consensus 7 формул, spread 7.7), 100×12→138.4 (4 формулы), clamp ≤15, Epley 126.7 / O'Conner 120 / Brzycki 124.1 / Lombardi 123.1; squat 90%→0.47 м/с, 60%→0.87; bench v0.33→90%→e1RM=100; roundtrip velocityForPct↔pctForVelocity.
+- tsc --noEmit ✓, vite build ✓.
+## P3 — Мониторинг тренировочной нагрузки (`src/engines/pro/training-load.engine.ts`) ✅
+- NEW+UNIFY: sRPE (RPE×длительность → AU), ACWR (острая 7д / хроническая 28д EWMA, зоны undertrained/optimal/caution/dangerous), monotony/strain, fitness-fatigue (Banister: τ1≈42, τ2≈7, performance=k1·fitness−k2·fatigue). Сводный отчёт + рекомендации.
+- API: sessionLoad, toDailyLoads, ewma, acuteChronicRatio, weeklyMonotony, fitnessFatigue, trainingLoadReport.
+- Верификация (verify-p3.mts, 12/12 PASS): стабильная нагрузка → ACWR 1.06 optimal; spike-неделя → 2.22 dangerous; monotony 1.15, strain 2956; fitness-fatigue за 8 нед: fitness 10853 > fatigue 2894, performance 5066, peakIdx валиден.
+- tsc ✓, vite ✓.
+## P2 — Velocity-Based Training (`src/engines/pro/vbt.engine.ts`) ✅
+- NEW: расширенный load-velocity profile (squat/bench/deadlift/ohp/row, 10 точек 30-100%), velocity-таргеты по intent (absolute_strength/strength/power_heavy/power_light/hypertrophy/speed), velocity-loss-пороги (10/20/25/40%) для авторегулируемого окончания сетов + оценка оставшихся повторов.
+- API: velocityForPct, pctForVelocity, targetVelocity, targetPct, loadForPct, estimate1RMFromVelocity, velocityLoss (best/last/lossPct/exceeded/remainingReps), thresholdForIntent, velocityLossZone.
+- Верификация (verify-p2.mts, 25/25 PASS): squat 90%→0.47, bench 90%→0.33, ohp 100%→0.18; roundtrip; strength→90%@0.40, speed→40%@>1.2; velocityLoss 12% (remainingReps 2) / 37.5% (exceeded); squat 1RM 150→90%=135 кг @0.40 м/с target.
+- tsc ✓, vite ✓.
+## P4 — Проф-авторегуляция (`src/engines/pro/autoregulation-pro.engine.ts`) ✅
+- REUSE+EXTEND: склейка сигналов readiness + ACWR (P3) + velocity-loss (P2) + last-RPE → суточная корректировка плана (топ-сет×, объём×, RIR-сдвиг, deload-триггер) + RPE↔%1RM↔load (через модель RIR: нагрузка для r@RPE e = нагрузка для (r+RIR)-повторного максимума).
+- API: autoRegulate (input→{topSetPctMultiplier, volumeMultiplier, rirShift, deload, adjustedTopSetPct, adjustedRIR, decisions}), pctForRPE, loadForRPE, rpeFromLoad, adjustedLoad.
+- Правила: ACWR dangerous→объём×0.7+deload; caution×0.85; undertrained×1.1. readiness<40→RIR+2 топ×0.92; <55→RIR+1 топ×0.96; ≥80+optimal→топ×1.02. fatigue>70→×0.9 RIR+1. lastRPE≥9.5→RIR+1 ×0.9. velocityLoss>40→deload ×0.6; >25→×0.8.
+- Верификация (verify-p4.mts, 19/19 PASS): 5@RPE10→85.7%, 5@RPE8→81.1%, 3@RPE9→88.2%; rpeFromLoad обратим; push/low/dangerous/undertrained/velocityLoss/combined кейсы; e1RM 120, 5@RPE8→97.3 кг.
+- tsc ✓, vite ✓.
+## P6 — Относительная сила (`src/engines/pro/relative-strength.engine.ts`) ✅
+- UNIFY: Wilks (классич.) + DOTS + IPF GLI + allometric(2/3) + relative (total/bw) в каноническом модуле + классификация по DOTS (novice<300/intermediate 300-380/advanced 380-450/elite 450-520/world_class>520).
+- DOTS/GLI коэффициенты перенесены из performance-analytics (проверены); Wilks — стандартные опубликованные коэф.
+- API: wilksScore, dotsScore, ipfGLPoints, allometricScore, relativeStrength, classifyByDots, relativeStrengthReport.
+- Верификация (verify-p6.mts, 20/20 PASS): allometric 600/90≈29.9, relative 6.67x; DOTS 600/90 male=388 (lighter→higher); GLI 600/93=65.1; Wilks 500@60/90/120=331/202/145 (монотон, lighter→higher, диапазон); классификация 388→advanced, 550→world_class; report сводка.
+- tsc ✓, vite ✓.
+## P5 — Библиотека прогрессий (`src/engines/pro/progression-pro.engine.ts`) ✅
+- 6 схем как данные (% templates) + генератор недель с весами: 5/3/1 (Wendler, TM=90%, W1 5×3 / W2 3×3 / W3 5-3-1 / W4 deload), DUP (heavy/medium/light +2.5%/нед), conjugate (Westside ME/DE/Rep), double progression (6-8×3, +reps→+вес), Hepburn A (8×2-3), super-squats (1×20 +2.5%/нед, 6 нед).
+- API: PROGRESSION_SCHEMES, getScheme, listSchemes, generateProgression(id, e1RM) → недели×дни×workSets(% ,reps, sets, вес).
+- Верификация (verify-p5.mts, 24/24 PASS): 5/3/1 TM=90, W1 65/70/75×5=58.5/63/67.5, W3 top 90%×1=81, W4 deload 60%=54, reps 5/5/5 & 5/3/1; DUP 82×5/70×8/58×12 +рост; conjugate 95%×3 + 10×2@55%; double W1 6→W4 8; hepburn 8×2@80%; super-squats 1×20@50% +рост.
+- tsc ✓, vite ✓.
+## P7 — Кривые прогрессии мезоцикла (`src/engines/pro/mesocycle-progression.engine.ts`) ✅
+- Неделя N+1 из N: объём/интенсивность/RIR по фазам (base/build/peak/deload, REUSE mesocyclePhaseForWeek), по цели (strength/hypertrophy/power). Fatigue-driven volume drop (усталость>70 → объём×0.9). Taper-кривая (объём 65→45→40% от пика, удержание интенсивности).
+- API: generateMesocycleProgression(config), taperCurve(taperWeeks, peakIntensityPct), phaseDistribution(weeks).
+- Фикс в процессе: r1 (0.1) слишком грубо — «съедало» приросты интенсивности (0.012) и объёма (0.04); переведено на r2 (0.01).
+- Верификация (verify-p7.mts, 20/20 PASS): 12-нед hypertrophy — RIR base3→build2→peak1→deload4, интенсивность растёт, объём build-пик>peak; strength 8 нед интенсивность растёт; fatigue>70 wk4-5 → volume drop; taper 2 нед объём 0.65→0.45, интенсивность удержание 0.91→0.92.
+- tsc ✓, vite ✓.
+## P9 — Scientific taper/peak (`src/engines/pro/taper.engine.ts`) ✅
+- Taper по усталости (1-3 нед), объём ↓40-60% (REUSE P7 taperCurve), удержание интенсивности, нейромышечный прайминг. Peak-week протокол: прикиды (opener/2nd/3rd) по стратегии (conservative 0.90/0.955/1.00, balanced 0.92/0.96/1.02, aggressive 0.93/0.97/1.05), тайминг последних тяжёлых (deadlift 12д / squat 8д / bench 4д — deadlift раньше всех), warmup-последовательность под опенер, инструкции соревновательного дня.
+- API: taperWeeksForFatigue, peakWeekAttempts, warmupSequence, taperPlan, LAST_HEAVY_DAYS.
+- Верификация (verify-p9.mts, 24/24 PASS): fatigue 20→1нед/55→2/80→3; balanced squat 138/144/153 (opener/2nd/3rd); conservative third=1RM; aggressive third>balanced; warmup 5 шагов 40→90% reps 5→1; wk1 heavy 85% > wk2 priming 75%; нет тяжёлой тяги (≥85%) в taper (ранний cutoff); high fatigue→3 нед.
+- tsc ✓, vite ✓.
 

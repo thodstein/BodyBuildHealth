@@ -169,10 +169,10 @@ export const TrainingScreen: React.FC = () => {
 
   const generatePlan = useCallback((overrideSplitType?: string) => {
     try {
-    const seed = Date.now();
-    const jitter = (v: number, range: number) => Math.max(0, Math.min(100, v + (Math.random() - 0.5) * range * 2));
+    // U6: детерминированная генерация — без Math.random-jitter (циклы воспроизводимы при тех же параметрах).
+    // recovery/fatigue берём как есть; nutrition — стабильное значение (8/10, питание учитывается отдельно).
     const input: TrainingInput = {
-      goal, level, daysPerWeek, recovery: jitter(recovery, 6), fatigue: jitter(fatigue, 6), nutrition: jitter(7, 1),
+      goal, level, daysPerWeek, recovery: Math.max(0, Math.min(100, recovery)), fatigue: Math.max(0, Math.min(100, fatigue)), nutrition: 8,
       weakPoints, sessionDuration: 60, exercises: [],
       splitType: overrideSplitType || splitType,
       periodizationType,
