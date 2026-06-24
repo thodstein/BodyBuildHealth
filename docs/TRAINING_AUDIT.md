@@ -670,4 +670,10 @@ profile → lms-selector (топ-N) → выбранный цикл → ввод
 - API: taperWeeksForFatigue, peakWeekAttempts, warmupSequence, taperPlan, LAST_HEAVY_DAYS.
 - Верификация (verify-p9.mts, 24/24 PASS): fatigue 20→1нед/55→2/80→3; balanced squat 138/144/153 (opener/2nd/3rd); conservative third=1RM; aggressive third>balanced; warmup 5 шагов 40→90% reps 5→1; wk1 heavy 85% > wk2 priming 75%; нет тяжёлой тяги (≥85%) в taper (ранний cutoff); high fatigue→3 нед.
 - tsc ✓, vite ✓.
+## P8 — Прескрипция упражнений по биомеханике (`src/engines/pro/exercise-prescription.engine.ts`) ✅
+- REUSE exercise-catalog + movement-engines + weakpoint-pl. Force-vector классификация (horizontal/vertical push/pull, knee/hip dominant, core_anti), региональная гипертрофия (lengthened partials / stretch-mediated, curated список по мышцам), фильтр по суставным ограничениям (исключает high-stress на повреждённом суставе), слабое место → ассистентные (REUSE diagnoseWeakPoint).
+- API: forceVector, prescribeExercises(input→ranked {score, rationale, lengthenedEmphasis, forceVector}), lengthenedPartials, MUSCLE_TO_JOINTS, REGIONAL_HYPERTROPHY.
+- Скоринг: цель (strength→compound+30, hypertrophy→isolation+18/compound+12, power→compound+25), региональная гипертрофия +20, ограничения high-stress −100, оборудование −15, низкая усталость +5.
+- Верификация (verify-p8.mts, 18/18 PASS): force-vector корректен (chest→hor_push, RDL→hip_dominant, подтяг→vert_pull); chest hypertrophy top=разводка/кроссовер/брусья (lengthened emphasis); strength→compound prioritized; injured shoulder/knee → high-stress excluded; weak point bench-lockout → дожимы ассистентные; dumbbell-only filter.
+- tsc ✓, vite ✓.
 

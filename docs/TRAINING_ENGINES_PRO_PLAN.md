@@ -64,7 +64,7 @@
   taper-кривая (объём ↓40-60%, интенсивность удержать). Расширение lms-progression / bb-builder.
 - Верификация: 12-нед мезо → монотонный RIR base→peak; peak-нед объём < base.
 
-### P8 — Прескрипция упражнений по биомеханике (`src/engines/pro/exercise-prescription.engine.ts`) — REUSE+EXTEND
+### P8 — Прескрипция упражнений по биомеханике (`src/engines/pro/exercise-prescription.engine.ts`) — REUSE+EXTEND  ✅ ГОТОВО (18/18 tsx PASS, tsc+vite ✓)
 - Региональная гипертрофия (lengthened partials, stretch-mediated, длина мышцы/кривая натяжения),
   force-vector, joint constraints, weak-point → ассистентные (расширение weakpoint-pl).
 - Верификация: weak point «дожим жима» → жим в раме/с досок/цепи.

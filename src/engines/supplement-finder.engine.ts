@@ -1,0 +1,759 @@
+import { SUPPORT_CATALOG_DATA } from '../data/support-database';
+import { CATALOG_ENRICHMENT } from '../data/support-database';
+import { ALL_SUBSTANCES, ALL_INTERACTIONS } from '../data/support-database';
+import { SUPPORT_SUBSTANCE_MAP, getSubstanceName as getSubstanceNameDb } from '../data/support-substances';
+import { getSubstanceTier } from '../data/support-database';
+import { SUBSTANCE_ANALOGS } from '../data/support-meta';
+
+export type GoalType =
+  | 'sleep' | 'energy' | 'concentration' | 'muscle_gain' | 'fat_loss'
+  | 'endurance' | 'recovery' | 'immunity' | 'liver_health' | 'cardio_health'
+  | 'joints' | 'skin' | 'hair' | 'hormones' | 'stress' | 'longevity'
+  | 'detox' | 'libido' | 'mood' | 'brain' | 'digestion' | 'kidney';
+
+export type ReplacementType =
+  | 'direct_analog' | 'functional' | 'safer' | 'stronger' | 'cheaper'
+  | 'stack_to_single' | 'single_to_stack';
+
+export interface FinderQuery {
+  goal?: GoalType;
+  organs?: string[];
+  mechanisms?: string[];
+  categories?: string[];
+  searchText?: string;
+  excludeIds?: string[];
+  maxResults?: number;
+  tierFilter?: string;
+}
+
+export interface FinderMatch {
+  id: string;
+  name: string;
+  relevanceScore: number;
+  matchReasons: string[];
+  tier: string;
+  categories: string[];
+  organs: string[];
+  mechanisms: string[];
+  targetOrgan: string;
+  mechanismOfAction: string;
+  clinicalEffect: string;
+  bestForm: string;
+  bestForCourse: boolean;
+  conflictCount: number;
+  synergyCount: number;
+  formCount: number;
+}
+
+export interface ReplacementResult {
+  originalId: string;
+  replacementId: string;
+  replacementName: string;
+  type: ReplacementType;
+  reason: string;
+  explanation: string;
+  tierLabel: string;
+  tierChange: 'upgrade' | 'downgrade' | 'same';
+  safetyNote: string;
+  bestForm: string;
+}
+
+export interface StackEntry {
+  id: string;
+  name: string;
+  role: string;
+  mechanism: string;
+  synergiesWith: { with: string; effect: string }[];
+}
+
+export interface StackExplanation {
+  name: string;
+  substances: StackEntry[];
+  pairwiseSynergies: { a: string; b: string; effect: string; severity: string }[];
+  coverage: { goals: string[]; organs: string[]; mechanisms: string[] };
+  warnings: string[];
+  totalSynergyScore: number;
+}
+
+export interface StackQuery {
+  baseIds: string[];
+  targetSize: number;
+  goal?: GoalType;
+  organs?: string[];
+  mechanisms?: string[];
+  categories?: string[];
+  avoidIds?: string[];
+  autoFill: boolean;
+}
+// ─── Goal → criteria mapping ────────────────────────────────────────────────
+const GOAL_MAP: Record<GoalType, { organs: string[]; mechanisms: string[]; categories: string[]; keywords: string[] }> = {
+  sleep: {
+    organs: ['BRAIN', 'NERVES'],
+    mechanisms: ['GABAERGIC', 'MELATONIN', 'SEROTONIN', 'NEUROTRANSMITTER_REGULATION', 'ANXIOLYTIC'],
+    categories: ['anxiolytic', 'adaptogen', 'mineral'],
+    keywords: ['сон', 'sleep', 'мелатонин', 'gaba', 'магний'],
+  },
+  energy: {
+    organs: ['MITOCHONDRIA', 'MUSCLES', 'BRAIN'],
+    mechanisms: ['ATP_SYNTHESIS', 'ELECTRON_TRANSPORT_CHAIN', 'ENERGY_PRODUCTION', 'MITOCHONDRIAL', 'CREATINE'],
+    categories: ['mitochondrial', 'stimulant', 'vitamin', 'mineral'],
+    keywords: ['энергия', 'energy', 'atp', 'mito', 'b12', 'железо'],
+  },
+  concentration: {
+    organs: ['BRAIN', 'NERVES'],
+    mechanisms: ['CHOLINERGIC', 'DOPAMINE', 'NEUROTRANSMITTER_REGULATION', 'BDNF', 'CEREBRAL_BLOOD_FLOW'],
+    categories: ['nootropic', 'neuroprotector'],
+    keywords: ['концентрация', 'focus', 'память', 'memory', 'дофамин', 'ацетилхолин'],
+  },
+  muscle_gain: {
+    organs: ['MUSCLES', 'ENDOCRINE', 'LIVER'],
+    mechanisms: ['MTOR', 'PROTEIN_SYNTHESIS', 'ANABOLIC', 'TESTOSTERONE', 'CREATINE', 'NITROGEN'],
+    categories: ['amino', 'anabolic', 'hormonal'],
+    keywords: ['мышцы', 'muscle', 'mass', 'тестостерон', 'mTOR', 'белок', 'креатин'],
+  },
+  fat_loss: {
+    organs: ['LIVER', 'PANCREAS', 'ENDOCRINE', 'ADRENALS'],
+    mechanisms: ['THERMOGENESIS', 'FAT_OXIDATION', 'LIPOLYSIS', 'METABOLIC', 'THYROID', 'AMPK_ACTIVATION'],
+    categories: ['metabolic', 'thyroid', 'stimulant'],
+    keywords: ['жир', 'fat', 'loss', 'термогенез', 'metabolism', 'липолиз'],
+  },
+  endurance: {
+    organs: ['HEART', 'LUNGS', 'BLOOD', 'MUSCLES'],
+    mechanisms: ['OXYGEN', 'NITRIC_OXIDE', 'BLOOD_FLOW', 'MITOCHONDRIAL', 'ATP_SYNTHESIS', 'VO2'],
+    categories: ['cardioprotector', 'fatty_acid', 'amino'],
+    keywords: ['endurance', 'выносливость', 'vo2', 'оксид азота', 'железо'],
+  },
+  recovery: {
+    organs: ['MUSCLES', 'LIVER', 'IMMUNE_SYSTEM', 'JOINTS'],
+    mechanisms: ['ANTI_INFLAMMATORY', 'ANTIOXIDANT', 'PROTEIN_SYNTHESIS', 'GLUTATHIONE', 'COLLAGEN'],
+    categories: ['antioxidant', 'anti_inflammatory', 'amino', 'joint'],
+    keywords: ['восстановление', 'recovery', 'collagen', 'глутамин', 'bcaa'],
+  },
+  immunity: {
+    organs: ['IMMUNE_SYSTEM', 'BLOOD', 'GUT'],
+    mechanisms: ['IMMUNE_MODULATION', 'ANTIOXIDANT', 'ANTIMICROBIAL', 'LYMPHOCYTE'],
+    categories: ['immunomodulator', 'vitamin', 'mineral', 'mushroom'],
+    keywords: ['иммунитет', 'immune', 'витамин с', 'цинк', 'эхинацея'],
+  },
+  liver_health: {
+    organs: ['LIVER', 'GALLBLADDER'],
+    mechanisms: ['LIVER_DETOX', 'ANTIOXIDANT', 'CHOLERETIC', 'GLUTATHIONE', 'BILE_ACID'],
+    categories: ['hepatoprotector', 'choleretic', 'bile_acid', 'antioxidant'],
+    keywords: ['печень', 'liver', 'detox', 'гепатопротектор', 'силимарин'],
+  },
+  cardio_health: {
+    organs: ['HEART', 'VESSELS', 'BLOOD'],
+    mechanisms: ['COQ10', 'BLOOD_PRESSURE', 'ANTICOAGULANT', 'LIPID', 'VASODILATION'],
+    categories: ['cardioprotector', 'fatty_acid', 'anticoagulant', 'electrolyte'],
+    keywords: ['сердце', 'heart', 'coq10', 'омега-3', 'калий', 'магний'],
+  },
+  joints: {
+    organs: ['JOINTS', 'BONES', 'CARTILAGE'],
+    mechanisms: ['COLLAGEN', 'ANTI_INFLAMMATORY', 'CHONDROPROTECTIVE', 'BONE_DENSITY'],
+    categories: ['joint', 'anti_inflammatory', 'bone', 'enzyme'],
+    keywords: ['суставы', 'joints', 'коллаген', 'глюкозамин', 'хондроитин'],
+  },
+  skin: {
+    organs: ['SKIN', 'HAIR'],
+    mechanisms: ['COLLAGEN', 'ANTIOXIDANT', 'KERATIN', 'SEBUM'],
+    categories: ['skin', 'vitamin', 'antioxidant', 'fatty_acid'],
+    keywords: ['кожа', 'skin', 'коллаген', 'коллаген', 'витамин с', 'biотин'],
+  },
+  hair: {
+    organs: ['HAIR', 'SKIN', 'PROSTATE'],
+    mechanisms: ['KERATIN', 'DHT', 'ANTIOXIDANT', 'BLOOD_FLOW'],
+    categories: ['skin', 'vitamin', 'mineral'],
+    keywords: ['волосы', 'hair', 'biотин', 'dht', 'пальметто'],
+  },
+  hormones: {
+    organs: ['ENDOCRINE', 'ADRENALS', 'THYROID', 'PITUITARY', 'TESTES'],
+    mechanisms: ['TESTOSTERONE', 'THYROID_HORMONE', 'CORTISOL', 'HPG_AXIS', 'AROMATASE'],
+    categories: ['hormonal', 'adaptogen', 'thyroid'],
+    keywords: ['гормоны', 'hormones', 'тестостерон', 'щитовидная', 'кортизол'],
+  },
+  stress: {
+    organs: ['ADRENALS', 'BRAIN', 'NERVES'],
+    mechanisms: ['CORTISOL', 'GABAERGIC', 'ADAPTOGEN', 'SEROTONIN', 'ANXIOLYTIC'],
+    categories: ['adaptogen', 'anxiolytic', 'antidepressant'],
+    keywords: ['стресс', 'stress', 'кортизол', 'адаптоген', 'ашваганда'],
+  },
+  longevity: {
+    organs: ['CELLS', 'MITOCHONDRIA', 'BRAIN', 'HEART'],
+    mechanisms: ['ANTIOXIDANT', 'SIRT1', 'AMPK_ACTIVATION', 'NAD', 'AUTOPHAGY', 'TELOMERE'],
+    categories: ['anti_aging', 'mitochondrial', 'antioxidant', 'polyphenol'],
+    keywords: ['долголетие', 'longevity', 'nmn', 'nad', 'resveratrol', 'sirtuin'],
+  },
+  detox: {
+    organs: ['LIVER', 'KIDNEYS', 'GUT', 'INTESTINES'],
+    mechanisms: ['LIVER_DETOX', 'GLUTATHIONE', 'ANTIOXIDANT', 'CHELATION', 'BILE_ACID'],
+    categories: ['hepatoprotector', 'antioxidant', 'choleretic', 'gut'],
+    keywords: ['детокс', 'detox', 'печень', 'глутатион', 'клетчатка'],
+  },
+  libido: {
+    organs: ['REPRODUCTIVE', 'PROSTATE', 'TESTES', 'BRAIN'],
+    mechanisms: ['TESTOSTERONE', 'NITRIC_OXIDE', 'BLOOD_FLOW', 'DOPAMINE', 'HPG_AXIS'],
+    categories: ['hormonal', 'adaptogen', 'herb'],
+    keywords: ['либидо', 'libido', 'testosterone', 'эрекция', 'dhea', 'трибулус'],
+  },
+  mood: {
+    organs: ['BRAIN', 'NERVES'],
+    mechanisms: ['SEROTONIN', 'DOPAMINE', 'GABAERGIC', 'BDNF', 'NEUROTRANSMITTER_REGULATION'],
+    categories: ['antidepressant', 'anxiolytic', 'adaptogen', 'nootropic'],
+    keywords: ['настроение', 'mood', 'депрессия', 'serotonin', 'дофамин', 'зверобой'],
+  },
+  brain: {
+    organs: ['BRAIN', 'NERVES', 'EYES'],
+    mechanisms: ['NEUROPROTECTION', 'BDNF', 'CEREBRAL_BLOOD_FLOW', 'CHOLINERGIC', 'DOPAMINE', 'NAD'],
+    categories: ['neuroprotector', 'nootropic', 'antioxidant'],
+    keywords: ['мозг', 'brain', 'память', 'нейропротектор', 'bdnf', 'пирацетам'],
+  },
+  digestion: {
+    organs: ['GUT', 'INTESTINES', 'STOMACH', 'PANCREAS'],
+    mechanisms: ['DIGESTIVE_ENZYME', 'GUT_BARRIER', 'MICROBIOME', 'BILE_ACID', 'ANTI_INFLAMMATORY'],
+    categories: ['gut', 'enzyme', 'probiotic', 'choleretic'],
+    keywords: ['жкт', 'digestion', 'пищеварение', 'пробиотики', 'ферменты'],
+  },
+  kidney: {
+    organs: ['KIDNEYS', 'VESSELS'],
+    mechanisms: ['RENAL_PROTECTION', 'ANTIOXIDANT', 'ELECTROLYTE', 'BLOOD_PRESSURE'],
+    categories: ['renoprotector', 'antioxidant', 'electrolyte'],
+    keywords: ['почки', 'kidney', 'renal', 'электролиты'],
+  },
+};
+
+// ─── HELPERS ────────────────────────────────────────────────────────────────
+function getEntry(id: string) {
+  return SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toLowerCase()];
+}
+
+function getEntryName(id: string): string {
+  const e = getEntry(id);
+  if (e) return e.nameRu || e.name;
+  const s = ALL_SUBSTANCES.find(x => x.id.toLowerCase() === id.toLowerCase());
+  return s?.name || SUPPORT_SUBSTANCE_MAP[id]?.name || id.replace(/_/g, ' ');
+}
+
+function getAllIds(): string[] {
+  return Object.keys(SUPPORT_CATALOG_DATA);
+}
+
+function scoreEntry(entryId: string, query: FinderQuery): { score: number; reasons: string[] } {
+  const entry = getEntry(entryId);
+  if (!entry) return { score: 0, reasons: [] };
+
+  let score = 0;
+  const reasons: string[] = [];
+
+  // Text search
+  if (query.searchText) {
+    const q = query.searchText.toLowerCase();
+    const text = ((entry.nameRu || '') + ' ' + (entry.name || '') + ' ' + (entry.description || '')).toLowerCase();
+    const catText = (entry.category || []).join(' ').toLowerCase();
+    const mechText = (entry.mechanisms || []).join(' ').toLowerCase();
+    const organText = (entry.organs || []).join(' ').toLowerCase();
+    if (text.includes(q)) { score += 5; reasons.push('Совпадение в названии/описании'); }
+    if (catText.includes(q)) { score += 3; reasons.push('Совпадение в категории'); }
+    if (mechText.includes(q)) { score += 3; reasons.push('Совпадение в механизмах'); }
+    if (organText.includes(q)) { score += 2; reasons.push('Совпадение в органах'); }
+    return { score, reasons };
+  }
+
+  // Goal-based scoring
+  if (query.goal) {
+    const goal = GOAL_MAP[query.goal];
+    if (goal) {
+      for (const m of goal.mechanisms) {
+        if ((entry.mechanisms || []).some(em => em.includes(m) || m.includes(em))) {
+          score += 5; reasons.push('Механизм отвечает цели');
+          break;
+        }
+      }
+      for (const o of goal.organs) {
+        if ((entry.organs || []).some(eo => eo.includes(o) || o.includes(eo))) {
+          score += 4; reasons.push('Орган-мишень соответствует цели');
+          break;
+        }
+      }
+      for (const c of goal.categories) {
+        if ((entry.category || []).some(ec => ec.includes(c) || c.includes(ec))) {
+          score += 3; reasons.push('Категория подходит под цель');
+          break;
+        }
+      }
+      const desc = (entry.description || '').toLowerCase();
+      for (const kw of goal.keywords) {
+        if (desc.includes(kw)) { score += 1; reasons.push('Ключевое слово в описании'); break; }
+      }
+    }
+  }
+
+  // Organ filter
+  if (query.organs && query.organs.length > 0) {
+    for (const qOrg of query.organs) {
+      if ((entry.organs || []).some(o => o === qOrg || o.includes(qOrg) || qOrg.includes(o))) {
+        score += 5; reasons.push(`Действует на орган: ${qOrg}`);
+        break;
+      }
+    }
+  }
+
+  // Mechanism filter
+  if (query.mechanisms && query.mechanisms.length > 0) {
+    for (const qMech of query.mechanisms) {
+      if ((entry.mechanisms || []).some(m => m.includes(qMech) || qMech.includes(m))) {
+        score += 5; reasons.push(`Механизм действия: ${qMech}`);
+        break;
+      }
+    }
+  }
+
+  // Category filter
+  if (query.categories && query.categories.length > 0) {
+    for (const qCat of query.categories) {
+      if ((entry.category || []).some(c => c === qCat || c.includes(qCat) || qCat.includes(c))) {
+        score += 3; reasons.push(`Категория: ${qCat}`);
+        break;
+      }
+    }
+  }
+
+  // Tier bonus
+  if (entry.bestForCourse) { score += 2; reasons.push('Обязателен на курсе ААС'); }
+
+  return { score, reasons };
+}
+
+// ─── MAIN FUNCTIONS ─────────────────────────────────────────────────────────
+
+export function findSupplements(query: FinderQuery): FinderMatch[] {
+  const ids = getAllIds();
+  const scored: { id: string; score: number; reasons: string[] }[] = [];
+
+  for (const id of ids) {
+    if (query.excludeIds && query.excludeIds.some(e => e.toLowerCase() === id.toLowerCase())) continue;
+    const { score, reasons } = scoreEntry(id, query);
+    if (score > 0) scored.push({ id, score, reasons });
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  const max = query.maxResults || 20;
+  const top = scored.slice(0, max);
+
+  return top.map(s => {
+    const entry = getEntry(s.id);
+    const tier = getSubstanceTier(s.id);
+    return {
+      id: s.id,
+      name: getEntryName(s.id),
+      relevanceScore: s.score,
+      matchReasons: s.reasons,
+      tier: tier || 'unknown',
+      categories: entry?.category || [],
+      organs: entry?.organs || [],
+      mechanisms: entry?.mechanisms || [],
+      targetOrgan: entry?.targetOrgan || '',
+      mechanismOfAction: entry?.mechanismOfAction || '',
+      clinicalEffect: entry?.clinicalEffect || '',
+      bestForm: entry?.bestForm || '',
+      bestForCourse: entry?.bestForCourse || false,
+      conflictCount: entry?.conflicts?.length || 0,
+      synergyCount: entry?.synergies?.length || 0,
+      formCount: entry?.forms?.length || 0,
+    };
+  });
+}
+
+// ─── REPLACEMENT ENGINE ─────────────────────────────────────────────────────
+
+function getAnalogScore(id: string): { sideEffects: number; contraindications: number; formCount: number; hasBestForm: boolean; tierScore: number } {
+  const e = getEntry(id);
+  if (!e) return { sideEffects: 99, contraindications: 99, formCount: 0, hasBestForm: false, tierScore: 3 };
+  const tierMap: Record<string, number> = { core: 4, standard: 3, advanced: 2, specialty: 1 };
+  return {
+    sideEffects: e.sideEffects?.length || 0,
+    contraindications: e.contraindications?.length || 0,
+    formCount: e.forms?.length || 0,
+    hasBestForm: !!e.bestForm,
+    tierScore: tierMap[e.tier] || 2,
+  };
+}
+
+export function findAnalog(id: string): string | null {
+  const analogs = SUBSTANCE_ANALOGS[id];
+  if (analogs && analogs.length > 0) {
+    const na = analogs.filter(a => a.id !== id);
+    if (na.length > 0) return na[0].id;
+  }
+  const entry = getEntry(id);
+  if (!entry) return null;
+  const sameCat = getAllIds()
+    .map(i => ({ id: i, entry: getEntry(i) }))
+    .filter(({ id: i, entry: e }) =>
+      i !== id && e &&
+      (e.category || []).some(c => (entry.category || []).includes(c)) &&
+      (e.organs || []).some(o => (entry.organs || []).includes(o))
+    );
+  sameCat.sort((a, b) => (b.entry?.synergies?.length || 0) - (a.entry?.synergies?.length || 0));
+  return sameCat.length > 0 ? sameCat[0].id : null;
+}
+
+export function findReplacement(id: string, type: ReplacementType): ReplacementResult[] {
+  const entry = getEntry(id);
+  if (!entry) return [];
+
+  const results: ReplacementResult[] = [];
+  const allIds = getAllIds().filter(i => i !== id && getEntry(i));
+
+  switch (type) {
+    case 'direct_analog': {
+      const analogs = SUBSTANCE_ANALOGS[id];
+      if (analogs) {
+        for (const a of analogs) {
+          if (a.id === id) continue;
+          results.push({
+            originalId: id,
+            replacementId: a.id,
+            replacementName: a.name || getEntryName(a.id),
+            type: 'direct_analog',
+            reason: a.reason || 'Прямой аналог',
+            explanation: `Аналог: ${a.name}. Причина замены: ${a.reason || 'сходное действие'}. Форма: ${a.form || ''}.`,
+            tierLabel: getSubstanceTier(a.id) || 'standard',
+            tierChange: 'same',
+            safetyNote: '',
+            bestForm: a.form || getEntry(a.id)?.bestForm || '',
+          });
+        }
+      }
+      const found = findAnalog(id);
+      if (found && !results.some(r => r.replacementId === found)) {
+        results.push({
+          originalId: id, replacementId: found, replacementName: getEntryName(found),
+          type: 'direct_analog', reason: 'Сходная категория и органы-мишени',
+          explanation: 'Препарат из той же категории, воздействует на те же органы.',
+          tierLabel: getSubstanceTier(found) || 'standard', tierChange: 'same', safetyNote: '', bestForm: getEntry(found)?.bestForm || '',
+        });
+      }
+      break;
+    }
+    case 'functional': {
+      for (const candidateId of allIds) {
+        const ce = getEntry(candidateId);
+        if (!ce) continue;
+        const sharedOrgans = (entry.organs || []).filter(o => (ce.organs || []).includes(o));
+        const sharedMechanisms = (entry.mechanisms || []).filter(m => (ce.mechanisms || []).includes(m));
+        const sharedCategories = (entry.category || []).filter(c => (ce.category || []).includes(c));
+        if (sharedOrgans.length > 0 && sharedMechanisms.length > 0 && !sharedCategories.length) {
+          results.push({
+            originalId: id, replacementId: candidateId, replacementName: getEntryName(candidateId),
+            type: 'functional', reason: 'Функциональный аналог (другой механизм)',
+            explanation: `Общие органы: ${sharedOrgans.join(', ')}. Механизмы: ${sharedMechanisms.slice(0,3).join(', ')}. Другая категория — иной подход к той же цели.`,
+            tierLabel: getSubstanceTier(candidateId) || 'standard', tierChange: 'same', safetyNote: '', bestForm: ce.bestForm || '',
+          });
+          if (results.length >= 5) break;
+        }
+      }
+      break;
+    }
+    case 'safer': {
+      const baseScore = getAnalogScore(id);
+      for (const candidateId of allIds) {
+        const cs = getAnalogScore(candidateId);
+        if (cs.sideEffects < baseScore.sideEffects && cs.contraindications <= baseScore.contraindications) {
+          const ce = getEntry(candidateId);
+          const sharedOrgans = (entry.organs || []).filter(o => (ce?.organs || []).includes(o));
+          if (sharedOrgans.length > 0) {
+            results.push({
+              originalId: id, replacementId: candidateId, replacementName: getEntryName(candidateId),
+              type: 'safer', reason: 'Более безопасная альтернатива',
+              explanation: `Побочных эффектов: ${cs.sideEffects} (было ${baseScore.sideEffects}). Противопоказаний: ${cs.contraindications} (было ${baseScore.contraindications}).`,
+              tierLabel: getSubstanceTier(candidateId) || 'standard', tierChange: 'same', safetyNote: 'Меньше побочных эффектов и противопоказаний', bestForm: ce?.bestForm || '',
+            });
+            if (results.length >= 3) break;
+          }
+        }
+      }
+      break;
+    }
+    case 'stronger': {
+      const baseTier = getAnalogScore(id).tierScore;
+      for (const candidateId of allIds) {
+        const cs = getAnalogScore(candidateId);
+        const ce = getEntry(candidateId);
+        if (!ce) continue;
+        const sharedOrgans = (entry.organs || []).filter(o => (ce.organs || []).includes(o));
+        const moreMechs = (ce.mechanisms || []).length > (entry.mechanisms || []).length;
+        if (sharedOrgans.length > 0 && (cs.tierScore > baseTier || moreMechs)) {
+          results.push({
+            originalId: id, replacementId: candidateId, replacementName: getEntryName(candidateId),
+            type: 'stronger', reason: cs.tierScore > baseTier ? 'Более высокий тир' : 'Больше механизмов действия',
+            explanation: `Тир: ${ce.tier} (был ${entry.tier}). Механизмов: ${(ce.mechanisms||[]).length} (было ${(entry.mechanisms||[]).length}).`,
+            tierLabel: getSubstanceTier(candidateId) || 'standard',
+            tierChange: cs.tierScore > baseTier ? 'upgrade' : 'same', safetyNote: '', bestForm: ce.bestForm || '',
+          });
+          if (results.length >= 3) break;
+        }
+      }
+      break;
+    }
+    case 'cheaper': {
+      for (const candidateId of allIds) {
+        const ce = getEntry(candidateId);
+        if (!ce) continue;
+        const sharedCategories = (entry.category || []).filter(c => (ce.category || []).includes(c));
+        const cheaperForm = ce.forms?.some(f => !f.best) && entry.bestForm ? true : false;
+        const simpler = (ce.forms || []).length <= 1 && (entry.forms || []).length > 1;
+        if (sharedCategories.length > 0 && (cheaperForm || simpler)) {
+          results.push({
+            originalId: id, replacementId: candidateId, replacementName: getEntryName(candidateId),
+            type: 'cheaper', reason: cheaperForm ? 'Доступная форма' : 'Проще форма выпуска',
+            explanation: 'Меньше форм = меньше затрат на производство. Базовая форма часто дешевле.',
+            tierLabel: getSubstanceTier(candidateId) || 'standard', tierChange: 'downgrade', safetyNote: '', bestForm: ce.bestForm || '',
+          });
+          if (results.length >= 3) break;
+        }
+      }
+      break;
+    }
+    case 'stack_to_single': {
+      for (const candidateId of allIds) {
+        const ce = getEntry(candidateId);
+        if (!ce) continue;
+        const cMechSet = new Set(ce.mechanisms || []);
+        const entryMechSet = new Set(entry.mechanisms || []);
+        const intersection = [...cMechSet].filter(m => entryMechSet.has(m));
+        const coverage = entryMechSet.size > 0 ? intersection.length / entryMechSet.size : 0;
+        if (coverage >= 0.4 && (ce.organs || []).length >= 2) {
+          results.push({
+            originalId: id, replacementId: candidateId, replacementName: getEntryName(candidateId),
+            type: 'stack_to_single', reason: 'Покрытие нескольких механизмов',
+            explanation: `Покрывает ${Math.round(coverage*100)}% механизмов исходного стека. Заменяет комплекс одним препаратом.`,
+            tierLabel: getSubstanceTier(candidateId) || 'standard', tierChange: 'same', safetyNote: '', bestForm: ce.bestForm || '',
+          });
+          if (results.length >= 3) break;
+        }
+      }
+      break;
+    }
+    case 'single_to_stack': {
+      const mechSplit = splitMechanisms(entry.mechanisms || []);
+      for (const group of mechSplit) {
+        for (const candidateId of allIds) {
+          const ce = getEntry(candidateId);
+          if (!ce) continue;
+          const sharedMechs = group.filter(m => (ce.mechanisms || []).some(cm => cm.includes(m) || m.includes(cm)));
+          if (sharedMechs.length >= Math.ceil(group.length / 2)) {
+            if (!results.some(r => r.replacementId === candidateId)) {
+              results.push({
+                originalId: id, replacementId: candidateId, replacementName: getEntryName(candidateId),
+                type: 'single_to_stack', reason: 'Специализированное действие',
+                explanation: `Покрывает механизмы: ${sharedMechs.slice(0,3).join(', ')}. Разделение одного препарата на стек узконаправленных даёт гибкость дозирования.`,
+                tierLabel: getSubstanceTier(candidateId) || 'standard', tierChange: 'same', safetyNote: '', bestForm: ce.bestForm || '',
+              });
+            }
+          }
+        }
+      }
+      break;
+    }
+  }
+
+  return results.slice(0, 8);
+}
+
+function splitMechanisms(mechs: string[]): string[][] {
+  if (mechs.length <= 2) return [mechs];
+  const groups: string[][] = [];
+  const size = Math.ceil(mechs.length / Math.min(mechs.length, 3));
+  for (let i = 0; i < mechs.length; i += size) {
+    groups.push(mechs.slice(i, i + size));
+  }
+  return groups;
+}
+
+// ─── STACK BUILDER ──────────────────────────────────────────────────────────
+
+export function explainStack(substanceIds: string[]): StackExplanation {
+  const entries = substanceIds.map(id => ({ id, entry: getEntry(id) }));
+  const substances: StackEntry[] = [];
+  const pairwiseSynergies: { a: string; b: string; effect: string; severity: string }[] = [];
+  const allOrgans = new Set<string>();
+  const allMechs = new Set<string>();
+  const warnings: string[] = [];
+  let totalSynergyScore = 0;
+
+  for (const { id, entry: e } of entries) {
+    const role = e ? (e.category || [])[0] || 'support' : 'support';
+    const mech = e?.mechanismOfAction || (e?.mechanisms || []).slice(0, 2).join(', ') || '';
+    const syns: { with: string; effect: string }[] = [];
+
+    if (e?.synergies) {
+      for (const syn of e.synergies) {
+        if (substanceIds.includes(syn.with)) {
+          syns.push({ with: syn.with, effect: syn.effect || '' });
+        }
+      }
+    }
+
+    substances.push({
+      id, name: getEntryName(id), role, mechanism: mech, synergiesWith: syns,
+    });
+
+    e?.organs?.forEach(o => allOrgans.add(o));
+    e?.mechanisms?.forEach(m => allMechs.add(m));
+  }
+
+  // Pairwise synergy check from interactions
+  for (let i = 0; i < substanceIds.length; i++) {
+    for (let j = i + 1; j < substanceIds.length; j++) {
+      const a = substanceIds[i], b = substanceIds[j];
+      const found = ALL_INTERACTIONS.find(
+        ix => (ix.substanceA === a && ix.substanceB === b) || (ix.substanceA === b && ix.substanceB === a)
+      );
+      if (found) {
+        pairwiseSynergies.push({ a, b, effect: found.effect || '', severity: String(found.severity || 'MEDIUM') });
+        totalSynergyScore += found.severity === 'HIGH' ? 3 : found.severity === 'MEDIUM' ? 2 : 1;
+      }
+
+      // Conflict detection
+      const conflict = ALL_INTERACTIONS.find(
+        ix => (ix.substanceA === a && ix.substanceB === b) && ix.type === 'conflict'
+          || (ix.substanceA === b && ix.substanceB === a) && ix.type === 'conflict'
+      );
+      if (conflict) {
+        warnings.push(`Конфликт: ${getEntryName(a)} + ${getEntryName(b)} — ${conflict.effect || 'несовместимы'}`);
+      }
+    }
+  }
+
+  // Contraindication warnings
+  for (const e of entries) {
+    if (e.entry?.contraindications) {
+      for (const ci of e.entry.contraindications) {
+        warnings.push(`${getEntryName(e.id)}: ${ci}`);
+      }
+    }
+  }
+
+  return {
+    name: `Стек из ${substanceIds.length} компонентов`,
+    substances,
+    pairwiseSynergies,
+    coverage: {
+      goals: [],
+      organs: [...allOrgans],
+      mechanisms: [...allMechs],
+    },
+    warnings: [...new Set(warnings)],
+    totalSynergyScore,
+  };
+}
+
+export function buildStack(query: StackQuery): { stack: string[]; explanation: StackExplanation } {
+  const selected = [...query.baseIds];
+  const usedSet = new Set(selected.map(s => s.toLowerCase()));
+  const avoidSet = new Set((query.avoidIds || []).map(a => a.toLowerCase()));
+  const allIds = getAllIds().filter(id => !usedSet.has(id.toLowerCase()) && !avoidSet.has(id.toLowerCase()));
+
+  // Score remaining candidates
+  const finderQuery: FinderQuery = {
+    goal: query.goal,
+    organs: query.organs,
+    mechanisms: query.mechanisms,
+    categories: query.categories,
+    excludeIds: [...query.baseIds, ...(query.avoidIds || [])],
+    maxResults: query.targetSize * 3,
+  };
+  const candidates = findSupplements(finderQuery);
+
+  // Fill to target size
+  if (query.autoFill) {
+    for (const c of candidates) {
+      if (selected.length >= query.targetSize) break;
+      if (!usedSet.has(c.id.toLowerCase()) && !avoidSet.has(c.id.toLowerCase())) {
+        selected.push(c.id);
+        usedSet.add(c.id.toLowerCase());
+      }
+    }
+  }
+
+  // If still under target, add from broader pool
+  if (query.autoFill && selected.length < query.targetSize) {
+    for (const id of allIds) {
+      if (selected.length >= query.targetSize) break;
+      const e = getEntry(id);
+      if (e && e.bestForCourse) {
+        selected.push(id);
+        usedSet.add(id.toLowerCase());
+      }
+    }
+  }
+
+  // If still under, add any from same categories as base
+  if (query.autoFill && selected.length < query.targetSize) {
+    const baseCats = new Set<string>();
+    for (const baseId of query.baseIds) {
+      const e = getEntry(baseId);
+      e?.category?.forEach(c => baseCats.add(c));
+    }
+    for (const id of allIds) {
+      if (selected.length >= query.targetSize) break;
+      const e = getEntry(id);
+      if (e && (e.category || []).some(c => baseCats.has(c))) {
+        selected.push(id);
+        usedSet.add(id.toLowerCase());
+      }
+    }
+  }
+
+  const explanation = explainStack(selected);
+  return { stack: selected, explanation };
+}
+
+export function findSingleReplacementForStack(substanceIds: string[]): ReplacementResult | null {
+  if (substanceIds.length < 2) return null;
+
+  const allMechs = new Set<string>();
+  const allOrgans = new Set<string>();
+  for (const id of substanceIds) {
+    const e = getEntry(id);
+    e?.mechanisms?.forEach(m => allMechs.add(m));
+    e?.organs?.forEach(o => allOrgans.add(o));
+  }
+
+  for (const candidateId of getAllIds()) {
+    if (substanceIds.some(s => s.toLowerCase() === candidateId.toLowerCase())) continue;
+    const ce = getEntry(candidateId);
+    if (!ce) continue;
+
+    const mechHit = (ce.mechanisms || []).filter(m => [...allMechs].some(am => am.includes(m) || m.includes(am)));
+    const organHit = (ce.organs || []).filter(o => [...allOrgans].some(ao => ao === o));
+    const coverageMech = allMechs.size > 0 ? mechHit.length / allMechs.size : 0;
+    const coverageOrgan = allOrgans.size > 0 ? organHit.length / allOrgans.size : 0;
+
+    if (coverageMech >= 0.3 || (coverageOrgan >= 0.5 && mechHit.length > 0)) {
+      return {
+        originalId: substanceIds.join('+'),
+        replacementId: candidateId,
+        replacementName: getEntryName(candidateId),
+        type: 'stack_to_single',
+        reason: 'Замена стека одним препаратом',
+        explanation: `Покрывает ${Math.round(coverageMech*100)}% механизмов и ${Math.round(coverageOrgan*100)}% органов исходного стека. Упрощает приём.`,
+        tierLabel: getSubstanceTier(candidateId) || 'standard',
+        tierChange: coverageMech >= 0.7 ? 'upgrade' : 'same',
+        safetyNote: '',
+        bestForm: ce.bestForm || '',
+      };
+    }
+  }
+  return null;
+}
+
+export function autoCompleteStack(baseIds: string[], targetSize: number, constraints?: { avoidIds?: string[]; preferredCategories?: string[] }): string[] {
+  const query: StackQuery = {
+    baseIds, targetSize, autoFill: true,
+    avoidIds: constraints?.avoidIds,
+    categories: constraints?.preferredCategories,
+  };
+  const result = buildStack(query);
+  return result.stack;
+}
