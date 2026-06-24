@@ -74,7 +74,7 @@
   peak-week протокол. Расширение peaking-engine.
 - Верификация: 2-нед taper → объём 60%→40%, RPE удержание 8-9.
 
-### P10 — Диагностика движений и мёртвые точки (`src/engines/pro/lift-diagnostics.engine.ts`) — REUSE+EXTEND
+### P10 — Диагностика движений и мёртвые точки (`src/engines/pro/lift-diagnostics.engine.ts`) — REUSE+EXTEND  ✅ ГОТОВО (20/20 tsx PASS, tsc+vite ✓)
 - Sticking points (углы суставов) присед/жим/тяга, bar path analysis, weakness → corrective exercises.
 - Верификация: «провал в 2/3 жима» → трицепс/дожим-ассистенты.
 

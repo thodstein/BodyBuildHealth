@@ -676,4 +676,9 @@ profile → lms-selector (топ-N) → выбранный цикл → ввод
 - Скоринг: цель (strength→compound+30, hypertrophy→isolation+18/compound+12, power→compound+25), региональная гипертрофия +20, ограничения high-stress −100, оборудование −15, низкая усталость +5.
 - Верификация (verify-p8.mts, 18/18 PASS): force-vector корректен (chest→hor_push, RDL→hip_dominant, подтяг→vert_pull); chest hypertrophy top=разводка/кроссовер/брусья (lengthened emphasis); strength→compound prioritized; injured shoulder/knee → high-stress excluded; weak point bench-lockout → дожимы ассистентные; dumbbell-only filter.
 - tsc ✓, vite ✓.
+## P10 — Диагностика движений и мёртвые точки (`src/engines/pro/lift-diagnostics.engine.ts`) ✅
+- Sticking points по углам суставов (bench локоть 0-180°, squat колено 0-180°, deadlift таз/колено) с биомеханической причиной (момент рычага), слабой мышцей, корректирующими упражнениями и load-подсказками. REUSE weakpoint-pl (assistance + intensity). + Bar-path-анализ (forward_drift / hips_shoot_up / good_morning / bar_loops / asymmetric) → причина + коррекция.
+- API: diagnoseLift(lift, weakPoint) → {phaseLabel, angleRangeDeg, keyJoint, weakMuscles, biomechanicalReason, corrections, loadCues, assistance, assistanceIntensityPct}; barPathAnalysis(lift, issues); stickingPhases(lift).
+- Верификация (verify-p10.mts, 20/20 PASS): bench lockout→Трицепс, angle 90-180°, дожимы; off_chest→грудь/дельта, 0-30°, паузы; squat bottom→квадрицепсы/ягодицы (front squat/pause/bulgarian); deadlift start→[Квадрицепсы,Разгибатели спины] (deficit pull); deadlift lockout→glutes/traps/extensors; invalid combo→null; barpath forward_drift/hips_shoot_up/good_morning diagnosed.
+- tsc ✓, vite ✓. (Параллельно: build-unblock — опечатка allOrgsans→allOrgans в supplement-finder.engine.ts агента БАД.)
 
