@@ -79,10 +79,12 @@ export const IndividualPlanSettings: React.FC = () => {
   const [prefSearch, setPrefSearch] = useState('');
   const [exclSearch, setExclSearch] = useState('');
   const [showSpecialMealPopup, setShowSpecialMealPopup] = useState(false);
+  const [showReplaceMealPopup, setShowReplaceMealPopup] = useState(false);
   const [specialMealType, setSpecialMealType] = useState<'cheat_meal' | 'refeed' | 'fast'>('cheat_meal');
   const [specialMealDate, setSpecialMealDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [specialMealNotes, setSpecialMealNotes] = useState('');
-  const [specialMeals, setSpecialMeals] = useState<{ type: string; typeLabel: string; date: string; notes: string }[]>(() => {
+  const [selectedMealToReplace, setSelectedMealToReplace] = useState('');
+  const [specialMeals, setSpecialMeals] = useState<{ type: string; typeLabel: string; date: string; notes: string; replaceMeal?: string }[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_special_meals') || '[]'); } catch { return []; }
   });
   const [dietPrefs, setDietPrefs] = useState<string[]>(() => {
@@ -717,37 +719,36 @@ export const IndividualPlanSettings: React.FC = () => {
             { label:'Углеводы', target:tC, actual:mockActual.c, unit:'г', color:'#f97316' },
           ];
           return <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginBottom:2 }}>Цель vs Факт (симуляция)</div>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:4, lineHeight:1.6, padding:'6px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.04)' }}>
+              <div>🎯 Цель — рассчитанная норма КБЖУ</div>
+              <div>📊 Факт — среднее потребление за последние дни</div>
+            </div>
             {items.map(m => {
               const pct = m.target > 0 ? Math.min(100, Math.round(m.actual / m.target * 100)) : 0;
-              const barW = Math.min(100, Math.round(m.actual / m.target * 100));
               return (
-                <div key={m.label}>
-                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:8, marginBottom:2 }}>
-                    <span style={{ color:m.color, fontWeight:600 }}>{m.label}</span>
-                    <span>
-                      <span style={{ color:'rgba(255,255,255,0.5)' }}>{m.actual}</span>
-                      <span style={{ color:'rgba(255,255,255,0.2)', margin:'0 3px' }}>/</span>
-                      <span style={{ color:m.color }}>{m.target}</span>
-                      <span style={{ color:'rgba(255,255,255,0.3)', marginLeft:3 }}>{m.unit}</span>
-                    </span>
+                <div key={m.label} style={{ marginBottom:4 }}>
+                  <div style={{ fontSize:8, fontWeight:600, color:m.color, marginBottom:3 }}>{m.label}</div>
+                   <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
+                    <span style={{ fontSize:6, color:'rgba(255,255,255,0.3)', minWidth:38, whiteSpace:'nowrap' }}>🎯 Цель</span>
+                    <div style={{ flex:1, height:6, borderRadius:3, background:'rgba(32,32,35,0.8)', position:'relative' }}>
+                      <div style={{ height:'100%', width:'100%', borderRadius:3, background:m.color, opacity:0.15 }} />
+                    </div>
+                    <span style={{ fontSize:7, fontWeight:600, color:m.color, minWidth:52, textAlign:'right', whiteSpace:'nowrap' }}>{m.target} <span style={{ fontSize:7, color:'rgba(255,255,255,0.2)' }}>{m.unit}</span></span>
                   </div>
-                  <div style={{ height:8, borderRadius:4, background:'rgba(32,32,35,0.8)', overflow:'hidden', position:'relative' }}>
-                    <div style={{ height:'100%', width:'100%', borderRadius:4, background:'rgba(255,255,255,0.05)', position:'absolute', top:0, left:0 }} />
-                    <div style={{ height:'100%', width:`${barW}%`, borderRadius:4, background:m.color, opacity:0.6, transition:'width 0.3s', position:'absolute', top:0, left:0 }} />
-                    <div style={{ height:'100%', width:`${Math.min(100, Math.round(m.target / m.target * 100))}%`, borderRadius:4, borderRight:'1.5px dashed rgba(255,255,255,0.6)', position:'absolute', top:0, left:0 }} />
+                  <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                    <span style={{ fontSize:6, color:'rgba(255,255,255,0.3)', minWidth:38, whiteSpace:'nowrap' }}>📊 Факт</span>
+                    <div style={{ flex:1, height:8, borderRadius:3, background:'rgba(32,32,35,0.8)', position:'relative', overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:`${pct}%`, borderRadius:3, background:m.color, opacity:0.6, transition:'width 0.3s' }} />
+                    </div>
+                    <span style={{ fontSize:7, fontWeight:700, color:m.color, minWidth:52, textAlign:'right', whiteSpace:'nowrap' }}>{m.actual} · {pct}%</span>
                   </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:6, color:'rgba(255,255,255,0.25)', marginTop:1 }}>
-                    <span>0</span>
-                    <span style={{ color: pct >= 85 && pct <= 110 ? '#00e68a' : pct < 85 ? '#f59e0b' : '#ef4444', fontWeight:600 }}>{pct}%</span>
-                    <span>{m.target}</span>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, color:'rgba(255,255,255,0.25)', marginTop:1, paddingLeft:44 }}>
+                    <span>норма</span>
+                    <span>факт ({pct}%)</span>
                   </div>
                 </div>
               );
             })}
-            <div style={{ fontSize:7, color:'rgba(255,255,255,0.2)', textAlign:'center', marginTop:2, borderTop:'1px solid rgba(255,255,255,0.04)', paddingTop:4 }}>
-              --- цель &mdash; факт
-            </div>
           </div>;
         })()}
       </GlassCard>
@@ -1600,27 +1601,66 @@ export const IndividualPlanSettings: React.FC = () => {
                 <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', textAlign:'center', marginBottom:12 }}>
                   ∑ {specialMealProteinG * 4 + specialMealFatG * 9 + specialMealCarbsG * 4} ккал · {specialMealProteinG + specialMealFatG + specialMealCarbsG}г общ.
                 </div>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16, padding:'10px 12px', borderRadius:10, background:'rgba(249,115,22,0.04)', border:'1px solid rgba(249,115,22,0.1)' }}>
-                  <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:9, color:'rgba(255,255,255,0.7)', cursor:'pointer', flex:1 }}>
-                    <input type="checkbox" checked={specialMealReplaceMode} onChange={e => setSpecialMealReplaceMode(e.target.checked)} style={{ accentColor:'#f97316', width:16, height:16 }} />
-                    Заменить приём
-                  </label>
-                  {specialMealReplaceMode && (
-                    <select value={specialMealReplaceTarget} onChange={e => setSpecialMealReplaceTarget(e.target.value)} style={{
-                      padding:'5px 8px', borderRadius:6, fontSize:9, background:'#202023',
-                      border:'1px solid rgba(255,255,255,0.06)', color:'#fff', outline:'none',
-                    }}>
-                      {['Завтрак','Обед','Ужин','Перекус','Полдник','Второй завтрак'].map(l => (
-                        <option key={l} value={l}>{l}</option>
-                      ))}
-                    </select>
-                  )}
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
+                  <button onClick={() => setShowReplaceMealPopup(true)} style={{
+                    flex:1, padding:'10px 12px', borderRadius:10, cursor:'pointer', fontSize:9, fontWeight:600, display:'flex', alignItems:'center', gap:6, justifyContent:'center',
+                    background: specialMealReplaceMode ? 'rgba(0,230,138,0.1)' : 'rgba(0,230,138,0.04)',
+                    border: specialMealReplaceMode ? '1.5px solid #00e68a' : '1px solid rgba(0,230,138,0.15)',
+                    color: specialMealReplaceMode ? '#00e68a' : 'rgba(0,230,138,0.7)',
+                    transition:'all 0.12s',
+                  }}>
+                    🔄 Заменить приём{specialMealReplaceMode ? ` (${specialMealReplaceTarget})` : ''}
+                  </button>
                 </div>
                 <button onClick={() => setShowSpecialMealModal(false)} style={{
                   width:'100%', padding:'11px', borderRadius:10, cursor:'pointer', border:'none',
                   background:'linear-gradient(135deg,#f97316,#fb923c)', color:'#fff', fontSize:11, fontWeight:700,
                   boxShadow:'0 4px 12px rgba(249,115,22,0.2)',
                 }}>✓ Готово</button>
+                {showReplaceMealPopup && (
+                  <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
+                    onClick={() => setShowReplaceMealPopup(false)}>
+                    <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(0,230,138,0.12)', boxShadow:'0 8px 40px rgba(0,0,0,0.4)' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                        <div style={{ fontSize:15, fontWeight:700, color:'#00e68a', letterSpacing:-0.3 }}>🔄 Заменить приём</div>
+                        <button onClick={() => setShowReplaceMealPopup(false)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.5)', fontSize:18, cursor:'pointer', padding:'0 4px', lineHeight:1 }}>×</button>
+                      </div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:12 }}>
+                        {[
+                          { id:'Завтрак', icon:'🌅' },
+                          { id:'Обед', icon:'☀️' },
+                          { id:'Ужин', icon:'🌆' },
+                          { id:'Перекус', icon:'🍪' },
+                          { id:'Полдник', icon:'🧁' },
+                          { id:'Второй завтрак', icon:'🥐' },
+                        ].map(m => {
+                          const sel = specialMealReplaceTarget === m.id && specialMealReplaceMode;
+                          return (
+                            <div key={m.id} onClick={() => { setSpecialMealReplaceTarget(m.id); setSpecialMealReplaceMode(true); setShowReplaceMealPopup(false); }} style={{
+                              padding:'10px 12px', borderRadius:10, cursor:'pointer', fontSize:10, fontWeight:500,
+                              background: sel ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)',
+                              border: sel ? '1.5px solid rgba(0,230,138,0.3)' : '1px solid transparent',
+                              color: sel ? '#00e68a' : 'rgba(255,255,255,0.7)',
+                              display:'flex', alignItems:'center', gap:8,
+                            }}>
+                              <span style={{ fontSize:14 }}>{m.icon}</span>
+                              <span>{m.id}</span>
+                              {sel && <span style={{ marginLeft:'auto', color:'#00e68a', fontSize:10, fontWeight:700 }}>✓</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display:'flex', gap:6 }}>
+                        <button onClick={() => { setSpecialMealReplaceMode(false); setShowReplaceMealPopup(false); }} style={{
+                          flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'#202023', color:'rgba(255,255,255,0.5)', fontSize:10, fontWeight:600,
+                        }}>Отмена</button>
+                        <button onClick={() => setShowReplaceMealPopup(false)} style={{
+                          flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:10, fontWeight:700,
+                        }}>✓ Готово</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1826,6 +1866,7 @@ export const IndividualPlanSettings: React.FC = () => {
                 <div>
                   <span style={{ fontWeight:700, color:'#f97316' }}>{m.typeLabel}</span>
                   <span style={{ color:'rgba(255,255,255,0.4)', marginLeft:4 }}>{m.date}</span>
+                  {m.replaceMeal && <span style={{ color:'#00e68a', marginLeft:4, fontSize:7, background:'rgba(0,230,138,0.08)', padding:'1px 5px', borderRadius:4 }}>↻ {m.replaceMeal}</span>}
                   {m.notes && <div style={{ color:'rgba(255,255,255,0.5)', marginTop:2, fontSize:7 }}>{m.notes}</div>}
                 </div>
                 <button onClick={() => { const upd = specialMeals.filter((_, j) => j !== i); setSpecialMeals(upd); localStorage.setItem('he_special_meals', JSON.stringify(upd)); }} style={{ background:'rgba(239,68,68,0.1)', border:'none', color:'#ef4444', cursor:'pointer', borderRadius:4, padding:'2px 6px', fontSize:8 }}>✕</button>
@@ -1877,18 +1918,27 @@ export const IndividualPlanSettings: React.FC = () => {
               </div>
               <div style={{ fontSize:8, color:'rgba(255,255,255,0.3)', textAlign:'center', marginTop:4 }}>{specialMealDate}</div>
             </div>
-            <div style={{ marginBottom:12 }}>
+            <div style={{ marginBottom:10 }}>
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:4 }}>Заметки</div>
               <textarea value={specialMealNotes} onChange={e => setSpecialMealNotes(e.target.value)} placeholder="Описание..." style={{ ...inputStyle, width:'100%', minHeight:50, resize:'vertical', boxSizing:'border-box', fontSize:9 }} rows={2} />
+            </div>
+            <div style={{ marginBottom:10 }}>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:4 }}>Заменить приём</div>
+              <select value={selectedMealToReplace} onChange={e => setSelectedMealToReplace(e.target.value)}
+                style={{ width:'100%', padding:'8px 10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'#202023', color:'#fff', fontSize:10 }}>
+                <option value="">— Без замены (добавить) —</option>
+                {['Завтрак','Обед','Ужин','Перекус'].map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
             </div>
             <div style={{ display:'flex', gap:6 }}>
               <button onClick={() => setShowSpecialMealPopup(false)} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(255,255,255,0.15)', background:'#202023', color:'#fff', fontSize:10, fontWeight:600 }}>Отмена</button>
               <button onClick={() => {
                 const typeLabels: Record<string, string> = { cheat_meal:'🍔 Читмил', refeed:'🍝 Рефид', fast:'⏳ Фастинг' };
-                const newItem = { type: specialMealType, typeLabel: typeLabels[specialMealType], date: specialMealDate, notes: specialMealNotes };
+                const newItem = { type: specialMealType, typeLabel: typeLabels[specialMealType], date: specialMealDate, notes: specialMealNotes, replaceMeal: selectedMealToReplace || undefined };
                 const upd = [...specialMeals, newItem];
                 setSpecialMeals(upd);
                 localStorage.setItem('he_special_meals', JSON.stringify(upd));
+                setSelectedMealToReplace('');
                 setShowSpecialMealPopup(false);
               }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#f97316,#fb923c)', color:'#fff', fontSize:10, fontWeight:700 }}>✓ Сохранить</button>
             </div>

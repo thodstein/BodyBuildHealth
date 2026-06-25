@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
-import { buildStack, explainStack, findReplacement, type ReplacementResult } from '../../engines/supplement-finder.engine';
-import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS, ALL_STACKS, type SupportStack } from '../../data/support-database';
+import { buildStack, explainStack, findReplacement, type ReplacementResult, type ReplacementType } from '../../engines/supplement-finder.engine';
+import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS, ALL_STACKS, ALL_SUBSTANCES, type SupportStack } from '../../data/support-database';
+import { decodeGarbled } from '../../utils/text-sanitizer';
 import { GlassCard, StatBox, ORGANS, toFinderProfile } from './BioStackAIConstants';
 
 export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void }) {
@@ -11,7 +12,17 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
     return explainStack(stackIds, fp);
   }, [stackIds, profile]);
 
-  const [replaceState, setReplaceState] = useState<Record<string, { open: boolean; results: ReplacementResult[]; loading: boolean }>>({});
+  const [replaceState, setReplaceState] = useState<Record<string, { open: boolean; results: ReplacementResult[]; loading: boolean; activeType: ReplacementType }>>({});
+
+  const REPLACE_TYPES: { key: ReplacementType; label: string; icon: string }[] = [
+    { key: 'direct_analog', label: 'Прямые аналоги', icon: '🔄' },
+    { key: 'functional', label: 'Функциональные', icon: '⚙' },
+    { key: 'safer', label: 'Безопаснее', icon: '🛡️' },
+    { key: 'stronger', label: 'Сильнее', icon: '⚡' },
+    { key: 'cheaper', label: 'Дешевле', icon: '💰' },
+    { key: 'stack_to_single', label: 'Стек→Один', icon: '⬇' },
+    { key: 'single_to_stack', label: 'Один→Стек', icon: '⬆' },
+  ];
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
@@ -26,15 +37,22 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
 
   const handleOpenReplace = useCallback((id: string) => {
     if (replaceState[id]?.open) { setReplaceState(prev => ({ ...prev, [id]: { ...prev[id], open: false } })); return; }
-    setReplaceState(prev => ({ ...prev, [id]: { open: true, results: [], loading: true } }));
+    setReplaceState(prev => ({ ...prev, [id]: { open: true, results: [], loading: true, activeType: prev[id]?.activeType || 'functional' } }));
     const fp = toFinderProfile(profile);
-    const results = findReplacement(id, 'functional', fp);
-    setReplaceState(prev => ({ ...prev, [id]: { open: true, results, loading: false } }));
+    const results = findReplacement(id, replaceState[id]?.activeType || 'functional', fp);
+    setReplaceState(prev => ({ ...prev, [id]: { open: true, results, loading: false, activeType: prev[id]?.activeType || 'functional' } }));
   }, [profile, replaceState]);
+
+  const handleChangeReplaceType = useCallback((id: string, rtype: ReplacementType) => {
+    setReplaceState(prev => ({ ...prev, [id]: { ...prev[id], activeType: rtype, loading: true } }));
+    const fp = toFinderProfile(profile);
+    const results = findReplacement(id, rtype, fp);
+    setReplaceState(prev => ({ ...prev, [id]: { ...prev[id], activeType: rtype, results, loading: false } }));
+  }, [profile]);
 
   const handleReplace = useCallback((oldId: string, newId: string) => {
     setStackIds(stackIds.map(s => s === oldId ? newId : s));
-    setReplaceState(prev => ({ ...prev, [oldId]: { open: false, results: [], loading: false } }));
+    setReplaceState(prev => ({ ...prev, [oldId]: { open: false, results: [], loading: false, activeType: prev[oldId]?.activeType || 'functional' } }));
   }, [stackIds, setStackIds]);
 
   const handleSaveStack = useCallback(() => {
@@ -487,8 +505,22 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
       )}
 
       {explanation?.substances.map((entry, idx) => {
-        const cat = SUPPORT_CATALOG_DATA[entry.id];
-        if (!cat) return null;
+        const cat = SUPPORT_CATALOG_DATA[entry.id]
+          || SUPPORT_CATALOG_DATA[entry.id?.toUpperCase()]
+          || SUPPORT_CATALOG_DATA[(entry.id || '').toLowerCase()]
+          || SUPPORT_CATALOG_DATA[entry.id?.replace(/-/g, '_')];
+        if (!cat) {
+          const sub = (ALL_SUBSTANCES as any[]).find((s: any) => s.id === entry.id || s.id?.toUpperCase() === entry.id?.toUpperCase());
+          return (
+            <div key={entry.id || idx} style={{ marginBottom:8 }}>
+              <GlassCard style={{ marginBottom:0 }}>
+                <div style={cardHeaderS}>
+                  <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{entry.name || entry.id}</div>
+                </div>
+              </GlassCard>
+            </div>
+          );
+        }
         const isExpanded = expanded[entry.id];
         const replace = replaceState[entry.id];
         const isDragging = draggedIdx === idx;
@@ -533,7 +565,7 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
 
                 {cat.description && (
                   <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, marginBottom: 6 }}>
-                    📝 {cat.description}
+                    📝 {decodeGarbled(cat.description)}
                   </div>
                 )}
 
@@ -596,11 +628,21 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
 
                 {replace?.open && (
                   <div style={{ marginTop: 8 }}>
+                    <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
+                      {REPLACE_TYPES.map(rt => (
+                        <button key={rt.key} onClick={() => handleChangeReplaceType(entry.id, rt.key)} style={{
+                          padding:'3px 8px', borderRadius:8, fontSize:7, fontWeight:600, cursor:'pointer',
+                          background: replace.activeType === rt.key ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                          border: replace.activeType === rt.key ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)',
+                          color: replace.activeType === rt.key ? '#00e68a' : 'rgba(255,255,255,0.4)',
+                        }}>{rt.icon} {rt.label}</button>
+                      ))}
+                    </div>
                     {replace.loading ? (
                       <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>Загрузка замен...</div>
                     ) : replace.results.length > 0 ? (
                       <>
-                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>🔁 Рекомендуемые замены:</div>
+                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>🔁 Рекомендуемые замены ({replace.activeType}):</div>
                         {replace.results.slice(0, 6).map((r, i) => (
                           <div key={i} onClick={() => handleReplace(entry.id, r.replacementId)}
                             style={{

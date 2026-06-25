@@ -55,14 +55,14 @@ const CLASS_LABELS: Record<string, string> = {
 };
 
 const PD_LABELS: Record<keyof PD, string> = {
-  AR_affinity: '',
-  aromatization: '',
-  five_alpha_reduction: '5α-восстановление',
-  progestogenic: '',
-  hepatotoxicity: '',
-  lipid_impact: '',
-  hct_impact: '',
-  neuro_toxicity: '',
+  AR_affinity: 'Андрогенность',
+  aromatization: 'Ароматизация',
+  five_alpha_reduction: '5α-редукция',
+  progestogenic: 'Прогестагенность',
+  hepatotoxicity: 'Гепатотоксичность',
+  lipid_impact: 'Влияние на липиды',
+  hct_impact: 'Гематокрит',
+  neuro_toxicity: 'Нейротоксичность',
 };
 
 const PD_MECHANISMS: Record<keyof PD, string> = {
@@ -758,7 +758,7 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
               return (
                 <div key={key} style={{ marginBottom: 3 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => setExpandedPD(isExpanded ? null : key)}>
-                    <span style={{ fontSize: 11 }}>{PD_LABELS[key]} {isExpanded ? '▾' : '▸'}</span>
+                    <span style={{ fontSize: 11 }}>{PD_LABELS[key] || key} {isExpanded ? '▾' : '▸'}</span>
                     <span style={{ color: pdBarColor(key, val), fontWeight: 600 }}>{val.toFixed(2)}</span>
                   </div>
                   <div style={{ background: 'var(--border)', borderRadius: 2, height: 4 }}>

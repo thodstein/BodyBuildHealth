@@ -88,6 +88,17 @@ export const INTERACTIONS_DB: Interaction[] = [
   { id: "INT_MAGNESIUM_GLYCINE", substanceA: "MAGNESIUM", substanceB: "GLYCINE", type: "synergy", effect: "SLEEP_CALM", mechanisms: ["GABA_UP", "NMDA_DOWN"], severity: "LOW", notes: "Магний + глицин: синергия для сна и расслабления" },
   { id: "INT_VITAMIN_C_QUERCETIN", substanceA: "VITAMIN_C", substanceB: "QUERCETIN", type: "synergy", effect: "ANTIOXIDANT_SYNERGY", mechanisms: ["ANTIOX_UP", "IRON_CHELATION"], severity: "LOW", notes: "Витамин C регенерирует окисленный кверцетин, усиливая его антиоксидантный эффект" },
   { id: "INT_MELATONIN_L_THEANINE", substanceA: "MELATONIN", substanceB: "L_THEANINE", type: "synergy", effect: "SLEEP_QUALITY", mechanisms: ["MELATONIN_UP", "GABA_UP"], severity: "LOW", notes: "Мелатонин + теанин: улучшение засыпания и глубины сна" },
+
+  // ── SERRAPEPTASE interactions ──
+  { id: "INT_SERRAPEPTASE_NATTOKINASE", substanceA: "SERRAPEPTASE", substanceB: "NATTOKINASE", type: "synergy", effect: "FIBRINOLYSIS_UP", mechanisms: ["PLASMIN_UP", "PAI1_DOWN"], severity: "LOW", notes: "Два протеолитических фермента с разными механизмами — полный фибринолиз" },
+  { id: "INT_SERRAPEPTASE_BROMELAIN", substanceA: "SERRAPEPTASE", substanceB: "BROMELAIN", type: "synergy", effect: "ANTIINFLAMMATION_UP", mechanisms: ["PROTEASE_UP", "CYTOKINE_DOWN"], severity: "LOW", notes: "Суммарный противовоспалительный и противоотёчный эффект" },
+  { id: "INT_SERRAPEPTASE_ANTICOAG", substanceA: "SERRAPEPTASE", substanceB: "ANTICOAGULANTS", type: "conflict", effect: "BLEED_RISK", mechanisms: ["FIBRINOLYSIS_UP", "PLATELETS_DOWN"], severity: "HIGH", notes: "Риск кровотечений при комбинации с антикоагулянтами" },
+
+  // ── LUMBROKINASE interactions ──
+  { id: "INT_LUMBROKINASE_NATTOKINASE", substanceA: "LUMBROKINASE", substanceB: "NATTOKINASE", type: "synergy", effect: "FIBRINOLYSIS_UP", mechanisms: ["PLASMIN_UP", "TISSUE_PLASMINOGEN_UP"], severity: "LOW", notes: "Два фибринолитика — взаимное усиление" },
+  { id: "INT_LUMBROKINASE_ANTICOAG", substanceA: "LUMBROKINASE", substanceB: "ANTICOAGULANTS", type: "conflict", effect: "BLEED_RISK", mechanisms: ["FIBRINOLYSIS_UP"], severity: "HIGH", notes: "Опасность кровотечений при комбинации с антикоагулянтами/антиагрегантами" },
+  { id: "INT_LUMBROKINASE_BROMELAIN", substanceA: "LUMBROKINASE", substanceB: "BROMELAIN", type: "synergy", effect: "ANTICOAG_SYNERGY", mechanisms: ["FIBRINOLYSIS_UP", "PAI1_DOWN"], severity: "LOW", notes: "Взаимное усиление фибринолитического эффекта" },
+  { id: "INT_NATTOKINASE_BROMELAIN", substanceA: "NATTOKINASE", substanceB: "BROMELAIN", type: "synergy", effect: "FIBRINOLYSIS_UP", mechanisms: ["PLASMIN_UP", "PAI1_DOWN", "FIBRIN_DEGRADATION"], severity: "LOW", notes: "Трёхуровневый фибринолиз: плазмин + ингибирование PAI-1 + деградация фибрина" },
 ];
 // ── FROM: interaction-links.ts ──
 export interface InteractionLink {
@@ -240,4 +251,24 @@ export const INTERACTION_LINKS_DB: InteractionLink[] = [
   { id: "LINK_VITAMIN_C_QUERCETIN_B", interactionId: "INT_VITAMIN_C_QUERCETIN", substance: "QUERCETIN", role: "B" },
   { id: "LINK_MELATONIN_L_THEANINE_A", interactionId: "INT_MELATONIN_L_THEANINE", substance: "MELATONIN", role: "A" },
   { id: "LINK_MELATONIN_L_THEANINE_B", interactionId: "INT_MELATONIN_L_THEANINE", substance: "L_THEANINE", role: "B" },
+
+  // ── SERRAPEPTASE links ──
+  { id: "LINK_SERRAPEPTASE_NATTOKINASE_A", interactionId: "INT_SERRAPEPTASE_NATTOKINASE", substance: "SERRAPEPTASE", role: "A" },
+  { id: "LINK_SERRAPEPTASE_NATTOKINASE_B", interactionId: "INT_SERRAPEPTASE_NATTOKINASE", substance: "NATTOKINASE", role: "B" },
+  { id: "LINK_SERRAPEPTASE_BROMELAIN_A", interactionId: "INT_SERRAPEPTASE_BROMELAIN", substance: "SERRAPEPTASE", role: "A" },
+  { id: "LINK_SERRAPEPTASE_BROMELAIN_B", interactionId: "INT_SERRAPEPTASE_BROMELAIN", substance: "BROMELAIN", role: "B" },
+  { id: "LINK_SERRAPEPTASE_ANTICOAG_A", interactionId: "INT_SERRAPEPTASE_ANTICOAG", substance: "SERRAPEPTASE", role: "A" },
+  { id: "LINK_SERRAPEPTASE_ANTICOAG_B", interactionId: "INT_SERRAPEPTASE_ANTICOAG", substance: "ANTICOAGULANTS", role: "B" },
+
+  // ── LUMBROKINASE links ──
+  { id: "LINK_LUMBROKINASE_NATTOKINASE_A", interactionId: "INT_LUMBROKINASE_NATTOKINASE", substance: "LUMBROKINASE", role: "A" },
+  { id: "LINK_LUMBROKINASE_NATTOKINASE_B", interactionId: "INT_LUMBROKINASE_NATTOKINASE", substance: "NATTOKINASE", role: "B" },
+  { id: "LINK_LUMBROKINASE_ANTICOAG_A", interactionId: "INT_LUMBROKINASE_ANTICOAG", substance: "LUMBROKINASE", role: "A" },
+  { id: "LINK_LUMBROKINASE_ANTICOAG_B", interactionId: "INT_LUMBROKINASE_ANTICOAG", substance: "ANTICOAGULANTS", role: "B" },
+
+  // ── LUMBROKINASE_BROMELAIN + NATTOKINASE_BROMELAIN links ──
+  { id: "LINK_LUMBROKINASE_BROMELAIN_A", interactionId: "INT_LUMBROKINASE_BROMELAIN", substance: "LUMBROKINASE", role: "A" },
+  { id: "LINK_LUMBROKINASE_BROMELAIN_B", interactionId: "INT_LUMBROKINASE_BROMELAIN", substance: "BROMELAIN", role: "B" },
+  { id: "LINK_NATTOKINASE_BROMELAIN_A", interactionId: "INT_NATTOKINASE_BROMELAIN", substance: "NATTOKINASE", role: "A" },
+  { id: "LINK_NATTOKINASE_BROMELAIN_B", interactionId: "INT_NATTOKINASE_BROMELAIN", substance: "BROMELAIN", role: "B" },
 ];

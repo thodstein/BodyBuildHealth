@@ -622,7 +622,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [neuroTab, setNeuroTab] = useState<'calc' | 'mechanisms' | 'support'>('calc');
 
   // Catalog sub-tab
-  const [catalogSubTab, setCatalogSubTab] = useState<'type' | 'organ' | 'tier'>('type');
+  const [catalogSubTab, setCatalogSubTab] = useState<'type' | 'organ' | 'tier' | 'stack'>('type');
   const isComplexId = (id: string) => {
     const low = id.toLowerCase();
     return low.includes('complex') || low.includes('_blend') || low.includes('_mix') || low.endsWith('_combo');
@@ -2197,20 +2197,17 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         <div style={{ padding:'0 0 70px', display:'flex', flexDirection:'column' }}>
           {/* Content */}
           <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
-            <div style={{fontSize:7,color:'rgba(255,255,255,0.2)',textAlign:'center',marginBottom:4}}>
-              build:2026-06-15 | subs:{catalogSubstances.length} | int:{ALL_INTERACTIONS.length} | stacks:{ALL_STACKS.length} | tab:{calcView}/{infoView}
-            </div>
             {renderView(infoView, 'catalog', () =>
               <div>
                 {/* Sub-tabs: По типам / По органам / По уровням */}
                  <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
-                   {(['type','organ','tier'] as const).map(t => (
+                   {(['type','organ','tier','stack'] as const).map(t => (
                      <button key={t} onClick={() => setCatalogSubTab(t)} style={{
                        padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
                        background: catalogSubTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
                        color: catalogSubTab === t ? '#000' : 'var(--text-dim)',
                        border: `1px solid ${catalogSubTab === t ? 'var(--accent)' : 'var(--border)'}`,
-                     }}>{t === 'type' ? '📋 По типам' : t === 'organ' ? '🫀 По органам' : t === 'tier' ? '⚡ По уровням' : ''}</button>
+                     }}>{t === 'stack' ? '🧩 Готовые стеки' : t === 'type' ? '📋 По типам' : t === 'organ' ? '🫀 По органам' : t === 'tier' ? '⚡ По уровням' : ''}</button>
                    ))}
                  </div>
                 <div style={{ display:'flex', gap:6, marginBottom:8, alignItems:'center' }}>
@@ -2357,6 +2354,32 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         </div>
                       );
                     })}
+                  </div>
+                )}
+                {catalogSubTab === 'stack' && (
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                    {ALL_STACKS.map(stk => (
+                      <div key={stk.id} style={{ padding:'10px 12px', borderRadius:12, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                          <span style={{ fontSize:10, fontWeight:700, color:'var(--accent)' }}>{stk.name}</span>
+                          <span style={{ fontSize:8, padding:'2px 6px', borderRadius:6, background:'rgba(0,230,138,0.1)', color:'#00e68a', fontWeight:600 }}>⭐ {stk.synergyScore}</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6, lineHeight:1.4 }}>{stk.problem}</div>
+                        <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
+                          {stk.substances.slice(0,6).map(s => {
+                            const cat = SUPPORT_CATALOG_DATA[s.id];
+                            return <span key={s.id} style={{ padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.06)', color:'#00e68a', fontSize:7 }}>{cat?.nameRu || cat?.name || s.id}</span>;
+                          })}
+                          {stk.substances.length > 6 && <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>+{stk.substances.length-6}</span>}
+                        </div>
+                        <button onClick={() => {
+                          const ids = stk.substances.map(s => s.id);
+                          const existing = JSON.parse(localStorage.getItem('he_finder_saved_stacks')||'[]');
+                          localStorage.setItem('he_finder_saved_stacks', JSON.stringify([ids, ...existing].slice(0,10)));
+                          setEnhancedSubs(prev => [...new Set([...prev, ...ids])]);
+                        }} style={{ padding:'4px 12px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.15)', color:'#00e68a' }}>📥 + Мой стек</button>
+                      </div>
+                    ))}
                   </div>
                 )}
                 {/* Complexes tab removed — all substances now in type/organ/tier views */}
