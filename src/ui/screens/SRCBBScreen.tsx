@@ -199,12 +199,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   }, [builtBb]);
 
   return (
-    <div style={{ padding: 12, color: '#fff', maxWidth: 720, margin: '0 auto' }}>
+    <div key={mode} style={{ padding: 12, color: '#fff', maxWidth: 720, margin: '0 auto' }}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        {track === 'auto' && <>
         <button style={mode === 'src' ? BTN : BTN_GHOST} onClick={() => setMode('src')} disabled={mode === 'src'}>🏆 СРЦ (сила)</button>
         <button style={mode === 'bb' ? BTN : BTN_GHOST} onClick={() => setMode('bb')} disabled={mode === 'bb'}>💪 Бодибилдинг</button>
-        </>}
       </div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
         {([['plan', '📋 План'], ['plates', '🧮 Блины'], ['run', '▶ Выполнение'], ['autoreg', '🧠 Авторег'], ['peak', '🏁 Пик'], ['recovery', '🔋 Восст'], ['safety', '🛡 Безоп'], ['demo', '🎬 Демо'], ['programs', '📚 Программы'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 Pro-метрики'], ['charts', '📊 График']] as const).map(([v, l]) => (

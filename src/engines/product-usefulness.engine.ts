@@ -23,6 +23,7 @@ export interface UsefulnessScore {
     microDensity: number;
     fiberQuality: number;
     tierScore: number;
+    aminoScore: number;
   };
   contextBonus: {
     goalMatch: number;
@@ -110,6 +111,15 @@ export function calcProductUsefulness(
   const tierScoreMap: Record<string, number> = { basic: 5, mid: 12, max: 20 };
   const tierScore = tierScoreMap[food.tier || 'basic'] || 5;
 
+  // Amino acid score (leucine + BCAA)
+  const leu = food.micros?.Leucine || 0;
+  const ile = food.micros?.Isoleucine || 0;
+  const val = food.micros?.Valine || 0;
+  const leuScore = Math.min(15, Math.round(leu * 5));          // 3g/100g = 15 pts
+  const bcaaTotal = leu + ile + val;
+  const bcaaScore = Math.min(10, Math.round(bcaaTotal * 2));   // 5g/100g = 10 pts
+  const aminoScore = leuScore + bcaaScore;
+
   const goal = opts.goal ? getEffectiveGoal(opts.goal) : 'maintenance';
   const bestFor = food.bestFor || [];
   const goalMatch = bestFor.includes(goal) ? 15 : bestFor.length === 0 ? 5 : 0;
@@ -136,11 +146,11 @@ export function calcProductUsefulness(
     }
   }
 
-  const rawA = opts.enableA ? (proteinDensity + microDensity + fiberScore + tierScore) : 0;
+  const rawA = opts.enableA ? (proteinDensity + microDensity + fiberScore + tierScore + aminoScore) : 0;
   const rawB = opts.enableB ? (goalMatch + timingMatch + pharmaMatch) : 0;
   const rawTotal = rawA + rawB;
 
-  const maxA = opts.enableA ? 80 : 0;
+  const maxA = opts.enableA ? 105 : 0;
   const maxB = opts.enableB ? 28 : 0;
   let maxPossible = maxA + maxB;
 
@@ -168,7 +178,7 @@ export function calcProductUsefulness(
 
   return {
     total, maxPossible,
-    breakdown: { proteinDensity, microDensity, fiberQuality: fiberScore, tierScore },
+    breakdown: { proteinDensity, microDensity, fiberQuality: fiberScore, tierScore, aminoScore },
     contextBonus: { goalMatch, timingMatch, pharmaMatch },
     costEfficiency, label, color,
   };

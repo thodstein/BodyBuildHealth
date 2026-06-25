@@ -292,17 +292,20 @@ const CATEGORY_LABELS: Record<string, string> = {
 const CatalogTab: React.FC = () => {
   const [catSearch, setCatSearch] = React.useState('');
   const [catFilter, setCatFilter] = React.useState('all');
+  const [catFilterMode, setCatFilterMode] = React.useState<'inclusive' | 'exclusive'>('inclusive');
+  const [showExclusive, setShowExclusive] = React.useState(false);
   const categories = React.useMemo(() => [...new Set(FOOD_DB.map(f => f.category).filter(Boolean) as string[])], []);
   const addFav = (food: { id: string; name: string; kcal: number; protein: number; fat: number; carbs: number }) => {
     try { const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); const updated = [food.id, ...ids.filter(f => f !== food.id)].slice(0, 100); localStorage.setItem('he_food_favs', JSON.stringify(updated)); } catch {}
   };
   const filtered = React.useMemo(() => {
     return FOOD_DB.filter(f => {
-      if (catFilter !== 'all' && f.category !== catFilter) return false;
+      if (catFilter !== 'all' && catFilterMode === 'exclusive' && f.category !== catFilter) return false;
+      if (showExclusive && f.tier !== 'max') return false;
       if (catSearch && !(f.name||'').toLowerCase().includes(catSearch.toLowerCase())) return false;
       return true;
     });
-  }, [catFilter, catSearch]);
+  }, [catFilter, catSearch, catFilterMode, showExclusive]);
   const filterBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode) => (
     <button onClick={onClick} style={{ padding:'5px 10px', borderRadius:8, fontSize:8, cursor:'pointer', fontWeight: isActive ? 700 : 400, letterSpacing:0.2, whiteSpace:'nowrap', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>{children}</button>
   );
@@ -311,14 +314,28 @@ const CatalogTab: React.FC = () => {
       <div style={labelSec}>📦 Каталог продуктов ({FOOD_DB.length})</div>
       <input value={catSearch} onChange={e => setCatSearch(e.target.value)} placeholder="🔍 Поиск по названию..." style={inputStyle} />
       <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-        {filterBtn(catFilter === 'all', () => setCatFilter('all'), `Все (${FOOD_DB.length})`)}
+        {filterBtn(catFilter === 'all' && !showExclusive, () => { setShowExclusive(false); setCatFilter('all'); setCatFilterMode('inclusive'); }, `Все (${FOOD_DB.length})`)}
         {categories.map(c => {
           const count = FOOD_DB.filter(f => f.category === c).length;
-          return filterBtn(catFilter === c, () => setCatFilter(c), `${CATEGORY_LABELS[c] || c} (${count})`);
+          return filterBtn(catFilter === c && !showExclusive, () => { setShowExclusive(false); setCatFilter(c); }, `${CATEGORY_LABELS[c] || c} (${count})`);
         })}
+        <button onClick={() => { setShowExclusive(e => !e); setCatFilter('all'); }} style={{
+          padding:'5px 10px', borderRadius:8, fontSize:8, cursor:'pointer', fontWeight: showExclusive ? 700 : 400, letterSpacing:0.2, whiteSpace:'nowrap',
+          border: showExclusive ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.06)',
+          background: showExclusive ? 'rgba(168,85,247,0.14)' : '#202023',
+          color: showExclusive ? '#a855f7' : 'rgba(255,255,255,0.85)',
+        }}>⭐ Exclusive ({FOOD_DB.filter(f => f.tier === 'max').length})</button>
       </div>
-      <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.7)' }}>
-        {catFilter === 'all' ? 'Показаны все продукты' : `${CATEGORY_LABELS[catFilter] || catFilter} — ${filtered.length} продуктов`}
+      <div style={{ marginTop:6, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>
+          {catFilter === 'all' ? 'Показаны все продукты' : `${CATEGORY_LABELS[catFilter] || catFilter} — ${filtered.length} продуктов`}
+        </div>
+        <button onClick={() => setCatFilterMode(m => m === 'inclusive' ? 'exclusive' : 'inclusive')} style={{
+          padding:'3px 8px', borderRadius:6, fontSize:7, fontWeight:600, cursor:'pointer',
+          background: catFilterMode === 'exclusive' ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
+          border: catFilterMode === 'exclusive' ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.06)',
+          color: catFilterMode === 'exclusive' ? '#00e68a' : 'rgba(255,255,255,0.5)',
+        }}>{catFilterMode === 'inclusive' ? '🔓 Все категории' : '🔒 Только выбранная'}</button>
       </div>
       <div style={{ marginTop:8, maxHeight:340, overflowY:'auto', display:'flex', flexDirection:'column', gap:3, borderRadius:8 }}>
         {filtered.map(f => <div key={f.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)' }}>
@@ -340,6 +357,18 @@ const RecipesTab: React.FC = () => {
   const [recMeal, setRecMeal] = React.useState('all');
   const [recSearch, setRecSearch] = React.useState('');
   const [recExpanded, setRecExpanded] = React.useState<Record<number, boolean>>({});
+  const [showRecipeModal, setShowRecipeModal] = React.useState(false);
+  const [recName, setRecName] = React.useState('');
+  const [recIngredients, setRecIngredients] = React.useState('');
+  const [recInstructions, setRecInstructions] = React.useState('');
+  const [recKcal, setRecKcal] = React.useState(0);
+  const [recProtein, setRecProtein] = React.useState(0);
+  const [recFat, setRecFat] = React.useState(0);
+  const [recCarbs, setRecCarbs] = React.useState(0);
+  const [myRecipes, setMyRecipes] = React.useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem('he_recipes') || '[]'); } catch { return []; }
+  });
+  const [myRecExpanded, setMyRecExpanded] = React.useState(false);
   const recipes = React.useMemo(() => getRecipes(), []);
   const list = React.useMemo(() => {
     let filtered = recipes;
@@ -351,10 +380,127 @@ const RecipesTab: React.FC = () => {
     <button onClick={onClick} style={{ padding:'5px 12px', borderRadius:8, fontSize:10, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: isActive ? 700 : 400 }}>{children}</button>
   );
   const mealLabel = (m: string) => m === 'breakfast' ? '🌅' : m === 'lunch' ? '☀️' : m === 'dinner' ? '🌙' : m === 'snack' ? '🍿' : '';
+  const saveRecipe = () => {
+    if (!recName.trim()) return;
+    const newRecipe = {
+      id: Date.now().toString(),
+      name: recName.trim(),
+      ingredients: recIngredients.split('\n').filter(s => s.trim()),
+      instructions: recInstructions,
+      kcal: recKcal,
+      protein: recProtein,
+      fat: recFat,
+      carbs: recCarbs,
+    };
+    const updated = [...myRecipes, newRecipe];
+    setMyRecipes(updated);
+    localStorage.setItem('he_recipes', JSON.stringify(updated));
+    setRecName(''); setRecIngredients(''); setRecInstructions('');
+    setRecKcal(0); setRecProtein(0); setRecFat(0); setRecCarbs(0);
+    setShowRecipeModal(false);
+  };
+  const deleteMyRecipe = (id: string) => {
+    const updated = myRecipes.filter((r: any) => r.id !== id);
+    setMyRecipes(updated);
+    localStorage.setItem('he_recipes', JSON.stringify(updated));
+  };
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
     <div style={{ padding:14, ...cardBg }}>
-      <div style={labelSec}>🍳 Рецепты ({recipes.length})</div>
-      <input value={recSearch} onChange={e => setRecSearch(e.target.value)} placeholder="🔍 Поиск рецептов..." style={inputStyle} />
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div style={labelSec}>🍳 Рецепты ({recipes.length + myRecipes.length})</div>
+        <button onClick={() => setShowRecipeModal(true)} style={{
+          padding:'6px 12px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:700,
+          border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.1)', color:'#00e68a',
+        }}>+ Рецепт</button>
+      </div>
+      {/* My recipes collapsible */}
+      {myRecipes.length > 0 && (
+        <div style={{ marginBottom: 6 }}>
+          <div onClick={() => setMyRecExpanded(!myRecExpanded)} style={{
+            display:'flex', alignItems:'center', justifyContent:'space-between',
+            padding:'6px 8px', borderRadius:6, cursor:'pointer',
+            background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.1)',
+          }}>
+            <span style={{ fontSize:9, color:'#a78bfa', fontWeight:600 }}>📝 Мои рецепты ({myRecipes.length})</span>
+            <span style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>{myRecExpanded ? '▲' : '▼'}</span>
+          </div>
+          {myRecExpanded && (
+            <div style={{ marginTop:4, maxHeight:200, overflowY:'auto' }}>
+              {myRecipes.map((r: any) => (
+                <div key={r.id} style={{
+                  padding:'6px 8px', borderRadius:6, marginBottom:3, position:'relative',
+                  background:'rgba(167,139,250,0.03)', border:'1px solid rgba(167,139,250,0.08)',
+                }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <div>
+                      <span style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{r.name}</span>
+                      <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginLeft:4 }}>
+                        {r.kcal} ккал · Б{r.protein} Ж{r.fat} У{r.carbs}
+                      </span>
+                    </div>
+                    <button onClick={() => deleteMyRecipe(r.id)} style={{
+                      padding:'2px 6px', borderRadius:4, cursor:'pointer', fontSize:8,
+                      background:'rgba(239,68,68,0.08)', border:'none', color:'#ef4444',
+                    }}>✕</button>
+                  </div>
+                  {r.ingredients?.length > 0 && (
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:3 }}>
+                      {r.ingredients.map((ing: string, j: number) => (
+                        <span key={j} style={{ padding:'1px 5px', borderRadius:4, fontSize:7, background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.5)' }}>{ing}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {/* Recipe creation modal */}
+      {showRecipeModal && (
+        <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
+          onClick={() => setShowRecipeModal(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:400, maxHeight:'85vh', padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(0,230,138,0.12)', overflowY:'auto' }}>
+            <div style={{ fontSize:15, fontWeight:700, color:'#00e68a', marginBottom:12, textAlign:'center' }}>🍳 Создать рецепт</div>
+            <div style={{ marginBottom:8 }}>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:3 }}>Название рецепта</div>
+              <input value={recName} onChange={e => setRecName(e.target.value)} placeholder="Например: Овсяноблин" style={inputStyle} />
+            </div>
+            <div style={{ marginBottom:8 }}>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:3 }}>Ингредиенты (по одному на строку)</div>
+              <textarea value={recIngredients} onChange={e => setRecIngredients(e.target.value)} placeholder="Яйца 2 шт&#10;Овсянка 30 г&#10;Творог 50 г" style={{ ...inputStyle, resize:'vertical', minHeight:70, fontSize:10 }} rows={3} />
+            </div>
+            <div style={{ marginBottom:8 }}>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:3 }}>Приготовление</div>
+              <textarea value={recInstructions} onChange={e => setRecInstructions(e.target.value)} placeholder="Описание процесса приготовления..." style={{ ...inputStyle, resize:'vertical', minHeight:60, fontSize:10 }} rows={3} />
+            </div>
+            <div style={{ marginBottom:12 }}>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:4 }}>КБЖУ на порцию</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4 }}>
+                {[
+                  { l:'Ккал', v: recKcal, s: setRecKcal, c:'#00e68a' },
+                  { l:'Белки', v: recProtein, s: setRecProtein, c:'#3b82f6' },
+                  { l:'Жиры', v: recFat, s: setRecFat, c:'#f59e0b' },
+                  { l:'Углеводы', v: recCarbs, s: setRecCarbs, c:'#f97316' },
+                ].map(m => (
+                  <div key={m.l} style={{ textAlign:'center' }}>
+                    <input type="number" value={m.v || ''} onChange={e => m.s(+e.target.value || 0)} placeholder="0" style={{
+                      width:'100%', padding:'8px 4px', borderRadius:8, fontSize:11, fontWeight:700, textAlign:'center',
+                      background:'#202023', border:`1px solid ${m.c}30`, color:m.c, outline:'none', boxSizing:'border-box',
+                    }} />
+                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', marginTop:1 }}>{m.l}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <button onClick={saveRecipe} style={{
+              width:'100%', padding:'12px', borderRadius:10, cursor:'pointer', border:'none',
+              background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:11, fontWeight:700,
+            }}>✓ Сохранить рецепт</button>
+          </div>
+        </div>
+      )}
+      <input value={recSearch} onChange={e => setRecSearch(e.target.value)} placeholder="🔍 Поиск рецептов..." style={{ ...inputStyle, marginTop: 6 }} />
       <div style={{ marginTop:8, display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
         {mealBtn(recMeal === 'all', () => setRecMeal('all'), 'Все')}
         {mealBtn(recMeal === 'breakfast', () => setRecMeal('breakfast'), 'Завтрак')}

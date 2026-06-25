@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { buildStack, explainStack, findReplacement, type ReplacementResult } from '../../engines/supplement-finder.engine';
-import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS } from '../../data/support-database';
+import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS, ALL_STACKS, type SupportStack } from '../../data/support-database';
 import { GlassCard, StatBox, ORGANS, toFinderProfile } from './BioStackAIConstants';
 
 export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void }) {
@@ -241,6 +241,22 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
     background: 'rgba(24,24,27,0.3)', border: '1px solid rgba(255,255,255,0.04)', borderTop: 'none',
   };
 
+  const SYSTEM_LABELS_RU: Record<string, string> = {
+    hepatic: '🫁 Печень', cardio: '❤️ ССС', renal: '🫘 Почки', neuro: '🧠 Нервная',
+    endocrine: '⚖️ Эндокринная', reproductive: '🧬 Репродуктивная', immune: '🛡️ Иммунитет',
+    musculo: '💪 Опорно-двиг.', metabolic: '⚡ Метаболизм', gi: '🫃 ЖКТ',
+    покровная: '🧴 Кожа', гепатобилиарная: '🫁 Печень+Жёлчь', иммунная: '🛡️ Иммунная',
+  };
+  const [libFilter, setLibFilter] = useState<string>('all');
+  const [libOpen, setLibOpen] = useState(false);
+  const filteredLib = useMemo(() => {
+    if (libFilter === 'all') return ALL_STACKS;
+    return ALL_STACKS.filter(s => {
+      const sys = s.system?.toLowerCase() || '';
+      return sys.includes(libFilter) || s.anatomicalMapping?.organSystems?.some((o: string) => o.toLowerCase().includes(libFilter));
+    });
+  }, [libFilter]);
+
   if (stackIds.length === 0) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 60, color: 'rgba(255,255,255,0.3)' }}>
@@ -249,6 +265,8 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
         <div style={{ fontSize: 10, maxWidth: 280, margin: '0 auto', lineHeight: 1.5, marginBottom: 16 }}>
           Добавьте препараты через 🔍 Поиск или 🧩 Сборка
         </div>
+
+        {/* ═══ Saved stacks ═══ */}
         {savedStacks.length > 0 && (
           <GlassCard title="💾 Сохранённые стеки" icon="📂" color="#8b5cf6">
             {savedStacks.map((stk, i) => (
@@ -274,6 +292,63 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
             ))}
           </GlassCard>
         )}
+
+        {/* ═══ Ready-made stacks library ═══ */}
+        <div style={{ marginTop: 12 }}>
+          <button onClick={() => setLibOpen(!libOpen)} style={{
+            padding: '8px 20px', borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+            background: libOpen ? 'rgba(139,92,246,0.15)' : 'rgba(139,92,246,0.08)',
+            border: '1px solid rgba(139,92,246,0.25)', color: '#8b5cf6',
+          }}>
+            📚 {libOpen ? 'Скрыть библиотеку' : 'Библиотека готовых стеков'} ({ALL_STACKS.length})
+          </button>
+        </div>
+
+        {libOpen && (
+          <div style={{ marginTop: 8, textAlign: 'left' }}>
+            {/* Filters */}
+            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 8, justifyContent: 'center' }}>
+              {['all', 'hepatic', 'cardio', 'renal', 'neuro', 'endocrine', 'immune', 'gi', 'reproductive', 'metabolic'].map(f => (
+                <button key={f} onClick={() => setLibFilter(f)} style={{
+                  padding: '3px 8px', borderRadius: 10, fontSize: 7, fontWeight: 600, cursor: 'pointer',
+                  background: libFilter === f ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${libFilter === f ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                  color: libFilter === f ? '#8b5cf6' : 'rgba(255,255,255,0.5)',
+                }}>{SYSTEM_LABELS_RU[f] || f}</button>
+              ))}
+            </div>
+
+            {filteredLib.map(stk => (
+              <GlassCard key={stk.id} style={{ marginBottom: 6, cursor: 'pointer', textAlign: 'left' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 2 }}>{stk.name}</div>
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, marginBottom: 4 }}>{stk.description}</div>
+                    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 4 }}>
+                      {stk.substances.slice(0, 5).map(sub => {
+                        const c = SUPPORT_CATALOG_DATA[sub.id];
+                        return <span key={sub.id} style={{ padding: '1px 5px', borderRadius: 4, fontSize: 7, background: 'rgba(0,230,138,0.08)', color: '#00e68a' }}>{c?.nameRu || c?.name || sub.id}</span>;
+                      })}
+                      {stk.substances.length > 5 && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>+{stk.substances.length - 5}</span>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 4, fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>
+                      <span>🎯 {stk.synergyScore}/100</span>
+                      <span>🧪 {stk.substances.length} компонентов</span>
+                      {stk.system && <span>📂 {stk.system}</span>}
+                    </div>
+                  </div>
+                  <button onClick={() => setStackIds(stk.substances.map(s => s.id))} style={{
+                    flexShrink: 0, padding: '6px 12px', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+                    background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', marginTop: 2,
+                  }}>📥</button>
+                </div>
+              </GlassCard>
+            ))}
+            {filteredLib.length === 0 && (
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>Нет стеков по этому фильтру</div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -292,11 +367,42 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
             flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
             background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a',
           }}>💾 Сохранить стек</button>
+          <button onClick={() => setLibOpen(!libOpen)} style={{
+            padding: '8px 10px', borderRadius: 10, fontSize: 9, fontWeight: 700, cursor: 'pointer',
+            background: libOpen ? 'rgba(139,92,246,0.12)' : 'rgba(139,92,246,0.08)',
+            border: '1px solid rgba(139,92,246,0.2)', color: '#8b5cf6',
+          }}>📚 {libOpen ? '✕' : 'Библиотека'}</button>
           <button onClick={handleClear} style={{
             padding: '8px 14px', borderRadius: 10, fontSize: 9, fontWeight: 700, cursor: 'pointer',
             background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444',
           }}>🗑 Очистить</button>
         </div>
+        {libOpen && (
+          <div style={{ marginTop: 8, textAlign: 'left', maxHeight: 300, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
+              {['all', 'hepatic', 'cardio', 'renal', 'neuro', 'endocrine', 'immune', 'gi', 'reproductive', 'metabolic'].map(f => (
+                <button key={f} onClick={() => setLibFilter(f)} style={{
+                  padding: '2px 6px', borderRadius: 8, fontSize: 7, fontWeight: 600, cursor: 'pointer',
+                  background: libFilter === f ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${libFilter === f ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                  color: libFilter === f ? '#8b5cf6' : 'rgba(255,255,255,0.5)',
+                }}>{SYSTEM_LABELS_RU[f] || f}</button>
+              ))}
+            </div>
+            {filteredLib.map(stk => (
+              <div key={stk.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', marginBottom: 4, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: '#fff', marginBottom: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stk.name}</div>
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>{stk.substances.length} комп. • {stk.synergyScore}/100</div>
+                </div>
+                <button onClick={() => setStackIds(stk.substances.map(s => s.id))} style={{
+                  flexShrink: 0, padding: '4px 10px', borderRadius: 6, fontSize: 7, fontWeight: 700, cursor: 'pointer',
+                  background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a',
+                }}>📥</button>
+              </div>
+            ))}
+          </div>
+        )}
       </GlassCard>
 
       {/* ✅ Compliance Check */}

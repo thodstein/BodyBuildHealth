@@ -45,7 +45,43 @@ export function RisksTab({ profile, stackIds }: { profile: BioStackProfile; stac
     const critical = pairs.filter(p => p.severity === 'HIGH' && (p.type === 'conflict' || p.type === 'caution'));
     const moderate = pairs.filter(p => p.severity === 'MEDIUM' && (p.type === 'conflict' || p.type === 'caution'));
     const cumulative = pairs.filter(p => (p.severity === 'LOW' || p.type === 'synergy' || p.type === 'no_interaction'));
-    return { pairs, critical, moderate, cumulative, total: pairs.length };
+
+    // Cumulative risk score: HIGH=10, MEDIUM=5, LOW=1 (only for conflict/caution)
+    const riskScore = Math.min(100,
+      critical.length * 10 + moderate.length * 5 + cumulative.filter(p => p.type === 'conflict' || p.type === 'caution').length * 1
+    );
+    const riskLevel = riskScore >= 50 ? 'HIGH' : riskScore >= 20 ? 'MEDIUM' : 'LOW';
+
+    // Per-substance risk contribution
+    const subRisk: Record<string, { id: string; name: string; score: number; conflictCount: number; highCount: number }> = {};
+    stackIds.forEach(id => {
+      const name = catData[id]?.nameRu || catData[id]?.name || id;
+      subRisk[id] = { id, name, score: 0, conflictCount: 0, highCount: 0 };
+    });
+    pairs.forEach(p => {
+      const pts = p.severity === 'HIGH' ? 10 : p.severity === 'MEDIUM' ? 5 : 1;
+      if (p.type === 'conflict' || p.type === 'caution') {
+        if (subRisk[p.a]) { subRisk[p.a].score += pts; subRisk[p.a].conflictCount++; if (p.severity === 'HIGH') subRisk[p.a].highCount++; }
+        if (subRisk[p.b]) { subRisk[p.b].score += pts; subRisk[p.b].conflictCount++; if (p.severity === 'HIGH') subRisk[p.b].highCount++; }
+      }
+    });
+    const sortedSubs = Object.values(subRisk).sort((a, b) => b.score - a.score);
+
+    // Risk reduction suggestions
+    const worstPairs = [...critical, ...moderate].slice(0, 5);
+    const suggestions = worstPairs.map(p => {
+      const removalScore = p.severity === 'HIGH' ? 10 : 5;
+      const newScore = Math.max(0, riskScore - removalScore);
+      return {
+        removeA: p.a, removeB: p.b,
+        nameA: p.nameA, nameB: p.nameB,
+        effect: p.effect,
+        reduction: removalScore,
+        newScore,
+      };
+    });
+
+    return { pairs, critical, moderate, cumulative, total: pairs.length, riskScore, riskLevel, sortedSubs, suggestions };
   }, [stackIds]);
 
   const [expandedPair, setExpandedPair] = useState<Record<string, boolean>>({});
@@ -156,6 +192,22 @@ export function RisksTab({ profile, stackIds }: { profile: BioStackProfile; stac
   return (
     <div style={{ paddingBottom: 80 }}>
       <GlassCard title="⚠ Анализ взаимодействий" icon="📊" color="#f59e0b">
+        {/* Cumulative risk score */}
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Кумулятивный риск</span>
+            <span style={{ fontSize: 11, fontWeight: 800, color: analysis.riskLevel === 'HIGH' ? '#ef4444' : analysis.riskLevel === 'MEDIUM' ? '#f59e0b' : '#22c55e' }}>
+              {analysis.riskScore}/100
+            </span>
+          </div>
+          <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.05)' }}>
+            <div style={{ width: Math.min(analysis.riskScore, 100) + '%', height: '100%', borderRadius: 3,
+              background: analysis.riskScore >= 50 ? '#ef4444' : analysis.riskScore >= 20 ? '#f59e0b' : '#22c55e', transition: 'width 0.3s' }} />
+          </div>
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
+            {'<50 безопасно • 20-50 умеренный риск • >50 высокий риск'}
+          </div>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 8 }}>
           <StatBox label="Всего пар" value={analysis.total} color="#60a5fa" />
           <StatBox label="Критических" value={analysis.critical.length} color="#ef4444" />
@@ -214,6 +266,55 @@ export function RisksTab({ profile, stackIds }: { profile: BioStackProfile; stac
             <span><span style={{ color: '#f59e0b' }}>- -</span> Осторожно</span>
             <span><span style={{ color: '#22c55e' }}>━</span> Синергия</span>
             <span><span style={{ color: 'rgba(255,255,255,0.15)' }}>- -</span> Нет данных</span>
+          </div>
+        </GlassCard>
+      )}
+
+      {/* Per-substance risk breakdown */}
+      {analysis.sortedSubs.filter(s => s.score > 0).length > 0 && (
+        <GlassCard title="📊 Вклад в риск по веществам" icon="📊" color="#f59e0b">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {analysis.sortedSubs.filter(s => s.score > 0).map(s => {
+              const maxScore = Math.max(...analysis.sortedSubs.map(x => x.score), 1);
+              const pct = Math.round(s.score / maxScore * 100);
+              return (
+                <div key={s.id} style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <span style={{ fontSize: 9, fontWeight: 600, color: '#fff' }}>{s.name}</span>
+                    <span style={{ fontSize: 8, color: s.score >= 20 ? '#ef4444' : s.score >= 10 ? '#f59e0b' : '#22c55e' }}>
+                      {s.score} pts • {s.highCount > 0 ? `🔴${s.highCount} ` : ''}{s.conflictCount} конфликтов
+                    </span>
+                  </div>
+                  <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.05)' }}>
+                    <div style={{ width: pct + '%', height: '100%', borderRadius: 2,
+                      background: s.score >= 20 ? '#ef4444' : s.score >= 10 ? '#f59e0b' : '#22c55e' }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </GlassCard>
+      )}
+
+      {/* Risk reduction suggestions */}
+      {analysis.suggestions.length > 0 && (
+        <GlassCard title="💡 Рекомендации по снижению риска" icon="💡" color="#60a5fa">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {analysis.suggestions.slice(0, 3).map((s, i) => {
+              const afterLabel = s.newScore >= 50 ? '🔴' : s.newScore >= 20 ? '🟡' : '🟢';
+              return (
+                <div key={i} style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.08)' }}>
+                  <div style={{ fontSize: 8, lineHeight: 1.4 }}>
+                    <span style={{ color: '#ef4444' }}>✕</span> Удалить <strong>{s.nameA}</strong> или <strong>{s.nameB}</strong>
+                    <span style={{ color: 'rgba(255,255,255,0.4)', marginLeft: 4 }}>— {s.effect}</span>
+                  </div>
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                    Снижение риска: <span style={{ color: '#22c55e' }}>-{s.reduction} pts</span>
+                    {' → '}После: {afterLabel} {Math.round(s.newScore)}/100
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </GlassCard>
       )}

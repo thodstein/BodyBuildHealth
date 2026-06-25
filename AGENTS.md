@@ -486,3 +486,205 @@ export interface SupportStack {
 - Подвкладка 📊 Отчёты — генерация + архив в localStorage
 - Подвкладка 🔍 Поиск — ПОЛНОСТЬЮ РЕАЛИЗОВАНА: текстовый поиск + фильтры по целям (22), органам (24), системам (11), механизмам (15 top), симптомам (10) + rich карточки с раскрытием, скорингом, категориями, противопоказаниями; кнопка + Стек; персонализация через BioStackProfile→FinderProfile bridge
 - Подвкладка 🧠 AI — 5 кнопок-действий на правилах
+
+## 🎯 ПЛАН (принят 26 Jun)
+
+### ПРИОРИТЕТ 1 — Критические баги
+| ID | Задача | Файл | Объём |
+|----|--------|------|-------|
+| C2 | PL/BB не переключается | SRCBBScreen.tsx | +1 строка (key) |
+| B8 | Кракозябры каталога | support-catalog | конвертация Win1251→UTF8 |
+
+### ПРИОРИТЕТ 2 — Очистка данных
+| ID | Задача | Файл | Объём |
+|----|--------|------|-------|
+| A1 | Удалить `generateStacks()` | support-synergy | −708 строк |
+| A3 | SYNERGY_NETWORK + INTERACTIONS | synergy + inter | +300 строк |
+| C4 | Проверить/дополнить каталог | catalog + enrich | +коррекции |
+
+### ПРИОРИТЕТ 3 — Новый функционал
+| ID | Задача | Файл | Объём |
+|----|--------|------|-------|
+| A2 | Написать 25 стеков вручную | support-stacks | +1000 строк |
+| A4 | Browsing BioStack Search | BioStackAISearch | +150 |
+| A5 | Готовые стеки BioStack Stack | BioStackAIStack | +100 |
+| B1 | Спецприём попап | IndividualPlan | +200 |
+| B2 | Скользящие графики | IndividualPlan | +100 |
+| B3 | Предпочтения попап | IndividualPlan | +100 |
+| B4 | Профицит в адаптации | IndividualPlan | +80 |
+| B5 | Диетические паузы GlassCard | IndividualPlan | +80 |
+| B6 | Создать рецепт попап | NutritionScreen | +150 |
+| B7 | Exclusive-фильтр каталога | NutritionScreen | +20 |
+| B9 | Полезность силовой контекст | product-usefulness | +400 |
+| B10 | Фарма-карточка расширение | PharmaScreen | +500 |
+
+### ПРИОРИТЕТ 4 — Стиль + рефакторинг
+| ID | Задача | Файл | Объём |
+|----|--------|------|-------|
+| C1 | Тренировки — единый accent | TrainingScreen | ~50 замен |
+| C3 | Описания СРЦ по ПЛ | SRCBBScreen + Training | +200 |
+| A6 | SupportScreen редиректы | SupportScreen | −5 строк |
+| A7 | Переименование файлов | support-stacks | 1 rename |
+| B10 | ✅ Правила фармы в AGENTS.md | AGENTS.md | +правила |
+
+## 11. PharmaSubstance — обязательные поля карточки фармакологии
+
+При добавлении ЛЮБОГО нового вещества в `pharma-database.ts` (или редактировании существующего) **ОБЯЗАТЕЛЬНО** заполнить все поля ниже. Карточка выводится в `DrugDetailCard` (PharmaScreen.tsx) — пропуск любого поля приводит к пустому месту в UI и считается критической ошибкой.
+
+### 11.1. Обязательный шаблон PharmaSubstance
+
+```typescript
+// Поля, которые БЫЛИ ВСЕГДА (уже обязательны):
+id: string;           // уникальный snake_case
+name: string;         // русское название
+class: string;        // ключ из CLASS_LABELS
+pk: PK;               // фармакокинетика (ka, k10, k12, k21, Vd, bioavailability, halfLifeHours)
+pd: PD;               // фармакодинамика (AR_affinity, aromatization, five_alpha_reduction, progestogenic, hepatotoxicity, lipid_impact, hct_impact, neuro_toxicity)
+ec50: number;
+n_hill: number;
+maxEffect: number;
+
+// НОВЫЕ ОБЯЗАТЕЛЬНЫЕ ПОЛЯ:
+targetSystems: string[];           // Какие системы организма затрагивает
+                                   // Допустимые значения: 'cardio','hepatic','neuro','neuro_toxicity','endocrine','reproductive','hematologic','musculoskeletal','prostate','skin','ghigf','metabolic','ins_axis','immunity','renal','vessels','blood','thyroid'
+                                   // Минимум 1, обычно 3-7 систем
+
+targetMechanisms: string[];        // Коды механизмов действия
+                                   // Допустимые значения: 'AR_AGONISM','mTOR_UP','PROTEIN_SYNTHESIS','ERYTHROPOIESIS','PR_AGONISM','GR_ANTAGONISM','DOPAMINE_MODULATION','COLLAGEN_SYNTHESIS',
+                                   // 'CYP3A4_METABOLISM','GLYCOGEN_SYNTHESIS','AR_SELECTIVE_AGONISM','GHSR_AGONISM','GH_RELEASE','IGF1_UP','IGF1_AGONISM','MGF_AGONISM',
+                                   // 'SATELLITE_CELL_ACTIVATION','INSULIN_AGONISM','GLUCOSE_UPTAKE','ER_ANTAGONISM','GNRH_UP','LH_UP','FSH_UP','AROMATASE_INHIBITION',
+                                   // 'E2_SUPPRESSION','D2_AGONISM','PROLACTIN_SUPPRESSION','ARB_AGONISM','PPARG_UP','B1_BLOCKADE','NO_UP','GLUTATHIONE_UP','ANTIOXIDANT',
+                                   // 'BILE_ACID_MOD','ANTIAPOPTOTIC','EPA_DHA_UP','ANTIINFLAMMATORY','NMDA_BLOCK','GABA_MOD','AMPK_UP','COX_INHIBITION',
+                                   // 'PLATELET_AGGREGATION_INHIBITION','TISSUE_REPAIR','IMMUNE_MODULATION','NEUROPEPTIDE_MOD','LIPOLYSIS_ACTIVATION','HSL_STIMULATION',
+                                   // 'SHBG_BINDING','5AR_INHIBITION','DHT_BLOCKADE','ANTIANDROGEN','VDR_AGONISM','CALCIUM_ABSORPTION','GLA_PROTEIN_ACTIVATION',
+                                   // 'CALCIUM_REGULATION','ZINC_COFACTOR','SHBG_REGULATION','TESTOSTERONE_UP','SELENOPROTEIN_SYNTHESIS','THYROID_HORMONE_METABOLISM',
+                                   // 'NEUROTRANSMITTER_SYNTHESIS','DOPAMINE_PRECURSOR','PROLACTIN_REGULATION','METHYLATION_CYCLE','MYELIN_SYNTHESIS','HOMOCYSTEINE_REGULATION',
+                                   // 'DNA_SYNTHESIS','MITOCHONDRIAL_ENERGY','COENZYME_ELECTRON_TRANSPORT','INSULIN_SENSITIVITY','LIVER_REGENERATION','CYP450_MODULATION',
+                                   // 'NFKB_INHIBITION','MEMBRANE_PHOSPHOLIPID','LIVER_LIPID_METABOLISM','CHOLINE_DONOR','CORTISOL_REGULATION','THYROID_STIMULATION',
+                                   // 'FULVIC_ACID','ADAPTOGEN','GUT_FLORA_MODULATION','SHORT_CHAIN_FATTY_ACIDS','OSMOREGULATION','GLP1_AGONISM','GIP_AGONISM'
+                                   // Минимум 1, обычно 2-4 механизма
+
+linkedRisks: Array<{               // Связанные риски: на какие системы и как влияет
+  system: string;                   // Ключ системы (те же, что в targetSystems)
+  direction: 'up' | 'down' | 'both'; // up = риск растёт, down = риск снижается
+  strength: number;                 // Сила влияния 0.0–1.0
+}>;                                 // Минимум 1, обычно 2-4 риска
+
+linkedSubstances: Array<{          // Связанные вещества (синергии/антагонизмы с другими препаратами)
+  id: string;                       // id из PHARMA_DB
+  type: 'synergy' | 'anti_synergy'; // synergy = усиливают друг друга, anti_synergy = конфликтуют
+  mechanism: string;                // Краткое описание мех-ма (20-60 символов)
+  strength: number;                 // Сила 0.0–1.0
+}>;                                 // Минимум 1, желательно 2+
+
+cvProfile: {                       // Сердечно-сосудистый профиль
+  bloodPressure: 'up' | 'down' | 'neutral';
+  heartRate: 'up' | 'down' | 'neutral';
+  vascularTone: 'constrict' | 'dilate' | 'neutral';
+  thrombosisRisk: 'low' | 'medium' | 'high';
+  cnsLoad: 'low' | 'medium' | 'high';
+};                                 // Обязательно ВСЕ 5 полей
+```
+
+### 11.2. Пример полностью заполненной карточки
+
+```typescript
+test_enan: {
+  id:'test_enan', name:'Тестостерон энантат', class:'testosterone',
+  esters:['enanthate'],
+  pk:{ka:0.024,k10:0.05,k12:0.02,k21:0.015,Vd:35,bioavailability:1,halfLifeHours:336},
+  pd:{AR_affinity:1,aromatization:1,five_alpha_reduction:0.5,progestogenic:0,hepatotoxicity:0,lipid_impact:-0.3,hct_impact:4,neuro_toxicity:0.1},
+  ec50:400,n_hill:2.5,maxEffect:1,
+  // ↓↓↓ ОБЯЗАТЕЛЬНЫЕ ПОЛЯ ↓↓↓
+  targetSystems:['cardio','endocrine','reproductive','hematologic','musculoskeletal','prostate','skin'],
+  targetMechanisms:['AR_AGONISM','mTOR_UP','PROTEIN_SYNTHESIS','ERYTHROPOIESIS'],
+  linkedRisks:[
+    {system:'cardio',direction:'up',strength:0.4},
+    {system:'hematologic',direction:'up',strength:0.6},
+    {system:'reproductive',direction:'down',strength:0.8},
+    {system:'endocrine',direction:'down',strength:0.7}
+  ],
+  linkedSubstances:[
+    {id:'anastro',type:'synergy',mechanism:'Контроль эстрадиола, снижение риска гинекомастии',strength:0.7},
+    {id:'tamox',type:'synergy',mechanism:'Синергия для HPTA восстановления в PCT',strength:0.5}
+  ],
+  cvProfile:{bloodPressure:'up',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'high',cnsLoad:'low'}
+}
+```
+
+### 11.3. Что отображается в DrugDetailCard
+
+| Блок | Источник | Цвет чипсов |
+|------|----------|-------------|
+| Системы-мишени | `sub.targetSystems` | indigo `#818cf8` |
+| СС-профиль | `sub.cvProfile` | динамический: опасный красный, защитный зелёный/синий |
+| Связанные риски | `sub.linkedRisks` | зелёный `#4caf50` (снижение риска) / красный `#f44336` (повышение) |
+| Связанные вещества | `sub.linkedSubstances` | зелёный `#00e68a` (⊕ синергия) / красный `#ff1744` (⊖ антагонизм) |
+
+### 11.4. Контроль качества
+- Каждый новый препарат проверяется на наличие ВСЕХ 4 блоков чипсов (targetSystems, cvProfile, linkedRisks, linkedSubstances)
+- linkedSubstances — минимум 1 запись (если нет известных — указать id='none' с type='synergy' и mechanism='Нет данных')
+- cvProfile — ВСЕ 5 полей обязательны, ни одно не может быть пропущено
+- После добавления запустить `tsc --noEmit && vite build`
+
+**Нарушение = критическая ошибка.** Препарат с пропущенными targetSystems, cvProfile, linkedRisks или linkedSubstances не принимается.
+
+## 12. Структура каталога продуктов питания (AdvancedProductCard) — ОБЯЗАТЕЛЬНО
+
+При добавлении любого продукта в каталог питания (`nutrition-db.ts`, `product-usefulness.ts` и т.д.) **каждый продукт ОБЯЗАН** строго соответствовать интерфейсу:
+
+```typescript
+interface AdvancedProductCard {
+  id: string;                         // уникальный идентификатор
+  name: string;                       // название на русском
+  category: string;                   // "Крупы" | "Мясо" | "Рыба" | "Овощи" | "Зелень" | "Молочные продукты" | "Спортивное питание" | "Жиры" | "Фрукты" | "Субпродукты"
+  macro_100g: {
+    calories: number;                 // ккал
+    proteins_total: number;           // общий белок, г
+    proteins_animal: number;          // животный белок, г
+    proteins_plant: number;           // растительный белок, г
+    fats_total: number;               // общие жиры, г
+    fats_saturated: number;           // насыщенные жиры, г
+    omega_3_mg: number;               // Омега-3, мг
+    omega_6_mg: number;               // Омега-6, мг
+    cholesterol_mg: number;           // холестерин, мг
+    carbs_total: number;              // общие углеводы, г
+    carbs_fiber: number;              // клетчатка, г
+    glycemic_index: number;           // гликемический индекс (0–100)
+    insulin_index: number;            // инсулиновый индекс (0–150)
+  };
+  amino_acid_profile_100g: {
+    leucine_mg: number;               // лейцин (триггер mTOR)
+    isoleucine_mg: number;
+    valine_mg: number;
+    lysine_mg: number;
+    methionine_mg: number;
+    arginine_mg: number;              // донатор NO, пампинг
+    glutamine_mg: number;             // поддержка ЖКТ
+  };
+  electrolytes_100g: {
+    sodium_mg: number;                // натрий
+    potassium_mg: number;             // калий
+    magnesium_mg: number;             // магний
+    pral_index: number;               // кислотная нагрузка
+  };
+  gastro_tags: {
+    fodmap_group: 'HIGH' | 'LOW';     // риск брожения / вздутия
+    enzyme_demand_score: number;      // нагрузка на ферменты поджелудочной (1–10)
+    gastric_emptying_speed: 'FAST' | 'MEDIUM' | 'SLOW';
+  };
+  metabolic_flags: {
+    atherogenic_potential: 'HIGH' | 'LOW';
+    glycation_potential: 'HIGH' | 'LOW';
+    ammonia_source_level: 'HIGH' | 'MEDIUM' | 'LOW';
+    heavy_metal_risk: 'HIGH' | 'LOW';
+    cns_impact: 'STIMULANT' | 'SEDATIVE' | 'NEUTRAL';
+  };
+}
+```
+
+**Запрещено:**
+- Добавлять продукт с пропущенными полями
+- Использовать `as any` для обхода типизации
+- Копировать существующий продукт без проверки всех полей
+- Оставлять `0` или `null` в обязательных числовых полях без реальных данных

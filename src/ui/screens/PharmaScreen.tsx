@@ -120,6 +120,24 @@ const PHARMA_MECH_LABELS: Record<string, string> = {
   'AROMATIZATION (20%)': 'Ароматизация (20%)',
 };
 
+const CV_LABELS: Record<string, string> = {
+  bloodPressure: 'АД', heartRate: 'ЧСС', vascularTone: 'Тонус', thrombosisRisk: 'Тромбоз', cnsLoad: 'ЦНС',
+};
+const CV_VALUE_LABELS: Record<string, Record<string, string>> = {
+  bloodPressure: { up: '↑', down: '↓', neutral: '=' },
+  heartRate: { up: '↑', down: '↓', neutral: '=' },
+  vascularTone: { constrict: 'спазм', dilate: 'расш', neutral: '=' },
+  thrombosisRisk: { low: 'низкий', medium: 'средний', high: 'высокий' },
+  cnsLoad: { low: 'низкая', medium: 'средняя', high: 'высокая' },
+};
+const CV_VALUE_COLORS: Record<string, Record<string, string>> = {
+  bloodPressure: { up: '#f44336', down: '#2196f3', neutral: '#9e9e9e' },
+  heartRate: { up: '#f44336', down: '#2196f3', neutral: '#9e9e9e' },
+  vascularTone: { constrict: '#f44336', dilate: '#2196f3', neutral: '#9e9e9e' },
+  thrombosisRisk: { low: '#4caf50', medium: '#ff9800', high: '#f44336' },
+  cnsLoad: { low: '#4caf50', medium: '#ff9800', high: '#f44336' },
+};
+
 const SEVERITY_COLORS: Record<string, string> = {
   critical: '#ff1744',
   warning: '#ff9100',
@@ -668,6 +686,66 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
         <span>Vd:</span><span style={{ fontWeight: 600 }}>{sub.pk ? sub.pk.Vd + ' л' : '—'}</span>
         <span>Эстеры:</span><span style={{ fontWeight: 600 }}>{sub.esters?.join(', ') || '—'}</span>
       </div>
+
+      {/* target systems chips */}
+      {sub.targetSystems && sub.targetSystems.length > 0 && (
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Системы-мишени</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {sub.targetSystems.map(s => (
+              <span key={s} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(99,102,241,0.12)', color: '#818cf8', fontWeight: 500 }}>{SYSTEM_LABELS[s] || s}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* cv profile chips */}
+      {sub.cvProfile && (
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Сердечно-сосудистый профиль</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {Object.entries(sub.cvProfile).map(([key, val]) => {
+              const lbl = CV_VALUE_LABELS[key]?.[val] || val;
+              const clr = CV_VALUE_COLORS[key]?.[val] || '#9e9e9e';
+              return (
+                <span key={key} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: `${clr}18`, color: clr, fontWeight: 500 }}>{CV_LABELS[key] || key}: {lbl}</span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* linked risks chips */}
+      {sub.linkedRisks && sub.linkedRisks.length > 0 && (
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Связанные риски</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {sub.linkedRisks.map((r, i) => (
+              <span key={i} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: r.direction === 'down' ? 'rgba(76,175,80,0.12)' : 'rgba(244,67,54,0.12)', color: r.direction === 'down' ? '#4caf50' : '#f44336', fontWeight: 500 }}>
+                {SYSTEM_LABELS[r.system] || r.system} {r.direction === 'up' ? '↑' : '↓'} {Math.round(r.strength * 100)}%
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* linked substances chips */}
+      {sub.linkedSubstances && sub.linkedSubstances.length > 0 && (
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Связанные вещества</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {sub.linkedSubstances.map((ls, i) => {
+              const linked = PHARMA_DB[ls.id];
+              const clr = ls.type === 'synergy' ? '#00e68a' : '#ff1744';
+              return (
+                <span key={i} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: `${clr}18`, color: clr, fontWeight: 500 }}>
+                  {ls.type === 'synergy' ? '⊕' : '⊖'} {linked?.name || ls.id} ({ls.mechanism})
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>Фармакодинамика</div>

@@ -173,6 +173,7 @@ export interface PlanCtx {
   butchPlan: any; setButchPlan: (v: any) => void;
   cravingPlan: any; setCravingPlan: (v: any) => void;
   lazyDayPlan: any; setLazyDayPlan: (v: any) => void;
+  surplusPct: number; setSurplusPct: (v: number) => void;
   recommendations: string[]; setRecommendations: (v: any) => void;
   activeReports: string[]; setActiveReports: (v: any) => void;
   allergenReport: any; setAllergenReport: (v: any) => void;
@@ -213,6 +214,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [lazyDayMode, setLazyDayMode] = useState(false);
   const [lazyDayDays, setLazyDayDays] = useState(1);
   const [periodizationEnabled, setPeriodizationEnabled] = useState(false);
+  const [surplusPct, setSurplusPct] = useState(() => { try { const v = localStorage.getItem('he_surplus_pct'); return v ? parseInt(v) : 10; } catch { return 10; } });
   const [trainType, setTrainType] = useState<'strength' | 'cardio' | 'mixed' | 'hiit'>('strength');
   const [trainIntensity, setTrainIntensity] = useState<'low' | 'medium' | 'high'>('medium');
   const [householdActivity, setHouseholdActivity] = useState<'sedentary' | 'light' | 'moderate' | 'active'>('light');
@@ -293,6 +295,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const targetsV2 = (() => { try { return calcNutritionV2({ weightKg: weight, heightCm: height, age, sex: sex || 'male', pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal as any, bodyFatPercent: bodyFatPct }); } catch { return null; } })();
     const baseTdeeV2 = targetsV2?.baseTdee || 0; const adjV2 = targetsV2?.adjustment || 0;
     let targets: any = targetsV2 ? { bmr: baseTdeeV2 > 0 ? Math.round(baseTdeeV2 / (pal || 1.2)) : 0, tdee: baseTdeeV2 || Math.round(targetsV2.kcal - adjV2), kcal: targetsV2.kcal, protein: targetsV2.proteinG, fats: targetsV2.fatG, carbs: targetsV2.carbsG, adjustment: adjV2 } : (() => { try { const r = calcNutrition({ weightKg: weight, heightCm: height, age, sex, pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal }); return { bmr: r.bmr, tdee: r.tdee, kcal: r.kcal, protein: r.protein, fats: r.fats, carbs: r.carbs, adjustment: r.kcal - r.tdee }; } catch { return { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300, adjustment: 0 }; } })();
+    if (engineGoal === 'bulk' && surplusPct !== 10) { targets.kcal = Math.round((targets.tdee || targets.kcal) * (1 + surplusPct / 100)); targets.carbs = Math.round((targets.kcal - targets.protein * 4 - targets.fats * 9) / 4); }
     const phaseMult: Record<string, { kcalMod: number; pAdd: number }> = { course:{kcalMod:1.0,pAdd:0.3},bridge:{kcalMod:0.95,pAdd:0},pct:{kcalMod:0.9,pAdd:0},recovery:{kcalMod:1.05,pAdd:0.3},cutting:{kcalMod:0.8,pAdd:0.2},maintenance:{kcalMod:1.0,pAdd:0},recomp:{kcalMod:0.9,pAdd:0.1},fat_loss:{kcalMod:0.75,pAdd:0.2},post_cut:{kcalMod:1.05,pAdd:0.1} };
     const pm = phaseMult[phase] || { kcalMod: 1.0, pAdd: 0 };
     targets.kcal = Math.round(targets.kcal * pm.kcalMod); targets.protein = Math.round(targets.protein + weight * pm.pAdd);
@@ -899,7 +902,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     specialMealReplaceTarget, setSpecialMealReplaceTarget,
     cheatMealPlan, setCheatMealPlan, carbloadPlan, setCarbloadPlan,
     butchPlan, setButchPlan,
-    cravingPlan, setCravingPlan, lazyDayPlan, setLazyDayPlan,
+    cravingPlan, setCravingPlan,     lazyDayPlan, setLazyDayPlan,
+    surplusPct, setSurplusPct,
     recommendations, setRecommendations,
     activeReports, setActiveReports,
     allergenReport, setAllergenReport, nutrientReport, setNutrientReport,

@@ -455,8 +455,8 @@ export const TrainingScreen: React.FC = () => {
       {mainGroup === 'planning' && (
         <div style={{ display:'flex', gap:4, marginBottom:10, padding:'6px', borderRadius:12, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
           <button onClick={() => { hapticImpact('medium'); switchPlanningTrack('pl'); }} style={{ flex:1, padding:'9px 6px', borderRadius:9, fontSize:11, fontWeight:700, cursor:'pointer', border: planningTrack === 'pl' ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)', background: planningTrack === 'pl' ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)', color: planningTrack === 'pl' ? 'var(--accent)' : 'var(--text-dim)' }}>🏆 ПЛ (сила)</button>
-          <button onClick={() => { hapticImpact('medium'); switchPlanningTrack('bb'); }} style={{ flex:1, padding:'9px 6px', borderRadius:9, fontSize:11, fontWeight:700, cursor:'pointer', border: planningTrack === 'bb' ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.06)', background: planningTrack === 'bb' ? 'rgba(59,130,246,0.14)' : 'rgba(255,255,255,0.02)', color: planningTrack === 'bb' ? '#3b82f6' : 'var(--text-dim)' }}>💪 ББ</button>
-          <button onClick={() => { hapticImpact('medium'); switchPlanningTrack('manual'); }} style={{ flex:1, padding:'9px 6px', borderRadius:9, fontSize:11, fontWeight:700, cursor:'pointer', border: planningTrack === 'manual' ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.06)', background: planningTrack === 'manual' ? 'rgba(168,85,247,0.14)' : 'rgba(255,255,255,0.02)', color: planningTrack === 'manual' ? '#a855f7' : 'var(--text-dim)' }}>🛠 Ручной сбор</button>
+          <button onClick={() => { hapticImpact('medium'); switchPlanningTrack('bb'); }} style={{ flex:1, padding:'9px 6px', borderRadius:9, fontSize:11, fontWeight:700, cursor:'pointer', border: planningTrack === 'bb' ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: planningTrack === 'bb' ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)', color: planningTrack === 'bb' ? '#00e68a' : 'var(--text-dim)' }}>💪 ББ</button>
+          <button onClick={() => { hapticImpact('medium'); switchPlanningTrack('manual'); }} style={{ flex:1, padding:'9px 6px', borderRadius:9, fontSize:11, fontWeight:700, cursor:'pointer', border: planningTrack === 'manual' ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: planningTrack === 'manual' ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)', color: planningTrack === 'manual' ? '#00e68a' : 'var(--text-dim)' }}>🛠 Ручной сбор</button>
         </div>
       )}
 
@@ -540,7 +540,7 @@ export const TrainingScreen: React.FC = () => {
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontWeight: 600 }}>{c.name}</span>
-                        <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: 'rgba(0,230,138,0.1)', color: '#00e68a', fontWeight: 600 }}>{(c.score * 100).toFixed(0)}%</span>
+                        <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: 'rgba(0,230,138,0.1)', color: 'var(--accent)', fontWeight: 600 }}>{(c.score * 100).toFixed(0)}%</span>
                       </div>
                       <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{c.desc?.slice(0, 80)}{c.desc && c.desc.length > 80 ? '...' : ''}</div>
                       {c.rationale && <div style={{ fontSize: 8, color: 'var(--accent)', marginTop: 1 }}>{c.rationale.slice(0, 60)}</div>}
@@ -678,7 +678,7 @@ export const TrainingScreen: React.FC = () => {
             <div style={{ display: 'flex', gap: 6 }}>
               <button onClick={() => generatePlan()} style={{
                 flex: 1, padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 13,
+                background: 'linear-gradient(135deg, var(--accent), #00c853)', color: '#000', fontWeight: 700, fontSize: 13,
               }}>▶ Сгенерировать план</button>
               {trainingOutput && (
                 <button onClick={() => { generatePlan(); }} style={{
@@ -728,7 +728,7 @@ export const TrainingScreen: React.FC = () => {
                 else if (currentMicrocycle?.mesocycleType === 'accumulation') tips.push({ icon: '📈', text: 'Фаза накопления: постепенно увеличивайте объём при сохранении качества повторений.', color: '#22c55e' });
                 if (weakPoints.length > 0) tips.push({ icon: '🔎', text: `Фокус на слабых зонах: ${weakPoints.map(w => GROUP_LABELS[w] || w).join(', ')}.`, color: '#8b5cf6' });
                 if (recovery > 8 && fatigue < 3) tips.push({ icon: '✅', text: 'Готовность высокая: можно добавить один качественный подход в приоритетную группу.', color: '#22c55e' });
-                if (tips.length === 0) tips.push({ icon: '✅', text: 'Параметры выглядят сбалансированно: выполняйте план без лишних изменений.', color: '#00e68a' });
+                if (tips.length === 0) tips.push({ icon: '✅', text: 'Параметры выглядят сбалансированно: выполняйте план без лишних изменений.', color: 'var(--accent)' });
                 return (
                   <div key="recommendations" className="card" style={{ padding: '10px 12px', border: '1px solid rgba(0,230,138,0.2)' }}>
                     <h4 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--accent)' }}>💡 Рекомендации</h4>
@@ -917,9 +917,9 @@ export const TrainingScreen: React.FC = () => {
                           <span style={{ fontSize: 7, padding: '1px 3px', borderRadius: 2, background: `${roleColor}22`, color: roleColor, fontWeight: 700, minWidth: 22, textAlign: 'center', flexShrink: 0 }}>{roleLabel}</span>
                           <span style={{ flex: 1 }} title={ex.technique || ''}>{ex.name}</span>
                           <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 55, textAlign: 'right' }}>{ex.sets}×{ex.reps}</span>
-                          {estMax > 0 && <span style={{ fontSize: 8, color: '#8b5cf6', minWidth: 40, textAlign: 'right' }}>~{estMax}кг</span>}
+                          {estMax > 0 && <span style={{ fontSize: 8, color: '#00e68a', minWidth: 40, textAlign: 'right' }}>~{estMax}кг</span>}
                           <span style={{ fontSize: 8, color: 'var(--text-dim)', minWidth: 25, textAlign: 'right' }}>RIR{ex.rir}</span>
-                          <span style={{ fontSize: 6, padding: '1px 2px', borderRadius: 2, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', whiteSpace: 'nowrap' }}>{scheme?.schemeType?.slice(0, 6) || '—'}</span>
+                          <span style={{ fontSize: 6, padding: '1px 2px', borderRadius: 2, background: 'rgba(0,230,138,0.1)', color: '#00e68a', whiteSpace: 'nowrap' }}>{scheme?.schemeType?.slice(0, 6) || '—'}</span>
                           <span style={{ fontSize: 6, padding: '1px 2px', borderRadius: 2, background: 'rgba(249,115,22,0.1)', color: '#f97316', whiteSpace: 'nowrap' }}>⏱{restSec}с</span>
                           {substitute && <span style={{ fontSize: 6, color: 'var(--text-dim)', maxWidth: 50, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={``}>↔{substitute.name.slice(0, 8)}</span>}
                         </div>
@@ -1238,7 +1238,7 @@ export const TrainingScreen: React.FC = () => {
                   })()}
                   <button onClick={() => { setRuntimeStarted(true); setRuntimeLogs({}); setRuntimeExIdx(0); }} style={{
                     width: '100%', padding: 12, borderRadius: 8, border: 'none', cursor: 'pointer',
-                    background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 14,
+                    background: 'linear-gradient(135deg, var(--accent), #00c853)', color: '#000', fontWeight: 700, fontSize: 14,
                   }}>▶ Старт</button>
                 </>
               ) : (
@@ -1371,7 +1371,7 @@ export const TrainingScreen: React.FC = () => {
                         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>{ex.name}</div>
                       </div>
                       <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>  
-                        <span style={{ fontSize: 9, padding: '2px 5px', borderRadius: 3, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6' }}>{scheme?.schemeType || 'straight'}</span>
+                        <span style={{ fontSize: 9, padding: '2px 5px', borderRadius: 3, background: 'rgba(0,230,138,0.1)', color: '#00e68a' }}>{scheme?.schemeType || 'straight'}</span>
                         <span style={{ fontSize: 9, padding: '2px 5px', borderRadius: 3, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{formatTempo(tempo)}</span>
                       </div>
                     </div>
@@ -1557,7 +1557,7 @@ export const TrainingScreen: React.FC = () => {
                         <span style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:ex.jointStress==='high'?'rgba(239,68,68,0.08)':'rgba(34,197,94,0.08)', color:ex.jointStress==='high'?'#ef4444':'#22c55e' }}>{JOINT_LABELS[ex.jointStress]||ex.jointStress}</span>
                       </div>
                     </div>
-                    <span style={{ fontSize:10, color:isSelected?'#00e68a':'var(--text-dim)', transition:'transform 0.15s', transform:isSelected?'rotate(180deg)':'none' }}>▼</span>
+                    <span style={{ fontSize:10, color:isSelected?'var(--accent)':'var(--text-dim)', transition:'transform 0.15s', transform:isSelected?'rotate(180deg)':'none' }}>▼</span>
                   </div>
 
                   {/* Detail panel inline (Apple bottom-sheet style) */}
@@ -1565,7 +1565,7 @@ export const TrainingScreen: React.FC = () => {
                     <div style={{ marginTop:8, paddingTop:8, borderTop:'1px solid var(--border)' }}>
                       {/* Tags row */}
                       <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
-                        <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{ex.type==='compound'?'Базовое':'Изолирующее'}</span>
+                        <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'var(--accent)' }}>{ex.type==='compound'?'Базовое':'Изолирующее'}</span>
                         {ex.difficulty && <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:ex.difficulty==='advanced'?'rgba(239,68,68,0.08)':'rgba(249,115,22,0.08)', color:ex.difficulty==='advanced'?'#ef4444':ex.difficulty==='intermediate'?'#f97316':'#22c55e' }}>{ex.difficulty==='advanced'?'Продвинутое':ex.difficulty==='intermediate'?'Среднее':'Начальное'}</span>}
                         <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(139,92,246,0.08)', color:'#8b5cf6' }}>Усталость: {ex.fatigueCost}/10</span>
                         {ex.targetMuscle && <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(236,72,153,0.08)', color:'#ec4899' }}>🎯 {ex.targetMuscle}</span>}
@@ -1581,7 +1581,7 @@ export const TrainingScreen: React.FC = () => {
                       {/* Replacements */}
                       {ex.canReplace && ex.canReplace.length > 0 && <div style={{ display:'flex', flexWrap:'wrap', gap:3, alignItems:'center', marginBottom:4 }}>
                         <span style={{ fontSize:8, color:'var(--text-dim)' }}>Замена:</span>
-                        {ex.canReplace.map(r => { const rep = EXERCISE_CATALOG.find(e => e.id === r); return rep ? <span key={r} style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.06)', color:'#00e68a' }}>{rep.name}</span> : null; })}
+                        {ex.canReplace.map(r => { const rep = EXERCISE_CATALOG.find(e => e.id === r); return rep ? <span key={r} style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.06)', color:'var(--accent)' }}>{rep.name}</span> : null; })}
                       </div>}
                       {/* Add to plan button */}
                       <button onClick={() => {
@@ -1593,7 +1593,7 @@ export const TrainingScreen: React.FC = () => {
                         width:'100%', marginTop:4, padding:'8px', borderRadius:8,
                         border: lastAddedEx === ex.id ? '1px solid rgba(0,230,138,0.5)' : '1px solid rgba(0,230,138,0.3)',
                         background: lastAddedEx === ex.id ? 'rgba(0,230,138,0.15)' : 'rgba(0,230,138,0.06)',
-                        color: lastAddedEx === ex.id ? '#00e68a' : 'var(--accent)', fontWeight:700, fontSize:11, cursor:'pointer',
+                        color: lastAddedEx === ex.id ? 'var(--accent)' : 'var(--accent)', fontWeight:700, fontSize:11, cursor:'pointer',
                         transition:'all 0.3s',
                       }}>{lastAddedEx === ex.id ? '✓ Добавлено!' : '+ Добавить в план'}</button>
                     </div>
@@ -1626,7 +1626,7 @@ export const TrainingScreen: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
               <div style={{ background: 'rgba(0,230,138,0.1)', borderRadius: 12, padding: 10, textAlign: 'center', border:'1px solid rgba(0,230,138,0.15)' }}>
                 <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Epley</div>
-                <div style={{ fontSize: 20, fontWeight: 800, background:'linear-gradient(135deg, #00e68a, #00c853)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>{calcResults.epley1RM.toFixed(1)}</div>
+                <div style={{ fontSize: 20, fontWeight: 800, background:'linear-gradient(135deg, var(--accent), #00c853)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>{calcResults.epley1RM.toFixed(1)}</div>
                 <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>кг</div>
               </div>
               <div style={{ background: 'rgba(59,130,246,0.1)', borderRadius: 12, padding: 10, textAlign: 'center', border:'1px solid rgba(59,130,246,0.15)' }}>
@@ -1634,9 +1634,9 @@ export const TrainingScreen: React.FC = () => {
                 <div style={{ fontSize: 20, fontWeight: 800, background:'linear-gradient(135deg, #3b82f6, #60a5fa)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>{calcResults.brzycki1RM.toFixed(1)}</div>
                 <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>кг</div>
               </div>
-              <div style={{ background: 'rgba(139,92,246,0.1)', borderRadius: 12, padding: 10, textAlign: 'center', border:'1px solid rgba(139,92,246,0.15)' }}>
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 12, padding: 10, textAlign: 'center', border:'1px solid rgba(0,230,138,0.15)' }}>
                 <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Среднее</div>
-                <div style={{ fontSize: 20, fontWeight: 800, background:'linear-gradient(135deg, #8b5cf6, #a855f7)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>{((calcResults.epley1RM + calcResults.brzycki1RM) / 2).toFixed(1)}</div>
+                <div style={{ fontSize: 20, fontWeight: 800, background:'linear-gradient(135deg, #00e68a, #00cc7a)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>{((calcResults.epley1RM + calcResults.brzycki1RM) / 2).toFixed(1)}</div>
                 <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>кг</div>
               </div>
             </div>
@@ -1713,7 +1713,7 @@ export const TrainingScreen: React.FC = () => {
                       flex: 1, padding: '6px 4px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
                       background: plSex === s ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
                       border: plSex === s ? '1px solid var(--accent)' : '1px solid var(--border)',
-                      color: plSex === s ? '#00e68a' : 'var(--text-dim)', fontWeight: plSex === s ? 700 : 400,
+                      color: plSex === s ? 'var(--accent)' : 'var(--text-dim)', fontWeight: plSex === s ? 700 : 400,
                     }}>{s === 'male' ? 'Мужской' : 'Женский'}</button>
                   ))}
                 </div>
@@ -1733,9 +1733,9 @@ export const TrainingScreen: React.FC = () => {
                     <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Сумма</div>
                     <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{total} кг</div>
                   </div>
-                  <div style={{ background: 'rgba(139,92,246,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
+                  <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
                     <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Dots</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: '#8b5cf6' }}>{dots.toFixed(2)}</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: '#00e68a' }}>{dots.toFixed(2)}</div>
                   </div>
                   <div style={{ background: 'rgba(249,115,22,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
                     <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Отн. вес</div>
@@ -1793,7 +1793,7 @@ export const TrainingScreen: React.FC = () => {
                       flex: 1, padding: '6px 4px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
                       background: bmrSex === s ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
                       border: bmrSex === s ? '1px solid var(--accent)' : '1px solid var(--border)',
-                      color: bmrSex === s ? '#00e68a' : 'var(--text-dim)', fontWeight: bmrSex === s ? 700 : 400,
+                      color: bmrSex === s ? 'var(--accent)' : 'var(--text-dim)', fontWeight: bmrSex === s ? 700 : 400,
                     }}>{s === 'male' ? 'Мужской' : 'Женский'}</button>
                   ))}
                 </div>
@@ -1870,7 +1870,7 @@ export const TrainingScreen: React.FC = () => {
                       flex: 1, padding: '6px 4px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
                       background: gripSex === s ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
                       border: gripSex === s ? '1px solid var(--accent)' : '1px solid var(--border)',
-                      color: gripSex === s ? '#00e68a' : 'var(--text-dim)', fontWeight: gripSex === s ? 700 : 400,
+                      color: gripSex === s ? 'var(--accent)' : 'var(--text-dim)', fontWeight: gripSex === s ? 700 : 400,
                     }}>{s === 'male' ? 'Мужской' : 'Женский'}</button>
                   ))}
                 </div>
@@ -2808,7 +2808,7 @@ export const TrainingScreen: React.FC = () => {
               {GOALS.map(g => (
                 <button key={g.value} onClick={() => { setGoal(g.value); setTimeout(generatePlan, 50); }} style={{
                   padding:'5px 8px', borderRadius:8, fontSize:10, fontWeight: goal === g.value ? 700 : 400,
-                  cursor:'pointer', border: goal === g.value ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                  cursor:'pointer', border: goal === g.value ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
                   background: goal === g.value ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: 'var(--text)', textAlign:'left',
                 }}>{g.icon} {g.label}</button>
               ))}
@@ -2822,7 +2822,7 @@ export const TrainingScreen: React.FC = () => {
               ].map(p => (
                 <button key={p.v} onClick={() => { setPeriodizationType(p.v as any); setTimeout(generatePlan, 50); }} style={{
                   padding:'3px 8px', borderRadius:6, fontSize:9, fontWeight: periodizationType === p.v ? 700 : 400, cursor:'pointer',
-                  border: periodizationType === p.v ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                  border: periodizationType === p.v ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
                   background: periodizationType === p.v ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: 'var(--text)',
                 }}>{p.l}</button>
               ))}
@@ -2841,8 +2841,8 @@ export const TrainingScreen: React.FC = () => {
               ].map(c => (
                 <button key={c.v} onClick={() => { setCycleType(c.v); setTimeout(generatePlan, 50); }} title={c.d} style={{
                   padding:'4px 6px', borderRadius:6, fontSize:8, fontWeight: cycleType === c.v ? 700 : 400, cursor:'pointer',
-                  border: cycleType === c.v ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.06)',
-                  background: cycleType === c.v ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.02)', color: 'var(--text)',
+                  border: cycleType === c.v ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+                  background: cycleType === c.v ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)', color: 'var(--text)',
                   textAlign:'center', lineHeight:1.2,
                 }}><div style={{fontWeight: cycleType === c.v ? 700 : 500}}>{c.l}</div><div style={{fontSize:6, color:'rgba(255,255,255,0.3)', marginTop:1}}>{c.d}</div></button>
               ))}
@@ -2853,14 +2853,14 @@ export const TrainingScreen: React.FC = () => {
               {LEVELS.map(l => (
                 <button key={l.value} onClick={() => setLevel(l.value)} style={{
                   padding:'3px 8px', borderRadius:6, fontSize:9, fontWeight: level === l.value ? 700 : 400, cursor:'pointer',
-                  border: level === l.value ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                  border: level === l.value ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
                   background: level === l.value ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: 'var(--text)',
                 }}>{l.icon} {l.label}</button>
               ))}
             </div>
             <button onClick={() => generatePlan()} style={{
               width:'100%', padding:'9px', borderRadius:10, border:'none', cursor:'pointer',
-              background:'linear-gradient(135deg,#00e68a,#00cc7a)', color:'#000', fontWeight:700, fontSize:12,
+              background:'linear-gradient(135deg,var(--accent),#00cc7a)', color:'#000', fontWeight:700, fontSize:12,
             }}>▶ Сгенерировать макроцикл</button>
             {cyclesError && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontSize:10, marginTop:6, textAlign:'center' }}>{cyclesError}</div>}
           </div>
@@ -2898,7 +2898,7 @@ export const TrainingScreen: React.FC = () => {
                         onClick={() => { setSelectedWeek(wi + 1); setTab('plan'); }}>
                         <div style={{ width:'70%', height:volH, background:color, borderRadius:'2px 2px 0 0', opacity: isCurrent ? 1 : 0.4, transition:'height 0.2s' }} />
                         <div style={{ width:'40%', height:intH, background:color, borderRadius:'2px 2px 0 0', opacity: isCurrent ? 0.8 : 0.3 }} />
-                        <span style={{ fontSize:7, color: isCurrent ? '#00e68a' : 'rgba(255,255,255,0.3)', fontWeight: isCurrent ? 700 : 400 }}>{wi + 1}</span>
+                        <span style={{ fontSize:7, color: isCurrent ? 'var(--accent)' : 'rgba(255,255,255,0.3)', fontWeight: isCurrent ? 700 : 400 }}>{wi + 1}</span>
                       </div>
                     );
                   })}
@@ -2915,7 +2915,7 @@ export const TrainingScreen: React.FC = () => {
               <div style={gCard}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
                   <span style={gLabel}>📅 {macrocycle.totalWeeks}-недельный макроцикл</span>
-                  <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(139,92,246,0.1)', color:'#8b5cf6' }}>{ctName}</span>
+                  <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.1)', color:'#00e68a' }}>{ctName}</span>
                 </div>
                 <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginBottom:6 }}>
                   {goalName} • {levelName} • Phase curve: {cycleType === 'bb_mass' || goal === 'bulk' ? '🌊 Wave' : goal === 'strength' || cycleType === 'pl_peaking' ? '📈 Linear' : goal === 'rehab' ? '📉 Inverted' : '⚖️ Balanced'}
@@ -2942,8 +2942,8 @@ export const TrainingScreen: React.FC = () => {
                         return <div key={wi} style={{
                           width:22, height:22, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center',
                           background: selectedWeek === weekNum ? 'rgba(0,230,138,0.3)' : isDeload ? 'rgba(107,114,128,0.2)' : 'rgba(255,255,255,0.04)',
-                          border: selectedWeek === weekNum ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-                          fontSize:8, color: selectedWeek === weekNum ? '#00e68a' : 'rgba(255,255,255,0.4)',
+                          border: selectedWeek === weekNum ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
+                          fontSize:8, color: selectedWeek === weekNum ? 'var(--accent)' : 'rgba(255,255,255,0.4)',
                           cursor:'pointer', transition:'all 0.15s',
                         }} onClick={(e) => { e.stopPropagation(); setSelectedWeek(weekNum); setTab('plan'); }}>
                           {weekNum}
@@ -2955,7 +2955,7 @@ export const TrainingScreen: React.FC = () => {
                       <div style={{ borderTop:'1px solid rgba(255,255,255,0.04)', padding:'6px 8px' }}>
                         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:4 }}>
                           {[
-                            { label:'Тип', value: mc.type || 'Рабочий', color:'#00e68a' },
+                            { label:'Тип', value: mc.type || 'Рабочий', color:'var(--accent)' },
                             { label:'Объём', value: `${(mc.microcycles?.[0]?.volumeMultiplier ?? 1).toFixed(1)}×`, color:'#60a5fa' },
                             { label:'RIR', value: `${mc.microcycles?.[0]?.rirRange?.[0] ?? 1}-${mc.microcycles?.[0]?.rirRange?.[1] ?? 3}`, color:'#f59e0b' },
                           ].map((s,i) => <div key={i} style={{ background:'rgba(255,255,255,0.02)', borderRadius:6, padding:'3px 6px', textAlign:'center' }}>
@@ -2965,7 +2965,7 @@ export const TrainingScreen: React.FC = () => {
                         </div>
                         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, fontSize:8 }}>
                           {[
-                            { label:'RPE', value: `${mc.microcycles?.[0]?.rpeTarget ?? 7}`, color:'#00e68a' },
+                            { label:'RPE', value: `${mc.microcycles?.[0]?.rpeTarget ?? 7}`, color:'var(--accent)' },
                             { label:'Сплит', value: goal === 'bulk' ? 'Гипертрофия' : goal === 'strength' ? 'Сила' : goal === 'cut' ? 'Сушка' : 'Баланс', color:'#a78bfa' },
                             { label:'Дней', value: `${daysPerWeek}`, color:'#f59e0b' },
                           ].map((s,i) => <div key={i} style={{ background:'rgba(255,255,255,0.02)', borderRadius:6, padding:'3px', textAlign:'center' }}>
@@ -2974,7 +2974,7 @@ export const TrainingScreen: React.FC = () => {
                         </div>
                         {mc.microcycles && mc.microcycles.length > 0 && (
                           <div style={{ fontSize:8, color:'rgba(255,255,255,0.25)', marginTop:4 }}>
-                            Микроциклов: {mc.microcycles.length} | Прогрессия: <b style={{ color:'#00e68a' }}>{mc.type === 'accumulation' ? '+объём' : mc.type === 'intensification' ? '+интенсивность' : mc.type === 'peaking' ? 'пик' : 'разгрузка'}</b>
+                            Микроциклов: {mc.microcycles.length} | Прогрессия: <b style={{ color:'var(--accent)' }}>{mc.type === 'accumulation' ? '+объём' : mc.type === 'intensification' ? '+интенсивность' : mc.type === 'peaking' ? 'пик' : 'разгрузка'}</b>
                           </div>
                         )}
                       </div>
@@ -3026,7 +3026,7 @@ export const TrainingScreen: React.FC = () => {
                 setTimeout(() => setMyCycleMsg(''), 3000);
               } catch {} }} style={{
                 width:'100%', padding:9, borderRadius:10, border:'1px solid rgba(0,230,138,0.3)', cursor:'pointer',
-                background:'rgba(0,230,138,0.06)', color:'#00e68a', fontWeight:600, fontSize:11,
+                background:'rgba(0,230,138,0.06)', color:'var(--accent)', fontWeight:600, fontSize:11,
               }}>📋 В мои циклы</button>
               {myCycleMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', color:'#8b5cf6', fontSize:10, marginTop:4, textAlign:'center' }}>{myCycleMsg}</div>}
             </>);

@@ -318,6 +318,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                         <ScoreBar label="Белок" value={score.breakdown.proteinDensity} max={30} color="#3b82f6" />
                         <ScoreBar label="Микро" value={score.breakdown.microDensity} max={30} color="#22c55e" />
                         <ScoreBar label="Клетчатка" value={score.breakdown.fiberQuality} max={20} color="#f97316" />
+                        <ScoreBar label="Аминокислоты" value={score.breakdown.aminoScore} max={25} color="#ec4899" />
                         <ScoreBar label="Категория" value={score.breakdown.tierScore} max={20} color="#f59e0b" /></>}
                       {enableB && <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>
                         {score.contextBonus.goalMatch > 0 && <span style={{ color: '#22c55e' }}>✓ Цель совпадает </span>}
@@ -396,6 +397,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       <ScoreBar label="Белок" value={score.breakdown.proteinDensity} max={30} color="#3b82f6" />
                       <ScoreBar label="Микро" value={score.breakdown.microDensity} max={30} color="#22c55e" />
                       <ScoreBar label="Клетчатка" value={score.breakdown.fiberQuality} max={20} color="#f97316" />
+                      <ScoreBar label="Аминокислоты" value={score.breakdown.aminoScore} max={25} color="#ec4899" />
                       <ScoreBar label="Категория" value={score.breakdown.tierScore} max={20} color="#f59e0b" />
                     </>}
                     {enableC && score.costEfficiency && (
