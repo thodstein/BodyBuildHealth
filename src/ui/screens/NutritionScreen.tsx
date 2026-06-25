@@ -12,6 +12,13 @@ import { addToCart, getCarts, saveCarts, getActiveStoreId, setActiveStoreId, CAR
 import { NutritionCustomFood } from './NutritionScreen_parts/NutritionCustomFood';
 import { NutritionOverview } from './NutritionScreen_parts/NutritionOverview';
 import { ProductUsefulnessPlanner } from './NutritionScreen_parts/ProductUsefulnessPlanner';
+import { HealthAnalytics } from './NutritionScreen_parts/HealthAnalytics';
+import { ProgressTracker } from './NutritionScreen_parts/ProgressTracker';
+import { NutriAdvisor } from './NutritionScreen_parts/NutriAdvisor';
+import { CustomProducts } from './NutritionScreen_parts/CustomProducts';
+import { MealVisualizer } from './NutritionScreen_parts/MealVisualizer';
+import { Achievements } from './NutritionScreen_parts/Achievements';
+import { DailyQuests } from './NutritionScreen_parts/DailyQuests';
 
 const NutritionCharts = lazy(() => import('./NutritionScreen_parts/NutritionCharts').then(m => ({ default: m.NutritionCharts })));
 import { generateNutritionReport, NutritionReport } from '../../engines/nutrition-report.engine';
@@ -21,14 +28,14 @@ import { getQualityLabel } from '../../engines/nutrition-quality.engine';
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
 type NutritionPage = 'hero' | 'tabs';
 type NutritionSection = 'diary' | 'planning' | 'overview' | 'analytics' | 'all';
-type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info' | 'customfood' | 'overview' | 'usefulness';
+type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info' | 'customfood' | 'overview' | 'usefulness' | 'health' | 'progress' | 'nutria' | 'visualize' | 'achievements' | 'quests';
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
-  overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness'],
+  overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests'],
   analytics: ['charts', 'reports'],
   diary: ['diary', 'charts', 'reports'],
-  planning: ['mealplan', 'catalog', 'reference', 'info', 'usefulness'],
-  all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness'],
+  planning: ['mealplan', 'catalog', 'reference', 'info', 'usefulness', 'health'],
+  all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests'],
 };
 
 const TAB_LABELS: Record<string, string> = {
@@ -38,6 +45,13 @@ const TAB_LABELS: Record<string, string> = {
   favorites: '⭐ Избранное', catalog: '📦 Каталог',
   reference: '📖 Справочник', recipes: '🍳 Рецепты', reports: '📊 Отчёты', info: 'ℹ️ Инфо',
   usefulness: '🧮 Полезность',
+  health: '🩺 Здоровье',
+  progress: '📈 Прогресс',
+  nutria: '🧑‍⚕️ Нутрициолог',
+  customfood: '📝 Свои',
+  visualize: '🍽️ Блюдо',
+  achievements: '🏆 Достижения',
+  quests: '🎯 Квесты',
 };
 
 const cardBg = { background: '#18181b', borderRadius: 18, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 16px rgba(0,0,0,0.2)' };
@@ -292,8 +306,9 @@ const CATEGORY_LABELS: Record<string, string> = {
 const CatalogTab: React.FC = () => {
   const [catSearch, setCatSearch] = React.useState('');
   const [catFilter, setCatFilter] = React.useState('all');
-  const [catFilterMode, setCatFilterMode] = React.useState<'inclusive' | 'exclusive'>('inclusive');
+  const [catFilterMode, setCatFilterMode] = React.useState<'inclusive' | 'exclusive'>('exclusive');
   const [showExclusive, setShowExclusive] = React.useState(false);
+  const [catExpanded, setCatExpanded] = React.useState<string | null>(null);
   const categories = React.useMemo(() => [...new Set(FOOD_DB.map(f => f.category).filter(Boolean) as string[])], []);
   const addFav = (food: { id: string; name: string; kcal: number; protein: number; fat: number; carbs: number }) => {
     try { const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); const updated = [food.id, ...ids.filter(f => f !== food.id)].slice(0, 100); localStorage.setItem('he_food_favs', JSON.stringify(updated)); } catch {}
@@ -309,6 +324,7 @@ const CatalogTab: React.FC = () => {
   const filterBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode) => (
     <button onClick={onClick} style={{ padding:'5px 10px', borderRadius:8, fontSize:8, cursor:'pointer', fontWeight: isActive ? 700 : 400, letterSpacing:0.2, whiteSpace:'nowrap', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>{children}</button>
   );
+  const toggleExpanded = (id: string) => setCatExpanded(prev => prev === id ? null : id);
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
     <div style={{ padding:14, ...cardBg }}>
       <div style={labelSec}>📦 Каталог продуктов ({FOOD_DB.length})</div>
@@ -337,17 +353,60 @@ const CatalogTab: React.FC = () => {
           color: catFilterMode === 'exclusive' ? '#00e68a' : 'rgba(255,255,255,0.5)',
         }}>{catFilterMode === 'inclusive' ? '🔓 Все категории' : '🔒 Только выбранная'}</button>
       </div>
-      <div style={{ marginTop:8, maxHeight:340, overflowY:'auto', display:'flex', flexDirection:'column', gap:3, borderRadius:8 }}>
-        {filtered.map(f => <div key={f.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)' }}>
-          <div>
-            <div style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{f.name}</div>
-            <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', marginTop:1 }}>{CATEGORY_LABELS[f.category] || f.category} • {f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs}</div>
-          </div>
-          <div style={{ display:'flex', gap:3, alignItems:'center' }}>
-            <button onClick={() => addFav(f)} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6' }}>⭐</button>
-            <button onClick={() => addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category })} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(0,230,138,0.15)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a' }}>🛒</button>
-          </div>
-        </div>)}
+      <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:3, borderRadius:8 }}>
+        {filtered.map(f => {
+          const isExpanded = catExpanded === f.id;
+          const bbScore = f.bb_quality_score;
+          const scoreLabel = bbScore ? (bbScore >= 7 ? '✅' : '⚠️') : '';
+          return (<div key={f.id}>
+            <div onClick={() => toggleExpanded(f.id)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', borderRadius:10, background: isExpanded ? 'rgba(0,230,138,0.04)' : '#202023', border: isExpanded ? '1px solid rgba(0,230,138,0.12)' : '1px solid rgba(255,255,255,0.06)', cursor:'pointer' }}>
+              <div style={{ flex:1 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                  <span style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{f.name}</span>
+                  {bbScore && <span style={{ fontSize:8, padding:'1px 5px', borderRadius:4, background: bbScore >= 7 ? 'rgba(0,230,138,0.1)' : bbScore >= 5 ? 'rgba(249,115,22,0.1)' : 'rgba(239,68,68,0.1)', color: bbScore >= 7 ? '#00e68a' : bbScore >= 5 ? '#f97316' : '#ef4444' }}>{bbScore.toFixed(1)}</span>}
+                  <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>{isExpanded ? '▲' : '▼'}</span>
+                </div>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', marginTop:1 }}>{CATEGORY_LABELS[f.category] || f.category} • {f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs} {f.fiber ? `• В{f.fiber}г` : ''}</div>
+              </div>
+              <div style={{ display:'flex', gap:3, alignItems:'center' }}>
+                <button onClick={e => { e.stopPropagation(); addFav(f); }} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6' }}>⭐</button>
+                <button onClick={e => { e.stopPropagation(); addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category }); }} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(0,230,138,0.15)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a' }}>🛒</button>
+              </div>
+            </div>
+            {isExpanded && (
+              <div style={{ padding:'8px 12px', marginBottom:2, borderRadius:'0 0 10px 10px', background:'rgba(32,32,35,0.6)', border:'1px solid rgba(255,255,255,0.04)', borderTop:'none', fontSize:8, color:'rgba(255,255,255,0.7)' }}>
+                {f.description && <div style={{ marginBottom:4, lineHeight:1.4 }}>📝 {f.description}</div>}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:2, marginBottom:4 }}>
+                  <span>⏱ ГИ: {f.gi} | ИИ: {f.macro_100g?.insulin_index ?? '—'}</span>
+                  <span>⚡ Клетчатка: {f.fiber}г</span>
+                  {f.macro_100g?.carbs_sugar && <span>🍬 Сахара: {f.macro_100g.carbs_sugar}г</span>}
+                  {f.macro_100g?.omega_3_mg ? <span>🐟 Омега-3: {f.macro_100g.omega_3_mg}мг</span> : null}
+                  {f.macro_100g?.cholesterol_mg ? <span>🫀 Холестерин: {f.macro_100g.cholesterol_mg}мг</span> : null}
+                  {f.electrolytes_100g?.pral_index ? <span>⚖ PRAL: {f.electrolytes_100g.pral_index}</span> : null}
+                </div>
+                {f.amino_acid_profile_100g && (
+                  <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginBottom:4 }}>
+                    <span style={{ color:'#8b5cf6' }}>🧬 АК: </span>
+                    <span>лейцин {f.amino_acid_profile_100g.leucine_mg}мг</span>
+                    <span>• BCAA {Math.round(((f.amino_acid_profile_100g.leucine_mg||0)+(f.amino_acid_profile_100g.isoleucine_mg||0)+(f.amino_acid_profile_100g.valine_mg||0)))}мг</span>
+                    {f.amino_acid_profile_100g.tryptophan_mg ? <span>• триптофан {f.amino_acid_profile_100g.tryptophan_mg}мг</span> : null}
+                  </div>
+                )}
+                {f.metabolic_flags && (
+                  <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                    {f.metabolic_flags.atherogenic_potential === 'HIGH' && <span style={{ color:'#ef4444' }}>🚨 Атерогенность</span>}
+                    {f.metabolic_flags.glycation_potential === 'HIGH' && <span style={{ color:'#f59e0b' }}>🔥 Гликация</span>}
+                    {f.metabolic_flags.anabolic_potential === 'HIGH' && <span style={{ color:'#00e68a' }}>💪 Анаболический</span>}
+                    {f.metabolic_flags.hepatoprotective && <span style={{ color:'#8b5cf6' }}>🫁 Гепатопротектор</span>}
+                    {f.gastro_tags?.fodmap_group === 'HIGH' && <span style={{ color:'#f97316' }}>💨 HIGH FODMAP</span>}
+                    {f.metabolic_flags.insulin_sensitivity_impact === 'NEGATIVE' && <span style={{ color:'#ef4444' }}>📉 Инсулин-сенс NEG</span>}
+                  </div>
+                )}
+                {f.tier && <div style={{ marginTop:2, color:'rgba(255,255,255,0.35)' }}>📊 Уровень: {f.tier === 'max' ? 'Максимум' : f.tier === 'mid' ? 'Средний' : 'Базовый'}</div>}
+              </div>
+            )}
+          </div>);
+        })}
       </div>
     </div>
   </div>);
@@ -1270,7 +1329,13 @@ export const NutritionScreen: React.FC = () => {
         avgWeeklyCarbs={avgWeeklyCarbs}
       />;
       case 'info': return <InfoTab />;
+      case 'progress': return <ProgressTracker />;
+      case 'nutria': return <NutriAdvisor />;
+      case 'visualize': return <MealVisualizer items={[]} />;
+      case 'achievements': return <Achievements />;
+      case 'quests': return <DailyQuests />;
       case 'usefulness': return <ProductUsefulnessPlanner />;
+      case 'health': return <HealthAnalytics />;
       default: return null;
     }
   };

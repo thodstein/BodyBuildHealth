@@ -7,6 +7,7 @@ import { ALLERGEN_LIST } from "./types";
 import type { DrugInjection } from "./types";
 import { GlassCard, greenBtn, reportPillStyle } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
+import { DailyDietDashboard } from "../DailyDietDashboard";
 
 export const IndividualPlanResults: React.FC = () => {
   const {
@@ -141,6 +142,7 @@ export const IndividualPlanResults: React.FC = () => {
           </div>
         </GlassCard>
       )}
+      {generated && dayPlan && <DailyDietDashboard />}
       {generated && allergens.length > 0 && (
         <GlassCard title="Аллергены" icon="⚠️" color="#f97316" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>

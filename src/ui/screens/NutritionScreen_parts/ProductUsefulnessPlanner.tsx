@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { FOOD_DB } from '../../../core/nutrition-database';
+import { FOOD_DB, calcBBQualityScore } from '../../../core/nutrition-database';
 import { useDataLink } from '../../../core/data-link';
 import { scoreAllProducts, compareProducts, calcMealScore, CATEGORY_LABELS, GOAL_MAP_RU } from '../../../engines/product-usefulness.engine';
 import type { MealProduct, SavedMeal, MealScore } from '../../../engines/product-usefulness.engine';
+import { calculateOverallScore, scoreAllProductsV2, compareProductsV2, calcMealScoreV2, analyzeDailyDiet, getDefaultProfile, type UserDietProfile, type V2ScoreResult } from '../../../engines/product-usefulness-v2.engine';
 
 type PlannerTab = 'settings' | 'catalog' | 'compare' | 'meal';
 type SortKey = 'score' | 'name' | 'protein' | 'kcal';
@@ -90,6 +91,9 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   const [sourcePicker, setSourcePicker] = useState<{ source: string; title: string; items: Array<{ id: string; name: string; label?: string }> } | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+  const [useV2, setUseV2] = useState(false);
+  const [v2Profile, setV2Profile] = useState<UserDietProfile>(getDefaultProfile());
+
   const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 2000); };
 
   const opts = useMemo(() => ({
@@ -114,6 +118,12 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   const scored = useMemo(() => {
     return scoreAllProducts({ ...opts, category: category === 'all' ? undefined : category });
   }, [opts, category]);
+
+  const v2Scored = useMemo(() => {
+    if (!useV2) return new Map<string, V2ScoreResult>();
+    const results = scoreAllProductsV2(v2Profile, category === 'all' ? undefined : category as any);
+    return new Map(results.map(r => [r.food.id, r.score]));
+  }, [useV2, v2Profile, category]);
 
   const filtered = useMemo(() => {
     if (!search) return scored;
@@ -300,6 +310,29 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               </div>
             )}
           </div>
+          <div style={{ borderTop: '1px solid rgba(0,230,138,0.1)', paddingTop: 6, marginTop: 6 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+              <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>🧬 v2 Скоринг</span>
+              <button onClick={() => setUseV2(!useV2)} style={{
+                padding:'3px 10px', borderRadius:10, fontSize:7, fontWeight:700, cursor:'pointer',
+                background: useV2 ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)',
+                border: useV2 ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                color: useV2 ? '#00e68a' : 'rgba(255,255,255,0.4)',
+              }}>{useV2 ? '✅ Включён' : '○ Выключен'}</button>
+            </div>
+            {useV2 && (
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:4 }}>
+                {['LEAN_MASS','EXTREME_CUT','PEAK_WEEK','POST_CYCLE','MOST'].map(ph => (
+                  <button key={ph} onClick={() => setV2Profile(prev => ({...prev, phase: ph as any}))} style={{
+                    padding:'2px 6px', borderRadius:6, fontSize:7, fontWeight:600, cursor:'pointer',
+                    background: v2Profile.phase === ph ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.03)',
+                    border: v2Profile.phase === ph ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(255,255,255,0.04)',
+                    color: v2Profile.phase === ph ? '#c4b5fd' : 'rgba(255,255,255,0.5)',
+                  }}>{ph === 'LEAN_MASS' ? '💪 Набор' : ph === 'EXTREME_CUT' ? '🔥 Сушка' : ph === 'PEAK_WEEK' ? '⚡ Пик' : ph === 'POST_CYCLE' ? '🔄 ПКТ' : '🌉 Мост'}</button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -360,9 +393,13 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                   border: exp ? `1px solid ${score.color}20` : '1px solid rgba(255,255,255,0.04)',
                   cursor: 'pointer', transition: 'all 0.15s',
                 }}>
-                  <div onClick={() => setExpandedId(exp ? null : food.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div onClick={() => setExpandedId(exp ? null : food.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
                       <ScoreBadge score={score.total} max={score.maxPossible} color={score.color} label={score.label} />
+                      {useV2 && v2Scored.has(food.id) && (() => {
+                        const vs = v2Scored.get(food.id)!;
+                        return <div style={{ padding:'2px 6px', borderRadius:6, fontSize:7, fontWeight:700, background: vs.total >= 7 ? 'rgba(0,230,138,0.1)' : vs.total >= 5 ? 'rgba(249,115,22,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${vs.color}30`, color: vs.color }}>v2 {vs.total.toFixed(1)}</div>;
+                      })()}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
                         <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
@@ -407,6 +444,18 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                           <span>💳 <span style={{ color: score.costEfficiency.efficiencyScore >= 50 ? '#22c55e' : '#f59e0b' }}>{score.costEfficiency.efficiencyScore}/100</span></span>
                         </div>
                       )}
+                      {useV2 && v2Scored.has(food.id) && (() => {
+                        const vs = v2Scored.get(food.id)!;
+                        return (
+                          <div style={{ marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>
+                            <div style={{ color: '#00e68a', fontWeight: 700, marginBottom: 2 }}>🧬 v2: BB {vs.bbScore.toFixed(1)} → Overall {vs.total.toFixed(1)}</div>
+                            {vs.factors.slice(0, 3).map((f, i) => (
+                              <div key={i} style={{ color: f.impact > 0 ? '#22c55e' : '#ef4444' }}>{f.icon} {f.text}</div>
+                            ))}
+                            {vs.factors.length > 3 && <span style={{ color: 'rgba(255,255,255,0.2)' }}>+{vs.factors.length - 3} факторов</span>}
+                          </div>
+                        );
+                      })()}
                       {food.bestFor && food.bestFor.length > 0 && (
                         <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>
                           🎯 Для: {food.bestFor.join(', ')}

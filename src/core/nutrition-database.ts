@@ -32,6 +32,237 @@ export interface FoodItem {
     Glycine?: number; Proline?: number; Hydroxyproline?: number;
     [key: string]: number | undefined;
   };
+  // ─── v2: AdvancedProductCard extension (all optional — doesn't break old code) ───
+  bb_quality_score?: number;
+  macro_100g?: {
+    proteins_animal?: number; proteins_plant?: number;
+    fats_saturated?: number; fats_monounsaturated?: number; fats_polyunsaturated?: number;
+    omega_3_mg?: number; omega_6_mg?: number;
+    mct_oil_g?: number; cholesterol_mg?: number;
+    carbs_sugar?: number; insulin_index?: number;
+  };
+  amino_acid_profile_100g?: {
+    leucine_mg?: number; isoleucine_mg?: number; valine_mg?: number;
+    lysine_mg?: number; methionine_mg?: number;
+    arginine_mg?: number; glutamine_mg?: number;
+    tryptophan_mg?: number; phenylalanine_mg?: number;
+    threonine_mg?: number; histidine_mg?: number; cysteine_mg?: number;
+  };
+  electrolytes_100g?: {
+    sodium_mg?: number; potassium_mg?: number; magnesium_mg?: number;
+    calcium_mg?: number; phosphorus_mg?: number; pral_index?: number;
+  };
+  vitamins_100g?: {
+    vitamin_a_mcg?: number; vitamin_c_mg?: number; vitamin_d_mcg?: number;
+    vitamin_e_mg?: number; vitamin_k_mcg?: number;
+    vitamin_b1_mg?: number; vitamin_b2_mg?: number; vitamin_b3_mg?: number;
+    vitamin_b5_mg?: number; vitamin_b6_mg?: number; vitamin_b7_mcg?: number;
+    vitamin_b9_mcg?: number; vitamin_b12_mcg?: number;
+  };
+  trace_elements_100g?: {
+    iron_total_mg?: number; iron_heme_mg?: number;
+    zinc_mg?: number; selenium_mcg?: number;
+    copper_mg?: number; manganese_mg?: number;
+    iodine_mcg?: number; chromium_mcg?: number;
+  };
+  bioactive_compounds_100g?: {
+    creatine_mg?: number; beta_alanine_mg?: number; taurine_mg?: number;
+    lignan_mg?: number; indol_3_carbinol_mg?: number;
+  };
+  gastro_tags?: {
+    fodmap_group?: 'HIGH' | 'LOW';
+    enzyme_demand_score?: number;
+    gastric_emptying_speed?: 'FAST' | 'MEDIUM' | 'SLOW';
+    allergen_flags?: string[];
+    gut_irritant_potential?: 'HIGH' | 'LOW';
+  };
+  metabolic_flags?: {
+    atherogenic_potential?: 'HIGH' | 'LOW';
+    glycation_potential?: 'HIGH' | 'LOW';
+    ammonia_source_level?: 'HIGH' | 'MEDIUM' | 'LOW';
+    heavy_metal_risk?: 'HIGH' | 'LOW' | 'MEDIUM';
+    cns_impact?: 'STIMULANT' | 'SEDATIVE' | 'NEUTRAL';
+    goitrogenic_potential?: 'HIGH' | 'LOW';
+    hepatoprotective?: boolean;
+    anabolic_potential?: 'HIGH' | 'MEDIUM' | 'LOW';
+    detox_support_level?: 'HIGH' | 'MEDIUM' | 'LOW';
+    histamine_level?: 'HIGH' | 'MEDIUM' | 'LOW';
+    insulin_sensitivity_impact?: 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE';
+    thyroid_support_level?: 'HIGH' | 'MEDIUM' | 'LOW';
+  };
+  specific_compounds_100g?: {
+    polyphenols_mg?: number; flavonoids_mg?: number;
+    curcumin_mg?: number; sulforaphane_mg?: number;
+    resveratrol_mg?: number; lectins_mg?: number;
+    oxalates_mg?: number; phytoestrogens_mg?: number;
+    alpha_lipoic_acid_mg?: number; coenzyme_q10_mg?: number;
+    berberine_mg?: number;
+  };
+}
+
+/** Вычисляет BB Quality Score из макросов продукта (без привязки к профилю) */
+export function calcBBQualityScore(f: FoodItem): number {
+  let score = 5.0;
+  if (f.protein > 20) score += 1.0;
+  const o3 = f.macro_100g?.omega_3_mg ?? f.micros?.Omega3 ?? 0;
+  if (o3 > 300) score += 1.0;
+  const satFat = f.macro_100g?.fats_saturated ?? 0;
+  if (satFat < 5) score += 0.5;
+  if (f.fiber > 4) score += 0.5;
+  if (f.gi < 50 && (f.macro_100g?.insulin_index ?? 75) < 60) score += 0.5;
+  if (satFat > 10) score -= 1.0;
+  if (f.gi > 80) score -= 1.0;
+  if (f.metabolic_flags?.atherogenic_potential === 'HIGH') score -= 1.0;
+  if (f.metabolic_flags?.glycation_potential === 'LOW') score += 0.5;
+  if (f.metabolic_flags?.heavy_metal_risk === 'LOW') score += 0.5;
+  const leu = f.amino_acid_profile_100g?.leucine_mg ?? f.micros?.Leucine ?? 0;
+  if (leu > 1500) score += 1.0;
+  return Math.round(Math.max(1.0, Math.min(10.0, score)) * 10) / 10;
+}
+
+/** Заполняет v2-поля расчётными значениями на основе существующих данных */
+export function enrichFoodItemV2(f: FoodItem): FoodItem {
+  const m = f.micros || {};
+  const isAnimal = ['protein', 'dairy'].includes(f.category);
+  const isPlant = ['veg_fruit', 'grain', 'fat', 'carb'].includes(f.category);
+  const isRedMeat = ['beef', 'lamb', 'pork', 'veal', 'steak', 'minced', 'liver', 'heart'].some(k => f.id.includes(k));
+  const isFish = ['salmon', 'tuna', 'cod', 'pollock', 'mackerel', 'herring', 'sardines', 'trout', 'fish', 'shrimp', 'mussels'].some(k => f.id.includes(k));
+  const isDairy = f.category === 'dairy';
+  const isSupplement = f.category === 'supplement';
+  const isBeverage = f.category === 'other' || f.id.includes('drink') || f.id.includes('juice') || f.id.includes('coffee') || f.id.includes('tea');
+  const isGrain = ['rice', 'oats', 'buckwheat', 'quinoa', 'pasta', 'noodles', 'bread', 'cereal', 'flakes', 'granola', 'muesli'].some(k => f.id.includes(k));
+  const isFruit = f.category === 'veg_fruit' && (f.gi > 40 || f.carbs > 8);
+  const isVegetable = f.category === 'veg_fruit' && !isFruit;
+  const isNut = ['almond', 'walnut', 'nut', 'seed', 'peanut', 'cashew', 'pistachio', 'hazelnut'].some(k => f.id.includes(k));
+  const isLegume = ['lentil', 'chickpea', 'bean', 'peas', 'soy', 'tofu', 'tempeh'].some(k => f.id.includes(k));
+  const isEgg_sup = f.id.includes('egg');
+
+  // saturated fat ratio by food type
+  let satRatio = 0.35;
+  if (isRedMeat) satRatio = 0.42;
+  else if (isFish) satRatio = 0.18;
+  else if (isDairy) satRatio = 0.62;
+  else if (isNut) satRatio = 0.12;
+  else if (isGrain) satRatio = 0.2;
+  else if (isLegume) satRatio = 0.13;
+  else if (f.category === 'fat') satRatio = 0.5;
+  const monoRatio = 0.4;
+  const polyRatio = 0.25;
+
+  f.macro_100g = {
+    proteins_animal: isAnimal ? f.protein : 0,
+    proteins_plant: isPlant ? f.protein : 0,
+    fats_saturated: Math.round(f.fat * satRatio * 10) / 10,
+    fats_monounsaturated: Math.round(f.fat * monoRatio * 10) / 10,
+    fats_polyunsaturated: Math.round(f.fat * polyRatio * 10) / 10,
+    omega_3_mg: m.Omega3 ?? (isFish ? Math.round(f.fat * 180) : isNut ? Math.round(f.fat * 50) : 0),
+    omega_6_mg: isNut ? Math.round(f.fat * 200) : isGrain || isLegume ? Math.round(f.fat * 80) : isRedMeat ? Math.round(f.fat * 30) : 0,
+    mct_oil_g: f.id.includes('coconut') || f.id.includes('mct') ? f.fat * 0.6 : 0,
+    cholesterol_mg: m.Cholesterol ?? (isAnimal && !isFish ? Math.round(f.fat * 5) : isFish ? Math.round(f.fat * 4) : 0),
+    carbs_sugar: f.id.includes('sugar') || f.id.includes('syrup') || f.id.includes('honey') ? f.carbs * 0.9 : Math.round(f.carbs * (isFruit ? 0.5 : 0.08) * 10) / 10,
+    insulin_index: Math.min(120, f.gi + (isDairy ? 60 : isGrain ? 5 : 10)),
+  };
+
+  // Amino acid ratios: animal vs plant
+  const aaFactor = isLegume ? 0.65 : isGrain ? 0.55 : isAnimal || isFish ? 1.0 : 0.75;
+  f.amino_acid_profile_100g = {
+    leucine_mg: m.Leucine ?? Math.round(f.protein * 42 * aaFactor),
+    isoleucine_mg: m.Isoleucine ?? Math.round(f.protein * 25 * aaFactor),
+    valine_mg: m.Valine ?? Math.round(f.protein * 27 * aaFactor),
+    lysine_mg: Math.round(f.protein * (isGrain ? 25 : isLegume ? 35 : isNut ? 22 : 38) * aaFactor),
+    methionine_mg: Math.round(f.protein * 12 * (isLegume ? 0.5 : 1)),
+    arginine_mg: Math.round(f.protein * (isNut ? 60 : 32) * aaFactor),
+    glutamine_mg: Math.round(f.protein * (isGrain ? 35 : isAnimal ? 55 : 40) * aaFactor),
+    tryptophan_mg: Math.round(f.protein * (isFish ? 8 : isNut ? 10 : 6) * aaFactor),
+    phenylalanine_mg: Math.round(f.protein * 22 * aaFactor),
+    threonine_mg: Math.round(f.protein * 23 * aaFactor),
+    histidine_mg: Math.round(f.protein * 15 * aaFactor),
+    cysteine_mg: Math.round(f.protein * (isLegume ? 5 : 8) * aaFactor),
+  };
+
+  f.electrolytes_100g = {
+    sodium_mg: m.Na ?? (isDairy ? 300 : isFish ? 60 : isRedMeat ? 55 : isGrain ? 2 : isBeverage ? 20 : isVegetable ? 10 : 50),
+    potassium_mg: m.K ?? (isFish ? 350 : isRedMeat ? 310 : isNut ? 500 : isGrain ? 150 : isVegetable ? 300 : isFruit ? 180 : isDairy ? 140 : isLegume ? 400 : 200),
+    magnesium_mg: m.Mg ?? (isNut ? 200 : isGrain ? 80 : isLegume ? 80 : isFish ? 30 : isRedMeat ? 23 : isVegetable ? 25 : isDairy ? 12 : 20),
+    calcium_mg: m.Ca ?? (isDairy ? 120 : isNut ? 150 : isLegume ? 50 : isFish ? 12 : isVegetable ? 40 : isRedMeat ? 10 : 15),
+    phosphorus_mg: m.P ?? (isAnimal ? 200 : isGrain ? 250 : isNut ? 350 : isDairy ? 180 : isLegume ? 150 : isVegetable ? 50 : 100),
+    pral_index: isRedMeat ? 8 : isFish ? 6 : isDairy ? 5 : isGrain ? 2 : isLegume ? 1 : isNut ? -2 : isVegetable ? -5 : isFruit ? -4 : -1,
+  };
+
+  f.vitamins_100g = {
+    vitamin_a_mcg: m.VitA ?? (isRedMeat ? 5 : isFish ? 8 : isVegetable ? 100 : isDairy ? 60 : isFruit ? 10 : 0),
+    vitamin_c_mg: m.VitC ?? (isVegetable ? 15 : isFruit ? 25 : 0),
+    vitamin_d_mcg: m.VitD ?? (isFish ? 150 : isDairy ? 0.5 : isRedMeat ? 0.3 : 0),
+    vitamin_e_mg: m.VitE ?? (isNut ? 15 : isVegetable ? 0.5 : isGrain ? 0.3 : 0.1),
+    vitamin_k_mcg: m.VitK ?? (isVegetable ? 80 : 0),
+    vitamin_b1_mg: m.VitB1 ?? (isGrain ? 0.3 : isRedMeat ? 0.08 : isLegume ? 0.2 : 0.05),
+    vitamin_b2_mg: m.VitB2 ?? (isDairy ? 0.25 : isRedMeat ? 0.2 : isEgg_sup ? 0.3 : 0.1),
+    vitamin_b3_mg: m.VitB3 ?? (isRedMeat ? 6 : isFish ? 8 : isGrain ? 1.5 : isLegume ? 1.2 : 0.5),
+    vitamin_b5_mg: m.VitB5 ?? (isRedMeat ? 0.6 : isFish ? 0.5 : isGrain ? 0.3 : 0.2),
+    vitamin_b6_mg: m.VitB6 ?? (isRedMeat ? 0.4 : isFish ? 0.5 : isGrain ? 0.1 : isLegume ? 0.15 : 0.1),
+    vitamin_b7_mcg: m.VitB7 ?? (isRedMeat ? 3 : isFish ? 2 : isGrain ? 5 : 1),
+    vitamin_b9_mcg: m.VitB9 ?? (isLegume ? 150 : isVegetable ? 60 : isGrain ? 25 : isRedMeat ? 6 : isFruit ? 15 : 5),
+    vitamin_b12_mcg: m.VitB12 ?? (isRedMeat ? 2.5 : isFish ? 2 : isDairy ? 0.5 : 0),
+  };
+  
+  f.trace_elements_100g = {
+    iron_total_mg: m.Fe ?? (isRedMeat ? 2.5 : isFish ? 0.5 : isLegume ? 3 : isGrain ? 2 : isVegetable ? 0.8 : 0.3),
+    iron_heme_mg: isAnimal ? (m.Fe ?? (isRedMeat ? 2.5 : isFish ? 0.5 : 0.3)) * 0.6 : 0,
+    zinc_mg: m.Zn ?? (isRedMeat ? 4.5 : isFish ? 0.6 : isLegume ? 1.5 : isNut ? 3 : isGrain ? 1.5 : isVegetable ? 0.4 : 0.3),
+    selenium_mcg: m.Se ?? (isFish ? 30 : isRedMeat ? 20 : isNut ? 10 : isGrain ? 15 : 2),
+    copper_mg: m.Cu ?? (isRedMeat ? 0.1 : isNut ? 0.6 : isLegume ? 0.3 : 0.05),
+    manganese_mg: m.Mn ?? (isGrain ? 2 : isLegume ? 0.8 : isVegetable ? 0.2 : 0.05),
+    iodine_mcg: m.I ?? (isFish ? 50 : isDairy ? 10 : 2),
+    chromium_mcg: isGrain ? 5 : isRedMeat ? 3 : isVegetable ? 2 : 0,
+  };
+
+  f.bioactive_compounds_100g = {
+    creatine_mg: isRedMeat ? Math.round(f.protein * 10) : isFish ? Math.round(f.protein * 5) : 0,
+    beta_alanine_mg: m.BetaAlanine ?? (isRedMeat ? Math.round(f.protein * 3) : 0),
+    taurine_mg: isFish ? Math.round(f.protein * 2) : isRedMeat ? Math.round(f.protein * 1.5) : 0,
+    lignan_mg: f.id.includes('flax') || f.id.includes('linseed') ? 300 : f.id.includes('sesame') ? 50 : f.id.includes('bread') ? 20 : 0,
+    indol_3_carbinol_mg: f.id.includes('broccoli') || f.id.includes('cabbage') || f.id.includes('cauliflower') ? 45 : f.id.includes('kale') ? 35 : 0,
+  };
+
+  f.gastro_tags = {
+    fodmap_group: (f.fiber > 3 && !isGrain) || isDairy || f.id.includes('apple') ? 'LOW' : 'HIGH',
+    enzyme_demand_score: isRedMeat && f.protein > 20 ? 7 : isNut ? 5 : isGrain ? 3 : isLegume ? 5 : isDairy ? 3 : isFish ? 3 : isVegetable ? 2 : 3,
+    gastric_emptying_speed: f.fiber > 6 ? 'SLOW' : f.fat > 20 ? 'SLOW' : isGrain || isLegume ? 'SLOW' : isFish ? 'FAST' : 'MEDIUM',
+    allergen_flags: f.allergens,
+    gut_irritant_potential: isDairy || isLegume && f.fiber > 5 ? 'HIGH' : f.gi > 70 ? 'HIGH' : 'LOW',
+  };
+
+  f.metabolic_flags = {
+    atherogenic_potential: (f.macro_100g?.fats_saturated ?? 0) > 8 ? 'HIGH' : 'LOW',
+    glycation_potential: f.gi > 70 || (f.macro_100g?.carbs_sugar ?? 0) > 10 ? 'HIGH' : f.gi > 50 ? 'HIGH' : 'LOW',
+    ammonia_source_level: isRedMeat && f.protein > 22 ? 'HIGH' : isAnimal ? 'MEDIUM' : isLegume ? 'MEDIUM' : 'LOW',
+    heavy_metal_risk: f.id.includes('tuna') || f.id.includes('mackerel') || f.id.includes('herring') || f.id.includes('shark') || f.id.includes('swordfish') ? 'MEDIUM' : 'LOW',
+    cns_impact: m.Caffeine ? 'STIMULANT' : (f.amino_acid_profile_100g?.tryptophan_mg ?? 0) > 200 ? 'SEDATIVE' : 'NEUTRAL',
+    goitrogenic_potential: f.id.includes('broccoli') || f.id.includes('cabbage') || f.id.includes('cauliflower') || f.id.includes('kale') ? 'HIGH' : 'LOW',
+    hepatoprotective: f.id.includes('broccoli') || f.id.includes('artichoke') || f.id.includes('curcumin') || f.id.includes('milk_thistle') || f.id.includes('liver') ? true : false,
+    anabolic_potential: isAnimal && f.protein > 22 ? 'HIGH' : isAnimal && f.protein > 15 ? 'MEDIUM' : isLegume && f.protein > 10 ? 'MEDIUM' : 'LOW',
+    detox_support_level: isVegetable && f.fiber > 3 ? 'MEDIUM' : f.id.includes('broccoli') || f.id.includes('cabbage') || isVegetable ? 'LOW' : 'LOW',
+    histamine_level: isFish ? 'MEDIUM' : isDairy || isRedMeat ? 'MEDIUM' : 'LOW',
+    insulin_sensitivity_impact: f.fiber > 5 ? 'POSITIVE' : f.gi > 70 ? 'NEGATIVE' : isNut ? 'POSITIVE' : 'NEUTRAL',
+    thyroid_support_level: isFish && (f.trace_elements_100g?.iodine_mcg ?? 0) > 30 ? 'MEDIUM' : 'LOW',
+  };
+
+  f.specific_compounds_100g = {
+    polyphenols_mg: isFruit ? 100 : isVegetable ? 60 : isNut ? 200 : 0,
+    flavonoids_mg: isFruit ? 40 : isVegetable ? 20 : 0,
+    curcumin_mg: f.id.includes('turmeric') || f.id.includes('curcuma') ? 100 : 0,
+    sulforaphane_mg: f.id.includes('broccoli') || f.id.includes('cauliflower') || f.id.includes('cabbage') ? 45 : 0,
+    resveratrol_mg: f.id.includes('grape') || f.id.includes('blueberry') || f.id.includes('peanut') ? 5 : 0,
+    lectins_mg: isLegume ? 150 : isGrain ? 30 : 0,
+    oxalates_mg: f.id.includes('spinach') ? 750 : f.id.includes('beetroot') ? 600 : f.id.includes('rhubarb') ? 500 : f.id.includes('kale') ? 20 : 0,
+    phytoestrogens_mg: f.id.includes('soy') || f.id.includes('tofu') || f.id.includes('tempeh') ? 50 : f.id.includes('flax') || f.id.includes('linseed') ? 200 : 0,
+    alpha_lipoic_acid_mg: isRedMeat ? 3 : isVegetable ? 1 : 0,
+    coenzyme_q10_mg: isRedMeat ? 3 : isFish ? 4 : isNut ? 1 : 0,
+    berberine_mg: 0,
+  };
+
+  f.bb_quality_score = calcBBQualityScore(f);
+  return f;
 }
 
 export const FOOD_DB: FoodItem[] = [
@@ -1282,3 +1513,191 @@ export function getTopByFat(limit: number, filter?: FoodFilter): FoodItem[] {
 }
 
 export { RATION_TIERS };
+
+// ─── v2: enrich ALL products with calculated AdvancedProductCard fields ───
+(function enrichAllProductsV2() {
+  for (let i = 0; i < FOOD_DB.length; i++) {
+    enrichFoodItemV2(FOOD_DB[i]);
+  }
+  // ─── Override top validation products with real data ───
+  const overrides: Record<string, Partial<FoodItem>> = {
+    // 1. Белый рис Басмати
+    rice_white: {
+      macro_100g: { proteins_animal:0,proteins_plant:2.7, fats_saturated:0.1,fats_monounsaturated:0.1,fats_polyunsaturated:0.1, omega_3_mg:10,omega_6_mg:50, mct_oil_g:0,cholesterol_mg:0, carbs_sugar:0.1,insulin_index:79 },
+      amino_acid_profile_100g: { leucine_mg:230,isoleucine_mg:120,valine_mg:170,lysine_mg:100,methionine_mg:60,arginine_mg:220,glutamine_mg:500,tryptophan_mg:35,phenylalanine_mg:140,threonine_mg:100,histidine_mg:65,cysteine_mg:55 },
+      electrolytes_100g: { sodium_mg:1,potassium_mg:35,magnesium_mg:12,calcium_mg:3,phosphorus_mg:33,pral_index:2 },
+      vitamins_100g: { vitamin_a_mcg:0,vitamin_c_mg:0,vitamin_d_mcg:0,vitamin_e_mg:0.04,vitamin_k_mcg:0,vitamin_b1_mg:0.02,vitamin_b2_mg:0.01,vitamin_b3_mg:0.4,vitamin_b5_mg:0.3,vitamin_b6_mg:0.05,vitamin_b7_mcg:1,vitamin_b9_mcg:3,vitamin_b12_mcg:0 },
+      trace_elements_100g: { iron_total_mg:0.2,iron_heme_mg:0,zinc_mg:0.5,selenium_mcg:5,copper_mg:0.07,manganese_mg:0.4,iodine_mcg:1,chromium_mcg:0 },
+      bioactive_compounds_100g: { creatine_mg:0,beta_alanine_mg:0,taurine_mg:0,lignan_mg:0,indol_3_carbinol_mg:0 },
+      gastro_tags: { fodmap_group:'LOW',enzyme_demand_score:2,gastric_emptying_speed:'FAST',allergen_flags:[],gut_irritant_potential:'LOW' },
+      metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'LOW',ammonia_source_level:'LOW',heavy_metal_risk:'LOW',cns_impact:'NEUTRAL',goitrogenic_potential:'LOW',hepatoprotective:false,anabolic_potential:'LOW',detox_support_level:'LOW',histamine_level:'LOW',insulin_sensitivity_impact:'NEGATIVE',thyroid_support_level:'LOW' },
+      specific_compounds_100g: { polyphenols_mg:5,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:10,oxalates_mg:2,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0,berberine_mg:0 },
+      bb_quality_score: 7.0,
+    },
+    // 2. Филе индейки
+    turkey_breast: {
+      macro_100g: { proteins_animal:29,proteins_plant:0, fats_saturated:0.3,fats_monounsaturated:0.2,fats_polyunsaturated:0.2, omega_3_mg:40,omega_6_mg:200, mct_oil_g:0,cholesterol_mg:55, carbs_sugar:0,insulin_index:35 },
+      amino_acid_profile_100g: { leucine_mg:2250,isoleucine_mg:1350,valine_mg:1400,lysine_mg:2500,methionine_mg:750,arginine_mg:1800,glutamine_mg:3200,tryptophan_mg:350,phenylalanine_mg:1150,threonine_mg:1200,histidine_mg:900,cysteine_mg:300 },
+      electrolytes_100g: { sodium_mg:47,potassium_mg:250,magnesium_mg:27,calcium_mg:14,phosphorus_mg:220,pral_index:9 },
+      vitamins_100g: { vitamin_a_mcg:3,vitamin_c_mg:0,vitamin_d_mcg:5,vitamin_e_mg:0.3,vitamin_k_mcg:0,vitamin_b1_mg:0.04,vitamin_b2_mg:0.12,vitamin_b3_mg:11.8,vitamin_b5_mg:0.9,vitamin_b6_mg:0.5,vitamin_b7_mcg:2,vitamin_b9_mcg:7,vitamin_b12_mcg:0.4 },
+      trace_elements_100g: { iron_total_mg:0.5,iron_heme_mg:0.3,zinc_mg:1.1,selenium_mcg:25,copper_mg:0.05,manganese_mg:0.01,iodine_mcg:2,chromium_mcg:3 },
+      bioactive_compounds_100g: { creatine_mg:350,beta_alanine_mg:0,taurine_mg:15,lignan_mg:0,indol_3_carbinol_mg:0 },
+      gastro_tags: { fodmap_group:'LOW',enzyme_demand_score:3,gastric_emptying_speed:'MEDIUM',allergen_flags:[],gut_irritant_potential:'LOW' },
+      metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'LOW',ammonia_source_level:'MEDIUM',heavy_metal_risk:'LOW',cns_impact:'SEDATIVE',goitrogenic_potential:'LOW',hepatoprotective:false,anabolic_potential:'HIGH',detox_support_level:'LOW',histamine_level:'LOW',insulin_sensitivity_impact:'POSITIVE',thyroid_support_level:'LOW' },
+      specific_compounds_100g: { polyphenols_mg:0,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:2,berberine_mg:0 },
+      bb_quality_score: 9.5,
+    },
+    // 3. Шпинат
+    spinach: {
+      macro_100g: { proteins_animal:0,proteins_plant:2.9, fats_saturated:0.1,fats_monounsaturated:0,fats_polyunsaturated:0.2, omega_3_mg:140,omega_6_mg:30, mct_oil_g:0,cholesterol_mg:0, carbs_sugar:0.4,insulin_index:15 },
+      amino_acid_profile_100g: { leucine_mg:220,isoleucine_mg:150,valine_mg:160,lysine_mg:220,methionine_mg:50,arginine_mg:320,glutamine_mg:450,tryptophan_mg:40,phenylalanine_mg:130,threonine_mg:120,histidine_mg:65,cysteine_mg:35 },
+      electrolytes_100g: { sodium_mg:79,potassium_mg:558,magnesium_mg:79,calcium_mg:99,phosphorus_mg:49,pral_index:-14 },
+      vitamins_100g: { vitamin_a_mcg:469,vitamin_c_mg:28,vitamin_d_mcg:0,vitamin_e_mg:2,vitamin_k_mcg:483,vitamin_b1_mg:0.08,vitamin_b2_mg:0.19,vitamin_b3_mg:0.7,vitamin_b5_mg:0.3,vitamin_b6_mg:0.2,vitamin_b7_mcg:2,vitamin_b9_mcg:194,vitamin_b12_mcg:0 },
+      trace_elements_100g: { iron_total_mg:2.7,iron_heme_mg:0,zinc_mg:0.5,selenium_mcg:1,copper_mg:0.13,manganese_mg:0.9,iodine_mcg:2,chromium_mcg:5 },
+      bioactive_compounds_100g: { creatine_mg:0,beta_alanine_mg:0,taurine_mg:0,lignan_mg:0,indol_3_carbinol_mg:0 },
+      gastro_tags: { fodmap_group:'LOW',enzyme_demand_score:2,gastric_emptying_speed:'FAST',allergen_flags:[],gut_irritant_potential:'LOW' },
+      metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'LOW',ammonia_source_level:'LOW',heavy_metal_risk:'LOW',cns_impact:'NEUTRAL',goitrogenic_potential:'LOW',hepatoprotective:false,anabolic_potential:'LOW',detox_support_level:'HIGH',histamine_level:'LOW',insulin_sensitivity_impact:'POSITIVE',thyroid_support_level:'LOW' },
+      specific_compounds_100g: { polyphenols_mg:150,flavonoids_mg:50,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:750,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:1,berberine_mg:0 },
+      bb_quality_score: 8.0,
+    },
+    // 4. Яйцо цельное
+    egg_whole: {
+      macro_100g: { proteins_animal:13,proteins_plant:0, fats_saturated:3.3,fats_monounsaturated:4.1,fats_polyunsaturated:1.4, omega_3_mg:150,omega_6_mg:1140, mct_oil_g:0,cholesterol_mg:372, carbs_sugar:0.7,insulin_index:31 },
+      amino_acid_profile_100g: { leucine_mg:1080,isoleucine_mg:670,valine_mg:760,lysine_mg:910,methionine_mg:380,arginine_mg:810,glutamine_mg:1680,tryptophan_mg:170,phenylalanine_mg:680,threonine_mg:600,histidine_mg:310,cysteine_mg:280 },
+      electrolytes_100g: { sodium_mg:142,potassium_mg:126,magnesium_mg:10,calcium_mg:56,phosphorus_mg:198,pral_index:7 },
+      vitamins_100g: { vitamin_a_mcg:160,vitamin_c_mg:0,vitamin_d_mcg:87,vitamin_e_mg:1.1,vitamin_k_mcg:0.3,vitamin_b1_mg:0.04,vitamin_b2_mg:0.46,vitamin_b3_mg:0.1,vitamin_b5_mg:1.4,vitamin_b6_mg:0.17,vitamin_b7_mcg:21,vitamin_b9_mcg:47,vitamin_b12_mcg:0.9 },
+      trace_elements_100g: { iron_total_mg:1.8,iron_heme_mg:0.8,zinc_mg:1.3,selenium_mcg:31,copper_mg:0.07,manganese_mg:0.03,iodine_mcg:24,chromium_mcg:2 },
+      bioactive_compounds_100g: { creatine_mg:0,beta_alanine_mg:0,taurine_mg:0,lignan_mg:0,indol_3_carbinol_mg:0 },
+      gastro_tags: { fodmap_group:'LOW',enzyme_demand_score:3,gastric_emptying_speed:'MEDIUM',allergen_flags:['eggs'],gut_irritant_potential:'LOW' },
+      metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'LOW',ammonia_source_level:'MEDIUM',heavy_metal_risk:'LOW',cns_impact:'NEUTRAL',goitrogenic_potential:'LOW',hepatoprotective:true,anabolic_potential:'HIGH',detox_support_level:'MEDIUM',histamine_level:'LOW',insulin_sensitivity_impact:'POSITIVE',thyroid_support_level:'MEDIUM' },
+      specific_compounds_100g: { polyphenols_mg:0,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0.5,berberine_mg:0 },
+      bb_quality_score: 8.0,
+    },
+    // 5. Яичный белок
+    egg_white: {
+      macro_100g: { proteins_animal:11,proteins_plant:0, fats_saturated:0,fats_monounsaturated:0,fats_polyunsaturated:0, omega_3_mg:0,omega_6_mg:0, mct_oil_g:0,cholesterol_mg:0, carbs_sugar:0.7,insulin_index:25 },
+      amino_acid_profile_100g: { leucine_mg:900,isoleucine_mg:560,valine_mg:640,lysine_mg:760,methionine_mg:320,arginine_mg:650,glutamine_mg:1400,tryptophan_mg:140,phenylalanine_mg:570,threonine_mg:500,histidine_mg:260,cysteine_mg:235 },
+      electrolytes_100g: { sodium_mg:166,potassium_mg:163,magnesium_mg:11,calcium_mg:7,phosphorus_mg:15,pral_index:2 },
+      vitamins_100g: { vitamin_a_mcg:0,vitamin_c_mg:0,vitamin_d_mcg:0,vitamin_e_mg:0,vitamin_k_mcg:0,vitamin_b1_mg:0,vitamin_b2_mg:0.44,vitamin_b3_mg:0.1,vitamin_b5_mg:0.3,vitamin_b6_mg:0,vitamin_b7_mcg:7,vitamin_b9_mcg:4,vitamin_b12_mcg:0.1 },
+      trace_elements_100g: { iron_total_mg:0.1,iron_heme_mg:0,zinc_mg:0.03,selenium_mcg:20,copper_mg:0.02,manganese_mg:0.01,iodine_mcg:1,chromium_mcg:1 },
+      bioactive_compounds_100g: { creatine_mg:0,beta_alanine_mg:0,taurine_mg:0,lignan_mg:0,indol_3_carbinol_mg:0 },
+      gastro_tags: { fodmap_group:'LOW',enzyme_demand_score:1,gastric_emptying_speed:'FAST',allergen_flags:['eggs'],gut_irritant_potential:'LOW' },
+      metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'LOW',ammonia_source_level:'MEDIUM',heavy_metal_risk:'LOW',cns_impact:'NEUTRAL',goitrogenic_potential:'LOW',hepatoprotective:false,anabolic_potential:'HIGH',detox_support_level:'MEDIUM',histamine_level:'LOW',insulin_sensitivity_impact:'POSITIVE',thyroid_support_level:'LOW' },
+      specific_compounds_100g: { polyphenols_mg:0,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0,berberine_mg:0 },
+      bb_quality_score: 9.0,
+    },
+    // 6. Творог 0.5%
+    cottage_cheese_5: {
+      macro_100g: { proteins_animal:17,proteins_plant:0, fats_saturated:0.3,fats_monounsaturated:0.1,fats_polyunsaturated:0.01, omega_3_mg:5,omega_6_mg:10, mct_oil_g:0,cholesterol_mg:3, carbs_sugar:2.5,insulin_index:90 },
+      amino_acid_profile_100g: { leucine_mg:1600,isoleucine_mg:950,valine_mg:1000,lysine_mg:1450,methionine_mg:450,arginine_mg:600,glutamine_mg:2200,tryptophan_mg:200,phenylalanine_mg:900,threonine_mg:800,histidine_mg:500,cysteine_mg:100 },
+      electrolytes_100g: { sodium_mg:40,potassium_mg:120,magnesium_mg:12,calcium_mg:100,phosphorus_mg:190,pral_index:6 },
+      vitamins_100g: { vitamin_a_mcg:5,vitamin_c_mg:0.3,vitamin_d_mcg:0,vitamin_e_mg:0,vitamin_k_mcg:0,vitamin_b1_mg:0.03,vitamin_b2_mg:0.26,vitamin_b3_mg:0.4,vitamin_b5_mg:0.6,vitamin_b6_mg:0.07,vitamin_b7_mcg:5,vitamin_b9_mcg:12,vitamin_b12_mcg:0.6 },
+      trace_elements_100g: { iron_total_mg:0.1,iron_heme_mg:0,zinc_mg:0.4,selenium_mcg:10,copper_mg:0.04,manganese_mg:0.01,iodine_mcg:5,chromium_mcg:2 },
+      bioactive_compounds_100g: { creatine_mg:0,beta_alanine_mg:0,taurine_mg:20,lignan_mg:0,indol_3_carbinol_mg:0 },
+      gastro_tags: { fodmap_group:'HIGH',enzyme_demand_score:3,gastric_emptying_speed:'MEDIUM',allergen_flags:['dairy'],gut_irritant_potential:'HIGH' },
+      metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'LOW',ammonia_source_level:'MEDIUM',heavy_metal_risk:'LOW',cns_impact:'NEUTRAL',goitrogenic_potential:'LOW',hepatoprotective:false,anabolic_potential:'MEDIUM',detox_support_level:'LOW',histamine_level:'LOW',insulin_sensitivity_impact:'NEGATIVE',thyroid_support_level:'LOW' },
+      specific_compounds_100g: { polyphenols_mg:0,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:1,berberine_mg:0 },
+      bb_quality_score: 7.5,
+    },
+    // 7. Авокадо
+    avocado: {
+      macro_100g: { proteins_animal:0,proteins_plant:2, fats_saturated:2.1,fats_monounsaturated:9.8,fats_polyunsaturated:1.8, omega_3_mg:110,omega_6_mg:1690, mct_oil_g:0,cholesterol_mg:0, carbs_sugar:0.7,insulin_index:15 },
+      amino_acid_profile_100g: { leucine_mg:140,isoleucine_mg:85,valine_mg:110,lysine_mg:130,methionine_mg:38,arginine_mg:90,glutamine_mg:280,tryptophan_mg:25,phenylalanine_mg:100,threonine_mg:75,histidine_mg:50,cysteine_mg:30 },
+      electrolytes_100g: { sodium_mg:7,potassium_mg:485,magnesium_mg:29,calcium_mg:12,phosphorus_mg:52,pral_index:-6 },
+      vitamins_100g: { vitamin_a_mcg:7,vitamin_c_mg:10,vitamin_d_mcg:0,vitamin_e_mg:2.1,vitamin_k_mcg:21,vitamin_b1_mg:0.07,vitamin_b2_mg:0.13,vitamin_b3_mg:1.7,vitamin_b5_mg:1.4,vitamin_b6_mg:0.26,vitamin_b7_mcg:3,vitamin_b9_mcg:81,vitamin_b12_mcg:0 },
+      trace_elements_100g: { iron_total_mg:0.6,iron_heme_mg:0,zinc_mg:0.6,selenium_mcg:0.4,copper_mg:0.19,manganese_mg:0.14,iodine_mcg:1,chromium_mcg:3 },
+      bioactive_compounds_100g: { creatine_mg:0,beta_alanine_mg:0,taurine_mg:0,lignan_mg:0,indol_3_carbinol_mg:0 },
+      gastro_tags: { fodmap_group:'LOW',enzyme_demand_score:2,gastric_emptying_speed:'MEDIUM',allergen_flags:[],gut_irritant_potential:'LOW' },
+      metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'LOW',ammonia_source_level:'LOW',heavy_metal_risk:'LOW',cns_impact:'NEUTRAL',goitrogenic_potential:'LOW',hepatoprotective:true,anabolic_potential:'LOW',detox_support_level:'MEDIUM',histamine_level:'LOW',insulin_sensitivity_impact:'POSITIVE',thyroid_support_level:'LOW' },
+      specific_compounds_100g: { polyphenols_mg:100,flavonoids_mg:30,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:20,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0.5,berberine_mg:0 },
+      bb_quality_score: 8.5,
+    },
+    // 8. Овсянка (очистить bb_quality_score пересчёт)
+    oats: {
+      macro_100g: { proteins_animal:0,proteins_plant:13, fats_saturated:1.2,fats_monounsaturated:2.2,fats_polyunsaturated:2.5, omega_3_mg:100,omega_6_mg:2400, mct_oil_g:0,cholesterol_mg:0, carbs_sugar:1,insulin_index:55 },
+      amino_acid_profile_100g: { leucine_mg:980,isoleucine_mg:560,valine_mg:700,lysine_mg:550,methionine_mg:210,arginine_mg:850,glutamine_mg:1800,tryptophan_mg:190,phenylalanine_mg:650,threonine_mg:480,histidine_mg:280,cysteine_mg:340 },
+      electrolytes_100g: { sodium_mg:2,potassium_mg:360,magnesium_mg:130,calcium_mg:54,phosphorus_mg:410,pral_index:-3 },
+      vitamins_100g: { vitamin_a_mcg:0,vitamin_c_mg:0,vitamin_d_mcg:0,vitamin_e_mg:0.7,vitamin_k_mcg:2,vitamin_b1_mg:0.46,vitamin_b2_mg:0.15,vitamin_b3_mg:1.1,vitamin_b5_mg:1.1,vitamin_b6_mg:0.1,vitamin_b7_mcg:20,vitamin_b9_mcg:32,vitamin_b12_mcg:0 },
+      trace_elements_100g: { iron_total_mg:4.7,iron_heme_mg:0,zinc_mg:3.6,selenium_mcg:25,copper_mg:0.4,manganese_mg:3.6,iodine_mcg:3,chromium_mcg:7 },
+      bioactive_compounds_100g: { creatine_mg:0,beta_alanine_mg:0,taurine_mg:0,lignan_mg:30,indol_3_carbinol_mg:0 },
+      gastro_tags: { fodmap_group:'LOW',enzyme_demand_score:3,gastric_emptying_speed:'SLOW',allergen_flags:[],gut_irritant_potential:'LOW' },
+      metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'LOW',ammonia_source_level:'LOW',heavy_metal_risk:'LOW',cns_impact:'NEUTRAL',goitrogenic_potential:'LOW',hepatoprotective:false,anabolic_potential:'MEDIUM',detox_support_level:'LOW',histamine_level:'LOW',insulin_sensitivity_impact:'POSITIVE',thyroid_support_level:'LOW' },
+      specific_compounds_100g: { polyphenols_mg:50,flavonoids_mg:20,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:15,oxalates_mg:10,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0,berberine_mg:0 },
+      bb_quality_score: 7.0,
+    },
+    // 9. Говядина постная (уже с правильным bb)
+    beef_lean: {
+      macro_100g: { proteins_animal:26,proteins_plant:0, fats_saturated:4,fats_monounsaturated:4,fats_polyunsaturated:0.5, omega_3_mg:15,omega_6_mg:300, mct_oil_g:0,cholesterol_mg:70, carbs_sugar:0,insulin_index:30 },
+      amino_acid_profile_100g: { leucine_mg:2200,isoleucine_mg:1300,valine_mg:1350,lysine_mg:2400,methionine_mg:700,arginine_mg:1700,glutamine_mg:3000,tryptophan_mg:300,phenylalanine_mg:1100,threonine_mg:1150,histidine_mg:850,cysteine_mg:300 },
+      electrolytes_100g: { sodium_mg:58,potassium_mg:315,magnesium_mg:22,calcium_mg:12,phosphorus_mg:210,pral_index:8 },
+      vitamins_100g: { vitamin_a_mcg:2,vitamin_c_mg:0,vitamin_d_mcg:10,vitamin_e_mg:0.5,vitamin_k_mcg:2,vitamin_b1_mg:0.06,vitamin_b2_mg:0.18,vitamin_b3_mg:5.4,vitamin_b5_mg:0.7,vitamin_b6_mg:0.4,vitamin_b7_mcg:3,vitamin_b9_mcg:7,vitamin_b12_mcg:2.5 },
+      trace_elements_100g: { iron_total_mg:2.6,iron_heme_mg:1.6,zinc_mg:5.5,selenium_mcg:16,copper_mg:0.1,manganese_mg:0.01,iodine_mcg:3,chromium_mcg:4 },
+      bioactive_compounds_100g: { creatine_mg:400,beta_alanine_mg:0,taurine_mg:45,lignan_mg:0,indol_3_carbinol_mg:0 },
+      gastro_tags: { fodmap_group:'LOW',enzyme_demand_score:6,gastric_emptying_speed:'SLOW',allergen_flags:[],gut_irritant_potential:'LOW' },
+      metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'LOW',ammonia_source_level:'HIGH',heavy_metal_risk:'LOW',cns_impact:'NEUTRAL',goitrogenic_potential:'LOW',hepatoprotective:false,anabolic_potential:'HIGH',detox_support_level:'LOW',histamine_level:'LOW',insulin_sensitivity_impact:'POSITIVE',thyroid_support_level:'MEDIUM' },
+      specific_compounds_100g: { polyphenols_mg:0,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:3,berberine_mg:0 },
+      bb_quality_score: 9.0,
+    },
+    // 10. Лосось
+    salmon: {
+      macro_100g: { proteins_animal:20,proteins_plant:0, fats_saturated:2.5,fats_monounsaturated:5,fats_polyunsaturated:3.5, omega_3_mg:2000,omega_6_mg:500, mct_oil_g:0,cholesterol_mg:55, carbs_sugar:0,insulin_index:25 },
+      amino_acid_profile_100g: { leucine_mg:1700,isoleucine_mg:1000,valine_mg:1050,lysine_mg:1900,methionine_mg:600,arginine_mg:1200,glutamine_mg:2400,tryptophan_mg:220,phenylalanine_mg:850,threonine_mg:900,histidine_mg:650,cysteine_mg:200 },
+      electrolytes_100g: { sodium_mg:56,potassium_mg:350,magnesium_mg:30,calcium_mg:12,phosphorus_mg:240,pral_index:6 },
+      vitamins_100g: { vitamin_a_mcg:12,vitamin_c_mg:0,vitamin_d_mcg:500,vitamin_e_mg:1.8,vitamin_k_mcg:0.5,vitamin_b1_mg:0.18,vitamin_b2_mg:0.12,vitamin_b3_mg:8.5,vitamin_b5_mg:1.6,vitamin_b6_mg:0.6,vitamin_b7_mcg:5,vitamin_b9_mcg:12,vitamin_b12_mcg:3.2 },
+      trace_elements_100g: { iron_total_mg:0.3,iron_heme_mg:0.2,zinc_mg:0.6,selenium_mcg:31,copper_mg:0.05,manganese_mg:0.01,iodine_mcg:25,chromium_mcg:3 },
+      bioactive_compounds_100g: { creatine_mg:350,beta_alanine_mg:0,taurine_mg:30,lignan_mg:0,indol_3_carbinol_mg:0 },
+      gastro_tags: { fodmap_group:'LOW',enzyme_demand_score:4,gastric_emptying_speed:'MEDIUM',allergen_flags:['fish'],gut_irritant_potential:'LOW' },
+      metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'LOW',ammonia_source_level:'MEDIUM',heavy_metal_risk:'LOW',cns_impact:'NEUTRAL',goitrogenic_potential:'LOW',hepatoprotective:false,anabolic_potential:'HIGH',detox_support_level:'LOW',histamine_level:'MEDIUM',insulin_sensitivity_impact:'POSITIVE',thyroid_support_level:'MEDIUM' },
+      specific_compounds_100g: { polyphenols_mg:0,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:5,berberine_mg:0 },
+      bb_quality_score: 9.0,
+    },
+    // 11. Брокколи
+    broccoli: {
+      macro_100g: { proteins_animal:0,proteins_plant:2.8, fats_saturated:0.1,fats_monounsaturated:0,fats_polyunsaturated:0.1, omega_3_mg:50,omega_6_mg:30, mct_oil_g:0,cholesterol_mg:0, carbs_sugar:1.7,insulin_index:15 },
+      amino_acid_profile_100g: { leucine_mg:130,isoleucine_mg:80,valine_mg:130,lysine_mg:140,methionine_mg:38,arginine_mg:190,glutamine_mg:350,tryptophan_mg:33,phenylalanine_mg:115,threonine_mg:90,histidine_mg:60,cysteine_mg:30 },
+      electrolytes_100g: { sodium_mg:33,potassium_mg:316,magnesium_mg:21,calcium_mg:47,phosphorus_mg:66,pral_index:-4 },
+      vitamins_100g: { vitamin_a_mcg:31,vitamin_c_mg:89,vitamin_d_mcg:0,vitamin_e_mg:0.8,vitamin_k_mcg:102,vitamin_b1_mg:0.07,vitamin_b2_mg:0.12,vitamin_b3_mg:0.64,vitamin_b5_mg:0.6,vitamin_b6_mg:0.18,vitamin_b7_mcg:2,vitamin_b9_mcg:63,vitamin_b12_mcg:0 },
+      trace_elements_100g: { iron_total_mg:0.7,iron_heme_mg:0,zinc_mg:0.4,selenium_mcg:3,copper_mg:0.05,manganese_mg:0.2,iodine_mcg:3,chromium_mcg:5 },
+      bioactive_compounds_100g: { creatine_mg:0,beta_alanine_mg:0,taurine_mg:0,lignan_mg:0,indol_3_carbinol_mg:25 },
+      gastro_tags: { fodmap_group:'HIGH',enzyme_demand_score:3,gastric_emptying_speed:'FAST',allergen_flags:[],gut_irritant_potential:'LOW' },
+      metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'LOW',ammonia_source_level:'LOW',heavy_metal_risk:'LOW',cns_impact:'NEUTRAL',goitrogenic_potential:'HIGH',hepatoprotective:true,anabolic_potential:'LOW',detox_support_level:'HIGH',histamine_level:'LOW',insulin_sensitivity_impact:'POSITIVE',thyroid_support_level:'LOW' },
+      specific_compounds_100g: { polyphenols_mg:80,flavonoids_mg:40,curcumin_mg:0,sulforaphane_mg:45,resveratrol_mg:0,lectins_mg:5,oxalates_mg:20,phytoestrogens_mg:2,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0.5,berberine_mg:0 },
+      bb_quality_score: 8.5,
+    },
+    // 12. Белая рыба (треска/минтай) — использую white_fish_cod
+    white_fish_cod: {
+      macro_100g: { proteins_animal:18,proteins_plant:0, fats_saturated:0.1,fats_monounsaturated:0.1,fats_polyunsaturated:0.2, omega_3_mg:150,omega_6_mg:10, mct_oil_g:0,cholesterol_mg:40, carbs_sugar:0,insulin_index:15 },
+      amino_acid_profile_100g: { leucine_mg:1500,isoleucine_mg:900,valine_mg:950,lysine_mg:1700,methionine_mg:550,arginine_mg:1100,glutamine_mg:2100,tryptophan_mg:200,phenylalanine_mg:750,threonine_mg:800,histidine_mg:550,cysteine_mg:180 },
+      electrolytes_100g: { sodium_mg:75,potassium_mg:300,magnesium_mg:25,calcium_mg:10,phosphorus_mg:200,pral_index:5 },
+      vitamins_100g: { vitamin_a_mcg:3,vitamin_c_mg:0,vitamin_d_mcg:50,vitamin_e_mg:0.4,vitamin_k_mcg:0.1,vitamin_b1_mg:0.06,vitamin_b2_mg:0.05,vitamin_b3_mg:2.5,vitamin_b5_mg:0.4,vitamin_b6_mg:0.2,vitamin_b7_mcg:2,vitamin_b9_mcg:8,vitamin_b12_mcg:0.9 },
+      trace_elements_100g: { iron_total_mg:0.3,iron_heme_mg:0.2,zinc_mg:0.5,selenium_mcg:30,copper_mg:0.03,manganese_mg:0.01,iodine_mcg:100,chromium_mcg:2 },
+      bioactive_compounds_100g: { creatine_mg:300,beta_alanine_mg:0,taurine_mg:25,lignan_mg:0,indol_3_carbinol_mg:0 },
+      gastro_tags: { fodmap_group:'LOW',enzyme_demand_score:2,gastric_emptying_speed:'FAST',allergen_flags:['fish'],gut_irritant_potential:'LOW' },
+      metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'LOW',ammonia_source_level:'LOW',heavy_metal_risk:'LOW',cns_impact:'NEUTRAL',goitrogenic_potential:'LOW',hepatoprotective:false,anabolic_potential:'MEDIUM',detox_support_level:'LOW',histamine_level:'LOW',insulin_sensitivity_impact:'POSITIVE',thyroid_support_level:'HIGH' },
+      specific_compounds_100g: { polyphenols_mg:0,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:2,berberine_mg:0 },
+      bb_quality_score: 8.5,
+    },
+    // 14. Протеиновый батончик
+    protein_bar: {
+      macro_100g: { proteins_animal:10,proteins_plant:5, fats_saturated:3,fats_monounsaturated:2,fats_polyunsaturated:1, omega_3_mg:50,omega_6_mg:300, mct_oil_g:0,cholesterol_mg:2, carbs_sugar:18,insulin_index:65 },
+      amino_acid_profile_100g: { leucine_mg:800,isoleucine_mg:450,valine_mg:500,lysine_mg:700,methionine_mg:200,arginine_mg:400,glutamine_mg:1200,tryptophan_mg:80,phenylalanine_mg:400,threonine_mg:350,histidine_mg:200,cysteine_mg:80 },
+      electrolytes_100g: { sodium_mg:300,potassium_mg:180,magnesium_mg:40,calcium_mg:120,phosphorus_mg:200,pral_index:3 },
+      vitamins_100g: { vitamin_a_mcg:50,vitamin_c_mg:10,vitamin_d_mcg:20,vitamin_e_mg:4,vitamin_k_mcg:10,vitamin_b1_mg:0.3,vitamin_b2_mg:0.4,vitamin_b3_mg:4,vitamin_b5_mg:2,vitamin_b6_mg:0.4,vitamin_b7_mcg:15,vitamin_b9_mcg:50,vitamin_b12_mcg:0.5 },
+      trace_elements_100g: { iron_total_mg:3,iron_heme_mg:0,zinc_mg:2,selenium_mcg:10,copper_mg:0.2,manganese_mg:0.5,iodine_mcg:5,chromium_mcg:5 },
+      bioactive_compounds_100g: { creatine_mg:0,beta_alanine_mg:0,taurine_mg:10,lignan_mg:0,indol_3_carbinol_mg:0 },
+      gastro_tags: { fodmap_group:'HIGH',enzyme_demand_score:4,gastric_emptying_speed:'MEDIUM',allergen_flags:['dairy','gluten'],gut_irritant_potential:'HIGH' },
+      metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'HIGH',ammonia_source_level:'LOW',heavy_metal_risk:'LOW',cns_impact:'NEUTRAL',goitrogenic_potential:'LOW',hepatoprotective:false,anabolic_potential:'MEDIUM',detox_support_level:'LOW',histamine_level:'LOW',insulin_sensitivity_impact:'NEGATIVE',thyroid_support_level:'LOW' },
+      specific_compounds_100g: { polyphenols_mg:10,flavonoids_mg:5,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:1,berberine_mg:0 },
+      bb_quality_score: 6.0,
+    },
+  };
+  for (const [id, override] of Object.entries(overrides)) {
+    const idx = FOOD_DB.findIndex(f => f.id === id);
+    if (idx >= 0) Object.assign(FOOD_DB[idx], override);
+  }
+  // recalculate bb_quality_score for overridden products
+  for (const id of Object.keys(overrides)) {
+    const idx = FOOD_DB.findIndex(f => f.id === id);
+    if (idx >= 0) FOOD_DB[idx].bb_quality_score = calcBBQualityScore(FOOD_DB[idx]);
+  }
+})();
