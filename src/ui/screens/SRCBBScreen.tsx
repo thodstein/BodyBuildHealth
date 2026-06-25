@@ -42,8 +42,8 @@ const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 1
 const H: React.CSSProperties = { color: '#fff', fontSize: 15, fontWeight: 600, margin: '4px 0' };
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 1.4 };
 
-export const SRCBBScreen: React.FC = () => {
-  const [mode, setMode] = useState<Mode>('src');
+export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
+  const [mode, setMode] = useState<Mode>(track === 'bb' ? 'bb' : 'src');
 
   // ── СРЦ ──
   const [level, setLevel] = useState<string>('II-KMS');
@@ -201,8 +201,10 @@ export const SRCBBScreen: React.FC = () => {
   return (
     <div style={{ padding: 12, color: '#fff', maxWidth: 720, margin: '0 auto' }}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        {track === 'auto' && <>
         <button style={mode === 'src' ? BTN : BTN_GHOST} onClick={() => setMode('src')} disabled={mode === 'src'}>🏆 СРЦ (сила)</button>
         <button style={mode === 'bb' ? BTN : BTN_GHOST} onClick={() => setMode('bb')} disabled={mode === 'bb'}>💪 Бодибилдинг</button>
+        </>}
       </div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
         {([['plan', '📋 План'], ['plates', '🧮 Блины'], ['run', '▶ Выполнение'], ['autoreg', '🧠 Авторег'], ['peak', '🏁 Пик'], ['recovery', '🔋 Восст'], ['safety', '🛡 Безоп'], ['demo', '🎬 Демо'], ['programs', '📚 Программы'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 Pro-метрики'], ['charts', '📊 График']] as const).map(([v, l]) => (

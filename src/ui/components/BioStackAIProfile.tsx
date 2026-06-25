@@ -1,11 +1,31 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { autoFillFromMainProfile, saveBioStackProfile } from '../../engines/biostack-ai.engine';
-import { GlassCard, PillBtn, Slider, inputS, selectS, GOALS, HEALTH_CONDS } from './BioStackAIConstants';
+import { buildStack } from '../../engines/supplement-finder.engine';
+import { GlassCard, PillBtn, Slider, toFinderProfile, inputS, selectS, GOALS, HEALTH_CONDS } from './BioStackAIConstants';
 import { type GutSensitivity, type AlcoholLevel, type AASStatus, type CognitiveTask, type StimSensitivity, type CaffeineLevel, type ADClass, type DietType, type Chronotype, type BudgetLevel, type StackComplexity } from '../../engines/biostack-ai.engine';
 
-export function ProfileTab({ profile, setProfile }: { profile: BioStackProfile; setProfile: (p: BioStackProfile) => void }) {
+export function ProfileTab({ profile, setProfile, setStackIds }: { profile: BioStackProfile; setProfile: (p: BioStackProfile) => void; setStackIds?: (ids: string[]) => void }) {
   const u = (patch: Partial<BioStackProfile>) => { const n = { ...profile, ...patch }; setProfile(n); saveBioStackProfile(n); };
+  const [quickLoading, setQuickLoading] = useState(false);
+  const [quickDone, setQuickDone] = useState(false);
+
+  const handleQuickStack = () => {
+    setQuickLoading(true);
+    setQuickDone(false);
+    setTimeout(() => {
+      const fp = toFinderProfile(profile);
+      const result = buildStack({
+        baseIds: [], targetSize: 10,
+        goal: profile.goals[0] || undefined,
+        autoFill: true, profile: fp,
+      });
+      if (setStackIds) setStackIds(result.stack);
+      setQuickLoading(false);
+      setQuickDone(true);
+      setTimeout(() => setQuickDone(false), 2500);
+    }, 400);
+  };
 
   return (
     <div style={{ paddingBottom: 80 }}>
@@ -141,8 +161,17 @@ export function ProfileTab({ profile, setProfile }: { profile: BioStackProfile; 
       <button onClick={() => { const filled = autoFillFromMainProfile(); if (Object.keys(filled).length > 0) setProfile({ ...profile, ...filled }); }}
         style={{ width: '100%', padding: 12, borderRadius: 14, border: 'none', cursor: 'pointer',
           background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700, fontSize: 13,
-          boxShadow: '0 4px 20px rgba(0,230,138,0.2)', marginBottom: 10 }}>
+          boxShadow: '0 4px 20px rgba(0,230,138,0.2)', marginBottom: 6 }}>
         📥 Заполнить из профиля
+      </button>
+
+      <button onClick={handleQuickStack} disabled={quickLoading} style={{
+        width: '100%', padding: 12, borderRadius: 14, cursor: quickLoading ? 'wait' : 'pointer', marginBottom: 6,
+        background: quickDone ? 'rgba(0,230,138,0.1)' : 'rgba(139,92,246,0.1)',
+        border: `1px solid ${quickDone ? 'rgba(0,230,138,0.2)' : 'rgba(139,92,246,0.2)'}`,
+        color: quickDone ? '#00e68a' : '#8b5cf6', fontWeight: 700, fontSize: 12,
+      }}>
+        {quickLoading ? '⏳ Собираем стек...' : quickDone ? '✅ Стек собран! Откройте 📋 Мой стек' : '⚡ Быстрый стек по профилю'}
       </button>
       <div style={{ textAlign: 'center', fontSize: 8, color: 'rgba(255,255,255,0.25)' }}>
         ⚡ Профиль сохраняется автоматически

@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { type BioStackProfile, type GoalType } from '../../engines/biostack-ai.engine';
 import { buildStack, explainStack, type StackExplanation } from '../../engines/supplement-finder.engine';
+import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { GlassCard, PillBtn, StatBox, inputS, selectS, ORGANS, SYSTEMS, GOALS, LAB_MARKERS, GROUP_LABELS, toFinderProfile } from './BioStackAIConstants';
+import { STACK_TEMPLATES, type BioStackTemplate } from '../../engines/biostack-templates';
 
 type LMState = Record<string, 'off' | 'maintain' | 'correct'>;
 
@@ -45,8 +47,31 @@ export function BuildTab({ profile, stackIds, setStackIds }: { profile: BioStack
     localStorage.setItem('he_finder_saved_stacks', JSON.stringify(updated));
   }, [result]);
 
+  const handleApplyTemplate = useCallback((t: BioStackTemplate) => {
+    setGoals([t.goal as GoalType]);
+    const validIds = t.substanceIds.filter(id => SUPPORT_CATALOG_DATA[id] !== undefined);
+    setStackIds(validIds);
+  }, [setStackIds]);
+
   return (
     <div style={{ paddingBottom: 80 }}>
+      {/* Templates */}
+      <GlassCard title="📋 Шаблоны стеков" icon="📋" color="#8b5cf6">
+        <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginBottom: 4 }}>
+          {STACK_TEMPLATES.map(t => (
+            <button key={t.id} onClick={() => handleApplyTemplate(t)}
+              style={{
+                padding: '4px 8px', borderRadius: 10, fontSize: 7, fontWeight: 600, cursor: 'pointer',
+                whiteSpace: 'nowrap', background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)', color: '#c4b5fd',
+                transition: 'all 0.15s',
+              }}>
+              {t.icon} {t.name}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>Нажмите шаблон — препараты загрузятся в стек</div>
+      </GlassCard>
+
       <GlassCard title="🎯 Цели" icon="🎯" color="#f59e0b">
         <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
           {GOALS.map(g => (

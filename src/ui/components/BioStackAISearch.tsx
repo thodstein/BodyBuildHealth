@@ -17,6 +17,21 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
   const [hasSearched, setHasSearched] = useState(false);
   const [openGroup, setOpenGroup] = useState<FilterGroup | null>(null);
   const [expandedCard, setExpandedCard] = useState<Record<string, boolean>>({});
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('he_biostack_favorites') || '[]'); } catch { return []; }
+  });
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+
+  const toggleFav = useCallback((id: string) => {
+    const updated = favorites.includes(id) ? favorites.filter(f => f !== id) : [...favorites, id];
+    setFavorites(updated);
+    localStorage.setItem('he_biostack_favorites', JSON.stringify(updated));
+  }, [favorites]);
+
+  const displayedResults = useMemo(() => {
+    if (!showFavoritesOnly) return results;
+    return results.filter(r => favorites.includes(r.id));
+  }, [results, showFavoritesOnly, favorites]);
 
   const clearSearch = useCallback(() => {
     setSearchText(''); setSelectedGoal(null); setSelectedOrgans([]);
@@ -106,6 +121,12 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
               {g === 'goals' && selectedGoal ? ` (1)` : (g === 'organs' && selectedOrgans.length > 0) ? ` (${selectedOrgans.length})` : (g === 'systems' && selectedSystems.length > 0) ? ` (${selectedSystems.length})` : (g === 'mechanisms' && selectedMechs.length > 0) ? ` (${selectedMechs.length})` : ''}
             </button>
           ))}
+          <button onClick={() => setShowFavoritesOnly(!showFavoritesOnly)} style={{
+            padding: '4px 10px', borderRadius: 8, fontSize: 7, cursor: 'pointer', fontWeight: 600,
+            background: showFavoritesOnly ? 'rgba(251,191,36,0.1)' : '#202023',
+            border: `1px solid ${showFavoritesOnly ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.04)'}`,
+            color: showFavoritesOnly ? '#f59e0b' : 'rgba(255,255,255,0.5)',
+          }}>⭐ {showFavoritesOnly ? `(${favorites.length})` : ''}</button>
         </div>
 
         {openGroup === 'goals' && (
@@ -145,13 +166,15 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
       </GlassCard>
 
       {/* Results */}
-      {hasSearched && results.length === 0 && (
+      {hasSearched && displayedResults.length === 0 && (
         <GlassCard title="Результаты" icon="🔍" color="#f59e0b">
-          <div style={{ textAlign:'center', fontSize:10, color:'rgba(255,255,255,0.3)', padding:12 }}>Ничего не найдено. Попробуйте изменить фильтры.</div>
+          <div style={{ textAlign:'center', fontSize:10, color:'rgba(255,255,255,0.3)', padding:12 }}>
+            {showFavoritesOnly ? '⭐ Нет избранных препаратов. Нажмите ☆ чтобы добавить.' : 'Ничего не найдено. Попробуйте изменить фильтры.'}
+          </div>
         </GlassCard>
       )}
 
-      {results.map(match => {
+      {displayedResults.map(match => {
         const cat = SUPPORT_CATALOG_DATA[match.id];
         if (!cat) return null;
         const isInStack = stackIds.includes(match.id);
@@ -167,6 +190,9 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
                     background: match.relevanceScore > 80 ? 'rgba(0,230,138,0.12)' : match.relevanceScore > 50 ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.04)',
                     color: match.relevanceScore > 80 ? '#00e68a' : match.relevanceScore > 50 ? '#f59e0b' : 'rgba(255,255,255,0.3)',
                   }}>{(match.relevanceScore)}%</span>
+                  <span onClick={e => { e.stopPropagation(); toggleFav(match.id); }} style={{ cursor: 'pointer', fontSize: 9 }}>
+                    {favorites.includes(match.id) ? '⭐' : '☆'}
+                  </span>
                 </div>
                 <div style={{ display: 'flex', gap: 3 }}>
                   {isInStack ? (

@@ -176,3 +176,21 @@ export function toFinderProfile(bp: BioStackProfile): FinderProfile {
     budget: bp.budget, avoidIds: bp.avoidIds, maxStackSize: bp.maxStackSize,
   };
 }
+
+/* ─── Animation CSS ─── */
+export const BIO_ANIM_CSS = `
+@keyframes bioFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes bioFadeOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-6px); } }
+@keyframes bioSlideDown { from { max-height: 0; opacity: 0; } to { max-height: 600px; opacity: 1; } }
+@keyframes bioSlideUp { from { max-height: 600px; opacity: 1; } to { max-height: 0; opacity: 0; } }
+@keyframes bioPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes bioScaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.bio-fade { animation: bioFadeIn 0.25s ease-out both; }
+.bio-fade-fast { animation: bioFadeIn 0.15s ease-out both; }
+.bio-card { transition: all 0.2s ease; }
+.bio-card:hover { border-color: rgba(0,230,138,0.12) !important; }
+.bio-chip { transition: all 0.15s ease; }
+.bio-chip:hover { transform: scale(1.05); }
+.bio-dragging { opacity: 0.4; transform: scale(0.98); }
+.bio-drag-over { border-top: 2px solid #00e68a !important; }
+`;

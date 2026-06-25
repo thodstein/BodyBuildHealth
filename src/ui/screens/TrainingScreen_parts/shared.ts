@@ -57,22 +57,26 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   srcbb: '🏆 СРЦ/BB',
 };
 
-// ── Этап R: PlanningMode (реструктуризация планировщика, AGENTS.md критич.баг #1) ──
-// Два режима планирования, разделённых чтобы устранить дублирование информации
-// (программа показывалась одновременно в СРЦ/BB-движке и в ручном конструкторе).
-//   src_auto    → авто-подбор (СРЦ + Бодибилдинг) через SRCBBScreen (единственный источник программ)
-//   constructor → ручной конструктор (план/циклы/программы/методики/калькулятор)
-export type PlanningMode = 'src_auto' | 'constructor';
-const PM_KEY = 'he_training_planning_mode';
-export function getPlanningMode(): PlanningMode {
-  try { return localStorage.getItem(PM_KEY) === 'constructor' ? 'constructor' : 'src_auto'; } catch { return 'src_auto'; }
+// ── Этап R/U: 3 плоские трассы планировщика (ПЛ / ББ / Ручной сбор), одна вкладка — один клик.
+//   pl    → ПЛ (сила, СРЦ-авто)        → SRCBBScreen track='pl'
+//   bb    → ББ (бодибилдинг, авто)     → SRCBBScreen track='bb'
+//   manual→ Ручной сбор (план/циклы/программы/методики/калькулятор)
+export type PlanningTrack = 'pl' | 'bb' | 'manual';
+const PT_KEY = 'he_training_planning_track';
+export function getPlanningTrack(): PlanningTrack {
+  try { const v = localStorage.getItem(PT_KEY); return v === 'manual' || v === 'bb' ? v : 'pl'; } catch { return 'pl'; }
 }
-export function setPlanningMode(m: PlanningMode): void {
-  try { localStorage.setItem(PM_KEY, m); } catch { /* ignore */ }
+export function setPlanningTrack(t: PlanningTrack): void {
+  try { localStorage.setItem(PT_KEY, t); } catch { /* ignore */ }
 }
-// Вкладки группы «Планирование» по режиму (взаимоисключающие — нет дублей).
-export const SRC_AUTO_PLANNING_TABS: TrainingTab[] = ['srcbb'];
-export const CONSTRUCTOR_PLANNING_TABS: TrainingTab[] = ['plan', 'cycles', 'programs', 'mytraining', 'methods', 'programcalc'];
-export function planningTabsFor(mode: PlanningMode): TrainingTab[] {
-  return mode === 'src_auto' ? SRC_AUTO_PLANNING_TABS : CONSTRUCTOR_PLANNING_TABS;
+export const PL_PLANNING_TABS: TrainingTab[] = ['srcbb'];
+export const BB_PLANNING_TABS: TrainingTab[] = ['srcbb'];
+export const MANUAL_PLANNING_TABS: TrainingTab[] = ['plan', 'cycles', 'programs', 'mytraining', 'methods', 'programcalc'];
+export function planningTabsFor(track: PlanningTrack): TrainingTab[] {
+  if (track === 'manual') return MANUAL_PLANNING_TABS;
+  return track === 'bb' ? BB_PLANNING_TABS : PL_PLANNING_TABS;
 }
+// Бэкворд-совместимость (старый импорт PlanningMode)
+export type PlanningMode = PlanningTrack;
+export const getPlanningMode = getPlanningTrack;
+export const setPlanningMode = (m: string) => setPlanningTrack(m === 'constructor' ? 'manual' : m === 'src_auto' ? 'pl' : 'pl')

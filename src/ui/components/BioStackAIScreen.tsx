@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { loadBioStackProfile } from '../../engines/biostack-ai.engine';
-import { SUB_TABS, type BSTab } from './BioStackAIConstants';
+import { SUB_TABS, BIO_ANIM_CSS, type BSTab } from './BioStackAIConstants';
 import { ProfileTab } from './BioStackAIProfile';
 import { SearchTab } from './BioStackAISearch';
 import { BuildTab } from './BioStackAIBuild';
@@ -16,8 +16,20 @@ export const BioStackAIScreen: React.FC = () => {
   const [profile, setProfile] = useState<BioStackProfile>(() => loadBioStackProfile());
   const [stackIds, setStackIds] = useState<string[]>([]);
 
+  const tabContent: Record<BSTab, React.ReactNode> = {
+    profile: <ProfileTab profile={profile} setProfile={setProfile} setStackIds={setStackIds} />,
+    search: <SearchTab profile={profile} stackIds={stackIds} setStackIds={setStackIds} />,
+    build: <BuildTab profile={profile} stackIds={stackIds} setStackIds={setStackIds} />,
+    stack: <StackTab profile={profile} stackIds={stackIds} setStackIds={setStackIds} />,
+    risks: <RisksTab profile={profile} stackIds={stackIds} />,
+    compare: <CompareTab profile={profile} stackIds={stackIds} setStackIds={setStackIds} />,
+    reports: <ReportsTab profile={profile} stackIds={stackIds} />,
+    ai: <AITab profile={profile} stackIds={stackIds} setStackIds={setStackIds} />,
+  };
+
   return (
     <div style={{ padding: '0 0 80px' }}>
+      <style>{BIO_ANIM_CSS}</style>
       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', textAlign: 'center', marginBottom: 6 }}>
         🧬 BioStack AI — Операционная система управления БАДами
       </div>
@@ -36,14 +48,7 @@ export const BioStackAIScreen: React.FC = () => {
         ))}
       </div>
 
-      {tab === 'profile' && <ProfileTab profile={profile} setProfile={setProfile} />}
-      {tab === 'search' && <SearchTab profile={profile} stackIds={stackIds} setStackIds={setStackIds} />}
-      {tab === 'build' && <BuildTab profile={profile} stackIds={stackIds} setStackIds={setStackIds} />}
-      {tab === 'stack' && <StackTab profile={profile} stackIds={stackIds} setStackIds={setStackIds} />}
-      {tab === 'risks' && <RisksTab profile={profile} stackIds={stackIds} />}
-      {tab === 'compare' && <CompareTab profile={profile} stackIds={stackIds} setStackIds={setStackIds} />}
-      {tab === 'reports' && <ReportsTab profile={profile} stackIds={stackIds} />}
-      {tab === 'ai' && <AITab profile={profile} stackIds={stackIds} setStackIds={setStackIds} />}
+      <div key={tab} className="bio-fade">{tabContent[tab]}</div>
     </div>
   );
 };

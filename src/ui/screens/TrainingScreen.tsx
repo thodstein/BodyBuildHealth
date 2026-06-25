@@ -29,7 +29,7 @@ import {
   WARMUP_LABELS, GOALS, LEVELS, MUSCLE_GROUPS, GROUP_LABELS, EQUIP_LABELS, JOINT_LABELS,
   PHASE_LABELS, PHASE_HINTS, TAB_GROUPS, TAB_LABELS,
   type TrainingTab, type TrainingPage, type TrainingGroup,
-  type PlanningMode, getPlanningMode, setPlanningMode, planningTabsFor,
+  type PlanningTrack, getPlanningTrack, setPlanningTrack, planningTabsFor,
 } from './TrainingScreen_parts/shared';
 import { hapticImpact } from '../../core/telegram';
 
@@ -39,19 +39,19 @@ export const TrainingScreen: React.FC = () => {
   const labAnalysis = linked.labAnalysis;
   const diary = useMemo(() => new StrengthDiary(), []);
   // Этап R: режим планирования (устраняет дубли программ СРЦ/BB ↔ конструктор, AGENTS.md баг #1)
-  const [planningMode, setPlanningModeState] = useState<PlanningMode>(getPlanningMode());
-  const [tab, setTab] = useState<TrainingTab>(getPlanningMode() === 'src_auto' ? 'srcbb' : 'plan');
+  const [planningTrack, setPlanningTrackState] = useState<PlanningTrack>(getPlanningTrack());
+  const [tab, setTab] = useState<TrainingTab>(getPlanningTrack() === 'manual' ? 'plan' : 'srcbb');
   const [page, setPage] = useState<TrainingPage>('hero');
   const [mainGroup, setMainGroup] = useState<TrainingGroup>(null);
   // Эффективные группы вкладок: «Планирование» зависит от режима (взаимоисключающие наборы — нет дублей)
   const TAB_GROUPS_EFF: typeof TAB_GROUPS = {
     ...TAB_GROUPS,
-    planning: { ...TAB_GROUPS.planning, tabs: planningTabsFor(planningMode) },
+    planning: { ...TAB_GROUPS.planning, tabs: planningTabsFor(planningTrack) },
   };
-  const switchPlanningMode = (m: PlanningMode) => {
-    setPlanningMode(m);
-    setPlanningModeState(m);
-    const visible = planningTabsFor(m);
+  const switchPlanningTrack = (t: PlanningTrack) => {
+    setPlanningTrack(t);
+    setPlanningTrackState(t);
+    const visible = planningTabsFor(t);
     if (mainGroup === 'planning' && !visible.includes(tab)) setTab(visible[0]);
   };
 
@@ -401,7 +401,7 @@ export const TrainingScreen: React.FC = () => {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, color: group.color }}>{group.title}</div>
                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3 }}>
-                      {key === 'training' ? 'Проведение тренировки, таймеры отдыха, учёт подходов' : key === 'planning' ? (planningMode === 'src_auto' ? 'Авто-подбор программ: СРЦ (сила) и бодибилдинг, метрики, блины, пик' : 'Ручной конструктор: план, циклы, программы, методики, калькулятор') : 'Аналитика, графики, прогресс, дневник, калькуляторы, история'}
+                      {key === 'training' ? 'Проведение тренировки, таймеры отдыха, учёт подходов' : key === 'planning' ? (planningTrack === 'manual' ? 'Ручной сбор: план, циклы, программы, методики, калькулятор' : planningTrack === 'bb' ? 'Бодибилдинг: авто-подбор сплита, объём/тяж-памп, PED, метрики' : 'ПЛ (сила): авто-подбор циклов СРЦ, PM-прогрессия, блины, пик, метрики') : 'Аналитика, графики, прогресс, дневник, калькуляторы, история'}
                     </div>
                   </div>
                   <span style={{ color: group.color, fontSize: 16, opacity: 0.6 }}>→</span>
@@ -453,20 +453,10 @@ export const TrainingScreen: React.FC = () => {
            Разделяет авто-подбор (СРЦ/BB, единственный источник программ) и ручной конструктор,
            устраняя дублирование информации (AGENTS.md критич.баг #1). */}
       {mainGroup === 'planning' && (
-        <div style={{ display:'flex', gap:4, marginBottom:10, padding:'6px', borderRadius:12,
-          background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-          <button onClick={() => { hapticImpact('medium'); switchPlanningMode('src_auto'); }} style={{
-            flex:1, padding:'8px 6px', borderRadius:9, fontSize:11, fontWeight:700, cursor:'pointer',
-            border: planningMode === 'src_auto' ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
-            background: planningMode === 'src_auto' ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)',
-            color: planningMode === 'src_auto' ? 'var(--accent)' : 'var(--text-dim)',
-          }}>🏆 Авто (СРЦ/ББ)</button>
-          <button onClick={() => { hapticImpact('medium'); switchPlanningMode('constructor'); }} style={{
-            flex:1, padding:'8px 6px', borderRadius:9, fontSize:11, fontWeight:700, cursor:'pointer',
-            border: planningMode === 'constructor' ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.06)',
-            background: planningMode === 'constructor' ? 'rgba(59,130,246,0.14)' : 'rgba(255,255,255,0.02)',
-            color: planningMode === 'constructor' ? '#3b82f6' : 'var(--text-dim)',
-          }}>🛠 Конструктор</button>
+        <div style={{ display:'flex', gap:4, marginBottom:10, padding:'6px', borderRadius:12, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
+          <button onClick={() => { hapticImpact('medium'); switchPlanningTrack('pl'); }} style={{ flex:1, padding:'9px 6px', borderRadius:9, fontSize:11, fontWeight:700, cursor:'pointer', border: planningTrack === 'pl' ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)', background: planningTrack === 'pl' ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)', color: planningTrack === 'pl' ? 'var(--accent)' : 'var(--text-dim)' }}>🏆 ПЛ (сила)</button>
+          <button onClick={() => { hapticImpact('medium'); switchPlanningTrack('bb'); }} style={{ flex:1, padding:'9px 6px', borderRadius:9, fontSize:11, fontWeight:700, cursor:'pointer', border: planningTrack === 'bb' ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.06)', background: planningTrack === 'bb' ? 'rgba(59,130,246,0.14)' : 'rgba(255,255,255,0.02)', color: planningTrack === 'bb' ? '#3b82f6' : 'var(--text-dim)' }}>💪 ББ</button>
+          <button onClick={() => { hapticImpact('medium'); switchPlanningTrack('manual'); }} style={{ flex:1, padding:'9px 6px', borderRadius:9, fontSize:11, fontWeight:700, cursor:'pointer', border: planningTrack === 'manual' ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.06)', background: planningTrack === 'manual' ? 'rgba(168,85,247,0.14)' : 'rgba(255,255,255,0.02)', color: planningTrack === 'manual' ? '#a855f7' : 'var(--text-dim)' }}>🛠 Ручной сбор</button>
         </div>
       )}
 
@@ -499,7 +489,7 @@ export const TrainingScreen: React.FC = () => {
       )}
 
       {/* ═══════════ PLAN TAB ═══════════ */}
-      {tab === 'srcbb' && <SRCBBScreen />}
+      {tab === 'srcbb' && <SRCBBScreen track={planningTrack === 'manual' ? 'auto' : planningTrack} />}
           {tab === 'plan' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div className="card" style={{ padding: '10px 12px' }}>
