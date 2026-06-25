@@ -14,17 +14,28 @@ import { AITab } from './BioStackAIAI';
 export const BioStackAIScreen: React.FC = () => {
   const [tab, setTab] = useState<BSTab>('profile');
   const [profile, setProfile] = useState<BioStackProfile>(() => loadBioStackProfile());
-  const [stackIds, setStackIds] = useState<string[]>([]);
+  const [stackIds, setStackIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('he_biostack_active');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  // auto-save active stack for other screens to read
+  const setStackIdsAndSync = (ids: string[]) => {
+    setStackIds(ids);
+    localStorage.setItem('he_biostack_active', JSON.stringify(ids));
+  };
 
   const tabContent: Record<BSTab, React.ReactNode> = {
-    profile: <ProfileTab profile={profile} setProfile={setProfile} setStackIds={setStackIds} />,
-    search: <SearchTab profile={profile} stackIds={stackIds} setStackIds={setStackIds} />,
-    build: <BuildTab profile={profile} stackIds={stackIds} setStackIds={setStackIds} />,
-    stack: <StackTab profile={profile} stackIds={stackIds} setStackIds={setStackIds} />,
+    profile: <ProfileTab profile={profile} setProfile={setProfile} setStackIds={setStackIdsAndSync} />,
+    search: <SearchTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
+    build: <BuildTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
+    stack: <StackTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
     risks: <RisksTab profile={profile} stackIds={stackIds} />,
-    compare: <CompareTab profile={profile} stackIds={stackIds} setStackIds={setStackIds} />,
+    compare: <CompareTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
     reports: <ReportsTab profile={profile} stackIds={stackIds} />,
-    ai: <AITab profile={profile} stackIds={stackIds} setStackIds={setStackIds} />,
+    ai: <AITab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
   };
 
   return (

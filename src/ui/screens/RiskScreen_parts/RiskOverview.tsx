@@ -9,6 +9,7 @@ import { getRiskColor } from '../../../core/utils/risk-colors';
 import type { AggregatedRisk } from '../../../engines/risk.engine';
 import type { WeeklyRiskDynamics } from '../../../engines/weekly-risk-dynamics.engine';
 import { WeeklyRiskChart } from './WeeklyRiskChart';
+import { getBioStackStackIds, getStackRiskCoverage, RISK_SYSTEM_LABELS, getBioStackSubstances } from '../../../engines/biostack-bridge';
 
 function mapRiskSystem(riskSystem: string): string { return RISK_SYSTEM_MAP[riskSystem] || riskSystem; }
 function getSystemLabel(sys: string): string { return SYSTEM_INFO[sys]?.label || sys; }
@@ -227,6 +228,35 @@ export const RiskOverview: React.FC<{
           })()}
         </div>
       </Section>
+
+      {/* BioStack AI — active stack coverage */}
+      {(() => {
+        const stackIds = getBioStackStackIds();
+        if (stackIds.length === 0) return null;
+        const coverage = getStackRiskCoverage();
+        const subs = getBioStackSubstances();
+        return (
+          <Section id="biostack" icon="🧬" title={`BioStack AI • ${stackIds.length} компонентов`}>
+            <div style={{ display:'grid', gap:4 }}>
+              {Object.entries(coverage).map(([sys, data]) => (
+                <div key={sys} style={{ padding:'6px 8px', borderRadius:8, background:'var(--bg-secondary)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div>
+                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{RISK_SYSTEM_LABELS[sys] || sys}</div>
+                    <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{data.names.join(', ')}</div>
+                  </div>
+                  <span style={{ fontSize:9, color:'#00e68a', fontWeight:700 }}>{data.ids.length}шт</span>
+                </div>
+              ))}
+              {Object.keys(coverage).length === 0 && (
+                <div style={{ fontSize:10, color:'var(--text-dim)', textAlign:'center', padding:8 }}>Препараты стека не маппятся на системы риска</div>
+              )}
+            </div>
+            <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:6, textAlign:'center' }}>
+              🧬 Изменить стек в SupportScreen → BioStack AI
+            </div>
+          </Section>
+        );
+      })()}
 
       {/* Recommendations */}
       {/* Recommendations */}

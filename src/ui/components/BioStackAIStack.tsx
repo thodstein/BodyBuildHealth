@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { explainStack, findReplacement, type ReplacementResult } from '../../engines/supplement-finder.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS } from '../../data/support-database';
@@ -13,6 +13,9 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
 
   const [replaceState, setReplaceState] = useState<Record<string, { open: boolean; results: ReplacementResult[]; loading: boolean }>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [dropTarget, setDropTarget] = useState<number | null>(null);
+  const dragNode = useRef<number | null>(null);
   const [savedStacks, setSavedStacks] = useState<string[][]>(() => {
     try { return JSON.parse(localStorage.getItem('he_finder_saved_stacks') || '[]'); } catch { return []; }
   });
@@ -45,6 +48,43 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
   const handleClear = useCallback(() => {
     setStackIds([]);
   }, [setStackIds]);
+
+  /* ── Drag & Drop ── */
+  const handleDragStart = useCallback((e: React.DragEvent, idx: number) => {
+    dragNode.current = idx;
+    setDraggedIdx(idx);
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => setDraggedIdx(idx), 0);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDropTarget(idx);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDropTarget(null);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent, toIdx: number) => {
+    e.preventDefault();
+    const fromIdx = dragNode.current;
+    if (fromIdx === null || fromIdx === toIdx) { setDraggedIdx(null); setDropTarget(null); return; }
+    const arr = [...stackIds];
+    const [moved] = arr.splice(fromIdx, 1);
+    arr.splice(toIdx, 0, moved);
+    setStackIds(arr);
+    setDraggedIdx(null);
+    setDropTarget(null);
+    dragNode.current = null;
+  }, [stackIds, setStackIds]);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedIdx(null);
+    setDropTarget(null);
+    dragNode.current = null;
+  }, []);
 
   const catLabel = (c: string) => CATEGORY_LABELS[c as keyof typeof CATEGORY_LABELS] || c;
 
@@ -124,11 +164,13 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
         </GlassCard>
       )}
 
-      {explanation?.substances.map(entry => {
+      {explanation?.substances.map((entry, idx) => {
         const cat = SUPPORT_CATALOG_DATA[entry.id];
         if (!cat) return null;
         const isExpanded = expanded[entry.id];
         const replace = replaceState[entry.id];
+        const isDragging = draggedIdx === idx;
+        const isDropOver = dropTarget === idx && draggedIdx !== idx;
         const synergiesInStack = explanation.substances
           .filter(s => s.id !== entry.id)
           .map(s => {
@@ -138,7 +180,11 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
           .filter((x): x is { name: string; effect: string } => x !== null);
 
         return (
-          <GlassCard key={entry.id} style={{ marginBottom: 8 }}>
+          <div key={entry.id} draggable onDragStart={e => handleDragStart(e, idx)} onDragOver={e => handleDragOver(e, idx)}
+            onDragLeave={handleDragLeave} onDrop={e => handleDrop(e, idx)} onDragEnd={handleDragEnd}
+            className={isDragging ? 'bio-dragging' : isDropOver ? 'bio-drag-over' : ''}
+            style={{ marginBottom: 8, transition: 'all 0.15s ease' }}>
+          <GlassCard style={{ marginBottom: 0 }}>
             <div onClick={() => setExpanded(prev => ({ ...prev, [entry.id]: !prev[entry.id] }))} style={cardHeaderS}>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 2 }}>
@@ -279,6 +325,8 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
               </div>
             )}
           </GlassCard>
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.12)', textAlign: 'center', padding: '1px 0' }}>⠿</div>
+          </div>
         );
       })}
     </div>

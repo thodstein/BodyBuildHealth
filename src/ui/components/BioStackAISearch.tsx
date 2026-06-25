@@ -20,6 +20,8 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
   const [favorites, setFavorites] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_biostack_favorites') || '[]'); } catch { return []; }
   });
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 12;
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   const toggleFav = useCallback((id: string) => {
@@ -174,7 +176,10 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
         </GlassCard>
       )}
 
-      {displayedResults.map(match => {
+      {(() => {
+        const visibleCount = page * PAGE_SIZE;
+        const paginated = displayedResults.slice(0, visibleCount);
+        return paginated.map(match => {
         const cat = SUPPORT_CATALOG_DATA[match.id];
         if (!cat) return null;
         const isInStack = stackIds.includes(match.id);
@@ -227,7 +232,7 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
 
             {/* Expandable */}
             {exp && (
-              <div style={{ marginTop: 6 }}>
+              <div className="bio-fade-fast" style={{ marginTop: 6 }}>
                 {cat.description && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, marginBottom: 4 }}>📝 {cat.description}</div>}
                 {match.personalNotes?.length > 0 && (
                   <div style={{ fontSize: 7, color: '#00e68a', marginBottom: 2 }}>🎯 Совпадения: {match.personalNotes.slice(0, 3).join(', ')}</div>
@@ -261,12 +266,25 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
                 {cat.dosage && <div style={{ fontSize: 7, color: '#60a5fa', marginTop: 2 }}>💊 {cat.dosage.mg} мг {cat.dosage.timing ? `• ${cat.dosage.timing}` : ''}</div>}
               </div>
             )}
-            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', textAlign: 'right', marginTop: 2 }}>
-              {exp ? '▲' : '▼'}
-            </div>
+            {!exp && (
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', textAlign: 'right', marginTop: 2 }}>▼</div>
+            )}
           </GlassCard>
         );
-      })}
+      });
+    })()
+  }
+  {displayedResults.length > page * PAGE_SIZE && (
+        <div style={{ textAlign: 'center', marginTop: 8 }}>
+          <button onClick={() => setPage(p => p + 1)} style={{
+            padding: '8px 24px', borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+            background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.12)', color: '#00e68a',
+            transition: 'all 0.2s',
+          }}>
+            Показать ещё {Math.min(PAGE_SIZE, displayedResults.length - page * PAGE_SIZE)} из {displayedResults.length}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
