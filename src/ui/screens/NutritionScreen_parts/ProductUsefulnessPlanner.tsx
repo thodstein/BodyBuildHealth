@@ -91,7 +91,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   const [sourcePicker, setSourcePicker] = useState<{ source: string; title: string; items: Array<{ id: string; name: string; label?: string }> } | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  const [useV2, setUseV2] = useState(false);
+  const [useV2, setUseV2] = useState(true);
   const [v2Profile, setV2Profile] = useState<UserDietProfile>(getDefaultProfile());
 
   const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 2000); };
@@ -134,13 +134,19 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   const sorted = useMemo(() => {
     const arr = [...filtered];
     switch (sortKey) {
-      case 'score': arr.sort((a, b) => b.score.total - a.score.total); break;
+      case 'score':
+        if (useV2) {
+          arr.sort((a, b) => (v2Scored.get(b.food.id)?.total ?? 0) - (v2Scored.get(a.food.id)?.total ?? 0));
+        } else {
+          arr.sort((a, b) => b.score.total - a.score.total);
+        }
+        break;
       case 'name': arr.sort((a, b) => a.food.name.localeCompare(b.food.name)); break;
       case 'protein': arr.sort((a, b) => (b.food.protein || 0) - (a.food.protein || 0)); break;
       case 'kcal': arr.sort((a, b) => (a.food.kcal || 0) - (b.food.kcal || 0)); break;
     }
     return arr;
-  }, [filtered, sortKey]);
+  }, [filtered, sortKey, useV2, v2Scored]);
 
   const displayed = useMemo(() => showAll ? sorted : sorted.slice(0, 50), [sorted, showAll]);
 
@@ -275,19 +281,30 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               <input type="number" value={manualPrice} onChange={e => setManualPrice(e.target.value)} placeholder="Авто" style={INPUT('100%')} />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 8, color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={manualAAS} onChange={e => setManualAAS(e.target.checked)} style={{ accentColor: '#ef4444' }} />
-              ААС в курсе
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 8, color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={manualInsulin} onChange={e => setManualInsulin(e.target.checked)} style={{ accentColor: '#8b5cf6' }} />
-              Инсулин
-            </label>
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', marginBottom: 4, lineHeight: 1.3 }}>
+            🧬 <b>ААС (анаболические стероиды)</b> — влияет на рейтинг: продукты с атерогенными жирами получают штраф −4.5 (риск липидного профиля).<br />
+            💉 <b>Инсулин</b> — влияет на рейтинг продуктов с высоким ГИ/ИИ (штраф при приёме HGH, проверка инсулинового рикошета).
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            <button onClick={() => setManualAAS(!manualAAS)} style={{
+              flex: 1, padding: '8px 6px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
+              background: manualAAS ? 'linear-gradient(135deg,#ef4444,#dc2626)' : '#202023',
+              border: manualAAS ? 'none' : '1px solid rgba(255,255,255,0.06)',
+              color: manualAAS ? '#fff' : 'rgba(255,255,255,0.7)',
+              fontWeight: 700, fontSize: 9, transition: 'all 0.15s',
+            }}>💉 {manualAAS ? 'ААС активен' : 'ААС выключен'}</button>
+            <button onClick={() => setManualInsulin(!manualInsulin)} style={{
+              flex: 1, padding: '8px 6px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
+              background: manualInsulin ? 'linear-gradient(135deg,#8b5cf6,#7c3aed)' : '#202023',
+              border: manualInsulin ? 'none' : '1px solid rgba(255,255,255,0.06)',
+              color: manualInsulin ? '#fff' : 'rgba(255,255,255,0.7)',
+              fontWeight: 700, fontSize: 9, transition: 'all 0.15s',
+            }}>💉 {manualInsulin ? 'Инсулин активен' : 'Инсулин выключен'}</button>
             <button onClick={fillFromProfile} style={{
-              marginLeft: 'auto', padding: '5px 10px', borderRadius: 8, fontSize: 7, border: '1px solid rgba(0,230,138,0.2)',
-              background: 'rgba(0,230,138,0.08)', color: '#00e68a', cursor: 'pointer',
-            }}>📋 Автозаполнение</button>
+              padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
+              background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a',
+              fontWeight: 600, fontSize: 8, transition: 'all 0.15s',
+            }}>📋 Авто</button>
           </div>
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: 8, marginTop: 4 }}>
             <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>Модули оценки:</div>
@@ -387,19 +404,31 @@ export const ProductUsefulnessPlanner: React.FC = () => {
             {displayed.map(({ food, score }) => {
               const exp = expandedId === food.id;
               const isCompared = compareIds.includes(food.id);
+              const vs = useV2 ? v2Scored.get(food.id) : null;
+              const displayScore = vs || score;
+              const dsTotal = vs ? vs.total : score.total;
+              const dsColor = vs ? vs.color : score.color;
+              const dsLabel = vs ? vs.label : score.label;
               return (
                 <div key={food.id} style={{
-                  borderRadius: 12, padding: 10, background: exp ? `${score.color}06` : 'rgba(255,255,255,0.02)',
-                  border: exp ? `1px solid ${score.color}20` : '1px solid rgba(255,255,255,0.04)',
+                  borderRadius: 12, padding: 10, background: exp ? `${dsColor}06` : 'rgba(255,255,255,0.02)',
+                  border: exp ? `1px solid ${dsColor}20` : '1px solid rgba(255,255,255,0.04)',
                   cursor: 'pointer', transition: 'all 0.15s',
                 }}>
                     <div onClick={() => setExpandedId(exp ? null : food.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                      <ScoreBadge score={score.total} max={score.maxPossible} color={score.color} label={score.label} />
-                      {useV2 && v2Scored.has(food.id) && (() => {
-                        const vs = v2Scored.get(food.id)!;
-                        return <div style={{ padding:'2px 6px', borderRadius:6, fontSize:7, fontWeight:700, background: vs.total >= 7 ? 'rgba(0,230,138,0.1)' : vs.total >= 5 ? 'rgba(249,115,22,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${vs.color}30`, color: vs.color }}>v2 {vs.total.toFixed(1)}</div>;
-                      })()}
+                      {vs ? (
+                        <div style={{
+                          width: 40, height: 40, borderRadius: 10, display: 'flex', flexDirection: 'column',
+                          alignItems: 'center', justifyContent: 'center',
+                          background: `${dsColor}18`, border: `1px solid ${dsColor}30`,
+                        }}>
+                          <span style={{ fontSize: 12, fontWeight: 800, color: dsColor, lineHeight: 1 }}>{dsTotal.toFixed(1)}</span>
+                          <span style={{ fontSize: 5, color: dsColor + 'aa', lineHeight: 1 }}>v2</span>
+                        </div>
+                      ) : (
+                        <ScoreBadge score={score.total} max={score.maxPossible} color={score.color} label={score.label} />
+                      )}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
                         <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
@@ -423,39 +452,69 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                   </div>
                   {exp && (
                     <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${score.color}15` }}>
-                      {enableA && <><div style={{ fontSize: 8, color: score.color, fontWeight: 600, marginBottom: 4 }}>📊 Разбивка скора</div>
-                        <ScoreBar label="Белок" value={score.breakdown.proteinDensity} max={30} color="#3b82f6" />
-                        <ScoreBar label="Микро" value={score.breakdown.microDensity} max={30} color="#22c55e" />
-                        <ScoreBar label="Клетчатка" value={score.breakdown.fiberQuality} max={20} color="#f97316" />
-                        <ScoreBar label="Аминокислоты" value={score.breakdown.aminoScore} max={25} color="#ec4899" />
-                        <ScoreBar label="Категория" value={score.breakdown.tierScore} max={20} color="#f59e0b" /></>}
-                      {enableB && <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>
-                        {score.contextBonus.goalMatch > 0 && <span style={{ color: '#22c55e' }}>✓ Цель совпадает </span>}
-                        {score.contextBonus.timingMatch > 0 && <span style={{ color: '#60a5fa' }}>✓ Время подходит </span>}
-                        {score.contextBonus.pharmaMatch > 0 && <span style={{ color: '#8b5cf6' }}>✓ Фарма-синергия </span>}
-                        {score.contextBonus.pharmaMatch < 0 && <span style={{ color: '#ef4444' }}>⚠️ Фарма-конфликт </span>}
-                        {score.contextBonus.goalMatch === 0 && score.contextBonus.timingMatch === 0 && score.contextBonus.pharmaMatch === 0 && (
-                          <span style={{ color: 'rgba(255,255,255,0.2)' }}>—</span>
-                        )}
-                      </div>}
-                      {enableC && score.costEfficiency && (
-                        <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.35)', display: 'flex', gap: 8 }}>
-                          <span>💰 {score.costEfficiency.proteinCostRub} ₽/10г белка</span>
-                          <span>💳 <span style={{ color: score.costEfficiency.efficiencyScore >= 50 ? '#22c55e' : '#f59e0b' }}>{score.costEfficiency.efficiencyScore}/100</span></span>
-                        </div>
-                      )}
-                      {useV2 && v2Scored.has(food.id) && (() => {
-                        const vs = v2Scored.get(food.id)!;
-                        return (
-                          <div style={{ marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>
-                            <div style={{ color: '#00e68a', fontWeight: 700, marginBottom: 2 }}>🧬 v2: BB {vs.bbScore.toFixed(1)} → Overall {vs.total.toFixed(1)}</div>
-                            {vs.factors.slice(0, 3).map((f, i) => (
-                              <div key={i} style={{ color: f.impact > 0 ? '#22c55e' : '#ef4444' }}>{f.icon} {f.text}</div>
-                            ))}
-                            {vs.factors.length > 3 && <span style={{ color: 'rgba(255,255,255,0.2)' }}>+{vs.factors.length - 3} факторов</span>}
-                          </div>
-                        );
-                      })()}
+                      {vs ? (
+  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, marginBottom: 4 }}>
+      <div style={{ padding: '3px 6px', borderRadius: 6, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.08)' }}>
+        <span style={{ color: '#8b5cf6' }}>BB Score</span>
+        <span style={{ float: 'right', fontWeight: 700, color: '#00e68a' }}>{vs.bbScore.toFixed(1)}</span>
+      </div>
+      <div style={{ padding: '3px 6px', borderRadius: 6, background: vs.phaseMod !== 0 ? 'rgba(249,115,22,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${vs.phaseMod < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}` }}>
+        <span style={{ color: '#8b5cf6' }}>Фаза</span>
+        <span style={{ float: 'right', fontWeight: 700, color: vs.phaseMod < 0 ? '#ef4444' : '#22c55e' }}>{vs.phaseMod > 0 ? '+' : ''}{vs.phaseMod.toFixed(1)}</span>
+      </div>
+      <div style={{ padding: '3px 6px', borderRadius: 6, background: vs.pharmaMod !== 0 ? 'rgba(239,68,68,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${vs.pharmaMod < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}` }}>
+        <span style={{ color: '#8b5cf6' }}>Фарма</span>
+        <span style={{ float: 'right', fontWeight: 700, color: vs.pharmaMod < 0 ? '#ef4444' : '#22c55e' }}>{vs.pharmaMod > 0 ? '+' : ''}{vs.pharmaMod.toFixed(1)}</span>
+      </div>
+      <div style={{ padding: '3px 6px', borderRadius: 6, background: vs.labMod !== 0 ? 'rgba(239,68,68,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${vs.labMod < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}` }}>
+        <span style={{ color: '#8b5cf6' }}>Анализы</span>
+        <span style={{ float: 'right', fontWeight: 700, color: vs.labMod < 0 ? '#ef4444' : '#22c55e' }}>{vs.labMod > 0 ? '+' : ''}{vs.labMod.toFixed(1)}</span>
+      </div>
+      {vs.timingMod !== 0 && (
+        <div style={{ padding: '3px 6px', borderRadius: 6, background: 'rgba(249,115,22,0.04)', border: '1px solid rgba(249,115,22,0.1)' }}>
+          <span style={{ color: '#8b5cf6' }}>Тайминг</span>
+          <span style={{ float: 'right', fontWeight: 700, color: vs.timingMod < 0 ? '#ef4444' : '#22c55e' }}>{vs.timingMod > 0 ? '+' : ''}{vs.timingMod.toFixed(1)}</span>
+        </div>
+      )}
+    </div>
+    {vs.factors.length > 0 ? (
+      <div>
+        <div style={{ fontSize: 7, fontWeight: 600, color: '#00e68a', marginBottom: 2 }}>🧬 Почему такой рейтинг:</div>
+        {vs.factors.map((f, i) => (
+          <div key={i} style={{ padding: '2px 6px', marginBottom: 1, borderRadius: 4, background: f.impact > 0 ? 'rgba(0,230,138,0.04)' : 'rgba(239,68,68,0.04)', border: `1px solid ${f.impact > 0 ? 'rgba(0,230,138,0.08)' : 'rgba(239,68,68,0.08)'}`, fontSize: 7, color: f.impact > 0 ? '#22c55e' : '#ef4444', lineHeight: 1.4 }}>
+            {f.icon} {f.text} <b>({f.impact > 0 ? '+' : ''}{f.impact.toFixed(1)})</b>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>Нет дополнительных факторов</div>
+    )}
+    <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', marginTop: 2 }}>Настройте фазу и фармакологию в ⚙️ Параметры → вкладка v2</div>
+  </div>
+) : (
+<><div style={{ fontSize: 8, color: score.color, fontWeight: 600, marginBottom: 4 }}>📊 Разбивка скора</div>
+  {enableA && <>
+  <ScoreBar label="Белок" value={score.breakdown.proteinDensity} max={30} color="#3b82f6" />
+  <ScoreBar label="Микро" value={score.breakdown.microDensity} max={30} color="#22c55e" />
+  <ScoreBar label="Клетчатка" value={score.breakdown.fiberQuality} max={20} color="#f97316" />
+  <ScoreBar label="Аминокислоты" value={score.breakdown.aminoScore} max={25} color="#ec4899" />
+  <ScoreBar label="Категория" value={score.breakdown.tierScore} max={20} color="#f59e0b" /></>}
+  {enableB && <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>
+    {score.contextBonus.goalMatch > 0 && <span style={{ color: '#22c55e' }}>✓ Цель совпадает </span>}
+    {score.contextBonus.timingMatch > 0 && <span style={{ color: '#60a5fa' }}>✓ Время подходит </span>}
+    {score.contextBonus.pharmaMatch > 0 && <span style={{ color: '#8b5cf6' }}>✓ Фарма-синергия </span>}
+    {score.contextBonus.pharmaMatch < 0 && <span style={{ color: '#ef4444' }}>⚠️ Фарма-конфликт </span>}
+    {(score.contextBonus.goalMatch === 0 && score.contextBonus.timingMatch === 0 && score.contextBonus.pharmaMatch === 0) && (<span style={{ color: 'rgba(255,255,255,0.2)' }}>—</span>)}
+  </div>}
+  {enableC && score.costEfficiency && (
+    <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.35)', display: 'flex', gap: 8 }}>
+      <span>💰 {score.costEfficiency.proteinCostRub} ₽/10г белка</span>
+      <span>💳 <span style={{ color: score.costEfficiency.efficiencyScore >= 50 ? '#22c55e' : '#f59e0b' }}>{score.costEfficiency.efficiencyScore}/100</span></span>
+    </div>
+  )}
+  </>)
+}
                       {food.bestFor && food.bestFor.length > 0 && (
                         <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>
                           🎯 Для: {food.bestFor.join(', ')}

@@ -78,6 +78,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [autoLevel, setAutoLevel] = useState<'basic' | 'mid' | 'max' | 'boost'>('mid');
   const [expandedMed, setExpandedMed] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const [stackExpanded, setStackExpanded] = useState<string | null>(null);
   // Protocol substance name -> ID lookup for +Стек buttons
   const PROTOCOL_IDS: Record<string, string> = {
     'nac':'AA_NAC','n-ацетилцистеин':'AA_NAC','n-acetyl-cysteine':'AA_NAC',
@@ -2356,32 +2357,57 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     })}
                   </div>
                 )}
-                {catalogSubTab === 'stack' && (
-                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                    {ALL_STACKS.map(stk => (
-                      <div key={stk.id} style={{ padding:'10px 12px', borderRadius:12, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
-                          <span style={{ fontSize:10, fontWeight:700, color:'var(--accent)' }}>{stk.name}</span>
-                          <span style={{ fontSize:8, padding:'2px 6px', borderRadius:6, background:'rgba(0,230,138,0.1)', color:'#00e68a', fontWeight:600 }}>⭐ {stk.synergyScore}</span>
+                  {catalogSubTab === 'stack' && (
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {ALL_STACKS.map(stk => {
+                        const isExp = stackExpanded === stk.id;
+                        return (
+                        <div key={stk.id} style={{ borderRadius:12, background:'var(--bg-secondary)', border:'1px solid var(--border)', overflow:'hidden' }}>
+                          <div style={{ padding:'10px 12px' }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                              <span style={{ fontSize:10, fontWeight:700, color:'var(--accent)' }}>{stk.name}</span>
+                              <span style={{ fontSize:8, padding:'2px 6px', borderRadius:6, background:'rgba(0,230,138,0.1)', color:'#00e68a', fontWeight:600 }}>⭐ {stk.synergyScore}</span>
+                            </div>
+                            <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6, lineHeight:1.4 }}>{stk.problem}</div>
+                            <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
+                              {stk.substances.slice(0,6).map(s => {
+                                const cat = SUPPORT_CATALOG_DATA[s.id];
+                                return <span key={s.id} style={{ padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.06)', color:'#00e68a', fontSize:7 }}>{cat?.nameRu || cat?.name || s.id}</span>;
+                              })}
+                              {stk.substances.length > 6 && <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>+{stk.substances.length-6}</span>}
+                            </div>
+                            <div style={{ display:'flex', gap:4 }}>
+                              <button onClick={() => {
+                                const ids = stk.substances.map(s => s.id);
+                                const existing = JSON.parse(localStorage.getItem('he_finder_saved_stacks')||'[]');
+                                localStorage.setItem('he_finder_saved_stacks', JSON.stringify([ids, ...existing].slice(0,10)));
+                                setEnhancedSubs(prev => [...new Set([...prev, ...ids])]);
+                              }} style={{ flex:1, padding:'4px 0', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.15)', color:'#00e68a' }}>📥 + Мой стек</button>
+                              <button onClick={() => setStackExpanded(isExp ? null : stk.id)} style={{
+                                padding:'4px 10px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer',
+                                background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.12)', color:'#8b5cf6',
+                              }}>📋 {isExp ? 'Скрыть' : 'Подробнее'}</button>
+                            </div>
+                          </div>
+                          {isExp && (
+                            <div style={{ padding:'0 12px 10px', borderTop:'1px solid var(--border)', marginTop:0, display:'flex', flexDirection:'column', gap:4, fontSize:7, color:'rgba(255,255,255,0.6)' }}>
+                              <div>🧬 <b>Синергия:</b> {stk.synergyPrinciple}</div>
+                              <div>⏰ <b>Приём:</b> {stk.timingSummary}</div>
+                              {stk.anatomicalMapping?.organSystems && <div>🫀 <b>Системы:</b> {stk.anatomicalMapping.organSystems.join(', ')}</div>}
+                              <div>🔬 <b>Контроль:</b> {stk.monitoring}</div>
+                              {stk.specialInstructions && <div>💡 <b>Указания:</b> {stk.specialInstructions}</div>}
+                              {stk.contraindications && <div style={{ color:'#ef4444' }}>⛔ <b>Противопоказания:</b> {stk.contraindications}</div>}
+                              {stk.warnings && <div style={{ color:'#f59e0b' }}>⚠️ <b>Предупреждения:</b> {stk.warnings}</div>}
+                              {stk.structuredLabControl?.markers && stk.structuredLabControl.markers.length > 0 && (
+                                <div>📊 <b>Маркеры:</b> {stk.structuredLabControl.markers.slice(0,5).map(m => `${m.marker} (${m.when} — ${m.targetRange})`).join('; ')}</div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6, lineHeight:1.4 }}>{stk.problem}</div>
-                        <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
-                          {stk.substances.slice(0,6).map(s => {
-                            const cat = SUPPORT_CATALOG_DATA[s.id];
-                            return <span key={s.id} style={{ padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.06)', color:'#00e68a', fontSize:7 }}>{cat?.nameRu || cat?.name || s.id}</span>;
-                          })}
-                          {stk.substances.length > 6 && <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>+{stk.substances.length-6}</span>}
-                        </div>
-                        <button onClick={() => {
-                          const ids = stk.substances.map(s => s.id);
-                          const existing = JSON.parse(localStorage.getItem('he_finder_saved_stacks')||'[]');
-                          localStorage.setItem('he_finder_saved_stacks', JSON.stringify([ids, ...existing].slice(0,10)));
-                          setEnhancedSubs(prev => [...new Set([...prev, ...ids])]);
-                        }} style={{ padding:'4px 12px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.15)', color:'#00e68a' }}>📥 + Мой стек</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                        );
+                      })}
+                    </div>
+                  )}
                 {/* Complexes tab removed — all substances now in type/organ/tier views */}
                 {(catalogSubTab === 'type' || !catalogSubTab) && (
                 /* По типам — все 280 препаратов, сгруппированы по типу (без органов/функций) */

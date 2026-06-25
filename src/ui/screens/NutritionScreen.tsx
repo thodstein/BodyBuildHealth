@@ -306,7 +306,6 @@ const CATEGORY_LABELS: Record<string, string> = {
 const CatalogTab: React.FC = () => {
   const [catSearch, setCatSearch] = React.useState('');
   const [catFilter, setCatFilter] = React.useState('all');
-  const [catFilterMode, setCatFilterMode] = React.useState<'inclusive' | 'exclusive'>('exclusive');
   const [showExclusive, setShowExclusive] = React.useState(false);
   const [catExpanded, setCatExpanded] = React.useState<string | null>(null);
   const categories = React.useMemo(() => [...new Set(FOOD_DB.map(f => f.category).filter(Boolean) as string[])], []);
@@ -315,12 +314,12 @@ const CatalogTab: React.FC = () => {
   };
   const filtered = React.useMemo(() => {
     return FOOD_DB.filter(f => {
-      if (catFilter !== 'all' && catFilterMode === 'exclusive' && f.category !== catFilter) return false;
+      if (catFilter !== 'all' && f.category !== catFilter) return false;
       if (showExclusive && f.tier !== 'max') return false;
       if (catSearch && !(f.name||'').toLowerCase().includes(catSearch.toLowerCase())) return false;
       return true;
     });
-  }, [catFilter, catSearch, catFilterMode, showExclusive]);
+  }, [catFilter, catSearch, showExclusive]);
   const filterBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode) => (
     <button onClick={onClick} style={{ padding:'5px 10px', borderRadius:8, fontSize:8, cursor:'pointer', fontWeight: isActive ? 700 : 400, letterSpacing:0.2, whiteSpace:'nowrap', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>{children}</button>
   );
@@ -330,10 +329,10 @@ const CatalogTab: React.FC = () => {
       <div style={labelSec}>📦 Каталог продуктов ({FOOD_DB.length})</div>
       <input value={catSearch} onChange={e => setCatSearch(e.target.value)} placeholder="🔍 Поиск по названию..." style={inputStyle} />
       <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-        {filterBtn(catFilter === 'all' && !showExclusive, () => { setShowExclusive(false); setCatFilter('all'); setCatFilterMode('inclusive'); }, `Все (${FOOD_DB.length})`)}
+        {filterBtn(catFilter === 'all', () => { setShowExclusive(false); setCatFilter('all'); }, `Все (${FOOD_DB.length})`)}
         {categories.map(c => {
           const count = FOOD_DB.filter(f => f.category === c).length;
-          return filterBtn(catFilter === c && !showExclusive, () => { setShowExclusive(false); setCatFilter(c); }, `${CATEGORY_LABELS[c] || c} (${count})`);
+          return filterBtn(catFilter === c, () => { setShowExclusive(false); setCatFilter(c); }, `${CATEGORY_LABELS[c] || c} (${count})`);
         })}
         <button onClick={() => { setShowExclusive(e => !e); setCatFilter('all'); }} style={{
           padding:'5px 10px', borderRadius:8, fontSize:8, cursor:'pointer', fontWeight: showExclusive ? 700 : 400, letterSpacing:0.2, whiteSpace:'nowrap',
@@ -346,12 +345,6 @@ const CatalogTab: React.FC = () => {
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>
           {catFilter === 'all' ? 'Показаны все продукты' : `${CATEGORY_LABELS[catFilter] || catFilter} — ${filtered.length} продуктов`}
         </div>
-        <button onClick={() => setCatFilterMode(m => m === 'inclusive' ? 'exclusive' : 'inclusive')} style={{
-          padding:'3px 8px', borderRadius:6, fontSize:7, fontWeight:600, cursor:'pointer',
-          background: catFilterMode === 'exclusive' ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
-          border: catFilterMode === 'exclusive' ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.06)',
-          color: catFilterMode === 'exclusive' ? '#00e68a' : 'rgba(255,255,255,0.5)',
-        }}>{catFilterMode === 'inclusive' ? '🔓 Все категории' : '🔒 Только выбранная'}</button>
       </div>
       <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:3, borderRadius:8 }}>
         {filtered.map(f => {
