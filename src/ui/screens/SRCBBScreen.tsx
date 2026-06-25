@@ -3,6 +3,9 @@ import { LMS_CYCLES, getCycleById } from '../../data/lms-cycles/lms-cycle-index'
 import { rankCycles, selectBestCycle, explainSelection, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
 import { buildLMSPlan, type LMSBuildOutput } from '../../engines/lms/lms-builder.engine';
 import { mesocyclePhaseForWeek } from '../../engines/rir-matrix.engine';
+import { autoRegulate, type AutoRegOutput } from '../../engines/pro/autoregulation-pro.engine';
+import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
+import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { SPLIT_PATTERNS } from '../../engines/bb/bb-split-patterns';
 import { rankBBSplits, selectBestBBSplit, explainBBSelection, type BBSelectorInput } from '../../engines/bb/bb-selector.engine';
 import { buildBBPlan, type BBPlan } from '../../engines/bb/bb-builder.engine';
@@ -111,6 +114,15 @@ export const SRCBBScreen: React.FC = () => {
   const [appliedMethods, setAppliedMethods] = useState<Record<string, string>>({});
   const [methodNote, setMethodNote] = useState<string | null>(null);
   const linked = useDataLink();
+  // P12-wire #2: проф-авторегуляция плана (readiness + ACWR из sRPE-дневника)
+  const [autoRegOn, setAutoRegOn] = useState<boolean>(false);
+  const autoRegResult: AutoRegOutput = useMemo(() => {
+    const rec = linked.readiness?.recovery ?? 80;
+    const fat = linked.readiness?.fatigue ?? 30;
+    const srpe = loadSRPESessions();
+    const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : { ratio: 1.0, zone: 'optimal' as const };
+    return autoRegulate({ readiness: rec, acwr: { ratio: acwr.ratio, zone: acwr.zone }, fatigue: fat, lastSessionRPE: 8, lastVelocityLossPct: 15, plannedTopSetPct: 0.85, plannedRIR: 2 });
+  }, [linked.readiness]);
   const diary = useMemo(() => new StrengthDiary(), []);
   const [historyWorkouts, setHistoryWorkouts] = useState<WorkoutLog[]>([]);
   useEffect(() => { (async () => { try { const w = await diary.getWorkoutLogs(); setHistoryWorkouts(w.reverse()); } catch { /* ignore */ } })(); }, [diary]);
@@ -138,7 +150,7 @@ export const SRCBBScreen: React.FC = () => {
       exercises: [
         ...d.exercises.map((e, ei) => ({
           name: e.name, muscleGroup: e.group,
-          targetSets: e.workSets.flatMap((ws, si) => { const es = effSet(w0, i, ei, si, ws); return Array.from({ length: es.sets }, () => ({ weight: es.weight, reps: es.reps, rir: 0 })); }),
+          targetSets: e.workSets.flatMap((ws, si) => { let es = effSet(w0, i, ei, si, ws); if (autoRegOn && autoRegResult) { es = { ...es, sets: Math.round(es.sets * autoRegResult.volumeMultiplier), weight: Math.round(es.weight * autoRegResult.topSetPctMultiplier * 10) / 10 }; } return Array.from({ length: es.sets }, () => ({ weight: es.weight, reps: es.reps, rir: 0 })); }),
           pm: e.pm, coef: e.coef, mnosz: e.mnosz, group: e.group,
         })),
         ...(srcAdditions[dayKey(w0, i)] || []).map(a => ({
@@ -148,7 +160,7 @@ export const SRCBBScreen: React.FC = () => {
         })),
       ],
     }));
-  }, [builtSrc, srcEdits, srcAdditions]);
+  }, [builtSrc, srcEdits, srcAdditions, autoRegOn, autoRegResult]);
 
   const bbDaysArr: PlayerDay[] = useMemo(() => {
     if (!builtBb) return [];
@@ -240,7 +252,11 @@ export const SRCBBScreen: React.FC = () => {
               peak: 'Пиковая фаза: интенсификация — %ПМ растёт, объём снижается, RIR 0-1. Готовность к тесту/соревнованию.',
               deload: 'Разгрузка: 50-60% объёма, RIR 4, восстановление перед следующим мезоциклом.',
             };
-            const setStr = (s: { sets: number; reps: number; weight: number; pct: number }) => s.sets + 'x' + s.reps + 'x' + s.weight + 'кг (' + Math.round(s.pct*100) + '%)';
+            const setStr = (s: { sets: number; reps: number; weight: number; pct: number }) => {
+              let sets = s.sets, weight = s.weight;
+              if (autoRegOn && autoRegResult) { sets = Math.round(sets * autoRegResult.volumeMultiplier); weight = Math.round(weight * autoRegResult.topSetPctMultiplier * 10) / 10; }
+              return sets + 'x' + s.reps + 'x' + weight + 'кг (' + Math.round(s.pct*100) + '%)' + (autoRegOn && autoRegResult && (autoRegResult.topSetPctMultiplier !== 1 || autoRegResult.volumeMultiplier !== 1) ? ' ⚡' : '');
+            };
             return <div style={CARD}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8 }}>
                 <div style={{ ...H, margin:0 }}>План: {builtSrc.template.meta.title}</div>
@@ -252,6 +268,17 @@ export const SRCBBScreen: React.FC = () => {
                 <button onClick={() => setEditMode(m => !m)} style={{ ...BTN_GHOST, padding:'6px 10px', minHeight:34, fontSize:11 }}>{editMode ? '✓ Готово' : '✏️ Правка плана'}</button>
                 {editMode && <button onClick={() => setSrcEdits({})} disabled={Object.keys(srcEdits).length===0} style={{ ...BTN_GHOST, padding:'6px 10px', minHeight:34, fontSize:11, opacity: Object.keys(srcEdits).length===0?0.4:1 }}>↺ Сбросить</button>}
                 {editMode && <span style={{ ...SMALL }}>правка недели 1 применяется к «Выполнение»</span>}
+              </div>
+              {/* P12-wire #2: проф-авторегуляция плана */}
+              <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: autoRegResult.deload ? 'rgba(239,68,68,0.08)' : 'rgba(96,165,250,0.06)', border: '1px solid ' + (autoRegResult.deload ? 'rgba(239,68,68,0.25)' : 'rgba(96,165,250,0.2)') }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span style={{ fontSize:11, fontWeight:700, color: autoRegResult.deload ? '#ef4444' : '#60a5fa' }}>🧠 Авторегуляция плана {autoRegOn ? 'ВКЛ' : 'ВЫКЛ'}</span>
+                  <button onClick={() => setAutoRegOn(a => !a)} style={{ padding:'5px 10px', borderRadius:6, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegOn ? '#60a5fa' : 'rgba(255,255,255,0.1)', color: autoRegOn ? '#000' : 'var(--text-dim)' }}>{autoRegOn ? 'Отключить' : 'Применить'}</button>
+                </div>
+                {autoRegOn && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.7)' }}>
+                  <div>Топ-сет ×{autoRegResult.topSetPctMultiplier} · объём ×{autoRegResult.volumeMultiplier} · RIR +{autoRegResult.rirShift}{autoRegResult.deload ? ' · 🔴 DELOAD-триггер' : ''}</div>
+                  {autoRegResult.decisions.slice(0,3).map((d, i) => <div key={i} style={{ marginTop:2, color:'rgba(255,255,255,0.55)' }}>• {d}</div>)}
+                </div>}
               </div>
               {pickerDay && (
                 <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.25)' }}>

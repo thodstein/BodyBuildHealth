@@ -11,6 +11,7 @@ import {
 import { computeSessionMetrics } from './sessionMetrics';
 import { hapticImpact, hapticNotify } from '../../../core/telegram';
 import { velocityLoss, velocityLossZone, thresholdForIntent, type VBTIntent } from '../../../engines/pro/vbt.engine';
+import { saveSRPESession } from '../../../engines/pro/srpe-store';
 
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -51,6 +52,8 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   // P11: VBT-ввод скорости штанги (м/с) на сет + авторегуляция по потере скорости
   const [vel, setVel] = useState<Record<string, number>>({});
   const [vbtIntent, setVbtIntent] = useState<VBTIntent>('strength');
+  const [sessionRPE, setSessionRPE] = useState<number>(7);
+  const [sessionDur, setSessionDur] = useState<number>(60);
 
   const day = days[dayIdx] || days[0];
   const last = useMemo(() => getLastSession(), [done]);
@@ -85,6 +88,8 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     if (!session) return;
     hapticNotify('success');
     const finished = finishSession(session, `${focus} — ${day?.label}`);
+    // P12 wire: сохранить сессию с sRPE для мониторинга нагрузки (training-load.engine)
+    try { saveSRPESession({ date: finished.date, sRPE: sessionRPE, durationMin: finished.durationMin || sessionDur }); } catch { /* ignore */ }
     setDone(finished);
     setSession(null);
   };
@@ -129,6 +134,13 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
             <button style={BTN} onClick={finish}>⏹ Завершить</button>
           </div>
           <div style={{ ...SMALL, marginBottom: 6 }}>План: {planned.sets} сетов / {planned.volume} кг·пов · Факт: {factVol.sets} сетов / {factVol.volume} кг·пов</div>
+          {/* P12: sRPE для мониторинга нагрузки (сохранится при завершении) */}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>sRPE сессии:</span>
+            {[6,7,8,9,10].map(r => <button key={r} onClick={() => setSessionRPE(r)} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 10, cursor: 'pointer', border: sessionRPE===r?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: sessionRPE===r?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.02)', color: sessionRPE===r?'#00e68a':'var(--text-dim)' }}>{r}</button>)}
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>· длительность, мин:</span>
+            <input style={{ ...IN, width: 64 }} type="number" value={sessionDur} onChange={e => setSessionDur(+e.target.value)} aria-label="длительность мин" />
+          </div>
           {day.exercises.map((ex, ei) => (
             <div key={ei} style={{ marginTop: 8, padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>{ex.name} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>({ex.muscleGroup})</span></div>

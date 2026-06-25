@@ -690,3 +690,18 @@ profile → lms-selector (топ-N) → выбранный цикл → ввод
 - Секции: Относительная сила (P6: ввод тотал/вес/пол → Wilks/DOTS/IPF GLI/allometric/relative + класс); Монитор нагрузки (P3: sRPE-сессии → ACWR/acute-chronic/monotony/strain/fitness-fatigue + рекомендации); Проф-авторегуляция (P4: readiness+ACWR+lastRPE+velocityLoss → топ-сет×/объём×/RIR+/deload + decisions); Прогрессии (P5: 6 схем, ввод e1RM → недели с весами).
 - Верификация (render, puppeteer): вью рендерится, DOTS 387.96 «Опытный», IPF GLI 66.2, allometric, ACWR, fitness-fatigue, авторегуляция, прогрессии — все секции видны. PE: 0.
 - tsc ✓, vite ✓. ПРОФ-ПЛАН (P1–P12) ПОЛНОСТЬЮ ЗАВЕРШЁН.
+## P12-wire — реальные данные в Pro-метрики ✅
+- sRPE-ввод в SessionPlayer: кнопки sRPE (6-10) + длительность (мин) при активной сессии; при «Завершить» сессия {date, sRPE, durationMin} сохраняется в localStorage (`he_srpe_sessions`, srpe-store.ts).
+- ProMetricsPanel: монитор нагрузки читает реальные sRPE-сессии из хранилища (P3 trainingLoadReport); если <2 реальных — демо-массив + подсказка «завершайте тренировки с sRPE во вкладке Выполнение».
+- tsc ✓, vite ✓.
+## P12-wire #3 — график fitness-fatigue в Pro-метрики ✅
+- Canvas-график кривой performance (Fitness − Fatigue, Banister) в панели мониторинга нагрузки (без зависимостей, mobile-first). Рендерится из tlReport.banister.series.
+- tsc ✓, vite ✓.
+## P12-wire #2 — проф-авторегуляция → план-вью ✅
+- В SRCBBScreen добавлен расчёт autoRegulate (P4) из linked.readiness + ACWR из sRPE-дневника (P3) + toggle «🧠 Авторегуляция плана ВКЛ/ВЫКЛ» в план-вью.
+- При ВКЛ: множители применяются к плану — setStr показывает скорректированные вес (×topSetPctMultiplier) и подходы (×volumeMultiplier) с маркером ⚡; баннер с decision-rationale + deload-триггер; правка propagate в «Выполнение» (srcDays).
+- Верификация (render): default ВЫКЛ; «Применить» → ВКЛ, «Топ-сет ×0.96 · объём ×1», Присед 81.6→78.3 кг (×0.96), ⚡ маркер; Выполнение target 78.3 кг (применено). PE: 0.
+- tsc ✓, vite ✓.
+## P12-wire #5 — визуальная полировка Pro-метрики ✅
+- Секционные заголовки с цветными акцентами (🏋️ относ. сила — фиолетовый, 📊 монитор нагрузки — голубой, 🧠 авторегуляция — зелёный, 📈 прогрессии — янтарный), цветной Badge для ACWR-зоны, подзаголовок-описание модулей. tsc ✓, vite ✓. Render: все 4 секции + badge видны, PE: 0.
+

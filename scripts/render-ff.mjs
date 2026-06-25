@@ -1,0 +1,17 @@
+﻿import puppeteer from 'puppeteer-core';
+const CHROME='C:/Program Files/Google/Chrome/Application/chrome.exe'; const pe=[];
+const browser=await puppeteer.launch({executablePath:CHROME,headless:'new',args:['--no-sandbox','--disable-gpu','--window-size=420,860'],defaultViewport:{width:420,height:860}});
+const page=await browser.newPage(); page.on('pageerror',e=>pe.push(e.message));
+await page.goto('http://localhost:4174/',{waitUntil:'networkidle2',timeout:45000});
+await page.waitForFunction(()=>!document.querySelector('.screen-loading'),{timeout:30000}).catch(()=>{});
+await new Promise(r=>setTimeout(r,2000));
+const clickText=async(t)=>{try{const el=await page.evaluateHandle((x)=>{const a=[...document.querySelectorAll('button,a,div[role=button],li,h2,h3')];return a.find(e=>(e.innerText||'').includes(x))||null;},t);const n=el.asElement();if(n){await n.click();return true;}}catch(e){}return false;};
+const clickBtn=async(re)=>{try{return await page.evaluate((r)=>{const b=[...document.querySelectorAll('button')].find(x=>new RegExp(r).test(x.innerText));if(b){b.click();return b.innerText;}return null;},re);}catch(e){return null;}};
+await clickText('Тренинг');await new Promise(r=>setTimeout(r,1000));
+await clickText('Планирование');await new Promise(r=>setTimeout(r,1200));
+await clickBtn('🧮 Pro-метрики');await new Promise(r=>setTimeout(r,2000));
+const canvases=await page.evaluate(()=>document.querySelectorAll('canvas').length);
+const hasFFLabel=await page.evaluate(()=>document.body.innerText.includes('Fitness-Fatigue'));
+console.log('canvases:', canvases, '| FF label:', hasFFLabel);
+await browser.close();
+console.log('PE:',pe.length,pe.length===0?'✅':'❌');
