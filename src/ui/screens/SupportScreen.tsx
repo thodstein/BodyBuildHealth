@@ -46,10 +46,9 @@ import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.en
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'plan' | 'reports';
-type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research' | 'favorites' | 'supportstacks' | 'protocols' | 'finder' | 'biostack';
+type InfoView = 'main' | 'catalog' | 'synergies' | 'interactions' | 'research' | 'favorites' | 'protocols' | 'biostack';
 
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
-import { SupplementFinder } from '../components/SupplementFinder';
 import { BioStackAIScreen } from '../components/BioStackAIScreen';
 export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTab }) => {
   const linked = useDataLink();
@@ -253,7 +252,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   }), [linked.course]);
   const uniqueCompounds = useMemo(() => {
     const map = new Map<string, { substanceId: string; name: string; cls: string; doseWeekly: number; startWeek: number; endWeek: number }>();
-    courseCompounds.forEach(c => {
+    (courseCompounds || []).forEach(c => {
       const ex = map.get(c.cls);
       map.set(c.cls, ex ? { ...ex, doseWeekly: ex.doseWeekly + c.doseWeekly } : c);
     });
@@ -281,9 +280,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     oxandrolone: 0.4, masteron: 0.3, primobolan: 0.2, testosterone: 0.3,
   };
   const neuroScore = useMemo(() => {
-    if (neuroSelected.length === 0) return 0;
+    if ((neuroSelected || []).length === 0) return 0;
     let totalRisk = 0;
-    neuroSelected.forEach(cls => {
+    (neuroSelected || []).forEach(cls => {
       const riskFactor = CLASS_RISK[cls] ?? 0.2;
       const dose = neuroDoses[cls] || 0;
       let doseMultiplier = 1;
@@ -1275,7 +1274,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       for (let a = 0; a < stack.substances.length; a++) {
         const sa = stack.substances[a].id;
         const subA = catalogSubstances.find(s => s.id === sa);
-        if (subA?.mechanisms) subA.mechanisms.forEach(m => allMechs.add(m));
+        (subA?.mechanisms || []).forEach(m => allMechs.add(m));
         for (let b = a + 1; b < stack.substances.length; b++) {
           const sb = stack.substances[b].id;
           const key = `${sa}||${sb}`;
@@ -1301,7 +1300,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const allSubstanceIds = useMemo(() => {
     const s = new Set<string>();
     CATALOG_IDS.forEach(id => s.add(id));
-    catalogSubstances.forEach((sub: any) => s.add((sub.id||'').toLowerCase()));
+    (catalogSubstances || []).forEach((sub: any) => s.add((sub.id||'').toLowerCase()));
     ALL_INTERACTIONS.forEach((i: any) => {
       ['A','B','C','D','E','F'].forEach(f => {
         const sid = i[`substance${f}`];
@@ -1407,50 +1406,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const supportConflicts = supportInteractions?.filter(i => i.type === 'conflict') ?? [];
   const supportCautions = supportInteractions?.filter(i => i.type === 'caution') ?? [];
 
-  // Stack count filter
-  const [stackFilterCount, setStackFilterCount] = useState<number>(0);
-
-  // Grouped stacks by size
-  const groupedStacks = useMemo(() => {
-    const getSizeGroup = (count: number): string => {
-      if (count <= 3) return '3';
-      if (count <= 5) return '4-5';
-      if (count <= 7) return '6-7';
-      if (count <= 9) return '8-9';
-      return '10+';
-    };
-    const groups: Record<string, SupportStack[]> = {};
-    for (const s of ALL_STACKS) {
-      if (stackFilterCount > 0 && s.substances.length < stackFilterCount) continue;
-      const g = getSizeGroup(s.substances.length);
-      if (!groups[g]) groups[g] = [];
-      groups[g].push(s);
-    }
-    const order = ['3', '4-5', '6-7', '8-9', '10+'];
-    const labels: Record<string, string> = {
-      '3': 'Мини-стеки (3 вещества)', '4-5': 'Базовые стеки (4-5 веществ)',
-      '6-7': 'Расширенные стеки (6-7 веществ)', '8-9': 'Продвинутые стеки (8-9 веществ)',
-      '10+': 'Максимальные стеки (10+ веществ)',
-    };
-    return order.filter(g => groups[g]).map(g => ({ key: g, label: labels[g] || g, stacks: groups[g] }));
-  }, [stackFilterCount]);
-
-  // Filtered stacks by search
-  const [stackSearch, setStackSearch] = useState('');
-  const filteredStacks = useMemo(() => {
-    let list = ALL_STACKS;
-    if (stackFilterCount > 0) list = list.filter(s => s.substances.length >= stackFilterCount);
-    if (!stackSearch) return list;
-    const q = stackSearch.toLowerCase();
-    return list.filter(s =>
-      (s.effects||[]).some(e => ((EFFECT_LABELS_ru[e] || e)||'').toLowerCase().includes(q)) ||
-      (s.substances||[]).some(sub => (getStackSubLabel(sub.id)||'').toLowerCase().includes(q))
-    );
-  }, [stackSearch, stackFilterCount]);
-
-  // Stack sub-tab state
-  const [stackSubTab, setStackSubTab] = useState<string>('readystacks');
-
   // Replacement calculator state
   const [replaceSearch, setReplaceSearch] = useState('');
   const [replaceSelectedSub, setReplaceSelectedSub] = useState<string | null>(null);
@@ -1525,7 +1480,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const sourceCats = new Set((source.categories||[]).map((c:string) => c.toLowerCase()));
     const hasAnyData = sourceMechs.size > 0 || sourceOrgs.size > 0 || sourceCats.size > 0;
     for (const sub of subs) {
-      const targetMechs = new Set(sub.mechanisms.map((m:string) => m.toLowerCase()));
+      const targetMechs = new Set((sub.mechanisms || []).map((m:string) => m.toLowerCase()));
       const targetOrgs = new Set((sub.organs||[]).map((o:string) => o.toLowerCase()));
       const targetCats = new Set((sub.categories||[]).map((c:string) => c.toLowerCase()));
       if (!hasAnyData) {
@@ -2162,20 +2117,16 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['finder','🔍 Поиск БАД'],['biostack','🧬 BioStack AI'],['synergies','Взаимодействие препаратов'],['favorites','Избранное'],['supportstacks','Стеки поддержки'],['research','Исследования']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['synergies','Взаимодействие препаратов'],['interactions','⚠ Взаимодействия'],['research','Исследования'],['favorites','Избранное']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 const a: Record<string,()=>void> = {
                   peptides: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); },
                   catalog: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); setSection('home'); },
                   biostack: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('biostack'); setSection('home'); },
-                  finder: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('biostack'); setSection('home'); },
                   synergies: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('synergies'); setSection('home'); },
-                  supportstacks: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('biostack'); setSection('home'); },
                   interactions: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('interactions'); setSection('home'); },
                   research: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); setSection('home'); },
                   favorites: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('favorites'); setSection('home'); },
-
-                  mixcalc: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('supportstacks'); setStackSubTab('mixcalc'); },
                 };
                 a[id]?.();
               }} style={{
@@ -2703,7 +2654,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                             ].filter(s => s.list.length>0).map(section => (
                               <div key={section.label} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
                                 <div style={{ fontSize:10, fontWeight:700, color:section.color, marginBottom:4 }}>{section.label} ({section.list.length})</div>
-                                {section.list.map(i => {
+                                {(section.list || []).map(i => {
                                   const sevColor = i.severity === 'HIGH' ? '#ef4444' : i.severity === 'MEDIUM' ? '#f59e0b' : '#22c55e';
                                   const aName = resolveSubName(i.substanceA) || i.substanceA;
                                   const bName = resolveSubName(i.substanceB) || i.substanceB;
@@ -3000,163 +2951,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 )}
               </div>
             )}
-            {renderView(infoView, 'stacks', () =>
-              <div>
-                <input value={stackSearch} onChange={e => setStackSearch(e.target.value)} placeholder="🔍 Поиск по эффекту или веществу..." style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box', marginBottom:4 }} />
-                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  {[[0,'♾️ Все'],[1,'1-3 в-ва'],[4,'4-7 в-в'],[8,'8-10 в-в'],[11,'10+ в-в']].map(([v,l]) => (
-                    <button key={String(v)} onClick={() => setStackFilterCount(v as number)} style={{ padding:'3px 8px', borderRadius:8, fontSize:7, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', background: stackFilterCount === v ? 'var(--accent)' : 'transparent', color: stackFilterCount === v ? '#000' : 'var(--text-dim)', border:`1px solid ${stackFilterCount === v ? 'var(--accent)' : 'var(--border)'}` }}>{l}</button>
-                  ))}
-                </div>
-                <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                  {(stackSearch ? [{ key:'search', label:`Результаты (${filteredStacks.length})`, stacks:filteredStacks }] : groupedStacks).map(group => (
-                    <div key={group.key} style={{ background:'var(--bg-secondary)', borderRadius:10, overflow:'hidden', border:'1px solid var(--border)' }}>
-                      <div onClick={() => setExpandedCategories(prev => ({ ...prev, ['stack_'+group.key]: !(prev['stack_'+group.key] ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', cursor:'pointer', userSelect:'none' }}>
-                        <span style={{ fontSize:13 }}>📋</span>
-                        <div style={{ flex:1, fontSize:10, fontWeight:700, color:'var(--text-light)' }}>{group.label}</div>
-                        <span style={{ fontSize:9, color:'var(--text-dim)', fontWeight:600, marginRight:2 }}>{group.stacks.length}</span>
-                        <span style={{ fontSize:9, color:'var(--text-dim)', transform:expandedCategories['stack_'+group.key] !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
-                      </div>
-                      {expandedCategories['stack_'+group.key] !== false && (
-                        <div style={{ borderTop:'1px solid var(--border)' }}>
-                          {group.stacks.map(stack => {
-                            const synergyColor = stack.synergyScore > 20 ? '#22c55e' : stack.synergyScore > 12 ? '#eab308' : '#f59e0b';
-                            return (
-                              <div key={stack.id} style={{ padding:'6px 10px 8px', borderBottom:'1px solid var(--border)', cursor:'pointer' }}
-                                onClick={() => setExpandedMed(expandedMed === stack.id ? null : stack.id)}>
-                                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:3 }}>
-                                  <div style={{ display:'flex', flexWrap:'wrap', gap:2, flex:1 }}>
-                                    {(stack.effects||[]).map(e => <span key={e} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a', fontWeight:500 }}>{EFFECT_LABELS_ru[e]||e}</span>)}
-                                  </div>
-                                  <span style={{ fontSize:11, fontWeight:800, color:synergyColor, marginLeft:4 }}>{(stack.synergyScore||0).toFixed(1)}</span>
-                                </div>
-                                <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:expandedMed === stack.id ? 4 : 0 }}>
-                                  {stack.substances.map(sub => <span key={sub.id} style={{ fontSize:8, padding:'1px 6px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.12)', color:'#a78bfa', fontWeight:600 }}>{getStackSubLabel(sub.id)}<button onClick={(e) => { e.stopPropagation(); setStackBuilder(prev => prev.includes(sub.id) ? prev : [...prev, sub.id]); }} style={{ padding:'3px 8px', borderRadius:4, fontSize:9, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'none', color:'#00e68a', fontWeight:700, marginLeft:2, minWidth:22 }} title="Добавить в стек">+</button></span>)}
-                                </div>
-                                <div style={{ fontSize:7, color:'var(--text-dim)' }}>{stack.substances.length} веществ</div>
-                                {expandedMed === stack.id && safeRender('stack_'+stack.id, () =>
-                                  <div style={{ marginTop:4, padding:'6px 8px', background:'rgba(0,0,0,0.15)', borderRadius:8 }}>
-                                    {/* Description */}
-                                    {stack.description && <div style={{ marginBottom:4, fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4, padding:'4px 6px', background:'rgba(0,230,138,0.04)', borderRadius:4, border:'1px solid rgba(0,230,138,0.08)' }}>{stack.description}</div>}
-                                    {/* Goal tags */}
-                                    {stack.goalTags && stack.goalTags.length > 0 && <div style={{ marginBottom:4, display:'flex', flexWrap:'wrap', gap:2 }}>{stack.goalTags.map(t => <span key={t} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(59,130,246,0.1)', color:'#60a5fa', fontWeight:500 }}>#{t}</span>)}</div>}
-                                    {/* Positive effects */}
-                                    <div style={{ marginBottom:4 }}>
-                                      <div style={{ fontSize:8, fontWeight:700, color:'#22c55e', marginBottom:3 }}>⊕ Положительные эффекты</div>
-                                      <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                                        {(stack.effects||[]).map(e => (
-                                          <span key={e} style={{ fontSize:7, padding:'2px 6px', borderRadius:4, background:'rgba(34,197,94,0.1)', color:'#4ade80', fontWeight:600 }}>
-                                            {EFFECT_LABELS_ru[e] || e}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    </div>
-                                    {/* Why this stack works — detailed */}
-                                    {(() => {
-                                      const subs = stack.substances.map(sub => catalogSubstances.find(s => s.id === sub.id)).filter(Boolean) as any[];
-                                      const allMechs = new Set<string>();
-                                      subs.forEach(s => { if (s?.mechanisms) s.mechanisms.forEach((m:string) => allMechs.add(m)); });
-                                      const uniqueMechs = [...allMechs].filter(m => subs.filter(s => (s?.mechanisms||[]).includes(m)).length >= Math.min(2, subs.length));
-                                      return (
-                                        <div style={{ marginBottom:4, padding:'5px 6px', background:'rgba(139,92,246,0.04)', borderRadius:4, border:'1px solid rgba(139,92,246,0.08)' }}>
-                                          <div style={{ fontSize:8, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>⚙️ Почему стек работает</div>
-                                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', lineHeight:1.3 }}>
-                                            <b style={{color:'#a78bfa'}}>{subs.length}</b> компонента • <b style={{color:'#a78bfa'}}>{allMechs.size}</b> механизмов • <b style={{color:'#a78bfa'}}>{uniqueMechs.length}</b> общих
-                                          </div>
-                                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', lineHeight:1.3, marginTop:2 }}>
-                                            {uniqueMechs.length > 0 ? (
-                                              <span>Общие механизмы: {uniqueMechs.map((m,i) => <span key={m}>{i > 0 && ', '}<b style={{color:'#a78bfa'}}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</b> ({subs.filter(s => (s?.mechanisms||[]).includes(m)).map(s => (s?.name || s?.id || '')).join(', ')})</span>)}</span>
-                                            ) : (
-                                              <span>Дополняющие механизмы — каждый компонент действует через уникальные пути, создавая комплексный эффект</span>
-                                            )}
-                                          </div>
-                                          {/* Per-component mechanism breakdown */}
-                                          <div style={{ marginTop:3, display:'flex', flexDirection:'column', gap:2 }}>
-                                            {subs.map(s => (
-                                              <div key={s.id} style={{ fontSize:6, color:'var(--text-dim)', lineHeight:1.3, padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
-                                                <b style={{color:'#60a5fa'}}>{(s.name||s.id||'').split('(')[0].trim()}</b>: {(s.mechanisms||[]).map((m:string) => MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')).join(', ') || '—'}
-                                              </div>
-                                            ))}
-                                          </div>
-                                          {subs.length >= 3 && (
-                                            <div style={{ marginTop:3, fontSize:7, color:'#00e68a', lineHeight:1.2 }}>
-                                              ✓ Multi-target эффект: каждое вещество дополняет механизмы остальных, обеспечивая комплексное действие, недостижимое при моно-приёме
-                                            </div>
-                                          )}
-                                          {/* Organ targets */}
-                                          {(()=>{
-                                            const organs = new Set<string>();
-                                            subs.forEach(s => { if (s?.organs) s.organs.forEach((o:string) => organs.add(o)); });
-                                            if (organs.size === 0) return null;
-                                            return <div style={{ marginTop:2, fontSize:7, color:'rgba(255,255,255,0.5)' }}>Органы-мишени: {[...organs].map(o => <span key={o} style={{color:'#f59e0b', fontWeight:600}}>{o}</span>).reduce<any>((acc, el, i) => i === 0 ? [el] : [...acc, <span key={`s${i}`} style={{color:'rgba(255,255,255,0.2)'}}>, </span>, el], null)}</div>;
-                                          })()}
-                                        </div>
-                                      );
-                                    })()}
-                                    {/* Synergy notes */}
-                                    {(stack as any).synergy_notes && (
-                                      <div style={{ marginBottom:4, padding:'4px 6px', background:'rgba(34,197,94,0.04)', borderRadius:4, border:'1px solid rgba(34,197,94,0.08)' }}>
-                                        <div style={{ fontSize:8, fontWeight:700, color:'#22c55e', marginBottom:1 }}>⊕ Синергия стека</div>
-                                        <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', lineHeight:1.3 }}>{(stack as any).synergy_notes}</div>
-                                      </div>
-                                    )}
-                                    {/* Substance breakdown */}
-                                    <div style={{ marginBottom:4 }}>
-                                      <div style={{ fontSize:8, fontWeight:700, color:'var(--text-light)', marginBottom:2 }}>🧬 Компоненты</div>
-                                      {stack.substances.map(sub => {
-                                        const subInfo = catalogSubstances.find(s => s.id === sub.id);
-                                        const cat = subInfo?.categories?.[0];
-                                        return (
-                                          <div key={sub.id} style={{ fontSize:7, color:'var(--text-dim)', padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.04)', lineHeight:1.4 }}>
-                                            <b style={{ color:'#a78bfa' }}>{getStackSubLabel(sub.id)}</b>
-                                            {cat && <span style={{ marginLeft:4, opacity:0.6 }}>· {getCategoryInfo(cat).label}</span>}
-                                            {subInfo?.description && <div style={{ opacity:0.7 }}>{subInfo.description}</div>}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                    {/* Potential conflicts warning */}
-                                    {(() => {
-                                      const pairs: string[] = [];
-                                      for (let a = 0; a < (stack.substances||[]).length; a++) {
-                                        for (let b = a + 1; b < (stack.substances||[]).length; b++) {
-                                          const key = `${stack.substances[a].id||''}||${stack.substances[b].id||''}`;
-                                          const found = conflictLookup.get(key);
-                                          if (found && found.type !== 'synergy') pairs.push(`${getStackSubLabel(stack.substances[a].id)} + ${getStackSubLabel(stack.substances[b].id)}: ${found.effect} (${found.severity})`);
-                                        }
-                                      }
-                                      return pairs.length > 0 ? (
-                                        <div>
-                                          <div style={{ fontSize:8, fontWeight:700, color:'#ef4444', marginBottom:2 }}>⚠ Возможные конфликты</div>
-                                          {pairs.map((p, i) => <div key={i} style={{ fontSize:7, color:'#f87171', padding:'1px 0', lineHeight:1.3 }}>{p}</div>)}
-                                        </div>
-                                      ) : (
-                                        <div style={{ fontSize:7, color:'#4ade80', opacity:0.6 }}>✓ Конфликтов между компонентами не обнаружено</div>
-                                      );
-                                    })()}
-                                    {/* Stack mechanisms & synergies */}
-                                    {(()=>{
-                                      const d=stackDetailMap.get(stack.id);
-                                      if(!d)return null;
-                                      return <>
-                                        {d.mechs.length>0&&<div style={{marginTop:3}}><div style={{fontSize:7,fontWeight:600,color:'var(--text-dim)',marginBottom:1}}>⚙️ Механизмы действия:</div><div style={{display:'flex',flexWrap:'wrap',gap:2}}>{d.mechs.map((m,i)=><span key={i} style={{fontSize:6,padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa',border:'1px solid rgba(139,92,246,0.12)'}}>{MECH_TRANSLATIONS_RU[m as string] || (m as string).replace(/_/g, ' ')}</span>)}</div></div>}
-                                        {d.synergies.length>0&&<div style={{marginTop:3}}><div style={{fontSize:7,fontWeight:600,color:'#22c55e',marginBottom:1}}>⊕ Синергии в стеке ({d.synergies.length}):</div>{d.synergies.map((s,i)=><div key={i} style={{fontSize:7,color:'var(--text-dim)',padding:'1px 0',lineHeight:1.2}}><b style={{color:'#4ade80'}}>{s.aName}+{s.bName}</b>: {s.effect}{s.notes?`: ${s.notes}`:''}{s.mechs.length>0&&<span style={{marginLeft:2,opacity:.5}}>[{s.mechs.map((mx: string) => MECH_TRANSLATIONS_RU[mx] || mx.replace(/_/g, ' ')).join(', ')}]</span>}</div>)}</div>}
-                                      </>;
-                                    })()}
-                                    <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:3 }}>Оценка синергии: <b style={{ color: synergyColor }}>{(stack.synergyScore||0).toFixed(1)}</b> · {(stack.substances||[]).length} веществ</div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {stackSearch && filteredStacks.length === 0 && <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:11 }}>Ничего не найдено</div>}
-                </div>
-              </div>
-            )}
             {renderView(infoView, 'favorites', () => {
               let favIds: string[] = [];
               try { favIds = JSON.parse(localStorage.getItem('he_support_favorites') || '[]'); } catch {}
@@ -3252,7 +3046,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                             {isExpanded && (
                               <div style={{ padding:'0 12px 10px' }}>
                                 <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:8 }}>
-                                  {stack.subs.map(id => {
+                                  {(stack.subs || []).map(id => {
                                     const sub = catalogSubstances.find(s => s.id === id);
                                     const pharma = PHARMA_DB[id];
                                     const name = sub?.name || pharma?.name || id.replace(/_/g, ' ');
@@ -3318,7 +3112,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                               const stackSubs = (stack.subs || []).filter((id: string) => !subs.includes(id));
                               if (stackSubs.length === 0) { alert('Все препараты уже в плане'); return; }
                               const newDosages = { ...dosages };
-                              stackSubs.forEach((id: string) => {
+                              (stackSubs || []).forEach((id: string) => {
                                 const d = stack.dosages?.[id];
                                 if (d) newDosages[id] = typeof d === 'number' ? { mg: d, timing: '' } : d;
                               });
@@ -3535,1047 +3329,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               </div>
               );
             })}
-            {renderView(infoView, 'supportstacks', () =>
-              <div>
-                {/* Sub-tabs: Все стеки / Миксы / Генератор / Замена / Поиск */}
-                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  {[['readystacks','📦 Все стеки'],['mixes','🧬 Генератор миксов'],['generator','⚡ Генератор стеков'],['replace','🔀 Генератор замены'],['search','🔍 Генератор поиска'],['mixcalc','⚡ Тренировочные миксы']].map(([id,label]) => (
-                    <button key={id} onClick={() => {
-                      setStackSubTab(id);
-                    }} style={{
-                      padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                      background: stackSubTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
-                      color: stackSubTab === id ? '#000' : 'var(--text-dim)',
-                      border: '1px solid ' + (stackSubTab === id ? 'var(--accent)' : 'var(--border)'),
-                    }}>{label}</button>
-                  ))}
-                </div>
-
-                {/* All Stacks view */}
-                {stackSubTab === 'readystacks' && (
-                <div style={{ padding:'0 4px' }}>
-                  <input value={stackSearch} onChange={e => setStackSearch(e.target.value)}
-                    placeholder="🔍 Поиск стеков..."
-                    style={{ width:'100%', padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box', marginBottom:8 }} />
-                  <div style={{ display:'flex', gap:3, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                    {[[0,'♾️ Все'],[1,'1-3 в-ва'],[4,'4-7 в-в'],[8,'8-10 в-в'],[11,'10+ в-в']].map(([v,l]) => (
-                      <button key={String(v)} onClick={() => setStackFilterCount(v as number)} style={{ padding:'3px 8px', borderRadius:8, fontSize:7, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', background: stackFilterCount === v ? 'var(--accent)' : 'transparent', color: stackFilterCount === v ? '#000' : 'var(--text-dim)', border:`1px solid ${stackFilterCount === v ? 'var(--accent)' : 'var(--border)'}` }}>{l}</button>
-                    ))}
-                  </div>
-                  {(stackSearch || stackFilterCount > 0 ? filteredStacks : ALL_STACKS).length === 0 ? (
-                    <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Ничего не найдено</div>
-                  ) : (
-                    (stackSearch ? [{key:'search',label:'Результаты поиска',stacks:filteredStacks}] : groupedStacks).map(group => (
-                      <div key={group.key} style={{ marginBottom:8 }}>
-                        <div style={{ fontSize:10, fontWeight:700, color:'var(--text-dim)', marginBottom:4, padding:'0 2px' }}>{group.label}</div>
-                        {group.stacks.map(stack => {
-                          const isExpanded = expandedStack === stack.id;
-                          const detail = stackDetailMap.get(stack.id);
-                          return (
-                            <div key={stack.id} style={{ marginBottom:4, background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)', overflow:'hidden' }}>
-                              <div onClick={() => setExpandedStack(isExpanded ? null : stack.id)} style={{ padding:'8px 10px', cursor:'pointer' }}>
-                                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                                  <div style={{ flex:1, fontSize:11, fontWeight:700, color:'var(--accent)' }}>{getStackDisplayName(stack)}</div>
-                                  <span style={{ fontSize:9, color:'var(--text-dim)', background:'rgba(255,255,255,0.05)', padding:'2px 6px', borderRadius:4 }}>{stack.substances.length} в-в</span>
-                                  <span style={{ fontSize:9, color:'#00e68a', fontWeight:600 }}>{stack.synergyScore}%</span>
-                                  <span style={{ fontSize:10, color:'var(--text-dim)', transform:isExpanded ? 'rotate(180deg)' : 'none' }}>▼</span>
-                                </div>
-                                <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:4 }}>
-                                  {(stack.effects||[]).map(e => (
-                                    <span key={e} style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{EFFECT_LABELS_ru[e] || e}</span>
-                                  ))}
-                                </div>
-                              </div>
-                               {isExpanded && (
-                                 <div style={{ padding:'0 10px 10px', borderTop:'1px solid var(--border)' }}>
-                                   {stack.description && <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)', lineHeight:1.4, marginTop:6, marginBottom:6 }}>{stack.description}</div>}
-                                   {detail && detail.mechs && detail.mechs.length > 0 && (
-                                     <div style={{ marginBottom:4 }}>
-                                       <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>⚙️ Механизмы стека ({detail.mechs.length}):</div>
-                                       <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                                         {detail.mechs.slice(0,20).map((m:string,i:number)=>(
-                                           <span key={i} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.1)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>
-                                         ))}
-                                       </div>
-                                     </div>
-                                   )}
-                                   <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}>Состав:</div>
-                                   {stack.substances.map(sub => {
-                                     const subInfo = catalogSubstances.find(x => x.id === sub.id);
-                                     return (
-                                       <div key={sub.id} style={{ padding:'4px 6px', marginBottom:3, borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.04)' }}>
-                                         <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:9 }}>
-                                           <span style={{ color:'var(--accent)', fontWeight:700, flex:1 }}>{getStackSubLabel(sub.id)}</span>
-                                           {subInfo?.description && <span style={{ color:'rgba(255,255,255,0.4)', fontSize:7.5 }}>{subInfo.description}</span>}
-                                         </div>
-                                         {subInfo?.mechanisms && subInfo.mechanisms.length > 0 && (
-                                           <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-                                             {subInfo.mechanisms.slice(0,4).map((m:string,mi:number) => (
-                                               <span key={mi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>
-                                             ))}
-                                           </div>
-                                         )}
-                                         {subInfo?.organs && subInfo.organs.length > 0 && (
-                                           <div style={{ fontSize:6.5, color:'rgba(255,255,255,0.35)', marginTop:1 }}>
-                                             Органы: {subInfo.organs.slice(0,3).map((o:string) => {const m = ORGAN_CATEGORY_MAP[o.toUpperCase().trim()]; return m?.emoji + m?.label || o;}).join(', ')}
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                  {detail && detail.synergies.length > 0 && (
-                                    <div style={{ marginTop:6 }}>
-                                      <div style={{ fontSize:8, color:'#22c55e', marginBottom:3 }}>⊕ Синергии ({detail.synergies.length}) — механизмы:</div>
-                                      {detail.synergies.slice(0,8).map((s,i) => (
-                                        <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.6)', lineHeight:1.4, padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
-                                          <div style={{ fontWeight:600, color:'#4ade80' }}>• {s.aName} + {s.bName}</div>
-                                          <div style={{ color:'rgba(255,255,255,0.65)' }}>{s.effect}</div>
-                                          {s.mechs && s.mechs.length > 0 && (
-                                            <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:1 }}>
-                                              {s.mechs.map((mx:string,xi:number) => <span key={xi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECH_TRANSLATIONS_RU[mx] || MECH_LABELS[mx] || mx.replace(/_/g,' ')}</span>)}
-                                            </div>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {(() => {
-                                    const conflicts: Array<{a:string;b:string;effect:string}> = [];
-                                    for (let a = 0; a < stack.substances.length; a++) {
-                                      for (let b = a + 1; b < stack.substances.length; b++) {
-                                        const key = `${stack.substances[a].id}||${stack.substances[b].id}`;
-                                        const rev = `${stack.substances[b].id}||${stack.substances[a].id}`;
-                                        const intx = conflictLookup.get(key) || conflictLookup.get(rev);
-                                        if (intx && intx.type === 'conflict') {
-                                          conflicts.push({ a: stack.substances[a].id, b: stack.substances[b].id, effect: intx.effect });
-                                        }
-                                      }
-                                    }
-                                    if (conflicts.length > 0) return (
-                                      <div style={{ marginTop:6 }}>
-                                        <div style={{ fontSize:8, color:'#ef4444', marginBottom:3 }}>⊖ Конфликты ({conflicts.length}):</div>
-                                        {conflicts.slice(0,3).map((c,i) => (
-                                          <div key={i} style={{ fontSize:8, color:'#f87171', lineHeight:1.4 }}>• {getStackSubLabel(c.a)} + {getStackSubLabel(c.b)} — {c.effect}</div>
-                                        ))}
-                                      </div>
-                                    );
-                                    return null;
-                                  })()}
-                                  <button onClick={e => { e.stopPropagation();
-                                    SUPPORT_LEVELS[supportLevel] = { ...SUPPORT_LEVELS[supportLevel], subs: [...(SUPPORT_LEVELS[supportLevel]?.subs || []), ...stack.substances.filter(sub => !(SUPPORT_LEVELS[supportLevel]?.subs||[]).includes(sub.id)).map(sub => sub.id)] };
-                                    alert(`✅ Добавлено в план`);
-                                  }} style={{ width:'100%', padding:'6px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(0,230,138,0.1)', color:'#00e68a', fontWeight:700, fontSize:10, marginTop:6 }}>+ В план</button>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))
-                  )}
-                </div>
-                )}
-
-                {/* GENERATOR — full stack generator (replaces old simple stub) */}
-                {stackSubTab === 'generator' && (
-                  <div>
-                    {safeRender('calc_stackcalc_inline', () => {
-                      const MECH_ROLE_LABELS: Record<string, string> = {
-                        antioxidant: 'Антиоксидант', anti_inflammatory: 'Противовоспал.', liver_protection: 'Гепатопротектор',
-                        hepatoprotective: 'Гепатопротектор', kidney_protection: 'Нефропротектор', nephroprotective: 'Нефропротектор',
-                        neuroprotective: 'Нейропротектор', brain_support: 'Поддержка мозга', cognitive: 'Когнитивный',
-                        cardio_protection: 'Кардиопротектор', cardioprotective: 'Кардиопротектор', hypotensive: 'Снижает АД',
-                        lipid_lowering: 'Снижает липиды', endocrine_support: 'Поддержка гормонов', hormonal: 'Гормональный',
-                        immune_support: 'Иммуномодулятор', immunomodulator: 'Иммуномодулятор', anti_catabolic: 'Антикатаболик',
-                        anabolic: 'Анаболик', energy: 'Энергия', mitochondrial: 'Митохондрии', adaptogen: 'Адаптоген',
-                        stress_reduction: 'Стресс-протектор', nootropic: 'Ноотроп', detoxification: 'Детокс',
-                        anti_estrogenic: 'Антиэстроген', anti_aging: 'Антивозрастной', gastrointestinal: 'Поддержка ЖКТ',
-                        digestive: 'Пищеварение', probiotic: 'Пробиотик', bone_health: 'Кости', joint_health: 'Суставы',
-                        skin_health: 'Кожа', hair_health: 'Волосы', blood_sugar: 'Сахар крови', insulin_sensitizer: 'Инсулин.сенс.',
-                        antiplatelet: 'Антиагрегант', vasodilator: 'Вазодилататор', nitric_oxide: 'Оксид азота',
-                        hpta_support: 'HPTA', liver_detox: 'Детокс печени', bile: 'Желчегонное', pancreatic: 'Поджелудочная',
-                        gut_health: 'Кишечник', microbiome: 'Микробиом', prebiotic: 'Пребиотик', antimicrobial: 'Антимикробн.',
-                        antifungal: 'Противогрибк.', antiviral: 'Противовирусн.', anticancer: 'Противораков.',
-                        analgesic: 'Анальгетик', anti_spasmodic: 'Спазмолитик', muscle_relaxant: 'Миорелаксант',
-                        wound_healing: 'Заживление', anti_scar: 'Против рубцов', collagen: 'Коллаген',
-                        anti_allergic: 'Антиаллерген', antihistamine: 'Антигистамин', expectorant: 'Отхаркивающее',
-                        mucolytic: 'Муколитик', bronchodilator: 'Бронходилататор', detox: 'Детокс',
-                        heavy_metal: 'Тяжёлые металлы', chelation: 'Хелатор', dna_repair: 'ДНК-репарация',
-                        telomere: 'Теломеры', stem_cell: 'Стволовые клетки', growth_factor: 'Фактор роста',
-                        anti_apoptotic: 'Антиапоптоз', autophagy: 'Аутофагия', sirtuin: 'Сиртуин', nad: 'NAD+',
-                        ampk: 'AMPK', mtor: 'mTOR', longevity: 'Долголетие', rejuvenation: 'Омоложение',
-                        recovery: 'Восстановление', muscle_building: 'Мышечный рост', strength: 'Сила', endurance: 'Выносливость',
-                      };
-                      const organList = [
-                        {key:'cardio',label:'❤️ Сердце/Сосуды',organs:['heart','vessels','cardiovascular']},
-                        {key:'liver',label:'🫁 Печень',organs:['liver','hepatobiliary']},
-                        {key:'kidney',label:'🫘 Почки',organs:['kidney','renal','urinary']},
-                        {key:'lung',label:'🫁 Лёгкие',organs:['lung','respiratory']},
-                        {key:'brain',label:'🧠 Мозг',organs:['brain','cns','neurons','cognitive']},
-                        {key:'bones',label:'🦴 Кости/Суставы',organs:['bone','joint','skeletal']},
-                        {key:'skin',label:'✨ Кожа/Волосы',organs:['skin','hair','nails','dermal']},
-                        {key:'thyroid',label:'🦋 Щитовидка',organs:['thyroid','endocrine']},
-                        {key:'pancreas',label:'🍬 Поджелудочная',organs:['pancreas','insulin','glucose']},
-                        {key:'blood',label:'🩸 Кровь',organs:['blood','hematologic','marrow']},
-                        {key:'immune',label:'🛡 Иммунитет',organs:['immune','lymphatic','thymus']},
-                        {key:'gi',label:'🫃 ЖКТ',organs:['gi','stomach','intestine','colon','microbiome']},
-                        {key:'hormones',label:'⚖ Гормоны',organs:['endocrine','adrenal','pituitary','gonads']},
-                        {key:'male',label:'♂️ Мужское',organs:['prostate','testes','male_reproductive']},
-                        {key:'female',label:'♀️ Женское',organs:['ovary','uterus','female_reproductive']},
-                        {key:'antiaging',label:'⏳ Антивозраст',organs:['cells','mitochondria','telomere']},
-                        {key:'energy',label:'⚡ Энергия',organs:['mitochondria','muscle','metabolic']},
-                        {key:'recovery',label:'🔄 Восстановление',organs:['muscle','tendon','soft_tissue']},
-                      ];
-                      const toggleOrgan = (key:string) => setStackCalcOrgans(prev=>prev.includes(key)?prev.filter(k=>k!==key):[...prev,key]);
-                      const selectAll = () => setStackCalcOrgans(organList.map(o=>o.key));
-                      const clearAll = () => { setStackCalcOrgans([]); setStackCalcMech([]); };
-                      const selectedOrgans = organList.filter(o=>stackCalcOrgans.includes(o.key)).flatMap(o=>o.organs);
-                      const toggleMech = (m:string) => setStackCalcMech(prev=>prev.includes(m)?prev.filter(x=>x!==m):[...prev,m]);
-                      const availableMechs = (() => {
-                        if (stackCalcOrgans.length === 0) return [];
-                        const mechSet = new Set<string>();
-                        for (const sub of catalogSubstances) {
-                          if (!sub.mechanisms) continue;
-                          const subOrgs = ((sub.organs||[]) as string[]).map((o:any)=>(o||'').toLowerCase());
-                          for (const o of selectedOrgans) {
-                            if (subOrgs.some((so:string)=>so.includes(o.toLowerCase())||o.toLowerCase().includes(so))) {
-                              sub.mechanisms.forEach((m:string) => mechSet.add(m));
-                              break;
-                            }
-                          }
-                        }
-                        return [...mechSet].sort();
-                      })();
-                      const [lo,hi]=stackCalcSize.split('-').map(Number);
-                      const generate = () => {
-                        const candidates:Array<{sub:typeof catalogSubstances[0];score:number;organHits:number;mechHits:number}> = [];
-                        for (const sub of catalogSubstances) {
-                          if (!sub.name||!sub.mechanisms||!sub.mechanisms.length) continue;
-                          if (sub.mechanisms.length === 1 && (sub.mechanisms[0] === 'general' || sub.mechanisms[0] === 'antioxidant')) continue;
-                          let score = 0; let organHits = 0; let mechHits = 0;
-                          const subOrgans = ((sub.organs||[]) as string[]).map((o:any)=>(o||'').toLowerCase());
-                          if (selectedOrgans.length>0) {
-                            for (const o of selectedOrgans) {
-                              if (subOrgans.some(so=>so.includes(o.toLowerCase())||o.toLowerCase().includes(so))) { score+=2; organHits++; }
-                            }
-                          } else { organHits = 1; score += 1; }
-                          if (stackCalcMech.length>0) {
-                            for (const m of stackCalcMech) {
-                              if ((sub.mechanisms||[]).some(sm=>(sm||'').toLowerCase().includes(m.toLowerCase()))) { score+=1; mechHits++; }
-                            }
-                          } else { mechHits = 1; score += 1; }
-                          if (score>0) candidates.push({sub,score,organHits,mechHits});
-                        }
-                        candidates.sort((a,b)=>(b.score-a.score) || (Math.random()-0.5));
-                        const allCandidates = candidates.slice(0, Math.min(50, candidates.length));
-                        const findSynergies = (subs: string[]) => {
-                          const synergies:any[] = []; const conflicts:any[] = [];
-                          for (let a=0;a<subs.length;a++) { for (let b=a+1;b<subs.length;b++) {
-                            const key = `${subs[a]}||${subs[b]}`;
-                            const found = conflictLookup.get(key);
-                            if (found&&found.type==='synergy') synergies.push({a:subs[a],b:subs[b],effect:found.effect,severity:found.severity,mechanisms:found.mechanisms||[]});
-                            else if (found&&found.type!=='synergy') conflicts.push({a:subs[a],b:subs[b],effect:found.effect,severity:found.severity});
-                          }}
-                          return {synergies,conflicts};
-                        };
-                        const buildStack = (startIdx: number, size: number, tag: string, tagDesc: string) => {
-                          const subset = allCandidates.slice(startIdx, startIdx + size);
-                          const subs = subset.map(s=>s.sub.id);
-                          const {synergies,conflicts} = findSynergies(subs);
-                          const allMechs = new Set<string>();
-                          subset.forEach(s=>((s.sub.mechanisms||[]) as string[]).forEach((m:any)=>allMechs.add(m)));
-                          const totalScore = Math.min(100, Math.round(size*3 + synergies.length*5 - conflicts.length*3));
-                          const organNames = stackCalcOrgans.length > 0 ? organList.filter(o=>stackCalcOrgans.includes(o.key)).map(o=>o.label.replace(/^[^\s]+\s/,'')).join(', ') : 'общая поддержка';
-                          return { tag, tagDesc, substances: subs, descriptions: subset.map(s=>s.sub.name||s.sub.id), scores: subset.map(s=>s.score), organHits: subset.map(s=>s.organHits), mechHits: subset.map(s=>s.mechHits), synergies, conflicts, mechs: [...allMechs], totalScore, stackDesc: `${tagDesc} для ${organNames}: ${subs.length} веществ, ${synergies.length} синергий, ${conflicts.length} конфликтов. Оценка: ${totalScore}/100`, subDetails: subset.map(s => ({ id: s.sub.id, name: s.sub.name || s.sub.id, mechanisms: (s.sub.mechanisms || []) as string[], description: s.sub.description || '' })) };
-                        };
-                        const stacks: any[] = [];
-                        const [lo2,hi2] = [2, Math.min(hi, Math.max(lo, allCandidates.length))];
-                        stacks.push(buildStack(0, Math.min(hi2, allCandidates.length), '🎯 Оптимальный', 'Стек с максимальным покрытием'));
-                        if (allCandidates.length > 5) stacks.push(buildStack(0, Math.min(lo2 + 2, allCandidates.length), '⚡ Минимальный', 'Минимальный набор'));
-                        if (allCandidates.length > 10) { const midStart = Math.floor(allCandidates.length * 0.2); stacks.push(buildStack(midStart, Math.min(hi2, allCandidates.length - midStart), '🔄 Альтернативный', 'Другие механизмы')); }
-                        if (allCandidates.length > 3) {
-                          const synergyOnly = allCandidates.filter(c => { const subId = c.sub.id; return allCandidates.some(other => other.sub.id !== subId && (conflictLookup.get(`${subId}||${other.sub.id}`)?.type === 'synergy' || conflictLookup.get(`${other.sub.id}||${subId}`)?.type === 'synergy')); });
-                          if (synergyOnly.length >= 3) {
-                            const synSubs = synergyOnly.slice(0, Math.min(hi, synergyOnly.length));
-                            const synIds = synSubs.map(s=>s.sub.id);
-                            const {synergies: synS, conflicts: synC} = findSynergies(synIds);
-                            const synMechs = new Set<string>(); synSubs.forEach(s=>((s.sub.mechanisms||[]) as string[]).forEach((m:any)=>synMechs.add(m)));
-                            stacks.push({ tag: '⊕ Синергетический', tagDesc: 'Максимальное количество синергий', substances: synIds, descriptions: synSubs.map(s=>s.sub.name||s.sub.id), scores: synSubs.map(s=>s.score), organHits: synSubs.map(s=>s.organHits), mechHits: synSubs.map(s=>s.mechHits), synergies: synS, conflicts: synC, mechs: [...synMechs], totalScore: Math.min(100, Math.round(synIds.length*3 + synS.length*8 - synC.length*3)), stackDesc: `Стек с ${synS.length} синергиями — максимальный усилительный эффект`, subDetails: synSubs.map(s => ({ id: s.sub.id, name: s.sub.name || s.sub.id, mechanisms: (s.sub.mechanisms || []) as string[], description: s.sub.description || '' })) });
-                          }
-                        }
-                        setGeneratedStacks(stacks);
-                        if (stacks.length > 0) setGeneratedStack(stacks[0]);
-                      };
-                      return <div>
-                        <div style={{fontSize:13,fontWeight:700,color:'var(--accent)',marginBottom:4}}>🧮 Генератор стеков</div>
-                        <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:6}}>Выберите органы, механизмы и размер — стек генерируется из базы {catalogSubstances.length} веществ с учётом синергий и конфликтов</div>
-                        <div style={{marginBottom:6}}>
-                          <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
-                            <span style={{fontSize:9,fontWeight:600,color:'var(--text-light)'}}>Органы:</span>
-                            <button onClick={selectAll} style={{fontSize:7,padding:'2px 6px',borderRadius:4,cursor:'pointer',background:'rgba(0,230,138,0.1)',border:'1px solid rgba(0,230,138,0.2)',color:'#00e68a'}}>Все</button>
-                            {stackCalcOrgans.length>0&&<button onClick={clearAll} style={{fontSize:7,padding:'2px 6px',borderRadius:4,cursor:'pointer',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.15)',color:'#f87171'}}>✕</button>}
-                            <span style={{fontSize:8,color:'var(--text-dim)',marginLeft:4}}>{stackCalcOrgans.length}/{organList.length}</span>
-                          </div>
-                          <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
-                            {organList.map(o=><button key={o.key} onClick={()=>toggleOrgan(o.key)} style={{padding:'2px 5px',borderRadius:6,fontSize:7,cursor:'pointer',whiteSpace:'nowrap',background:stackCalcOrgans.includes(o.key)?'var(--accent)':'var(--bg-secondary)',color:stackCalcOrgans.includes(o.key)?'#000':'var(--text-dim)',border:`1px solid ${stackCalcOrgans.includes(o.key)?'var(--accent)':'var(--border)'}`}}>{o.label}</button>)}
-                          </div>
-                        </div>
-                        {stackCalcOrgans.length > 0 && availableMechs.length>0&&<div style={{marginBottom:6}}>
-                          <div style={{fontSize:9,fontWeight:600,color:'var(--text-light)',marginBottom:3}}>Механизмы ({availableMechs.length}):</div>
-                          <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
-                            {availableMechs.slice(0,40).map(m=><button key={m} onClick={()=>toggleMech(m)} style={{padding:'1px 4px',borderRadius:6,fontSize:6,cursor:'pointer',whiteSpace:'nowrap',background:stackCalcMech.includes(m)?'#8b5cf6':'var(--bg-secondary)',color:stackCalcMech.includes(m)?'#fff':'var(--text-dim)',border:`1px solid ${stackCalcMech.includes(m)?'#8b5cf6':'var(--border)'}`}}>{MECH_TRANSLATIONS_RU[m] || m.replace(/_/g, ' ')}</button>)}
-                          </div>
-                        </div>}
-                        {stackCalcOrgans.length === 0 && (
-                          <div style={{marginBottom:6,padding:8,borderRadius:8,background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)',textAlign:'center',fontSize:9,color:'var(--text-dim)'}}>
-                            Выберите орган для отображения механизмов
-                          </div>
-                        )}
-                        <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:4}}>
-                          <span style={{fontSize:9,fontWeight:600,color:'var(--text-light)'}}>Размер:</span>
-                          {['2-4','5-7','8-10','11-15','15-20','20-25','30-35'].map(s=><button key={s} onClick={()=>setStackCalcSize(s)} style={{padding:'2px 5px',borderRadius:6,fontSize:7,cursor:'pointer',background:stackCalcSize===s?'var(--accent)':'var(--bg-secondary)',color:stackCalcSize===s?'#000':'var(--text-dim)',border:`1px solid ${stackCalcSize===s?'var(--accent)':'var(--border)'}`}}>{s}</button>)}
-                        </div>
-                        {/* Mode toggle: auto / manual */}
-                        <div style={{display:'flex',gap:4,marginBottom:6}}>
-                          <button onClick={()=>setStackCalcMode('auto')} style={{flex:1,padding:'6px',borderRadius:8,fontSize:9,fontWeight:700,cursor:'pointer',background:stackCalcMode==='auto'?'var(--accent)':'var(--bg-secondary)',color:stackCalcMode==='auto'?'#000':'var(--text-dim)',border:`1px solid ${stackCalcMode==='auto'?'var(--accent)':'var(--border)'}`}}>⚡ Авто</button>
-                          <button onClick={()=>setStackCalcMode('manual')} style={{flex:1,padding:'6px',borderRadius:8,fontSize:9,fontWeight:700,cursor:'pointer',background:stackCalcMode==='manual'?'var(--accent)':'var(--bg-secondary)',color:stackCalcMode==='manual'?'#000':'var(--text-dim)',border:`1px solid ${stackCalcMode==='manual'?'var(--accent)':'var(--border)'}`}}>✋ Ручной</button>
-                        </div>
-                        {stackCalcMode==='manual'&&<div style={{marginBottom:6,background:'var(--bg-secondary)',borderRadius:8,border:'1px solid var(--border)',padding:'8px 10px'}}>
-                          <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:4}}>Выбранные препараты ({enhancedSubs.length})</div>
-                          {enhancedSubs.length===0?<div style={{fontSize:9,color:'rgba(255,255,255,0.4)',textAlign:'center',padding:10}}>Начните добавлять вещества</div>:<div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:4}}>{enhancedSubs.map(sid=>{const sub=catalogSubstances.find(x=>x.id===sid);return <div key={sid} style={{display:'inline-flex',alignItems:'center',gap:3,padding:'2px 6px',borderRadius:6,background:'rgba(139,92,246,0.08)',border:'1px solid rgba(139,92,246,0.15)'}}><span style={{fontSize:9,color:'#a78bfa',fontWeight:600}}>{sub?.name||sid.replace(/_/g,' ')}</span><span onClick={()=>setEnhancedSubs(prev=>prev.filter(x=>x!==sid))} style={{fontSize:10,cursor:'pointer',color:'rgba(255,255,255,0.3)'}}>×</span></div>})}</div>}
-                          <input value={stackSearch} onChange={e=>setStackSearch(e.target.value)} placeholder="🔍 Добавить препарат..." style={{width:'100%',padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg)',color:'var(--text)',fontSize:10,boxSizing:'border-box',marginTop:4}} />
-                          {stackSearch&&<div style={{marginTop:3,maxHeight:100,overflowY:'auto'}}>{catalogSubstances.filter(s=>(s.name||'').toLowerCase().includes(stackSearch.toLowerCase())||(s.id||'').toLowerCase().includes(stackSearch.toLowerCase())).slice(0,5).map(s=><div key={s.id} onClick={()=>{if(!enhancedSubs.includes(s.id))setEnhancedSubs(prev=>[...prev,s.id]);setStackSearch('')}} style={{padding:'4px 6px',borderRadius:4,cursor:'pointer',fontSize:9,borderBottom:'1px solid rgba(255,255,255,0.04)'}}><span style={{fontWeight:600,color:'var(--text-light)'}}>{s.name}</span><span style={{fontSize:7,color:'var(--text-dim)',marginLeft:4}}>{s.id}</span></div>)}</div>}
-                        </div>}
-                        <button onClick={generate} style={{width:'100%',padding:'10px',borderRadius:12,fontWeight:800,fontSize:14,cursor:'pointer',background:'var(--accent)',border:'none',color:'#000',marginBottom:6}}>⚡ {stackCalcMode==='auto'?'Сгенерировать':'Собрать стек'}</button>
-                        {generatedStacks.length > 0 && (
-                          <div style={{marginBottom:6}}>
-                            <div style={{display:'flex',gap:4,overflowX:'auto',marginBottom:4}}>
-                              {generatedStacks.map((st:any,si:number)=>(
-                                <button key={si} onClick={()=>setGeneratedStack(st)} style={{padding:'3px 8px',borderRadius:8,fontSize:8,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap',background:generatedStack===st?'var(--accent)':'var(--bg-secondary)',color:generatedStack===st?'#000':'var(--text-dim)',border:`1px solid ${generatedStack===st?'var(--accent)':'var(--border)'}`}}>
-                                  {st.tag} · {st.substances.length} шт
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {generatedStack&&<div style={{background:'rgba(0,230,138,0.04)',borderRadius:10,padding:8,border:'1px solid rgba(0,230,138,0.12)'}}>
-                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
-                            <div style={{fontSize:11,fontWeight:700,color:'var(--accent)'}}>{generatedStack.tag || 'Стек'} · {generatedStack.substances.length} веществ</div>
-                            <div style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:6,background:generatedStack.totalScore>=70?'rgba(34,197,94,0.12)':generatedStack.totalScore>=40?'rgba(234,179,8,0.12)':'rgba(239,68,68,0.12)',color:generatedStack.totalScore>=70?'#4ade80':generatedStack.totalScore>=40?'#facc15':'#f87171'}}>{generatedStack.totalScore}/100</div>
-                          </div>
-                          {generatedStack.stackDesc && <div style={{fontSize:8,color:'var(--text-dim)',marginBottom:4,lineHeight:1.4}}>{generatedStack.stackDesc}</div>}
-                          <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:4}}>
-                            {generatedStack.substances.map((sid:string,i:number)=>{const n=generatedStack.descriptions[i];return <span key={sid} style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:8,padding:'2px 8px',borderRadius:6,background:'rgba(139,92,246,0.1)',color:'#a78bfa',border:'1px solid rgba(139,92,246,0.15)'}}>{n}<span style={{opacity:0.5,fontSize:7}}>+{generatedStack.scores[i]}</span><span onClick={(e)=>{e.stopPropagation();const reps=findReplacements(sid);if(reps.length>0){const rep=reps[0];const idx=generatedStack.substances.indexOf(sid);if(idx>-1){const newSubs=[...generatedStack.substances];newSubs[idx]=rep.id;const newDesc=[...generatedStack.descriptions];newDesc[idx]=getSubstanceName(rep.id);setGeneratedStack({...generatedStack,substances:newSubs,descriptions:newDesc})}}}} style={{fontSize:7,padding:'1px 4px',borderRadius:3,cursor:'pointer',background:'rgba(249,115,22,0.15)',color:'#fb923c'}}>🔀</span></span>})}
-                          </div>
-                          {generatedStack.subDetails && generatedStack.subDetails.length > 0 && (
-                            <details style={{marginBottom:4}}>
-                              <summary style={{fontSize:8,fontWeight:600,color:'var(--text-light)',cursor:'pointer',marginBottom:3}}>📋 Детали веществ ({generatedStack.subDetails.length})</summary>
-                              <div style={{display:'flex',flexDirection:'column',gap:3}}>
-                                {generatedStack.subDetails.map((sd:any,si:number)=>(
-                                  <div key={si} style={{padding:'4px 8px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
-                                    <div style={{fontSize:9,fontWeight:600,color:'var(--text-light)',marginBottom:2}}>{sd.name}</div>
-                                    <div style={{display:'flex',flexWrap:'wrap',gap:2,marginBottom:2}}>
-                                      {sd.mechanisms && sd.mechanisms.length > 0 && sd.mechanisms.slice(0,3).map((m:string,mi:number)=>{
-                                        const role = MECH_ROLE_LABELS[m.toLowerCase().replace(/\s+/g,'_')] || MECH_ROLE_LABELS[m] || '';
-                                        return <span key={mi} style={{fontSize:7,padding:'1px 5px',borderRadius:4,background:role?'rgba(0,230,138,0.1)':'rgba(139,92,246,0.08)',color:role?'#00e68a':'#a78bfa',fontWeight:role?600:400}}>{role || MECH_TRANSLATIONS_RU[m] || m.replace(/_/g, ' ')}</span>;
-                                      })}
-                                    </div>
-                                    {sd.description && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3}}>{sd.description}</div>}
-                                  </div>
-                                ))}
-                              </div>
-                            </details>
-                          )}
-                          {generatedStack.mechs.length>0&&<div style={{marginBottom:3}}><div style={{fontSize:7,fontWeight:600,color:'var(--text-dim)',marginBottom:2}}>⚙️ Механизмы:</div><div style={{display:'flex',flexWrap:'wrap',gap:2}}>{generatedStack.mechs.map((m:string,i:number)=><span key={i} style={{fontSize:6,padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa'}}>{MECH_TRANSLATIONS_RU[m] || m.replace(/_/g, ' ')}</span>)}</div></div>}
-                          {generatedStack.synergies.length>0&&<details style={{marginBottom:3}}><summary style={{fontSize:7,fontWeight:600,color:'#22c55e',cursor:'pointer'}}>⊕ Синергии ({generatedStack.synergies.length})</summary>{generatedStack.synergies.map((s:any,i:number)=><div key={i} style={{fontSize:7,color:'var(--text-dim)',padding:'2px 0'}}><b style={{color:'#4ade80'}}>{getStackSubLabel(s.a)} + {getStackSubLabel(s.b)}</b>: {s.effect} [{s.severity}]{s.mechanisms&&s.mechanisms.length>0&&<span style={{fontSize:6,color:'#a78bfa',marginLeft:4}}>→ {s.mechanisms.map((mx: string) => MECH_TRANSLATIONS_RU[mx] || mx.replace(/_/g, ' ')).join(', ')}</span>}</div>)}</details>}
-                          {generatedStack.conflicts.length>0&&<details><summary style={{fontSize:7,fontWeight:600,color:'#ef4444',cursor:'pointer'}}>⚠ Конфликты ({generatedStack.conflicts.length})</summary>{generatedStack.conflicts.map((c:any,i:number)=><div key={i} style={{fontSize:7,color:'#f87171',padding:'2px 0'}}><b>{getStackSubLabel(c.a)} + {getStackSubLabel(c.b)}</b>: {c.effect} [{c.severity}]</div>)}</details>}
-                        </div>}
-                        {!generatedStack&&stackCalcOrgans.length===0&&<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:10,background:'var(--bg-secondary)',borderRadius:10,border:'1px solid var(--border)'}}>Выберите органы/системы и нажмите «Сгенерировать»</div>}
-                      </div>;
-                    })}
-                  </div>
-                )}
-
-                {/* MIXES — Генератор миксов */}
-                {stackSubTab === 'mixes' && (
-                  <div style={{ padding:'0 4px' }}>
-                    <div style={{ marginBottom:10, background:'linear-gradient(135deg,rgba(236,72,153,0.08),rgba(219,39,119,0.04))', borderRadius:12, padding:'14px 12px', border:'1px solid rgba(236,72,153,0.12)' }}>
-                      <div style={{ fontSize:13, fontWeight:700, color:'#ec4899', marginBottom:2 }}>🧬 Генератор миксов</div>
-                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', lineHeight:1.3 }}>Создавайте персональные комбинации с анализом синергий, конфликтов и охвата органов</div>
-                    </div>
-                    {/* Saved mixes */}
-                    {(() => {
-                      const saved = (()=>{try{return JSON.parse(localStorage.getItem('he_support_mixes')||'[]')}catch{return []}})() as Array<{id:string;name:string;substances:string[];created:string}>;
-                      return (
-                        <div style={{ marginBottom:8 }}>
-                          {saved.length > 0 && (
-                            <div style={{ marginBottom:6 }}>
-                              <div style={{ fontSize:9, fontWeight:700, color:'var(--text-dim)', marginBottom:4 }}>💾 Сохранённые миксы ({saved.length})</div>
-                              {saved.map(mix => (
-                                <div key={mix.id} style={{ display:'flex', alignItems:'center', gap:4, padding:'6px 8px', background:'var(--bg-secondary)', borderRadius:8, marginBottom:3, border:'1px solid var(--border)' }}>
-                                  <div style={{ flex:1, fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{mix.name}</div>
-                                  <span style={{ fontSize:8, color:'var(--text-dim)' }}>{mix.substances.length} в-в</span>
-                                  <button onClick={() => { setEnhancedSubs(mix.substances); setStackSubTab('generator'); }} style={{ padding:'2px 6px', borderRadius:4, fontSize:7, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a' }}>Загрузить</button>
-                                  <button onClick={() => { try{const arr=JSON.parse(localStorage.getItem('he_support_mixes')||'[]');const upd=arr.filter((x:any)=>x.id!==mix.id);localStorage.setItem('he_support_mixes',JSON.stringify(upd));setFavRefresh(p=>p+1)}catch{} }} style={{ padding:'2px 6px', borderRadius:4, fontSize:7, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444' }}>✕</button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                    {/* Mix builder */}
-                    <div style={{ marginBottom:8, background:'rgba(24,24,27,0.15)', borderRadius:10, border:'1px solid rgba(255,255,255,0.04)', padding:'10px 12px' }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-                        <span style={{ fontSize:10, fontWeight:700, color:'var(--text-light)' }}>🧪 Состав микса ({enhancedSubs.length})</span>
-                        {enhancedSubs.length > 0 && (
-                          <span onClick={()=>setEnhancedSubs([])} style={{ fontSize:8, cursor:'pointer', color:'#ef4444', padding:'2px 6px', borderRadius:4, background:'rgba(239,68,68,0.08)' }}>Очистить</span>
-                        )}
-                      </div>
-                      {enhancedSubs.length === 0 ? (
-                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', textAlign:'center', padding:12, background:'var(--bg-secondary)', borderRadius:8, border:'1px dashed var(--border)', marginBottom:6 }}>Начните добавлять вещества через поиск ниже</div>
-                      ) : (
-                        <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:6 }}>
-                          {enhancedSubs.map(sid => {
-                            const sub = catalogSubstances.find(x => x.id === sid);
-                            const dosage = sub && (sub as any).dosage;
-                            return (
-                              <div key={sid} style={{ display:'flex', alignItems:'center', gap:4, padding:'5px 8px', borderRadius:6, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.12)' }}>
-                                <span style={{ flex:1, fontSize:9, color:'#ec4899', fontWeight:600 }}>{sub?.name || sid.replace(/_/g,' ')}</span>
-                                {dosage && <span style={{ fontSize:7, color:'var(--text-dim)' }}>{dosage.timing}{dosage.mg ? ` ${dosage.mg}мг` : ''}</span>}
-                                <span onClick={() => setEnhancedSubs(prev => prev.filter(x => x !== sid))} style={{ fontSize:10, cursor:'pointer', color:'rgba(255,255,255,0.3)', padding:'0 4px' }}>×</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      <input value={stackSearch} onChange={e => setStackSearch(e.target.value)}
-                        placeholder="🔍 Поиск препарата для добавления..."
-                        style={{ width:'100%', padding:'8px 10px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
-                      {stackSearch && (
-                        <div style={{ marginTop:4, maxHeight:140, overflowY:'auto', background:'var(--bg)', borderRadius:6, border:'1px solid var(--border)' }}>
-                          {catalogSubstances.filter(s => (s.name||'').toLowerCase().includes(stackSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(stackSearch.toLowerCase())).slice(0,8).map(s => {
-                            const sd = (s as any).dosage;
-                            return (
-                              <div key={s.id} onClick={() => { if (!enhancedSubs.includes(s.id)) setEnhancedSubs(prev => [...prev, s.id]); setStackSearch(''); }} style={{ display:'flex', alignItems:'center', gap:4, padding:'6px 8px', cursor:'pointer', fontSize:9, borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                                <span style={{ flex:1, fontWeight:600, color:'var(--text-light)' }}>{s.name}</span>
-                                {sd && <span style={{ fontSize:7, color:'var(--text-dim)' }}>{sd.timing}{sd.mg ? ` ${sd.mg}мг` : ''}</span>}
-                                <span style={{ fontSize:7, color:'var(--accent)' }}>+</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                    {/* Analysis cards */}
-                    {enhancedSubs.length >= 2 && (() => {
-                      const checked: Array<{a:string;b:string;type:string;effect:string;severity:string;synergyType?:string;affectedSystems?:string[];clinicalNote?:string;mechanisms?:string[];notes?:string}> = [];
-                      for (let i = 0; i < enhancedSubs.length; i++) {
-                        for (let j = i + 1; j < enhancedSubs.length; j++) {
-                          const key = `${enhancedSubs[i]}||${enhancedSubs[j]}`;
-                          const rev = `${enhancedSubs[j]}||${enhancedSubs[i]}`;
-                          const intx = conflictLookup.get(key) || conflictLookup.get(rev);
-                          if (intx) checked.push({ a: enhancedSubs[i], b: enhancedSubs[j], type: intx.type, effect: intx.effect, severity: intx.severity, mechanisms: intx.mechanisms, notes: (intx as any).notes || '' });
-                          const syn = SYNERGY_PAIRS.find(sp => (sp.substanceA === enhancedSubs[i] && sp.substanceB === enhancedSubs[j]) || (sp.substanceA === enhancedSubs[j] && sp.substanceB === enhancedSubs[i]));
-                          if (syn) checked.push({ a: enhancedSubs[i], b: enhancedSubs[j], type: 'synergy', effect: syn.mechanism, severity: syn.strength >= 0.7 ? 'HIGH' : syn.strength >= 0.4 ? 'MEDIUM' : 'LOW', synergyType: syn.synergyType, affectedSystems: syn.affectedSystems, clinicalNote: syn.clinicalNote });
-                        }
-                      }
-                      const synergies = checked.filter(c => c.type === 'synergy');
-                      const conflicts = checked.filter(c => c.type === 'conflict' || c.type === 'caution');
-                      const allOrgans = new Set<string>();
-                      enhancedSubs.forEach(sid => {
-                        const sub = catalogSubstances.find(x => x.id === sid);
-                        if (sub && sub.organs) (sub.organs as string[]).forEach(o => allOrgans.add(o.toLowerCase()));
-                      });
-                      const organCoverage = [...allOrgans].slice(0, 8);
-                      return (
-                        <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
-                          {/* Organ coverage */}
-                          {organCoverage.length > 0 && (
-                            <div style={{ background:'rgba(139,92,246,0.04)', borderRadius:8, border:'1px solid rgba(139,92,246,0.1)', padding:'8px 10px' }}>
-                              <div style={{ fontSize:8, fontWeight:600, color:'#a78bfa', marginBottom:3 }}>🎯 Охват органов ({organCoverage.length})</div>
-                              <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                                {organCoverage.map((o,i) => (
-                                  <span key={i} style={{ fontSize:7, padding:'1px 5px', borderRadius:4, background:'rgba(139,92,246,0.1)', color:'#a78bfa' }}>{ORGAN_CATEGORY_MAP[o]?.emoji || ''} {MECH_TRANSLATIONS_RU[o] || o.replace(/_/g,' ')}</span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {/* Synergies */}
-                          {synergies.length > 0 && (
-                            <div style={{ background:'rgba(34,197,94,0.04)', borderRadius:8, border:'1px solid rgba(34,197,94,0.1)', padding:'8px 10px' }}>
-                              <div style={{ fontSize:8, fontWeight:600, color:'#22c55e', marginBottom:3 }}>⊕ Синергии ({synergies.length})</div>
-                              {synergies.map((s,i) => (
-                                <div key={i} style={{ fontSize:7.5, color:'rgba(255,255,255,0.75)', lineHeight:1.4, padding:'3px 0', borderBottom: i < synergies.length-1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                                  <div style={{ fontWeight:600, color:'#4ade80' }}>{getStackSubLabel(s.a)} + {getStackSubLabel(s.b)} <span style={{ fontSize:6, marginLeft:3, padding:'1px 3px', borderRadius:2, background: s.severity==='HIGH'?'rgba(34,197,94,0.2)':'rgba(34,197,94,0.1)', color:'#22c55e' }}>{s.severity}</span></div>
-                                  <div style={{ color:'rgba(255,255,255,0.6)', marginTop:1 }}>{s.effect}</div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {/* Conflicts */}
-                          {conflicts.length > 0 && (
-                            <div style={{ background:'rgba(239,68,68,0.04)', borderRadius:8, border:'1px solid rgba(239,68,68,0.1)', padding:'8px 10px' }}>
-                              <div style={{ fontSize:8, fontWeight:600, color:'#ef4444', marginBottom:3 }}>⊖ Конфликты ({conflicts.length})</div>
-                              {conflicts.map((c,i) => (
-                                <div key={i} style={{ fontSize:7.5, color:'#f87171', lineHeight:1.4, padding:'3px 0', borderBottom: i < conflicts.length-1 ? '1px solid rgba(239,68,68,0.06)' : 'none' }}>
-                                  <div style={{ fontWeight:600 }}>{getStackSubLabel(c.a)} + {getStackSubLabel(c.b)} <span style={{ fontSize:6, marginLeft:3, padding:'1px 3px', borderRadius:2, background: c.severity==='HIGH'?'rgba(239,68,68,0.2)':'rgba(239,68,68,0.1)', color:'#ef4444' }}>{c.severity||''}</span></div>
-                                  <div style={{ color:'rgba(255,255,255,0.6)', marginTop:1 }}>{c.effect}</div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                    {/* Save + Clear buttons */}
-                    <div style={{ display:'flex', gap:4 }}>
-                      {enhancedSubs.length >= 2 && (
-                        <button onClick={() => {
-                          const name = prompt('Название микса:', `Микс ${enhancedSubs.length} веществ`);
-                          if (!name) return;
-                          const mix = { id:'mix_'+Date.now(), name, substances: enhancedSubs, created: new Date().toISOString() };
-                          try {
-                            const arr = JSON.parse(localStorage.getItem('he_support_mixes')||'[]');
-                            arr.unshift(mix);
-                            localStorage.setItem('he_support_mixes', JSON.stringify(arr));
-                            setFavRefresh(p=>p+1);
-                          } catch {}
-                        }} style={{ flex:1, padding:'8px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(236,72,153,0.1)', border:'1px solid rgba(236,72,153,0.25)', color:'#ec4899' }}>💾 Сохранить микс</button>
-                      )}
-                    </div>
-                    {enhancedSubs.length === 0 && (
-                      <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:10, background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)' }}>
-                        Добавьте 2+ вещества, чтобы увидеть анализ синергий и конфликтов
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* REPLACEMENT CALCULATOR — mode selector + ranked results */}
-                {stackSubTab === 'replace' && (
-                  <div style={{ padding:'0 4px' }}>
-                    <div style={{ marginBottom:10, background:'linear-gradient(135deg,rgba(167,139,250,0.08),rgba(139,92,246,0.04))', borderRadius:12, padding:'14px 12px', border:'1px solid rgba(167,139,250,0.12)' }}>
-                      <div style={{ fontSize:13, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>🔀 Подбор замены</div>
-                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', lineHeight:1.3 }}>Найдите аналоги и альтернативы по препарату, органу-мишени или механизму действия</div>
-                    </div>
-
-                    {/* Mode selector pills */}
-                    <div style={{ display:'flex', gap:4, marginBottom:8 }}>
-                      {([
-                        {key:'substance',label:'🧪 Препарат',color:'#a78bfa'},
-                        {key:'organ',label:'❤️ Орган',color:'#22c55e'},
-                        {key:'mechanism',label:'⚙️ Механизм',color:'#f59e0b'},
-                      ] as const).map(m => (
-                        <button key={m.key} onClick={() => { setReplaceMode(m.key as any); setReplaceResults([]); setReplaceSelectedSub(null); setReplaceTargetOrgan(''); setReplaceTargetMech(''); setReplaceSearch(''); }}
-                          style={{ flex:1, padding:'5px 4px', borderRadius:8, fontSize:8, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap',
-                            background: replaceMode===m.key ? m.color+'22' : 'var(--bg-secondary)',
-                            color: replaceMode===m.key ? m.color : 'var(--text-dim)',
-                            border: `1px solid ${replaceMode===m.key ? m.color+'44' : 'var(--border)'}` }}>{m.label}</button>
-                      ))}
-                    </div>
-
-                    {/* Substance mode: search + select */}
-                    {replaceMode === 'substance' && (
-                      <div style={{ marginBottom:10, background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)', overflow:'hidden' }}>
-                        <div style={{ padding:'10px 12px' }}>
-                          <div style={{ position:'relative' }}>
-                            <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Название препарата</label>
-                            <input value={replaceSearch} onChange={e => setReplaceSearch(e.target.value)} placeholder="🔍 Введите название для поиска..."
-                              autoComplete="off"
-                              style={{ width:'100%', padding:'10px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
-                            {replaceSearch.length >= 2 && (
-                              <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:8, maxHeight:180, overflowY:'auto', marginTop:2, boxShadow:'0 4px 12px rgba(0,0,0,0.2)' }}>
-                                {catalogSubstances.filter(s => (s.name||'').toLowerCase().includes(replaceSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(replaceSearch.toLowerCase())).slice(0,6).map(s => (
-                                  <div key={s.id} onClick={() => { setReplaceSelectedSub(s.id); setReplaceSearch(s.name || s.id); setReplaceResults(findReplacements(s.id)); }} style={{ padding:'8px 10px', cursor:'pointer', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{s.name}</div>
-                                    <div style={{ fontSize:7, color:'var(--text-dim)' }}>{(s.categories||[]).slice(0,3).join(' • ') || s.id}</div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        {replaceSelectedSub && (
-                          <div style={{ padding:'8px 12px 10px', borderTop:'1px solid var(--border)', background:'rgba(167,139,250,0.03)' }}>
-                            <div style={{ fontSize:8, fontWeight:600, color:'rgba(255,255,255,0.5)', marginBottom:6, textTransform:'uppercase', letterSpacing:0.5 }}>Выбранный препарат</div>
-                            <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
-                              <span style={{ fontSize:16 }}>🧪</span>
-                              <div>
-                                <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa' }}>{getSubstanceName(replaceSelectedSub)}</div>
-                                <div style={{ fontSize:8, color:'var(--text-dim)' }}>{(findSubstance(replaceSelectedSub)?.organs||[]).join(', ') || '—'}</div>
-                              </div>
-                            </div>
-                            <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Механизмы действия</div>
-                            <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                              {(findSubstance(replaceSelectedSub)?.mechanisms||[]).slice(0,6).map((m:string,i:number) => (
-                                <span key={i} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(167,139,250,0.1)', color:'#a78bfa', border:'1px solid rgba(167,139,250,0.15)' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Organ mode: select organ */}
-                    {replaceMode === 'organ' && (
-                      <div style={{ marginBottom:8, padding:'10px 12px', background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)' }}>
-                        <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:5, fontWeight:500 }}>Выберите орган-мишень</label>
-                        <select value={replaceTargetOrgan} onChange={e => { setReplaceTargetOrgan(e.target.value); if (e.target.value) setReplaceResults(findReplacements('', 'organ', e.target.value)); else setReplaceResults([]); }}
-                          style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
-                          <option value="">— Выберите орган —</option>
-                          {[...new Set(Object.values(ORGAN_CATEGORY_MAP).map(v => v.key))].map(k => {
-                            const firstKey = Object.entries(ORGAN_CATEGORY_MAP).find(([,v]) => v.key === k)?.[0] || '';
-                            return <option key={k} value={k}>{ORGAN_CATEGORY_MAP[firstKey]?.emoji || ''} {ORGAN_CATEGORY_MAP[firstKey]?.label || k}</option>;
-                          })}
-                        </select>
-                        {replaceTargetOrgan && <div style={{ marginTop:4, fontSize:8, color:'var(--text-dim)' }}>Найдено замен: <b style={{color:'#22c55e'}}>{replaceResults.length}</b></div>}
-                      </div>
-                    )}
-
-                    {/* Mechanism mode: select mechanism */}
-                    {replaceMode === 'mechanism' && (
-                      <div style={{ marginBottom:8, padding:'10px 12px', background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)' }}>
-                        <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:5, fontWeight:500 }}>Выберите механизм действия</label>
-                        <select value={replaceTargetMech} onChange={e => { setReplaceTargetMech(e.target.value); if (e.target.value) setReplaceResults(findReplacements('', 'mechanism', e.target.value)); else setReplaceResults([]); }}
-                          style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
-                          <option value="">— Выберите механизм —</option>
-                          {[...new Set(catalogSubstances.flatMap(s => s.mechanisms||[]))].filter(Boolean).sort().slice(0,60).map(m => (
-                            <option key={m} value={m}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</option>
-                          ))}
-                        </select>
-                        {replaceTargetMech && <div style={{ marginTop:4, fontSize:8, color:'var(--text-dim)' }}>Найдено замен: <b style={{color:'#f59e0b'}}>{replaceResults.length}</b></div>}
-                      </div>
-                    )}
-
-                    {/* Results */}
-                    {replaceResults.length > 0 && (
-                      <div style={{ marginBottom:6, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 4px' }}>
-                        <span style={{ fontSize:9, color:'var(--text-dim)' }}>Результаты: <b style={{color: replaceMode==='substance'?'#a78bfa':replaceMode==='organ'?'#22c55e':'#f59e0b'}}>{replaceResults.length}</b></span>
-                      </div>
-                    )}
-                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                      {replaceResults.slice(0,20).map(r => {
-                        const matches = r.score >= 70 ? 'high' : r.score >= 40 ? 'med' : 'low';
-                        const accentColor = matches === 'high' ? '#22c55e' : matches === 'med' ? '#f59e0b' : '#ef4444';
-                        const bgColor = matches === 'high' ? 'rgba(34,197,94,0.04)' : matches === 'med' ? 'rgba(245,158,11,0.04)' : 'rgba(239,68,68,0.04)';
-                        const borderColor = matches === 'high' ? 'rgba(34,197,94,0.12)' : matches === 'med' ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)';
-                        return (
-                          <div key={r.id} style={{ background:bgColor, borderRadius:12, border:'1px solid '+borderColor, overflow:'hidden' }}>
-                            <div style={{ padding:'10px 12px' }}>
-                              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
-                                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                                  <span style={{ fontSize:10, fontWeight:700, color:'var(--text-light)' }}>{getSubstanceName(r.id)}</span>
-                                  {(() => {
-                                    const tier = r.tier || getSubstanceTier(r.id);
-                                    const tierLabel = tier === 'core' ? 'ЯДРО' : tier === 'standard' ? 'СТАНДАРТ' : tier === 'advanced' ? 'ПРОДВИНУТЫЙ' : tier === 'specialty' ? 'РЕЦЕПТ' : null;
-                                    return tierLabel ? <span style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background:'rgba(255,255,255,0.06)', color:'var(--text-dim)', marginLeft:4 }}>{tierLabel}</span> : null;
-                                  })()}
-                                </div>
-                                <span style={{ fontSize:7, padding:'2px 6px', borderRadius:4, background:accentColor+'22', color:accentColor, fontWeight:700 }}>{r.score}%</span>
-                              </div>
-                              <div style={{ fontSize:8, color:'rgba(255,255,255,0.65)', lineHeight:1.3, marginBottom:4 }}>{r.reason}</div>
-                              {/* Mechanism badges */}
-                              <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:3 }}>
-                                {(catalogSubstances.find(x => x.id === r.id)?.mechanisms||[]).slice(0,4).map((m:string,mi:number) => (
-                                  <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background:accentColor+'15', color:accentColor, border:'1px solid '+accentColor+'20' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>
-                                ))}
-                              </div>
-                              {/* Mechanism comparison (substance mode) */}
-                              {r.mechComparison && r.mechComparison.length > 0 && (
-                                <details style={{ marginBottom:3 }}>
-                                  <summary style={{ fontSize:7, fontWeight:600, color:'#a78bfa', cursor:'pointer' }}>⚖️ Сравнение механизмов</summary>
-                                  <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-                                    {r.mechComparison.map((mc:string,mi:number) => {
-                                      const isMatch = mc.startsWith('✓');
-                                      return <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background: isMatch ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: isMatch ? '#22c55e' : '#ef4444' }}>{mc}</span>;
-                                    })}
-                                  </div>
-                                </details>
-                              )}
-                              {/* Organ badges */}
-                              {r.organs && r.organs.length > 0 && (
-                                <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:3 }}>
-                                  {r.organs.slice(0,3).map((o:string,oi:number) => {
-                                    const map = ORGAN_CATEGORY_MAP[o.toUpperCase().trim()];
-                                    return <span key={oi} style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background:'rgba(139,92,246,0.08)', color:'#a78bfa' }}>{map?.emoji || ''} {map?.label || o}</span>;
-                                  })}
-                                </div>
-                              )}
-                              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                                {r.pros.length > 0 && <span style={{ fontSize:7, color:'#22c55e', fontWeight:500 }}>✓ {r.pros.slice(0,3).join(', ')}</span>}
-                                {r.cons.length > 0 && <span style={{ fontSize:7, color:'#ef4444', fontWeight:500 }}>✗ {r.cons.slice(0,3).join(', ')}</span>}
-                              </div>
-                              <button onClick={() => { if (!enhancedSubs.includes(r.id)) setEnhancedSubs(prev => [...prev, r.id]); }} style={{ marginTop:6, padding:'5px 12px', borderRadius:6, border:'1px solid rgba(0,230,138,0.2)', cursor:'pointer', background:'rgba(0,230,138,0.06)', color:'#00e68a', fontSize:8, fontWeight:700, width:'100%' }}>+ Добавить в стек</button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {replaceResults.length === 0 && replaceMode === 'substance' && replaceSelectedSub && (
-                      <div style={{ padding:20, textAlign:'center', background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)' }}>
-                        <div style={{ fontSize:24, marginBottom:4 }}>🔍</div>
-                        <div style={{ fontSize:10, color:'var(--text-dim)' }}>Замен не найдено для <b style={{color:'var(--text-light)'}}>{getSubstanceName(replaceSelectedSub)}</b></div>
-                      </div>
-                    )}
-                    {replaceResults.length === 0 && replaceMode === 'organ' && replaceTargetOrgan && (
-                      <div style={{ padding:14, textAlign:'center', background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)' }}>
-                        <div style={{ fontSize:10, color:'var(--text-dim)' }}>Нет препаратов для выбранного органа</div>
-                      </div>
-                    )}
-                    {replaceResults.length === 0 && replaceMode === 'mechanism' && replaceTargetMech && (
-                      <div style={{ padding:14, textAlign:'center', background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)' }}>
-                        <div style={{ fontSize:10, color:'var(--text-dim)' }}>Нет препаратов с выбранным механизмом</div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* SEARCH CALCULATOR — combined filters + expandable cards */}
-                {stackSubTab === 'search' && (
-                  <div style={{ padding:'0 4px' }}>
-                    <div style={{ marginBottom:10, background:'linear-gradient(135deg,rgba(59,130,246,0.08),rgba(37,99,235,0.04))', borderRadius:12, padding:'14px 12px', border:'1px solid rgba(59,130,246,0.12)' }}>
-                      <div style={{ fontSize:13, fontWeight:700, color:'#60a5fa', marginBottom:2 }}>🔍 Поиск препарата</div>
-                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', lineHeight:1.3 }}>Комбинированный поиск по органу, механизму, категории, тиру и тексту</div>
-                    </div>
-
-                    {/* Filters — 5 parameters */}
-                    <div style={{ marginBottom:10, background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)', padding:'12px' }}>
-                      <div style={{ fontSize:9, fontWeight:600, color:'var(--text-dim)', marginBottom:10, textTransform:'uppercase', letterSpacing:0.5 }}>Параметры поиска</div>
-                      {/* Row 1: organ + mech */}
-                      <div style={{ display:'flex', gap:6, marginBottom:8 }}>
-                        <div style={{ flex:1 }}>
-                          <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Орган-мишень</label>
-                          <select value={searchOrgan} onChange={e => setSearchOrgan(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
-                            <option value="">Любой</option>
-                            {[...new Set(Object.values(ORGAN_CATEGORY_MAP).map(v => v.key))].map(k => {
-                              const firstKey = Object.entries(ORGAN_CATEGORY_MAP).find(([,v]) => v.key === k)?.[0] || '';
-                              return <option key={k} value={k}>{ORGAN_CATEGORY_MAP[firstKey]?.emoji || ''} {ORGAN_CATEGORY_MAP[firstKey]?.label || k}</option>;
-                            })}
-                          </select>
-                        </div>
-                        <div style={{ flex:1 }}>
-                          <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Механизм</label>
-                          <select value={searchMech} onChange={e => setSearchMech(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
-                            <option value="">Любой</option>
-                            {[...new Set(catalogSubstances.flatMap(s => s.mechanisms||[]))].filter(Boolean).sort().slice(0,60).map(m => (
-                              <option key={m} value={m}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      {/* Row 2: category + tier */}
-                      <div style={{ display:'flex', gap:6, marginBottom:8 }}>
-                        <div style={{ flex:1 }}>
-                          <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Категория</label>
-                          <select value={searchCategory} onChange={e => setSearchCategory(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
-                            <option value="">Любая</option>
-                            {[...new Set(catalogSubstances.flatMap(s => s.categories||[]))].filter(Boolean).sort().slice(0,40).map(c => (
-                              <option key={c} value={c}>{c}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div style={{ flex:1 }}>
-                          <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Тир</label>
-                          <select value={searchTier} onChange={e => setSearchTier(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, appearance:'none' }}>
-                            <option value="">Любой</option>
-                            <option value="core">Ядро</option>
-                            <option value="standard">Стандарт</option>
-                            <option value="advanced">Продвинутый</option>
-                            <option value="specialty">Рецепт</option>
-                          </select>
-                        </div>
-                      </div>
-                      {/* Row 3: text search */}
-                      <div>
-                        <label style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:3, fontWeight:500 }}>Текстовый поиск</label>
-                        <input value={searchEffect} onChange={e => setSearchEffect(e.target.value)} placeholder="Название, эффект, проблема..." style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
-                      </div>
-                      <button onClick={() => setSearchResults(doSearch(searchOrgan, searchMech, searchEffect, searchCategory, searchTier))} disabled={!searchOrgan && !searchMech && !searchEffect.trim() && !searchCategory && !searchTier} style={{ width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'#fff', fontWeight:700, fontSize:11, marginTop:8, opacity:(!searchOrgan && !searchMech && !searchEffect.trim() && !searchCategory && !searchTier) ? 0.5 : 1, transition:'opacity 0.2s' }}>
-                        🔍 НАЙТИ
-                      </button>
-                    </div>
-
-                    {/* Results count */}
-                    {searchResults.length > 0 && (
-                      <div style={{ marginBottom:6, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                        <span style={{ fontSize:9, color:'var(--text-dim)' }}>Найдено: <b style={{color:'#60a5fa'}}>{searchResults.length}</b></span>
-                      </div>
-                    )}
-                    {/* Results as expandable cards */}
-                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                      {searchResults.slice(0,40).map(r => {
-                        const isExpanded = searchExpanded[r.id];
-                        const typeColor = r.type === 'stack' ? '#00e68a' : r.type === 'complex' ? '#a78bfa' : '#60a5fa';
-                        const typeBg = r.type === 'stack' ? 'rgba(0,230,138,0.04)' : r.type === 'complex' ? 'rgba(167,139,250,0.04)' : 'rgba(59,130,246,0.04)';
-                        const typeBorder = r.type === 'stack' ? 'rgba(0,230,138,0.12)' : r.type === 'complex' ? 'rgba(167,139,250,0.12)' : 'rgba(59,130,246,0.12)';
-                        const sub = r.type === 'substance' ? catalogSubstances.find(x => x.id === r.id) : null;
-                        return (
-                          <div key={r.id} style={{ background:typeBg, borderRadius:12, border:'1px solid '+typeBorder, overflow:'hidden' }}>
-                            {/* Card header — always visible */}
-                            <div style={{ padding:'10px 12px', cursor:'pointer' }} onClick={() => setSearchExpanded(prev => ({...prev, [r.id]: !prev[r.id]}))}>
-                              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:3 }}>
-                                <div style={{ display:'flex', alignItems:'center', gap:4, flex:1, minWidth:0 }}>
-                                  <span style={{ fontSize:7, padding:'2px 6px', borderRadius:3, background:typeColor+'22', color:typeColor, fontWeight:700, flexShrink:0 }}>{r.type === 'stack' ? 'СТЕК' : r.type === 'complex' ? 'КОМПЛЕКС' : 'ПРЕПАРАТ'}</span>
-                                  <span style={{ fontSize:10, fontWeight:700, color:'var(--text-light)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.name}</span>
-                                </div>
-                                <div style={{ display:'flex', alignItems:'center', gap:3, flexShrink:0 }}>
-                                  {(() => {
-                                    if (r.type === 'substance' && sub) {
-                                      const t = getSubstanceTier(sub.id);
-                                      const tl = t === 'core' ? 'ЯДРО' : t === 'standard' ? 'СТД' : t === 'advanced' ? 'ПРО' : t === 'specialty' ? 'РЕЦ' : null;
-                                      if (tl) return <span style={{ fontSize:6, padding:'1px 3px', borderRadius:2, background:'rgba(255,255,255,0.06)', color:'var(--text-dim)' }}>{tl}</span>;
-                                    }
-                                    return null;
-                                  })()}
-                                  <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:r.score >= 70 ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', color:r.score >= 70 ? '#22c55e' : '#f59e0b', fontWeight:700 }}>{r.score}%</span>
-                                  <span style={{ fontSize:8, color:'var(--text-dim)', transition:'transform 0.2s', display:'inline-block', transform: isExpanded ? 'rotate(180deg)' : 'none' }}>▼</span>
-                                </div>
-                              </div>
-                              <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', lineHeight:1.3 }}>{r.reason}</div>
-                              {r.type === 'stack' && r.substanceCount && <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:3 }}>{r.substanceCount} веществ</div>}
-                              {r.pros && r.pros.length > 0 && !isExpanded && <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginTop:3 }}>{r.pros.slice(0,2).map((p,i) => <span key={i} style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background:'rgba(34,197,94,0.1)', color:'#22c55e' }}>✓ {p}</span>)}</div>}
-                            </div>
-                            {/* Expanded content */}
-                            {isExpanded && (
-                              <div style={{ padding:'0 12px 10px', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
-                                {r.description && <div style={{ fontSize:8, color:'rgba(255,255,255,0.65)', lineHeight:1.3, marginTop:6, marginBottom:4 }}>{r.description}</div>}
-                                {/* Mechanisms */}
-                                {(r.mechanisms || (sub?.mechanisms||[])).length > 0 && (
-                                  <div style={{ marginBottom:4 }}>
-                                    <div style={{ fontSize:7, fontWeight:600, color:'var(--text-dim)', marginBottom:2 }}>⚙️ Механизмы:</div>
-                                    <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                                      {(r.mechanisms || sub?.mechanisms || []).slice(0,8).map((m:string,mi:number) => (
-                                        <span key={mi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.1)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                                {/* Organs */}
-                                {(r.organs || (sub?.organs||[])).length > 0 && (
-                                  <div style={{ marginBottom:4 }}>
-                                    <div style={{ fontSize:7, fontWeight:600, color:'var(--text-dim)', marginBottom:2 }}>🎯 Органы:</div>
-                                    <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                                      {(r.organs || sub?.organs || []).slice(0,6).map((o:string,oi:number) => {
-                                        const map = ORGAN_CATEGORY_MAP[o.toUpperCase().trim()];
-                                        return <span key={oi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{map?.emoji || ''} {map?.label || o}</span>;
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-                                {/* Categories */}
-                                {(sub?.categories||[]).length > 0 && (
-                                  <div style={{ marginBottom:3 }}>
-                                    <div style={{ fontSize:7, fontWeight:600, color:'var(--text-dim)', marginBottom:2 }}>🏷️ Категории:</div>
-                                    <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                                      {sub?.categories.slice(0,6).map((c:string,ci:number) => <span key={ci} style={{ fontSize:6, padding:'1px 4px', borderRadius:2, background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.5)' }}>{c}</span>)}
-                                    </div>
-                                  </div>
-                                )}
-                                {/* Add to mix button */}
-                                {r.type === 'substance' && (
-                                  <button onClick={() => { if (!enhancedSubs.includes(r.id)) setEnhancedSubs(prev => [...prev, r.id]); }} style={{ marginTop:6, padding:'5px 12px', borderRadius:6, border:'1px solid rgba(0,230,138,0.2)', cursor:'pointer', background:'rgba(0,230,138,0.06)', color:'#00e68a', fontSize:8, fontWeight:700, width:'100%' }}>+ Добавить в стек</button>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {searchResults.length === 0 && (searchOrgan || searchMech || searchEffect.trim() || searchCategory || searchTier) && (
-                      <div style={{ padding:20, textAlign:'center', background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)' }}>
-                        <div style={{ fontSize:24, marginBottom:4 }}>🔍</div>
-                        <div style={{ fontSize:10, color:'var(--text-dim)' }}>Ничего не найдено</div>
-                        <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:4 }}>Попробуйте изменить параметры поиска</div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* TRAINING MIXES sub-tab */}
-                {stackSubTab === 'mixcalc' && (() => {
-                  const hasCourse = (linked.course || []).length > 0;
-                  const isOnCycle = hasCourse;
-                  const bw = linked.profile?.settings?.weight ?? 80;
-                  const multiplier = isOnCycle ? 1.25 : 1.0;
-                  const isPre = mixTiming === 'pre';
-                  const isIntra = mixTiming === 'intra';
-                  const isPost = mixTiming === 'post';
-
-                  const preStack = [
-                    { name:'Кофеин (безводный)', dose: `${(Math.min(6, 3 + (mixGoal==='focus'?3:0) + (mixGoal==='endurance'?1:0)) * bw * multiplier / 1000).toFixed(2)} г`, note:'За 30-45 мин до. Стимуляция ЦНС, липолиз' },
-                    { name:'L-Цитруллин малат', dose: `${(8 * multiplier).toFixed(1)} г`, note:'За 45-60 мин до. Оксид азота, памп' },
-                    { name:'Бета-аланин', dose:'3.2 г', note:'За 30 мин до. Буфер молочной кислоты' },
-                    { name:'L-Аргинин (опционально)', dose:`${(5 * multiplier).toFixed(1)} г`, note:'За 30 мин до. Усиливает памп' },
-                    { name:'L-Тирозин', dose:`${(2 * multiplier).toFixed(1)} г`, note:'За 30 мин до. Фокус, дофамин' },
-                    { name:'Таурин', dose:`${(2 * multiplier).toFixed(1)} г`, note:'За 30 мин до. Осморегуляция, антиоксидант' },
-                  ];
-
-                  const durationHrs = mixGoal === 'endurance' ? 2 : 1.5;
-                  const intraStack = [
-                    { name:'Натрий (Na⁺)', dose: `${Math.round(750 * durationHrs)} мг`, note:'Каждые 15-20 мин с водой. Гидратация' },
-                    { name:'Калий (K⁺)', dose: `${Math.round(300 * durationHrs)} мг`, note:'Каждые 15-20 мин. Предотвращение судорог' },
-                    { name:'Магний (Mg²⁺)', dose: `${Math.round(150 * durationHrs)} мг`, note:'Каждые 30 мин. Судороги, расслабление' },
-                    { name:'Циклический декстрин (HBCD)', dose: `${Math.round(45 * durationHrs)} г`, note:'Каждые 15-20 мин. Быстрый углевод, низкий GI' },
-                    { name:'EAA (BCAA 2:1:1)', dose: `${(10 * multiplier).toFixed(1)} г`, note:'Каждые 30 мин. Анти-катаболизм' },
-                    { name:'L-Глютамин', dose:`${(5 * multiplier).toFixed(1)} г`, note:'Каждые 30 мин. Кишечник, иммунитет' },
-                  ];
-
-                  const postStack = [
-                    { name:'Сывороточный протеин (изолят)', dose: `${(0.4 * bw).toFixed(0)} г`, note:'Сразу после. Быстрое усвоение' },
-                    { name:'Креатин моногидрат', dose:'5 г', note:'Сразу после. Восполнение фосфокреатина' },
-                    { name:'HMB (β-гидрокси-β-метилбутират)', dose: isOnCycle ? '3 г' : '— (натуральный тренинг)', note:'Сразу после. Анти-катаболизм' },
-                    { name:'L-Глютамин', dose:`${(5 * multiplier).toFixed(0)} г`, note:'Сразу после. Иммунитет, гликоген' },
-                    { name:'Цинк + Магний (ZMA)', dose:'30 мг Zn + 450 мг Mg', note:'За 30-60 мин до сна. Тестостерон, сон' },
-                    { name:'Витамин C', dose:'500 мг', note:'Сразу после. Кортизол, антиоксидант' },
-                  ];
-
-                  const activeStack = isPre ? preStack : isIntra ? intraStack : postStack;
-                  const stackTitle = isPre ? '⚡ Пре-тренировочный стек' : isIntra ? '💧 Интра-тренировочный стек' : '🍗 Пост-тренировочный стек';
-                  const timingLabel = isPre ? 'За 30-60 мин до тренировки' : isIntra ? 'Во время тренировки (каждые 15-20 мин)' : 'Сразу после тренировки';
-
-                  const glycemicCompounds = ['HGH','insulin','metformin','berberine','semaglutide','tirzepatide'];
-                  const userGlycemic = (linked.course || []).filter(c => glycemicCompounds.some(g => (c.substanceId||'').toLowerCase().includes(g.toLowerCase())));
-                  const hasGlycemic = userGlycemic.length > 0;
-
-                  return (
-                  <div style={{ padding:'0 4px' }}>
-                    <div style={{ marginBottom:10, background:'linear-gradient(135deg,rgba(249,115,22,0.08),rgba(234,88,12,0.04))', borderRadius:12, padding:'14px 12px', border:'1px solid rgba(249,115,22,0.12)' }}>
-                      <div style={{ fontSize:13, fontWeight:700, color:'#f97316', marginBottom:2 }}>⚡ Тренировочные миксы</div>
-                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', lineHeight:1.3 }}>Пре-/интра-/пост-тренировочные стеки для пампа, силы и восстановления</div>
-                    </div>
-                    {/* Parameters */}
-                    <div className="card" style={{ marginBottom:10, padding:10 }}>
-                      <h4 style={{ margin:'0 0 8px', fontSize:11, color:'var(--text)' }}>🎯 Параметры</h4>
-                      <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' }}>
-                        <div style={{ flex:'1 1 45%', minWidth:100 }}>
-                          <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Цель</div>
-                          <select value={mixGoal} onChange={e=>setMixGoal(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
-                            <option value="pump">💪 Памп</option>
-                            <option value="endurance">🏃 Выносливость</option>
-                            <option value="strength">🏋️ Сила</option>
-                            <option value="recovery">🔄 Восстановление</option>
-                            <option value="focus">🧠 Фокус</option>
-                          </select>
-                        </div>
-                        <div style={{ flex:'1 1 45%', minWidth:100 }}>
-                          <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Время приёма</div>
-                          <select value={mixTiming} onChange={e=>setMixTiming(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
-                            <option value="pre">⚡ Пре-тренировка</option>
-                            <option value="intra">💧 Интра-тренировка</option>
-                            <option value="post">🍗 Пост-тренировка</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div style={{ marginBottom:8 }}>
-                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Вес тела (кг)</div>
-                        <input type="number" value={bw} readOnly
-                          style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
-                      </div>
-                    </div>
-
-                    {isOnCycle && (
-                      <div className="card" style={{ padding:'8px 10px', marginBottom:10, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', fontSize:9, color:'#a78bfa' }}>
-                        🔬 На курсе: дозы повышены ×{multiplier}. Активные вещества: {(linked.course||[]).map(c=>c.substanceId).join(', ')}
-                      </div>
-                    )}
-
-                    <div className="card" style={{ marginBottom:10, padding:12, background:'linear-gradient(135deg, rgba(0,230,138,0.04), rgba(139,92,246,0.04))', border:'1px solid var(--glass-border)' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                        <span style={{ fontSize:18 }}>{isPre ? '⚡' : isIntra ? '💧' : '🍗'}</span>
-                        <div>
-                          <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>{stackTitle}</div>
-                          <div style={{ fontSize:8, color:'var(--text-dim)' }}>{timingLabel}</div>
-                        </div>
-                        {isOnCycle && <span style={{ marginLeft:'auto', fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(139,92,246,0.15)', color:'#a78bfa' }}>×{multiplier}</span>}
-                      </div>
-                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                        {activeStack.map((item,i)=>(
-                          <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
-                            <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--accent)', flexShrink:0 }} />
-                            <div style={{ flex:1, fontSize:10 }}>
-                              <span style={{ color:'var(--text-light)' }}>{item.name}</span>
-                              <span style={{ color:'var(--text-dim)', fontSize:8, marginLeft:4 }}>— {item.note}</span>
-                            </div>
-                            <span style={{ fontSize:10, fontWeight:600, color:'#00e68a', whiteSpace:'nowrap' }}>{item.dose}</span>
-                            <button onClick={() => { const id = resolveProtoId(item.name); if (id && !enhancedSubs.includes(id)) setEnhancedSubs(prev => [...prev, id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:8, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'rgba(0,230,138,0.7)' }}>+ Стек</button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {hasGlycemic && isIntra && (
-                      <div className="card" style={{ padding:10, marginBottom:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.15)' }}>
-                        <div style={{ fontSize:10, fontWeight:700, color:'#f87171', marginBottom:4 }}>⚠ Внимание: гликемические взаимодействия</div>
-                        <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>
-                          У вас на курсе: <b>{userGlycemic.map(c=>c.substanceId).join(', ')}</b>. Эти вещества влияют на уровень глюкозы.
-                          Контролируйте глюкометром каждые 30 мин. При гипогликемии — увеличьте HBCD на 15-20 г.
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="card" style={{ padding:10, marginBottom:8 }}>
-                      <h4 style={{ margin:'0 0 6px', fontSize:11, color:'var(--text)' }}>📋 Все три стека (обзор)</h4>
-                      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                        {[
-                          { label:'⚡ Пре', items:preStack.slice(0,4).map(i=>`${i.name.split('(')[0].trim()}: ${i.dose}`).join(' · ') },
-                          { label:'💧 Интра', items:intraStack.slice(0,4).map(i=>`${i.name.split('(')[0].trim()}: ${i.dose}`).join(' · ') },
-                          { label:'🍗 Пост', items:postStack.slice(0,4).map(i=>`${i.name.split('(')[0].trim()}: ${i.dose}`).join(' · ') },
-                        ].map((grp, gi) => (
-                          <div key={gi} style={{ padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
-                            <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:3 }}>{grp.label}-тренировочный</div>
-                            <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>{grp.items}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="card" style={{ padding:12, marginBottom:8, border:'1px solid rgba(236,72,153,0.2)' }}>
-                      <h4 style={{ margin:'0 0 8px', fontSize:11, color:'#ec4899' }}>💉 Пептиды/Гормоны к тренировке</h4>
-                      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                        {[
-                          { key:'insulin', label:'Инсулин', val:mixInsulin, set:setMixInsulin, timing:mixInsulinTiming, setTiming:setMixInsulinTiming, defaultUnit:'ЕД', note:'Только под глюкометром! +30г быстрых углеводов' },
-                          { key:'mgf', label:'MGF (PEG-MGF)', val:mixMGF, set:setMixMGF, timing:mixMGFTiming, setTiming:setMixMGFTiming, defaultUnit:'мкг', note:'Локально в целевую мышцу за 15 мин до тренировки' },
-                          { key:'igf', label:'IGF-1 (LR3/DES)', val:mixIGF, set:setMixIGF, timing:mixIGFTiming, setTiming:setMixIGFTiming, defaultUnit:'мкг', note:'Системно/локально. DES — немедленно, LR3 — за 20 мин' },
-                          { key:'gh', label:'ГР (HGH/rHGH)', val:mixGH, set:setMixGH, timing:mixGHTiming, setTiming:setMixGHTiming, defaultUnit:'МЕ', note:'За 30-60 мин до для жиросжигания. Пост — для восстановления' },
-                        ].map((p) => (
-                          <div key={p.key} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.1)' }}>
-                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
-                              <span style={{ fontSize:10, fontWeight:700, color:'var(--text-light)' }}>{p.label}</span>
-                              <div style={{ display:'flex', gap:4, alignItems:'center' }}>
-                                <span style={{ fontSize:8, color:'var(--text-dim)' }}>{p.defaultUnit}</span>
-                                <input type="number" min="0" max="100" step="0.5" value={p.val} onChange={e => p.set(Math.max(0, Number(e.target.value) || 0))} placeholder="0" style={{ width:60, padding:'4px 6px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-primary)', color:'var(--text)', fontSize:10, textAlign:'center' }} />
-                              </div>
-                            </div>
-                            <div style={{ display:'flex', gap:4 }}>
-                              <button onClick={() => p.setTiming('pre')} style={{ padding:'2px 8px', borderRadius:4, fontSize:8, fontWeight:600, cursor:'pointer', border:'none', background:p.timing==='pre'?'#ec4899':'var(--bg-secondary)', color:p.timing==='pre'?'#000':'var(--text-dim)' }}>До тренировки</button>
-                              <button onClick={() => p.setTiming('post')} style={{ padding:'2px 8px', borderRadius:4, fontSize:8, fontWeight:600, cursor:'pointer', border:'none', background:p.timing==='post'?'#ec4899':'var(--bg-secondary)', color:p.timing==='post'?'#000':'var(--text-dim)' }}>После тренировки</button>
-                            </div>
-                            {p.val > 0 && <div style={{ fontSize:7, color:'#ec4899', marginTop:2, opacity:0.7 }}>{p.note}</div>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="card" style={{ padding:10 }}>
-                      <h4 style={{ margin:'0 0 4px', fontSize:10, color:'var(--text-dim)' }}>📝 Рекомендации</h4>
-                      <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>
-                        • Все дозы рассчитаны на вес <b>{bw} кг</b>{isOnCycle ? ' (на курсе ×1.25)' : ' (натуральный тренинг ×1.0)'}.<br/>
-                        • Пейте воду: 500 мл за 2 ч до + 200-300 мл каждые 15-20 мин во время тренировки.<br/>
-                        • Общий объём жидкости интра-тренировки: ~{(durationHrs * 0.9).toFixed(1)} л для {bw} кг.<br/>
-                        • Избегайте жиров и клетчатки за 2 ч до тренировки — замедляют всасывание.<br/>
-                        • Пост-тренировочный приём — в течение 30 мин после завершения (анаболическое окно).<br/>
-                        • При использовании инсулина/метформина: обязательно глюкометр + быстрые углеводы под рукой.
-                      </div>
-                    </div>
-                    {/* Back to stacks */}
-                    <button onClick={() => setStackSubTab('readystacks')} style={{ width:'100%', marginTop:10, padding:'8px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)' }}>← Назад к стекам</button>
-                  </div>
-                  );
-                })()}
-              </div>
-            )}
-
             {renderView(infoView, 'research', () => (
                 <div>
                   <div style={{fontSize:13,fontWeight:700,color:'var(--accent)',marginBottom:4}}>🔬 Поиск исследований</div>
@@ -4770,12 +3523,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   </div>
                 </div>
               ))}
-
-            {renderView(infoView, 'finder', () =>
-              <div style={{ padding: '0 4px' }}>
-                <SupplementFinder />
-              </div>
-            )}
 
             {renderView(infoView, 'biostack', () =>
               <div style={{ padding: '0 4px' }}>
@@ -5417,7 +4164,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                 <div style={{ marginBottom: 4 }}>
                                   <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>Механизмы действия:</div>
                                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                                    {sub.mechanisms.map((m, i) => (
+                                    {(sub.mechanisms || []).map((m, i) => (
                                       <span key={i} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.06)', color: '#00e68a' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>
                                     ))}
                                   </div>
@@ -6177,9 +4924,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
                 {(expandedCategories.calc_plan ?? true) && (<>
                   <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'40vh', overflowY:'auto', marginBottom:8 }}>
-                    {effectiveLevel.subs.map((id: string) => {
+                    {(effectiveLevel?.subs || []).map((id: string) => {
                       const sub = allSupport.find((s: any) => s.id === id);
-                      const d = effectiveLevel.dosages?.[id];
+                      const d = effectiveLevel?.dosages?.[id];
                       return sub ? (
                         <div key={id} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)', fontSize:9, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                           <span style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</span>
@@ -6204,9 +4951,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           <th style={{ padding:'3px 5px', textAlign:'left' }}>Примечание</th>
                         </tr></thead>
                         <tbody>
-                          {effectiveLevel.subs.map((id: string) => {
+                          {(effectiveLevel?.subs || []).map((id: string) => {
                             const sub = allSupport.find((s: any) => s.id === id);
-                            const d = effectiveLevel.dosages?.[id];
+                            const d = effectiveLevel?.dosages?.[id];
                             if (!sub || !d) return null;
                             return (
                               <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
@@ -6245,7 +4992,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                             <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Синергии</th>
                           </tr></thead>
                           <tbody>
-                            {effectiveLevel.subs.map((id: string) => {
+                            {(effectiveLevel?.subs || []).map((id: string) => {
                               const sub = allSupport.find((s: any) => s.id === id);
                               const subDb = catalogSubstances.find((s: any) => s.id === id);
                               if (!sub) return null;

@@ -85,7 +85,6 @@ export const IndividualPlanSettings: React.FC = () => {
   const [specialMeals, setSpecialMeals] = useState<{ type: string; typeLabel: string; date: string; notes: string }[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_special_meals') || '[]'); } catch { return []; }
   });
-  const [showPrefPopup, setShowPrefPopup] = useState(false);
   const [dietPrefs, setDietPrefs] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_diet_preferences') || '[]'); } catch { return []; }
   });
@@ -842,8 +841,9 @@ export const IndividualPlanSettings: React.FC = () => {
             ))}
           </div>
           {(() => {
-            const wMin = parseInt(wakeTime.split(':')[0]) * 60 + parseInt(wakeTime.split(':')[1]);
-            const bMin = parseInt(bedTime.split(':')[0]) * 60 + parseInt(bedTime.split(':')[1]);
+            const toMin = (t: string) => t?.includes(':') ? parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]) : 0;
+            const wMin = toMin(wakeTime);
+            const bMin = toMin(bedTime);
             const awakeH = Math.round((bMin - wMin) / 60);
             const recCount = awakeH >= 16 ? 5 : awakeH >= 14 ? 4 : 3;
             return <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginTop: 2, lineHeight: 1.5 }}>⏰ Бодрствование {awakeH} ч → рекомендуется {recCount} приёмов (каждые {Math.round(awakeH / recCount)} ч).<br />🍳 Завтрак около {wakeTime} · 🥗 Обед в {lunchTime} · 🍽 Ужин в {dinnerTime}</div>;
@@ -982,6 +982,42 @@ export const IndividualPlanSettings: React.FC = () => {
               ) : null;
             })}
             {excludedFoods.length === 0 && <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>Не выбраны</span>}
+          </div>
+          {dietPrefs.length > 0 && (
+            <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:4 }}>
+              {dietPrefs.map(p => (
+                <span key={p} style={{ fontSize:7, padding:'1px 5px', borderRadius:4, background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.15)', color:'#22c55e' }}>
+                  {({ no_dairy:'🚫 Без молочных', no_gluten:'🚫 Без глютена', vegetarian:'🌱 Вегетарианское', min_processed:'🔬 Минимум обработки', min_sugar:'🍬 Минимум сахара' } as Record<string,string>)[p] || p}
+                </span>
+              ))}
+              <span onClick={() => setShowExclFoodModal(true)} style={{ fontSize:7, padding:'1px 5px', borderRadius:4, cursor:'pointer', background:'rgba(34,197,94,0.04)', border:'1px dashed rgba(34,197,94,0.2)', color:'#22c55e' }}>+</span>
+            </div>
+          )}
+          <div style={{ marginTop:4 }}>
+            {[
+              { id:'no_dairy', label:'🚫 Без молочных' },
+              { id:'no_gluten', label:'🚫 Без глютена' },
+              { id:'vegetarian', label:'🌱 Вегетарианское' },
+              { id:'min_processed', label:'🔬 Минимум обраб.' },
+              { id:'min_sugar', label:'🍬 Минимум сахара' },
+            ].map(opt => {
+              const sel = dietPrefs.includes(opt.id);
+              return (
+                <span key={opt.id} onClick={() => {
+                  const upd = sel ? dietPrefs.filter(p => p !== opt.id) : [...dietPrefs, opt.id];
+                  setDietPrefs(upd);
+                  localStorage.setItem('he_diet_preferences', JSON.stringify(upd));
+                }} style={{
+                  display:'inline-flex', alignItems:'center', gap:3, marginRight:3, marginBottom:3,
+                  padding:'2px 6px', borderRadius:6, cursor:'pointer', fontSize:7,
+                  background: sel ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.03)',
+                  border: sel ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                  color: sel ? '#22c55e' : 'rgba(255,255,255,0.5)',
+                }}>
+                  {opt.label}
+                </span>
+              );
+            })}
           </div>
         </div>
         <div>
@@ -1885,7 +1921,24 @@ export const IndividualPlanSettings: React.FC = () => {
             </div>
             <div style={{ marginBottom:10 }}>
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:4 }}>Дата</div>
-              <input type="date" value={specialMealDate} onChange={e => setSpecialMealDate(e.target.value)} style={{ ...inputStyle, width:'100%', boxSizing:'border-box' }} />
+              <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
+                {DAY_LABELS.map((label, idx) => {
+                  const now = new Date(); const curr = now.getDay() - 1; const dayOff = (idx - curr + 7) % 7;
+                  const target = new Date(now); target.setDate(now.getDate() + dayOff);
+                  const dateStr = target.toISOString().split('T')[0];
+                  const sel = specialMealDate === dateStr;
+                  return (
+                    <button key={idx} onClick={() => setSpecialMealDate(dateStr)} style={{
+                      width:36, height:36, borderRadius:'50%', cursor:'pointer', fontSize:9, fontWeight:sel?800:500,
+                      background: sel ? 'rgba(249,115,22,0.2)' : 'rgba(255,255,255,0.03)',
+                      border: sel ? '2px solid #f97316' : '1px solid rgba(255,255,255,0.08)',
+                      color: sel ? '#f97316' : 'rgba(255,255,255,0.7)',
+                      transition:'all 0.15s',
+                    }}>{label}</button>
+                  );
+                })}
+              </div>
+              <div style={{ fontSize:8, color:'rgba(255,255,255,0.3)', textAlign:'center', marginTop:4 }}>{specialMealDate}</div>
             </div>
             <div style={{ marginBottom:12 }}>
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:4 }}>Заметки</div>
@@ -1902,58 +1955,6 @@ export const IndividualPlanSettings: React.FC = () => {
                 setShowSpecialMealPopup(false);
               }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#f97316,#fb923c)', color:'#fff', fontSize:10, fontWeight:700 }}>✓ Сохранить</button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* B3 — PreferencesPopup */}
-      <GlassCard title="🥗 Предпочтения" icon="🥗" color="#22c55e">
-        <button onClick={() => setShowPrefPopup(true)} style={{
-          width:'100%', padding:'8px', borderRadius:10, cursor:'pointer', fontSize:9, fontWeight:600,
-          background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,0.2)', color:'#22c55e',
-        }}>🥗 Настроить предпочтения</button>
-        {dietPrefs.length > 0 && (
-          <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginTop:6 }}>
-            {dietPrefs.map(p => (
-              <span key={p} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.15)', color:'#22c55e' }}>
-                {({ no_dairy:'🚫 Без молочных', no_gluten:'🚫 Без глютена', vegetarian:'🌱 Вегетарианское', min_processed:'🔬 Минимум обработки', min_sugar:'🍬 Минимум сахара' } as Record<string,string>)[p] || p}
-              </span>
-            ))}
-          </div>
-        )}
-      </GlassCard>
-      {showPrefPopup && (
-        <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
-          onClick={() => setShowPrefPopup(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(34,197,94,0.12)', boxShadow:'0 8px 40px rgba(0,0,0,0.4)' }}>
-            <div style={{ fontSize:15, fontWeight:700, color:'#22c55e', marginBottom:14, textAlign:'center' }}>🥗 Предпочтения питания</div>
-            {[
-              { id:'no_dairy', label:'🚫 Исключить молочные' },
-              { id:'no_gluten', label:'🚫 Исключить глютен' },
-              { id:'vegetarian', label:'🌱 Только вегетарианское' },
-              { id:'min_processed', label:'🔬 Минимум обработанной пищи' },
-              { id:'min_sugar', label:'🍬 Минимум сахара' },
-            ].map(opt => {
-              const sel = dietPrefs.includes(opt.id);
-              return (
-                <div key={opt.id} onClick={() => {
-                  const upd = sel ? dietPrefs.filter(p => p !== opt.id) : [...dietPrefs, opt.id];
-                  setDietPrefs(upd);
-                  localStorage.setItem('he_diet_preferences', JSON.stringify(upd));
-                }} style={{
-                  display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, cursor:'pointer', marginBottom:4,
-                  background: sel ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.02)',
-                  border: sel ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.05)',
-                }}>
-                  <div style={{ width:20, height:20, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center',
-                    background: sel ? '#22c55e' : 'rgba(255,255,255,0.06)', color: sel ? '#000' : 'rgba(255,255,255,0.3)',
-                    fontSize:10, fontWeight:800, transition:'all 0.15s',
-                  }}>{sel ? '✓' : ''}</div>
-                  <span style={{ fontSize:10, color: sel ? '#22c55e' : 'rgba(255,255,255,0.7)', fontWeight: sel ? 600 : 400 }}>{opt.label}</span>
-                </div>
-              );
-            })}
-            <button onClick={() => setShowPrefPopup(false)} style={{ width:'100%', marginTop:8, padding:'8px', borderRadius:8, border:'1px solid rgba(34,197,94,0.2)', background:'rgba(34,197,94,0.08)', color:'#22c55e', cursor:'pointer', fontSize:10, fontWeight:600 }}>✓ Готово ({dietPrefs.length})</button>
           </div>
         </div>
       )}

@@ -29,7 +29,7 @@ const PRIMARY_NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
 function DarkBg() {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 70% 50%, rgba(200,245,96,0.03) 0%, transparent 60%)' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 70% 50%, rgba(0,230,138,0.04) 0%, transparent 60%)' }} />
     </div>
   );
 }

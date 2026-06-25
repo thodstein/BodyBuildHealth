@@ -346,6 +346,7 @@ export function getQualifyingTotal(fed: string, weightClass: number): number {
   const event = COMPETITION_CALENDAR.find(e => e.fed.toLowerCase().includes(fed.toLowerCase()));
   if (!event) return 0;
   const weights = Object.keys(event.qualifyingTotal).map(Number);
+  if (weights.length === 0) return 0;
   const closest = weights.reduce((prev, curr) => Math.abs(curr - weightClass) < Math.abs(prev - weightClass) ? curr : prev);
   return event.qualifyingTotal[String(closest)] || 0;
 }

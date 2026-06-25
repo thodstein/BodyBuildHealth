@@ -37,6 +37,7 @@ function daysToClear(halfLifeHours: number): number {
 export function generatePCTPlan(course: CourseEntry[], lastCourseWeek: number): PCTSchedule {
   const warnings: string[] = [];
   const activeDrugs = course.filter(c => c.endWeek >= lastCourseWeek);
+  if (activeDrugs.length === 0) return { startDate: new Date().toISOString().slice(0, 10), taperWeeks: [], pctStartWeek: course.length + 4, pctProtocol: [], supportStack: [], warnings: ['Нет активных препаратов для ПКТ'] };
   const maxClearanceDays = Math.max(...activeDrugs.map(d => daysToClear(getHalfLifeHours(d.substanceId))));
   const pctStartOffset = Math.ceil(maxClearanceDays / 7);
   const pctStartWeek = lastCourseWeek + pctStartOffset;

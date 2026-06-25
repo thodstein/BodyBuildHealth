@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useRef } from 'react';
 
-const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 10, margin: '6px 0' };
+const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 10, margin: '6px 0' };
 const H: React.CSSProperties = { color: '#fff', fontSize: 13, fontWeight: 600, margin: '0 0 4px' };
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 11, lineHeight: 1.4 };
 const ACCENT = '#00e68a';

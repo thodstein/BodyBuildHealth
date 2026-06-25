@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { type BioStackProfile, type GoalType } from '../../engines/biostack-ai.engine';
 import { buildStack, explainStack, type StackExplanation } from '../../engines/supplement-finder.engine';
-import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS } from '../../data/support-database';
+import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS, ALL_STACKS, type SupportStack, getStackSubstanceLabel } from '../../data/support-database';
 import { GlassCard, PillBtn, StatBox, inputS, selectS, ORGANS, SYSTEMS, GOALS, LAB_MARKERS, GROUP_LABELS, toFinderProfile } from './BioStackAIConstants';
 import { STACK_TEMPLATES, type BioStackTemplate } from '../../engines/biostack-templates';
 
@@ -28,6 +28,33 @@ function estCost(id: string): number {
   return tm[c.tier as string] || 500;
 }
 
+const SYSTEM_FILTER_MAP: Record<string, string[]> = {
+  hepatic: ['гепато', 'печен'],
+  cardio: ['сердечно', 'сосудист'],
+  renal: ['почеч'],
+  neuro: ['нервн', 'нейро'],
+  endocrine: ['эндокрин'],
+  immune: ['иммун'],
+  gi: ['желудочно', 'кишеч'],
+  reproductive: ['репродуктив'],
+  metabolic: ['метабол'],
+  adaptogenic: ['адаптоген'],
+};
+
+const FILTER_ITEMS = [
+  { key: 'all', label: '🏠 Все' },
+  { key: 'hepatic', label: '🫁 Печень' },
+  { key: 'cardio', label: '❤️ ССС' },
+  { key: 'renal', label: '🫘 Почки' },
+  { key: 'neuro', label: '🧠 Нервная' },
+  { key: 'endocrine', label: '⚖️ Эндокринная' },
+  { key: 'immune', label: '🛡️ Иммунитет' },
+  { key: 'gi', label: '🫃 ЖКТ' },
+  { key: 'reproductive', label: '🧬 Репродукт.' },
+  { key: 'metabolic', label: '⚡ Метаболизм' },
+  { key: 'adaptogenic', label: '🌿 Адаптогены' },
+];
+
 export function BuildTab({ profile, stackIds, setStackIds }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void }) {
   const [goals, setGoals] = useState<GoalType[]>(profile.goals);
   const [selOrgans, setSelOrgans] = useState<string[]>([]);
@@ -36,6 +63,17 @@ export function BuildTab({ profile, stackIds, setStackIds }: { profile: BioStack
   const [lmState, setLmState] = useState<LMState>({});
   const [result, setResult] = useState<{ stack: string[]; explanation: StackExplanation } | null>(null);
   const [avoidConflicts, setAvoidConflicts] = useState(true);
+  const [libFilter, setLibFilter] = useState<string>('all');
+  const [libExpanded, setLibExpanded] = useState<Record<string, boolean>>({});
+
+  const filteredLib = useMemo(() => {
+    if (libFilter === 'all') return ALL_STACKS;
+    const terms = SYSTEM_FILTER_MAP[libFilter] || [libFilter];
+    return ALL_STACKS.filter(s => {
+      const sys = (s.system || '').toLowerCase();
+      return terms.some(t => sys.includes(t));
+    });
+  }, [libFilter]);
 
   const handleBuild = useCallback(() => {
     const queryOrgans = [...selOrgans];
@@ -107,6 +145,115 @@ export function BuildTab({ profile, stackIds, setStackIds }: { profile: BioStack
           ))}
         </div>
         <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>Нажмите шаблон — препараты загрузятся в стек</div>
+      </GlassCard>
+
+      <GlassCard title={`📚 Библиотека готовых стеков (${ALL_STACKS.length})`} icon="📚" color="#8b5cf6">
+        <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginBottom: 8 }}>
+          {FILTER_ITEMS.map(f => (
+            <button key={f.key} onClick={() => setLibFilter(f.key)}
+              style={{
+                padding: '3px 8px', borderRadius: 10, fontSize: 7, fontWeight: 600, cursor: 'pointer',
+                whiteSpace: 'nowrap', transition: 'all 0.15s',
+                background: libFilter === f.key ? 'rgba(139,92,246,0.15)' : '#202023',
+                border: libFilter === f.key ? '1px solid rgba(139,92,246,0.35)' : '1px solid rgba(255,255,255,0.04)',
+                color: libFilter === f.key ? '#c4b5fd' : 'rgba(255,255,255,0.5)',
+              }}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        {filteredLib.length === 0 ? (
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '12px 0' }}>
+            Нет стеков по выбранной категории
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {filteredLib.map(stk => {
+              const expanded = libExpanded[stk.id] || false;
+              return (
+                <div key={stk.id} style={{ borderRadius: 12, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)', overflow: 'hidden' }}>
+                  <div style={{ padding: '8px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6' }}>{stk.name}</span>
+                        <span style={{ padding: '1px 6px', borderRadius: 8, background: 'rgba(0,230,138,0.1)', color: '#00e68a', fontSize: 7, fontWeight: 600 }}>⭐ {stk.synergyScore}</span>
+                        <span style={{ padding: '1px 6px', borderRadius: 8, background: 'rgba(96,165,250,0.1)', color: '#60a5fa', fontSize: 7, fontWeight: 600 }}>🧪 {stk.substances.length}</span>
+                      </div>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>{stk.system}</div>
+                    </div>
+                  </div>
+                  <div style={{ padding: '0 10px' }}>
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', lineHeight: 1.3, marginBottom: 4 }}>
+                      <span style={{ color: 'rgba(255,255,255,0.25)' }}>Проблема: </span>{stk.problem}
+                    </div>
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', lineHeight: 1.3, marginBottom: 4 }}>
+                      {stk.description.length > 120 ? (expanded ? stk.description : stk.description.slice(0, 120) + '…') : stk.description}
+                      {stk.description.length > 120 && (
+                        <button onClick={() => setLibExpanded(prev => ({...prev, [stk.id]: !expanded}))}
+                          style={{ background: 'none', border: 'none', color: '#8b5cf6', fontSize: 7, cursor: 'pointer', padding: 0, marginLeft: 2 }}>
+                          {expanded ? 'свернуть' : 'ещё'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ padding: '0 10px 8px', display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                    {stk.substances.slice(0, 6).map(s => (
+                      <span key={s.id} style={{ padding: '1px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 7 }}>
+                        {getStackSubstanceLabel(s.id)}
+                      </span>
+                    ))}
+                    {stk.substances.length > 6 && (
+                      <span style={{ padding: '1px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.35)', fontSize: 7 }}>
+                        +{stk.substances.length - 6}
+                      </span>
+                    )}
+                  </div>
+                  {expanded && (
+                    <div style={{ padding: '0 10px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>
+                        <span style={{ color: '#8b5cf6' }}>🧬 Синергия: </span>{stk.synergyPrinciple}
+                      </div>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>
+                        <span style={{ color: '#8b5cf6' }}>⏰ Приём: </span>{stk.timingSummary}
+                      </div>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>
+                        <span style={{ color: '#8b5cf6' }}>🔬 Контроль: </span>{stk.monitoring}
+                      </div>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>
+                        <span style={{ color: '#8b5cf6' }}>🫀 Системы: </span>{stk.anatomicalMapping.organSystems.join(', ')}
+                      </div>
+                      {stk.contraindications && (
+                        <div style={{ fontSize: 7, color: '#ef4444', lineHeight: 1.3 }}>⛔ {stk.contraindications}</div>
+                      )}
+                      {stk.warnings && (
+                        <div style={{ fontSize: 7, color: '#f59e0b', lineHeight: 1.3 }}>⚠ {stk.warnings}</div>
+                      )}
+                      {stk.specialInstructions && (
+                        <div style={{ fontSize: 7, color: '#60a5fa', lineHeight: 1.3 }}>💡 {stk.specialInstructions}</div>
+                      )}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 4, padding: '6px 10px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
+                    <button onClick={() => setStackIds(stk.substances.map(s => s.id))}
+                      style={{
+                        flex: 1, padding: '5px 0', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+                        background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a',
+                      }}>
+                      📥 Загрузить
+                    </button>
+                    <button onClick={() => setLibExpanded(prev => ({...prev, [stk.id]: !expanded}))}
+                      style={{
+                        padding: '5px 10px', borderRadius: 8, fontSize: 8, fontWeight: 600, cursor: 'pointer',
+                        background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
+                      }}>
+                      📋 {expanded ? 'Скрыть' : 'Подробнее'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </GlassCard>
 
       <GlassCard title="🎯 Цели" icon="🎯" color="#f59e0b">

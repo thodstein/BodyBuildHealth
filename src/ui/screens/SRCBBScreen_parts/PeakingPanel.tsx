@@ -7,7 +7,7 @@ import React, { useMemo, useState } from 'react';
 import { generatePLPeaking, generateBBPeaking, type PLPeakingOutput, type BBPeakingOutput } from '../../../engines/peaking-engine';
 import { generateAttemptStrategy } from '../../../engines/gym-competition.engine';
 
-const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 12, margin: '6px 0' };
+const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
 const BTN: React.CSSProperties = { background: ACCENT, color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 14, minHeight: 44 };
 const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: ACCENT, border: `1px solid ${ACCENT}` };

@@ -56,8 +56,8 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   const profileGoal = linked.profile?.settings?.primaryGoal || linked.profile?.settings?.goal;
   const profileWeight = linked.profile?.settings?.weight || 80;
   const profileWorkouts = linked.profile?.settings?.workoutsPerWeek || 0;
-  const courseEntries = linked.course?.entries ? Array.from(linked.course.entries as any) : [];
-  const profileAAS = courseEntries.some((e: any) => e.type === 'ААС' || e.class === 'aas');
+  const courseEntries = linked.course ?? [];
+  const profileAAS = Array.isArray(courseEntries) && courseEntries.some((e: any) => e.type === 'ААС' || e.class === 'aas');
 
   const [plannerTab, setPlannerTab] = useState<PlannerTab>('catalog');
   const [enableA, setEnableA] = useState(true);

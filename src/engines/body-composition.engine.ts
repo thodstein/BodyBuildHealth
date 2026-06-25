@@ -160,8 +160,9 @@ export function computeStats(
     ? (recent30[recent30.length - 1].weightKg - recent30[0].weightKg) / recent30.length * 30
     : 0;
 
-  const avg7Day = recent7.reduce((s, e) => s + e.weightKg, 0) / recent7.length;
+  const avg7Day = recent7.length > 0 ? recent7.reduce((s, e) => s + e.weightKg, 0) / recent7.length : 0;
   const weights = sorted.map(e => e.weightKg);
+  if (weights.length === 0) return null;
   const minWeight = Math.min(...weights);
   const maxWeight = Math.max(...weights);
 

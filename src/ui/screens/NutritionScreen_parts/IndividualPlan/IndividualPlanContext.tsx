@@ -345,7 +345,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [dinnerTime, setDinnerTime] = useState('19:00');
   const [workFood, setWorkFood] = useState<'any' | 'portable'>('any');
   const [mealsCount, setMealsCount] = useState(4);
-  useEffect(() => { const wMin = parseInt(wakeTime.split(':')[0]) * 60 + parseInt(wakeTime.split(':')[1]); const bMin = parseInt(bedTime.split(':')[0]) * 60 + parseInt(bedTime.split(':')[1]); const awakeHours = (bMin - wMin) / 60; if (awakeHours >= 16) setMealsCount(5); else if (awakeHours >= 14) setMealsCount(4); else setMealsCount(3); }, [wakeTime, bedTime]);
+  useEffect(() => { if (!wakeTime?.includes(':') || !bedTime?.includes(':')) return; const wMin = parseInt(wakeTime.split(':')[0]) * 60 + parseInt(wakeTime.split(':')[1]); const bMin = parseInt(bedTime.split(':')[0]) * 60 + parseInt(bedTime.split(':')[1]); const awakeHours = (bMin - wMin) / 60; if (awakeHours >= 16) setMealsCount(5); else if (awakeHours >= 14) setMealsCount(4); else setMealsCount(3); }, [wakeTime, bedTime]);
 
   const [allergens, setAllergens] = useState<string[]>(() => { try { const local = JSON.parse(localStorage.getItem('he_food_allergens') || 'null'); if (local && Array.isArray(local) && local.length > 0) return local; } catch {} try { return getContraindications().foodAllergies || []; } catch { return []; } });
   const [healthIssues, setHealthIssues] = useState<string[]>(() => { try { const local = JSON.parse(localStorage.getItem('he_health_issues') || 'null'); if (local && Array.isArray(local) && local.length > 0) return local; } catch {} try { return getContraindications().chronicConditions || []; } catch { return []; } });
@@ -499,11 +499,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const seedRand = (seed: number) => { const x = Math.sin(seed) * 10000; return x - Math.floor(x); };
     const buildDay = (dayOffset: number, isTrainingDay: boolean) => {
       const mealTimes: { time: string; label: string; pct: number }[] = [];
-      const wakeMin = parseInt(wakeTime.split(':')[0]) * 60 + parseInt(wakeTime.split(':')[1]);
-      const lunchMin = parseInt(lunchTime.split(':')[0]) * 60 + parseInt(lunchTime.split(':')[1]);
-      const dinnerMin = parseInt(dinnerTime.split(':')[0]) * 60 + parseInt(dinnerTime.split(':')[1]);
-      const bedMin = parseInt(bedTime.split(':')[0]) * 60 + parseInt(bedTime.split(':')[1]);
-      const trainMin = linkToTraining && isTrainingDay ? parseInt(trainStart.split(':')[0]) * 60 + parseInt(trainStart.split(':')[1]) : 0;
+      const toMin = (t: string) => t?.includes(':') ? parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]) : 0;
+      const wakeMin = toMin(wakeTime);
+      const lunchMin = toMin(lunchTime);
+      const dinnerMin = toMin(dinnerTime);
+      const bedMin = toMin(bedTime);
+      const trainMin = linkToTraining && isTrainingDay ? toMin(trainStart) : 0;
 
       // Work schedule: determine if work day + shift anchors
       let isWorkDay = false;
@@ -524,8 +525,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           const pos = ((dayOffset % cycleLen) + cycleLen) % cycleLen;
           isWorkDay = pos < workLen;
         }
-        workStartMin = parseInt(workStartTime.split(':')[0]) * 60 + parseInt(workStartTime.split(':')[1]);
-        workEndMin = parseInt(workEndTime.split(':')[0]) * 60 + parseInt(workEndTime.split(':')[1]);
+        workStartMin = toMin(workStartTime);
+        workEndMin = toMin(workEndTime);
       }
       const isNightShift = workScheduleEnabled && isWorkDay && (workEndMin < workStartMin);
       const effectiveWake = isNightShift ? Math.max(workStartMin - 300, 600) : wakeMin;
@@ -550,7 +551,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         return { ...m, time: t, fixed: false };
       });
       anchored.forEach((m, i) => { const mMin = Math.max(effectiveWake + 15, Math.min(effectiveBed - 15, m.time)); const hh = Math.floor(mMin / 60); const mm = mMin % 60; mealTimes.push({ time: `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`, label: m.label, pct: [0.2,0.2,0.3,0.15,0.1,0.05][i] || 0.15 }); });
-      if (linkToTraining && isTrainingDay) { const trainH = parseInt(trainStart.split(':')[0]); const preTime = `${String(trainH-2).padStart(2,'0')}:00`; const postTime = `${String(trainH+1).padStart(2,'0')}:30`; const hasNearby = (t: string) => mealTimes.some(mt => { const mtMin = parseInt(mt.time.split(':')[0])*60 + parseInt(mt.time.split(':')[1]); const tMin = parseInt(t.split(':')[0])*60 + parseInt(t.split(':')[1]); return Math.abs(mtMin - tMin) <= 45; }); if (!hasNearby(preTime)) mealTimes.push({ time: preTime, label: 'Предтрен', pct: 0.1 }); if (!hasNearby(postTime)) mealTimes.push({ time: postTime, label: 'Пост-трен', pct: 0.15 }); mealTimes.sort((a, b) => { const aMin = parseInt(a.time.split(':')[0])*60 + parseInt(a.time.split(':')[1]); const bMin = parseInt(b.time.split(':')[0])*60 + parseInt(b.time.split(':')[1]); return aMin - bMin; }); }
+      if (linkToTraining && isTrainingDay && trainStart?.includes(':')) { const trainH = parseInt(trainStart.split(':')[0]); const preTime = `${String(trainH-2).padStart(2,'0')}:00`; const postTime = `${String(trainH+1).padStart(2,'0')}:30`; const hasNearby = (t: string) => mealTimes.some(mt => { const mtMin = toMin(mt.time); const tMin = toMin(t); return Math.abs(mtMin - tMin) <= 45; }); if (!hasNearby(preTime)) mealTimes.push({ time: preTime, label: 'Предтрен', pct: 0.1 }); if (!hasNearby(postTime)) mealTimes.push({ time: postTime, label: 'Пост-трен', pct: 0.15 }); mealTimes.sort((a, b) => { const aMin = toMin(a.time); const bMin = toMin(b.time); return aMin - bMin; }); }
       const tKcal = Math.round(weight * 30 * (nutrMult || 1) * (pMod || 1)); const tP = Math.round(weight * 2 * (pMod || 1)); const tF = Math.round(weight * 0.8 * (fMod || 1)); const tC = Math.round(weight * 3.5 * (cMod || 1));
       let tKcalAdj = tKcal; let tCAdj = tC;
       if (cyclingMode === 'macro' && !isTrainingDay) { tKcalAdj = Math.round(tKcal * 0.85); tCAdj = Math.round(tC * 0.7); }

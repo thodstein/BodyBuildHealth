@@ -36,6 +36,7 @@ function tfidf(query: string, db: QAPair[]): { q: string; a: string; score: numb
 
   return db.map((item, i) => {
     const docTokens = corpus[i];
+    if (!docTokens || docTokens.length === 0) return { q: item.q, a: item.a, score: 0 };
     const score = qTokens.reduce((s, t) => {
       const tf = docTokens.filter(x => x === t).length / docTokens.length;
       return s + (tf * (idf[t] || 0));

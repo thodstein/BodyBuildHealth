@@ -254,7 +254,7 @@ export const IndividualPlanResults: React.FC = () => {
                       <div key={mi} style={{ padding: '2px 0', display: 'flex', gap: 4 }}>
                         <span style={{ color: '#00e68a', fontWeight: 600, minWidth: 50 }}>{m.time}</span>
                         <span style={{ color: '#00e68a', minWidth: 55 }}>{m.label}</span>
-                        <span style={{ flex: 1 }}>{m.items.map((it: any) => it.name).join(', ')}</span>
+                        <span style={{ flex: 1 }}>{m.items?.map((it: any) => it.name)?.join(', ') || ''}</span>
                         <span style={{ color: 'rgba(255,255,255,0.85)', whiteSpace: 'nowrap' }}>{Math.round(m.totals?.kcal || 0)} ккал</span>
                       </div>
                     ))}
@@ -294,7 +294,7 @@ export const IndividualPlanResults: React.FC = () => {
                         return (
                           <td key={di} style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: 6, verticalAlign: 'top' }}>
                             <div style={{ color: '#00e68a', fontWeight: 700, fontSize: 7, marginBottom: 2 }}>{kcal} ккал</div>
-                            {meal.items.slice(0, 2).map((it: any, ii: number) => (
+                            {(meal.items || []).slice(0, 2).map((it: any, ii: number) => (
                               <div key={ii} style={{ color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, fontSize: 6 }}>{it.name} {it.amount}г</div>
                             ))}
                             {meal.items.length > 2 && <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 5 }}>+{meal.items.length - 2} ещё</div>}
@@ -330,7 +330,7 @@ export const IndividualPlanResults: React.FC = () => {
                     <div style={{ height: '100%', width: `${w}%`, background: 'linear-gradient(90deg, #06b6d4, #00e68a)', borderRadius: 2 }} />
                   </div>
                   <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginTop: 2, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {m.items.map((it: any, ii: number) => (
+                    {(m.items || []).map((it: any, ii: number) => (
                       <span key={ii} style={{ background: '#202023', padding: '1px 5px', borderRadius: 4 }}>{it.name} {it.amount}г</span>
                     ))}
                   </div>
@@ -357,7 +357,7 @@ export const IndividualPlanResults: React.FC = () => {
                   onMouseLeave={e => (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'}>
                   <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{r.name}</div>
                   <div style={{ color:'rgba(255,255,255,0.85)', marginBottom:4 }}>⏱{r.prepTimeMin}мин · {r.kcal}ккал · Б{r.protein}/Ж{r.fat}/У{r.carbs}</div>
-                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', display:'flex', gap:2, flexWrap:'wrap' }}>{r.tags.map(t => <span key={t} style={{ padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.08)', color:'rgba(167,139,250,0.5)' }}>{t}</span>)}</div>
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', display:'flex', gap:2, flexWrap:'wrap' }}>{(r.tags || []).map(t => <span key={t} style={{ padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.08)', color:'rgba(167,139,250,0.5)' }}>{t}</span>)}</div>
                 </button>
               ))}
             </div>
@@ -1020,7 +1020,26 @@ export const IndividualPlanResults: React.FC = () => {
         </GlassCard>
       )}
 
-      {specialMealMode && (
+      {specialMealMode && (() => {
+        const p = specialMealProteinG; const f = specialMealFatG; const c = specialMealCarbsG;
+        const kcal = p * 4 + f * 9 + c * 4;
+        const suggestFoods = (): { id: string; name: string; amount: string }[] => {
+          const picks: { id: string; g: number }[] = [];
+          if (p > 20) picks.push({ id: 'chicken_breast', g: Math.round(p / 31 * 100) });
+          else picks.push({ id: 'egg_whole', g: Math.round(p / 13 * 60) });
+          if (f > 10) picks.push({ id: 'salmon', g: Math.round(f / 13 * 100) });
+          if (c > 30) picks.push({ id: 'rice_white', g: Math.round(c / 28 * 100) });
+          else if (c > 10) picks.push({ id: 'buckwheat', g: Math.round(c / 30 * 100) });
+          if (specialMealGoal === 'pre_workout' || specialMealGoal === 'post_workout') picks.push({ id: 'whey', g: 30 });
+          if (specialMealGoal === 'before_bed') picks.push({ id: 'cottage_cheese', g: Math.round(p / 18 * 100) });
+          if (specialMealGoal === 'keto' && f > 20) picks.push({ id: 'avocado', g: Math.round(f / 15 * 100) });
+          return picks.map(pk => {
+            const food = FOOD_DB.find(x => x.id === pk.id);
+            return { id: pk.id, name: food?.name || pk.id, amount: pk.g + 'г' };
+          });
+        };
+        const suggested = suggestFoods();
+        return (
         <div style={{ borderRadius: 12, padding: 12, background: 'rgba(249,115,22,0.04)', border: '1px solid rgba(249,115,22,0.15)', marginTop: 4 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: '#f97316' }}>🍽️ Спецприём{specialMealReplaceMode ? ` (замена: ${specialMealReplaceTarget})` : ' (дополнительно)'}</span>
@@ -1035,26 +1054,38 @@ export const IndividualPlanResults: React.FC = () => {
              specialMealGoal === 'low_cal_day' ? '📉 Низкокалорийный приём' : '⚙️ Свой приём'}
             · {specialMealTiming === 'breakfast' ? '🌅 Завтрак' : specialMealTiming === 'lunch' ? '☀️ Обед' : specialMealTiming === 'dinner' ? '🌆 Ужин' : specialMealTiming === 'snack' ? '🍪 Перекус' : '🌙 Перед сном'}
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
             <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', textAlign: 'center' }}>
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>🥩 Белок</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#22c55e' }}>{specialMealProteinG}г</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#22c55e' }}>{p}г</div>
             </div>
             <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', textAlign: 'center' }}>
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>🧈 Жиры</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b' }}>{specialMealFatG}г</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b' }}>{f}г</div>
             </div>
             <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', textAlign: 'center' }}>
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>🍚 Углеводы</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#3b82f6' }}>{specialMealCarbsG}г</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#3b82f6' }}>{c}г</div>
             </div>
             <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(249,115,22,0.06)', textAlign: 'center' }}>
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>🔥 Ккал</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#f97316' }}>{specialMealProteinG * 4 + specialMealFatG * 9 + specialMealCarbsG * 4}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#f97316' }}>{kcal}</div>
             </div>
           </div>
+          {suggested.length > 0 && (
+            <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(249,115,22,0.04)', border: '1px solid rgba(249,115,22,0.1)' }}>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>🍽️ Рекомендуемые продукты:</div>
+              {suggested.map(s => (
+                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'rgba(255,255,255,0.7)', padding: '2px 0' }}>
+                  <span>{s.name}</span>
+                  <span style={{ color: '#f97316', fontWeight: 600 }}>{s.amount}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+        );
+      })()}
 
       {butchPlan && (
         <GlassCard title="БУЧ (белково-углеводное чередование)" icon="⤴️⤵️" color="#3b82f6" style={{ border: '1px solid rgba(59,130,246,0.15)' }}>

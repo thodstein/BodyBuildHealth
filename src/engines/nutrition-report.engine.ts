@@ -292,7 +292,7 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
     for (let i = 0; i < meals.length - 1; i++) {
       const t1 = meals[i].time || '';
       const t2 = meals[i + 1].time || '';
-      if (t1 && t2) {
+      if (t1 && t2 && t1.includes(':') && t2.includes(':')) {
         const h1 = parseInt(t1.split(':')[0]) + parseInt(t1.split(':')[1]) / 60;
         const h2 = parseInt(t2.split(':')[0]) + parseInt(t2.split(':')[1]) / 60;
         if (h2 > h1) {
@@ -418,6 +418,7 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
   const timingGaps: string[] = [];
   let longestGap = 0;
   for (let i = 0; i < mealTimes.length - 1; i++) {
+    if (!mealTimes[i].includes(':') || !mealTimes[i + 1].includes(':')) continue;
     const h1 = parseInt(mealTimes[i].split(':')[0]) + parseInt(mealTimes[i].split(':')[1]) / 60;
     const h2 = parseInt(mealTimes[i + 1].split(':')[0]) + parseInt(mealTimes[i + 1].split(':')[1]) / 60;
     const gap = h2 - h1;

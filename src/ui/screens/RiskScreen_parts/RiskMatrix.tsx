@@ -131,7 +131,7 @@ export const RiskMatrix: React.FC<{
           <div>
             {Object.entries(systemGroups).sort(([a], [b]) => a.localeCompare(b)).map(([sysKey, sysRows]) => {
               const sysInfo = SYSTEM_INFO[sysKey];
-              const avgNet = sysRows.reduce((s, r) => s + r.net, 0) / sysRows.length;
+              const avgNet = sysRows.length > 0 ? sysRows.reduce((s, r) => s + r.net, 0) / sysRows.length : 0;
 
               return (
                 <div key={sysKey} style={{ marginBottom: 12, background: 'var(--bg-secondary)', padding: 10, borderRadius: 8 }}>
@@ -145,7 +145,7 @@ export const RiskMatrix: React.FC<{
 
                   {sysRows.map((row) => {
                     const sysKey = row.systemKey;
-                    const mechNum = parseInt(row.mechanismKey.split('_')[1], 10);
+                    const mechNum = row.mechanismKey?.includes('_') ? parseInt(row.mechanismKey.split('_')[1], 10) : 0;
                     const specificMechs = SYSTEM_MECHANISMS[sysKey] || [];
                     const specMech = specificMechs.find(m => m.num === mechNum);
                     return (

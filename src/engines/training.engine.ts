@@ -208,6 +208,7 @@ export function calcTraining(i: TrainingInput): TrainingOutput {
   Object.entries(volMap).forEach(([k, v]) => { roundedVol[k] = Math.round(v); });
 
   const weeklyProgression = generateWeeklyPlan(i, 6);
+  if (weeklyProgression.length === 0) return { splitName: '', splitDesc: '', volumePerGroup: {}, rir: '2', isDeload: false, deloadReason: '', weekPlan: 'Нет плана', plan: [], weeklyVolume: 0, estimatedProgress: 0, periodizationType: '', progressionModel: '' };
   
   const weekNum = 1;
   const PHASE_NAMES_RU: Record<string, string> = { base: 'База', build: 'Накопление', peak: 'Пик', deload: 'Разгрузка' };

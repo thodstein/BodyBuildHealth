@@ -142,7 +142,7 @@ export class StrengthDiary {
       else current.isolation++;
       
       // Max 1RM for week
-      const week1RM = Math.max(...log.sets.map(s => this.estimate1RM(s.weight, s.reps)));
+      const week1RM = Math.max(...(log?.sets || []).map(s => this.estimate1RM(s.weight, s.reps)), 0);
       current.oneRm = Math.max(current.oneRm, week1RM);
       
       weekMap.set(week, current);
@@ -263,7 +263,7 @@ export class StrengthDiary {
       .map((l: StrengthLogEntry) => ({
         date: l.date,
         volume: l.totalVolume,
-        oneRm: Math.max(...l.sets.map((s: { weight: number; reps: number }) => this.estimate1RM(s.weight, s.reps)))
+        oneRm: Math.max(...(l?.sets || []).map((s: { weight: number; reps: number }) => this.estimate1RM(s.weight, s.reps)), 0)
       }))
       .sort((a, b) => b.date.localeCompare(a.date));
 

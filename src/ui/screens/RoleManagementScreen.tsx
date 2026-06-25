@@ -355,7 +355,7 @@ export const RoleManagementScreen: React.FC = () => {
                   <td><span className={`role-badge ${role}`}>{ROLE_LABELS[role]}</span></td>
                   <td>
                     <ul>
-                      {PERMISSIONS[role].map(p => (
+                      {(PERMISSIONS[role] || []).map(p => (
                         <li key={p}>{p}</li>
                       ))}
                     </ul>

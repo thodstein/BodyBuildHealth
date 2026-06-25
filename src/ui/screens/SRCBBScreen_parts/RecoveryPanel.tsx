@@ -6,7 +6,7 @@ import React, { useMemo, useState } from 'react';
 import { analyzeRecovery, shouldTrain, type RecoveryOutput } from '../../../engines/recovery-optimization.engine';
 import { getMobilityFlows, getAllCorrectives } from '../../../engines/federation-grip-mobility.engine';
 
-const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 12, margin: '6px 0' };
+const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
 const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const };
 const SEL: React.CSSProperties = { ...IN, minHeight: 40 };

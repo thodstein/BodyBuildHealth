@@ -141,6 +141,7 @@ export function predictStrength(input: PredictionInput): StrengthPrediction[] {
 
 export function predictFatigue(input: PredictionInput): FatiguePrediction {
   const recentFatigue = input.fatigueHistory.slice(-input.trendWeeks);
+  if (recentFatigue.length === 0) return { nextWeekFatigue: 0, nextMonthFatigue: 0, overtrainingRisk: 0, deloadRecommended: false };
   const avgFatigue = recentFatigue.reduce((s, v) => s + v, 0) / recentFatigue.length;
   const fatigueTrend = recentFatigue.length >= 2
     ? (recentFatigue[recentFatigue.length - 1] - recentFatigue[0]) / recentFatigue.length

@@ -10,7 +10,7 @@ import { autoRegulate } from '../../../engines/pro/autoregulation-pro.engine';
 import { listSchemes, generateProgression } from '../../../engines/pro/progression-pro.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 
-const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 12, margin: '6px 0' };
+const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
 const H: React.CSSProperties = { color: '#fff', fontSize: 14, fontWeight: 600, margin: '4px 0 6px' };
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 1.4 };

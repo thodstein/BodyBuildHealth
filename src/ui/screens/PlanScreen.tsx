@@ -208,7 +208,7 @@ function buildDayPlan(result: TrainingOutput, daysPerWeek: number, weakPoints: s
 
       for (const ex of picked) {
 
-        const setsForEx = picked.length === 1 ? sets : Math.max(2, Math.round(sets / picked.length));
+        const setsForEx = picked.length === 1 ? sets : Math.max(2, Math.round(picked.length > 0 ? sets / picked.length : 0));
 
         const rirStr = result.rir;
 

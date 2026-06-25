@@ -11,10 +11,10 @@
   --border: #2A2A2A;
   --border-light: #333333;
   --border-bright: #444444;
-  --accent: #C8F560;
-  --accent-dim: rgba(200,245,96,0.12);
-  --accent-glow: rgba(200,245,96,0.35);
-  --accent-gradient: linear-gradient(135deg, #C8F560, #A8E040);
+  --accent: #00e68a;
+  --accent-dim: rgba(0,230,138,0.12);
+  --accent-glow: rgba(0,230,138,0.35);
+  --accent-gradient: linear-gradient(135deg, #00e68a, #00b864);
   --danger: #FF4757;
   --danger-dim: rgba(255,71,87,0.12);
   --danger-gradient: linear-gradient(135deg, #FF4757, #FF3742);
@@ -34,17 +34,17 @@
   --accent-yellow: #FFA502;
   --accent-green: #2ED573;
   --font-main: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
-  --radius: 16px;
-  --radius-sm: 12px;
-  --radius-lg: 24px;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-lg: 22px;
   --shadow: 0 4px 24px rgba(0,0,0,0.3);
   --shadow-lg: 0 8px 40px rgba(0,0,0,0.5);
   --shadow-inner: inset 0 2px 4px rgba(0,0,0,0.3);
   --transition-fast: 0.15s ease;
   --transition-medium: 0.25s ease;
   --transition-slow: 0.4s ease;
-  --glass-bg: rgba(255,255,255,0.06);
-  --glass-border: rgba(255,255,255,0.1);
+  --glass-bg: rgba(24,24,27,0.12);
+  --glass-border: rgba(255,255,255,0.06);
   --glass-shadow: 0 8px 32px rgba(0,0,0,0.4);
   --organ-3d-size: 200px;
   --organ-3d-bg: rgba(0,0,0,0.2);
@@ -158,13 +158,30 @@ main.has-sub-nav {
 
 /* === CARDS === */
 .card {
-  background:var(--bg-secondary);
-  border:1px solid var(--border);
+  background:var(--glass-bg);
+  border:1px solid var(--glass-border);
   border-radius:var(--radius);
   padding:16px;
   margin:10px 0;
   transition:all .2s ease;
   box-shadow:var(--shadow);
+  -webkit-backdrop-filter:blur(16px);
+  backdrop-filter:blur(16px);
+}
+@supports not ((-webkit-backdrop-filter:blur(16px)) or (backdrop-filter:blur(16px))) {
+  .card { background:var(--bg-secondary); }
+}
+.glass-card {
+  background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:var(--radius);
+  -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px);
+  transition:all .2s ease;
+}
+.glass-card-sm { border-radius:var(--radius-sm); padding:10px 12px; }
+.glass-card-md { border-radius:var(--radius); padding:14px; }
+@supports not ((-webkit-backdrop-filter:blur(16px)) or (backdrop-filter:blur(16px))) {
+  .glass-card { background:var(--bg-secondary); }
+  .glass-card-sm { background:var(--bg-secondary); }
+  .glass-card-md { background:var(--bg-secondary); }
 }
 .card:hover {
   border-color:var(--border-light);
@@ -472,7 +489,7 @@ details ul { list-style:none; padding:8px 0; }
   flex-direction:column;
   justify-content:flex-end;
   padding:24px 20px;
-  background:linear-gradient(135deg, rgba(200,245,96,0.15), rgba(168,224,64,0.1), rgba(10,10,10,0.95));
+  background:linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,184,100,0.08), rgba(10,10,10,0.95));
   border:1px solid var(--border);
 }
 
@@ -1079,7 +1096,7 @@ main::-webkit-scrollbar-thumb { background:var(--accent-dim); border-radius:2px;
 .article-card:hover { border-color:var(--border-light); transform:translateY(-1px); }
 .premium-badge {
   display:inline-block; font-size:10px; padding:2px 8px; border-radius:10px;
-  background:linear-gradient(135deg,#C8F560,#A8E040); color:#0A0A0A; font-weight:700;
+  background:linear-gradient(135deg,#00e68a,#00b864); color:#0A0A0A; font-weight:700;
   margin-bottom:6px;
 }
 .article-meta { display:flex; gap:8px; font-size:11px; color:var(--text-dim); margin:6px 0; flex-wrap:wrap; }
@@ -1380,9 +1397,9 @@ body { overscroll-behavior: none; position: fixed; width: 100%; height: 100%; ov
   --text: #FFFFFF;
   --text-dim: #fff;
   --text-light: rgba(255,255,255,0.92);
-  --accent: #C8F560;
-  --accent-dim: rgba(200,245,96,0.12);
-  --accent-glow: rgba(200,245,96,0.35);
+  --accent: #00e68a;
+  --accent-dim: rgba(0,230,138,0.12);
+  --accent-glow: rgba(0,230,138,0.35);
   --danger: #FF453A;
   --danger-dim: rgba(255,69,58,0.15);
   --warning: #FFA502;

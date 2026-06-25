@@ -23,6 +23,26 @@
 - **Report support plan**: добавлена колонка "Цель" с отображением категорий поддержки
 - `tsc --noEmit` ✓, `vite build` ✓
 
+## Session Summary (Jun 25 — Part 2)
+### Done
+- **A3 — SYNERGY_NETWORK**: +52 новых записей (грибы/адаптогены/лекарственные/аминокислоты/иммунитет/метилирование). Полный граф пар.
+- **A2 — 25 стеков B-формат**: +10 новых (hair_skin_nails, detox_heavy_metals, sleep_recovery, libido_erectile, thyroid_support, nootropic_energy, anti_catabolic, blood_flow_NO, insulin_sensitivity, pancreas_liver). Итого 25 стеков с полным B-форматом.
+- **C4 — Каталог**: SUPPORT_CATALOG_DATA + CATALOG_ENRICHMENT — все core-записи полностью укомплектованы.
+- **B1 — Спецприём попап**: модалка (читмил/рефид/фастинг), localStorage, список + удаление.
+- **B2 — Скользящие графики KBJU**: 4 инлайн-бара target vs actual с цветовой индикацией.
+- **B3 — Предпочтения попап**: 5 чекбоксов (молочка/глютен/веган/обработка/сахар), chips, localStorage.
+- **B4 — Профицит в адаптации**: слайдер +5..+25%, badge с дельтой ккал.
+- **B5 — Диетические паузы GlassCard**: кнопки 1/2 нед, таймер, отмена, localStorage.
+- **B6 — Создать рецепт попап**: модалка (название/ингредиенты/приготовление/КБЖУ), localStorage, список.
+- **B7 — Exclusive-фильтр каталога**: кнопка ⭐, фильтр по `tier === 'max'`.
+- **C1 — Единый accent TrainingScreen**: 9 мест `#3b82f6`/`#a855f7`/`#8b5cf6` → `#00e68a`.
+- **C3 — Описания СРЦ**: 30 файлов циклов (18 cycle, 6 block, 6 embed) — русские описания 2-3 предложения.
+- `tsc --noEmit` ✓, `vite build` ✓
+
+### Осталось
+- **A6** — SupportScreen редиректы: упростить goBack/goHome (дублирование `setSection('home')` и др., −5 строк)
+- **A7** — Переименование support-stacks.ts
+
 ## Session Summary (Jun 23)
 ### Done
 - **support-database.ts**: 20+ SUPPORT_CATALOG_DATA entries re-added (DIOSMIN, BERGAMOT, SERRAPEPTASE, PAPAIN, BROMELAIN, PHARMA_TADALAFIL, LUMBROKINASE, HORSE_CHESTNUT, INOSINE, NARINGIN, PHARMA_CABERGOLINE, NATTOKINASE, HESPERIDIN, CITRUS_BIOFLAVONOIDS, BROMANTANE, FASORACETAM, AGMATINE, TMG, SAME, VITAMIN_B1, COLOSTRUM, PYCNOGENOL). Full descriptions, mechanisms, organs, forms, synergies, conflicts, monitoring, contraindications, sideEffects.

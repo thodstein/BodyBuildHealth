@@ -187,13 +187,25 @@ export function calcProductUsefulness(
 export function scoreAllProducts(
   opts: UsefulnessOptions & { category?: string }
 ): { food: FoodItem; score: UsefulnessScore }[] {
-  const filtered = opts.category && opts.category !== 'all'
-    ? FOOD_DB.filter(f => f.category === opts.category)
-    : FOOD_DB;
-  return filtered.map(food => ({
-    food,
-    score: calcProductUsefulness(food, opts),
-  })).sort((a, b) => b.score.total - a.score.total);
+  try {
+    const filtered = opts.category && opts.category !== 'all'
+      ? FOOD_DB.filter(f => f.category === opts.category)
+      : FOOD_DB;
+    return filtered.map(food => {
+      try {
+        return { food, score: calcProductUsefulness(food, opts) };
+      } catch {
+        return { food, score: {
+          total: 0, maxPossible: 100,
+          breakdown: { proteinDensity: 0, microDensity: 0, fiberQuality: 0, tierScore: 0, aminoScore: 0 },
+          contextBonus: { goalMatch: 0, timingMatch: 0, pharmaMatch: 0 },
+          costEfficiency: null, label: 'Низкая', color: '#ef4444',
+        } };
+      }
+    }).sort((a, b) => b.score.total - a.score.total);
+  } catch {
+    return [];
+  }
 }
 
 export function compareProducts(

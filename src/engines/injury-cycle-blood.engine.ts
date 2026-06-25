@@ -456,6 +456,7 @@ export function designCustomCycle(
   compounds: { name: string; dosageMg: number; freq: number; startWeek: number; endWeek: number; ester: string; class: string }[],
   name: string,
 ): CycleDesign {
+  if (compounds.length === 0) return { name, totalWeeks: 0, compounds: [], pctStartWeek: 0, pctProtocol: [], onCycleSupport: [], labSchedule: [], expectedResults: 'Нет соединений', riskLevel: 'beginner' };
   const maxEndWeek = Math.max(...compounds.map(c => c.endWeek));
   const has19nor = compounds.some(c => c.class === 'trenbolone' || c.class === 'nandrolone');
   const hasOrals = compounds.some(c => c.ester === 'oral' || c.class === 'oral_17aa');

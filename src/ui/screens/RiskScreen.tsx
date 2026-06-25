@@ -153,7 +153,7 @@ export const RiskScreen: React.FC = () => {
   // Compute lab risk contributions
   const labRiskContributions = useMemo(() => {
     if (!hasLabs) return null;
-    const labData = linked.labs.map(l => ({ ...l, date: l.date || new Date().toISOString().split('T')[0] }));
+    const labData = (linked?.labs || []).map(l => ({ ...l, date: l.date || new Date().toISOString().split('T')[0] }));
     return calculateRiskFromAnalyses(labData);
   }, [hasLabs, linked.labs]);
 
@@ -242,7 +242,7 @@ export const RiskScreen: React.FC = () => {
     const geom = (arr: number[]) => {
       if (!arr.length) return 0;
       const l = arr.reduce((a, v) => a + Math.log(Math.max(0.0001, v)), 0);
-      return Math.exp(l / arr.length);
+      return Math.exp(l / Math.max(arr.length, 1));
     };
     return {
       ...base,

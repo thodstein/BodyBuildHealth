@@ -211,10 +211,10 @@ export function getAllTimeStats(): {
 
   return {
     totalDays: metrics.length,
-    bestSleep: Math.max(...metrics.map(m => m.sleepHours)),
-    bestHRV: Math.max(...metrics.map(m => m.hrvMs)),
-    lowestWeight: Math.min(...metrics.map(m => m.weightKg)),
-    highestWeight: Math.max(...metrics.map(m => m.weightKg)),
+    bestSleep: metrics.length > 0 ? Math.max(...metrics.map(m => m.sleepHours)) : 0,
+    bestHRV: metrics.length > 0 ? Math.max(...metrics.map(m => m.hrvMs)) : 0,
+    lowestWeight: metrics.length > 0 ? Math.min(...metrics.map(m => m.weightKg)) : 0,
+    highestWeight: metrics.length > 0 ? Math.max(...metrics.map(m => m.weightKg)) : 0,
     longestStreak,
   };
 }

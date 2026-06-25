@@ -14,7 +14,7 @@ export const Orchestrator = {
 
     // 1. Маппинг веществ → эффекты → механизмы
     // 1. Map substances to DB entries, filling missing data
-    const mappedSubstances = input.substances.map(s => {
+    const mappedSubstances = (input?.substances || []).map((s: any) => {
       const subRaw = db.substances.find(sub => sub.id === s.id);
       const sub = {
         id: s.id,
@@ -25,8 +25,8 @@ export const Orchestrator = {
         tHalfHours: subRaw?.tHalfHours,
         bioavailability: subRaw?.bioavailability
       };
-      const effectList = s.effects.map(eId => db.effects.find(e => e.id === eId)).filter(Boolean);
-      const mechanismList = [...new Set(effectList.flatMap(e => (e as any).mechanisms || []))];
+      const effectList = (s.effects || []).map((eId: any) => db.effects.find((e: any) => e.id === eId)).filter(Boolean);
+      const mechanismList = [...new Set(effectList.flatMap((e: any) => (e as any).mechanisms || []))];
       return { ...sub, effects: effectList, mechanisms: mechanismList };
     });
 

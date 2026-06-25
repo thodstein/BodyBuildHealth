@@ -83,8 +83,8 @@ export function computePKPD(drugs: DrugDoseInput[]): PKPDOutput[] {
     }
 
     const last14 = dailyProfile.slice(-14);
-    const peakConc = Math.max(...last14);
-    const troughConc = Math.min(...last14);
+    const peakConc = last14.length > 0 ? Math.max(...last14) : 0;
+    const troughConc = last14.length > 0 ? Math.min(...last14) : 0;
     const deltaPct = ((peakConc - troughConc) / Math.max(peakConc, 0.01)) * 100;
     const hormonalSwing = deltaPct > 40;
 

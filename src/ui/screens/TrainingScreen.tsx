@@ -2886,7 +2886,7 @@ export const TrainingScreen: React.FC = () => {
               <div style={gCard}>
                 <div style={gLabel}>📊 Объём и интенсивность по неделям</div>
                 <div style={{ display:'flex', gap:1, height:80, alignItems:'flex-end' }}>
-                  {macrocycle.mesocycles.flatMap(mc => mc.microcycles || []).map((mc, wi) => {
+                  {(macrocycle.mesocycles || []).flatMap(mc => mc.microcycles || []).map((mc, wi) => {
                     const isCurrent = wi + 1 === selectedWeek;
                     const volH = Math.max(4, (mc?.volumeMultiplier || 1) * 35);
                     const intH = Math.max(4, (mc?.rpeTarget || 7) * 5);

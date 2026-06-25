@@ -534,7 +534,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
       try { setLabs(await db.getAll<LabPoint>('labs_log')); } catch {}
       try {
         const wLogs = await db.getAll<WorkoutLog>('workout_log');
-        setWorkoutLogs(wLogs.sort((a, b) => b.date.localeCompare(a.date)));
+        setWorkoutLogs((wLogs || []).sort((a, b) => b.date.localeCompare(a.date)));
       } catch {}
       // Load food diary for avg calculations
       try {

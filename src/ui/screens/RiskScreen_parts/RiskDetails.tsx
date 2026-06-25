@@ -170,7 +170,7 @@ export const RiskDetails: React.FC<{
                 {/* Contributing drugs */}
                 {contributorMap[coreSys] && contributorMap[coreSys].length > 0 && (
                   <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:6 }}>
-                    {contributorMap[coreSys].map(id => (
+                    {(contributorMap[coreSys] || []).map(id => (
                       <span key={id} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(249,115,22,0.1)', color:'#f97316' }}>
                         {(PHARMA_DB as any)[id]?.name || id}
                       </span>

@@ -144,7 +144,7 @@ const CartTab: React.FC = () => {
   const totalKcal = items.reduce((s, i) => s + (i.kcal || 0), 0);
   const totalPrice = items.reduce((s, i) => s + (i.price || 0), 0);
   const groups: Record<string, CartItemEnhanced[]> = {};
-  items.forEach(item => { const cat = item.category || 'other'; if (!groups[cat]) groups[cat] = []; groups[cat].push(item); });
+  (items || []).forEach(item => { const cat = item.category || 'other'; if (!groups[cat]) groups[cat] = []; groups[cat].push(item); });
 
   const storeBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode, extra?: React.CSSProperties) => (
     <button onClick={onClick} style={{ padding:'4px 10px', borderRadius:8, fontSize:9, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'rgba(0,230,138,0.12)' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: isActive ? 700 : 400, whiteSpace:'nowrap', ...extra }}>{children}</button>
