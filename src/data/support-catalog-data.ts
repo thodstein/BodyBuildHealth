@@ -8413,7 +8413,10 @@ cortisol: {
     systems: ['endocrine', 'musculoskeletal', 'neuro'],
     mechanisms: ['STRESS_RESPONSE', 'ANTI_INFLAMMATORY', 'METABOLIC_REGULATION', 'MORNING_CORTISOL_RHYTHM'],
     description: 'Кортизол — маркер стрессовой реакции надпочечников. Не добавка, а показатель для контроля на курсе.',
-    synergies: [],
+    synergies: [
+      { with: "ashwagandha", effect: "Ашваганда снижает кортизол — помогает интерпретировать уровень стресса", mechanism: "Модуляция HPA-оси через снижение CRH", severity: "MEDIUM" },
+      { with: "phosphatidylserine", effect: "Фосфатидилсерин снижает утренний кортизол — синергия для оценки HPA-оси", mechanism: "Нормализация кортизолового ритма через ACTH", severity: "LOW" },
+    ],
     conflicts: [
       { with: "pharma", effect: "Экзогенные глюкокортикоиды искажают уровень кортизола", mechanism: "Суппрессия HPA-оси", severity: "HIGH" },
       { with: "ashwagandha", effect: "Ашваганда снижает кортизол — возможна маскировка гиперкортицизма", mechanism: "Модуляция HPA-оси", severity: "LOW" },
@@ -8444,7 +8447,10 @@ adrenaline: {
     systems: ['endocrine', 'cardio'],
     mechanisms: ['FIGHT_OR_FLIGHT', 'HEART_RATE_INCREASE', 'BRONCHODILATION', 'GLUCOSE_ELEVATION'],
     description: 'Адреналин — маркер симпатической активации. Не добавка, а показатель стресс-реакции для контроля на курсе.',
-    synergies: [],
+    synergies: [
+      { with: "magnesium", effect: "Магний снижает выделение адреналина — помогает оценить фоновую активность", mechanism: "Ингибиция высвобождения катехоламинов через Ca²⁺-каналы", severity: "MEDIUM" },
+      { with: "taurine", effect: "Таурин модулирует симпатическую активность — синергия для стресс-оценки", mechanism: "Антагонизм к β-адренорецепторам", severity: "LOW" },
+    ],
     conflicts: [
         {with: "pharma", effect: "Антагонизм", mechanism: "Бета-блокаторы блокируют адреналин", severity: "HIGH"},
       ],
@@ -8474,7 +8480,10 @@ endocrine_marker: {
     systems: ['endocrine'],
     mechanisms: ['HORMONE_BALANCE', 'CORTISOL_REGULATION', 'THYROID_FUNCTION', 'REPRODUCTIVE_HORMONES'],
     description: 'Эндокринный маркер — комплексный анализ: кортизол, ТТГ, тестостерон, эстрадиол, пролактин. Для контроля на курсе.',
-    synergies: [],
+    synergies: [
+      { with: "dim", effect: "DIM помогает интерпретировать метаболизм эстрогенов в профиле", mechanism: "Модуляция 2-OH/16α-OH пути эстрогенов", severity: "LOW" },
+      { with: "zinc", effect: "Цинк важен для синтеза ЛГ/ФСГ — контекст для оценки гонадной оси", mechanism: "Кофактор ароматазы и 5α-редуктазы", severity: "LOW" },
+    ],
     conflicts: [
       { with: "pharma", effect: "Экзогенные гормоны искажают результаты анализа", mechanism: "ААС/СЕРМ/ИА подавляют HPG-ось", severity: "HIGH" },
       { with: "cortisol", effect: "Стресс и кортизол влияют на весь эндокринный профиль", mechanism: "Перекрестная регуляция HPA/HPG осей", severity: "MEDIUM" },

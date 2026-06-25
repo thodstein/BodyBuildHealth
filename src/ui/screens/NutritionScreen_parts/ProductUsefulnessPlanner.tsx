@@ -87,6 +87,10 @@ export const ProductUsefulnessPlanner: React.FC = () => {
     catch { return []; }
   });
   const [mealTab, setMealTab] = useState<'compose' | 'saved'>('compose');
+  const [sourcePicker, setSourcePicker] = useState<{ source: string; title: string; items: Array<{ id: string; name: string; label?: string }> } | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 2000); };
 
   const opts = useMemo(() => ({
     goal: manualGoal || profileGoal,
@@ -114,7 +118,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   const filtered = useMemo(() => {
     if (!search) return scored;
     const q = search.toLowerCase();
-    return scored.filter(s => (s.food.name || '').toLowerCase().includes(q) || s.food.id.includes(q));
+    return scored.filter(s => (s.food.name || '').toLowerCase().includes(q) || (s.food.id || '').toLowerCase().includes(q));
   }, [scored, search]);
 
   const sorted = useMemo(() => {
@@ -142,6 +146,74 @@ export const ProductUsefulnessPlanner: React.FC = () => {
       if (compareIds.length >= 3) setCompareIds([...compareIds.slice(1), id]);
       else setCompareIds([...compareIds, id]);
     }
+  };
+
+  const openSourcePicker = (source: string) => {
+    try {
+      if (source === 'plan') {
+        const raw = JSON.parse(localStorage.getItem('he_daily_plan') || '[]');
+        const fallback = JSON.parse(localStorage.getItem('he_quick_plan_items') || '[]');
+        const list = raw.length > 0 ? raw : fallback;
+        if (list.length === 0) { showToast('Нет сохранённого плана'); return; }
+        const items = list.map((i: any) => ({ foodId: i.id || i.foodId, weightGrams: i.amount || i.weightGrams || 100 }));
+        setMealProducts(prev => [...prev, ...items]);
+        showToast(`✅ Добавлено ${items.length} продуктов из плана`);
+        return;
+      }
+      if (source === 'recipe') {
+        const recipes = JSON.parse(localStorage.getItem('he_recipes') || '[]');
+        if (recipes.length === 0) { showToast('Нет рецептов'); return; }
+        setSourcePicker({ source: 'recipe', title: '📝 Выберите рецепт', items: recipes.map((r: any) => ({ id: r.id, name: r.name, label: `${r.kcal || 0} ккал · Б${r.protein || 0} Ж${r.fat || 0} У${r.carbs || 0}` })) });
+        return;
+      }
+      if (source === 'saved') {
+        if (savedMeals.length === 0) { showToast('Нет сохранённых приёмов'); return; }
+        setSourcePicker({ source: 'saved', title: '💾 Выберите приём', items: savedMeals.map(m => ({ id: m.id, name: m.name, label: `${m.products.length} продуктов` })) });
+        return;
+      }
+      if (source === 'diary') {
+        const diary = JSON.parse(localStorage.getItem('nutrition_diary') || '{}');
+        const today = new Date().toISOString().split('T')[0];
+        const dayData = diary[today]?.meals || {};
+        const entries: { foodId: string; weightGrams: number }[] = [];
+        Object.keys(dayData).forEach(mealName => {
+          (dayData[mealName] || []).forEach((item: any) => {
+            const q = (item.name || '').toLowerCase().trim();
+            const found = FOOD_DB.find(f => f.name.toLowerCase() === q) || FOOD_DB.find(f => f.name.toLowerCase().includes(q) || q.includes(f.name.toLowerCase()));
+            if (found) entries.push({ foodId: found.id, weightGrams: parseInt(item.qty) || 100 });
+          });
+        });
+        if (entries.length === 0) { showToast('Нет записей в дневнике за сегодня'); return; }
+        setMealProducts(prev => [...prev, ...entries]);
+        showToast(`✅ Добавлено ${entries.length} продуктов из дневника`);
+        return;
+      }
+    } catch { showToast('Ошибка загрузки'); }
+  };
+
+  const handlePickerSelect = (id: string) => {
+    if (!sourcePicker) return;
+    try {
+      if (sourcePicker.source === 'saved') {
+        const meal = savedMeals.find(m => m.id === id);
+        if (meal) { setMealProducts(prev => [...prev, ...meal.products]); showToast(`✅ Загружен «${meal.name}»`); }
+      }
+      if (sourcePicker.source === 'recipe') {
+        const allRecipes = JSON.parse(localStorage.getItem('he_recipes') || '[]');
+        const recipe = allRecipes.find((r: any) => r.id === id);
+        if (recipe) {
+          const mapped: MealProduct[] = [];
+          (recipe.ingredients || []).forEach((ing: string) => {
+            const q = ing.toLowerCase().trim();
+            const found = FOOD_DB.find(f => f.name.toLowerCase() === q) || FOOD_DB.find(f => f.name.toLowerCase().includes(q) || q.includes(f.name.toLowerCase()));
+            if (found) mapped.push({ foodId: found.id, weightGrams: 100 });
+          });
+          if (mapped.length > 0) { setMealProducts(prev => [...prev, ...mapped]); showToast(`✅ Добавлено ${mapped.length} продуктов из «${recipe.name}»`); }
+          else showToast('Не удалось сопоставить ингредиенты с базой');
+        }
+      }
+    } catch { showToast('Ошибка'); }
+    setSourcePicker(null);
   };
 
   const activeModules = [
@@ -305,11 +377,11 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                         <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>{food.kcal} ккал</div>
                       </div>
                       <button onClick={e => { e.stopPropagation(); toggleCompare(food.id); }} style={{
-                        width: 26, height: 26, borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: isCompared ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.03)',
-                        border: isCompared ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                        color: isCompared ? '#a78bfa' : 'rgba(255,255,255,0.3)', fontSize: 10,
-                      }}>⚖</button>
+                        padding: '4px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600, whiteSpace: 'nowrap',
+                        background: isCompared ? 'rgba(0,230,138,0.15)' : 'rgba(0,230,138,0.08)',
+                        border: isCompared ? '1px solid #00e68a' : '1px solid rgba(0,230,138,0.2)',
+                        color: isCompared ? '#00e68a' : 'rgba(0,230,138,0.8)',
+                      }}>{isCompared ? '✓ В сравнении' : '⚖ Сравнить'}</button>
                     </div>
                   </div>
                   {exp && (
@@ -420,8 +492,48 @@ export const ProductUsefulnessPlanner: React.FC = () => {
             <button onClick={() => setMealTab('saved')} style={PILL(mealTab === 'saved', '#a855f7')}>💾 Сохранённые ({savedMeals.length})</button>
           </div>
 
+          {toastMsg && (
+            <div style={{ marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', fontSize: 9, color: '#00e68a', textAlign: 'center' }}>
+              {toastMsg}
+            </div>
+          )}
+
           {mealTab === 'compose' && (
             <div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+                {[
+                  { key: 'plan', icon: '📋', label: 'Из плана' },
+                  { key: 'recipe', icon: '📝', label: 'Из рецептов' },
+                  { key: 'saved', icon: '💾', label: 'Из сохранённых' },
+                  { key: 'diary', icon: '📓', label: 'Из дневника' },
+                ].map(btn => (
+                  <button key={btn.key} onClick={() => openSourcePicker(btn.key)} style={{
+                    padding: '8px', borderRadius: 12, cursor: 'pointer', fontSize: 9, fontWeight: 600,
+                    background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#fff',
+                  }}>
+                    {btn.icon} {btn.label}
+                  </button>
+                ))}
+              </div>
+              {sourcePicker && (
+                <div style={{ marginBottom: 8, borderRadius: 10, padding: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#00e68a' }}>{sourcePicker.title}</span>
+                    <span onClick={() => setSourcePicker(null)} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: 700 }}>×</span>
+                  </div>
+                  <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+                    {sourcePicker.items.map(item => (
+                      <div key={item.id} onClick={() => handlePickerSelect(item.id)} style={{
+                        padding: '6px 8px', borderRadius: 6, cursor: 'pointer', marginBottom: 3,
+                        background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.08)',
+                      }}>
+                        <div style={{ fontSize: 9, fontWeight: 600, color: '#fff' }}>{item.name}</div>
+                        {item.label && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>{item.label}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div style={{ position: 'relative', marginBottom: 8 }}>
                 <input value={mealSearch} onChange={e => setMealSearch(e.target.value)} placeholder="🔍 Добавить продукт к приёму..." style={{
                   width: '100%', padding: '8px 10px', borderRadius: 10, fontSize: 10, background: '#202023',

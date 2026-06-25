@@ -7,7 +7,7 @@ import { getProfile } from '../../core/profile-manager';
 import { generatePCTPlan } from '../../engines/pct-planner.engine';
 import { PHARMA_DB } from '../../core/pharma-database';
 
-type FertTab = 'overview' | 'semen' | 'hormones' | 'structure' | 'pct-plan' | 'hrt' | 'analyses';
+type FertTab = 'overview' | 'pct-plan' | 'hrt' | 'analyses';
 type AnalysesSubTab = 'before' | 'during' | 'after' | 'spermogram' | 'instrumental' | 'structure';
 
 const addToPlan = async (substanceId: string, doseValue: number, doseUnit: string, freq: string, startWeek: number, endWeek: number) => {
@@ -59,9 +59,6 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
   // Filter tabs based on mode
   const fertTabsAll: { id: FertTab; label: string }[] = [
     { id: 'overview', label: '📋 Ориентировочные протоколы' },
-    { id: 'semen', label: 'Спермограмма' },
-    { id: 'hormones', label: 'Гормоны' },
-    { id: 'structure', label: 'DFI/Структура' },
     { id: 'pct-plan', label: 'ПКТ базовый протокол' },
     { id: 'hrt', label: '⚕️ Ориентировочные протоколы ГЗТ' },
     { id: 'analyses', label: '🧪 Анализы' },
@@ -282,7 +279,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
         })}
       </div>
 
-      <div style={{ maxWidth: '100%', overflowX: 'hidden', overflowY: 'auto', wordBreak: 'break-word' }}>
+      <div style={{ width: '100%', overflowX: 'hidden', overflowY: 'auto', wordBreak: 'break-word' }}>
 
       {/* ─── OVERVIEW TAB ─── */}
       {tab === 'overview' && restrictToMode !== 'fertility' && (
@@ -548,84 +545,11 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
         </div>
       )}
 
-      {tab === 'semen' && (
-        <div style={s.card}>
-          <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>Спермограмма расширенная</h4>
-          <div style={s.row}>
-            <div>{field('Объём (мл) ≥1.5', volume, setVolume, '1.5')}</div>
-            <div>{field('Концентрация (млн/мл) ≥16', concentration, setConcentration, '16')}</div>
-          </div>
-          <div style={s.row}>
-            <div>{field('Общее кол-во (млн) ≥39', totalCount, setTotalCount, '39')}</div>
-            <div>{field('PR подвижность (%) ≥30', pr, setPr, '30')}</div>
-          </div>
-          <div style={s.row}>
-            <div>{field('NP подвижность (%)', np, setNp, '10')}</div>
-            <div>{field('Неподвижные (%)', immotile, setImmotile, '0')}</div>
-          </div>
-          <div style={s.row}>
-            <div>{field('Морфология (%) ≥4', morphology, setMorphology, '4')}</div>
-            <div>{field('Жизнеспособность (%) ≥58', viability, setViability, '58')}</div>
-          </div>
-          <div style={s.row}>
-            <div>{field('pH 7.2–8.0', ph, setPh, '7.4')}</div>
-            <div>{field('Фруктоза (ммоль/л)', fructose, setFructose, '13')}</div>
-          </div>
-          <div style={s.row}>
-            <div>{field('Цинк (ммоль/л)', zincMmol, setZincMmol, '2')}</div>
-            <div>{field('MAR-тест (%) <50', mar, setMar, '0')}</div>
-          </div>
-          <div style={s.row}>
-            <div>{field('Лейкоциты (млн/мл)', leukocytes, setLeukocytes, '0')}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <label style={{ fontSize: 10 }}><input type="checkbox" style={s.check} checked={viscosity} onChange={e => setViscosity(e.target.checked)} /> Вязкость</label>
-              <label style={{ fontSize: 10 }}><input type="checkbox" style={s.check} checked={agglutination} onChange={e => setAgglutination(e.target.checked)} /> Агглютинация</label>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {tab === 'hormones' && (
-        <div style={s.card}>
-          <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>Гормоны крови (10 маркеров)</h4>
-          <p style={{ fontSize: 10, opacity: 0.6, margin: '0 0 8px' }}>Автозаполнение из LabsScreen</p>
-          <div style={s.row}>
-            <div>{field('LH (mIU/mL)', lh, setLh, '5')}</div>
-            <div>{field('FSH (mIU/mL)', fsh, setFsh, '4')}</div>
-          </div>
-          <div style={s.row}>
-            <div>{field('TT общ. (ng/dL)', tt, setTt, '500')}</div>
-            <div>{field('FT своб. (pg/mL)', ft, setFt, '15')}</div>
-          </div>
-          <div style={s.row}>
-            <div>{field('E2 (pg/mL)', e2, setE2, '25')}</div>
-            <div>{field('Пролактин (ng/mL)', prl, setPrl, '8')}</div>
-          </div>
-          <div style={s.row}>
-            <div>{field('SHBG (nmol/L)', shbg, setShbg, '30')}</div>
-            <div>{field('Ингибин B (pg/mL)', inhb, setInhb, '150')}</div>
-          </div>
-          <div style={s.row}>
-            <div>{field('AMH (ng/mL)', amh, setAmh, '4')}</div>
-            <div></div>
-          </div>
-        </div>
-      )}
 
-      {tab === 'structure' && (
-        <div style={s.card}>
-          <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>DFI и структурные факторы</h4>
-          <div style={s.row}>
-            <div>{field('DFI (%) ≤15 норма', dfi, setDfi, '0')}</div>
-            <div>
-              <span style={s.label}>Варикоцеле</span>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {VARICOCELE.map(v => <button key={v.id} style={varicocele === v.id ? s.btnActive : s.btn} onClick={() => setVaricocele(v.id)}>{v.label}</button>)}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
+
+
 
       {tab === 'pct-plan' && pctPlan && (
         <div className="card" style={{ marginBottom: 12 }}>
@@ -711,48 +635,6 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
             </div>
           ) : (
             <>
-              <div style={s.card}>
-                <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>Базовый План, подлежит корректировке</h4>
-                <div style={{ fontSize: 12, marginBottom: 6 }}>
-                  Начало: <b>неделя {pctPlan.pctStartWeek}</b>
-                </div>
-                {pctPlan.warnings.length > 0 && (
-                  <div style={{ background: 'rgba(255,152,0,0.1)', borderRadius: 6, padding: '8px 10px', marginBottom: 8 }}>
-                    {pctPlan.warnings.map((w: string, i: number) => (
-                      <div key={i} style={{ fontSize: 10, color: '#ff9800' }}>⚠ {w}</div>
-                    ))}
-                  </div>
-                )}
-                {pctPlan.pctProtocol.map((p: any, i: number) => (
-                  <div key={i} style={{
-                    background: 'var(--glass-bg)', borderRadius: 10, padding: '12px 14px', marginBottom: 6,
-                    border: `1px solid ${CLASS_COLORS[p.class] || '#666'}44`,
-                    borderLeft: `3px solid ${CLASS_COLORS[p.class] || '#666'}`,
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 600, fontSize: 12 }}>{PHARMA_DB[p.substanceId]?.name || p.substanceId}</span>
-                        <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: `${CLASS_COLORS[p.class] || '#666'}22`, color: CLASS_COLORS[p.class] || '#666' }}>{CLASS_LABEL_PCT[p.class] || p.class}</span>
-                      </div>
-                      <span style={{ fontWeight: 700, fontSize: 12 }}>{p.doseValue}{p.doseUnit}</span>
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
-                      {p.timing || `${p.frequency}`} | Нед {p.startWeek}-{p.endWeek}
-                    </div>
-                    <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                      <button onClick={() => addToPlan(p.substanceId, p.doseValue, p.doseUnit, p.frequency || '2x/wk', p.startWeek, p.endWeek)} style={{
-                        flex: 1, padding: '5px 8px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 9, fontWeight: 600,
-                        background: 'rgba(0,230,138,0.12)', color: '#00e68a',
-                      }}>+ В план</button>
-                      <button onClick={() => addToCart(p.substanceId, PHARMA_DB[p.substanceId]?.name || p.substanceId, `${p.doseValue}${p.doseUnit}`)} style={{
-                        flex: 1, padding: '5px 8px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 9, fontWeight: 600,
-                        background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
-                      }}>🛒 В корзину</button>
-                    </div>
-                  </div>
-                ))}
-                <button onClick={() => setPctPlan(null)} style={{ marginTop: 8, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 11 }}>✕ Сбросить</button>
-              </div>
               <div style={s.card}>
                 <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>Восстановление фертильности</h4>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>Рекомендации для восстановления после курса</div>
@@ -888,13 +770,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
               { id:'during' as AnalysesSubTab, label:'Контроль (6-8 нед)' },
               { id:'after' as AnalysesSubTab, label:'Ежегодно' },
               { id:'instrumental' as AnalysesSubTab, label:'Инструментальные' },
-            ] : [
-              { id:'before' as AnalysesSubTab, label:'Гормоны + Данные' },
-              { id:'spermogram' as AnalysesSubTab, label:'Спермограмма' },
-              { id:'structure' as AnalysesSubTab, label:'DFI/Структура' },
-              { id:'during' as AnalysesSubTab, label:'Периоды сдачи' },
-              { id:'instrumental' as AnalysesSubTab, label:'Инструментальные' },
-            ]).map(st =>
+            ] : []).map(st =>
               <button key={st.id} onClick={() => setAnalysesSTab(st.id)} style={{
                 padding:'5px 10px', borderRadius:16, fontSize:9, cursor:'pointer', whiteSpace:'nowrap',
                 background: analysesSTab===st.id ? 'var(--accent-green)' : 'var(--bg-secondary)',
@@ -1104,7 +980,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
               );
             }
 
-            if (restrictToMode === 'fertility') {
+            if (restrictToMode === 'fertility' || !restrictToMode) {
               const FERT_LABS = [
                 { code:'INHB', name:'Ингибин B', range:'>80 pg/mL' },
                 { code:'AMH', name:'АМГ (анти-Мюллеров гормон)', range:'>2.0 ng/mL' },
@@ -1154,181 +1030,132 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
               );
               return (
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  {analysesSTab === 'before' && (
-                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                      {/* Гормоны карточка */}
-                      <div style={{ borderRadius:14, overflow:'hidden', border:'1px solid rgba(59,130,246,0.2)' }}>
-                        <div style={{ padding:'8px 12px', background:'linear-gradient(135deg,rgba(59,130,246,0.12),rgba(99,102,241,0.06))', borderBottom:'1px solid rgba(59,130,246,0.1)' }}>
-                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                            <span style={{ fontSize:16 }}>🧬</span>
-                            <span style={{ fontSize:12, fontWeight:700, color:'#3b82f6' }}>Гормоны крови</span>
-                            <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginLeft:'auto' }}>10 маркеров</span>
-                          </div>
-                        </div>
-                        <div style={{ padding:12, background:'rgba(24,24,27,0.12)' }}>
-                          <p style={{ fontSize:9, color:'rgba(255,255,255,0.5)', margin:'0 0 8px' }}>Автозаполнение из LabsScreen. Заполните или проверьте значения.</p>
-                          <div style={s.row}>
-                            <div>{field('LH (mIU/mL)', lh, setLh, '5')}</div>
-                            <div>{field('FSH (mIU/mL)', fsh, setFsh, '4')}</div>
-                          </div>
-                          <div style={s.row}>
-                            <div>{field('TT общ. (ng/dL)', tt, setTt, '500')}</div>
-                            <div>{field('FT своб. (pg/mL)', ft, setFt, '15')}</div>
-                          </div>
-                          <div style={s.row}>
-                            <div>{field('E2 (pg/mL)', e2, setE2, '25')}</div>
-                            <div>{field('Пролактин (ng/mL)', prl, setPrl, '8')}</div>
-                          </div>
-                          <div style={s.row}>
-                            <div>{field('SHBG (nmol/L)', shbg, setShbg, '30')}</div>
-                            <div>{field('Ингибин B (pg/mL)', inhb, setInhb, '150')}</div>
-                          </div>
-                          <div style={s.row}>
-                            <div>{field('AMH (ng/mL)', amh, setAmh, '4')}</div>
-                            <div></div>
-                          </div>
-                        </div>
+                  {/* 1. Гормоны */}
+                  <div style={{ borderRadius:14, overflow:'hidden', border:'1px solid rgba(59,130,246,0.2)' }}>
+                    <div style={{ padding:'8px 12px', background:'linear-gradient(135deg,rgba(59,130,246,0.12),rgba(99,102,241,0.06))', borderBottom:'1px solid rgba(59,130,246,0.1)' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <span style={{ fontSize:16 }}>🧬</span>
+                        <span style={{ fontSize:12, fontWeight:700, color:'#3b82f6' }}>Гормоны крови</span>
+                        <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginLeft:'auto' }}>10 маркеров</span>
                       </div>
-                      {renderChecklist('Гормональные маркеры фертильности', 'Базовые и контрольные', FERT_LABS, '#3b82f6')}
                     </div>
-                  )}
-                  {analysesSTab === 'spermogram' && (
-                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                      {/* Спермограмма карточка */}
-                      <div style={{ borderRadius:14, overflow:'hidden', border:'1px solid rgba(34,197,94,0.2)' }}>
-                        <div style={{ padding:'8px 12px', background:'linear-gradient(135deg,rgba(34,197,94,0.12),rgba(22,163,74,0.06))', borderBottom:'1px solid rgba(34,197,94,0.1)' }}>
-                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                            <span style={{ fontSize:16 }}>🔬</span>
-                            <span style={{ fontSize:12, fontWeight:700, color:'#22c55e' }}>Спермограмма расширенная</span>
-                            <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginLeft:'auto' }}>ВОЗ 2021</span>
-                          </div>
-                        </div>
-                        <div style={{ padding:12, background:'rgba(24,24,27,0.12)' }}>
-                          <div style={s.row}>
-                            <div>{field('Объём (мл) >=1.5', volume, setVolume, '1.5')}</div>
-                            <div>{field('Концентрация (млн/мл) >=16', concentration, setConcentration, '16')}</div>
-                          </div>
-                          <div style={s.row}>
-                            <div>{field('Общее кол-во (млн) >=39', totalCount, setTotalCount, '39')}</div>
-                            <div>{field('PR подвижность (%) >=30', pr, setPr, '30')}</div>
-                          </div>
-                          <div style={s.row}>
-                            <div>{field('NP подвижность (%)', np, setNp, '10')}</div>
-                            <div>{field('Неподвижные (%)', immotile, setImmotile, '0')}</div>
-                          </div>
-                          <div style={s.row}>
-                            <div>{field('Морфология (%) >=4', morphology, setMorphology, '4')}</div>
-                            <div>{field('Жизнеспособность (%) >=58', viability, setViability, '58')}</div>
-                          </div>
-                          <div style={s.row}>
-                            <div>{field('pH 7.2-8.0', ph, setPh, '7.4')}</div>
-                            <div>{field('Фруктоза (ммоль/л)', fructose, setFructose, '13')}</div>
-                          </div>
-                          <div style={s.row}>
-                            <div>{field('Цинк (ммоль/л)', zincMmol, setZincMmol, '2')}</div>
-                            <div>{field('MAR-тест (%) <50', mar, setMar, '0')}</div>
-                          </div>
-                          <div style={s.row}>
-                            <div>{field('Лейкоциты (млн/мл)', leukocytes, setLeukocytes, '0')}</div>
-                            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                              <label style={{ fontSize:10 }}><input type='checkbox' style={s.check} checked={viscosity} onChange={e => setViscosity(e.target.checked)} /> Вязкость</label>
-                              <label style={{ fontSize:10 }}><input type='checkbox' style={s.check} checked={agglutination} onChange={e => setAgglutination(e.target.checked)} /> Агглютинация</label>
-                            </div>
-                          </div>
-                        </div>
+                    <div style={{ padding:12, background:'rgba(24,24,27,0.12)' }}>
+                      <p style={{ fontSize:9, color:'rgba(255,255,255,0.5)', margin:'0 0 8px' }}>Автозаполнение из LabsScreen</p>
+                      <div style={s.row}>
+                        <div>{field('LH (mIU/mL)', lh, setLh, '5')}</div>
+                        <div>{field('FSH (mIU/mL)', fsh, setFsh, '4')}</div>
                       </div>
-                      {renderChecklist('Спермограмма + MAR + DFI', 'Полная оценка сперматогенеза', FERT_SPERM, '#22c55e')}
+                      <div style={s.row}>
+                        <div>{field('TT общ. (ng/dL)', tt, setTt, '500')}</div>
+                        <div>{field('FT своб. (pg/mL)', ft, setFt, '15')}</div>
+                      </div>
+                      <div style={s.row}>
+                        <div>{field('E2 (pg/mL)', e2, setE2, '25')}</div>
+                        <div>{field('Пролактин (ng/mL)', prl, setPrl, '8')}</div>
+                      </div>
+                      <div style={s.row}>
+                        <div>{field('SHBG (nmol/L)', shbg, setShbg, '30')}</div>
+                        <div>{field('Ингибин B (pg/mL)', inhb, setInhb, '150')}</div>
+                      </div>
+                      <div style={s.row}>
+                        <div>{field('AMH (ng/mL)', amh, setAmh, '4')}</div>
+                        <div></div>
+                      </div>
                     </div>
-                  )}
-                  {analysesSTab === 'structure' && (
-                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                      {/* DFI карточка */}
-                      <div style={{ borderRadius:14, overflow:'hidden', border:'1px solid rgba(168,85,247,0.2)' }}>
-                        <div style={{ padding:'8px 12px', background:'linear-gradient(135deg,rgba(168,85,247,0.12),rgba(139,92,246,0.06))', borderBottom:'1px solid rgba(168,85,247,0.1)' }}>
-                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                            <span style={{ fontSize:16 }}>🧬</span>
-                            <span style={{ fontSize:12, fontWeight:700, color:'#a855f7' }}>DFI и структурные факторы</span>
-                            <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginLeft:'auto' }}>Фрагментация ДНК</span>
-                          </div>
-                        </div>
-                        <div style={{ padding:12, background:'rgba(24,24,27,0.12)' }}>
-                          <div style={s.row}>
-                            <div>{field('DFI (%) <=15 норма', dfi, setDfi, '0')}</div>
-                            <div>
-                              <span style={s.label}>Варикоцеле</span>
-                              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                                {VARICOCELE.map(v => <button key={v.id} style={varicocele === v.id ? s.btnActive : s.btn} onClick={() => setVaricocele(v.id)}>{v.label}</button>)}
+                  </div>
+                  {renderChecklist('Гормональные маркеры фертильности', 'Базовые и контрольные', FERT_LABS, '#3b82f6')}
+
+                  {/* 2. Спермограмма — display-only */}
+                  <div style={{ borderRadius:14, overflow:'hidden', border:'1px solid rgba(34,197,94,0.2)' }}>
+                    <div style={{ padding:'8px 12px', background:'linear-gradient(135deg,rgba(34,197,94,0.12),rgba(22,163,74,0.06))', borderBottom:'1px solid rgba(34,197,94,0.1)' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <span style={{ fontSize:16 }}>🔬</span>
+                        <span style={{ fontSize:12, fontWeight:700, color:'#22c55e' }}>Спермограмма</span>
+                        <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginLeft:'auto' }}>ВОЗ 2021</span>
+                      </div>
+                    </div>
+                    <div style={{ padding:12, background:'rgba(24,24,27,0.12)' }}>
+                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                        {[
+                          { label:'📦 Объём', val:volume, norm:'≥1.5 мл', good:(v:any)=>parseFloat(v||'0')>=1.5 },
+                          { label:'🔬 Концентрация', val:concentration, norm:'≥16 млн/мл', good:(v:any)=>parseFloat(v||'0')>=16 },
+                          { label:'📊 Общее кол-во', val:totalCount, norm:'≥39 млн', good:(v:any)=>parseFloat(v||'0')>=39 },
+                          { label:'🏃 PR подвижность', val:pr, norm:'≥30%', good:(v:any)=>parseFloat(v||'0')>=30 },
+                          { label:'🚶 NP подвижность', val:np, norm:'—', good:()=>true },
+                          { label:'🛑 Неподвижные', val:immotile, norm:'—', good:()=>true },
+                          { label:'🧬 Морфология', val:morphology, norm:'≥4%', good:(v:any)=>parseFloat(v||'0')>=4 },
+                          { label:'💪 Жизнеспособность', val:viability, norm:'≥58%', good:(v:any)=>parseFloat(v||'0')>=58 },
+                          { label:'🧪 pH', val:ph, norm:'7.2–8.0', good:(v:any)=>{const n=parseFloat(v||'7.4'); return n>=7.2&&n<=8.0} },
+                          { label:'🍬 Фруктоза', val:fructose, norm:'≥13 ммоль/л', good:()=>true },
+                          { label:'⚡ Цинк', val:zincMmol, norm:'≥2 ммоль/л', good:()=>true },
+                          { label:'🛡 MAR-тест', val:mar, norm:'<50%', good:(v:any)=>parseFloat(v||'0')<50 },
+                          { label:'🔴 Лейкоциты', val:leukocytes, norm:'<1 млн/мл', good:(v:any)=>parseFloat(v||'0')<1 },
+                        ].map((item, i) => {
+                          const isGood = item.good(item.val||'0');
+                          return (
+                            <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:6, background:i%2===0?'rgba(34,197,94,0.04)':'transparent' }}>
+                              <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{item.label}</span>
+                              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                <span style={{ fontSize:9, color:item.val?(isGood?'#22c55e':'#ef4444'):'var(--text-dim)', fontWeight:item.val?700:400 }}>
+                                  {item.val || '—'}
+                                </span>
+                                <span style={{ fontSize:8, color:'var(--text-dim)' }}>{item.norm}</span>
+                                {item.val && <span style={{ fontSize:10 }}>{isGood ? '✅' : '❌'}</span>}
                               </div>
                             </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display:'flex', gap:12, padding:'5px 8px', fontSize:9, color:'var(--text-dim)' }}>
+                        <span>Вязкость: {viscosity ? '⚠ Повышена' : '✅ Норма'}</span>
+                        <span>Агглютинация: {agglutination ? '❌ Есть' : '✅ Нет'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  {renderChecklist('Спермограмма + MAR + DFI', 'Полная оценка сперматогенеза', FERT_SPERM, '#22c55e')}
+
+                  {/* 3. DFI/Структура */}
+                  <div style={{ borderRadius:14, overflow:'hidden', border:'1px solid rgba(168,85,247,0.2)' }}>
+                    <div style={{ padding:'8px 12px', background:'linear-gradient(135deg,rgba(168,85,247,0.12),rgba(139,92,246,0.06))', borderBottom:'1px solid rgba(168,85,247,0.1)' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <span style={{ fontSize:16 }}>🧬</span>
+                        <span style={{ fontSize:12, fontWeight:700, color:'#a855f7' }}>DFI и структурные факторы</span>
+                        <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginLeft:'auto' }}>Фрагментация ДНК</span>
+                      </div>
+                    </div>
+                    <div style={{ padding:12, background:'rgba(24,24,27,0.12)' }}>
+                      <div style={s.row}>
+                        <div>{field('DFI (%) <=15 норма', dfi, setDfi, '0')}</div>
+                        <div>
+                          <span style={s.label}>Варикоцеле</span>
+                          <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                            {VARICOCELE.map(v => <button key={v.id} style={varicocele === v.id ? s.btnActive : s.btn} onClick={() => setVaricocele(v.id)}>{v.label}</button>)}
                           </div>
                         </div>
                       </div>
                     </div>
-                  )}
-                  {analysesSTab === 'during' && <FertTimeline />}
-                  {analysesSTab === 'instrumental' && (
-                    <div style={s.card}>
-                      <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#a855f7' }}>🔬 Инструментальные исследования фертильности</h4>
-                      <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                        {[
-                          { name:'УЗИ мошонки с допплером', purpose:'Кровоток яичек, варикоцеле, объём яичек' },
-                          { name:'Спермограмма + MAR-тест', purpose:'Количество, подвижность, морфология, антиспермальные антитела' },
-                          { name:'Фрагментация ДНК (SCD/Halosperm)', purpose:'Целостность хроматина, DFI < 15%' },
-                          { name:'УЗИ простаты (трансректальное)', purpose:'Исключение инфекции/воспаления' },
-                          { name:'Гормональный профиль (кровь)', purpose:'ЛГ, ФСГ, ТТ, ⣔, Пролактин, Ингибин В, АМГ' },
-                        ].map((e, i) => (
-                          <div key={i} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.08)' }}>
-                            <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{e.name}</span>
-                            <span style={{ fontSize:9, color:'var(--text-dim)', marginLeft:4 }}>— {e.purpose}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  </div>
 
-                  {/* Save/Load all fertility analysis data */}
-                  <div style={{ display:'flex', gap:6, marginTop:4 }}>
-                    <button onClick={() => {
-                      try {
-                        const data = { volume, concentration, totalCount, pr, np, immotile, morphology, viability, ph, viscosity, mar, leukocytes, agglutination, fructose, zincMmol, dfi, varicocele, tt, ft, e2, lh, fsh, prl, shbg, inhb, amh };
-                        localStorage.setItem('he_fertility_analysis', JSON.stringify(data));
-                      } catch {}
-                    }} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid rgba(0,230,138,0.25)', background:'rgba(0,230,138,0.06)', color:'#00e68a', cursor:'pointer', fontWeight:700, fontSize:11 }}>
-                      💾 Сохранить все анализы
-                    </button>
-                    <button onClick={() => {
-                      try {
-                        const data = JSON.parse(localStorage.getItem('he_fertility_analysis') || '{}');
-                        if (data.volume !== undefined) setVolume(data.volume);
-                        if (data.concentration !== undefined) setConcentration(data.concentration);
-                        if (data.totalCount !== undefined) setTotalCount(data.totalCount);
-                        if (data.pr !== undefined) setPr(data.pr);
-                        if (data.np !== undefined) setNp(data.np);
-                        if (data.immotile !== undefined) setImmotile(data.immotile);
-                        if (data.morphology !== undefined) setMorphology(data.morphology);
-                        if (data.viability !== undefined) setViability(data.viability);
-                        if (data.ph !== undefined) setPh(data.ph);
-                        if (data.viscosity !== undefined) setViscosity(data.viscosity);
-                        if (data.mar !== undefined) setMar(data.mar);
-                        if (data.leukocytes !== undefined) setLeukocytes(data.leukocytes);
-                        if (data.agglutination !== undefined) setAgglutination(data.agglutination);
-                        if (data.fructose !== undefined) setFructose(data.fructose);
-                        if (data.zincMmol !== undefined) setZincMmol(data.zincMmol);
-                        if (data.dfi !== undefined) setDfi(data.dfi);
-                        if (data.varicocele !== undefined) setVaricocele(data.varicocele);
-                        if (data.tt !== undefined) setTt(data.tt);
-                        if (data.ft !== undefined) setFt(data.ft);
-                        if (data.e2 !== undefined) setE2(data.e2);
-                        if (data.lh !== undefined) setLh(data.lh);
-                        if (data.fsh !== undefined) setFsh(data.fsh);
-                        if (data.prl !== undefined) setPrl(data.prl);
-                        if (data.shbg !== undefined) setShbg(data.shbg);
-                        if (data.inhb !== undefined) setInhb(data.inhb);
-                        if (data.amh !== undefined) setAmh(data.amh);
-                      } catch {}
-                    }} style={{ padding:'10px 14px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.85)', cursor:'pointer', fontWeight:600, fontSize:11 }}>
-                      📂 Загрузить
-                    </button>
+                  {/* 4. Периоды сдачи */}
+                  <FertTimeline />
+
+                  {/* 5. Инструментальные */}
+                  <div style={s.card}>
+                    <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#a855f7' }}>🔬 Инструментальные исследования фертильности</h4>
+                    <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                      {[
+                        { name:'УЗИ мошонки с допплером', purpose:'Кровоток яичек, варикоцеле, объём яичек' },
+                        { name:'Спермограмма + MAR-тест', purpose:'Количество, подвижность, морфология, антиспермальные антитела' },
+                        { name:'Фрагментация ДНК (SCD/Halosperm)', purpose:'Целостность хроматина, DFI < 15%' },
+                        { name:'УЗИ простаты (трансректальное)', purpose:'Исключение инфекции/воспаления' },
+                        { name:'Гормональный профиль (кровь)', purpose:'ЛГ, ФСГ, ТТ, E2, Пролактин, Ингибин В, АМГ' },
+                      ].map((e, i) => (
+                        <div key={i} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.08)' }}>
+                          <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{e.name}</span>
+                          <span style={{ fontSize:9, color:'var(--text-dim)', marginLeft:4 }}>— {e.purpose}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               );

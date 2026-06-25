@@ -851,6 +851,113 @@ export const IndividualPlanSettings: React.FC = () => {
         </div>
       </GlassCard>
 
+        {/* Work Schedule — MOVED FROM INSIDE Циклирование */}
+        <GlassCard title="💼 Работа" icon="💼" color="#60a5fa">
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <div>
+                <div style={{ fontSize:10, fontWeight:700, color: workScheduleEnabled ? '#60a5fa' : 'rgba(255,255,255,0.5)' }}>График работы</div>
+                {!workScheduleEnabled && <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>Рабочие дни, время, смены</div>}
+              </div>
+            </div>
+            <button onClick={() => setWorkScheduleEnabled(!workScheduleEnabled)} style={{
+              padding:'5px 10px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer',
+              background: workScheduleEnabled ? 'rgba(96,165,250,0.1)' : 'rgba(255,255,255,0.04)',
+              border: workScheduleEnabled ? '1px solid rgba(96,165,250,0.2)' : '1px solid rgba(255,255,255,0.06)',
+              color: workScheduleEnabled ? '#60a5fa' : 'rgba(255,255,255,0.5)',
+            }}>{workScheduleEnabled ? '✓ Вкл' : 'Выкл'}</button>
+          </div>
+          {workScheduleEnabled && (
+            <div style={{ marginTop:8 }}>
+              <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>Тип графика</div>
+              <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
+                {[
+                  { id:'standard', label:'📅 Стандарт' },
+                  { id:'sliding', label:'🔄 Скользящий' },
+                  { id:'shift_1_3', label:'1/3' },
+                  { id:'shift_2_2', label:'2/2' },
+                  { id:'shift_day_night', label:'🌙 День/Ночь' },
+                  { id:'shift_2_1', label:'2/1' },
+                  { id:'shift_3_1', label:'3/1' },
+                  { id:'custom', label:'⚙️ Свой' },
+                ].map(t => (
+                  <button key={t.id} onClick={() => setWorkScheduleType(t.id)} style={{
+                    padding:'4px 8px', borderRadius:6, fontSize:7, cursor:'pointer', fontWeight: workScheduleType === t.id ? 700 : 400,
+                    background: workScheduleType === t.id ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.03)',
+                    border: workScheduleType === t.id ? '1px solid rgba(96,165,250,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                    color: workScheduleType === t.id ? '#60a5fa' : 'rgba(255,255,255,0.6)',
+                  }}>{t.label}</button>
+                ))}
+              </div>
+              <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:2 }}>Начало работы</div>
+                  <input type="time" value={workStartTime} onChange={e => setWorkStartTime(e.target.value)} style={{
+                    width:'100%', padding:'5px 8px', borderRadius:6, fontSize:8, background:'#202023',
+                    border:'1px solid rgba(255,255,255,0.06)', color:'#fff', outline:'none', boxSizing:'border-box',
+                  }} />
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:2 }}>Конец работы</div>
+                  <input type="time" value={workEndTime} onChange={e => setWorkEndTime(e.target.value)} style={{
+                    width:'100%', padding:'5px 8px', borderRadius:6, fontSize:8, background:'#202023',
+                    border:'1px solid rgba(255,255,255,0.06)', color:'#fff', outline:'none', boxSizing:'border-box',
+                  }} />
+                </div>
+              </div>
+              {(() => {
+                const descs: Record<string, string> = {
+                  standard: '5/2, работа в будние дни',
+                  sliding: 'Плавающие выходные, дни работы задаются вручную',
+                  shift_1_3: '1 день работа → 3 дня отдых',
+                  shift_2_2: '2 дня работа → 2 дня отдых',
+                  shift_day_night: 'День/ночь/отсыпной/выходной',
+                  shift_2_1: '2 дня работа → 1 день отдых',
+                  shift_3_1: '3 дня работа → 1 день отдых',
+                  custom: 'Ручной выбор рабочих дней',
+                };
+                return (
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', marginBottom:6 }}>
+                    {descs[workScheduleType] || ''}
+                  </div>
+                );
+              })()}
+              {(workScheduleType === 'standard' || workScheduleType === 'sliding' || workScheduleType === 'custom') && (
+                <div style={{ marginTop:6 }}>
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>Рабочие дни</div>
+                  <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
+                    {DAY_LABELS.map((label, idx) => {
+                      const sel = workDays[idx];
+                      return (
+                        <button key={idx} onClick={() => {
+                          const updated = [...workDays];
+                          updated[idx] = !updated[idx];
+                          setWorkDays(updated);
+                        }} style={{
+                          width:32, height:32, borderRadius:'50%', cursor:'pointer', fontSize:9, fontWeight: sel ? 800 : 500,
+                          background: sel ? 'rgba(96,165,250,0.2)' : 'rgba(255,255,255,0.03)',
+                          border: sel ? '2px solid #60a5fa' : '1px solid rgba(255,255,255,0.08)',
+                          color: sel ? '#60a5fa' : 'rgba(255,255,255,0.7)',
+                          transition:'all 0.15s',
+                        }}>{label}</button>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginTop:4, fontSize:8, color:'rgba(255,255,255,0.5)' }}>
+                    <span>💼 {workDays.filter(Boolean).length} рабочих</span>
+                    <span>🌴 {workDays.filter(d => !d).length} выходных</span>
+                  </div>
+                </div>
+              )}
+              {workScheduleType.startsWith('shift_') && (
+                <div style={{ marginTop:6, padding:'6px 8px', borderRadius:6, background:'rgba(96,165,250,0.04)', border:'1px solid rgba(96,165,250,0.08)', fontSize:7, color:'rgba(255,255,255,0.5)', lineHeight:1.5 }}>
+                  🔄 Питание будет адаптировано под сменный график: время приёмов сдвинется относительно начала/конца смены, перекусы на работе включены в план.
+                </div>
+              )}
+            </div>
+          )}
+        </GlassCard>
+
       <GlassCard title="Аллергены и ограничения" icon="⚠️" color="#ef4444">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
           {ALLERGEN_LIST.map(a => (
@@ -1519,110 +1626,6 @@ export const IndividualPlanSettings: React.FC = () => {
           </div>
         )}
 
-        {/* Work Schedule */}
-        <div style={{ marginTop:8, padding:12, borderRadius:12, background: workScheduleEnabled ? 'rgba(96,165,250,0.05)' : 'rgba(255,255,255,0.02)', border: workScheduleEnabled ? '1px solid rgba(96,165,250,0.15)' : '1px solid rgba(255,255,255,0.04)' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-              <span style={{ fontSize:14 }}>💼</span>
-              <div>
-                <div style={{ fontSize:10, fontWeight:700, color: workScheduleEnabled ? '#60a5fa' : 'rgba(255,255,255,0.5)' }}>Работа</div>
-                {!workScheduleEnabled && <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>График работы, смены, время</div>}
-              </div>
-            </div>
-            <button onClick={() => setWorkScheduleEnabled(!workScheduleEnabled)} style={{
-              padding:'5px 10px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer',
-              background: workScheduleEnabled ? 'rgba(96,165,250,0.1)' : 'rgba(255,255,255,0.04)',
-              border: workScheduleEnabled ? '1px solid rgba(96,165,250,0.2)' : '1px solid rgba(255,255,255,0.06)',
-              color: workScheduleEnabled ? '#60a5fa' : 'rgba(255,255,255,0.5)',
-            }}>{workScheduleEnabled ? '✓ Вкл' : 'Выкл'}</button>
-          </div>
-          {workScheduleEnabled && (
-            <div style={{ marginTop:8 }}>
-              <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>Тип графика</div>
-              <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
-                {[
-                  { id:'standard', label:'📅 Стандарт' },
-                  { id:'sliding', label:'🔄 Скользящий' },
-                  { id:'shift_1_3', label:'1/3' },
-                  { id:'shift_2_2', label:'2/2' },
-                  { id:'shift_day_night', label:'🌙 День/Ночь' },
-                  { id:'shift_2_1', label:'2/1' },
-                  { id:'shift_3_1', label:'3/1' },
-                  { id:'custom', label:'⚙️ Свой' },
-                ].map(t => (
-                  <button key={t.id} onClick={() => setWorkScheduleType(t.id)} style={{
-                    padding:'4px 8px', borderRadius:6, fontSize:7, cursor:'pointer', fontWeight: workScheduleType === t.id ? 700 : 400,
-                    background: workScheduleType === t.id ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.03)',
-                    border: workScheduleType === t.id ? '1px solid rgba(96,165,250,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                    color: workScheduleType === t.id ? '#60a5fa' : 'rgba(255,255,255,0.6)',
-                  }}>{t.label}</button>
-                ))}
-              </div>
-              <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:2 }}>Начало работы</div>
-                  <input type="time" value={workStartTime} onChange={e => setWorkStartTime(e.target.value)} style={{
-                    width:'100%', padding:'5px 8px', borderRadius:6, fontSize:8, background:'#202023',
-                    border:'1px solid rgba(255,255,255,0.06)', color:'#fff', outline:'none', boxSizing:'border-box',
-                  }} />
-                </div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:2 }}>Конец работы</div>
-                  <input type="time" value={workEndTime} onChange={e => setWorkEndTime(e.target.value)} style={{
-                    width:'100%', padding:'5px 8px', borderRadius:6, fontSize:8, background:'#202023',
-                    border:'1px solid rgba(255,255,255,0.06)', color:'#fff', outline:'none', boxSizing:'border-box',
-                  }} />
-                </div>
-              </div>
-              {(() => {
-                const descs: Record<string, string> = {
-                  standard: '5/2, работа в будние дни',
-                  sliding: 'Плавающие выходные, дни работы задаются вручную',
-                  shift_1_3: '1 день работа → 3 дня отдых',
-                  shift_2_2: '2 дня работа → 2 дня отдых',
-                  shift_day_night: 'День/ночь/отсыпной/выходной',
-                  shift_2_1: '2 дня работа → 1 день отдых',
-                  shift_3_1: '3 дня работа → 1 день отдых',
-                  custom: 'Ручной выбор рабочих дней',
-                };
-                return (
-                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', marginBottom:6 }}>
-                    {descs[workScheduleType] || ''}
-                  </div>
-                );
-              })()}
-              {(workScheduleType === 'standard' || workScheduleType === 'sliding' || workScheduleType === 'custom') && (
-                <div>
-                  <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginBottom:3 }}>Рабочие дни</div>
-                  <div style={{ display:'flex', gap:3 }}>
-                    {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map((label, idx) => {
-                      const sel = workDays[idx];
-                      return (
-                        <button key={label} onClick={() => {
-                          const updated = [...workDays];
-                          updated[idx] = !updated[idx];
-                          setWorkDays(updated);
-                        }} style={{
-                          width:34, height:34, borderRadius:'50%', cursor:'pointer', fontSize:9,
-                          background: sel ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.03)',
-                          border: sel ? '2px solid #60a5fa' : '1px solid rgba(255,255,255,0.08)',
-                          color: sel ? '#60a5fa' : 'rgba(255,255,255,0.4)',
-                          fontWeight: sel ? 700 : 400,
-                          display:'flex', alignItems:'center', justifyContent:'center',
-                        }}>{label}</button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              {workScheduleType.startsWith('shift_') && (
-                <div style={{ marginTop:4, fontSize:8, color:'#60a5fa', padding:'6px 8px', borderRadius:6, background:'rgba(96,165,250,0.06)' }}>
-                  🔄 Питание будет адаптировано под сменный график: время приёмов сдвинется относительно начала/конца смены, перекусы на работе включены в план.
-                </div>
-              )}
-            </div>
-          )}
-        </div>
       </GlassCard>
 
       {/* Weight adaptation modal */}
@@ -1802,73 +1805,7 @@ export const IndividualPlanSettings: React.FC = () => {
         </GlassCard>
       )}
 
-      <GlassCard title="⏸ Диетические паузы" icon="⏸" color="#f97316">
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
-          Периодические паузы в дефиците калорий помогают избежать метаболической адаптации, восстановить гормональный фон и психическую устойчивость.
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
-          {[
-            { icon: '🕐', text: 'После 4-6 нед дефицита — метаболическая адаптация снижает TDEE на 10-20%' },
-            { icon: '📉', text: 'При снижении адаптации — жиросжигание замедляется, появляется плато' },
-            { icon: '🍔', text: 'Перед читмилом — чтобы получить максимум от рефида, а не отложение жира' },
-          ].map((item, i) => (
-            <div key={i} style={{
-              padding: '8px 10px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6,
-              background: 'rgba(249,115,22,0.04)', border: '1px solid rgba(249,115,22,0.08)',
-            }}>
-              <span style={{ fontSize: 14 }}>{item.icon}</span>
-              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)' }}>{item.text}</span>
-            </div>
-          ))}
-        </div>
-        {(() => {
-          const raw = localStorage.getItem('he_diet_pause');
-          const activePause = raw ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : null;
-          if (activePause?.active) {
-            const start = new Date(activePause.startDate);
-            const end = new Date(start);
-            end.setDate(end.getDate() + (activePause.durationWeeks || 1) * 7);
-            const today = new Date();
-            const daysLeft = Math.max(0, Math.ceil((end.getTime() - today.getTime()) / 86400000));
-            return (
-              <div style={{
-                padding: '10px 12px', borderRadius: 10,
-                background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: '#22c55e' }}>✅ Пауза активна</span>
-                  <button onClick={() => { localStorage.setItem('he_diet_pause', JSON.stringify({ active: false, startDate: '', durationWeeks: 1 })); window.location.reload(); }} style={{
-                    padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 8, fontWeight: 600,
-                    background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444',
-                  }}>✕ Отменить</button>
-                </div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
-                  <div>Начало: {new Date(activePause.startDate).toLocaleDateString('ru-RU')}</div>
-                  <div>Длительность: {activePause.durationWeeks} {activePause.durationWeeks === 1 ? 'неделя' : 'недели'}</div>
-                  <div>Осталось: <strong style={{ color: daysLeft <= 3 ? '#ef4444' : '#22c55e' }}>{daysLeft} дн.</strong></div>
-                </div>
-              </div>
-            );
-          }
-          return (
-            <div style={{ display: 'flex', gap: 6 }}>
-              {([1, 2] as const).map(w => (
-                <button key={w} onClick={() => {
-                  const now = new Date();
-                  const startStr = now.toISOString().split('T')[0];
-                  localStorage.setItem('he_diet_pause', JSON.stringify({ active: true, startDate: startStr, durationWeeks: w }));
-                  window.location.reload();
-                }} style={{
-                  flex: 1, padding: '8px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600,
-                  background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)', color: '#f97316',
-                }}>
-                  🗓 Запланировать на {w} {w === 1 ? 'неделю' : 'недели'}
-                </button>
-              ))}
-            </div>
-          );
-        })()}
-      </GlassCard>
+
 
       {/* B1 — SpecialMealPopup */}
       <GlassCard title="➕ Спецприём" icon="🍽️" color="#f97316">

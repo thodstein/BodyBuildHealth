@@ -2216,20 +2216,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 <div style={{ display:'flex', gap:6, marginBottom:8, alignItems:'center' }}>
                   <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-light)', fontSize:12 }} />
                 </div>
-                {/* Category filter pills */}
-                <div style={{ display:'flex', gap:3, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  {[['all','🔍 Все'],['vitamin','💊 Витамины'],['mineral','⚡ Минералы'],['amino','🧬 АК'],['fatty_acid','🐟 ЖК'],['antioxidant','🛡️ Антиоксиданты'],['nootropic','🧠 Ноотропы'],['adaptogen','🌿 Адаптогены'],['herb','🌿 Травы'],['mushroom','🍄 Грибы'],['peptide','🧬 Пептиды'],['hormonal','⚖️ Гормоны'],['pharma','💊 Фарма'],['cardioprotector','❤️ Сердце'],['hepatoprotector','🫁 Печень'],['neuroprotector','🧠 Нейро'],['immunomodulator','🛡️ Иммунитет'],['gut','🫁 ЖКТ'],['joint','🦴 Суставы'],['anti_inflammatory','🔥 Воспаление'],['metabolic','⚡ Метаболизм']].map(([key, label]) => {
-                    const isSel = categoryFilter === key;
-                    return (
-                      <button key={key} onClick={() => setCategoryFilter(isSel ? 'all' : key)} style={{
-                        padding:'3px 8px', borderRadius:10, fontSize:8, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap',
-                        background: isSel ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
-                        color: isSel ? '#000' : 'rgba(255,255,255,0.7)',
-                        border: `1px solid ${isSel ? 'var(--accent)' : 'rgba(255,255,255,0.08)'}`,
-                      }}>{label}</button>
-                    );
-                  })}
-                </div>
+                <div style={{height:4}} />
                 {/* Tier filter buttons */}
                 <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
                   {(['all','core','standard','advanced','specialty'] as const).map(tier => {
@@ -3657,21 +3644,21 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               <p style={{ margin:'4px 0 0' }}>План можно сохранить в избранное, экспортировать или добавить всё в корзину магазина.</p>
             </div>
 
-            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#f59e0b' }}>⚠️ Важные замечания</h3>
-              <div style={{ margin:0 }}>
-                <p style={{ margin:'0 0 4px' }}><b>Информация носит ознакомительный характер.</b> Подбор поддержки должен производиться врачом или профильным специалистом с учётом индивидуальных особенностей: возраста, веса, генетических полиморфизмов (MTHFR, COMT, CYP), сопутствующих заболеваний и принимаемых лекарств.</p>
-                <p style={{ margin:'0 0 4px' }}><b>Без лабораторных данных</b> система использует среднестатистические риски по курсу. Для точного подбора необходимы свежие анализы (не старше 3 месяцев).</p>
-                <p style={{ margin:0 }}><b>Противопоказания:</b> некоторые вещества несовместимы с определёнными заболеваниями или лекарствами. Если вы принимаете варфарин, антидепрессанты, антипсихотики, антигипертензивные — проконсультируйтесь со специалистом.</p>
-              </div>
-            </div>
-
           </div>
         </div>
       )}
 
       {section === 'protocols' && (
         <div style={{ padding:'0 12px 12px' }}>
+          {/* Warning card — важные замечания */}
+          <div style={{ borderRadius:12, padding:14, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)', marginBottom:8 }}>
+            <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#f59e0b' }}>⚠️ Важные замечания</h3>
+            <div style={{ margin:0 }}>
+              <p style={{ margin:'0 0 4px', fontSize:9, lineHeight:1.3 }}><b>Информация носит ознакомительный характер.</b> Подбор поддержки должен производиться врачом или профильным специалистом с учётом индивидуальных особенностей: возраста, веса, генетических полиморфизмов (MTHFR, COMT, CYP), сопутствующих заболеваний и принимаемых лекарств.</p>
+              <p style={{ margin:'0 0 4px', fontSize:9, lineHeight:1.3 }}><b>Без лабораторных данных</b> система использует среднестатистические риски по курсу. Для точного подбора необходимы свежие анализы (не старше 3 месяцев).</p>
+              <p style={{ margin:0, fontSize:9, lineHeight:1.3 }}><b>Противопоказания:</b> некоторые вещества несовместимы с определёнными заболеваниями или лекарствами. Если вы принимаете варфарин, антидепрессанты, антипсихотики, антигипертензивные — проконсультируйтесь со специалистом.</p>
+            </div>
+          </div>
           {/* Unified protocol sub-tab pills (6 protocols — peptides removed) */}
           <div style={{ display:'flex', gap:4, padding:'4px 0 8px', overflowX:'auto', scrollbarWidth:'none' }}>
             {[['pct','ПКТ','#8b5cf6'],['fertility','Фертильность','#ec4899'],['hrt','ГЗТ','#f59e0b'],['neuro','Нейро','#06b6d4'],['joints','Суставы','#22c55e'],['acne','Акне','#ef4444']].map(([id,label,color]) => (
@@ -3696,8 +3683,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Механизмы нейротоксичности, калькулятор риска и многоуровневый протокол нейропротекции.</p>
               <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
                 {[
-                  { id:'calc', label:'🧮 Калькулятор' },
-                  { id:'mechanisms', label:'🔬 Механизмы' },
+                  { id:'mechanisms', label:'🔬 Симптомы и механизмы' },
                   { id:'support', label:'💊 Протокол' },
                 ].map(t => (
                   <button key={t.id} onClick={() => setNeuroTab(t.id as any)} style={{
@@ -3708,78 +3694,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   }}>{t.label}</button>
                 ))}
               </div>
-              {neuroTab === 'calc' && (<>
-                <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, marginBottom:8, border:'1px solid var(--border)' }}>
-                  {uniqueCompounds.length > 0 ? (<div style={{ marginBottom:8 }}>
-                    <div style={{ fontSize:10, fontWeight:700, color:'var(--text-light)', marginBottom:4 }}>💊 Соединения курса</div>
-                    {uniqueCompounds.map((c, i) => {
-                      const isSel = neuroSelected.includes(c.cls);
-                      const ph = (PHARMA_DB as any)[c.substanceId];
-                      const neuroToxPd = ph?.pd?.neuro_toxicity ?? 0;
-                      return (
-                        <div key={i} style={{ padding:'6px 8px', borderRadius:6, marginBottom:4, background:isSel?'rgba(236,72,153,0.08)':'rgba(255,255,255,0.02)', border:'1px solid '+(isSel?'rgba(236,72,153,0.25)':'var(--border)') }}>
-                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                            <label style={{ display:'flex', alignItems:'center', gap:6, flex:1, cursor:'pointer', fontSize:9, userSelect:'none' }}>
-                              <input type="checkbox" checked={isSel} onChange={() => setNeuroSelected(prev=>prev.includes(c.cls)?prev.filter(x=>x!==c.cls):[...prev,c.cls])} style={{ accentColor:'#ec4899' }} />
-                              <span style={{ color:'var(--text-light)', fontWeight:600 }}>{c.name}</span>
-                              <span style={{ fontSize:7, color:'var(--text-dim)', background:'rgba(255,255,255,0.05)', padding:'1px 4px', borderRadius:3 }}>PD:{neuroToxPd}</span>
-                            </label>
-                            {isSel && (
-                              <div style={{ display:'flex', alignItems:'center', gap:3 }}>
-                                <input type="number" value={neuroDoses[c.cls]||''} onChange={e=>setNeuroDoses(prev=>({...prev,[c.cls]:Number(e.target.value)||0}))} style={{ width:55, padding:'3px 5px', borderRadius:4, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:9, textAlign:'center' }} />
-                                <span style={{ fontSize:7, color:'var(--text-dim)' }}>мг/нед</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>) : (
-                    <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8, padding:8, background:'rgba(245,158,11,0.08)', borderRadius:6, border:'1px solid rgba(245,158,11,0.2)' }}>
-                      ⚠ Нет активных соединений. Добавьте препараты во вкладке Фарма.
-                    </div>
-                  )}
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
-                    <div><div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:2 }}>⏱ Длительность курса (нед)</div><input type="number" value={neuroDuration} onChange={e=>setNeuroDuration(Math.max(1,Math.min(52,Number(e.target.value)||1)))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'rgba(0,0,0,0.15)', color:'var(--text)', fontSize:12, fontWeight:700, textAlign:'center', boxSizing:'border-box' }} /></div>
-                    <div><div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:2 }}>🎂 Возраст</div><input type="number" value={neuroAge} onChange={e=>setNeuroAge(Math.max(18,Math.min(80,Number(e.target.value)||18)))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'rgba(0,0,0,0.15)', color:'var(--text)', fontSize:12, fontWeight:700, textAlign:'center', boxSizing:'border-box' }} /></div>
-                  </div>
-                  <div style={{ background: (neuroScore>70?'#ef4444':neuroScore>40?'#f59e0b':'#22c55e')+'18', borderRadius:12, padding:14, marginBottom:8, border:'2px solid '+(neuroScore>70?'#ef4444':neuroScore>40?'#f59e0b':'#22c55e')+'44', textAlign:'center' }}>
-                    <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Общий индекс нейротоксичности</div>
-                    <div style={{ fontSize:36, fontWeight:800, color:neuroScore>70?'#ef4444':neuroScore>40?'#f59e0b':'#22c55e', lineHeight:1 }}>{neuroScore}</div>
-                    <div style={{ fontSize:12, fontWeight:700, color:neuroScore>70?'#ef4444':neuroScore>40?'#f59e0b':'#22c55e', marginTop:4 }}>{neuroScore>70?'🔴 Критический':neuroScore>40?'🟡 Средний':'🟢 Низкий'}</div>
-                    <div style={{ marginTop:6, height:5, borderRadius:3, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
-                      <div style={{ width:neuroScore+'%', height:'100%', borderRadius:3, background:'linear-gradient(90deg, #22c55e, #f59e0b 50%, #f97316 70%, #ef4444)', transition:'width 0.5s' }} />
-                    </div>
-                  </div>
-                  {/* Symptoms reference */}
-                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:10, marginBottom:8, border:'1px solid var(--border)' }}>
-                    <div style={{ fontSize:10, fontWeight:700, color:'#ef4444', marginBottom:4 }}>🩺 Симптомы нейротоксичности</div>
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                      {['Депрессия','Тревожность','Агрессия','Нарушение сна','Когнитивное снижение','Потеря памяти','Ангедония','Импульсивность','Спутанность сознания','Эмоц. нестабильность'].map((s,i)=>(<span key={i} style={{fontSize:7,padding:'3px 7px',borderRadius:10,background:'rgba(239,68,68,0.08)',color:'#fca5a5',border:'1px solid rgba(239,68,68,0.15)'}}>⚠ {s}</span>))}
-                    </div>
-                  </div>
-                  {/* Monitoring */}
-                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:10, border:'1px solid var(--border)' }}>
-                    <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>📊 Мониторинг</div>
-                    <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                      {[
-                        { label:'BDNF (нейротрофический фактор мозга)', desc:'Маркер нейропластичности', target:'> 20 нг/мл' },
-                        { label:'Нейропсихологическая оценка', desc:'Тесты памяти, внимания', target:'Каждые 3-6 мес' },
-                        { label:'Кортизол (утренний)', desc:'Гиперкортизолемия усугубляет', target:'10-20 мкг/дл' },
-                        { label:'Пролактин', desc:'Гиперпролактинемия → депрессия', target:'< 15 нг/мл' },
-                      ].map((m,i)=>(
-                        <div key={i} style={{ padding:'4px 6px', borderRadius:6, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.08)' }}>
-                          <div style={{ display:'flex', justifyContent:'space-between' }}>
-                            <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{m.label}</span>
-                            <span style={{ fontSize:7, fontWeight:600, color:'#60a5fa' }}>{m.target}</span>
-                          </div>
-                          <div style={{ fontSize:7, color:'var(--text-dim)' }}>{m.desc}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </>)}
               {neuroTab === 'mechanisms' && (
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                   <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
@@ -3838,6 +3752,35 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         </div>
                       </div>
                     ))}
+                  </div>
+                  {/* Symptoms reference — from old calculator */}
+                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:10, border:'1px solid var(--border)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:6 }}>🩺 Симптомы нейротоксичности</div>
+                    <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 6px', lineHeight:1.3 }}>При появлении любых из этих симптомов на курсе ААС — немедленно подключите нейропротекцию (вкладка "Протокол") и рассмотрите снижение доз.</p>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      {['Депрессия','Тревожность','Агрессия','Нарушение сна','Когнитивное снижение','Потеря памяти','Ангедония','Импульсивность','Спутанность сознания','Эмоц. нестабильность'].map((s,i)=>(<span key={i} style={{fontSize:8,padding:'4px 8px',borderRadius:10,background:'rgba(239,68,68,0.08)',color:'#fca5a5',border:'1px solid rgba(239,68,68,0.15)'}}>⚠ {s}</span>))}
+                    </div>
+                  </div>
+                  {/* Monitoring — from old calculator */}
+                  <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📊 Мониторинг нейротоксичности</div>
+                    <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Регулярный лабораторный контроль позволяет выявить нейротоксические изменения на ранней стадии.</p>
+                    <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                      {[
+                        { label:'BDNF (нейротрофический фактор мозга)', desc:'Маркер нейропластичности', target:'> 20 нг/мл' },
+                        { label:'Нейропсихологическая оценка', desc:'Тесты памяти, внимания, скорости реакции', target:'Каждые 3-6 мес' },
+                        { label:'Кортизол (утренний)', desc:'Гиперкортизолемия усугубляет нейротоксичность', target:'10-20 мкг/дл' },
+                        { label:'Пролактин', desc:'Гиперпролактинемия → депрессия, ангедония', target:'< 15 нг/мл' },
+                      ].map((m,i)=>(
+                        <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.08)' }}>
+                          <div style={{ display:'flex', justifyContent:'space-between' }}>
+                            <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{m.label}</span>
+                            <span style={{ fontSize:8, fontWeight:600, color:'#60a5fa' }}>{m.target}</span>
+                          </div>
+                          <div style={{ fontSize:8, color:'var(--text-dim)' }}>{m.desc}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
