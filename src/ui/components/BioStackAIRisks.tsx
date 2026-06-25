@@ -66,6 +66,34 @@ export function RisksTab({ profile, stackIds }: { profile: BioStackProfile; stac
   const severityLabel = (s: string) => s === 'HIGH' ? '🔴 Высокий' : s === 'MEDIUM' ? '🟡 Средний' : '🟢 Низкий';
   const typeIcon = (t: string) => t === 'conflict' ? '🚫' : t === 'caution' ? '⚡' : t === 'synergy' ? '🤝' : '➖';
 
+  // ── Interaction Network Graph ──
+  const graphNodes = stackIds.map((id, i) => {
+    const cat = SUPPORT_CATALOG_DATA[id];
+    return { id, label: cat?.nameRu || cat?.name || id, idx: i };
+  });
+  const angles = graphNodes.map((_, i) => (2 * Math.PI * i) / graphNodes.length - Math.PI / 2);
+  const cx = 50, cy = 50, r = 38;
+  const positions = angles.map(a => ({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }));
+  const pairKey = (a: string, b: string) => [a, b].sort().join('|');
+  const pairMap = new Map<string, typeof analysis.pairs[0]>();
+  analysis.pairs.forEach(p => pairMap.set(pairKey(p.a, p.b), p));
+
+  const interColor = (type: string, severity: string) => {
+    if (type === 'conflict' && severity === 'HIGH') return '#ef4444';
+    if (type === 'conflict' && severity === 'MEDIUM') return '#f97316';
+    if (type === 'caution') return '#f59e0b';
+    if (type === 'synergy') return '#22c55e';
+    return 'rgba(255,255,255,0.1)';
+  };
+  const interWidth = (type: string, severity: string) => {
+    if (type === 'conflict' && severity === 'HIGH') return 3;
+    if (type === 'conflict' && severity === 'MEDIUM') return 2;
+    return 1.5;
+  };
+  const interDash = (type: string) => type === 'synergy' ? '' : '5,3';
+
+  const [graphTab, setGraphTab] = useState<'graph' | 'list'>('list');
+
   const SectionCard: React.FC<{ title: string; icon: string; color: string; items: typeof analysis.critical; defaultOpen?: boolean }> =
     ({ title, icon, color, items, defaultOpen }) => (
     <GlassCard title={`${icon} ${title} (${items.length})`} color={color}>
@@ -134,7 +162,61 @@ export function RisksTab({ profile, stackIds }: { profile: BioStackProfile; stac
           <StatBox label="Умеренных" value={analysis.moderate.length} color="#f59e0b" />
           <StatBox label="Безопасных" value={analysis.cumulative.length} color="#22c55e" />
         </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button onClick={() => setGraphTab('list')} style={{
+            flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+            background: graphTab === 'list' ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${graphTab === 'list' ? 'rgba(0,230,138,0.2)' : 'rgba(255,255,255,0.06)'}`,
+            color: graphTab === 'list' ? '#00e68a' : 'rgba(255,255,255,0.5)',
+          }}>📋 Список</button>
+          <button onClick={() => setGraphTab('graph')} style={{
+            flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+            background: graphTab === 'graph' ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${graphTab === 'graph' ? 'rgba(0,230,138,0.2)' : 'rgba(255,255,255,0.06)'}`,
+            color: graphTab === 'graph' ? '#00e68a' : 'rgba(255,255,255,0.5)',
+          }}>🕸️ Граф</button>
+        </div>
       </GlassCard>
+
+      {/* Graph view */}
+      {graphTab === 'graph' && (
+        <GlassCard title="🕸️ Граф взаимодействий" icon="🕸️" color="#8b5cf6">
+          <svg viewBox="0 0 100 100" style={{ width: '100%', height: 220, background: 'rgba(0,0,0,0.15)', borderRadius: 12 }}>
+            {(() => {
+              const drawn = new Set<string>();
+              return analysis.pairs.map(p => {
+                const k = pairKey(p.a, p.b);
+                if (drawn.has(k)) return null;
+                drawn.add(k);
+                const i1 = stackIds.indexOf(p.a), i2 = stackIds.indexOf(p.b);
+                if (i1 === -1 || i2 === -1) return null;
+                const p1 = positions[i1], p2 = positions[i2];
+                return (
+                  <line key={k} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
+                    stroke={interColor(p.type, p.severity)} strokeWidth={interWidth(p.type, p.severity)}
+                    strokeDasharray={interDash(p.type)} opacity={0.7} />
+                );
+              });
+            })()}
+            {graphNodes.map((n, i) => {
+              const p = positions[i];
+              const criticalCount = analysis.critical.filter(x => x.a === n.id || x.b === n.id).length;
+              return (
+                <g key={n.id}>
+                  <circle cx={p.x} cy={p.y} r={5} fill={criticalCount > 0 ? '#ef4444' : criticalCount > 1 ? '#f59e0b' : '#1a1a1e'} stroke={criticalCount > 0 ? '#ef4444' : '#00e68a'} strokeWidth={1.2} />
+                  <text x={p.x} y={p.y + 10} textAnchor="middle" fill="rgba(255,255,255,0.8)" fontSize={3.5} fontWeight={600}>{n.label}</text>
+                </g>
+              );
+            })}
+          </svg>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>
+            <span><span style={{ color: '#ef4444' }}>━</span> Конфликт</span>
+            <span><span style={{ color: '#f59e0b' }}>- -</span> Осторожно</span>
+            <span><span style={{ color: '#22c55e' }}>━</span> Синергия</span>
+            <span><span style={{ color: 'rgba(255,255,255,0.15)' }}>- -</span> Нет данных</span>
+          </div>
+        </GlassCard>
+      )}
 
       <SectionCard title="🔴 Критические" icon="🚫" color="#ef4444" items={analysis.critical} defaultOpen={true} />
       <SectionCard title="🟡 Умеренные" icon="⚡" color="#f59e0b" items={analysis.moderate} defaultOpen={true} />

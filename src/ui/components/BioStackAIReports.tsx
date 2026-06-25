@@ -9,6 +9,7 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
     try { return JSON.parse(localStorage.getItem('he_biostack_reports') || '[]'); } catch { return []; }
   });
   const [currentReport, setCurrentReport] = useState<string>('');
+  const [reportMode, setReportMode] = useState<'standard' | 'doctor'>('standard');
 
   const explanation = useMemo(() => {
     if (stackIds.length === 0) return null;
@@ -19,6 +20,58 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
     if (!explanation || stackIds.length === 0) { setCurrentReport('❌ Стек пуст. Добавьте препараты через 🔍 Поиск или 🧩 Сборка.'); return; }
     const catData = SUPPORT_CATALOG_DATA;
     const date = new Date().toLocaleString('ru-RU');
+
+    if (reportMode === 'doctor') {
+      const lines: string[] = [];
+      lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      lines.push('  📋 ОТЧЁТ ДЛЯ ВРАЧА');
+      lines.push('  BioStack AI — сводка текущей фармакологической поддержки');
+      lines.push(`  📅 ${date}`);
+      lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      lines.push('');
+      lines.push('👤 ПРОФИЛЬ ПАЦИЕНТА:');
+      lines.push(`  • Возраст: ${profile.age || '—'}`);
+      lines.push(`  • Пол: ${profile.sex === 'male' ? 'Мужской' : profile.sex === 'female' ? 'Женский' : '—'}`);
+      lines.push(`  • Вес: ${profile.weight || '—'} кг • Рост: ${profile.height || '—'} см`);
+      lines.push(`  • Стаж: ${profile.experience || '—'} лет`);
+      lines.push(`  • Цели: ${(profile.goals || []).filter(Boolean).join(', ') || '—'}`);
+      lines.push('');
+      lines.push('💊 ТЕКУЩИЙ СТЕК ПОДДЕРЖКИ:');
+      lines.push(`  Всего компонентов: ${stackIds.length}`);
+      explanation.substances.forEach(s => {
+        const cat = catData[s.id];
+        const name = cat?.nameRu || cat?.name || s.name;
+        const dose = s.dose || (cat?.dosage?.mg ? `${cat.dosage.mg} мг` : '—');
+        const timing = cat?.dosage?.timing || (cat as any)?.timingDosage || '—';
+        lines.push(`  • ${name}`);
+        lines.push(`    💊 Дозировка: ${dose}`);
+        lines.push(`    ⏱ Приём: ${timing}`);
+        lines.push(`    🧬 Механизм: ${s.mechanism}`);
+        if (cat?.organs && cat.organs.length > 0) lines.push(`    🫀 Органы-мишени: ${cat.organs.join(', ')}`);
+      });
+      lines.push('');
+      lines.push('⚕️ КЛИНИЧЕСКИ ЗНАЧИМЫЕ ВЗАИМОДЕЙСТВИЯ:');
+      const warnings = explanation.warnings || [];
+      if (warnings.length > 0) {
+        warnings.forEach(w => lines.push(`  ⚠ ${w}`));
+      } else {
+        lines.push('  ✅ Критических взаимодействий не выявлено');
+      }
+      lines.push('');
+      lines.push('📊 ПОКАЗАТЕЛИ СТЕКА:');
+      lines.push(`  • Интегральная синергия: ${explanation.totalSynergyScore}`);
+      lines.push(`  • Покрытие целей: ${explanation.completeness}%`);
+      lines.push(`  • Дозировки указаны: ${explanation.totalDoseCount}/${stackIds.length}`);
+      lines.push('');
+      lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      lines.push('  Сгенерировано BioStack AI — https://body-build-health.vercel.app');
+      lines.push('  Данный отчёт не является медицинским заключением.');
+      lines.push('  Проконсультируйтесь с врачом перед приёмом любых БАД.');
+      const text = lines.join('\n');
+      setCurrentReport(text);
+      return;
+    }
+
     const lines: string[] = [];
     lines.push('═══════════════════════════════════════════');
     lines.push(`  🧬 BioStack AI — Отчёт стека`);
@@ -85,6 +138,20 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
           Стек: <strong>{stackIds.length} компонентов</strong>
           {explanation && ` • Синергия: ${explanation.totalSynergyScore} • Покрытие: ${explanation.completeness}%`}
+        </div>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+          <button onClick={() => setReportMode('standard')} style={{
+            flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+            background: reportMode === 'standard' ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${reportMode === 'standard' ? 'rgba(0,230,138,0.2)' : 'rgba(255,255,255,0.06)'}`,
+            color: reportMode === 'standard' ? '#00e68a' : 'rgba(255,255,255,0.5)',
+          }}>📄 Стандартный</button>
+          <button onClick={() => setReportMode('doctor')} style={{
+            flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+            background: reportMode === 'doctor' ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${reportMode === 'doctor' ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.06)'}`,
+            color: reportMode === 'doctor' ? '#8b5cf6' : 'rgba(255,255,255,0.5)',
+          }}>🩺 К врачу</button>
         </div>
         <button onClick={handleGenerate} style={{
           width: '100%', padding: '10px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer', marginBottom: 6,

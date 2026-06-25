@@ -489,7 +489,7 @@ export const TrainingScreen: React.FC = () => {
       )}
 
       {/* ═══════════ PLAN TAB ═══════════ */}
-      {tab === 'srcbb' && <SRCBBScreen track={planningTrack === 'manual' ? 'auto' : planningTrack} />}
+      {tab === 'srcbb' && <SRCBBScreen key={planningTrack} track={planningTrack === 'manual' ? 'auto' : planningTrack} />}
           {tab === 'plan' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div className="card" style={{ padding: '10px 12px' }}>

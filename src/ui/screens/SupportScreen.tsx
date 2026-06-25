@@ -1273,11 +1273,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       const allMechs = new Set<string>();
       const synergies: any[] = [];
       for (let a = 0; a < stack.substances.length; a++) {
-        const sa = stack.substances[a];
+        const sa = stack.substances[a].id;
         const subA = catalogSubstances.find(s => s.id === sa);
         if (subA?.mechanisms) subA.mechanisms.forEach(m => allMechs.add(m));
         for (let b = a + 1; b < stack.substances.length; b++) {
-          const sb = stack.substances[b];
+          const sb = stack.substances[b].id;
           const key = `${sa}||${sb}`;
           const intx = conflictLookup.get(key);
           if (intx && intx.type === 'synergy') {
@@ -1444,7 +1444,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const q = stackSearch.toLowerCase();
     return list.filter(s =>
       (s.effects||[]).some(e => ((EFFECT_LABELS_ru[e] || e)||'').toLowerCase().includes(q)) ||
-      (s.substances||[]).some(sid => (getStackSubLabel(sid)||'').toLowerCase().includes(q))
+      (s.substances||[]).some(sub => (getStackSubLabel(sub.id)||'').toLowerCase().includes(q))
     );
   }, [stackSearch, stackFilterCount]);
 
@@ -1616,7 +1616,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         if (searchText.includes(eq)) { score += 20; reasons.push('совпадает с запросом'); }
       }
       if (score > 0 || (!organ && !mech && eq)) {
-        const subNames = (stack.substances||[]).map(sid => getSubstanceName(sid)).join(', ');
+        const subNames = (stack.substances||[]).map(sub => getSubstanceName(sub.id)).join(', ');
         if (!organ && !mech && !eq) continue;
         if (!score) score = 30;
         results.push({ id: stack.id, name: getStackDisplayName(stack), type: 'stack', score: Math.min(100, score), reason: reasons.concat([`${stack.substances.length} веществ`]).join('; ') || `стек из ${stack.substances.length} веществ`, pros: [`синергия ${stack.synergyScore}%`, ...(stack.effects||[]).slice(0,3)], cons: [], substanceCount: stack.substances.length });
@@ -3026,12 +3026,12 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                 onClick={() => setExpandedMed(expandedMed === stack.id ? null : stack.id)}>
                                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:3 }}>
                                   <div style={{ display:'flex', flexWrap:'wrap', gap:2, flex:1 }}>
-                                    {stack.effects.map(e => <span key={e} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a', fontWeight:500 }}>{EFFECT_LABELS_ru[e]||e}</span>)}
+                                    {(stack.effects||[]).map(e => <span key={e} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a', fontWeight:500 }}>{EFFECT_LABELS_ru[e]||e}</span>)}
                                   </div>
                                   <span style={{ fontSize:11, fontWeight:800, color:synergyColor, marginLeft:4 }}>{(stack.synergyScore||0).toFixed(1)}</span>
                                 </div>
                                 <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:expandedMed === stack.id ? 4 : 0 }}>
-                                  {stack.substances.map(sid => <span key={sid} style={{ fontSize:8, padding:'1px 6px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.12)', color:'#a78bfa', fontWeight:600 }}>{getStackSubLabel(sid)}<button onClick={(e) => { e.stopPropagation(); setStackBuilder(prev => prev.includes(sid) ? prev : [...prev, sid]); }} style={{ padding:'3px 8px', borderRadius:4, fontSize:9, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'none', color:'#00e68a', fontWeight:700, marginLeft:2, minWidth:22 }} title="Добавить в стек">+</button></span>)}
+                                  {stack.substances.map(sub => <span key={sub.id} style={{ fontSize:8, padding:'1px 6px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.12)', color:'#a78bfa', fontWeight:600 }}>{getStackSubLabel(sub.id)}<button onClick={(e) => { e.stopPropagation(); setStackBuilder(prev => prev.includes(sub.id) ? prev : [...prev, sub.id]); }} style={{ padding:'3px 8px', borderRadius:4, fontSize:9, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'none', color:'#00e68a', fontWeight:700, marginLeft:2, minWidth:22 }} title="Добавить в стек">+</button></span>)}
                                 </div>
                                 <div style={{ fontSize:7, color:'var(--text-dim)' }}>{stack.substances.length} веществ</div>
                                 {expandedMed === stack.id && safeRender('stack_'+stack.id, () =>
@@ -3044,7 +3044,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     <div style={{ marginBottom:4 }}>
                                       <div style={{ fontSize:8, fontWeight:700, color:'#22c55e', marginBottom:3 }}>⊕ Положительные эффекты</div>
                                       <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                                        {stack.effects.map(e => (
+                                        {(stack.effects||[]).map(e => (
                                           <span key={e} style={{ fontSize:7, padding:'2px 6px', borderRadius:4, background:'rgba(34,197,94,0.1)', color:'#4ade80', fontWeight:600 }}>
                                             {EFFECT_LABELS_ru[e] || e}
                                           </span>
@@ -3053,7 +3053,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     </div>
                                     {/* Why this stack works — detailed */}
                                     {(() => {
-                                      const subs = stack.substances.map(sid => catalogSubstances.find(s => s.id === sid)).filter(Boolean) as any[];
+                                      const subs = stack.substances.map(sub => catalogSubstances.find(s => s.id === sub.id)).filter(Boolean) as any[];
                                       const allMechs = new Set<string>();
                                       subs.forEach(s => { if (s?.mechanisms) s.mechanisms.forEach((m:string) => allMechs.add(m)); });
                                       const uniqueMechs = [...allMechs].filter(m => subs.filter(s => (s?.mechanisms||[]).includes(m)).length >= Math.min(2, subs.length));
@@ -3103,12 +3103,12 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     {/* Substance breakdown */}
                                     <div style={{ marginBottom:4 }}>
                                       <div style={{ fontSize:8, fontWeight:700, color:'var(--text-light)', marginBottom:2 }}>🧬 Компоненты</div>
-                                      {stack.substances.map(sid => {
-                                        const subInfo = catalogSubstances.find(s => s.id === sid);
+                                      {stack.substances.map(sub => {
+                                        const subInfo = catalogSubstances.find(s => s.id === sub.id);
                                         const cat = subInfo?.categories?.[0];
                                         return (
-                                          <div key={sid} style={{ fontSize:7, color:'var(--text-dim)', padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.04)', lineHeight:1.4 }}>
-                                            <b style={{ color:'#a78bfa' }}>{getStackSubLabel(sid)}</b>
+                                          <div key={sub.id} style={{ fontSize:7, color:'var(--text-dim)', padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.04)', lineHeight:1.4 }}>
+                                            <b style={{ color:'#a78bfa' }}>{getStackSubLabel(sub.id)}</b>
                                             {cat && <span style={{ marginLeft:4, opacity:0.6 }}>· {getCategoryInfo(cat).label}</span>}
                                             {subInfo?.description && <div style={{ opacity:0.7 }}>{subInfo.description}</div>}
                                           </div>
@@ -3120,9 +3120,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                       const pairs: string[] = [];
                                       for (let a = 0; a < (stack.substances||[]).length; a++) {
                                         for (let b = a + 1; b < (stack.substances||[]).length; b++) {
-                                          const key = `${stack.substances[a]||''}||${stack.substances[b]||''}`;
+                                          const key = `${stack.substances[a].id||''}||${stack.substances[b].id||''}`;
                                           const found = conflictLookup.get(key);
-                                          if (found && found.type !== 'synergy') pairs.push(`${getStackSubLabel(stack.substances[a])} + ${getStackSubLabel(stack.substances[b])}: ${found.effect} (${found.severity})`);
+                                          if (found && found.type !== 'synergy') pairs.push(`${getStackSubLabel(stack.substances[a].id)} + ${getStackSubLabel(stack.substances[b].id)}: ${found.effect} (${found.severity})`);
                                         }
                                       }
                                       return pairs.length > 0 ? (
@@ -3600,24 +3600,24 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                      </div>
                                    )}
                                    <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}>Состав:</div>
-                                  {stack.substances.map(sid => {
-                                    const sub = catalogSubstances.find(x => x.id === sid);
-                                    return (
-                                      <div key={sid} style={{ padding:'4px 6px', marginBottom:3, borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.04)' }}>
-                                        <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:9 }}>
-                                          <span style={{ color:'var(--accent)', fontWeight:700, flex:1 }}>{getStackSubLabel(sid)}</span>
-                                          {sub?.description && <span style={{ color:'rgba(255,255,255,0.4)', fontSize:7.5 }}>{sub.description}</span>}
-                                        </div>
-                                        {sub?.mechanisms && sub.mechanisms.length > 0 && (
-                                          <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-                                            {sub.mechanisms.slice(0,4).map((m:string,mi:number) => (
-                                              <span key={mi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>
-                                            ))}
-                                          </div>
-                                        )}
-                                        {sub?.organs && sub.organs.length > 0 && (
-                                          <div style={{ fontSize:6.5, color:'rgba(255,255,255,0.35)', marginTop:1 }}>
-                                            Органы: {sub.organs.slice(0,3).map((o:string) => {const m = ORGAN_CATEGORY_MAP[o.toUpperCase().trim()]; return m?.emoji + m?.label || o;}).join(', ')}
+                                   {stack.substances.map(sub => {
+                                     const subInfo = catalogSubstances.find(x => x.id === sub.id);
+                                     return (
+                                       <div key={sub.id} style={{ padding:'4px 6px', marginBottom:3, borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.04)' }}>
+                                         <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:9 }}>
+                                           <span style={{ color:'var(--accent)', fontWeight:700, flex:1 }}>{getStackSubLabel(sub.id)}</span>
+                                           {subInfo?.description && <span style={{ color:'rgba(255,255,255,0.4)', fontSize:7.5 }}>{subInfo.description}</span>}
+                                         </div>
+                                         {subInfo?.mechanisms && subInfo.mechanisms.length > 0 && (
+                                           <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                                             {subInfo.mechanisms.slice(0,4).map((m:string,mi:number) => (
+                                               <span key={mi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>
+                                             ))}
+                                           </div>
+                                         )}
+                                         {subInfo?.organs && subInfo.organs.length > 0 && (
+                                           <div style={{ fontSize:6.5, color:'rgba(255,255,255,0.35)', marginTop:1 }}>
+                                             Органы: {subInfo.organs.slice(0,3).map((o:string) => {const m = ORGAN_CATEGORY_MAP[o.toUpperCase().trim()]; return m?.emoji + m?.label || o;}).join(', ')}
                                           </div>
                                         )}
                                       </div>
@@ -3643,11 +3643,11 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     const conflicts: Array<{a:string;b:string;effect:string}> = [];
                                     for (let a = 0; a < stack.substances.length; a++) {
                                       for (let b = a + 1; b < stack.substances.length; b++) {
-                                        const key = `${stack.substances[a]}||${stack.substances[b]}`;
-                                        const rev = `${stack.substances[b]}||${stack.substances[a]}`;
+                                        const key = `${stack.substances[a].id}||${stack.substances[b].id}`;
+                                        const rev = `${stack.substances[b].id}||${stack.substances[a].id}`;
                                         const intx = conflictLookup.get(key) || conflictLookup.get(rev);
                                         if (intx && intx.type === 'conflict') {
-                                          conflicts.push({ a: stack.substances[a], b: stack.substances[b], effect: intx.effect });
+                                          conflicts.push({ a: stack.substances[a].id, b: stack.substances[b].id, effect: intx.effect });
                                         }
                                       }
                                     }
@@ -3662,7 +3662,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     return null;
                                   })()}
                                   <button onClick={e => { e.stopPropagation();
-                                    SUPPORT_LEVELS[supportLevel] = { ...SUPPORT_LEVELS[supportLevel], subs: [...(SUPPORT_LEVELS[supportLevel]?.subs || []), ...stack.substances.filter(sid => !(SUPPORT_LEVELS[supportLevel]?.subs||[]).includes(sid))] };
+                                    SUPPORT_LEVELS[supportLevel] = { ...SUPPORT_LEVELS[supportLevel], subs: [...(SUPPORT_LEVELS[supportLevel]?.subs || []), ...stack.substances.filter(sub => !(SUPPORT_LEVELS[supportLevel]?.subs||[]).includes(sub.id)).map(sub => sub.id)] };
                                     alert(`✅ Добавлено в план`);
                                   }} style={{ width:'100%', padding:'6px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(0,230,138,0.1)', color:'#00e68a', fontWeight:700, fontSize:10, marginTop:6 }}>+ В план</button>
                                 </div>

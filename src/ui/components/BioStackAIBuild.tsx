@@ -109,6 +109,13 @@ export function BuildTab({ profile, stackIds, setStackIds }: { profile: BioStack
       </GlassCard>
 
       <GlassCard title="🧪 По анализам" icon="🧪" color="#a78bfa">
+        <div style={{ display: 'flex', gap: 6, marginBottom: 6, fontSize: 8 }}>
+          <span style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.08)', color: '#00e68a' }}>🟢 Поддержать: {Object.values(lmState).filter(v => v === 'maintain').length}</span>
+          <span style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.08)', color: '#ef4444' }}>🔴 Скорректировать: {Object.values(lmState).filter(v => v === 'correct').length}</span>
+        </div>
+        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', marginBottom: 6, lineHeight: 1.3 }}>
+          Выберите маркеры, которые хотите поддержать (🟢) или скорректировать (🔴). Статус влияет на подбор препаратов.
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {GROUP_LABELS.map(group => {
             const markers = LAB_MARKERS.filter(m => m.group === group);
@@ -130,6 +137,7 @@ export function BuildTab({ profile, stackIds, setStackIds }: { profile: BioStack
                         color: st === 'correct' ? '#ef4444' : st === 'maintain' ? '#00e68a' : 'rgba(255,255,255,0.5)',
                       }}>
                         {m.label} {st === 'maintain' ? '🟢' : st === 'correct' ? '🔴' : ''}
+                        <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)', marginLeft: 2 }}>{m.ref || ''}</span>
                       </button>
                     );
                   })}

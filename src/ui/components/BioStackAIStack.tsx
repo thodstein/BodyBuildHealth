@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
-import { explainStack, findReplacement, type ReplacementResult } from '../../engines/supplement-finder.engine';
-import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS } from '../../data/support-database';
+import { buildStack, explainStack, findReplacement, type ReplacementResult } from '../../engines/supplement-finder.engine';
+import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS } from '../../data/support-database';
 import { GlassCard, StatBox, ORGANS, toFinderProfile } from './BioStackAIConstants';
 
 export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void }) {
@@ -86,6 +86,149 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
     dragNode.current = null;
   }, []);
 
+  /* ── Compliance Tracker ── */
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const [compliance, setCompliance] = useState<Record<string, string[]>>(() => {
+    try { return JSON.parse(localStorage.getItem('he_biostack_compliance') || '{}'); } catch { return {}; }
+  });
+  const todayTaken = compliance[todayKey] || [];
+
+  const toggleTaken = useCallback((id: string) => {
+    setCompliance(prev => {
+      const taken = prev[todayKey] || [];
+      const next = taken.includes(id) ? taken.filter(x => x !== id) : [...taken, id];
+      const updated = { ...prev, [todayKey]: next };
+      localStorage.setItem('he_biostack_compliance', JSON.stringify(updated));
+      return updated;
+    });
+  }, [todayKey]);
+
+  const todayPct = stackIds.length > 0 ? Math.round(todayTaken.length / stackIds.length * 100) : 0;
+  const streakDays = (() => {
+    let streak = 0;
+    const d = new Date();
+    while (true) {
+      const k = d.toISOString().slice(0, 10);
+      const t = compliance[k];
+      if (!t || t.length === 0) break;
+      streak++;
+      d.setDate(d.getDate() - 1);
+    }
+    return streak;
+  })();
+
+  /* ── Stack Actions ── */
+  const [actionResult, setActionResult] = useState<{ title: string; text: string; resultStack?: string[] } | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const ACTIONS: { id: string; label: string; icon: string; color: string; run: () => void }[] = useMemo(() => [
+    { id: 'best', label: 'Собрать лучший', icon: '🏆', color: '#8b5cf6',
+      run: () => {
+        setActionLoading('best');
+        setTimeout(() => {
+          const fp = toFinderProfile(profile);
+          const r = buildStack({ baseIds: [], targetSize: profile.maxStackSize || 10, autoFill: true, profile: fp });
+          const exp = explainStack(r.stack, fp);
+          const lines = r.stack.map(id => { const c = SUPPORT_CATALOG_DATA[id]; return `• ${c?.nameRu || c?.name || id}`; });
+          setActionResult({ title: '🏆 Лучший стек под ваш профиль', text: `Состав (${r.stack.length} компонентов):\n${lines.join('\n')}\n\nСинергия: ${exp.totalSynergyScore}\nПокрытие: ${exp.completeness}%`, resultStack: r.stack });
+          setActionLoading(null);
+        }, 400);
+      }},
+    { id: 'optimize', label: 'Оптимизировать', icon: '⚡', color: '#f59e0b',
+      run: () => {
+        if (stackIds.length === 0) return;
+        setActionLoading('optimize');
+        setTimeout(() => {
+          const fp = toFinderProfile(profile);
+          const r = buildStack({ baseIds: stackIds, targetSize: Math.max(stackIds.length, 10), autoFill: true, profile: fp });
+          const exp = explainStack(r.stack, fp);
+          const added = r.stack.filter(id => !stackIds.includes(id));
+          const lines = added.map(id => { const c = SUPPORT_CATALOG_DATA[id]; return `• ${c?.nameRu || c?.name || id} (добавлен)`; });
+          setActionResult({ title: '⚡ Оптимизированный стек', text: `Добавлено ${added.length} компонентов:\n${lines.join('\n')}\n\nСинергия: ${exp.totalSynergyScore} (было ${explanation?.totalSynergyScore ?? 0})\nПокрытие: ${exp.completeness}% (было ${explanation?.completeness ?? 0}%)`, resultStack: r.stack });
+          setActionLoading(null);
+        }, 400);
+      }},
+    { id: 'risks', label: 'Убрать риски', icon: '🛡️', color: '#ef4444',
+      run: () => {
+        if (stackIds.length === 0) return;
+        setActionLoading('risks');
+        setTimeout(() => {
+          const risky = new Set<string>();
+          for (const a of stackIds) {
+            for (const b of stackIds) {
+              if (a === b) continue;
+              const pair = ALL_INTERACTIONS.find(inx =>
+                (inx.substanceA === a && inx.substanceB === b) || (inx.substanceA === b && inx.substanceB === a));
+              if (pair && pair.severity === 'HIGH' && (pair.type === 'conflict' || pair.type === 'caution')) {
+                risky.add(a); risky.add(b);
+              }
+            }
+          }
+          const clean = stackIds.filter(id => !risky.has(id));
+          if (clean.length === stackIds.length) {
+            setActionResult({ title: '🛡️ Риски не найдены', text: 'В вашем стеке нет критических взаимодействий.' });
+          } else {
+            const lines = stackIds.filter(id => risky.has(id)).map(id => { const c = SUPPORT_CATALOG_DATA[id]; return `• ${c?.nameRu || c?.name || id} (удалён)`; });
+            setActionResult({ title: `🛡️ Убрано ${risky.size} рискованных компонентов`, text: `Удалены:\n${lines.join('\n')}\n\nОсталось: ${clean.length} компонентов`, resultStack: clean });
+          }
+          setActionLoading(null);
+        }, 300);
+      }},
+    { id: 'cheaper', label: 'Сделать дешевле', icon: '💰', color: '#22c55e',
+      run: () => {
+        if (stackIds.length === 0) return;
+        setActionLoading('cheaper');
+        setTimeout(() => {
+          const P: Record<string, number> = { nac: 650, tudca: 900, omega3: 800, coq10: 1200, magnesium: 350, zinc: 200, vitamin_d3: 300, curcumin: 500, alpha_lipoic: 700, ashwagandha: 600, rhodiola: 550, theanine: 450, creatine: 400, l_carnitine: 700, lions_mane: 900, tongkat_ali: 1200, collagen: 1200, probiotics: 1200, berberine: 600 };
+          const ALT: Record<string, string[]> = { omega3: ['flax_oil', 'chia'], coq10: ['idebenone', 'pqq'], probiotics: ['kefir', 'sauerkraut'], collagen: ['bone_broth', 'gelatin'], ashwagandha: ['rhodiola', 'schisandra'], lions_mane: ['alpha_gpc', 'phosphatidylserine'], tongkat_ali: ['fadogia', 'shilajit'] };
+          const swaps: string[] = [];
+          const ns = [...stackIds];
+          for (let i = 0; i < ns.length; i++) {
+            const id = ns[i];
+            const alts = ALT[id];
+            if (alts) {
+              const ch = alts.find(a => (P[a] || 999) < (P[id] || 999));
+              if (ch && SUPPORT_CATALOG_DATA[ch]) {
+                swaps.push(`• ${SUPPORT_CATALOG_DATA[id]?.nameRu || id} (${P[id]}₽) → ${SUPPORT_CATALOG_DATA[ch]?.nameRu || ch} (${P[ch]}₽) — экономия ${P[id] - (P[ch]||0)}₽/мес`);
+                ns[i] = ch;
+              }
+            }
+          }
+          if (swaps.length === 0) {
+            setActionResult({ title: '💰 Оптимизация стоимости', text: 'Не найдено более дешёвых аналогов в базе.' });
+          } else {
+            setActionResult({ title: `💰 ${swaps.length} замен на более дешёвые`, text: swaps.join('\n'), resultStack: ns });
+          }
+          setActionLoading(null);
+        }, 300);
+      }},
+    { id: 'why', label: 'Почему мне хуже', icon: '🤔', color: '#60a5fa',
+      run: () => {
+        if (stackIds.length === 0) return;
+        setActionLoading('why');
+        setTimeout(() => {
+          const issues: string[] = [];
+          for (const id of stackIds) {
+            const cat = SUPPORT_CATALOG_DATA[id];
+            if (!cat) continue;
+            const organs = (cat as any).organs || (cat as any).targetOrgans || [];
+            if (profile.healthConditions?.includes('hypertension' as any) && organs.some((o: string) => ['HEART', 'VESSELS'].includes(o))) {
+              issues.push(`• ${cat.nameRu || cat.name} — влияет на ССС. При гипертонии — контроль давления.`);
+            }
+            if (organs.some((o: string) => ['LIVER'].includes(o)) && profile.goals?.includes('liver_health' as any)) {
+              issues.push(`• ${cat.nameRu || cat.name} — ✅ поддерживает печень, совпадает с целями.`);
+            }
+            if (!cat.dosage) {
+              issues.push(`• ${cat.nameRu || cat.name} — ⚠ нет дозировки.`);
+            }
+          }
+          if (issues.length === 0) issues.push('✅ Все компоненты соответствуют профилю.');
+          setActionResult({ title: '🤔 Анализ совместимости с профилем', text: issues.join('\n\n') });
+          setActionLoading(null);
+        }, 400);
+      }},
+  ], [stackIds, profile, explanation]);
+
   const catLabel = (c: string) => CATEGORY_LABELS[c as keyof typeof CATEGORY_LABELS] || c;
 
   const cardHeaderS: React.CSSProperties = {
@@ -154,6 +297,79 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
             background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444',
           }}>🗑 Очистить</button>
         </div>
+      </GlassCard>
+
+      {/* ✅ Compliance Check */}
+      <GlassCard title={`✅ Комплаенс • ${todayPct}% сегодня`} icon="✅" color="#22c55e">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+            <div style={{ width: todayPct + '%', height: '100%', borderRadius: 3, background: todayPct >= 80 ? '#22c55e' : todayPct >= 50 ? '#f59e0b' : '#ef4444', transition: 'width 0.3s' }} />
+          </div>
+          <span style={{ fontSize: 10, fontWeight: 700, color: todayPct >= 80 ? '#22c55e' : todayPct >= 50 ? '#f59e0b' : '#ef4444' }}>{todayTaken.length}/{stackIds.length}</span>
+          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>🔥 {streakDays} дней</span>
+        </div>
+        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+          {stackIds.map(id => {
+            const cat = SUPPORT_CATALOG_DATA[id];
+            const taken = todayTaken.includes(id);
+            return (
+              <button key={id} onClick={() => toggleTaken(id)} style={{
+                padding: '4px 8px', borderRadius: 8, fontSize: 8, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                background: taken ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${taken ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.06)'}`,
+                color: taken ? '#22c55e' : 'rgba(255,255,255,0.4)',
+                textDecoration: taken ? 'line-through' : 'none',
+              }}>
+                {taken ? '✅' : '○'} {cat?.nameRu || cat?.name || id}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>
+          Нажмите на препарат, чтобы отметить как принятый
+        </div>
+      </GlassCard>
+
+      {/* 🚀 Stack Actions */}
+      <GlassCard title="🚀 Действия со стеком" icon="🚀" color="#8b5cf6">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+          {ACTIONS.map(btn => (
+            <button key={btn.id} onClick={btn.run} disabled={actionLoading !== null} style={{
+              padding: '8px 6px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: actionLoading ? 'wait' : 'pointer',
+              background: actionLoading === btn.id ? `${btn.color}15` : `${btn.color}08`,
+              border: `1px solid ${actionLoading === btn.id ? btn.color : btn.color + '25'}`,
+              color: actionLoading === btn.id ? btn.color : btn.color,
+              transition: 'all 0.15s',
+            }}>
+              {actionLoading === btn.id ? '⏳' : btn.icon} {btn.label}
+            </button>
+          ))}
+        </div>
+
+        {actionResult && (
+          <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{actionResult.title}</div>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>{actionResult.text}</div>
+            {actionResult.resultStack && (
+              <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                <button onClick={() => { setStackIds(actionResult.resultStack!); setActionResult(null); }} style={{
+                  flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+                  background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a',
+                }}>📥 Применить стек</button>
+                <button onClick={() => setActionResult(null)} style={{
+                  padding: '6px 10px', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+                  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
+                }}>✕</button>
+              </div>
+            )}
+            {!actionResult.resultStack && (
+              <button onClick={() => setActionResult(null)} style={{
+                padding: '4px 10px', borderRadius: 6, fontSize: 7, fontWeight: 600, cursor: 'pointer', marginTop: 4,
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)',
+              }}>✕ Закрыть</button>
+            )}
+          </div>
+        )}
       </GlassCard>
 
       {explanation?.warnings && explanation.warnings.length > 0 && (

@@ -9,7 +9,7 @@ import { StackTab } from './BioStackAIStack';
 import { RisksTab } from './BioStackAIRisks';
 import { CompareTab } from './BioStackAICompare';
 import { ReportsTab } from './BioStackAIReports';
-import { AITab } from './BioStackAIAI';
+import { PeriodizationTab } from './BioStackAIPeriodization';
 
 export const BioStackAIScreen: React.FC = () => {
   const [tab, setTab] = useState<BSTab>('profile');
@@ -35,7 +35,7 @@ export const BioStackAIScreen: React.FC = () => {
     risks: <RisksTab profile={profile} stackIds={stackIds} />,
     compare: <CompareTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
     reports: <ReportsTab profile={profile} stackIds={stackIds} />,
-    ai: <AITab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
+    periodization: <PeriodizationTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
   };
 
   return (

@@ -2,7 +2,7 @@ import React from 'react';
 import { type GoalType, type HealthCondition, type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { type FinderProfile, type GoalType as FinderGoal } from '../../engines/supplement-finder.engine';
 
-export type BSTab = 'profile' | 'search' | 'build' | 'stack' | 'risks' | 'compare' | 'reports' | 'ai';
+export type BSTab = 'profile' | 'search' | 'build' | 'stack' | 'risks' | 'compare' | 'reports' | 'periodization';
 
 export const SUB_TABS: { id: BSTab; label: string }[] = [
   { id: 'profile', label: '👤 Профиль' },
@@ -12,7 +12,7 @@ export const SUB_TABS: { id: BSTab; label: string }[] = [
   { id: 'risks', label: '⚠ Риски' },
   { id: 'compare', label: '⚖ Сравнение' },
   { id: 'reports', label: '📊 Отчёты' },
-  { id: 'ai', label: '🧠 AI' },
+  { id: 'periodization', label: '🔄 Циклы' },
 ];
 
 export const GOALS: { key: GoalType; label: string }[] = [
@@ -92,28 +92,28 @@ export const SYMPTOMS: { label: string; goal: GoalType }[] = [
   { label:'🤕 Частые болезни', goal:'immunity' },
 ];
 
-export interface LabMarker { id: string; label: string; group: string; organs: string[]; mechanisms: string[]; }
+export interface LabMarker { id: string; label: string; group: string; organs: string[]; mechanisms: string[]; ref?: string; }
 
 export const LAB_MARKERS: LabMarker[] = [
-  { id:'alt_ast', label:'АЛТ / АСТ', group:'🫁 Печень', organs:['LIVER'], mechanisms:['ANTIOXIDANT','LIVER_DETOX','GLUTATHIONE'] },
-  { id:'ggt', label:'ГГТ', group:'🫁 Печень', organs:['LIVER','GALLBLADDER'], mechanisms:['CHOLERETIC','ANTIOXIDANT'] },
-  { id:'homocysteine', label:'Гомоцистеин', group:'🧬 Метилирование', organs:['BLOOD','VESSELS'], mechanisms:['METHYLATION','ANTIOXIDANT'] },
-  { id:'bp', label:'Давление (сист/диаст)', group:'❤️ ССС', organs:['HEART','VESSELS'], mechanisms:['BLOOD_PRESSURE','VASODILATION'] },
-  { id:'hr', label:'ЧСС', group:'❤️ ССС', organs:['HEART'], mechanisms:['BLOOD_PRESSURE','COQ10'] },
-  { id:'ldl_hdl_tg', label:'LDL / HDL / ТГ', group:'❤️ ССС', organs:['HEART','VESSELS','LIVER'], mechanisms:['LIPID','ANTIOXIDANT','FAT_OXIDATION'] },
-  { id:'glucose_hba1c', label:'Глюкоза / HbA1c', group:'⚡ Метаболизм', organs:['PANCREAS','LIVER'], mechanisms:['AMPK_ACTIVATION','METABOLIC'] },
-  { id:'creatinine_urea', label:'Креатинин / Мочевина', group:'🫘 Почки', organs:['KIDNEYS'], mechanisms:['RENAL_PROTECTION'] },
-  { id:'tsh_ft3_ft4', label:'ТТГ / Т3св / Т4св', group:'⚖️ Эндокринная', organs:['THYROID','PITUITARY'], mechanisms:['THYROID_HORMONE'] },
-  { id:'t_e2', label:'Тестостерон / Эстрадиол', group:'⚖️ Эндокринная', organs:['ENDOCRINE','REPRODUCTIVE'], mechanisms:['TESTOSTERONE','AROMATASE'] },
-  { id:'prolactin', label:'Пролактин', group:'⚖️ Эндокринная', organs:['PITUITARY','BRAIN'], mechanisms:['DOPAMINE'] },
-  { id:'cortisol', label:'Кортизол', group:'⚖️ Эндокринная', organs:['ADRENALS','BRAIN'], mechanisms:['CORTISOL','ADAPTOGENIC'] },
-  { id:'ferritin_iron', label:'Ферритин / Железо', group:'🩸 Кровь', organs:['BLOOD','LIVER'], mechanisms:['ANTIOXIDANT'] },
-  { id:'b12_folate', label:'B12 / Фолат', group:'🩸 Кровь', organs:['BLOOD','NERVES'], mechanisms:['METHYLATION','ENERGY_PRODUCTION'] },
-  { id:'crp', label:'СРБ (воспаление)', group:'🛡️ Иммунитет', organs:['IMMUNE_SYSTEM','LIVER'], mechanisms:['ANTI_INFLAMMATORY','ANTIOXIDANT'] },
-  { id:'vitamin_d', label:'Витамин D', group:'🛡️ Иммунитет', organs:['IMMUNE_SYSTEM','BONES'], mechanisms:['VITAMIN_D_RECEPTOR'] },
-  { id:'prostate_psa', label:'ПСА', group:'🔴 Простата', organs:['PROSTATE'], mechanisms:['5AR_INHIBITION','ANTI_ANDROGENIC'] },
-  { id:'dht', label:'DHT', group:'🔴 Простата', organs:['PROSTATE','HAIR','SKIN'], mechanisms:['5AR_INHIBITION'] },
-  { id:'uric_acid', label:'Мочевая кислота', group:'🫘 Почки', organs:['KIDNEYS','JOINTS'], mechanisms:['URIC_ACID','ANTIOXIDANT'] },
+  { id:'alt_ast', label:'АЛТ / АСТ', group:'🫁 Печень', organs:['LIVER'], mechanisms:['ANTIOXIDANT','LIVER_DETOX','GLUTATHIONE'], ref:'<40 Ед/л' },
+  { id:'ggt', label:'ГГТ', group:'🫁 Печень', organs:['LIVER','GALLBLADDER'], mechanisms:['CHOLERETIC','ANTIOXIDANT'], ref:'<55 Ед/л' },
+  { id:'homocysteine', label:'Гомоцистеин', group:'🧬 Метилирование', organs:['BLOOD','VESSELS'], mechanisms:['METHYLATION','ANTIOXIDANT'], ref:'5-15 мкмоль/л' },
+  { id:'bp', label:'Давление (сист/диаст)', group:'❤️ ССС', organs:['HEART','VESSELS'], mechanisms:['BLOOD_PRESSURE','VASODILATION'], ref:'<130/80' },
+  { id:'hr', label:'ЧСС', group:'❤️ ССС', organs:['HEART'], mechanisms:['BLOOD_PRESSURE','COQ10'], ref:'60-80 уд/мин' },
+  { id:'ldl_hdl_tg', label:'LDL / HDL / ТГ', group:'❤️ ССС', organs:['HEART','VESSELS','LIVER'], mechanisms:['LIPID','ANTIOXIDANT','FAT_OXIDATION'], ref:'LDL<3.0 HDL>1.0 ТГ<1.7' },
+  { id:'glucose_hba1c', label:'Глюкоза / HbA1c', group:'⚡ Метаболизм', organs:['PANCREAS','LIVER'], mechanisms:['AMPK_ACTIVATION','METABOLIC'], ref:'3.3-5.5 / <5.7%' },
+  { id:'creatinine_urea', label:'Креатинин / Мочевина', group:'🫘 Почки', organs:['KIDNEYS'], mechanisms:['RENAL_PROTECTION'], ref:'62-106 / 2.5-8.3' },
+  { id:'tsh_ft3_ft4', label:'ТТГ / Т3св / Т4св', group:'⚖️ Эндокринная', organs:['THYROID','PITUITARY'], mechanisms:['THYROID_HORMONE'], ref:'TTG 0.4-4.0' },
+  { id:'t_e2', label:'Тестостерон / Эстрадиол', group:'⚖️ Эндокринная', organs:['ENDOCRINE','REPRODUCTIVE'], mechanisms:['TESTOSTERONE','AROMATASE'], ref:'8-30 / <160 пмоль/л' },
+  { id:'prolactin', label:'Пролактин', group:'⚖️ Эндокринная', organs:['PITUITARY','BRAIN'], mechanisms:['DOPAMINE'], ref:'86-324 мМЕ/л' },
+  { id:'cortisol', label:'Кортизол', group:'⚖️ Эндокринная', organs:['ADRENALS','BRAIN'], mechanisms:['CORTISOL','ADAPTOGENIC'], ref:'150-660 нмоль/л' },
+  { id:'ferritin_iron', label:'Ферритин / Железо', group:'🩸 Кровь', organs:['BLOOD','LIVER'], mechanisms:['ANTIOXIDANT'], ref:'30-400 / 11-32' },
+  { id:'b12_folate', label:'B12 / Фолат', group:'🩸 Кровь', organs:['BLOOD','NERVES'], mechanisms:['METHYLATION','ENERGY_PRODUCTION'], ref:'200-900 пг/мл' },
+  { id:'crp', label:'СРБ (воспаление)', group:'🛡️ Иммунитет', organs:['IMMUNE_SYSTEM','LIVER'], mechanisms:['ANTI_INFLAMMATORY','ANTIOXIDANT'], ref:'<5 мг/л' },
+  { id:'vitamin_d', label:'Витамин D', group:'🛡️ Иммунитет', organs:['IMMUNE_SYSTEM','BONES'], mechanisms:['VITAMIN_D_RECEPTOR'], ref:'30-100 нг/мл' },
+  { id:'prostate_psa', label:'ПСА', group:'🔴 Простата', organs:['PROSTATE'], mechanisms:['5AR_INHIBITION','ANTI_ANDROGENIC'], ref:'<4 нг/мл' },
+  { id:'dht', label:'DHT', group:'🔴 Простата', organs:['PROSTATE','HAIR','SKIN'], mechanisms:['5AR_INHIBITION'], ref:'250-990 пг/мл' },
+  { id:'uric_acid', label:'Мочевая кислота', group:'🫘 Почки', organs:['KIDNEYS','JOINTS'], mechanisms:['URIC_ACID','ANTIOXIDANT'], ref:'200-420 мкмоль/л' },
 ];
 
 export const GROUP_LABELS = ['🫁 Печень','🧬 Метилирование','❤️ ССС','⚡ Метаболизм','🫘 Почки','⚖️ Эндокринная','🩸 Кровь','🛡️ Иммунитет','🔴 Простата'];
