@@ -277,11 +277,11 @@ $env:NODE_OPTIONS='--max-old-space-size=2048'; npx vite build
 
 ## 10. Правила создания стеков (обязательно)
 
-### 10.1. Формат стека
+### 10.1. Формат стека — РАСШИРЕННАЯ КАРТОЧКА (B-формат)
 Каждый стек — это клинически обоснованная комбинация веществ с единой целью.  
 Запрещено генерировать стеки алгоритмически. Каждый стек пишется вручную.
 
-Стек содержит следующие поля (расширение интерфейса `SupportStack`):
+Стек ОБЯЗАТЕЛЬНО содержит следующие поля (полная карточка):
 
 ```typescript
 export interface SupportStack {
@@ -305,6 +305,39 @@ export interface SupportStack {
   specialInstructions: string;      // Особые указания: еда, вода, интервалы
   contraindications: string;        // Противопоказания: когда НЕЛЬЗЯ
   warnings: string;                 // Возможные проблемы: с чем осторожно
+
+  // ── РАСШИРЕННЫЕ ПОЛЯ (B-формат) ──
+  anatomicalMapping: {
+    organSystems: string[];          // Системы органов (например ['Гепатобилиарная', 'Метаболизм'])
+    targetOrgans: string[];          // Конкретные органы-мишени (например ['Печень', 'Желчевыводящие пути'])
+    organMechanisms: string;         // Физиологический процесс органа
+    drugMechanisms: string[];        // Механизм КАЖДОГО вещества в стеке (1 строка на вещество)
+    mechanismCodes: string[];        // Коды механизмов (например ['GLUTATHIONE_SYNTHESIS', 'NRF2_ACTIVATION'])
+    finalEffect: string;             // Конечный клинический результат
+  };
+  structuredInteractions: {
+    synergies: Array<{
+      with: string;                  // id вещества или комбинации (например 'nac+tudca')
+      effect: string;                // Кратко об эффекте
+      mechanism: string;             // Механизм синергии
+      strength: string;              // 'HIGH' | 'MEDIUM' | 'LOW'
+    }>;
+    conflicts: Array<{
+      with: string;                  // С чем конфликт
+      effect: string;                // Что происходит
+      mechanism: string;             // Механизм конфликта
+      strength: string;              // 'HIGH' | 'MEDIUM' | 'LOW'
+    }>;
+    specialInstructions: string;     // Доп. указания по приёму
+    cautions: string;                // Осторожности
+  };
+  structuredLabControl: {
+    markers: Array<{
+      marker: string;                // Название маркера (например 'АЛТ')
+      when: string;                  // Периодичность (например 'Каждые 4 нед')
+      targetRange: string;           // Целевой диапазон (например '<40 Ед/л')
+    }>;
+  };
 }
 ```
 
@@ -326,11 +359,24 @@ export interface SupportStack {
 - Показать, что именно это вещество даёт этому стеку
 - Пример: «Прямой фибринолитик (активирует плазминоген → плазмин), снижает фактор фон Виллебранда» — а не «снижает холестерин»
 
+**anatomicalMapping.drugMechanisms** — по 1 строке на КАЖДОЕ вещество:
+- Формат: «id вещества — краткий механизм в контексте стека»
+- Пример: «NAC — донатор SH-групп, восстанавливает глутатион, конъюгирует с токсичными метаболитами (фаза II)»
+
+**structureInteractions.synergies** — минимум 3 пары на стек:
+- `with` указывает на комбинацию (через `+`) или id другого вещества
+- Заполнять ТОЛЬКО значимые взаимодействия в контексте стека
+
+**structuredLabControl.markers** — минимум 5 маркеров:
+- Только релевантные для данного стека
+- targetRange указывать с единицами измерения
+
 ### 10.3. Категорический запрет
 - Запрещено использовать `generateStacks()` или любую другую форму автогенерации стеков.
 - Запрещено копировать описания из SUPPORT_CATALOG_DATA без привязки к контексту стека.
 - Запрещено оставлять поля пустыми.
 - Запрещено добавлять вещества, которых нет в SUPPORT_CATALOG_DATA.
+- Запрещено пропускать `anatomicalMapping`, `structuredInteractions` или `structuredLabControl`.
 
 ### 10.4. Принцип формирования стеков
 
@@ -348,27 +394,63 @@ export interface SupportStack {
 | CoQ10 + PQQ + L-Карнитин | Митохондриальный биогенез |
 | Zn + Mg + D3 + Бор | Эндогенный тестостерон: 4 точки |
 
-### 10.5. Пример стека (эталон)
+### 10.5. Пример стека (эталон — B-формат)
 
 ```typescript
 {
-  id: 'fibrinolytic_stack',
-  name: 'Фибринолитический стек',
-  problem: 'Профилактика тромбоза, улучшение реологии крови, снижение вязкости',
-  system: 'Сердечно-сосудистая / Кровь',
-  description: 'Для профилактики тромбообразования на курсе ААС. Нормализует гемореологию, снижает вязкость крови, растворяет фибрин за счёт комбинации трёх протеолитических ферментов с разными механизмами действия.',
-  synergyPrinciple: 'Серрапептаза расщепляет α2-макроглобулин и фибрин в плазме, наттокиназа активирует плазминоген→плазин, бромелайн подавляет PAI-1. Три разных пути фибринолиза — полный охват каскада.',
+  id: 'hepatoprotection_stack',
+  name: 'Гепатопротекция: глутатион + ER-стресс + мембраны',
+  problem: 'Защита печени от токсического повреждения на курсе ААС и пероральных 17-алкилированных стероидов',
+  system: 'Гепатобилиарная',
+  description: 'Для защиты гепатоцитов от окислительного стресса, холестаза и фиброза. NAC даёт субстрат для синтеза глутатиона, TUDCA снижает ER-стресс и улучшает желчеотток, силимарин стабилизирует мембраны, АЛЬК регенерирует антиоксидантную сеть.',
+  synergyPrinciple: 'Четыре независимых механизма гепатопротекции: субстрат для глутатиона (NAC), снижение ER-стресса и апоптоза (TUDCA), стабилизация мембран гепатоцитов (силимарин), регенерация антиоксидантной сети (АЛЬК). Полный охват путей токсического поражения печени.',
   substances: [
-    { id: 'serrapeptase', dose: '240000 SPU', timing: 'fasting', mechanism: 'Протеолитический фермент, расщепляет фибрин и некротические ткани, снижает PAI-1, модулирует воспаление' },
-    { id: 'nattokinase', dose: '12000 FU', timing: 'fasting', mechanism: 'Прямой фибринолитик: активирует плазминоген→плазмин, снижает фактор фон Виллебранда, улучшает деформируемость эритроцитов' },
-    { id: 'bromelain', dose: '500 мг', timing: 'fasting', mechanism: 'Подавляет PAI-1 (ингибитор плазминогена), снижает агрегацию тромбоцитов через COX-2↓, потенцирует фибринолиз' },
+    { id: 'nac', dose: '1200 мг', timing: 'morning', mechanism: 'Предшественник глутатиона (GSH), повышает внутриклеточный пул GSH, связывает активные метаболиты токсинов через конъюгацию с глутатионом' },
+    { id: 'tudca', dose: '500 мг', timing: 'evening', mechanism: 'Снижает ER-стресс через ингибицию CHOP/GADD153, улучшает митохондриальный мембранный потенциал, стимулирует BSEP-зависимый желчеотток' },
+    { id: 'milk_thistle', dose: '280 мг', timing: 'morning', mechanism: 'Силимарин стабилизирует мембраны гепатоцитов, ингибирует перекисное окисление липидов, стимулирует РНК-полимеразу I для синтеза белка' },
+    { id: 'alpha_lipoic', dose: '300 мг', timing: 'morning', mechanism: 'Активатор Nrf2/ARE, усиливает фазу II детоксикации (GST, NQO1), регенерирует окисленные формы витаминов C и E, хелатирует переходные металлы' },
   ],
-  synergyScore: 85,
-  timingSummary: 'Натощак за 40 мин до еды: серрапептаза + наттокиназа + бромелайн. Запить 200 мл воды. Не есть 40 мин.',
-  monitoring: 'D-димер, фибриноген, МНО, тромбоциты — каждые 4 нед. Контроль АД и ЧСС.',
-  specialInstructions: 'Все ферменты натощак за 40 мин до еды (иначе работают на переваривание пищи). Не запивать горячим (денатурация). Интервал с любыми препаратами — 2 ч.',
-  contraindications: 'Язва желудка/12-п.к. в обострении, гемофилия, приём антикоагулянтов (варфарин, ксарелто), за 2 нед до и после операции.',
-  warnings: '⚠ НПВС + ферменты → риск ЖКТ-кровотечения. ⚠ Антиагреганты (аспирин, клопидогрел) → контроль МНО каждые 2 нед.',
+  synergyScore: 95,
+  timingSummary: 'Утро (с едой): NAC 600 мг + силимарин 280 мг + АЛЬК 300 мг. Вечер (за 2 ч до сна): NAC 600 мг + TUDCA 500 мг.',
+  monitoring: 'АЛТ, АСТ, ГГТ, ЩФ, билирубин общий/прямой — каждые 4 нед. УЗИ печени — 1 раз в 3 мес.',
+  specialInstructions: 'NAC и TUDCA натощак или за 1 ч до еды. Интервал NAC и антибиотики — 2 ч. АЛЬК не сочетать с цисплатином.',
+  contraindications: 'ЖКБ с камнями >5 мм (TUDCA может растворять → закупорка протоков). Язва желудка в обострении.',
+  warnings: '⚠ TUDCA может послабить стул первые 2 нед — старт 250 мг и титровать. ⚠ NAC >2400 мг/сут → риск головной боли и тошноты.',
+  anatomicalMapping: {
+    organSystems: ['Гепатобилиарная', 'Метаболизм', 'Кровь'],
+    targetOrgans: ['Печень', 'Желчевыводящие пути'],
+    organMechanisms: 'Детоксикация ксенобиотиков, синтез белков плазмы, метаболизм липидов, продукция и экскреция желчи',
+    drugMechanisms: [
+      'NAC — донатор SH-групп, восстанавливает глутатион, конъюгирует с токсичными метаболитами (фаза II)',
+      'TUDCA — гидрофильная желчная кислота, снижает ER-стресс через ↓ CHOP, ↑ BSEP-экспрессию',
+      'Силимарин — стабилизация мембран гепатоцитов, ↓ перекисного окисления, ↑ РНК-полимеразу I',
+      'АЛЬК — активация Nrf2/ARE, ↑ ферменты фазы II, хелатация переходных металлов',
+    ],
+    mechanismCodes: ['GLUTATHIONE_SYNTHESIS', 'ER_STRESS_REDUCTION', 'MEMBRANE_STABILIZATION', 'NRF2_ACTIVATION', 'BILE_FLOW_STIMULATION'],
+    finalEffect: 'Снижение цитолиза (АЛТ/АСТ ↓), улучшение желчеоттока, предотвращение фиброза и стеатоза гепатоцитов',
+  },
+  structuredInteractions: {
+    synergies: [
+      { with: 'nac+tudca', effect: 'Двойная защита: глутатион + анти-ER-стресс', mechanism: 'NAC ↑ GSH, TUDCA ↓ CHOP — разные механизмы, аддитивный эффект', strength: 'HIGH' },
+      { with: 'tudca+milk_thistle', effect: 'Желчеотток + мембраны', mechanism: 'TUDCA ↑ BSEP, силимарин защищает мембраны — полный охват холестаза', strength: 'HIGH' },
+      { with: 'nac+alpha_lipoic', effect: 'Глутатион + Nrf2', mechanism: 'NAC — субстрат GSH, АЛЬК — активатор Nrf2, ↑ ферментов фазы II', strength: 'HIGH' },
+    ],
+    conflicts: [
+      { with: 'цитостатики', effect: 'АЛЬК может снижать эффективность цисплатина', mechanism: 'Хелатация Pt-соединений АЛЬК', strength: 'MEDIUM' },
+    ],
+    specialInstructions: 'NAC и TUDCA разделить приём — утро/вечер. АЛЬК с едой для ↓ раздражения ЖКТ.',
+    cautions: 'TUDCA не применять при полной обструкции желчевыводящих путей. NAC с антибиотиками с интервалом ≥2 ч.',
+  },
+  structuredLabControl: {
+    markers: [
+      { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
+      { marker: 'АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
+      { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л' },
+      { marker: 'Щелочная фосфатаза', when: 'Каждые 4 нед', targetRange: '<150 Ед/л' },
+      { marker: 'Билирубин общий', when: 'Каждые 4 нед', targetRange: '<21 мкмоль/л' },
+      { marker: 'Билирубин прямой', when: 'При ↑ общего', targetRange: '<5 мкмоль/л' },
+    ],
+  },
 }
 ```
 
@@ -377,6 +459,16 @@ export interface SupportStack {
 - Все id веществ проверяются на наличие в SUPPORT_CATALOG_DATA.
 - Все interaction-пары проверяются на наличие в ALL_INTERACTIONS или SYNERGY_NETWORK (при отсутствии — добавить).
 - После каждого изменения запускать `tsc --noEmit && vite build`.
+- Запрещено создавать стек с неполными расширенными полями (anatomicalMapping, structuredInteractions, structuredLabControl — обязательны).
+
+## Session Summary (Jun 25) — BioStack AI + B-format стеки
+### Done
+- **BioStack AI Periodization**: AI-подсказки фазовых переходов (селекторы От→К, AI-анализ с keep/add/remove), матрица покрытия всех веществ по фазам (table). 
+- **BioStack AI Reports**: метрики совместимости (compatScore 0-100), synergy density, tier distribution, bar progress bar в UI, добавлено в текстовые отчёты (standard + doctor).
+- **AGENTS.md — секция 10 полностью переписана**: интерфейс `SupportStack` расширен до B-формата (anatomicalMapping, structuredInteractions, structuredLabControl — все обязательны), эталон стека заменён на гепатопротекцию с полным B-форматом, добавлены правила для `drugMechanisms`, `synergies` (мин 3 пары), `markers` (мин 5), запрет на пропуск расширенных полей.
+- **support-synergy-stacks.ts — 15 стеков в B-формате**: 5 переписаны (hepatoprotection, cardioprotection, nephroprotection, neuroprotection, adaptogenic) + 10 новых (fibrinolytic, articular, immune, hormonal/pct, mitochondrial, nootropic, anti-stress, bone, gi_microbiome, antioxidant_network). Каждый стек: id, name, problem, system, description, synergyPrinciple, substances (per-substance mechanism), synergyScore, timingSummary, monitoring, specialInstructions, contraindications, warnings, anatomicalMapping (organSystems, targetOrgans, organMechanisms, drugMechanisms, mechanismCodes, finalEffect), structuredInteractions (synergies ≥3, conflicts, specialInstructions, cautions), structuredLabControl (markers ≥5).
+- **SupportStack interface**: обновлён — обязательные поля `anatomicalMapping`, `structuredInteractions`, `structuredLabControl` (теперь требуются для всех стеков).
+- `tsc --noEmit` ✓, `vite build` ✓ (1262 строки, <1500 limit)
 
 ## Session Summary (Jun 25) — BioStack AI (начало)
 ### Done

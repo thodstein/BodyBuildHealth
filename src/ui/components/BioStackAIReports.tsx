@@ -11,13 +11,32 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
   const [currentReport, setCurrentReport] = useState<string>('');
   const [reportMode, setReportMode] = useState<'standard' | 'doctor'>('standard');
 
-  const explanation = useMemo(() => {
+  // ── Compatibility metrics ──
+  const metrics = useMemo(() => {
     if (stackIds.length === 0) return null;
-    return explainStack(stackIds, toFinderProfile(profile));
+    const catData = SUPPORT_CATALOG_DATA;
+    const expl = explainStack(stackIds, toFinderProfile(profile));
+    const tiers = { core: 0, standard: 0, advanced: 0, specialty: 0 };
+    const categories = new Map<string, number>();
+    stackIds.forEach(id => {
+      const c = catData[id];
+      if (!c) return;
+      if (c.tier && tiers[c.tier as keyof typeof tiers] !== undefined) tiers[c.tier as keyof typeof tiers]++;
+      (c.category || []).forEach(cat => categories.set(cat, (categories.get(cat) || 0) + 1));
+    });
+    const synergyPairs = expl.pairwiseSynergies.filter(p => p.severity !== 'LOW' && p.severity !== 'none').length;
+    const totalPairs = (stackIds.length * (stackIds.length - 1)) / 2;
+    const synergyDensity = totalPairs > 0 ? Math.round(synergyPairs / totalPairs * 100) : 0;
+    const warningsCount = expl.warnings.length;
+    // compatibility score: 0-100 based on synergy density, warnings penalty
+    const compatScore = Math.max(0, Math.min(100,
+      Math.round(synergyDensity * 0.7 + (expl.totalSynergyScore / 100) * 30 - warningsCount * 8)
+    ));
+    return { ...expl, tiers, categories, synergyPairs, totalPairs, synergyDensity, compatScore, warningsCount };
   }, [stackIds, profile]);
 
   const handleGenerate = useCallback(() => {
-    if (!explanation || stackIds.length === 0) { setCurrentReport('❌ Стек пуст. Добавьте препараты через 🔍 Поиск или 🧩 Сборка.'); return; }
+    if (!metrics || stackIds.length === 0) { setCurrentReport('❌ Стек пуст. Добавьте препараты через 🔍 Поиск или 🧩 Сборка.'); return; }
     const catData = SUPPORT_CATALOG_DATA;
     const date = new Date().toLocaleString('ru-RU');
 
@@ -38,7 +57,7 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
       lines.push('');
       lines.push('💊 ТЕКУЩИЙ СТЕК ПОДДЕРЖКИ:');
       lines.push(`  Всего компонентов: ${stackIds.length}`);
-      explanation.substances.forEach(s => {
+      metrics.substances.forEach(s => {
         const cat = catData[s.id];
         const name = cat?.nameRu || cat?.name || s.name;
         const dose = s.dose || (cat?.dosage?.mg ? `${cat.dosage.mg} мг` : '—');
@@ -50,8 +69,13 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
         if (cat?.organs && cat.organs.length > 0) lines.push(`    🫀 Органы-мишени: ${cat.organs.join(', ')}`);
       });
       lines.push('');
+      lines.push('🤝 МЕТРИКИ СОВМЕСТИМОСТИ:');
+      lines.push(`  • Совместимость стека: ${metrics.compatScore}/100`);
+      lines.push(`  • Плотность синергий: ${metrics.synergyDensity}% (${metrics.synergyPairs}/${metrics.totalPairs} пар)`);
+      lines.push(`  • Предупреждений: ${metrics.warningsCount}`);
+      lines.push('');
       lines.push('⚕️ КЛИНИЧЕСКИ ЗНАЧИМЫЕ ВЗАИМОДЕЙСТВИЯ:');
-      const warnings = explanation.warnings || [];
+      const warnings = metrics.warnings || [];
       if (warnings.length > 0) {
         warnings.forEach(w => lines.push(`  ⚠ ${w}`));
       } else {
@@ -59,9 +83,10 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
       }
       lines.push('');
       lines.push('📊 ПОКАЗАТЕЛИ СТЕКА:');
-      lines.push(`  • Интегральная синергия: ${explanation.totalSynergyScore}`);
-      lines.push(`  • Покрытие целей: ${explanation.completeness}%`);
-      lines.push(`  • Дозировки указаны: ${explanation.totalDoseCount}/${stackIds.length}`);
+      lines.push(`  • Интегральная синергия: ${metrics.totalSynergyScore}`);
+      lines.push(`  • Покрытие целей: ${metrics.completeness}%`);
+      lines.push(`  • Дозировки указаны: ${metrics.totalDoseCount}/${stackIds.length}`);
+      lines.push(`  • Core-препаратов: ${metrics.tiers.core} • Standard: ${metrics.tiers.standard} • Advanced: ${metrics.tiers.advanced}`);
       lines.push('');
       lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       lines.push('  Сгенерировано BioStack AI — https://body-build-health.vercel.app');
@@ -77,42 +102,47 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
     lines.push(`  🧬 BioStack AI — Отчёт стека`);
     lines.push(`  📅 ${date}`);
     lines.push(`  📋 Компонентов: ${stackIds.length}`);
-    lines.push(`  🎯 Синергия: ${explanation.totalSynergyScore}`);
-    lines.push(`  📊 Покрытие: ${explanation.completeness}%`);
-    lines.push(`  💊 С дозировкой: ${explanation.totalDoseCount}/${stackIds.length}`);
+    lines.push(`  🎯 Синергия: ${metrics.totalSynergyScore}`);
+    lines.push(`  📊 Покрытие: ${metrics.completeness}%`);
+    lines.push(`  💊 С дозировкой: ${metrics.totalDoseCount}/${stackIds.length}`);
+    lines.push(`  🤝 Совместимость: ${metrics.compatScore}/100`);
+    lines.push(`  🔗 Плотность синергий: ${metrics.synergyDensity}% (${metrics.synergyPairs}/${metrics.totalPairs})`);
     lines.push('═══════════════════════════════════════════');
     lines.push('');
     lines.push('📋 СОСТАВ СТЕКА:');
-    explanation.substances.forEach(s => {
+    metrics.substances.forEach(s => {
       const cat = catData[s.id];
       const name = cat?.nameRu || cat?.name || s.name;
       const dose = s.dose || (cat?.dosage?.mg ? `${cat.dosage.mg} мг${cat.dosage.timing ? ' — ' + cat.dosage.timing : ''}` : '—');
-      lines.push(`  • ${name} (${s.role})`);
+      lines.push(`  • ${name} (${s.role}) [${cat?.tier || ''}]`);
       lines.push(`    🧬 ${s.mechanism}`);
       lines.push(`    💊 ${dose}`);
       if (s.synergiesWith.length > 0) {
         lines.push(`    🤝 Синергии: ${s.synergiesWith.map(x => x.with + ' → ' + x.effect).join(', ')}`);
       }
     });
-    if (explanation.pairwiseSynergies.length > 0) {
+    if (metrics.pairwiseSynergies.length > 0) {
       lines.push('');
       lines.push('🤝 ПАРНЫЕ СИНЕРГИИ:');
-      explanation.pairwiseSynergies.forEach(p => {
+      metrics.pairwiseSynergies.forEach(p => {
         const na = catData[p.a]?.nameRu || catData[p.a]?.name || p.a;
         const nb = catData[p.b]?.nameRu || catData[p.b]?.name || p.b;
         lines.push(`  • ${na} + ${nb}: ${p.effect} (${p.severity})`);
       });
     }
-    if (explanation.warnings.length > 0) {
+    if (metrics.warnings.length > 0) {
       lines.push('');
       lines.push('⚠ ПРЕДУПРЕЖДЕНИЯ:');
-      explanation.warnings.forEach(w => lines.push(`  • ${w}`));
+      metrics.warnings.forEach(w => lines.push(`  • ${w}`));
     }
+    lines.push('');
+    lines.push('📊 РАСПРЕДЕЛЕНИЕ ПО ТИРАМ:');
+    lines.push(`  • Core: ${metrics.tiers.core} • Standard: ${metrics.tiers.standard} • Advanced: ${metrics.tiers.advanced} • Specialty: ${metrics.tiers.specialty}`);
     lines.push('');
     lines.push('═══════════════════════════════════════════');
     const text = lines.join('\n');
     setCurrentReport(text);
-  }, [explanation, stackIds]);
+  }, [metrics, stackIds]);
 
   const handleSave = useCallback(() => {
     if (!currentReport || currentReport.startsWith('❌')) return;
@@ -137,8 +167,17 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
       <GlassCard title="📊 Генерация отчёта" icon="📄" color="#60a5fa">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
           Стек: <strong>{stackIds.length} компонентов</strong>
-          {explanation && ` • Синергия: ${explanation.totalSynergyScore} • Покрытие: ${explanation.completeness}%`}
+          {metrics && ` • Синергия: ${metrics.totalSynergyScore} • Покрытие: ${metrics.completeness}%`}
+          {metrics && ` • Совместимость: ${metrics.compatScore}/100`}
         </div>
+        {metrics && (
+          <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+            <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
+              <div style={{ width: metrics.compatScore + '%', height: '100%', borderRadius: 2,
+                background: metrics.compatScore >= 70 ? '#00e68a' : metrics.compatScore >= 40 ? '#f59e0b' : '#ef4444', transition: 'width 0.3s' }} />
+            </div>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
           <button onClick={() => setReportMode('standard')} style={{
             flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
