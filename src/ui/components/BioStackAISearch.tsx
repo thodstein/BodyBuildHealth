@@ -1,0 +1,246 @@
+import React, { useState, useMemo, useCallback } from 'react';
+import { type BioStackProfile } from '../../engines/biostack-ai.engine';
+import { type GoalType } from '../../engines/biostack-ai.engine';
+import { findSupplements, type FinderMatch, type FinderQuery } from '../../engines/supplement-finder.engine';
+import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, MECHANISM_LABELS } from '../../data/support-database';
+import { GlassCard, PillBtn, inputS, GOALS, ORGANS, SYSTEMS, TOP_MECHANISMS, SYMPTOMS, toFinderProfile } from './BioStackAIConstants';
+
+type FilterGroup = 'goals' | 'organs' | 'systems' | 'mechanisms' | 'symptoms';
+
+export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void }) {
+  const [searchText, setSearchText] = useState('');
+  const [selectedGoal, setSelectedGoal] = useState<GoalType | null>(null);
+  const [selectedOrgans, setSelectedOrgans] = useState<string[]>([]);
+  const [selectedSystems, setSelectedSystems] = useState<string[]>([]);
+  const [selectedMechs, setSelectedMechs] = useState<string[]>([]);
+  const [results, setResults] = useState<FinderMatch[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [openGroup, setOpenGroup] = useState<FilterGroup | null>(null);
+  const [expandedCard, setExpandedCard] = useState<Record<string, boolean>>({});
+
+  const clearSearch = useCallback(() => {
+    setSearchText(''); setSelectedGoal(null); setSelectedOrgans([]);
+    setSelectedSystems([]); setSelectedMechs([]); setResults([]); setHasSearched(false);
+  }, []);
+
+  const hasAnyFilter = searchText || selectedGoal || selectedOrgans.length > 0 || selectedSystems.length > 0 || selectedMechs.length > 0;
+
+  const handleSearch = useCallback(() => {
+    const organs = selectedOrgans.length > 0 ? selectedOrgans : undefined;
+    const query: FinderQuery = {
+      searchText: searchText || undefined,
+      goal: selectedGoal || undefined,
+      organs,
+      profile: toFinderProfile(profile),
+    };
+    if (selectedMechs.length > 0) query.mechanisms = selectedMechs;
+    const res = findSupplements(query);
+    setResults([...res].sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, 50));
+    setHasSearched(true);
+  }, [searchText, selectedGoal, selectedOrgans, selectedMechs, profile]);
+
+  const toggleGoal = useCallback((g: GoalType) => { setSelectedGoal(prev => prev === g ? null : g); }, []);
+
+  const toggleArray = useCallback((arr: string[], set: (v: string[]) => void, val: string) => {
+    set(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
+  }, []);
+
+  const addToStack = useCallback((id: string) => {
+    if (!stackIds.includes(id)) setStackIds([...stackIds, id]);
+  }, [stackIds, setStackIds]);
+
+  const removeFromStack = useCallback((id: string) => {
+    setStackIds(stackIds.filter(s => s !== id));
+  }, [stackIds, setStackIds]);
+
+  const catLabel = (c: string) => CATEGORY_LABELS[c as keyof typeof CATEGORY_LABELS] || c;
+  const mechLabel = (m: string) => MECHANISM_LABELS[m] || m;
+
+  const filterBtn = (label: string, active: boolean, onClick: () => void) => (
+    <button onClick={onClick} style={{
+      padding: '4px 8px', borderRadius: 10, fontSize: 8, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+      background: active ? 'rgba(0,230,138,0.1)' : '#202023',
+      border: active ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)',
+      color: active ? '#00e68a' : 'rgba(255,255,255,0.5)',
+    }}>{label}</button>
+  );
+
+  return (
+    <div style={{ paddingBottom: 80 }}>
+      {/* Search input + filters */}
+      <GlassCard title="🔍 Поиск препаратов" icon="🔍" color="#60a5fa">
+        <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+          <input value={searchText} onChange={e => setSearchText(e.target.value)} placeholder="Название, механизм, орган..." style={inputS} />
+          <button onClick={handleSearch} style={{
+            padding: '10px 16px', borderRadius: 12, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+            background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', whiteSpace: 'nowrap',
+          }}>🔍</button>
+          {hasAnyFilter && <button onClick={clearSearch} style={{
+            padding: '10px 12px', borderRadius: 12, fontSize: 10, cursor: 'pointer',
+            background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap',
+          }}>✕</button>}
+        </div>
+
+        {/* Quick symptom chips */}
+        {!hasAnyFilter && !hasSearched && (
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 3 }}>Быстрый поиск по симптомам:</div>
+            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+              {SYMPTOMS.map(s => (
+                <PillBtn key={s.label} small onClick={() => { setSelectedGoal(s.goal); setTimeout(handleSearch, 0); }}>{s.label}</PillBtn>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Collapsible filter groups */}
+        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 4 }}>
+          {(['goals','organs','systems','mechanisms'] as FilterGroup[]).map(g => (
+            <button key={g} onClick={() => setOpenGroup(openGroup === g ? null : g)} style={{
+              padding: '4px 10px', borderRadius: 8, fontSize: 7, cursor: 'pointer', fontWeight: 600,
+              background: openGroup === g ? 'rgba(139,92,246,0.1)' : '#202023',
+              border: `1px solid ${openGroup === g ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.04)'}`,
+              color: openGroup === g ? '#8b5cf6' : 'rgba(255,255,255,0.5)',
+            }}>
+              {g === 'goals' ? '🎯 Цели' : g === 'organs' ? '🫀 Органы' : g === 'systems' ? '⚙️ Системы' : '🧬 Механизмы'}
+              {g === 'goals' && selectedGoal ? ` (1)` : (g === 'organs' && selectedOrgans.length > 0) ? ` (${selectedOrgans.length})` : (g === 'systems' && selectedSystems.length > 0) ? ` (${selectedSystems.length})` : (g === 'mechanisms' && selectedMechs.length > 0) ? ` (${selectedMechs.length})` : ''}
+            </button>
+          ))}
+        </div>
+
+        {openGroup === 'goals' && (
+          <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', padding: '4px 0', marginBottom: 4 }}>
+            {GOALS.map(g => filterBtn(g.label, selectedGoal === g.key, () => toggleGoal(g.key)))}
+          </div>
+        )}
+        {openGroup === 'organs' && (
+          <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', padding: '4px 0', marginBottom: 4 }}>
+            {ORGANS.map(o => filterBtn(o.label, selectedOrgans.includes(o.key), () => toggleArray(selectedOrgans, setSelectedOrgans, o.key)))}
+          </div>
+        )}
+        {openGroup === 'systems' && (
+          <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', padding: '4px 0', marginBottom: 4 }}>
+            {SYSTEMS.map(s => filterBtn(s.label, selectedSystems.includes(s.key), () => toggleArray(selectedSystems, setSelectedSystems, s.key)))}
+          </div>
+        )}
+        {openGroup === 'mechanisms' && (
+          <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', padding: '4px 0', marginBottom: 4 }}>
+            {TOP_MECHANISMS.map(m => filterBtn(m.label, selectedMechs.includes(m.key), () => toggleArray(selectedMechs, setSelectedMechs, m.key)))}
+          </div>
+        )}
+
+        {/* Active chips */}
+        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 4 }}>
+          {stackIds.slice(-5).map(id => {
+            const cat = SUPPORT_CATALOG_DATA[id];
+            return (
+              <span key={id} style={{ padding: '2px 6px', borderRadius: 6, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.1)', fontSize: 7, display: 'flex', alignItems: 'center', gap: 3 }}>
+                {cat?.nameRu || cat?.name || id}
+                <span onClick={() => removeFromStack(id)} style={{ cursor: 'pointer', marginLeft: 2 }}>✕</span>
+              </span>
+            );
+          })}
+          {stackIds.length > 5 && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>+{stackIds.length - 5}...</span>}
+        </div>
+      </GlassCard>
+
+      {/* Results */}
+      {hasSearched && results.length === 0 && (
+        <GlassCard title="Результаты" icon="🔍" color="#f59e0b">
+          <div style={{ textAlign:'center', fontSize:10, color:'rgba(255,255,255,0.3)', padding:12 }}>Ничего не найдено. Попробуйте изменить фильтры.</div>
+        </GlassCard>
+      )}
+
+      {results.map(match => {
+        const cat = SUPPORT_CATALOG_DATA[match.id];
+        if (!cat) return null;
+        const isInStack = stackIds.includes(match.id);
+        const exp = expandedCard[match.id];
+
+        return (
+          <GlassCard key={match.id} style={{ marginBottom: 6 }}>
+            <div onClick={() => setExpandedCard(prev => ({ ...prev, [match.id]: !exp }))} style={{ cursor: 'pointer' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{cat.nameRu || cat.name}</span>
+                  <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 7, fontWeight: 700,
+                    background: match.relevanceScore > 80 ? 'rgba(0,230,138,0.12)' : match.relevanceScore > 50 ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.04)',
+                    color: match.relevanceScore > 80 ? '#00e68a' : match.relevanceScore > 50 ? '#f59e0b' : 'rgba(255,255,255,0.3)',
+                  }}>{(match.relevanceScore)}%</span>
+                </div>
+                <div style={{ display: 'flex', gap: 3 }}>
+                  {isInStack ? (
+                    <button onClick={e => { e.stopPropagation(); removeFromStack(match.id); }}
+                      style={{ padding: '3px 8px', borderRadius: 6, fontSize: 7, cursor: 'pointer', fontWeight: 600,
+                        background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>
+                      ✕ Убрать
+                    </button>
+                  ) : (
+                    <button onClick={e => { e.stopPropagation(); addToStack(match.id); }}
+                      style={{ padding: '3px 8px', borderRadius: 6, fontSize: 7, cursor: 'pointer', fontWeight: 600,
+                        background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a' }}>
+                      + Стек
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Badges */}
+              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 3 }}>
+                {cat.tier && <span style={{ padding: '1px 5px', borderRadius: 3, fontSize: 7, background: 'rgba(0,230,138,0.06)', color: '#00e68a' }}>{catLabel(cat.tier)}</span>}
+                {cat.category?.slice(0, 3).map((c: string, i: number) => (
+                  <span key={i} style={{ padding: '1px 5px', borderRadius: 3, fontSize: 7, background: 'rgba(96,165,250,0.06)', color: '#60a5fa' }}>{catLabel(c)}</span>
+                ))}
+              </div>
+
+              {/* Match highlights */}
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', lineHeight: 1.3 }}>
+                {match.matchReasons?.slice(0, 1).join('; ')}
+              </div>
+            </div>
+
+            {/* Expandable */}
+            {exp && (
+              <div style={{ marginTop: 6 }}>
+                {cat.description && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, marginBottom: 4 }}>📝 {cat.description}</div>}
+                {match.personalNotes?.length > 0 && (
+                  <div style={{ fontSize: 7, color: '#00e68a', marginBottom: 2 }}>🎯 Совпадения: {match.personalNotes.slice(0, 3).join(', ')}</div>
+                )}
+                {cat.organs?.length > 0 && (
+                  <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginBottom: 3 }}>
+                    {cat.organs.map((o: string, i: number) => (
+                      <span key={i} style={{ padding: '1px 5px', borderRadius: 3, fontSize: 7, background: 'rgba(96,165,250,0.06)', color: '#60a5fa' }}>{o}</span>
+                    ))}
+                  </div>
+                )}
+                {cat.synergies?.length > 0 && (
+                  <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.06)', marginBottom: 3 }}>
+                    <div style={{ fontSize: 7, color: '#8b5cf6', fontWeight: 600 }}>🤝 Синергии:</div>
+                    {cat.synergies.slice(0, 3).map((s, i) => (
+                      <div key={i} style={{ fontSize: 7, color: '#a78bfa' }}>• {s.effect}</div>
+                    ))}
+                  </div>
+                )}
+                {cat.conflicts?.length > 0 && (
+                  <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.06)', marginBottom: 3 }}>
+                    <div style={{ fontSize: 7, color: '#ef4444', fontWeight: 600 }}>🚫 Конфликты:</div>
+                    {cat.conflicts.slice(0, 2).map((c, i) => (
+                      <div key={i} style={{ fontSize: 7, color: '#f87171' }}>• {c.effect}</div>
+                    ))}
+                  </div>
+                )}
+                {cat.contraindications?.length > 0 && (
+                  <div style={{ fontSize: 7, color: '#f59e0b', marginBottom: 2 }}>⚠ {cat.contraindications.slice(0, 2).join(', ')}</div>
+                )}
+                {cat.dosage && <div style={{ fontSize: 7, color: '#60a5fa', marginTop: 2 }}>💊 {cat.dosage.mg} мг {cat.dosage.timing ? `• ${cat.dosage.timing}` : ''}</div>}
+              </div>
+            )}
+            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', textAlign: 'right', marginTop: 2 }}>
+              {exp ? '▲' : '▼'}
+            </div>
+          </GlassCard>
+        );
+      })}
+    </div>
+  );
+}
