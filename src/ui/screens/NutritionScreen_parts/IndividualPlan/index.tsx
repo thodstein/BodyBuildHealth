@@ -4,14 +4,16 @@ import { IndividualPlanProvider } from "./IndividualPlanContext";
 import { IndividualPlanSettings } from "./IndividualPlanSettings";
 import { IndividualPlanResults } from "./IndividualPlanResults";
 import { MealComposer } from "./MealComposer";
+import { IndividualPlanHealth } from "./IndividualPlanHealth";
 import { usePlanCtx } from "./IndividualPlanContext";
 
-type PlanTab = 'settings' | 'plan' | 'composer' | 'report';
+type PlanTab = 'settings' | 'plan' | 'composer' | 'report' | 'health';
 
 const TAB_META: { key: PlanTab; label: string; icon: string }[] = [
   { key: 'settings', label: 'Настройки', icon: '⚙️' },
   { key: 'plan', label: 'План', icon: '🥗' },
   { key: 'composer', label: 'Компоновщик', icon: '🍳' },
+  { key: 'health', label: 'Здоровье', icon: '🩺' },
   { key: 'report', label: 'Отчёт', icon: '📊' },
 ];
 
@@ -38,6 +40,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         {tab === 'settings' && <IndividualPlanSettings />}
         {tab === 'plan' && <IndividualPlanResults />}
         {tab === 'composer' && <MealComposer />}
+        {tab === 'health' && <IndividualPlanHealth />}
         {tab === 'report' && <ReportTab />}
       </div>
     </IndividualPlanProvider>

@@ -1041,6 +1041,7 @@ export const IndividualPlanSettings: React.FC = () => {
       <GlassCard title="⚡ Быстрые пресеты" icon="⚡" color="#f97316">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {[
+            { id: 'max', label: '🚀 Максимум', desc: 'Топ-рейтинг + макс. калории + макс. разнообразие', fn: () => { setBudget('max'); setNutrLevel('max'); setVariety('max'); } },
             { id: 'meat', label: '🥩 Мясной', desc: 'Курица, говядина, индейка', fn: () => { setPlanType('classic'); setPreferredFoods(['chicken_breast','beef_lean','turkey_breast','rice_white','broccoli']); } },
             { id: 'fish', label: '🐟 Рыбный', desc: 'Лосось, тунец, треска', fn: () => { setPlanType('mediterranean'); setPreferredFoods(['salmon','tuna_canned','cod','rice_brown','broccoli','olive_oil']); } },
             { id: 'vegan', label: '🌱 Веган', desc: 'Бобовые, тофу, киноа', fn: () => { setPlanType('vegetarian'); setPreferredFoods(['tofu','tempeh','lentils','quinoa','broccoli','avocado']); } },

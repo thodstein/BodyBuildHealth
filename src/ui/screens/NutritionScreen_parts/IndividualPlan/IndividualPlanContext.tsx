@@ -587,7 +587,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       });
       anchored.forEach((m, i) => { const mMin = Math.max(effectiveWake + 15, Math.min(effectiveBed - 15, m.time)); const hh = Math.floor(mMin / 60); const mm = mMin % 60; mealTimes.push({ time: `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`, label: m.label, pct: [0.2,0.2,0.3,0.15,0.1,0.05][i] || 0.15 }); });
       if (linkToTraining && isTrainingDay && trainStart?.includes(':')) { const trainH = parseInt(trainStart.split(':')[0]); const preTime = `${String(trainH-2).padStart(2,'0')}:00`; const postTime = `${String(trainH+1).padStart(2,'0')}:30`; const hasNearby = (t: string) => mealTimes.some(mt => { const mtMin = toMin(mt.time); const tMin = toMin(t); return Math.abs(mtMin - tMin) <= 45; }); if (!hasNearby(preTime)) mealTimes.push({ time: preTime, label: 'Предтрен', pct: 0.1 }); if (!hasNearby(postTime)) mealTimes.push({ time: postTime, label: 'Пост-трен', pct: 0.15 }); mealTimes.sort((a, b) => { const aMin = toMin(a.time); const bMin = toMin(b.time); return aMin - bMin; }); }
-      const tKcal = Math.round(weight * 30 * (nutrMult || 1) * (pMod || 1)); const tP = Math.round(weight * 2 * (pMod || 1)); const tF = Math.round(weight * 0.8 * (fMod || 1)); const tC = Math.round(weight * 3.5 * (cMod || 1));
+      const tKcal = Math.round((effectiveKcal || weight * 30) * (nutrMult || 1));
+      const tP = Math.round(Math.max(50, (effectiveP || weight * 2) * (pMod || 1)));
+      const tF = Math.round(Math.max(20, (effectiveF || weight * 0.8) * (fMod || 1)));
+      const tC = Math.round(Math.max(50, (effectiveC || weight * 3.5) * (cMod || 1)));
       let tKcalAdj = tKcal; let tCAdj = tC;
       if (cyclingMode === 'macro' && !isTrainingDay) { tKcalAdj = Math.round(tKcal * 0.85); tCAdj = Math.round(tC * 0.7); }
       if (cyclingMode === 'butch') { tCAdj = isTrainingDay ? Math.round(tC * 1.3) : Math.round(tC * 0.5); }
