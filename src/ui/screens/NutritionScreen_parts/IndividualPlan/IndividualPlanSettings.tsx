@@ -71,6 +71,7 @@ export const IndividualPlanSettings: React.FC = () => {
     showSuppPicker, setShowSuppPicker, suppSearch, setSuppSearch,
     linkToTraining, setLinkToTraining,
     trainStart, setTrainStart, trainEnd, setTrainEnd,
+    v2Phase, setV2Phase, v2Labs, setV2Labs, v2Pharma, setV2Pharma,
   } = usePlanCtx();
 
   const [showSpecialMealModal, setShowSpecialMealModal] = useState(false);
@@ -1869,12 +1870,57 @@ export const IndividualPlanSettings: React.FC = () => {
                   {m.replaceMeal && <span style={{ color:'#00e68a', marginLeft:4, fontSize:7, background:'rgba(0,230,138,0.08)', padding:'1px 5px', borderRadius:4 }}>↻ {m.replaceMeal}</span>}
                   {m.notes && <div style={{ color:'rgba(255,255,255,0.5)', marginTop:2, fontSize:7 }}>{m.notes}</div>}
                 </div>
-                <button onClick={() => { const upd = specialMeals.filter((_, j) => j !== i); setSpecialMeals(upd); localStorage.setItem('he_special_meals', JSON.stringify(upd)); }} style={{ background:'rgba(239,68,68,0.1)', border:'none', color:'#ef4444', cursor:'pointer', borderRadius:4, padding:'2px 6px', fontSize:8 }}>✕</button>
+                <button onClick={() =>
+
+ { const upd = specialMeals.filter((_, j) => j !== i); setSpecialMeals(upd); localStorage.setItem('he_special_meals', JSON.stringify(upd)); }} style={{ background:'rgba(239,68,68,0.1)', border:'none', color:'#ef4444', cursor:'pointer', borderRadius:4, padding:'2px 6px', fontSize:8 }}>✕</button>
               </div>
             ))}
           </div>
         )}
       </GlassCard>
+
+        {/* v2 Scoring Profile */}
+        <GlassCard title="🧬 v2 Скоринг" icon="🧬" color="#00e68a">
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 6, lineHeight: 1.3 }}>
+            Настройте параметры для v2-движка.
+          </div>
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Фаза</div>
+            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+              {['LEAN_MASS', 'EXTREME_CUT', 'PEAK_WEEK', 'POST_CYCLE', 'MOST'].map(ph => (
+                <button key={ph} onClick={() => setV2Phase(ph)} style={{
+                  padding: '4px 10px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+                  background: v2Phase === ph ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+                  border: v2Phase === ph ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                  color: v2Phase === ph ? '#000' : 'rgba(255,255,255,0.7)',
+                }}>{ph === 'LEAN_MASS' ? '💪 Набор' : ph === 'EXTREME_CUT' ? '🔥 Сушка' : ph === 'PEAK_WEEK' ? '⚡ Пик' : ph === 'POST_CYCLE' ? '🔄 ПКТ' : '🌉 Мост'}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Фармакология</div>
+            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+              {[
+                { id: 'AAS_ORAL', label: '💊 Оральные ААС', color: '#ef4444' },
+                { id: 'AAS_INJECTABLE', label: '💉 Инъекционные ААС', color: '#ef4444' },
+                { id: 'HGH', label: '🧬 HGH/Пептиды', color: '#8b5cf6' },
+                { id: 'DIURETICS', label: '💧 Диуретики', color: '#f59e0b' },
+                { id: 'STIMULATORS', label: '⚡ Стимуляторы', color: '#f97316' },
+                { id: 'INSULIN_USE', label: '💉 Инсулин', color: '#8b5cf6' },
+                { id: 'LIVER_SUPPORT', label: '🫁 Гепатопротекторы', color: '#22c55e' },
+                { id: 'GUT_SUPPORT', label: '🫃 Поддержка ЖКТ', color: '#22c55e' },
+              ].map(p => (
+                <button key={p.id} onClick={() => setV2Pharma((prev: Record<string, boolean>) => ({ ...prev, [p.id]: !prev[p.id] }))} style={{
+                  padding: '3px 8px', borderRadius: 8, fontSize: 7, fontWeight: 600, cursor: 'pointer',
+                  background: v2Pharma[p.id] ? p.color + '20' : '#202023',
+                  border: v2Pharma[p.id] ? `1px solid ${p.color}40` : '1px solid rgba(255,255,255,0.04)',
+                  color: v2Pharma[p.id] ? p.color : 'rgba(255,255,255,0.5)',
+                }}>{p.label}</button>
+              ))}
+            </div>
+          </div>
+        </GlassCard>
+
       {showSpecialMealPopup && (
         <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
           onClick={() => setShowSpecialMealPopup(false)}>

@@ -481,6 +481,20 @@ export interface SupportStack {
 - После каждого изменения запускать `tsc --noEmit && vite build`.
 - Запрещено создавать стек с неполными расширенными полями (anatomicalMapping, structuredInteractions, structuredLabControl — обязательны).
 
+### 10.7. ОБЯЗАТЕЛЬНОЕ ПРАВИЛО ЗАПОЛНЕНИЯ СТЕКА (для всех агентов)
+При добавлении или редактировании ЛЮБОГО стека в `support-stacks-bformat.ts` агент ОБЯЗАН соблюдать **полный макет** (B-формат) без пропусков:
+
+1. **Все 23+ поля** из `SupportStack` интерфейса должны быть заполнены. Ни одно поле не может быть пустым или пропущено.
+2. **`description`** — только УСИЛЕНИЕ существующего. Запрещено сокращать или упрощать. Если стек уже имеет описание — агент может ДОБАВИТЬ детали, но НЕ УДАЛЯЕТ.
+3. **`substances[].mechanism`** — для КАЖДОГО вещества описать его роль ИМЕННО В ЭТОМ СТЕКЕ (30-50 символов). Не копировать общее описание из SUPPORT_CATALOG_DATA.
+4. **`anatomicalMapping`** — ВСЕ 6 полей заполнить (organSystems, targetOrgans, organMechanisms, drugMechanisms, mechanismCodes, finalEffect).
+5. **`structuredInteractions`** — минимум 3 синергии (`synergies[]`) и 1 конфликт (`conflicts[]`). ВСЕ поля внутри каждой записи (with, effect, mechanism, strength) обязательны.
+6. **`structuredLabControl`** — минимум 5 маркеров (`markers[]`). Каждый маркер: marker, when, targetRange — ВСЕ поля обязательны.
+7. **Запрещено** использовать `as any`, оставлять `undefined`, использовать плейсхолдеры.
+8. После заполнения — `tsc --noEmit && vite build`.
+
+Нарушение любого из пунктов 10.7 считается **критической ошибкой**. Стек с неполными полями не принимается.
+
 ## Session Summary (Jun 25) — BioStack AI + B-format стеки
 ### Done
 - **BioStack AI Periodization**: AI-подсказки фазовых переходов (селекторы От→К, AI-анализ с keep/add/remove), матрица покрытия всех веществ по фазам (table). 

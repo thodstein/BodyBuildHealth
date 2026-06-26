@@ -193,6 +193,10 @@ export interface PlanCtx {
   hungerLevel: number; setHungerLevel: (v: number) => void;
   householdActivity: string; setHouseholdActivity: (v: any) => void;
   customNotes: string; setCustomNotes: (v: string) => void;
+  // v2 scoring profile
+  v2Phase: string; setV2Phase: (v: string) => void;
+  v2Labs: Record<string, string>; setV2Labs: (v: any) => void;
+  v2Pharma: Record<string, boolean>; setV2Pharma: (v: any) => void;
 }
 
 const PlanContext = createContext<PlanCtx>(null as any);
@@ -395,6 +399,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [showSuppPicker, setShowSuppPicker] = useState(false);
   const [suppSearch, setSuppSearch] = useState('');
   const [newRecipe, setNewRecipe] = useState({ name: '', meal: 'lunch' as string, prepTime: 10, kcal: 400, protein: 30, fat: 10, carbs: 40, ingredients: '', instructions: '', tags: '' });
+  const [v2Phase, setV2Phase] = useState('LEAN_MASS');
+  const [v2Labs, setV2Labs] = useState<Record<string, string>>(() => { try { return JSON.parse(localStorage.getItem('he_planner_labs') || '{}'); } catch { return {}; } });
+  const [v2Pharma, setV2Pharma] = useState<Record<string, boolean>>(() => { try { return JSON.parse(localStorage.getItem('he_planner_pharma') || '{}'); } catch { return {}; } });
+  useEffect(() => { try { localStorage.setItem('he_planner_labs', JSON.stringify(v2Labs)); } catch {} }, [v2Labs]);
+  useEffect(() => { try { localStorage.setItem('he_planner_pharma', JSON.stringify(v2Pharma)); } catch {} }, [v2Pharma]);
   useEffect(() => { try { localStorage.setItem('he_nutrition_supps', JSON.stringify(takenSupplements)); } catch {} }, [takenSupplements]);
 
   const saveUndo = () => { if (dayPlan) setUndoStack(prev => [JSON.parse(JSON.stringify(dayPlan)), ...prev].slice(0, 5)); };
@@ -914,6 +923,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     generateRiskReport, generateDrugCompatReport, generateFullNutritionReport,
     renderMealList,
     customNotes, setCustomNotes,
+    v2Phase, setV2Phase, v2Labs, setV2Labs, v2Pharma, setV2Pharma,
   };
 
   return <PlanContext.Provider value={ctx}>{children}</PlanContext.Provider>;

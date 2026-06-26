@@ -152,8 +152,8 @@ export const ProductUsefulnessPlanner: React.FC = () => {
 
   const compareData = useMemo(() => {
     if (compareIds.length < 2) return [];
-    return compareProducts(compareIds, opts);
-  }, [compareIds, opts]);
+    return useV2 ? compareProductsV2(compareIds, v2Profile) : compareProducts(compareIds, opts);
+  }, [compareIds, opts, useV2, v2Profile]);
 
   const toggleCompare = (id: string) => {
     if (compareIds.includes(id)) {
@@ -564,22 +564,29 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 <button onClick={() => setCompareIds([])} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 7, border: 'none', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer' }}>Очистить</button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(compareData.length, 3)}, 1fr)`, gap: 6 }}>
-                {compareData.map(({ food, score }) => (
+                {compareData.map(({ food, score }: any) => (
                   <div key={food.id} style={{ borderRadius: 12, padding: 10, background: `rgba(255,255,255,0.02)`, border: `1px solid ${score.color}20` }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 4, textAlign: 'center' }}>{food.name}</div>
                     <div style={{ textAlign: 'center', marginBottom: 6 }}>
-                      <ScoreBadge score={score.total} max={score.maxPossible} color={score.color} label={score.label} />
+                      <ScoreBadge score={score.total} max={score.maxPossible || 10} color={score.color} label={score.label} />
                     </div>
                     <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 4, textAlign: 'center' }}>
                       {food.kcal} ккал · {food.protein}г б · {food.fat}г ж · {food.carbs}г у
                     </div>
-                    {enableA && <>
+                    {score.breakdown && enableA && <>
                       <ScoreBar label="Белок" value={score.breakdown.proteinDensity} max={30} color="#3b82f6" />
                       <ScoreBar label="Микро" value={score.breakdown.microDensity} max={30} color="#22c55e" />
                       <ScoreBar label="Клетчатка" value={score.breakdown.fiberQuality} max={20} color="#f97316" />
-                      <ScoreBar label="Аминокислоты" value={score.breakdown.aminoScore} max={25} color="#ec4899" />
+                      <ScoreBar label="АК" value={score.breakdown.aminoScore} max={25} color="#ec4899" />
                       <ScoreBar label="Категория" value={score.breakdown.tierScore} max={20} color="#f59e0b" />
                     </>}
+                    {score.factors && useV2 && (
+                      <div style={{ marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.35)' }}>
+                        {score.factors.slice(0, 3).map((f: any, i: number) => (
+                          <div key={i} style={{ color: f.impact > 0 ? '#22c55e' : '#ef4444' }}>{f.icon} {f.text}</div>
+                        ))}
+                      </div>
+                    )}
                     {enableC && score.costEfficiency && (
                       <div style={{ marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
                         💰 {score.costEfficiency.proteinCostRub} ₽/10г белка · <span style={{ color: score.costEfficiency.efficiencyScore >= 50 ? '#22c55e' : '#f59e0b' }}>{score.costEfficiency.efficiencyScore}/100</span>
@@ -726,8 +733,8 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               {mealProducts.length > 0 && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                   <button onClick={() => {
-                    const result = calcMealScore(mealProducts, opts);
-                    setMealResult(result);
+                    const result = useV2 ? calcMealScoreV2(mealProducts, v2Profile) : calcMealScore(mealProducts, opts);
+                    setMealResult(result as any);
                   }} style={{
                     padding: '7px 14px', borderRadius: 8, fontSize: 9, border: 'none',
                     background: 'linear-gradient(135deg, #f97316, #ef4444)', color: '#fff', cursor: 'pointer', fontWeight: 700,
