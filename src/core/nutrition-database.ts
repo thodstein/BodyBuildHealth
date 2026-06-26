@@ -248,17 +248,17 @@ export function enrichFoodItemV2(f: FoodItem): FoodItem {
   };
 
   f.specific_compounds_100g = {
-    polyphenols_mg: isFruit ? 100 : isVegetable ? 60 : isNut ? 200 : 0,
-    flavonoids_mg: isFruit ? 40 : isVegetable ? 20 : 0,
+    polyphenols_mg: isFruit ? 100 : isVegetable ? 60 : isNut ? 200 : isLegume ? 80 : isGrain ? 15 : (isBeverage && (f.id.includes('coffee') || f.id.includes('tea'))) ? 200 : 0,
+    flavonoids_mg: isFruit ? 40 : isVegetable ? 20 : isLegume ? 25 : isNut ? 10 : 0,
     curcumin_mg: f.id.includes('turmeric') || f.id.includes('curcuma') ? 100 : 0,
     sulforaphane_mg: f.id.includes('broccoli') || f.id.includes('cauliflower') || f.id.includes('cabbage') ? 45 : 0,
-    resveratrol_mg: f.id.includes('grape') || f.id.includes('blueberry') || f.id.includes('peanut') ? 5 : 0,
-    lectins_mg: isLegume ? 150 : isGrain ? 30 : 0,
-    oxalates_mg: f.id.includes('spinach') ? 750 : f.id.includes('beetroot') ? 600 : f.id.includes('rhubarb') ? 500 : f.id.includes('kale') ? 20 : 0,
-    phytoestrogens_mg: f.id.includes('soy') || f.id.includes('tofu') || f.id.includes('tempeh') ? 50 : f.id.includes('flax') || f.id.includes('linseed') ? 200 : 0,
-    alpha_lipoic_acid_mg: isRedMeat ? 3 : isVegetable ? 1 : 0,
-    coenzyme_q10_mg: isRedMeat ? 3 : isFish ? 4 : isNut ? 1 : 0,
-    berberine_mg: 0,
+    resveratrol_mg: f.id.includes('grape') || f.id.includes('blueberry') || f.id.includes('peanut') || f.id.includes('pistachio') ? 5 : f.id.includes('cocoa') || f.id.includes('chocolate') ? 3 : 0,
+    lectins_mg: isLegume ? 150 : isGrain ? 30 : isNut ? 10 : 0,
+    oxalates_mg: f.id.includes('spinach') ? 750 : f.id.includes('beetroot') ? 600 : f.id.includes('rhubarb') ? 500 : f.id.includes('kale') ? 20 : f.id.includes('almond') ? 120 : isNut ? 30 : isLegume ? 20 : isVegetable ? 10 : 0,
+    phytoestrogens_mg: f.id.includes('soy') || f.id.includes('tofu') || f.id.includes('tempeh') ? 50 : f.id.includes('flax') || f.id.includes('linseed') ? 200 : isLegume ? 5 : 0,
+    alpha_lipoic_acid_mg: isRedMeat ? 3 : f.id.includes('broccoli') ? 3 : f.id.includes('spinach') ? 2 : isFish ? 1 : isEgg_sup ? 0.5 : isVegetable ? 1 : 0,
+    coenzyme_q10_mg: isRedMeat ? 3 : isFish ? 4 : isNut ? 1 : isEgg_sup ? 2 : f.id.includes('chicken') ? 1.5 : f.id.includes('broccoli') ? 0.9 : isVegetable ? 0.5 : 0,
+    berberine_mg: f.id.includes('barberry') || f.id.includes('goldenseal') || f.id.includes('oregon_grape') ? 50 : 0,
   };
 
   f.bb_quality_score = calcBBQualityScore(f);
@@ -1689,6 +1689,38 @@ export { RATION_TIERS };
       metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'HIGH',ammonia_source_level:'LOW',heavy_metal_risk:'LOW',cns_impact:'NEUTRAL',goitrogenic_potential:'LOW',hepatoprotective:false,anabolic_potential:'MEDIUM',detox_support_level:'LOW',histamine_level:'LOW',insulin_sensitivity_impact:'NEGATIVE',thyroid_support_level:'LOW' },
       specific_compounds_100g: { polyphenols_mg:10,flavonoids_mg:5,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:1,berberine_mg:0 },
       bb_quality_score: 6.0,
+    },
+    // 15. Куриная грудка
+    chicken_breast: {
+      specific_compounds_100g: { polyphenols_mg:0,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0.5,coenzyme_q10_mg:1.5,berberine_mg:0 },
+      bb_quality_score: 9.5,
+    },
+    // 16. Яблоко
+    apple: {
+      specific_compounds_100g: { polyphenols_mg:120,flavonoids_mg:45,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:5,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0,berberine_mg:0 },
+      bb_quality_score: 7.0,
+    },
+    // 17. Чечевица
+    lentils: {
+      macro_100g: { proteins_animal:0,proteins_plant:9, fats_saturated:0.1,fats_monounsaturated:0.1,fats_polyunsaturated:0.2, omega_3_mg:10,omega_6_mg:80, mct_oil_g:0,cholesterol_mg:0, carbs_sugar:1.8,insulin_index:25 },
+      amino_acid_profile_100g: { leucine_mg:640,isoleucine_mg:390,valine_mg:440,lysine_mg:630,methionine_mg:75,arginine_mg:590,glutamine_mg:1200,tryptophan_mg:80,phenylalanine_mg:440,threonine_mg:340,histidine_mg:240,cysteine_mg:85 },
+      specific_compounds_100g: { polyphenols_mg:80,flavonoids_mg:25,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:150,oxalates_mg:20,phytoestrogens_mg:5,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0,berberine_mg:0 },
+      bb_quality_score: 8.0,
+    },
+    // 18. Греческий йогурт
+    yogurt_greek: {
+      specific_compounds_100g: { polyphenols_mg:0,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:3,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0.3,berberine_mg:0 },
+      bb_quality_score: 8.0,
+    },
+    // 20. Молоко 2.5%
+    milk: {
+      specific_compounds_100g: { polyphenols_mg:0,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:3,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0.3,berberine_mg:0 },
+      bb_quality_score: 6.5,
+    },
+    // 21. Сывороточный протеин
+    whey_protein: {
+      specific_compounds_100g: { polyphenols_mg:0,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0,berberine_mg:0 },
+      bb_quality_score: 9.0,
     },
   };
   for (const [id, override] of Object.entries(overrides)) {

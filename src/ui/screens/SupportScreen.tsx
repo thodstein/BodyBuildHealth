@@ -8,6 +8,7 @@ import { useDataLink, notifyDataChange } from '../../core/data-link';
 import { updateProfile, getProfile } from '../../core/profile-manager';
 import { SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { ALL_SUBSTANCES, ALL_INTERACTIONS, type SupportSubstance, type SupportInteraction } from '../../data/support-database';
+import { INTERACTION_ENRICHMENT } from '../../data/support-interaction-enrichment';
 import { getSubstanceTier, TIER_LABELS } from '../../data/support-database';
 import { getBpRiskLevel } from '../../core/bp-hr-data';
 import { SUPPORT_CATALOG_DATA, CATALOG_ENRICHMENT, MECHANISM_LABELS, ORGAN_LABELS as CATALOG_ORGAN_LABELS, SYSTEM_LABELS_CATALOG, CATEGORY_LABELS as CATALOG_CATEGORY_LABELS, TIER_LABELS_CATALOG, type SupportCatalogEntry } from '../../data/support-database';
@@ -2795,8 +2796,33 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                           🎯 {effText}
                                         </div>
                                       )}
-                                      {/* Почему */}
-                                      {mechTexts.length > 0 && (
+                                      {/* Пояснения (из обогащения) */}
+                                      {(INTERACTION_ENRICHMENT[i.interactionId]?.mechanismRu?.length > 0 ? INTERACTION_ENRICHMENT[i.interactionId].mechanismRu : mechTexts).length > 0 && (
+                                        <div style={{ marginBottom:3 }}>
+                                          <div style={{ fontSize:7, color:'#a78bfa', fontWeight:600, marginBottom:1 }}>⚙️ Почему:</div>
+                                          <ul style={{ margin:0, paddingLeft:14, fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.3 }}>
+                                            {(INTERACTION_ENRICHMENT[i.interactionId]?.mechanismRu?.length > 0 ? INTERACTION_ENRICHMENT[i.interactionId].mechanismRu : mechTexts).map((txt: string, mi: number) => (
+                                              <li key={mi}>{txt}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+                                      {/* Риск (из обогащения) */}
+                                      {INTERACTION_ENRICHMENT[i.interactionId]?.riskDescription && (
+                                        <div style={{ background:'rgba(239,68,68,0.06)', borderRadius:6, padding:'5px 8px', marginBottom:3, border:'1px solid rgba(239,68,68,0.15)' }}>
+                                          <div style={{ fontSize:7, color:'#ef4444', fontWeight:700, marginBottom:1 }}>⚠️ Риск:</div>
+                                          <div style={{ fontSize:8, color:'rgba(255,255,255,0.75)', lineHeight:1.3 }}>{INTERACTION_ENRICHMENT[i.interactionId].riskDescription}</div>
+                                        </div>
+                                      )}
+                                      {/* Параметры (из обогащения) */}
+                                      {INTERACTION_ENRICHMENT[i.interactionId]?.parameters && (
+                                        <div style={{ background:'rgba(245,158,11,0.06)', borderRadius:6, padding:'5px 8px', marginBottom:3, border:'1px solid rgba(245,158,11,0.15)' }}>
+                                          <div style={{ fontSize:7, color:'#f59e0b', fontWeight:700, marginBottom:1 }}>📋 Параметры:</div>
+                                          <div style={{ fontSize:8, color:'rgba(255,255,255,0.75)', lineHeight:1.3 }}>{INTERACTION_ENRICHMENT[i.interactionId].parameters}</div>
+                                        </div>
+                                      )}
+                                      {/* Запасные механизмы (когда enrichment нет) */}
+                                      {!INTERACTION_ENRICHMENT[i.interactionId] && mechTexts.length > 0 && (
                                         <div style={{ marginBottom:3 }}>
                                           <div style={{ fontSize:7, color:'#a78bfa', fontWeight:600, marginBottom:1 }}>⚙️ Почему:</div>
                                           <ul style={{ margin:0, paddingLeft:14, fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.3 }}>
@@ -2806,8 +2832,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                           </ul>
                                         </div>
                                       )}
-                                      {/* Параметры / Рекомендации */}
-                                      {i.notes && (
+                                      {/* Параметры / Рекомендации (запасные) */}
+                                      {!INTERACTION_ENRICHMENT[i.interactionId] && i.notes && (
                                         <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', lineHeight:1.3, background:'rgba(245,158,11,0.06)', padding:'4px 6px', borderRadius:4, marginTop:2 }}>
                                           <span style={{ color:'#f59e0b', fontWeight:600 }}>💊 </span>
                                           {i.notes}

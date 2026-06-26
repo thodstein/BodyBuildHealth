@@ -50,7 +50,7 @@ export const IndividualPlanResults: React.FC = () => {
     setDayPlan, planTargets, healthIssues, planType, variety,
     linkToTraining, trainStart,
     workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType,
-    v2Phase, v2Pharma, v2Labs,
+    v2Phase, v2Pharma, v2Labs, histamineSensitive,
   } = usePlanCtx();
 
   const [showCalcPopup, setShowCalcPopup] = useState(false);
@@ -74,6 +74,7 @@ export const IndividualPlanResults: React.FC = () => {
     profile.pharma.INSULIN_USE = v2Pharma.INSULIN_USE || false;
     profile.pharma.LIVER_SUPPORT = v2Pharma.LIVER_SUPPORT || false;
     profile.pharma.GUT_SUPPORT = v2Pharma.GUT_SUPPORT || false;
+    profile.histamineSensitive = histamineSensitive;
     profile.labs.hematocrit = v2Labs.hematocrit ? parseFloat(v2Labs.hematocrit) : undefined;
     profile.labs.ldl = v2Labs.ldl ? parseFloat(v2Labs.ldl) : undefined;
     profile.labs.alt = v2Labs.alt ? parseFloat(v2Labs.alt) : undefined;
@@ -164,6 +165,7 @@ export const IndividualPlanResults: React.FC = () => {
     profile.pharma.INSULIN_USE = v2Pharma.INSULIN_USE || false;
     profile.pharma.LIVER_SUPPORT = v2Pharma.LIVER_SUPPORT || false;
     profile.pharma.GUT_SUPPORT = v2Pharma.GUT_SUPPORT || false;
+    profile.histamineSensitive = histamineSensitive;
     profile.labs.hematocrit = v2Labs.hematocrit ? parseFloat(v2Labs.hematocrit) : undefined;
     profile.labs.ldl = v2Labs.ldl ? parseFloat(v2Labs.ldl) : undefined;
     profile.labs.hdl = v2Labs.hdl ? parseFloat(v2Labs.hdl) : undefined;

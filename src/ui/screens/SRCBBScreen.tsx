@@ -30,7 +30,7 @@ import type { WorkoutLog } from '../../core/types';
 import { AnalyticsTab } from './TrainingScreen_parts/AnalyticsTab';
 import { VisualTab } from './TrainingScreen_parts/VisualTab';
 import { ProMetricsPanel } from './SRCBBScreen_parts/ProMetricsPanel';
-type Mode = 'src' | 'bb';
+type Mode = 'pl' | 'bb' | 'manual';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: '12px', margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -43,7 +43,13 @@ const H: React.CSSProperties = { color: '#fff', fontSize: 15, fontWeight: 600, m
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 1.4 };
 
 export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
-  const [mode, setMode] = useState<Mode>(track === 'bb' ? 'bb' : 'src');
+  const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'pl');
+  const subViewList: Record<Mode, { key: string; label: string }[]> = {
+    pl: [['plan', '📋 План'], ['plates', '🧮 Блины'], ['run', '▶ Выполнение'], ['autoreg', '🧠 Авто'], ['peak', '🏁 Пик'], ['recovery', '🔋 Восст'], ['safety', '🛡 Безоп'], ['demo', '🎬 Демо']].map(([k, l]) => ({ key: k, label: l })),
+    bb: [['plan', '📋 План'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 Про'], ['charts', '📊 График']].map(([k, l]) => ({ key: k, label: l })),
+    manual: [],
+  };
+  const [subView, setSubView] = useState<string>('plan');
 
   // ── СРЦ ──
   const [level, setLevel] = useState<string>('II-KMS');
@@ -139,9 +145,6 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const pedAdapt = useMemo(() => adaptForPEDs(peds, baseMrv), [peds, baseMrv]);
 
   const togglePed = (p: PED) => setPeds(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
-  // ── INT: sub-tabs План/Блины/Выполнение + нормализаторы плана для execution-слоя ──
-  const [view, setView] = useState<'plan' | 'plates' | 'run' | 'autoreg' | 'peak' | 'recovery' | 'safety' | 'demo' | 'programs' | 'methods' | 'analytics' | 'prometrics' | 'charts'>('plan');
-
   const srcDays: PlayerDay[] = useMemo(() => {
     if (!builtSrc) return [];
     const wk0 = builtSrc.weeks[0]; const w0 = wk0.week;
@@ -174,13 +177,13 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     }));
   }, [builtBb]);
 
-  const playerDays: PlayerDay[] = mode === 'src' ? srcDays : bbDaysArr;
+  const playerDays: PlayerDay[] = mainTab === 'pl' ? srcDays : bbDaysArr;
   const workingWeight = useMemo(() => {
-    if (mode === 'src' && builtSrc) return builtSrc.weeks[0]?.days[0]?.exercises[0]?.workSets[0]?.weight || 100;
-    if (mode === 'bb' && builtBb) return builtBb.weeks[0]?.sessions[0]?.exercises[0]?.workSets[0]?.weight || 100;
+    if (mainTab === 'pl' && builtSrc) return builtSrc.weeks[0]?.days[0]?.exercises[0]?.workSets[0]?.weight || 100;
+    if (mainTab === 'bb' && builtBb) return builtBb.weeks[0]?.sessions[0]?.exercises[0]?.workSets[0]?.weight || 100;
     return 100;
-  }, [mode, builtSrc, builtBb]);
-  const runFocus = mode === 'src' ? (getCycleById(selectedCycleId)?.meta.title || 'СРЦ') : 'BB';
+  }, [mainTab, builtSrc, builtBb]);
+  const runFocus = mainTab === 'pl' ? (getCycleById(selectedCycleId)?.meta.title || 'СРЦ') : 'BB';
   const lmsChart: LMSWeekMetric[] = useMemo(() => {
     if (!builtSrc) return [];
     return builtSrc.weeks.map(wk => {
@@ -199,18 +202,23 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   }, [builtBb]);
 
   return (
-    <div key={mode} style={{ padding: 12, color: '#fff', maxWidth: 720, margin: '0 auto' }}>
+    <div key={mainTab} style={{ padding: 12, color: '#fff', maxWidth: 720, margin: '0 auto' }}>
+      {/* 3 main tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <button style={mode === 'src' ? BTN : BTN_GHOST} onClick={() => setMode('src')} disabled={mode === 'src'}>🏆 СРЦ (сила)</button>
-        <button style={mode === 'bb' ? BTN : BTN_GHOST} onClick={() => setMode('bb')} disabled={mode === 'bb'}>💪 Бодибилдинг</button>
+        <button style={mainTab === 'pl' ? BTN : BTN_GHOST} onClick={() => { setMainTab('pl'); setSubView('plan'); }}>🏆 PL (сила)</button>
+        <button style={mainTab === 'bb' ? BTN : BTN_GHOST} onClick={() => { setMainTab('bb'); setSubView('plan'); }}>💪 BB</button>
+        <button style={mainTab === 'manual' ? BTN : BTN_GHOST} onClick={() => { setMainTab('manual'); setSubView('plan'); }}>🛠 Ручной</button>
       </div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        {([['plan', '📋 План'], ['plates', '🧮 Блины'], ['run', '▶ Выполнение'], ['autoreg', '🧠 Авторег'], ['peak', '🏁 Пик'], ['recovery', '🔋 Восст'], ['safety', '🛡 Безоп'], ['demo', '🎬 Демо'], ['programs', '📚 Программы'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 Pro-метрики'], ['charts', '📊 График']] as const).map(([v, l]) => (
-          <button key={v} style={view === v ? BTN : BTN_GHOST} onClick={() => setView(v)}>{l}</button>
-        ))}
-      </div>
+      {/* sub-view nav for PL/BB */}
+      {mainTab !== 'manual' && subViewList[mainTab].length > 0 && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
+          {subViewList[mainTab].map(({ key, label }) => (
+            <button key={key} style={subView === key ? BTN : { ...BTN_GHOST, whiteSpace: 'nowrap', fontSize: 11, padding: '8px 12px', minHeight: 36 }} onClick={() => setSubView(key)}>{label}</button>
+          ))}
+        </div>
+      )}
 
-      {mode === 'src' && view === 'plan' && (
+      {mainTab === 'pl' && subView === 'plan' && (
         <div>
           <div style={H}>Авто-подбор силового цикла</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -379,7 +387,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
         </div>
       )}
 
-      {mode === 'bb' && view === 'plan' && (
+      {mainTab === 'bb' && subView === 'plan' && (
         <div>
           <div style={H}>Авто-подбор бодибилдинг-сплита</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
@@ -408,22 +416,66 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
         </div>
       )}
 
-      {view === 'plates' && <PlateCalculator initialWeight={workingWeight} />}
-      {view === 'run' && playerDays.length > 0 && <SessionPlayer days={playerDays} weekNumber={1} focus={runFocus} />}
-      {view === 'run' && playerDays.length === 0 && <div style={SMALL}>Сначала сгенерируйте план во вкладке «План».</div>}
-      {view === 'autoreg' && <AutoregPanel />}
-      {view === 'peak' && <PeakingPanel />}
-      {view === 'recovery' && <RecoveryPanel />}
-      {view === 'safety' && <ExerciseSafetyPanel />}
-      {view === 'demo' && <ExerciseDemoPanel />}
-      {view === 'programs' && <ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} onAddToMyTraining={() => {}} />}
-      {view === 'methods' && (<>
+      {/* ── Ручной сбор ── */}
+      {mainTab === 'manual' && (() => {
+        const [manualWorkout, setManualWorkout] = React.useState<{ name: string; exercises: { name: string; sets: number; reps: number; weight: number }[]; date: string }>({ name: '', exercises: [{ name: '', sets: 3, reps: 10, weight: 0 }], date: new Date().toISOString().slice(0, 10) });
+        const [saved, setSaved] = React.useState<typeof manualWorkout[]>(() => { try { return JSON.parse(localStorage.getItem('he_manual_workouts') || '[]'); } catch { return []; } });
+        const addEx = () => setManualWorkout(p => ({ ...p, exercises: [...p.exercises, { name: '', sets: 3, reps: 10, weight: 0 }] }));
+        const updEx = (i: number, field: string, val: any) => setManualWorkout(p => { const ex = [...p.exercises]; ex[i] = { ...ex[i], [field]: val }; return { ...p, exercises: ex }; });
+        const saveWorkout = () => { if (!manualWorkout.name.trim() || manualWorkout.exercises.every(e => !e.name.trim())) return; const updated = [...saved, manualWorkout]; setSaved(updated); localStorage.setItem('he_manual_workouts', JSON.stringify(updated)); setManualWorkout({ name: '', exercises: [{ name: '', sets: 3, reps: 10, weight: 0 }], date: new Date().toISOString().slice(0, 10) }); };
+        const delWorkout = (i: number) => { const updated = saved.filter((_, idx) => idx !== i); setSaved(updated); localStorage.setItem('he_manual_workouts', JSON.stringify(updated)); };
+        return <div>
+          <div style={H}>🛠 Ручной сбор тренировки</div>
+          <div style={CARD}>
+            <div style={LABEL}>Название</div>
+            <input style={IN} value={manualWorkout.name} onChange={e => setManualWorkout(p => ({ ...p, name: e.target.value }))} placeholder="Например: Грудные + трицепс" />
+            <div style={LABEL}>Дата</div>
+            <input style={IN} type="date" value={manualWorkout.date} onChange={e => setManualWorkout(p => ({ ...p, date: e.target.value }))} />
+            {manualWorkout.exercises.map((ex, i) => (
+              <div key={i} style={{ display: 'flex', gap: 4, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input style={{ ...IN, flex: '2 1 80px', minWidth: 60 }} value={ex.name} onChange={e => updEx(i, 'name', e.target.value)} placeholder="Упражнение" list="ex-list" />
+                <input style={{ ...IN, flex: '0 1 40px', width: 40 }} type="number" min={1} max={20} value={ex.sets} onChange={e => updEx(i, 'sets', +e.target.value)} placeholder="С" />
+                <input style={{ ...IN, flex: '0 1 40px', width: 40 }} type="number" min={1} max={100} value={ex.reps} onChange={e => updEx(i, 'reps', +e.target.value)} placeholder="П" />
+                <input style={{ ...IN, flex: '0 1 50px', width: 50 }} type="number" min={0} step={2.5} value={ex.weight} onChange={e => updEx(i, 'weight', +e.target.value)} placeholder="кг" />
+                <button style={{ ...BTN, background: '#ef4444', flex: '0 0 auto' }} onClick={() => setManualWorkout(p => ({ ...p, exercises: p.exercises.filter((_, idx) => idx !== i) }))}>✕</button>
+              </div>
+            ))}
+            <button style={{ ...BTN, width: '100%', marginTop: 8 }} onClick={addEx}>+ Упражнение</button>
+            <button style={{ ...BTN, width: '100%', marginTop: 6, background: '#00e68a', color: '#000' }} onClick={saveWorkout}>💾 Сохранить тренировку</button>
+            <datalist id="ex-list">{EXERCISE_CATALOG.slice(0, 50).map(e => <option key={e.id} value={e.name} />)}</datalist>
+          </div>
+          {saved.length > 0 && <div style={{ marginTop: 12 }}>
+            <div style={H}>Сохранённые ({saved.length})</div>
+            {saved.map((w, i) => (
+              <div key={i} style={CARD}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <b>{w.name}</b>
+                  <span style={SMALL}>{w.date}</span>
+                </div>
+                <div style={SMALL}>{w.exercises.map(e => `${e.name}: ${e.sets}×${e.reps}@${e.weight}кг`).join(', ')}</div>
+                <button style={{ ...BTN, background: '#ef4444', fontSize: 10, padding: '4px 10px', marginTop: 6 }} onClick={() => delWorkout(i)}>✕ Удалить</button>
+              </div>
+            ))}
+          </div>}
+        </div>;
+      })()}
+
+      {subView === 'plates' && <PlateCalculator initialWeight={workingWeight} />}
+      {subView === 'run' && playerDays.length > 0 && <SessionPlayer days={playerDays} weekNumber={1} focus={runFocus} />}
+      {subView === 'run' && playerDays.length === 0 && <div style={SMALL}>Сначала сгенерируйте план во вкладке «План».</div>}
+      {subView === 'autoreg' && <AutoregPanel />}
+      {subView === 'peak' && <PeakingPanel />}
+      {subView === 'recovery' && <RecoveryPanel />}
+      {subView === 'safety' && <ExerciseSafetyPanel />}
+      {subView === 'demo' && <ExerciseDemoPanel />}
+      {subView === 'programs' && <ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} onAddToMyTraining={() => {}} />}
+      {subView === 'methods' && (<>
         {methodNote && <div style={{ ...CARD, borderColor:'rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color:'#00e68a', fontSize:11 }}>{methodNote}</div>}
-        <MethodsTab linked={linked} trainingOutput={null} diaryStats={[] as any} historyWorkouts={[] as any} goal={mode === 'src' ? goal : bbGoal} level={mode === 'src' ? level : bbLevel} daysPerWeek={mode === 'src' ? days : bbDays} recovery={linked.readiness?.recovery ?? 80} fatigue={linked.readiness?.fatigue ?? 30} appliedMethods={appliedMethods} onToggleMethod={(name, cat) => setAppliedMethods(prev => { const n = { ...prev }; if (n[cat] === name) delete n[cat]; else n[cat] = name; return n; })} onApplyComposition={() => { const keys = Object.keys(appliedMethods); if (keys.length > 0) { const h = deriveHints(appliedMethods); setMethodHints(h); setMethodNote(`✓ Применена методология: ${h.label}${h.volumeMult !== 1 ? ' · объём×' + h.volumeMult : ''}${h.technique ? ' · техн: ' + h.technique : ''}`); } else { setMethodHints({ volumeMult: 1, technique: null, label: '' }); setMethodNote('Выберите методики (по одной из категории)'); } }} />
+        <MethodsTab linked={linked} trainingOutput={null} diaryStats={[] as any} historyWorkouts={[] as any} goal={mainTab === 'pl' ? goal : bbGoal} level={mainTab === 'pl' ? level : bbLevel} daysPerWeek={mainTab === 'pl' ? days : bbDays} recovery={linked.readiness?.recovery ?? 80} fatigue={linked.readiness?.fatigue ?? 30} appliedMethods={appliedMethods} onToggleMethod={(name, cat) => setAppliedMethods(prev => { const n = { ...prev }; if (n[cat] === name) delete n[cat]; else n[cat] = name; return n; })} onApplyComposition={() => { const keys = Object.keys(appliedMethods); if (keys.length > 0) { const h = deriveHints(appliedMethods); setMethodHints(h); setMethodNote(`✓ Применена методология: ${h.label}${h.volumeMult !== 1 ? ' · объём×' + h.volumeMult : ''}${h.technique ? ' · техн: ' + h.technique : ''}`); } else { setMethodHints({ volumeMult: 1, technique: null, label: '' }); setMethodNote('Выберите методики (по одной из категории)'); } }} />
       </>)}
-      {view === 'analytics' && (<><AnalyticsTab sessions={historyWorkouts} /><VisualTab sessions={historyWorkouts} /></>)}
-      {view === 'prometrics' && <ProMetricsPanel />}
-      {view === 'charts' && <TrainingMetricsChart lms={lmsChart} bb={bbChart} />}
+      {subView === 'analytics' && (<><AnalyticsTab sessions={historyWorkouts} /><VisualTab sessions={historyWorkouts} /></>)}
+      {subView === 'prometrics' && <ProMetricsPanel />}
+      {subView === 'charts' && <TrainingMetricsChart lms={lmsChart} bb={bbChart} />}
     </div>
   );
 };

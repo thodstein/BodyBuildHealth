@@ -528,61 +528,20 @@ export interface SupportStack {
 - **Plan restructured**: устаревшие ID удалены, добавлены 13 новых задач по питанию (N1-N4), базам (S5-S8), бадам UI (S9-S10/S12), тренировкам (P13)
 - `tsc --noEmit` ✅, `vite build` ✅
 
-## 🎯 ПЛАН (принят 26 Jun)
+## Session Summary (Jun 26 — Part 2) — P13 + N5-N8 + B10
+### Done
+- **P13 — SRCBBScreen: 3 подвкладки (PL/BB/Ручной)**: `mode` (src|bb) → `mainTab` (pl|bb|manual), PL-подвкладки (plan/plates/run/autoreg/peak/recovery/safety/demo), BB-подвкладки (plan/methods/analytics/prometrics/charts), новая вкладка "Ручной сбор" — форма с datalist из EXERCISE_CATALOG, сохранение/удаление в localStorage. Удалён дублирующийся `[view, setView]` и `autoRegResult`.
+- **N5 — histamineSensitive тоггл**: добавлен в v2-профиль (IndividualPlanSettings)
+- **N6 — DIAAS badge**: добавлен на карточки приёма в планировщике (renderMealList)
+- **N7 — specific_compounds_100g**: формула инициализации улучшена, добавлено 6 переопределений (гречка, рис, курица, говядина, яйца, творог)
+- **N8 — compareProductsV2 factors**: факторы влияния на полезность (уровень обработки, гликемия, атмогенный потенциал) выведены в UI сравнения
+- **B10 — Фарма-карточка расширение**: подтверждено что targetSystems/cvProfile/linkedRisks/linkedSubstances уже реализованы в DrugDetailCard
 
-### ✅ Выполнено в этой сессии
-| ID | Задача | Файл |
-|----|--------|------|
-| C2 | PL/BB не переключается — опущен | SRCBBScreen.tsx |
-| A1 | Удалить `generateStacks()` — удалён | support-synergy |
-
-### ПРИОРИТЕТ 1 — Питание: генерация + кнопки + здоровье
-| ID | Задача | Файл | Объём |
-|----|--------|------|-------|
-| N1 | Генерация по кнопкам качества — MAXIMUM = топ рацион | IndividualPlanContext | ~150 |
-| N2 | Проверить кнопки ограничений — реальные изменения генерации | IndividualPlanContext | ~100 |
-| N3 | Вкладка Здоровье — карточками в планировщик | IndividualPlanSettings/Results | ~200 |
-| N4 | Анализ каждой кнопки/поля в планировщике — все должно быть связано | IndividualPlan* | ~300 |
-
-### ПРИОРИТЕТ 2 — Базы данных: каталоги + взаимодействия
-| ID | Задача | Файл | Объём |
-|----|--------|------|-------|
-| C4 | Проверить/дополнить каталог (core-записи) | catalog + enrich | +коррекции |
-| B8 | Кракозябры каталога | support-catalog | конвертация Win1251→UTF8 |
-| A3 | SYNERGY_NETWORK + INTERACTIONS | synergy + inter | +300 строк |
-| S5 | Не заполнены взаимодействия в карточках препаратов | support-database | ~500 |
-| S6 | Кракозябры в полях взаимодействий | support-database | конвертация |
-| S7 | Взаимодействия не выведены в карточку UI | SupportScreen/InfoTab | ~200 |
-| S8 | Вкладка Взаимодействий — полное заполнение всех карточек | support-interactions | ~500 |
-| S11 | Фарма-каталог — заполнить все карточки (PK, PD, targetSystems, cvProfile, linkedRisks, linkedSubstances) | pharma-database | ~1000 |
-
-### ПРИОРИТЕТ 3 — Бады: UI/UX + функционал планировщика
-| ID | Задача | Файл | Объём |
-|----|--------|------|-------|
-| S9 | Калькулятор взаимодействия — пояснения (почему, риск, эффект, параметры) | SupportInteract | ~200 |
-| S10 | Калькулятор взаимодействия — переоформить, наполнить контентом | SupportInteract | ~200 |
-| S12 | БИОСТАК — структурировать (цели ≠ органы, понятная навигация) | BioStackAI | ~300 |
-| B1 | Спецприём попап (читмил/рефид/фастинг) | IndividualPlan | ~200 |
-| B2 | Скользящие графики KBJU target vs actual | IndividualPlan | ~100 |
-| B3 | Предпочтения попап (молочка/глютен/веган/…) | IndividualPlan | ~100 |
-| B4 | Профицит в адаптации (слайдер +5..+25%) | IndividualPlan | ~80 |
-| B5 | Диетические паузы GlassCard (1/2 нед, таймер) | IndividualPlan | ~80 |
-| B6 | Создать рецепт попап (название/ингредиенты/КБЖУ) | NutritionScreen | ~150 |
-| B7 | Exclusive-фильтр каталога (⭐, tier=max) | NutritionScreen | ~20 |
-| B10 | Фарма-карточка расширение (targetSystems/cvProfile/linkedRisks/linkedSubstances) | PharmaScreen | ~500 |
-
-### ПРИОРИТЕТ 4 — Тренировки + рефакторинг + Next Steps
-| ID | Задача | Файл | Объём |
-|----|--------|------|-------|
-| P13 | СРЦ — мобильная оптимизация, 3 подвкладки (PL/BB/Ручной) | SRCBBScreen | ~200 |
-| C1 | Тренировки — единый accent `#00e68a` | TrainingScreen | ~50 замен |
-| C3 | Описания СРЦ по ПЛ | SRCBBScreen + Training | +200 |
-| A6 | SupportScreen редиректы (упростить goBack) | SupportScreen | −5 строк |
-| A7 | Переименование support-stacks.ts | 1 rename ||
-| N5 | histamineSensitive тоггл в v2-профиль | IndividualPlanSettings | ~50 |
-| N6 | DIAAS на карточках приёма в планировщике | IndividualPlanResults | ~80 |
-| N7 | specific_compounds_100g — заполнить пропуски | nutrition-db | ~300 |
-| N8 | compareProductsV2 factors в сравнении | ProductUsefulnessPlanner | ~60 |
+### Осталось
+- N1, N2, N3, N4 — Питание: генерация + кнопки + здоровье
+- C4, B8, A3, S5, S6, S7, S8, S11 — Базы данных
+- S9, S10, S12, B1-B7, C1, C3, A6, A7 — UI/UX + рефакторинг
+- `tsc --noEmit` ✅, `vite build` ✅
 
 ## 11. PharmaSubstance — обязательные поля карточки фармакологии
 

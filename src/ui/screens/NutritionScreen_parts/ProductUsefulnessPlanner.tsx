@@ -628,15 +628,26 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       <ScoreBar label="Категория" value={score.breakdown.tierScore} max={20} color="#f59e0b" />
                     </>}
                     {score.factors && useV2 && (
-                      <div style={{ marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.35)' }}>
-                        {score.factors.slice(0, 3).map((f: any, i: number) => (
-                          <div key={i} style={{ color: f.impact > 0 ? '#22c55e' : '#ef4444' }}>{f.icon} {f.text}</div>
-                        ))}
+                      <div style={{ marginTop: 4 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, fontSize: 7, marginBottom: 4 }}>
+                          <div style={{ color: '#22c55e' }}>🟢 База {score.bbScore?.toFixed(1)||'—'}</div>
+                          <div style={{ color: '#a78bfa' }}>🟣 Фаза {score.phaseMod?.toFixed(1)||'—'}</div>
+                          {score.pharmaMod !== undefined && <div style={{ color: score.pharmaMod >= 0 ? '#22c55e' : '#ef4444' }}>{score.pharmaMod >= 0 ? '🟢' : '🔴'} Фарма {score.pharmaMod.toFixed(1)}</div>}
+                          {score.labMod !== undefined && <div style={{ color: score.labMod >= 0 ? '#22c55e' : '#ef4444' }}>{score.labMod >= 0 ? '🟢' : '🔴'} Лабы {score.labMod.toFixed(1)}</div>}
+                          {score.timingMod !== undefined && <div style={{ color: score.timingMod >= 0 ? '#22c55e' : '#ef4444' }}>{score.timingMod >= 0 ? '🟢' : '🔴'} Тайминг {score.timingMod.toFixed(1)}</div>}
+                        </div>
+                        {score.factors.length > 0 && (
+                          <div style={{ maxHeight: 80, overflowY: 'auto', fontSize: 7, color: 'rgba(255,255,255,0.35)' }}>
+                            {score.factors.map((f: any, i: number) => (
+                              <div key={i} style={{ color: f.impact > 0 ? '#22c55e' : '#ef4444', marginBottom: 1 }}>{f.icon} {f.text}</div>
+                            ))}
+                          </div>
+                        )}
                         {(() => {
                           const d = calcDIAAS(food);
                           return d.diaas > 0 ? (
-                            <div style={{ marginTop: 2, color: d.diaas >= 1 ? '#22c55e' : d.diaas >= 0.75 ? '#f59e0b' : '#ef4444' }}>
-                              💪 DIAAS {d.diaas.toFixed(2)} (лимит: {d.limitingAA})
+                            <div style={{ marginTop: 2, fontSize: 7, color: d.diaas >= 1 ? '#22c55e' : d.diaas >= 0.75 ? '#f59e0b' : '#ef4444' }}>
+                              💪 DIAAS {d.diaas.toFixed(2)} · {d.limitingAA}
                             </div>
                           ) : null;
                         })()}

@@ -198,6 +198,7 @@ export interface PlanCtx {
   v2Phase: string; setV2Phase: (v: string) => void;
   v2Labs: Record<string, string>; setV2Labs: (v: any) => void;
   v2Pharma: Record<string, boolean>; setV2Pharma: (v: any) => void;
+  histamineSensitive: boolean; setHistamineSensitive: (v: boolean) => void;
   dietPrefs: string[]; setDietPrefs: (v: string[]) => void;
 }
 
@@ -413,8 +414,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [v2Phase, setV2Phase] = useState('LEAN_MASS');
   const [v2Labs, setV2Labs] = useState<Record<string, string>>(() => { try { return JSON.parse(localStorage.getItem('he_planner_labs') || '{}'); } catch { return {}; } });
   const [v2Pharma, setV2Pharma] = useState<Record<string, boolean>>(() => { try { return JSON.parse(localStorage.getItem('he_planner_pharma') || '{}'); } catch { return {}; } });
+  const [histamineSensitive, setHistamineSensitive] = useState(() => { try { return localStorage.getItem('he_planner_histamine') === 'true'; } catch { return false; } });
   useEffect(() => { try { localStorage.setItem('he_planner_labs', JSON.stringify(v2Labs)); } catch {} }, [v2Labs]);
   useEffect(() => { try { localStorage.setItem('he_planner_pharma', JSON.stringify(v2Pharma)); } catch {} }, [v2Pharma]);
+  useEffect(() => { try { localStorage.setItem('he_planner_histamine', histamineSensitive ? 'true' : 'false'); } catch {} }, [histamineSensitive]);
   useEffect(() => { try { localStorage.setItem('he_nutrition_supps', JSON.stringify(takenSupplements)); } catch {} }, [takenSupplements]);
 
   const saveUndo = () => { if (dayPlan) setUndoStack(prev => [JSON.parse(JSON.stringify(dayPlan)), ...prev].slice(0, 5)); };
@@ -768,6 +771,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       profile.pharma.INSULIN_USE = v2Pharma.INSULIN_USE || false;
       profile.pharma.LIVER_SUPPORT = v2Pharma.LIVER_SUPPORT || false;
       profile.pharma.GUT_SUPPORT = v2Pharma.GUT_SUPPORT || false;
+      profile.histamineSensitive = histamineSensitive;
       profile.labs.hematocrit = v2Labs.hematocrit ? parseFloat(v2Labs.hematocrit) : undefined;
       profile.labs.ldl = v2Labs.ldl ? parseFloat(v2Labs.ldl) : undefined;
       profile.labs.alt = v2Labs.alt ? parseFloat(v2Labs.alt) : undefined;
@@ -916,6 +920,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         {d.allergenWarnings?.length > 0 && <div style={{padding:'6px 10px',borderRadius:8,background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',fontSize:8,color:'#ef4444',marginBottom:8,display:'flex',alignItems:'center',gap:4}}><span style={{fontSize:10}}>⚠️</span><span>{d.allergenWarnings.join('; ')}</span></div>}
         {d.meals.map((m: any, mi: number) => {
           const mealKcal = Math.round(m.totals?.kcal || 0); const mealP = Math.round(m.totals?.p || 0); const mealF = Math.round(m.totals?.f || 0); const mealC = Math.round(m.totals?.c || 0);
+          const mealDiaas = calcMealDIAAS((m.items || []).map((it: any) => ({ foodId: it.id || it.name, weightGrams: it.amount || 100 })));
           const isPreWorkout = m.label?.toLowerCase().includes('предтрен'); const isPostWorkout = m.label?.toLowerCase().includes('пост-трен'); const accentColor = isPreWorkout ? '#8b5cf6' : isPostWorkout ? '#f59e0b' : '#00e68a';
           return (
             <div key={mi} style={{marginBottom:6,borderRadius:10,overflow:'hidden',border:`1px solid ${dropTarget===mi?'rgba(0,230,138,0.4)':isPreWorkout?'rgba(139,92,246,0.2)':isPostWorkout?'rgba(245,158,11,0.2)':'rgba(255,255,255,0.15)'}`,transition:'all 0.2s',background:dropTarget===mi?'rgba(0,230,138,0.04)':undefined}}
@@ -942,7 +947,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
                     :isReplacing?<><span style={{fontWeight:600}}>{it.name}</span><select onChange={e=>{if(e.target.value){const f=FOOD_DB.find(x=>x.id===e.target.value);if(f)replaceFoodItem(0,mi,ii,f);}}} value="" style={{fontSize:7,padding:'1px 2px',borderRadius:3,border:'1px solid rgba(255,255,255,0.06)',background:'#18181b',color:'#fff',maxWidth:120}}><option value="">🔀 Заменить...</option>{findSimilarFoods(it).map((s:any)=><option key={s.id} value={s.id}>{s.name}</option>)}</select></>
                     :<><span style={{fontWeight:600}}>{it.name}</span><span style={{color:'rgba(255,255,255,0.9)',fontSize:7}}>{it.amount}г</span><span onClick={()=>addToCart({name:it.name,kcal:it.kcal*(it.amount/100),amount:it.amount,category:it.category})} style={{cursor:'pointer',fontSize:7,color:'#00e68a',opacity:0.35,padding:'0 2px'}}>🛒</span><span onClick={()=>{setEditItem({dayIdx:0,mealIdx:mi,itemIdx:ii});setEditAmount(it.amount);}} style={{cursor:'pointer',fontSize:7,color:'rgba(255,255,255,0.8)',padding:'0 2px'}}>✏️</span><span onClick={()=>setReplacingItem({dayIdx:0,mealIdx:mi,itemIdx:ii})} style={{cursor:'pointer',fontSize:7,color:'rgba(245,158,11,0.4)',padding:'0 2px'}}>🔄</span><span onClick={()=>removeFoodItem(0,mi,ii)} style={{cursor:'pointer',fontSize:7,color:'rgba(239,68,68,0.3)',padding:'0 2px'}}>✕</span></>}
                   </span>;})}</div>
-                {m.totals&&<div style={{display:'flex',gap:6,marginTop:4,fontSize:7}}><span style={{color:'#3b82f6',fontWeight:600}}>Б {mealP}г</span><span style={{color:'#f59e0b',fontWeight:600}}>Ж {mealF}г</span><span style={{color:'#f97316',fontWeight:600}}>У {mealC}г</span></div>}
+                {m.totals&&<div style={{display:'flex',gap:6,marginTop:4,fontSize:7,alignItems:'center'}}><span style={{color:'#3b82f6',fontWeight:600}}>Б {mealP}г</span><span style={{color:'#f59e0b',fontWeight:600}}>Ж {mealF}г</span><span style={{color:'#f97316',fontWeight:600}}>У {mealC}г</span>{mealDiaas.diaas > 0 && <span style={{marginLeft:'auto',fontSize:6,fontWeight:600,color:mealDiaas.diaas >= 1 ? '#22c55e' : mealDiaas.diaas >= 0.75 ? '#f59e0b' : '#ef4444',background:(mealDiaas.diaas >= 1 ? 'rgba(34,197,94,0.08)' : mealDiaas.diaas >= 0.75 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)') + ' none repeat scroll 0% 0%',padding:'1px 5px',borderRadius:4}}>DIAAS {mealDiaas.diaas.toFixed(2)}</span>}</div>}
               </div>
             </div>
           );
@@ -1043,6 +1048,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     customNotes, setCustomNotes,
     dietPrefs, setDietPrefs,
     v2Phase, setV2Phase, v2Labs, setV2Labs, v2Pharma, setV2Pharma,
+    histamineSensitive, setHistamineSensitive,
   };
 
   return <PlanContext.Provider value={ctx}>{children}</PlanContext.Provider>;

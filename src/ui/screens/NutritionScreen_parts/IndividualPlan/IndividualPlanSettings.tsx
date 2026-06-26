@@ -72,6 +72,7 @@ export const IndividualPlanSettings: React.FC = () => {
     linkToTraining, setLinkToTraining,
     trainStart, setTrainStart, trainEnd, setTrainEnd,
     v2Phase, setV2Phase, v2Labs, setV2Labs, v2Pharma, setV2Pharma,
+    histamineSensitive, setHistamineSensitive,
     dietPrefs, setDietPrefs,
   } = usePlanCtx();
 
@@ -1945,6 +1946,15 @@ export const IndividualPlanSettings: React.FC = () => {
                 }}>{p.label}</button>
               ))}
             </div>
+          </div>
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Чувствительность к гистамину</div>
+            <button onClick={() => setHistamineSensitive(!histamineSensitive)} style={{
+              padding: '4px 10px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+              background: histamineSensitive ? 'rgba(239,68,68,0.15)' : '#202023',
+              border: histamineSensitive ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(255,255,255,0.06)',
+              color: histamineSensitive ? '#ef4444' : 'rgba(255,255,255,0.5)',
+            }}>{histamineSensitive ? '⚠️ Чувствителен к гистамину' : '✅ Не чувствителен'}</button>
           </div>
         </GlassCard>
 
