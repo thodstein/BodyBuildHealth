@@ -46,7 +46,7 @@ import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.en
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'plan' | 'reports';
-type InfoView = 'main' | 'catalog' | 'synergies' | 'interactions' | 'research' | 'favorites' | 'protocols' | 'biostack';
+type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'research' | 'favorites' | 'protocols' | 'biostack';
 
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { BioStackAIScreen } from '../components/BioStackAIScreen';
@@ -187,6 +187,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [synergyPage, setSynergyPage] = useState<number>(1);
   const [synergySearch, setSynergySearch] = useState('');
   const [synergyCountFilter, setSynergyCountFilter] = useState<number>(0);
+  const [interactSearch2, setInteractSearch2] = useState('');
+  const [interactTypeFilter, setInteractTypeFilter] = useState<string>('all');
   const [synergyOrganFilter, setSynergyOrganFilter] = useState<string>('');
   const SYNERGY_PAGE_SIZE = 30;
   const [interactionPage, setInteractionPage] = useState<number>(1);
@@ -1319,6 +1321,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   }, [allSubstanceIds]);
 
   const mergedInteractions = useMemo(() => {
+    try {
     const seen = new Set<string>();
     const pairKey = (a: string, b: string, t?: string) => [a.toLowerCase(), b.toLowerCase()].sort().join('||') + (t ? `:${t}` : '');
     const fromDB = ALL_INTERACTIONS
@@ -1370,6 +1373,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       source: 'pharma' as const,
     }));
     return [...fromDB, ...dedupedEngine, ...pharmaFromEngine];
+    } catch { return []; }
   }, [CATALOG_IDS]);
 
   // Interaction calculator memo (uses mergedInteractions)
@@ -1598,9 +1602,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   // Resolve interaction effect to readable text
   const showEffect = (interaction: any): string => {
     const eff = interaction?.effect;
-    if (!eff) return interaction?.notes || '';
+    if (!eff) return '';
     if (/^[A-Z0-9_]+$/.test(eff)) {
-      if (interaction?.notes) return interaction.notes;
       if (EFFECT_LABELS[eff]) return EFFECT_LABELS[eff];
       return eff.replace(/_/g, ' ');
     }
@@ -2118,14 +2121,14 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['synergies','Взаимодействие препаратов'],['interactions','⚠ Взаимодействия'],['research','Исследования'],['favorites','Избранное']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['interactions','⚠ Взаимодействия'],['stacks','📂 Стеки'],['research','Исследования'],['favorites','Избранное']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 const a: Record<string,()=>void> = {
                   peptides: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); },
                   catalog: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); setSection('home'); },
                   biostack: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('biostack'); setSection('home'); },
-                  synergies: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('synergies'); setSection('home'); },
                   interactions: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('interactions'); setSection('home'); },
+                  stacks: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('stacks'); setSection('home'); },
                   research: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); setSection('home'); },
                   favorites: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('favorites'); setSection('home'); },
                 };
@@ -2592,9 +2595,28 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 )}
               </div>
             )}
-            {renderView(infoView, 'synergies', () =>
+            {/* synergies merged into interactions tab */}
+            {/* ─── ВЗАИМОДЕЙСТВИЯ (единая вкладка: всё + калькулятор) ─── */}
+            {renderView(infoView, 'interactions', () => {
+              const allItems = mergedInteractions || [];
+              const stats = [
+                { label: '🤝 Синергии', count: allItems.filter((i:any) => i?.type === 'synergy').length, color: '#22c55e' },
+                { label: '🔴 Конфликты', count: allItems.filter((i:any) => i?.type === 'conflict').length, color: '#ef4444' },
+                { label: '🟡 Осторожности', count: allItems.filter((i:any) => i?.type === 'caution').length, color: '#f59e0b' },
+              ];
+              return (
               <div>
-                {/* Type sub-tabs */}
+                {/* Stats cards */}
+                <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' }}>
+                  {stats.map(s => (
+                    <div key={s.label} style={{ flex:1, minWidth:80, padding:'8px 6px', borderRadius:10, textAlign:'center', background:s.color+'12', border:`1px solid ${s.color}22` }}>
+                      <div style={{ fontSize:18, fontWeight:800, color:s.color }}>{s.count}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', fontWeight:600 }}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Sub-tab bar: Все/Синергии/Конфликты/Осторожности/Калькулятор */}
                 <div style={{ display:'flex', gap:4, marginBottom:6, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
                   {(['all','synergies','conflicts','cautions','calculator'] as const).map(st => (
                     <button key={st} onClick={() => { setSynergySubTab(st); setSynergyPage(1); }} style={{
@@ -2606,7 +2628,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   ))}
                 </div>
 
-                {/* ════ Severity, Count, Organ filter pills ════ */}
+                {/* Severity / Count / Organ filters (not in calculator) */}
                 {synergySubTab !== 'calculator' && (<>
                   <div style={{ fontSize:7, color:'var(--text-dim)', fontWeight:600, marginBottom:3 }}>По эффективности:</div>
                   <div style={{ display:'flex', gap:3, marginBottom:4, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
@@ -2712,26 +2734,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                         </div>
                                       )}
                                       {i.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:1 }}>{i.notes}</div>}
-                                           {(() => {
-                                             const catA = SUPPORT_CATALOG_DATA[i.substanceA as string];
-                                             const catB = SUPPORT_CATALOG_DATA[i.substanceB as string];
-                                             const entries: {label:string,items:string[],color:string}[] = [];
-                                             if (catA?.contraindications?.length) entries.push({label:`Противопоказания ${aName}`,items:catA.contraindications.slice(0,5),color:'#ef4444'});
-                                             if (catB?.contraindications?.length) entries.push({label:`Противопоказания ${bName}`,items:catB.contraindications.slice(0,5),color:'#ef4444'});
-                                             if (catA?.sideEffects?.length) entries.push({label:`Побочные ${aName}`,items:catA.sideEffects.slice(0,4),color:'#f59e0b'});
-                                             if (catB?.sideEffects?.length) entries.push({label:`Побочные ${bName}`,items:catB.sideEffects.slice(0,4),color:'#f59e0b'});
-                                             if (catA?.dosage) entries.push({label:`Дозировка ${aName}`,items:[`${catA.dosage.mg}${catA.dosage.mg>=1000?'г':'мг'} · ${catA.dosage.timing||''}${catA.dosage.form?' · '+catA.dosage.form:''}`],color:'#60a5fa'});
-                                             if (catB?.dosage) entries.push({label:`Дозировка ${bName}`,items:[`${catB.dosage.mg}${catB.dosage.mg>=1000?'г':'мг'} · ${catB.dosage.timing||''}${catB.dosage.form?' · '+catB.dosage.form:''}`],color:'#60a5fa'});
-                                             if (entries.length === 0) return null;
-                                             return <div style={{ marginTop:3, display:'flex', flexDirection:'column', gap:1 }}>
-                                               <div style={{ fontSize:7, color:'#f59e0b', fontWeight:600, marginBottom:1 }}>📋 Особые указания:</div>
-                                               {entries.map((e,ei)=>(
-                                                 <div key={ei} style={{ fontSize:7, color:'rgba(255,255,255,0.65)', lineHeight:1.3, padding:'1px 0' }}>
-                                                   <span style={{ color:e.color, fontWeight:600 }}>{e.label}:</span> {e.items.join(', ')}
-                                                 </div>
-                                               ))}
-                                             </div>;
-                                           })()}
                                     </div>
                                   );
                                 })}
@@ -2784,90 +2786,20 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           </div>
                         </div>
                         {(() => {
-                          const validIds = pharmaInteractIds.filter(Boolean);
-                          if (validIds.length < 2) {
-                            return <div style={{ textAlign:'center', padding:'20px 12px', background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)' }}><div style={{ fontSize:20, marginBottom:4 }}>💉</div><div style={{ fontSize:10, color:'var(--text-dim)' }}>Выберите минимум 2 препарата</div></div>;
-                          }
                           try {
-                            // Search mergedInteractions for pharma-related pairs
-                            const pharmaInteractions = mergedInteractions.filter((i: any) => {
-                              const aInPharma = validIds.some(id => 
-                                id.toLowerCase() === (i.substanceA||'').toLowerCase() || 
-                                id.toLowerCase() === (i.substanceB||'').toLowerCase()
-                              );
-                              const bInPharma = validIds.some(id => 
-                                id.toLowerCase() === (i.substanceB||'').toLowerCase() || 
-                                id.toLowerCase() === (i.substanceA||'').toLowerCase()
-                              );
-                              return aInPharma && bInPharma && aInPharma !== bInPharma;
-                            });
-                            // Also check hardcoded pharma interactions
-                            const course = validIds.map((sid, i) => ({
-                              id: `pharma_int_${i}`,
-                              substanceId: sid,
-                              doseValue: 100,
-                              doseUnit: 'мг/нед',
-                              frequency: '1x/day',
-                              startWeek: 0,
-                              endWeek: 12,
-                            }));
+                            const course: CourseEntry[] = pharmaInteractIds.filter(Boolean).map((id,ix) => ({ id: 'interact_'+ix, substanceId: id, doseValue: 100, doseUnit: 'mg', frequency: 7, startWeek: 1, endWeek: 12 }));
                             const alerts = checkDrugInteractions(course);
-                            const totalFound = pharmaInteractions.length + alerts.length;
-                            if (totalFound === 0) {
-                              return <div style={{ textAlign:'center', padding:'10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)' }}><span style={{ fontSize:10, color:'#4caf50', fontWeight:600 }}>✓ Конфликтов не обнаружено</span></div>;
-                            }
+                            if (alerts.length === 0) return <div style={{ textAlign:'center', padding:'10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)' }}><span style={{ fontSize:10, color:'#4caf50', fontWeight:600 }}>✓ Конфликтов не обнаружено</span></div>;
+                            const color = (t: string) => t === 'critical' ? '#ef4444' : t === 'warning' ? '#f59e0b' : '#60a5fa';
                             return (
                               <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                                {/* Merged interactions results */}
-                                {pharmaInteractions.map((i: any) => {
-                                  const typeInfo = INTERACTION_TYPE_LABELS[i.type] || { label:i.type, emoji:'🔗', color:'#888' };
-                                  const sevInfo = INTERACTION_SEVERITY_LABELS[i.severity] || { label:i.severity, color:'#888' };
-                                  const aName = resolveSubName(i.substanceA) || i.substanceA;
-                                  const bName = resolveSubName(i.substanceB) || i.substanceB;
-                                  return (
-                                    <div key={i.interactionId} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:`1px solid ${typeInfo.color}33` }}>
-                                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                                        <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap', flex:1 }}>
-                                          <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)' }}>{aName}</span>
-                                          <span style={{ fontSize:10, color:typeInfo.color, fontWeight:700 }}>{i.type === 'synergy' ? '+' : '×'}</span>
-                                          <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)' }}>{bName}</span>
-                                        </div>
-                                        <div style={{ display:'flex', gap:3 }}>
-                                          <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:typeInfo.color+'22', color:typeInfo.color, fontWeight:600 }}>{typeInfo.label}</span>
-                                          <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevInfo.color+'22', color:sevInfo.color }}>{sevInfo.label}</span>
-                                        </div>
-                                      </div>
-                                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginTop:1 }}>{showEffect(i)}</div>
-                                      {i.mechanisms && i.mechanisms.length > 0 && (
-                                        <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-                                          {i.mechanisms.map((m: string, mi: number) => (
-                                            <span key={mi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>
-                                          ))}
-                                        </div>
-                                      )}
-                                      {i.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:1 }}>{i.notes}</div>}
-                                          {(() => {
-                                            const catA = SUPPORT_CATALOG_DATA[i.substanceA as string];
-                                            const catB = SUPPORT_CATALOG_DATA[i.substanceB as string];
-                                            const parts: string[] = [];
-                                            if (catA?.contraindications?.length) parts.push(`${aName}: противопоказания — ${catA.contraindications.join(', ')}`);
-                                            if (catB?.contraindications?.length) parts.push(`${bName}: противопоказания — ${catB.contraindications.join(', ')}`);
-                                            if (catA?.sideEffects?.length) parts.push(`${aName}: побочные — ${catA.sideEffects.join(', ')}`);
-                                            if (catB?.sideEffects?.length) parts.push(`${bName}: побочные — ${catB.sideEffects.join(', ')}`);
-                                            if (parts.length === 0) return null;
-                                            return <div style={{ marginTop:2, fontSize:7, color:'#f59e0b', lineHeight:1.2 }}>📋 Особые указания: {parts.join('; ')}</div>;
-                                          })()}
-                                    </div>
-                                  );
-                                })}
-                                {/* Hardcoded pharma alerts */}
                                 {alerts.map((alert, ai) => {
-                                  const color = alert.type === 'critical' ? '#ef4444' : alert.type === 'warning' ? '#f59e0b' : '#60a5fa';
+                                  const c = color(alert.type);
                                   return (
-                                    <div key={`alert_${ai}`} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:`1px solid ${color}33` }}>
+                                    <div key={`alert_${ai}`} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:`1px solid ${c}33` }}>
                                       <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
-                                        <span style={{ fontSize:10, fontWeight:700, color }}>{alert.type === 'critical' ? '🔴' : alert.type === 'warning' ? '🟡' : '🔵'}</span>
-                                        <span style={{ fontSize:9, padding:'1px 5px', borderRadius:3, background:color+'22', color, fontWeight:600 }}>
+                                        <span style={{ fontSize:10, fontWeight:700, color:c }}>{alert.type === 'critical' ? '🔴' : alert.type === 'warning' ? '🟡' : '🔵'}</span>
+                                        <span style={{ fontSize:9, padding:'1px 5px', borderRadius:3, background:c+'22', color:c, fontWeight:600 }}>
                                           {alert.type === 'critical' ? 'Критично' : alert.type === 'warning' ? 'Предупреждение' : 'Инфо'}
                                         </span>
                                         <span style={{ fontSize:8, color:'var(--text-dim)' }}>{(alert.drugs||[]).map(d => resolveSubName(d)).join(', ')}</span>
@@ -2889,7 +2821,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 ) : (
                   /* ─── СИНЕРГИИ/КОНФЛИКТЫ/ОСТОРОЖНОСТИ ─── */
                   <>
-                    {/* Search bar BELOW sub-tabs */}
                     <div style={{ marginBottom:6 }}>
                       <input value={synergySearch} onChange={e => setSynergySearch(e.target.value)} placeholder="🔍 Поиск по веществу/эффекту..." style={{ width:'100%', padding:'7px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
                     </div>
@@ -2910,7 +2841,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                              if (synergyOrganFilter) {
                                list = list.filter((i: any) => {
                                  const checkOrg = (subId: string) => {
-                                   // Try catalogSubstances first
                                    const sub = catalogSubstances.find(s => s.id === subId);
                                    if (sub && sub.organs && sub.organs.length > 0) {
                                      return sub.organs.some((o: string) => {
@@ -2919,7 +2849,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                        return mapping?.key === synergyOrganFilter;
                                      });
                                    }
-                                   // Try PHARMA_DB exact match
                                    const pharm = PHARMA_DB?.[subId];
                                    if (pharm && pharm.targetSystems) {
                                      const sysToOrg: Record<string, string> = {
@@ -2942,7 +2871,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                        return key === synergyOrganFilter;
                                      });
                                    }
-                                   // Fallback: try to find PHARMA_DB entry by partial ID match (base name without ester)
                                    if (subId) {
                                      const pharmKeys = Object.keys(PHARMA_DB);
                                      const baseLower = subId.toLowerCase();
@@ -2986,7 +2914,77 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   </>
                 )}
               </div>
-            )}
+            )})}
+            {renderView(infoView, 'stacks', () => (
+              <div style={{ padding:'0 0 80px' }}>
+                <div className="card" style={{ marginBottom:10, padding:10, background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)' }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>💾 Сохранить текущий стек</div>
+                  <div style={{ display:'flex', gap:6 }}>
+                    <input value={stackName} onChange={e=>setStackName(e.target.value)} placeholder="Название стека..."
+                      style={{ flex:1, padding:'6px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10 }} />
+                    <button onClick={() => {
+                      if (!stackName.trim()) { alert('Введите название'); return; }
+                      const level = SUPPORT_LEVELS[supportLevel];
+                      if (!level?.subs || level.subs.length === 0) { alert('Нет препаратов в калькуляторе'); return; }
+                      const newStack = { id: 'stack_'+Date.now(), name: stackName.trim(), date: new Date().toISOString(), subs: [...level.subs], dosages: { ...(level.dosages||{}) }, notes: '' };
+                      const updated = [...savedStacks, newStack];
+                      setSavedStacks(updated);
+                      localStorage.setItem('savedStacks', JSON.stringify(updated));
+                      setStackName('');
+                    }} style={{ padding:'6px 12px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:10 }}>Сохранить</button>
+                  </div>
+                </div>
+                {savedStacks.length === 0 ? (
+                  <div style={{ textAlign:'center', padding:24, background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)' }}>
+                    <div style={{ fontSize:28, marginBottom:6 }}>📂</div>
+                    <div style={{ fontSize:12, color:'var(--text-dim)' }}>Нет сохранённых стеков</div>
+                  </div>
+                ) : (
+                  savedStacks.map(stack => {
+                    const isExpanded = expandedStack === stack.id;
+                    return (
+                      <div key={stack.id} style={{ marginBottom:8, background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)', overflow:'hidden' }}>
+                        <div onClick={() => setExpandedStack(isExpanded ? null : stack.id)} style={{ padding:'10px 12px', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'flex-start', borderBottom: isExpanded ? '1px solid var(--border)' : 'none' }}>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>{getStackDisplayName(stack)}</div>
+                            <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{stack.date ? new Date(stack.date).toLocaleDateString('ru') : ''} · {stack.subs.length} добавок</div>
+                            {(stack as any).notes && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{(stack as any).notes}</div>}
+                          </div>
+                          <span style={{ fontSize:12, color:'var(--text-dim)', flexShrink:0 }}>{isExpanded ? '▲' : '▼'}</span>
+                        </div>
+                        {isExpanded && (
+                          <div style={{ padding:'0 12px 10px' }}>
+                            <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:8 }}>
+                              {(stack.subs || []).map(id => {
+                                const sub = catalogSubstances.find(s => s.id === id);
+                                const pharma = PHARMA_DB[id];
+                                const name = sub?.name || pharma?.name || id.replace(/_/g, ' ');
+                                const dosage = stack.dosages?.[id];
+                                const desc = sub?.description || pharma?.description || '';
+                                return (
+                                  <div key={id} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.1)' }}>
+                                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                      <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{name}</span>
+                                      {dosage && <span style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>{dosage.timing || ''} {dosage.mg ? `${dosage.mg}мг` : ''}</span>}
+                                    </div>
+                                    {desc && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{desc}</div>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div style={{ display:'flex', gap:4 }}>
+                              <button onClick={() => {
+                                try { localStorage.setItem('savedStacks', JSON.stringify(savedStacks.filter(s => s.id !== stack.id))); setSavedStacks(prev => prev.filter(s => s.id !== stack.id)); } catch {}
+                              }} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444', fontWeight:600 }}>✕ Удалить</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            ))}
             {renderView(infoView, 'favorites', () => {
               let favIds: string[] = [];
               try { favIds = JSON.parse(localStorage.getItem('he_support_favorites') || '[]'); } catch {}
@@ -2995,7 +2993,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               return (
               <div>
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  {[['favorites','⭐ Избранное'],['mystacks','📂 Мои стеки'],['plan','📋 План'],['reports','📊 Отчеты']].map(([id,label]) => (
+                  {[['favorites','⭐ Избранное'],['plan','📋 План'],['reports','📊 Отчеты']].map(([id,label]) => (
                     <button key={id} onClick={() => setFavTab(id)} style={{
                       padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
                       background: favTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
@@ -3042,76 +3040,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 )}
 
                 {/* === MYSTACKS TAB === */}
-                {favTab === 'mystacks' && (
-                  <div style={{ padding:'0 0 80px' }}>
-                    <div className="card" style={{ marginBottom:10, padding:10, background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)' }}>
-                      <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>💾 Сохранить текущий стек</div>
-                      <div style={{ display:'flex', gap:6 }}>
-                        <input value={stackName} onChange={e=>setStackName(e.target.value)} placeholder="Название стека..."
-                          style={{ flex:1, padding:'6px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:10 }} />
-                        <button onClick={() => {
-                          if (!stackName.trim()) { alert('Введите название'); return; }
-                          const level = SUPPORT_LEVELS[supportLevel];
-                          if (!level?.subs || level.subs.length === 0) { alert('Нет препаратов в калькуляторе'); return; }
-                          const newStack = { id: 'stack_'+Date.now(), name: stackName.trim(), date: new Date().toISOString(), subs: [...level.subs], dosages: { ...(level.dosages||{}) }, notes: '' };
-                          const updated = [...savedStacks, newStack];
-                          setSavedStacks(updated);
-                          localStorage.setItem('savedStacks', JSON.stringify(updated));
-                          setStackName('');
-                        }} style={{ padding:'6px 12px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:10 }}>Сохранить</button>
-                      </div>
-                    </div>
-                    {savedStacks.length === 0 ? (
-                      <div style={{ textAlign:'center', padding:24, background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)' }}>
-                        <div style={{ fontSize:28, marginBottom:6 }}>📂</div>
-                        <div style={{ fontSize:12, color:'var(--text-dim)' }}>Нет сохранённых стеков</div>
-                      </div>
-                    ) : (
-                      savedStacks.map(stack => {
-                        const isExpanded = expandedStack === stack.id;
-                        return (
-                          <div key={stack.id} style={{ marginBottom:8, background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)', overflow:'hidden' }}>
-                            <div onClick={() => setExpandedStack(isExpanded ? null : stack.id)} style={{ padding:'10px 12px', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'flex-start', borderBottom: isExpanded ? '1px solid var(--border)' : 'none' }}>
-                              <div style={{ flex:1 }}>
-                                <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>{getStackDisplayName(stack)}</div>
-                                <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{stack.date ? new Date(stack.date).toLocaleDateString('ru') : ''} · {stack.subs.length} добавок</div>
-                                {(stack as any).notes && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{(stack as any).notes}</div>}
-                              </div>
-                              <span style={{ fontSize:12, color:'var(--text-dim)', flexShrink:0 }}>{isExpanded ? '▲' : '▼'}</span>
-                            </div>
-                            {isExpanded && (
-                              <div style={{ padding:'0 12px 10px' }}>
-                                <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:8 }}>
-                                  {(stack.subs || []).map(id => {
-                                    const sub = catalogSubstances.find(s => s.id === id);
-                                    const pharma = PHARMA_DB[id];
-                                    const name = sub?.name || pharma?.name || id.replace(/_/g, ' ');
-                                    const dosage = stack.dosages?.[id];
-                                    const desc = sub?.description || pharma?.description || '';
-                                    return (
-                                      <div key={id} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.1)' }}>
-                                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                                          <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{name}</span>
-                                          {dosage && <span style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>{dosage.timing || ''} {dosage.mg ? `${dosage.mg}мг` : ''}</span>}
-                                        </div>
-                                        {desc && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{desc}</div>}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                                <div style={{ display:'flex', gap:4 }}>
-                                  <button onClick={() => {
-                                    try { localStorage.setItem('savedStacks', JSON.stringify(savedStacks.filter(s => s.id !== stack.id))); setSavedStacks(prev => prev.filter(s => s.id !== stack.id)); } catch {}
-                                  }} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444', fontWeight:600 }}>✕ Удалить</button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
 
                 {/* === PLAN TAB === */}
                 {favTab === 'plan' && (
