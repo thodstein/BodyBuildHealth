@@ -2145,7 +2145,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       )}
 
       {/* ===== MAIN HERO ===== */}
-      {(section === 'home' && tab === 'main' && supportView === 'main') && (
+      {(section === 'home' && tab === 'main' && supportView === 'main') && (<InfoErrorBoundary label="Главная бады">
         <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
           <img src="/support-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
@@ -2192,8 +2192,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               </div>
             </div>
         </div>
-      </div>
-      )}
+        </div>
+      </InfoErrorBoundary>)}
 
       {/* ===== SUB-NAVIGATION (REMOVED — content moved to existing tabs) ===== */}
 
@@ -3499,7 +3499,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       )}
 
       {/* ===== INFO: КАК РАБОТАЕТ ПОДБОР ПОДДЕРЖКИ ===== */}
-      {genTab === 'info' && section === 'generator' && (
+      {genTab === 'info' && section === 'generator' && (<InfoErrorBoundary label="Генератор — как работает">
         <div style={{ padding:'0 12px 80px', maxWidth:600, margin:'0 auto' }}>
           <h2 style={{ fontSize:16, fontWeight:800, color:'#fff', margin:'0 0 16px', display:'flex', alignItems:'center', gap:6 }}>
             <span>📖</span> Как работает подбор поддержки
@@ -3623,7 +3623,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
 
           </div>
         </div>
-      )}
+      </InfoErrorBoundary>)}
 
       {section === 'protocols' && (
         <div style={{ padding:'0 12px 12px' }}>
@@ -3650,11 +3650,13 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
 
           {/* Content: PCT / Fertility / HRT → FertilityPCTScreen */}
           {(['pct','fertility','hrt'] as string[]).includes(protocolTab) && (
-            <FertilityPCTScreen initialTab={protocolTab === 'pct' ? 'pct-plan' : protocolTab === 'hrt' ? 'hrt' : undefined} restrictToMode={protocolTab as 'pct' | 'fertility' | 'hrt'} />
+            <InfoErrorBoundary label="Протоколы ПКТ/Фертильность/HRT">
+              <FertilityPCTScreen initialTab={protocolTab === 'pct' ? 'pct-plan' : protocolTab === 'hrt' ? 'hrt' : undefined} restrictToMode={protocolTab as 'pct' | 'fertility' | 'hrt'} />
+            </InfoErrorBoundary>
           )}
 
           {/* Content: Neuro → full enhanced (inline, full-screen level) */}
-          {protocolTab === 'neuro' && (
+          {protocolTab === 'neuro' && (<InfoErrorBoundary label="Нейропротекция">
             <div style={{ paddingBottom: 70 }}>
               <div style={{ fontSize:11, fontWeight:700, color:'#ec4899', marginBottom:6 }}>🧠 Нейротоксичность ААС</div>
               <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Механизмы нейротоксичности, калькулятор риска и многоуровневый протокол нейропротекции.</p>
@@ -3819,10 +3821,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
               )}
             </div>
-          )}
+          </InfoErrorBoundary>)}
 
           {/* Content: Joints → full enhanced (inline, full-screen level) */}
-          {protocolTab === 'joints' && (
+          {protocolTab === 'joints' && (<InfoErrorBoundary label="Суставы">
             <div style={{ paddingBottom: 70 }}>
               <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
                 <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🦴 Калькулятор суставов и связок</div>
@@ -3943,10 +3945,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 ))}
               </div>
             </div>
-          )}
+          </InfoErrorBoundary>)}
 
           {/* Content: Acne → full enhanced (inline, full-screen level) */}
-          {protocolTab === 'acne' && (
+          {protocolTab === 'acne' && (<InfoErrorBoundary label="Акне">
             <div style={{ paddingBottom: 70 }}>
               <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
                 <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:4 }}>🔴 Анти-прыщ протокол</div>
@@ -4010,7 +4012,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
               </div>
             </div>
-          )}
+          </InfoErrorBoundary>)}
 
           {/* Warning card — compact, under tabs */}
           <div style={{ margin:'6px 0', padding:'8px 10px', borderRadius:4,
@@ -4031,7 +4033,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         <div style={{ paddingBottom: 16 }}>
 
       {/* ===== CATALOG ===== */}
-      {(section === 'home' || section === 'info') && tab === 'catalog' && (
+      {(section === 'home' || section === 'info') && tab === 'catalog' && (<InfoErrorBoundary label="Каталог">
         <div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>
             <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
@@ -4149,7 +4151,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             )}
           </div>
         </div>
-      )}
+      </InfoErrorBoundary>)}
         </div>
       )}
 
@@ -5026,7 +5028,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       })()}
 
       {/* ===== PEPTIDE CALCULATOR ===== */}
-      {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'peptides' && (
+      {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'peptides' && (<InfoErrorBoundary label="Пептидный калькулятор">
         <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
             <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
@@ -5196,7 +5198,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             </div>
           </div>
         </div>
-      )}
+      </InfoErrorBoundary>)}
 
       {/* ===== MODAL OVERLAY ===== */}
       {showModal && <SupportModals

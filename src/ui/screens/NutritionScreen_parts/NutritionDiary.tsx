@@ -158,12 +158,14 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const dayMeals = diaryData[selectedDate]?.meals || {};
 
   const dayTotals = useMemo(() => {
-    const items = Object.values(dayMeals).flat();
-    const kcal = items.reduce((s: number, i: any) => s + (i.kcal || 0), 0);
-    const p = items.reduce((s: number, i: any) => s + (i.p || 0), 0);
-    const f = items.reduce((s: number, i: any) => s + (i.f || 0), 0);
-    const c = items.reduce((s: number, i: any) => s + (i.c || 0), 0);
-    return { kcal, p, f, c };
+    try {
+      const items = Object.values(dayMeals).filter(Array.isArray).flat().filter((i:any) => i && typeof i === 'object');
+      const kcal = items.reduce((s: number, i: any) => s + (i.kcal || 0), 0);
+      const p = items.reduce((s: number, i: any) => s + (i.p || 0), 0);
+      const f = items.reduce((s: number, i: any) => s + (i.f || 0), 0);
+      const c = items.reduce((s: number, i: any) => s + (i.c || 0), 0);
+      return { kcal, p, f, c };
+    } catch { return { kcal:0, p:0, f:0, c:0 }; }
   }, [dayMeals, refreshKey]);
 
   return (
@@ -542,7 +544,8 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 Нет записей. Переключитесь на «➕ Добавить», чтобы внести продукты.
               </div>
             ) : (
-              Object.entries(dayMeals).map(([meal, items]: [string, any]) => {
+              Object.entries(dayMeals).map(([meal, raw]: [string, any]) => {
+                const items = Array.isArray(raw) ? raw : [];
                 const mealKcal = items.reduce((s:number,i:any)=>s+(i.kcal||0),0);
                 const mealP = items.reduce((s:number,i:any)=>s+(i.p||0),0);
                 const mealF = items.reduce((s:number,i:any)=>s+(i.f||0),0);

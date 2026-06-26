@@ -32,6 +32,7 @@ import {
   type PlanningTrack, getPlanningTrack, setPlanningTrack, planningTabsFor,
 } from './TrainingScreen_parts/shared';
 import { hapticImpact } from '../../core/telegram';
+import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 
 export const TrainingScreen: React.FC = () => {
   const linked = useDataLink();
@@ -489,8 +490,9 @@ export const TrainingScreen: React.FC = () => {
       )}
 
       {/* ═══════════ PLAN TAB ═══════════ */}
-      {tab === 'srcbb' && <SRCBBScreen key={planningTrack} track={planningTrack === 'manual' ? 'auto' : planningTrack} />}
+      {tab === 'srcbb' && <InfoErrorBoundary label="СРЦ"><SRCBBScreen key={planningTrack} track={planningTrack === 'manual' ? 'auto' : planningTrack} /></InfoErrorBoundary>}
           {tab === 'plan' && (
+        <InfoErrorBoundary label="План тренировок">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div className="card" style={{ padding: '10px 12px' }}>
             <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>⚙️ Параметры плана</h3>
@@ -1183,10 +1185,12 @@ export const TrainingScreen: React.FC = () => {
             </>
           )}
         </div>
+        </InfoErrorBoundary>
       )}
 
       {/* ═══════════ RUNTIME (Live Workout) ═══════════ */}
       {tab === 'runtime' && (
+        <InfoErrorBoundary label="Тренировка">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {!runtimeStarted ? (
             <div className="card" style={{ padding: '12px' }}>
@@ -1510,10 +1514,12 @@ export const TrainingScreen: React.FC = () => {
             </>
           )}
         </div>
+        </InfoErrorBoundary>
       )}
 
       {/* ═══════════ EXERCISES TAB (Apple-style) ═══════════ */}
       {tab === 'exercises' && (
+        <InfoErrorBoundary label="Упражнения">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {/* Search + filters */}
           <div style={{ background:'var(--bg-secondary)', borderRadius:14, padding:'8px 10px', border:'1px solid var(--border)' }}>
@@ -1604,10 +1610,12 @@ export const TrainingScreen: React.FC = () => {
             {filteredExercises.length === 0 && <div style={{ textAlign:'center', padding:20, color:'var(--text-dim)', fontSize:11 }}>Упражнения не найдены</div>}
           </div>
         </div>
+        </InfoErrorBoundary>
       )}
 
       {/* ═══════════ CALCULATORS TAB (also serves programcalc) ═══════════ */}
       {(tab === 'calculators' || tab === 'programcalc') && (
+        <InfoErrorBoundary label="Калькуляторы">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {showNonBuilder && (<>
           <div className="card" style={{ padding: '12px 14px', background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)', borderRadius:14 }}>
@@ -2619,10 +2627,12 @@ export const TrainingScreen: React.FC = () => {
           </div>
         </>)}
         </div>
+        </InfoErrorBoundary>
       )}
 
       {/* ═══════════ DIARY TAB ═══════════ */}
       {tab === 'diary' && (
+        <InfoErrorBoundary label="Дневник">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div className="card" style={{ padding: '10px 12px' }}>
             <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>📝 Записать подход</h3>
@@ -2795,10 +2805,12 @@ export const TrainingScreen: React.FC = () => {
             </div>
           )}
         </div>
+        </InfoErrorBoundary>
       )}
 
       {/* ═══════════ CYCLES TAB ═══════════ */}
       {tab === 'cycles' && (
+        <InfoErrorBoundary label="Циклы">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {/* Controls - glass card */}
           <div style={{ padding:12, borderRadius:14, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)' }}>
@@ -3032,9 +3044,10 @@ export const TrainingScreen: React.FC = () => {
             </>);
           })()}
           </div>
+          </InfoErrorBoundary>
         )}
       {/* ═══════════ HISTORY TAB ═══════════ */}
-      {tab === 'history' && (() => {
+      {tab === 'history' && <InfoErrorBoundary label="История">{(() => {
         try {
         const gCard: React.CSSProperties = { padding:12, borderRadius:14, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)', marginBottom:8 };
         if (diaryProgress.length === 0) return (
@@ -3099,24 +3112,27 @@ export const TrainingScreen: React.FC = () => {
           </div>
         </div>);
         } catch { return <div style={{ padding:20, textAlign:'center', color:'rgba(255,255,255,0.3)', fontSize:11 }}>Ошибка загрузки истории</div>; }
-      })()}
+      })()}</InfoErrorBoundary>}
       {/* ═══════════ ANALYTICS TAB ═══════════ */}
-      {tab === 'analytics' && <><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /></>}
-      {tab === 'methods' && <MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} appliedMethods={appliedMethods} onToggleMethod={(name, category) => setAppliedMethods(prev => { const next = { ...prev }; if (next[category] === name) delete next[category]; else next[category] = name; return next; })} onApplyComposition={() => { applyMethodComposition(); setTab('plan'); }} />}
-      {tab === 'visual' && <VisualTab sessions={historyWorkouts} />}
-      {tab === 'programs' && <ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} onAddToMyTraining={(exs) => setCustomExercises(prev => [...prev, ...exs])} />}
-      {tab === 'timers' && <TimersTab />}
-      {tab === 'progress' && <ProgressTab historyWorkouts={historyWorkouts} />}
+      {tab === 'analytics' && <InfoErrorBoundary label="Аналитика"><><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /></></InfoErrorBoundary>}
+      {tab === 'methods' && <InfoErrorBoundary label="Методы"><MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} appliedMethods={appliedMethods} onToggleMethod={(name, category) => setAppliedMethods(prev => { const next = { ...prev }; if (next[category] === name) delete next[category]; else next[category] = name; return next; })} onApplyComposition={() => { applyMethodComposition(); setTab('plan'); }} /></InfoErrorBoundary>}
+      {tab === 'visual' && <InfoErrorBoundary label="Визуализация"><VisualTab sessions={historyWorkouts} /></InfoErrorBoundary>}
+      {tab === 'programs' && <InfoErrorBoundary label="Программы"><ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} onAddToMyTraining={(exs) => setCustomExercises(prev => [...prev, ...exs])} /></InfoErrorBoundary>}
+      {tab === 'timers' && <InfoErrorBoundary label="Таймеры"><TimersTab /></InfoErrorBoundary>}
+      {tab === 'progress' && <InfoErrorBoundary label="Прогресс"><ProgressTab historyWorkouts={historyWorkouts} /></InfoErrorBoundary>}
 
       {/* ═══════════ MY TRAINING TAB ═══════════ */}
       {tab === 'mytraining' && (
+        <InfoErrorBoundary label="Мои тренировки">
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           <MyTrainingTab customExercises={customExercises} setCustomExercises={setCustomExercises} goal={goal} level={level} daysPerWeek={daysPerWeek} mesoLength={mesoLength} />
         </div>
+        </InfoErrorBoundary>
       )}
 
       {/* ═══════════ REPORTS TAB ═══════════ */}
       {tab === 'reports' && (
+        <InfoErrorBoundary label="Отчёты">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div className="card" style={{ padding: '10px 12px' }}>
             <h3 style={{ margin: '0 0 4px', fontSize: 13 }}>📄 Отчёты по тренировкам</h3>
@@ -3196,6 +3212,7 @@ export const TrainingScreen: React.FC = () => {
             )}
           </div>
         </div>
+        </InfoErrorBoundary>
       )}
     </div>
       )}

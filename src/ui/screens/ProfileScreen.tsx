@@ -8,6 +8,7 @@ import { calcReadiness } from '../../engines/readiness.engine';
 import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indices.engine';
 import { calculateIndices } from '../../engines/clinical-indices.engine';
 import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../core/constants';
+import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 
 type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'analytics' | 'contacts' | 'bp_diary' | 'measurements' | 'diaries';
 type ProfilePage = 'hero' | 'tabs';
@@ -675,7 +676,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
 
           {/* ═══ OVERVIEW TAB ═══ */}
           {tab === 'overview' && (
-          <>
+          <InfoErrorBoundary label="Обзор">
             {/* Hero card with avatar + key stats */}
             <div style={{
               ...glassCard,
@@ -889,12 +890,12 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                 </div>
               </div>
             )}
-          </>
+            </InfoErrorBoundary>
           )}
 
           {/* ═══ ANTHROPOMETRY TAB ═══ */}
           {tab === 'anthropometry' && (
-          <>
+          <InfoErrorBoundary label="Замеры">
             {/* Bio card: BMI, LBM, FFMI */}
             <div style={glassCard}>
               <div style={sectionLabel}>Показатели тела</div>
@@ -1010,17 +1011,15 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                 </div>
               </div>
             )}
-          </>
+            </InfoErrorBoundary>
           )}
 
           {/* ═══ SLEEP TAB — ДНЕВНИК СНА ═══ */}
-          {tab === 'sleep' && (
-            <SleepDiary settings={settings} save={save} />
-          )}
+          {tab === 'sleep' && <InfoErrorBoundary label="Сон"><SleepDiary settings={settings} save={save} /></InfoErrorBoundary>}
 
           {/* ═══ LIFESTYLE TAB ═══ */}
           {tab === 'lifestyle' && (
-            <>
+            <InfoErrorBoundary label="Образ жизни">
               <div style={glassCard}>
                 <div style={sectionLabel}>Стресс и усталость</div>
                 <div style={{ marginBottom:12 }}>
@@ -1124,12 +1123,12 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   save({ currentMedications: [...(settings.currentMedications ?? []), nm] });
                 }}>+ Добавить препарат</button>
               </div>
-            </>
+            </InfoErrorBoundary>
           )}
 
           {/* ═══ DIET TAB ═══ */}
           {tab === 'diet' && (
-            <div>
+            <InfoErrorBoundary label="Питание"><div>
               <div style={glassCard}>
                 <div style={sectionLabel}>Тип питания</div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(110px, 1fr))', gap:6 }}>
@@ -1213,12 +1212,12 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   </div>
                 </div>
               )}
-            </div>
+            </div></InfoErrorBoundary>
           )}
 
           {/* ═══ NUTRITION V7 TAB ═══ */}
           {tab === 'nutrition_v7' && (
-            <div>
+            <InfoErrorBoundary label="Нутрициология v7"><div>
               <div style={glassCard}>
                 <div style={sectionLabel}>Параметры питания V7</div>
                 <p style={{ fontSize:10, color: apple.textDim, margin:'4px 0 10px' }}>Эти параметры используются V7 риск-движком для расчёта рисков.</p>
@@ -1275,12 +1274,12 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   <div><span style={{ fontSize:10, color: apple.textDim }}>Курсов ААС</span><input style={appleInput} type="number" value={settings.totalCycles || ''} onChange={e => save({ totalCycles: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} /></div>
                 </div>
               </div>
-            </div>
+            </div></InfoErrorBoundary>
           )}
 
           {/* ═══ GENETICS TAB ═══ */}
           {tab === 'genetics' && (
-            <div style={glassCard}>
+            <InfoErrorBoundary label="Генетика"><div style={glassCard}>
               <div style={sectionLabel}>Генетические полиморфизмы</div>
               <p style={{ fontSize:10, color: apple.textDim, margin:'4px 0 10px' }}>Укажите ваши генетические варианты, если известны. Они влияют на расчёт рисков в V7 движке.</p>
               <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:8 }}>
@@ -1305,12 +1304,12 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   </div>
                 ))}
               </div>
-            </div>
+            </div></InfoErrorBoundary>
           )}
 
           {/* ═══ INJURIES TAB ═══ */}
           {tab === 'injuries' && (
-            <>
+            <InfoErrorBoundary label="Травмы">
               <div style={glassCard}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <div style={sectionLabel}>Травмы</div>
@@ -1379,12 +1378,12 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   }}>Отмена</button>
                 </div>
               )}
-            </>
+            </InfoErrorBoundary>
           )}
 
           {/* ═══ PROGRESS TAB ═══ */}
           {tab === 'progress' && (
-          <>
+          <InfoErrorBoundary label="Прогресс">
             {/* Weight goal + line chart */}
             <div style={glassCard}>
               <div style={sectionLabel}>Прогресс веса</div>
@@ -1593,12 +1592,12 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                 })}
               </div>
             </div>
-          </>
+          </InfoErrorBoundary>
           )}
 
           {/* ═══ ANALYTICS TAB ═══ */}
-           {tab === 'analytics' && (() => {
-             const bmiVal = settings.weight && settings.height ? (settings.weight / Math.pow(settings.height / 100, 2)).toFixed(1) : '—';
+          {tab === 'analytics' && <InfoErrorBoundary label="Аналитика">{(() => {
+            const bmiVal = settings.weight && settings.height ? (settings.weight / Math.pow(settings.height / 100, 2)).toFixed(1) : '—';
             const lbmVal = settings.weight && settings.bodyFat ? (settings.weight * (1 - settings.bodyFat / 100)).toFixed(1) : '—';
             const ffmiVal = lbmVal !== '—' && settings.height ? (parseFloat(lbmVal) / Math.pow(settings.height / 100, 2) + 6.1 * (1.8 - settings.height / 100)).toFixed(1) : '—';
             const riskData = (() => { try { return JSON.parse(localStorage.getItem('he_last_risk') || 'null'); } catch { return null; } })();
@@ -2089,11 +2088,11 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
               </div>
             )}
           </div>);
-          })()}
-
+          })()}</InfoErrorBoundary>}
+          
           {/* ═══ BP/HR DIARY ═══ */}
           {tab === 'bp_diary' && (
-            <div>
+            <InfoErrorBoundary label="Давление"><div>
               {/* Header + Add button */}
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
                 <h3 style={{ margin:0, fontSize:15, fontWeight:700, color: apple.textPrimary }}>🫀 Давление и пульс</h3>
@@ -2255,15 +2254,15 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   </>
                 );
               })()}
-            </div>
+            </div></InfoErrorBoundary>
           )}
 
           {/* ═══ MEASUREMENTS TAB ═══ */}
-          {tab === 'measurements' && <ProfileMeasurementsTab />}
+          {tab === 'measurements' && <InfoErrorBoundary label="Измерения"><ProfileMeasurementsTab /></InfoErrorBoundary>}
 
           {/* ═══ DIARIES TAB ═══ */}
           {tab === 'diaries' && (
-            <div>
+            <InfoErrorBoundary label="Дневники"><div>
               <div style={{ marginBottom:12 }}>
                 <h3 style={{ margin:'0 0 4px', fontSize:15, fontWeight:800, color:'#fff' }}>📔 Дневники</h3>
                 <p style={{ fontSize:10, color:'rgba(255,255,255,0.7)', margin:0 }}>Все дневники приложения для отслеживания прогресса</p>
@@ -2297,12 +2296,12 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   </div>
                 ))}
               </div>
-            </div>
+            </div></InfoErrorBoundary>
           )}
 
           {/* ═══ CONTACTS TAB ═══ */}
           {tab === 'contacts' && (
-            <div>
+            <InfoErrorBoundary label="Контакты"><div>
               <div style={glassCard}>
                 <div style={sectionLabel}>Контакты и друзья</div>
                 <p style={{ fontSize:10, color: apple.textDim, margin:'4px 0 10px' }}>
@@ -2378,7 +2377,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   <div>• <b>Открыть тренировку</b> — deep-link для доступа друга к программе</div>
                 </div>
               </div>
-            </div>
+            </div></InfoErrorBoundary>
           )}
           </div>
         </div>

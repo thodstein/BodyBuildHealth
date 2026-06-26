@@ -24,6 +24,7 @@ const NutritionCharts = lazy(() => import('./NutritionScreen_parts/NutritionChar
 import { generateNutritionReport, NutritionReport } from '../../engines/nutrition-report.engine';
 import { getNutritionV2Data, saveNutritionV2Data } from '../../core/nutrition-v2-data';
 import { getQualityLabel } from '../../engines/nutrition-quality.engine';
+import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
 type NutritionPage = 'hero' | 'tabs';
@@ -1312,32 +1313,32 @@ export const NutritionScreen: React.FC = () => {
 
   const renderContent = () => {
     switch (tab) {
-      case 'diary': try { return <NutritionDiary foodEntries={foodEntries} targets={macroTargets} />; } catch(e) { console.error('Diary error:', e); return <div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>⚠️ Ошибка загрузки дневника. Попробуйте обновить страницу.</div>; }
-      case 'charts': return <Suspense fallback={<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Загрузка графиков...</div>}><NutritionCharts kcalData={chartKcalData} proteinData={chartProteinData} labels={chartLabels} dailyLogs={dailyLogs} /></Suspense>;
-      case 'mealplan': try { return <IndividualPlan profile={linked.profile} course={linked.course} />; } catch (e) { console.error('IndividualPlan crash:', e); return <div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>⚠️ Ошибка загрузки плана питания. Попробуйте обновить страницу.</div>; }
+      case 'diary': return <InfoErrorBoundary label="Дневник питания"><NutritionDiary foodEntries={foodEntries} targets={macroTargets} /></InfoErrorBoundary>;
+      case 'charts': return <InfoErrorBoundary label="Графики"><Suspense fallback={<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Загрузка графиков...</div>}><NutritionCharts kcalData={chartKcalData} proteinData={chartProteinData} labels={chartLabels} dailyLogs={dailyLogs} /></Suspense></InfoErrorBoundary>;
+      case 'mealplan': return <InfoErrorBoundary label="План питания"><IndividualPlan profile={linked.profile} course={linked.course} /></InfoErrorBoundary>;
       case 'cart': return <CartTab />;
       case 'restaurant': return <RestaurantTab />;
       case 'favorites': return <FavoritesTab />;
       case 'catalog': return <CatalogTab />;
       case 'reference': return <ReferenceTab />;
       case 'recipes': return <RecipesTab />;
-      case 'reports': return <ReportsTab foodEntries={foodEntries} profile={linked.profile} targets={macroTargets} />;
-      case 'customfood': return <NutritionCustomFood />;
-      case 'overview': return <NutritionOverview
+      case 'reports': return <InfoErrorBoundary label="Отчёты"><ReportsTab foodEntries={foodEntries} profile={linked.profile} targets={macroTargets} /></InfoErrorBoundary>;
+      case 'customfood': return <InfoErrorBoundary label="Свои продукты"><NutritionCustomFood /></InfoErrorBoundary>;
+      case 'overview': return <InfoErrorBoundary label="Обзор"><NutritionOverview
         profile={linked.profile}
         avgWeeklyKcal={avgWeeklyKcal}
         avgWeeklyProtein={avgWeeklyProtein}
         avgWeeklyFat={avgWeeklyFat}
         avgWeeklyCarbs={avgWeeklyCarbs}
-      />;
+      /></InfoErrorBoundary>;
       case 'info': return <InfoTab />;
-      case 'progress': return <ProgressTracker />;
-      case 'nutria': return <NutriAdvisor />;
-      case 'visualize': return <MealVisualizer items={[]} />;
-      case 'achievements': return <Achievements />;
-      case 'quests': return <DailyQuests />;
-      case 'usefulness': return <ProductUsefulnessPlanner />;
-      case 'health': try { return <HealthAnalytics />; } catch(e) { console.error('Health error:', e); return <div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>⚠️ Ошибка загрузки аналитики здоровья.</div>; }
+      case 'progress': return <InfoErrorBoundary label="Прогресс"><ProgressTracker /></InfoErrorBoundary>;
+      case 'nutria': return <InfoErrorBoundary label="Нутрициолог"><NutriAdvisor /></InfoErrorBoundary>;
+      case 'visualize': return <InfoErrorBoundary label="Блюдо"><MealVisualizer items={[]} /></InfoErrorBoundary>;
+      case 'achievements': return <InfoErrorBoundary label="Достижения"><Achievements /></InfoErrorBoundary>;
+      case 'quests': return <InfoErrorBoundary label="Квесты"><DailyQuests /></InfoErrorBoundary>;
+      case 'usefulness': return <InfoErrorBoundary label="Полезность"><ProductUsefulnessPlanner /></InfoErrorBoundary>;
+      case 'health': return <InfoErrorBoundary label="Аналитика здоровья"><HealthAnalytics /></InfoErrorBoundary>;
       default: return null;
     }
   };
