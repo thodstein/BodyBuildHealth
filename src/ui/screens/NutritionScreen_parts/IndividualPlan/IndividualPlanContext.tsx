@@ -498,6 +498,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const pMod = planTypeMod?.pMult || 1.0; const fMod = planTypeMod?.fMult || 1.0; const cMod = planTypeMod?.cMult || 1.0;
     const excludedIds = new Set(excludedFoods);
     healthIssues.forEach(hid => { const issue = HEALTH_ISSUES.find(h => h.id === hid); if (issue?.foodIds) issue.foodIds.forEach(fid => excludedIds.add(fid)); });
+    // N2: vegetarian mode — exclude all non-vegetarian foods (meat, fish, poultry)
+    if (dietPrefs.includes('vegetarian')) {
+      Object.entries(FOOD_ALLERGEN_DIET).forEach(([fid, tags]) => {
+        if (tags.isVegetarian === false) excludedIds.add(fid);
+      });
+    }
     const getFoodAllergens = (foodId: string): string[] => { const fromDiet = FOOD_ALLERGEN_DIET[foodId]; if (fromDiet) return fromDiet.allergens; const food = FOOD_DB.find(f => f.id === foodId); return food?.allergens || []; };
     const userAllergenToValues: Record<string, string[]> = { 'лактоза':['dairy'],'молочные':['dairy'],'глютен':['gluten'],'орехи':['nuts','tree_nuts'],'арахис':['peanuts'],'яйца':['eggs'],'соя':['soy'],'рыба':['fish'],'морепродукты':['shellfish'],'кунжут':['sesame'],'горчица':['mustard'],'сельдерей':['celery'],'сульфиты':['sulfites'],'люпин':['lupin'] };
     const allergenTextMatches = (a: string, fName: string): boolean => { const n = fName.toLowerCase();
@@ -541,6 +547,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       else sorted = [...sorted].sort((a, b) => { const sa = Math.sin(seed * 10007 + (a.id?.length || 0)); const sb = Math.sin(seed * 10007 + (b.id?.length || 0)); return sa - sb; });
       return sorted.slice(0, variety === 'minimal' ? 4 : variety === 'medium' ? 8 : 12);
     };
+    // N1: track used food IDs across meals to avoid duplicates when budget=max
+    const usedFoodIds = new Set<string>();
     const portableFilter = (pool: any[]) => { if (workFood !== 'portable') return pool; const nonPortableIds = new Set(['kfc_wings','kfc_soup','kfc_bucket','mcd_big_mac','mcd_royale','bk_whopper','vt_big_smoke','pizza_margherita','french_fries','soup_chicken','soup_borscht','soup_mushroom','porridge_oat','porridge_buckwheat','rice_white_cooked','pasta_boiled','mayonnaise','ketchup','cream_sauce','bouillon_cube','soda','coca_cola','juice_apple','juice_orange','ice_cream','condensed_milk','cheese_processed','marmalade','cookie','chocolate']); return pool.filter(f => !nonPortableIds.has(f.id)); };
     const applyFoodPrefs = (pool: any[], prefType: string) => { const lower = prefType.toLowerCase(); if (pool.length <= 3) return pool; return portableFilter(pool).filter(f => !excludedIds.has(f.id) && [...allergenIds].every(a => !getFoodAllergens(f.id).includes(a) && !allergenTextMatches(a, f.name))); };
     const seedRand = (seed: number) => { const x = Math.sin(seed) * 10000; return x - Math.floor(x); };
@@ -581,13 +589,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const effectiveLunch = isWorkDay && workScheduleEnabled ? workStartMin + Math.round((workEndMin - workStartMin + (isNightShift ? 1440 : 0)) / 2) % 1440 : lunchMin;
       const effectiveDinner = isWorkDay && workScheduleEnabled ? (isNightShift ? workEndMin + 60 : Math.min(workEndMin + 30, 1380)) : dinnerMin;
 
+      const effectiveMealsCount = lazyDayMode ? Math.min(3, mealsCount) : cookTimeMin < 30 ? Math.min(3, mealsCount) : cookTimeMin < 60 ? Math.min(4, mealsCount) : mealsCount;
       const mealDefs: { label: string; anchor?: number }[] = [];
       mealDefs.push({ label: 'Завтрак', anchor: effectiveWake + 30 });
-      if (mealsCount >= 5) mealDefs.push({ label: 'Второй завтрак' });
-      if (mealsCount >= 3) mealDefs.push({ label: 'Обед', anchor: Math.min(effectiveLunch, 1320) });
-      if (mealsCount >= 4) mealDefs.push({ label: 'Полдник' });
+      if (effectiveMealsCount >= 5) mealDefs.push({ label: 'Второй завтрак' });
+      if (effectiveMealsCount >= 3) mealDefs.push({ label: 'Обед', anchor: Math.min(effectiveLunch, 1320) });
+      if (effectiveMealsCount >= 4) mealDefs.push({ label: 'Полдник' });
       mealDefs.push({ label: 'Ужин', anchor: Math.min(effectiveDinner, 1380) });
-      if (mealsCount >= 6) mealDefs.push({ label: 'Перекус' });
+      if (effectiveMealsCount >= 6) mealDefs.push({ label: 'Перекус' });
       const anchored = mealDefs.map((m, i) => {
         if (m.anchor) return { ...m, time: m.anchor, fixed: true };
         let leftAnchorIdx = i; let leftTime = effectiveWake; while (leftAnchorIdx >= 0 && !mealDefs[leftAnchorIdx].anchor) leftAnchorIdx--; if (leftAnchorIdx >= 0) leftTime = mealDefs[leftAnchorIdx].anchor!;
@@ -617,8 +626,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const sSeed = dayOffset * 10007 + idx * 997 + (isTrainingDay ? 3000 : 0) + (cyclingMode === 'butch' ? 5000 : 0);
         const isPreWorkout = mt.label === 'Предтрен'; const isPostWorkout = mt.label === 'Пост-трен'; const isPeriWorkout = isPreWorkout || isPostWorkout;
         const highQuality = budget === 'max' || budget === 'enhanced'; const lowQuality = budget === 'low';
-        const fastCarbs = FOOD_DB.filter(f => f.gi && f.gi >= 80); const slowCarbs = FOOD_DB.filter(f => f.category === 'carb' || f.category === 'grain'); const proteinFoods = FOOD_DB.filter(f => f.category === 'protein' && (f.tier === 'basic' || f.tier === 'mid' || f.tier === 'max')); const allProtein = applyFoodPrefs(proteinFoods, 'protein'); const topProtein = highQuality ? qualitySort(allProtein, true).slice(0, 8) : lowQuality ? qualitySort(allProtein, false).slice(0, 5) : allProtein.filter(f => f.protein > 15).sort(() => Math.random() - 0.5).slice(0, 5);
-        const pickItem = (foodPool: any[], targetG: number, seed: number, maxItems = 2): any[] => { const result: any[] = []; let pool = applyFoodPrefs(foodPool, 'any'); if (pool.length === 0) return result; const highQ = budget === 'max' || budget === 'enhanced'; const lowQ = budget === 'low'; if (highQ) pool = qualitySort(pool, true); else if (lowQ) pool = qualitySort(pool, false); const preferPool = preferredSet.size > 0 ? pool.filter(f => preferredSet.has(f.id)) : []; const mainPool = preferPool.length > 0 ? preferPool : pool; for (let i = 0; i < maxItems && targetG > 5; i++) { const idx = highQ ? i : lowQ ? (mainPool.length - 1 - i) : Math.floor(seedRand(seed + i * 997) * mainPool.length); const food = mainPool[Math.min(idx, mainPool.length - 1)]; const portion = Math.min(1, targetG / Math.max(1, food.protein || food.fat || food.carbs || 1)); result.push({ name: food.name, id: food.id, amount: Math.round(portion * (parseInt(food.servingSize) || 100)), kcal: Math.round(food.kcal * portion), p: Math.round(food.protein * portion), f: Math.round(food.fat * portion), c: Math.round(food.carbs * portion) }); targetG -= food.protein * portion || 0; } return result; };
+        const effectiveTierFilter = lazyDayMode ? (f: any) => f.tier === 'basic' : (f: any) => f.tier === 'basic' || f.tier === 'mid' || f.tier === 'max';
+        const fastCarbs = FOOD_DB.filter(f => f.gi && f.gi >= 80); const slowCarbs = FOOD_DB.filter(f => f.category === 'carb' || f.category === 'grain'); const proteinFoods = FOOD_DB.filter(f => f.category === 'protein' && effectiveTierFilter(f)); const allProtein = applyFoodPrefs(proteinFoods, 'protein'); const topProtein = highQuality ? qualitySort(allProtein, true).slice(0, 8) : lowQuality ? qualitySort(allProtein, false).slice(0, 5) : allProtein.filter(f => f.protein > 15).sort(() => Math.random() - 0.5).slice(0, 5);
+        const pickItem = (foodPool: any[], targetG: number, seed: number, maxItems = 2): any[] => { const result: any[] = []; let pool = applyFoodPrefs(foodPool, 'any'); if (pool.length === 0) return result; const highQ = budget === 'max' || budget === 'enhanced'; const lowQ = budget === 'low'; if (highQ) pool = qualitySort(pool, true); else if (lowQ) pool = qualitySort(pool, false); const preferPool = preferredSet.size > 0 ? pool.filter(f => preferredSet.has(f.id)) : []; let mainPool = preferPool.length > 0 ? preferPool : pool; if (lazyDayMode) { mainPool = mainPool.filter(f => f.tier === 'basic'); } // N4: lazyDayMode — only basic foods
+        if (highQ && usedFoodIds.size > 0) { const unused = mainPool.filter(f => !usedFoodIds.has(f.id)); if (unused.length > 0) mainPool = unused; }
+        const lm = lazyDayMode ? 1 : maxItems; // N4: lazyDayMode — 1 item max per meal
+        for (let i = 0; i < lm && targetG > 5; i++) { const idx = highQ ? 0 : lowQ ? (mainPool.length - 1 - i) : Math.floor(seedRand(seed + i * 997) * mainPool.length); const food = mainPool[Math.min(idx, mainPool.length - 1)]; if (!food) break; usedFoodIds.add(food.id); const portion = Math.min(1, targetG / Math.max(1, food.protein || food.fat || food.carbs || 1)); result.push({ name: food.name, id: food.id, amount: Math.round(portion * (parseInt(food.servingSize) || 100)), kcal: Math.round(food.kcal * portion), p: Math.round(food.protein * portion), f: Math.round(food.fat * portion), c: Math.round(food.carbs * portion) }); targetG -= food.protein * portion || 0; } return result; };
         if (isPreWorkout) {
           const preProtein = FOOD_DB.find(f => f.id === 'whey_isolate'); if (preProtein) items.push({ name: preProtein.name, id: 'whey_isolate', amount: 40, kcal: Math.round(preProtein.kcal * 0.4), p: Math.round(preProtein.protein * 0.4), f: Math.round(preProtein.fat * 0.4), c: Math.round(preProtein.carbs * 0.4) });
           const preCarb = FOOD_DB.find(f => f.id === 'banana'); if (preCarb) items.push({ name: preCarb.name, id: 'banana', amount: 100, kcal: Math.round(preCarb.kcal), p: Math.round(preCarb.protein), f: Math.round(preCarb.fat), c: Math.round(preCarb.carbs) });
@@ -626,9 +639,19 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           const postProtein = FOOD_DB.find(f => f.id === 'whey_isolate'); if (postProtein) items.push({ name: postProtein.name, id: 'whey_isolate', amount: 50, kcal: Math.round(postProtein.kcal * 0.5), p: Math.round(postProtein.protein * 0.5), f: Math.round(postProtein.fat * 0.5), c: Math.round(postProtein.carbs * 0.5) });
           const postCarb = FOOD_DB.find(f => f.id === 'rice_white'); if (postCarb) items.push({ name: postCarb.name, id: 'rice_white', amount: 150, kcal: Math.round(postCarb.kcal * 1.5), p: Math.round(postCarb.protein * 1.5), f: Math.round(postCarb.fat * 1.5), c: Math.round(postCarb.carbs * 1.5) });
         } else {
+          // N4: cravingMode — add a treat to one random meal per day
+          if (cravingMode && idx === 2) {
+            const treatPool = ['chocolate','cookie','ice_cream','marmalade'];
+            const treatId = treatPool[Math.floor(seedRand(sSeed + 999) * treatPool.length)];
+            const treat = FOOD_DB.find(f => f.id === treatId);
+            if (treat && !excludedIds.has(treat.id) && !allergenIds.has(treat.id)) {
+              items.push({ name: treat.name, id: treat.id, amount: 30, kcal: Math.round(treat.kcal * 0.3), p: Math.round(treat.protein * 0.3), f: Math.round(treat.fat * 0.3), c: Math.round(treat.carbs * 0.3) });
+              remainingC -= (treat.carbs || 0) * 0.3;
+            }
+          }
           const protItems = pickItem(topProtein, remainingP, sSeed); protItems.forEach(i => { items.push(i); remainingP -= i.p || 0; remainingF -= i.f || 0; remainingC -= i.c || 0; });
-          const carbPool = applyFoodPrefs(slowCarbs, 'carb'); if (carbPool.length > 0 && remainingC > 10) { const cIdx = Math.floor(seedRand(sSeed + 3) * carbPool.length); const cF = carbPool[cIdx % carbPool.length]; const cPortion = Math.min(1, remainingC / Math.max(1, cF.carbs || 1)); items.push({ name: cF.name, id: cF.id, amount: Math.round(cPortion * (parseInt(cF.servingSize) || 100)), kcal: Math.round(cF.kcal * cPortion), p: Math.round(cF.protein * cPortion), f: Math.round(cF.fat * cPortion), c: Math.round(cF.carbs * cPortion) }); }
-          const vegPool = limitPool(applyFoodPrefs(FOOD_DB.filter(f => f.category === 'veg_fruit'), 'veg'), foodSeed + 4); if (vegPool.length > 0) { const vegIdx = Math.floor(seedRand(foodSeed + 4) * vegPool.length); const v = vegPool[vegIdx % vegPool.length]; items.push({ name: v.name, id: v.id, amount: 80, kcal: Math.round(v.kcal * 0.8), p: Math.round(v.protein * 0.8), f: Math.round(v.fat * 0.8), c: Math.round(v.carbs * 0.8) }); }
+          const carbPool = applyFoodPrefs(slowCarbs, 'carb'); if (carbPool.length > 0 && remainingC > 10) { const cPool = highQuality ? qualitySort(carbPool, true) : carbPool; const cIdx = highQuality ? 0 : Math.floor(seedRand(sSeed + 3) * cPool.length); const cF = cPool[cIdx % cPool.length]; usedFoodIds.add(cF.id); const cPortion = Math.min(1, remainingC / Math.max(1, cF.carbs || 1)); items.push({ name: cF.name, id: cF.id, amount: Math.round(cPortion * (parseInt(cF.servingSize) || 100)), kcal: Math.round(cF.kcal * cPortion), p: Math.round(cF.protein * cPortion), f: Math.round(cF.fat * cPortion), c: Math.round(cF.carbs * cPortion) }); }
+          const vegPool = limitPool(applyFoodPrefs(FOOD_DB.filter(f => f.category === 'veg_fruit'), 'veg'), foodSeed + 4); if (vegPool.length > 0) { const vIdx = highQuality ? 0 : Math.floor(seedRand(foodSeed + 4) * vegPool.length); const v = vegPool[vIdx % vegPool.length]; usedFoodIds.add(v.id); items.push({ name: v.name, id: v.id, amount: 80, kcal: Math.round(v.kcal * 0.8), p: Math.round(v.protein * 0.8), f: Math.round(v.fat * 0.8), c: Math.round(v.carbs * 0.8) }); }
         }
         const tot = { kcal: items.reduce((s,i) => s + i.kcal, 0), p: items.reduce((s,i) => s + i.p, 0), f: items.reduce((s,i) => s + i.f, 0), c: items.reduce((s,i) => s + i.c, 0) };
         return { ...mt, items, totals: tot, idx };
@@ -644,7 +667,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const d3 = buildDay(2, trainingDays[2]);
     setDayPlan(d1);
     if (days >= 3) setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: d1.totals.kcal + d2.totals.kcal + d3.totals.kcal, p: d1.totals.p + d2.totals.p + d3.totals.p, f: d1.totals.f + d2.totals.f + d3.totals.f, c: d1.totals.c + d2.totals.c + d3.totals.c } });
-    if (days >= 7) { const week = Array.from({ length: 7 }, (_, i) => buildDay(i, trainingDays[i])); const weekData = { days: week, totals: { kcal: week.reduce((s,d) => s + d.totals.kcal, 0), p: week.reduce((s,d) => s + d.totals.p, 0), f: week.reduce((s,d) => s + d.totals.f, 0), c: week.reduce((s,d) => s + d.totals.c, 0) }}; if (weekIndex !== undefined) { const mPlan = [...monthPlan]; mPlan[weekIndex] = weekData; setMonthPlan(mPlan); } else setWeekPlan(weekData); }
+    if (days >= 7) { let week = Array.from({ length: 7 }, (_, i) => buildDay(i, trainingDays[i])); if (periodizationEnabled) { // N4: apply periodization pattern — surplus/maintenance/deficit rotation
+        const pWeek = weekIndex !== undefined ? weekIndex % 5 : 0;
+        if (pWeek === 0 || pWeek === 4) { // surplus week
+          week = week.map((d: any) => ({ ...d, meals: d.meals.map((m: any) => ({ ...m, items: m.items.map((it: any) => ({ ...it, amount: Math.round(it.amount * 1.15), kcal: Math.round(it.kcal * 1.15), p: Math.round(it.p * 1.15), f: Math.round(it.f * 1.15), c: Math.round(it.c * 1.15) })) })), totals: { kcal: Math.round(d.totals.kcal * 1.15), p: Math.round(d.totals.p * 1.15), f: Math.round(d.totals.f * 1.15), c: Math.round(d.totals.c * 1.15) } }));
+        } else if (pWeek === 2) { // deficit week
+          week = week.map((d: any) => ({ ...d, meals: d.meals.map((m: any) => ({ ...m, items: m.items.map((it: any) => ({ ...it, amount: Math.round(it.amount * 0.8), kcal: Math.round(it.kcal * 0.8), p: Math.round(it.p * 0.8), f: Math.round(it.f * 0.8), c: Math.round(it.c * 0.8) })) })), totals: { kcal: Math.round(d.totals.kcal * 0.8), p: Math.round(d.totals.p * 0.8), f: Math.round(d.totals.f * 0.8), c: Math.round(d.totals.c * 0.8) } }));
+        } // weeks 1,3 = maintenance (unchanged)
+      } const weekData = { days: week, totals: { kcal: week.reduce((s,d) => s + d.totals.kcal, 0), p: week.reduce((s,d) => s + d.totals.p, 0), f: week.reduce((s,d) => s + d.totals.f, 0), c: week.reduce((s,d) => s + d.totals.c, 0) }}; if (weekIndex !== undefined) { const mPlan = [...monthPlan]; mPlan[weekIndex] = weekData; setMonthPlan(mPlan); } else setWeekPlan(weekData); }
     generateRecommendations();
     const sorted = [...FOOD_DB].sort(() => Math.random() - 0.5).slice(0, 10);
     setShoppingList(sorted);

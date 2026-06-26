@@ -170,6 +170,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (tab !== 'main') { setTab('main'); return; }
     if (section !== 'home') { setSection('home'); resetMain(); return; }
   };
+  const backBtnStyle: React.CSSProperties = { padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' as const };
+  const BackNav = ({ homeLabel = '← На главную' }: { homeLabel?: string }) => <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' as const }}>
+    <button onClick={goBack} style={backBtnStyle}>← Назад</button>
+    <button onClick={goHome} style={backBtnStyle}>{homeLabel}</button>
+  </div>;
   const [interactionTypeFilter, setInteractionTypeFilter] = useState<string>('all');
   const [interactionSeverityFilter, setInteractionSeverityFilter] = useState<string>('all');
   const [infoSynergySeverity, setInfoSynergySeverity] = useState<string>('all');
@@ -2139,8 +2144,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       {section === 'generator' && (
         <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
           <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center', overflowX:'auto' }}>
-            <button onClick={goBack} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
-            <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
+            <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
             {[['calculator','🧮 Калькулятор'],['info','📖 О подборе']].map(([id,label]) => (
@@ -2165,8 +2169,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       {section === 'protocols' && (
         <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
           <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center', overflowX:'auto' }}>
-            <button onClick={goBack} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
-            <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
+            <BackNav />
           </div>
         </div>
       )}
@@ -2175,8 +2178,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       {(section === 'info' || calcView === 'info' || calcView === 'peptides') && (
         <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
           <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center', overflowX:'auto' }}>
-            <button onClick={goBack} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
-            <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
+            <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
             {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['interactions','⚠ Взаимодействия'],['stacks','📂 Стеки'],['research','Исследования'],['favorites','Избранное']].map(([id,label]) => (
@@ -5285,8 +5287,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'peptides' && (<InfoErrorBoundary label="Пептидный калькулятор">
         <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-            <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+            <BackNav homeLabel="← На главную Поддержки" />
           </div>
           <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#a78bfa' }}>🧬 Пептидный калькулятор</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Расчёт дозировок, баков, разведения и протоколов пептидов.</p>
