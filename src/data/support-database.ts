@@ -5,5 +5,5 @@ export * from "./support-meta";
 export * from "./support-catalog-data";
 export * from "./support-enrichment";
 export * from "./support-synergy-network";
-export * from "./support-stacks-bformat";
+export * from "./support-stacks";
 export * from "./support-substances";

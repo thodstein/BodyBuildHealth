@@ -3,9 +3,9 @@ import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { type GoalType } from '../../engines/biostack-ai.engine';
 import { findSupplements, type FinderMatch, type FinderQuery } from '../../engines/supplement-finder.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, MECHANISM_LABELS } from '../../data/support-database';
-import { GlassCard, PillBtn, inputS, GOALS, ORGANS, SYSTEMS, TOP_MECHANISMS, SYMPTOMS, toFinderProfile } from './BioStackAIConstants';
+import { GlassCard, PillBtn, inputS, PURE_GOALS, TARGET_SYSTEMS, ORGANS, SYSTEMS, TOP_MECHANISMS, SYMPTOMS, toFinderProfile } from './BioStackAIConstants';
 
-type FilterGroup = 'goals' | 'organs' | 'systems' | 'mechanisms' | 'symptoms';
+type FilterGroup = 'goals' | 'targets' | 'organs' | 'systems' | 'mechanisms';
 
 export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void }) {
   const [searchText, setSearchText] = useState('');
@@ -134,14 +134,14 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
 
         {/* Collapsible filter groups */}
         <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 4 }}>
-          {(['goals','organs','systems','mechanisms'] as FilterGroup[]).map(g => (
+          {(['goals','targets','organs','systems','mechanisms'] as FilterGroup[]).map(g => (
             <button key={g} onClick={() => setOpenGroup(openGroup === g ? null : g)} style={{
               padding: '4px 10px', borderRadius: 8, fontSize: 7, cursor: 'pointer', fontWeight: 600,
               background: openGroup === g ? 'rgba(139,92,246,0.1)' : '#202023',
               border: `1px solid ${openGroup === g ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.04)'}`,
               color: openGroup === g ? '#8b5cf6' : 'rgba(255,255,255,0.5)',
             }}>
-              {g === 'goals' ? '🎯 Цели' : g === 'organs' ? '🫀 Органы' : g === 'systems' ? '⚙️ Системы' : '🧬 Механизмы'}
+              {g === 'goals' ? '🎯 Цели' : g === 'targets' ? '📍 Мишени' : g === 'organs' ? '🫀 Органы' : g === 'systems' ? '⚙️ Системы' : '🧬 Механизмы'}
               {g === 'goals' && selectedGoal ? ` (1)` : (g === 'organs' && selectedOrgans.length > 0) ? ` (${selectedOrgans.length})` : (g === 'systems' && selectedSystems.length > 0) ? ` (${selectedSystems.length})` : (g === 'mechanisms' && selectedMechs.length > 0) ? ` (${selectedMechs.length})` : ''}
             </button>
           ))}
@@ -155,7 +155,12 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
 
         {openGroup === 'goals' && (
           <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', padding: '4px 0', marginBottom: 4 }}>
-            {GOALS.map(g => filterBtn(g.label, selectedGoal === g.key, () => toggleGoal(g.key)))}
+            {PURE_GOALS.map(g => filterBtn(g.label, selectedGoal === g.key, () => toggleGoal(g.key)))}
+          </div>
+        )}
+        {openGroup === 'targets' && (
+          <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', padding: '4px 0', marginBottom: 4 }}>
+            {TARGET_SYSTEMS.map(t => filterBtn(t.label, selectedGoal === t.key, () => toggleGoal(t.key)))}
           </div>
         )}
         {openGroup === 'organs' && (

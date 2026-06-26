@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { type BioStackProfile, type GoalType } from '../../engines/biostack-ai.engine';
 import { buildStack, explainStack, type StackExplanation } from '../../engines/supplement-finder.engine';
 import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS, ALL_STACKS, type SupportStack, getStackSubstanceLabel } from '../../data/support-database';
-import { GlassCard, PillBtn, StatBox, inputS, selectS, ORGANS, SYSTEMS, GOALS, LAB_MARKERS, GROUP_LABELS, toFinderProfile } from './BioStackAIConstants';
+import { GlassCard, PillBtn, StatBox, inputS, selectS, ORGANS, SYSTEMS, PURE_GOALS, TARGET_SYSTEMS, LAB_MARKERS, GROUP_LABELS, toFinderProfile } from './BioStackAIConstants';
 import { STACK_TEMPLATES, type BioStackTemplate } from '../../engines/biostack-templates';
 
 type LMState = Record<string, 'off' | 'maintain' | 'correct'>;
@@ -57,8 +57,9 @@ const FILTER_ITEMS = [
 
 export function BuildTab({ profile, stackIds, setStackIds }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void }) {
   const [goals, setGoals] = useState<GoalType[]>(profile.goals);
-  const [selOrgans, setSelOrgans] = useState<string[]>([]);
-  const [selSystems, setSelSystems] = useState<string[]>([]);
+  const [selOrgans, setSelOrgans] = useState<string[]>(profile.targetOrgans || []);
+  const [selSystems, setSelSystems] = useState<string[]>(profile.targetSystems || []);
+  const [selTargets, setSelTargets] = useState<GoalType[]>([]);
   const [targetSize, setTargetSize] = useState(() => profile.stackComplexity === 'minimal' ? 5 : profile.stackComplexity === 'balanced' ? 10 : 18);
   const [lmState, setLmState] = useState<LMState>({});
   const [result, setResult] = useState<{ stack: string[]; explanation: StackExplanation } | null>(null);
@@ -78,6 +79,23 @@ export function BuildTab({ profile, stackIds, setStackIds }: { profile: BioStack
   const handleBuild = useCallback(() => {
     const queryOrgans = [...selOrgans];
     const queryMechs: string[] = [];
+    // Добавляем цели-мишени как органы для поиска
+    const targetToOrgan: Record<string, string> = {
+      liver_health: 'LIVER', cardio_health: 'HEART', joints: 'JOINTS',
+      skin: 'SKIN', hair: 'SKIN', brain: 'BRAIN', kidney: 'KIDNEYS',
+      immunity: 'IMMUNE_SYSTEM', hormones: 'ENDOCRINE', digestion: 'GUT',
+    };
+    selTargets.forEach(t => { const o = targetToOrgan[t]; if (o && !queryOrgans.includes(o)) queryOrgans.push(o); });
+    // Добавляем системы как органы
+    const sysToOrgan: Record<string, string[]> = {
+      hepatic: ['LIVER'], cardio: ['HEART','VESSELS'], renal: ['KIDNEYS'],
+      neuro: ['BRAIN','NERVES'], endocrine: ['ENDOCRINE','ADRENALS','THYROID'],
+      hematologic: ['BLOOD'], reproductive: ['REPRODUCTIVE','PROSTATE'],
+      musculoskeletal: ['MUSCLES','BONES','JOINTS'], immune: ['IMMUNE_SYSTEM'],
+      metabolic: ['PANCREAS','LIVER'], gastrointestinal: ['GUT'],
+    };
+    selSystems.forEach(s => { (sysToOrgan[s] || []).forEach(o => { if (!queryOrgans.includes(o)) queryOrgans.push(o); }); });
+    // Добавляем органы из лаб-маркеров
     Object.entries(lmState).forEach(([id, state]) => {
       if (state === 'maintain' || state === 'correct') {
         const marker = LAB_MARKERS.find(m => m.id === id);
@@ -87,7 +105,8 @@ export function BuildTab({ profile, stackIds, setStackIds }: { profile: BioStack
         }
       }
     });
-    const firstGoal = goals[0] || profile.goals[0] || undefined;
+    const allGoals = [...new Set([...goals, ...selTargets, ...profile.goals])];
+    const firstGoal = allGoals[0] || undefined;
     const fp = toFinderProfile(profile);
 
     const conflictFilter = avoidConflicts ? (id: string) => {
@@ -113,7 +132,7 @@ export function BuildTab({ profile, stackIds, setStackIds }: { profile: BioStack
     });
     const exp = explainStack(built.stack, fp);
     setResult({ stack: built.stack, explanation: exp });
-  }, [goals, selOrgans, selSystems, targetSize, lmState, stackIds, profile, avoidConflicts]);
+  }, [goals, selTargets, selOrgans, selSystems, targetSize, lmState, stackIds, profile, avoidConflicts]);
 
   const handleSaveStack = useCallback(() => {
     if (!result) return;
@@ -256,14 +275,28 @@ export function BuildTab({ profile, stackIds, setStackIds }: { profile: BioStack
         )}
       </GlassCard>
 
-      <GlassCard title="🎯 Цели" icon="🎯" color="#f59e0b">
-        <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-          {GOALS.map(g => (
-            <PillBtn key={g.key} small active={goals.includes(g.key)}
-              onClick={() => setGoals(goals.includes(g.key) ? goals.filter(x => x !== g.key) : [...goals, g.key])}>
-              {g.label}
-            </PillBtn>
-          ))}
+      <GlassCard title="🎯 Цели и мишени" icon="🎯" color="#f59e0b">
+        <div style={{ marginBottom: 4 }}>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Цели (что хотите достичь):</div>
+          <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            {PURE_GOALS.map(g => (
+              <PillBtn key={g.key} small active={goals.includes(g.key)}
+                onClick={() => setGoals(goals.includes(g.key) ? goals.filter(x => x !== g.key) : [...goals, g.key])}>
+                {g.label}
+              </PillBtn>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Мишени (на что воздействовать):</div>
+          <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            {TARGET_SYSTEMS.map(t => (
+              <PillBtn key={t.key} small active={selTargets.includes(t.key)}
+                onClick={() => setSelTargets(selTargets.includes(t.key) ? selTargets.filter(x => x !== t.key) : [...selTargets, t.key])}>
+                {t.label}
+              </PillBtn>
+            ))}
+          </div>
         </div>
       </GlassCard>
 

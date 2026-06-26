@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { autoFillFromMainProfile, saveBioStackProfile } from '../../engines/biostack-ai.engine';
 import { buildStack } from '../../engines/supplement-finder.engine';
-import { GlassCard, PillBtn, Slider, toFinderProfile, inputS, selectS, GOALS, HEALTH_CONDS } from './BioStackAIConstants';
-import { type GutSensitivity, type AlcoholLevel, type AASStatus, type CognitiveTask, type StimSensitivity, type CaffeineLevel, type ADClass, type DietType, type Chronotype, type BudgetLevel, type StackComplexity } from '../../engines/biostack-ai.engine';
+import { GlassCard, PillBtn, Slider, toFinderProfile, inputS, selectS, GOALS, PURE_GOALS, TARGET_SYSTEMS, ORGANS, SYSTEMS, HEALTH_CONDS } from './BioStackAIConstants';
+import { type GutSensitivity, type AlcoholLevel, type AASStatus, type CognitiveTask, type StimSensitivity, type CaffeineLevel, type ADClass, type DietType, type Chronotype, type BudgetLevel, type StackComplexity, type ExperienceLevel } from '../../engines/biostack-ai.engine';
 
 export function ProfileTab({ profile, setProfile, setStackIds }: { profile: BioStackProfile; setProfile: (p: BioStackProfile) => void; setStackIds?: (ids: string[]) => void }) {
   const u = (patch: Partial<BioStackProfile>) => { const n = { ...profile, ...patch }; setProfile(n); saveBioStackProfile(n); };
@@ -144,18 +144,84 @@ export function ProfileTab({ profile, setProfile, setStackIds }: { profile: BioS
       </GlassCard>
 
       <GlassCard title="Цели" icon="🎯" color="#f59e0b">
-        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-          {GOALS.map(g => (
-            <PillBtn key={g.key} active={profile.goals.includes(g.key)}
-              onClick={() => u({ goals: profile.goals.includes(g.key) ? profile.goals.filter(x => x !== g.key) : [...profile.goals, g.key] })}>
-              {g.label}
-            </PillBtn>
-          ))}
+        <div style={{ marginBottom: 4 }}>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Что хотите достичь:</div>
+          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            {PURE_GOALS.map(g => (
+              <PillBtn key={g.key} small active={profile.goals.includes(g.key)}
+                onClick={() => u({ goals: profile.goals.includes(g.key) ? profile.goals.filter(x => x !== g.key) : [...profile.goals, g.key] })}>
+                {g.label}
+              </PillBtn>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Системы-мишени:</div>
+          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            {TARGET_SYSTEMS.map(t => (
+              <PillBtn key={t.key} small active={profile.goals.includes(t.key)}
+                onClick={() => u({ goals: profile.goals.includes(t.key) ? profile.goals.filter(x => x !== t.key) : [...profile.goals, t.key] })}>
+                {t.label}
+              </PillBtn>
+            ))}
+          </div>
         </div>
       </GlassCard>
 
-      <GlassCard title="Текущие БАДы" icon="💊" color="#8b5cf6">
-        <input value={profile.currentSupplements.join(', ')} onChange={e => u({ currentSupplements: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} style={inputS} placeholder="nap: nac, omega3, tudca" />
+      <GlassCard title="📍 Органы-мишени" icon="🫀" color="#60a5fa">
+        <div style={{ marginBottom: 4 }}>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Органы (анатомические):</div>
+          <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            {ORGANS.map(o => (
+              <PillBtn key={o.key} small active={profile.targetOrgans.includes(o.key)}
+                onClick={() => u({ targetOrgans: profile.targetOrgans.includes(o.key) ? profile.targetOrgans.filter(x => x !== o.key) : [...profile.targetOrgans, o.key] })}>
+                {o.label}
+              </PillBtn>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Системы (физиологические):</div>
+          <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            {SYSTEMS.map(s => (
+              <PillBtn key={s.key} small active={profile.targetSystems.includes(s.key)}
+                onClick={() => u({ targetSystems: profile.targetSystems.includes(s.key) ? profile.targetSystems.filter(x => x !== s.key) : [...profile.targetSystems, s.key] })}>
+                {s.label}
+              </PillBtn>
+            ))}
+          </div>
+        </div>
+      </GlassCard>
+
+      <GlassCard title="Текущие БАДы / Избегать" icon="💊" color="#8b5cf6">
+        <div style={{ marginBottom: 4 }}>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Текущие БАДы (через запятую):</div>
+          <input value={profile.currentSupplements.join(', ')} onChange={e => u({ currentSupplements: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} style={inputS} placeholder="nap: nac, omega3, tudca, витамин D" />
+        </div>
+        <div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Избегать (id через запятую):</div>
+          <input value={profile.avoidIds.join(', ')} onChange={e => u({ avoidIds: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} style={inputS} placeholder="nap: yohimbine, huperzine_a, dmaa" />
+        </div>
+      </GlassCard>
+
+      {/* Пресеты */}
+      <GlassCard title="🚀 Быстрые пресеты профиля" icon="🚀" color="#00e68a">
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 2 }}>
+          {([
+            { id:'bodybuilder', label:'🏋️ Бодибилдер', icon:'🏋️', p: { goals:['muscle_gain','recovery'], experience:'advanced' as ExperienceLevel, budget:'premium' as BudgetLevel, stackComplexity:'maximum' as StackComplexity, targetSystems:['musculoskeletal','endocrine'], maxStackSize: 20 } },
+            { id:'health', label:'🧘 ЗОЖ', icon:'🧘', p: { goals:['immunity','energy','longevity','detox'], experience:'intermediate' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['immune','metabolic','gastrointestinal'], maxStackSize: 10 } },
+            { id:'nootropic', label:'🧠 Ноотроп', icon:'🧠', p: { goals:['brain','concentration','stress','mood'], experience:'beginner' as ExperienceLevel, budget:'premium' as BudgetLevel, stackComplexity:'minimal' as StackComplexity, cognitiveTask:'focus' as any, targetSystems:['neuro'], maxStackSize: 6 } },
+            { id:'athlete', label:'🏃 Спортсмен', icon:'🏃', p: { goals:['endurance','recovery','energy','cardio_health'], experience:'advanced' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['cardio','musculoskeletal','metabolic'], maxStackSize: 12 } },
+          ] as const).map(pre => (
+            <button key={pre.id} onClick={() => u(pre.p as any)}
+              style={{ padding:'5px 10px', borderRadius:10, fontSize:8, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
+                background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.12)', color:'#00e68a',
+                transition:'all 0.15s' }}>
+              {pre.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize:7, color:'rgba(255,255,255,0.25)' }}>Заполняет цели, уровень, бюджет, органы-мишени и размер стека</div>
       </GlassCard>
 
       <button onClick={() => { const filled = autoFillFromMainProfile(); if (Object.keys(filled).length > 0) setProfile({ ...profile, ...filled }); }}

@@ -150,32 +150,24 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     });
     return found?.id || '';
   };
-  const goHome = () => { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); setInfoView('catalog'); };
+  const resetMain = () => { setTab('main'); setSupportView('main'); setCalcView('main'); };
+  const goHome = () => { setSection('home'); resetMain(); setInfoView('catalog'); };
   const goBack = () => {
-    if (section === 'protocols') { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); setInfoView('catalog'); return; }
+    if (section === 'protocols') { goHome(); return; }
     if (calcView !== 'main') {
-      if (section === 'generator') {
-        setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main');
-      } else if (calcView === 'peptides') {
-        setCalcView('info'); setInfoView('catalog'); setInfoTab('catalog');
-        setSection('home');
-      } else if (calcView === 'info') {
-        setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); setInfoView('catalog');
-      } else {
-        setCalcView('main');
-      }
+      if (section === 'generator') { setSection('home'); resetMain(); } 
+      else if (calcView === 'peptides') { setCalcView('info'); setInfoView('catalog'); setInfoTab('catalog'); setSection('home'); } 
+      else if (calcView === 'info') { goHome(); } 
+      else { setCalcView('main'); }
       return;
     }
     if (supportView === 'calc' || supportView !== 'main') {
-      if (section === 'generator') {
-        setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main');
-      } else {
-        setSupportView('main');
-      }
-      setTab('main'); return;
+      if (section === 'generator') { setSection('home'); resetMain(); } 
+      else { setSupportView('main'); setTab('main'); }
+      return;
     }
     if (tab !== 'main') { setTab('main'); return; }
-    if (section !== 'home') { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); return; }
+    if (section !== 'home') { setSection('home'); resetMain(); return; }
   };
   const [interactionTypeFilter, setInteractionTypeFilter] = useState<string>('all');
   const [interactionSeverityFilter, setInteractionSeverityFilter] = useState<string>('all');
@@ -2188,16 +2180,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
             {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['interactions','⚠ Взаимодействия'],['stacks','📂 Стеки'],['research','Исследования'],['favorites','Избранное']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
-                const a: Record<string,()=>void> = {
-                  peptides: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); },
-                  catalog: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); setSection('home'); },
-                  biostack: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('biostack'); setSection('home'); },
-                  interactions: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('interactions'); setSection('home'); },
-                  stacks: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('stacks'); setSection('home'); },
-                  research: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); setSection('home'); },
-                  favorites: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('favorites'); setSection('home'); },
-                };
-                a[id]?.();
+                if (id === 'peptides') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); }
+                else { setTab('main'); setSupportView('calc'); setCalcView('info'); setSection('home'); setInfoView(id as InfoView); }
               }} style={{
                 padding:'5px 12px', borderRadius:16, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
                 background: infoTab === id ? 'var(--accent)' : 'var(--bg-secondary)',

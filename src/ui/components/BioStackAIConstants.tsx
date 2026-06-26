@@ -29,6 +29,27 @@ export const GOALS: { key: GoalType; label: string }[] = [
   { key:'digestion', label:'🫃 ЖКТ' }, { key:'kidney', label:'🫘 Почки' },
 ];
 
+// Чистые цели (что ХОТИМ достичь) — без органов
+export const PURE_GOALS: { key: GoalType; label: string }[] = [
+  { key:'sleep', label:'😴 Сон' }, { key:'energy', label:'⚡ Энергия' },
+  { key:'concentration', label:'🎯 Фокус' }, { key:'muscle_gain', label:'💪 Мышцы' },
+  { key:'fat_loss', label:'🔥 Жиросжигание' }, { key:'endurance', label:'🏃 Выносливость' },
+  { key:'recovery', label:'🔄 Восстановление' },
+  { key:'stress', label:'🧘 Стресс' }, { key:'longevity', label:'⏳ Долголетие' },
+  { key:'detox', label:'🧹 Детокс' }, { key:'libido', label:'🔥 Либидо' },
+  { key:'mood', label:'😊 Настроение' },
+];
+
+// Системы-мишени (на какой ОРГАН/СИСТЕМУ влияем)
+export const TARGET_SYSTEMS: { key: GoalType; label: string }[] = [
+  { key:'immunity', label:'🛡️ Иммунитет' },
+  { key:'liver_health', label:'🫁 Печень' }, { key:'cardio_health', label:'❤️ Сердце' },
+  { key:'joints', label:'🦴 Суставы' }, { key:'skin', label:'🧴 Кожа' },
+  { key:'hair', label:'💇 Волосы' }, { key:'hormones', label:'⚖️ Гормоны' },
+  { key:'brain', label:'🧠 Мозг' },
+  { key:'digestion', label:'🫃 ЖКТ' }, { key:'kidney', label:'🫘 Почки' },
+];
+
 export const HEALTH_CONDS: { key: HealthCondition; label: string }[] = [
   { key:'liver', label:'🫁 Печень' }, { key:'kidney', label:'🫘 Почки' },
   { key:'heart', label:'❤️ Сердце' }, { key:'thyroid', label:'🦋 Щитовидная' },
@@ -157,11 +178,12 @@ export const Slider: React.FC<{ value: number; onChange: (v: number) => void; la
   </div>
 );
 
-export function StatBox({ label, value, color }: { label: string; value: string | number; color: string }) {
+export function StatBox({ label, value, color, sub }: { label: string; value: string | number; color: string; sub?: string }) {
   return (
     <div style={{ padding: '8px 10px', borderRadius: 10, background: color + '08', border: '1px solid ' + color + '20', textAlign: 'center' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color }}>{value}</div>
-      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)' }}>{label}</div>
+      <div style={{ fontSize: 7, color }}>{label}</div>
+      {sub && <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{sub}</div>}
     </div>
   );
 }

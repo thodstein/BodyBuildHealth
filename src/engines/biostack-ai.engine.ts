@@ -32,6 +32,8 @@ export interface BioStackProfile {
   gutSensitivity: GutSensitivity; smoke: boolean; alcoholLevel: AlcoholLevel;
   dietType: DietType; chronotype: Chronotype; stressLevel: number;
   currentSupplements: string[]; stackComplexity: StackComplexity;
+  targetOrgans: string[];  // органы-мишени (ключи из ORGANS)
+  targetSystems: string[]; // системы-мишени (ключи из SYSTEMS)
 }
 
 export function getDefaultBioStackProfile(): BioStackProfile {
@@ -46,6 +48,7 @@ export function getDefaultBioStackProfile(): BioStackProfile {
     gutSensitivity: 'normal', smoke: false, alcoholLevel: 'rare',
     dietType: 'mixed', chronotype: 'mixed', stressLevel: 5,
     currentSupplements: [], stackComplexity: 'balanced',
+    targetOrgans: [], targetSystems: [],
   };
 }
 
