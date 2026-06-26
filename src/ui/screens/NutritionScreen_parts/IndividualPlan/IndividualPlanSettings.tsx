@@ -72,6 +72,7 @@ export const IndividualPlanSettings: React.FC = () => {
     linkToTraining, setLinkToTraining,
     trainStart, setTrainStart, trainEnd, setTrainEnd,
     v2Phase, setV2Phase, v2Labs, setV2Labs, v2Pharma, setV2Pharma,
+    dietPrefs, setDietPrefs,
   } = usePlanCtx();
 
   const [showSpecialMealModal, setShowSpecialMealModal] = useState(false);
@@ -88,10 +89,6 @@ export const IndividualPlanSettings: React.FC = () => {
   const [specialMeals, setSpecialMeals] = useState<{ type: string; typeLabel: string; date: string; notes: string; replaceMeal?: string }[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_special_meals') || '[]'); } catch { return []; }
   });
-  const [dietPrefs, setDietPrefs] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('he_diet_preferences') || '[]'); } catch { return []; }
-  });
-
   const goalLabels: Record<string,string> = { pre_workout:'🏋️ Предтреник', post_workout:'💪 Пост-треник', before_bed:'🌙 На ночь (каз.)', high_protein:'🥩 Высокобелк.', keto:'🥑 Кето', low_cal_day:'📉 Мало-кал.', custom:'⚙️ Своё' };
   const timingLabels: Record<string,string> = { breakfast:'🌅 Завтрак', lunch:'☀️ Обед', dinner:'🌆 Ужин', snack:'🍪 Перекус', before_bed:'🌙 Перед сном' };
   const specialMealGoalLabel = goalLabels[specialMealGoal] || specialMealGoal;
@@ -755,20 +752,30 @@ export const IndividualPlanSettings: React.FC = () => {
       </GlassCard>
 
       <GlassCard title="Уровень бюджета" icon="💰" color="#f59e0b">
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
+          Определяет качество продуктов: низкий = базовые продукты, средний = сбалансированный, максимум = топ по рейтингу <span style={{ color:'#f59e0b', fontWeight:700 }}>bb_quality_score</span>, усиленный = только элитные.
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-          {BUDGET_LEVELS.map(b => (
-            <button key={b.id} onClick={() => setBudget(b.id)} style={{
-              padding: '10px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
-              background: budget === b.id ? `${b.color}18` : '#202023',
-              border: budget === b.id ? `2px solid ${b.color}` : '1px solid rgba(255,255,255,0.06)',
-              color: budget === b.id ? b.color : 'rgba(255,255,255,0.85)',
-              fontWeight: budget === b.id ? 700 : 500,
-              transition: 'all 0.2s',
-            }}>
-              <div style={{ fontSize: 12 }}>{b.icon} {b.label}</div>
-              <div style={{ fontSize: 9, color: budget === b.id ? `${b.color}aa` : 'rgba(255,255,255,0.85)', marginTop: 3 }}>{b.desc}</div>
-            </button>
-          ))}
+          {BUDGET_LEVELS.map(b => {
+            const isActive = budget === b.id;
+            const scoreRange = b.id === 'low' ? '1–5' : b.id === 'medium' ? '5–8' : b.id === 'max' ? '8–10' : '9–10';
+            return (
+              <button key={b.id} onClick={() => setBudget(b.id)} style={{
+                padding: '10px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
+                background: isActive ? `${b.color}18` : '#202023',
+                border: isActive ? `2px solid ${b.color}` : '1px solid rgba(255,255,255,0.06)',
+                color: isActive ? b.color : 'rgba(255,255,255,0.85)',
+                fontWeight: isActive ? 700 : 500,
+                transition: 'all 0.2s',
+              }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span style={{ fontSize:12 }}>{b.icon} {b.label}</span>
+                  <span style={{ fontSize:7, padding:'1px 5px', borderRadius:4, background:'rgba(255,255,255,0.05)', color:'rgba(255,255,255,0.4)' }}>★{scoreRange}</span>
+                </div>
+                <div style={{ fontSize:9, color: isActive ? `${b.color}aa` : 'rgba(255,255,255,0.85)', marginTop:3 }}>{b.desc}</div>
+              </button>
+            );
+          })}
         </div>
       </GlassCard>
 

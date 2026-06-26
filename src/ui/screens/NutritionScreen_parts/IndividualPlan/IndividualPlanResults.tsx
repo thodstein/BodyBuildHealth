@@ -3,7 +3,7 @@ import { addToCart } from "../../../../core/nutrition-utils";
 import { FOOD_DB } from "../../../../core/nutrition-database";
 import { getRecipesByMeal } from "../../../../engines/nutrition-periodization.engine";
 import { generateNutritionReport } from "../../../../engines/nutrition-report.engine";
-import { ALLERGEN_LIST } from "./types";
+import { ALLERGEN_LIST, HEALTH_ISSUES } from "./types";
 import type { DrugInjection } from "./types";
 import { GlassCard, greenBtn, reportPillStyle } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
@@ -58,6 +58,89 @@ export const IndividualPlanResults: React.FC = () => {
   const [calcSelections, setCalcSelections] = useState<Set<string>>(new Set());
   const [calcResults, setCalcResults] = useState<{ id: string; name: string; score: MealScoreV2; diaas: { diaas: number; limitingAA: string } }[] | null>(null);
   const [calcDailyReport, setCalcDailyReport] = useState<DailyDietReport | null>(null);
+
+  const [showCorrectPopup, setShowCorrectPopup] = useState(false);
+  const [correctIssues, setCorrectIssues] = useState<{ mealIdx: number; mealName: string; issues: { type: string; text: string; severity: 'low' | 'medium' | 'high'; suggestion?: { foodId: string; name: string; reason: string }[] }[] }[] | null>(null);
+
+  const analyzePlanIssues = () => {
+    if (!dayPlan || !dayPlan.meals) return;
+    const profile = getDefaultProfile();
+    profile.phase = (v2Phase as any) || 'LEAN_MASS';
+    profile.pharma.AAS_ORAL = v2Pharma.AAS_ORAL || false;
+    profile.pharma.AAS_INJECTABLE = v2Pharma.AAS_INJECTABLE || false;
+    profile.pharma.HGH = v2Pharma.HGH || false;
+    profile.pharma.DIURETICS = v2Pharma.DIURETICS || false;
+    profile.pharma.STIMULATORS = v2Pharma.STIMULATORS || false;
+    profile.pharma.INSULIN_USE = v2Pharma.INSULIN_USE || false;
+    profile.pharma.LIVER_SUPPORT = v2Pharma.LIVER_SUPPORT || false;
+    profile.pharma.GUT_SUPPORT = v2Pharma.GUT_SUPPORT || false;
+    profile.labs.hematocrit = v2Labs.hematocrit ? parseFloat(v2Labs.hematocrit) : undefined;
+    profile.labs.ldl = v2Labs.ldl ? parseFloat(v2Labs.ldl) : undefined;
+    profile.labs.alt = v2Labs.alt ? parseFloat(v2Labs.alt) : undefined;
+    profile.labs.ast = v2Labs.ast ? parseFloat(v2Labs.ast) : undefined;
+    profile.weightKg = weight || 80;
+    profile.lbm = profile.weightKg * 0.85;
+
+    const result: { mealIdx: number; mealName: string; issues: { type: string; text: string; severity: 'low' | 'medium' | 'high'; suggestion?: { foodId: string; name: string; reason: string }[] }[] }[] = [];
+
+    dayPlan.meals.forEach((m: any, mi: number) => {
+      const issues: { type: string; text: string; severity: 'low' | 'medium' | 'high'; suggestion?: { foodId: string; name: string; reason: string }[] }[] = [];
+      const products = (m.items || []).map((it: any) => {
+        const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+        return { ...it, food };
+      });
+      const totalKcal = m.totals?.kcal || 0;
+      const totalP = m.totals?.p || 0;
+      const totalF = m.totals?.f || 0;
+      const totalC = m.totals?.c || 0;
+
+      // Low protein
+      if (totalP < 25) {
+        const highProteinFoods = FOOD_DB.filter(f => f.protein > 25 && f.category !== 'protein').slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `${f.protein}г белка/100г` }));
+        issues.push({ type: 'low_protein', text: `🥩 Мало белка (${totalP}г) — <25г за приём`, severity: 'high', suggestion: highProteinFoods });
+      }
+      // High fat
+      if (totalF > 30) {
+        const lowFatFoods = FOOD_DB.filter(f => f.fat < 5 && f.protein > 15).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Жиры ${f.fat}г/100г, белок ${f.protein}г/100г` }));
+        issues.push({ type: 'high_fat', text: `🧈 Много жиров (${totalF}г) — >30г за приём`, severity: 'medium', suggestion: lowFatFoods });
+      }
+      // High carb
+      if (totalC > 100 && profile.phase === 'EXTREME_CUT') {
+        const lowCarbFoods = FOOD_DB.filter(f => f.carbs < 10 && f.protein > 15).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Углеводы ${f.carbs}г/100г, белок ${f.protein}г/100г` }));
+        issues.push({ type: 'high_carb', text: `🍚 Много углеводов (${totalC}г) на сушке`, severity: 'high', suggestion: lowCarbFoods });
+      }
+      // Missing mTOR trigger
+      const totalLeucine = products.reduce((s: number, p: any) => {
+        const leucineMg = p.food?.amino_acid_profile_100g?.leucine_mg;
+        const fallbackLeucine = p.food?.protein ? p.food.protein * 42 : 0;
+        return s + (leucineMg ?? fallbackLeucine) * (p.amount || 100) / 100;
+      }, 0);
+      if (totalLeucine < 3000 && totalLeucine > 0) {
+        const getLeucine = (f: any) => f.amino_acid_profile_100g?.leucine_mg ?? (f.protein ? f.protein * 42 : 0);
+        const leucineFoods = FOOD_DB.filter(f => getLeucine(f) > 250).sort((a, b) => getLeucine(b) - getLeucine(a)).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Лейцин ${Math.round(getLeucine(f))}мг/100г` }));
+        issues.push({ type: 'low_leucine', text: `🧬 Нет лейцинового триггера (${Math.round(totalLeucine)}мг)`, severity: 'high', suggestion: leucineFoods });
+      }
+      // Low fiber
+      const totalFiber = products.reduce((s: number, p: any) => s + (p.food?.fiber || 0) * (p.amount || 100) / 100, 0);
+      if (totalFiber < 3) {
+        const fiberFoods = FOOD_DB.filter(f => f.fiber > 4).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Клетчатка ${f.fiber}г/100г` }));
+        issues.push({ type: 'low_fiber', text: `🌾 Мало клетчатки (${totalFiber.toFixed(0)}г)`, severity: 'medium', suggestion: fiberFoods });
+      }
+      // DIAAS per meal
+      const v2Products = products.filter((p: any) => p.food).map((p: any) => ({ foodId: p.food.id, weightGrams: p.amount || 100 }));
+      if (v2Products.length > 0) {
+        const diaas = calcMealDIAAS(v2Products);
+        if (diaas.diaas < 0.75 && diaas.diaas > 0) {
+          const aaFoods = FOOD_DB.filter(f => f.protein > 15 && f.category === 'protein').slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Полноценный белок, ${f.protein}г/100г` }));
+          issues.push({ type: 'low_diaas', text: `💪 Низкий DIAAS (${diaas.diaas.toFixed(2)}) — лимит: ${diaas.limitingAA}`, severity: 'high', suggestion: aaFoods });
+        }
+      }
+
+      if (issues.length > 0) result.push({ mealIdx: mi, mealName: m.label || `Приём ${mi + 1}`, issues });
+    });
+
+    setCorrectIssues(result);
+  };
 
   const toggleCalcSelection = (id: string) => {
     const next = new Set(calcSelections);
@@ -814,6 +897,21 @@ export const IndividualPlanResults: React.FC = () => {
         </GlassCard>
       )}
 
+      {generated && healthIssues.length > 0 && (
+        <GlassCard title="🩺 Здоровье — активные ограничения" icon="" color="#06b6d4" style={{ border: '1px solid rgba(6,182,212,0.15)' }}>
+          {HEALTH_ISSUES.filter(h => healthIssues.includes(h.id)).map(h => (
+            <div key={h.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 8px', marginBottom:4, borderRadius:10, background:'rgba(6,182,212,0.06)', border:'1px solid rgba(6,182,212,0.1)' }}>
+              <div style={{ fontSize:16, width:28, textAlign:'center' }}>{h.icon}</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#06b6d4' }}>{h.label}</div>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>{h.desc} — исключено {h.foodIds.length} продуктов</div>
+              </div>
+              <div style={{ fontSize:8, color:'rgba(6,182,212,0.6)', background:'rgba(6,182,212,0.1)', padding:'2px 6px', borderRadius:6 }}>{h.foodIds.length}</div>
+            </div>
+          ))}
+        </GlassCard>
+      )}
+
       {generated && (
         <GlassCard title="Отчёты по рациону" icon="📊" color="#3b82f6" style={{ border: '1px solid rgba(59,130,246,0.15)' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
@@ -862,8 +960,13 @@ export const IndividualPlanResults: React.FC = () => {
           )}
           {qualityReport && activeReports.includes('quality') && (
             <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.12)' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: qualityReport.avgScore >= 8 ? '#22c55e' : '#f59e0b', marginBottom: 3 }}>
-                ⭐ Среднее качество: {qualityReport.avgScore}/10
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:3 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: qualityReport.budgetOk ? '#22c55e' : '#f59e0b' }}>
+                  ⭐ Качество: {qualityReport.avgScore}/10
+                </div>
+                <div style={{ fontSize:7, padding:'1px 5px', borderRadius:4, background: qualityReport.budgetOk ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', color: qualityReport.budgetOk ? '#22c55e' : '#f59e0b' }}>
+                  {qualityReport.budgetRange} · bb_quality {qualityReport.bbsAvg}
+                </div>
               </div>
               {qualityReport.bestItems.length > 0 && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>Лучшие: {qualityReport.bestItems.join(', ')}</div>}
               {qualityReport.weakItems.length > 0 && <div style={{ fontSize: 8, color: '#ef4444' }}>Слабые: {qualityReport.weakItems.join(', ')}</div>}
@@ -1270,6 +1373,14 @@ export const IndividualPlanResults: React.FC = () => {
               <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:4, lineHeight:1.2 }}>v2 скоринг выбранных приёмов + спецприёмов</div>
             </div>
           )}
+          {generated && (
+            <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(249,115,22,0.05)', padding:'8px 6px', textAlign:'center' }}>
+              <button onClick={() => { setShowCorrectPopup(true); analyzePlanIssues(); }} style={{ width:'100%', padding:'12px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'linear-gradient(135deg,rgba(249,115,22,0.12),rgba(245,158,11,0.12))', border:'1px solid rgba(249,115,22,0.3)', color:'#f97316', fontWeight:800, fontSize:11, transition:'all 0.15s' }}>
+                🔀 Корректировка рациона
+              </button>
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:4, lineHeight:1.2 }}>Анализ недочётов + замена продуктов + перегенерация</div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1572,6 +1683,101 @@ export const IndividualPlanResults: React.FC = () => {
                   </div>
                 )}
               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showCorrectPopup && (
+        <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
+          onClick={() => { setShowCorrectPopup(false); setCorrectIssues(null); }}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'96%', maxWidth:440, maxHeight:'92vh', overflowY:'auto', padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(249,115,22,0.12)', boxShadow:'0 8px 40px rgba(0,0,0,0.4)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+              <div style={{ fontSize:15, fontWeight:800, color:'#f97316' }}>🔀 Корректировка рациона</div>
+              <span onClick={() => { setShowCorrectPopup(false); setCorrectIssues(null); }} style={{ cursor:'pointer', fontSize:10, color:'rgba(255,255,255,0.3)', padding:'2px 6px' }}>✕</span>
+            </div>
+
+            {!correctIssues ? (
+              <div style={{ textAlign:'center', padding:20, fontSize:9, color:'rgba(255,255,255,0.4)' }}>Анализ рациона...</div>
+            ) : correctIssues.length === 0 ? (
+              <div style={{ textAlign:'center', padding:20 }}>
+                <div style={{ fontSize:24, marginBottom:8 }}>✅</div>
+                <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:4 }}>Рацион сбалансирован</div>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>Не найдено критических недочётов</div>
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:8 }}>
+                  Найдено <strong style={{ color:'#f97316' }}>{correctIssues.reduce((s, m) => s + m.issues.length, 0)}</strong> недочёта(ов) в <strong style={{ color:'#f97316' }}>{correctIssues.length}</strong> приёмах
+                </div>
+
+                {correctIssues.map((meal, mi) => (
+                  <div key={mi} style={{ marginBottom:8, borderRadius:10, background:'rgba(24,24,27,0.8)', border:'1px solid rgba(249,115,22,0.1)', overflow:'hidden' }}>
+                    <div style={{ padding:'7px 10px', background:'rgba(249,115,22,0.06)', borderBottom:'1px solid rgba(249,115,22,0.08)' }}>
+                      <span style={{ fontSize:10, fontWeight:700, color:'#f97316' }}>{meal.mealName}</span>
+                      <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginLeft:6 }}>({meal.issues.length})</span>
+                    </div>
+                    <div style={{ padding:'6px 10px' }}>
+                      {meal.issues.map((issue, ii) => (
+                        <div key={ii} style={{ marginBottom:6, padding:'6px 8px', borderRadius:8, background: issue.severity === 'high' ? 'rgba(239,68,68,0.04)' : 'rgba(245,158,11,0.04)', border:`1px solid ${issue.severity === 'high' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)'}` }}>
+                          <div style={{ fontSize:8, fontWeight:600, color: issue.severity === 'high' ? '#ef4444' : '#f59e0b', marginBottom:3 }}>{issue.text}</div>
+                          {issue.suggestion && issue.suggestion.length > 0 && (
+                            <div>
+                              <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:2 }}>🔀 Заменить на:</div>
+                              <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
+                                {issue.suggestion.map((s, si) => (
+                                  <button key={si} onClick={() => {
+                                    const itemIdx = dayPlan?.meals?.[meal.mealIdx]?.items?.findIndex((it: any) => {
+                                      const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+                                      return food?.id === s.foodId || it.name === s.name;
+                                    });
+                                    if (itemIdx !== undefined && itemIdx >= 0) {
+                                      saveUndo();
+                                      replaceFoodItem(0, meal.mealIdx, itemIdx, FOOD_DB.find(f => f.id === s.foodId));
+                                      analyzePlanIssues();
+                                    }
+                                  }} style={{ padding:'3px 8px', borderRadius:6, fontSize:7, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontWeight:600 }}>
+                                    {s.name} <span style={{ fontWeight:400, color:'rgba(255,255,255,0.4)' }}>({s.reason})</span>
+                                  </button>
+                                ))}
+                                <button onClick={() => {
+                                  const allItems = dayPlan?.meals?.[meal.mealIdx]?.items || [];
+                                  allItems.forEach((it: any, i: number) => {
+                                    const similar = findSimilarFoods(it);
+                                    if (similar.length > 0) {
+                                      const targetFood = similar.find(f => issue.suggestion?.some(s => s.foodId === f.id));
+                                      if (targetFood) {
+                                        saveUndo();
+                                        replaceFoodItem(0, meal.mealIdx, i, targetFood);
+                                      }
+                                    }
+                                  });
+                                  analyzePlanIssues();
+                                }} style={{ padding:'3px 8px', borderRadius:6, fontSize:7, cursor:'pointer', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', color:'#a78bfa', fontWeight:600 }}>
+                                  🔄 Все
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                <div style={{ display:'flex', gap:4, marginTop:8 }}>
+                  <button onClick={() => {
+                    setShowCorrectPopup(false);
+                    setCorrectIssues(null);
+                    generatePlan(1, undefined, selectedDayIndex);
+                  }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#f97316,#fb923c)', color:'#fff', fontSize:10, fontWeight:800 }}>
+                    ♻️ Перегенерировать рацион
+                  </button>
+                  <button onClick={() => { setShowCorrectPopup(false); setCorrectIssues(null); }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(255,255,255,0.15)', background:'#202023', color:'#fff', fontSize:10, fontWeight:600 }}>
+                    ✕ Закрыть
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

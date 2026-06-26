@@ -349,6 +349,43 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 ))}
               </div>
             )}
+            {useV2 && (
+              <div style={{ marginTop:4 }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:2 }}>💊 Фармакология</div>
+                <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                  {[
+                    { id:'AAS_ORAL', label:'Орал.ААС', color:'#ef4444' },
+                    { id:'AAS_INJECTABLE', label:'Инъекц.ААС', color:'#ef4444' },
+                    { id:'HGH', label:'HGH', color:'#8b5cf6' },
+                    { id:'DIURETICS', label:'Диуретики', color:'#f59e0b' },
+                    { id:'STIMULATORS', label:'Стимуляторы', color:'#f97316' },
+                    { id:'INSULIN_USE', label:'Инсулин', color:'#8b5cf6' },
+                    { id:'LIVER_SUPPORT', label:'Гепато', color:'#22c55e' },
+                    { id:'GUT_SUPPORT', label:'ЖКТ', color:'#22c55e' },
+                  ].map(p => (
+                    <button key={p.id} onClick={() => setV2Profile(prev => ({ ...prev, pharma: { ...prev.pharma, [p.id]: !prev.pharma[p.id as keyof typeof prev.pharma] } }))} style={{
+                      padding:'2px 6px', borderRadius:6, fontSize:6, fontWeight:600, cursor:'pointer',
+                      background: v2Profile.pharma[p.id as keyof typeof v2Profile.pharma] ? `${p.color}15` : '#202023',
+                      border: v2Profile.pharma[p.id as keyof typeof v2Profile.pharma] ? `1px solid ${p.color}30` : '1px solid rgba(255,255,255,0.04)',
+                      color: v2Profile.pharma[p.id as keyof typeof v2Profile.pharma] ? p.color : 'rgba(255,255,255,0.4)',
+                    }}>{p.label}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {useV2 && (
+              <div style={{ marginTop:4 }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:2 }}>🩸 Анализы</div>
+                <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
+                  {['HCT','LDL','HDL','ALT','AST','CRP'].map(lab => (
+                    <div key={lab} style={{ display:'flex', alignItems:'center', gap:2 }}>
+                      <span style={{ fontSize:6, color:'rgba(255,255,255,0.4)' }}>{lab}</span>
+                      <input type="number" value={(v2Profile.labs as any)[lab.toLowerCase()] ?? ''} onChange={e => setV2Profile(prev => ({ ...prev, labs: { ...prev.labs, [lab.toLowerCase()]: e.target.value ? parseFloat(e.target.value) : undefined } }))} placeholder="—" style={{ width:36, padding:'2px 4px', borderRadius:4, fontSize:6, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', color:'#fff', outline:'none' }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -521,45 +521,68 @@ export interface SupportStack {
 - Подвкладка 🔍 Поиск — ПОЛНОСТЬЮ РЕАЛИЗОВАНА: текстовый поиск + фильтры по целям (22), органам (24), системам (11), механизмам (15 top), симптомам (10) + rich карточки с раскрытием, скорингом, категориями, противопоказаниями; кнопка + Стек; персонализация через BioStackProfile→FinderProfile bridge
 - Подвкладка 🧠 AI — 5 кнопок-действий на правилах
 
+## Session Summary (Jun 26) — Plan restructured
+### Done
+- **C2** — PL/BB переключатель в SRCBBScreen.tsx: проверен, dropdown работает, баг закрыт
+- **A1** — `generateStacks()` удалён из codebase (grep 0 matches)
+- **Plan restructured**: устаревшие ID удалены, добавлены 13 новых задач по питанию (N1-N4), базам (S5-S8), бадам UI (S9-S10/S12), тренировкам (P13)
+- `tsc --noEmit` ✅, `vite build` ✅
+
 ## 🎯 ПЛАН (принят 26 Jun)
 
-### ПРИОРИТЕТ 1 — Критические баги
+### ✅ Выполнено в этой сессии
+| ID | Задача | Файл |
+|----|--------|------|
+| C2 | PL/BB не переключается — опущен | SRCBBScreen.tsx |
+| A1 | Удалить `generateStacks()` — удалён | support-synergy |
+
+### ПРИОРИТЕТ 1 — Питание: генерация + кнопки + здоровье
 | ID | Задача | Файл | Объём |
 |----|--------|------|-------|
-| C2 | PL/BB не переключается | SRCBBScreen.tsx | +1 строка (key) |
+| N1 | Генерация по кнопкам качества — MAXIMUM = топ рацион | IndividualPlanContext | ~150 |
+| N2 | Проверить кнопки ограничений — реальные изменения генерации | IndividualPlanContext | ~100 |
+| N3 | Вкладка Здоровье — карточками в планировщик | IndividualPlanSettings/Results | ~200 |
+| N4 | Анализ каждой кнопки/поля в планировщике — все должно быть связано | IndividualPlan* | ~300 |
+
+### ПРИОРИТЕТ 2 — Базы данных: каталоги + взаимодействия
+| ID | Задача | Файл | Объём |
+|----|--------|------|-------|
+| C4 | Проверить/дополнить каталог (core-записи) | catalog + enrich | +коррекции |
 | B8 | Кракозябры каталога | support-catalog | конвертация Win1251→UTF8 |
-
-### ПРИОРИТЕТ 2 — Очистка данных
-| ID | Задача | Файл | Объём |
-|----|--------|------|-------|
-| A1 | Удалить `generateStacks()` | support-synergy | −708 строк |
 | A3 | SYNERGY_NETWORK + INTERACTIONS | synergy + inter | +300 строк |
-| C4 | Проверить/дополнить каталог | catalog + enrich | +коррекции |
+| S5 | Не заполнены взаимодействия в карточках препаратов | support-database | ~500 |
+| S6 | Кракозябры в полях взаимодействий | support-database | конвертация |
+| S7 | Взаимодействия не выведены в карточку UI | SupportScreen/InfoTab | ~200 |
+| S8 | Вкладка Взаимодействий — полное заполнение всех карточек | support-interactions | ~500 |
+| S11 | Фарма-каталог — заполнить все карточки (PK, PD, targetSystems, cvProfile, linkedRisks, linkedSubstances) | pharma-database | ~1000 |
 
-### ПРИОРИТЕТ 3 — Новый функционал
+### ПРИОРИТЕТ 3 — Бады: UI/UX + функционал планировщика
 | ID | Задача | Файл | Объём |
 |----|--------|------|-------|
-| A2 | Написать 25 стеков вручную | support-stacks | +1000 строк |
-| A4 | Browsing BioStack Search | BioStackAISearch | +150 |
-| A5 | Готовые стеки BioStack Stack | BioStackAIStack | +100 |
-| B1 | Спецприём попап | IndividualPlan | +200 |
-| B2 | Скользящие графики | IndividualPlan | +100 |
-| B3 | Предпочтения попап | IndividualPlan | +100 |
-| B4 | Профицит в адаптации | IndividualPlan | +80 |
-| B5 | Диетические паузы GlassCard | IndividualPlan | +80 |
-| B6 | Создать рецепт попап | NutritionScreen | +150 |
-| B7 | Exclusive-фильтр каталога | NutritionScreen | +20 |
-| B9 | Полезность силовой контекст | product-usefulness | +400 |
-| B10 | Фарма-карточка расширение | PharmaScreen | +500 |
+| S9 | Калькулятор взаимодействия — пояснения (почему, риск, эффект, параметры) | SupportInteract | ~200 |
+| S10 | Калькулятор взаимодействия — переоформить, наполнить контентом | SupportInteract | ~200 |
+| S12 | БИОСТАК — структурировать (цели ≠ органы, понятная навигация) | BioStackAI | ~300 |
+| B1 | Спецприём попап (читмил/рефид/фастинг) | IndividualPlan | ~200 |
+| B2 | Скользящие графики KBJU target vs actual | IndividualPlan | ~100 |
+| B3 | Предпочтения попап (молочка/глютен/веган/…) | IndividualPlan | ~100 |
+| B4 | Профицит в адаптации (слайдер +5..+25%) | IndividualPlan | ~80 |
+| B5 | Диетические паузы GlassCard (1/2 нед, таймер) | IndividualPlan | ~80 |
+| B6 | Создать рецепт попап (название/ингредиенты/КБЖУ) | NutritionScreen | ~150 |
+| B7 | Exclusive-фильтр каталога (⭐, tier=max) | NutritionScreen | ~20 |
+| B10 | Фарма-карточка расширение (targetSystems/cvProfile/linkedRisks/linkedSubstances) | PharmaScreen | ~500 |
 
-### ПРИОРИТЕТ 4 — Стиль + рефакторинг
+### ПРИОРИТЕТ 4 — Тренировки + рефакторинг + Next Steps
 | ID | Задача | Файл | Объём |
 |----|--------|------|-------|
-| C1 | Тренировки — единый accent | TrainingScreen | ~50 замен |
+| P13 | СРЦ — мобильная оптимизация, 3 подвкладки (PL/BB/Ручной) | SRCBBScreen | ~200 |
+| C1 | Тренировки — единый accent `#00e68a` | TrainingScreen | ~50 замен |
 | C3 | Описания СРЦ по ПЛ | SRCBBScreen + Training | +200 |
-| A6 | SupportScreen редиректы | SupportScreen | −5 строк |
-| A7 | Переименование файлов | support-stacks | 1 rename |
-| B10 | ✅ Правила фармы в AGENTS.md | AGENTS.md | +правила |
+| A6 | SupportScreen редиректы (упростить goBack) | SupportScreen | −5 строк |
+| A7 | Переименование support-stacks.ts | 1 rename ||
+| N5 | histamineSensitive тоггл в v2-профиль | IndividualPlanSettings | ~50 |
+| N6 | DIAAS на карточках приёма в планировщике | IndividualPlanResults | ~80 |
+| N7 | specific_compounds_100g — заполнить пропуски | nutrition-db | ~300 |
+| N8 | compareProductsV2 factors в сравнении | ProductUsefulnessPlanner | ~60 |
 
 ## 11. PharmaSubstance — обязательные поля карточки фармакологии
 

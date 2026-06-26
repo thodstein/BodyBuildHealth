@@ -6,6 +6,7 @@ import { calcNutrition } from "../../../../engines/nutrition.engine";
 import { calcNutritionV2 } from "../../../../engines/nutrition-v2.engine";
 import { updateProfile } from "../../../../core/profile-manager";
 import { getRecipesByMeal, type Recipe } from "../../../../engines/nutrition-periodization.engine";
+import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type DailyDietReport, type MealScoreV2 } from "../../../../engines/product-usefulness-v2.engine";
 import { generateNutritionReport, type NutritionReport } from "../../../../engines/nutrition-report.engine";
 import type { UserProfile } from "../../../../core/types";
 import { getContraindications, saveContraindications } from "../../../../core/contraindications";
@@ -197,6 +198,7 @@ export interface PlanCtx {
   v2Phase: string; setV2Phase: (v: string) => void;
   v2Labs: Record<string, string>; setV2Labs: (v: any) => void;
   v2Pharma: Record<string, boolean>; setV2Pharma: (v: any) => void;
+  dietPrefs: string[]; setDietPrefs: (v: string[]) => void;
 }
 
 const PlanContext = createContext<PlanCtx>(null as any);
@@ -360,6 +362,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [preferredFoods, setPreferredFoods] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_preferred_foods') || '["chicken_breast","rice_white","broccoli","egg_whole","avocado"]'); } catch { return ['chicken_breast','rice_white','broccoli','egg_whole','avocado']; } });
   const [customNotes, setCustomNotes] = useState(() => { try { return localStorage.getItem('he_nutrition_notes') || ''; } catch { return ''; } });
   const [excludedFoods, setExcludedFoods] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_excluded_foods') || '[]'); } catch { return []; } });
+  const [dietPrefs, setDietPrefs] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_diet_preferences') || '[]'); } catch { return []; } });
   const [allergenExcludedCount, setAllergenExcludedCount] = useState(0);
   const [planTargets, setPlanTargets] = useState<{ kcal: number; protein: number; fats: number; carbs: number }>({ kcal: 2500, protein: 160, fats: 70, carbs: 300 });
   const [cyclingMode, setCyclingMode] = useState<CycleType>('none');
@@ -479,7 +482,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
     const budgetFilter = (id: BudgetLevel): number[] => { const map: Record<string, number[]> = { low:[0,5],medium:[5,8],max:[8,10],enhanced:[9,15] }; return map[id] || [5,10]; };
     const [bMin, bMax] = budgetFilter(budget);
-    const planTypeMod = PLAN_TYPES.find(p => p.id === planType);
+    const effectivePlanType = dietPrefs.includes('vegetarian') ? ('vegetarian' as PlanType) : planType;
+    const planTypeMod = PLAN_TYPES.find(p => p.id === effectivePlanType);
     const pMod = planTypeMod?.pMult || 1.0; const fMod = planTypeMod?.fMult || 1.0; const cMod = planTypeMod?.cMult || 1.0;
     const excludedIds = new Set(excludedFoods);
     healthIssues.forEach(hid => { const issue = HEALTH_ISSUES.find(h => h.id === hid); if (issue?.foodIds) issue.foodIds.forEach(fid => excludedIds.add(fid)); });
@@ -503,7 +507,29 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     };
     const allergenIds = new Set<string>();
     allergens.forEach(a => { const vals = userAllergenToValues[a] || [a]; vals.forEach(v => allergenIds.add(v)); });
-    const limitPool = (pool: any[], seed: number) => { if (pool.length <= 8) return pool; const shuffled = [...pool].sort((a, b) => { const sa = Math.sin(seed * 10007 + a.id?.length || 0); const sb = Math.sin(seed * 10007 + b.id?.length || 0); return sa - sb; }); return shuffled.slice(0, variety === 'minimal' ? 4 : variety === 'medium' ? 8 : 12); };
+    // Wire diet preferences into allergen/exclusion system
+    dietPrefs.forEach(dp => {
+      if (dp === 'no_dairy' && !allergens.includes('молочные')) { ['dairy'].forEach(v => allergenIds.add(v)); }
+      if (dp === 'no_gluten' && !allergens.includes('глютен')) { ['gluten'].forEach(v => allergenIds.add(v)); }
+      if (dp === 'min_sugar') {
+        FOOD_DB.filter(f => (f.carbs || 0) > 15 && (f.gi || 0) > 60).forEach(f => excludedIds.add(f.id));
+      }
+      if (dp === 'min_processed') {
+        ['sausage','bacon','ham','kfc_wings','kfc_soup','kfc_bucket','mcd_big_mac','mcd_royale','bk_whopper','vt_big_smoke','pizza_margherita','french_fries','chips','nuggets','mayonnaise','ketchup','cream_sauce','marmalade','cookie','chocolate','ice_cream','condensed_milk','cheese_processed','bouillon_cube','soda','coca_cola','juice_apple','juice_orange','bread_white'].forEach(fid => excludedIds.add(fid));
+      }
+    });
+    const preferredSet = new Set(preferredFoods);
+    const qualitySort = (pool: any[], highFirst: boolean) => [...pool].sort((a, b) => highFirst ? ((b.bb_quality_score || 5) - (a.bb_quality_score || 5)) : ((a.bb_quality_score || 5) - (b.bb_quality_score || 5)));
+    const limitPool = (pool: any[], seed: number) => {
+      if (pool.length <= 8) return pool;
+      const highQuality = budget === 'max' || budget === 'enhanced';
+      const lowQuality = budget === 'low';
+      let sorted = [...pool];
+      if (highQuality) sorted = qualitySort(sorted, true);
+      else if (lowQuality) sorted = qualitySort(sorted, false);
+      else sorted = [...sorted].sort((a, b) => { const sa = Math.sin(seed * 10007 + (a.id?.length || 0)); const sb = Math.sin(seed * 10007 + (b.id?.length || 0)); return sa - sb; });
+      return sorted.slice(0, variety === 'minimal' ? 4 : variety === 'medium' ? 8 : 12);
+    };
     const applyFoodPrefs = (pool: any[], prefType: string) => { const lower = prefType.toLowerCase(); if (pool.length <= 3) return pool; return pool.filter(f => !excludedIds.has(f.id) && [...allergenIds].every(a => !getFoodAllergens(f.id).includes(a) && !allergenTextMatches(a, f.name))); };
     const seedRand = (seed: number) => { const x = Math.sin(seed) * 10000; return x - Math.floor(x); };
     const buildDay = (dayOffset: number, isTrainingDay: boolean) => {
@@ -575,8 +601,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const items: any[] = []; let remainingP = p; let remainingF = f; let remainingC = c;
         const sSeed = dayOffset * 10007 + idx * 997 + (isTrainingDay ? 3000 : 0) + (cyclingMode === 'butch' ? 5000 : 0);
         const isPreWorkout = mt.label === 'Предтрен'; const isPostWorkout = mt.label === 'Пост-трен'; const isPeriWorkout = isPreWorkout || isPostWorkout;
-        const fastCarbs = FOOD_DB.filter(f => f.gi && f.gi >= 80); const slowCarbs = FOOD_DB.filter(f => f.category === 'carb' || f.category === 'grain'); const proteinFoods = FOOD_DB.filter(f => f.category === 'protein' && (f.tier === 'basic' || f.tier === 'mid')); const topProtein = proteinFoods.filter(f => f.protein > 15).sort(() => Math.random() - 0.5).slice(0, 5);
-        const pickItem = (foodPool: any[], targetG: number, seed: number, maxItems = 2): any[] => { const result: any[] = []; const pool = applyFoodPrefs(foodPool, 'any'); if (pool.length === 0) return result; for (let i = 0; i < maxItems && targetG > 5; i++) { const idx = Math.floor(seedRand(seed + i * 997) * pool.length); const food = pool[idx % pool.length]; const portion = Math.min(1, targetG / Math.max(1, food.protein || food.fat || food.carbs || 1)); result.push({ name: food.name, id: food.id, amount: Math.round(portion * (parseInt(food.servingSize) || 100)), kcal: Math.round(food.kcal * portion), p: Math.round(food.protein * portion), f: Math.round(food.fat * portion), c: Math.round(food.carbs * portion) }); targetG -= food.protein * portion || 0; } return result; };
+        const highQuality = budget === 'max' || budget === 'enhanced'; const lowQuality = budget === 'low';
+        const fastCarbs = FOOD_DB.filter(f => f.gi && f.gi >= 80); const slowCarbs = FOOD_DB.filter(f => f.category === 'carb' || f.category === 'grain'); const proteinFoods = FOOD_DB.filter(f => f.category === 'protein' && (f.tier === 'basic' || f.tier === 'mid' || f.tier === 'max')); const allProtein = applyFoodPrefs(proteinFoods, 'protein'); const topProtein = highQuality ? qualitySort(allProtein, true).slice(0, 8) : lowQuality ? qualitySort(allProtein, false).slice(0, 5) : allProtein.filter(f => f.protein > 15).sort(() => Math.random() - 0.5).slice(0, 5);
+        const pickItem = (foodPool: any[], targetG: number, seed: number, maxItems = 2): any[] => { const result: any[] = []; let pool = applyFoodPrefs(foodPool, 'any'); if (pool.length === 0) return result; const highQ = budget === 'max' || budget === 'enhanced'; const lowQ = budget === 'low'; if (highQ) pool = qualitySort(pool, true); else if (lowQ) pool = qualitySort(pool, false); const preferPool = preferredSet.size > 0 ? pool.filter(f => preferredSet.has(f.id)) : []; const mainPool = preferPool.length > 0 ? preferPool : pool; for (let i = 0; i < maxItems && targetG > 5; i++) { const idx = highQ ? i : lowQ ? (mainPool.length - 1 - i) : Math.floor(seedRand(seed + i * 997) * mainPool.length); const food = mainPool[Math.min(idx, mainPool.length - 1)]; const portion = Math.min(1, targetG / Math.max(1, food.protein || food.fat || food.carbs || 1)); result.push({ name: food.name, id: food.id, amount: Math.round(portion * (parseInt(food.servingSize) || 100)), kcal: Math.round(food.kcal * portion), p: Math.round(food.protein * portion), f: Math.round(food.fat * portion), c: Math.round(food.carbs * portion) }); targetG -= food.protein * portion || 0; } return result; };
         if (isPreWorkout) {
           const preProtein = FOOD_DB.find(f => f.id === 'whey_isolate'); if (preProtein) items.push({ name: preProtein.name, id: 'whey_isolate', amount: 40, kcal: Math.round(preProtein.kcal * 0.4), p: Math.round(preProtein.protein * 0.4), f: Math.round(preProtein.fat * 0.4), c: Math.round(preProtein.carbs * 0.4) });
           const preCarb = FOOD_DB.find(f => f.id === 'banana'); if (preCarb) items.push({ name: preCarb.name, id: 'banana', amount: 100, kcal: Math.round(preCarb.kcal), p: Math.round(preCarb.protein), f: Math.round(preCarb.fat), c: Math.round(preCarb.carbs) });
@@ -716,6 +743,85 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     }
     if (linkToTraining) recs.push(`🏋️ Тренировка ${trainStart}-${trainEnd}. Предтрен за 1.5-2ч, пост-трен в течение 60-90мин.`);
     recs.push('✅ Белок с каждым приёмом. Овощи 300-500г/день. Вода 2.5-4л. Сон 7-9ч.');
+
+    // ── v2-анализ сгенерированного рациона и правил справочника ──
+    if (generated && dayPlan) {
+      const profile = getDefaultProfile();
+      profile.phase = (v2Phase as any) || 'LEAN_MASS';
+      profile.pharma.AAS_ORAL = v2Pharma.AAS_ORAL || false;
+      profile.pharma.AAS_INJECTABLE = v2Pharma.AAS_INJECTABLE || false;
+      profile.pharma.HGH = v2Pharma.HGH || false;
+      profile.pharma.DIURETICS = v2Pharma.DIURETICS || false;
+      profile.pharma.STIMULATORS = v2Pharma.STIMULATORS || false;
+      profile.pharma.INSULIN_USE = v2Pharma.INSULIN_USE || false;
+      profile.pharma.LIVER_SUPPORT = v2Pharma.LIVER_SUPPORT || false;
+      profile.pharma.GUT_SUPPORT = v2Pharma.GUT_SUPPORT || false;
+      profile.labs.hematocrit = v2Labs.hematocrit ? parseFloat(v2Labs.hematocrit) : undefined;
+      profile.labs.ldl = v2Labs.ldl ? parseFloat(v2Labs.ldl) : undefined;
+      profile.labs.alt = v2Labs.alt ? parseFloat(v2Labs.alt) : undefined;
+      profile.labs.ast = v2Labs.ast ? parseFloat(v2Labs.ast) : undefined;
+      profile.labs.crp = v2Labs.crp ? parseFloat(v2Labs.crp) : undefined;
+      profile.weightKg = weight || 80;
+      profile.lbm = profile.weightKg * 0.85;
+
+      const meals = dayPlan.meals || [];
+      const allMeals = meals.map((m: any) => ({
+        timing: (m.timing || 'regular') as any,
+        products: (m.items || []).map((it: any) => {
+          const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+          return { foodId: food?.id || it.name || 'unknown', weightGrams: it.amount || 100 };
+        }).filter((p: any) => p.weightGrams > 0),
+      }));
+
+      const daily = analyzeDailyDiet(allMeals, profile);
+      const totalKcal = Math.round(dayPlan.totals?.kcal || 0);
+      const totalP = Math.round(dayPlan.totals?.p || 0);
+      const mealsCount = meals.length;
+
+      // mTOR
+      if (!daily.mtorTriggered) recs.push(`🧬 mTOR не запущен — дефицит ${daily.mtorDeficitMg}мг лейцина. Добавьте 30-40г сывороточного протеина или 200г курицы.`);
+      else recs.push('🧬 mTOR запущен — лейцин >3г/день ✅');
+
+      // DIAAS
+      if (daily.diaasWarning) recs.push(`💪 ${daily.diaasWarning}`);
+
+      // GI load
+      if (daily.giLoadWarning) recs.push(`🫃 Высокая нагрузка на ЖКТ (${Math.round(daily.giLoad)}). Добавьте пищеварительные ферменты или уменьшите порции.`);
+
+      // Electrolytes
+      if (daily.electrolyteRisk) recs.push(`💧 Риск электролитов: K ${Math.round(daily.potassiumMg)}мг, Mg ${Math.round(daily.magnesiumMg)}мг. Добавьте шпинат, авокадо, орехи.`);
+
+      // Omega
+      if (daily.omegaWarning) recs.push(`🐟 ${daily.omegaWarning}. Добавьте жирную рыбу 2-3р/нед или омега-3 2-4г/день.`);
+
+      // Antinutrients
+      if (daily.antinutrientWarning) recs.push(daily.antinutrientWarning);
+
+      // Glutathione
+      if (daily.glutathioneWarning) recs.push(daily.glutathioneWarning);
+
+      // Histamine
+      if (daily.histamineWarning) recs.push(daily.histamineWarning);
+
+      // Micro deficits
+      if (daily.microDeficits.length > 0) recs.push(`⚠️ Дефициты микронутриентов: ${daily.microDeficits.join(', ')}. Рассмотрите приём ВМК.`);
+
+      // ── Правила справочника ──
+      if (mealsCount < 4) recs.push('📋 Меньше 4 приёмов — распределите белок равномерно для MPS.');
+      if (mealsCount > 6) recs.push('📋 Больше 6 приёмов — возможно дробление порций, проверьте насыщение.');
+      if (totalP < weight * 1.8) recs.push(`🥩 Белок ${totalP}г (${(totalP/weight).toFixed(1)}г/кг) — ниже ${weight*1.8}г. Увеличьте белок до 2г/кг.`);
+      if (profile.labs.ldl && profile.labs.ldl > 4.2) recs.push('🩸 ЛПНП >4.2 ммоль/л — ограничьте насыщенные жиры (жирное мясо, сливочное масло).');
+      if (profile.labs.alt && profile.labs.alt > 45) recs.push('🫁 АЛТ >45 Ед/л — добавьте NAC 600-1200мг, расторопшу 280мг, TUDCA 500мг.');
+      if (profile.labs.crp && profile.labs.crp > 3) recs.push('🔥 СРБ >3 мг/л — добавьте омега-3 3-5г/день, полифенолы (куркума 500мг, зелёный чай).');
+
+      // Macros deviation
+      const targetKcal = effectiveKcal || (weight * 33);
+      if (Math.abs(totalKcal - targetKcal) > 200) {
+        const dir = totalKcal > targetKcal ? 'превышение' : 'недобор';
+        recs.push(`📊 ${dir.toUpperCase()} ${Math.abs(totalKcal - targetKcal)} ккал от цели (${targetKcal}). Откорректируйте приёмы.`);
+      }
+    }
+
     setRecommendations(recs);
   };
 
@@ -761,7 +867,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
 
   const generateAllergenReport = () => { if (!dayPlan) return; const conflicts: any[] = []; dayPlan.meals.flatMap((m: any) => m.items).forEach((it: any) => { const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name); if (food?.allergens) { const matched = food.allergens.filter((a: string) => allergens.includes(a)); if (matched.length > 0) conflicts.push({ food: it.name, allergens: matched }); } }); const riskLevel = conflicts.length === 0 ? 'low' : conflicts.length <= 3 ? 'medium' : 'high'; setAllergenReport({ conflicts, riskLevel, summary: conflicts.length === 0 ? '✅ Нет совпадений' : `⚠ ${conflicts.length} совпадений` }); setActiveReports(prev => prev.includes('allergen') ? prev : [...prev, 'allergen']); };
   const generateNutrientReport = () => { if (!dayPlan) return; const micros: Record<string, number> = {}; dayPlan.meals.flatMap((m: any) => m.items).forEach((it: any) => { const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name); if (food?.micros) Object.entries(food.micros).forEach(([k, v]) => { if (v) micros[k] = (micros[k] || 0) + (v as number) * (it.amount / 100); }); }); const targets: Record<string, number> = { Ca:1000,Fe:18,Mg:400,Zn:15,K:3500,Se:55,VitC:100,VitD:15,VitB12:2.4,Omega3:1.6 }; const results: Record<string, any> = {}; const gaps: string[] = []; Object.entries(targets).forEach(([k, t]) => { const actual = Math.round((micros[k]||0)*10)/10; const pct = Math.round(actual/t*100); results[k] = { actual, target: t, pct, status: pct>=80?'ok':pct>=50?'low':'critical' }; if (pct < 80) gaps.push(`${k}: ${actual} из ${t} (${pct}%)`); }); setNutrientReport({ micros: results, gaps: gaps.length === 0 ? ['✅ Все в норме'] : gaps }); setActiveReports(prev => prev.includes('nutrient') ? prev : [...prev, 'nutrient']); };
-  const generateQualityReport = () => { if (!dayPlan) return; const scores: any[] = []; dayPlan.meals.flatMap((m: any) => m.items).forEach((it: any) => { const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name); if (!food) return; let score = 5; const pd = (food.protein*4)/Math.max(food.kcal,1); if (pd > 0.6) score += 2; else if (pd > 0.3) score += 1; if ((food.fiber||0)>=3) score += 1; if (food.tier === 'max') score = 10; else if (food.tier === 'mid') score = Math.max(score,8); else if (food.tier === 'basic') score = Math.max(score,6); scores.push({ name: it.name, score: Math.min(10, score), category: food.category }); }); const avg = Math.round(scores.reduce((s,x)=>s+x.score,0)/Math.max(1,scores.length)*10)/10; const sorted = [...scores].sort((a,b)=>b.score-a.score); setQualityReport({ avgScore: avg, bestItems: sorted.filter(s=>s.score>=8).map(s=>s.name).slice(0,5), weakItems: sorted.filter(s=>s.score<=5).map(s=>s.name).slice(0,5), recommendations: avg<6?['Повысьте качество продуктов']:avg>=8?['Отличный выбор!']:[] }); setActiveReports(prev => prev.includes('quality') ? prev : [...prev, 'quality']); };
+  const generateQualityReport = () => { if (!dayPlan) return; const scores: any[] = []; dayPlan.meals.flatMap((m: any) => m.items).forEach((it: any) => { const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name); if (!food) return; let score = 5; const pd = (food.protein*4)/Math.max(food.kcal,1); if (pd > 0.6) score += 2; else if (pd > 0.3) score += 1; if ((food.fiber||0)>=3) score += 1; if (food.tier === 'max') score = 10; else if (food.tier === 'mid') score = Math.max(score,8); else if (food.tier === 'basic') score = Math.max(score,6); scores.push({ name: it.name, score: Math.min(10, score), bbs: food.bb_quality_score || 0, category: food.category }); }); const avg = Math.round(scores.reduce((s,x)=>s+x.score,0)/Math.max(1,scores.length)*10)/10; const bbsAvg = Math.round(scores.reduce((s,x)=>s+x.bbs,0)/Math.max(1,scores.length)*10)/10; const sorted = [...scores].sort((a,b)=>b.score-a.score); const budgetRange = budget === 'low' ? '★1-5' : budget === 'medium' ? '★5-8' : budget === 'max' ? '★8-10' : '★9-10'; const budgetOk = (budget === 'low' && bbsAvg <= 5) || (budget === 'medium' && bbsAvg >= 5 && bbsAvg <= 8) || ((budget === 'max' || budget === 'enhanced') && bbsAvg >= 8); setQualityReport({ avgScore: avg, bbsAvg, budget, budgetRange, budgetOk, bestItems: sorted.filter(s=>s.score>=8).map(s=>s.name).slice(0,5), weakItems: sorted.filter(s=>s.score<=5).map(s=>s.name).slice(0,5), recommendations: !budgetOk ? [`Бюджет «${budget}» (${budgetRange}), а средний bb_quality_score рациона ${bbsAvg}. ${budget==='low'?'Снизьте бюджет или повысьте качество.':(budget==='max'||budget==='enhanced')?'Выберите более дешёвые продукты или повысьте бюджет.':'Настройте бюджет под качество.'}`] : avg<6 ? ['Повысьте качество продуктов, увеличьте бюджет'] : avg>=8 ? [`✅ Отлично! Средний bb_quality_score ${bbsAvg} соответствует бюджету ${budgetRange}.`] : [] }); setActiveReports(prev => prev.includes('quality') ? prev : [...prev, 'quality']); };
   const generateRiskReport = () => { if (!dayPlan) return; const systems: Record<string, any> = {}; const allItems = dayPlan.meals.flatMap((m: any)=>m.items); const totalFat = allItems.reduce((s:number,it:any)=>s+(it.f||0),0); const totalKcal = allItems.reduce((s:number,it:any)=>s+(it.kcal||0),0); const fatPct = totalKcal>0?totalFat*9/totalKcal*100:0; systems.hepatic = { score: fatPct>40?7:fatPct>30?5:fatPct>20?3:1, impact: fatPct>35?'Высокожировая':'Умеренные', recommendation: fatPct>35?'Снизить жиры до 25-30%':'Норма' }; const proteinGPerKg = Math.round((allItems.reduce((s:number,it:any)=>s+(it.p||0),0)/weight)*10)/10; systems.renal = { score: proteinGPerKg>3?7:proteinGPerKg>2.5?5:proteinGPerKg>2?3:1, impact: `${proteinGPerKg.toFixed(1)} г/кг`, recommendation: proteinGPerKg>2.5?'Контроль белка':'Норма' }; const totalScore = Object.values(systems).reduce((s:number,sys:any)=>s+sys.score,0); setRiskReport({ systems, totalRisk: totalScore<=8?'Низкий':totalScore<=14?'Средний':'Высокий', summary: totalScore<=8?'✅ Рацион сбалансирован':totalScore<=14?'⚠ Есть зоны для улучшения':'🔴 Требуется коррекция' }); setActiveReports(prev => prev.includes('risk')?prev:[...prev,'risk']); };
   const generateDrugCompatReport = () => { if (!dayPlan || injections.length === 0) return; const warnings: string[] = []; const allItems = dayPlan.meals.flatMap((m: any) => m.items); injections.forEach(inj => { const t = inj.type.toLowerCase(); if (t.includes('инсулин')) { const totalCarbs = dayPlan.totals.c || 0; if (totalCarbs < 150) warnings.push(`💉 ${inj.name}: ${Math.round(totalCarbs)}г угл/день — риск гипогликемии`); } }); if (warnings.length === 0) warnings.push('✅ Все препараты совместимы'); setDrugCompatReport({ interactions: [], warnings }); setActiveReports(prev => prev.includes('drug')?prev:[...prev,'drug']); };
   const generateFullNutritionReport = () => { if (!dayPlan) return; try { const rep = generateNutritionReport({ meals: dayPlan.meals.map((m:any)=>({ label:m.label, items:m.items.map((i:any)=>({name:i.name||'',id:i.id||'',amount:i.amount||100,kcal:i.kcal||0,p:i.p||0,f:i.f||0,c:i.c||0})), totals:m.totals||{kcal:0,p:0,f:0,c:0}, time:m.time||'' })), totals: dayPlan.totals||{kcal:0,p:0,f:0,c:0}, targets: planTargets, userWeight: getProfileSafe()?.settings?.weight||80, userTDEE: planTargets.kcal, healthIssues, planType, variety, budget, allergens, cyclingMode, goal: getProfileSafe()?.settings?.primaryGoal||'maintenance', waterMl: waterCalc?.total?Math.round(waterCalc.total*1000):0, injections: injections.map(i=>({type:i.type,dose:i.dose,name:i.name,time:i.time})), workoutTime: linkToTraining&&trainingDays.some(Boolean)?trainStart:undefined }); if (rep) { setNutritionReport(rep); setActiveReports(prev=>prev.includes('nutrition')?prev:[...prev,'nutrition']); try { const arch = JSON.parse(localStorage.getItem('he_nutrition_report_archive')||'[]'); arch.unshift(rep); localStorage.setItem('he_nutrition_report_archive', JSON.stringify(arch.slice(0,50))); localStorage.setItem('he_nutrition_report_current', JSON.stringify(rep)); try { localStorage.setItem('he_profile_nutrition_reports', JSON.stringify(arch.slice(0,20))); } catch {} } catch {} } } catch(e) { console.error('Report failed:', e); } };
@@ -923,6 +1029,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     generateRiskReport, generateDrugCompatReport, generateFullNutritionReport,
     renderMealList,
     customNotes, setCustomNotes,
+    dietPrefs, setDietPrefs,
     v2Phase, setV2Phase, v2Labs, setV2Labs, v2Pharma, setV2Pharma,
   };
 
