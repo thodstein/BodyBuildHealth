@@ -89,6 +89,32 @@ export const IndividualPlanSettings: React.FC = () => {
   const [specialMeals, setSpecialMeals] = useState<{ type: string; typeLabel: string; date: string; notes: string; replaceMeal?: string }[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_special_meals') || '[]'); } catch { return []; }
   });
+  const [showSexPicker, setShowSexPicker] = useState(false);
+  const [showTrainTypePicker, setShowTrainTypePicker] = useState(false);
+  const [showIntensityPicker, setShowIntensityPicker] = useState(false);
+  const [showActivityPicker, setShowActivityPicker] = useState(false);
+  const [showCyclePicker, setShowCyclePicker] = useState(false);
+  const [showWorkFoodPicker, setShowWorkFoodPicker] = useState(false);
+  const pickerBtn = (label: string, opts: {value:string,label:string}[], cur: string, setShow: (v:boolean)=>void) => (
+    <div onClick={() => setShow(true)} style={{...selectStyle, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', minHeight:32, boxSizing:'border-box'}}>
+      <span>{opts.find(o => o.value === cur)?.label || cur}</span>
+      <span style={{fontSize:7, opacity:0.4, marginLeft:4}}>▼</span>
+    </div>
+  );
+  const pickerModal = (label: string, opts: {value:string,label:string}[], cur: string, onChange: (...args:any[])=>void, show: boolean, setShow: (v:boolean)=>void) => show ? (
+    <div key={label} style={{position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)'}} onClick={() => setShow(false)}>
+      <div onClick={e => e.stopPropagation()} style={{width:'92%', maxWidth:380, padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.15)'}}>
+        <div style={{fontSize:14, fontWeight:700, color:'#fff', marginBottom:8, textAlign:'center'}}>{label}</div>
+        {opts.map(o => (
+          <div key={o.value} onClick={() => { onChange(o.value as any); setShow(false); }} style={{padding:'8px 10px', borderRadius:8, cursor:'pointer', fontSize:10, background: cur === o.value ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)', border: cur === o.value ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent', color: cur === o.value ? '#00e68a' : 'rgba(255,255,255,0.7)', display:'flex', alignItems:'center', gap:6, marginBottom:3}}>
+            <span>{cur === o.value ? '✓' : '○'}</span><span>{o.label}</span>
+          </div>
+        ))}
+        <button onClick={() => setShow(false)} style={{width:'100%', marginTop:8, padding:'8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.15)', background:'#202023', color:'#fff', cursor:'pointer', fontSize:10}}>Готово</button>
+      </div>
+    </div>
+  ) : null;
+
   const goalLabels: Record<string,string> = { pre_workout:'🏋️ Предтреник', post_workout:'💪 Пост-треник', before_bed:'🌙 На ночь (каз.)', high_protein:'🥩 Высокобелк.', keto:'🥑 Кето', low_cal_day:'📉 Мало-кал.', custom:'⚙️ Своё' };
   const timingLabels: Record<string,string> = { breakfast:'🌅 Завтрак', lunch:'☀️ Обед', dinner:'🌆 Ужин', snack:'🍪 Перекус', before_bed:'🌙 Перед сном' };
   const specialMealGoalLabel = goalLabels[specialMealGoal] || specialMealGoal;
@@ -105,9 +131,8 @@ export const IndividualPlanSettings: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
           <div>
             <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Пол</label>
-            <select value={sex} onChange={e => setSex(e.target.value as any)} style={selectStyle}>
-              <option value="male">Мужской</option><option value="female">Женский</option>
-            </select>
+            {pickerBtn('Выберите пол', [{value:'male',label:'Мужской'},{value:'female',label:'Женский'}], sex, setShowSexPicker)}
+            {pickerModal('Выберите пол', [{value:'male',label:'Мужской'},{value:'female',label:'Женский'}], sex, setSex, showSexPicker, setShowSexPicker)}
           </div>
           <div>
             <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Шагов/день</label>
@@ -132,15 +157,13 @@ export const IndividualPlanSettings: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
           <div>
             <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Тип тренировок</label>
-            <select value={trainType} onChange={e => setTrainType(e.target.value as any)} style={selectStyle}>
-              <option value="strength">Силовые</option><option value="cardio">Кардио</option><option value="mixed">Смешанные</option><option value="hiit">HIIT</option>
-            </select>
+            {pickerBtn('Тип тренировок', [{value:'strength',label:'Силовые'},{value:'cardio',label:'Кардио'},{value:'mixed',label:'Смешанные'},{value:'hiit',label:'HIIT'}], trainType, setShowTrainTypePicker)}
+            {pickerModal('Тип тренировок', [{value:'strength',label:'Силовые'},{value:'cardio',label:'Кардио'},{value:'mixed',label:'Смешанные'},{value:'hiit',label:'HIIT'}], trainType, setTrainType, showTrainTypePicker, setShowTrainTypePicker)}
           </div>
           <div>
             <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Интенсивность</label>
-            <select value={trainIntensity} onChange={e => setTrainIntensity(e.target.value as any)} style={selectStyle}>
-              <option value="low">Низкая</option><option value="medium">Средняя</option><option value="high">Высокая</option>
-            </select>
+            {pickerBtn('Интенсивность', [{value:'low',label:'Низкая'},{value:'medium',label:'Средняя'},{value:'high',label:'Высокая'}], trainIntensity, setShowIntensityPicker)}
+            {pickerModal('Интенсивность', [{value:'low',label:'Низкая'},{value:'medium',label:'Средняя'},{value:'high',label:'Высокая'}], trainIntensity, setTrainIntensity, showIntensityPicker, setShowIntensityPicker)}
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
@@ -150,9 +173,8 @@ export const IndividualPlanSettings: React.FC = () => {
           </div>
           <div>
             <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Бытовая активность</label>
-            <select value={householdActivity} onChange={e => setHouseholdActivity(e.target.value as any)} style={selectStyle}>
-              <option value="sedentary">Сидячий</option><option value="light">Лёгкая</option><option value="moderate">Умеренная</option><option value="active">Активная</option>
-            </select>
+            {pickerBtn('Бытовая активность', [{value:'sedentary',label:'Сидячий'},{value:'light',label:'Лёгкая'},{value:'moderate',label:'Умеренная'},{value:'active',label:'Активная'}], householdActivity, setShowActivityPicker)}
+            {pickerModal('Бытовая активность', [{value:'sedentary',label:'Сидячий'},{value:'light',label:'Лёгкая'},{value:'moderate',label:'Умеренная'},{value:'active',label:'Активная'}], householdActivity, setHouseholdActivity, showActivityPicker, setShowActivityPicker)}
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
@@ -172,9 +194,8 @@ export const IndividualPlanSettings: React.FC = () => {
         {sex === 'female' && (
           <div style={{ marginBottom: 6 }}>
             <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Фаза цикла</label>
-            <select value={cyclePhase} onChange={e => setCyclePhase(e.target.value as any)} style={selectStyle}>
-              <option value="none">Не указана</option><option value="follicular">Фолликулярная</option><option value="ovulation">Овуляция</option><option value="luteal">Лютеиновая</option><option value="menstrual">Менструация</option>
-            </select>
+            {pickerBtn('Фаза цикла', [{value:'none',label:'Не указана'},{value:'follicular',label:'Фолликулярная'},{value:'ovulation',label:'Овуляция'},{value:'luteal',label:'Лютеиновая'},{value:'menstrual',label:'Менструация'}], cyclePhase, setShowCyclePicker)}
+            {pickerModal('Фаза цикла', [{value:'none',label:'Не указана'},{value:'follicular',label:'Фолликулярная'},{value:'ovulation',label:'Овуляция'},{value:'luteal',label:'Лютеиновая'},{value:'menstrual',label:'Менструация'}], cyclePhase, setCyclePhase, showCyclePicker, setShowCyclePicker)}
           </div>
         )}
         <div style={{ marginBottom: 6 }}>
@@ -836,10 +857,8 @@ export const IndividualPlanSettings: React.FC = () => {
           <div><label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:3,display:'block'}}>Отход ко сну</label><input type="time" value={bedTime} onChange={e => setBedTime(e.target.value)} style={inputStyle} /></div>
           <div style={{ gridColumn: 'span 2' }}>
             <label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:3,display:'block'}}>Еда на работе</label>
-            <select value={workFood} onChange={e => setWorkFood(e.target.value as any)} style={selectStyle}>
-              <option value="any">Любая (можно разогреть)</option>
-              <option value="portable">Только порошок/хлопья/протеин</option>
-            </select>
+            {pickerBtn('Еда на работе', [{value:'any',label:'Любая (можно разогреть)'},{value:'portable',label:'Только порошок/хлопья/протеин'}], workFood, setShowWorkFoodPicker)}
+            {pickerModal('Еда на работе', [{value:'any',label:'Любая (можно разогреть)'},{value:'portable',label:'Только порошок/хлопья/протеин'}], workFood, setWorkFood, showWorkFoodPicker, setShowWorkFoodPicker)}
           </div>
         </div>
         <div>

@@ -117,6 +117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
   { id:'D_ASPARTIC_ACID', name:'D ASPARTIC ACID', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'ECHINACEA', name:'ECHINACEA', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'EGCG', name:'EGCG (Эпигаллокатехин)', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
+  { id:'ELEUTHERO', name:'Элеутерококк', type:'supplement', description:'Адаптоген — повышает работоспособность, снижает утомляемость', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'PHARMA_ENCLOMIPHENE', name:'Энкломифен (Enclomiphene)', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'FADOGIA', name:'FADOGIA', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'FINASTERIDE', name:'FINASTERIDE', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },

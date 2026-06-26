@@ -2062,6 +2062,13 @@ export const CATALOG_ENRICHMENT: Record<string, CatalogEnrichment> = {
     labMarkers: ['АЛТ', 'АСТ', 'ОАК'],
     restrictions: ['Не при беременности и лактации', 'Циклировать 6-8 нед'],
   },
+  eleuthero: {
+    targetSystems:['neuro','endocrine','immune'], targetMechanisms:['ADAPTOGEN','CORTISOL_REGULATION','IMMUNE_MODULATION','NEUROTRANSMITTER_SYNTHESIS'], linkedRisks:[{system:'cardio',direction:'up',strength:0.3}], cvProfile:{bloodPressure:'up',heartRate:'up',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
+    analog:['rhodiola','ashwagandha'],
+    maxUsageWeeks: 8,
+    labMarkers: ['АД','Кортизол','АКТГ'],
+    restrictions: ['При гипертонии контроль АД','Не принимать после 15:00','Курс не более 8 нед'],
+  },
   propolis: {
     targetSystems:['immunity','skin','gut'], targetMechanisms:['ANTIMICROBIAL','ANTIOXIDANT','IMMUNE_STIMULATION','WOUND_HEALING','ANTIINFLAMMATORY'], linkedRisks:[], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['honey','bee_pollen'],
     maxUsageWeeks: 24,

@@ -83,6 +83,25 @@ export const INTERACTIONS_DB: Interaction[] = [
   { id: "INT_OMEGA3_ANTICOAGULANTS", substanceA: "OMEGA3", substanceB: "ANTICOAGULANTS", type: "conflict", effect: "↑ риска кровотечений", mechanisms: ["Высокие дозы Омега-3 (>4г/д) снижают агрегацию тромбоцитов → повышение риска кровотечений с антикоагулянтами"], severity: "MEDIUM", notes: "Высокие дозы Омега-3 (>4г/д) снижают агрегацию тромбоцитов → повышение риска кровотечений с антикоагулянтами" },
   { id: "INT_ASPIRIN_NATTOKINASE", substanceA: "ASPIRIN", substanceB: "NATTOKINASE", type: "caution", effect: "Риск кровотечения: двойная антиагрегация", mechanisms: ["Аспирин — необратимая блокада COX-1 → снижение тромбоксана A2. Наттокиназа снижает PAI-1 и агрегацию тромбоцитов через GPIIb/IIIa. Риск ЖКТ- и носовых кровотечений. Интервал ≥4ч"], severity: "HIGH", notes: "Аспирин — необратимая блокада COX-1 → снижение тромбоксана A2. Наттокиназа снижает PAI-1 и агрегацию тромбоцитов через GPIIb/IIIa. Риск ЖКТ- и носовых кровотечений. Интервал ≥4ч" },
   { id: "INT_CALCIUM_VITAMIN_K2", substanceA: "CALCIUM", substanceB: "VITAMIN_K2", type: "caution", effect: "Кальцификация сосудов: ОСТОРОЖНО без K2", mechanisms: ["Кальций без достаточного K2 (MGP-инактивация) → отложение Ca в сосудах вместо костей. K2 активирует MGP и остеокальцин, направляя Ca в кости"], severity: "HIGH", notes: "Кальций без достаточного K2 (MGP-инактивация) → отложение Ca в сосудах вместо костей. K2 активирует MGP и остеокальцин, направляя Ca в кости" },
+
+  // ── CHAGA interactions ──
+  { id:'INT_CHAGA_REISHI', substanceA:'CHAGA', substanceB:'REISHI', type:'synergy', effect:'Усиление иммуномодуляции и антиоксидантной защиты', mechanisms:['IMMUNE_MODULATION','ANTIOXIDANT'], severity:'MEDIUM', notes:'Бета-глюканы чаги и тритерпены рейши дополняют друг друга' },
+  { id:'INT_CHAGA_CORDYCEPS', substanceA:'CHAGA', substanceB:'CORDYCEPS', type:'synergy', effect:'Комплексная иммунная поддержка и повышение энергии', mechanisms:['IMMUNE_MODULATION','ADAPTOGEN'], severity:'MEDIUM', notes:'Чага — антиоксидант/иммунитет, кордицепс — энергия/выносливость' },
+  { id:'INT_CHAGA_PROBIOTICS', substanceA:'CHAGA', substanceB:'PROBIOTICS', type:'synergy', effect:'Пребиотическое действие и поддержка микробиома', mechanisms:['GUT_FLORA_MODULATION','IMMUNE_MODULATION'], severity:'LOW', notes:'Полисахариды чаги — пребиотики' },
+  { id:'INT_CHAGA_STATINS', substanceA:'CHAGA', substanceB:'STATINS', type:'caution', effect:'Потенциальное усиление антикоагулянтного эффекта', mechanisms:['CYP450_MODULATION'], severity:'LOW', notes:'Чага может влиять на CYP450, изменяя метаболизм статинов' },
+
+  // ── CORDYCEPS interactions ──
+  { id:'INT_CORDYCEPS_REISHI', substanceA:'CORDYCEPS', substanceB:'REISHI', type:'synergy', effect:'Синергия иммунитета: Th1 (кордицепс) + Th2 (рейши)', mechanisms:['IMMUNE_MODULATION','ADAPTOGEN'], severity:'MEDIUM', notes:'Разные ветви иммунного ответа' },
+  { id:'INT_CORDYCEPS_ASTRAGALUS', substanceA:'CORDYCEPS', substanceB:'ASTRAGALUS', type:'synergy', effect:'Усиление иммунной и антиоксидантной защиты', mechanisms:['IMMUNE_MODULATION','ANTIOXIDANT'], severity:'MEDIUM', notes:'Два мощных иммуномодулятора с разными механизмами' },
+  { id:'INT_CORDYCEPS_COQ10', substanceA:'CORDYCEPS', substanceB:'COQ10', type:'synergy', effect:'Митохондриальная поддержка и производство АТФ', mechanisms:['MITOCHONDRIAL_ENERGY'], severity:'MEDIUM', notes:'Кордицепс повышает захват кислорода, CoQ10 улучшает цепь переноса электронов' },
+  { id:'INT_CORDYCEPS_CAFFEINE', substanceA:'CORDYCEPS', substanceB:'CAFFEINE', type:'caution', effect:'Возможна избыточная стимуляция ЦНС', mechanisms:['ADAPTOGEN'], severity:'LOW', notes:'Начинать с малых доз при комбинации с кофеином' },
+
+  // ── LIONS_MANE interactions ──
+  { id:'INT_LIONS_MANE_BACOPA', substanceA:'LIONS_MANE', substanceB:'BACOPA', type:'synergy', effect:'Усиление нейропротекции и когнитивного потенциала', mechanisms:['NEUROPROTECTION','COGNITIVE_ENHANCEMENT'], severity:'MEDIUM', notes:'Львиная грива стимулирует NGF, бакопа улучшает синаптическую пластичность' },
+  { id:'INT_LIONS_MANE_OMEGA3', substanceA:'LIONS_MANE', substanceB:'OMEGA3', type:'synergy', effect:'Комплексная поддержка миелинизации и нейрогенеза', mechanisms:['NEUROPROTECTION','ANTIINFLAMMATORY'], severity:'MEDIUM', notes:'Омега-3 — структурный компонент мембран, львиная грива — NGF' },
+  { id:'INT_LIONS_MANE_PHOSPHATIDYLSERINE', substanceA:'LIONS_MANE', substanceB:'PHOSPHATIDYLSERINE', type:'synergy', effect:'Синергия для памяти и когнитивной функции', mechanisms:['COGNITIVE_ENHANCEMENT','NEUROPROTECTION'], severity:'MEDIUM', notes:'PS — строительный блок мембран, львиная грива — фактор роста нейронов' },
+  { id:'INT_LIONS_MANE_GINKGO', substanceA:'LIONS_MANE', substanceB:'GINKGO', type:'synergy', effect:'Улучшение церебрального кровотока и нейропластичности', mechanisms:['NO_UP','NEUROPROTECTION'], severity:'LOW', notes:'Гинкго улучшает мозговой кровоток, львиная грива — NGF' },
+  { id:'INT_LIONS_MANE_CURCUMIN', substanceA:'LIONS_MANE', substanceB:'CURCUMIN', type:'synergy', effect:'Противовоспалительная и нейропротекторная синергия', mechanisms:['ANTIINFLAMMATORY','NEUROPROTECTION'], severity:'MEDIUM', notes:'Куркумин снижает нейровоспаление, львиная грива стимулирует NGF' },
 ];
 // ── FROM: interaction-links.ts ──
 export interface InteractionLink {
@@ -255,4 +274,36 @@ export const INTERACTION_LINKS_DB: InteractionLink[] = [
   { id: "LINK_LUMBROKINASE_BROMELAIN_B", interactionId: "INT_LUMBROKINASE_BROMELAIN", substance: "BROMELAIN", role: "B" },
   { id: "LINK_NATTOKINASE_BROMELAIN_A", interactionId: "INT_NATTOKINASE_BROMELAIN", substance: "NATTOKINASE", role: "A" },
   { id: "LINK_NATTOKINASE_BROMELAIN_B", interactionId: "INT_NATTOKINASE_BROMELAIN", substance: "BROMELAIN", role: "B" },
+
+  // ── CHAGA links ──
+  { id: "LINK_CHAGA_REISHI_A", interactionId: "INT_CHAGA_REISHI", substance: "CHAGA", role: "A" },
+  { id: "LINK_CHAGA_REISHI_B", interactionId: "INT_CHAGA_REISHI", substance: "REISHI", role: "B" },
+  { id: "LINK_CHAGA_CORDYCEPS_A", interactionId: "INT_CHAGA_CORDYCEPS", substance: "CHAGA", role: "A" },
+  { id: "LINK_CHAGA_CORDYCEPS_B", interactionId: "INT_CHAGA_CORDYCEPS", substance: "CORDYCEPS", role: "B" },
+  { id: "LINK_CHAGA_PROBIOTICS_A", interactionId: "INT_CHAGA_PROBIOTICS", substance: "CHAGA", role: "A" },
+  { id: "LINK_CHAGA_PROBIOTICS_B", interactionId: "INT_CHAGA_PROBIOTICS", substance: "PROBIOTICS", role: "B" },
+  { id: "LINK_CHAGA_STATINS_A", interactionId: "INT_CHAGA_STATINS", substance: "CHAGA", role: "A" },
+  { id: "LINK_CHAGA_STATINS_B", interactionId: "INT_CHAGA_STATINS", substance: "STATINS", role: "B" },
+
+  // ── CORDYCEPS links ──
+  { id: "LINK_CORDYCEPS_REISHI_A", interactionId: "INT_CORDYCEPS_REISHI", substance: "CORDYCEPS", role: "A" },
+  { id: "LINK_CORDYCEPS_REISHI_B", interactionId: "INT_CORDYCEPS_REISHI", substance: "REISHI", role: "B" },
+  { id: "LINK_CORDYCEPS_ASTRAGALUS_A", interactionId: "INT_CORDYCEPS_ASTRAGALUS", substance: "CORDYCEPS", role: "A" },
+  { id: "LINK_CORDYCEPS_ASTRAGALUS_B", interactionId: "INT_CORDYCEPS_ASTRAGALUS", substance: "ASTRAGALUS", role: "B" },
+  { id: "LINK_CORDYCEPS_COQ10_A", interactionId: "INT_CORDYCEPS_COQ10", substance: "CORDYCEPS", role: "A" },
+  { id: "LINK_CORDYCEPS_COQ10_B", interactionId: "INT_CORDYCEPS_COQ10", substance: "COQ10", role: "B" },
+  { id: "LINK_CORDYCEPS_CAFFEINE_A", interactionId: "INT_CORDYCEPS_CAFFEINE", substance: "CORDYCEPS", role: "A" },
+  { id: "LINK_CORDYCEPS_CAFFEINE_B", interactionId: "INT_CORDYCEPS_CAFFEINE", substance: "CAFFEINE", role: "B" },
+
+  // ── LIONS_MANE links ──
+  { id: "LINK_LIONS_MANE_BACOPA_A", interactionId: "INT_LIONS_MANE_BACOPA", substance: "LIONS_MANE", role: "A" },
+  { id: "LINK_LIONS_MANE_BACOPA_B", interactionId: "INT_LIONS_MANE_BACOPA", substance: "BACOPA", role: "B" },
+  { id: "LINK_LIONS_MANE_OMEGA3_A", interactionId: "INT_LIONS_MANE_OMEGA3", substance: "LIONS_MANE", role: "A" },
+  { id: "LINK_LIONS_MANE_OMEGA3_B", interactionId: "INT_LIONS_MANE_OMEGA3", substance: "OMEGA3", role: "B" },
+  { id: "LINK_LIONS_MANE_PHOSPHATIDYLSERINE_A", interactionId: "INT_LIONS_MANE_PHOSPHATIDYLSERINE", substance: "LIONS_MANE", role: "A" },
+  { id: "LINK_LIONS_MANE_PHOSPHATIDYLSERINE_B", interactionId: "INT_LIONS_MANE_PHOSPHATIDYLSERINE", substance: "PHOSPHATIDYLSERINE", role: "B" },
+  { id: "LINK_LIONS_MANE_GINKGO_A", interactionId: "INT_LIONS_MANE_GINKGO", substance: "LIONS_MANE", role: "A" },
+  { id: "LINK_LIONS_MANE_GINKGO_B", interactionId: "INT_LIONS_MANE_GINKGO", substance: "GINKGO", role: "B" },
+  { id: "LINK_LIONS_MANE_CURCUMIN_A", interactionId: "INT_LIONS_MANE_CURCUMIN", substance: "LIONS_MANE", role: "A" },
+  { id: "LINK_LIONS_MANE_CURCUMIN_B", interactionId: "INT_LIONS_MANE_CURCUMIN", substance: "CURCUMIN", role: "B" },
 ];
