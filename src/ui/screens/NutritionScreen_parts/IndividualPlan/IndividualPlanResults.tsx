@@ -8,6 +8,7 @@ import type { DrugInjection } from "./types";
 import { GlassCard, greenBtn, reportPillStyle } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
 import { DailyDietDashboard } from "../DailyDietDashboard";
+import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type MealTiming, type DailyDietReport, type MealScoreV2 } from '../../../../engines/product-usefulness-v2.engine';
 
 export const IndividualPlanResults: React.FC = () => {
   const {
@@ -49,7 +50,111 @@ export const IndividualPlanResults: React.FC = () => {
     setDayPlan, planTargets, healthIssues, planType, variety,
     linkToTraining, trainStart,
     workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType,
+    v2Phase, v2Pharma, v2Labs,
   } = usePlanCtx();
+
+  const [showCalcPopup, setShowCalcPopup] = useState(false);
+  const [calcTab, setCalcTab] = useState<'day' | 'week'>('day');
+  const [calcSelections, setCalcSelections] = useState<Set<string>>(new Set());
+  const [calcResults, setCalcResults] = useState<{ id: string; name: string; score: MealScoreV2; diaas: { diaas: number; limitingAA: string } }[] | null>(null);
+  const [calcDailyReport, setCalcDailyReport] = useState<DailyDietReport | null>(null);
+
+  const toggleCalcSelection = (id: string) => {
+    const next = new Set(calcSelections);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setCalcSelections(next);
+  };
+
+  const itemToProduct = (it: any) => {
+    const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+    return { foodId: food?.id || it.name || 'unknown', weightGrams: it.amount || 100 };
+  };
+
+  const handleCalcUsefulness = () => {
+    const profile = getDefaultProfile();
+    profile.phase = (v2Phase as any) || 'LEAN_MASS';
+    profile.pharma.AAS_ORAL = v2Pharma.AAS_ORAL || false;
+    profile.pharma.AAS_INJECTABLE = v2Pharma.AAS_INJECTABLE || false;
+    profile.pharma.HGH = v2Pharma.HGH || false;
+    profile.pharma.DIURETICS = v2Pharma.DIURETICS || false;
+    profile.pharma.STIMULATORS = v2Pharma.STIMULATORS || false;
+    profile.pharma.INSULIN_USE = v2Pharma.INSULIN_USE || false;
+    profile.pharma.LIVER_SUPPORT = v2Pharma.LIVER_SUPPORT || false;
+    profile.pharma.GUT_SUPPORT = v2Pharma.GUT_SUPPORT || false;
+    profile.labs.hematocrit = v2Labs.hematocrit ? parseFloat(v2Labs.hematocrit) : undefined;
+    profile.labs.ldl = v2Labs.ldl ? parseFloat(v2Labs.ldl) : undefined;
+    profile.labs.hdl = v2Labs.hdl ? parseFloat(v2Labs.hdl) : undefined;
+    profile.labs.alt = v2Labs.alt ? parseFloat(v2Labs.alt) : undefined;
+    profile.labs.ast = v2Labs.ast ? parseFloat(v2Labs.ast) : undefined;
+    profile.labs.crp = v2Labs.crp ? parseFloat(v2Labs.crp) : undefined;
+    profile.labs.estradiol = v2Labs.estradiol ? parseFloat(v2Labs.estradiol) : undefined;
+    profile.labs.prolactin = v2Labs.prolactin ? parseFloat(v2Labs.prolactin) : undefined;
+    profile.labs.testosterone = v2Labs.testosterone ? parseFloat(v2Labs.testosterone) : undefined;
+    profile.labs.glucose_fasting = v2Labs.glucose ? parseFloat(v2Labs.glucose) : undefined;
+    profile.labs.insulin_fasting = v2Labs.insulin ? parseFloat(v2Labs.insulin) : undefined;
+    profile.weightKg = weight || 80;
+    profile.lbm = profile.weightKg * 0.85;
+
+    const allMeals: { timing?: MealTiming; products: { foodId: string; weightGrams: number }[] }[] = [];
+    const results: { id: string; name: string; score: MealScoreV2; diaas: { diaas: number; limitingAA: string } }[] = [];
+
+    if (dayPlan) {
+      calcSelections.forEach(id => {
+        if (id.startsWith('meal_')) {
+          const idx = parseInt(id.replace('meal_', ''));
+          const meal = dayPlan.meals[idx];
+          if (!meal) return;
+          const products = (meal.items || []).map(itemToProduct).filter((p: any) => p.weightGrams > 0);
+          if (products.length === 0) return;
+          const timing = (meal.timing || 'regular') as MealTiming;
+          const score = calcMealScoreV2(products, profile, timing);
+          const diaas = calcMealDIAAS(products);
+          allMeals.push({ timing, products });
+          results.push({ id, name: meal.label || `Приём ${idx + 1}`, score, diaas });
+        }
+        if (id === 'special_cheatmeal' && cheatMealPlan) {
+          const products = (cheatMealPlan.items || []).map(itemToProduct).filter((p: any) => p.weightGrams > 0);
+          if (products.length > 0) {
+            const score = calcMealScoreV2(products, profile, 'cheat_meal');
+            const diaas = calcMealDIAAS(products);
+            allMeals.push({ timing: 'cheat_meal', products });
+            results.push({ id, name: '🍔 Читмил', score, diaas });
+          }
+        }
+        if (id === 'special_carbload' && carbloadPlan) {
+          const products = (carbloadPlan.foods || []).map(itemToProduct).filter((p: any) => p.weightGrams > 0);
+          if (products.length > 0) {
+            const score = calcMealScoreV2(products, profile, 'carb_load');
+            const diaas = calcMealDIAAS(products);
+            allMeals.push({ timing: 'carb_load', products });
+            results.push({ id, name: '🍚 Углев. загрузка', score, diaas });
+          }
+        }
+        if (id === 'special_lazy' && lazyDayPlan) {
+          const products = (lazyDayPlan.items || []).map(itemToProduct).filter((p: any) => p.weightGrams > 0);
+          if (products.length > 0) {
+            const score = calcMealScoreV2(products, profile, 'regular');
+            const diaas = calcMealDIAAS(products);
+            allMeals.push({ products });
+            results.push({ id, name: '😴 Ленивый день', score, diaas });
+          }
+        }
+        if (id === 'special_craving' && cravingPlan) {
+          const products = (cravingPlan.items || []).map(itemToProduct).filter((p: any) => p.weightGrams > 0);
+          if (products.length > 0) {
+            const score = calcMealScoreV2(products, profile, 'regular');
+            const diaas = calcMealDIAAS(products);
+            allMeals.push({ products });
+            results.push({ id, name: '🍬 Хочу сладкое', score, diaas });
+          }
+        }
+      });
+    }
+
+    const dailyReport = allMeals.length > 0 ? analyzeDailyDiet(allMeals, profile) : null;
+    setCalcResults(results);
+    setCalcDailyReport(dailyReport);
+  };
 
 
   return (
@@ -1157,6 +1262,14 @@ export const IndividualPlanResults: React.FC = () => {
               <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:4, lineHeight:1.2 }}>План приготовления на несколько дней</div>
             </div>
           )}
+          {generated && (
+            <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(0,230,138,0.05)', padding:'8px 6px', textAlign:'center' }}>
+              <button onClick={() => { setShowCalcPopup(true); setCalcResults(null); setCalcDailyReport(null); }} style={{ width:'100%', padding:'12px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(0,200,160,0.12))', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', fontWeight:800, fontSize:11, transition:'all 0.15s' }}>
+                🧬 Рассчитать полезность
+              </button>
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:4, lineHeight:1.2 }}>v2 скоринг выбранных приёмов + спецприёмов</div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1233,6 +1346,235 @@ export const IndividualPlanResults: React.FC = () => {
             );
           })}
         </GlassCard>
+      )}
+
+      {showCalcPopup && (
+        <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
+          onClick={() => { setShowCalcPopup(false); setCalcResults(null); setCalcDailyReport(null); }}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'96%', maxWidth:440, maxHeight:'92vh', overflowY:'auto', padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(0,230,138,0.12)', boxShadow:'0 8px 40px rgba(0,0,0,0.4)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+              <div style={{ fontSize:15, fontWeight:800, color:'#00e68a' }}>🧬 Калькулятор полезности</div>
+              <span onClick={() => { setShowCalcPopup(false); setCalcResults(null); setCalcDailyReport(null); }} style={{ cursor:'pointer', fontSize:10, color:'rgba(255,255,255,0.3)', padding:'2px 6px' }}>✕</span>
+            </div>
+
+            {/* Tabs */}
+            <div style={{ display:'flex', gap:4, marginBottom:10 }}>
+              {['day','week','month'].map(t => (
+                <button key={t} onClick={() => setCalcTab(t as any)} style={{
+                  flex:1, padding:'8px', borderRadius:10, cursor:'pointer', textAlign:'center', fontSize:9, fontWeight:700,
+                  background: calcTab === t ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)',
+                  border: calcTab === t ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+                  color: calcTab === t ? '#00e68a' : 'rgba(255,255,255,0.7)',
+                }}>{t === 'day' ? '📅 День' : t === 'week' ? '📆 Неделя' : '🗓 Месяц'}</button>
+              ))}
+            </div>
+
+            {/* Day view */}
+            {calcTab === 'day' && (
+              <>
+                {planDays !== 1 ? (
+                  <div style={{ textAlign:'center', padding:16, fontSize:9, color:'rgba(255,255,255,0.4)' }}>Выберите день (нажмите на день недели сверху) и сгенерируйте план на 1 день</div>
+                ) : dayPlan ? (
+                  <div style={{ marginBottom:10 }}>
+                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:4, display:'flex', justifyContent:'space-between' }}>
+                      <span>🍽 Приёмы пищи</span>
+                      <span onClick={() => { const all: string[] = dayPlan.meals.map((_: any, i: number) => `meal_${i}`); const next = new Set(calcSelections); all.forEach((id: string) => next.add(id)); setCalcSelections(next); }} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', fontWeight:600 }}>Выбрать все</span>
+                    </div>
+                    {dayPlan.meals.map((m: any, i: number) => {
+                      const id = `meal_${i}`;
+                      const sel = calcSelections.has(id);
+                      return (
+                        <div key={id} onClick={() => toggleCalcSelection(id)} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 9px', borderRadius:8, marginBottom:3, background: sel ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)', cursor:'pointer' }}>
+                          <div style={{ width:20, height:20, borderRadius:5, display:'flex', alignItems:'center', justifyContent:'center', background: sel ? '#00e68a' : 'rgba(255,255,255,0.06)', color: sel ? '#000' : 'transparent', fontSize:11, fontWeight:800, border: sel ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>{sel ? '✓' : ''}</div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{m.label || `Приём ${i+1}`} {m.time && <span style={{ color:'rgba(255,255,255,0.3)', fontWeight:400, marginLeft:3 }}>{m.time}</span>}</div>
+                            <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>{Math.round(m.totals?.kcal || 0)} ккал · Б{m.totals?.p||0}/Ж{m.totals?.f||0}/У{m.totals?.c||0} · {m.items?.length || 0} продуктов</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ textAlign:'center', padding:16, fontSize:9, color:'rgba(255,255,255,0.4)' }}>Сначала сгенерируйте план питания</div>
+                )}
+
+                {/* Special meals */}
+                {(cheatMealPlan || carbloadPlan || lazyDayPlan || cravingPlan) && (
+                  <div style={{ marginBottom:10 }}>
+                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:4 }}>⚡ Спецприёмы</div>
+                    {[
+                      { id:'special_cheatmeal', label:'🍔 Читмил', desc: cheatMealPlan ? `~${cheatMealPlan.cals} ккал` : '', plan: cheatMealPlan },
+                      { id:'special_carbload', label:'🍚 Углев. загрузка', desc: carbloadPlan ? `${carbloadPlan.totalCarbs}г углей` : '', plan: carbloadPlan },
+                      { id:'special_lazy', label:'😴 Ленивый день', desc: lazyDayPlan ? `~${lazyDayPlan.kcal} ккал` : '', plan: lazyDayPlan },
+                      { id:'special_craving', label:'🍬 Хочу сладкое', desc: cravingPlan ? `~${cravingPlan.kcal} ккал` : '', plan: cravingPlan },
+                    ].filter(s => s.plan).map(s => {
+                      const sel = calcSelections.has(s.id);
+                      return (
+                        <div key={s.id} onClick={() => toggleCalcSelection(s.id)} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 9px', borderRadius:8, marginBottom:3, background: sel ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)', cursor:'pointer' }}>
+                          <div style={{ width:20, height:20, borderRadius:5, display:'flex', alignItems:'center', justifyContent:'center', background: sel ? '#00e68a' : 'rgba(255,255,255,0.06)', color: sel ? '#000' : 'transparent', fontSize:11, fontWeight:800, border: sel ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>{sel ? '✓' : ''}</div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{s.label}</div>
+                            <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>{s.desc}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Week/Month view */}
+            {calcTab !== 'day' && (
+              <div style={{ textAlign:'center', padding:16, fontSize:9, color:'rgba(255,255,255,0.4)' }}>
+                {calcTab === 'week' ? '📆 Выберите день на вкладке "День" для поимённого выбора приёмов' : '🗓 Выберите день на вкладке "День"'}
+                <div style={{ fontSize:7, marginTop:4, color:'rgba(255,255,255,0.2)' }}>Недельный/месячный расчёт доступен через выбор каждого дня отдельно</div>
+              </div>
+            )}
+
+            {/* Calculate button */}
+            <button onClick={handleCalcUsefulness} disabled={calcSelections.size === 0} style={{
+              width:'100%', padding:'12px', borderRadius:12, cursor: calcSelections.size === 0 ? 'default' : 'pointer', textAlign:'center',
+              background: calcSelections.size === 0 ? 'rgba(0,230,138,0.05)' : 'linear-gradient(135deg,#00e68a,#00c8a0)',
+              border: calcSelections.size === 0 ? '1px solid rgba(0,230,138,0.1)' : 'none',
+              color: calcSelections.size === 0 ? 'rgba(0,230,138,0.4)' : '#000',
+              fontSize:11, fontWeight:800, opacity: calcSelections.size === 0 ? 0.4 : 1, transition:'all 0.15s',
+            }}>
+              🔬 Рассчитать выбранное ({calcSelections.size})
+            </button>
+
+            {/* Results */}
+            {calcResults && calcResults.length > 0 && (
+              <div style={{ marginTop:12, borderTop:'1px solid rgba(0,230,138,0.1)', paddingTop:10 }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', marginBottom:6 }}>📊 Результаты</div>
+                {/* Summary row */}
+                <div style={{ display:'flex', gap:4, marginBottom:6 }}>
+                  <div style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(0,230,138,0.06)', textAlign:'center' }}>
+                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>Приёмов</div>
+                    <div style={{ fontSize:14, fontWeight:800, color:'#00e68a' }}>{calcResults.length}</div>
+                  </div>
+                  <div style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(139,92,246,0.06)', textAlign:'center' }}>
+                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>Ср. скор</div>
+                    <div style={{ fontSize:14, fontWeight:800, color:'#8b5cf6' }}>{(calcResults.reduce((s, r) => s + r.score.compositeScore, 0) / calcResults.length).toFixed(1)}</div>
+                  </div>
+                  <div style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(245,158,11,0.06)', textAlign:'center' }}>
+                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>Всего ккал</div>
+                    <div style={{ fontSize:14, fontWeight:800, color:'#f59e0b' }}>{calcResults.reduce((s, r) => s + r.score.macros.kcal, 0)}</div>
+                  </div>
+                </div>
+
+                {/* Per-meal results */}
+                {calcResults.map((r, i) => {
+                  const sc = r.score;
+                  const color = sc.compositeScore >= 8 ? '#22c55e' : sc.compositeScore >= 5 ? '#f59e0b' : '#ef4444';
+                  return (
+                    <div key={r.id} style={{ marginBottom:6, borderRadius:10, padding:10, background:'rgba(24,24,27,0.8)', border:`1px solid ${color}20` }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                        <span style={{ fontSize:9, fontWeight:700, color:'#fff' }}>{r.name}</span>
+                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                          <span style={{ fontSize:11, fontWeight:800, color }}>{sc.compositeScore.toFixed(1)}</span>
+                          <span style={{ fontSize:6, color, opacity:0.6 }}>{sc.label}</span>
+                        </div>
+                      </div>
+                      {/* Macros bar */}
+                      <div style={{ display:'flex', gap:4, marginBottom:4 }}>
+                        {[
+                          { label:'Б', val:sc.macros.protein, color:'#3b82f6' },
+                          { label:'Ж', val:sc.macros.fat, color:'#f59e0b' },
+                          { label:'У', val:sc.macros.carbs, color:'#ef4444' },
+                          { label:'Кл', val:sc.macros.fiber, color:'#22c55e' },
+                        ].map(m => (
+                          <div key={m.label} style={{ flex:1, padding:'3px 4px', borderRadius:5, background:`${m.color}0a`, textAlign:'center' }}>
+                            <div style={{ fontSize:6, color:`${m.color}aa` }}>{m.label}</div>
+                            <div style={{ fontSize:8, fontWeight:700, color:m.color }}>{m.val}г</div>
+                          </div>
+                        ))}
+                        <div style={{ flex:1, padding:'3px 4px', borderRadius:5, background:'rgba(139,92,246,0.08)', textAlign:'center' }}>
+                          <div style={{ fontSize:6, color:'#8b5cf6aa' }}>DIAAS</div>
+                          <div style={{ fontSize:8, fontWeight:700, color: r.diaas.diaas >= 1 ? '#22c55e' : r.diaas.diaas >= 0.75 ? '#f59e0b' : '#ef4444' }}>{r.diaas.diaas.toFixed(2)}</div>
+                        </div>
+                      </div>
+                      {/* Modifiers */}
+                      {sc.modifiers.length > 0 && (
+                        <div style={{ marginTop:4 }}>
+                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:2 }}>🧬 Факторы:</div>
+                          {sc.modifiers.map((m, mi) => (
+                            <div key={mi} style={{ fontSize:7, padding:'2px 5px', marginBottom:1, borderRadius:4, background: m.value > 0 ? 'rgba(0,230,138,0.04)' : 'rgba(239,68,68,0.04)', color: m.value > 0 ? '#22c55e' : '#ef4444' }}>
+                              {m.name} <b>({m.value > 0 ? '+' : ''}{m.value.toFixed(1)})</b>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Weak links */}
+                      {sc.weakLinks.length > 0 && (
+                        <div style={{ marginTop:3, fontSize:7, color:'#f59e0b' }}>
+                          ⚠️ Cлабые звенья: {sc.weakLinks.join(', ')}
+                        </div>
+                      )}
+                      {/* Products */}
+                      <div style={{ marginTop:4, fontSize:7, color:'rgba(255,255,255,0.3)' }}>
+                        Продукты: {sc.productScores.map(p => `${p.name} (${p.weightG}г)`).join(', ')}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Combined daily report */}
+                {calcDailyReport && calcResults.length > 1 && (
+                  <div style={{ marginTop:8, borderRadius:10, padding:10, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.12)' }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>📈 Совокупный анализ ({calcResults.length} приёма)</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:3, fontSize:7, color:'rgba(255,255,255,0.85)' }}>
+                      <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.mtorTriggered ? 'rgba(0,230,138,0.06)' : 'rgba(239,68,68,0.06)', color: calcDailyReport.mtorTriggered ? '#22c55e' : '#ef4444' }}>
+                        🧬 mTOR: {calcDailyReport.mtorTriggered ? '✅ Запущен' : `❌ Дефицит ${calcDailyReport.mtorDeficitMg}мг лейцина`}
+                      </div>
+                      <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.giLoadWarning ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.giLoadWarning ? '#ef4444' : '#22c55e' }}>
+                        🫃 Нагр. ЖКТ: {calcDailyReport.giLoad.toFixed(0)} {calcDailyReport.giLoadWarning ? '⚠️' : '✅'}
+                      </div>
+                      <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.pralWarning ? 'rgba(245,158,11,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.pralWarning ? '#f59e0b' : '#22c55e' }}>
+                        🧂 PRAL: {calcDailyReport.pralTotal.toFixed(0)} {calcDailyReport.pralWarning || '✅'}
+                      </div>
+                      <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.ammoniaRisk ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.ammoniaRisk ? '#ef4444' : '#22c55e' }}>
+                        💨 Аммиак: {calcDailyReport.ammoniaScore.toFixed(1)} {calcDailyReport.ammoniaRisk ? '⚠️' : '✅'}
+                      </div>
+                      <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.omegaWarning ? 'rgba(245,158,11,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.omegaWarning ? '#f59e0b' : '#22c55e' }}>
+                        🐟 Омега: {calcDailyReport.omegaRatio.toFixed(1)}:1 {calcDailyReport.omegaWarning ? '⚠️' : '✅'}
+                      </div>
+                      <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.electrolyteRisk ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.electrolyteRisk ? '#ef4444' : '#22c55e' }}>
+                        💧 K/Mg: {calcDailyReport.potassiumMg}/{calcDailyReport.magnesiumMg}мг {calcDailyReport.electrolyteRisk ? '⚠️' : '✅'}
+                      </div>
+                    </div>
+                    {calcDailyReport.diaasWarning && (
+                      <div style={{ marginTop:4, fontSize:7, padding:'4px 8px', borderRadius:6, background: 'rgba(139,92,246,0.06)', color: '#8b5cf6' }}>
+                        💪 DIAAS: {calcDailyReport.diaasWarning}
+                      </div>
+                    )}
+                    {calcDailyReport.antinutrientWarning && (
+                      <div style={{ marginTop:3, fontSize:7, padding:'4px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', color:'#f59e0b' }}>
+                        {calcDailyReport.antinutrientWarning}
+                      </div>
+                    )}
+                    {calcDailyReport.glutathioneWarning && (
+                      <div style={{ marginTop:3, fontSize:7, padding:'4px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', color:'#f59e0b' }}>
+                        {calcDailyReport.glutathioneWarning}
+                      </div>
+                    )}
+                    {calcDailyReport.histamineWarning && (
+                      <div style={{ marginTop:3, fontSize:7, padding:'4px 8px', borderRadius:6, background:'rgba(239,68,68,0.06)', color:'#ef4444' }}>
+                        {calcDailyReport.histamineWarning}
+                      </div>
+                    )}
+                    {/* Micro deficits */}
+                    {calcDailyReport.microDeficits.length > 0 && (
+                      <div style={{ marginTop:3, fontSize:7, padding:'4px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', color:'#f59e0b' }}>
+                        ⚠️ Дефициты: {calcDailyReport.microDeficits.join(', ')}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </>
   );

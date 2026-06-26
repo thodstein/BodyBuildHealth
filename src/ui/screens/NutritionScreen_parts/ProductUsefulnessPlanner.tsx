@@ -3,7 +3,7 @@ import { FOOD_DB, calcBBQualityScore } from '../../../core/nutrition-database';
 import { useDataLink } from '../../../core/data-link';
 import { scoreAllProducts, compareProducts, calcMealScore, CATEGORY_LABELS, GOAL_MAP_RU } from '../../../engines/product-usefulness.engine';
 import type { MealProduct, SavedMeal, MealScore } from '../../../engines/product-usefulness.engine';
-import { calculateOverallScore, scoreAllProductsV2, compareProductsV2, calcMealScoreV2, analyzeDailyDiet, getDefaultProfile, type UserDietProfile, type V2ScoreResult } from '../../../engines/product-usefulness-v2.engine';
+import { calculateOverallScore, scoreAllProductsV2, compareProductsV2, calcMealScoreV2, calcDIAAS, analyzeDailyDiet, getDefaultProfile, type UserDietProfile, type V2ScoreResult } from '../../../engines/product-usefulness-v2.engine';
 
 type PlannerTab = 'settings' | 'catalog' | 'compare' | 'meal';
 type SortKey = 'score' | 'name' | 'protein' | 'kcal';
@@ -490,6 +490,16 @@ export const ProductUsefulnessPlanner: React.FC = () => {
     ) : (
       <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>Нет дополнительных факторов</div>
     )}
+    {(() => {
+      const diaas = calcDIAAS(food);
+      return diaas.diaas > 0 ? (
+        <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:7, marginTop:2, padding:'2px 6px', borderRadius:4, background: diaas.diaas >= 1 ? 'rgba(0,230,138,0.04)' : diaas.diaas >= 0.75 ? 'rgba(245,158,11,0.04)' : 'rgba(239,68,68,0.04)', border:`1px solid ${diaas.diaas >= 1 ? 'rgba(0,230,138,0.15)' : diaas.diaas >= 0.75 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)'}` }}>
+          <span style={{ color: '#8b5cf6', fontWeight:600 }}>💪 DIAAS</span>
+          <span style={{ fontWeight:700, color: diaas.diaas >= 1 ? '#22c55e' : diaas.diaas >= 0.75 ? '#f59e0b' : '#ef4444' }}>{diaas.diaas.toFixed(2)}</span>
+          <span style={{ color:'rgba(255,255,255,0.4)' }}>• лимит: {diaas.limitingAA}</span>
+        </div>
+      ) : null;
+    })()}
     <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', marginTop: 2 }}>Настройте фазу и фармакологию в ⚙️ Параметры → вкладка v2</div>
   </div>
 ) : (
@@ -585,6 +595,14 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                         {score.factors.slice(0, 3).map((f: any, i: number) => (
                           <div key={i} style={{ color: f.impact > 0 ? '#22c55e' : '#ef4444' }}>{f.icon} {f.text}</div>
                         ))}
+                        {(() => {
+                          const d = calcDIAAS(food);
+                          return d.diaas > 0 ? (
+                            <div style={{ marginTop: 2, color: d.diaas >= 1 ? '#22c55e' : d.diaas >= 0.75 ? '#f59e0b' : '#ef4444' }}>
+                              💪 DIAAS {d.diaas.toFixed(2)} (лимит: {d.limitingAA})
+                            </div>
+                          ) : null;
+                        })()}
                       </div>
                     )}
                     {enableC && score.costEfficiency && (

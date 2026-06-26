@@ -94,6 +94,14 @@ export interface DailyDietReport {
   omegaWarning: string | null;
   microDeficits: string[];
   homaIr: number | null;
+  // Phase 2 modules
+  diaas: number;
+  diaasLimitingAA: string;
+  diaasWarning: string | null;
+  antinutrientWarning: string | null;
+  glutathioneWarning: string | null;
+  histamineWarning: string | null;
+  histamineSensitive: boolean;
 }
 
 export function getDefaultProfile(): UserDietProfile {
@@ -541,7 +549,93 @@ export function calcMealScoreV2(
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// 10. DAILY DIET ANALYSIS (14 modules)
+// 11. DIAAS: AMINO ACID SCORE
+// ═══════════════════════════════════════════════════════════════════
+
+/** FAO/WHO reference amino acid pattern (mg/g protein) for adults */
+const FAO_WHO_REF: Record<string, number> = {
+  histidine: 15, isoleucine: 30, leucine: 59, lysine: 45,
+  methionine_cystine: 22, // SAA
+  phenylalanine_tyrosine: 38, // AAA
+  threonine: 23, tryptophan: 6, valine: 39,
+};
+
+/** Digestibility coefficients by food category */
+const DIGEST: Record<string, number> = {
+  protein: 0.95, dairy: 0.97, egg: 0.97, fish: 0.94,
+  grain: 0.85, legume: 0.82, nut: 0.88, vegetable: 0.82,
+  fruit: 0.85, other: 0.85,
+};
+
+export function calcDIAAS(f: FoodItem): { diaas: number; limitingAA: string; score: number } {
+  const a = f.amino_acid_profile_100g;
+  if (!a || f.protein === 0) return { diaas: 0, limitingAA: '—', score: 0 };
+
+  const protG = f.protein;
+  const ratios: Record<string, number> = {
+    histidine: ((a.histidine_mg ?? 0) / protG) / FAO_WHO_REF.histidine,
+    isoleucine: ((a.isoleucine_mg ?? 0) / protG) / FAO_WHO_REF.isoleucine,
+    leucine: ((a.leucine_mg ?? 0) / protG) / FAO_WHO_REF.leucine,
+    lysine: ((a.lysine_mg ?? 0) / protG) / FAO_WHO_REF.lysine,
+    methionine_cystine: (((a.methionine_mg ?? 0) + (a.cysteine_mg ?? 0)) / protG) / FAO_WHO_REF.methionine_cystine,
+    phenylalanine_tyrosine: (((a.phenylalanine_mg ?? 0) + (a.phenylalanine_mg ?? 0) * 0.5) / protG) / FAO_WHO_REF.phenylalanine_tyrosine,
+    threonine: ((a.threonine_mg ?? 0) / protG) / FAO_WHO_REF.threonine,
+    tryptophan: ((a.tryptophan_mg ?? 0) / protG) / FAO_WHO_REF.tryptophan,
+    valine: ((a.valine_mg ?? 0) / protG) / FAO_WHO_REF.valine,
+  };
+
+  const limiting = Object.entries(ratios).reduce((min, curr) => curr[1] < min[1] ? curr : min);
+  const coefficient = DIGEST[f.category] ?? 0.85;
+  const diaas = Math.min(limiting[1] * coefficient, 1.5);
+
+  return {
+    diaas: Math.round(diaas * 100) / 100,
+    limitingAA: limiting[0],
+    score: diaas >= 1.0 ? 1.5 : diaas < 0.75 ? -2.0 : 0,
+  };
+}
+
+export function calcMealDIAAS(products: { foodId: string; weightGrams: number }[]): { diaas: number; limitingAA: string } {
+  const entries = products.map(p => ({ f: FOOD_DB.find(x => x.id === p.foodId), w: p.weightGrams })).filter(e => e.f);
+  const totalW = entries.reduce((s, e) => s + e.w, 0);
+  if (totalW === 0) return { diaas: 0, limitingAA: '—' };
+
+  // Sum amino acids weighted by weight
+  const sum = { histidine: 0, isoleucine: 0, leucine: 0, lysine: 0, methionine: 0, cysteine: 0,
+    phenylalanine: 0, tyrosine: 0, threonine: 0, tryptophan: 0, valine: 0, protein: 0 };
+  for (const e of entries) {
+    const a = e.f!.amino_acid_profile_100g;
+    const w = e.w / 100;
+    if (a) {
+      sum.histidine += (a.histidine_mg ?? 0) * w; sum.isoleucine += (a.isoleucine_mg ?? 0) * w;
+      sum.leucine += (a.leucine_mg ?? 0) * w; sum.lysine += (a.lysine_mg ?? 0) * w;
+      sum.methionine += (a.methionine_mg ?? 0) * w; sum.cysteine += (a.cysteine_mg ?? 0) * w;
+      sum.phenylalanine += (a.phenylalanine_mg ?? 0) * w; sum.tyrosine += (a.phenylalanine_mg ?? 0) * 0.5 * w;
+      sum.threonine += (a.threonine_mg ?? 0) * w; sum.tryptophan += (a.tryptophan_mg ?? 0) * w;
+      sum.valine += (a.valine_mg ?? 0) * w;
+    }
+    sum.protein += e.f!.protein * w;
+  }
+
+  if (sum.protein === 0) return { diaas: 0, limitingAA: '—' };
+
+  const ref = FAO_WHO_REF;
+  const ratios: Record<string, number> = {
+    histidine: (sum.histidine / sum.protein) / ref.histidine,
+    isoleucine: (sum.isoleucine / sum.protein) / ref.isoleucine,
+    leucine: (sum.leucine / sum.protein) / ref.leucine,
+    lysine: (sum.lysine / sum.protein) / ref.lysine,
+    methionine_cystine: ((sum.methionine + sum.cysteine) / sum.protein) / ref.methionine_cystine,
+    threonine: (sum.threonine / sum.protein) / ref.threonine,
+    tryptophan: (sum.tryptophan / sum.protein) / ref.tryptophan,
+    valine: (sum.valine / sum.protein) / ref.valine,
+  };
+
+  const limiting = Object.entries(ratios).reduce((min, curr) => curr[1] < min[1] ? curr : min);
+  const avgCoef = entries.reduce((s, e) => s + (DIGEST[e.f!.category] ?? 0.85) * e.w, 0) / totalW;
+  const diaas = Math.min(limiting[1] * avgCoef, 1.5);
+  return { diaas: Math.round(diaas * 100) / 100, limitingAA: limiting[0] };
+}
 // ═══════════════════════════════════════════════════════════════════
 
 export function analyzeDailyDiet(
@@ -618,6 +712,60 @@ export function analyzeDailyDiet(
     ? l.glucose_fasting! * l.insulin_fasting! / 22.5
     : null;
 
+  // ── Phase 2: DIAAS ──
+  const allFoods = allProducts.map(p => { const f = FOOD_DB.find(x => x.id === p.foodId); return f ? { f, w: p.weightGrams } : null; }).filter(Boolean) as { f: FoodItem; w: number }[];
+  const totalProtein = allFoods.reduce((s, e) => s + e.f.protein * e.w / 100, 0);
+  let diaas = 0;
+  let diaasLimitingAA = '—';
+  let diaasWarning: string | null = null;
+  if (totalProtein > 0 && allFoods.length > 0) {
+    const mealDiaas = calcMealDIAAS(allProducts.map(p => ({ foodId: p.foodId, weightGrams: p.weightGrams })));
+    diaas = mealDiaas.diaas;
+    diaasLimitingAA = mealDiaas.limitingAA;
+    if (diaas < 0.75) diaasWarning = `Низкий DIAAS (${diaas.toFixed(2)}) — неполноценный белок. Лимитирующая АК: ${diaasLimitingAA}`;
+    else if (diaas >= 1.0) diaasWarning = `✅ Полноценный белок (DIAAS ${diaas.toFixed(2)})`;
+    else diaasWarning = `DIAAS ${diaas.toFixed(2)} — допустимо, лимитирует ${diaasLimitingAA}`;
+  }
+
+  // ── Phase 2: Antinutrients ──
+  const totalLectins = sumF(f => f.specific_compounds_100g?.lectins_mg ?? 0);
+  const totalOxalates = sumF(f => f.specific_compounds_100g?.oxalates_mg ?? 0);
+  const antinutrientThreshold = 500;
+  let antinutrientWarning: string | null = null;
+  if (totalLectins > antinutrientThreshold || totalOxalates > antinutrientThreshold) {
+    const parts: string[] = [];
+    if (totalLectins > antinutrientThreshold) parts.push(`лектины ${Math.round(totalLectins)}мг`);
+    if (totalOxalates > antinutrientThreshold) parts.push(`оксалаты ${Math.round(totalOxalates)}мг`);
+    antinutrientWarning = `⚠️ Повышены антинутриенты: ${parts.join(', ')}. Замачивание/термическая обработка бобовых`;
+  }
+
+  // ── Phase 2: Glutathione status ──
+  const totalCysteine = sumF(f => f.amino_acid_profile_100g?.cysteine_mg ?? 0);
+  const totalSelenium = sumF(f => f.trace_elements_100g?.selenium_mcg ?? 0);
+  const totalVitC = sumF(f => f.vitamins_100g?.vitamin_c_mg ?? 0);
+  const totalB2 = sumF(f => f.vitamins_100g?.vitamin_b2_mg ?? 0);
+  const totalB3 = sumF(f => f.vitamins_100g?.vitamin_b3_mg ?? 0);
+  let glutathioneWarning: string | null = null;
+  if (!profile.pharma.DETOX_SUPPORT && (totalCysteine < 500 || totalSelenium < 50 || totalVitC < 50 || totalB2 < 1 || totalB3 < 10)) {
+    const deficits: string[] = [];
+    if (totalCysteine < 500) deficits.push('цистеин');
+    if (totalSelenium < 50) deficits.push('селен');
+    if (totalVitC < 50) deficits.push('вит. C');
+    if (totalB2 < 1) deficits.push('B2');
+    if (totalB3 < 10) deficits.push('B3');
+    glutathioneWarning = `⚠️ Низкая поддержка глутатиона: ${deficits.join(', ')}. Добавьте яйца, бразильские орехи, крестоцветные`;
+  }
+
+  // ── Phase 2: Histamine control ──
+  let histamineWarning: string | null = null;
+  if (profile.histamineSensitive) {
+    const histamineLevels = allFoods.map(e => e.f.metabolic_flags?.histamine_level ?? 'LOW');
+    const hasHighHistamine = histamineLevels.some(h => h === 'HIGH');
+    const highHistamineCount = histamineLevels.filter(h => h === 'HIGH' || h === 'MEDIUM').length;
+    if (hasHighHistamine) histamineWarning = `🚨 Высокий гистамин! ${highHistamineCount} продуктов с высоким/средним содержанием. Исключите ферментированные/выдержанные продукты`;
+    else if (highHistamineCount >= 3) histamineWarning = `⚠️ ${highHistamineCount} продукта со средним гистамином — возможно накопление`;
+  }
+
   return {
     date: new Date().toISOString().slice(0, 10),
     totalKcal: Math.round(kcal),
@@ -638,5 +786,12 @@ export function analyzeDailyDiet(
     omegaWarning,
     microDeficits,
     homaIr: homaIr ? Math.round(homaIr * 10) / 10 : null,
+    diaas: Math.round(diaas * 100) / 100,
+    diaasLimitingAA,
+    diaasWarning,
+    antinutrientWarning,
+    glutathioneWarning,
+    histamineWarning,
+    histamineSensitive: profile.histamineSensitive,
   };
 }

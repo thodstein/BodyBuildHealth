@@ -123,6 +123,26 @@ export const DailyDietDashboard: React.FC = () => {
           🚨 HOMA-IR {report.homaIr.toFixed(1)}{' > 2.5 — инсулинорезистентность'}
         </div>
       )}
+      {report.diaasWarning && (
+        <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: report.diaas >= 1.0 ? 'rgba(0,230,138,0.06)' : 'rgba(249,115,22,0.06)', border: `1px solid ${report.diaas >= 1.0 ? 'rgba(0,230,138,0.1)' : 'rgba(249,115,22,0.1)'}`, fontSize: 7, color: report.diaas >= 1.0 ? '#00e68a' : '#f59e0b' }}>
+          {report.diaasWarning}
+        </div>
+      )}
+      {report.antinutrientWarning && (
+        <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.1)', fontSize: 7, color: '#f59e0b' }}>
+          {report.antinutrientWarning}
+        </div>
+      )}
+      {report.glutathioneWarning && (
+        <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.1)', fontSize: 7, color: '#f59e0b' }}>
+          {report.glutathioneWarning}
+        </div>
+      )}
+      {report.histamineWarning && (
+        <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.1)', fontSize: 7, color: '#ef4444' }}>
+          {report.histamineWarning}
+        </div>
+      )}
     </div>
   );
 };
