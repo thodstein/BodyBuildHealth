@@ -378,6 +378,15 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
   { id:'PPI_DRUGS', name:'ИПП (ингибиторы протонной помпы)', type:'complex', description:'Препараты для снижения кислотности желудка — лечение ГЭРБ и язв', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'STATIN_DRUGS', name:'Статины (группа)', type:'complex', description:'Ингибиторы HMG-CoA редуктазы — снижение холестерина, гиполипидемические', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'THYROID_DRUGS', name:'Тиреоидные препараты (группа)', type:'complex', description:'Препараты гормонов щитовидной железы — терапия гипотиреоза', mechanisms:[], organs:[], categories:[], deficiency:'' },
+  { id:'LACTOFERRIN', name:'Лактоферрин', type:'supplement', description:'Железосвязывающий гликопротеин — иммуномодулятор', mechanisms:[], organs:[], categories:[], deficiency:'' },
+  { id:'L_HISTIDINE', name:'L-Гистидин', type:'amino', description:'Незаменимая аминокислота — предшественник гистамина', mechanisms:[], organs:[], categories:[], deficiency:'' },
+  { id:'L_LYSINE', name:'L-Лизин', type:'amino', description:'Незаменимая аминокислота — компонент коллагена', mechanisms:[], organs:[], categories:[], deficiency:'' },
+  { id:'BENFOTIAMINE', name:'Бенфотиамин', type:'supplement', description:'Жирорастворимая форма B1', mechanisms:[], organs:[], categories:[], deficiency:'' },
+  { id:'NICOTINAMIDE_RIBOSIDE', name:'Никотинамид Рибозид (NR)', type:'supplement', description:'Предшественник NAD+', mechanisms:[], organs:[], categories:[], deficiency:'' },
+  { id:'SPERMIDINE', name:'Спермидин', type:'supplement', description:'Индуктор аутофагии', mechanisms:[], organs:[], categories:[], deficiency:'' },
+  { id:'URIDINE_MONOPHOSPHATE', name:'Уридин монофосфат', type:'supplement', description:'Нуклеотид для памяти и сна', mechanisms:[], organs:[], categories:[], deficiency:'' },
+  { id:'CHOLINE_BITARTRATE', name:'Холина битартрат', type:'supplement', description:'Соль холина — предшественник ацетилхолина', mechanisms:[], organs:[], categories:[], deficiency:'' },
+  { id:'CHANTERELLE', name:'Лисички (грибы)', type:'supplement', description:'Природный источник витамина D, антипаразитарное', mechanisms:[], organs:[], categories:[], deficiency:'' },
 ];
 
 export const SUPPORT_SUBSTANCE_MAP: Record<string, SupportSubstance> = {};
