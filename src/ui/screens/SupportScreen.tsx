@@ -1761,6 +1761,71 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         </div>
       )}
 
+      {entry.analog && entry.analog.length > 0 && (
+        <div style={{ marginTop: 3 }}>
+          <div style={{ fontSize: 7, color: '#818cf8', fontWeight: 600, marginBottom: 2 }}>🔗 Аналоги/синергисты:</div>
+          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            {entry.analog.map((a, i) => {
+              const analogEntry = SUPPORT_CATALOG_DATA[a];
+              const analogName = analogEntry?.nameRu || analogEntry?.name || a;
+              return (
+                <span key={i} style={{ fontSize: 7, padding: '1px 5px', borderRadius: 3, background: 'rgba(129,140,248,0.1)', color: '#818cf8', border: '1px solid rgba(129,140,248,0.2)' }}>
+                  {analogName}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {entry.specialInstructions && entry.specialInstructions.length > 0 && (
+        <div style={{ marginTop: 3, padding: '4px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+          <div style={{ fontSize: 7, color: '#f59e0b', fontWeight: 600, marginBottom: 2 }}>📋 Особые указания:</div>
+          {entry.specialInstructions.map((si, i) => (
+            <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', lineHeight: 1.4, paddingLeft: 8, position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 0, color: '#f59e0b' }}>•</span>
+              {si}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {entry.synergies && entry.synergies.length > 0 && (
+        <div style={{ marginTop: 3 }}>
+          <div style={{ fontSize: 7, color: '#22c55e', fontWeight: 600, marginBottom: 2 }}>🟢 Синергии:</div>
+          {entry.synergies.map((s, i) => (
+            <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', lineHeight: 1.4, display: 'flex', gap: 3, marginBottom: 1 }}>
+              <span style={{ color: '#22c55e', flexShrink: 0, fontWeight: 700, fontSize: 10 }}>+</span>
+              <span style={{ fontWeight: 600 }}>{s.with}</span>
+              <span>— {s.effect}</span>
+              {s.severity && (
+                <span style={{ marginLeft: 'auto', fontSize: 7, padding: '0 4px', borderRadius: 2, background: s.severity === 'HIGH' ? 'rgba(34,197,94,0.15)' : s.severity === 'MEDIUM' ? 'rgba(234,179,8,0.15)' : 'rgba(255,255,255,0.08)', color: s.severity === 'HIGH' ? '#22c55e' : s.severity === 'MEDIUM' ? '#eab308' : 'rgba(255,255,255,0.5)' }}>
+                  {s.severity === 'HIGH' ? '◉' : s.severity === 'MEDIUM' ? '◐' : '○'}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {entry.conflicts && entry.conflicts.length > 0 && (
+        <div style={{ marginTop: 3 }}>
+          <div style={{ fontSize: 7, color: '#ef4444', fontWeight: 600, marginBottom: 2 }}>🔴 Конфликты:</div>
+          {entry.conflicts.map((c, i) => (
+            <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', lineHeight: 1.4, display: 'flex', gap: 3, marginBottom: 1 }}>
+              <span style={{ color: '#ef4444', flexShrink: 0, fontWeight: 700, fontSize: 10 }}>×</span>
+              <span style={{ fontWeight: 600 }}>{c.with}</span>
+              <span>— {c.effect}</span>
+              {c.severity && (
+                <span style={{ marginLeft: 'auto', fontSize: 7, padding: '0 4px', borderRadius: 2, background: c.severity === 'HIGH' ? 'rgba(239,68,68,0.15)' : c.severity === 'MEDIUM' ? 'rgba(234,179,8,0.15)' : 'rgba(255,255,255,0.08)', color: c.severity === 'HIGH' ? '#ef4444' : c.severity === 'MEDIUM' ? '#eab308' : 'rgba(255,255,255,0.5)' }}>
+                  {c.severity === 'HIGH' ? '◉' : c.severity === 'MEDIUM' ? '◐' : '○'}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Enrichment data */}
       {(() => {
         const enrich = CATALOG_ENRICHMENT[canonicalId] || CATALOG_ENRICHMENT[subId];
@@ -2704,41 +2769,138 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         {validInteractionIds.length<2 && <div style={{ textAlign:'center', padding:'20px 12px', background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)' }}><div style={{ fontSize:20, marginBottom:4 }}>⚡</div><div style={{ fontSize:10, color:'var(--text-dim)' }}>Выберите минимум 2 препарата</div></div>}
                         {validInteractionIds.length>=2 && !hasSupportInteractions && <div style={{ textAlign:'center', padding:'10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)' }}><span style={{ fontSize:10, color:'#4caf50', fontWeight:600 }}>✓ Конфликтов не обнаружено</span></div>}
                         {hasSupportInteractions && (
-                          <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                             {[
-                              { list: supportSynergiesList, label:'⊕ Синергия', color:'#22c55e' },
-                              { list: supportConflicts, label:'⊖ Конфликт', color:'#ef4444' },
-                              { list: supportCautions, label:'⚡ Осторожность', color:'#f59e0b' },
+                              { list: supportSynergiesList, label:'Синергия', color:'#22c55e', emoji:'🤝' },
+                              { list: supportConflicts, label:'Конфликт', color:'#ef4444', emoji:'🔴' },
+                              { list: supportCautions, label:'Осторожность', color:'#f59e0b', emoji:'🟡' },
                             ].filter(s => s.list.length>0).map(section => (
-                              <div key={section.label} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
-                                <div style={{ fontSize:10, fontWeight:700, color:section.color, marginBottom:4 }}>{section.label} ({section.list.length})</div>
+                              <div key={section.label}>
+                                <div style={{ fontSize:10, fontWeight:700, color:section.color, marginBottom:4 }}>
+                                  {section.emoji} {section.label} <span style={{ fontSize:8, opacity:0.6 }}>({section.list.length})</span>
+                                </div>
                                 {(section.list || []).map(i => {
                                   const sevColor = i.severity === 'HIGH' ? '#ef4444' : i.severity === 'MEDIUM' ? '#f59e0b' : '#22c55e';
+                                  const sevLabel = i.severity === 'HIGH' ? 'Высокий' : i.severity === 'MEDIUM' ? 'Средний' : 'Низкий';
                                   const aName = resolveSubName(i.substanceA) || i.substanceA;
                                   const bName = resolveSubName(i.substanceB) || i.substanceB;
+                                  const effText = showEffect(i);
+                                  const mechTexts = (i.mechanisms || []).map((m: string) =>
+                                    MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')
+                                  );
                                   return (
-                                     <div key={i.interactionId} style={{ padding:'5px 0', borderBottom:'1px solid var(--border)' }}>
-                                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                                        <span style={{ color:section.color, fontWeight:700, fontSize:9 }}>{aName} + {bName}</span>
+                                    <div key={i.interactionId} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'10px 12px', border:'1px solid '+section.color+'22', marginBottom:4 }}>
+                                      {/* Header: pair names + severity badge */}
+                                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                                        <span style={{ color:section.color, fontWeight:700, fontSize:10 }}>{aName} + {bName}</span>
                                         <div style={{ display:'flex', gap:3 }}>
-                                          <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:section.color+'22', color:section.color, fontWeight:600 }}>{i.type === 'synergy' ? '⊕ Синергия' : i.type === 'conflict' ? '⊖ Конфликт' : '⚡ Осторожно'}</span>
-                                          {i.severity && <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevColor+'22', color:sevColor }}>{i.severity==='HIGH'?'Высокий':i.severity==='MEDIUM'?'Средний':'Низкий'}</span>}
+                                          {i.severity && (
+                                            <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:sevColor+'22', color:sevColor, fontWeight:600 }}>
+                                              {sevLabel}
+                                            </span>
+                                          )}
                                         </div>
                                       </div>
-                                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginTop:2 }}>{showEffect(i)}</div>
-                                      {i.mechanisms && i.mechanisms.length > 0 && (
-                                        <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-                                          {i.mechanisms.map((m: string, mi: number) => (
-                                            <span key={mi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>
-                                          ))}
+                                      {/* Severity bar */}
+                                      <div style={{ height:3, borderRadius:2, background:'rgba(255,255,255,0.06)', marginBottom:5, overflow:'hidden' }}>
+                                        <div style={{ width: i.severity === 'HIGH' ? '100%' : i.severity === 'MEDIUM' ? '60%' : '30%', height:'100%', background:sevColor, borderRadius:2 }} />
+                                      </div>
+                                      {/* Эффект */}
+                                      {effText && (
+                                        <div style={{ fontSize:9, color: section.color, fontWeight:600, lineHeight:1.3, marginBottom:4 }}>
+                                          🎯 {effText}
                                         </div>
                                       )}
-                                      {i.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:1 }}>{i.notes}</div>}
+                                      {/* Почему */}
+                                      {mechTexts.length > 0 && (
+                                        <div style={{ marginBottom:3 }}>
+                                          <div style={{ fontSize:7, color:'#a78bfa', fontWeight:600, marginBottom:1 }}>⚙️ Почему:</div>
+                                          <ul style={{ margin:0, paddingLeft:14, fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.3 }}>
+                                            {mechTexts.map((txt: string, mi: number) => (
+                                              <li key={mi}>{txt}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+                                      {/* Параметры / Рекомендации */}
+                                      {i.notes && (
+                                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', lineHeight:1.3, background:'rgba(245,158,11,0.06)', padding:'4px 6px', borderRadius:4, marginTop:2 }}>
+                                          <span style={{ color:'#f59e0b', fontWeight:600 }}>💊 </span>
+                                          {i.notes}
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
                               </div>
                             ))}
+                          </div>
+                        )}
+
+                        {/* Per-entry data for support substances */}
+                        {validInteractionIds.length >= 1 && (
+                          <div style={{ marginTop: 10 }}>
+                            <h4 style={{ margin: '0 0 6px 0', fontSize: 10, color: 'var(--text-dim)' }}>📋 Данные по веществам</h4>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              {validInteractionIds.map((id, idx) => {
+                                const entry = SUPPORT_CATALOG_DATA[id];
+                                if (!entry) return null;
+                                const tierColors: Record<string,string> = { core:'#00e68a', standard:'#60a5fa', advanced:'#a78bfa', specialty:'#f59e0b' };
+                                return (
+                                  <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'9px 11px', border:'1px solid var(--border)' }}>
+                                    {/* Name + tier badge */}
+                                    <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:4 }}>
+                                      <span style={{ fontSize:10, fontWeight:700, color:'#00e68a' }}>{entry.nameRu || entry.name || id}</span>
+                                      {entry.tier && <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:(tierColors[entry.tier]||'#888')+'22', color:tierColors[entry.tier]||'#888', fontWeight:600 }}>{entry.tier}</span>}
+                                    </div>
+                                    {/* Categories + organs */}
+                                    <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:3 }}>
+                                      {(entry.category||[]).slice(0,3).map((cat,i) => (
+                                        <span key={i} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.1)', color:'#a78bfa' }}>{cat}</span>
+                                      ))}
+                                      {entry.targetOrgan && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(96,165,250,0.1)', color:'#60a5fa' }}>{entry.targetOrgan}</span>}
+                                    </div>
+                                    {/* Description */}
+                                    {entry.description && <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', lineHeight:1.25, marginBottom:3 }}>{entry.description}</div>}
+                                    {/* Analog chips */}
+                                    {entry.analog && entry.analog.length > 0 && (
+                                      <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:2 }}>
+                                        <span style={{ fontSize:7, color:'#818cf8', fontWeight:600 }}>🔗 Аналоги: </span>
+                                        {entry.analog.map((a,i) => {
+                                          const ae = SUPPORT_CATALOG_DATA[a];
+                                          return <span key={i} style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:'rgba(129,140,248,0.1)', color:'#818cf8' }}>{ae?.nameRu || ae?.name || a}</span>;
+                                        })}
+                                      </div>
+                                    )}
+                                    {/* Synergy chips */}
+                                    {entry.synergies && entry.synergies.length > 0 && (
+                                      <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:2 }}>
+                                        <span style={{ fontSize:7, color:'#22c55e', fontWeight:600 }}>🟢 Синергии: </span>
+                                        {entry.synergies.map((s,i) => (
+                                          <span key={i} style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:'rgba(34,197,94,0.1)', color:'#22c55e' }}>{s.with}: {s.effect}</span>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {/* Conflict chips */}
+                                    {entry.conflicts && entry.conflicts.length > 0 && (
+                                      <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:2 }}>
+                                        <span style={{ fontSize:7, color:'#ef4444', fontWeight:600 }}>🔴 Конфликты: </span>
+                                        {entry.conflicts.map((c,i) => (
+                                          <span key={i} style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background: c.severity === 'HIGH' ? 'rgba(239,68,68,0.12)' : 'rgba(234,179,8,0.12)', color: c.severity === 'HIGH' ? '#ef4444' : '#eab308' }}>{c.with}: {c.effect}</span>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {/* Special instructions */}
+                                    {entry.specialInstructions && entry.specialInstructions.length > 0 && (
+                                      <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', lineHeight:1.2, marginTop:2, borderTop:'1px solid rgba(255,255,255,0.04)', paddingTop:3 }}>
+                                        <span style={{ color:'#f59e0b', fontWeight:600 }}>📋 </span>
+                                        {entry.specialInstructions.join(' · ')}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -2792,20 +2954,35 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                             if (alerts.length === 0) return <div style={{ textAlign:'center', padding:'10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)' }}><span style={{ fontSize:10, color:'#4caf50', fontWeight:600 }}>✓ Конфликтов не обнаружено</span></div>;
                             const color = (t: string) => t === 'critical' ? '#ef4444' : t === 'warning' ? '#f59e0b' : '#60a5fa';
                             return (
-                              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                                 {alerts.map((alert, ai) => {
                                   const c = color(alert.type);
+                                  const alertSevLabel = alert.type === 'critical' ? 'Критично' : alert.type === 'warning' ? 'Предупреждение' : 'Инфо';
                                   return (
-                                    <div key={`alert_${ai}`} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:`1px solid ${c}33` }}>
-                                      <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
+                                    <div key={`alert_${ai}`} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'10px 12px', border:'1px solid '+c+'33' }}>
+                                      {/* Header */}
+                                      <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:3 }}>
                                         <span style={{ fontSize:10, fontWeight:700, color:c }}>{alert.type === 'critical' ? '🔴' : alert.type === 'warning' ? '🟡' : '🔵'}</span>
-                                        <span style={{ fontSize:9, padding:'1px 5px', borderRadius:3, background:c+'22', color:c, fontWeight:600 }}>
-                                          {alert.type === 'critical' ? 'Критично' : alert.type === 'warning' ? 'Предупреждение' : 'Инфо'}
-                                        </span>
+                                        <span style={{ fontSize:9, padding:'1px 6px', borderRadius:3, background:c+'22', color:c, fontWeight:600 }}>{alertSevLabel}</span>
                                         <span style={{ fontSize:8, color:'var(--text-dim)' }}>{(alert.drugs||[]).map(d => resolveSubName(d)).join(', ')}</span>
                                       </div>
-                                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.9)', lineHeight:1.3, marginTop:1 }}>{alert.mechanism}</div>
-                                      <div style={{ fontSize:8, color:'#f59e0b', lineHeight:1.3, marginTop:2, background:'rgba(245,158,11,0.06)', padding:'3px 6px', borderRadius:4 }}>💊 {alert.recommendation}</div>
+                                      {/* Severity bar */}
+                                      <div style={{ height:3, borderRadius:2, background:'rgba(255,255,255,0.06)', marginBottom:5, overflow:'hidden' }}>
+                                        <div style={{ width: alert.type === 'critical' ? '100%' : alert.type === 'warning' ? '60%' : '30%', height:'100%', background:c, borderRadius:2 }} />
+                                      </div>
+                                      {/* Эффект / Почему */}
+                                      {alert.mechanism && (
+                                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.9)', lineHeight:1.3, marginBottom:5 }}>
+                                          <span style={{ color:'#a78bfa', fontWeight:600, fontSize:8 }}>⚙️ Механизм: </span>
+                                          {alert.mechanism}
+                                        </div>
+                                      )}
+                                      {/* Рекомендация */}
+                                      {alert.recommendation && (
+                                        <div style={{ fontSize:8, color:'#f59e0b', lineHeight:1.3, background:'rgba(245,158,11,0.06)', padding:'4px 6px', borderRadius:4 }}>
+                                          💊 Рекомендация: {alert.recommendation}
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -2815,6 +2992,73 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                             return <div style={{ textAlign:'center', padding:'10px', borderRadius:8, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)' }}><span style={{ fontSize:9, color:'#ef4444' }}>Ошибка: {String(e)}</span></div>;
                           }
                         })()}
+
+                        {/* Per-entry data for pharma substances */}
+                        {pharmaInteractIds.filter(Boolean).length >= 1 && (
+                          <div style={{ marginTop: 10 }}>
+                            <h4 style={{ margin: '0 0 6px 0', fontSize: 10, color: 'var(--text-dim)' }}>📋 Данные по препаратам</h4>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              {pharmaInteractIds.filter(Boolean).map((id, idx) => {
+                                const sub = PHARMA_DB[id];
+                                if (!sub) return null;
+                                const classLabel = (sub.class||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+                                const cvIcons: Record<string,string> = { up:'↑', down:'↓', neutral:'→' };
+                                return (
+                                  <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'9px 11px', border:'1px solid var(--border)' }}>
+                                    {/* Name + class badge */}
+                                    <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:3 }}>
+                                      <span style={{ fontSize:10, fontWeight:700, color:'#60a5fa' }}>{sub.name}</span>
+                                      {classLabel && <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(129,140,248,0.1)', color:'#818cf8', fontWeight:600 }}>{classLabel}</span>}
+                                    </div>
+                                    {/* Target systems chips */}
+                                    {(sub.targetSystems||[]).length > 0 && (
+                                      <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:3 }}>
+                                        {(sub.targetSystems||[]).slice(0,4).map((sys,i) => (
+                                          <span key={i} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(96,165,250,0.1)', color:'#60a5fa' }}>{sys}</span>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {/* cvProfile summary */}
+                                    {sub.cvProfile && (
+                                      <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:3, fontSize:7, color:'rgba(255,255,255,0.5)' }}>
+                                        <span style={{ color:'#f59e0b', fontWeight:600 }}>❤️ </span>
+                                        <span style={{ color: sub.cvProfile.bloodPressure==='up'?'#ef4444':sub.cvProfile.bloodPressure==='down'?'#22c55e':'#888' }}>АД {cvIcons[sub.cvProfile.bloodPressure]||sub.cvProfile.bloodPressure}</span>
+                                        <span style={{ color: sub.cvProfile.heartRate==='up'?'#ef4444':sub.cvProfile.heartRate==='down'?'#22c55e':'#888' }}>ЧСС {cvIcons[sub.cvProfile.heartRate]||sub.cvProfile.heartRate}</span>
+                                        <span style={{ color: sub.cvProfile.thrombosisRisk==='high'?'#ef4444':sub.cvProfile.thrombosisRisk==='medium'?'#f59e0b':'#22c55e' }}>Тромбоз: {sub.cvProfile.thrombosisRisk}</span>
+                                      </div>
+                                    )}
+                                    {/* Conflict chips */}
+                                    {sub.conflicts && sub.conflicts.length > 0 && (
+                                      <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:2 }}>
+                                        <span style={{ fontSize:7, color:'#ef4444', fontWeight:600 }}>🔴 Конфликты: </span>
+                                        {sub.conflicts.map((c,i) => (
+                                          <span key={i} style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background: c.severity === 'HIGH' ? 'rgba(239,68,68,0.12)' : 'rgba(234,179,8,0.12)', color: c.severity === 'HIGH' ? '#ef4444' : '#eab308' }}>{c.with}: {c.effect}</span>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {/* Linked substances chips */}
+                                    {sub.linkedSubstances && sub.linkedSubstances.length > 0 && (
+                                      <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:2 }}>
+                                        <span style={{ fontSize:7, color:'#22c55e', fontWeight:600 }}>🟢 Связанные: </span>
+                                        {sub.linkedSubstances.map((ls,i) => {
+                                          const linkedName = PHARMA_DB[ls.id]?.name || ls.id;
+                                          return <span key={i} style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background: ls.type === 'synergy' ? 'rgba(34,197,94,0.1)' : 'rgba(255,23,68,0.1)', color: ls.type === 'synergy' ? '#22c55e' : '#ff1744' }}>{linkedName}: {ls.mechanism}</span>;
+                                        })}
+                                      </div>
+                                    )}
+                                    {/* Special instructions */}
+                                    {sub.specialInstructions && sub.specialInstructions.length > 0 && (
+                                      <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', lineHeight:1.2, marginTop:2, borderTop:'1px solid rgba(255,255,255,0.04)', paddingTop:3 }}>
+                                        <span style={{ color:'#f59e0b', fontWeight:600 }}>📋 </span>
+                                        {sub.specialInstructions.join(' · ')}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

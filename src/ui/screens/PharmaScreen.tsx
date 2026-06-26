@@ -747,6 +747,58 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
         </div>
       )}
 
+      {/* conflicts */}
+      {sub.conflicts && sub.conflicts.length > 0 && (
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 9, color: '#ef4444', fontWeight: 600, marginBottom: 3 }}>🔴 Конфликты</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {sub.conflicts.map((c, i) => (
+              <span key={i} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: c.severity === 'HIGH' ? 'rgba(239,68,68,0.12)' : 'rgba(234,179,8,0.12)', color: c.severity === 'HIGH' ? '#ef4444' : '#eab308', fontWeight: 500, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {c.with}: {c.effect}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* special instructions */}
+      {sub.specialInstructions && sub.specialInstructions.length > 0 && (
+        <div style={{ marginBottom: 6, padding: '4px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+          <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600, marginBottom: 2 }}>📋 Особые указания</div>
+          {sub.specialInstructions.map((si, i) => (
+            <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', lineHeight: 1.4, paddingLeft: 8, position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 0, color: '#f59e0b' }}>•</span>
+              {si}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* contraindications */}
+      {(sub.contraindications || detail?.contraindications) && (
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 9, color: '#ef4444', fontWeight: 600, marginBottom: 2 }}>🚫 Противопоказания</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+            {(sub.contraindications || detail?.contraindications || []).map((c: string, i: number) => (
+              <span key={i} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,0.08)', color: '#ef4444' }}>{c}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* side effects */}
+      {(sub.sideEffects || detail?.sideEffects) && (
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600, marginBottom: 2 }}>⚠ Побочные эффекты</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+            {(sub.sideEffects || detail?.sideEffects || []).map((se: any, i: number) => {
+              if (typeof se === 'string') return <span key={i} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(245,158,11,0.08)', color: '#f59e0b' }}>{se}</span>;
+              return <span key={i} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: se.frequency === 'common' ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.04)', color: se.frequency === 'common' ? '#f59e0b' : 'rgba(255,255,255,0.5)' }}>{se.effect}</span>;
+            })}
+          </div>
+        </div>
+      )}
+
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>Фармакодинамика</div>
             {pdEntries.map(([key, val]) => {
@@ -2411,6 +2463,58 @@ const InteractionCheckerTab: React.FC = () => {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Per-entry conflicts & instructions */}
+      {validIds.length >= 1 && (
+        <div style={{ marginTop: 12 }}>
+          <h4 style={{ margin: '0 0 6px 0', fontSize: 11, color: 'var(--text-dim)' }}>📋 Данные по каждому препарату</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {validIds.map((id, idx) => {
+              const sub = PHARMA_DB[id];
+              if (!sub) return null;
+              return (
+                <div key={idx} style={{
+                  background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+                  borderRadius: 10, padding: '10px 12px',
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 4 }}>{sub.name}</div>
+                  
+                  {sub.conflicts && sub.conflicts.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 3 }}>
+                      <span style={{ fontSize: 8, color: '#ef4444', fontWeight: 600 }}>🔴 Конфликты:</span>
+                      {sub.conflicts.map((c, i) => (
+                        <span key={i} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3,
+                          background: c.severity === 'HIGH' ? 'rgba(239,68,68,0.12)' : 'rgba(234,179,8,0.12)',
+                          color: c.severity === 'HIGH' ? '#ef4444' : '#eab308',
+                        }}>{c.with}: {c.effect}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {sub.linkedSubstances && sub.linkedSubstances.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 3 }}>
+                      <span style={{ fontSize: 8, color: '#22c55e', fontWeight: 600 }}>🟢 Связанные:</span>
+                      {sub.linkedSubstances.map((ls, i) => (
+                        <span key={i} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3,
+                          background: ls.type === 'synergy' ? 'rgba(34,197,94,0.12)' : 'rgba(255,23,68,0.12)',
+                          color: ls.type === 'synergy' ? '#22c55e' : '#ff1744',
+                        }}>{PHARMA_DB[ls.id]?.name || ls.id}: {ls.mechanism}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {sub.specialInstructions && sub.specialInstructions.length > 0 && (
+                    <div>
+                      <span style={{ fontSize: 8, color: '#f59e0b', fontWeight: 600 }}>📋 Указания: </span>
+                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)' }}>{sub.specialInstructions.join(' · ')}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

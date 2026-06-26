@@ -369,6 +369,8 @@ export interface PharmaSubstance {
   n_hill: number;
   maxEffect: number;
   synergies?: PharmaSynergy[];
+  conflicts?: { with: string; effect: string; mechanism: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' }[];
+  specialInstructions?: string[];
   contraindications?: string[];
   sideEffects?: SideEffect[];
   dosageRange?: { min: number; max: number; unit: string; frequency: string };
