@@ -120,6 +120,53 @@ export function calcBBQualityScore(f: FoodItem): number {
   return Math.round(Math.max(1.0, Math.min(10.0, score)) * 10) / 10;
 }
 
+/** Композитный рейтинг качества: bb_quality_score + все метаболические флаги + аминокислоты + ЖКТ */
+export function compositeQualityScore(f: FoodItem): number {
+  let s = calcBBQualityScore(f);
+  const mf = f.metabolic_flags || {};
+  const gt = f.gastro_tags || {};
+  const aa = f.amino_acid_profile_100g || {};
+  const el = f.electrolytes_100g || {};
+  const sc = f.specific_compounds_100g || {};
+  // Метаболические флаги
+  if (mf.ammonia_source_level === 'HIGH') s -= 0.5;
+  if (mf.ammonia_source_level === 'MEDIUM') s -= 0.2;
+  if (mf.heavy_metal_risk === 'MEDIUM') s -= 0.3;
+  if (mf.cns_impact === 'SEDATIVE') s -= 0.3;
+  if (mf.anabolic_potential === 'HIGH') s += 0.5;
+  if (mf.anabolic_potential === 'MEDIUM') s += 0.2;
+  if (mf.hepatoprotective) s += 0.5;
+  if (mf.insulin_sensitivity_impact === 'POSITIVE') s += 0.5;
+  if (mf.insulin_sensitivity_impact === 'NEGATIVE') s -= 0.5;
+  if (mf.detox_support_level === 'HIGH') s += 0.3;
+  if (mf.detox_support_level === 'MEDIUM') s += 0.1;
+  if (mf.goitrogenic_potential === 'HIGH') s -= 0.3;
+  if (mf.histamine_level === 'HIGH') s -= 0.3;
+  if (mf.thyroid_support_level === 'HIGH') s += 0.3;
+  // ЖКТ
+  if (gt.gut_irritant_potential === 'HIGH') s -= 0.3;
+  if ((gt.enzyme_demand_score || 0) > 7) s -= 0.2;
+  if (gt.fodmap_group === 'HIGH') s -= 0.2;
+  // Аминокислоты
+  if ((aa.leucine_mg || 0) > 2000) s += 0.5;
+  else if ((aa.leucine_mg || 0) > 1000) s += 0.2;
+  if ((aa.arginine_mg || 0) > 1000) s += 0.3;
+  if ((aa.glutamine_mg || 0) > 1000) s += 0.2;
+  // Электролиты
+  if ((el.potassium_mg || 0) > 300) s += 0.3;
+  if ((el.magnesium_mg || 0) > 50) s += 0.3;
+  if ((el.pral_index || 0) < -5) s += 0.2;
+  // Специфические соединения
+  if ((sc.polyphenols_mg || 0) > 100) s += 0.3;
+  if ((sc.curcumin_mg || 0) > 10) s += 0.3;
+  if ((sc.sulforaphane_mg || 0) > 5) s += 0.2;
+  if ((sc.resveratrol_mg || 0) > 1) s += 0.2;
+  // Ограничения
+  if ((sc.oxalates_mg || 0) > 200) s -= 0.2;
+  if ((sc.lectins_mg || 0) > 500) s -= 0.2;
+  return Math.round(Math.max(1.0, Math.min(10.0, s)) * 10) / 10;
+}
+
 /** Заполняет v2-поля расчётными значениями на основе существующих данных */
 export function enrichFoodItemV2(f: FoodItem): FoodItem {
   const m = f.micros || {};

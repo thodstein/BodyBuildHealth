@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, createContext, useContext } from "react";
 import { addToCart } from "../../../../core/nutrition-utils";
-import { FOOD_DB, FOOD_ALLERGEN_DIET } from "../../../../core/nutrition-database";
+import { FOOD_DB, FOOD_ALLERGEN_DIET, compositeQualityScore } from "../../../../core/nutrition-database";
 import { PHARMA_DB } from "../../../../core/pharma-database";
 import { calcNutrition } from "../../../../engines/nutrition.engine";
 import { calcNutritionV2 } from "../../../../engines/nutrition-v2.engine";
@@ -493,6 +493,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
     const budgetFilter = (id: BudgetLevel): number[] => { const map: Record<string, number[]> = { low:[0,5],medium:[5,8],max:[8,10],enhanced:[9,15] }; return map[id] || [5,10]; };
     const [bMin, bMax] = budgetFilter(budget);
+    const qualityRange = (pool: any[]) => pool.filter((f: any) => { const q = compositeQualityScore(f); return q >= bMin && q <= bMax; });
     const effectivePlanType = dietPrefs.includes('vegetarian') ? ('vegetarian' as PlanType) : planType;
     const planTypeMod = PLAN_TYPES.find(p => p.id === effectivePlanType);
     const pMod = planTypeMod?.pMult || 1.0; const fMod = planTypeMod?.fMult || 1.0; const cMod = planTypeMod?.cMult || 1.0;
@@ -627,7 +628,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const isPreWorkout = mt.label === 'Предтрен'; const isPostWorkout = mt.label === 'Пост-трен'; const isPeriWorkout = isPreWorkout || isPostWorkout;
         const highQuality = budget === 'max' || budget === 'enhanced'; const lowQuality = budget === 'low';
         const effectiveTierFilter = lazyDayMode ? (f: any) => f.tier === 'basic' : (f: any) => f.tier === 'basic' || f.tier === 'mid' || f.tier === 'max';
-        const fastCarbs = FOOD_DB.filter(f => f.gi && f.gi >= 80); const slowCarbs = FOOD_DB.filter(f => f.category === 'carb' || f.category === 'grain'); const proteinFoods = FOOD_DB.filter(f => f.category === 'protein' && effectiveTierFilter(f)); const allProtein = applyFoodPrefs(proteinFoods, 'protein'); const topProtein = highQuality ? qualitySort(allProtein, true).slice(0, 8) : lowQuality ? qualitySort(allProtein, false).slice(0, 5) : allProtein.filter(f => f.protein > 15).sort(() => Math.random() - 0.5).slice(0, 5);
+        const fastCarbs = qualityRange(FOOD_DB.filter(f => f.gi && f.gi >= 80)); const slowCarbs = qualityRange(FOOD_DB.filter(f => f.category === 'carb' || f.category === 'grain')); const proteinFoods = qualityRange(FOOD_DB.filter(f => f.category === 'protein' && effectiveTierFilter(f))); const allProtein = applyFoodPrefs(proteinFoods, 'protein'); const topProtein = highQuality ? qualitySort(allProtein, true).slice(0, 8) : lowQuality ? qualitySort(allProtein, false).slice(0, 5) : allProtein.filter(f => f.protein > 15).sort(() => Math.random() - 0.5).slice(0, 5);
         const pickItem = (foodPool: any[], targetG: number, seed: number, maxItems = 2): any[] => { const result: any[] = []; let pool = applyFoodPrefs(foodPool, 'any'); if (pool.length === 0) return result; const highQ = budget === 'max' || budget === 'enhanced'; const lowQ = budget === 'low'; if (highQ) pool = qualitySort(pool, true); else if (lowQ) pool = qualitySort(pool, false); const preferPool = preferredSet.size > 0 ? pool.filter(f => preferredSet.has(f.id)) : []; let mainPool = preferPool.length > 0 ? preferPool : pool; if (lazyDayMode) { mainPool = mainPool.filter(f => f.tier === 'basic'); } // N4: lazyDayMode — only basic foods
         if (highQ && usedFoodIds.size > 0) { const unused = mainPool.filter(f => !usedFoodIds.has(f.id)); if (unused.length > 0) mainPool = unused; }
         const lm = lazyDayMode ? 1 : maxItems; // N4: lazyDayMode — 1 item max per meal
@@ -651,12 +652,31 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           }
           const protItems = pickItem(topProtein, remainingP, sSeed); protItems.forEach(i => { items.push(i); remainingP -= i.p || 0; remainingF -= i.f || 0; remainingC -= i.c || 0; });
           const carbPool = applyFoodPrefs(slowCarbs, 'carb'); if (carbPool.length > 0 && remainingC > 10) { const cPool = highQuality ? qualitySort(carbPool, true) : carbPool; const cIdx = highQuality ? 0 : Math.floor(seedRand(sSeed + 3) * cPool.length); const cF = cPool[cIdx % cPool.length]; usedFoodIds.add(cF.id); const cPortion = Math.min(1, remainingC / Math.max(1, cF.carbs || 1)); items.push({ name: cF.name, id: cF.id, amount: Math.round(cPortion * (parseInt(cF.servingSize) || 100)), kcal: Math.round(cF.kcal * cPortion), p: Math.round(cF.protein * cPortion), f: Math.round(cF.fat * cPortion), c: Math.round(cF.carbs * cPortion) }); }
-          const vegPool = limitPool(applyFoodPrefs(FOOD_DB.filter(f => f.category === 'veg_fruit'), 'veg'), foodSeed + 4); if (vegPool.length > 0) { const vIdx = highQuality ? 0 : Math.floor(seedRand(foodSeed + 4) * vegPool.length); const v = vegPool[vIdx % vegPool.length]; usedFoodIds.add(v.id); items.push({ name: v.name, id: v.id, amount: 80, kcal: Math.round(v.kcal * 0.8), p: Math.round(v.protein * 0.8), f: Math.round(v.fat * 0.8), c: Math.round(v.carbs * 0.8) }); }
+          const vegPool = limitPool(applyFoodPrefs(qualityRange(FOOD_DB.filter(f => f.category === 'veg_fruit')), 'veg'), foodSeed + 4); if (vegPool.length > 0) { const vIdx = highQuality ? 0 : Math.floor(seedRand(foodSeed + 4) * vegPool.length); const v = vegPool[vIdx % vegPool.length]; usedFoodIds.add(v.id); items.push({ name: v.name, id: v.id, amount: 80, kcal: Math.round(v.kcal * 0.8), p: Math.round(v.protein * 0.8), f: Math.round(v.fat * 0.8), c: Math.round(v.carbs * 0.8) }); }
         }
         const tot = { kcal: items.reduce((s,i) => s + i.kcal, 0), p: items.reduce((s,i) => s + i.p, 0), f: items.reduce((s,i) => s + i.f, 0), c: items.reduce((s,i) => s + i.c, 0) };
         return { ...mt, items, totals: tot, idx };
       });
-      const totals = { kcal: meals.reduce((s,m) => s + m.totals.kcal, 0), p: meals.reduce((s,m) => s + m.totals.p, 0), f: meals.reduce((s,m) => s + m.totals.f, 0), c: meals.reduce((s,m) => s + m.totals.c, 0) };
+      let totals = { kcal: meals.reduce((s,m) => s + m.totals.kcal, 0), p: meals.reduce((s,m) => s + m.totals.p, 0), f: meals.reduce((s,m) => s + m.totals.f, 0), c: meals.reduce((s,m) => s + m.totals.c, 0) };
+      // KBJU correction: scale all items uniformly to meet targets within 2%
+      const tK = tKcalAdj || 1; const tP_ = tP || 1; const tF_ = tF || 1; const tC_ = tCAdj || 1;
+      const devK = Math.abs(totals.kcal - tK) / tK; const devP = Math.abs(totals.p - tP_) / tP_;
+      const devF = Math.abs(totals.f - tF_) / tF_; const devC = Math.abs(totals.c - tC_) / tC_;
+      if (devK > 0.02 || devP > 0.02 || devF > 0.02 || devC > 0.02) {
+        const scales = [tK / Math.max(1, totals.kcal), tP_ / Math.max(1, totals.p), tF_ / Math.max(1, totals.f), tC_ / Math.max(1, totals.c)];
+        const effScale = Math.min(1.3, Math.max(0.7, scales.reduce((s, v) => s + v, 0) / scales.length));
+        meals.forEach((m: any) => {
+          m.items.forEach((it: any) => {
+            it.amount = Math.round(it.amount * effScale);
+            it.kcal = Math.round(it.kcal * effScale);
+            it.p = Math.round(it.p * effScale);
+            it.f = Math.round(it.f * effScale);
+            it.c = Math.round(it.c * effScale);
+          });
+          m.totals = { kcal: m.items.reduce((s: number, i: any) => s + i.kcal, 0), p: m.items.reduce((s: number, i: any) => s + i.p, 0), f: m.items.reduce((s: number, i: any) => s + i.f, 0), c: m.items.reduce((s: number, i: any) => s + i.c, 0) };
+        });
+        totals = { kcal: meals.reduce((s: number, m: any) => s + m.totals.kcal, 0), p: meals.reduce((s: number, m: any) => s + m.totals.p, 0), f: meals.reduce((s: number, m: any) => s + m.totals.f, 0), c: meals.reduce((s: number, m: any) => s + m.totals.c, 0) };
+      }
       const allergenWarnings: string[] = [];
       meals.forEach(m => { m.items.forEach((it: any) => { const food = FOOD_DB.find(f => f.id === it.id); if (food?.allergens) { const matched = food.allergens.filter(a => !allergens.includes(a)); if (matched.length > 0 && !excludedIds.has(food.id)) allergenWarnings.push(`${it.name}: содержит ${matched.join(', ')}`); } }); });
       return { meals, totals, isTrainingDay, isWorkDay, allergenWarnings: [...new Set(allergenWarnings)] };

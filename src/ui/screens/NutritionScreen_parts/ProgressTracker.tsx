@@ -89,12 +89,42 @@ export const ProgressTracker: React.FC = () => {
         </div>
       )}
 
-      {/* Smart metrics placeholders */}
+      {/* Smart metrics */}
       <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)' }}>
         <div style={{ fontSize: 9, fontWeight: 600, color: '#8b5cf6', marginBottom: 4 }}>🎯 Умные показатели</div>
-        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 8 }}>
-          Графики по Аммиак-Риск, Омега-Балансу, ЖКТ-нагрузке, Микронутриентам и Инсулин-Сенс будут доступны после 2+ дней с анализом рациона
-        </div>
+        {(() => {
+          try {
+            const report = JSON.parse(localStorage.getItem('he_nutrition_report_current') || 'null');
+            if (report && report.riskAnalysis) {
+              return (
+                <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                  {report.riskAnalysis.map((r: any, i: number) => (
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:7, padding:'3px 6px', borderRadius:4, background:'rgba(255,255,255,0.02)' }}>
+                      <span style={{ color:'rgba(255,255,255,0.7)' }}>{r.system}</span>
+                      <span style={{ fontWeight:600, color: r.score / r.maxScore > 0.7 ? '#ef4444' : r.score / r.maxScore > 0.4 ? '#f59e0b' : '#22c55e' }}>
+                        {Math.round(r.score / r.maxScore * 100)}% ({r.score}/{r.maxScore})
+                      </span>
+                    </div>
+                  ))}
+                  {report.foodQualityScore && (
+                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, padding:'3px 6px', borderRadius:4, background:'rgba(255,255,255,0.02)' }}>
+                      <span style={{ color:'rgba(255,255,255,0.7)' }}>⭐ Качество продуктов</span>
+                      <span style={{ fontWeight:600, color:'#00e68a' }}>{report.foodQualityScore.toFixed(1)}</span>
+                    </div>
+                  )}
+                  {report.microDeficiencies?.length > 0 && (
+                    <div style={{ fontSize:7, color:'#f59e0b' }}>
+                      ⚠️ Дефициты: {report.microDeficiencies.join(', ')}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+          } catch {}
+          return <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', textAlign:'center', padding:8 }}>
+            Нет данных. Сгенерируйте отчёт в Планировщике питания → Отчёт
+          </div>;
+        })()}
       </div>
     </div>
   );

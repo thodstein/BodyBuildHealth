@@ -66,7 +66,8 @@ export const DailyDietDashboard: React.FC = () => {
 
   return (
     <div style={{ padding: '8px 0', marginBottom: 8 }}>
-      <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 6 }}>📊 Анализ рациона (v2)</div>
+      <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 4 }}>📊 Анализ рациона (v2)</div>
+      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Ккал: {Math.round(report.totalKcal)} | DIAAS: {report.diaas.toFixed(2)} | PRAL: {report.pralTotal.toFixed(1)} | Омега-6/3: {report.omegaRatio.toFixed(1)} | Гистамин: {report.histamineSensitive ? '⚠️ Чувствителен' : '✅ Норма'}</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
         {bars.map(b => (
           <div key={b.key} style={{ padding: '4px 6px', borderRadius: 8, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)' }}>
@@ -123,6 +124,11 @@ export const DailyDietDashboard: React.FC = () => {
           🚨 HOMA-IR {report.homaIr.toFixed(1)}{' > 2.5 — инсулинорезистентность'}
         </div>
       )}
+      {report.ammoniaRisk && (
+        <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.12)', fontSize: 7, color: '#ef4444' }}>
+          💨 Аммиак-риск: {report.ammoniaScore.toFixed(1)} балла. Высокая аммиачная нагрузка — добавьте цитруллин/аргинин, снизьте глютамин
+        </div>
+      )}
       {report.diaasWarning && (
         <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: report.diaas >= 1.0 ? 'rgba(0,230,138,0.06)' : 'rgba(249,115,22,0.06)', border: `1px solid ${report.diaas >= 1.0 ? 'rgba(0,230,138,0.1)' : 'rgba(249,115,22,0.1)'}`, fontSize: 7, color: report.diaas >= 1.0 ? '#00e68a' : '#f59e0b' }}>
           {report.diaasWarning}
@@ -143,6 +149,41 @@ export const DailyDietDashboard: React.FC = () => {
           {report.histamineWarning}
         </div>
       )}
+
+      {/* Dynamic recommendations based on diet report */}
+      {(() => {
+        const recs: { text: string; priority: 'high' | 'medium' | 'low'; icon: string }[] = [];
+        if (report.mtorDeficitMg > 0 && !report.mtorTriggered) recs.push({ priority: 'high', icon: '🧬', text: `Добавьте ${Math.round(report.mtorDeficitMg)} мг лейцина (ещё 1 порция курицы/говядины/яиц)` });
+        if (report.giLoadWarning) recs.push({ priority: 'high', icon: '🫃', text: `Нагрузка ЖКТ ${report.giLoad.toFixed(0)} — добавьте ферменты (панкреатин, бромелайн)` });
+        if (report.pralWarning) recs.push({ priority: 'medium', icon: '🧂', text: `PRAL ${report.pralTotal.toFixed(1)} — ${report.pralWarning === 'Закисление' ? 'добавьте зелень, лимоны, овощи' : 'уберите избыток воды/соды'}` });
+        if (report.ammoniaRisk) recs.push({ priority: 'high', icon: '💨', text: `Аммиак ${report.ammoniaScore.toFixed(1)} — добавьте цитруллин 3-6 г/д или снизьте глютамин, увеличьте клетчатку` });
+        if (report.omegaWarning) recs.push({ priority: 'medium', icon: '🐟', text: `Омега-6/3 ${report.omegaRatio.toFixed(1)}:1 — добавьте EPA/DHA 1-2 г/д, снизьте растительные масла` });
+        if (report.electrolyteRisk) recs.push({ priority: 'high', icon: '💧', text: `K ${report.potassiumMg}мг/Mg ${report.magnesiumMg}мг — добавьте шпинат 200г/курагу 100г/авокадо` });
+        if (report.insulinRicohet) recs.push({ priority: 'high', icon: '💉', text: `Риск гипогликемии — замените сахар/фруктозу на амилопектин/изомальтулозу` });
+        if (report.cortisolRisk) recs.push({ priority: 'medium', icon: '🧠', text: `Кортизоловый риск — добавьте 30-40г быстрых углеводов (декстроза/рисовые вафли) после тренировки` });
+        if (report.microDeficits.length > 0) recs.push({ priority: 'medium', icon: '💊', text: `Дефициты: ${report.microDeficits.join(', ')} — добавьте соответствующие продукты/добавки` });
+        if (report.homaIr !== null && report.homaIr > 2.5) recs.push({ priority: 'high', icon: '🔬', text: `HOMA-IR ${report.homaIr.toFixed(1)} >2.5 — добавьте берберин 500 мг 2x/д, хром 200 мкг, снизьте сахар` });
+        if (report.diaas < 0.9) recs.push({ priority: 'high', icon: '💪', text: `DIAAS ${report.diaas.toFixed(2)} — лимитирует ${report.diaasLimitingAA}. Смешайте источники белка (животный+растительный)` });
+        if (report.antinutrientWarning) recs.push({ priority: 'low', icon: '🌿', text: `${report.antinutrientWarning} — замачивайте/проращивайте бобовые, термически обрабатывайте` });
+        if (report.glutathioneWarning) recs.push({ priority: 'medium', icon: '🧪', text: `${report.glutathioneWarning} — добавьте NAC 600 мг, селен 200 мкг, серу (MSM/крестоцветные)` });
+        if (report.histamineWarning) recs.push({ priority: 'medium', icon: '🧪', text: `${report.histamineWarning} — исключите ферментированные продукты, добавьте DAO-фермент` });
+        if (recs.length === 0) return null;
+        const prioColors = { high: '#ef4444', medium: '#f59e0b', low: '#8b5cf6' };
+        const prioOrder = { high: 0, medium: 1, low: 2 };
+        recs.sort((a, b) => prioOrder[a.priority] - prioOrder[b.priority]);
+        return (
+          <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.12)' }}>
+            <div style={{ fontSize: 8, fontWeight: 700, color: '#a78bfa', marginBottom: 4 }}>📋 Рекомендации на основе рациона</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {recs.map((r, i) => (
+                <div key={i} style={{ fontSize: 7, padding: '4px 6px', borderRadius: 6, background: `${prioColors[r.priority]}08`, border: `1px solid ${prioColors[r.priority]}15`, color: prioColors[r.priority], lineHeight: 1.4 }}>
+                  {r.icon} {r.text}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

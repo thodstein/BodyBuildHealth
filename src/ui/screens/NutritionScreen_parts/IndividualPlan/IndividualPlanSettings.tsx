@@ -1948,6 +1948,19 @@ export const IndividualPlanSettings: React.FC = () => {
             </div>
           </div>
           <div style={{ marginBottom: 6 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Лабораторные (v2)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3 }}>
+              {['hematocrit','hemoglobin','hdl','ldl','alt','ast','crp','testosterone'].map(lab => (
+                <div key={lab} style={{ display:'flex', flexDirection:'column', gap:1 }}>
+                  <span style={{ fontSize:6, color:'rgba(255,255,255,0.35)', textTransform:'capitalize' }}>{lab}</span>
+                  <input value={v2Labs[lab] || ''} onChange={e => setV2Labs((prev:any) => ({...prev, [lab]: e.target.value}))}
+                    placeholder="—" style={{ padding:'3px 5px', borderRadius:4, fontSize:7, background:'#202023',
+                    border:'1px solid rgba(255,255,255,0.06)', color:'#fff', outline:'none', width:'100%', boxSizing:'border-box' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginBottom: 6 }}>
             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Чувствительность к гистамину</div>
             <button onClick={() => setHistamineSensitive(!histamineSensitive)} style={{
               padding: '4px 10px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: 'pointer',

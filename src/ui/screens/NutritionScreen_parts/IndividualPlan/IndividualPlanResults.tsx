@@ -1636,6 +1636,7 @@ export const IndividualPlanResults: React.FC = () => {
                 {calcDailyReport && calcResults.length > 1 && (
                   <div style={{ marginTop:8, borderRadius:10, padding:10, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.12)' }}>
                     <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>📈 Совокупный анализ ({calcResults.length} приёма)</div>
+                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>Ккал: {Math.round(calcDailyReport.totalKcal)} | DIAAS: {calcDailyReport.diaas.toFixed(2)} | Лимит.АК: {calcDailyReport.diaasLimitingAA} {calcDailyReport.histamineSensitive ? '| ⚠️ Чувствителен к гистамину' : ''}</div>
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:3, fontSize:7, color:'rgba(255,255,255,0.85)' }}>
                       <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.mtorTriggered ? 'rgba(0,230,138,0.06)' : 'rgba(239,68,68,0.06)', color: calcDailyReport.mtorTriggered ? '#22c55e' : '#ef4444' }}>
                         🧬 mTOR: {calcDailyReport.mtorTriggered ? '✅ Запущен' : `❌ Дефицит ${calcDailyReport.mtorDeficitMg}мг лейцина`}
@@ -1654,6 +1655,15 @@ export const IndividualPlanResults: React.FC = () => {
                       </div>
                       <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.electrolyteRisk ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.electrolyteRisk ? '#ef4444' : '#22c55e' }}>
                         💧 K/Mg: {calcDailyReport.potassiumMg}/{calcDailyReport.magnesiumMg}мг {calcDailyReport.electrolyteRisk ? '⚠️' : '✅'}
+                      </div>
+                      <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.cortisolRisk ? 'rgba(245,158,11,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.cortisolRisk ? '#f59e0b' : '#22c55e' }}>
+                        🧠 Кортизол: {calcDailyReport.cortisolRisk ? '⚠️ Риск' : '✅ Норма'}
+                      </div>
+                      <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.insulinRicohet ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.insulinRicohet ? '#ef4444' : '#22c55e' }}>
+                        💉 Инсулин: {calcDailyReport.insulinRicohet ? '🚨 Рикшет' : '✅ Норма'}
+                      </div>
+                      <div style={{ padding:'3px 6px', borderRadius:4, background: (calcDailyReport.homaIr !== null && calcDailyReport.homaIr > 2.5) ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: (calcDailyReport.homaIr !== null && calcDailyReport.homaIr > 2.5) ? '#ef4444' : '#22c55e' }}>
+                        🔬 HOMA-IR: {calcDailyReport.homaIr !== null ? calcDailyReport.homaIr.toFixed(1) : '—'} {(calcDailyReport.homaIr !== null && calcDailyReport.homaIr > 2.5) ? '🚨' : '✅'}
                       </div>
                     </div>
                     {calcDailyReport.diaasWarning && (

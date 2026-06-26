@@ -367,38 +367,144 @@ const CatalogTab: React.FC = () => {
                 <button onClick={e => { e.stopPropagation(); addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category }); }} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(0,230,138,0.15)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a' }}>🛒</button>
               </div>
             </div>
-            {isExpanded && (
-              <div style={{ padding:'8px 12px', marginBottom:2, borderRadius:'0 0 10px 10px', background:'rgba(32,32,35,0.6)', border:'1px solid rgba(255,255,255,0.04)', borderTop:'none', fontSize:8, color:'rgba(255,255,255,0.7)' }}>
-                {f.description && <div style={{ marginBottom:4, lineHeight:1.4 }}>📝 {f.description}</div>}
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:2, marginBottom:4 }}>
-                  <span>⏱ ГИ: {f.gi} | ИИ: {f.macro_100g?.insulin_index ?? '—'}</span>
-                  <span>⚡ Клетчатка: {f.fiber}г</span>
-                  {f.macro_100g?.carbs_sugar && <span>🍬 Сахара: {f.macro_100g.carbs_sugar}г</span>}
-                  {f.macro_100g?.omega_3_mg ? <span>🐟 Омега-3: {f.macro_100g.omega_3_mg}мг</span> : null}
-                  {f.macro_100g?.cholesterol_mg ? <span>🫀 Холестерин: {f.macro_100g.cholesterol_mg}мг</span> : null}
-                  {f.electrolytes_100g?.pral_index ? <span>⚖ PRAL: {f.electrolytes_100g.pral_index}</span> : null}
+            {isExpanded && (() => {
+              const m = f.macro_100g || {};
+              const aa = f.amino_acid_profile_100g || {};
+              const el = f.electrolytes_100g || {};
+              const vit = f.vitamins_100g || {};
+              const tr = f.trace_elements_100g || {};
+              const bio = f.bioactive_compounds_100g || {};
+              const gt = f.gastro_tags || {};
+              const mf = f.metabolic_flags || {};
+              const sc = f.specific_compounds_100g || {};
+              const row = (items: any[], color = 'rgba(255,255,255,0.7)') => (
+                <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginBottom:2, fontSize:7, color }}>
+                  {items.map((item: any,i: number) => <span key={i}>{item}</span>)}
                 </div>
-                {f.amino_acid_profile_100g && (
-                  <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginBottom:4 }}>
-                    <span style={{ color:'#8b5cf6' }}>🧬 АК: </span>
-                    <span>лейцин {f.amino_acid_profile_100g.leucine_mg}мг</span>
-                    <span>• BCAA {Math.round(((f.amino_acid_profile_100g.leucine_mg||0)+(f.amino_acid_profile_100g.isoleucine_mg||0)+(f.amino_acid_profile_100g.valine_mg||0)))}мг</span>
-                    {f.amino_acid_profile_100g.tryptophan_mg ? <span>• триптофан {f.amino_acid_profile_100g.tryptophan_mg}мг</span> : null}
-                  </div>
-                )}
-                {f.metabolic_flags && (
-                  <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                    {f.metabolic_flags.atherogenic_potential === 'HIGH' && <span style={{ color:'#ef4444' }}>🚨 Атерогенность</span>}
-                    {f.metabolic_flags.glycation_potential === 'HIGH' && <span style={{ color:'#f59e0b' }}>🔥 Гликация</span>}
-                    {f.metabolic_flags.anabolic_potential === 'HIGH' && <span style={{ color:'#00e68a' }}>💪 Анаболический</span>}
-                    {f.metabolic_flags.hepatoprotective && <span style={{ color:'#8b5cf6' }}>🫁 Гепатопротектор</span>}
-                    {f.gastro_tags?.fodmap_group === 'HIGH' && <span style={{ color:'#f97316' }}>💨 HIGH FODMAP</span>}
-                    {f.metabolic_flags.insulin_sensitivity_impact === 'NEGATIVE' && <span style={{ color:'#ef4444' }}>📉 Инсулин-сенс NEG</span>}
-                  </div>
-                )}
-                {f.tier && <div style={{ marginTop:2, color:'rgba(255,255,255,0.35)' }}>📊 Уровень: {f.tier === 'max' ? 'Максимум' : f.tier === 'mid' ? 'Средний' : 'Базовый'}</div>}
-              </div>
-            )}
+              );
+              return (
+              <div style={{ padding:'8px 12px', marginBottom:2, borderRadius:'0 0 10px 10px', background:'rgba(32,32,35,0.6)', border:'1px solid rgba(255,255,255,0.04)', borderTop:'none', fontSize:8, color:'rgba(255,255,255,0.7)' }}>
+                {f.description && <div style={{ marginBottom:3, lineHeight:1.3, fontSize:7 }}>{f.description}</div>}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:2, marginBottom:3 }}>
+                  <span>⏱ ГИ: {f.gi ?? '—'} | ИИ: {m.insulin_index ?? '—'}</span>
+                  <span>⚡ Клетчатка: {f.fiber ?? '—'}г</span>
+                  {m.proteins_animal !== undefined ? <span>🥩 Белок жив.: {m.proteins_animal}г</span> : null}
+                  {m.proteins_plant !== undefined ? <span>🌱 Белок раст.: {m.proteins_plant}г</span> : null}
+                  {m.fats_saturated !== undefined ? <span>🧈 Насыщ.: {m.fats_saturated}г</span> : null}
+                  {m.fats_monounsaturated !== undefined ? <span>🫒 Моно: {m.fats_monounsaturated}г</span> : null}
+                  {m.fats_polyunsaturated !== undefined ? <span>🌻 Поли: {m.fats_polyunsaturated}г</span> : null}
+                  {m.omega_3_mg !== undefined ? <span>🐟 Омега-3: {m.omega_3_mg}мг</span> : null}
+                  {m.omega_6_mg !== undefined ? <span>🔴 Омега-6: {m.omega_6_mg}мг</span> : null}
+                  {m.mct_oil_g !== undefined ? <span>🫐 MCT: {m.mct_oil_g}г</span> : null}
+                  {m.cholesterol_mg !== undefined ? <span>🫀 Холестерин: {m.cholesterol_mg}мг</span> : null}
+                  {m.carbs_sugar !== undefined ? <span>🍬 Сахара: {m.carbs_sugar}г</span> : null}
+                </div>
+                {aa.leucine_mg !== undefined && row([
+                  <span style={{color:'#8b5cf6'}}>🧬 АК:</span>,
+                  <span>лей {aa.leucine_mg}мг</span>,
+                  aa.isoleucine_mg !== undefined && <span>• илей {aa.isoleucine_mg}мг</span>,
+                  aa.valine_mg !== undefined && <span>• вал {aa.valine_mg}мг</span>,
+                  aa.lysine_mg !== undefined && <span>• лиз {aa.lysine_mg}мг</span>,
+                  aa.methionine_mg !== undefined && <span>• мет {aa.methionine_mg}мг</span>,
+                  aa.threonine_mg !== undefined && <span>• тре {aa.threonine_mg}мг</span>,
+                  aa.tryptophan_mg !== undefined && <span>• три {aa.tryptophan_mg}мг</span>,
+                  aa.phenylalanine_mg !== undefined && <span>• фен {aa.phenylalanine_mg}мг</span>,
+                  aa.histidine_mg !== undefined && <span>• гис {aa.histidine_mg}мг</span>,
+                  aa.arginine_mg !== undefined && <span>• арг {aa.arginine_mg}мг</span>,
+                  aa.glutamine_mg !== undefined && <span>• глу {aa.glutamine_mg}мг</span>,
+                  aa.cysteine_mg !== undefined && <span>• цис {aa.cysteine_mg}мг</span>,
+                ], '#8b5cf6')}
+                {el.sodium_mg !== undefined && row([
+                  <span style={{color:'#60a5fa'}}>⚡ Электролиты:</span>,
+                  <span>Na {el.sodium_mg}мг</span>,
+                  el.potassium_mg !== undefined && <span>• K {el.potassium_mg}мг</span>,
+                  el.magnesium_mg !== undefined && <span>• Mg {el.magnesium_mg}мг</span>,
+                  el.calcium_mg !== undefined && <span>• Ca {el.calcium_mg}мг</span>,
+                  el.phosphorus_mg !== undefined && <span>• P {el.phosphorus_mg}мг</span>,
+                  el.pral_index !== undefined && <span>• PRAL {el.pral_index}</span>,
+                ], '#60a5fa')}
+                {vit.vitamin_a_mcg !== undefined && row([
+                  <span style={{color:'#f97316'}}>💊 Витамины:</span>,
+                  <span>A {vit.vitamin_a_mcg}мкг</span>,
+                  vit.vitamin_c_mg !== undefined && <span>• C {vit.vitamin_c_mg}мг</span>,
+                  vit.vitamin_d_mcg !== undefined && <span>• D {vit.vitamin_d_mcg}мкг</span>,
+                  vit.vitamin_e_mg !== undefined && <span>• E {vit.vitamin_e_mg}мг</span>,
+                  vit.vitamin_k_mcg !== undefined && <span>• K {vit.vitamin_k_mcg}мкг</span>,
+                  vit.vitamin_b1_mg !== undefined && <span>• B1 {vit.vitamin_b1_mg}мг</span>,
+                  vit.vitamin_b2_mg !== undefined && <span>• B2 {vit.vitamin_b2_mg}мг</span>,
+                  vit.vitamin_b3_mg !== undefined && <span>• B3 {vit.vitamin_b3_mg}мг</span>,
+                  vit.vitamin_b5_mg !== undefined && <span>• B5 {vit.vitamin_b5_mg}мг</span>,
+                  vit.vitamin_b6_mg !== undefined && <span>• B6 {vit.vitamin_b6_mg}мг</span>,
+                  vit.vitamin_b7_mcg !== undefined && <span>• B7 {vit.vitamin_b7_mcg}мкг</span>,
+                  vit.vitamin_b9_mcg !== undefined && <span>• B9 {vit.vitamin_b9_mcg}мкг</span>,
+                  vit.vitamin_b12_mcg !== undefined && <span>• B12 {vit.vitamin_b12_mcg}мкг</span>,
+                ], '#f97316')}
+                {tr.iron_total_mg !== undefined && row([
+                  <span style={{color:'#22c55e'}}>⚙️ Микроэлементы:</span>,
+                  <span>Fe {tr.iron_total_mg}мг{tr.iron_heme_mg ? `(гем ${tr.iron_heme_mg})` : ''}</span>,
+                  tr.zinc_mg !== undefined && <span>• Zn {tr.zinc_mg}мг</span>,
+                  tr.selenium_mcg !== undefined && <span>• Se {tr.selenium_mcg}мкг</span>,
+                  tr.copper_mg !== undefined && <span>• Cu {tr.copper_mg}мг</span>,
+                  tr.manganese_mg !== undefined && <span>• Mn {tr.manganese_mg}мг</span>,
+                  tr.iodine_mcg !== undefined && <span>• I {tr.iodine_mcg}мкг</span>,
+                  tr.chromium_mcg !== undefined && <span>• Cr {tr.chromium_mcg}мкг</span>,
+                ], '#22c55e')}
+                {bio.creatine_mg !== undefined && row([
+                  <span style={{color:'#a78bfa'}}>🧪 Биоактивные:</span>,
+                  <span>креатин {bio.creatine_mg}мг</span>,
+                  bio.beta_alanine_mg !== undefined && <span>• β-аланин {bio.beta_alanine_mg}мг</span>,
+                  bio.taurine_mg !== undefined && <span>• таурин {bio.taurine_mg}мг</span>,
+                  bio.lignan_mg !== undefined && <span>• лигнан {bio.lignan_mg}мг</span>,
+                  bio.indol_3_carbinol_mg !== undefined && <span>• I3C {bio.indol_3_carbinol_mg}мг</span>,
+                ], '#a78bfa')}
+                {sc.polyphenols_mg !== undefined && row([
+                  <span style={{color:'#f59e0b'}}>🌿 Соединения:</span>,
+                  <span>полифенолы {sc.polyphenols_mg}мг</span>,
+                  sc.flavonoids_mg !== undefined && <span>• флав. {sc.flavonoids_mg}мг</span>,
+                  sc.curcumin_mg !== undefined && <span>• куркумин {sc.curcumin_mg}мг</span>,
+                  sc.sulforaphane_mg !== undefined && <span>• сульф. {sc.sulforaphane_mg}мг</span>,
+                  sc.resveratrol_mg !== undefined && <span>• ресвер. {sc.resveratrol_mg}мг</span>,
+                  sc.lectins_mg !== undefined && <span>• лектины {sc.lectins_mg}мг</span>,
+                  sc.oxalates_mg !== undefined && <span>• оксалаты {sc.oxalates_mg}мг</span>,
+                  sc.phytoestrogens_mg !== undefined && <span>• фитоэстр. {sc.phytoestrogens_mg}мг</span>,
+                  sc.alpha_lipoic_acid_mg !== undefined && <span>• АЛК {sc.alpha_lipoic_acid_mg}мг</span>,
+                  sc.coenzyme_q10_mg !== undefined && <span>• CoQ10 {sc.coenzyme_q10_mg}мг</span>,
+                  sc.berberine_mg !== undefined && <span>• берберин {sc.berberine_mg}мг</span>,
+                ], '#f59e0b')}
+                {gt.fodmap_group && row([
+                  <span style={{color:'#f97316'}}>🫃 ЖКТ:</span>,
+                  <span>FODMAP {gt.fodmap_group}</span>,
+                  gt.enzyme_demand_score !== undefined && <span>• Ферм.нагрузка {gt.enzyme_demand_score}/10</span>,
+                  gt.gastric_emptying_speed && <span>• Опорожнение: {gt.gastric_emptying_speed === 'FAST' ? 'быстрое' : gt.gastric_emptying_speed === 'SLOW' ? 'медленное' : 'среднее'}</span>,
+                  gt.gut_irritant_potential && <span>• Раздражение: {gt.gut_irritant_potential}</span>,
+                  gt.allergen_flags && gt.allergen_flags.length > 0 && <span>• Аллергены: {gt.allergen_flags.join(',')}</span>,
+                ], '#f97316')}
+                {row([
+                  <span style={{color:'#a78bfa'}}>🏷 Флаги:</span>,
+                  mf.atherogenic_potential === 'HIGH' && <span style={{color:'#ef4444'}}>🚨 Атероген.</span>,
+                  mf.glycation_potential === 'HIGH' && <span style={{color:'#f59e0b'}}>🔥 Гликация</span>,
+                  mf.ammonia_source_level === 'HIGH' && <span style={{color:'#ef4444'}}>💨 Аммиак HIGH</span>,
+                  mf.ammonia_source_level === 'MEDIUM' && <span style={{color:'#a78bfa'}}>💨 Аммиак MED</span>,
+                  mf.heavy_metal_risk === 'HIGH' && <span style={{color:'#ef4444'}}>☢️ Тяж.мет.</span>,
+                  mf.heavy_metal_risk === 'MEDIUM' && <span style={{color:'#f59e0b'}}>☢️ Тяж.мет.MED</span>,
+                  mf.cns_impact === 'STIMULANT' && <span style={{color:'#f97316'}}>🧠 Стим.</span>,
+                  mf.cns_impact === 'SEDATIVE' && <span style={{color:'#8b5cf6'}}>😴 Седат.</span>,
+                  mf.anabolic_potential === 'HIGH' && <span style={{color:'#00e68a'}}>💪 Анабол</span>,
+                  mf.anabolic_potential === 'MEDIUM' && <span style={{color:'#f59e0b'}}>💪 Анабол MED</span>,
+                  mf.hepatoprotective && <span style={{color:'#22c55e'}}>🫁 Гепатопр.</span>,
+                  mf.insulin_sensitivity_impact === 'NEGATIVE' && <span style={{color:'#ef4444'}}>📉 Инс.-сенс NEG</span>,
+                  mf.insulin_sensitivity_impact === 'POSITIVE' && <span style={{color:'#00e68a'}}>📈 Инс.-сенс POS</span>,
+                  mf.goitrogenic_potential === 'HIGH' && <span style={{color:'#f59e0b'}}>🦋 Зобоген.</span>,
+                  mf.detox_support_level === 'HIGH' && <span style={{color:'#22c55e'}}>🧹 Детокс</span>,
+                  mf.histamine_level === 'HIGH' && <span style={{color:'#ef4444'}}>🧪 Гистамин HIGH</span>,
+                  mf.thyroid_support_level === 'HIGH' && <span style={{color:'#22c55e'}}>🦋 Щит. HIGH</span>,
+                ], '#a78bfa')}
+                {row([
+                  <span style={{color:'rgba(255,255,255,0.35)'}}>📊 {f.tier === 'max' ? 'Уровень: Максимум' : f.tier === 'mid' ? 'Уровень: Средний' : 'Уровень: Базовый'}</span>,
+                  f.bb_quality_score ? <span>| BB Score: {f.bb_quality_score.toFixed(1)}</span> : null,
+                ], 'rgba(255,255,255,0.35)')}
+              </div>);
+            })()}
           </div>);
         })}
       </div>
