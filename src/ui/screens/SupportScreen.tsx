@@ -2241,7 +2241,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
             {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['interactions','⚠ Взаимодействия'],['stacks','📂 Стеки'],['research','Исследования'],['favorites','Избранное']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
-                if (id === 'peptides') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); }
+                if (id === 'stacks') { setInfoView('catalog'); setCatalogSubTab('stack'); setTab('main'); setSupportView('calc'); setCalcView('info'); setSection('home'); }
+                else if (id === 'peptides') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); }
                 else { setTab('main'); setSupportView('calc'); setCalcView('info'); setSection('home'); setInfoView(id as InfoView); }
               }} style={{
                 padding:'5px 12px', borderRadius:16, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
@@ -4483,8 +4484,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       {/* ===== MIX CALCULATOR moved to supportstacks → mixcalc sub-tab ===== */}
 
 
-      {/* ===== AUTO-CALCULATOR INPUT CARDS (TZ) ===== */}
-      {genTab === 'calculator' && (
+      {/* ===== AUTO-CALCULATOR INPUT CARDS (TZ) — only in generator ===== */}
+      {section === 'generator' && genTab === 'calculator' && (
         <AutoCalculator
           key="autoCalc"
           onApply={(applied: { level: string; subs: string[]; result: any }) => {

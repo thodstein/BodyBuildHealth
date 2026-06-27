@@ -1029,9 +1029,9 @@ export const IndividualPlanResults: React.FC = () => {
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                       <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>Общий ГН (расчётный):</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: glColor }}>{gl} <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)' }}>({glLabel})</span></span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: glColor }}>{gl} <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.9)' }}>({glLabel})</span></span>
                     </div>
-                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)' }}>
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.9)' }}>
                       Средний Г�? рациона: ~{avgGI} · ГН на приём: ~{glPerMeal} · Углеводы: {Math.round(totalCarbs)}г
                     </div>
                     {gl > 120 && <div style={{ fontSize: 8, color: '#f59e0b', marginTop: 2 }}>💡 Высокая нагрузка — рекомендуется увеличить долю низко-Г�? продуктов (бобовые, цельнозерновые, овощи)</div>}
@@ -1281,7 +1281,7 @@ export const IndividualPlanResults: React.FC = () => {
         <div style={{ borderRadius: 12, padding: 12, background: 'rgba(249,115,22,0.04)', border: '1px solid rgba(249,115,22,0.15)', marginTop: 4 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: '#f97316' }}>🍽️ Спецприём{specialMealReplaceMode ? ` (замена: ${specialMealReplaceTarget})` : ' (дополнительно)'}</span>
-            <span onClick={() => setSpecialMealMode(false)} style={{ cursor: 'pointer', fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>вњ•</span>
+            <span onClick={() => setSpecialMealMode(false)} style={{ cursor: 'pointer', fontSize: 10, color: 'rgba(255,255,255,0.9)' }}>вњ•</span>
           </div>
           <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
             {specialMealGoal === 'pre_workout' ? '🏋️ Предтренировочный приём' :
@@ -1487,7 +1487,7 @@ export const IndividualPlanResults: React.FC = () => {
           <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#18181b', display:'flex', flexDirection:'column' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 12px 0' }}>
               <div style={{ fontSize:15, fontWeight:800, color:'#00e68a' }}>🧬 Калькулятор полезности</div>
-              <span onClick={() => { setShowCalcPopup(false); setCalcResults(null); setCalcDailyReport(null); }} style={{ cursor:'pointer', fontSize:10, color:'rgba(255,255,255,0.6)', padding:'2px 6px' }}>вњ•</span>
+              <span onClick={() => { setShowCalcPopup(false); setCalcResults(null); setCalcDailyReport(null); }} style={{ cursor:'pointer', fontSize:10, color:'rgba(255,255,255,0.9)', padding:'2px 6px' }}>вњ•</span>
             </div>
             <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'0 12px 80px' }}>
 
@@ -1521,7 +1521,7 @@ export const IndividualPlanResults: React.FC = () => {
                         <div key={id} onClick={() => toggleCalcSelection(id)} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 9px', borderRadius:8, marginBottom:3, background: sel ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)', cursor:'pointer' }}>
                           <div style={{ width:20, height:20, borderRadius:5, display:'flex', alignItems:'center', justifyContent:'center', background: sel ? '#00e68a' : 'rgba(255,255,255,0.06)', color: sel ? '#000' : 'transparent', fontSize:11, fontWeight:800, border: sel ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>{sel ? 'вњ“' : ''}</div>
                           <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{m.label || `Приём ${i+1}`} {m.time && <span style={{ color:'rgba(255,255,255,0.6)', fontWeight:400, marginLeft:3 }}>{m.time}</span>}</div>
+                            <div style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{m.label || `Приём ${i+1}`} {m.time && <span style={{ color:'rgba(255,255,255,0.9)', fontWeight:400, marginLeft:3 }}>{m.time}</span>}</div>
                             <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)' }}>{Math.round(m.totals?.kcal || 0)} ккал · Б{m.totals?.p||0}/Ж{m.totals?.f||0}/У{m.totals?.c||0} · {m.items?.length || 0} продуктов</div>
                           </div>
                         </div>
@@ -1630,7 +1630,7 @@ export const IndividualPlanResults: React.FC = () => {
                       </div>
                       {/* Quality breakdown */}
                       <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:2 }}>
-                        <span style={{ fontSize:6, color:'rgba(255,255,255,0.6)' }}>⭐ Качество: {sc.compositeScore.toFixed(1)}</span>
+                        <span style={{ fontSize:6, color:'rgba(255,255,255,0.9)' }}>⭐ Качество: {sc.compositeScore.toFixed(1)}</span>
                         {sc.productScores.slice(0,3).map((p,pi) => (
                           <span key={pi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background: p.score >= 7 ? 'rgba(0,230,138,0.08)' : p.score >= 4 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', color: p.score >= 7 ? '#22c55e' : p.score >= 4 ? '#f59e0b' : '#ef4444' }}>
                             {p.name} ({p.score.toFixed(1)})
@@ -1655,7 +1655,7 @@ export const IndividualPlanResults: React.FC = () => {
                         </div>
                       )}
                       {/* Products */}
-                      <div style={{ marginTop:4, fontSize:7, color:'rgba(255,255,255,0.6)' }}>
+                      <div style={{ marginTop:4, fontSize:7, color:'rgba(255,255,255,0.9)' }}>
                         Продукты: {sc.productScores.map(p => `${p.name} (${p.weightG}г)`).join(', ')}
                       </div>
                     </div>
@@ -1737,7 +1737,7 @@ export const IndividualPlanResults: React.FC = () => {
           <div onClick={e => e.stopPropagation()} style={{ width:'96%', maxWidth:440, maxHeight:'92vh', overflowY:'auto', padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(249,115,22,0.12)', boxShadow:'0 8px 40px rgba(0,0,0,0.4)' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
               <div style={{ fontSize:15, fontWeight:800, color:'#f97316' }}>🔀 Корректировка рациона</div>
-              <span onClick={() => { setShowCorrectPopup(false); setCorrectIssues(null); }} style={{ cursor:'pointer', fontSize:10, color:'rgba(255,255,255,0.6)', padding:'2px 6px' }}>вњ•</span>
+              <span onClick={() => { setShowCorrectPopup(false); setCorrectIssues(null); }} style={{ cursor:'pointer', fontSize:10, color:'rgba(255,255,255,0.9)', padding:'2px 6px' }}>вњ•</span>
             </div>
 
             {!correctIssues ? (

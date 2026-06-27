@@ -40,7 +40,7 @@ export const Achievements: React.FC = () => {
     <div style={{ paddingBottom: 80 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6' }}>🏆 Достижения</div>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{unlockedCount}/{ACHIEVEMENTS.length}</div>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{unlockedCount}/{ACHIEVEMENTS.length}</div>
       </div>
 
       <div style={{ padding: '8px 12px', borderRadius: 12, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8 }}>
@@ -70,11 +70,11 @@ export const Achievements: React.FC = () => {
                 {s.unlocked && <span style={{ fontSize: 8, color: '#c084fc' }}>✅</span>}
               </div>
               <div style={{ fontSize: 8, fontWeight: 600, color: s.unlocked ? '#c084fc' : '#fff', marginBottom: 2 }}>{a.name}</div>
-              <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.4)', lineHeight: 1.3, marginBottom: 4 }}>{a.desc}</div>
+              <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.8)', lineHeight: 1.3, marginBottom: 4 }}>{a.desc}</div>
               <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
                 <div style={{ width: `${pct}%`, height: '100%', borderRadius: 2, background: s.unlocked ? '#c084fc' : pct > 0 ? '#8b5cf6' : 'rgba(255,255,255,0.1)' }} />
               </div>
-              <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>{s.unlocked ? '✅ Выполнено!' : `${s.progress}/${a.target} ${a.unit}`}</div>
+              <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.75)', marginTop: 1 }}>{s.unlocked ? '✅ Выполнено!' : `${s.progress}/${a.target} ${a.unit}`}</div>
             </div>
           );
         })}

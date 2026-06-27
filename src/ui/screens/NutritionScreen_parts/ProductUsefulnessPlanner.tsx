@@ -28,7 +28,7 @@ const ScoreBadge: React.FC<{ score: number; max: number; color: string; label: s
     </div>
     <div>
       <div style={{ fontSize: 9, fontWeight: 700, color }}>{label}</div>
-      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>РёР· {max}</div>
+      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.9)' }}>РёР· {max}</div>
     </div>
   </div>
 );
@@ -281,7 +281,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               <input type="number" value={manualPrice} onChange={e => setManualPrice(e.target.value)} placeholder="Авто" style={INPUT('100%')} />
             </div>
           </div>
-          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', marginBottom: 4, lineHeight: 1.3 }}>
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.9)', marginBottom: 4, lineHeight: 1.3 }}>
             🧬 <b>ААС (анаболические стероиды)</b> — влияет на рейтинг: продукты с атерогенными жирами получают штраф −4.5 (риск липидного профиля).<br />
             💉 <b>�?нсулин</b> — влияет на рейтинг продуктов с высоким Г�?/�?�? (штраф при приёме HGH, проверка инсулинового рикошета).
           </div>
@@ -401,7 +401,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               {search && (
                 <span onClick={() => setSearch('')} style={{
                   position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                  color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                  color: 'rgba(255,255,255,0.9)', cursor: 'pointer', fontSize: 12, fontWeight: 700,
                 }}>Г—</span>
               )}
             </div>
@@ -429,7 +429,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 </span>
               ))}
               {(manualGoal || manualAAS || manualInsulin) && (
-                <span style={{ fontSize: 6, padding: '2px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)' }}>
+                <span style={{ fontSize: 6, padding: '2px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.9)' }}>
                   {manualGoal ? `${GOAL_MAP_RU[manualGoal] || manualGoal}` : ''}
                   {manualAAS ? ' · ААС' : ''}
                   {manualInsulin ? ' · �?нсулин' : ''}
@@ -468,7 +468,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
-                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginTop: 1 }}>
+                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.9)', marginTop: 1 }}>
                           {CATEGORY_LABELS[food.category] || food.category}
                           {food.tier && <span style={{ marginLeft: 4 }}>· {food.tier === 'max' ? '🔸' : food.tier === 'mid' ? '🔹' : '⚪'} {food.tier}</span>}
                         </div>
@@ -477,7 +477,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <div style={{ textAlign: 'right', marginRight: 4 }}>
                         <div style={{ fontSize: 10, fontWeight: 700, color: '#22c55e' }}>{food.protein}г</div>
-                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)' }}>{food.kcal} ккал</div>
+                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.9)' }}>{food.kcal} ккал</div>
                       </div>
                       <button onClick={e => { e.stopPropagation(); toggleCompare(food.id); }} style={{
                         padding: '4px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600, whiteSpace: 'nowrap',
@@ -525,7 +525,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         ))}
       </div>
     ) : (
-      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>Нет дополнительных факторов</div>
+      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.9)' }}>Нет дополнительных факторов</div>
     )}
     {(() => {
       const diaas = calcDIAAS(food);
@@ -563,7 +563,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   </>)
 }
                       {food.bestFor && food.bestFor.length > 0 && (
-                        <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.6)' }}>
+                        <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.9)' }}>
                           🎯 Для: {food.bestFor.join(', ')}
                         </div>
                       )}
@@ -573,7 +573,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               );
             })}
             {sorted.length === 0 && (
-              <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.6)', fontSize: 10 }}>
+              <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.9)', fontSize: 10 }}>
                 {search ? 'Ничего не найдено' : 'Нет продуктов в этой категории'}
               </div>
             )}
@@ -592,7 +592,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
       {plannerTab === 'compare' && (
         <div>
           {compareIds.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.6)', fontSize: 10 }}>
+            <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.9)', fontSize: 10 }}>
               Нажмите ⚖ на продукте в каталоге, чтобы добавить в сравнение (до 3)
             </div>
           ) : (
@@ -654,7 +654,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       </div>
                     )}
                     {enableC && score.costEfficiency && (
-                      <div style={{ marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>
+                      <div style={{ marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.9)', textAlign: 'center' }}>
                         💰 {score.costEfficiency.proteinCostRub} ₽/10г белка · <span style={{ color: score.costEfficiency.efficiencyScore >= 50 ? '#22c55e' : '#f59e0b' }}>{score.costEfficiency.efficiencyScore}/100</span>
                       </div>
                     )}
@@ -700,7 +700,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 <div style={{ marginBottom: 8, borderRadius: 10, padding: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <span style={{ fontSize: 10, fontWeight: 700, color: '#00e68a' }}>{sourcePicker.title}</span>
-                    <span onClick={() => setSourcePicker(null)} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: 700 }}>Г—</span>
+                    <span onClick={() => setSourcePicker(null)} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: 700 }}>Г—</span>
                   </div>
                   <div style={{ maxHeight: 180, overflowY: 'auto' }}>
                     {sourcePicker.items.map(item => (
@@ -737,7 +737,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       borderBottom: '1px solid rgba(255,255,255,0.02)', display: 'flex', justifyContent: 'space-between',
                     }}>
                       <span>{food.name}</span>
-                      <span style={{ color: 'rgba(255,255,255,0.6)' }}>{food.kcal} ккал · {food.protein}г б</span>
+                      <span style={{ color: 'rgba(255,255,255,0.9)' }}>{food.kcal} ккал · {food.protein}г б</span>
                     </div>
                   ))}
                 </div>
@@ -836,7 +836,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <div>
                       <div style={{ fontSize: 10, fontWeight: 700, color: mealResult.color }}>🍽️ Композитный скор</div>
-                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>средневзвешенный по граммовке</div>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.9)' }}>средневзвешенный по граммовке</div>
                     </div>
                     <ScoreBadge score={mealResult.compositeScore} max={mealResult.maxPossible} color={mealResult.color} label={mealResult.label} />
                   </div>
@@ -851,7 +851,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       ['📊', 'Ккал/г', `${mealResult.kcalPerGram}`],
                     ].map(([icon, label, val]) => (
                       <div key={label} style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
-                        <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.6)' }}>{icon} {label}</div>
+                        <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.9)' }}>{icon} {label}</div>
                         <div style={{ fontSize: 11, fontWeight: 700, color: label === 'Белок' ? '#22c55e' : label === 'Жиры' ? '#f59e0b' : label === 'Углеводы' ? '#3b82f6' : '#fff' }}>{val}</div>
                       </div>
                     ))}
@@ -863,7 +863,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       <div style={{ flex: mealResult.pfcRatio.fatPct, background: '#f59e0b' }} />
                       <div style={{ flex: mealResult.pfcRatio.carbsPct, background: '#3b82f6' }} />
                     </div>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 2, fontSize: 6, color: 'rgba(255,255,255,0.6)' }}>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 2, fontSize: 6, color: 'rgba(255,255,255,0.9)' }}>
                       <span>🥩 {mealResult.pfcRatio.proteinPct}%</span>
                       <span>🧈 {mealResult.pfcRatio.fatPct}%</span>
                       <span>🍚 {mealResult.pfcRatio.carbsPct}%</span>
@@ -877,7 +877,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                         color: ps.score >= 55 ? '#22c55e' : ps.score >= 40 ? '#f59e0b' : '#ef4444',
                       }}>{ps.score}</div>
                       <span style={{ flex: 1, fontSize: 8, color: '#fff' }}>{ps.name}</span>
-                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>{ps.weight}г</span>
+                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.9)' }}>{ps.weight}г</span>
                       <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>вклад {ps.contribution}%</span>
                     </div>
                   ))}
@@ -898,7 +898,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                               background: m.percent >= 50 ? '#22c55e' : m.percent >= 20 ? '#f59e0b' : '#ef4444',
                               borderRadius: 2 }} />
                           </div>
-                          <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', minWidth: 30, textAlign: 'right' }}>
+                          <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.9)', minWidth: 30, textAlign: 'right' }}>
                             {m.percent}% · {m.current}{m.key.startsWith('Vit') ? 'мкг' : 'мг'}
                           </span>
                         </div>
@@ -918,7 +918,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
           {mealTab === 'saved' && (
             <div>
               {savedMeals.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.6)', fontSize: 10 }}>
+                <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.9)', fontSize: 10 }}>
                   Нет сохранённых приёмов. Соберите приём на вкладке «Состав» и нажмите 💾
                 </div>
               ) : (
@@ -930,7 +930,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                         <span style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{meal.name}</span>
-                        <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>
+                        <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.9)' }}>
                           {new Date(meal.createdAt).toLocaleDateString('ru-RU')}
                         </span>
                       </div>

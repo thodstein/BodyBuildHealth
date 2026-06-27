@@ -57,11 +57,11 @@ const ReportTab: React.FC = () => {
         padding:'8px 16px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:700,
         background:'linear-gradient(135deg,#00e68a,#00c8a0)', border:'none', color:'#000', marginBottom:8,
       }}>📊 Сгенерировать отчёт</button>
-      {!r && generated && <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>⚠️ Сначала создайте план на день.</div>}
+      {!r && generated && <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)' }}>⚠️ Сначала создайте план на день.</div>}
       {r && <>
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
           <span style={{ fontSize:24, fontWeight:800, color: gradeColor[r.overallGrade] || '#fff' }}>{r.overallGrade}</span>
-          <span style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>{r.overallGradeLabel}</span>
+          <span style={{ fontSize:10, color:'rgba(255,255,255,0.9)' }}>{r.overallGradeLabel}</span>
         </div>
         <div style={card}>
           <div style={{ fontSize:9, fontWeight:600, color:'#60a5fa', marginBottom:4 }}>🥗 КБЖУ</div>
@@ -77,19 +77,19 @@ const ReportTab: React.FC = () => {
           <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)' }}>
             {r.waterBalance.intakeMl} / {r.waterBalance.targetMl} мл ({r.waterBalance.intakePerKg} мл/кг)
             {r.waterBalance.status === 'low' && ' ⚠️ Недостаточно'}
-            <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:2 }}>{r.waterBalance.recommendation}</div>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)', marginTop:2 }}>{r.waterBalance.recommendation}</div>
           </div>
         </div>}
         {r.sodiumPotassium && <div style={card}>
           <div style={{ fontSize:9, fontWeight:600, color:'#f59e0b', marginBottom:4 }}>🧂 Натрий/Калий</div>
           <div style={{ fontSize:8 }}>Na {r.sodiumPotassium.naMg}мг / K {r.sodiumPotassium.kMg}мг = {r.sodiumPotassium.ratio.toFixed(1)} (норма {r.sodiumPotassium.targetRatio})</div>
-          {r.sodiumPotassium.recommendation && <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:2 }}>{r.sodiumPotassium.recommendation}</div>}
+          {r.sodiumPotassium.recommendation && <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)', marginTop:2 }}>{r.sodiumPotassium.recommendation}</div>}
         </div>}
         {r.proteinTiming && <div style={card}>
           <div style={{ fontSize:9, fontWeight:600, color:'#8b5cf6', marginBottom:4 }}>⏱ Тайминг белка</div>
           <div style={{ fontSize:8 }}>Равномерность: {r.proteinTiming.evennessScore.toFixed(0)}%, макс.перерыв: {r.proteinTiming.maxGapHours}ч</div>
           {r.proteinTiming.gaps.length > 0 && <div style={{ fontSize:7, color:'#f59e0b' }}>Пропуски: {r.proteinTiming.gaps.join(', ')}</div>}
-          <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:2 }}>{r.proteinTiming.recommendation}</div>
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)', marginTop:2 }}>{r.proteinTiming.recommendation}</div>
         </div>}
         {r.glycemicLoad && <div style={card}>
           <div style={{ fontSize:9, fontWeight:600, color:'#f97316', marginBottom:4 }}>🍬 Гликемическая нагрузка</div>
@@ -99,17 +99,17 @@ const ReportTab: React.FC = () => {
         {r.fatQuality && <div style={card}>
           <div style={{ fontSize:9, fontWeight:600, color:'#f59e0b', marginBottom:4 }}>🧈 Качество жиров</div>
           <div style={{ fontSize:8 }}>Насыщ. {r.fatQuality.satG.toFixed(0)}г, ненасыщ. {r.fatQuality.unsatG.toFixed(0)}г, Омега-3 {r.fatQuality.omega3G.toFixed(2)}г</div>
-          <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:2 }}>{r.fatQuality.recommendation}</div>
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)', marginTop:2 }}>{r.fatQuality.recommendation}</div>
         </div>}
         {r.fiberAnalysis && <div style={card}>
           <div style={{ fontSize:9, fontWeight:600, color:'#22c55e', marginBottom:4 }}>🌿 Клетчатка</div>
           <div style={{ fontSize:8 }}>{r.fiberAnalysis.totalG.toFixed(0)} / {r.fiberAnalysis.targetG}г ({Math.round(r.fiberAnalysis.pct)}%)</div>
-          {r.fiberAnalysis.recommendation && <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:2 }}>{r.fiberAnalysis.recommendation}</div>}
+          {r.fiberAnalysis.recommendation && <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)', marginTop:2 }}>{r.fiberAnalysis.recommendation}</div>}
         </div>}
         {r.calciumMagnesium && <div style={card}>
           <div style={{ fontSize:9, fontWeight:600, color:'#a78bfa', marginBottom:4 }}>🦴 Кальций/Магний</div>
           <div style={{ fontSize:8 }}>Ca {r.calciumMagnesium.caMg}мг / Mg {r.calciumMagnesium.mgMg}мг = {r.calciumMagnesium.ratio.toFixed(1)} (норма {r.calciumMagnesium.targetRatio})</div>
-          <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:2 }}>{r.calciumMagnesium.recommendation}</div>
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)', marginTop:2 }}>{r.calciumMagnesium.recommendation}</div>
         </div>}
         {r.microDeficiencies.length > 0 && <div style={card}>
           <div style={{ fontSize:9, fontWeight:600, color:'#ef4444', marginBottom:4 }}>💊 Дефициты микронутриентов</div>

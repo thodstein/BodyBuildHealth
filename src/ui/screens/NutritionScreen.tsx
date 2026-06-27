@@ -358,7 +358,7 @@ const CatalogTab: React.FC = () => {
                 <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                   <span style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{f.name}</span>
                   {bbScore && <span style={{ fontSize:8, padding:'1px 5px', borderRadius:4, background: bbScore >= 7 ? 'rgba(0,230,138,0.1)' : bbScore >= 5 ? 'rgba(249,115,22,0.1)' : 'rgba(239,68,68,0.1)', color: bbScore >= 7 ? '#00e68a' : bbScore >= 5 ? '#f97316' : '#ef4444' }}>{bbScore.toFixed(1)}</span>}
-                  <span style={{ fontSize:7, color:'rgba(255,255,255,0.6)' }}>{isExpanded ? 'в–І' : 'в–ј'}</span>
+                  <span style={{ fontSize:7, color:'rgba(255,255,255,0.9)' }}>{isExpanded ? 'в–І' : 'в–ј'}</span>
                 </div>
                 <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', marginTop:1 }}>{CATEGORY_LABELS[f.category] || f.category} • {f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs} {f.fiber ? `• В{f.fiber}г` : ''}</div>
               </div>
@@ -647,7 +647,7 @@ const RecipesTab: React.FC = () => {
                       width:'100%', padding:'8px 4px', borderRadius:8, fontSize:11, fontWeight:700, textAlign:'center',
                       background:'#202023', border:`1px solid ${m.c}30`, color:m.c, outline:'none', boxSizing:'border-box',
                     }} />
-                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)', marginTop:1 }}>{m.l}</div>
+                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.9)', marginTop:1 }}>{m.l}</div>
                   </div>
                 ))}
               </div>
@@ -907,7 +907,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
           }} style={{ padding:'10px 24px', borderRadius:12, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:12, boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>
             📊 Сгенерировать полный отчёт
           </button>
-          <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', marginTop:8 }}>Отчёт будет сохранён в архив и профиль</div>
+          <div style={{ fontSize:9, color:'rgba(255,255,255,0.9)', marginTop:8 }}>Отчёт будет сохранён в архив и профиль</div>
         </div>
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:'calc(100vh - 320px)', overflowY:'auto' }}>
@@ -948,7 +948,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
               </div>
             </div>
             <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>{fullReport.weightDynamicsBasic.explanation}</div>
-            {fullReport.weightDynamicsEnhanced.factors.length > 0 && <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)', marginTop:2 }}>Факторы: {fullReport.weightDynamicsEnhanced.factors.join('; ')}</div>}
+            {fullReport.weightDynamicsEnhanced.factors.length > 0 && <div style={{ fontSize:7, color:'rgba(255,255,255,0.9)', marginTop:2 }}>Факторы: {fullReport.weightDynamicsEnhanced.factors.join('; ')}</div>}
           </div>
 
           {/* Micros */}
@@ -1130,7 +1130,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
             <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>📋 Параметры составления рациона</div>
             {fullReport.planDecisions.map((d, i) => (
               <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:8, padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
-                <span style={{ color:'rgba(255,255,255,0.6)' }}>{d.param}</span>
+                <span style={{ color:'rgba(255,255,255,0.9)' }}>{d.param}</span>
                 <span style={{ color:'#fff', fontWeight:600, textAlign:'right', maxWidth:'60%' }}>{d.value}</span>
               </div>
             ))}
@@ -1188,7 +1188,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
                 <span style={{ fontSize:10, fontWeight:600, color:'#fff' }}>Отчёт от {rep.generatedAt?.slice(0,10) || 'N/A'}</span>
                 <span style={{ fontSize:12, fontWeight:800, color: rep.overallGrade === 'A' ? '#00e68a' : rep.overallGrade === 'B' ? '#8b5cf6' : rep.overallGrade === 'C' ? '#f59e0b' : '#ef4444' }}>{rep.overallGrade}</span>
               </div>
-              <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', marginTop:2 }}>{rep.overallGradeLabel} · КБЖУ {rep.kbjuPct.kcal}% · {rep.microDeficiencies.length} дефицитов</div>
+              <div style={{ fontSize:8, color:'rgba(255,255,255,0.9)', marginTop:2 }}>{rep.overallGradeLabel} · КБЖУ {rep.kbjuPct.kcal}% · {rep.microDeficiencies.length} дефицитов</div>
             </div>
           ))}
         </div>

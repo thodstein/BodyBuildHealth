@@ -127,7 +127,7 @@ export const HealthAnalytics: React.FC = () => {
             {LABS.map(l => (
               <div key={l.id} style={{ padding: '3px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7, color: 'rgba(255,255,255,0.8)', marginBottom: 1 }}>
-                  <span>{l.label}</span><span style={{ color: 'rgba(255,255,255,0.6)' }}>{l.refLow}-{l.refHigh} {l.unit}</span>
+                  <span>{l.label}</span><span style={{ color: 'rgba(255,255,255,0.9)' }}>{l.refLow}-{l.refHigh} {l.unit}</span>
                 </div>
                 <input type="number" step="0.1" value={labs[l.id] || ''} onChange={e => saveLabs(l.id, e.target.value)}
                   placeholder="вЂ”" style={{
@@ -145,7 +145,7 @@ export const HealthAnalytics: React.FC = () => {
               </div>
             ))}
           </div>
-          {!hasAnyLabs && <div style={{ marginTop: 6, fontSize: 7, color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>Введите значения анализов</div>}
+          {!hasAnyLabs && <div style={{ marginTop: 6, fontSize: 7, color: 'rgba(255,255,255,0.9)', textAlign: 'center' }}>Введите значения анализов</div>}
         </div>
         {hasAnyLabs && <div style={{ marginBottom: 8 }}>
           {getWarnings().length === 0 ? (
@@ -182,7 +182,7 @@ export const HealthAnalytics: React.FC = () => {
                       {h.foodIds.slice(0, 8).map(fid => (
                         <span key={fid} style={{ fontSize: 6, padding: '1px 4px', borderRadius: 3, background: 'rgba(239,68,68,0.15)', color: '#ef4444', textDecoration: 'line-through' }}>{fid.replace(/_/g, ' ')}</span>
                       ))}
-                      {h.foodIds.length > 8 && <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.6)', padding: '1px 4px' }}>+{h.foodIds.length - 8}</span>}
+                      {h.foodIds.length > 8 && <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.9)', padding: '1px 4px' }}>+{h.foodIds.length - 8}</span>}
                     </div>
                   )}
                 </div>

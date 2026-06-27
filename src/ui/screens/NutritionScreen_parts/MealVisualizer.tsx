@@ -20,7 +20,7 @@ export const MealVisualizer: React.FC<VisualizerProps> = ({ items, maxItems = 6 
 
   return (
     <div style={{ marginTop: 8, textAlign: 'center' }}>
-      <div style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>🍽 Визуализатор блюда</div>
+      <div style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>🍽 Визуализатор блюда</div>
       <div style={{ display: 'flex', height: 12, borderRadius: 6, overflow: 'hidden', background: 'rgba(255,255,255,0.03)' }}>
         {display.map((item, i) => {
           const pct = item.weightG / totalW * 100;
@@ -37,7 +37,7 @@ export const MealVisualizer: React.FC<VisualizerProps> = ({ items, maxItems = 6 
           const bb = food?.bb_quality_score;
           const color = FOOD_COLORS[item.id] || `hsl(${i * 60}, 60%, 50%)`;
           return (
-            <div key={item.id + '_l' + i} style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 6, color: 'rgba(255,255,255,0.4)' }}>
+            <div key={item.id + '_l' + i} style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 6, color: 'rgba(255,255,255,0.8)' }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, opacity: bb && bb >= 6 ? 1 : 0.5 }} />
               {item.weightG}г
             </div>

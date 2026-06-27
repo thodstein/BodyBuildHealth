@@ -56,7 +56,7 @@ export const ProgressTracker: React.FC = () => {
             background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#000',
           }}>вњ“</button>
         </div>
-        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>
+        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.9)' }}>
           {entries.length > 0 ? `Последняя запись: ${entries[entries.length - 1].date} — ${entries[entries.length - 1].weight} кг` : 'Нет записей'}
         </div>
       </div>
@@ -73,7 +73,7 @@ export const ProgressTracker: React.FC = () => {
                   borderRadius: '4px 4px 0 0', background: e.weight > entries[Math.max(0, i - 1)].weight ? '#ef4444' : '#22c55e',
                   opacity: 0.8, transition: 'height 0.2s',
                 }} />
-                <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.6)', marginTop: 2, writingMode: 'vertical-lr' as any }}>{e.weight}</span>
+                <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.9)', marginTop: 2, writingMode: 'vertical-lr' as any }}>{e.weight}</span>
               </div>
             ))}
           </div>
@@ -121,7 +121,7 @@ export const ProgressTracker: React.FC = () => {
               );
             }
           } catch {}
-          return <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)', textAlign:'center', padding:8 }}>
+          return <div style={{ fontSize:7, color:'rgba(255,255,255,0.9)', textAlign:'center', padding:8 }}>
             Нет данных. Сгенерируйте отчёт в Планировщике питания → Отчёт
           </div>;
         })()}

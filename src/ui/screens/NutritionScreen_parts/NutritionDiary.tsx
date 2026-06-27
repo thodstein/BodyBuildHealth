@@ -348,7 +348,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                         style={{ width:50, padding:'4px 2px', borderRadius:4, background:'transparent', border:'none', color:'#fff', fontSize:13, fontWeight:700, textAlign:'center', outline:'none' }} />
                       <button onClick={() => setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: Math.min(1000, (x.qty||100) + 10)} : x))} style={{ width:24, height:24, borderRadius:6, border:'none', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer', fontSize:12, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
                     </div>
-                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>г</span>
+                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.85)' }}>г</span>
                     <div style={{ display:'flex', gap:3, marginLeft:'auto' }}>
                       {[50,100,200,300].map(v => <button key={v} onClick={() => setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: v} : x))} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.06)', background: q===v ? 'rgba(0,230,138,0.12)' : '#18181b', color: q===v ? '#00e68a' : 'rgba(255,255,255,0.7)', cursor:'pointer', fontSize:8, fontWeight: q===v ? 700 : 400 }}>{v}г</button>)}
                     </div>
@@ -390,7 +390,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                           {d.nutrient}: {d.current}/{d.target} {d.unit}
                         </span>
                       ))}
-                      {q.microDeficiencies.length > 4 && <span style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>+{q.microDeficiencies.length-4}</span>}
+                      {q.microDeficiencies.length > 4 && <span style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>+{q.microDeficiencies.length-4}</span>}
                     </div>
                   )}
                 </div>
@@ -493,7 +493,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                     {kcalDiff !== 0 && <div style={{ fontSize:8, color: kcalDiff > 0 ? '#f59e0b' : '#22c55e' }}>
                       {sleepDepCount > 0 ? `В дни недосыпа калории ${kcalDiff > 0 ? '+' : ''}${kcalDiff}%` : 'Нет данных по недосыпу'}
                     </div>}
-                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginTop:1 }}>
+                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginTop:1 }}>
                       {entries.length} дней · Среднее {Math.round(avg)} ккал · σ={Math.round(stdDev)}
                     </div>
                   </div>

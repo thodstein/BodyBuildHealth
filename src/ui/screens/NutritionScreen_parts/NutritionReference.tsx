@@ -242,7 +242,7 @@ export const NutritionReference: React.FC = () => {
       {/* Search results overlay */}
       {filtered && filtered.length > 0 && (
         <div style={{ padding: '6px 8px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', marginBottom: 4 }}>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 4, fontWeight: 600 }}>Результатов: {filtered.length}</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', marginBottom: 4, fontWeight: 600 }}>Результатов: {filtered.length}</div>
           {filtered.slice(0, 30).map(item => (
             <div key={item.id} style={{ padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: 12, lineHeight: 1.5 }}>
               <span style={{ color: '#00e68a', fontWeight: 700 }}>
@@ -254,12 +254,12 @@ export const NutritionReference: React.FC = () => {
               </div>
             </div>
           ))}
-          {filtered.length > 30 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: 4 }}>...и ещё {filtered.length - 30} результатов</div>}
+          {filtered.length > 30 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', textAlign: 'center', padding: 4 }}>...и ещё {filtered.length - 30} результатов</div>}
         </div>
       )}
 
       {filtered && filtered.length === 0 && (
-        <div style={{ padding: 14, borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center', fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Ничего не найдено. Попробуйте другой запрос.</div>
+        <div style={{ padding: 14, borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center', fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>Ничего не найдено. Попробуйте другой запрос.</div>
       )}
 
       {!search && (
@@ -345,11 +345,11 @@ export const NutritionReference: React.FC = () => {
               {nutris.map(s => (
                 <span key={s.id} style={{ padding: '4px 8px', borderRadius: 8, fontSize: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.1)', color: '#00e68a', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <span>{s.nameRu || s.name}</span>
-                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>{(s as any).category?.[0] || (s as any).categories?.[0] || ''}</span>
+                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)' }}>{(s as any).category?.[0] || (s as any).categories?.[0] || ''}</span>
                 </span>
               ))}
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 6, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', marginTop: 6, lineHeight: 1.5 }}>
               Ваш стек BioStack AI содержит {nutris.length} питательных веществ{nutris.length > 3 ? ', учитывайте их при составлении рациона' : ''}
             </div>
           </SectionCard>

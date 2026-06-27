@@ -80,7 +80,7 @@ export const IndividualPlanHealth: React.FC = () => {
                     <span style={{ fontSize: 9, color: isActive ? '#8b5cf6' : 'rgba(255,255,255,0.2)' }}>{isActive ? '✓' : '+'}</span>
                   </div>
                 </div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginTop: 2, lineHeight: 1.3 }}>{h.desc}</div>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginTop: 2, lineHeight: 1.3 }}>{h.desc}</div>
                 {isActive && (
                   <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                     {h.foodIds.slice(0, 8).map(fid => {
@@ -94,7 +94,7 @@ export const IndividualPlanHealth: React.FC = () => {
                         }}>{getFoodName(fid)}</span>
                       );
                     })}
-                    {h.foodIds.length > 8 && <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)', padding: '1px 4px' }}>+{h.foodIds.length - 8}</span>}
+                    {h.foodIds.length > 8 && <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.75)', padding: '1px 4px' }}>+{h.foodIds.length - 8}</span>}
                   </div>
                 )}
               </div>
@@ -130,7 +130,7 @@ export const IndividualPlanHealth: React.FC = () => {
         <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginBottom: 8 }}>✅ Соответствие текущего плана</div>
           {activeIssues.length === 0 ? (
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', padding: '6px 0' }}>Нет активных ограничений здоровья.</div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', padding: '6px 0' }}>Нет активных ограничений здоровья.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {activeIssues.map(h => {
@@ -145,7 +145,7 @@ export const IndividualPlanHealth: React.FC = () => {
                       <span style={{ fontSize: 9, fontWeight: 600, color: conflicts.length === 0 ? '#22c55e' : '#ef4444' }}>
                         {h.icon} {h.label}
                       </span>
-                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)' }}>
+                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>
                         {h.foodIds.length} зонтировано, {conflicts.length} в плане
                       </span>
                     </div>
@@ -195,19 +195,19 @@ export const IndividualPlanHealth: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#8b5cf6' }}>{activeIssues.length}</div>
-            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)' }}>Активных проблем</div>
+            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Активных проблем</div>
           </div>
           <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.1)' }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#f59e0b' }}>{activeAllergens.length}</div>
-            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)' }}>Активных аллергенов</div>
+            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Активных аллергенов</div>
           </div>
           <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.1)' }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#00e68a' }}>{totalExcluded}</div>
-            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)' }}>Исключено продуктов</div>
+            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Исключено продуктов</div>
           </div>
           <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.1)' }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#f97316' }}>{(ctx.budget === 'low' ? '❌ Низкое' : ctx.budget === 'medium' ? '⚖️ Среднее' : ctx.budget === 'max' ? '⭐ Хорошее' : '💎 Отличное')}</div>
-            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)' }}>Качество продуктов</div>
+            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Качество продуктов</div>
           </div>
         </div>
       </div>

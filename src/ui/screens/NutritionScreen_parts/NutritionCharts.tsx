@@ -22,9 +22,9 @@ const commonChartOptions = (hasWeight: boolean) => ({
     tooltip: { backgroundColor: '#202023', titleColor: '#fff', bodyColor: '#fff', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 },
   },
   scales: {
-    y: { beginAtZero: false, position: 'left' as const, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 9 } } },
-    ...(hasWeight ? { y1: { beginAtZero: false, position: 'right' as const, grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 9 } } } } : {}),
-    x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { maxTicksLimit: 7, color: 'rgba(255,255,255,0.4)', font: { size: 9 } } },
+    y: { beginAtZero: false, position: 'left' as const, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(255,255,255,0.8)', font: { size: 9 } } },
+    ...(hasWeight ? { y1: { beginAtZero: false, position: 'right' as const, grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.8)', font: { size: 9 } } } } : {}),
+    x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { maxTicksLimit: 7, color: 'rgba(255,255,255,0.8)', font: { size: 9 } } },
   },
 });
 
@@ -194,7 +194,7 @@ export const NutritionCharts: React.FC<{
             <div key={s.label} style={{ background: '#202023', padding: '8px 10px', borderRadius: 10, textAlign: 'center', border: '1px solid rgba(255,255,255,0.04)' }}>
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{s.label}</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.val}</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>{s.unit}</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)' }}>{s.unit}</div>
             </div>
           ))}
         </div>
@@ -224,7 +224,7 @@ export const NutritionCharts: React.FC<{
                     <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
                       <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: g.color, transition: 'width 0.3s' }} />
                     </div>
-                    <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>{g.met}/{g.total}</div>
+                    <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)' }}>{g.met}/{g.total}</div>
                   </div>
                 </div>;
               })}
@@ -238,7 +238,7 @@ export const NutritionCharts: React.FC<{
       <div style={{ ...cardBg }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8, letterSpacing: -0.3 }}>📅 Календарь достижений</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
-          {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(d => <div key={d} style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '2px 0' }}>{d}</div>)}
+          {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(d => <div key={d} style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', textAlign: 'center', padding: '2px 0' }}>{d}</div>)}
           {(() => {
             const today = new Date();
             const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);

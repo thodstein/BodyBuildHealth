@@ -49,7 +49,7 @@ export const DailyQuests: React.FC = () => {
     <div style={{ paddingBottom: 80 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>🎯 Ежедневные квесты</div>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>🏆 {score} баллов</div>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>🏆 {score} баллов</div>
       </div>
 
       <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.12)', marginBottom: 8 }}>
@@ -63,7 +63,7 @@ export const DailyQuests: React.FC = () => {
         }}>{completed.includes(questOfDay.id) ? '✅ Выполнено +10' : '○ Отметить'}</button>
       </div>
 
-      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>Все квесты</div>
+      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', marginBottom: 6 }}>Все квесты</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         {QUESTS.map(q => (
           <div key={q.id} style={{

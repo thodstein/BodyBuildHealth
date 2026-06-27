@@ -21,7 +21,7 @@ export const MealComposer: React.FC = () => {
     <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
       {!generated && (
         <div style={{ padding:16, textAlign:'center', background:'rgba(0,230,138,0.03)', borderRadius:12, border:'1px solid rgba(0,230,138,0.1)' }}>
-          <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)', marginBottom:10 }}>Сначала сгенерируйте план в разделе «План»</div>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,0.85)', marginBottom:10 }}>Сначала сгенерируйте план в разделе «План»</div>
           <button onClick={() => { setGenerated(true); generatePlan(1); }} style={{
             padding:'8px 20px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:700,
             background:'linear-gradient(135deg,#00e68a,#00c8a0)', border:'none', color:'#000',
@@ -47,7 +47,7 @@ export const MealComposer: React.FC = () => {
           {renderMealList ? (
             renderMealList(dayPlan || threeDayPlan?.[selectedDayIndex] || null, true)
           ) : (
-            <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', textAlign:'center', padding:20 }}>
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', textAlign:'center', padding:20 }}>
               Выберите день для просмотра состава приёмов пищи
             </div>
           )}

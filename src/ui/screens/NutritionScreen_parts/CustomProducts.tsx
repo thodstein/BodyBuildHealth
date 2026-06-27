@@ -52,7 +52,7 @@ export const CustomProducts: React.FC = () => {
             <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
               <div>
                 <div style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{p.name}</div>
-                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>{p.kcal} ккал • Б{p.protein} Ж{p.fat} У{p.carbs}</div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)' }}>{p.kcal} ккал • Б{p.protein} Ж{p.fat} У{p.carbs}</div>
               </div>
               <button onClick={() => remove(p.id)} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 8, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>✕</button>
             </div>

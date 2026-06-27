@@ -653,10 +653,33 @@ const CatalogTab: React.FC = () => {
         </div>
       )}
 
-      {/* Detail card below list */}
+      {/* Popup detail modal — same style as supplements catalog */}
       {selected && (
-        <div style={{ marginTop: 8 }}>
-          <DrugDetailCard sub={selected} detail={detail} />
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 300,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.85)',
+        }} onClick={() => setSelectedId(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '92%', maxWidth: 480, maxHeight: '85vh',
+            borderRadius: 16, background: '#18181b',
+            border: '1px solid rgba(255,255,255,0.1)',
+            boxShadow: '0 16px 60px rgba(0,0,0,0.5)',
+            overflow: 'hidden', display: 'flex', flexDirection: 'column',
+          }}>
+            <div style={{ height: 3, background: 'linear-gradient(90deg, var(--accent), #00c853)' }} />
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)' }}>{selected.name}</span>
+                <button onClick={() => setSelectedId(null)} style={{
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                  color: 'rgba(255,255,255,0.5)', borderRadius: 8, padding: '4px 10px',
+                  cursor: 'pointer', fontSize: 10, fontWeight: 600,
+                }}>✕ Закрыть</button>
+              </div>
+              <DrugDetailCard sub={selected} detail={detail} />
+            </div>
+          </div>
         </div>
       )}
     </div>
