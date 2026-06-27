@@ -32,15 +32,17 @@ import { VisualTab } from './TrainingScreen_parts/VisualTab';
 import { ProMetricsPanel } from './SRCBBScreen_parts/ProMetricsPanel';
 type Mode = 'pl' | 'bb' | 'manual';
 
-const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: '12px', margin: '6px 0' };
+const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: '12px', margin: '6px 0' };
+const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 10, lineHeight: 1.4 };
+const cardBg = CARD;
 const ACCENT = '#00e68a';
-const BTN: React.CSSProperties = { background: ACCENT, color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 14, minHeight: 44 };
-const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: ACCENT, border: `1px solid ${ACCENT}` };
-const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 40, width: '100%' };
+const BTN: React.CSSProperties = { background: ACCENT, color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 12, minHeight: 40, cursor: 'pointer' };
+const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: ACCENT, border: `1px solid ${ACCENT}20` };
+const PILL = (active: boolean) => ({ padding:'6px 14px', borderRadius:20, fontSize:10, fontWeight: active ? 700 : 500, cursor:'pointer', border: active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: active ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#18181b', color: active ? '#000' : '#fff', whiteSpace:'nowrap' as const, flexShrink:0 } as React.CSSProperties);
+const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 40, width: '100%', outline: 'none', boxSizing: 'border-box' };
 const IN: React.CSSProperties = { ...SEL, padding: '10px' };
-const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 12, margin: '6px 0 3px' };
-const H: React.CSSProperties = { color: '#fff', fontSize: 15, fontWeight: 600, margin: '4px 0' };
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 1.4 };
+const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 10, margin: '6px 0 3px' };
+const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: '#00e68a', marginBottom: 8 };
 
 export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'pl');
@@ -203,18 +205,18 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
 
   return (
     <div key={mainTab} style={{ padding: 12, color: '#fff', maxWidth: 720, margin: '0 auto' }}>
-      {/* sub-view nav for PL/BB */}
+      {/* sub-view pill nav for PL/BB */}
       {mainTab !== 'manual' && subViewList[mainTab].length > 0 && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 10, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4, scrollbarWidth: 'none' }}>
           {subViewList[mainTab].map(({ key, label }) => (
-            <button key={key} style={subView === key ? BTN : { ...BTN_GHOST, whiteSpace: 'nowrap', fontSize: 11, padding: '8px 12px', minHeight: 36 }} onClick={() => setSubView(key)}>{label}</button>
+            <button key={key} style={PILL(subView === key)} onClick={() => setSubView(key)}>{label}</button>
           ))}
         </div>
       )}
 
       {mainTab === 'pl' && subView === 'plan' && (
         <div>
-          <div style={H}>Авто-подбор силового цикла</div>
+          <div style={H}>🏆 Авто-подбор силового цикла</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div><div style={LABEL}>Уровень</div><select style={SEL} value={level} onChange={e => setLevel(e.target.value)}>
               {['novice','II-KMS','KMS-MS','MS-MSMK','II-MS','intermediate'].map(l => <option key={l} value={l}>{l}</option>)}
@@ -282,24 +284,32 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   {autoRegResult.decisions.slice(0,3).map((d, i) => <div key={i} style={{ marginTop:2, color:'rgba(255,255,255,0.55)' }}>• {d}</div>)}
                 </div>}
               </div>
+              {/* Exercise picker popup */}
               {pickerDay && (
-                <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.25)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}><span style={{ fontSize:12, fontWeight:700, color:'#00e68a' }}>＋ Упражнение в день</span><button onClick={() => setPickerDay(null)} style={{ fontSize:10, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer' }}>✕ Отмена</button></div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>{CAT_GROUPS.map(g => <button key={g} onClick={() => { setPickerGroup(g); setPickerExName(''); }} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', border: pickerGroup===g?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: pickerGroup===g?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.03)', color: pickerGroup===g?'#00e68a':'var(--text-dim)' }}>{GRP_RU[g]||g}</button>)}</div>
-                  <select value={pickerExName} onChange={e => setPickerExName(e.target.value)} style={{ ...SEL, marginBottom:6 }}>
-                    <option value=''>— выберите упражнение —</option>
-                    {getExercisesByGroup(pickerGroup).map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
-                  </select>
-                  <div style={{ display:'flex', gap:6, alignItems:'center', marginBottom:6 }}>
-                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>Схема:</span>
-                    <input type='number' value={pickerScheme.sets} onChange={e => setPickerScheme(s => ({ ...s, sets: +e.target.value }))} style={{ width:40, ...IN, padding:'4px', fontSize:10 }} aria-label='подходы'/>
-                    <span style={{ fontSize:9 }}>× </span>
-                    <input type='number' value={pickerScheme.reps} onChange={e => setPickerScheme(s => ({ ...s, reps: +e.target.value }))} style={{ width:40, ...IN, padding:'4px', fontSize:10 }} aria-label='повт'/>
-                    <span style={{ fontSize:9 }}>× </span>
-                    <input type='number' value={pickerScheme.weight} onChange={e => setPickerScheme(s => ({ ...s, weight: +e.target.value }))} style={{ width:56, ...IN, padding:'4px', fontSize:10 }} aria-label='вес'/>
-                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>кг</span>
+                <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', background:'rgba(0,0,0,0.9)' }} onClick={() => setPickerDay(null)}>
+                  <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#18181b', display:'flex', flexDirection:'column' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 12px 0' }}>
+                      <span style={{ fontSize:14, fontWeight:700, color:'#00e68a' }}>＋ Упражнение в день</span>
+                      <button onClick={() => setPickerDay(null)} style={{ fontSize:10, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', padding:'4px 8px' }}>✕</button>
+                    </div>
+                    <div style={{ flex:1, overflowY:'auto', padding:'8px 12px 80px' }}>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>{CAT_GROUPS.map(g => <button key={g} onClick={() => { setPickerGroup(g); setPickerExName(''); }} style={{ padding:'5px 10px', borderRadius:16, fontSize:9, cursor:'pointer', border: pickerGroup===g?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: pickerGroup===g?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.03)', color: pickerGroup===g?'#00e68a':'rgba(255,255,255,0.7)' }}>{GRP_RU[g]||g}</button>)}</div>
+                      <select value={pickerExName} onChange={e => setPickerExName(e.target.value)} style={{ ...SEL, marginBottom:8 }}>
+                        <option value=''>— выберите упражнение —</option>
+                        {getExercisesByGroup(pickerGroup).map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
+                      </select>
+                      <div style={{ display:'flex', gap:6, alignItems:'center', marginBottom:8 }}>
+                        <span style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>Подходы</span>
+                        <input type='number' value={pickerScheme.sets} onChange={e => setPickerScheme(s => ({ ...s, sets: +e.target.value }))} style={{ width:48, ...IN, padding:'4px', fontSize:10 }} />
+                        <span style={{ fontSize:9 }}>×</span>
+                        <input type='number' value={pickerScheme.reps} onChange={e => setPickerScheme(s => ({ ...s, reps: +e.target.value }))} style={{ width:48, ...IN, padding:'4px', fontSize:10 }} />
+                        <span style={{ fontSize:9 }}>×</span>
+                        <input type='number' value={pickerScheme.weight} onChange={e => setPickerScheme(s => ({ ...s, weight: +e.target.value }))} style={{ width:56, ...IN, padding:'4px', fontSize:10 }} />
+                        <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>кг</span>
+                      </div>
+                      <button onClick={() => addExToDay(pickerDay)} disabled={!pickerExName} style={{ width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer', fontWeight:700, fontSize:11, background: pickerExName ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(255,255,255,0.1)', color: pickerExName ? '#000' : 'rgba(255,255,255,0.3)' }}>Добавить в день</button>
+                    </div>
                   </div>
-                  <button onClick={() => addExToDay(pickerDay)} disabled={!pickerExName} style={{ ...BTN, width:'100%', opacity: pickerExName?1:0.5 }}>Добавить в день</button>
                 </div>
               )}
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, marginTop:10, padding:'6px 8px', borderRadius:10, background:'rgba(255,255,255,0.03)' }}>
@@ -315,30 +325,39 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 <div style={{ ...LABEL, color: ACCENT, margin:0 }}>ПМ на неделю {wk.week} (прогрессия)</div>
                 <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:4 }}>{Object.entries(wk.pmRow).map(([n, pm]) => <span key={n} style={{ ...SMALL, color:'#fff' }}><b>{n}:</b> {pm.toFixed(1)}кг</span>)}</div>
               </div>
+              {/* Save program button */}
+              <button onClick={() => { try { const cycle = LMS_CYCLES.find(c => c.meta.id === selectedCycleId); const data = { name: `PL ${cycle?.meta.title || selectedCycleId || 'цикл'}`, date: new Date().toISOString().slice(0,10), goal: level, weekCount: totalW, generatedAt: Date.now() }; const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); existing.unshift(data); localStorage.setItem('myTrainingPlans', JSON.stringify(existing.slice(0,30))); } catch {} }} style={{ width:'100%', padding:'8px 0', borderRadius:8, border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.06)', color:'#00e68a', cursor:'pointer', fontSize:9, fontWeight:600, marginTop:6 }}>💾 Сохранить программу</button>
               {wk.days.map((d, di) => (
-                <div key={di} style={{ marginTop:10, padding:10, borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6, gap:6 }}>
-                    <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>День {di+1}{d.exercises[0]?.load ? ' · '+d.exercises[0].load : ''}</span>
-                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)', textAlign:'right' }}>тоннаж {d.metrics.tonnage.toFixed(0)} · КПШ {d.metrics.kpsh} · Инт.отн {d.metrics.relIntensity.toFixed(3)} · УОИ {d.metrics.uoi.toFixed(2)}</span>
+                <div key={di} style={{ ...CARD, marginTop:10, borderLeft:`3px solid ${ACCENT}` }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, gap:6 }}>
+                    <span style={{ fontSize:13, fontWeight:700, color:'#fff' }}>🏋️ День {di+1}{d.exercises[0]?.load ? ' · '+d.exercises[0].load : ''}</span>
+                    <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)', textAlign:'right' }}>{d.metrics.tonnage.toFixed(0)}т · {d.metrics.kpsh}КПШ · УОИ {d.metrics.uoi.toFixed(2)}</span>
                   </div>
                   {d.exercises.map((e, ei) => (
-                    <div key={ei} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:4, padding:'5px 0', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                      <div style={{ fontSize:11, color:'#fff', fontWeight:600 }}>{e.name}</div>
-                      <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', textAlign:'right' }}>
+                    <div key={ei} style={{ background:'rgba(255,255,255,0.02)', borderRadius:8, padding:'6px 8px', marginBottom:4, border:'1px solid rgba(255,255,255,0.04)' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                        <span style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{e.name}</span>
+                        <span style={{ fontSize:9, color:e.load === 'main' ? '#00e68a' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.4)', fontWeight:600, padding:'1px 6px', borderRadius:4, background: e.load === 'main' ? 'rgba(0,230,138,0.1)' : e.load === 'additional' ? 'rgba(245,158,11,0.1)' : 'transparent' }}>
+                          {e.load === 'main' ? 'ОСН' : e.load === 'additional' ? 'ДОП' : 'АКС'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>
                         {editMode ? (
-                          <div style={{ display:'flex', flexDirection:'column', gap:3, alignItems:'flex-end' }}>
-                            {e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); const es = effSet(wk.week, di, ei, si, ws); const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'3px 4px', fontSize:10, textAlign:'center' }; return (
+                          <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                            {e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); const es = effSet(wk.week, di, ei, si, ws); const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'2px 4px', fontSize:9, textAlign:'center' }; return (
                               <div key={si} style={{ display:'flex', gap:3, alignItems:'center' }}>
-                                <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>С{si+1}</span>
-                                <input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], weight: +ev.target.value } }))} style={{ ...INM, width:50 }} aria-label='вес'/>
-                                <span style={{ fontSize:8 }}>×</span>
-                                <input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, width:36 }} aria-label='повт'/>
-                                <span style={{ fontSize:8 }}>×</span>
-                                <input type='number' value={es.sets} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], sets: +ev.target.value } }))} style={{ ...INM, width:30 }} aria-label='подходы'/>
+                                <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>С{si+1}</span>
+                                <input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], weight: +ev.target.value } }))} style={{ ...INM, width:44 }} />
+                                <span style={{ fontSize:7 }}>×</span>
+                                <input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, width:32 }} />
+                                <span style={{ fontSize:7 }}>×</span>
+                                <input type='number' value={es.sets} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], sets: +ev.target.value } }))} style={{ ...INM, width:28 }} />
                               </div>
                             ); })}
                           </div>
-                        ) : e.workSets.map((ws, si) => setStr(effSet(wk.week, di, ei, si, ws))).join('  ·  ')}
+                        ) : e.workSets.map((ws, si) => (
+                          <span key={si} style={{ marginRight:6 }}>{setStr(effSet(wk.week, di, ei, si, ws))}</span>
+                        ))}
                       </div>
                     </div>
                   ))}

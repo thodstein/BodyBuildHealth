@@ -3,6 +3,7 @@ import { PHARMA_DB, SUBSTANCES_BY_CLASS, getPharmaDetail } from '../../core/phar
 import { db } from '../../core/db';
 import { calculateDose } from '../../engines/dosage.engine';
 import { simulateCourse, steadyStatePeak, steadyStateTrough, eliminationConstant } from '../../engines/pk-pd.engine';
+import { PharmaScoreCard } from '../components/PharmaScoreCard';
 import { calculateMultiSubstancePKPD } from '../../engines/pkpd-superposition.engine';
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
 import { PHARMA_DETAILS, type PharmaDetail } from '../../data/support-database';
@@ -276,6 +277,12 @@ export const PharmaScreen: React.FC = () => {
               Активные вещества: {Object.keys(linked.activeDrugs).map(d => PHARMA_DB[d]?.name || d).join(', ')}
             </div>
           )}
+          <PharmaScoreCard
+            course={(linked.course || []).map((c: any) => ({ substanceId: c.substanceId || '', dose: c.doseValue || 0, unit: c.doseUnit || 'мг', weeks: (c.endWeek || 12) - (c.startWeek || 0) }))}
+            weight={linked.profile?.settings?.weight || 80}
+            age={linked.profile?.settings?.age || 30}
+            sex={linked.profile?.settings?.sex || 'male'}
+          />
         </div>
       )}
       <div style={{ display:'flex', gap:4, overflowX:'auto', marginBottom:8, scrollbarWidth:'none' }}>

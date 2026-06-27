@@ -8,6 +8,7 @@ import type { DrugInjection } from "./types";
 import { GlassCard, greenBtn, reportPillStyle } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
 import { DailyDietDashboard } from "../DailyDietDashboard";
+import { NutritionQualityCard } from '../../../components/NutritionQualityCard';
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type MealTiming, type DailyDietReport, type MealScoreV2 } from '../../../../engines/product-usefulness-v2.engine';
 
 export const IndividualPlanResults: React.FC = () => {
@@ -27,7 +28,7 @@ export const IndividualPlanResults: React.FC = () => {
     recipePickerMeal, setRecipePickerMeal,
     replaceMealWithRecipe, undoStack, setUndoStack,
     saveCurrentPlan, savedPlans, setSavedPlans, expandedSavedId, setExpandedSavedId,
-    loadSavedPlan, weight, budget,
+    loadSavedPlan, weight, budget, age, sex,
     generateCheatMeal, cheatMealPlan, setCheatMealPlan,
     generateCarbload, carbloadPlan, setCarbloadPlan,
     generateBUTCH, butchPlan, setButchPlan,
@@ -333,6 +334,25 @@ export const IndividualPlanResults: React.FC = () => {
         </GlassCard>
       )}
       {generated && dayPlan && <DailyDietDashboard />}
+      {generated && dayPlan && (
+        <NutritionQualityCard
+          meals={(dayPlan as any)?.meals?.map((m: any) => ({
+            foods: (m.items || []).map((it: any) => ({
+              id: it.id || it.name || 'unknown',
+              name: it.name || '',
+              grams: it.amount || 100,
+              protein: it.p || 0,
+              fat: it.f || 0,
+              carbs: it.c || 0,
+              kcal: it.kcal || 0,
+              fiber: 0,
+            })),
+          })) || []}
+          weight={weight}
+          age={age}
+          sex={sex}
+        />
+      )}
       {generated && allergens.length > 0 && (
         <GlassCard title="РђР»Р»РµСЂРіРµРЅС‹" icon="вљ пёЏ" color="#f97316" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>

@@ -1452,7 +1452,7 @@ export const NutritionScreen: React.FC = () => {
 
   const renderContent = () => {
     switch (tab) {
-      case 'diary': return <InfoErrorBoundary label="Р”РЅРµРІРЅРёРє РїРёС‚Р°РЅРёСЏ"><NutritionDiary foodEntries={foodEntries} targets={macroTargets} /></InfoErrorBoundary>;
+      case 'diary': return <InfoErrorBoundary label="Дневник питания"><NutritionDiary foodEntries={foodEntries} targets={macroTargets} weight={linked.profile?.settings?.weight} age={linked.profile?.settings?.age} sex={linked.profile?.settings?.sex} /></InfoErrorBoundary>;
       case 'charts': return <InfoErrorBoundary label="Р“СЂР°С„РёРєРё"><Suspense fallback={<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Р—Р°РіСЂСѓР·РєР° РіСЂР°С„РёРєРѕРІ...</div>}><NutritionCharts kcalData={chartKcalData} proteinData={chartProteinData} labels={chartLabels} dailyLogs={dailyLogs} /></Suspense></InfoErrorBoundary>;
       case 'mealplan': return <InfoErrorBoundary label="РџР»Р°РЅ РїРёС‚Р°РЅРёСЏ"><IndividualPlan profile={linked.profile} course={linked.course} /></InfoErrorBoundary>;
       case 'cart': return <CartTab />;

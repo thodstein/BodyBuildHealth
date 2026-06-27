@@ -51,6 +51,7 @@ type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'research' | 'f
 
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { BioStackAIScreen } from '../components/BioStackAIScreen';
+import { AutoCalculator } from './SupportScreen_parts/AutoCalculator';
 export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTab }) => {
   const linked = useDataLink();
   const [tab, setTab] = useState<SupportTab>(initialTab || 'main');
@@ -58,7 +59,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [calcView, setCalcView] = useState<CalcView>('main');
   const [infoView, setInfoView] = useState<InfoView>('main');
   const [section, setSection] = useState<'home'|'generator'|'protocols'|'info'>('home');
-  const [genTab, setGenTab] = useState<'calculator'|'info'>('calculator');
+  const [genTab, setGenTab] = useState<'calculator'|'auto'|'info'>('calculator');
   const [protocolTab, setProtocolTab] = useState<'pct'|'fertility'|'hrt'|'neuro'|'joints'|'acne'>('pct');
   const [infoTab, setInfoTab] = useState<string>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
@@ -2165,7 +2166,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['calculator','🧮 Калькулятор'],['info','📖 О подборе']].map(([id,label]) => (
+            {[['calculator','🧮 Калькулятор'],['auto','🤖 Авто'],['info','📖 О подборе']].map(([id,label]) => (
               <button key={id} onClick={() => { setGenTab(id as any); 
               const a: Record<string,()=>void> = {
                 calculator: ()=>{ setTab('calculator'); setSupportView('calc'); },
@@ -4440,6 +4441,27 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         </div>
       )}
 
+      {/* ===== AUTO-CALCULATOR — УМНЫЙ ПОДБОР ПОДДЕРЖКИ ===== */}
+      {genTab === 'auto' && section === 'generator' && (
+        <AutoCalculator
+          linked={linked}
+          supportLevel={supportLevel}
+          boostEnabled={boostEnabled}
+          selectedAnalogs={selectedAnalogs}
+          enhancedSubs={enhancedSubs}
+          calcResult={calcResult}
+          supportResult={supportResult}
+          onApply={(result: any) => {
+            setSupportLevel(result.level);
+            setBoostEnabled(result.boostEnabled);
+            setSelectedAnalogs(result.analogs);
+            setEnhancedSubs(result.subs);
+            setCalcResult(result.calcResult);
+            setSupportResult(result.supportResult);
+            setGenTab('calculator');
+          }}
+        />
+      )}
 
       {/* ===== MIX CALCULATOR moved to supportstacks → mixcalc sub-tab ===== */}
 

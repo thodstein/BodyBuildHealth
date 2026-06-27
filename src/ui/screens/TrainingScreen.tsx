@@ -8,6 +8,7 @@ import { RIR_MATRIX, generateWeeklyPlan } from '../../engines/rir-matrix.engine'
 import { StrengthDiary, type StrengthStats, type WeeklyProgress, type ProgressionAlert } from '../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../core/types';
 import { generateWarmup } from '../../engines/warmup.engine';
+import { TrainingScoreCard } from '../components/TrainingScoreCard';
 import { generateCooldown } from '../../engines/cooldown.engine';
 import { selectSetScheme } from '../../engines/set-scheme.engine';
 import { selectTempo, formatTempo } from '../../engines/tempo.engine';
@@ -488,6 +489,22 @@ export const TrainingScreen: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Training Score Card */}
+      <TrainingScoreCard
+        workoutsPerWeek={linked.profile?.settings?.workoutsPerWeek || 3}
+        avgMinutes={60}
+        intensity="moderate"
+        goal={(linked.profile?.settings?.goal as any) || 'hypertrophy'}
+        experience={(linked.profile?.settings?.trainingLevel as any) || 'intermediate'}
+        sleepHours={linked.profile?.settings?.sleepHours || 7}
+        stressLevel={linked.profile?.settings?.stressLevel || 3}
+        jointPain={[]}
+        deloadWeeksAgo={99}
+        weight={linked.profile?.settings?.weight || 80}
+        age={linked.profile?.settings?.age || 30}
+        sex={linked.profile?.settings?.sex || 'male'}
+      />
 
       {/* ═══════════ PLAN TAB ═══════════ */}
       {tab === 'srcbb' && <InfoErrorBoundary label="СРЦ"><SRCBBScreen key={planningTrack} track={planningTrack === 'manual' ? 'auto' : planningTrack} /></InfoErrorBoundary>}

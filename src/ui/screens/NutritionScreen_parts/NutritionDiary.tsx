@@ -6,6 +6,7 @@ import { processUploadedFile, saveParsedMeals } from '../../../core/ocr-engine';
 import { FOOD_DB } from '../../../core/nutrition-database';
 import { CAT_MAP_EMOJI } from '../../../core/nutrition-utils';
 import { calcMealQuality, getQualityLabel } from '../../../engines/nutrition-quality.engine';
+import { NutritionQualityCard } from '../../components/NutritionQualityCard';
 
 const MEAL_PRESETS = ['Завтрак', 'Второй завтрак', 'Обед', 'Полдник', 'Ужин', 'Перекус', 'До тренировки', 'После тренировки', 'Поздний перекус'];
 const DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -14,7 +15,10 @@ interface DiaryItem { name: string; kcal: number; p: number; f: number; c: numbe
 
 interface NutritionTargets { kcal: number; protein: number; fats: number; carbs: number; }
 
-export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: number; p: number; f: number; c: number }[]; targets?: NutritionTargets }> = ({ foodEntries, targets }) => {
+export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: number; p: number; f: number; c: number }[]; targets?: NutritionTargets; weight?: number; age?: number; sex?: 'male' | 'female' }> = ({ foodEntries, targets, weight: w, age: a, sex: s }) => {
+  const weight = w || 80;
+  const age = a || 30;
+  const sex = s || 'male';
   const [tab, setTab] = useState<'add'|'day'>('add');
   const [showOCR, setShowOCR] = useState(false);
   const [showBarcode, setShowBarcode] = useState(false);
@@ -495,6 +499,35 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                   </div>
                 );
               } catch { return null; }
+            })()}
+
+            {/* Nutrition Quality Card */}
+            {(() => {
+              const meals = Object.entries(dayMeals).map(([mealName, raw]: [string, any]) => {
+                const items = Array.isArray(raw) ? raw : [];
+                return {
+                  foods: items.map((i: any) => ({
+                    id: i.name || 'unknown',
+                    name: i.name || '',
+                    grams: parseInt(i.qty) || 100,
+                    protein: i.p || 0,
+                    fat: i.f || 0,
+                    carbs: i.c || 0,
+                    kcal: i.kcal || 0,
+                    fiber: 0,
+                  })),
+                };
+              });
+              return (
+                <NutritionQualityCard
+                  meals={meals}
+                  weight={weight}
+                  age={age}
+                  sex={sex}
+                  goal={sex === 'male' ? 'maintain' : 'maintain'}
+                  activityLevel="moderate"
+                />
+              );
             })()}
 
             {/* Food patterns & triggers */}

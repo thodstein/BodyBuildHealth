@@ -6,6 +6,7 @@ import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine'
 import { computeLabIndexDetails, type LabIndexDetail } from '../../engines/labs-indices.engine';
 import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
+import { LabsScoreCard } from '../components/LabsScoreCard';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
 import { db } from '../../core/db';
@@ -1260,6 +1261,18 @@ export const LabsScreen: React.FC = () => {
         return (
           <div>
             <div style={{ fontSize: 16, fontWeight: 700, padding: '10px 0' }}>⚠️ Риски и индексы здоровья</div>
+
+            {/* Labs Score Card (TZ Pipeline) */}
+            <LabsScoreCard
+              markers={(() => {
+                const latest = currentLabs?.[currentLabs.length - 1];
+                if (!latest) return [];
+                return Object.entries(latest).filter(([k, v]) => typeof v === 'number').map(([id, value]) => ({ id, value: value as number }));
+              })()}
+              weight={linked.profile?.settings?.weight || 80}
+              age={linked.profile?.settings?.age || 30}
+              sex={linked.profile?.settings?.sex || 'male'}
+            />
 
             {/* Lab-Pharma Risks */}
             <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 8 }}>
