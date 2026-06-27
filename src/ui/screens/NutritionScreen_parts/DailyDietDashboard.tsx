@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+﻿import React, { useMemo } from 'react';
 import { FOOD_DB } from '../../../core/nutrition-database';
 import { analyzeDailyDiet, getDefaultProfile, type DailyDietReport, type UserDietProfile } from '../../../engines/product-usefulness-v2.engine';
 import { usePlanCtx } from './IndividualPlan/IndividualPlanContext';
@@ -53,21 +53,21 @@ export const DailyDietDashboard: React.FC = () => {
   if (!report) return null;
 
   const bars = [
-    { key: 'mtor', label: 'mTOR', pct: report.mtorTriggered ? 100 : Math.min(100, (3000 - report.mtorDeficitMg) / 3000 * 100), color: report.mtorTriggered ? '#22c55e' : '#f59e0b', icon: '🧬' },
-    { key: 'gi', label: 'ЖКТ', pct: Math.min(100, report.giLoad / 60 * 100), color: report.giLoadWarning ? '#ef4444' : '#22c55e', icon: '🫁' },
-    { key: 'pral', label: 'PRAL', pct: report.pralWarning ? 80 : 30, color: report.pralWarning ? '#f59e0b' : '#22c55e', icon: '⚖' },
-    { key: 'ammonia', label: 'Аммиак', pct: report.ammoniaRisk ? 80 : Math.min(100, report.ammoniaScore / 3 * 100), color: report.ammoniaRisk ? '#ef4444' : '#22c55e', icon: '💨' },
-    { key: 'omega', label: 'Омега', pct: report.omegaWarning ? 80 : report.omegaRatio < 4 ? 30 : 60, color: report.omegaWarning ? '#f59e0b' : '#22c55e', icon: '🐟' },
-    { key: 'electro', label: 'K/Mg', pct: report.electrolyteRisk ? 80 : 40, color: report.electrolyteRisk ? '#ef4444' : '#22c55e', icon: '⚡' },
-    { key: 'insulin', label: 'Инсулин', pct: report.insulinRicohet ? 100 : 20, color: report.insulinRicohet ? '#ef4444' : '#22c55e', icon: '💉' },
-    { key: 'cortisol', label: 'Кортизол', pct: report.cortisolRisk ? 80 : 20, color: report.cortisolRisk ? '#f59e0b' : '#22c55e', icon: '🧠' },
-    { key: 'micro', label: 'Микро', pct: report.microDeficits.length > 0 ? 60 : 20, color: report.microDeficits.length > 0 ? '#f59e0b' : '#22c55e', icon: '💊' },
+    { key: 'mtor', label: 'mTOR', pct: report.mtorTriggered ? 100 : Math.min(100, (3000 - report.mtorDeficitMg) / 3000 * 100), color: report.mtorTriggered ? '#22c55e' : '#f59e0b', icon: 'рџ§¬' },
+    { key: 'gi', label: 'Р–РљРў', pct: Math.min(100, report.giLoad / 60 * 100), color: report.giLoadWarning ? '#ef4444' : '#22c55e', icon: 'рџ«Ѓ' },
+    { key: 'pral', label: 'PRAL', pct: report.pralWarning ? 80 : 30, color: report.pralWarning ? '#f59e0b' : '#22c55e', icon: 'вљ–' },
+    { key: 'ammonia', label: 'РђРјРјРёР°Рє', pct: report.ammoniaRisk ? 80 : Math.min(100, report.ammoniaScore / 3 * 100), color: report.ammoniaRisk ? '#ef4444' : '#22c55e', icon: 'рџ’Ё' },
+    { key: 'omega', label: 'РћРјРµРіР°', pct: report.omegaWarning ? 80 : report.omegaRatio < 4 ? 30 : 60, color: report.omegaWarning ? '#f59e0b' : '#22c55e', icon: 'рџђџ' },
+    { key: 'electro', label: 'K/Mg', pct: report.electrolyteRisk ? 80 : 40, color: report.electrolyteRisk ? '#ef4444' : '#22c55e', icon: 'вљЎ' },
+    { key: 'insulin', label: 'РРЅСЃСѓР»РёРЅ', pct: report.insulinRicohet ? 100 : 20, color: report.insulinRicohet ? '#ef4444' : '#22c55e', icon: 'рџ’‰' },
+    { key: 'cortisol', label: 'РљРѕСЂС‚РёР·РѕР»', pct: report.cortisolRisk ? 80 : 20, color: report.cortisolRisk ? '#f59e0b' : '#22c55e', icon: 'рџ§ ' },
+    { key: 'micro', label: 'РњРёРєСЂРѕ', pct: report.microDeficits.length > 0 ? 60 : 20, color: report.microDeficits.length > 0 ? '#f59e0b' : '#22c55e', icon: 'рџ’Љ' },
   ];
 
   return (
     <div style={{ padding: '8px 0', marginBottom: 8 }}>
-      <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 4 }}>📊 Анализ рациона (v2)</div>
-      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Ккал: {Math.round(report.totalKcal)} | DIAAS: {report.diaas.toFixed(2)} | PRAL: {report.pralTotal.toFixed(1)} | Омега-6/3: {report.omegaRatio.toFixed(1)} | Гистамин: {report.histamineSensitive ? '⚠️ Чувствителен' : '✅ Норма'}</div>
+      <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 4 }}>рџ“Љ РђРЅР°Р»РёР· СЂР°С†РёРѕРЅР° (v2)</div>
+      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', marginBottom: 6 }}>РљРєР°Р»: {Math.round(report.totalKcal)} | DIAAS: {report.diaas.toFixed(2)} | PRAL: {report.pralTotal.toFixed(1)} | РћРјРµРіР°-6/3: {report.omegaRatio.toFixed(1)} | Р“РёСЃС‚Р°РјРёРЅ: {report.histamineSensitive ? 'вљ пёЏ Р§СѓРІСЃС‚РІРёС‚РµР»РµРЅ' : 'вњ… РќРѕСЂРјР°'}</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
         {bars.map(b => (
           <div key={b.key} style={{ padding: '4px 6px', borderRadius: 8, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)' }}>
@@ -81,52 +81,52 @@ export const DailyDietDashboard: React.FC = () => {
       </div>
       {report.mtorDeficitMg > 0 && !report.mtorTriggered && (
         <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.12)', fontSize: 7, color: '#f97316' }}>
-          ⚠️ Не хватает {Math.round(report.mtorDeficitMg)} мг лейцина для mTOR
+          вљ пёЏ РќРµ С…РІР°С‚Р°РµС‚ {Math.round(report.mtorDeficitMg)} РјРі Р»РµР№С†РёРЅР° РґР»СЏ mTOR
         </div>
       )}
       {report.cortisolRisk && (
         <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.12)', fontSize: 7, color: '#f59e0b' }}>
-          ⚠️ Кортизоловый риск — недостаточно быстрых углеводов после тренировки
+          вљ пёЏ РљРѕСЂС‚РёР·РѕР»РѕРІС‹Р№ СЂРёСЃРє вЂ” РЅРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ Р±С‹СЃС‚СЂС‹С… СѓРіР»РµРІРѕРґРѕРІ РїРѕСЃР»Рµ С‚СЂРµРЅРёСЂРѕРІРєРё
         </div>
       )}
       {report.insulinRicohet && (
         <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.12)', fontSize: 7, color: '#ef4444' }}>
-          🚨 Риск гипогликемии — замените сахар на амилопектин
+          рџљЁ Р РёСЃРє РіРёРїРѕРіР»РёРєРµРјРёРё вЂ” Р·Р°РјРµРЅРёС‚Рµ СЃР°С…Р°СЂ РЅР° Р°РјРёР»РѕРїРµРєС‚РёРЅ
         </div>
       )}
       {report.electrolyteRisk && (
         <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.12)', fontSize: 7, color: '#ef4444' }}>
-          🚨 Электролитный срыв! Калий {report.potassiumMg}мг/Магний {report.magnesiumMg}мг. Добавьте шпинат/курагу
+          рџљЁ Р­Р»РµРєС‚СЂРѕР»РёС‚РЅС‹Р№ СЃСЂС‹РІ! РљР°Р»РёР№ {report.potassiumMg}РјРі/РњР°РіРЅРёР№ {report.magnesiumMg}РјРі. Р”РѕР±Р°РІСЊС‚Рµ С€РїРёРЅР°С‚/РєСѓСЂР°РіСѓ
         </div>
       )}
       {report.giLoadWarning && (
         <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.1)', fontSize: 7, color: '#f97316' }}>
-          ⚠️ Высокая нагрузка ЖКТ — подключите ферменты
+          вљ пёЏ Р’С‹СЃРѕРєР°СЏ РЅР°РіСЂСѓР·РєР° Р–РљРў вЂ” РїРѕРґРєР»СЋС‡РёС‚Рµ С„РµСЂРјРµРЅС‚С‹
         </div>
       )}
       {report.pralWarning && (
         <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.1)', fontSize: 7, color: '#f59e0b' }}>
-          ⚖️ {report.pralWarning} (PRAL {report.pralTotal.toFixed(1)})
+          вљ–пёЏ {report.pralWarning} (PRAL {report.pralTotal.toFixed(1)})
         </div>
       )}
       {report.omegaWarning && (
         <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.1)', fontSize: 7, color: '#f59e0b' }}>
-          🐟 {report.omegaWarning}
+          рџђџ {report.omegaWarning}
         </div>
       )}
       {report.microDeficits.length > 0 && (
-        <div style={{ marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>
-          ⚠️ Дефицит: {report.microDeficits.join(', ')}
+        <div style={{ marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>
+          вљ пёЏ Р”РµС„РёС†РёС‚: {report.microDeficits.join(', ')}
         </div>
       )}
       {report.homaIr !== null && report.homaIr > 2.5 && (
         <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.1)', fontSize: 7, color: '#ef4444' }}>
-          🚨 HOMA-IR {report.homaIr.toFixed(1)}{' > 2.5 — инсулинорезистентность'}
+          рџљЁ HOMA-IR {report.homaIr.toFixed(1)}{' > 2.5 вЂ” РёРЅСЃСѓР»РёРЅРѕСЂРµР·РёСЃС‚РµРЅС‚РЅРѕСЃС‚СЊ'}
         </div>
       )}
       {report.ammoniaRisk && (
         <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.12)', fontSize: 7, color: '#ef4444' }}>
-          💨 Аммиак-риск: {report.ammoniaScore.toFixed(1)} балла. Высокая аммиачная нагрузка — добавьте цитруллин/аргинин, снизьте глютамин
+          рџ’Ё РђРјРјРёР°Рє-СЂРёСЃРє: {report.ammoniaScore.toFixed(1)} Р±Р°Р»Р»Р°. Р’С‹СЃРѕРєР°СЏ Р°РјРјРёР°С‡РЅР°СЏ РЅР°РіСЂСѓР·РєР° вЂ” РґРѕР±Р°РІСЊС‚Рµ С†РёС‚СЂСѓР»Р»РёРЅ/Р°СЂРіРёРЅРёРЅ, СЃРЅРёР·СЊС‚Рµ РіР»СЋС‚Р°РјРёРЅ
         </div>
       )}
       {report.diaasWarning && (
@@ -153,27 +153,27 @@ export const DailyDietDashboard: React.FC = () => {
       {/* Dynamic recommendations based on diet report */}
       {(() => {
         const recs: { text: string; priority: 'high' | 'medium' | 'low'; icon: string }[] = [];
-        if (report.mtorDeficitMg > 0 && !report.mtorTriggered) recs.push({ priority: 'high', icon: '🧬', text: `Добавьте ${Math.round(report.mtorDeficitMg)} мг лейцина (ещё 1 порция курицы/говядины/яиц)` });
-        if (report.giLoadWarning) recs.push({ priority: 'high', icon: '🫃', text: `Нагрузка ЖКТ ${report.giLoad.toFixed(0)} — добавьте ферменты (панкреатин, бромелайн)` });
-        if (report.pralWarning) recs.push({ priority: 'medium', icon: '🧂', text: `PRAL ${report.pralTotal.toFixed(1)} — ${report.pralWarning === 'Закисление' ? 'добавьте зелень, лимоны, овощи' : 'уберите избыток воды/соды'}` });
-        if (report.ammoniaRisk) recs.push({ priority: 'high', icon: '💨', text: `Аммиак ${report.ammoniaScore.toFixed(1)} — добавьте цитруллин 3-6 г/д или снизьте глютамин, увеличьте клетчатку` });
-        if (report.omegaWarning) recs.push({ priority: 'medium', icon: '🐟', text: `Омега-6/3 ${report.omegaRatio.toFixed(1)}:1 — добавьте EPA/DHA 1-2 г/д, снизьте растительные масла` });
-        if (report.electrolyteRisk) recs.push({ priority: 'high', icon: '💧', text: `K ${report.potassiumMg}мг/Mg ${report.magnesiumMg}мг — добавьте шпинат 200г/курагу 100г/авокадо` });
-        if (report.insulinRicohet) recs.push({ priority: 'high', icon: '💉', text: `Риск гипогликемии — замените сахар/фруктозу на амилопектин/изомальтулозу` });
-        if (report.cortisolRisk) recs.push({ priority: 'medium', icon: '🧠', text: `Кортизоловый риск — добавьте 30-40г быстрых углеводов (декстроза/рисовые вафли) после тренировки` });
-        if (report.microDeficits.length > 0) recs.push({ priority: 'medium', icon: '💊', text: `Дефициты: ${report.microDeficits.join(', ')} — добавьте соответствующие продукты/добавки` });
-        if (report.homaIr !== null && report.homaIr > 2.5) recs.push({ priority: 'high', icon: '🔬', text: `HOMA-IR ${report.homaIr.toFixed(1)} >2.5 — добавьте берберин 500 мг 2x/д, хром 200 мкг, снизьте сахар` });
-        if (report.diaas < 0.9) recs.push({ priority: 'high', icon: '💪', text: `DIAAS ${report.diaas.toFixed(2)} — лимитирует ${report.diaasLimitingAA}. Смешайте источники белка (животный+растительный)` });
-        if (report.antinutrientWarning) recs.push({ priority: 'low', icon: '🌿', text: `${report.antinutrientWarning} — замачивайте/проращивайте бобовые, термически обрабатывайте` });
-        if (report.glutathioneWarning) recs.push({ priority: 'medium', icon: '🧪', text: `${report.glutathioneWarning} — добавьте NAC 600 мг, селен 200 мкг, серу (MSM/крестоцветные)` });
-        if (report.histamineWarning) recs.push({ priority: 'medium', icon: '🧪', text: `${report.histamineWarning} — исключите ферментированные продукты, добавьте DAO-фермент` });
+        if (report.mtorDeficitMg > 0 && !report.mtorTriggered) recs.push({ priority: 'high', icon: 'рџ§¬', text: `Р”РѕР±Р°РІСЊС‚Рµ ${Math.round(report.mtorDeficitMg)} РјРі Р»РµР№С†РёРЅР° (РµС‰С‘ 1 РїРѕСЂС†РёСЏ РєСѓСЂРёС†С‹/РіРѕРІСЏРґРёРЅС‹/СЏРёС†)` });
+        if (report.giLoadWarning) recs.push({ priority: 'high', icon: 'рџ«ѓ', text: `РќР°РіСЂСѓР·РєР° Р–РљРў ${report.giLoad.toFixed(0)} вЂ” РґРѕР±Р°РІСЊС‚Рµ С„РµСЂРјРµРЅС‚С‹ (РїР°РЅРєСЂРµР°С‚РёРЅ, Р±СЂРѕРјРµР»Р°Р№РЅ)` });
+        if (report.pralWarning) recs.push({ priority: 'medium', icon: 'рџ§‚', text: `PRAL ${report.pralTotal.toFixed(1)} вЂ” ${report.pralWarning === 'Р—Р°РєРёСЃР»РµРЅРёРµ' ? 'РґРѕР±Р°РІСЊС‚Рµ Р·РµР»РµРЅСЊ, Р»РёРјРѕРЅС‹, РѕРІРѕС‰Рё' : 'СѓР±РµСЂРёС‚Рµ РёР·Р±С‹С‚РѕРє РІРѕРґС‹/СЃРѕРґС‹'}` });
+        if (report.ammoniaRisk) recs.push({ priority: 'high', icon: 'рџ’Ё', text: `РђРјРјРёР°Рє ${report.ammoniaScore.toFixed(1)} вЂ” РґРѕР±Р°РІСЊС‚Рµ С†РёС‚СЂСѓР»Р»РёРЅ 3-6 Рі/Рґ РёР»Рё СЃРЅРёР·СЊС‚Рµ РіР»СЋС‚Р°РјРёРЅ, СѓРІРµР»РёС‡СЊС‚Рµ РєР»РµС‚С‡Р°С‚РєСѓ` });
+        if (report.omegaWarning) recs.push({ priority: 'medium', icon: 'рџђџ', text: `РћРјРµРіР°-6/3 ${report.omegaRatio.toFixed(1)}:1 вЂ” РґРѕР±Р°РІСЊС‚Рµ EPA/DHA 1-2 Рі/Рґ, СЃРЅРёР·СЊС‚Рµ СЂР°СЃС‚РёС‚РµР»СЊРЅС‹Рµ РјР°СЃР»Р°` });
+        if (report.electrolyteRisk) recs.push({ priority: 'high', icon: 'рџ’§', text: `K ${report.potassiumMg}РјРі/Mg ${report.magnesiumMg}РјРі вЂ” РґРѕР±Р°РІСЊС‚Рµ С€РїРёРЅР°С‚ 200Рі/РєСѓСЂР°РіСѓ 100Рі/Р°РІРѕРєР°РґРѕ` });
+        if (report.insulinRicohet) recs.push({ priority: 'high', icon: 'рџ’‰', text: `Р РёСЃРє РіРёРїРѕРіР»РёРєРµРјРёРё вЂ” Р·Р°РјРµРЅРёС‚Рµ СЃР°С…Р°СЂ/С„СЂСѓРєС‚РѕР·Сѓ РЅР° Р°РјРёР»РѕРїРµРєС‚РёРЅ/РёР·РѕРјР°Р»СЊС‚СѓР»РѕР·Сѓ` });
+        if (report.cortisolRisk) recs.push({ priority: 'medium', icon: 'рџ§ ', text: `РљРѕСЂС‚РёР·РѕР»РѕРІС‹Р№ СЂРёСЃРє вЂ” РґРѕР±Р°РІСЊС‚Рµ 30-40Рі Р±С‹СЃС‚СЂС‹С… СѓРіР»РµРІРѕРґРѕРІ (РґРµРєСЃС‚СЂРѕР·Р°/СЂРёСЃРѕРІС‹Рµ РІР°С„Р»Рё) РїРѕСЃР»Рµ С‚СЂРµРЅРёСЂРѕРІРєРё` });
+        if (report.microDeficits.length > 0) recs.push({ priority: 'medium', icon: 'рџ’Љ', text: `Р”РµС„РёС†РёС‚С‹: ${report.microDeficits.join(', ')} вЂ” РґРѕР±Р°РІСЊС‚Рµ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰РёРµ РїСЂРѕРґСѓРєС‚С‹/РґРѕР±Р°РІРєРё` });
+        if (report.homaIr !== null && report.homaIr > 2.5) recs.push({ priority: 'high', icon: 'рџ”¬', text: `HOMA-IR ${report.homaIr.toFixed(1)} >2.5 вЂ” РґРѕР±Р°РІСЊС‚Рµ Р±РµСЂР±РµСЂРёРЅ 500 РјРі 2x/Рґ, С…СЂРѕРј 200 РјРєРі, СЃРЅРёР·СЊС‚Рµ СЃР°С…Р°СЂ` });
+        if (report.diaas < 0.9) recs.push({ priority: 'high', icon: 'рџ’Є', text: `DIAAS ${report.diaas.toFixed(2)} вЂ” Р»РёРјРёС‚РёСЂСѓРµС‚ ${report.diaasLimitingAA}. РЎРјРµС€Р°Р№С‚Рµ РёСЃС‚РѕС‡РЅРёРєРё Р±РµР»РєР° (Р¶РёРІРѕС‚РЅС‹Р№+СЂР°СЃС‚РёС‚РµР»СЊРЅС‹Р№)` });
+        if (report.antinutrientWarning) recs.push({ priority: 'low', icon: 'рџЊї', text: `${report.antinutrientWarning} вЂ” Р·Р°РјР°С‡РёРІР°Р№С‚Рµ/РїСЂРѕСЂР°С‰РёРІР°Р№С‚Рµ Р±РѕР±РѕРІС‹Рµ, С‚РµСЂРјРёС‡РµСЃРєРё РѕР±СЂР°Р±Р°С‚С‹РІР°Р№С‚Рµ` });
+        if (report.glutathioneWarning) recs.push({ priority: 'medium', icon: 'рџ§Є', text: `${report.glutathioneWarning} вЂ” РґРѕР±Р°РІСЊС‚Рµ NAC 600 РјРі, СЃРµР»РµРЅ 200 РјРєРі, СЃРµСЂСѓ (MSM/РєСЂРµСЃС‚РѕС†РІРµС‚РЅС‹Рµ)` });
+        if (report.histamineWarning) recs.push({ priority: 'medium', icon: 'рџ§Є', text: `${report.histamineWarning} вЂ” РёСЃРєР»СЋС‡РёС‚Рµ С„РµСЂРјРµРЅС‚РёСЂРѕРІР°РЅРЅС‹Рµ РїСЂРѕРґСѓРєС‚С‹, РґРѕР±Р°РІСЊС‚Рµ DAO-С„РµСЂРјРµРЅС‚` });
         if (recs.length === 0) return null;
         const prioColors = { high: '#ef4444', medium: '#f59e0b', low: '#8b5cf6' };
         const prioOrder = { high: 0, medium: 1, low: 2 };
         recs.sort((a, b) => prioOrder[a.priority] - prioOrder[b.priority]);
         return (
           <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.12)' }}>
-            <div style={{ fontSize: 8, fontWeight: 700, color: '#a78bfa', marginBottom: 4 }}>📋 Рекомендации на основе рациона</div>
+            <div style={{ fontSize: 8, fontWeight: 700, color: '#a78bfa', marginBottom: 4 }}>рџ“‹ Р РµРєРѕРјРµРЅРґР°С†РёРё РЅР° РѕСЃРЅРѕРІРµ СЂР°С†РёРѕРЅР°</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               {recs.map((r, i) => (
                 <div key={i} style={{ fontSize: 7, padding: '4px 6px', borderRadius: 6, background: `${prioColors[r.priority]}08`, border: `1px solid ${prioColors[r.priority]}15`, color: prioColors[r.priority], lineHeight: 1.4 }}>
@@ -187,3 +187,4 @@ export const DailyDietDashboard: React.FC = () => {
     </div>
   );
 };
+

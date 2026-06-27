@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { FOOD_DB, calcBBQualityScore } from '../../../core/nutrition-database';
 import { useDataLink } from '../../../core/data-link';
 import { scoreAllProducts, compareProducts, calcMealScore, CATEGORY_LABELS, GOAL_MAP_RU } from '../../../engines/product-usefulness.engine';
@@ -28,7 +28,7 @@ const ScoreBadge: React.FC<{ score: number; max: number; color: string; label: s
     </div>
     <div>
       <div style={{ fontSize: 9, fontWeight: 700, color }}>{label}</div>
-      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>из {max}</div>
+      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>РёР· {max}</div>
     </div>
   </div>
 );
@@ -37,19 +37,19 @@ const ScoreBar: React.FC<{ label: string; value: number; max: number; color: str
   const pct = Math.min(100, Math.round(value / max * 100));
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', minWidth: 50 }}>{label}</span>
+      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)', minWidth: 50 }}>{label}</span>
       <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
         <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 0.3s' }} />
       </div>
-      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', minWidth: 20, textAlign: 'right' }}>{value}</span>
+      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', minWidth: 20, textAlign: 'right' }}>{value}</span>
     </div>
   );
 };
 
 const MODULE_LABELS: Record<string, { label: string; color: string }> = {
-  A: { label: '🅰 Питат. плотность', color: '#22c55e' },
-  B: { label: '🅱 Контекст', color: '#3b82f6' },
-  C: { label: '🅲 Цена/эффект.', color: '#f59e0b' },
+  A: { label: 'рџ…° РџРёС‚Р°С‚. РїР»РѕС‚РЅРѕСЃС‚СЊ', color: '#22c55e' },
+  B: { label: 'рџ…± РљРѕРЅС‚РµРєСЃС‚', color: '#3b82f6' },
+  C: { label: 'рџ…І Р¦РµРЅР°/СЌС„С„РµРєС‚.', color: '#f59e0b' },
 };
 
 export const ProductUsefulnessPlanner: React.FC = () => {
@@ -58,7 +58,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   const profileWeight = linked.profile?.settings?.weight || 80;
   const profileWorkouts = linked.profile?.settings?.workoutsPerWeek || 0;
   const courseEntries = linked.course ?? [];
-  const profileAAS = Array.isArray(courseEntries) && courseEntries.some((e: any) => e.type === 'ААС' || e.class === 'aas');
+  const profileAAS = Array.isArray(courseEntries) && courseEntries.some((e: any) => e.type === 'РђРђРЎ' || e.class === 'aas');
 
   const [plannerTab, setPlannerTab] = useState<PlannerTab>('catalog');
   const [enableA, setEnableA] = useState(true);
@@ -170,21 +170,21 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         const raw = JSON.parse(localStorage.getItem('he_daily_plan') || '[]');
         const fallback = JSON.parse(localStorage.getItem('he_quick_plan_items') || '[]');
         const list = raw.length > 0 ? raw : fallback;
-        if (list.length === 0) { showToast('Нет сохранённого плана'); return; }
+        if (list.length === 0) { showToast('РќРµС‚ СЃРѕС…СЂР°РЅС‘РЅРЅРѕРіРѕ РїР»Р°РЅР°'); return; }
         const items = list.map((i: any) => ({ foodId: i.id || i.foodId, weightGrams: i.amount || i.weightGrams || 100 }));
         setMealProducts(prev => [...prev, ...items]);
-        showToast(`✅ Добавлено ${items.length} продуктов из плана`);
+        showToast(`вњ… Р”РѕР±Р°РІР»РµРЅРѕ ${items.length} РїСЂРѕРґСѓРєС‚РѕРІ РёР· РїР»Р°РЅР°`);
         return;
       }
       if (source === 'recipe') {
         const recipes = JSON.parse(localStorage.getItem('he_recipes') || '[]');
-        if (recipes.length === 0) { showToast('Нет рецептов'); return; }
-        setSourcePicker({ source: 'recipe', title: '📝 Выберите рецепт', items: recipes.map((r: any) => ({ id: r.id, name: r.name, label: `${r.kcal || 0} ккал · Б${r.protein || 0} Ж${r.fat || 0} У${r.carbs || 0}` })) });
+        if (recipes.length === 0) { showToast('РќРµС‚ СЂРµС†РµРїС‚РѕРІ'); return; }
+        setSourcePicker({ source: 'recipe', title: 'рџ“ќ Р’С‹Р±РµСЂРёС‚Рµ СЂРµС†РµРїС‚', items: recipes.map((r: any) => ({ id: r.id, name: r.name, label: `${r.kcal || 0} РєРєР°Р» В· Р‘${r.protein || 0} Р–${r.fat || 0} РЈ${r.carbs || 0}` })) });
         return;
       }
       if (source === 'saved') {
-        if (savedMeals.length === 0) { showToast('Нет сохранённых приёмов'); return; }
-        setSourcePicker({ source: 'saved', title: '💾 Выберите приём', items: savedMeals.map(m => ({ id: m.id, name: m.name, label: `${m.products.length} продуктов` })) });
+        if (savedMeals.length === 0) { showToast('РќРµС‚ СЃРѕС…СЂР°РЅС‘РЅРЅС‹С… РїСЂРёС‘РјРѕРІ'); return; }
+        setSourcePicker({ source: 'saved', title: 'рџ’ѕ Р’С‹Р±РµСЂРёС‚Рµ РїСЂРёС‘Рј', items: savedMeals.map(m => ({ id: m.id, name: m.name, label: `${m.products.length} РїСЂРѕРґСѓРєС‚РѕРІ` })) });
         return;
       }
       if (source === 'diary') {
@@ -199,12 +199,12 @@ export const ProductUsefulnessPlanner: React.FC = () => {
             if (found) entries.push({ foodId: found.id, weightGrams: parseInt(item.qty) || 100 });
           });
         });
-        if (entries.length === 0) { showToast('Нет записей в дневнике за сегодня'); return; }
+        if (entries.length === 0) { showToast('РќРµС‚ Р·Р°РїРёСЃРµР№ РІ РґРЅРµРІРЅРёРєРµ Р·Р° СЃРµРіРѕРґРЅСЏ'); return; }
         setMealProducts(prev => [...prev, ...entries]);
-        showToast(`✅ Добавлено ${entries.length} продуктов из дневника`);
+        showToast(`вњ… Р”РѕР±Р°РІР»РµРЅРѕ ${entries.length} РїСЂРѕРґСѓРєС‚РѕРІ РёР· РґРЅРµРІРЅРёРєР°`);
         return;
       }
-    } catch { showToast('Ошибка загрузки'); }
+    } catch { showToast('РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё'); }
   };
 
   const handlePickerSelect = (id: string) => {
@@ -212,7 +212,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
     try {
       if (sourcePicker.source === 'saved') {
         const meal = savedMeals.find(m => m.id === id);
-        if (meal) { setMealProducts(prev => [...prev, ...meal.products]); showToast(`✅ Загружен «${meal.name}»`); }
+        if (meal) { setMealProducts(prev => [...prev, ...meal.products]); showToast(`вњ… Р—Р°РіСЂСѓР¶РµРЅ В«${meal.name}В»`); }
       }
       if (sourcePicker.source === 'recipe') {
         const allRecipes = JSON.parse(localStorage.getItem('he_recipes') || '[]');
@@ -224,11 +224,11 @@ export const ProductUsefulnessPlanner: React.FC = () => {
             const found = FOOD_DB.find(f => f.name.toLowerCase() === q) || FOOD_DB.find(f => f.name.toLowerCase().includes(q) || q.includes(f.name.toLowerCase()));
             if (found) mapped.push({ foodId: found.id, weightGrams: 100 });
           });
-          if (mapped.length > 0) { setMealProducts(prev => [...prev, ...mapped]); showToast(`✅ Добавлено ${mapped.length} продуктов из «${recipe.name}»`); }
-          else showToast('Не удалось сопоставить ингредиенты с базой');
+          if (mapped.length > 0) { setMealProducts(prev => [...prev, ...mapped]); showToast(`вњ… Р”РѕР±Р°РІР»РµРЅРѕ ${mapped.length} РїСЂРѕРґСѓРєС‚РѕРІ РёР· В«${recipe.name}В»`); }
+          else showToast('РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕРїРѕСЃС‚Р°РІРёС‚СЊ РёРЅРіСЂРµРґРёРµРЅС‚С‹ СЃ Р±Р°Р·РѕР№');
         }
       }
-    } catch { showToast('Ошибка'); }
+    } catch { showToast('РћС€РёР±РєР°'); }
     setSourcePicker(null);
   };
 
@@ -239,51 +239,51 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   ];
 
   const modulesDesc = [
-    ...(enableA ? ['🅰 Питательная плотность (белок, микро, клетчатка, категория)'] : []),
-    ...(enableB ? ['🅱 Контекст (цель, время, фарма-синергия)'] : []),
-    ...(enableC ? ['🅲 Цена/эффективность (стоимость белка)'] : []),
+    ...(enableA ? ['рџ…° РџРёС‚Р°С‚РµР»СЊРЅР°СЏ РїР»РѕС‚РЅРѕСЃС‚СЊ (Р±РµР»РѕРє, РјРёРєСЂРѕ, РєР»РµС‚С‡Р°С‚РєР°, РєР°С‚РµРіРѕСЂРёСЏ)'] : []),
+    ...(enableB ? ['рџ…± РљРѕРЅС‚РµРєСЃС‚ (С†РµР»СЊ, РІСЂРµРјСЏ, С„Р°СЂРјР°-СЃРёРЅРµСЂРіРёСЏ)'] : []),
+    ...(enableC ? ['рџ…І Р¦РµРЅР°/СЌС„С„РµРєС‚РёРІРЅРѕСЃС‚СЊ (СЃС‚РѕРёРјРѕСЃС‚СЊ Р±РµР»РєР°)'] : []),
   ];
 
   return (
     <div style={{ padding: '0 2px' }}>
       <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-        <button onClick={() => setPlannerTab('settings')} style={PILL(plannerTab === 'settings', '#f59e0b')}>⚙️</button>
-        <button onClick={() => setPlannerTab('catalog')} style={PILL(plannerTab === 'catalog', '#3b82f6')}>📦 {filtered.length > 0 && `(${filtered.length})`}</button>
-        <button onClick={() => setPlannerTab('compare')} style={PILL(plannerTab === 'compare', '#8b5cf6')}>⚖️ {compareIds.length > 0 && `(${compareIds.length})`}</button>
-        <button onClick={() => setPlannerTab('meal')} style={PILL(plannerTab === 'meal', '#f97316')}>🍽️ Приём</button>
+        <button onClick={() => setPlannerTab('settings')} style={PILL(plannerTab === 'settings', '#f59e0b')}>вљ™пёЏ</button>
+        <button onClick={() => setPlannerTab('catalog')} style={PILL(plannerTab === 'catalog', '#3b82f6')}>рџ“¦ {filtered.length > 0 && `(${filtered.length})`}</button>
+        <button onClick={() => setPlannerTab('compare')} style={PILL(plannerTab === 'compare', '#8b5cf6')}>вљ–пёЏ {compareIds.length > 0 && `(${compareIds.length})`}</button>
+        <button onClick={() => setPlannerTab('meal')} style={PILL(plannerTab === 'meal', '#f97316')}>рџЌЅпёЏ РџСЂРёС‘Рј</button>
       </div>
 
       {plannerTab === 'settings' && (
         <div style={{ borderRadius: 12, padding: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 8 }}>⚙️ Параметры расчёта</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 8 }}>вљ™пёЏ РџР°СЂР°РјРµС‚СЂС‹ СЂР°СЃС‡С‘С‚Р°</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
             <div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Цель</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>Р¦РµР»СЊ</div>
               <select value={manualGoal} onChange={e => setManualGoal(e.target.value)} style={{
                 ...INPUT('100%'), padding: '6px 8px', appearance: 'none' as const,
               }}>
-                <option value="">Авто ({profileGoal ? GOAL_MAP_RU[profileGoal] || profileGoal : 'не указана'})</option>
+                <option value="">РђРІС‚Рѕ ({profileGoal ? GOAL_MAP_RU[profileGoal] || profileGoal : 'РЅРµ СѓРєР°Р·Р°РЅР°'})</option>
                 {Object.entries(GOAL_MAP_RU).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
             </div>
             <div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Вес (кг)</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>Р’РµСЃ (РєРі)</div>
               <input type="number" value={manualWeight} onChange={e => setManualWeight(e.target.value)} style={INPUT('100%')} />
             </div>
             <div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Тренировок/нед</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>РўСЂРµРЅРёСЂРѕРІРѕРє/РЅРµРґ</div>
               <input type="number" value={manualWorkouts} onChange={e => setManualWorkouts(e.target.value)} style={INPUT('100%')} />
             </div>
             <div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Цена за кг (₽)</div>
-              <input type="number" value={manualPrice} onChange={e => setManualPrice(e.target.value)} placeholder="Авто" style={INPUT('100%')} />
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>Р¦РµРЅР° Р·Р° РєРі (в‚Ѕ)</div>
+              <input type="number" value={manualPrice} onChange={e => setManualPrice(e.target.value)} placeholder="РђРІС‚Рѕ" style={INPUT('100%')} />
             </div>
           </div>
-          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', marginBottom: 4, lineHeight: 1.3 }}>
-            🧬 <b>ААС (анаболические стероиды)</b> — влияет на рейтинг: продукты с атерогенными жирами получают штраф −4.5 (риск липидного профиля).<br />
-            💉 <b>Инсулин</b> — влияет на рейтинг продуктов с высоким ГИ/ИИ (штраф при приёме HGH, проверка инсулинового рикошета).
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', marginBottom: 4, lineHeight: 1.3 }}>
+            рџ§¬ <b>РђРђРЎ (Р°РЅР°Р±РѕР»РёС‡РµСЃРєРёРµ СЃС‚РµСЂРѕРёРґС‹)</b> вЂ” РІР»РёСЏРµС‚ РЅР° СЂРµР№С‚РёРЅРі: РїСЂРѕРґСѓРєС‚С‹ СЃ Р°С‚РµСЂРѕРіРµРЅРЅС‹РјРё Р¶РёСЂР°РјРё РїРѕР»СѓС‡Р°СЋС‚ С€С‚СЂР°С„ в€’4.5 (СЂРёСЃРє Р»РёРїРёРґРЅРѕРіРѕ РїСЂРѕС„РёР»СЏ).<br />
+            рџ’‰ <b>РРЅСЃСѓР»РёРЅ</b> вЂ” РІР»РёСЏРµС‚ РЅР° СЂРµР№С‚РёРЅРі РїСЂРѕРґСѓРєС‚РѕРІ СЃ РІС‹СЃРѕРєРёРј Р“Р/РР (С€С‚СЂР°С„ РїСЂРё РїСЂРёС‘РјРµ HGH, РїСЂРѕРІРµСЂРєР° РёРЅСЃСѓР»РёРЅРѕРІРѕРіРѕ СЂРёРєРѕС€РµС‚Р°).
           </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
             <button onClick={() => setManualAAS(!manualAAS)} style={{
@@ -292,22 +292,22 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               border: manualAAS ? 'none' : '1px solid rgba(255,255,255,0.06)',
               color: manualAAS ? '#fff' : 'rgba(255,255,255,0.7)',
               fontWeight: 700, fontSize: 9, transition: 'all 0.15s',
-            }}>💉 {manualAAS ? 'ААС активен' : 'ААС выключен'}</button>
+            }}>рџ’‰ {manualAAS ? 'РђРђРЎ Р°РєС‚РёРІРµРЅ' : 'РђРђРЎ РІС‹РєР»СЋС‡РµРЅ'}</button>
             <button onClick={() => setManualInsulin(!manualInsulin)} style={{
               flex: 1, padding: '8px 6px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
               background: manualInsulin ? 'linear-gradient(135deg,#8b5cf6,#7c3aed)' : '#202023',
               border: manualInsulin ? 'none' : '1px solid rgba(255,255,255,0.06)',
               color: manualInsulin ? '#fff' : 'rgba(255,255,255,0.7)',
               fontWeight: 700, fontSize: 9, transition: 'all 0.15s',
-            }}>💉 {manualInsulin ? 'Инсулин активен' : 'Инсулин выключен'}</button>
+            }}>рџ’‰ {manualInsulin ? 'РРЅСЃСѓР»РёРЅ Р°РєС‚РёРІРµРЅ' : 'РРЅСЃСѓР»РёРЅ РІС‹РєР»СЋС‡РµРЅ'}</button>
             <button onClick={fillFromProfile} style={{
               padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
               background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a',
               fontWeight: 600, fontSize: 8, transition: 'all 0.15s',
-            }}>📋 Авто</button>
+            }}>рџ“‹ РђРІС‚Рѕ</button>
           </div>
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: 8, marginTop: 4 }}>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>Модули оценки:</div>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', marginBottom: 6 }}>РњРѕРґСѓР»Рё РѕС†РµРЅРєРё:</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
               {([
                 { key: 'A', color: '#22c55e', state: enableA, set: setEnableA },
@@ -317,25 +317,25 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 <button key={m.key} onClick={() => { m.set(!m.state); setShowAll(false); }} style={{
                   ...PILL(m.state, m.color), fontSize: 7, padding: '4px 8px',
                 }}>
-                  {m.state ? '✓' : '○'} {MODULE_LABELS[m.key].label}
+                  {m.state ? 'вњ“' : 'в—‹'} {MODULE_LABELS[m.key].label}
                 </button>
               ))}
             </div>
             {modulesDesc.length > 0 && (
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', lineHeight: 1.4 }}>
-                Активны: {modulesDesc.join(' · ')}
+                РђРєС‚РёРІРЅС‹: {modulesDesc.join(' В· ')}
               </div>
             )}
           </div>
           <div style={{ borderTop: '1px solid rgba(0,230,138,0.1)', paddingTop: 6, marginTop: 6 }}>
             <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
-              <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>🧬 v2 Скоринг</span>
+              <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>рџ§¬ v2 РЎРєРѕСЂРёРЅРі</span>
               <button onClick={() => setUseV2(!useV2)} style={{
                 padding:'3px 10px', borderRadius:10, fontSize:7, fontWeight:700, cursor:'pointer',
                 background: useV2 ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)',
                 border: useV2 ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                color: useV2 ? '#00e68a' : 'rgba(255,255,255,0.4)',
-              }}>{useV2 ? '✅ Включён' : '○ Выключен'}</button>
+                color: useV2 ? '#00e68a' : 'rgba(255,255,255,0.75)',
+              }}>{useV2 ? 'вњ… Р’РєР»СЋС‡С‘РЅ' : 'в—‹ Р’С‹РєР»СЋС‡РµРЅ'}</button>
             </div>
             {useV2 && (
               <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:4 }}>
@@ -344,30 +344,30 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                     padding:'2px 6px', borderRadius:6, fontSize:7, fontWeight:600, cursor:'pointer',
                     background: v2Profile.phase === ph ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.03)',
                     border: v2Profile.phase === ph ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(255,255,255,0.04)',
-                    color: v2Profile.phase === ph ? '#c4b5fd' : 'rgba(255,255,255,0.5)',
-                  }}>{ph === 'LEAN_MASS' ? '💪 Набор' : ph === 'EXTREME_CUT' ? '🔥 Сушка' : ph === 'PEAK_WEEK' ? '⚡ Пик' : ph === 'POST_CYCLE' ? '🔄 ПКТ' : '🌉 Мост'}</button>
+                    color: v2Profile.phase === ph ? '#c4b5fd' : 'rgba(255,255,255,0.8)',
+                  }}>{ph === 'LEAN_MASS' ? 'рџ’Є РќР°Р±РѕСЂ' : ph === 'EXTREME_CUT' ? 'рџ”Ґ РЎСѓС€РєР°' : ph === 'PEAK_WEEK' ? 'вљЎ РџРёРє' : ph === 'POST_CYCLE' ? 'рџ”„ РџРљРў' : 'рџЊ‰ РњРѕСЃС‚'}</button>
                 ))}
               </div>
             )}
             {useV2 && (
               <div style={{ marginTop:4 }}>
-                <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:2 }}>💊 Фармакология</div>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>рџ’Љ Р¤Р°СЂРјР°РєРѕР»РѕРіРёСЏ</div>
                 <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
                   {[
-                    { id:'AAS_ORAL', label:'Орал.ААС', color:'#ef4444' },
-                    { id:'AAS_INJECTABLE', label:'Инъекц.ААС', color:'#ef4444' },
+                    { id:'AAS_ORAL', label:'РћСЂР°Р».РђРђРЎ', color:'#ef4444' },
+                    { id:'AAS_INJECTABLE', label:'РРЅСЉРµРєС†.РђРђРЎ', color:'#ef4444' },
                     { id:'HGH', label:'HGH', color:'#8b5cf6' },
-                    { id:'DIURETICS', label:'Диуретики', color:'#f59e0b' },
-                    { id:'STIMULATORS', label:'Стимуляторы', color:'#f97316' },
-                    { id:'INSULIN_USE', label:'Инсулин', color:'#8b5cf6' },
-                    { id:'LIVER_SUPPORT', label:'Гепато', color:'#22c55e' },
-                    { id:'GUT_SUPPORT', label:'ЖКТ', color:'#22c55e' },
+                    { id:'DIURETICS', label:'Р”РёСѓСЂРµС‚РёРєРё', color:'#f59e0b' },
+                    { id:'STIMULATORS', label:'РЎС‚РёРјСѓР»СЏС‚РѕСЂС‹', color:'#f97316' },
+                    { id:'INSULIN_USE', label:'РРЅСЃСѓР»РёРЅ', color:'#8b5cf6' },
+                    { id:'LIVER_SUPPORT', label:'Р“РµРїР°С‚Рѕ', color:'#22c55e' },
+                    { id:'GUT_SUPPORT', label:'Р–РљРў', color:'#22c55e' },
                   ].map(p => (
                     <button key={p.id} onClick={() => setV2Profile(prev => ({ ...prev, pharma: { ...prev.pharma, [p.id]: !prev.pharma[p.id as keyof typeof prev.pharma] } }))} style={{
                       padding:'2px 6px', borderRadius:6, fontSize:6, fontWeight:600, cursor:'pointer',
                       background: v2Profile.pharma[p.id as keyof typeof v2Profile.pharma] ? `${p.color}15` : '#202023',
                       border: v2Profile.pharma[p.id as keyof typeof v2Profile.pharma] ? `1px solid ${p.color}30` : '1px solid rgba(255,255,255,0.04)',
-                      color: v2Profile.pharma[p.id as keyof typeof v2Profile.pharma] ? p.color : 'rgba(255,255,255,0.4)',
+                      color: v2Profile.pharma[p.id as keyof typeof v2Profile.pharma] ? p.color : 'rgba(255,255,255,0.75)',
                     }}>{p.label}</button>
                   ))}
                 </div>
@@ -375,12 +375,12 @@ export const ProductUsefulnessPlanner: React.FC = () => {
             )}
             {useV2 && (
               <div style={{ marginTop:4 }}>
-                <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:2 }}>🩸 Анализы</div>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>рџ©ё РђРЅР°Р»РёР·С‹</div>
                 <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
                   {['HCT','LDL','HDL','ALT','AST','CRP'].map(lab => (
                     <div key={lab} style={{ display:'flex', alignItems:'center', gap:2 }}>
-                      <span style={{ fontSize:6, color:'rgba(255,255,255,0.4)' }}>{lab}</span>
-                      <input type="number" value={(v2Profile.labs as any)[lab.toLowerCase()] ?? ''} onChange={e => setV2Profile(prev => ({ ...prev, labs: { ...prev.labs, [lab.toLowerCase()]: e.target.value ? parseFloat(e.target.value) : undefined } }))} placeholder="—" style={{ width:36, padding:'2px 4px', borderRadius:4, fontSize:6, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', color:'#fff', outline:'none' }} />
+                      <span style={{ fontSize:6, color:'rgba(255,255,255,0.75)' }}>{lab}</span>
+                      <input type="number" value={(v2Profile.labs as any)[lab.toLowerCase()] ?? ''} onChange={e => setV2Profile(prev => ({ ...prev, labs: { ...prev.labs, [lab.toLowerCase()]: e.target.value ? parseFloat(e.target.value) : undefined } }))} placeholder="вЂ”" style={{ width:36, padding:'2px 4px', borderRadius:4, fontSize:6, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', color:'#fff', outline:'none' }} />
                     </div>
                   ))}
                 </div>
@@ -394,15 +394,15 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         <>
           <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Поиск продуктов..." style={{
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="рџ”Ќ РџРѕРёСЃРє РїСЂРѕРґСѓРєС‚РѕРІ..." style={{
                 width: '100%', padding: '8px 28px 8px 10px', borderRadius: 10, fontSize: 10, background: '#202023',
                 border: '1px solid rgba(255,255,255,0.06)', color: '#fff', outline: 'none', boxSizing: 'border-box',
               }} />
               {search && (
                 <span onClick={() => setSearch('')} style={{
                   position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                  color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: 12, fontWeight: 700,
-                }}>×</span>
+                  color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                }}>Г—</span>
               )}
             </div>
           </div>
@@ -414,11 +414,11 @@ export const ProductUsefulnessPlanner: React.FC = () => {
           <div style={{ display: 'flex', gap: 3, marginBottom: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             {(['score', 'name', 'protein', 'kcal'] as SortKey[]).map(k => (
               <button key={k} onClick={() => setSortKey(k)} style={PILL(sortKey === k, '#f59e0b')}>
-                {k === 'score' ? '⭐ По скору' : k === 'name' ? '📝 По имени' : k === 'protein' ? '🥩 По белку' : '🔥 По калориям'}
+                {k === 'score' ? 'в­ђ РџРѕ СЃРєРѕСЂСѓ' : k === 'name' ? 'рџ“ќ РџРѕ РёРјРµРЅРё' : k === 'protein' ? 'рџҐ© РџРѕ Р±РµР»РєСѓ' : 'рџ”Ґ РџРѕ РєР°Р»РѕСЂРёСЏРј'}
               </button>
             ))}
             <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', marginLeft: 'auto' }}>
-              {filtered.length} из {scored.length}
+              {filtered.length} РёР· {scored.length}
             </span>
           </div>
           {activeModules.length > 0 && (
@@ -429,10 +429,10 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 </span>
               ))}
               {(manualGoal || manualAAS || manualInsulin) && (
-                <span style={{ fontSize: 6, padding: '2px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.3)' }}>
+                <span style={{ fontSize: 6, padding: '2px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)' }}>
                   {manualGoal ? `${GOAL_MAP_RU[manualGoal] || manualGoal}` : ''}
-                  {manualAAS ? ' · ААС' : ''}
-                  {manualInsulin ? ' · Инсулин' : ''}
+                  {manualAAS ? ' В· РђРђРЎ' : ''}
+                  {manualInsulin ? ' В· РРЅСЃСѓР»РёРЅ' : ''}
                 </span>
               )}
             </div>
@@ -468,56 +468,56 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
-                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
+                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginTop: 1 }}>
                           {CATEGORY_LABELS[food.category] || food.category}
-                          {food.tier && <span style={{ marginLeft: 4 }}>· {food.tier === 'max' ? '🔸' : food.tier === 'mid' ? '🔹' : '⚪'} {food.tier}</span>}
+                          {food.tier && <span style={{ marginLeft: 4 }}>В· {food.tier === 'max' ? 'рџ”ё' : food.tier === 'mid' ? 'рџ”№' : 'вљЄ'} {food.tier}</span>}
                         </div>
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <div style={{ textAlign: 'right', marginRight: 4 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#22c55e' }}>{food.protein}г</div>
-                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>{food.kcal} ккал</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#22c55e' }}>{food.protein}Рі</div>
+                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)' }}>{food.kcal} РєРєР°Р»</div>
                       </div>
                       <button onClick={e => { e.stopPropagation(); toggleCompare(food.id); }} style={{
                         padding: '4px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600, whiteSpace: 'nowrap',
                         background: isCompared ? 'rgba(0,230,138,0.15)' : 'rgba(0,230,138,0.08)',
                         border: isCompared ? '1px solid #00e68a' : '1px solid rgba(0,230,138,0.2)',
                         color: isCompared ? '#00e68a' : 'rgba(0,230,138,0.8)',
-                      }}>{isCompared ? '✓ В сравнении' : '⚖ Сравнить'}</button>
+                      }}>{isCompared ? 'вњ“ Р’ СЃСЂР°РІРЅРµРЅРёРё' : 'вљ– РЎСЂР°РІРЅРёС‚СЊ'}</button>
                     </div>
                   </div>
                   {exp && (
                     <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${score.color}15` }}>
                       {vs ? (
-  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>
+  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, marginBottom: 4 }}>
       <div style={{ padding: '3px 6px', borderRadius: 6, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.08)' }}>
         <span style={{ color: '#8b5cf6' }}>BB Score</span>
         <span style={{ float: 'right', fontWeight: 700, color: '#00e68a' }}>{vs.bbScore.toFixed(1)}</span>
       </div>
       <div style={{ padding: '3px 6px', borderRadius: 6, background: vs.phaseMod !== 0 ? 'rgba(249,115,22,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${vs.phaseMod < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}` }}>
-        <span style={{ color: '#8b5cf6' }}>Фаза</span>
+        <span style={{ color: '#8b5cf6' }}>Р¤Р°Р·Р°</span>
         <span style={{ float: 'right', fontWeight: 700, color: vs.phaseMod < 0 ? '#ef4444' : '#22c55e' }}>{vs.phaseMod > 0 ? '+' : ''}{vs.phaseMod.toFixed(1)}</span>
       </div>
       <div style={{ padding: '3px 6px', borderRadius: 6, background: vs.pharmaMod !== 0 ? 'rgba(239,68,68,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${vs.pharmaMod < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}` }}>
-        <span style={{ color: '#8b5cf6' }}>Фарма</span>
+        <span style={{ color: '#8b5cf6' }}>Р¤Р°СЂРјР°</span>
         <span style={{ float: 'right', fontWeight: 700, color: vs.pharmaMod < 0 ? '#ef4444' : '#22c55e' }}>{vs.pharmaMod > 0 ? '+' : ''}{vs.pharmaMod.toFixed(1)}</span>
       </div>
       <div style={{ padding: '3px 6px', borderRadius: 6, background: vs.labMod !== 0 ? 'rgba(239,68,68,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${vs.labMod < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}` }}>
-        <span style={{ color: '#8b5cf6' }}>Анализы</span>
+        <span style={{ color: '#8b5cf6' }}>РђРЅР°Р»РёР·С‹</span>
         <span style={{ float: 'right', fontWeight: 700, color: vs.labMod < 0 ? '#ef4444' : '#22c55e' }}>{vs.labMod > 0 ? '+' : ''}{vs.labMod.toFixed(1)}</span>
       </div>
       {vs.timingMod !== 0 && (
         <div style={{ padding: '3px 6px', borderRadius: 6, background: 'rgba(249,115,22,0.04)', border: '1px solid rgba(249,115,22,0.1)' }}>
-          <span style={{ color: '#8b5cf6' }}>Тайминг</span>
+          <span style={{ color: '#8b5cf6' }}>РўР°Р№РјРёРЅРі</span>
           <span style={{ float: 'right', fontWeight: 700, color: vs.timingMod < 0 ? '#ef4444' : '#22c55e' }}>{vs.timingMod > 0 ? '+' : ''}{vs.timingMod.toFixed(1)}</span>
         </div>
       )}
     </div>
     {vs.factors.length > 0 ? (
       <div>
-        <div style={{ fontSize: 7, fontWeight: 600, color: '#00e68a', marginBottom: 2 }}>🧬 Почему такой рейтинг:</div>
+        <div style={{ fontSize: 7, fontWeight: 600, color: '#00e68a', marginBottom: 2 }}>рџ§¬ РџРѕС‡РµРјСѓ С‚Р°РєРѕР№ СЂРµР№С‚РёРЅРі:</div>
         {vs.factors.map((f, i) => (
           <div key={i} style={{ padding: '2px 6px', marginBottom: 1, borderRadius: 4, background: f.impact > 0 ? 'rgba(0,230,138,0.04)' : 'rgba(239,68,68,0.04)', border: `1px solid ${f.impact > 0 ? 'rgba(0,230,138,0.08)' : 'rgba(239,68,68,0.08)'}`, fontSize: 7, color: f.impact > 0 ? '#22c55e' : '#ef4444', lineHeight: 1.4 }}>
             {f.icon} {f.text} <b>({f.impact > 0 ? '+' : ''}{f.impact.toFixed(1)})</b>
@@ -525,46 +525,46 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         ))}
       </div>
     ) : (
-      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>Нет дополнительных факторов</div>
+      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>РќРµС‚ РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹С… С„Р°РєС‚РѕСЂРѕРІ</div>
     )}
     {(() => {
       const diaas = calcDIAAS(food);
       return diaas.diaas > 0 ? (
         <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:7, marginTop:2, padding:'2px 6px', borderRadius:4, background: diaas.diaas >= 1 ? 'rgba(0,230,138,0.04)' : diaas.diaas >= 0.75 ? 'rgba(245,158,11,0.04)' : 'rgba(239,68,68,0.04)', border:`1px solid ${diaas.diaas >= 1 ? 'rgba(0,230,138,0.15)' : diaas.diaas >= 0.75 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)'}` }}>
-          <span style={{ color: '#8b5cf6', fontWeight:600 }}>💪 DIAAS</span>
+          <span style={{ color: '#8b5cf6', fontWeight:600 }}>рџ’Є DIAAS</span>
           <span style={{ fontWeight:700, color: diaas.diaas >= 1 ? '#22c55e' : diaas.diaas >= 0.75 ? '#f59e0b' : '#ef4444' }}>{diaas.diaas.toFixed(2)}</span>
-          <span style={{ color:'rgba(255,255,255,0.4)' }}>• лимит: {diaas.limitingAA}</span>
+          <span style={{ color:'rgba(255,255,255,0.75)' }}>вЂў Р»РёРјРёС‚: {diaas.limitingAA}</span>
         </div>
       ) : null;
     })()}
-    <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', marginTop: 2 }}>Настройте фазу и фармакологию в ⚙️ Параметры → вкладка v2</div>
+    <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', marginTop: 2 }}>РќР°СЃС‚СЂРѕР№С‚Рµ С„Р°Р·Сѓ Рё С„Р°СЂРјР°РєРѕР»РѕРіРёСЋ РІ вљ™пёЏ РџР°СЂР°РјРµС‚СЂС‹ в†’ РІРєР»Р°РґРєР° v2</div>
   </div>
 ) : (
-<><div style={{ fontSize: 8, color: score.color, fontWeight: 600, marginBottom: 4 }}>📊 Разбивка скора</div>
+<><div style={{ fontSize: 8, color: score.color, fontWeight: 600, marginBottom: 4 }}>рџ“Љ Р Р°Р·Р±РёРІРєР° СЃРєРѕСЂР°</div>
   {enableA && <>
-  <ScoreBar label="Белок" value={score.breakdown.proteinDensity} max={30} color="#3b82f6" />
-  <ScoreBar label="Микро" value={score.breakdown.microDensity} max={30} color="#22c55e" />
-  <ScoreBar label="Клетчатка" value={score.breakdown.fiberQuality} max={20} color="#f97316" />
-  <ScoreBar label="Аминокислоты" value={score.breakdown.aminoScore} max={25} color="#ec4899" />
-  <ScoreBar label="Категория" value={score.breakdown.tierScore} max={20} color="#f59e0b" /></>}
-  {enableB && <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>
-    {score.contextBonus.goalMatch > 0 && <span style={{ color: '#22c55e' }}>✓ Цель совпадает </span>}
-    {score.contextBonus.timingMatch > 0 && <span style={{ color: '#60a5fa' }}>✓ Время подходит </span>}
-    {score.contextBonus.pharmaMatch > 0 && <span style={{ color: '#8b5cf6' }}>✓ Фарма-синергия </span>}
-    {score.contextBonus.pharmaMatch < 0 && <span style={{ color: '#ef4444' }}>⚠️ Фарма-конфликт </span>}
-    {(score.contextBonus.goalMatch === 0 && score.contextBonus.timingMatch === 0 && score.contextBonus.pharmaMatch === 0) && (<span style={{ color: 'rgba(255,255,255,0.2)' }}>—</span>)}
+  <ScoreBar label="Р‘РµР»РѕРє" value={score.breakdown.proteinDensity} max={30} color="#3b82f6" />
+  <ScoreBar label="РњРёРєСЂРѕ" value={score.breakdown.microDensity} max={30} color="#22c55e" />
+  <ScoreBar label="РљР»РµС‚С‡Р°С‚РєР°" value={score.breakdown.fiberQuality} max={20} color="#f97316" />
+  <ScoreBar label="РђРјРёРЅРѕРєРёСЃР»РѕС‚С‹" value={score.breakdown.aminoScore} max={25} color="#ec4899" />
+  <ScoreBar label="РљР°С‚РµРіРѕСЂРёСЏ" value={score.breakdown.tierScore} max={20} color="#f59e0b" /></>}
+  {enableB && <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.65)' }}>
+    {score.contextBonus.goalMatch > 0 && <span style={{ color: '#22c55e' }}>вњ“ Р¦РµР»СЊ СЃРѕРІРїР°РґР°РµС‚ </span>}
+    {score.contextBonus.timingMatch > 0 && <span style={{ color: '#60a5fa' }}>вњ“ Р’СЂРµРјСЏ РїРѕРґС…РѕРґРёС‚ </span>}
+    {score.contextBonus.pharmaMatch > 0 && <span style={{ color: '#8b5cf6' }}>вњ“ Р¤Р°СЂРјР°-СЃРёРЅРµСЂРіРёСЏ </span>}
+    {score.contextBonus.pharmaMatch < 0 && <span style={{ color: '#ef4444' }}>вљ пёЏ Р¤Р°СЂРјР°-РєРѕРЅС„Р»РёРєС‚ </span>}
+    {(score.contextBonus.goalMatch === 0 && score.contextBonus.timingMatch === 0 && score.contextBonus.pharmaMatch === 0) && (<span style={{ color: 'rgba(255,255,255,0.2)' }}>вЂ”</span>)}
   </div>}
   {enableC && score.costEfficiency && (
-    <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.35)', display: 'flex', gap: 8 }}>
-      <span>💰 {score.costEfficiency.proteinCostRub} ₽/10г белка</span>
-      <span>💳 <span style={{ color: score.costEfficiency.efficiencyScore >= 50 ? '#22c55e' : '#f59e0b' }}>{score.costEfficiency.efficiencyScore}/100</span></span>
+    <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.65)', display: 'flex', gap: 8 }}>
+      <span>рџ’° {score.costEfficiency.proteinCostRub} в‚Ѕ/10Рі Р±РµР»РєР°</span>
+      <span>рџ’і <span style={{ color: score.costEfficiency.efficiencyScore >= 50 ? '#22c55e' : '#f59e0b' }}>{score.costEfficiency.efficiencyScore}/100</span></span>
     </div>
   )}
   </>)
 }
                       {food.bestFor && food.bestFor.length > 0 && (
-                        <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>
-                          🎯 Для: {food.bestFor.join(', ')}
+                        <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.6)' }}>
+                          рџЋЇ Р”Р»СЏ: {food.bestFor.join(', ')}
                         </div>
                       )}
                     </div>
@@ -573,8 +573,8 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               );
             })}
             {sorted.length === 0 && (
-              <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>
-                {search ? 'Ничего не найдено' : 'Нет продуктов в этой категории'}
+              <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.6)', fontSize: 10 }}>
+                {search ? 'РќРёС‡РµРіРѕ РЅРµ РЅР°Р№РґРµРЅРѕ' : 'РќРµС‚ РїСЂРѕРґСѓРєС‚РѕРІ РІ СЌС‚РѕР№ РєР°С‚РµРіРѕСЂРёРё'}
               </div>
             )}
             {sorted.length > 50 && !showAll && (
@@ -582,7 +582,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 padding: '8px', borderRadius: 8, fontSize: 8, border: '1px solid rgba(255,255,255,0.06)',
                 background: 'rgba(255,255,255,0.02)', color: '#3b82f6', cursor: 'pointer',
               }}>
-                📄 Показать все ({sorted.length})
+                рџ“„ РџРѕРєР°Р·Р°С‚СЊ РІСЃРµ ({sorted.length})
               </button>
             )}
           </div>
@@ -592,23 +592,23 @@ export const ProductUsefulnessPlanner: React.FC = () => {
       {plannerTab === 'compare' && (
         <div>
           {compareIds.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>
-              Нажмите ⚖ на продукте в каталоге, чтобы добавить в сравнение (до 3)
+            <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.6)', fontSize: 10 }}>
+              РќР°Р¶РјРёС‚Рµ вљ– РЅР° РїСЂРѕРґСѓРєС‚Рµ РІ РєР°С‚Р°Р»РѕРіРµ, С‡С‚РѕР±С‹ РґРѕР±Р°РІРёС‚СЊ РІ СЃСЂР°РІРЅРµРЅРёРµ (РґРѕ 3)
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6' }}>⚖️ Сравнение:</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6' }}>вљ–пёЏ РЎСЂР°РІРЅРµРЅРёРµ:</span>
                 {compareIds.map(id => {
                   const f = FOOD_DB.find(x => x.id === id);
                   return (
                     <span key={id} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 8, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 4 }}>
                       {f?.name || id}
-                      <span onClick={() => toggleCompare(id)} style={{ cursor: 'pointer', fontWeight: 700, color: '#ef4444' }}>×</span>
+                      <span onClick={() => toggleCompare(id)} style={{ cursor: 'pointer', fontWeight: 700, color: '#ef4444' }}>Г—</span>
                     </span>
                   );
                 })}
-                <button onClick={() => setCompareIds([])} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 7, border: 'none', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer' }}>Очистить</button>
+                <button onClick={() => setCompareIds([])} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 7, border: 'none', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer' }}>РћС‡РёСЃС‚РёС‚СЊ</button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(compareData.length, 3)}, 1fr)`, gap: 6 }}>
                 {compareData.map(({ food, score }: any) => (
@@ -617,27 +617,27 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                     <div style={{ textAlign: 'center', marginBottom: 6 }}>
                       <ScoreBadge score={score.total} max={score.maxPossible || 10} color={score.color} label={score.label} />
                     </div>
-                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 4, textAlign: 'center' }}>
-                      {food.kcal} ккал · {food.protein}г б · {food.fat}г ж · {food.carbs}г у
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', marginBottom: 4, textAlign: 'center' }}>
+                      {food.kcal} РєРєР°Р» В· {food.protein}Рі Р± В· {food.fat}Рі Р¶ В· {food.carbs}Рі Сѓ
                     </div>
                     {score.breakdown && enableA && <>
-                      <ScoreBar label="Белок" value={score.breakdown.proteinDensity} max={30} color="#3b82f6" />
-                      <ScoreBar label="Микро" value={score.breakdown.microDensity} max={30} color="#22c55e" />
-                      <ScoreBar label="Клетчатка" value={score.breakdown.fiberQuality} max={20} color="#f97316" />
-                      <ScoreBar label="АК" value={score.breakdown.aminoScore} max={25} color="#ec4899" />
-                      <ScoreBar label="Категория" value={score.breakdown.tierScore} max={20} color="#f59e0b" />
+                      <ScoreBar label="Р‘РµР»РѕРє" value={score.breakdown.proteinDensity} max={30} color="#3b82f6" />
+                      <ScoreBar label="РњРёРєСЂРѕ" value={score.breakdown.microDensity} max={30} color="#22c55e" />
+                      <ScoreBar label="РљР»РµС‚С‡Р°С‚РєР°" value={score.breakdown.fiberQuality} max={20} color="#f97316" />
+                      <ScoreBar label="РђРљ" value={score.breakdown.aminoScore} max={25} color="#ec4899" />
+                      <ScoreBar label="РљР°С‚РµРіРѕСЂРёСЏ" value={score.breakdown.tierScore} max={20} color="#f59e0b" />
                     </>}
                     {score.factors && useV2 && (
                       <div style={{ marginTop: 4 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, fontSize: 7, marginBottom: 4 }}>
-                          <div style={{ color: '#22c55e' }}>🟢 База {score.bbScore?.toFixed(1)||'—'}</div>
-                          <div style={{ color: '#a78bfa' }}>🟣 Фаза {score.phaseMod?.toFixed(1)||'—'}</div>
-                          {score.pharmaMod !== undefined && <div style={{ color: score.pharmaMod >= 0 ? '#22c55e' : '#ef4444' }}>{score.pharmaMod >= 0 ? '🟢' : '🔴'} Фарма {score.pharmaMod.toFixed(1)}</div>}
-                          {score.labMod !== undefined && <div style={{ color: score.labMod >= 0 ? '#22c55e' : '#ef4444' }}>{score.labMod >= 0 ? '🟢' : '🔴'} Лабы {score.labMod.toFixed(1)}</div>}
-                          {score.timingMod !== undefined && <div style={{ color: score.timingMod >= 0 ? '#22c55e' : '#ef4444' }}>{score.timingMod >= 0 ? '🟢' : '🔴'} Тайминг {score.timingMod.toFixed(1)}</div>}
+                          <div style={{ color: '#22c55e' }}>рџџў Р‘Р°Р·Р° {score.bbScore?.toFixed(1)||'вЂ”'}</div>
+                          <div style={{ color: '#a78bfa' }}>рџџЈ Р¤Р°Р·Р° {score.phaseMod?.toFixed(1)||'вЂ”'}</div>
+                          {score.pharmaMod !== undefined && <div style={{ color: score.pharmaMod >= 0 ? '#22c55e' : '#ef4444' }}>{score.pharmaMod >= 0 ? 'рџџў' : 'рџ”ґ'} Р¤Р°СЂРјР° {score.pharmaMod.toFixed(1)}</div>}
+                          {score.labMod !== undefined && <div style={{ color: score.labMod >= 0 ? '#22c55e' : '#ef4444' }}>{score.labMod >= 0 ? 'рџџў' : 'рџ”ґ'} Р›Р°Р±С‹ {score.labMod.toFixed(1)}</div>}
+                          {score.timingMod !== undefined && <div style={{ color: score.timingMod >= 0 ? '#22c55e' : '#ef4444' }}>{score.timingMod >= 0 ? 'рџџў' : 'рџ”ґ'} РўР°Р№РјРёРЅРі {score.timingMod.toFixed(1)}</div>}
                         </div>
                         {score.factors.length > 0 && (
-                          <div style={{ maxHeight: 80, overflowY: 'auto', fontSize: 7, color: 'rgba(255,255,255,0.35)' }}>
+                          <div style={{ maxHeight: 80, overflowY: 'auto', fontSize: 7, color: 'rgba(255,255,255,0.65)' }}>
                             {score.factors.map((f: any, i: number) => (
                               <div key={i} style={{ color: f.impact > 0 ? '#22c55e' : '#ef4444', marginBottom: 1 }}>{f.icon} {f.text}</div>
                             ))}
@@ -647,15 +647,15 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                           const d = calcDIAAS(food);
                           return d.diaas > 0 ? (
                             <div style={{ marginTop: 2, fontSize: 7, color: d.diaas >= 1 ? '#22c55e' : d.diaas >= 0.75 ? '#f59e0b' : '#ef4444' }}>
-                              💪 DIAAS {d.diaas.toFixed(2)} · {d.limitingAA}
+                              рџ’Є DIAAS {d.diaas.toFixed(2)} В· {d.limitingAA}
                             </div>
                           ) : null;
                         })()}
                       </div>
                     )}
                     {enableC && score.costEfficiency && (
-                      <div style={{ marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
-                        💰 {score.costEfficiency.proteinCostRub} ₽/10г белка · <span style={{ color: score.costEfficiency.efficiencyScore >= 50 ? '#22c55e' : '#f59e0b' }}>{score.costEfficiency.efficiencyScore}/100</span>
+                      <div style={{ marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>
+                        рџ’° {score.costEfficiency.proteinCostRub} в‚Ѕ/10Рі Р±РµР»РєР° В· <span style={{ color: score.costEfficiency.efficiencyScore >= 50 ? '#22c55e' : '#f59e0b' }}>{score.costEfficiency.efficiencyScore}/100</span>
                       </div>
                     )}
                   </div>
@@ -669,8 +669,8 @@ export const ProductUsefulnessPlanner: React.FC = () => {
       {plannerTab === 'meal' && (
         <div>
           <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-            <button onClick={() => setMealTab('compose')} style={PILL(mealTab === 'compose', '#f97316')}>🍽️ Состав приёма</button>
-            <button onClick={() => setMealTab('saved')} style={PILL(mealTab === 'saved', '#a855f7')}>💾 Сохранённые ({savedMeals.length})</button>
+            <button onClick={() => setMealTab('compose')} style={PILL(mealTab === 'compose', '#f97316')}>рџЌЅпёЏ РЎРѕСЃС‚Р°РІ РїСЂРёС‘РјР°</button>
+            <button onClick={() => setMealTab('saved')} style={PILL(mealTab === 'saved', '#a855f7')}>рџ’ѕ РЎРѕС…СЂР°РЅС‘РЅРЅС‹Рµ ({savedMeals.length})</button>
           </div>
 
           {toastMsg && (
@@ -683,10 +683,10 @@ export const ProductUsefulnessPlanner: React.FC = () => {
             <div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
                 {[
-                  { key: 'plan', icon: '📋', label: 'Из плана' },
-                  { key: 'recipe', icon: '📝', label: 'Из рецептов' },
-                  { key: 'saved', icon: '💾', label: 'Из сохранённых' },
-                  { key: 'diary', icon: '📓', label: 'Из дневника' },
+                  { key: 'plan', icon: 'рџ“‹', label: 'РР· РїР»Р°РЅР°' },
+                  { key: 'recipe', icon: 'рџ“ќ', label: 'РР· СЂРµС†РµРїС‚РѕРІ' },
+                  { key: 'saved', icon: 'рџ’ѕ', label: 'РР· СЃРѕС…СЂР°РЅС‘РЅРЅС‹С…' },
+                  { key: 'diary', icon: 'рџ““', label: 'РР· РґРЅРµРІРЅРёРєР°' },
                 ].map(btn => (
                   <button key={btn.key} onClick={() => openSourcePicker(btn.key)} style={{
                     padding: '8px', borderRadius: 12, cursor: 'pointer', fontSize: 9, fontWeight: 600,
@@ -700,7 +700,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 <div style={{ marginBottom: 8, borderRadius: 10, padding: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <span style={{ fontSize: 10, fontWeight: 700, color: '#00e68a' }}>{sourcePicker.title}</span>
-                    <span onClick={() => setSourcePicker(null)} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: 700 }}>×</span>
+                    <span onClick={() => setSourcePicker(null)} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: 700 }}>Г—</span>
                   </div>
                   <div style={{ maxHeight: 180, overflowY: 'auto' }}>
                     {sourcePicker.items.map(item => (
@@ -709,14 +709,14 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                         background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.08)',
                       }}>
                         <div style={{ fontSize: 9, fontWeight: 600, color: '#fff' }}>{item.name}</div>
-                        {item.label && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>{item.label}</div>}
+                        {item.label && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>{item.label}</div>}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
               <div style={{ position: 'relative', marginBottom: 8 }}>
-                <input value={mealSearch} onChange={e => setMealSearch(e.target.value)} placeholder="🔍 Добавить продукт к приёму..." style={{
+                <input value={mealSearch} onChange={e => setMealSearch(e.target.value)} placeholder="рџ”Ќ Р”РѕР±Р°РІРёС‚СЊ РїСЂРѕРґСѓРєС‚ Рє РїСЂРёС‘РјСѓ..." style={{
                   width: '100%', padding: '8px 10px', borderRadius: 10, fontSize: 10, background: '#202023',
                   border: '1px solid rgba(255,255,255,0.06)', color: '#fff', outline: 'none', boxSizing: 'border-box',
                 }} />
@@ -737,14 +737,14 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       borderBottom: '1px solid rgba(255,255,255,0.02)', display: 'flex', justifyContent: 'space-between',
                     }}>
                       <span>{food.name}</span>
-                      <span style={{ color: 'rgba(255,255,255,0.3)' }}>{food.kcal} ккал · {food.protein}г б</span>
+                      <span style={{ color: 'rgba(255,255,255,0.6)' }}>{food.kcal} РєРєР°Р» В· {food.protein}Рі Р±</span>
                     </div>
                   ))}
                 </div>
               )}
               {mealProducts.length > 0 && (
                 <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Продукты в приёме:</div>
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>РџСЂРѕРґСѓРєС‚С‹ РІ РїСЂРёС‘РјРµ:</div>
                   {mealProducts.map((mp, idx) => {
                     const food = FOOD_DB.find(f => f.id === mp.foodId);
                     return (
@@ -762,37 +762,37 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                           width: 50, padding: '3px 5px', borderRadius: 5, fontSize: 8, background: '#202023',
                           border: '1px solid rgba(255,255,255,0.06)', color: '#fff', outline: 'none', textAlign: 'center',
                         }} />
-                        <span style={{ color: 'rgba(255,255,255,0.4)' }}>г</span>
+                        <span style={{ color: 'rgba(255,255,255,0.75)' }}>Рі</span>
                         <span style={{ color: '#22c55e', minWidth: 30, textAlign: 'right' }}>
-                          {food ? Math.round((food.protein || 0) * mp.weightGrams / 100) : 0}г
+                          {food ? Math.round((food.protein || 0) * mp.weightGrams / 100) : 0}Рі
                         </span>
                         <span onClick={() => setMealProducts(mealProducts.filter((_, i) => i !== idx))} style={{
                           cursor: 'pointer', color: '#ef4444', fontWeight: 700, fontSize: 10, padding: '0 4px',
-                        }}>×</span>
+                        }}>Г—</span>
                       </div>
                     );
                   })}
                   <div style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px',
-                    marginTop: 4, borderRadius: 8, background: 'rgba(255,255,255,0.03)', fontSize: 8, color: 'rgba(255,255,255,0.5)',
+                    marginTop: 4, borderRadius: 8, background: 'rgba(255,255,255,0.03)', fontSize: 8, color: 'rgba(255,255,255,0.8)',
                   }}>
-                    <span>∑ {mealProducts.reduce((s, mp) => {
+                    <span>в€‘ {mealProducts.reduce((s, mp) => {
                       const f = FOOD_DB.find(x => x.id === mp.foodId);
                       return s + ((f?.kcal || 0) * mp.weightGrams / 100);
-                    }, 0).toFixed(0)} ккал</span>
-                    <span>🥩 {mealProducts.reduce((s, mp) => {
+                    }, 0).toFixed(0)} РєРєР°Р»</span>
+                    <span>рџҐ© {mealProducts.reduce((s, mp) => {
                       const f = FOOD_DB.find(x => x.id === mp.foodId);
                       return s + ((f?.protein || 0) * mp.weightGrams / 100);
-                    }, 0).toFixed(1)}г</span>
-                    <span>🧈 {mealProducts.reduce((s, mp) => {
+                    }, 0).toFixed(1)}Рі</span>
+                    <span>рџ§€ {mealProducts.reduce((s, mp) => {
                       const f = FOOD_DB.find(x => x.id === mp.foodId);
                       return s + ((f?.fat || 0) * mp.weightGrams / 100);
-                    }, 0).toFixed(1)}г</span>
-                    <span>🍚 {mealProducts.reduce((s, mp) => {
+                    }, 0).toFixed(1)}Рі</span>
+                    <span>рџЌљ {mealProducts.reduce((s, mp) => {
                       const f = FOOD_DB.find(x => x.id === mp.foodId);
                       return s + ((f?.carbs || 0) * mp.weightGrams / 100);
-                    }, 0).toFixed(1)}г</span>
-                    <span>⚖️ {mealProducts.reduce((s, mp) => s + mp.weightGrams, 0).toFixed(0)}г</span>
+                    }, 0).toFixed(1)}Рі</span>
+                    <span>вљ–пёЏ {mealProducts.reduce((s, mp) => s + mp.weightGrams, 0).toFixed(0)}Рі</span>
                   </div>
                 </div>
               )}
@@ -805,15 +805,15 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                     padding: '7px 14px', borderRadius: 8, fontSize: 9, border: 'none',
                     background: 'linear-gradient(135deg, #f97316, #ef4444)', color: '#fff', cursor: 'pointer', fontWeight: 700,
                   }}>
-                    🧮 Рассчитать полезность
+                    рџ§® Р Р°СЃСЃС‡РёС‚Р°С‚СЊ РїРѕР»РµР·РЅРѕСЃС‚СЊ
                   </button>
                   <button onClick={() => setMealProducts([])} style={{
                     padding: '7px 14px', borderRadius: 8, fontSize: 8, border: '1px solid rgba(255,255,255,0.06)',
-                    background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer',
-                  }}>Очистить</button>
+                    background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.8)', cursor: 'pointer',
+                  }}>РћС‡РёСЃС‚РёС‚СЊ</button>
                   {mealResult && (
                     <button onClick={() => {
-                      const name = mealName.trim() || `Приём от ${new Date().toLocaleDateString('ru-RU')}`;
+                      const name = mealName.trim() || `РџСЂРёС‘Рј РѕС‚ ${new Date().toLocaleDateString('ru-RU')}`;
                       const meal: SavedMeal = {
                         id: Date.now().toString(36),
                         name,
@@ -827,7 +827,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                     }} style={{
                       padding: '7px 14px', borderRadius: 8, fontSize: 8, border: '1px solid rgba(168,85,247,0.2)',
                       background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer',
-                    }}>💾 Сохранить приём</button>
+                    }}>рџ’ѕ РЎРѕС…СЂР°РЅРёС‚СЊ РїСЂРёС‘Рј</button>
                   )}
                 </div>
               )}
@@ -835,41 +835,41 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 <div style={{ borderRadius: 12, padding: 12, background: `${mealResult.color}06`, border: `1px solid ${mealResult.color}20`, marginTop: 4 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: mealResult.color }}>🍽️ Композитный скор</div>
-                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>средневзвешенный по граммовке</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: mealResult.color }}>рџЌЅпёЏ РљРѕРјРїРѕР·РёС‚РЅС‹Р№ СЃРєРѕСЂ</div>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>СЃСЂРµРґРЅРµРІР·РІРµС€РµРЅРЅС‹Р№ РїРѕ РіСЂР°РјРјРѕРІРєРµ</div>
                     </div>
                     <ScoreBadge score={mealResult.compositeScore} max={mealResult.maxPossible} color={mealResult.color} label={mealResult.label} />
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 8 }}>
                     {[
-                      ['🔥', 'Калории', `${mealResult.totalKcal} ккал`],
-                      ['🥩', 'Белок', `${mealResult.totalProtein}г`],
-                      ['🧈', 'Жиры', `${mealResult.totalFat}г`],
-                      ['🍚', 'Углеводы', `${mealResult.totalCarbs}г`],
-                      ['🌾', 'Клетчатка', `${mealResult.totalFiber}г`],
-                      ['⚖️', 'Вес', `${mealResult.totalWeight}г`],
-                      ['📊', 'Ккал/г', `${mealResult.kcalPerGram}`],
+                      ['рџ”Ґ', 'РљР°Р»РѕСЂРёРё', `${mealResult.totalKcal} РєРєР°Р»`],
+                      ['рџҐ©', 'Р‘РµР»РѕРє', `${mealResult.totalProtein}Рі`],
+                      ['рџ§€', 'Р–РёСЂС‹', `${mealResult.totalFat}Рі`],
+                      ['рџЌљ', 'РЈРіР»РµРІРѕРґС‹', `${mealResult.totalCarbs}Рі`],
+                      ['рџЊѕ', 'РљР»РµС‚С‡Р°С‚РєР°', `${mealResult.totalFiber}Рі`],
+                      ['вљ–пёЏ', 'Р’РµСЃ', `${mealResult.totalWeight}Рі`],
+                      ['рџ“Љ', 'РљРєР°Р»/Рі', `${mealResult.kcalPerGram}`],
                     ].map(([icon, label, val]) => (
                       <div key={label} style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
-                        <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)' }}>{icon} {label}</div>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: label === 'Белок' ? '#22c55e' : label === 'Жиры' ? '#f59e0b' : label === 'Углеводы' ? '#3b82f6' : '#fff' }}>{val}</div>
+                        <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.6)' }}>{icon} {label}</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: label === 'Р‘РµР»РѕРє' ? '#22c55e' : label === 'Р–РёСЂС‹' ? '#f59e0b' : label === 'РЈРіР»РµРІРѕРґС‹' ? '#3b82f6' : '#fff' }}>{val}</div>
                       </div>
                     ))}
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>БЖУ %</div>
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>Р‘Р–РЈ %</div>
                     <div style={{ display: 'flex', gap: 4, height: 6, borderRadius: 3, overflow: 'hidden' }}>
                       <div style={{ flex: mealResult.pfcRatio.proteinPct, background: '#22c55e' }} />
                       <div style={{ flex: mealResult.pfcRatio.fatPct, background: '#f59e0b' }} />
                       <div style={{ flex: mealResult.pfcRatio.carbsPct, background: '#3b82f6' }} />
                     </div>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 2, fontSize: 6, color: 'rgba(255,255,255,0.3)' }}>
-                      <span>🥩 {mealResult.pfcRatio.proteinPct}%</span>
-                      <span>🧈 {mealResult.pfcRatio.fatPct}%</span>
-                      <span>🍚 {mealResult.pfcRatio.carbsPct}%</span>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 2, fontSize: 6, color: 'rgba(255,255,255,0.6)' }}>
+                      <span>рџҐ© {mealResult.pfcRatio.proteinPct}%</span>
+                      <span>рџ§€ {mealResult.pfcRatio.fatPct}%</span>
+                      <span>рџЌљ {mealResult.pfcRatio.carbsPct}%</span>
                     </div>
                   </div>
-                  <div style={{ fontSize: 8, color: mealResult.color, fontWeight: 600, marginBottom: 4 }}>📊 Продукты</div>
+                  <div style={{ fontSize: 8, color: mealResult.color, fontWeight: 600, marginBottom: 4 }}>рџ“Љ РџСЂРѕРґСѓРєС‚С‹</div>
                   {mealResult.productScores.map(ps => (
                     <div key={ps.foodId} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0' }}>
                       <div style={{ width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -877,35 +877,35 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                         color: ps.score >= 55 ? '#22c55e' : ps.score >= 40 ? '#f59e0b' : '#ef4444',
                       }}>{ps.score}</div>
                       <span style={{ flex: 1, fontSize: 8, color: '#fff' }}>{ps.name}</span>
-                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>{ps.weight}г</span>
-                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>вклад {ps.contribution}%</span>
+                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>{ps.weight}Рі</span>
+                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>РІРєР»Р°Рґ {ps.contribution}%</span>
                     </div>
                   ))}
                   {mealResult.weakLink && (
                     <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.1)' }}>
-                      <div style={{ fontSize: 7, color: '#ef4444', fontWeight: 600 }}>⚠️ Слабый продукт: {mealResult.weakLink.name}</div>
-                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>{mealResult.weakLink.reason}</div>
+                      <div style={{ fontSize: 7, color: '#ef4444', fontWeight: 600 }}>вљ пёЏ РЎР»Р°Р±С‹Р№ РїСЂРѕРґСѓРєС‚: {mealResult.weakLink.name}</div>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>{mealResult.weakLink.reason}</div>
                     </div>
                   )}
                   {mealResult.microCoverage.length > 0 && (
                     <div style={{ marginTop: 8 }}>
-                      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Микронутриенты (% от суточной нормы)</div>
+                      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>РњРёРєСЂРѕРЅСѓС‚СЂРёРµРЅС‚С‹ (% РѕС‚ СЃСѓС‚РѕС‡РЅРѕР№ РЅРѕСЂРјС‹)</div>
                       {mealResult.microCoverage.slice(0, 10).map(m => (
                         <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                          <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', minWidth: 24 }}>{m.name}</span>
+                          <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)', minWidth: 24 }}>{m.name}</span>
                           <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
                             <div style={{ width: `${Math.min(100, m.percent)}%`, height: '100%',
                               background: m.percent >= 50 ? '#22c55e' : m.percent >= 20 ? '#f59e0b' : '#ef4444',
                               borderRadius: 2 }} />
                           </div>
-                          <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', minWidth: 30, textAlign: 'right' }}>
-                            {m.percent}% · {m.current}{m.key.startsWith('Vit') ? 'мкг' : 'мг'}
+                          <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', minWidth: 30, textAlign: 'right' }}>
+                            {m.percent}% В· {m.current}{m.key.startsWith('Vit') ? 'РјРєРі' : 'РјРі'}
                           </span>
                         </div>
                       ))}
                       {mealResult.microCoverage.length > 10 && (
                         <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', marginTop: 2 }}>
-                          + ещё {mealResult.microCoverage.length - 10}
+                          + РµС‰С‘ {mealResult.microCoverage.length - 10}
                         </div>
                       )}
                     </div>
@@ -918,8 +918,8 @@ export const ProductUsefulnessPlanner: React.FC = () => {
           {mealTab === 'saved' && (
             <div>
               {savedMeals.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>
-                  Нет сохранённых приёмов. Соберите приём на вкладке «Состав» и нажмите 💾
+                <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.6)', fontSize: 10 }}>
+                  РќРµС‚ СЃРѕС…СЂР°РЅС‘РЅРЅС‹С… РїСЂРёС‘РјРѕРІ. РЎРѕР±РµСЂРёС‚Рµ РїСЂРёС‘Рј РЅР° РІРєР»Р°РґРєРµ В«РЎРѕСЃС‚Р°РІВ» Рё РЅР°Р¶РјРёС‚Рµ рџ’ѕ
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -930,14 +930,14 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                         <span style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{meal.name}</span>
-                        <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>
+                        <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>
                           {new Date(meal.createdAt).toLocaleDateString('ru-RU')}
                         </span>
                       </div>
-                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>
                         {meal.products.map(p => {
                           const f = FOOD_DB.find(x => x.id === p.foodId);
-                          return `${f?.name || p.foodId} (${p.weightGrams}г)`;
+                          return `${f?.name || p.foodId} (${p.weightGrams}Рі)`;
                         }).join(', ')}
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>
@@ -948,7 +948,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                         }} style={{
                           padding: '4px 8px', borderRadius: 6, fontSize: 7, border: '1px solid rgba(59,130,246,0.2)',
                           background: 'rgba(59,130,246,0.08)', color: '#60a5fa', cursor: 'pointer',
-                        }}>📂 Загрузить</button>
+                        }}>рџ“‚ Р—Р°РіСЂСѓР·РёС‚СЊ</button>
                         <button onClick={() => {
                           const updated = savedMeals.filter(m => m.id !== meal.id);
                           setSavedMeals(updated);
@@ -956,7 +956,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                         }} style={{
                           padding: '4px 8px', borderRadius: 6, fontSize: 7, border: '1px solid rgba(239,68,68,0.2)',
                           background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer',
-                        }}>🗑️ Удалить</button>
+                        }}>рџ—‘пёЏ РЈРґР°Р»РёС‚СЊ</button>
                       </div>
                     </div>
                   ))}
@@ -969,3 +969,4 @@ export const ProductUsefulnessPlanner: React.FC = () => {
     </div>
   );
 };
+

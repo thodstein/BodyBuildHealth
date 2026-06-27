@@ -203,12 +203,6 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
 
   return (
     <div key={mainTab} style={{ padding: 12, color: '#fff', maxWidth: 720, margin: '0 auto' }}>
-      {/* 3 main tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <button style={mainTab === 'pl' ? BTN : BTN_GHOST} onClick={() => { setMainTab('pl'); setSubView('plan'); }}>🏆 PL (сила)</button>
-        <button style={mainTab === 'bb' ? BTN : BTN_GHOST} onClick={() => { setMainTab('bb'); setSubView('plan'); }}>💪 BB</button>
-        <button style={mainTab === 'manual' ? BTN : BTN_GHOST} onClick={() => { setMainTab('manual'); setSubView('plan'); }}>🛠 Ручной</button>
-      </div>
       {/* sub-view nav for PL/BB */}
       {mainTab !== 'manual' && subViewList[mainTab].length > 0 && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>

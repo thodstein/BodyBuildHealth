@@ -675,223 +675,169 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
           </div>
 
           {/* ═══ OVERVIEW TAB ═══ */}
-          {tab === 'overview' && (
-          <InfoErrorBoundary label="Обзор">
-            {/* Hero card with avatar + key stats */}
-            <div style={{
-              ...glassCard,
-              background: 'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(0,180,100,0.04))',
-              border: apple.accentBorder,
-            }}>
-              <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:14 }}>
-                <div style={{
-                  width:60, height:60, borderRadius:'50%',
-                  background: apple.gradientGreen,
-                  display:'flex', alignItems:'center', justifyContent:'center',
-                  fontSize:24, fontWeight:800, color:'#000',
-                  boxShadow: '0 4px 20px rgba(0,230,138,0.25)',
-                  flexShrink:0,
-                }}>{initials}</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:18, fontWeight:700, color: apple.textPrimary }}>{profile.name || 'Пользователь'}</div>
-                  <div style={{ fontSize:12, color: apple.textSecondary, marginTop:2 }}>
-                    {settings.age || '—'} лет • {goalLabel} • {sportLabel}
-                  </div>
-                  <div style={{ fontSize:11, color: apple.textDim, marginTop:2 }}>
-                    Стаж: {trainExp || '—'} лет • Уровень: {trainLevelLabel}
-                  </div>
-                </div>
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
-                {[
-                  { label:'Вес', val: settings.weight ? `${settings.weight} кг` : '—', sub: '' },
-                  { label:'Рост', val: settings.height ? `${settings.height} см` : '—', sub: '' },
-                  { label:'BMI', val: bmi || '—', sub: bmiCategory, color: bmi ? (parseFloat(bmi) < 18.5 ? '#f97316' : parseFloat(bmi) < 25 ? '#00e68a' : parseFloat(bmi) < 30 ? '#f59e0b' : '#ef4444') : undefined },
-                  { label:'FFMI', val: ffmi || '—', sub: ffmiCategory, color: ffmi ? (parseFloat(ffmi) < 18 ? '#f97316' : parseFloat(ffmi) < 22 ? '#f59e0b' : '#00e68a') : undefined },
-                ].map(s => (
-                  <div key={s.label} style={{ textAlign:'center', background:'rgba(255,255,255,0.03)', borderRadius:10, padding:'8px 4px' }}>
-                    <div style={{ fontSize:10, color: apple.textDim, marginBottom:2 }}>{s.label}</div>
-                    <div style={{ fontSize:14, fontWeight:700, color: s.color || apple.textPrimary }}>{s.val}</div>
-                    <div style={{ fontSize:9, color: s.color || apple.textSecondary, marginTop:1 }}>{s.sub}</div>
-                  </div>
+          {tab === 'overview' && (() => {
+            const [overTab, setOverTab] = useState('general');
+            const ovTab = (id: string, icon: string, label: string) => ({
+              id, icon, label,
+              active: overTab === id,
+              onClick: () => setOverTab(id),
+            } as any);
+            const ovTabs = [
+              ovTab('general','👤','Общая'), ovTab('nutrition','🥗','Питание'),
+              ovTab('training','💪','Тренировки'), ovTab('supplements','💊','Поддержка'),
+              ovTab('pharma','💉','Фарма'), ovTab('labs','🔬','Анализы'), ovTab('risks','⚠️','Риски'),
+            ];
+            const pillS = (active: boolean) => ({
+              padding:'4px 8px', borderRadius:8, fontSize:7, fontWeight: active ? 700 : 400, cursor:'pointer', whiteSpace:'nowrap' as const, flexShrink:0,
+              background: active ? '#00e68a' : 'rgba(255,255,255,0.04)', border:'1px solid ' + (active ? '#00e68a' : 'rgba(255,255,255,0.06)'), color: active ? '#000' : 'rgba(255,255,255,0.8)',
+            });
+            return (
+            <InfoErrorBoundary label="Сведения о пользователе">
+              <div style={{ display:'flex', gap:2, padding:'4px 0', overflowX:'auto', scrollbarWidth:'none' }}>
+                {ovTabs.map(t => (
+                  <button key={t.id} onClick={t.onClick} style={pillS(t.active)}>{t.icon} {t.label}</button>
                 ))}
               </div>
-            </div>
-
-            {readinessScores && (
-              <div style={glassCard}>
-                <div style={{ ...sectionLabel, marginBottom:10 }}>Готовность</div>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, textAlign:'center' }}>
-                  {[
-                    { label:'Восст.', value:readinessScores.recovery, good:60 },
-                    { label:'Питание', value:readinessScores.nutrition, good:60 },
-                    { label:'Поддержка', value:readinessScores.support, good:60 },
-                    { label:'Усталость', value:readinessScores.fatigue, good:40, invert:true },
-                  ].map(m => (
-                    <div key={m.label} style={{ background:'rgba(255,255,255,0.02)', borderRadius:10, padding:'8px 4px' }}>
-                      <div style={{ fontSize:22, fontWeight:700, color: m.invert ? (m.value <= m.good ? '#00e68a' : m.value <= 60 ? '#f59e0b' : '#ef4444') : (m.value >= m.good ? '#00e68a' : m.value >= 40 ? '#f59e0b' : '#ef4444') }}>{m.value}</div>
-                      <div style={{ fontSize:10, color: apple.textDim }}>{m.label}</div>
+              {overTab === 'general' && <>
+                <div style={{ ...glassCard, background:'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(0,180,100,0.04))', border: apple.accentBorder }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:14 }}>
+                    <div style={{ width:60, height:60, borderRadius:'50%', background: apple.gradientGreen, display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, fontWeight:800, color:'#000', boxShadow:'0 4px 20px rgba(0,230,138,0.25)', flexShrink:0 }}>{initials}</div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:18, fontWeight:700, color: apple.textPrimary }}>{profile.name || 'Пользователь'}</div>
+                      <div style={{ fontSize:12, color: apple.textSecondary, marginTop:2 }}>{settings.age || '—'} лет • {goalLabel} • {sportLabel}</div>
+                      <div style={{ fontSize:11, color: apple.textDim, marginTop:2 }}>Стаж: {trainExp || '—'} лет • Уровень: {trainLevelLabel}</div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div style={glassCard}>
-              <div style={sectionLabel}>Фаза курса</div>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-                {COURSE_PHASES.map(p => (
-                  <button key={p.id} style={pillBtn((settings.phase ?? 'baseline') === p.id)} onClick={() => save({ phase: p.id })}>{p.label}</button>
-                ))}
-              </div>
-              {settings.courseStartDate && (
-                <div style={{ marginTop:10 }}>
-                  <span style={sectionLabel}>Дата начала курса</span>
-                  <input style={appleInput} type="date" value={settings.courseStartDate} onChange={e => save({ courseStartDate: e.target.value })} />
-                </div>
-              )}
-              {!settings.courseStartDate && settings.phase && settings.phase !== 'baseline' && (
-                <button style={{ ...pillBtn(false), marginTop:10 }} onClick={() => save({ courseStartDate: new Date().toISOString().slice(0, 10) })}>Указать дату начала</button>
-              )}
-            </div>
-
-            <div style={glassCard}>
-              <div style={sectionLabel}>Основная информация</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                <div><span style={sectionLabel}>Имя</span><input style={appleInput} value={profile.name} onChange={e => updateProfile({ name: e.target.value })} /></div>
-                <div><span style={sectionLabel}>Email</span><input style={appleInput} value={settings.email ?? ''} disabled /></div>
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10 }}>
-                <div><span style={sectionLabel}>Возраст</span><input style={appleInput} type="number" value={settings.age || ''} onChange={e => save({ age: parseFloat(e.target.value) || 0 })} placeholder="30" /></div>
-                <div>
-                  <span style={sectionLabel}>Пол</span>
-                  <div style={{ display:'flex', gap:6 }}>
-                    <button style={pillBtn(settings.sex === 'male')} onClick={() => save({ sex: 'male' })}>Муж</button>
-                    <button style={pillBtn(settings.sex === 'female')} onClick={() => save({ sex: 'female' })}>Жен</button>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
+                    {[
+                      { label:'Вес', val: settings.weight ? `${settings.weight} кг` : '—', sub: '' },
+                      { label:'Рост', val: settings.height ? `${settings.height} см` : '—', sub: '' },
+                      { label:'BMI', val: bmi || '—', sub: bmiCategory, color: bmi ? (parseFloat(bmi) < 18.5 ? '#f97316' : parseFloat(bmi) < 25 ? '#00e68a' : parseFloat(bmi) < 30 ? '#f59e0b' : '#ef4444') : undefined },
+                      { label:'FFMI', val: ffmi || '—', sub: ffmiCategory, color: ffmi ? (parseFloat(ffmi) < 18 ? '#f97316' : parseFloat(ffmi) < 22 ? '#f59e0b' : '#00e68a') : undefined },
+                    ].map(s => (
+                      <div key={s.label} style={{ textAlign:'center', background:'rgba(255,255,255,0.03)', borderRadius:10, padding:'8px 4px' }}>
+                        <div style={{ fontSize:10, color: apple.textDim, marginBottom:2 }}>{s.label}</div>
+                        <div style={{ fontSize:14, fontWeight:700, color: s.color || apple.textPrimary }}>{s.val}</div>
+                        <div style={{ fontSize:9, color: s.color || apple.textSecondary, marginTop:1 }}>{s.sub}</div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <div style={glassCard}>
-              <div style={sectionLabel}>Расширенная информация</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                <div>
-                  <span style={sectionLabel}>Вид спорта</span>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-                    {SPORT_TYPES.map(st => <button key={st.id} style={pillBtn((settings.sportType ?? 'bodybuilding') === st.id)} onClick={() => save({ sportType: st.id })}>{st.label}</button>)}
+                <div style={glassCard}>
+                  <div style={sectionLabel}>Основная информация</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                    <div><span style={sectionLabel}>Имя</span><input style={appleInput} value={profile.name} onChange={e => updateProfile({ name: e.target.value })} /></div>
+                    <div><span style={sectionLabel}>Email</span><input style={appleInput} value={settings.email ?? ''} disabled /></div>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10 }}>
+                    <div><span style={sectionLabel}>Возраст</span><input style={appleInput} type="number" value={settings.age || ''} onChange={e => save({ age: parseFloat(e.target.value) || 0 })} placeholder="30" /></div>
+                    <div><span style={sectionLabel}>Пол</span><div style={{ display:'flex', gap:6 }}><button style={pillBtn(settings.sex === 'male')} onClick={() => save({ sex: 'male' })}>Муж</button><button style={pillBtn(settings.sex === 'female')} onClick={() => save({ sex: 'female' })}>Жен</button></div></div>
                   </div>
                 </div>
-                <div><span style={sectionLabel}>Стаж тренировок (лет)</span><input style={appleInput} type="number" value={(settings.trainingExperience ?? 0) || ''} onChange={e => save({ trainingExperience: parseFloat(e.target.value) || 0 })} /></div>
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10 }}>
-                <div><span style={sectionLabel}>Группа крови</span>
-                  <select style={appleInput} value={settings.bloodType ?? ''} onChange={e => save({ bloodType: e.target.value })}>
-                    <option value="">Не указано</option>
-                    {BLOOD_TYPES.map(bt => <option key={bt.id} value={bt.id}>{bt.label}</option>)}
-                  </select>
-                </div>
-                <div><span style={sectionLabel}>Аллергии (текст)</span><input style={appleInput} value={settings.allergyNotes ?? ''} onChange={e => save({ allergyNotes: e.target.value })} /></div>
-              </div>
-              <div style={{ marginTop:10 }}>
-                <span style={sectionLabel}>Хронические заболевания</span>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:4 }}>
-                  {CHRONIC_CONDITIONS.map(c => {
-                    const active = (settings.chronicConditions ?? []).includes(c.id);
-                    return <button key={c.id} onClick={() => { const cur = settings.chronicConditions ?? []; save({ chronicConditions: active ? cur.filter(x => x !== c.id) : [...cur, c.id] }); }} style={pillBtn(active)}>{c.label}</button>;
-                  })}
-                </div>
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10 }}>
-                <div><span style={sectionLabel}>Экстренный контакт (имя)</span><input style={appleInput} value={settings.emergencyName ?? ''} onChange={e => save({ emergencyName: e.target.value })} /></div>
-                <div><span style={sectionLabel}>Экстренный телефон</span><input style={appleInput} value={settings.emergencyPhone ?? ''} onChange={e => save({ emergencyPhone: e.target.value })} /></div>
-              </div>
-            </div>
-
-            <div style={glassCard}>
-              <div style={sectionLabel}>Питание v2 (динамический TDEE)</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:4 }}>
-                <div style={{ background:'rgba(0,230,138,0.06)', borderRadius:10, padding:'8px 10px', textAlign:'center' }}>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>Текущий TDEE</div>
-                  <div style={{ fontSize:20, fontWeight:800, color:'#00e68a' }}>{Math.round(nutV2.currentTDEE)}</div>
-                  <div style={{ fontSize:9, color: nutV2.tdeeAdjustment > 50 ? '#ef4444' : nutV2.tdeeAdjustment < -50 ? '#22c55e' : 'rgba(255,255,255,0.5)' }}>
-                    {nutV2.tdeeAdjustment !== 0 ? `${nutV2.tdeeAdjustment > 0 ? '+' : ''}${Math.round(nutV2.tdeeAdjustment)} ккал корр.` : 'базовый'}
+                <div style={glassCard}>
+                  <div style={sectionLabel}>Расширенная информация</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                    <div><span style={sectionLabel}>Вид спорта</span><div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>{SPORT_TYPES.map(st => <button key={st.id} style={pillBtn((settings.sportType ?? 'bodybuilding') === st.id)} onClick={() => save({ sportType: st.id })}>{st.label}</button>)}</div></div>
+                    <div><span style={sectionLabel}>Стаж (лет)</span><input style={appleInput} type="number" value={(settings.trainingExperience ?? 0) || ''} onChange={e => save({ trainingExperience: parseFloat(e.target.value) || 0 })} /></div>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10 }}>
+                    <div><span style={sectionLabel}>Группа крови</span><select style={appleInput} value={settings.bloodType ?? ''} onChange={e => save({ bloodType: e.target.value })}><option value="">—</option>{BLOOD_TYPES.map(bt => <option key={bt.id} value={bt.id}>{bt.label}</option>)}</select></div>
+                    <div><span style={sectionLabel}>Аллергии</span><input style={appleInput} value={settings.allergyNotes ?? ''} onChange={e => save({ allergyNotes: e.target.value })} /></div>
+                  </div>
+                  <div style={{ marginTop:10 }}>
+                    <span style={sectionLabel}>Хронические заболевания</span>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:4 }}>{CHRONIC_CONDITIONS.map(c => { const a = (settings.chronicConditions ?? []).includes(c.id); return <button key={c.id} onClick={() => { const cur = settings.chronicConditions ?? []; save({ chronicConditions: a ? cur.filter(x => x !== c.id) : [...cur, c.id] }); }} style={pillBtn(a)}>{c.label}</button>; })}</div>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10 }}>
+                    <div><span style={sectionLabel}>Экстренный контакт</span><input style={appleInput} value={settings.emergencyName ?? ''} onChange={e => save({ emergencyName: e.target.value })} placeholder="Имя" /></div>
+                    <div><span style={sectionLabel}>Экстренный телефон</span><input style={appleInput} value={settings.emergencyPhone ?? ''} onChange={e => save({ emergencyPhone: e.target.value })} placeholder="Телефон" /></div>
                   </div>
                 </div>
-                <div style={{ background:'rgba(59,130,246,0.06)', borderRadius:10, padding:'8px 10px', textAlign:'center' }}>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>Тренд веса</div>
-                  <div style={{ fontSize:20, fontWeight:800, color:'#3b82f6' }}>{nutV2.lastTrendKgPerWeek.toFixed(2)}</div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>кг/нед</div>
+                <div style={glassCard}>
+                  <div style={sectionLabel}>Фаза курса</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>{COURSE_PHASES.map(p => <button key={p.id} style={pillBtn((settings.phase ?? 'baseline') === p.id)} onClick={() => save({ phase: p.id })}>{p.label}</button>)}</div>
+                  {settings.courseStartDate && <div style={{ marginTop:10 }}><span style={sectionLabel}>Дата начала курса</span><input style={appleInput} type="date" value={settings.courseStartDate} onChange={e => save({ courseStartDate: e.target.value })} /></div>}
+                  {!settings.courseStartDate && settings.phase && settings.phase !== 'baseline' && <button style={{ ...pillBtn(false), marginTop:10 }} onClick={() => save({ courseStartDate: new Date().toISOString().slice(0, 10) })}>Указать дату начала</button>}
                 </div>
-              </div>
-              <div style={{ marginTop:8, display:'flex', gap:6 }}>
-                <input type="number" id="v2-weight-input" placeholder="Вес, кг" style={{ flex:1, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12 }} />
-                <button onClick={() => { const inp = document.getElementById('v2-weight-input') as HTMLInputElement; if (inp?.value) { addWeightEntry(parseFloat(inp.value)); inp.value = ''; } }} style={{ padding:'8px 14px', borderRadius:8, border:'none', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:11, cursor:'pointer' }}>Записать</button>
-              </div>
-              {nutV2.weightHistory.length > 0 && (
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginTop:4, textAlign:'center' }}>
-                  {nutV2.weightHistory.length} записей, последняя: {nutV2.weightHistory[nutV2.weightHistory.length-1].kg} кг ({nutV2.weightHistory[nutV2.weightHistory.length-1].date})
-                </div>
-              )}
-            </div>
-
-            <div style={glassCard}>
-              <div style={sectionLabel}>🍬 Поведенческие режимы</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop:4 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <button onClick={() => saveNutritionV2Data({ cravingMode: !nutV2.cravingMode })} style={{
-                    padding:'5px 10px', borderRadius:8, fontSize:9, cursor:'pointer', fontWeight: nutV2.cravingMode ? 700 : 400,
-                    background: nutV2.cravingMode ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)',
-                    border: nutV2.cravingMode ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.06)',
-                    color: nutV2.cravingMode ? '#ef4444' : 'rgba(255,255,255,0.8)',
-                  }}>🍬 Хочу сладкое</button>
-                  {nutV2.cravingMode && (
-                    <select value={nutV2.cravingDays} onChange={e => saveNutritionV2Data({ cravingDays: parseInt(e.target.value) })} style={{
-                      padding:'4px 6px', borderRadius:6, fontSize:9, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff',
-                    }}>
-                      {[1,2,3,4,5,6,7].map(d => <option key={d} value={d}>{d} дн.</option>)}
-                    </select>
-                  )}
-                </div>
-                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <button onClick={() => saveNutritionV2Data({ lazyDayActive: !nutV2.lazyDayActive })} style={{
-                    padding:'5px 10px', borderRadius:8, fontSize:9, cursor:'pointer', fontWeight: nutV2.lazyDayActive ? 700 : 400,
-                    background: nutV2.lazyDayActive ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)',
-                    border: nutV2.lazyDayActive ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.06)',
-                    color: nutV2.lazyDayActive ? '#f59e0b' : 'rgba(255,255,255,0.8)',
-                  }}>🛋 Ленивый день</button>
-                  {nutV2.lazyDayActive && (
-                    <select value={nutV2.lazyDayDays} onChange={e => saveNutritionV2Data({ lazyDayDays: parseInt(e.target.value) })} style={{
-                      padding:'4px 6px', borderRadius:6, fontSize:9, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff',
-                    }}>
-                      {[1,2,3,4,5,6,7].map(d => <option key={d} value={d}>{d} дн.</option>)}
-                    </select>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {clinicalIndices && (
-              <div style={glassCard}>
-                <div style={sectionLabel}>Клинические индексы</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, textAlign:'center' }}>
-                  {[
-                    { n:'HOMA-IR', v:clinicalIndices.homaIR.value, l:clinicalIndices.homaIR.status === 'normal' ? '✓' : '!' },
-                    { n:'eGFR', v:clinicalIndices.egfr.value, l:clinicalIndices.egfr.status === 'normal' ? '✓' : '!' },
-                    { n:'LDL/HDL', v:clinicalIndices.ldlHdlRatio.value, l:clinicalIndices.ldlHdlRatio.status === 'optimal' ? '✓' : '!' },
-                    { n:'De Ritis', v:clinicalIndices.deritis.value, l:clinicalIndices.deritis.status === 'normal' ? '✓' : '!' },
-                  ].map(i => (
-                    <div key={i.n} style={{ background:'rgba(255,255,255,0.03)', borderRadius:10, padding:'10px 6px' }}>
-                      <div style={{ fontSize:18, fontWeight:700 }}>{i.v}</div>
-                      <div style={{ fontSize:10, color: apple.textDim }}>{i.n}</div>
-                      <div style={{ fontSize:10, opacity:0.6 }}>{i.l}</div>
+              </>}
+              {overTab === 'nutrition' && <>
+                <div style={glassCard}>
+                  <div style={sectionLabel}>Питание v2 (динамический TDEE)</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:4 }}>
+                    <div style={{ background:'rgba(0,230,138,0.06)', borderRadius:10, padding:'8px 10px', textAlign:'center' }}>
+                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>Текущий TDEE</div>
+                      <div style={{ fontSize:20, fontWeight:800, color:'#00e68a' }}>{Math.round(nutV2.currentTDEE)}</div>
+                      <div style={{ fontSize:9, color: nutV2.tdeeAdjustment > 50 ? '#ef4444' : nutV2.tdeeAdjustment < -50 ? '#22c55e' : 'rgba(255,255,255,0.5)' }}>{nutV2.tdeeAdjustment !== 0 ? `${nutV2.tdeeAdjustment > 0 ? '+' : ''}${Math.round(nutV2.tdeeAdjustment)} ккал корр.` : 'базовый'}</div>
                     </div>
-                  ))}
+                    <div style={{ background:'rgba(59,130,246,0.06)', borderRadius:10, padding:'8px 10px', textAlign:'center' }}>
+                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>Тренд веса</div>
+                      <div style={{ fontSize:20, fontWeight:800, color:'#3b82f6' }}>{nutV2.lastTrendKgPerWeek.toFixed(2)}</div>
+                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>кг/нед</div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop:8, display:'flex', gap:6 }}>
+                    <input type="number" id="v2-weight-input" placeholder="Вес, кг" style={{ flex:1, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12 }} />
+                    <button onClick={() => { const inp = document.getElementById('v2-weight-input') as HTMLInputElement; if (inp?.value) { addWeightEntry(parseFloat(inp.value)); inp.value = ''; } }} style={{ padding:'8px 14px', borderRadius:8, border:'none', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:11, cursor:'pointer' }}>Записать</button>
+                  </div>
+                  {nutV2.weightHistory.length > 0 && <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginTop:4, textAlign:'center' }}>{nutV2.weightHistory.length} записей</div>}
                 </div>
-              </div>
-            )}
-            </InfoErrorBoundary>
-          )}
+                <div style={glassCard}>
+                  <div style={sectionLabel}>🍬 Поведенческие режимы</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop:4 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      <button onClick={() => saveNutritionV2Data({ cravingMode: !nutV2.cravingMode })} style={{ padding:'5px 10px', borderRadius:8, fontSize:9, cursor:'pointer', fontWeight: nutV2.cravingMode ? 700 : 400, background: nutV2.cravingMode ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)', border: nutV2.cravingMode ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.06)', color: nutV2.cravingMode ? '#ef4444' : 'rgba(255,255,255,0.8)' }}>🍬 Хочу сладкое</button>
+                      {nutV2.cravingMode && <select value={nutV2.cravingDays} onChange={e => saveNutritionV2Data({ cravingDays: parseInt(e.target.value) })} style={{ padding:'4px 6px', borderRadius:6, fontSize:9, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff' }}>{[1,2,3,4,5,6,7].map(d => <option key={d} value={d}>{d} дн.</option>)}</select>}
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      <button onClick={() => saveNutritionV2Data({ lazyDayActive: !nutV2.lazyDayActive })} style={{ padding:'5px 10px', borderRadius:8, fontSize:9, cursor:'pointer', fontWeight: nutV2.lazyDayActive ? 700 : 400, background: nutV2.lazyDayActive ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)', border: nutV2.lazyDayActive ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.06)', color: nutV2.lazyDayActive ? '#f59e0b' : 'rgba(255,255,255,0.8)' }}>🛋 Ленивый день</button>
+                      {nutV2.lazyDayActive && <select value={nutV2.lazyDayDays} onChange={e => saveNutritionV2Data({ lazyDayDays: parseInt(e.target.value) })} style={{ padding:'4px 6px', borderRadius:6, fontSize:9, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff' }}>{[1,2,3,4,5,6,7].map(d => <option key={d} value={d}>{d} дн.</option>)}</select>}
+                    </div>
+                  </div>
+                </div>
+              </>}
+              {overTab === 'training' && <>
+                {readinessScores && <div style={glassCard}>
+                  <div style={{ ...sectionLabel, marginBottom:10 }}>Готовность</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, textAlign:'center' }}>
+                    {[
+                      { label:'Восст.', value:readinessScores.recovery, good:60 },
+                      { label:'Питание', value:readinessScores.nutrition, good:60 },
+                      { label:'Поддержка', value:readinessScores.support, good:60 },
+                      { label:'Усталость', value:readinessScores.fatigue, good:40, invert:true },
+                    ].map(m => (
+                      <div key={m.label} style={{ background:'rgba(255,255,255,0.02)', borderRadius:10, padding:'8px 4px' }}>
+                        <div style={{ fontSize:22, fontWeight:700, color: m.invert ? (m.value <= m.good ? '#00e68a' : m.value <= 60 ? '#f59e0b' : '#ef4444') : (m.value >= m.good ? '#00e68a' : m.value >= 40 ? '#f59e0b' : '#ef4444') }}>{m.value}</div>
+                        <div style={{ fontSize:10, color: apple.textDim }}>{m.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>}
+              </>}
+              {overTab === 'supplements' && <div style={glassCard}><div style={sectionLabel}>💊 Добавки</div><div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>Управление добавками — в разделе Бады → Каталог</div></div>}
+              {overTab === 'pharma' && <div style={glassCard}><div style={sectionLabel}>💉 Фармакология</div><div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>Управление курсом — в разделе Фармакология → Курс</div></div>}
+              {overTab === 'labs' && <>
+                {clinicalIndices && <div style={glassCard}>
+                  <div style={sectionLabel}>Клинические индексы</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, textAlign:'center' }}>
+                    {[
+                      { n:'HOMA-IR', v:clinicalIndices.homaIR.value, l:clinicalIndices.homaIR.status === 'normal' ? '✓' : '!' },
+                      { n:'eGFR', v:clinicalIndices.egfr.value, l:clinicalIndices.egfr.status === 'normal' ? '✓' : '!' },
+                      { n:'LDL/HDL', v:clinicalIndices.ldlHdlRatio.value, l:clinicalIndices.ldlHdlRatio.status === 'optimal' ? '✓' : '!' },
+                      { n:'De Ritis', v:clinicalIndices.deritis.value, l:clinicalIndices.deritis.status === 'normal' ? '✓' : '!' },
+                    ].map(i => (
+                      <div key={i.n} style={{ background:'rgba(255,255,255,0.03)', borderRadius:10, padding:'10px 6px' }}>
+                        <div style={{ fontSize:18, fontWeight:700 }}>{i.v}</div>
+                        <div style={{ fontSize:10, color: apple.textDim }}>{i.n}</div>
+                        <div style={{ fontSize:10, opacity:0.6 }}>{i.l}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>}
+                <div style={glassCard}><div style={sectionLabel}>Ввод анализов</div><div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>Ввод и отслеживание анализов — в разделе Питание → Здоровье</div></div>
+              </>}
+              {overTab === 'risks' && <div style={glassCard}><div style={sectionLabel}>⚠️ Риски</div><div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>Детальный анализ рисков — в разделе Риски</div></div>}
+            </InfoErrorBoundary>);
+          })()}
 
           {/* ═══ ANTHROPOMETRY TAB ═══ */}
           {tab === 'anthropometry' && (

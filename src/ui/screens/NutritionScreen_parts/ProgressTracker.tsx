@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { getProfile } from '../../../core/profile-manager';
 
 interface WeightEntry { date: string; weight: number; fatPct?: number; }
@@ -38,42 +38,42 @@ export const ProgressTracker: React.FC = () => {
 
   return (
     <div style={{ paddingBottom: 80 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', marginBottom: 8 }}>📈 Трекер прогресса</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', marginBottom: 8 }}>рџ“€ РўСЂРµРєРµСЂ РїСЂРѕРіСЂРµСЃСЃР°</div>
 
       {/* Input */}
       <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8 }}>
         <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
-          <input value={weightInput} onChange={e => setWeightInput(e.target.value)} type="number" step="0.1" placeholder="Вес (кг)" style={{
+          <input value={weightInput} onChange={e => setWeightInput(e.target.value)} type="number" step="0.1" placeholder="Р’РµСЃ (РєРі)" style={{
             flex: 1, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: '#202023',
             border: '1px solid rgba(255,255,255,0.06)', color: '#fff', outline: 'none',
           }} />
-          <input value={fatInput} onChange={e => setFatInput(e.target.value)} type="number" step="0.1" placeholder="%жира" style={{
+          <input value={fatInput} onChange={e => setFatInput(e.target.value)} type="number" step="0.1" placeholder="%Р¶РёСЂР°" style={{
             width: 70, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: '#202023',
             border: '1px solid rgba(255,255,255,0.06)', color: '#fff', outline: 'none',
           }} />
           <button onClick={addEntry} style={{
             padding: '6px 12px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer',
             background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#000',
-          }}>✓</button>
+          }}>вњ“</button>
         </div>
-        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>
-          {entries.length > 0 ? `Последняя запись: ${entries[entries.length - 1].date} — ${entries[entries.length - 1].weight} кг` : 'Нет записей'}
+        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>
+          {entries.length > 0 ? `РџРѕСЃР»РµРґРЅСЏСЏ Р·Р°РїРёСЃСЊ: ${entries[entries.length - 1].date} вЂ” ${entries[entries.length - 1].weight} РєРі` : 'РќРµС‚ Р·Р°РїРёСЃРµР№'}
         </div>
       </div>
 
       {/* Weight chart */}
       {entries.length > 1 && (
         <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8 }}>
-          <div style={{ fontSize: 9, fontWeight: 600, color: '#00e68a', marginBottom: 4 }}>📊 Динамика веса</div>
+          <div style={{ fontSize: 9, fontWeight: 600, color: '#00e68a', marginBottom: 4 }}>рџ“Љ Р”РёРЅР°РјРёРєР° РІРµСЃР°</div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 100, padding: '4px 0' }}>
             {entries.map((e, i) => (
               <div key={e.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                <div title={`${e.date}: ${e.weight} кг`} style={{
+                <div title={`${e.date}: ${e.weight} РєРі`} style={{
                   width: '100%', maxWidth: 30, height: `${barH(e.weight)}%`,
                   borderRadius: '4px 4px 0 0', background: e.weight > entries[Math.max(0, i - 1)].weight ? '#ef4444' : '#22c55e',
                   opacity: 0.8, transition: 'height 0.2s',
                 }} />
-                <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)', marginTop: 2, writingMode: 'vertical-lr' as any }}>{e.weight}</span>
+                <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.6)', marginTop: 2, writingMode: 'vertical-lr' as any }}>{e.weight}</span>
               </div>
             ))}
           </div>
@@ -81,17 +81,17 @@ export const ProgressTracker: React.FC = () => {
             <span>{entries[0].date.slice(5)}</span>
             <span>{entries[entries.length - 1].date.slice(5)}</span>
           </div>
-          <div style={{ marginTop: 4, display: 'flex', gap: 8, fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>
-            <span>Старт: <b>{entries[0].weight} кг</b></span>
-            <span>Текущий: <b style={{ color: entries[entries.length - 1].weight <= entries[0].weight ? '#22c55e' : '#ef4444' }}>{entries[entries.length - 1].weight} кг</b></span>
-            <span>Δ: <b style={{ color: (entries[entries.length - 1].weight - entries[0].weight) <= 0 ? '#22c55e' : '#ef4444' }}>{(entries[entries.length - 1].weight - entries[0].weight).toFixed(1)} кг</b></span>
+          <div style={{ marginTop: 4, display: 'flex', gap: 8, fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>
+            <span>РЎС‚Р°СЂС‚: <b>{entries[0].weight} РєРі</b></span>
+            <span>РўРµРєСѓС‰РёР№: <b style={{ color: entries[entries.length - 1].weight <= entries[0].weight ? '#22c55e' : '#ef4444' }}>{entries[entries.length - 1].weight} РєРі</b></span>
+            <span>О”: <b style={{ color: (entries[entries.length - 1].weight - entries[0].weight) <= 0 ? '#22c55e' : '#ef4444' }}>{(entries[entries.length - 1].weight - entries[0].weight).toFixed(1)} РєРі</b></span>
           </div>
         </div>
       )}
 
       {/* Smart metrics */}
       <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)' }}>
-        <div style={{ fontSize: 9, fontWeight: 600, color: '#8b5cf6', marginBottom: 4 }}>🎯 Умные показатели</div>
+        <div style={{ fontSize: 9, fontWeight: 600, color: '#8b5cf6', marginBottom: 4 }}>рџЋЇ РЈРјРЅС‹Рµ РїРѕРєР°Р·Р°С‚РµР»Рё</div>
         {(() => {
           try {
             const report = JSON.parse(localStorage.getItem('he_nutrition_report_current') || 'null');
@@ -108,24 +108,25 @@ export const ProgressTracker: React.FC = () => {
                   ))}
                   {report.foodQualityScore && (
                     <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, padding:'3px 6px', borderRadius:4, background:'rgba(255,255,255,0.02)' }}>
-                      <span style={{ color:'rgba(255,255,255,0.7)' }}>⭐ Качество продуктов</span>
+                      <span style={{ color:'rgba(255,255,255,0.7)' }}>в­ђ РљР°С‡РµСЃС‚РІРѕ РїСЂРѕРґСѓРєС‚РѕРІ</span>
                       <span style={{ fontWeight:600, color:'#00e68a' }}>{report.foodQualityScore.toFixed(1)}</span>
                     </div>
                   )}
                   {report.microDeficiencies?.length > 0 && (
                     <div style={{ fontSize:7, color:'#f59e0b' }}>
-                      ⚠️ Дефициты: {report.microDeficiencies.join(', ')}
+                      вљ пёЏ Р”РµС„РёС†РёС‚С‹: {report.microDeficiencies.join(', ')}
                     </div>
                   )}
                 </div>
               );
             }
           } catch {}
-          return <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', textAlign:'center', padding:8 }}>
-            Нет данных. Сгенерируйте отчёт в Планировщике питания → Отчёт
+          return <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)', textAlign:'center', padding:8 }}>
+            РќРµС‚ РґР°РЅРЅС‹С…. РЎРіРµРЅРµСЂРёСЂСѓР№С‚Рµ РѕС‚С‡С‘С‚ РІ РџР»Р°РЅРёСЂРѕРІС‰РёРєРµ РїРёС‚Р°РЅРёСЏ в†’ РћС‚С‡С‘С‚
           </div>;
         })()}
       </div>
     </div>
   );
 };
+
