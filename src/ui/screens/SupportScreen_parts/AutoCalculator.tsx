@@ -22,6 +22,7 @@ import {
 import type { ModuleResult } from '../../../engines/score-engine';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { getScoreHistory, saveScoreSnapshot, getScoreTrend } from '../../../engines/score-history';
+import ScoreDashboard from '../../components/ScoreDashboard';
 
 interface AutoCalculatorProps {
   linked: any;
@@ -156,10 +157,24 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({
     weight, age, sex,
   }), [course, weight, age, sex]);
 
-  const nutritionResult = useMemo<ModuleResult>(() => analyzeNutrition({
-    meals: [],
-    weight, age, sex, goal: profile?.settings?.goal, activityLevel: 'moderate',
-  }), [weight, age, sex]);
+  const nutritionResult = useMemo<ModuleResult>(() => {
+    // Try to load real meal data from diary
+    let meals: Array<{ foods: Array<any> }> = [];
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const diary = JSON.parse(localStorage.getItem('nutrition_diary') || '{}');
+      const dayData = diary[today];
+      if (dayData?.meals) {
+        meals = Object.values(dayData.meals).map((items: any) => ({
+          foods: (Array.isArray(items) ? items : []).map((i: any) => ({
+            id: i.name || 'unknown', name: i.name || '', grams: parseInt(i.qty) || 100,
+            protein: i.p || 0, fat: i.f || 0, carbs: i.c || 0, kcal: i.kcal || 0, fiber: 0,
+          })),
+        }));
+      }
+    } catch {}
+    return analyzeNutrition({ meals, weight, age, sex, goal: profile?.settings?.goal, activityLevel: 'moderate' });
+  }, [weight, age, sex]);
 
   const trainingResult = useMemo<ModuleResult>(() => analyzeTraining({
     workoutsPerWeek: trainingPlan?.workoutsPerWeek || profile?.settings?.workoutsPerWeek || 3,
@@ -220,17 +235,18 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({
   }, [moduleTab, supportResult_, pharmaResult, labsResult, nutritionResult, trainingResult]);
 
   const suggestedPlan = useMemo(() => moduleTab === 'support' ? getSuggestedPlan(supportResult_) : [], [moduleTab, supportResult_]);
+  const enrichedPlan = useMemo(() => fullResult.modules.support ? getSuggestedPlan(fullResult.modules.support as any) : [], [fullResult]);
 
-  const handleApply = useCallback(() => {
+  const handleApply = useCallback((plan: Array<{ id: string }>) => {
     onApply({
       level: supportLevel, boostEnabled,
       analogs: selectedAnalogs,
-      subs: suggestedPlan.map(p => p.id),
+      subs: plan.map(p => p.id),
       calcResult, supportResult,
     });
     setApplied(true);
     setTimeout(() => setApplied(false), 2000);
-  }, [onApply, supportLevel, boostEnabled, selectedAnalogs, suggestedPlan, calcResult, supportResult]);
+  }, [onApply, supportLevel, boostEnabled, selectedAnalogs, calcResult, supportResult]);
 
   const handleGenerateReport = useCallback(() => {
     let text = '';
@@ -437,41 +453,28 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({
           </div>
 
           {/* Cross-module auto-suggest plan */}
-          {fullResult.modules.support && (() => {
-            const enrichedPlan = getSuggestedPlan(fullResult.modules.support as any);
-            if (enrichedPlan.length === 0) return null;
-            return (
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 4, color: 'var(--text)' }}>💊 План поддержки (cross-module enriched)</div>
-                {enrichedPlan.map(p => (
-                  <div key={p.id} style={{ ...GLASS_CARD, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                    <span style={{ fontSize: 12 }}>💊</span>
-                    <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--text)', flex: 1 }}>{p.name}</span>
-                    <span style={{ fontSize: 8, color: 'var(--accent)' }}>{p.dose}</span>
-                    <span style={{ fontSize: 8, color: '#818cf8' }}>{p.timing}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
+          {enrichedPlan.length > 0 && (
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 4, color: 'var(--text)' }}>💊 План поддержки (cross-module enriched)</div>
+              {enrichedPlan.map(p => (
+                <div key={p.id} style={{ ...GLASS_CARD, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <span style={{ fontSize: 12 }}>💊</span>
+                  <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--text)', flex: 1 }}>{p.name}</span>
+                  <span style={{ fontSize: 8, color: 'var(--accent)' }}>{p.dose}</span>
+                  <span style={{ fontSize: 8, color: '#818cf8' }}>{p.timing}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
-          {/* Module summaries */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-            {[
-              { icon: '💊', label: 'Поддержка', risk: fullResult.modules.support?.overallRaw || 0, count: fullResult.modules.support?.systems.filter(s => s.weightedScore > 0).length || 0 },
-              { icon: '💉', label: 'Фарма', risk: fullResult.modules.pharma?.overallRaw || 0, count: fullResult.modules.pharma?.systems.filter(s => s.weightedScore > 0).length || 0 },
-              { icon: '🧪', label: 'Анализы', risk: fullResult.modules.labs?.overallRaw || 0, count: fullResult.modules.labs?.systems.filter(s => s.weightedScore > 0).length || 0 },
-              { icon: '🥗', label: 'Питание', risk: fullResult.modules.nutrition?.overallRaw || 0, count: fullResult.modules.nutrition?.systems.filter(s => s.weightedScore > 0).length || 0 },
-              { icon: '🏋️', label: 'Тренинг', risk: fullResult.modules.training?.overallRaw || 0, count: fullResult.modules.training?.systems.filter(s => s.weightedScore > 0).length || 0 },
-            ].map(m => (
-              <div key={m.label} style={{ ...GLASS_CARD, padding: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: 18 }}>{m.icon}</div>
-                <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2 }}>{m.label}</div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: m.risk >= 60 ? '#ef4444' : m.risk >= 30 ? '#fbbf24' : '#22c55e' }}>{m.risk}%</div>
-                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>{m.count} систем</div>
-              </div>
-            ))}
-          </div>
+          {/* Score Dashboard */}
+          <ScoreDashboard modules={[
+            { icon: '💊', label: 'Поддержка', risk: fullResult.modules.support?.overallRaw || 0, systemCount: fullResult.modules.support?.systems.filter(s => s.weightedScore > 0).length || 0, totalSystems: fullResult.modules.support?.systems.length || 8 },
+            { icon: '💉', label: 'Фарма', risk: fullResult.modules.pharma?.overallRaw || 0, systemCount: fullResult.modules.pharma?.systems.filter(s => s.weightedScore > 0).length || 0, totalSystems: fullResult.modules.pharma?.systems.length || 8 },
+            { icon: '🧪', label: 'Анализы', risk: fullResult.modules.labs?.overallRaw || 0, systemCount: fullResult.modules.labs?.systems.filter(s => s.weightedScore > 0).length || 0, totalSystems: fullResult.modules.labs?.systems.length || 8 },
+            { icon: '🥗', label: 'Питание', risk: fullResult.modules.nutrition?.overallRaw || 0, systemCount: fullResult.modules.nutrition?.systems.filter(s => s.weightedScore > 0).length || 0, totalSystems: fullResult.modules.nutrition?.systems.length || 8 },
+            { icon: '🏋️', label: 'Тренинг', risk: fullResult.modules.training?.overallRaw || 0, systemCount: fullResult.modules.training?.systems.filter(s => s.weightedScore > 0).length || 0, totalSystems: fullResult.modules.training?.systems.length || 6 },
+          ]} overallRisk={fullResult.overallRisk} />
 
           {/* Cross-module insights */}
           {(nutritionQuality !== undefined || trainingLoad !== undefined) && (
@@ -566,8 +569,13 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 10 }}>
         <button onClick={handleGenerateReport} style={PILL_BTN}>📋 Сгенерировать отчёт</button>
         {moduleTab === 'support' && suggestedPlan.length > 0 && (
-          <button onClick={handleApply} style={applied ? { ...PILL_BTN, background: '#22c55e', color: '#000' } : PILL_BTN}>
+          <button onClick={() => handleApply(suggestedPlan)} style={applied ? { ...PILL_BTN, background: '#22c55e', color: '#000' } : PILL_BTN}>
             {applied ? '✅ План применён' : '✅ Применить план в калькулятор'}
+          </button>
+        )}
+        {moduleTab === 'full' && enrichedPlan.length > 0 && (
+          <button onClick={() => handleApply(enrichedPlan)} style={applied ? { ...PILL_BTN, background: '#22c55e', color: '#000' } : PILL_BTN}>
+            {applied ? '✅ План применён' : '✅ Применить enriched план в калькулятор'}
           </button>
         )}
       </div>
