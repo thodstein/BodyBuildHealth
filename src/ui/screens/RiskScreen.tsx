@@ -989,10 +989,10 @@ export const RiskScreen: React.FC = () => {
               {mainTab === 'calculations' && calcPage === 'basic' && riskResult && renderBasicCalc()}
               {/* MONTE CARLO — multi-page */}
               {mainTab === 'calculations' && calcPage === 'montecarlo' && renderMonteCarlo()}
+              {/* TZ Risk Matrix — комплексные расчёты (вероятностная модель) */}
+              {mainTab === 'calculations' && calcPage === 'montecarlo' && linked.profile && <TZRiskMatrix />}
               {/* All other content */}
               {!((mainTab === 'calculations' && calcPage === 'basic') || (mainTab === 'calculations' && calcPage === 'montecarlo')) && renderContent()}
-              {/* TZ Risk Matrix — always visible when data available */}
-              {linked.profile && <TZRiskMatrix />}
             </>
           )}
       </div>

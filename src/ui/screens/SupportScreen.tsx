@@ -55,7 +55,6 @@ type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'research' | 'f
 
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { BioStackAIScreen } from '../components/BioStackAIScreen';
-import SupportScoreCard from '../components/SupportScoreCard';
 export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTab }) => {
   const linked = useDataLink();
   const [tab, setTab] = useState<SupportTab>(initialTab || 'main');
@@ -4940,29 +4939,14 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             </>)}
             </div>
 
-            {/* ==================== Score Engine: TZ Risk Overview ==================== */}
-            {course.length > 0 && (
-              <div>
-                <SupportScoreCard
-                  course={course.map((c: any) => ({
-                    substanceId: c.substanceId || c.id || '',
-                    dose: c.doseValue || c.dose || 0,
-                    unit: c.doseUnit || 'мг',
-                    weeks: c.durationWeeks || c.endWeek - c.startWeek || 0,
-                  }))}
-                  weight={weightKg} age={age} sex={sex}
-                />
-              </div>
-            )}
+            {/* ==================== Score Engine: TZ Risk Overview — REMOVED, using TZ engine ==================== */}
 
-            {/* ==================== 2b: АНАЛИЗ АНАЛИЗОВ ==================== */}
+            {/* ==================== 2b: АНАЛИЗЫ — всегда видимая карточка ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-              <div onClick={() => setExpandedCategories(p => ({ ...p, calc_labs: !(p.calc_labs ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_labs ?? true) ? 8 : 0 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
                 <span style={{ fontSize:13 }}>🧪</span>
                 <span style={{ flex:1, fontSize:12, fontWeight:700, color:'#60a5fa' }}>Анализы — требуется поддержка</span>
-                <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_labs ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
               </div>
-              {(expandedCategories.calc_labs ?? true) && (<>
               {labs.length === 0 ? (
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Нет анализов. <span style={{ color:'#60a5fa', cursor:'pointer', textDecoration:'underline' }} onClick={goHome}>Добавьте анализы</span> для персональных рекомендаций.</p>
               ) : (() => {
@@ -4987,7 +4971,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   </div>
                 );
               })()}
-            </>)}
             </div>
 
             {/* ==================== 2c: РИСКИ ПО СИСТЕМАМ ==================== */}
@@ -5120,9 +5103,27 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
               </div>
               {(expandedCategories.calc_intel ?? true) && (<>
-               <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 10px', lineHeight:1.5 }}>
-                Анализ: <b style={{ color:'var(--accent)' }}>{uniqCourse.length}</b> препаратов · <b style={{ color:'#60a5fa' }}>{labs.length}</b> анализов · <b style={{ color:'#f59e0b' }}>{Object.keys(riskData?.systemBreakdown || {}).length}</b> систем рисков · <b style={{ color:'#a78bfa' }}>{weightKg}</b>кг {age}лет {sex === 'male' ? '♂' : '♀'}
-              </p>
+                {/* Week slider for risk accumulation */}
+                <div style={{ background:'rgba(0,0,0,0.12)', borderRadius:8, padding:'8px 12px', marginBottom:8 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:3 }}>
+                    <span style={{ fontSize:9, fontWeight:600, color:'var(--text-dim)' }}>📅 Неделя курса</span>
+                    <span style={{ fontSize:11, fontWeight:800, color:'var(--accent)' }}>{courseWeekState}</span>
+                  </div>
+                  <input type="range" min={1} max={Math.max(2, ...((linked.course || []).map(c => (c.endWeek || 12) - (c.startWeek || 0))), 12)} value={courseWeekState}
+                    onChange={e => { setCourseWeekState(parseInt(e.target.value)); }}
+                    style={{ width:'100%', height:4, accentColor:'var(--accent)', cursor:'pointer', marginBottom:2 }} />
+                  <div style={{ fontSize:7, color:'var(--text-dim)', display:'flex', justifyContent:'space-between' }}>
+                    <span>Начало</span><span>Пик нагрузки</span><span>Конец курса</span>
+                  </div>
+                </div>
+
+                {/* Note about missing data */}
+                {(!linked.labs || linked.labs.length === 0) && (
+                  <div style={{ fontSize:8, color:'#f59e0b', marginBottom:8, padding:'4px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.1)' }}>
+                    ⚠️ Нет данных анализов — риск рассчитан консервативно. Добавьте анализы для точного расчёта.
+                  </div>
+                )}
+
               <div style={{ display:'flex', gap:6, marginBottom:6 }}>
                 <button onClick={() => setShowModal('intel')} style={{
                   flex:1, padding:'12px', borderRadius:10, border:'none', cursor:'pointer',

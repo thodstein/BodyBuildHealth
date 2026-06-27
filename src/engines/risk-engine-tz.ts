@@ -21,6 +21,7 @@ import {
 import type { CourseEntry, LabPoint } from '../core/types';
 import { PHARMA_DB } from '../core/pharma-database';
 import { PD_SYSTEM_MAP } from '../core/risk-shared';
+import { SUPPORT_COVERAGE_MAP } from '../data/support-coverage-map';
 
 // ─── Types ───
 
@@ -84,14 +85,17 @@ export interface TZRiskResult {
 
 // ─── Base Risk Values per System per Mechanism ───
 
+// ─── Base Risk Values per System per Mechanism ───
+// Calibrated to produce 70-90% raw risk for typical AAS cycles
+
 const BASE_RISK: Record<string, Record<number, number>> = {
-  cardio: { 1: 0.08, 2: 0.06, 3: 0.04, 4: 0.05, 5: 0.04, 6: 0.03, 7: 0.05 },
-  hepatic: { 1: 0.07, 2: 0.08, 3: 0.06, 4: 0.04, 5: 0.03, 6: 0.05, 7: 0.06 },
-  renal: { 1: 0.05, 2: 0.04, 3: 0.05, 4: 0.04, 5: 0.03, 6: 0.02, 7: 0.04 },
-  neuro: { 1: 0.06, 2: 0.05, 3: 0.05, 4: 0.04, 5: 0.04, 6: 0.03, 7: 0.05 },
-  endocrine: { 1: 0.09, 2: 0.07, 3: 0.05, 4: 0.04, 5: 0.03, 6: 0.04, 7: 0.05 },
-  hematologic: { 1: 0.07, 2: 0.05, 3: 0.03, 4: 0.05, 5: 0.03, 6: 0.04, 7: 0.03 },
-  reproductive: { 1: 0.08, 2: 0.07, 3: 0.05, 4: 0.04, 5: 0.04, 6: 0.03, 7: 0.05 },
+  cardio: { 1: 0.25, 2: 0.20, 3: 0.15, 4: 0.18, 5: 0.15, 6: 0.12, 7: 0.18 },
+  hepatic: { 1: 0.22, 2: 0.25, 3: 0.18, 4: 0.15, 5: 0.12, 6: 0.18, 7: 0.20 },
+  renal: { 1: 0.18, 2: 0.15, 3: 0.16, 4: 0.12, 5: 0.10, 6: 0.08, 7: 0.15 },
+  neuro: { 1: 0.20, 2: 0.16, 3: 0.16, 4: 0.14, 5: 0.14, 6: 0.10, 7: 0.16 },
+  endocrine: { 1: 0.30, 2: 0.22, 3: 0.16, 4: 0.14, 5: 0.10, 6: 0.14, 7: 0.16 },
+  hematologic: { 1: 0.22, 2: 0.16, 3: 0.10, 4: 0.16, 5: 0.10, 6: 0.14, 7: 0.10 },
+  reproductive: { 1: 0.25, 2: 0.22, 3: 0.16, 4: 0.14, 5: 0.14, 6: 0.10, 7: 0.16 },
 };
 
 // Mechanism weights for geometric mean
@@ -340,23 +344,43 @@ function ensureSupportReductions(): Record<string, Record<string, Record<number,
 }
 
 function computeSupportFactor(supportIds: string[], system: string, mechIdx: number): number {
-  const reductions = ensureSupportReductions();
   let factor = 1.0;
+  const SUBSYS_PARENT: Record<string, string> = {
+    vessels: 'cardio', metabolic: 'endocrine', ghigf: 'endocrine', ins_axis: 'endocrine',
+    neuro_toxicity: 'neuro', blood: 'hematologic',
+  };
+
   for (const id of supportIds) {
-    const lowerId = id.toLowerCase();
-    // Try multiple key variants
-    const keys = [id, lowerId, id.toUpperCase(), id.replace(/_/g, '').toLowerCase()];
+    let found = false;
+    const keys = [id, id.toLowerCase(), id.replace(/_/g, '').toLowerCase()];
+
+    // 1. Exact match in comprehensive coverage map
     for (const key of keys) {
-      const reds = reductions[key];
-      if (!reds) continue;
-      const sysReds = reds[system];
-      if (!sysReds) continue;
-      const reduction = sysReds[mechIdx];
-      if (reduction !== undefined) {
-        factor *= (1 - Math.abs(reduction));
-        break;
+      const cov = SUPPORT_COVERAGE_MAP[key];
+      if (!cov) continue;
+      const sysCov = cov[system];
+      if (!sysCov) continue;
+      const reduction = sysCov[mechIdx];
+      if (reduction !== undefined) { factor *= (1 - Math.abs(reduction)); found = true; break; }
+    }
+    if (found) continue;
+
+    // 2. Subsystem parent fallback
+    const parent = SUBSYS_PARENT[system];
+    if (parent) {
+      for (const key of keys) {
+        const cov = SUPPORT_COVERAGE_MAP[key];
+        if (!cov) continue;
+        const pCov = cov[parent];
+        if (!pCov) continue;
+        const reduction = pCov[mechIdx];
+        if (reduction !== undefined) { factor *= (1 - Math.abs(reduction) * 0.6); found = true; break; }
       }
     }
+    if (found) continue;
+
+    // 3. Tiny default
+    factor *= 0.97;
   }
   return Math.max(0.1, factor);
 }
