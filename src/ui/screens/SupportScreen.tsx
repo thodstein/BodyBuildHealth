@@ -185,6 +185,24 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [synergyPage, setSynergyPage] = useState<number>(1);
   const [synergySearch, setSynergySearch] = useState('');
   const [synergyCountFilter, setSynergyCountFilter] = useState<number>(0);
+  const [stkFilterSystem, setStkFilterSystem] = useState('all');
+  const [stkFilterQty, setStkFilterQty] = useState('all');
+  const [stkFilterScore, setStkFilterScore] = useState('all');
+  const filteredStacks = useMemo(() => ALL_STACKS.filter(stk => {
+    if (stkFilterSystem !== 'all' && !(stk.system||'').includes(stkFilterSystem)) return false;
+    if (stkFilterQty !== 'all') {
+      if (stkFilterQty === '1-3' && (stk.substances.length < 1 || stk.substances.length > 3)) return false;
+      if (stkFilterQty === '4-6' && (stk.substances.length < 4 || stk.substances.length > 6)) return false;
+      if (stkFilterQty === '7+' && stk.substances.length < 7) return false;
+    }
+    if (stkFilterScore !== 'all') {
+      if (stkFilterScore === '70-79' && (stk.synergyScore < 70 || stk.synergyScore > 79)) return false;
+      if (stkFilterScore === '80-89' && (stk.synergyScore < 80 || stk.synergyScore > 89)) return false;
+      if (stkFilterScore === '90-100' && (stk.synergyScore < 90 || stk.synergyScore > 100)) return false;
+    }
+    return true;
+  }), [stkFilterSystem, stkFilterQty, stkFilterScore]);
+  const stackSystems = useMemo(() => [...new Set(ALL_STACKS.map(s => s.system).filter(Boolean))].sort(), []);
   const [interactSearch2, setInteractSearch2] = useState('');
   const [interactTypeFilter, setInteractTypeFilter] = useState<string>('all');
   const [synergyOrganFilter, setSynergyOrganFilter] = useState<string>('');
@@ -2138,7 +2156,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || calcView === 'peptides' || section === 'generator' || section === 'protocols' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'protocols' ? '35px' : section === 'generator' ? '55px' : section === 'info' || calcView === 'info' || calcView === 'peptides' ? '55px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (with back/home) ===== */}
       {section === 'generator' && (
@@ -2412,9 +2430,20 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     })}
                   </div>
                 )}
-                  {catalogSubTab === 'stack' && (
+                   {catalogSubTab === 'stack' && (
                     <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                      {ALL_STACKS.map(stk => {
+                      <div style={{ display:'flex', gap:3, flexWrap:'wrap', padding:'4px 0', overflowX:'auto', scrollbarWidth:'none' }}>
+                        <select value={stkFilterSystem} onChange={e => setStkFilterSystem(e.target.value)} style={{ padding:'4px 8px', borderRadius:10, fontSize:7, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.7)', outline:'none', maxWidth:100 }}>
+                          <option value="all">🫀 Все системы</option>
+                          {stackSystems.map(sys => <option key={sys} value={sys}>{sys}</option>)}
+                        </select>
+                        <button onClick={() => setStkFilterQty(stkFilterQty === 'all' ? '1-3' : 'all')} style={{ padding:'4px 8px', borderRadius:10, fontSize:7, fontWeight: stkFilterQty !== 'all' ? 700 : 400, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0, background: stkFilterQty !== 'all' ? '#00e68a18' : '#202023', border: stkFilterQty !== 'all' ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', color: stkFilterQty !== 'all' ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>
+                          🧪 {stkFilterQty === 'all' ? 'Любое кол-во' : stkFilterQty}</button>
+                        <button onClick={() => setStkFilterScore(stkFilterScore === 'all' ? '80-89' : 'all')} style={{ padding:'4px 8px', borderRadius:10, fontSize:7, fontWeight: stkFilterScore !== 'all' ? 700 : 400, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0, background: stkFilterScore !== 'all' ? '#8b5cf618' : '#202023', border: stkFilterScore !== 'all' ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.06)', color: stkFilterScore !== 'all' ? '#8b5cf6' : 'rgba(255,255,255,0.6)' }}>
+                          ⭐ {stkFilterScore === 'all' ? 'Любой рейтинг' : stkFilterScore}</button>
+                        <span style={{ fontSize:7, color:'rgba(255,255,255,0.4)', alignSelf:'center' }}>{filteredStacks.length} из {ALL_STACKS.length}</span>
+                      </div>
+                      {filteredStacks.map(stk => {
                         const isExp = stackExpanded === stk.id;
                         return (
                         <div key={stk.id} style={{ borderRadius:12, background:'var(--bg-secondary)', border:'1px solid var(--border)', overflow:'hidden' }}>
@@ -3882,7 +3911,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       </InfoErrorBoundary>)}
 
       {section === 'protocols' && (
-        <div style={{ padding:'0 12px 12px' }}>
+        <div style={{ padding:'0 0 12px' }}>
           {/* Warning card — важные замечания */}
           <div style={{ borderRadius:12, padding:14, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)', marginBottom:8 }}>
             <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#f59e0b' }}>⚠️ Важные замечания</h3>
@@ -4289,7 +4318,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         <div style={{ paddingBottom: 16 }}>
 
       {/* ===== CATALOG ===== */}
-      {(section === 'home' || section === 'info') && tab === 'catalog' && (<InfoErrorBoundary label="Каталог">
+      {(section === 'home' || section === 'info') && tab === 'catalog' && catalogSubTab !== 'stack' && (<InfoErrorBoundary label="Каталог">
         <div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>
             <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />

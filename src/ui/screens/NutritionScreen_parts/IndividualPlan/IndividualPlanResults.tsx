@@ -1462,13 +1462,14 @@ export const IndividualPlanResults: React.FC = () => {
       )}
 
       {showCalcPopup && (
-        <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
+        <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', background:'rgba(0,0,0,0.9)' }}
           onClick={() => { setShowCalcPopup(false); setCalcResults(null); setCalcDailyReport(null); }}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'96%', maxWidth:440, maxHeight:'92vh', overflowY:'auto', padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(0,230,138,0.12)', boxShadow:'0 8px 40px rgba(0,0,0,0.4)' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#18181b', display:'flex', flexDirection:'column' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 12px 0' }}>
               <div style={{ fontSize:15, fontWeight:800, color:'#00e68a' }}>🧬 Калькулятор полезности</div>
               <span onClick={() => { setShowCalcPopup(false); setCalcResults(null); setCalcDailyReport(null); }} style={{ cursor:'pointer', fontSize:10, color:'rgba(255,255,255,0.3)', padding:'2px 6px' }}>✕</span>
             </div>
+            <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'0 12px 80px' }}>
 
             {/* Tabs */}
             <div style={{ display:'flex', gap:4, marginBottom:10 }}>
@@ -1607,6 +1608,15 @@ export const IndividualPlanResults: React.FC = () => {
                           <div style={{ fontSize:8, fontWeight:700, color: r.diaas.diaas >= 1 ? '#22c55e' : r.diaas.diaas >= 0.75 ? '#f59e0b' : '#ef4444' }}>{r.diaas.diaas.toFixed(2)}</div>
                         </div>
                       </div>
+                      {/* Quality breakdown */}
+                      <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:2 }}>
+                        <span style={{ fontSize:6, color:'rgba(255,255,255,0.3)' }}>⭐ Качество: {sc.compositeScore.toFixed(1)}</span>
+                        {sc.productScores.slice(0,3).map((p,pi) => (
+                          <span key={pi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background: p.score >= 7 ? 'rgba(0,230,138,0.08)' : p.score >= 4 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', color: p.score >= 7 ? '#22c55e' : p.score >= 4 ? '#f59e0b' : '#ef4444' }}>
+                            {p.name} ({p.score.toFixed(1)})
+                          </span>
+                        ))}
+                      </div>
                       {/* Modifiers */}
                       {sc.modifiers.length > 0 && (
                         <div style={{ marginTop:4 }}>
@@ -1697,6 +1707,7 @@ export const IndividualPlanResults: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
         </div>
       )}
 

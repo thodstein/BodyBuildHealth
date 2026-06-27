@@ -35,7 +35,7 @@ const addToCart = (id: string, name: string, dose: string) => {
 };
 
 const s: Record<string, React.CSSProperties> = {
-  card: { background: 'rgba(24,24,27,0.15)', borderRadius: 14, padding: 20, marginBottom: 12, border: '1px solid rgba(255,255,255,0.04)' },
+  card: { background: 'rgba(24,24,27,0.15)', borderRadius: 14, padding: 12, marginBottom: 8, border: '1px solid rgba(255,255,255,0.04)' },
   row: { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 },
   label: { fontSize: 11, fontWeight: 700, opacity: 0.75, marginBottom: 4, letterSpacing: '0.2px', color: 'rgba(255,255,255,0.85)' },
   input: { width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.2)', color: '#fff', fontSize: 15, boxSizing: 'border-box' as const, outline: 'none', transition: 'border 0.2s' },
@@ -550,64 +550,6 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
 
 
 
-
-      {tab === 'pct-plan' && pctPlan && (
-        <div className="card" style={{ marginBottom: 12 }}>
-          <div style={{ textAlign: 'center', padding: '8px 0' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>⏳ Таймер ПКТ</div>
-            {(() => {
-              const minWeek = pctCourse.length > 0 ? Math.min(...pctCourse.map(e => e.startWeek)) : 0;
-              const maxWeek = pctCourse.length > 0 ? Math.max(...pctCourse.map(e => e.endWeek)) : 0;
-              const pctWeek = pctPlan.pctStartWeek;
-              const totalCourseWeeks = maxWeek - minWeek;
-              // Calculate real-time week based on course start date from profile
-              let realWeek = 0;
-              let courseStartStr = '';
-              try {
-                const { getProfile } = require('../../core/profile-manager');
-                const prof = getProfile();
-                courseStartStr = prof?.settings?.courseStartDate || '';
-                if (courseStartStr) {
-                  const start = new Date(courseStartStr).getTime();
-                  const now = Date.now();
-                  const daysSinceStart = (now - start) / 86400000;
-                  realWeek = Math.max(1, Math.floor(daysSinceStart / 7) + 1);
-                }
-              } catch {}
-              const displayWeek = realWeek > 0 ? realWeek : pctWeek;
-              const weeksUntilPct = Math.max(0, pctWeek - displayWeek);
-              const pctStarted = displayWeek >= pctWeek;
-              const pctWeeksIn = pctStarted ? Math.max(1, displayWeek - pctWeek + 1) : 0;
-              const totalPctWeeks = pctPlan.pctProtocol.reduce((max: number, p: any) => Math.max(max, p.endWeek || 0), 0) - pctWeek + 1;
-              return (
-                <div>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: pctStarted ? '#22c55e' : '#ec4899' }}>
-                    {pctStarted ? `ПКТ: нед ${pctWeeksIn}` : `Неделя ${displayWeek}`}
-                  </div>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-                    {pctStarted
-                      ? `Прогресс ПКТ: ${pctWeeksIn} из ${totalPctWeeks} нед`
-                      : `Старт ПКТ через ${weeksUntilPct} нед (всего курс: ${totalCourseWeeks} нед)`
-                    }
-                  </div>
-                  <div style={{ marginTop: 8, height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden', maxWidth: 240, marginLeft: 'auto', marginRight: 'auto' }}>
-                    {pctStarted ? (
-                      <div style={{ height: '100%', borderRadius: 3, width: `${Math.min(100, (pctWeeksIn / totalPctWeeks) * 100)}%`, background: 'linear-gradient(90deg, #22c55e, #8b5cf6)', transition: 'width 0.5s' }} />
-                    ) : (
-                      <div style={{ height: '100%', borderRadius: 3, width: `${Math.min(100, (displayWeek / (totalCourseWeeks + 12)) * 100)}%`, background: 'linear-gradient(90deg, #ec4899, #8b5cf6)', transition: 'width 0.5s' }} />
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 6, fontSize: 10, color: 'var(--text-dim)' }}>
-                    <span>Курс: нед {minWeek}-{maxWeek}</span>
-                    <span>ПКТ: нед {pctWeek}+</span>
-                    {courseStartStr && <span style={{fontSize:8,color:'var(--text-dim)'}}>Старт: {courseStartStr}</span>}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      )}
 
       {tab === 'pct-plan' && (
         <div>
