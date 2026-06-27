@@ -17,6 +17,7 @@ import { WeeklyRiskChart } from './RiskScreen_parts/WeeklyRiskChart';
 import { RiskInfo } from './RiskScreen_parts/RiskInfo';
 import { runMDSS, type MDSSInput, type MDSSOutput, type BiomarkerInput } from '../../engines/mdss-engine';
 const Risk3DModel = React.lazy(() => import('./RiskScreen_parts/Risk3DModel').then(m => ({ default: m.Risk3DModel })));
+import { TZRiskMatrix } from './RiskScreen_parts/TZRiskMatrix';
 import { calculateWeeklyRiskDynamics, type WeeklyRiskDynamics } from '../../engines/weekly-risk-dynamics.engine';
 import { useV7Risk } from '../hooks/useV7Risk';
 import { getProfile, updateProfile } from '../../core/profile-manager';
@@ -969,9 +970,11 @@ export const RiskScreen: React.FC = () => {
               {mainTab === 'calculations' && calcPage === 'montecarlo' && renderMonteCarlo()}
               {/* All other content */}
               {!((mainTab === 'calculations' && calcPage === 'basic') || (mainTab === 'calculations' && calcPage === 'montecarlo')) && renderContent()}
+              {/* TZ Risk Matrix — always visible when data available */}
+              {linked.profile && <TZRiskMatrix />}
             </>
           )}
-          </div>
+      </div>
         </div>
       )}
     </div>

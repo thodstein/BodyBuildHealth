@@ -188,7 +188,6 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply }) => {
     return { ...DEFAULT_STATE, ...h, profile: { ...DEFAULT_STATE.profile, ...(h.profile || {}) }, pharma: { ...DEFAULT_STATE.pharma, ...(h.pharma || {}) }, labs: { ...DEFAULT_STATE.labs, ...(h.labs || {}) } };
   });
   const [tab, setTab] = useState<'cards'|'labs'|'risk'|'schedule'>('cards');
-  const [applied, setApplied] = useState(false);
   const [copied, setCopied] = useState(false);
   const [aasEditor, setAasEditor] = useState({ id: 'test_enan', doseMgWeek: 500, weeks: 12 });
   const [negSubId, setNegSubId] = useState('');
@@ -213,17 +212,6 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply }) => {
   const uGI = (v: Partial<CalculatorState['gi']>) => setState(s => ({ ...s, gi: { ...s.gi, ...v } }));
   const uPsych = (v: Partial<CalculatorState['psych']>) => setState(s => ({ ...s, psych: { ...s.psych, ...v } }));
   const uInj = (v: Partial<CalculatorState['injection']>) => setState(s => ({ ...s, injection: { ...s.injection, ...v } }));
-
-  const handleApply = () => {
-    onApply({ level: state.powerLevel, subs: result.selectedSubstances, result });
-    try {
-      const plan = { date: new Date().toISOString(), state, result, level: state.powerLevel, subs: result.selectedSubstances };
-      localStorage.setItem('he_support_plan_current', JSON.stringify(plan));
-      const key = `supportPlan_${new Date().toISOString().slice(0, 10)}`;
-      localStorage.setItem(key, JSON.stringify(plan));
-    } catch {}
-    setApplied(true); setTimeout(() => setApplied(false), 2000);
-  };
 
   const handleCopy = useCallback(() => {
     const lines = [
@@ -719,11 +707,6 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply }) => {
         </div>
       </div>}
 
-      <div style={{ marginTop: 10 }}>
-        <button onClick={handleApply} style={{ ...PILL, width: '100%', padding: '8px 0', fontSize: 12, background: applied ? '#22c55e' : 'var(--accent)', color: '#000' }}>
-          {applied ? '✅ План сохранён' : '✅ Применить план поддержки'}
-        </button>
-      </div>
       {copied && <div style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)', background: 'var(--bg-primary)', border: '1px solid var(--accent)', borderRadius: 12, padding: '8px 16px', fontSize: 10, color: 'var(--accent)', zIndex: 999 }}>📋 Отчёт скопирован</div>}
     </div>
   );

@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 const LABS: { id: string; label: string; unit: string; refLow: number; refHigh: number }[] = [
   { id: 'hematocrit', label: 'Р“РµРјР°С‚РѕРєСЂРёС‚ (HCT)', unit: '%', refLow: 40, refHigh: 49 },
   { id: 'hemoglobin', label: 'Р“РµРјРѕРіР»РѕР±РёРЅ', unit: 'Рі/Р»', refLow: 130, refHigh: 160 },
-  { id: 'hdl', label: 'Р›РџР’Рџ', unit: 'РјРјРѕР»СЊ/Р»', refLow: 1.0, refHigh: 2.0 },
-  { id: 'ldl', label: 'Р›РџРќРџ', unit: 'РјРјРѕР»СЊ/Р»', refLow: 0, refHigh: 3.0 },
+  { id: 'hdl', label: 'ЛПВП', unit: 'ммоль/л', refLow: 1.0, refHigh: 2.0 },
+  { id: 'ldl', label: 'ЛПНП', unit: 'ммоль/л', refLow: 0, refHigh: 3.0 },
   { id: 'alt', label: 'РђР›Рў', unit: 'Р•Рґ/Р»', refLow: 0, refHigh: 45 },
   { id: 'ast', label: 'РђРЎРў', unit: 'Р•Рґ/Р»', refLow: 0, refHigh: 35 },
   { id: 'crp', label: 'РЎР Р‘', unit: 'РјРі/Р»', refLow: 0, refHigh: 1.0 },
@@ -12,25 +12,25 @@ const LABS: { id: string; label: string; unit: string; refLow: number; refHigh: 
 ];
 
 const HEALTH_ISSUES: { id: string; icon: string; label: string; desc: string; foodIds: string[] }[] = [
-  { id: 'oedema', icon: 'рџ¦¶', label: 'РћС‚С‘РєРё', desc: 'Р—Р°РґРµСЂР¶РєР° Р¶РёРґРєРѕСЃС‚Рё вЂ” СЃРЅРёР·РёС‚СЊ РЅР°С‚СЂРёР№, РґРѕР±Р°РІРёС‚СЊ РєР°Р»РёР№', foodIds: ['salt', 'soy_sauce', 'sausages', 'kfc_wings', 'canned_food', 'cheese', 'bread_white', 'pickles'] },
-  { id: 'lactose_intolerance', icon: 'рџҐ›', label: 'РќРµРїРµСЂРµРЅРѕСЃРёРјРѕСЃС‚СЊ Р»Р°РєС‚РѕР·С‹', desc: 'Р”РµС„РёС†РёС‚ Р»Р°РєС‚Р°Р·С‹ вЂ” РёСЃРєР»СЋС‡РёС‚СЊ РјРѕР»РѕС‡РЅС‹Рµ РїСЂРѕРґСѓРєС‚С‹', foodIds: ['milk', 'cheese', 'yogurt', 'cream', 'ice_cream', 'whey', 'cottage_cheese', 'kefir'] },
-  { id: 'gluten_intolerance', icon: 'рџЊѕ', label: 'РќРµРїРµСЂРµРЅРѕСЃРёРјРѕСЃС‚СЊ РіР»СЋС‚РµРЅР°', desc: 'Р¦РµР»РёР°РєРёСЏ/С‡СѓРІСЃС‚РІРёС‚РµР»СЊРЅРѕСЃС‚СЊ вЂ” РёСЃРєР»СЋС‡РёС‚СЊ РїС€РµРЅРёС†Сѓ, СЂРѕР¶СЊ, СЏС‡РјРµРЅСЊ', foodIds: ['bread_white', 'bread_rye', 'pasta', 'cookies', 'pizza', 'couscous', 'barley', 'bulgur'] },
-  { id: 'diabetes', icon: 'рџЌ¬', label: 'Р”РёР°Р±РµС‚/РРЅСЃСѓР»РёРЅРѕСЂРµР·РёСЃС‚РµРЅС‚РЅРѕСЃС‚СЊ', desc: 'РљРѕРЅС‚СЂРѕР»СЊ РіР»РёРєРµРјРёРё вЂ” РЅРёР·РєРёРµ GI, РєР»РµС‚С‡Р°С‚РєР°, Р±РµР»РѕРє', foodIds: ['sugar', 'honey', 'rice_white', 'bread_white', 'pasta', 'potato', 'juice_pack', 'chocolate_milk'] },
-  { id: 'hypertension', icon: 'рџ’“', label: 'Р“РёРїРµСЂС‚РѕРЅРёСЏ', desc: 'Р’С‹СЃРѕРєРѕРµ РђР” вЂ” СЃРЅРёР·РёС‚СЊ РЅР°С‚СЂРёР№, РґРѕР±Р°РІРёС‚СЊ K/Mg', foodIds: ['salt', 'soy_sauce', 'sausages', 'kfc_wings', 'canned_food', 'cheese', 'chips', 'pickles'] },
-  { id: 'gi_issues', icon: 'рџ«ѓ', label: 'РџСЂРѕР±Р»РµРјС‹ Р–РљРў', desc: 'Р“Р°СЃС‚СЂРёС‚/РЎР Рљ вЂ” С‚РµСЂРјРёС‡РµСЃРєР°СЏ РѕР±СЂР°Р±РѕС‚РєР°, РёСЃРєР»СЋС‡РёС‚СЊ СЂР°Р·РґСЂР°Р¶Р°СЋС‰РµРµ', foodIds: ['beans', 'lentils', 'cabbage', 'broccoli', 'milk', 'spicy', 'fried', 'coffee'] },
-  { id: 'gout', icon: 'рџ¦¶', label: 'РџРѕРґР°РіСЂР°', desc: 'Р’С‹СЃРѕРєР°СЏ РјРѕС‡РµРІР°СЏ РєРёСЃР»РѕС‚Р° вЂ” РѕРіСЂР°РЅРёС‡РёС‚СЊ РїСѓСЂРёРЅС‹', foodIds: ['liver', 'red_meat', 'sardines', 'beer', 'shrimps', 'mussels', 'tuna', 'mushrooms'] },
-  { id: 'kidney_stones', icon: 'рџЄЁ', label: 'РљР°РјРЅРё РІ РїРѕС‡РєР°С…', desc: 'РћРєСЃР°Р»Р°С‚С‹/РєР°Р»СЊС†РёР№ вЂ” РѕРіСЂР°РЅРёС‡РёС‚СЊ РѕРєСЃР°Р»Р°С‚С‹, РјРЅРѕРіРѕ РІРѕРґС‹', foodIds: ['spinach', 'beet', 'nuts', 'chocolate', 'rhubarb', 'sweet_potato', 'swiss_chard', 'okra'] },
+  { id: 'oedema', icon: '🦶', label: 'Отёки', desc: 'Задержка жидкости — снизить натрий, добавить калий', foodIds: ['salt', 'soy_sauce', 'sausages', 'kfc_wings', 'canned_food', 'cheese', 'bread_white', 'pickles'] },
+  { id: 'lactose_intolerance', icon: '🥛', label: 'Непереносимость лактозы', desc: 'Дефицит лактазы — исключить молочные продукты', foodIds: ['milk', 'cheese', 'yogurt', 'cream', 'ice_cream', 'whey', 'cottage_cheese', 'kefir'] },
+  { id: 'gluten_intolerance', icon: '🌾', label: 'Непереносимость глютена', desc: 'Целиакия/чувствительность — исключить пшеницу, рожь, ячмень', foodIds: ['bread_white', 'bread_rye', 'pasta', 'cookies', 'pizza', 'couscous', 'barley', 'bulgur'] },
+  { id: 'diabetes', icon: '🍬', label: 'Диабет/�?нсулинорезистентность', desc: 'Контроль гликемии — низкие GI, клетчатка, белок', foodIds: ['sugar', 'honey', 'rice_white', 'bread_white', 'pasta', 'potato', 'juice_pack', 'chocolate_milk'] },
+  { id: 'hypertension', icon: '💓', label: 'Гипертония', desc: 'Высокое АД — снизить натрий, добавить K/Mg', foodIds: ['salt', 'soy_sauce', 'sausages', 'kfc_wings', 'canned_food', 'cheese', 'chips', 'pickles'] },
+  { id: 'gi_issues', icon: '🫃', label: 'Проблемы ЖКТ', desc: 'Гастрит/СРК — термическая обработка, исключить раздражающее', foodIds: ['beans', 'lentils', 'cabbage', 'broccoli', 'milk', 'spicy', 'fried', 'coffee'] },
+  { id: 'gout', icon: '🦶', label: 'Подагра', desc: 'Высокая мочевая кислота — ограничить пурины', foodIds: ['liver', 'red_meat', 'sardines', 'beer', 'shrimps', 'mussels', 'tuna', 'mushrooms'] },
+  { id: 'kidney_stones', icon: '🪨', label: 'Камни в почках', desc: 'Оксалаты/кальций — ограничить оксалаты, много воды', foodIds: ['spinach', 'beet', 'nuts', 'chocolate', 'rhubarb', 'sweet_potato', 'swiss_chard', 'okra'] },
 ];
 
 const ALLERGEN_LIST: { id: string; icon: string; label: string }[] = [
-  { id: 'lactose', icon: 'рџҐ›', label: 'Р›Р°РєС‚РѕР·Р°' },
-  { id: 'gluten', icon: 'рџЊѕ', label: 'Р“Р»СЋС‚РµРЅ' },
-  { id: 'nuts', icon: 'рџҐњ', label: 'РћСЂРµС…Рё' },
-  { id: 'eggs', icon: 'рџҐљ', label: 'РЇР№С†Р°' },
-  { id: 'soy', icon: 'рџ«', label: 'РЎРѕСЏ' },
-  { id: 'seafood', icon: 'рџ¦ђ', label: 'РњРѕСЂРµРїСЂРѕРґСѓРєС‚С‹' },
-  { id: 'histamine', icon: 'рџ§Є', label: 'Р“РёСЃС‚Р°РјРёРЅ' },
-  { id: 'sulfites', icon: 'рџ§ґ', label: 'РЎСѓР»СЊС„РёС‚С‹' },
+  { id: 'lactose', icon: '🥛', label: 'Лактоза' },
+  { id: 'gluten', icon: '🌾', label: 'Глютен' },
+  { id: 'nuts', icon: '🥜', label: 'Орехи' },
+  { id: 'eggs', icon: '🥚', label: 'Яйца' },
+  { id: 'soy', icon: '�?', label: 'Соя' },
+  { id: 'seafood', icon: '🦐', label: 'Морепродукты' },
+  { id: 'histamine', icon: '🧪', label: 'Гистамин' },
+  { id: 'sulfites', icon: '🧴', label: 'Сульфиты' },
 ];
 
 const cardBg: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)' };
@@ -85,21 +85,21 @@ export const HealthAnalytics: React.FC = () => {
     const w: string[] = [];
     const hct = val('hematocrit');
     const hb = val('hemoglobin');
-    if (hct && hct > 51) w.push('рџљЁ РљР РРўРР§Р•РЎРљРР™ Р“Р•РњРђРўРћРљР РРў! РљСЂРѕРІСЊ СЃР»РёС€РєРѕРј РіСѓСЃС‚Р°СЏ вЂ” СЂРёСЃРє С‚СЂРѕРјР±РѕР·Р°. РЎРґР°Р№С‚Рµ РєСЂРѕРІСЊ РёР»Рё РґРѕР±Р°РІСЊС‚Рµ Р°РЅС‚РёРєРѕР°РіСѓР»СЏРЅС‚С‹.');
+    if (hct && hct > 51) w.push('🚨 КР�?Т�?ЧЕСК�?Й ГЕМАТОКР�?Т! Кровь слишком густая — риск тромбоза. Сдайте кровь или добавьте антикоагулянты.');
     if (hct && hct < 37) w.push('вљ пёЏ РќРёР·РєРёР№ РіРµРјР°С‚РѕРєСЂРёС‚ вЂ” РІРѕР·РјРѕР¶РЅР° Р°РЅРµРјРёСЏ. Р”РѕР±Р°РІСЊС‚Рµ Р¶РµР»РµР·Рѕ, B12, С„РѕР»Р°С‚С‹.');
     const ldl = val('ldl');
-    if (ldl && ldl > 4.2) w.push('рџљЁ Р’С‹СЃРѕРєРёР№ Р›РџРќРџ вЂ” СЂРёСЃРє Р°С‚РµСЂРѕСЃРєР»РµСЂРѕР·Р°. РЎРЅРёР·СЊС‚Рµ РЅР°СЃС‹С‰РµРЅРЅС‹Рµ Р¶РёСЂС‹, РґРѕР±Р°РІСЊС‚Рµ РћРјРµРіР°-3, РєР»РµС‚С‡Р°С‚РєСѓ, РєРѕСЌРЅР·РёРј Q10.');
+    if (ldl && ldl > 4.2) w.push('🚨 Высокий ЛПНП — риск атеросклероза. Снизьте насыщенные жиры, добавьте Омега-3, клетчатку, коэнзим Q10.');
     const hdl = val('hdl');
-    if (hdl && hdl < 0.8) w.push('рџљЁ РќРёР·РєРёР№ Р›РџР’Рџ вЂ” СЂРёСЃРє Р°С‚РµСЂРѕСЃРєР»РµСЂРѕР·Р°. Р”РѕР±Р°РІСЊС‚Рµ Р¶РёСЂРЅСѓСЋ СЂС‹Р±Сѓ, РѕР»РёРІРєРѕРІРѕРµ РјР°СЃР»Рѕ, Р°РІРѕРєР°РґРѕ.');
+    if (hdl && hdl < 0.8) w.push('🚨 Низкий ЛПВП — риск атеросклероза. Добавьте жирную рыбу, оливковое масло, авокадо.');
     const alt = val('alt');
-    if (alt && alt > 80) w.push('рџљЁ РђР›Рў > 80 вЂ” С‚РѕРєСЃРёС‡РµСЃРєРѕРµ РїРѕСЂР°Р¶РµРЅРёРµ РїРµС‡РµРЅРё. РСЃРєР»СЋС‡РёС‚Рµ РіРµРїР°С‚РѕС‚РѕРєСЃРёС‡РЅС‹Рµ РїСЂРµРїР°СЂР°С‚С‹, РґРѕР±Р°РІСЊС‚Рµ TUDCA+NAC.');
+    if (alt && alt > 80) w.push('🚨 АЛТ > 80 — токсическое поражение печени. �?сключите гепатотоксичные препараты, добавьте TUDCA+NAC.');
     else if (alt && alt > 45) w.push('вљ пёЏ РђР›Рў РїРѕРІС‹С€РµРЅ вЂ” РЅР°РіСЂСѓР·РєР° РЅР° РїРµС‡РµРЅСЊ. Р”РѕР±Р°РІСЊС‚Рµ РіРµРїР°С‚РѕРїСЂРѕС‚РµРєС‚РѕСЂС‹ (TUDCA, NAC, СЃРёР»РёРјР°СЂРёРЅ).');
     const crp = val('crp');
-    if (crp && crp > 3) w.push('рџљЁ РЎР Р‘ > 3 вЂ” СЃРёСЃС‚РµРјРЅРѕРµ РІРѕСЃРїР°Р»РµРЅРёРµ. Р”РѕР±Р°РІСЊС‚Рµ РћРјРµРіР°-3, РєСѓСЂРєСѓРјРёРЅ, РїСЂРѕРІРµСЂСЊС‚Рµ Р–РљРў.');
+    if (crp && crp > 3) w.push('🚨 СРБ > 3 — системное воспаление. Добавьте Омега-3, куркумин, проверьте ЖКТ.');
     const t = val('testosterone');
-    if (t && t < 12) w.push('вљ пёЏ РќРёР·РєРёР№ С‚РµСЃС‚РѕСЃС‚РµСЂРѕРЅ. РџСЂРѕРІРµСЂСЊС‚Рµ SHBG, РґРѕР±Р°РІСЊС‚Рµ С†РёРЅРє, РјР°РіРЅРёР№, РІРёС‚Р°РјРёРЅ D, С…РѕР»РµСЃС‚РµСЂРёРЅ РІ СЂР°С†РёРѕРЅ.');
+    if (t && t < 12) w.push('⚠️ Низкий тестостерон. Проверьте SHBG, добавьте цинк, магний, витамин D, холестерин в рацион.');
     const cr = val('creatinine');
-    if (cr && cr > 115) w.push('вљ пёЏ Р’С‹СЃРѕРєРёР№ РєСЂРµР°С‚РёРЅРёРЅ вЂ” РїРµСЂРµРіСЂСѓР·РєР° РїРѕС‡РµРє. РџСЂРѕРІРµСЂСЊС‚Рµ Р±РµР»РѕРє, РґРѕР±Р°РІСЊС‚Рµ Р·Р°С‰РµР»Р°С‡РёРІР°РЅРёРµ (Р·РµР»РµРЅСЊ, Р»РёРјРѕРЅС‹).');
+    if (cr && cr > 115) w.push('⚠️ Высокий креатинин — перегрузка почек. Проверьте белок, добавьте защелачивание (зелень, лимоны).');
     return w;
   };
 
@@ -116,13 +116,13 @@ export const HealthAnalytics: React.FC = () => {
   return (
     <div style={{ paddingBottom: 80 }}>
       <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-        <button onClick={() => setTab('labs')} style={btn('labs')}>рџ©ё РђРЅР°Р»РёР·С‹</button>
-        <button onClick={() => setTab('diet')} style={btn('diet')}>рџҐ— Р”РёРµС‚Р°</button>
+        <button onClick={() => setTab('labs')} style={btn('labs')}>🩸 Анализы</button>
+        <button onClick={() => setTab('diet')} style={btn('diet')}>🥗 Диета</button>
       </div>
 
       {tab === 'labs' && <>
         <div style={{ ...cardBg, padding: '10px 12px', marginBottom: 8 }}>
-          <div style={{ ...sectionTitle, color: '#60a5fa' }}>рџ©ё Р‘РёРѕС…РёРјРёС‡РµСЃРєРёР№ Р±Р°СЂРѕРјРµС‚СЂ</div>
+          <div style={{ ...sectionTitle, color: '#60a5fa' }}>🩸 Биохимический барометр</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
             {LABS.map(l => (
               <div key={l.id} style={{ padding: '3px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
@@ -151,14 +151,14 @@ export const HealthAnalytics: React.FC = () => {
           {getWarnings().length === 0 ? (
             <div style={{ padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.1)', fontSize: 8, color: '#00e68a' }}>вњ… Р’СЃРµ Р°РЅР°Р»РёР·С‹ РІ РЅРѕСЂРјРµ.</div>
           ) : getWarnings().map((w, i) => (
-            <div key={i} style={{ padding: '6px 8px', marginBottom: 3, borderRadius: 6, background: w.startsWith('рџљЁ') ? 'rgba(239,68,68,0.08)' : 'rgba(249,115,22,0.06)', border: '1px solid rgba(239,68,68,0.1)', fontSize: 7, color: w.startsWith('рџљЁ') ? '#ef4444' : '#f97316', lineHeight: 1.4 }}>{w}</div>
+            <div key={i} style={{ padding: '6px 8px', marginBottom: 3, borderRadius: 6, background: w.startsWith('🚨') ? 'rgba(239,68,68,0.08)' : 'rgba(249,115,22,0.06)', border: '1px solid rgba(239,68,68,0.1)', fontSize: 7, color: w.startsWith('🚨') ? '#ef4444' : '#f97316', lineHeight: 1.4 }}>{w}</div>
           ))}
         </div>}
       </>}
 
       {tab === 'diet' && <>
         <div style={{ ...cardBg, padding: '10px 12px', marginBottom: 8 }}>
-          <div style={{ ...sectionTitle, color: '#8b5cf6' }}>рџ©є РћРіСЂР°РЅРёС‡РµРЅРёСЏ Р·РґРѕСЂРѕРІСЊСЏ</div>
+          <div style={{ ...sectionTitle, color: '#8b5cf6' }}>🩺 Ограничения здоровья</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {HEALTH_ISSUES.map(h => {
               const isActive = activeIssues.includes(h.id);
@@ -208,7 +208,7 @@ export const HealthAnalytics: React.FC = () => {
         </div>
         {activeIssues.length > 0 && (
           <div style={{ ...cardBg, padding: '10px 12px' }}>
-            <div style={{ ...sectionTitle, color: '#a78bfa' }}>рџ“‹ Р РµРєРѕРјРµРЅРґР°С†РёРё</div>
+            <div style={{ ...sectionTitle, color: '#a78bfa' }}>📋 Рекомендации</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 8, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
               {HEALTH_ISSUES.filter(h => activeIssues.includes(h.id)).map(h => {
                 const tips: Record<string, string> = {
@@ -218,7 +218,7 @@ export const HealthAnalytics: React.FC = () => {
                   diabetes: 'в¬‡ GI: РёСЃРєР»СЋС‡РёС‚Рµ СЃР°С…Р°СЂ, Р±РµР»С‹Р№ СЂРёСЃ, С…Р»РµР±. в¬† РљР»РµС‚С‡Р°С‚РєР°, Р±РµР»РѕРє, РЅРёР·РєРёРµ GI (РіСЂРµС‡РєР°, С‡РµС‡РµРІРёС†Р°). РЈР¶РёРЅ РЅРёР·РєРѕСѓРіР»РµРІРѕРґРЅС‹Р№.',
                   hypertension: 'в¬‡ РќР°С‚СЂРёР№ <1500 РјРі/СЃСѓС‚. в¬† РљР°Р»РёР№, РјР°РіРЅРёР№. РСЃРєР»СЋС‡РёС‚Рµ С„Р°СЃС‚С„СѓРґ, РєРѕРЅСЃРµСЂРІС‹, СЃС‹СЂ, РєРѕР»Р±Р°СЃС‹.',
                   gi_issues: 'в¬† РўРµСЂРјРёС‡РµСЃРєРё РѕР±СЂР°Р±РѕС‚Р°РЅРЅС‹Рµ РѕРІРѕС‰Рё. в¬‡ РЎС‹СЂС‹Рµ РѕРІРѕС‰Рё, Р±РѕР±РѕРІС‹Рµ, РјРѕР»РѕС‡РєР°, Р¶Р°СЂРµРЅРѕРµ. Р”СЂРѕР±РЅРѕРµ РїРёС‚Р°РЅРёРµ.',
-                  gout: 'в¬‡ РџСѓСЂРёРЅС‹: РѕРіСЂР°РЅРёС‡СЊС‚Рµ РїРµС‡РµРЅСЊ, РєСЂР°СЃРЅРѕРµ РјСЏСЃРѕ, СЃР°СЂРґРёРЅС‹, РїРёРІРѕ. в¬† Р’РѕРґР° 2-3Р».',
+                  gout: '⬇ Пурины: ограничьте печень, красное мясо, сардины, пиво. ⬆ Вода 2-3л.',
                   kidney_stones: 'в¬‡ РћРєСЃР°Р»Р°С‚С‹: С€РїРёРЅР°С‚, СЃРІС‘РєР»Р°, РѕСЂРµС…Рё, С€РѕРєРѕР»Р°Рґ. в¬† Р’РѕРґР° 2.5-3Р». Р›РёРјРѕРЅРЅР°СЏ РІРѕРґР° РёРЅРіРёР±РёСЂСѓРµС‚ РєР°РјРЅРё.',
                 };
                 return (

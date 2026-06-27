@@ -38,7 +38,7 @@ export const ProgressTracker: React.FC = () => {
 
   return (
     <div style={{ paddingBottom: 80 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', marginBottom: 8 }}>рџ“€ РўСЂРµРєРµСЂ РїСЂРѕРіСЂРµСЃСЃР°</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', marginBottom: 8 }}>📈 Трекер прогресса</div>
 
       {/* Input */}
       <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8 }}>
@@ -57,14 +57,14 @@ export const ProgressTracker: React.FC = () => {
           }}>вњ“</button>
         </div>
         <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>
-          {entries.length > 0 ? `РџРѕСЃР»РµРґРЅСЏСЏ Р·Р°РїРёСЃСЊ: ${entries[entries.length - 1].date} вЂ” ${entries[entries.length - 1].weight} РєРі` : 'РќРµС‚ Р·Р°РїРёСЃРµР№'}
+          {entries.length > 0 ? `Последняя запись: ${entries[entries.length - 1].date} — ${entries[entries.length - 1].weight} кг` : 'Нет записей'}
         </div>
       </div>
 
       {/* Weight chart */}
       {entries.length > 1 && (
         <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8 }}>
-          <div style={{ fontSize: 9, fontWeight: 600, color: '#00e68a', marginBottom: 4 }}>рџ“Љ Р”РёРЅР°РјРёРєР° РІРµСЃР°</div>
+          <div style={{ fontSize: 9, fontWeight: 600, color: '#00e68a', marginBottom: 4 }}>📊 Динамика веса</div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 100, padding: '4px 0' }}>
             {entries.map((e, i) => (
               <div key={e.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
@@ -91,7 +91,7 @@ export const ProgressTracker: React.FC = () => {
 
       {/* Smart metrics */}
       <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)' }}>
-        <div style={{ fontSize: 9, fontWeight: 600, color: '#8b5cf6', marginBottom: 4 }}>рџЋЇ РЈРјРЅС‹Рµ РїРѕРєР°Р·Р°С‚РµР»Рё</div>
+        <div style={{ fontSize: 9, fontWeight: 600, color: '#8b5cf6', marginBottom: 4 }}>🎯 Умные показатели</div>
         {(() => {
           try {
             const report = JSON.parse(localStorage.getItem('he_nutrition_report_current') || 'null');
@@ -122,7 +122,7 @@ export const ProgressTracker: React.FC = () => {
             }
           } catch {}
           return <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)', textAlign:'center', padding:8 }}>
-            РќРµС‚ РґР°РЅРЅС‹С…. РЎРіРµРЅРµСЂРёСЂСѓР№С‚Рµ РѕС‚С‡С‘С‚ РІ РџР»Р°РЅРёСЂРѕРІС‰РёРєРµ РїРёС‚Р°РЅРёСЏ в†’ РћС‚С‡С‘С‚
+            Нет данных. Сгенерируйте отчёт в Планировщике питания → Отчёт
           </div>;
         })()}
       </div>

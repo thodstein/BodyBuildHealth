@@ -38,6 +38,9 @@ import { getSubstanceName, type StackResult as OptimizerStackResult } from '../.
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
 import type { CourseEntry } from '../../core/types';
 import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.engine';
+import { calculateSupportTZ, hydrateState } from '../../engines/support-calculator.engine';
+import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engines/support-calculator.types';
+import { calculateTZRisk, toCompatibleResult, type TZRiskResult } from '../../engines/risk-engine-tz';
 // Force Vite to include SUPPORT_CATALOG_DATA and CANONICAL_ID_MAP (prevents tree-shaking)
 // @ts-ignore
 (window as any).__SUPPORT_CATALOG__ = SUPPORT_CATALOG_DATA;
@@ -60,7 +63,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [calcView, setCalcView] = useState<CalcView>('main');
   const [infoView, setInfoView] = useState<InfoView>('main');
   const [section, setSection] = useState<'home'|'generator'|'protocols'|'info'>('home');
-  const [genTab, setGenTab] = useState<'calculator'|'auto'|'info'>('calculator');
+  const [genTab, setGenTab] = useState<'calculator'|'info'>('calculator');
   const [protocolTab, setProtocolTab] = useState<'pct'|'fertility'|'hrt'|'neuro'|'joints'|'acne'>('pct');
   const [infoTab, setInfoTab] = useState<string>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
@@ -479,31 +482,59 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
   const calcSupport = (overrideLevel?: 'basic' | 'mid' | 'max' | 'boost', overrideSubs?: string[]) => {
     const s = linked.profile?.settings;
-    const level = overrideLevel || supportLevel;
-    const input: SupportInput = {
-      userId: linked.profile?.id || 'current',
-      substances: effectiveLevel?.subs || SUPPORT_LEVELS[level]?.subs || [],
-      goals: [supportGoal],
-      labs: (linked.labs || []).map(l => ({ code: l.code, value: l.value })),
-      demographics: { age: s?.age ?? 30, weight: s?.weight ?? 80, sex: (s?.sex ?? 'male') as 'male' | 'female' },
-      genetics: s?.genetics,
-      nutritionFactor: s?.nutritionFactor ?? 0.8,
-      trainingFactor: s?.trainingFactor ?? 0.7,
-      drugDoses: Object.fromEntries((linked.course || []).map(c => [c.substanceId, c.doseValue])),
+    const level = (overrideLevel || supportLevel) as PowerLevel;
+    // Build TZ state from linked data
+    const h = hydrateState();
+    const aasList = (linked.course || []).filter(c => {
+      const ph = PHARMA_DB[c.substanceId] as any;
+      return ph?.class && ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm'].includes(ph.class);
+    }).map(c => ({ id: c.substanceId, doseMgWeek: (c.doseValue || 0) * ((typeof c.frequency === 'number' ? c.frequency : parseFloat(String(c.frequency)) || 0) > 0 ? (typeof c.frequency === 'number' ? c.frequency : parseFloat(String(c.frequency)) || 0) : 1), weeks: (c.endWeek || 12) - (c.startWeek || 0) }));
+    const defaults: Partial<CalculatorState> = {
+      profile: { weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male' | 'female', workoutsPerWeek: s?.workoutsPerWeek ?? 3, avgWorkoutMinutes: s?.avgWorkoutMinutes ?? 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
+      pharma: { phase: 'course', aas: aasList, hasGH: false, hasIGF: false, hasInsulin: false, hasHCG: !!linked.course?.find((c: any) => c.substanceId === 'hcg'), hasAI: false, hasCaber: false, hasSERM: false, hasSARMs: aasList.some(a => a.id.includes('ostarine') || a.id.includes('lgd')) },
+      oda: { jointPain: jointMode ? 'moderate' : 'none' as const, ligamentIssues: false, backPain: false, injuries: [] },
     };
-    const calcResultData = calculateSupport(input);
-    // Apply BP/HR adjustment to cardio risk
-    try {
-      const bpRisk = getBpRiskLevel();
-      if (bpRisk === 'high' && calcResultData?.riskAssessment?.systemBreakdown?.cardio) {
-        calcResultData.riskAssessment.systemBreakdown.cardio.raw = Math.min(100, calcResultData.riskAssessment.systemBreakdown.cardio.raw * 1.3);
-        calcResultData.riskAssessment.systemBreakdown.cardio.net = Math.min(100, calcResultData.riskAssessment.systemBreakdown.cardio.net * 1.3);
-      } else if (bpRisk === 'medium' && calcResultData?.riskAssessment?.systemBreakdown?.cardio) {
-        calcResultData.riskAssessment.systemBreakdown.cardio.raw = Math.min(100, calcResultData.riskAssessment.systemBreakdown.cardio.raw * 1.15);
-        calcResultData.riskAssessment.systemBreakdown.cardio.net = Math.min(100, calcResultData.riskAssessment.systemBreakdown.cardio.net * 1.15);
-      }
-    } catch {}
-    setSupportResult(calcResultData);
+    const state: CalculatorState = { ...defaults, ...h, powerLevel: boostEnabled ? 'boost' : level } as CalculatorState;
+    const tzResult: CalculatorResult = calculateSupportTZ(state);
+    // ── TZ Risk Engine: probabilistic 49-cell model ──
+    const tzRiskInput = {
+      course: linked.course || [],
+      labs: linked.labs || [],
+      genetics: {} as any,
+      nutrition: {
+        proteinPerKg: (s?.weight ?? 80) > 0 ? ((s?.nutritionFactor ?? 0.8) * 160) / (s?.weight ?? 80) : 1.8,
+        fiberG: 25, omega3G: 1.5, sodiumG: 3, potassiumG: 3, waterL: 2,
+        calories: 2500,
+      },
+      training: {
+        hasHIIT: (s?.workoutsPerWeek ?? 3) >= 4,
+        weeklyMinutes: (s?.workoutsPerWeek ?? 3) * (s?.avgWorkoutMinutes ?? 60),
+        volumeTonnes: 8000, lissMinutesPerWeek: 60,
+      },
+      weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male' | 'female',
+      supportSubstances: tzResult.selectedSubstances || [],
+    };
+    const tzRiskResult: TZRiskResult = calculateTZRisk(tzRiskInput);
+    const tzCompat = toCompatibleResult(tzRiskResult);
+    const calcResultData: Record<string, any> = {
+      riskBeforeSupport: tzRiskResult.overallRaw,
+      riskAfterSupport: tzRiskResult.overallNet,
+      supportScore: Math.round(100 - tzRiskResult.overallNet),
+      systemSupport: Object.fromEntries(Object.entries(tzCompat.systemBreakdown).map(([k, v]) => [k, 100 - v.net])),
+      riskAssessment: {
+        systemBreakdown: Object.fromEntries(Object.entries(tzCompat.systemBreakdown).map(([k, v]) => [k, { raw: v.raw, net: v.net }])),
+        mechanismBreakdown: tzCompat.mechanismBreakdown,
+        mechanismDetail: tzCompat.mechanismDetail,
+      },
+      tzRiskResult,
+      timestamp: tzResult.timestamp ?? new Date().toISOString(),
+      schedule: tzResult.schedule,
+      synergyIdsUsed: tzResult.synergyIdsUsed,
+      selectedSubstances: tzResult.selectedSubstances,
+      contraindicationAlerts: tzResult.contraindicationAlerts,
+      negativeBlocks: tzResult.negativeBlocks,
+    };
+    setSupportResult(calcResultData as any);
     setCalcResult(calcResultData);
     setCalcDone(true);
     const allSubs = [...supportDrugs, ...(effectiveLevel?.subs || SUPPORT_LEVELS[level]?.subs || [])].filter(Boolean);
@@ -2168,7 +2199,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['calculator','🧮 Калькулятор'],['auto','🤖 Авто'],['info','📖 О подборе']].map(([id,label]) => (
+            {[['calculator','🧮 Калькулятор'],['info','📖 О подборе']].map(([id,label]) => (
               <button key={id} onClick={() => { setGenTab(id as any); 
               const a: Record<string,()=>void> = {
                 calculator: ()=>{ setTab('calculator'); setSupportView('calc'); },
@@ -4443,15 +4474,19 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         </div>
       )}
 
-      {/* ===== AUTO-CALCULATOR — КАЛЬКУЛЯТОР ПОДДЕРЖКИ ПО ТЗ ===== */}
-      {genTab === 'auto' && section === 'generator' && (
+      {/* ===== MIX CALCULATOR moved to supportstacks → mixcalc sub-tab ===== */}
+
+
+
+      {/* ===== AUTO-CALCULATOR (ТЗ) ===== */}
+      {genTab === 'calculator' && (
         <AutoCalculator
+          key="autoCalc"
           onApply={(applied: { level: string; subs: string[]; result: any }) => {
             const r = applied.result;
             setAutoCalcResult(applied);
             setSupportLevel(applied.level as 'basic' | 'mid' | 'max' | 'boost');
             setEnhancedSubs(applied.subs || []);
-            // Map AutoCalculator result to old calcResult shape
             setCalcResult({
               riskBeforeSupport: r?.overallRiskBefore ?? 50,
               riskAfterSupport: r?.overallRiskAfter ?? 30,
@@ -4467,14 +4502,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               timestamp: r?.timestamp ?? new Date().toISOString(),
             });
             setCalcDone(true);
-            setGenTab('calculator');
           }}
         />
       )}
-
-      {/* ===== MIX CALCULATOR moved to supportstacks → mixcalc sub-tab ===== */}
-
-
 
       {/* ===== SUPPORT CALCULATOR — FULL DATA-INTEGRATED OVERHAUL ===== */}
       {section === 'generator' && genTab === 'calculator' && ((tab === 'main' && supportView === 'calc' && calcView === 'calculator') || tab === 'calculator') && (() => {
