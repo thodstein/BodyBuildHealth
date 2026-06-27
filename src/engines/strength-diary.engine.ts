@@ -1,4 +1,4 @@
-﻿import { db } from '../core/db';
+import { db } from '../core/db';
 import type { StrengthLogEntry, WorkoutLog } from '../core/types';
 
 export interface StrengthStats {

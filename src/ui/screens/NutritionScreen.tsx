@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { FOOD_DB } from '../../core/nutrition-database';
 import { useDataLink, derivePAL } from '../../core/data-link';
 import { getRecipes } from '../../engines/nutrition-periodization.engine';
@@ -1454,7 +1454,7 @@ export const NutritionScreen: React.FC = () => {
     switch (tab) {
       case 'diary': return <InfoErrorBoundary label="Дневник питания"><NutritionDiary foodEntries={foodEntries} targets={macroTargets} weight={linked.profile?.settings?.weight} age={linked.profile?.settings?.age} sex={linked.profile?.settings?.sex} /></InfoErrorBoundary>;
       case 'charts': return <InfoErrorBoundary label="Р“СЂР°С„РёРєРё"><Suspense fallback={<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Р—Р°РіСЂСѓР·РєР° РіСЂР°С„РёРєРѕРІ...</div>}><NutritionCharts kcalData={chartKcalData} proteinData={chartProteinData} labels={chartLabels} dailyLogs={dailyLogs} /></Suspense></InfoErrorBoundary>;
-      case 'mealplan': return <InfoErrorBoundary label="РџР»Р°РЅ РїРёС‚Р°РЅРёСЏ"><IndividualPlan profile={linked.profile} course={linked.course} /></InfoErrorBoundary>;
+      case 'mealplan': return <InfoErrorBoundary label="План питания"><IndividualPlan profile={linked.profile} course={linked.course} /></InfoErrorBoundary>;
       case 'cart': return <CartTab />;
       case 'restaurant': return <RestaurantTab />;
       case 'favorites': return <FavoritesTab />;

@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { computeStructuredAnalytics } from '../../../engines/structured-analytics.engine';
 
 export const StructuredAnalyticsCard: React.FC<{ sessions: any[] }> = ({ sessions }) => {

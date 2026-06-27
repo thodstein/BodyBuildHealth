@@ -1,4 +1,4 @@
-﻿/**
+/**
  * PlateCalculator.tsx — T4: калькулятор блинов для рабочего веса (Этап INT2).
  * REUSE gym-competition.engine: calculatePlates / getPlateLoadingOrder / warmupPlateSequence.
  * Mobile-first, dark theme, green accent. Самодостаточный компонент (стили локальные).

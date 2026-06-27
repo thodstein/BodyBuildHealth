@@ -1,4 +1,4 @@
-﻿/**
+/**
  * sessionMetrics.ts — D1: калькулятор LMS-показателей для фактической сессии (Этап D).
  * Преобразует записанную тренировку (WorkoutSession + PlayerDay) → SRExercise[] →
  * calcSessionMetrics (Тоннаж/КПШ/Инт.отн/УОИ/Инт.Ф+Б). REUSE lms-metrics.engine.

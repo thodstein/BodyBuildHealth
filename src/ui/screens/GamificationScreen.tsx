@@ -1,4 +1,4 @@
-﻿import React, { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { calcTrust, checkAchievements, ACHIEVEMENTS, GamificationState } from '../../engines/gamification.full';
 
 const CHALLENGES = [

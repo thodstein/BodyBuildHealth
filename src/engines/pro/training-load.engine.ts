@@ -1,4 +1,4 @@
-﻿/**
+/**
  * training-load.engine.ts — P3: мониторинг тренировочной нагрузки (проф. уровень).
  * NEW + UNIFY: sRPE-нагрузка, ACWR (EWMA), monotony/strain, fitness-fatigue (Banister).
  * Заполняет пробел: sRPE и fitness-fatigue отсутствовали; ACWR был разбросан по 13 файлам →

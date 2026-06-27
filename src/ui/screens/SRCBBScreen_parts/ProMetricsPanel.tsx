@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ProMetricsPanel.tsx — P12: UI-интеграция проф-движков.
  * REUSE P1/P3/P4/P6/P9. Калькулятор относительной силы + монитор тренировочной нагрузки (sRPE/ACWR/fitness-fatigue)
  * + панель проф-авторегуляции (readiness/ACWR/velocity-loss → корректировка плана).

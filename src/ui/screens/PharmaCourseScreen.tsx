@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
 import { validateCourse } from '../../engines/pharmacology.engine';
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';

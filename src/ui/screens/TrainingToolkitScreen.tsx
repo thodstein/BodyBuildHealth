@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { classifyMovement, estimateDifficulty, getMuscleSynergy, getJointStress, assessSafety } from '../../engines/movement-engines';
 import { generatePLPeaking, generateBBPeaking } from '../../engines/peaking-engine';
 import { generateCalendarMonth, getDayTrainingFocus, getWaterStats, quickAddWater } from '../../engines/training-calendar.engine';

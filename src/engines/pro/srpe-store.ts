@@ -1,4 +1,4 @@
-﻿/**
+/**
  * srpe-store.ts — P12 wire: хранилище сессий с sRPE (session RPE × длительность) для
  * мониторинга тренировочной нагрузки (P3 training-load). localStorage, browser-only.
  */

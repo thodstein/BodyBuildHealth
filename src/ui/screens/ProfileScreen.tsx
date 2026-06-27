@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import type { UserProfile, InjuryRecord, SupplementEntry, MedicationEntry, LabPoint, WorkoutLog, StrengthLogEntry } from '../../core/types';
 import { getProfile, updateProfile, useProfileRefresh } from '../../core/profile-manager';
 import { saveContraindications, CHRONIC_CONDITIONS_LIST, ORGAN_WEAKNESSES, GENETIC_POLYMORPHISMS, getContraindications } from '../../core/contraindications';
@@ -381,6 +381,7 @@ const SleepDiary: React.FC<{ settings: any; save: (data: any) => void }> = ({ se
 export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> = ({ onNavigate }) => {
   const profile = useProfileRefresh();
   const [tab, setTab] = useState<ProfileTab>('overview');
+  const [overTab, setOverTab] = useState('general');
   const [page, setPage] = useState<ProfilePage>('hero');
   const [labs, setLabs] = useState<LabPoint[]>([]);
   const [editInjury, setEditInjury] = useState<InjuryRecord | null>(null);
@@ -431,7 +432,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
 
   const shareReport = () => {
     const tg = (window as any).Telegram?.WebApp;
-    const settings = profile.settings;
+  const settings = profile?.settings ?? {};
     const bmiVal = settings.weight && settings.height ? (settings.weight / Math.pow(settings.height / 100, 2)).toFixed(1) : '—';
     const ffmiVal = (() => {
       if (!settings.weight || !settings.height || !settings.bodyFat) return '—';
@@ -675,28 +676,17 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
           </div>
 
           {/* ═══ OVERVIEW TAB ═══ */}
-          {tab === 'overview' && (() => {
-            const [overTab, setOverTab] = useState('general');
-            const ovTab = (id: string, icon: string, label: string) => ({
-              id, icon, label,
-              active: overTab === id,
-              onClick: () => setOverTab(id),
-            } as any);
-            const ovTabs = [
-              ovTab('general','👤','Общая'), ovTab('nutrition','🥗','Питание'),
-              ovTab('training','💪','Тренировки'), ovTab('supplements','💊','Поддержка'),
-              ovTab('pharma','💉','Фарма'), ovTab('labs','🔬','Анализы'), ovTab('risks','⚠️','Риски'),
-            ];
-            const pillS = (active: boolean) => ({
-              padding:'4px 8px', borderRadius:8, fontSize:7, fontWeight: active ? 700 : 400, cursor:'pointer', whiteSpace:'nowrap' as const, flexShrink:0,
-              background: active ? '#00e68a' : 'rgba(255,255,255,0.04)', border:'1px solid ' + (active ? '#00e68a' : 'rgba(255,255,255,0.06)'), color: active ? '#000' : 'rgba(255,255,255,0.8)',
-            });
-            return (
+          {tab === 'overview' && <>
             <InfoErrorBoundary label="Сведения о пользователе">
               <div style={{ display:'flex', gap:2, padding:'4px 0', overflowX:'auto', scrollbarWidth:'none' }}>
-                {ovTabs.map(t => (
-                  <button key={t.id} onClick={t.onClick} style={pillS(t.active)}>{t.icon} {t.label}</button>
-                ))}
+                {[
+                  ['general','👤','Общая'], ['nutrition','🥗','Питание'],
+                  ['training','💪','Тренировки'], ['supplements','💊','Поддержка'],
+                  ['pharma','💉','Фарма'], ['labs','🔬','Анализы'], ['risks','⚠️','Риски'],
+                ].map(t => {
+                  const a = overTab === t[0];
+                  return <button key={t[0]} onClick={() => setOverTab(t[0])} style={{ padding:'4px 8px', borderRadius:8, fontSize:7, fontWeight: a ? 700 : 400, cursor:'pointer', whiteSpace:'nowrap' as const, flexShrink:0, background: a ? '#00e68a' : 'rgba(255,255,255,0.04)', border:'1px solid ' + (a ? '#00e68a' : 'rgba(255,255,255,0.06)'), color: a ? '#000' : 'rgba(255,255,255,0.8)' }}>{t[1]} {t[2]}</button>;
+                })}
               </div>
               {overTab === 'general' && <>
                 <div style={{ ...glassCard, background:'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(0,180,100,0.04))', border: apple.accentBorder }}>
@@ -836,8 +826,8 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                 <div style={glassCard}><div style={sectionLabel}>Ввод анализов</div><div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>Ввод и отслеживание анализов — в разделе Питание → Здоровье</div></div>
               </>}
               {overTab === 'risks' && <div style={glassCard}><div style={sectionLabel}>⚠️ Риски</div><div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>Детальный анализ рисков — в разделе Риски</div></div>}
-            </InfoErrorBoundary>);
-          })()}
+            </InfoErrorBoundary>
+          </>}
 
           {/* ═══ ANTHROPOMETRY TAB ═══ */}
           {tab === 'anthropometry' && (
@@ -951,9 +941,9 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   })}
                 </div>
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color: apple.textDim, marginTop:6 }}>
-                  <span>Мин: {Math.min(...weightLog.map(w => w.weight)).toFixed(1)} кг</span>
-                  <span style={{ color: apple.accent, fontWeight:600 }}>{weightLog[weightLog.length - 1]?.weight?.toFixed(1)} кг</span>
-                  <span>Макс: {Math.max(...weightLog.map(w => w.weight)).toFixed(1)} кг</span>
+                  <span>Мин: {weightLog.length > 0 ? Math.min(...weightLog.map(w => w.weight ?? 0)).toFixed(1) : '—'} кг</span>
+                  <span style={{ color: apple.accent, fontWeight:600 }}>{weightLog[weightLog.length - 1]?.weight?.toFixed(1) ?? '—'} кг</span>
+                  <span>Макс: {weightLog.length > 0 ? Math.max(...weightLog.map(w => w.weight ?? 0)).toFixed(1) : '—'} кг</span>
                 </div>
               </div>
             )}
@@ -1554,7 +1544,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
             const labsList = labs.map(l => `${l.code}: ${l.value} ${l.unit}`).join('\n  ') || 'нет данных';
             const last3Workouts = workoutLogs.slice(0, 3);
             const workoutSummary = last3Workouts.length > 0
-              ? last3Workouts.map(w => `  • ${w.date} | Сплит: ${w.split} | RPE: ${w.overallRPE} | Упр: ${w.exercises.length} | Объём: ${w.exercises.reduce((s, e) => s + e.totalVolume, 0).toFixed(0)} кг`).join('\n')
+              ? last3Workouts.map(w => `  • ${w.date} | Сплит: ${w.split} | RPE: ${w.overallRPE} | Упр: ${(w.exercises??[]).length} | Объём: ${(w.exercises??[]).reduce((s, e) => s + (e.totalVolume??0), 0).toFixed(0)} кг`).join('\n')
               : '  — нет записей';
             const programName = localStorage.getItem('he_current_program') || 'не задана';
             const measurements = getMeasurementsLog();
@@ -1587,7 +1577,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
               `  Программа: ${programName}`,
               `  Текущий сплит: ${workoutLogs.length > 0 ? (workoutLogs[0].split || 'не указан') : ((() => { try { const ap = JSON.parse(localStorage.getItem('activeProgram') || 'null'); return ap?.weeks?.[0]?.days?.[0]?.name || ap?.name || 'не задан'; } catch { return 'не задан'; } })())}`,
               `  Последняя тренировка: ${workoutLogs.length > 0 ? workoutLogs[0].date : 'нет записей'}`,
-              `  Объём за неделю: ${(() => { const last7 = new Date(Date.now() - 7*86400000).toISOString().split('T')[0]; const wkLogs = workoutLogs.filter(w => w.date >= last7); const wkVol = wkLogs.reduce((s, w) => s + w.exercises.reduce((ss, e) => ss + e.totalVolume, 0), 0); return wkVol > 0 ? `${wkVol.toFixed(0)} кг` : 'нет данных'; })()}`,
+              `  Объём за неделю: ${(() => { const last7 = new Date(Date.now() - 7*86400000).toISOString().split('T')[0]; const wkLogs = workoutLogs.filter(w => w.date >= last7); const wkVol = wkLogs.reduce((s, w) => s + (w.exercises??[]).reduce((ss, e) => ss + (e.totalVolume??0), 0), 0); return wkVol > 0 ? `${wkVol.toFixed(0)} кг` : 'нет данных'; })()}`,
               ``,
               `ПОСЛЕДНИЕ ТРЕНИРОВКИ (${last3Workouts.length})`,
               workoutSummary,
@@ -1749,7 +1739,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                           <span style={{ fontSize:9, color:'var(--text-dim)' }}>кг</span>
                         </div>
                       </div>
-                      {weightLog.length > 0 && <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Записей: {weightLog.length} | Мин: {Math.min(...weightLog.map(w=>w.weight)).toFixed(1)} | Тек: {weightLog[weightLog.length-1].weight.toFixed(1)} | Макс: {Math.max(...weightLog.map(w=>w.weight)).toFixed(1)}</div>}
+                      {weightLog.length > 0 && <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Записей: {weightLog.length} | Мин: {Math.min(...weightLog.map(w=>w.weight??0)).toFixed(1)} | Тек: {weightLog[weightLog.length-1]?.weight?.toFixed(1) ?? '—'} | Макс: {Math.max(...weightLog.map(w=>w.weight??0)).toFixed(1)}</div>}
                       {weightLog.length > 2 && <div style={{ width:'100%', height:40, marginBottom:4 }}>
                         <svg width="100%" height="40" viewBox="0 0 100 40" preserveAspectRatio="none">
                           <defs><linearGradient id="wgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#00e68a" stopOpacity="0.3"/><stop offset="100%" stopColor="#00e68a" stopOpacity="0"/></linearGradient></defs>

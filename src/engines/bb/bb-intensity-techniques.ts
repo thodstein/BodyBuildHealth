@@ -1,4 +1,4 @@
-﻿/**
+/**
  * bb-intensity-techniques.ts — интенс-техники гипертрофии (Этап BB11, REUSE+EXTEND set-scheme/advanced-methods).
  * Дропсеты, rest-pause, суперсеты, myo-reps, BFR/окклюзия, lengthened partials, механический дроп, пре/пост-истощение.
  * Применяются к памп-дням и фазе интенсификации.

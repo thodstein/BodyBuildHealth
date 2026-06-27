@@ -1,4 +1,4 @@
-﻿/**
+/**
  * training-integration.engine.ts — мост между СРЦ/BB-планами и существующими движками
  * (Этап INT1-INT4). Объединяет новые планировщики с workout-logger / gym-competition /
  * autoregulation-engine / peaking-engine без дублирования их логики.

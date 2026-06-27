@@ -1,4 +1,4 @@
-﻿/**
+/**
  * AutoregPanel.tsx — T6/BB14: авторегуляция плана по readiness/fatigue (Этап INT4).
  * REUSE autoregulation-engine.autoregulate. Ввод ключевых метрик готовности -> решения
  * (интенсивность/объём/частота/выбор упражнений, отмена/даунгрейд сессии).

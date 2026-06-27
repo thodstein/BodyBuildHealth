@@ -1,4 +1,4 @@
-﻿import React, { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { derivePAL } from '../../../core/data-link';
 import { calcNutrition } from '../../../engines/nutrition.engine';
 import { MICRONUTRIENT_TARGETS } from '../../../core/constants';

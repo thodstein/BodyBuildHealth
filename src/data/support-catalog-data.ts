@@ -11268,7 +11268,13 @@ kpv: {
     sideEffects: ['Аллергические реакции (редко)', 'Дискомфорт в ЖКТ'],
   },
 };
- 
+
+// ── Lowercase aliases for case-insensitive catalog lookup ──
+const _cat = SUPPORT_CATALOG_DATA as Record<string, any>;
+for (const _k of Object.keys(_cat)) { const _l = _k.toLowerCase(); if (_l !== _k && !(_l in _cat)) _cat[_l] = _cat[_k]; }
+const _extraAliases: Record<string, string> = { cabergoline:'PHARMA_CABERGOLINE', theanine:'L_THEANINE', };
+for (const [_a,_k] of Object.entries(_extraAliases)) { if (_k in _cat && !(_a in _cat)) _cat[_a] = _cat[_k]; }
+
 // ── FROM: catalog-exports.ts ──
 ﻿// Side effects file to prevent Vite tree-shaking of catalog data
 

@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 
 const SECTIONS = [
   { id:'formulas', icon:'📐', title:'Формулы расчёта рисков', content:

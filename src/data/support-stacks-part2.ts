@@ -1,4 +1,4 @@
-﻿import { SupportStack } from './support-stacks-types';
+import { SupportStack } from './support-stacks-types';
 export const STACKS_PART_2: SupportStack[] = [
   // ════════════════════════════════════════════════════════
   // 26. ВОЛОСЫ, КОЖА, НОГТИ

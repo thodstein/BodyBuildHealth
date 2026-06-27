@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useProfileRefresh } from '../../core/profile-manager';
 
 type ScreenId = 'dashboard'|'pharma'|'course'|'peptides'|'nutrition'|'plan'|'substances'|'labs'|'risks'|'profile'|'predictive'|'marketplace'|'articles'|'assistant'|'gamification'|'fertility-pct'|'reports'|'integrations'|'role-management'|'support'|'training';

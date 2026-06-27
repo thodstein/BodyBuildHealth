@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { generateTierMealPlan, generateRegimeAdvice, generateLabsBasedAdvice, type MealTier, type MealGoal, type MealPlanResult, type MealPlanInput } from '../../../engines/meal-tier-generator.engine';
 import { FOOD_DB } from '../../../core/nutrition-database';
 import type { UserProfile } from '../../../core/types';

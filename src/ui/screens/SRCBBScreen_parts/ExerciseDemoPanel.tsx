@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ExerciseDemoPanel.tsx — T9: демо/медиа упражнения (браузерно).
  * REUSE exercise-demo.ts aggregator. Inline-SVG карта тела (без ассетов), mobile-first.
  */

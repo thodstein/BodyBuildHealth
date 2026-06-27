@@ -1,4 +1,4 @@
-﻿/**
+/**
  * progression-pro.engine.ts — P5: библиотория прогрессий (проф. уровень).
  * 5/3/1 (BBB), DUP (daily undulating), conjugate (Westside), double progression,
  * Hepburn, super-squats — как данные (% templates) + генератор недель с весами.

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * relative-strength.engine.ts — P6: относительная сила (проф. уровень). UNIFY.
  * Wilks / DOTS / IPF GLI / allometric / относительная сила — канонический модуль
  * (DOTS/GLI были в performance-analytics, Wilks не было). + классификация по уровню.

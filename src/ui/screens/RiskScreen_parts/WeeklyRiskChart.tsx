@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { WeeklyRiskDynamics } from '../../../engines/weekly-risk-dynamics.engine';
 import { getRiskColor } from '../../../core/utils/risk-colors';
 

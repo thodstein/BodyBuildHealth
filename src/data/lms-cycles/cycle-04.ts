@@ -1,4 +1,4 @@
-﻿import type { SRCycleTemplate } from './lms-types';
+import type { SRCycleTemplate } from './lms-types';
 
 /**
  * cycle-04.ts — Силовой цикл (армрестлинг, верх). Импортировано из xlsm (Этап A1/B3). Обезличено.

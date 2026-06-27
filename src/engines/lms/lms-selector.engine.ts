@@ -1,4 +1,4 @@
-﻿/**
+/**
  * lms-selector.engine.ts — авто-подбор СРЦ-цикла по параметрам пользователя (Этап B4).
  * Scoring + rationale, по аналогии с split-selector. Обезличено.
  *

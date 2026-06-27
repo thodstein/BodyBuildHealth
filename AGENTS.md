@@ -1,3 +1,12 @@
+## Session Summary (Jun 27 — Part 3) — Substance ID mapping fix (critical)
+### Done
+- **CRITICAL FIX: Substance ID mismatch** — `SYNERGY_ID_SUBSTANCES` used lowercase IDs (`nac`, `tudca`, `zinc`, `omega3`…) while `SUPPORT_CATALOG_DATA` keys were UPPERCASE (`NAC`, `TUDCA`…) and 28 substances were missing from catalog entirely. This caused `renderCatalogDetail` to return `null` for all plan substances.
+- **Solution**: Two changes:
+  1. **Alias loop** in `support-catalog-data.ts:11272` — post-processing loop that creates lowercase aliases for ALL UPPERCASE keys (e.g. `SUPPORT_CATALOG_DATA['nac']` = `SUPPORT_CATALOG_DATA['NAC']`). Also adds extra specific aliases for prefix-mismatch IDs (`cabergoline→PHARMA_CABERGOLINE`, `theanine→L_THEANINE`).
+  2. **Supplement file** `support-catalog-supplement.ts` — 28 new `SupportCatalogEntry` objects appended to `SUPPORT_CATALOG_DATA` at module init: minerals (zinc, magnesium, selenium, potassium, boron), vitamins (D3, C, B6, B12, K2), amino acids/supps (alpha_lipoic, milk_thistle, ashwagandha, glutathione, betaine, gaba, l_dopa, tyrosine, x5htp), other (omega3, probiotics), pharma (telmisartan, nebivolol, anastrozole), and new (aspirin, celery_extract, red_yeast, bile_acids). Each entry has full description, synergies, conflicts, monitoring, dosage, contraindications, sideEffects.
+- **Imported** in `support-database.ts:4` (side-effect import triggers append).
+- `tsc --noEmit` ✓, `vite build` ✓
+
 ## Session Summary (Jun 27 — Part 2) — Cross-Module Enrichment v2: pharma + labs → support
 ### Done
 - **Cross-module enrichment v2**: 4 новых поля в `ScoreInput` (`pharmaHepatic`, `pharmaCardio`, `pharmaRenal`, `pharmaNeuro`) и 4 поля для labs — PK/PD и лаб. риски → коррекция поддержки

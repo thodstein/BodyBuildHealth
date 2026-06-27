@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Ultimate Calculators Engine — Complete calculation module
  *
  * Strength:     Epley, Brzycki, Lander, Lombardi, O'Conner, Wathen, Mayhew

@@ -1,4 +1,4 @@
-﻿import React, { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { FOOD_DB } from '../../../core/nutrition-database';
 import { analyzeDailyDiet, getDefaultProfile, type DailyDietReport, type UserDietProfile } from '../../../engines/product-usefulness-v2.engine';
 import { usePlanCtx } from './IndividualPlan/IndividualPlanContext';

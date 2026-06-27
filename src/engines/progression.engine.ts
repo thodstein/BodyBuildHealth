@@ -1,4 +1,4 @@
-﻿import type { StrengthLogEntry, WorkoutLog } from '../core/types';
+import type { StrengthLogEntry, WorkoutLog } from '../core/types';
 
 export interface ProgressionRule {
   type: 'linear' | 'double' | 'undulating' | 'conjugate';

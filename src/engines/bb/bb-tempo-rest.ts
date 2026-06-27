@@ -1,4 +1,4 @@
-﻿/**
+/**
  * bb-tempo-rest.ts — темп, TUT, интервалы отдыха по характеру дня (Этап BB12, NEW).
  */
 export type DayCharacter = 'тяж' | 'памп' | 'лёг';

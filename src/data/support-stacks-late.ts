@@ -1,4 +1,4 @@
-﻿import { SupportStack } from './support-stacks-types';
+import { SupportStack } from './support-stacks-types';
 export const STACKS_PART_3: SupportStack[] = [
   // 48. МЕМБРАННЫЙ НООТРОП: PS + PC + Alpha-GPC
   // ════════════════════════════════════════════════════════

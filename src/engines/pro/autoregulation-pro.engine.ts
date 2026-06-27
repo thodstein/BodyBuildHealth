@@ -1,4 +1,4 @@
-﻿/**
+/**
  * autoregulation-pro.engine.ts — P4: проф-авторегуляция (проф. уровень).
  * Склейка сигналов → суточная корректировка плана (REUSE P1/P2/P3 outputs):
  *   readiness + ACWR (P3) + velocity-loss (P2) + last-RPE → % топ-сета, объём-множитель, RIR-сдвиг, триггер deload.

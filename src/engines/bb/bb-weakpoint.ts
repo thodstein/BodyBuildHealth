@@ -1,4 +1,4 @@
-﻿/**
+/**
  * bb-weakpoint.ts — слабые места и специализация (Этап BB9, REUSE+EXTEND training-methodology.getVolumeByMuscle).
  * Метка отстающих групп → MAV↑/частота↑; блоки специализации (1-2 группы в MAV, остальные на MEV).
  */

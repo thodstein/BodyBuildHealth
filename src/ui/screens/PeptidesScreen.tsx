@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { db } from '../../core/db';
 import { calculateDose } from '../../engines/dosage.engine';

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * RecoveryPanel.tsx — T8/BB13: восстановление + readiness + мобилити/преабил (Этап INT5).
  * REUSE recovery-optimization.engine (analyzeRecovery/shouldTrain) + federation-grip-mobility.engine (getMobilityFlows/getAllCorrectives).
  */

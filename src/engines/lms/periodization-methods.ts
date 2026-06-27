@@ -1,4 +1,4 @@
-﻿/**
+/**
  * periodization-methods.ts — методы периодизации и accommodating resistance (Этап PL1, REUSE+EXTEND advanced-methods).
  * linear / undulating (DUP) / conjugate / block; цепи/резина (accommodating resistance); cluster sets; PAP; контрастный тренинг.
  */

@@ -1,4 +1,4 @@
-﻿import type { SupportStack } from './support-stacks-types';
+import type { SupportStack } from './support-stacks-types';
 import { STACKS_PART_1 } from './support-stacks-part1';
 import { STACKS_PART_2 } from './support-stacks-part2';
 import { STACKS_PART_3 } from './support-stacks-late';

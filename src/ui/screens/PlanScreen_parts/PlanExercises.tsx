@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { GROUP_LABELS, MUSCLE_GROUPS } from './PlanConstants';
 

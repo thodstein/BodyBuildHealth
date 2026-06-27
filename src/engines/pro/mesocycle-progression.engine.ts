@@ -1,4 +1,4 @@
-﻿/**
+/**
  * mesocycle-progression.engine.ts — P7: кривые прогрессии мезоцикла (проф. уровень).
  * Неделя N+1 из N: объём/интенсивность/RIR по фазам (base/build/peak/deload),
  * fatigue-driven volume drop, taper-кривая. Расширяет lms-progression / bb-builder

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SessionPlayer.tsx — T3: экран выполнения СРЦ/BB-плана (Этап INT1).
  * REUSE workout-logger.engine: startSession → addExerciseToSession → logSet → finishSession.
  * Mobile-first, dark theme. Принимает нормализованный план (дни → упражнения → целевые сеты).

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { calculateDose } from '../../engines/dosage.engine';
 import { SYRINGE_SPECS, DRUG_THRESHOLDS } from '../../core/constants';
 import { calcNutrition } from '../../engines/nutrition.engine';

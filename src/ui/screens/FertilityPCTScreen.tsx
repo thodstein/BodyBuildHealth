@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { calcFertility } from '../../engines/fertility.engine';
 import type { FertilityInput, FertilityResult, LabPoint, CourseEntry } from '../../core/types';
 import { FERTILITY_TARGET, FERTILITY_TAU_WEEKS } from '../../core/constants';

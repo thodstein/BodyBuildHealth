@@ -1,4 +1,4 @@
-﻿/**
+/**
  * PeakingPanel.tsx — T1: выход на пик (Этап INT3).
  * REUSE peaking-engine (generatePLPeaking/generateBBPeaking) + gym-competition.generateAttemptStrategy.
  * Два режима: пауэрлифтинг (тэйпер + план подходов) и бодибилдинг-шоу (неделя пика).

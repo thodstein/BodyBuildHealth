@@ -1,4 +1,4 @@
-﻿/**
+/**
  * vbt.engine.ts — P2: Velocity-Based Training (проф. уровень).
  * Load-velocity profile по движениям, velocity-таргеты по intent (сила/мощность/гипертрофия/скорость),
  * velocity-loss-пороги для авторегулируемого окончания сетов. P1 заложил базовый LVP — здесь

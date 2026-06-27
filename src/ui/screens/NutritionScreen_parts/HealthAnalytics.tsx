@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 
 const LABS: { id: string; label: string; unit: string; refLow: number; refHigh: number }[] = [
   { id: 'hematocrit', label: 'Р“РµРјР°С‚РѕРєСЂРёС‚ (HCT)', unit: '%', refLow: 40, refHigh: 49 },

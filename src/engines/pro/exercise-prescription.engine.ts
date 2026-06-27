@@ -1,4 +1,4 @@
-﻿/**
+/**
  * exercise-prescription.engine.ts — P8: прескрипция упражнений по биомеханике (проф. уровень).
  * REUSE exercise-catalog (group/type/equipment/jointStress) + movement-engines (joint stress) +
  * weakpoint-pl. Расширение: региональная гипертрофия (lengthened partials / stretch-mediated),

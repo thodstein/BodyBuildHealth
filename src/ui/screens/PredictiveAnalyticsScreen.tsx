@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { calculateRisks } from '../../engines/risk.engine';
 import { generateReadinessForecast, predictLabTrend, runWhatIf } from '../../engines/predictive.engine';
 import type { RiskInput, RiskResult } from '../../core/types';

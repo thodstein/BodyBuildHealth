@@ -1,4 +1,4 @@
-﻿import { SupportStack } from './support-stacks-types';
+import { SupportStack } from './support-stacks-types';
 export const STACKS_PART_1: SupportStack[] = [
   // ════════════════════════════════════════════════════════
   // 1. ГЕПАТОПРОТЕКЦИЯ

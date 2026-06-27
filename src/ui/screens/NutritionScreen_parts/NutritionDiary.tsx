@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { BarcodeScanner } from '../../components/BarcodeScanner';
 import { type OFFProduct, productToFoodItem } from '../../../engines/openfoodfacts.engine';
 import { parseFatSecretText, parseNutritionScreenshot } from '../../../engines/nutrition-ocr-parser';

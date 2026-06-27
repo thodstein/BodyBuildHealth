@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 
 import { calcTraining, EXERCISE_DB, getAvailableSplits, replaceExercise, calcExercisePrescription, canReplace, getSubstitutes } from '../../engines/training.engine';
 

@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { PHARMA_DB, SUBSTANCES_BY_CLASS, getPharmaDetail } from '../../core/pharma-database';
 import { db } from '../../core/db';
 import { calculateDose } from '../../engines/dosage.engine';

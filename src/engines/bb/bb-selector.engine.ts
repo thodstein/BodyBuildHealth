@@ -1,4 +1,4 @@
-﻿/**
+/**
  * bb-selector.engine.ts — подбор BB-сплита по параметрам (Этап BB7).
  * Scoring + rationale по аналогии с lms-selector / split-selector.
  */

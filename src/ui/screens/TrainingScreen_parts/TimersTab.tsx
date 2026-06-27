@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 
 export const TimersTab: React.FC = () => {
   const [totalSec, setTotalSec] = React.useState(60);

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * bb-builder.engine.ts — генератор бодибилдинг-плана из раскладки ротации (Этап BB6).
  * Связывает: bb-split-patterns (расписание) + bb-day-types (тяж/памп/первичная-добивка) +
  * volume-landmarks (MEV/MAV/MRV) + rir-matrix (RIR-прогрессия по неделям).

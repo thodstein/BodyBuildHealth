@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '../../core/db';
 
 type Role = 'user' | 'coach' | 'doctor' | 'author' | 'editor' | 'admin';

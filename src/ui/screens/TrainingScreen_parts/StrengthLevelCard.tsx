@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { getStrengthLevel, getNextLevelTarget } from '../../../engines/performance-analytics.engine';
 
 export const StrengthLevelCard: React.FC = () => {

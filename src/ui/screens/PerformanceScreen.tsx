@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useDataLink } from '../../core/data-link';
 import { getBloodMarkersDeep, getCriticalMarkers, getSupplementStacks, calculateFullMacros, calculateMealSplit } from '../../engines/blood-stack-macro.engine';
 import { getPeriodizationModels, getBBContestPrep, getPCTProtocols, generateMeetStrategy, type MeetStrategy } from '../../engines/periodization-meet-pct.engine';

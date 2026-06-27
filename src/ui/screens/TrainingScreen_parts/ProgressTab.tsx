@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import type { WorkoutLog } from '../../../core/types';
 import { generateWeeklyReport, analyzeMeasurements, loadMeasurements, saveMeasurement, type BodyMeasurement } from '../../../engines/log-analytics-progression.engine';
 

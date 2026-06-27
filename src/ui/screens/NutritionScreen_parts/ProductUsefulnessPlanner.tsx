@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { FOOD_DB, calcBBQualityScore } from '../../../core/nutrition-database';
 import { useDataLink } from '../../../core/data-link';
 import { scoreAllProducts, compareProducts, calcMealScore, CATEGORY_LABELS, GOAL_MAP_RU } from '../../../engines/product-usefulness.engine';

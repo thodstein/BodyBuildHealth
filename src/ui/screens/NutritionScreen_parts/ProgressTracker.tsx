@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { getProfile } from '../../../core/profile-manager';
 
 interface WeightEntry { date: string; weight: number; fatPct?: number; }

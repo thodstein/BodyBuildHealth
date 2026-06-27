@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useDataLink } from '../../core/data-link';
 import { analyzeRecovery, shouldTrain } from '../../engines/recovery-optimization.engine';
 import { getBiohackingProtocols, getHomeGymSetups } from '../../engines/biohacking-environment.engine';

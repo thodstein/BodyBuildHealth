@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { SYSTEM_MECHANISMS } from '../../../core/system-mechanisms';
 import { SYSTEM_INFO, SYSTEM_INFO_ALL, MECHANISM_INFO, SYSTEM_ORGANS } from '../../../core/risk-info';
 import { PHARMA_DB } from '../../../core/pharma-database';

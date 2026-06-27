@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ExerciseSafetyPanel.tsx — BB10: выбор/оценка безопасности упражнения (Этап INT6).
  * REUSE movement-engines (classifyMovement/getMuscleSynergy/getJointStress/assessSafety) + biomechanics-risk-engine (quickSafetyCheck).
  */

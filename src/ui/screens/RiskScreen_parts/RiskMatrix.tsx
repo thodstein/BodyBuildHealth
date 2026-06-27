@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import type { RiskResult, MechanismCell } from '../../../core/types';
 import { RISK_SYSTEMS } from '../../../core/constants';
 import { MECHANISM_INFO, SYSTEM_INFO } from '../../../core/risk-info';
