@@ -677,7 +677,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const CATALOG_IDS = useMemo(() => new Set(Object.keys(SUPPORT_CATALOG_DATA).map(k => k.toLowerCase())), []);
 
   // Neurotoxicity tab state (lifted from IIFE to component level)
-  const [neuroTab, setNeuroTab] = useState<'calc' | 'mechanisms' | 'support'>('calc');
+  const [neuroTab, setNeuroTab] = useState<'calc' | 'mechanisms' | 'support'>('mechanisms');
 
   // Catalog sub-tab
   const [catalogSubTab, setCatalogSubTab] = useState<'type' | 'organ' | 'tier' | 'stack'>('type');
@@ -2195,7 +2195,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'protocols' ? '35px' : section === 'generator' ? '55px' : section === 'info' || calcView === 'info' || calcView === 'peptides' ? '55px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'protocols' ? '40px' : section === 'generator' ? '55px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '80px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (with back/home) ===== */}
       {section === 'generator' && (
@@ -4169,7 +4169,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       <span style={{ fontSize:8, color:'var(--text-dim)' }}>🏥 Травмы в анамнезе</span>
                       <span style={{ fontSize:9, fontWeight:700, color: jointScore<20?'#22c55e':jointScore<40?'#f59e0b':jointScore<60?'#f97316':'#ef4444' }}>{injuryHistory}/5</span>
                     </div>
-                    <input type="range" min="0" max="5" value={injuryHistory} onChange={e=>setInjuryHistory(Number(e.target.value))} style={{ width:'100%' }} />
+                    <input type="range" min="0" max="5" value={injuryHistory} onChange={e=>setInjuryHistory(Number(e.target.value))} style={{ width:'100%', accentColor:'#f59e0b' }} />
                     <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, color:'var(--text-dim)' }}><span>Нет</span><span>Растяжения</span><span>Разрывы</span></div>
                   </div>
                   <div>
@@ -4177,7 +4177,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       <span style={{ fontSize:8, color:'var(--text-dim)' }}>🏋️ Тренировочная нагрузка</span>
                       <span style={{ fontSize:9, fontWeight:700, color: jointScore<20?'#22c55e':jointScore<40?'#f59e0b':jointScore<60?'#f97316':'#ef4444' }}>{trainLoad}/5</span>
                     </div>
-                    <input type="range" min="0" max="5" value={trainLoad} onChange={e=>setTrainLoad(Number(e.target.value))} style={{ width:'100%' }} />
+                    <input type="range" min="0" max="5" value={trainLoad} onChange={e=>setTrainLoad(Number(e.target.value))} style={{ width:'100%', accentColor:'#f97316' }} />
                     <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, color:'var(--text-dim)' }}><span>Лёгкая</span><span>Умеренная</span><span>Тяжёлые веса</span></div>
                   </div>
                 </div>
@@ -4338,18 +4338,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               </div>
             </div>
           </InfoErrorBoundary>)}
-
-          {/* Warning card — compact, under tabs */}
-          <div style={{ margin:'6px 0', padding:'8px 10px', borderRadius:4,
-            background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)',
-          }}>
-            <div style={{ fontSize:10, fontWeight:700, color:'#ef4444', marginBottom:4, display:'flex', alignItems:'center', gap:4 }}>
-              <span style={{ fontSize:13 }}>⚠️</span> ВАЖНАЯ ИНФОРМАЦИЯ
-            </div>
-            <div style={{ fontSize:8, lineHeight:1.3, color:'rgba(255,255,255,0.85)' }}>
-              Информация ознакомительная. Выбор схемы и интерпретация анализов — только специалистом. Обратитесь к врачу.
-            </div>
-          </div>
         </div>
       )}
 

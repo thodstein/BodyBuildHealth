@@ -556,26 +556,10 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
           {pctCourse.length === 0 ? (
             <div style={s.card}>
               <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>💊</div>
-                <div style={{ fontSize: 12 }}>Курс не найден</div>
-                <div style={{ fontSize: 10, marginTop: 4 }}>Добавьте препараты во вкладке Фармакология → Курс</div>
+                <div style={{ fontSize: 13 }}>Добавьте препараты в Фармакология → Курс для расчёта ПКТ</div>
               </div>
             </div>
-          ) : !pctPlan ? (
-            <div style={s.card}>
-              <div style={{ textAlign: 'center', padding: 20 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
-                  Активных веществ в курсе: {pctCourse.length}
-                </div>
-                <button onClick={() => { const plan = generatePCTPlan(pctCourse, Math.max(...pctCourse.map(c => c.endWeek))); setPctPlan(plan); }} style={{
-                  padding: '12px 24px', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                  background: 'linear-gradient(135deg, #00e68a, #00c77a)', color: '#000', border: 'none',
-                }}>
-                  🔄 Сгенерировать ПКТ
-                </button>
-              </div>
-            </div>
-          ) : (
+          ) : pctPlan ? (
             <>
               <div style={s.card}>
                 <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>Восстановление фертильности</h4>
@@ -598,7 +582,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 </div>
               </div>
             </>
-          )}
+          ) : null}
         </div>
       )}
 
