@@ -5,7 +5,6 @@ import { checkDrugInteractions } from '../../engines/pharma-interactions.engine'
 import { db } from '../../core/db';
 import { notifyDataChange } from '../../core/data-link';
 import type { CourseEntry } from '../../core/types';
-import { getBioStackStackIds, getBioStackSubstances } from '../../engines/biostack-bridge';
 
 const CLASS_LABELS: Record<string, string> = {
   testosterone: 'Тестостерон', trenbolone: 'Тренболон', nandrolone: 'Нандролон',
@@ -365,31 +364,6 @@ export const PharmaCourseScreen: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* BioStack AI — active support stack */}
-      {(() => {
-        const stackIds = getBioStackStackIds();
-        if (stackIds.length === 0) return null;
-        const subs = getBioStackSubstances();
-        return (
-          <div className="pc-card" style={{ marginTop: 10, padding: '10px 12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#00e68a' }}>🧬 BioStack AI • {stackIds.length} компонентов</span>
-            </div>
-            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-              {subs.slice(0, 10).map(s => (
-                <span key={s.id} style={{ padding: '2px 6px', borderRadius: 5, fontSize: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.1)', color: '#00e68a' }}>
-                  {s.nameRu || s.name}
-                </span>
-              ))}
-              {subs.length > 10 && <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>+{subs.length - 10}...</span>}
-            </div>
-            <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 4 }}>
-              🧬 Настроить поддержку: SupportScreen → BioStack AI
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ========= DRUG PICKER MODAL ========= */}
       {showPicker && (

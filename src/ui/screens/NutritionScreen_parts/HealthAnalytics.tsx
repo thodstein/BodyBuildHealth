@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 
 const LABS: { id: string; label: string; unit: string; refLow: number; refHigh: number }[] = [
-  { id: 'hematocrit', label: 'Р“РµРјР°С‚РѕРєСЂРёС‚ (HCT)', unit: '%', refLow: 40, refHigh: 49 },
-  { id: 'hemoglobin', label: 'Р“РµРјРѕРіР»РѕР±РёРЅ', unit: 'Рі/Р»', refLow: 130, refHigh: 160 },
+  { id: 'hematocrit', label: 'Гематокрит (HCT)', unit: '%', refLow: 40, refHigh: 49 },
+  { id: 'hemoglobin', label: 'Гемоглобин', unit: 'г/л', refLow: 130, refHigh: 160 },
   { id: 'hdl', label: 'ЛПВП', unit: 'ммоль/л', refLow: 1.0, refHigh: 2.0 },
   { id: 'ldl', label: 'ЛПНП', unit: 'ммоль/л', refLow: 0, refHigh: 3.0 },
-  { id: 'alt', label: 'РђР›Рў', unit: 'Р•Рґ/Р»', refLow: 0, refHigh: 45 },
-  { id: 'ast', label: 'РђРЎРў', unit: 'Р•Рґ/Р»', refLow: 0, refHigh: 35 },
-  { id: 'crp', label: 'РЎР Р‘', unit: 'РјРі/Р»', refLow: 0, refHigh: 1.0 },
-  { id: 'testosterone', label: 'РўРµСЃС‚РѕСЃС‚РµСЂРѕРЅ', unit: 'РЅРјРѕР»СЊ/Р»', refLow: 12, refHigh: 35 },
+  { id: 'alt', label: 'АЛТ', unit: 'Ед/л', refLow: 0, refHigh: 45 },
+  { id: 'ast', label: 'АСТ', unit: 'Ед/л', refLow: 0, refHigh: 35 },
+  { id: 'crp', label: 'СРБ', unit: 'мг/л', refLow: 0, refHigh: 1.0 },
+  { id: 'testosterone', label: 'Тестостерон', unit: 'нмоль/л', refLow: 12, refHigh: 35 },
 ];
 
 const HEALTH_ISSUES: { id: string; icon: string; label: string; desc: string; foodIds: string[] }[] = [
@@ -86,14 +86,14 @@ export const HealthAnalytics: React.FC = () => {
     const hct = val('hematocrit');
     const hb = val('hemoglobin');
     if (hct && hct > 51) w.push('🚨 КР�?Т�?ЧЕСК�?Й ГЕМАТОКР�?Т! Кровь слишком густая — риск тромбоза. Сдайте кровь или добавьте антикоагулянты.');
-    if (hct && hct < 37) w.push('вљ пёЏ РќРёР·РєРёР№ РіРµРјР°С‚РѕРєСЂРёС‚ вЂ” РІРѕР·РјРѕР¶РЅР° Р°РЅРµРјРёСЏ. Р”РѕР±Р°РІСЊС‚Рµ Р¶РµР»РµР·Рѕ, B12, С„РѕР»Р°С‚С‹.');
+    if (hct && hct < 37) w.push('⚠️ Низкий гематокрит — возможна анемия. Добавьте железо, B12, фолаты.');
     const ldl = val('ldl');
     if (ldl && ldl > 4.2) w.push('🚨 Высокий ЛПНП — риск атеросклероза. Снизьте насыщенные жиры, добавьте Омега-3, клетчатку, коэнзим Q10.');
     const hdl = val('hdl');
     if (hdl && hdl < 0.8) w.push('🚨 Низкий ЛПВП — риск атеросклероза. Добавьте жирную рыбу, оливковое масло, авокадо.');
     const alt = val('alt');
     if (alt && alt > 80) w.push('🚨 АЛТ > 80 — токсическое поражение печени. �?сключите гепатотоксичные препараты, добавьте TUDCA+NAC.');
-    else if (alt && alt > 45) w.push('вљ пёЏ РђР›Рў РїРѕРІС‹С€РµРЅ вЂ” РЅР°РіСЂСѓР·РєР° РЅР° РїРµС‡РµРЅСЊ. Р”РѕР±Р°РІСЊС‚Рµ РіРµРїР°С‚РѕРїСЂРѕС‚РµРєС‚РѕСЂС‹ (TUDCA, NAC, СЃРёР»РёРјР°СЂРёРЅ).');
+    else if (alt && alt > 45) w.push('⚠️ АЛТ повышен — нагрузка на печень. Добавьте гепатопротекторы (TUDCA, NAC, силимарин).');
     const crp = val('crp');
     if (crp && crp > 3) w.push('🚨 СРБ > 3 — системное воспаление. Добавьте Омега-3, куркумин, проверьте ЖКТ.');
     const t = val('testosterone');
@@ -145,11 +145,11 @@ export const HealthAnalytics: React.FC = () => {
               </div>
             ))}
           </div>
-          {!hasAnyLabs && <div style={{ marginTop: 6, fontSize: 7, color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>Р’РІРµРґРёС‚Рµ Р·РЅР°С‡РµРЅРёСЏ Р°РЅР°Р»РёР·РѕРІ</div>}
+          {!hasAnyLabs && <div style={{ marginTop: 6, fontSize: 7, color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>Введите значения анализов</div>}
         </div>
         {hasAnyLabs && <div style={{ marginBottom: 8 }}>
           {getWarnings().length === 0 ? (
-            <div style={{ padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.1)', fontSize: 8, color: '#00e68a' }}>вњ… Р’СЃРµ Р°РЅР°Р»РёР·С‹ РІ РЅРѕСЂРјРµ.</div>
+            <div style={{ padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.1)', fontSize: 8, color: '#00e68a' }}>✅ Все анализы в норме.</div>
           ) : getWarnings().map((w, i) => (
             <div key={i} style={{ padding: '6px 8px', marginBottom: 3, borderRadius: 6, background: w.startsWith('🚨') ? 'rgba(239,68,68,0.08)' : 'rgba(249,115,22,0.06)', border: '1px solid rgba(239,68,68,0.1)', fontSize: 7, color: w.startsWith('🚨') ? '#ef4444' : '#f97316', lineHeight: 1.4 }}>{w}</div>
           ))}
@@ -172,7 +172,7 @@ export const HealthAnalytics: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <span style={{ fontSize: 14 }}>{h.icon}</span>
                       <span style={{ fontSize: 10, fontWeight: 600, color: isActive ? '#8b5cf6' : 'rgba(255,255,255,0.7)' }}>{h.label}</span>
-                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.65)' }}>В· {h.foodIds.length} РїСЂРѕРґСѓРєС‚РѕРІ</span>
+                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.65)' }}>· {h.foodIds.length} продуктов</span>
                     </div>
                     <span style={{ fontSize: 9, color: isActive ? '#8b5cf6' : 'rgba(255,255,255,0.2)' }}>{isActive ? 'вњ“' : '+'}</span>
                   </div>
@@ -191,7 +191,7 @@ export const HealthAnalytics: React.FC = () => {
           </div>
         </div>
         <div style={{ ...cardBg, padding: '10px 12px', marginBottom: 8 }}>
-          <div style={{ ...sectionTitle, color: '#f59e0b' }}>вљ пёЏ РђР»Р»РµСЂРіРµРЅС‹</div>
+          <div style={{ ...sectionTitle, color: '#f59e0b' }}>⚠️ Аллергены</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
             {ALLERGEN_LIST.map(a => {
               const isActive = activeAllergens.includes(a.id);
@@ -212,18 +212,18 @@ export const HealthAnalytics: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 8, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
               {HEALTH_ISSUES.filter(h => activeIssues.includes(h.id)).map(h => {
                 const tips: Record<string, string> = {
-                  oedema: 'в¬‡ РќР°С‚СЂРёР№: СѓР±РµСЂРёС‚Рµ СЃРѕР»СЊ, СЃРѕСѓСЃС‹, РєРѕР»Р±Р°СЃС‹. в¬† РљР°Р»РёР№: Р·РµР»РµРЅСЊ, Р°РІРѕРєР°РґРѕ, Р±Р°С‚Р°С‚.',
-                  lactose_intolerance: 'в¬‡ Р›Р°РєС‚РѕР·Р°: Р·Р°РјРµРЅРёС‚Рµ РјРѕР»РѕРєРѕ РЅР° Р±РµР·Р»Р°РєС‚РѕР·РЅРѕРµ, СЃС‹СЂ РЅР° С‚РѕС„Сѓ. Р¤РµСЂРјРµРЅС‚ Р»Р°РєС‚Р°Р·Р° +.',
-                  gluten_intolerance: 'в¬‡ Р“Р»СЋС‚РµРЅ: Р·Р°РјРµРЅРёС‚Рµ РїС€РµРЅРёС†Сѓ РЅР° СЂРёСЃ, РіСЂРµС‡РєСѓ, РєРёРЅРѕР°. Р§РёСЃС‚С‹Рµ РѕРІС‘СЃ (Р±РµР· РєР»РµР№РєРѕРІРёРЅС‹).',
-                  diabetes: 'в¬‡ GI: РёСЃРєР»СЋС‡РёС‚Рµ СЃР°С…Р°СЂ, Р±РµР»С‹Р№ СЂРёСЃ, С…Р»РµР±. в¬† РљР»РµС‚С‡Р°С‚РєР°, Р±РµР»РѕРє, РЅРёР·РєРёРµ GI (РіСЂРµС‡РєР°, С‡РµС‡РµРІРёС†Р°). РЈР¶РёРЅ РЅРёР·РєРѕСѓРіР»РµРІРѕРґРЅС‹Р№.',
-                  hypertension: 'в¬‡ РќР°С‚СЂРёР№ <1500 РјРі/СЃСѓС‚. в¬† РљР°Р»РёР№, РјР°РіРЅРёР№. РСЃРєР»СЋС‡РёС‚Рµ С„Р°СЃС‚С„СѓРґ, РєРѕРЅСЃРµСЂРІС‹, СЃС‹СЂ, РєРѕР»Р±Р°СЃС‹.',
-                  gi_issues: 'в¬† РўРµСЂРјРёС‡РµСЃРєРё РѕР±СЂР°Р±РѕС‚Р°РЅРЅС‹Рµ РѕРІРѕС‰Рё. в¬‡ РЎС‹СЂС‹Рµ РѕРІРѕС‰Рё, Р±РѕР±РѕРІС‹Рµ, РјРѕР»РѕС‡РєР°, Р¶Р°СЂРµРЅРѕРµ. Р”СЂРѕР±РЅРѕРµ РїРёС‚Р°РЅРёРµ.',
+                  oedema: '⬇ Натрий: уберите соль, соусы, колбасы. ⬆ Калий: зелень, авокадо, батат.',
+                  lactose_intolerance: '⬇ Лактоза: замените молоко на безлактозное, сыр на тофу. Фермент лактаза +.',
+                  gluten_intolerance: '⬇ Глютен: замените пшеницу на рис, гречку, киноа. Чистые овёс (без клейковины).',
+                  diabetes: '⬇ GI: исключите сахар, белый рис, хлеб. ⬆ Клетчатка, белок, низкие GI (гречка, чечевица). Ужин низкоуглеводный.',
+                  hypertension: '⬇ Натрий <1500 мг/сут. ⬆ Калий, магний. �?сключите фастфуд, консервы, сыр, колбасы.',
+                  gi_issues: '⬆ Термически обработанные овощи. ⬇ Сырые овощи, бобовые, молочка, жареное. Дробное питание.',
                   gout: '⬇ Пурины: ограничьте печень, красное мясо, сардины, пиво. ⬆ Вода 2-3л.',
-                  kidney_stones: 'в¬‡ РћРєСЃР°Р»Р°С‚С‹: С€РїРёРЅР°С‚, СЃРІС‘РєР»Р°, РѕСЂРµС…Рё, С€РѕРєРѕР»Р°Рґ. в¬† Р’РѕРґР° 2.5-3Р». Р›РёРјРѕРЅРЅР°СЏ РІРѕРґР° РёРЅРіРёР±РёСЂСѓРµС‚ РєР°РјРЅРё.',
+                  kidney_stones: '⬇ Оксалаты: шпинат, свёкла, орехи, шоколад. ⬆ Вода 2.5-3л. Лимонная вода ингибирует камни.',
                 };
                 return (
                   <div key={h.id} style={{ padding: '4px 0' }}>
-                    <span style={{ fontWeight: 600, color: '#a78bfa' }}>{h.icon} {h.label}:</span> {tips[h.id] || 'РЎРѕР±Р»СЋРґР°Р№С‚Рµ РґРёРµС‚РёС‡РµСЃРєРёРµ СЂРµРєРѕРјРµРЅРґР°С†РёРё РІР°С€РµРіРѕ РІСЂР°С‡Р°.'}
+                    <span style={{ fontWeight: 600, color: '#a78bfa' }}>{h.icon} {h.label}:</span> {tips[h.id] || 'Соблюдайте диетические рекомендации вашего врача.'}
                   </div>
                 );
               })}
@@ -233,15 +233,15 @@ export const HealthAnalytics: React.FC = () => {
         <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#8b5cf6' }}>{activeIssues.length}</div>
-            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)' }}>РђРєС‚РёРІРЅС‹С… РїСЂРѕР±Р»РµРј</div>
+            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)' }}>Активных проблем</div>
           </div>
           <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.1)' }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#f59e0b' }}>{activeAllergens.length}</div>
-            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)' }}>РђРєС‚РёРІРЅС‹С… Р°Р»Р»РµСЂРіРµРЅРѕРІ</div>
+            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)' }}>Активных аллергенов</div>
           </div>
           <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.1)' }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#00e68a' }}>{totalExcluded}</div>
-            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)' }}>РСЃРєР»СЋС‡РµРЅРѕ РїСЂРѕРґСѓРєС‚РѕРІ</div>
+            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)' }}>�?сключено продуктов</div>
           </div>
         </div>
       </>}

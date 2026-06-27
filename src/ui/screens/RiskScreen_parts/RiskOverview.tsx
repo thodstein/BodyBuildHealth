@@ -9,7 +9,6 @@ import { getRiskColor } from '../../../core/utils/risk-colors';
 import type { AggregatedRisk } from '../../../engines/risk.engine';
 import type { WeeklyRiskDynamics } from '../../../engines/weekly-risk-dynamics.engine';
 import { WeeklyRiskChart } from './WeeklyRiskChart';
-import { getBioStackStackIds, getStackRiskCoverage, RISK_SYSTEM_LABELS, getBioStackSubstances } from '../../../engines/biostack-bridge';
 
 function mapRiskSystem(riskSystem: string): string { return RISK_SYSTEM_MAP[riskSystem] || riskSystem; }
 function getSystemLabel(sys: string): string { return SYSTEM_INFO[sys]?.label || sys; }

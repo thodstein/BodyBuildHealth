@@ -3,7 +3,8 @@ import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, SUBSYSTEM_MAP, SUBSYSTEM_PARENT, DRUG_T
 import { PHARMA_DB } from '../../core/pharma-database';
 import { SYSTEM_INFO, SYSTEM_INFO_ALL, MECHANISM_INFO, SYSTEM_ORGANS } from '../../core/risk-info';
 import type { RiskResult, MechanismCell, LabPoint, CourseEntry } from '../../core/types';
-import { calculateRisks, calculateAggregatedRisks, type AggregatedRisk } from '../../engines/risk.engine';
+import { calculateAggregatedRisks, type AggregatedRisk } from '../../engines/risk.engine';
+import { calculateTZRisk, toCompatibleResult, type TZRiskResult } from '../../engines/risk-engine-tz';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
 import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine';
 import { getRiskColor } from '../../core/utils/risk-colors';
@@ -138,18 +139,38 @@ export const RiskScreen: React.FC = () => {
   // Determine if penalty should be applied
   const shouldApplyPenalty = globalNoLabs || noLabsSystems.length > 0;
 
-  // Compute pharma risk
+  // Compute pharma risk — using TZ engine (single source of truth)
   const pharmaRisk = useMemo<RiskResult | null>(() => {
     if (!linked.profile) return null;
-    const genetics = linked.profile.settings.genetics ?? {};
-    return calculateRisks({
-      genetics,
-      nutritionFactor: linked.profile.settings.nutritionFactor ?? 0.8,
-      trainingFactor: linked.profile.settings.trainingFactor ?? 0.7,
-      activeDrugs: linked.activeDrugs,
-      supportCoverage: linked.supportCoverage,
-    });
-  }, [linked.profile, linked.activeDrugs, linked.supportCoverage]);
+    try {
+      const s = linked.profile.settings;
+      const tzResult: TZRiskResult = calculateTZRisk({
+        course: linked.course || [],
+        labs: linked.labs || [],
+        genetics: (s.genetics || {}) as any,
+        nutrition: {
+          proteinPerKg: (s.weight || 80) > 0 ? ((s.nutritionFactor ?? 0.8) * 160) / (s.weight || 80) : 1.8,
+          fiberG: 25, omega3G: 1.5, sodiumG: 3, potassiumG: 3, waterL: 2, calories: 2500,
+        },
+        training: {
+          hasHIIT: (s.workoutsPerWeek ?? 3) >= 4,
+          weeklyMinutes: (s.workoutsPerWeek ?? 3) * (s.avgWorkoutMinutes ?? 60),
+          volumeTonnes: 8000, lissMinutesPerWeek: 60,
+        },
+        weight: s.weight ?? 80, age: s.age ?? 30,
+        sex: (s.sex ?? 'male') as 'male' | 'female',
+        supportSubstances: [],
+      });
+      const compat = toCompatibleResult(tzResult);
+      return {
+        overallRaw: tzResult.overallRaw,
+        overallNet: tzResult.overallNet,
+        systemBreakdown: compat.systemBreakdown,
+        mechanismBreakdown: compat.mechanismBreakdown as any,
+        mechanismDetail: compat.mechanismDetail as any,
+      } as unknown as RiskResult;
+    } catch { return null; }
+  }, [linked.profile, linked.course, linked.labs]);
 
   // Compute lab risk contributions
   const labRiskContributions = useMemo(() => {

@@ -34,6 +34,7 @@ export interface TZRiskInput {
   age: number;
   sex: 'male' | 'female';
   supportSubstances: string[];
+  courseWeek?: number; // 0+  — week of course for accumulation calculation
 }
 
 export interface TZNutritionInput {
@@ -116,14 +117,29 @@ const LAB_MECH_MAP: Record<string, Record<number, string[]>> = {
   reproductive: { 1: ['LH', 'FSH', 'TOTAL_TESTOSTERONE'], 2: ['SPERM_COUNT'], 3: ['SPERM_MORPH'], 4: ['SPERM_MOTIL'], 5: ['PSA'], 6: ['PSA'], 7: ['TOTAL_TESTOSTERONE', 'ESTRADIOL', 'PROLACTIN'] },
 };
 
-// ─── Drug Dose Factor: D_i = min(2.0, (dose/threshold)^γ) ───
+// ─── Drug Dose Factor: D_i = min(2.0, (dose/threshold)^γ) × accumulation ───
 
-function computeDrugDoseFactor(substanceId: string, dosePerWeek: number): number {
+function computeDrugDoseFactor(substanceId: string, dosePerWeek: number, courseWeek: number): number {
   const GAMMA = 1.2;
   const threshold = DRUG_THRESHOLDS_V7[substanceId];
   if (!threshold || !threshold.dosePerWeek) return 1.0;
   const ratio = dosePerWeek / threshold.dosePerWeek;
-  return Math.min(2.0, Math.pow(ratio, GAMMA));
+  let doseF = Math.min(2.0, Math.pow(ratio, GAMMA));
+
+  // Accumulation model: steady-state ratio from half-life
+  const ph = PHARMA_DB[substanceId] as any;
+  const halfLifeDays = ph?.pk?.halfLifeHours ? ph.pk.halfLifeHours / 24 : 7;
+  const dosingIntervalDays = halfLifeDays > 3 ? 7 : halfLifeDays > 1 ? 3.5 : 1;
+  const k = Math.LN2 / halfLifeDays;
+  const ssr = 1 / (1 - Math.exp(-k * dosingIntervalDays));
+  const accumFactor = Math.max(1.0, Math.min(2.5, ssr));
+
+  // Course progress: how far into the course (0 = first week, 1 = steady state)
+  const weeksToSteady = halfLifeDays * 0.7;
+  const progress = Math.min(1.0, Math.max(0, courseWeek / weeksToSteady));
+  const effectiveAccum = 1.0 + (accumFactor - 1.0) * progress;
+
+  return doseF * effectiveAccum;
 }
 
 // ─── Compute Drug Contribution per Mechanism ───
@@ -357,7 +373,8 @@ function geometricMean(values: number[]): number {
 // ─── Main TZ Risk Calculation ───
 
 export function calculateTZRisk(input: TZRiskInput): TZRiskResult {
-  const { course, labs, genetics, nutrition, training, weight, age, sex, supportSubstances } = input;
+  const { course, labs, genetics, nutrition, training, weight, age, sex, supportSubstances, courseWeek } = input;
+  const effectiveWeek = courseWeek ?? Math.max(...course.map(c => (c.endWeek || 12) - (c.startWeek || 0)), 6);
 
   // 1. Compute per-drug dose factors
   const doseFactors: Record<string, number> = {};
@@ -369,7 +386,7 @@ export function calculateTZRisk(input: TZRiskInput): TZRiskResult {
     weeklyDoses[id] = (weeklyDoses[id] || 0) + weekly;
   }
   for (const [id, dose] of Object.entries(weeklyDoses)) {
-    doseFactors[id] = computeDrugDoseFactor(id, dose);
+    doseFactors[id] = computeDrugDoseFactor(id, dose, effectiveWeek);
   }
 
   // 2. Ensure support reductions loaded

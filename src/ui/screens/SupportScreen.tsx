@@ -38,6 +38,7 @@ import { getSubstanceName, type StackResult as OptimizerStackResult } from '../.
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
 import type { CourseEntry } from '../../core/types';
 import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.engine';
+import { AutoCalculator } from './SupportScreen_parts/AutoCalculator';
 import { calculateSupportTZ, hydrateState } from '../../engines/support-calculator.engine';
 import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engines/support-calculator.types';
 import { calculateTZRisk, toCompatibleResult, type TZRiskResult } from '../../engines/risk-engine-tz';
@@ -54,7 +55,6 @@ type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'research' | 'f
 
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { BioStackAIScreen } from '../components/BioStackAIScreen';
-import { AutoCalculator } from './SupportScreen_parts/AutoCalculator';
 import SupportScoreCard from '../components/SupportScoreCard';
 export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTab }) => {
   const linked = useDataLink();
@@ -73,6 +73,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [supportTierFilter, setSupportTierFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [supportLevel, setSupportLevel] = useState<'basic' | 'mid' | 'max' | 'boost'>('mid');
+  const [courseWeekState, setCourseWeekState] = useState<number>(() => {
+    const c = linked?.course || [];
+    if (!c.length) return 6;
+    return Math.max(...c.map(e => (e.endWeek || 12) - (e.startWeek || 0)), 8);
+  });
   const [manualLevelSelected, setManualLevelSelected] = useState(false);
   const [boostEnabled, setBoostEnabled] = useState(false);
   const [jointMode, setJointMode] = useState(false);
@@ -513,6 +518,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       },
       weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male' | 'female',
       supportSubstances: tzResult.selectedSubstances || [],
+      courseWeek: courseWeekState,
     };
     const tzRiskResult: TZRiskResult = calculateTZRisk(tzRiskInput);
     const tzCompat = toCompatibleResult(tzRiskResult);
@@ -4477,31 +4483,15 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       {/* ===== MIX CALCULATOR moved to supportstacks → mixcalc sub-tab ===== */}
 
 
-
-      {/* ===== AUTO-CALCULATOR (ТЗ) ===== */}
+      {/* ===== AUTO-CALCULATOR INPUT CARDS (TZ) ===== */}
       {genTab === 'calculator' && (
         <AutoCalculator
           key="autoCalc"
           onApply={(applied: { level: string; subs: string[]; result: any }) => {
-            const r = applied.result;
+            // AutoCalculator sets no calc state — old buttons trigger calcSupport() for that
             setAutoCalcResult(applied);
             setSupportLevel(applied.level as 'basic' | 'mid' | 'max' | 'boost');
             setEnhancedSubs(applied.subs || []);
-            setCalcResult({
-              riskBeforeSupport: r?.overallRiskBefore ?? 50,
-              riskAfterSupport: r?.overallRiskAfter ?? 30,
-              supportScore: Math.round(60 - (r?.overallRiskAfter ?? 30) * 0.6),
-              systemSupport: Object.fromEntries(
-                (r?.risk?.systems ?? []).map((s: any) => [s.id, Math.round(100 - s.afterSupport)])
-              ),
-              riskAssessment: {
-                systemBreakdown: Object.fromEntries(
-                  (r?.risk?.systems ?? []).map((s: any) => [s.id, { raw: s.rawScore, net: s.afterSupport }])
-                ),
-              },
-              timestamp: r?.timestamp ?? new Date().toISOString(),
-            });
-            setCalcDone(true);
           }}
         />
       )}
@@ -4841,6 +4831,17 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 10px' }}>Анализ курса + анализов + рисков → персонализированный план</p>
 
             <div style={{ flex:1, overflowY:'auto', paddingRight:4, display:'flex', flexDirection:'column', gap:8 }}>
+
+            {/* Week slider — triggers TZ recalculation */}
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'8px 12px', border:'1px solid var(--border)' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, marginBottom:4 }}>
+                <span style={{ color:'var(--text-dim)' }}>📅 Неделя курса</span>
+                <span style={{ fontWeight:700, color:'var(--accent)' }}>{courseWeekState}</span>
+              </div>
+              <input type="range" min={1} max={Math.max(2, ...((linked.course || []).map(c => (c.endWeek || 12) - (c.startWeek || 0))), 12)}
+                value={courseWeekState} onChange={e => { setCourseWeekState(parseInt(e.target.value)); }}
+                style={{ width:'100%', height:4, accentColor:'var(--accent)', cursor:'pointer' }} />
+            </div>
 
             {/* ===== AUTO-CALCULATOR RESULT (ТЗ) ===== */}
             {autoCalcResult && (() => {

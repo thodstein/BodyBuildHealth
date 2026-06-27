@@ -3,7 +3,7 @@
 // Shows: 7 systems × 7 mechanisms with raw/net risk percentages
 // ============================================================
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useDataLink } from '../../../core/data-link';
 import { calculateTZRisk, type TZRiskResult } from '../../../engines/risk-engine-tz';
 import { MECHANISM_NAMES, SYSTEM_NAMES_RU, CORE_SYSTEMS_V7 } from '../../../engines/risk-engine-v7-matrix';
@@ -17,6 +17,12 @@ const GLASS: React.CSSProperties = {
 
 export const TZRiskMatrix: React.FC = () => {
   const linked = useDataLink();
+  const maxCourseWeeks = useMemo(() => {
+    const c = linked.course || [];
+    if (!c.length) return 12;
+    return Math.max(...c.map(e => (e.endWeek || 12) - (e.startWeek || 0)), 8);
+  }, [linked.course]);
+  const [sliderWeek, setSliderWeek] = useState(() => Math.round(maxCourseWeeks * 0.5));
 
   const tzResult = useMemo<TZRiskResult | null>(() => {
     if (!linked.profile) return null;
@@ -38,9 +44,10 @@ export const TZRiskMatrix: React.FC = () => {
         weight: s.weight ?? 80, age: s.age ?? 30,
         sex: (s.sex ?? 'male') as 'male' | 'female',
         supportSubstances: [],
+        courseWeek: sliderWeek,
       });
     } catch { return null; }
-  }, [linked.profile, linked.course, linked.labs]);
+  }, [linked.profile, linked.course, linked.labs, sliderWeek]);
 
   if (!tzResult) {
     return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Загрузка данных профиля и курса...</div>;
@@ -69,6 +76,14 @@ export const TZRiskMatrix: React.FC = () => {
             <span style={{ color: riskColor(tzResult.overallNet) }}>{tzResult.overallNet}%</span>
           </div>
         </div>
+      </div>
+
+      {/* Week slider */}
+      <div style={{ marginBottom: 10, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
+        <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 3 }}>📅 Неделя курса: {sliderWeek}</div>
+        <input type="range" min={1} max={Math.max(2, maxCourseWeeks)} value={sliderWeek}
+          onChange={e => setSliderWeek(parseInt(e.target.value))}
+          style={{ width: '100%', height: 4, accentColor: 'var(--accent)', cursor: 'pointer' }} />
       </div>
 
       {/* Per-system bars */}

@@ -58,7 +58,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   const profileWeight = linked.profile?.settings?.weight || 80;
   const profileWorkouts = linked.profile?.settings?.workoutsPerWeek || 0;
   const courseEntries = linked.course ?? [];
-  const profileAAS = Array.isArray(courseEntries) && courseEntries.some((e: any) => e.type === 'РђРђРЎ' || e.class === 'aas');
+  const profileAAS = Array.isArray(courseEntries) && courseEntries.some((e: any) => e.type === 'ААС' || e.class === 'aas');
 
   const [plannerTab, setPlannerTab] = useState<PlannerTab>('catalog');
   const [enableA, setEnableA] = useState(true);
@@ -170,20 +170,20 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         const raw = JSON.parse(localStorage.getItem('he_daily_plan') || '[]');
         const fallback = JSON.parse(localStorage.getItem('he_quick_plan_items') || '[]');
         const list = raw.length > 0 ? raw : fallback;
-        if (list.length === 0) { showToast('РќРµС‚ СЃРѕС…СЂР°РЅС‘РЅРЅРѕРіРѕ РїР»Р°РЅР°'); return; }
+        if (list.length === 0) { showToast('Нет сохранённого плана'); return; }
         const items = list.map((i: any) => ({ foodId: i.id || i.foodId, weightGrams: i.amount || i.weightGrams || 100 }));
         setMealProducts(prev => [...prev, ...items]);
-        showToast(`вњ… Р”РѕР±Р°РІР»РµРЅРѕ ${items.length} РїСЂРѕРґСѓРєС‚РѕРІ РёР· РїР»Р°РЅР°`);
+        showToast(`✅ Добавлено ${items.length} продуктов из плана`);
         return;
       }
       if (source === 'recipe') {
         const recipes = JSON.parse(localStorage.getItem('he_recipes') || '[]');
-        if (recipes.length === 0) { showToast('РќРµС‚ СЂРµС†РµРїС‚РѕРІ'); return; }
+        if (recipes.length === 0) { showToast('Нет рецептов'); return; }
         setSourcePicker({ source: 'recipe', title: '📝 Выберите рецепт', items: recipes.map((r: any) => ({ id: r.id, name: r.name, label: `${r.kcal || 0} ккал · Б${r.protein || 0} Ж${r.fat || 0} У${r.carbs || 0}` })) });
         return;
       }
       if (source === 'saved') {
-        if (savedMeals.length === 0) { showToast('РќРµС‚ СЃРѕС…СЂР°РЅС‘РЅРЅС‹С… РїСЂРёС‘РјРѕРІ'); return; }
+        if (savedMeals.length === 0) { showToast('Нет сохранённых приёмов'); return; }
         setSourcePicker({ source: 'saved', title: '💾 Выберите приём', items: savedMeals.map(m => ({ id: m.id, name: m.name, label: `${m.products.length} продуктов` })) });
         return;
       }
@@ -199,12 +199,12 @@ export const ProductUsefulnessPlanner: React.FC = () => {
             if (found) entries.push({ foodId: found.id, weightGrams: parseInt(item.qty) || 100 });
           });
         });
-        if (entries.length === 0) { showToast('РќРµС‚ Р·Р°РїРёСЃРµР№ РІ РґРЅРµРІРЅРёРєРµ Р·Р° СЃРµРіРѕРґРЅСЏ'); return; }
+        if (entries.length === 0) { showToast('Нет записей в дневнике за сегодня'); return; }
         setMealProducts(prev => [...prev, ...entries]);
-        showToast(`вњ… Р”РѕР±Р°РІР»РµРЅРѕ ${entries.length} РїСЂРѕРґСѓРєС‚РѕРІ РёР· РґРЅРµРІРЅРёРєР°`);
+        showToast(`✅ Добавлено ${entries.length} продуктов из дневника`);
         return;
       }
-    } catch { showToast('РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё'); }
+    } catch { showToast('Ошибка загрузки'); }
   };
 
   const handlePickerSelect = (id: string) => {
@@ -212,7 +212,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
     try {
       if (sourcePicker.source === 'saved') {
         const meal = savedMeals.find(m => m.id === id);
-        if (meal) { setMealProducts(prev => [...prev, ...meal.products]); showToast(`вњ… Р—Р°РіСЂСѓР¶РµРЅ В«${meal.name}В»`); }
+        if (meal) { setMealProducts(prev => [...prev, ...meal.products]); showToast(`✅ Загружен «${meal.name}»`); }
       }
       if (sourcePicker.source === 'recipe') {
         const allRecipes = JSON.parse(localStorage.getItem('he_recipes') || '[]');
@@ -224,11 +224,11 @@ export const ProductUsefulnessPlanner: React.FC = () => {
             const found = FOOD_DB.find(f => f.name.toLowerCase() === q) || FOOD_DB.find(f => f.name.toLowerCase().includes(q) || q.includes(f.name.toLowerCase()));
             if (found) mapped.push({ foodId: found.id, weightGrams: 100 });
           });
-          if (mapped.length > 0) { setMealProducts(prev => [...prev, ...mapped]); showToast(`вњ… Р”РѕР±Р°РІР»РµРЅРѕ ${mapped.length} РїСЂРѕРґСѓРєС‚РѕРІ РёР· В«${recipe.name}В»`); }
-          else showToast('РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕРїРѕСЃС‚Р°РІРёС‚СЊ РёРЅРіСЂРµРґРёРµРЅС‚С‹ СЃ Р±Р°Р·РѕР№');
+          if (mapped.length > 0) { setMealProducts(prev => [...prev, ...mapped]); showToast(`✅ Добавлено ${mapped.length} продуктов из «${recipe.name}»`); }
+          else showToast('Не удалось сопоставить ингредиенты с базой');
         }
       }
-    } catch { showToast('РћС€РёР±РєР°'); }
+    } catch { showToast('Ошибка'); }
     setSourcePicker(null);
   };
 
@@ -262,23 +262,23 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               <select value={manualGoal} onChange={e => setManualGoal(e.target.value)} style={{
                 ...INPUT('100%'), padding: '6px 8px', appearance: 'none' as const,
               }}>
-                <option value="">РђРІС‚Рѕ ({profileGoal ? GOAL_MAP_RU[profileGoal] || profileGoal : 'РЅРµ СѓРєР°Р·Р°РЅР°'})</option>
+                <option value="">Авто ({profileGoal ? GOAL_MAP_RU[profileGoal] || profileGoal : 'не указана'})</option>
                 {Object.entries(GOAL_MAP_RU).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
             </div>
             <div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>Р’РµСЃ (РєРі)</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>Вес (кг)</div>
               <input type="number" value={manualWeight} onChange={e => setManualWeight(e.target.value)} style={INPUT('100%')} />
             </div>
             <div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>РўСЂРµРЅРёСЂРѕРІРѕРє/РЅРµРґ</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>Тренировок/нед</div>
               <input type="number" value={manualWorkouts} onChange={e => setManualWorkouts(e.target.value)} style={INPUT('100%')} />
             </div>
             <div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>Р¦РµРЅР° Р·Р° РєРі (в‚Ѕ)</div>
-              <input type="number" value={manualPrice} onChange={e => setManualPrice(e.target.value)} placeholder="РђРІС‚Рѕ" style={INPUT('100%')} />
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>Цена за кг (₽)</div>
+              <input type="number" value={manualPrice} onChange={e => setManualPrice(e.target.value)} placeholder="Авто" style={INPUT('100%')} />
             </div>
           </div>
           <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', marginBottom: 4, lineHeight: 1.3 }}>
@@ -307,7 +307,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
             }}>📋 Авто</button>
           </div>
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: 8, marginTop: 4 }}>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', marginBottom: 6 }}>РњРѕРґСѓР»Рё РѕС†РµРЅРєРё:</div>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', marginBottom: 6 }}>Модули оценки:</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
               {([
                 { key: 'A', color: '#22c55e', state: enableA, set: setEnableA },
@@ -323,7 +323,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
             </div>
             {modulesDesc.length > 0 && (
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', lineHeight: 1.4 }}>
-                РђРєС‚РёРІРЅС‹: {modulesDesc.join(' В· ')}
+                Активны: {modulesDesc.join(' · ')}
               </div>
             )}
           </div>
@@ -335,7 +335,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 background: useV2 ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)',
                 border: useV2 ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
                 color: useV2 ? '#00e68a' : 'rgba(255,255,255,0.75)',
-              }}>{useV2 ? 'вњ… Р’РєР»СЋС‡С‘РЅ' : 'в—‹ Р’С‹РєР»СЋС‡РµРЅ'}</button>
+              }}>{useV2 ? '✅ Включён' : '○ Выключен'}</button>
             </div>
             {useV2 && (
               <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:4 }}>
@@ -354,14 +354,14 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>💊 Фармакология</div>
                 <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
                   {[
-                    { id:'AAS_ORAL', label:'РћСЂР°Р».РђРђРЎ', color:'#ef4444' },
-                    { id:'AAS_INJECTABLE', label:'РРЅСЉРµРєС†.РђРђРЎ', color:'#ef4444' },
+                    { id:'AAS_ORAL', label:'Орал.ААС', color:'#ef4444' },
+                    { id:'AAS_INJECTABLE', label:'�?нъекц.ААС', color:'#ef4444' },
                     { id:'HGH', label:'HGH', color:'#8b5cf6' },
                     { id:'DIURETICS', label:'Р”РёСѓСЂРµС‚РёРєРё', color:'#f59e0b' },
-                    { id:'STIMULATORS', label:'РЎС‚РёРјСѓР»СЏС‚РѕСЂС‹', color:'#f97316' },
-                    { id:'INSULIN_USE', label:'РРЅСЃСѓР»РёРЅ', color:'#8b5cf6' },
-                    { id:'LIVER_SUPPORT', label:'Р“РµРїР°С‚Рѕ', color:'#22c55e' },
-                    { id:'GUT_SUPPORT', label:'Р–РљРў', color:'#22c55e' },
+                    { id:'STIMULATORS', label:'Стимуляторы', color:'#f97316' },
+                    { id:'INSULIN_USE', label:'�?нсулин', color:'#8b5cf6' },
+                    { id:'LIVER_SUPPORT', label:'Гепато', color:'#22c55e' },
+                    { id:'GUT_SUPPORT', label:'ЖКТ', color:'#22c55e' },
                   ].map(p => (
                     <button key={p.id} onClick={() => setV2Profile(prev => ({ ...prev, pharma: { ...prev.pharma, [p.id]: !prev.pharma[p.id as keyof typeof prev.pharma] } }))} style={{
                       padding:'2px 6px', borderRadius:6, fontSize:6, fontWeight:600, cursor:'pointer',
@@ -431,8 +431,8 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               {(manualGoal || manualAAS || manualInsulin) && (
                 <span style={{ fontSize: 6, padding: '2px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)' }}>
                   {manualGoal ? `${GOAL_MAP_RU[manualGoal] || manualGoal}` : ''}
-                  {manualAAS ? ' В· РђРђРЎ' : ''}
-                  {manualInsulin ? ' В· РРЅСЃСѓР»РёРЅ' : ''}
+                  {manualAAS ? ' · ААС' : ''}
+                  {manualInsulin ? ' · �?нсулин' : ''}
                 </span>
               )}
             </div>
@@ -476,15 +476,15 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <div style={{ textAlign: 'right', marginRight: 4 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#22c55e' }}>{food.protein}Рі</div>
-                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)' }}>{food.kcal} РєРєР°Р»</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#22c55e' }}>{food.protein}г</div>
+                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)' }}>{food.kcal} ккал</div>
                       </div>
                       <button onClick={e => { e.stopPropagation(); toggleCompare(food.id); }} style={{
                         padding: '4px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600, whiteSpace: 'nowrap',
                         background: isCompared ? 'rgba(0,230,138,0.15)' : 'rgba(0,230,138,0.08)',
                         border: isCompared ? '1px solid #00e68a' : '1px solid rgba(0,230,138,0.2)',
                         color: isCompared ? '#00e68a' : 'rgba(0,230,138,0.8)',
-                      }}>{isCompared ? 'вњ“ Р’ СЃСЂР°РІРЅРµРЅРёРё' : 'вљ– РЎСЂР°РІРЅРёС‚СЊ'}</button>
+                      }}>{isCompared ? '✓ В сравнении' : '⚖ Сравнить'}</button>
                     </div>
                   </div>
                   {exp && (
@@ -501,7 +501,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         <span style={{ float: 'right', fontWeight: 700, color: vs.phaseMod < 0 ? '#ef4444' : '#22c55e' }}>{vs.phaseMod > 0 ? '+' : ''}{vs.phaseMod.toFixed(1)}</span>
       </div>
       <div style={{ padding: '3px 6px', borderRadius: 6, background: vs.pharmaMod !== 0 ? 'rgba(239,68,68,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${vs.pharmaMod < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}` }}>
-        <span style={{ color: '#8b5cf6' }}>Р¤Р°СЂРјР°</span>
+        <span style={{ color: '#8b5cf6' }}>Фарма</span>
         <span style={{ float: 'right', fontWeight: 700, color: vs.pharmaMod < 0 ? '#ef4444' : '#22c55e' }}>{vs.pharmaMod > 0 ? '+' : ''}{vs.pharmaMod.toFixed(1)}</span>
       </div>
       <div style={{ padding: '3px 6px', borderRadius: 6, background: vs.labMod !== 0 ? 'rgba(239,68,68,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${vs.labMod < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}` }}>
@@ -510,7 +510,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
       </div>
       {vs.timingMod !== 0 && (
         <div style={{ padding: '3px 6px', borderRadius: 6, background: 'rgba(249,115,22,0.04)', border: '1px solid rgba(249,115,22,0.1)' }}>
-          <span style={{ color: '#8b5cf6' }}>РўР°Р№РјРёРЅРі</span>
+          <span style={{ color: '#8b5cf6' }}>Тайминг</span>
           <span style={{ float: 'right', fontWeight: 700, color: vs.timingMod < 0 ? '#ef4444' : '#22c55e' }}>{vs.timingMod > 0 ? '+' : ''}{vs.timingMod.toFixed(1)}</span>
         </div>
       )}
@@ -525,7 +525,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         ))}
       </div>
     ) : (
-      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>РќРµС‚ РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹С… С„Р°РєС‚РѕСЂРѕРІ</div>
+      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>Нет дополнительных факторов</div>
     )}
     {(() => {
       const diaas = calcDIAAS(food);
@@ -533,7 +533,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:7, marginTop:2, padding:'2px 6px', borderRadius:4, background: diaas.diaas >= 1 ? 'rgba(0,230,138,0.04)' : diaas.diaas >= 0.75 ? 'rgba(245,158,11,0.04)' : 'rgba(239,68,68,0.04)', border:`1px solid ${diaas.diaas >= 1 ? 'rgba(0,230,138,0.15)' : diaas.diaas >= 0.75 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)'}` }}>
           <span style={{ color: '#8b5cf6', fontWeight:600 }}>💪 DIAAS</span>
           <span style={{ fontWeight:700, color: diaas.diaas >= 1 ? '#22c55e' : diaas.diaas >= 0.75 ? '#f59e0b' : '#ef4444' }}>{diaas.diaas.toFixed(2)}</span>
-          <span style={{ color:'rgba(255,255,255,0.75)' }}>вЂў Р»РёРјРёС‚: {diaas.limitingAA}</span>
+          <span style={{ color:'rgba(255,255,255,0.75)' }}>• лимит: {diaas.limitingAA}</span>
         </div>
       ) : null;
     })()}
@@ -542,16 +542,16 @@ export const ProductUsefulnessPlanner: React.FC = () => {
 ) : (
 <><div style={{ fontSize: 8, color: score.color, fontWeight: 600, marginBottom: 4 }}>📊 Разбивка скора</div>
   {enableA && <>
-  <ScoreBar label="Р‘РµР»РѕРє" value={score.breakdown.proteinDensity} max={30} color="#3b82f6" />
-  <ScoreBar label="РњРёРєСЂРѕ" value={score.breakdown.microDensity} max={30} color="#22c55e" />
+  <ScoreBar label="Белок" value={score.breakdown.proteinDensity} max={30} color="#3b82f6" />
+  <ScoreBar label="Микро" value={score.breakdown.microDensity} max={30} color="#22c55e" />
   <ScoreBar label="РљР»РµС‚С‡Р°С‚РєР°" value={score.breakdown.fiberQuality} max={20} color="#f97316" />
-  <ScoreBar label="РђРјРёРЅРѕРєРёСЃР»РѕС‚С‹" value={score.breakdown.aminoScore} max={25} color="#ec4899" />
-  <ScoreBar label="РљР°С‚РµРіРѕСЂРёСЏ" value={score.breakdown.tierScore} max={20} color="#f59e0b" /></>}
+  <ScoreBar label="Аминокислоты" value={score.breakdown.aminoScore} max={25} color="#ec4899" />
+  <ScoreBar label="Категория" value={score.breakdown.tierScore} max={20} color="#f59e0b" /></>}
   {enableB && <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.65)' }}>
-    {score.contextBonus.goalMatch > 0 && <span style={{ color: '#22c55e' }}>вњ“ Р¦РµР»СЊ СЃРѕРІРїР°РґР°РµС‚ </span>}
-    {score.contextBonus.timingMatch > 0 && <span style={{ color: '#60a5fa' }}>вњ“ Р’СЂРµРјСЏ РїРѕРґС…РѕРґРёС‚ </span>}
-    {score.contextBonus.pharmaMatch > 0 && <span style={{ color: '#8b5cf6' }}>вњ“ Р¤Р°СЂРјР°-СЃРёРЅРµСЂРіРёСЏ </span>}
-    {score.contextBonus.pharmaMatch < 0 && <span style={{ color: '#ef4444' }}>вљ пёЏ Р¤Р°СЂРјР°-РєРѕРЅС„Р»РёРєС‚ </span>}
+    {score.contextBonus.goalMatch > 0 && <span style={{ color: '#22c55e' }}>✓ Цель совпадает </span>}
+    {score.contextBonus.timingMatch > 0 && <span style={{ color: '#60a5fa' }}>✓ Время подходит </span>}
+    {score.contextBonus.pharmaMatch > 0 && <span style={{ color: '#8b5cf6' }}>✓ Фарма-синергия </span>}
+    {score.contextBonus.pharmaMatch < 0 && <span style={{ color: '#ef4444' }}>⚠️ Фарма-конфликт </span>}
     {(score.contextBonus.goalMatch === 0 && score.contextBonus.timingMatch === 0 && score.contextBonus.pharmaMatch === 0) && (<span style={{ color: 'rgba(255,255,255,0.2)' }}>вЂ”</span>)}
   </div>}
   {enableC && score.costEfficiency && (
@@ -574,7 +574,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
             })}
             {sorted.length === 0 && (
               <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.6)', fontSize: 10 }}>
-                {search ? 'РќРёС‡РµРіРѕ РЅРµ РЅР°Р№РґРµРЅРѕ' : 'РќРµС‚ РїСЂРѕРґСѓРєС‚РѕРІ РІ СЌС‚РѕР№ РєР°С‚РµРіРѕСЂРёРё'}
+                {search ? 'Ничего не найдено' : 'Нет продуктов в этой категории'}
               </div>
             )}
             {sorted.length > 50 && !showAll && (
@@ -593,12 +593,12 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         <div>
           {compareIds.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.6)', fontSize: 10 }}>
-              РќР°Р¶РјРёС‚Рµ вљ– РЅР° РїСЂРѕРґСѓРєС‚Рµ РІ РєР°С‚Р°Р»РѕРіРµ, С‡С‚РѕР±С‹ РґРѕР±Р°РІРёС‚СЊ РІ СЃСЂР°РІРЅРµРЅРёРµ (РґРѕ 3)
+              Нажмите ⚖ на продукте в каталоге, чтобы добавить в сравнение (до 3)
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6' }}>вљ–пёЏ РЎСЂР°РІРЅРµРЅРёРµ:</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6' }}>⚖️ Сравнение:</span>
                 {compareIds.map(id => {
                   const f = FOOD_DB.find(x => x.id === id);
                   return (
@@ -608,7 +608,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                     </span>
                   );
                 })}
-                <button onClick={() => setCompareIds([])} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 7, border: 'none', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer' }}>РћС‡РёСЃС‚РёС‚СЊ</button>
+                <button onClick={() => setCompareIds([])} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 7, border: 'none', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer' }}>Очистить</button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(compareData.length, 3)}, 1fr)`, gap: 6 }}>
                 {compareData.map(({ food, score }: any) => (
@@ -618,14 +618,14 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       <ScoreBadge score={score.total} max={score.maxPossible || 10} color={score.color} label={score.label} />
                     </div>
                     <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', marginBottom: 4, textAlign: 'center' }}>
-                      {food.kcal} РєРєР°Р» В· {food.protein}Рі Р± В· {food.fat}Рі Р¶ В· {food.carbs}Рі Сѓ
+                      {food.kcal} ккал · {food.protein}г б · {food.fat}г ж · {food.carbs}г у
                     </div>
                     {score.breakdown && enableA && <>
-                      <ScoreBar label="Р‘РµР»РѕРє" value={score.breakdown.proteinDensity} max={30} color="#3b82f6" />
-                      <ScoreBar label="РњРёРєСЂРѕ" value={score.breakdown.microDensity} max={30} color="#22c55e" />
+                      <ScoreBar label="Белок" value={score.breakdown.proteinDensity} max={30} color="#3b82f6" />
+                      <ScoreBar label="Микро" value={score.breakdown.microDensity} max={30} color="#22c55e" />
                       <ScoreBar label="РљР»РµС‚С‡Р°С‚РєР°" value={score.breakdown.fiberQuality} max={20} color="#f97316" />
-                      <ScoreBar label="РђРљ" value={score.breakdown.aminoScore} max={25} color="#ec4899" />
-                      <ScoreBar label="РљР°С‚РµРіРѕСЂРёСЏ" value={score.breakdown.tierScore} max={20} color="#f59e0b" />
+                      <ScoreBar label="АК" value={score.breakdown.aminoScore} max={25} color="#ec4899" />
+                      <ScoreBar label="Категория" value={score.breakdown.tierScore} max={20} color="#f59e0b" />
                     </>}
                     {score.factors && useV2 && (
                       <div style={{ marginTop: 4 }}>
@@ -737,7 +737,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       borderBottom: '1px solid rgba(255,255,255,0.02)', display: 'flex', justifyContent: 'space-between',
                     }}>
                       <span>{food.name}</span>
-                      <span style={{ color: 'rgba(255,255,255,0.6)' }}>{food.kcal} РєРєР°Р» В· {food.protein}Рі Р±</span>
+                      <span style={{ color: 'rgba(255,255,255,0.6)' }}>{food.kcal} ккал · {food.protein}г б</span>
                     </div>
                   ))}
                 </div>
@@ -762,9 +762,9 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                           width: 50, padding: '3px 5px', borderRadius: 5, fontSize: 8, background: '#202023',
                           border: '1px solid rgba(255,255,255,0.06)', color: '#fff', outline: 'none', textAlign: 'center',
                         }} />
-                        <span style={{ color: 'rgba(255,255,255,0.75)' }}>Рі</span>
+                        <span style={{ color: 'rgba(255,255,255,0.75)' }}>г</span>
                         <span style={{ color: '#22c55e', minWidth: 30, textAlign: 'right' }}>
-                          {food ? Math.round((food.protein || 0) * mp.weightGrams / 100) : 0}Рі
+                          {food ? Math.round((food.protein || 0) * mp.weightGrams / 100) : 0}г
                         </span>
                         <span onClick={() => setMealProducts(mealProducts.filter((_, i) => i !== idx))} style={{
                           cursor: 'pointer', color: '#ef4444', fontWeight: 700, fontSize: 10, padding: '0 4px',
@@ -779,20 +779,20 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                     <span>в€‘ {mealProducts.reduce((s, mp) => {
                       const f = FOOD_DB.find(x => x.id === mp.foodId);
                       return s + ((f?.kcal || 0) * mp.weightGrams / 100);
-                    }, 0).toFixed(0)} РєРєР°Р»</span>
+                    }, 0).toFixed(0)} ккал</span>
                     <span>🥩 {mealProducts.reduce((s, mp) => {
                       const f = FOOD_DB.find(x => x.id === mp.foodId);
                       return s + ((f?.protein || 0) * mp.weightGrams / 100);
-                    }, 0).toFixed(1)}Рі</span>
+                    }, 0).toFixed(1)}г</span>
                     <span>🧈 {mealProducts.reduce((s, mp) => {
                       const f = FOOD_DB.find(x => x.id === mp.foodId);
                       return s + ((f?.fat || 0) * mp.weightGrams / 100);
-                    }, 0).toFixed(1)}Рі</span>
+                    }, 0).toFixed(1)}г</span>
                     <span>🍚 {mealProducts.reduce((s, mp) => {
                       const f = FOOD_DB.find(x => x.id === mp.foodId);
                       return s + ((f?.carbs || 0) * mp.weightGrams / 100);
-                    }, 0).toFixed(1)}Рі</span>
-                    <span>вљ–пёЏ {mealProducts.reduce((s, mp) => s + mp.weightGrams, 0).toFixed(0)}Рі</span>
+                    }, 0).toFixed(1)}г</span>
+                    <span>⚖️ {mealProducts.reduce((s, mp) => s + mp.weightGrams, 0).toFixed(0)}г</span>
                   </div>
                 </div>
               )}
@@ -810,7 +810,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                   <button onClick={() => setMealProducts([])} style={{
                     padding: '7px 14px', borderRadius: 8, fontSize: 8, border: '1px solid rgba(255,255,255,0.06)',
                     background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.8)', cursor: 'pointer',
-                  }}>РћС‡РёСЃС‚РёС‚СЊ</button>
+                  }}>Очистить</button>
                   {mealResult && (
                     <button onClick={() => {
                       const name = mealName.trim() || `Приём от ${new Date().toLocaleDateString('ru-RU')}`;
@@ -836,7 +836,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <div>
                       <div style={{ fontSize: 10, fontWeight: 700, color: mealResult.color }}>🍽️ Композитный скор</div>
-                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>СЃСЂРµРґРЅРµРІР·РІРµС€РµРЅРЅС‹Р№ РїРѕ РіСЂР°РјРјРѕРІРєРµ</div>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>средневзвешенный по граммовке</div>
                     </div>
                     <ScoreBadge score={mealResult.compositeScore} max={mealResult.maxPossible} color={mealResult.color} label={mealResult.label} />
                   </div>
@@ -847,17 +847,17 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       ['🧈', 'Жиры', `${mealResult.totalFat}г`],
                       ['🍚', 'Углеводы', `${mealResult.totalCarbs}г`],
                       ['🌾', 'Клетчатка', `${mealResult.totalFiber}г`],
-                      ['вљ–пёЏ', 'Р’РµСЃ', `${mealResult.totalWeight}Рі`],
+                      ['⚖️', 'Вес', `${mealResult.totalWeight}г`],
                       ['📊', 'Ккал/г', `${mealResult.kcalPerGram}`],
                     ].map(([icon, label, val]) => (
                       <div key={label} style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
                         <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.6)' }}>{icon} {label}</div>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: label === 'Р‘РµР»РѕРє' ? '#22c55e' : label === 'Р–РёСЂС‹' ? '#f59e0b' : label === 'РЈРіР»РµРІРѕРґС‹' ? '#3b82f6' : '#fff' }}>{val}</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: label === 'Белок' ? '#22c55e' : label === 'Жиры' ? '#f59e0b' : label === 'Углеводы' ? '#3b82f6' : '#fff' }}>{val}</div>
                       </div>
                     ))}
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>Р‘Р–РЈ %</div>
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>БЖУ %</div>
                     <div style={{ display: 'flex', gap: 4, height: 6, borderRadius: 3, overflow: 'hidden' }}>
                       <div style={{ flex: mealResult.pfcRatio.proteinPct, background: '#22c55e' }} />
                       <div style={{ flex: mealResult.pfcRatio.fatPct, background: '#f59e0b' }} />
@@ -877,19 +877,19 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                         color: ps.score >= 55 ? '#22c55e' : ps.score >= 40 ? '#f59e0b' : '#ef4444',
                       }}>{ps.score}</div>
                       <span style={{ flex: 1, fontSize: 8, color: '#fff' }}>{ps.name}</span>
-                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>{ps.weight}Рі</span>
-                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>РІРєР»Р°Рґ {ps.contribution}%</span>
+                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>{ps.weight}г</span>
+                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>вклад {ps.contribution}%</span>
                     </div>
                   ))}
                   {mealResult.weakLink && (
                     <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.1)' }}>
-                      <div style={{ fontSize: 7, color: '#ef4444', fontWeight: 600 }}>вљ пёЏ РЎР»Р°Р±С‹Р№ РїСЂРѕРґСѓРєС‚: {mealResult.weakLink.name}</div>
+                      <div style={{ fontSize: 7, color: '#ef4444', fontWeight: 600 }}>⚠️ Слабый продукт: {mealResult.weakLink.name}</div>
                       <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>{mealResult.weakLink.reason}</div>
                     </div>
                   )}
                   {mealResult.microCoverage.length > 0 && (
                     <div style={{ marginTop: 8 }}>
-                      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>РњРёРєСЂРѕРЅСѓС‚СЂРёРµРЅС‚С‹ (% РѕС‚ СЃСѓС‚РѕС‡РЅРѕР№ РЅРѕСЂРјС‹)</div>
+                      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>Микронутриенты (% от суточной нормы)</div>
                       {mealResult.microCoverage.slice(0, 10).map(m => (
                         <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                           <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)', minWidth: 24 }}>{m.name}</span>
@@ -899,7 +899,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                               borderRadius: 2 }} />
                           </div>
                           <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', minWidth: 30, textAlign: 'right' }}>
-                            {m.percent}% В· {m.current}{m.key.startsWith('Vit') ? 'РјРєРі' : 'РјРі'}
+                            {m.percent}% · {m.current}{m.key.startsWith('Vit') ? 'мкг' : 'мг'}
                           </span>
                         </div>
                       ))}
@@ -937,7 +937,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>
                         {meal.products.map(p => {
                           const f = FOOD_DB.find(x => x.id === p.foodId);
-                          return `${f?.name || p.foodId} (${p.weightGrams}Рі)`;
+                          return `${f?.name || p.foodId} (${p.weightGrams}г)`;
                         }).join(', ')}
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>

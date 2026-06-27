@@ -53,6 +53,90 @@
 
 ✅ `tsc --noEmit` ✓, `vite build` ✓
 
+---
+
+## 🎯 ГЕНЕРАЛЬНЫЙ ПЛАН (Gap Analysis: ТЗ vs Реализация)
+
+### БЛОК 1: Support Engine (ТЗ раздел 10) — БАДы+аптека 🔴
+| № | Задача | Статус |
+|----|--------|--------|
+| S1 | Клинические эффекты: цифры мета-анализов для веществ | ❌ |
+| S2 | Карта покрытия raw→net — таблица 18 строк system×mechanism | ❌ |
+| S3 | Персонализация SNP (COMT, MTHFR) — в SupportScreen | 🟡 |
+| S4 | Понедельный вывод плана в UI | ❌ |
+| S5 | Каталог фармы: targetSystems/cvProfile/linkedRisks — ВСЕ препараты | ❌ |
+| S6 | Каталог фармы: maxUsageWeeks, labMarkers, restrictions | ❌ |
+| S7 | synergy-network.ts: расширить (грибы, адаптогены, лекарства) | 🟡 |
+| S8 | Грибы: категоризация (чага→immunity, cordyceps→renal) | ❌ |
+| S9 | «О подборе» — перенос/убрать | ❌ |
+| S10 | Сохранение плана «Мои планы» (localStorage) | ❌ |
+| S11 | Синхронизация RiskScreen ↔ support.engine.ts | ❌ |
+
+### БЛОК 2: Pharma Engine (ТЗ раздел 9)
+| № | Задача | Статус |
+|----|--------|--------|
+| P1 | Гистерезис: dMarker/dt = (E(t−τ)−Marker)/τ | ❌ |
+| P2 | Ребаунд: A·e^{−λt}·sin(2πt/T) + Overshoot | ❌ |
+| P3 | Байесовское обновление (фильтр Калмана) | ❌ |
+
+### БЛОК 3: Labs Engine (ТЗ раздел 12)
+| № | Задача | Статус |
+|----|--------|--------|
+| L1 | 80+ маркеров + словарь синонимов | 🟡 |
+| L2 | UCUM-нормализация единиц | ❌ |
+| L3 | LOINC коды | ❌ |
+| L4 | API FHIR/REST (Инвитро, Хеликс, CMD) | ❌ |
+| L5 | Тренды (линейная регрессия) | 🟡 |
+| L6 | Прогноз на 2/4/6 недель с 95% ДИ | ❌ |
+| L7 | Фазовая логика (baseline/курс/ПКТ/мост) | ❌ |
+
+### БЛОК 4: Nutrition (ТЗ разделы 7-8) + Баги
+| № | Задача | Статус |
+|----|--------|--------|
+| N1 | USDA FoodData Central | ❌ |
+| N2 | OCR со скриншотов (Tesseract.js) | ❌ |
+| N3 | Полный микронутриентный профиль | 🟡 |
+| N4 | Интеграция питание↔фарма | ❌ |
+| N5 | HGI (Hunger & Glycemic Index) | ❌ |
+| N6 | IndividualPlan — краш при загрузке | ❌ |
+| N7 | Питание→Отчёты: кнопка «Сгенерировать» | ❌ |
+| N8 | Все блоковые отчёты — проверка сохранения | ❌ |
+
+### БЛОК 5: Training
+| № | Задача | Статус |
+|----|--------|--------|
+| T1 | SRCBBScreen: 3 подвкладки PL/BB/Ручной | 🟡 |
+| T2 | Описания циклов (cycle/block/embed) | 🟡 |
+| T3 | Тренировки→Отчёты: генерация + архив | 🟡 |
+
+### БЛОК 6: UI/UX — Профиль, Биостак
+| № | Задача | Статус |
+|----|--------|--------|
+| U1 | Профиль→Дневники: 12 карточек — реальный контент | ❌ |
+| U2 | Профиль→Сон: дневник (часы, качество, график) | ❌ |
+| U3 | Профиль→Давление: архив + график | ❌ |
+| U4 | Биостак AI: 6/7 подвкладок (Сборка, Стек, Риски, Сравнение, Отчёты, AI) | ❌ |
+| U5 | Фертильность→Анализы: ввод (поля, лейблы, spacing) | ❌ |
+| U6 | ProfileScreen: useState из IIFE в компоненты | ❌ |
+
+### БЛОК 7: Predictive Analytics (ТЗ раздел 15)
+| № | Задача | Статус |
+|----|--------|--------|
+| A1 | ARIMA(1,1,1) / Холт-Уинтерс | ❌ |
+| A2 | What-if сценарии | ❌ |
+| A3 | Прогноз readiness/fatigue/MRR/HGI | 🟡 |
+
+### БЛОК 8: Readiness Engine (ТЗ раздел 3)
+| № | Задача | Статус |
+|----|--------|--------|
+| R1 | Recovery score: HRVratio, DOMS, Stress, SleepScore | 🟡 |
+| R2 | Support score: 49 механизмов ∏ формула | 🟡 |
+| R3 | Fatigue score: TrainingLoad, SubjFatigue, HRincrease | 🟡 |
+
+### Порядок: S1→S4→S5→S8→S9→S11→N6→N8→P1→L1→N1→T1→U1→A1→R1
+
+---
+
 ## Session Summary (Jun 27 — Part 3) — Substance ID mapping fix (critical)
 ### Done
 - **CRITICAL FIX: Substance ID mismatch** — `SYNERGY_ID_SUBSTANCES` used lowercase IDs (`nac`, `tudca`, `zinc`, `omega3`…) while `SUPPORT_CATALOG_DATA` keys were UPPERCASE (`NAC`, `TUDCA`…) and 28 substances were missing from catalog entirely. This caused `renderCatalogDetail` to return `null` for all plan substances.

@@ -43,7 +43,7 @@ export const ProgressTracker: React.FC = () => {
       {/* Input */}
       <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8 }}>
         <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
-          <input value={weightInput} onChange={e => setWeightInput(e.target.value)} type="number" step="0.1" placeholder="Р’РµСЃ (РєРі)" style={{
+          <input value={weightInput} onChange={e => setWeightInput(e.target.value)} type="number" step="0.1" placeholder="Вес (кг)" style={{
             flex: 1, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: '#202023',
             border: '1px solid rgba(255,255,255,0.06)', color: '#fff', outline: 'none',
           }} />
@@ -68,7 +68,7 @@ export const ProgressTracker: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 100, padding: '4px 0' }}>
             {entries.map((e, i) => (
               <div key={e.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                <div title={`${e.date}: ${e.weight} РєРі`} style={{
+                <div title={`${e.date}: ${e.weight} кг`} style={{
                   width: '100%', maxWidth: 30, height: `${barH(e.weight)}%`,
                   borderRadius: '4px 4px 0 0', background: e.weight > entries[Math.max(0, i - 1)].weight ? '#ef4444' : '#22c55e',
                   opacity: 0.8, transition: 'height 0.2s',
@@ -82,9 +82,9 @@ export const ProgressTracker: React.FC = () => {
             <span>{entries[entries.length - 1].date.slice(5)}</span>
           </div>
           <div style={{ marginTop: 4, display: 'flex', gap: 8, fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>
-            <span>РЎС‚Р°СЂС‚: <b>{entries[0].weight} РєРі</b></span>
-            <span>РўРµРєСѓС‰РёР№: <b style={{ color: entries[entries.length - 1].weight <= entries[0].weight ? '#22c55e' : '#ef4444' }}>{entries[entries.length - 1].weight} РєРі</b></span>
-            <span>О”: <b style={{ color: (entries[entries.length - 1].weight - entries[0].weight) <= 0 ? '#22c55e' : '#ef4444' }}>{(entries[entries.length - 1].weight - entries[0].weight).toFixed(1)} РєРі</b></span>
+            <span>Старт: <b>{entries[0].weight} кг</b></span>
+            <span>Текущий: <b style={{ color: entries[entries.length - 1].weight <= entries[0].weight ? '#22c55e' : '#ef4444' }}>{entries[entries.length - 1].weight} кг</b></span>
+            <span>Δ: <b style={{ color: (entries[entries.length - 1].weight - entries[0].weight) <= 0 ? '#22c55e' : '#ef4444' }}>{(entries[entries.length - 1].weight - entries[0].weight).toFixed(1)} кг</b></span>
           </div>
         </div>
       )}
@@ -108,7 +108,7 @@ export const ProgressTracker: React.FC = () => {
                   ))}
                   {report.foodQualityScore && (
                     <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, padding:'3px 6px', borderRadius:4, background:'rgba(255,255,255,0.02)' }}>
-                      <span style={{ color:'rgba(255,255,255,0.7)' }}>в­ђ РљР°С‡РµСЃС‚РІРѕ РїСЂРѕРґСѓРєС‚РѕРІ</span>
+                      <span style={{ color:'rgba(255,255,255,0.7)' }}>⭐ Качество продуктов</span>
                       <span style={{ fontWeight:600, color:'#00e68a' }}>{report.foodQualityScore.toFixed(1)}</span>
                     </div>
                   )}

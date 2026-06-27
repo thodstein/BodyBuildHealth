@@ -67,7 +67,7 @@ export const DailyDietDashboard: React.FC = () => {
   return (
     <div style={{ padding: '8px 0', marginBottom: 8 }}>
       <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 4 }}>📊 Анализ рациона (v2)</div>
-      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', marginBottom: 6 }}>РљРєР°Р»: {Math.round(report.totalKcal)} | DIAAS: {report.diaas.toFixed(2)} | PRAL: {report.pralTotal.toFixed(1)} | РћРјРµРіР°-6/3: {report.omegaRatio.toFixed(1)} | Р“РёСЃС‚Р°РјРёРЅ: {report.histamineSensitive ? 'вљ пёЏ Р§СѓРІСЃС‚РІРёС‚РµР»РµРЅ' : 'вњ… РќРѕСЂРјР°'}</div>
+      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', marginBottom: 6 }}>Ккал: {Math.round(report.totalKcal)} | DIAAS: {report.diaas.toFixed(2)} | PRAL: {report.pralTotal.toFixed(1)} | Омега-6/3: {report.omegaRatio.toFixed(1)} | Гистамин: {report.histamineSensitive ? '⚠️ Чувствителен' : '✅ Норма'}</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
         {bars.map(b => (
           <div key={b.key} style={{ padding: '4px 6px', borderRadius: 8, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)' }}>
@@ -81,12 +81,12 @@ export const DailyDietDashboard: React.FC = () => {
       </div>
       {report.mtorDeficitMg > 0 && !report.mtorTriggered && (
         <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.12)', fontSize: 7, color: '#f97316' }}>
-          вљ пёЏ РќРµ С…РІР°С‚Р°РµС‚ {Math.round(report.mtorDeficitMg)} РјРі Р»РµР№С†РёРЅР° РґР»СЏ mTOR
+          ⚠️ Не хватает {Math.round(report.mtorDeficitMg)} мг лейцина для mTOR
         </div>
       )}
       {report.cortisolRisk && (
         <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.12)', fontSize: 7, color: '#f59e0b' }}>
-          вљ пёЏ РљРѕСЂС‚РёР·РѕР»РѕРІС‹Р№ СЂРёСЃРє вЂ” РЅРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ Р±С‹СЃС‚СЂС‹С… СѓРіР»РµРІРѕРґРѕРІ РїРѕСЃР»Рµ С‚СЂРµРЅРёСЂРѕРІРєРё
+          ⚠️ Кортизоловый риск — недостаточно быстрых углеводов после тренировки
         </div>
       )}
       {report.insulinRicohet && (
@@ -101,7 +101,7 @@ export const DailyDietDashboard: React.FC = () => {
       )}
       {report.giLoadWarning && (
         <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.1)', fontSize: 7, color: '#f97316' }}>
-          вљ пёЏ Р’С‹СЃРѕРєР°СЏ РЅР°РіСЂСѓР·РєР° Р–РљРў вЂ” РїРѕРґРєР»СЋС‡РёС‚Рµ С„РµСЂРјРµРЅС‚С‹
+          ⚠️ Высокая нагрузка ЖКТ — подключите ферменты
         </div>
       )}
       {report.pralWarning && (
