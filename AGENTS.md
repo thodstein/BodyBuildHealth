@@ -1,3 +1,19 @@
+## Session Summary (Jun 27 — Part 2) — Cross-Module Enrichment v2: pharma + labs → support
+### Done
+- **Cross-module enrichment v2**: 4 новых поля в `ScoreInput` (`pharmaHepatic`, `pharmaCardio`, `pharmaRenal`, `pharmaNeuro`) и 4 поля для labs — PK/PD и лаб. риски → коррекция поддержки
+- **Orchestrator Phase 2**: извлекает weightedScore из pharmaResult/labsResult для hepatic/cardio/renal/neuro → передаёт в `runScoreAnalysis`
+- **Кросс-коррекция рекомендаций**: 5 новых правил (pharma hepatic, cardio + labs hepatic, cardio)
+- `tsc --noEmit` ✓, `vite build` ✓
+
+## Session Summary (Jun 27) — Score Engine v2: SupportScoreCard + ScoreDashboard + History Chart + Full Tab Enrich
+### Done
+- **SupportScoreCard**: создан переиспользуемый компонент `src/ui/components/SupportScoreCard.tsx` — 8 систем с цветными барами, свёртка/развёртка, рекомендации, авто-план
+- **AutoCalculator nutrition — real meal data**: подвкладка 🥗 загружает приёмы из `nutrition_diary` localStorage за сегодня вместо пустого массива
+- **AutoCalculator full tab — apply enriched plan**: кнопка ✅ Применить enriched план в калькулятор для cross-module обогащённого плана
+- **ScoreDashboard**: `src/ui/components/ScoreDashboard.tsx` — компактная сводка всех 5 модулей с сортировкой по риску, прогресс-барами, system count. Заменила старую сетку 2×3 в 🧬 табе
+- **ScoreHistoryChart**: `src/ui/components/ScoreHistoryChart.tsx` — SVG line chart трендов риска за 30 дней для всех модулей, с переключаемой легендой. Заменила старые дельта-индикаторы в 🧬 табе
+- `tsc --noEmit` ✓, `vite build` ✓
+
 ## Session Summary (Jun 20)
 ### Done
 - **PctScreen fix**: CLASS_LABELS filled with Russian (`СЕРМ`, `Ингибиторы ароматазы`, `Дофаминовые агонисты`, `Гонадотропины`); pct-planner.engine.ts updated to include `class` in PCTProtocolItem; removed `as any`

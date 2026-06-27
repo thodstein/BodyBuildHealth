@@ -8,6 +8,14 @@ interface SupportScoreCardProps {
   sex: 'male' | 'female';
   nutritionQuality?: number;
   trainingLoad?: number;
+  pharmaHepatic?: number;
+  pharmaCardio?: number;
+  pharmaRenal?: number;
+  pharmaNeuro?: number;
+  labsHepatic?: number;
+  labsCardio?: number;
+  labsRenal?: number;
+  labsNeuro?: number;
 }
 
 const G: React.CSSProperties = {
@@ -22,9 +30,9 @@ const LEVEL_META: Record<string, { icon: string; color: string }> = {
   high: { icon: '🔴', color: '#ef4444' },
 };
 
-export const SupportScoreCard: React.FC<SupportScoreCardProps> = ({ course, weight, age, sex, nutritionQuality, trainingLoad }) => {
+export const SupportScoreCard: React.FC<SupportScoreCardProps> = ({ course, weight, age, sex, nutritionQuality, trainingLoad, pharmaHepatic, pharmaCardio, pharmaRenal, pharmaNeuro, labsHepatic, labsCardio, labsRenal, labsNeuro }) => {
   const [expanded, setExpanded] = useState(false);
-  const result = useMemo<ScoreReport>(() => runScoreAnalysis({ course, weight, age, sex, nutritionQuality, trainingLoad }), [course, weight, age, sex, nutritionQuality, trainingLoad]);
+  const result = useMemo<ScoreReport>(() => runScoreAnalysis({ course, weight, age, sex, nutritionQuality, trainingLoad, pharmaHepatic, pharmaCardio, pharmaRenal, pharmaNeuro, labsHepatic, labsCardio, labsRenal, labsNeuro }), [course, weight, age, sex, nutritionQuality, trainingLoad, pharmaHepatic, pharmaCardio, pharmaRenal, pharmaNeuro, labsHepatic, labsCardio, labsRenal, labsNeuro]);
   if (!course || course.length === 0) return null;
 
   const plan = useMemo(() => getSuggestedPlan(result), [result]);

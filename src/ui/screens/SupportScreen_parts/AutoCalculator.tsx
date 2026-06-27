@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
   runScoreAnalysis, getSuggestedPlan, generateScoreReportText,
   type ScoreReport,
@@ -23,6 +23,8 @@ import type { ModuleResult } from '../../../engines/score-engine';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { getScoreHistory, saveScoreSnapshot, getScoreTrend } from '../../../engines/score-history';
 import ScoreDashboard from '../../components/ScoreDashboard';
+import ScoreHistoryChart from '../../components/ScoreHistoryChart';
+import SupportScoreCard from '../../components/SupportScoreCard';
 
 interface AutoCalculatorProps {
   linked: any;
@@ -223,6 +225,20 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({
     weight, age, sex,
   }), [course, latestLab, trainingPlan, profile, weight, age, sex]);
 
+  // Auto-save score snapshot to history when full results change
+  useEffect(() => {
+    const all = fullResult?.modules || {};
+    if (!all.support && !all.pharma && !all.labs && !all.nutrition && !all.training) return;
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const modules: Record<string, { overallRaw: number; systemCount: number }> = {};
+      for (const [key, val] of Object.entries(all)) {
+        if (val) modules[key] = { overallRaw: val.overallRaw, systemCount: val.systems.filter((s: any) => s.weightedScore > 0).length };
+      }
+      saveScoreSnapshot({ date: today, modules });
+    } catch {}
+  }, [fullResult]);
+
   const currentResult = useMemo<ScoreReport | ModuleResult | null>(() => {
     switch (moduleTab) {
       case 'support': return supportResult_;
@@ -328,7 +344,20 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({
       {/* SUPPORT MODULE */}
       {moduleTab === 'support' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)' }}>💊 Анализ поддержки курса</div>
+          <SupportScoreCard
+            course={course.map((c: any) => ({ substanceId: c.substanceId || c.id || '', dose: c.doseValue || c.dose || 0, unit: c.doseUnit || 'мг', weeks: c.durationWeeks || c.endWeek - c.startWeek || 0 }))}
+            weight={weight} age={age} sex={sex}
+            nutritionQuality={nutritionQuality} trainingLoad={trainingLoad}
+            pharmaHepatic={pharmaResult.systems.find(s => s.id === 'hepatic')?.weightedScore}
+            pharmaCardio={pharmaResult.systems.find(s => s.id === 'cardio')?.weightedScore}
+            pharmaRenal={pharmaResult.systems.find(s => s.id === 'renal')?.weightedScore}
+            pharmaNeuro={pharmaResult.systems.find(s => s.id === 'neuro')?.weightedScore}
+            labsHepatic={labsResult.systems.find(s => s.id === 'hepatic')?.weightedScore}
+            labsCardio={labsResult.systems.find(s => s.id === 'cardio')?.weightedScore}
+            labsRenal={labsResult.systems.find(s => s.id === 'renal')?.weightedScore}
+            labsNeuro={labsResult.systems.find(s => s.id === 'neuro')?.weightedScore}
+          />
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)' }}>💊 Анализ поддержки курса — детально</div>
           <ModuleSystemsView systems={supportResult_.systems} totalLabel={`Risk: ${supportResult_.overallRaw}% → ${supportResult_.overallAfterSupport}% · ${supportResult_.supportCount} веществ`} />
           {supportResult_.organs && supportResult_.organs.length > 0 && (
             <div><div style={{ fontSize: 10, fontWeight: 700, marginBottom: 4, color: 'var(--text)' }}>🔬 Органы под нагрузкой</div>
@@ -517,35 +546,8 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({
             </div>
           )}
 
-          {/* Score History Trends */}
-          {(() => {
-            const history = getScoreHistory();
-            if (history.length < 2) return null;
-            const trendData = ['support', 'pharma', 'nutrition', 'training'].map(key => {
-              const trend = getScoreTrend(key, 7);
-              if (trend.length < 2) return null;
-              const first = trend[0].value;
-              const last = trend[trend.length - 1].value;
-              const delta = last - first;
-              return { key, icon: key === 'support' ? '💊' : key === 'pharma' ? '💉' : key === 'nutrition' ? '🥗' : '🏋️', delta };
-            }).filter(Boolean);
-            if (trendData.length === 0) return null;
-            return (
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 4, color: 'var(--text)' }}>📈 Тренды (7 дней)</div>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  {trendData.map((t: any) => (
-                    <div key={t.key} style={{ ...GLASS_CARD, padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ fontSize: 10 }}>{t.icon}</span>
-                      <span style={{ fontSize: 9, color: t.delta > 0 ? '#ef4444' : t.delta < 0 ? '#22c55e' : 'var(--text-dim)' }}>
-                        {t.delta > 0 ? '↑' : t.delta < 0 ? '↓' : '→'} {Math.abs(t.delta)}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+          {/* Score History Trends Chart */}
+          <ScoreHistoryChart days={30} />
 
           {/* All recommendations */}
           <ModuleRecsView recommendations={fullResult.recommendations} />

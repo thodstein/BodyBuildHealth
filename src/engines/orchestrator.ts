@@ -102,6 +102,19 @@ export function runPipeline(input: OrchestratorInput): OrchestratorResult {
     ? trainingResult.overallRaw
     : undefined;
 
+  // Pharma → support modifiers (PK/PD risk → усиливает потребность в поддержке)
+  const getSysRisk = (r: ModuleResult | null, id: string) => r?.systems?.find(s => s.id === id)?.weightedScore;
+  const pharmaHepatic = getSysRisk(pharmaResult, 'hepatic');
+  const pharmaCardio = getSysRisk(pharmaResult, 'cardio');
+  const pharmaRenal = getSysRisk(pharmaResult, 'renal');
+  const pharmaNeuro = getSysRisk(pharmaResult, 'neuro');
+
+  // Labs → support modifiers
+  const labsHepatic = getSysRisk(labsResult, 'hepatic');
+  const labsCardio = getSysRisk(labsResult, 'cardio');
+  const labsRenal = getSysRisk(labsResult, 'renal');
+  const labsNeuro = getSysRisk(labsResult, 'neuro');
+
   // Phase 3: Run support WITH cross-modifiers
   const supportResult = input.support
     ? runScoreAnalysis({
@@ -112,6 +125,8 @@ export function runPipeline(input: OrchestratorInput): OrchestratorResult {
         labs: input.support.labs,
         nutritionQuality,
         trainingLoad,
+        pharmaHepatic, pharmaCardio, pharmaRenal, pharmaNeuro,
+        labsHepatic, labsCardio, labsRenal, labsNeuro,
       })
     : null;
 
@@ -141,6 +156,18 @@ export function runPipeline(input: OrchestratorInput): OrchestratorResult {
   }
   if (trainingLoad !== undefined && trainingLoad > 50 && neuroSys && neuroSys.weightedScore >= 40) {
     recommendations.push(`🔗 Кросс-коррекция: Высокая нагрузка тренинга (${trainingLoad}%) усиливает нейро-риск. Увеличьте восстановление.`);
+  }
+  if (pharmaHepatic !== undefined && pharmaHepatic > 40 && hepaticSys && hepaticSys.weightedScore >= 40) {
+    recommendations.push(`🔗 Кросс-коррекция: Фарма даёт нагрузку на печень (${pharmaHepatic}%) — усильте гепатопротекцию.`);
+  }
+  if (pharmaCardio !== undefined && pharmaCardio > 40) {
+    recommendations.push(`🔗 Кросс-коррекция: СС риск от фармы (${pharmaCardio}%) — добавьте кардио-поддержку.`);
+  }
+  if (labsHepatic !== undefined && labsHepatic > 40) {
+    recommendations.push(`🔗 Кросс-коррекция: Анализы печени (${labsHepatic}%) — контроль АЛТ/АСТ, скорректируйте терапию.`);
+  }
+  if (labsCardio !== undefined && labsCardio > 40) {
+    recommendations.push(`🔗 Кросс-коррекция: СС маркеры (${labsCardio}%) — проверьте липиды, HCT, давление.`);
   }
 
   return {

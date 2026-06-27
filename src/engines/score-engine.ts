@@ -43,6 +43,14 @@ export interface ScoreInput {
   // Cross-module modifiers (TZ: данные из других модулей → коррекция рисков)
   nutritionQuality?: number;  // 0-100: качество питания (ниже → выше риск hepatic/metabolic/cardio)
   trainingLoad?: number;      // 0-100: нагрузка тренинга (выше → выше риск neuro/joint/recovery)
+  pharmaHepatic?: number;     // 0-100: риск от фармы для печени (PK/PD)
+  pharmaCardio?: number;      // 0-100: СС риск от фармы
+  pharmaRenal?: number;       // 0-100: риск для почек от фармы
+  pharmaNeuro?: number;       // 0-100: нейро-риск от фармы
+  labsHepatic?: number;       // 0-100: риск печени по анализам
+  labsCardio?: number;        // 0-100: СС риск по анализам
+  labsRenal?: number;         // 0-100: риск почек по анализам
+  labsNeuro?: number;         // 0-100: нейро-риск по анализам
 }
 
 export interface SystemRisk {
@@ -284,7 +292,7 @@ function checkSynergies(supportIds: string[]): SynergyCheck[] {
 // ─── Main Entry Point ───
 
 export function runScoreAnalysis(input: ScoreInput): ScoreReport {
-  const { course, weight, age, sex, nutritionQuality, trainingLoad } = input;
+  const { course, weight, age, sex, nutritionQuality, trainingLoad, pharmaHepatic, pharmaCardio, pharmaRenal, pharmaNeuro, labsHepatic, labsCardio, labsRenal, labsNeuro } = input;
 
   const dbEntries = course.map(c => PHARMA_DB[c.substanceId] || null).filter(Boolean);
 
@@ -308,6 +316,32 @@ export function runScoreAnalysis(input: ScoreInput): ScoreReport {
     }
     if (id === 'neuro' && trainingLoad !== undefined && trainingLoad > 50) {
       adjustedRaw += (trainingLoad - 50) * 0.3; // Перетренированность → нейро-риск
+    }
+    // Pharma PK/PD cross-modifiers
+    if (id === 'hepatic' && pharmaHepatic !== undefined && pharmaHepatic > 30) {
+      adjustedRaw += (pharmaHepatic - 30) * 0.25; // Гепатотоксичность фармы → больше поддержки печени
+    }
+    if (id === 'cardio' && pharmaCardio !== undefined && pharmaCardio > 30) {
+      adjustedRaw += (pharmaCardio - 30) * 0.25; // СС токсичность фармы → больше кардио-поддержки
+    }
+    if (id === 'renal' && pharmaRenal !== undefined && pharmaRenal > 30) {
+      adjustedRaw += (pharmaRenal - 30) * 0.2; // Нефротоксичность фармы
+    }
+    if (id === 'neuro' && pharmaNeuro !== undefined && pharmaNeuro > 30) {
+      adjustedRaw += (pharmaNeuro - 30) * 0.2; // Нейротоксичность фармы
+    }
+    // Labs cross-modifiers
+    if (id === 'hepatic' && labsHepatic !== undefined && labsHepatic > 30) {
+      adjustedRaw += (labsHepatic - 30) * 0.2; // Плохие анализы печени → больше поддержки
+    }
+    if (id === 'cardio' && labsCardio !== undefined && labsCardio > 30) {
+      adjustedRaw += (labsCardio - 30) * 0.2; // Плохие СС анализы
+    }
+    if (id === 'renal' && labsRenal !== undefined && labsRenal > 30) {
+      adjustedRaw += (labsRenal - 30) * 0.2; // Плохие почечные маркеры
+    }
+    if (id === 'neuro' && labsNeuro !== undefined && labsNeuro > 30) {
+      adjustedRaw += (labsNeuro - 30) * 0.15; // Нейро-маркеры по анализам
     }
     const weightedScore = Math.min(100, adjustedRaw * config.weight);
     return {
