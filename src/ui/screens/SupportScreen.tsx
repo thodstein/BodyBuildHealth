@@ -52,6 +52,7 @@ type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'research' | 'f
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { BioStackAIScreen } from '../components/BioStackAIScreen';
 import { AutoCalculator } from './SupportScreen_parts/AutoCalculator';
+import SupportScoreCard from '../components/SupportScoreCard';
 export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTab }) => {
   const linked = useDataLink();
   const [tab, setTab] = useState<SupportTab>(initialTab || 'main');
@@ -218,6 +219,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [supportResult, setSupportResult] = useState<ReturnType<typeof calculateSupport> | null>(null);
   const [calcResult, setCalcResult] = useState<any>(null);
   const [calcDone, setCalcDone] = useState(false);
+  const [autoCalcResult, setAutoCalcResult] = useState<{ level: string; subs: string[]; result: any } | null>(null);
 
   const [dbInteractions, setDbInteractions] = useState<ReturnType<typeof checkSupportInteractions> | null>(null);
   const [dbSearchQuery, setDbSearchQuery] = useState('');
@@ -4441,23 +4443,30 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         </div>
       )}
 
-      {/* ===== AUTO-CALCULATOR — УМНЫЙ ПОДБОР ПОДДЕРЖКИ ===== */}
+      {/* ===== AUTO-CALCULATOR — КАЛЬКУЛЯТОР ПОДДЕРЖКИ ПО ТЗ ===== */}
       {genTab === 'auto' && section === 'generator' && (
         <AutoCalculator
-          linked={linked}
-          supportLevel={supportLevel}
-          boostEnabled={boostEnabled}
-          selectedAnalogs={selectedAnalogs}
-          enhancedSubs={enhancedSubs}
-          calcResult={calcResult}
-          supportResult={supportResult}
-          onApply={(result: any) => {
-            setSupportLevel(result.level);
-            setBoostEnabled(result.boostEnabled);
-            setSelectedAnalogs(result.analogs);
-            setEnhancedSubs(result.subs);
-            setCalcResult(result.calcResult);
-            setSupportResult(result.supportResult);
+          onApply={(applied: { level: string; subs: string[]; result: any }) => {
+            const r = applied.result;
+            setAutoCalcResult(applied);
+            setSupportLevel(applied.level as 'basic' | 'mid' | 'max' | 'boost');
+            setEnhancedSubs(applied.subs || []);
+            // Map AutoCalculator result to old calcResult shape
+            setCalcResult({
+              riskBeforeSupport: r?.overallRiskBefore ?? 50,
+              riskAfterSupport: r?.overallRiskAfter ?? 30,
+              supportScore: Math.round(60 - (r?.overallRiskAfter ?? 30) * 0.6),
+              systemSupport: Object.fromEntries(
+                (r?.risk?.systems ?? []).map((s: any) => [s.id, Math.round(100 - s.afterSupport)])
+              ),
+              riskAssessment: {
+                systemBreakdown: Object.fromEntries(
+                  (r?.risk?.systems ?? []).map((s: any) => [s.id, { raw: s.rawScore, net: s.afterSupport }])
+                ),
+              },
+              timestamp: r?.timestamp ?? new Date().toISOString(),
+            });
+            setCalcDone(true);
             setGenTab('calculator');
           }}
         />
@@ -4803,6 +4812,65 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
 
             <div style={{ flex:1, overflowY:'auto', paddingRight:4, display:'flex', flexDirection:'column', gap:8 }}>
 
+            {/* ===== AUTO-CALCULATOR RESULT (ТЗ) ===== */}
+            {autoCalcResult && (() => {
+              const r = autoCalcResult.result;
+              return <div style={{ background:'rgba(129,140,248,0.08)', border:'1px solid rgba(129,140,248,0.2)', borderRadius:12, padding:12, marginBottom:4 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
+                  <span style={{ fontSize:10, padding:'2px 8px', borderRadius:4, background:'#818cf8', color:'#fff', fontWeight:700 }}>ТЗ</span>
+                  <span style={{ fontSize:11, fontWeight:700, color:'var(--accent)' }}>Калькулятор поддержки по ТЗ</span>
+                  <span style={{ marginLeft:'auto', fontSize:9, color:'var(--text-dim)' }}>Уровень: {autoCalcResult.level}</span>
+                </div>
+
+                {/* Risk bar */}
+                  <div style={{ background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', borderRadius:16, padding:12, marginBottom:6 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, marginBottom:4 }}>
+                    <span style={{ fontWeight:700, color:'var(--text)' }}>📊 Риск</span>
+                    <span style={{ fontWeight:800, color: r?.overallRiskBefore >= 60 ? '#ef4444' : r?.overallRiskBefore >= 30 ? '#fbbf24' : '#22c55e' }}>{r?.overallRiskBefore ?? '?'}% → {r?.overallRiskAfter ?? '?'}%</span>
+                  </div>
+                  <div style={{ height:6, background:'rgba(255,255,255,0.06)', borderRadius:3, overflow:'hidden', position:'relative' }}>
+                    <div style={{ height:'100%', width:`${Math.min(r?.overallRiskBefore ?? 0, 100)}%`, background:(r?.overallRiskBefore ?? 0) >= 60 ? '#ef4444' : (r?.overallRiskBefore ?? 0) >= 30 ? '#fbbf24' : '#22c55e', borderRadius:3 }} />
+                    <div style={{ position:'absolute', top:0, left:0, height:'100%', width:`${Math.min(r?.overallRiskAfter ?? 0, 100)}%`, background:'#22c55e', borderRadius:3, opacity:0.5 }} />
+                  </div>
+                </div>
+
+                {/* Synergy badges */}
+                {(r?.synergyIdsUsed ?? []).length > 0 && <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:6 }}>
+                  {(r.synergyIdsUsed as string[]).map((id: string) =>
+                    <span key={id} style={{ display:'inline-block', padding:'2px 6px', borderRadius:6, fontSize:8, fontWeight:700, background:'#818cf8', color:'#000' }}>{id}</span>
+                  )}
+                </div>}
+
+                {/* Schedule */}
+                {(r?.schedule ?? []).length > 0 && ['morning','afternoon','evening'].map(block => {
+                  const items = (r.schedule as any[]).filter((i: any) => i.timeBlock === block);
+                  if (items.length === 0) return null;
+                  return <div key={block} style={{ marginBottom:4 }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:2 }}>{block === 'morning' ? '🌅 Утро' : block === 'afternoon' ? '☀️ День' : '🌙 Вечер'}</div>
+                    {items.map((item: any) =>
+                      <div key={item.substanceId} style={{ background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', borderRadius:12, padding:'4px 8px', marginBottom:2, display:'flex', alignItems:'center', gap:6 }}>
+                        <span style={{ fontSize:9, fontWeight:600, color:'var(--text)', flex:1 }}>{item.name}</span>
+                        <span style={{ fontSize:8, color:'var(--accent)', fontWeight:700 }}>{item.dose}</span>
+                        <span style={{ fontSize:7, color:'var(--text-dim)' }}>{item.instructions}</span>
+                      </div>
+                    )}
+                  </div>;
+                })}
+
+                {/* Contraindication alerts */}
+                {(r?.contraindicationAlerts ?? []).length > 0 && <div style={{ padding:6, background:'rgba(239,68,68,0.08)', borderRadius:8, marginBottom:4 }}>
+                  {(r.contraindicationAlerts as string[]).map((a: string, i: number) => <div key={i} style={{ fontSize:8, color:'#ef4444', marginBottom:2 }}>{a}</div>)}
+                </div>}
+
+                {(r?.negativeBlocks ?? []).length > 0 && <div style={{ padding:6, background:'rgba(239,68,68,0.06)', borderRadius:8 }}>
+                  <span style={{ fontSize:8, color:'#ef4444', fontWeight:700 }}>🚫 Заблокировано: {(r.negativeBlocks as string[]).join(', ')}</span>
+                </div>}
+
+                <div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right', marginTop:4 }}>Синергий: {(r?.synergyIdsUsed ?? []).length} | Позиций: {(r?.schedule ?? []).length}</div>
+              </div>;
+            })()}
+
+            {/* ===== Course Analysis (AutoCalc also sets this) ===== */}
             {/* ==================== 2a: АНАЛИЗ КУРСА ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
               <div onClick={() => setExpandedCategories(p => ({ ...p, calc_course: !(p.calc_course ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_course ?? true) ? 8 : 0 }}>
@@ -4839,6 +4907,21 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               )}
             </>)}
             </div>
+
+            {/* ==================== Score Engine: TZ Risk Overview ==================== */}
+            {course.length > 0 && (
+              <div>
+                <SupportScoreCard
+                  course={course.map((c: any) => ({
+                    substanceId: c.substanceId || c.id || '',
+                    dose: c.doseValue || c.dose || 0,
+                    unit: c.doseUnit || 'мг',
+                    weeks: c.durationWeeks || c.endWeek - c.startWeek || 0,
+                  }))}
+                  weight={weightKg} age={age} sex={sex}
+                />
+              </div>
+            )}
 
             {/* ==================== 2b: АНАЛИЗ АНАЛИЗОВ ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>

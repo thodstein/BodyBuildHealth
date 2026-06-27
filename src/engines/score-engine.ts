@@ -485,21 +485,99 @@ export function runScoreAnalysis(input: ScoreInput): ScoreReport {
   };
 }
 
+// Mechanism conflict → support substance mechanism mapping (TZ: проблемный механизм → терапевтический)
+const PROBLEM_TO_THERAPY: Record<string, string[]> = {
+  HEPATOTOXICITY: ['GLUTATHIONE_SYNTHESIS', 'ANTIOXIDANT', 'NRF2_ACTIVATION'],
+  LIPID_IMPACT: ['NO_UP', 'ARB_AGONISM', 'B1_BLOCKADE'],
+  HCT_IMPACT: ['NO_UP', 'ANTIOXIDANT'],
+  AROMATIZATION: ['AROMATIZATION'],
+  NEURO_TOXICITY: ['NMDA_BLOCK', 'GABA_MOD', 'ANTIOXIDANT'],
+  PROGESTOGENIC: [],
+};
+
 export function getSuggestedPlan(report: ScoreReport): Array<{ id: string; name: string; dose: string; timing: string }> {
   const suggested: Array<{ id: string; name: string; dose: string; timing: string }> = [];
   const added = new Set<string>();
 
+  // Collect active mechanisms per system from the report
+  const sysMechanisms: Record<string, Set<string>> = {};
   for (const sys of report.systems) {
-    const threshold = sys.id === 'renal' || sys.id === 'immunity' ? 30 : 40;
+    if (sys.weightedScore < 10) continue;
+    sysMechanisms[sys.id] = new Set(sys.activeMechanisms || []);
+  }
+
+  // Collect global mechanisms from report with high stress
+  const highStressMechs = new Set<string>();
+  for (const gm of report.mechanisms) {
+    if (gm.stressLevel >= 40) highStressMechs.add(gm.code);
+  }
+
+  // Score each system for priority sorting
+  const sysPriority: Array<{ id: string; score: number }> = report.systems
+    .filter(s => s.weightedScore > 0)
+    .map(s => ({ id: s.id, score: s.weightedScore }))
+    .sort((a, b) => b.score - a.score);
+
+  // Phase 1: assign substances by mechanism match (TZ: mechanism-driven assignment)
+  for (const { id: sysId } of sysPriority) {
+    const sys = report.systems.find(s => s.id === sysId);
+    if (!sys) continue;
+    const threshold = sysId === 'renal' || sysId === 'immunity' ? 30 : 40;
     if (sys.weightedScore < threshold) continue;
+
+    // Map active problem mechanisms to required therapeutic mechanism codes
+    const activeMechs = sysMechanisms[sysId] || new Set();
+    const therapyMechs = new Set<string>();
+    for (const am of activeMechs) {
+      const mapped = PROBLEM_TO_THERAPY[am];
+      if (mapped) for (const tm of mapped) therapyMechs.add(tm);
+    }
+    // Also add from global high-stress mechanisms
+    for (const hm of highStressMechs) {
+      const mapped = PROBLEM_TO_THERAPY[hm];
+      if (mapped) for (const tm of mapped) therapyMechs.add(tm);
+    }
+
+    const useMechanismMatch = therapyMechs.size > 0;
+
     for (const [subId, info] of Object.entries(SUPPORT_COVERAGE)) {
-      if (info.systems.includes(sys.id) && !added.has(subId)) {
-        added.add(subId);
-        const catalogEntry = (SUPPORT_CATALOG_DATA as any)?.[subId];
-        const name = catalogEntry?.nameRu || PHARMA_DB[subId]?.name || subId;
-        const dose = catalogEntry?.dosage?.mg ? `${catalogEntry.dosage.mg} мг` : '—';
-        const timing = catalogEntry?.dosage?.timing || '—';
-        suggested.push({ id: subId, name, dose, timing: getTimingRu(timing) });
+      if (added.has(subId)) continue;
+      if (!info.systems.includes(sysId)) continue;
+
+      let matches = false;
+      if (useMechanismMatch) {
+        for (const sm of info.mechanisms) {
+          if (therapyMechs.has(sm)) { matches = true; break; }
+        }
+      } else {
+        matches = true;
+      }
+      if (!matches) continue;
+
+      added.add(subId);
+      const catalogEntry = (SUPPORT_CATALOG_DATA as any)?.[subId];
+      const name = catalogEntry?.nameRu || PHARMA_DB[subId]?.name || subId;
+      const dose = catalogEntry?.dosage?.mg ? `${catalogEntry.dosage.mg} мг` : '—';
+      const timing = catalogEntry?.dosage?.timing || '—';
+      suggested.push({ id: subId, name, dose, timing: getTimingRu(timing) });
+    }
+  }
+
+  // Phase 2: Fallback — if no substances via mechanism matching, add one per high-risk system
+  if (suggested.length === 0) {
+    for (const sys of report.systems) {
+      const threshold = sys.id === 'renal' || sys.id === 'immunity' ? 30 : 40;
+      if (sys.weightedScore < threshold) continue;
+      for (const [subId, info] of Object.entries(SUPPORT_COVERAGE)) {
+        if (info.systems.includes(sys.id) && !added.has(subId)) {
+          added.add(subId);
+          const catalogEntry = (SUPPORT_CATALOG_DATA as any)?.[subId];
+          const name = catalogEntry?.nameRu || PHARMA_DB[subId]?.name || subId;
+          const dose = catalogEntry?.dosage?.mg ? `${catalogEntry.dosage.mg} мг` : '—';
+          const timing = catalogEntry?.dosage?.timing || '—';
+          suggested.push({ id: subId, name, dose, timing: getTimingRu(timing) });
+          break;
+        }
       }
     }
   }
