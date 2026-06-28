@@ -523,8 +523,33 @@ export function hydrateState(): Partial<CalculatorState> {
     const raw = localStorage.getItem('he_labs_history');
     if (raw) {
       const arr = JSON.parse(raw); const l = Array.isArray(arr) ? arr : [];
-      const toSlice = (d: any): LabSlice => ({ date: d.date || '', panelSex: d.panelSex || d.values || {}, panelBiochem: d.panelBiochem || {}, panelHematology: d.panelHematology || {}, panelThyroid: d.panelThyroid || {} });
-      result.labs = { preCourse: l[0] ? toSlice(l[0]) : null, midCourse: l[1] ? toSlice(l[1]) : null, postPCT: l[2] ? toSlice(l[2]) : null };
+      const toSlice = (d: any): LabSlice => ({ date: d.date || '', panelSex: d.panelSex || d.values || {}, panelBiochem: d.panelBiochem || {}, panelHematology: d.panelHematology || {}, panelThyroid: d.panelThyroid || {}, panelLipid: d.panelLipid || {}, panelIron: d.panelIron || {}, panelVitamin: d.panelVitamin || {}, panelCardiac: d.panelCardiac || {}, panelCoagulation: d.panelCoagulation || {}, panelInflammatory: d.panelInflammatory || {}, panelAdrenal: d.panelAdrenal || {}, panelMineral: d.panelMineral || {}, panelTumor: d.panelTumor || {}, panelUrinalysis: d.panelUrinalysis || {} });
+      result.labs = { preCourse: l[0] ? toSlice(l[0]) : null, midCourse: l[1] ? toSlice(l[1]) : null, postPCT: l[2] ? toSlice(l[2]) : null, fullPanel: null };
+    }
+  } catch {}
+  // Also read extended profile data saved by the AutoCalculator itself
+  try {
+    const extState = localStorage.getItem('he_autocalc_state');
+    if (extState) {
+      const s = JSON.parse(extState);
+      if (s.neuro) result.neuro = { ...(result.neuro || {}), ...s.neuro };
+      if (s.psych) result.psych = { ...(result.psych || {}), ...s.psych };
+      if (s.genetics) result.genetics = { ...(result.genetics || {}), ...s.genetics };
+      if (s.hepatobiliary) result.hepatobiliary = { ...(result.hepatobiliary || {}), ...s.hepatobiliary };
+      if (s.cardio) result.cardio = { ...(result.cardio || {}), ...s.cardio };
+      if (s.urinary) result.urinary = { ...(result.urinary || {}), ...s.urinary };
+      if (s.goals) result.goals = { ...(result.goals || {}), ...s.goals };
+      if (s.nutrition) result.nutrition = { ...(result.nutrition || {}), ...s.nutrition };
+      if (s.contraindications) result.contraindications = { ...(result.contraindications || {}), ...s.contraindications };
+      if (s.oda) result.oda = { ...(result.oda || {}), ...s.oda };
+      if (s.dental) result.dental = { ...(result.dental || {}), ...s.dental };
+      if (s.gi) result.gi = { ...(result.gi || {}), ...s.gi };
+      if (s.toxicLoad) result.toxicLoad = { ...(result.toxicLoad || {}), ...s.toxicLoad };
+      if (s.epicrisis) result.epicrisis = { ...(result.epicrisis || {}), ...s.epicrisis };
+      if (s.injection) result.injection = { ...(result.injection || {}), ...s.injection };
+      if (s.journal) result.journal = { ...(result.journal || {}), ...s.journal };
+      if (s.labs) result.labs = { ...(result.labs || {}), ...s.labs };
+      if (s.profile) result.profile = { ...(result.profile || {}), ...s.profile };
     }
   } catch {}
   return result;

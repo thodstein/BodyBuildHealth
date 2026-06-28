@@ -43,8 +43,8 @@ const TAB_LABELS: Record<string, string> = {
   diary: '📝 Дневник', charts: '📈 Графики',
   mealplan: '🥗 План', cart: '🛒 Корзина',
   restaurant: '🍽 Ресторан',
-  favorites: '⭐ �?збранное', catalog: '📦 Каталог',
-  reference: '📖 Справочник', recipes: '🍳 Рецепты', reports: '📊 Отчёты', info: 'ℹ️ �?нфо',
+  favorites: '⭐ Избранное', catalog: '📦 Каталог',
+  reference: '📖 Справочник', recipes: '🍳 Рецепты', reports: '📊 Отчёты', info: 'ℹ️ Инфо',
   usefulness: '🧮 Полезность',
   health: '🩺 Здоровье',
   progress: '📈 Прогресс',
@@ -177,8 +177,8 @@ const CartTab: React.FC = () => {
           <div style={{ display:'flex', gap:4, marginBottom:8 }}>
             <input value={newStoreName} onChange={e => setNewStoreName(e.target.value)} placeholder="Название магазина" style={{ flex:1, padding:'6px 10px', borderRadius:8, fontSize:9, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', outline:'none' }}
               onKeyDown={e => { if (e.key === 'Enter') addStore(); }} />
-            <button onClick={addStore} style={{ padding:'6px 12px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:9, fontWeight:700 }}>вњ…</button>
-            <button onClick={() => setShowNewStore(false)} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)', cursor:'pointer', background:'#202023', color:'rgba(255,255,255,0.7)', fontSize:9 }}>вњ•</button>
+            <button onClick={addStore} style={{ padding:'6px 12px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:9, fontWeight:700 }}>✅</button>
+            <button onClick={() => setShowNewStore(false)} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)', cursor:'pointer', background:'#202023', color:'rgba(255,255,255,0.7)', fontSize:9 }}>✕</button>
           </div>
         )}
         <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
@@ -186,7 +186,7 @@ const CartTab: React.FC = () => {
             <div key={s.id} style={{ display:'flex', alignItems:'center', gap:2 }}>
               {storeBtn(s.id === (activeStore?.id || ''), () => switchStore(s.id), `${s.name} (${s.items.length})`)}
               <button onClick={() => duplicateStore(s.id)} style={{ padding:'2px 4px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.8)', fontSize:7 }}>📋</button>
-              {carts.length > 1 && <button onClick={() => deleteStore(s.id)} style={{ padding:'2px 4px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.08)', color:'#ef4444', fontSize:7 }}>вњ•</button>}
+              {carts.length > 1 && <button onClick={() => deleteStore(s.id)} style={{ padding:'2px 4px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.08)', color:'#ef4444', fontSize:7 }}>✕</button>}
             </div>
           ))}
         </div>
@@ -256,7 +256,7 @@ const CartTab: React.FC = () => {
                           </div>
                           <div style={{ display:'flex', alignItems:'center', gap:3 }}>
                             <div style={{ fontSize:11, fontWeight:800, color:'#00e68a' }}>{Math.round(item.kcal)}</div>
-                            <button onClick={() => removeItem(item.id)} style={{ padding:'2px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:8 }}>вњ•</button>
+                            <button onClick={() => removeItem(item.id)} style={{ padding:'2px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:8 }}>✕</button>
                           </div>
                         </div>
                         {/* Price + Note row */}
@@ -306,33 +306,53 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CatalogTab: React.FC = () => {
   const [catSearch, setCatSearch] = React.useState('');
+  const [debouncedSearch, setDebouncedSearch] = React.useState('');
   const [catFilter, setCatFilter] = React.useState('all');
+
+  // Debounce search
+  React.useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(catSearch), 250);
+    return () => clearTimeout(t);
+  }, [catSearch]);
   const [showExclusive, setShowExclusive] = React.useState(false);
   const [catExpanded, setCatExpanded] = React.useState<string | null>(null);
-  const categories = React.useMemo(() => [...new Set(FOOD_DB.map(f => f.category).filter(Boolean) as string[])], []);
+  const [usdaFoods, setUsdaFoods] = React.useState<Array<{id:string;name:string;kcal:number;protein:number;fat:number;carbs:number;fiber?:number;category?:string;tier?:string;description?:string}>>([]);
+
+  React.useEffect(() => {
+    let ok = true;
+    import('../../data/usda-foods').then(m => { if (ok && m.USDA_FOODS) setUsdaFoods(m.USDA_FOODS); }).catch(() => {});
+    return () => { ok = false; };
+  }, []);
+
+  const allFoods = React.useMemo(() => [...FOOD_DB as any[], ...usdaFoods.map(f => ({...f, category: f.category || 'other', tier: f.tier || 'standard', fiber: f.fiber || 0, gi: 0, servingSize: '100g', allergens: [], isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false, dietTags: [] as string[], description: f.description || '', micros: {} }))], [usdaFoods]);
+
+  const categories = React.useMemo(() => [...new Set(allFoods.map(f => f.category).filter(Boolean) as string[])], [allFoods]);
   const addFav = (food: { id: string; name: string; kcal: number; protein: number; fat: number; carbs: number }) => {
     try { const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); const updated = [food.id, ...ids.filter(f => f !== food.id)].slice(0, 100); localStorage.setItem('he_food_favs', JSON.stringify(updated)); } catch {}
   };
   const filtered = React.useMemo(() => {
-    return FOOD_DB.filter(f => {
-      if (catFilter !== 'all' && f.category !== catFilter) return false;
-      if (showExclusive && f.tier !== 'max') return false;
-      if (catSearch && !(f.name||'').toLowerCase().includes(catSearch.toLowerCase())) return false;
-      return true;
-    });
-  }, [catFilter, catSearch, showExclusive]);
+    const q = debouncedSearch.toLowerCase();
+    let result = allFoods;
+    if (catFilter !== 'all') result = result.filter((f: any) => f.category === catFilter);
+    if (showExclusive) result = result.filter((f: any) => f.tier === 'max');
+    if (q) {
+      // Use indexOf for faster substring matching than regex
+      result = result.filter((f: any) => (f.name||'').toLowerCase().indexOf(q) >= 0 || (f.description||'').toLowerCase().indexOf(q) >= 0);
+    }
+    return result.slice(0, 100); // Limit to 100 results for performance
+  }, [catFilter, debouncedSearch, showExclusive, allFoods]);
   const filterBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode) => (
     <button onClick={onClick} style={{ padding:'5px 10px', borderRadius:8, fontSize:8, cursor:'pointer', fontWeight: isActive ? 700 : 400, letterSpacing:0.2, whiteSpace:'nowrap', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>{children}</button>
   );
   const toggleExpanded = (id: string) => setCatExpanded(prev => prev === id ? null : id);
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
     <div style={{ padding:14, ...cardBg }}>
-      <div style={labelSec}>📦 Каталог продуктов ({FOOD_DB.length})</div>
+      <div style={labelSec}>📦 Каталог продуктов ({allFoods.length})</div>
       <input value={catSearch} onChange={e => setCatSearch(e.target.value)} placeholder="🔍 Поиск по названию..." style={inputStyle} />
       <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-        {filterBtn(catFilter === 'all', () => { setShowExclusive(false); setCatFilter('all'); }, `Все (${FOOD_DB.length})`)}
+        {filterBtn(catFilter === 'all', () => { setShowExclusive(false); setCatFilter('all'); }, `Все (${allFoods.length})`)}
         {categories.map(c => {
-          const count = FOOD_DB.filter(f => f.category === c).length;
+          const count = allFoods.filter(f => f.category === c).length;
           return filterBtn(catFilter === c, () => { setShowExclusive(false); setCatFilter(c); }, `${CATEGORY_LABELS[c] || c} (${count})`);
         })}
         <button onClick={() => { setShowExclusive(e => !e); setCatFilter('all'); }} style={{
@@ -351,7 +371,7 @@ const CatalogTab: React.FC = () => {
         {filtered.map(f => {
           const isExpanded = catExpanded === f.id;
           const bbScore = f.bb_quality_score;
-          const scoreLabel = bbScore ? (bbScore >= 7 ? 'вњ…' : 'вљ пёЏ') : '';
+          const scoreLabel = bbScore ? (bbScore >= 7 ? '✅' : '⚠️') : '';
           return (<div key={f.id}>
             <div onClick={() => toggleExpanded(f.id)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', borderRadius:10, background: isExpanded ? 'rgba(0,230,138,0.04)' : '#202023', border: isExpanded ? '1px solid rgba(0,230,138,0.12)' : '1px solid rgba(255,255,255,0.06)', cursor:'pointer' }}>
               <div style={{ flex:1 }}>
@@ -386,7 +406,7 @@ const CatalogTab: React.FC = () => {
               <div style={{ padding:'8px 12px', marginBottom:2, borderRadius:'0 0 10px 10px', background:'rgba(32,32,35,0.6)', border:'1px solid rgba(255,255,255,0.04)', borderTop:'none', fontSize:8, color:'rgba(255,255,255,0.7)' }}>
                 {f.description && <div style={{ marginBottom:3, lineHeight:1.3, fontSize:7 }}>{f.description}</div>}
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:2, marginBottom:3 }}>
-                  <span>⏱ Г�?: {f.gi ?? '—'} | �?�?: {m.insulin_index ?? '—'}</span>
+                  <span>⏱ ГИ: {f.gi ?? '—'} | ИИ: {m.insulin_index ?? '—'}</span>
                   <span>⚡ Клетчатка: {f.fiber ?? '—'}г</span>
                   {m.proteins_animal !== undefined ? <span>🥩 Белок жив.: {m.proteins_animal}г</span> : null}
                   {m.proteins_plant !== undefined ? <span>🌱 Белок раст.: {m.proteins_plant}г</span> : null}
@@ -485,15 +505,15 @@ const CatalogTab: React.FC = () => {
                   mf.glycation_potential === 'HIGH' && <span style={{color:'#f59e0b'}}>🔥 Гликация</span>,
                   mf.ammonia_source_level === 'HIGH' && <span style={{color:'#ef4444'}}>💨 Аммиак HIGH</span>,
                   mf.ammonia_source_level === 'MEDIUM' && <span style={{color:'#a78bfa'}}>💨 Аммиак MED</span>,
-                  mf.heavy_metal_risk === 'HIGH' && <span style={{color:'#ef4444'}}>�?�️ Тяж.мет.</span>,
-                  mf.heavy_metal_risk === 'MEDIUM' && <span style={{color:'#f59e0b'}}>�?�️ Тяж.мет.MED</span>,
+                  mf.heavy_metal_risk === 'HIGH' && <span style={{color:'#ef4444'}}>☢️ Тяж.мет.</span>,
+                  mf.heavy_metal_risk === 'MEDIUM' && <span style={{color:'#f59e0b'}}>☢️ Тяж.мет.MED</span>,
                   mf.cns_impact === 'STIMULANT' && <span style={{color:'#f97316'}}>🧠 Стим.</span>,
-                  mf.cns_impact === 'SEDATIVE' && <span style={{color:'#8b5cf6'}}>�?� Седат.</span>,
+                  mf.cns_impact === 'SEDATIVE' && <span style={{color:'#8b5cf6'}}>😴 Седат.</span>,
                   mf.anabolic_potential === 'HIGH' && <span style={{color:'#00e68a'}}>💪 Анабол</span>,
                   mf.anabolic_potential === 'MEDIUM' && <span style={{color:'#f59e0b'}}>💪 Анабол MED</span>,
                   mf.hepatoprotective && <span style={{color:'#22c55e'}}>🫁 Гепатопр.</span>,
-                  mf.insulin_sensitivity_impact === 'NEGATIVE' && <span style={{color:'#ef4444'}}>📉 �?нс.-сенс NEG</span>,
-                  mf.insulin_sensitivity_impact === 'POSITIVE' && <span style={{color:'#00e68a'}}>📈 �?нс.-сенс POS</span>,
+                  mf.insulin_sensitivity_impact === 'NEGATIVE' && <span style={{color:'#ef4444'}}>📉 Инс.-сенс NEG</span>,
+                  mf.insulin_sensitivity_impact === 'POSITIVE' && <span style={{color:'#00e68a'}}>📈 Инс.-сенс POS</span>,
                   mf.goitrogenic_potential === 'HIGH' && <span style={{color:'#f59e0b'}}>🦋 Зобоген.</span>,
                   mf.detox_support_level === 'HIGH' && <span style={{color:'#22c55e'}}>🧹 Детокс</span>,
                   mf.histamine_level === 'HIGH' && <span style={{color:'#ef4444'}}>🧪 Гистамин HIGH</span>,
@@ -538,7 +558,7 @@ const RecipesTab: React.FC = () => {
   const mealBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode) => (
     <button onClick={onClick} style={{ padding:'5px 12px', borderRadius:8, fontSize:10, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: isActive ? 700 : 400 }}>{children}</button>
   );
-  const mealLabel = (m: string) => m === 'breakfast' ? '🌅' : m === 'lunch' ? '�?�️' : m === 'dinner' ? '🌙' : m === 'snack' ? '🍿' : '';
+  const mealLabel = (m: string) => m === 'breakfast' ? '🌅' : m === 'lunch' ? '?️' : m === 'dinner' ? '🌙' : m === 'snack' ? '🍿' : '';
   const saveRecipe = () => {
     if (!recName.trim()) return;
     const newRecipe = {
@@ -570,7 +590,7 @@ const RecipesTab: React.FC = () => {
         <button onClick={() => setShowRecipeModal(true)} style={{
           padding:'6px 12px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:700,
           border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.1)', color:'#00e68a',
-        }}>+ Р РµС†РµРїС‚</button>
+        }}>+ Рецепт</button>
       </div>
       {/* My recipes collapsible */}
       {myRecipes.length > 0 && (
@@ -600,7 +620,7 @@ const RecipesTab: React.FC = () => {
                     <button onClick={() => deleteMyRecipe(r.id)} style={{
                       padding:'2px 6px', borderRadius:4, cursor:'pointer', fontSize:8,
                       background:'rgba(239,68,68,0.08)', border:'none', color:'#ef4444',
-                    }}>вњ•</button>
+                    }}>✕</button>
                   </div>
                   {r.ingredients?.length > 0 && (
                     <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:3 }}>
@@ -626,7 +646,7 @@ const RecipesTab: React.FC = () => {
               <input value={recName} onChange={e => setRecName(e.target.value)} placeholder="Например: Овсяноблин" style={inputStyle} />
             </div>
             <div style={{ marginBottom:8 }}>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>�?нгредиенты (по одному на строку)</div>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>Ингредиенты (по одному на строку)</div>
               <textarea value={recIngredients} onChange={e => setRecIngredients(e.target.value)} placeholder="Яйца 2 шт&#10;Овсянка 30 г&#10;Творог 50 г" style={{ ...inputStyle, resize:'vertical', minHeight:70, fontSize:10 }} rows={3} />
             </div>
             <div style={{ marginBottom:8 }}>
@@ -638,8 +658,8 @@ const RecipesTab: React.FC = () => {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4 }}>
                 {[
                   { l:'Ккал', v: recKcal, s: setRecKcal, c:'#00e68a' },
-                  { l:'Р‘РµР»РєРё', v: recProtein, s: setRecProtein, c:'#3b82f6' },
-                  { l:'Р–РёСЂС‹', v: recFat, s: setRecFat, c:'#f59e0b' },
+                  { l:'Белки', v: recProtein, s: setRecProtein, c:'#3b82f6' },
+                  { l:'Жиры', v: recFat, s: setRecFat, c:'#f59e0b' },
                   { l:'Углеводы', v: recCarbs, s: setRecCarbs, c:'#f97316' },
                 ].map(m => (
                   <div key={m.l} style={{ textAlign:'center' }}>
@@ -679,8 +699,8 @@ const RecipesTab: React.FC = () => {
                 </div>
                 <div style={{ fontSize:10, display:'flex', gap:4, marginTop:2 }}>
                   <span style={{ color:'#00e68a', fontWeight:700 }}>{r.kcal} ккал</span>
-                  <span style={{ color:'#60a5fa' }}>Р‘{r.protein}</span>
-                  <span style={{ color:'#fbbf24' }}>Р–{r.fat}</span>
+                  <span style={{ color:'#60a5fa' }}>Б{r.protein}</span>
+                  <span style={{ color:'#fbbf24' }}>Ж{r.fat}</span>
                   <span style={{ color:'#fb923c' }}>У{r.carbs}</span>
                 </div>
               </div>
@@ -709,7 +729,7 @@ const RecipesTab: React.FC = () => {
 const RESTAURANT_CUISINE: Record<string, string[]> = {
   russian: ['харчо','лагман','долма','хачапури','чебуреки','пян-се','шницель','котлета по-киевски','бефстроганов','щавелевый суп'],
   asian: ['рамен','жареный рис','курица терияки','вок','поке','том ям','мисо суп','оладьи','курица карри','греческий','оладьи'],
-  italian: ['РїРёС†С†Р°'],
+  italian: ['пицца'],
   fastfood: ['шаурма','бургер','kfc','mcdonald','burger king','макнаггетс','big mac','whopper','вкусно и точка','биг смоук','чизбургер','чизбургер','лонг чикен','twister','твистер','боксмастер','гриль-ролл','куриные фри','наггетс','цезарь','картофель фри','луковые кольца','фалафель','гирос','сэндвич с тунцом','картофель фри'],
 };
 function detectCuisine(name: string): string {
@@ -754,13 +774,13 @@ const RestaurantTab: React.FC = () => {
         </div>
       </div>
     )}
-    {/* Р¤РёР»СЊС‚СЂС‹ */}
+    {/* Фильтры */}
     <div style={{ padding:14, ...cardBg }}>
       <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
         {cuisineBtn('all', 'Все')}
         {cuisineBtn('russian', '🇷🇺 Русская')}
         {cuisineBtn('asian', '🥟 Азиатская')}
-        {cuisineBtn('italian', '🍝 �?тальянская')}
+        {cuisineBtn('italian', '🍝 Итальянская')}
         {cuisineBtn('fastfood', '🍔 Фаст-фуд')}
       </div>
       <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Поиск блюд..." style={{ width:'100%', boxSizing:'border-box', padding:'6px 10px', borderRadius:8, fontSize:9, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', outline:'none' }} />
@@ -778,7 +798,7 @@ const RestaurantTab: React.FC = () => {
               <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{food.name}</div>
-                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>{food.servingSize || ''} В· {detectCuisine(food.name)}</div>
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>{food.servingSize || ''} · {detectCuisine(food.name)}</div>
                 </div>
                 <div style={{ display:'flex', gap:2 }}>
                   {[-1,1].map(d => <button key={d} onClick={() => setPortions(p => ({...p, [food.id]: Math.max(0.25, (p[food.id]||1) + d * 0.25)}))} style={{ width:18, height:18, borderRadius:4, border:'1px solid rgba(255,255,255,0.06)', background:'#18181b', color:'rgba(255,255,255,0.85)', cursor:'pointer', fontSize:10, display:'flex', alignItems:'center', justifyContent:'center' }}>{d>0?'+':'-'}</button>)}
@@ -788,8 +808,8 @@ const RestaurantTab: React.FC = () => {
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:3, marginTop:4 }}>
                 <div style={{ background:'#18181b', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'rgba(255,255,255,0.85)' }}>🔥 {Math.round(food.kcal * portion)}</div>
-                <div style={{ background:'rgba(59,130,246,0.08)', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'#60a5fa' }}>Р‘ {Math.round(food.protein * portion)}</div>
-                <div style={{ background:'rgba(245,158,11,0.08)', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'#fbbf24' }}>Р– {Math.round(food.fat * portion)}</div>
+                <div style={{ background:'rgba(59,130,246,0.08)', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'#60a5fa' }}>Б {Math.round(food.protein * portion)}</div>
+                <div style={{ background:'rgba(245,158,11,0.08)', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'#fbbf24' }}>Ж {Math.round(food.fat * portion)}</div>
                 <div style={{ background:'rgba(249,115,22,0.08)', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'#fb923c' }}>У {Math.round(food.carbs * portion)}</div>
               </div>
               {portion !== 1 && <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', marginTop:2 }}>× {portion.toFixed(2)} порции</div>}
@@ -822,7 +842,7 @@ const SleepGuide: React.FC = () => {
     <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginTop:6 }}>
       🌙 Последний приём за 2-3 ч до сна<br />
       🥛 Казеин/творог 30г на ночь ↓ катаболизм<br />
-      �? Магний 400-600 мг + глицинат улучшают качество сна
+      ? Магний 400-600 мг + глицинат улучшают качество сна
     </div>
   </>);
 };
@@ -943,7 +963,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
                 <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Усиленная</div>
                 <div style={{ fontSize:12, fontWeight:700, color:'#8b5cf6', display:'flex', alignItems:'center', gap:2 }}>
                   {fullReport.weightDynamicsEnhanced.weeklyKg} кг/нед
-                  <span style={{ fontSize:7, color:'rgba(255,255,255,0.8)', fontWeight:400 }}>({fullReport.weightDynamicsEnhanced.confidence === 'high' ? 'вњ“' : '?'})</span>
+                  <span style={{ fontSize:7, color:'rgba(255,255,255,0.8)', fontWeight:400 }}>({fullReport.weightDynamicsEnhanced.confidence === 'high' ? '✓' : '?'})</span>
                 </div>
               </div>
             </div>
@@ -992,7 +1012,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
                 <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{fullReport.waterBalance.intakePerKg}/{fullReport.waterBalance.targetPerKg}</div>
               </div>
             </div>
-            {fullReport.waterBalance.deficitMl > 0 && <div style={{ fontSize:7, color:'#f59e0b' }}>Р”РµС„РёС†РёС‚ {fullReport.waterBalance.deficitMl} РјР»</div>}
+            {fullReport.waterBalance.deficitMl > 0 && <div style={{ fontSize:7, color:'#f59e0b' }}>Дефицит {fullReport.waterBalance.deficitMl} мл</div>}
             <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', marginTop:2, lineHeight:1.4 }}>{fullReport.waterBalance.recommendation}</div>
           </div>
 
@@ -1090,11 +1110,11 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
             <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>🥬 Клетчатка</div>
             <div style={{ display:'flex', gap:4, alignItems:'center' }}>
               <div style={{ flex:1, background:'rgba(34,197,94,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
-                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Р¤Р°РєС‚</div>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Факт</div>
                 <div style={{ fontSize:11, fontWeight:700, color: fullReport.fiberAnalysis.status === 'ok' ? '#00e68a' : fullReport.fiberAnalysis.status === 'low' ? '#f59e0b' : '#ef4444' }}>{fullReport.fiberAnalysis.totalG}г</div>
               </div>
               <div style={{ flex:1, background:'rgba(34,197,94,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
-                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Р¦РµР»СЊ</div>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Цель</div>
                 <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{fullReport.fiberAnalysis.targetG}г</div>
               </div>
               <div style={{ flex:1, background:'rgba(34,197,94,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
@@ -1193,7 +1213,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
           ))}
         </div>
       )}
-      {archiveReports.length > 0 && <button onClick={() => { setArchiveReports([]); localStorage.removeItem('he_nutrition_report_archive'); }} style={{ marginTop:6, padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border:'1px solid rgba(239,68,68,0.2)', background:'rgba(239,68,68,0.06)', color:'#ef4444' }}>🗑 Очистить архив</button>}
+      {archiveReports.length > 0 && <button onClick={() => { setArchiveReports([]); localStorage.removeItem('he_nutrition_report_archive'); localStorage.removeItem('he_nutrition_report_current'); localStorage.removeItem('he_profile_nutrition_reports'); }} style={{ marginTop:6, padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border:'1px solid rgba(239,68,68,0.2)', background:'rgba(239,68,68,0.06)', color:'#ef4444' }}>🗑 Очистить архив</button>}
     </div>)}
 
     {reportSubTab === 'overview' && (<div style={{ padding:14, ...cardBg }}>
@@ -1208,7 +1228,8 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
       {/* Generate + save button */}
       <button onClick={() => {
         try {
-          const report = { id: Date.now().toString(), date: new Date().toISOString().slice(0,10), kcal: Math.round(totals.kcal), protein: Math.round(totals.p), fat: Math.round(totals.f), carbs: Math.round(totals.c), items: data.length, timestamp: Date.now(), overallGrade: 'вЂ”', kbjuPct: { kcal: 0, protein: 0, fat: 0, carbs: 0 }, mealCount: data.length, dietQuality: { score: 0, label: 'вЂ”' }, risks: [], recommendations: [], plan: { days: [] } };
+          const report = { id: Date.now().toString(), date: new Date().toISOString().slice(0,10), kcal: Math.round(totals.kcal), protein: Math.round(totals.p), fat: Math.round(totals.f), carbs: Math.round(totals.c), items: data.length, timestamp: Date.now(), overallGrade: '—', kbjuPct: { kcal: Math.round(totals.kcal), protein: Math.round(totals.p), fat: Math.round(totals.f), carbs: Math.round(totals.c) }, mealCount: data.length, dietQuality: { score: 0, label: '—' }, risks: [], recommendations: [], plan: { days: [] } };
+          localStorage.setItem('he_nutrition_report_current', JSON.stringify(report));
           const archive = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]');
           archive.unshift(report);
           localStorage.setItem('he_nutrition_report_archive', JSON.stringify(archive.slice(0, 20)));
@@ -1265,10 +1286,10 @@ const InfoTab: React.FC = () => {
     { title: '🎯 Расчёт целей КБЖУ', body: 'Калькулятор использует формулу Миффлина-Сан-Жеора для определения базового метаболизма (BMR), умножает на коэффициент активности (PAL) и корректирует под цель: дефицит 20% для похудения, профицит 10-15% для набора массы, поддержание на уровне TDEE.' },
     { title: '🔄 Циклирование углеводов', body: 'Чередование высоко- и низкоуглеводных дней для ускорения метаболизма. В тренировочные дни — норма или повышение углеводов, в дни отдыха — снижение на 30-50%. Автоматически привязывается к дням тренировок из профиля.' },
     { title: '⏱ Тайминг белка', body: 'Равномерное распределение белка (20-40г на приём) каждые 3-4 часа для максимальной стимуляции MPS (мышечного протеинового синтеза). Приоритет: после тренировки (быстрый белок), перед сном (казеин).' },
-    { title: '💉 �?нсулиновое правило', body: '10г углеводов на 1 ЕД инсулина короткого действия — базовое правило коррекции. Алгоритм учитывает гликемический индекс продуктов и подбирает источники углеводов так, чтобы избежать резких скачков сахара.' },
-    { title: '🥦 Алгоритм подбора продуктов', body: '1) Выбор категории под цель 2) Фильтр по бюджету и предпочтениям 3) Проверка аллергенов 4) �?сключение конфликтующих с фармакологией продуктов 5) Рандомизация в рамках пула для разнообразия.' },
-    { title: '⚠ Типичные ошибки', body: '• Пропуск углеводов в тренировочный день\n• Недостаток жиров (ниже 0.8г/кг)\n• Слишком быстрый дефицит (>30% от TDEE)\n• �?гнорирование клетчатки (нужно 25-35г/день)\n• Однообразный рацион (дефицит микронутриентов)' },
-    { title: '🛒 Корзина с магазинами', body: 'Поддержка нескольких магазинов: добавляйте, переименовывайте, удаляйте списки покупок. �?тоговая сумма и калорийность по магазину. Активный магазин сохраняется между сессиями.' },
+    { title: '💉 ИИнсулиновое правило', body: '10г углеводов на 1 ЕД инсулина короткого действия — базовое правило коррекции. Алгоритм учитывает гликемический индекс продуктов и подбирает источники углеводов так, чтобы избежать резких скачков сахара.' },
+    { title: '🥦 Алгоритм подбора продуктов', body: '1) Выбор категории под цель 2) Фильтр по бюджету и предпочтениям 3) Проверка аллергенов 4) Исключение конфликтующих с фармакологией продуктов 5) Рандомизация в рамках пула для разнообразия.' },
+    { title: '⚠ Типичные ошибки', body: '• Пропуск углеводов в тренировочный день\n• Недостаток жиров (ниже 0.8г/кг)\n• Слишком быстрый дефицит (>30% от TDEE)\n• Игнорирование клетчатки (нужно 25-35г/день)\n• Однообразный рацион (дефицит микронутриентов)' },
+    { title: '🛒 Корзина с магазинами', body: 'Поддержка нескольких магазинов: добавляйте, переименовывайте, удаляйте списки покупок. Итоговая сумма и калорийность по магазину. Активный магазин сохраняется между сессиями.' },
     { title: '🎚 Контроль разнообразия', body: 'Три режима: «Минимум» (2 продукта на категорию), «Средний» (4), «Максимум» (весь пул). Пул сортируется детерминированно по seed.' },
     { title: '🩺 Проблемы со здоровьем', body: '8 предустановленных проблем: отёки, непереносимость лактозы/глютена, диабет, гипертония, ЖКТ, подагра, камни в почках. Выбор автоматически исключает продукты.' },
     { title: '📋 Полный отчёт о питании', body: 'Генерирует детальный отчёт: КБЖУ, микронутриенты vs RDA, дефициты, динамика веса, качество продуктов, риски, аллергены, рекомендации, итоговая оценка A/B/C/D.' },
@@ -1276,7 +1297,7 @@ const InfoTab: React.FC = () => {
     { title: '⚡ Быстрые пресеты', body: 'Готовые наборы настроек: мясной, вегетарианский, средиземноморский, кето, High Carb, бюджетный, массонаборный, жиросжигающий.' },
     // НОВОЕ:
     { title: '🧬 v2 Скоринг продуктов (BB Quality + Overall Dietary)', body: 'Новый движок оценки продуктов: BB Quality Score (1-10) — статический рейтинг качества для бодибилдинга на основе макронутриентов, аминокислот, клетчатки. Overall Dietary Score — динамический рейтинг с учётом фазы (набор/сушка/ПКТ/мост), фармакологии (ААС, инсулин, HGH, диуретики), анализов крови (гематокрит, липиды, печень, CRP, HOMA-IR) и тайминга приёма. Включите в ⚙️ Параметры → вкладка v2.' },
-    { title: '📊 DailyDietDashboard', body: 'Панель анализа суточного рациона в планировщике: 7 прогресс-баров (mTOR, ЖКТ-нагрузка, PRAL, Аммиак-риск, Омега-баланс, Электролиты, �?нсулин-риск). Автоматические предупреждения: дефицит лейцина, риск гипогликемии, нехватка микронутриентов.' },
+    { title: '📊 DailyDietDashboard', body: 'Панель анализа суточного рациона в планировщике: 7 прогресс-баров (mTOR, ЖКТ-нагрузка, PRAL, Аммиак-риск, Омега-баланс, Электролиты, Инсулин-риск). Автоматические предупреждения: дефицит лейцина, риск гипогликемии, нехватка микронутриентов.' },
     { title: '🩺 Аналитика здоровья', body: 'Вкладка «Здоровье»: ввод анализов крови (12 маркеров) с автоматической цветовой индикацией (зелёный/жёлтый/красный). Текстовые предупреждения и рекомендации при отклонениях. Карта дефицитов микронутриентов (цинк, магний, железо, кальций, D, B12, омега-3, йод). Кнопка «Оптимизировать каталог» — скрыть продукты с рейтингом <4.0.' },
     { title: '📈 Трекер прогресса', body: 'Вкладка «Прогресс»: ежедневный ввод веса и %жира. График динамики веса с цветовой индикацией (зелёный — снижение, красный — повышение). Старт/текущий вес и дельта. В планах: графики анализов крови и «умных» показателей (аммиак, омега, ЖКТ, микронутриенты).' },
     { title: '🧑‍⚕️ Нутрициолог (FAQ)', body: 'Вкладка «Нутрициолог»: 8 карточек-ответов на частые вопросы (почему низкий рейтинг, HOMA-IR, защита печени, тестостерон, CRP, mTOR, K/Na, энергия). Фильтр по тегам. Ответы адаптированы под профиль пользователя.' },
@@ -1461,7 +1482,7 @@ export const NutritionScreen: React.FC = () => {
       case 'catalog': return <CatalogTab />;
       case 'reference': return <ReferenceTab />;
       case 'recipes': return <RecipesTab />;
-      case 'reports': return <InfoErrorBoundary label="РћС‚С‡С‘С‚С‹"><ReportsTab foodEntries={foodEntries} profile={linked.profile} targets={macroTargets} /></InfoErrorBoundary>;
+      case 'reports': return <InfoErrorBoundary label="Отчёты"><ReportsTab foodEntries={foodEntries} profile={linked.profile} targets={macroTargets} /></InfoErrorBoundary>;
       case 'customfood': return <InfoErrorBoundary label="Свои продукты"><NutritionCustomFood /></InfoErrorBoundary>;
       case 'overview': return <InfoErrorBoundary label="Обзор"><NutritionOverview
         profile={linked.profile}
@@ -1546,7 +1567,7 @@ export const NutritionScreen: React.FC = () => {
         if (nv2.lazyDayActive) active.push('🛋 Ленивый день');
         if (nv2.cravingMode) active.push('🍬 Хочу сладкое');
         if (nv2.compensationActive) active.push(`⚖ Компенсация ${nv2.compensationRemaining}ккал`);
-        if (nv2.hungryLevel > 7) active.push('�?� Высокий голод');
+        if (nv2.hungryLevel > 7) active.push('? Высокий голод');
         if (nv2.metabolicAdaptation > 0) active.push(`📉 Адаптация -${Math.round(nv2.metabolicAdaptation * 100)}%`);
         if (v2Result && v2Result.adjustment !== 0) active.push(`📊 TDEE корр. ${v2Result.adjustment > 0 ? '+' : ''}${v2Result.adjustment}ккал`);
         if (s.bodyFat) active.push(`🧬 %жира: ${s.bodyFat}%`);

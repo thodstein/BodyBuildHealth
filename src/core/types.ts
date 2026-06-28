@@ -386,6 +386,7 @@ export interface PharmaSubstance {
     thrombosisRisk: 'low' | 'medium' | 'high';
     cnsLoad: 'low' | 'medium' | 'high';
   };
+  labMarkers?: string[];
 }
 export interface UserContext {
   id?: string;

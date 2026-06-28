@@ -222,7 +222,7 @@ export const IndividualPlanResults: React.FC = () => {
             const score = calcMealScoreV2(products, profile, 'regular');
             const diaas = calcMealDIAAS(products);
             allMeals.push({ products });
-            results.push({ id, name: '�?� Ленивый день', score, diaas });
+            results.push({ id, name: '?🛋 Ленивый день', score, diaas });
           }
         }
         if (id === 'special_craving' && cravingPlan) {
@@ -319,7 +319,7 @@ export const IndividualPlanResults: React.FC = () => {
           )}
           <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
             <button onClick={() => {
-              const txt = dayPlan ? `🍽 План питания\n${dayPlan.meals.map((m: any) => `${m.time} ${m.label}: ${m.items.map((it: any) => `${it.name} ${it.amount}г`).join(', ')}  [${Math.round(m.totals?.kcal || 0)}ккал]`).join('\n')}\n\n📊 �?того: ${Math.round(dayPlan.totals.kcal)} ккал, Б${Math.round(dayPlan.totals.p)}/Ж${Math.round(dayPlan.totals.f)}/У${Math.round(dayPlan.totals.c)}` : '';
+              const txt = dayPlan ? `🍽 План питания\n${dayPlan.meals.map((m: any) => `${m.time} ${m.label}: ${m.items.map((it: any) => `${it.name} ${it.amount}г`).join(', ')}  [${Math.round(m.totals?.kcal || 0)}ккал]`).join('\n')}\n\n📊 Итого: ${Math.round(dayPlan.totals.kcal)} ккал, Б${Math.round(dayPlan.totals.p)}/Ж${Math.round(dayPlan.totals.f)}/У${Math.round(dayPlan.totals.c)}` : '';
               navigator.clipboard?.writeText(txt);
             }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:7, fontWeight:600 }}>📤 Копировать</button>
             <button onClick={() => {
@@ -329,7 +329,7 @@ export const IndividualPlanResults: React.FC = () => {
                 const parsed = JSON.parse(input);
                 if (parsed.meals) { setDayPlan(parsed); setGenerated(true); }
               } catch { alert('Неверный формат. Скопируйте план через кнопку "Копировать план".'); }
-            }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:7, fontWeight:600 }}>📥 �?мпорт</button>
+            }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:7, fontWeight:600 }}>📥 Импорт</button>
           </div>
         </GlassCard>
       )}
@@ -357,7 +357,7 @@ export const IndividualPlanResults: React.FC = () => {
         <GlassCard title="Аллергены" icon="⚠️" color="#f97316" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
             {allergenExcludedCount > 0 ? (
-              <>🚫 �?сключено <strong style={{ color: '#f97316' }}>{allergenExcludedCount}</strong> продуктов из {FOOD_DB.length} по вашим аллергенам: <span style={{ color: '#fb923c' }}>{allergens.map(a => ALLERGEN_LIST.find(al => al.id === a)?.label || a).join(', ')}</span></>
+              <>🚫 Исключено <strong style={{ color: '#f97316' }}>{allergenExcludedCount}</strong> продуктов из {FOOD_DB.length} по вашим аллергенам: <span style={{ color: '#fb923c' }}>{allergens.map(a => ALLERGEN_LIST.find(al => al.id === a)?.label || a).join(', ')}</span></>
             ) : (
               <>⚠️ Аллергены выбраны ({allergens.map(a => ALLERGEN_LIST.find(al => al.id === a)?.label || a).join(', ')}), но ни один продукт не был исключён — проверьте список продуктов в базе</>
             )}
@@ -420,7 +420,7 @@ export const IndividualPlanResults: React.FC = () => {
               <button onClick={() => { setMonthPlanMode(false); setMonthPlan([]); }} style={{
                 padding:'5px 8px', borderRadius:8, fontSize:8, cursor:'pointer',
                 background:'transparent', color:'rgba(255,255,255,0.8)', border:'1px solid rgba(255,255,255,0.06)',
-              }}>вњ•</button>
+              }}>✕</button>
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.1)' }}>
@@ -447,14 +447,14 @@ export const IndividualPlanResults: React.FC = () => {
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 14 }}>{wIsTraining ? '🏋️' : '�?�'}</span>
+                      <span style={{ fontSize: 14 }}>{wIsTraining ? '🏋️' : '?'}</span>
                       <div>
                         <span style={{ fontSize: 10, fontWeight: 700, color: wIsTraining ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>
                           {DAY_LABELS[di]} · День {di + 1}
                         </span>
                         <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', display: 'flex', gap: 4 }}>
-                          <span style={{ color: '#3b82f6' }}>Р‘ {wP}</span>
-                          <span style={{ color: '#f59e0b' }}>Р– {wF}</span>
+                          <span style={{ color: '#3b82f6' }}>Б {wP}</span>
+                          <span style={{ color: '#f59e0b' }}>Ж {wF}</span>
                           <span style={{ color: '#f97316' }}>У {wC}</span>
                         </div>
                       </div>
@@ -509,7 +509,7 @@ export const IndividualPlanResults: React.FC = () => {
                             {(meal.items || []).slice(0, 2).map((it: any, ii: number) => (
                               <div key={ii} style={{ color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, fontSize: 6 }}>{it.name} {it.amount}г</div>
                             ))}
-                            {meal.items.length > 2 && <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 5 }}>+{meal.items.length - 2} РµС‰С‘</div>}
+                            {meal.items.length > 2 && <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 5 }}>+{meal.items.length - 2} ещё</div>}
                           </td>
                         );
                       })}
@@ -655,10 +655,10 @@ export const IndividualPlanResults: React.FC = () => {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:5 }}>
                 {[{k:'kcal',l:'Ккал',c:'#22c55e'},{k:'protein',l:'Белки',c:'#3b82f6'},{k:'fat',l:'Жиры',c:'#f59e0b'},{k:'carbs',l:'Угл',c:'#f97316'}].map(f => <div key={f.k}><input type="number" value={(newRecipe as Record<string,number|string>)[f.k] as number} onChange={e => setNewRecipe({...newRecipe, [f.k]: +e.target.value || 0})} placeholder={f.l} style={{ width:'100%', padding:'14px 6px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:f.c, fontSize:15, boxSizing:'border-box', outline:'none', textAlign:'center', fontWeight:700 }} /></div>)}
               </div>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>�?нгредиенты</div>
-              <textarea value={newRecipe.ingredients} onChange={e => setNewRecipe({...newRecipe, ingredients: e.target.value})} placeholder="�?нгредиенты (каждый с новой строки)" style={{ width:'100%', padding:'12px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', boxSizing:'border-box', outline:'none', minHeight:64, resize:'vertical', fontSize:13, lineHeight:1.4 }} rows={3} />
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>Ингредиенты</div>
+              <textarea value={newRecipe.ingredients} onChange={e => setNewRecipe({...newRecipe, ingredients: e.target.value})} placeholder="Ингредиенты (каждый с новой строки)" style={{ width:'100%', padding:'12px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', boxSizing:'border-box', outline:'none', minHeight:64, resize:'vertical', fontSize:13, lineHeight:1.4 }} rows={3} />
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>Приготовление</div>
-              <textarea value={newRecipe.instructions} onChange={e => setNewRecipe({...newRecipe, instructions: e.target.value})} placeholder="�?нструкция (каждый шаг с новой строки)" style={{ width:'100%', padding:'12px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', boxSizing:'border-box', outline:'none', minHeight:64, resize:'vertical', fontSize:13, lineHeight:1.4 }} rows={3} />
+              <textarea value={newRecipe.instructions} onChange={e => setNewRecipe({...newRecipe, instructions: e.target.value})} placeholder="Инструкция (каждый шаг с новой строки)" style={{ width:'100%', padding:'12px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', boxSizing:'border-box', outline:'none', minHeight:64, resize:'vertical', fontSize:13, lineHeight:1.4 }} rows={3} />
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>Теги</div>
               <input value={newRecipe.tags} onChange={e => setNewRecipe({...newRecipe, tags: e.target.value})} placeholder="Теги (через запятую)" style={{ width:'100%', padding:'12px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', boxSizing:'border-box', outline:'none', fontSize:13 }} />
               <button onClick={() => {
@@ -705,7 +705,7 @@ export const IndividualPlanResults: React.FC = () => {
                   <div key={cat} style={{ marginBottom: 6 }}>
                     <div style={{ fontSize: 9, fontWeight: 700, color: '#f97316', marginBottom: 2, padding: '2px 0 2px 4px', borderLeft: '2px solid rgba(249,115,22,0.3)', display: 'flex', alignItems: 'center', gap: 4 }}>
                       {cat}
-                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)', marginLeft: 'auto' }}>{items.length} С€С‚</span>
+                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)', marginLeft: 'auto' }}>{items.length} шт</span>
                     </div>
                     {items.map((data: any, i: number) => (
                       <div key={data.name + i} style={{ fontSize: 9, padding: '3px 0 3px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'rgba(255,255,255,0.85)' }}>
@@ -731,8 +731,8 @@ export const IndividualPlanResults: React.FC = () => {
         <GlassCard title="Тайминг препаратов и приёмов пищи" icon="💊" color="#8b5cf6" style={{ border: '1px solid rgba(139,92,246,0.15)' }}>
           {injections.map((inj: DrugInjection) => {
             const isInsulin = inj.type === 'инсулин';
-            const isIGF = inj.type === 'РР¤Р -1';
-            const isGH = inj.type === 'Р“Р ';
+            const isIGF = inj.type === 'IGF-1';
+            const isGH = inj.type === 'ГР';
             const isPeptide = inj.type === 'пептид';
             const isAAS = inj.type === 'ААС';
             return (
@@ -747,11 +747,11 @@ export const IndividualPlanResults: React.FC = () => {
                 {isInsulin && inj.esterType === 'rapid' && (
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
                     ⚡ <strong>Быстрый инсулин (аналог)</strong> — пик 30-90 мин, длительность 3-4ч.<br />
-                    🍚 На <strong>{Math.round(inj.dose * 10)}г углеводов</strong> (10г/ед). Принять сразу перед едой или после. <strong>ПРОПУСК ЕДЫ = Г�?ПОГЛ�?КЕМ�?Я!</strong><br />
+                    🍚 На <strong>{Math.round(inj.dose * 10)}г углеводов</strong> (10г/ед). Принять сразу перед едой или после. <strong>ПРОПУСК ЕДЫ = ГИПОГЛИКЕМИЯ!</strong><br />
                     {inj.trainLinked ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до и после'}). В приёме: изолят сывороточного белка + ${inj.trainTiming === 'before' ? 'амилопектин' : 'декстроза'}.` : ''}
                     {inj.trainLinked && inj.trainTiming !== 'after' ? ' 🚨 На тренировке ОБЯЗАТЕЛЬНО углеводы (изотоник/гейнер/бананы) каждые 20 мин!' : ''}
                     {!inj.trainLinked ? ' ⏰ Не ешь без углеводов — риск гипогликемии!' : ''}<br />
-                    🥑 <strong>Жиры М�?Н�?МУМ</strong> в окне действия (первые 90 мин) — не более 3-5г. Жиры замедляют опорожнение желудка и блокируют поступление глюкозы.<br />
+                    🥑 <strong>Жиры МИНИМУМ</strong> в окне действия (первые 90 мин) — не более 3-5г. Жиры замедляют опорожнение желудка и блокируют поступление глюкозы.<br />
                     🩸 <strong>Глюкоза:</strong> замеры через 15, 30, 60, 90, 120 мин. Цель не ниже 4.0 ммоль/л.<br />
                     🍬 <strong>Экстренно:</strong> 200мл сока + 4 таблетки глюкозы при уровне &lt;3.5 ммоль/л. 
                   </div>
@@ -776,11 +776,11 @@ export const IndividualPlanResults: React.FC = () => {
                 )}
                 {isIGF && (
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
-                    🧬 <strong>�?ФР-1/MGF</strong> — анаболический пептид, работает синергично с инсулином.<br />
+                    🧬 <strong>IGF-1/MGF</strong> — анаболический пептид, работает синергично с инсулином.<br />
                     {inj.trainLinked ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до и после'}). Принимать НАТОЩАК за 30-45 мин до еды. Еда после — изолят + декстроза (МGF — натощак, локально в месте нагрузки).` : '⏰ Принимать натощак, за 30-45 мин до еды или согласно протоколу.'}<br />
-                    🥑 <strong>Жиры М�?Н�?МУМ</strong> — в комбинации с инсулином жиры критически замедляют анаболический ответ.<br />
-                    🩸 <strong>Гипогликемия:</strong> �?ФР-1 + инсулин — риск гипо вдвойне. Глюкометр обязателен!<br />
-                    🔬 <strong>MGF:</strong> активирует сателлитные клетки локально (только нагружаемая мышца). В комбинации с �?ФР-1 — каскад гиперплазии. Питание: глюкоза + аминокислоты (BCAA/изолят) в окне 30 мин после.
+                    🥑 <strong>Жиры МИНИМУМ</strong> — в комбинации с инсулином жиры критически замедляют анаболический ответ.<br />
+                    🩸 <strong>Гипогликемия:</strong> IGF-1 + инсулин — риск гипо вдвойне. Глюкометр обязателен!<br />
+                    🔬 <strong>MGF:</strong> активирует сателлитные клетки локально (только нагружаемая мышца). В комбинации с IGF-1 — каскад гиперплазии. Питание: глюкоза + аминокислоты (BCAA/изолят) в окне 30 мин после.
                   </div>
                 )}
                 {isGH && (
@@ -811,7 +811,7 @@ export const IndividualPlanResults: React.FC = () => {
                     ⏰ <strong>Дни пик тошноты:</strong> первые 24-72ч после еженедельной инъекции — самые лёгкие приёмы, жиры &lt;20г/день.<br />
                     🩸 <strong>B12 и электролиты:</strong> добавки обязательны — GLP-1 снижает всасывание через IF-фактор.<br />
                     🚫 <strong>Алкоголь</strong> — исключить полностью (панкреатит, гипогликемия).<br />
-                    �? <strong>Боли в животе/подреберье:</strong> немедленно к врачу — исключить панкреатит.
+                    ? <strong>Боли в животе/подреберье:</strong> немедленно к врачу — исключить панкреатит.
                   </div>
                 )}
                 {inj.type === 'другое' && (
@@ -834,17 +834,17 @@ export const IndividualPlanResults: React.FC = () => {
                 🔴 <strong>Если глюкоза &lt;3.5 ммоль/л:</strong> немедленно 15-20г быстрых углеводов, замер через 15 мин<br />
                 🚑 <strong>Если &lt;2.5 ммоль/л или потеря сознания:</strong> ВЫЗОВ 103! Глюкагон 1мг в/м или в/в глюкоза 40%<br />
                 📋 <strong>Симптомы:</strong> потливость, дрожь, голод → спутанность, агрессия → потеря сознания, судороги<br />
-                🥑 <strong>Жиры М�?Н�?МУМ:</strong> в окне действия инсулина — не более 5г жиров за приём (жиры замедляют всасывание углеводов!)
+                🥑 <strong>Жиры МИНИМУМ:</strong> в окне действия инсулина — не более 5г жиров за приём (жиры замедляют всасывание углеводов!)
               </div>
             </div>
           )}
           <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginTop: 2, lineHeight: 1.5 }}>
-            💡 <strong>БАЗОВЫЕ ПРАВ�?ЛА �?НСУЛ�?НА:</strong><br />
+            💡 <strong>БАЗОВЫЕ ПРАВИЛА ИНСУЛИНА:</strong><br />
             🧮 1 ЕД короткого/быстрого ≈ 10г углеводов (чувствительность индивидуальна — после курса ГР/ААС может требоваться на 20-30% больше).<br />
-            🥑 <strong>Ж�?РЫ М�?Н�?МАЛЬНЫ</strong> в окне действия инсулина (первые 2ч) — не более 5г. Жиры блокируют выход глюкозы из желудка в кровь, вызывая гипогликемию при уже принятых углеводах!<br />
-            🚫 <strong>НЕ ПРОПУСКАЙ ПР�?ЁМЫ П�?Щ�?</strong> — гипогликемия развивается за 15-30 минут!<br />
+            🥑 <strong>ЖИРЫ МИНИМАЛЬНЫ</strong> в окне действия инсулина (первые 2ч) — не более 5г. Жиры блокируют выход глюкозы из желудка в кровь, вызывая гипогликемию при уже принятых углеводах!<br />
+            🚫 <strong>НЕ ПРОПУСКАЙ ПРИЁМЫ ПИЩИ</strong> — гипогликемия развивается за 15-30 минут!<br />
             🩸 <strong>Глюкометр — твой лучший друг.</strong> Цель: 4.0-6.0 ммоль/л через 2ч после инъекции. Не выше 7.8, не ниже 3.9.<br />
-            🧬 MGF активирует сателлитные клетки локально (место инъекции/тренировки). �?ФР-1 — системно. Оба требуют глюкозу и аминокислоты. Без еды в окне — нулевой эффект. 
+            🧬 MGF активирует сателлитные клетки локально (место инъекции/тренировки). IGF-1 — системно. Оба требуют глюкозу и аминокислоты. Без еды в окне — нулевой эффект. 
           </div>
           {injections.some((i: DrugInjection) => i.type === 'семаглутид' || i.type === 'тирзепатид') && (
             <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
@@ -855,7 +855,7 @@ export const IndividualPlanResults: React.FC = () => {
                 💧 <strong>Вода 30-40 мл/кг:</strong> GLP-1 снижает моторику ЖКТ — риск запоров. Клетчатка 25-30г/день дополнительно.<br />
                 ⏰ <strong>График инъекций:</strong> пик тошноты — первые 24-72ч после инъекции. Планируй самые лёгкие приёмы на эти дни. Жиры в эти дни &lt;20г/день.<br />
                 🩸 <strong>Контроль B12 и электролитов:</strong> GLP-1 снижает всасывание B12 (через IF-фактор) и калия/магния — добавки обязательны.<br />
-                �? <strong>Боли в левом подреберье/животе:</strong> прекратить приём, срочно к врачу — исключить острый панкреатит.<br />
+                ? <strong>Боли в левом подреберье/животе:</strong> прекратить приём, срочно к врачу — исключить острый панкреатит.<br />
                 🚫 <strong>Алкоголь:</strong> исключить полностью — усиливает тошноту, риск гипогликемии, панкреатит.<br />
                 🍬 <strong>Гипогликемия:</strong> в комбинации с инсулином — риск возрастает вдвое. Глюкометр обязателен!
               </div>
@@ -865,16 +865,16 @@ export const IndividualPlanResults: React.FC = () => {
       )}
 
       {injections.some((i: DrugInjection) => i.type === 'инсулин') && (
-        <GlassCard title="📖 Справочник: �?нсулин" icon="📖" color="#ef4444" style={{ border: '1px solid rgba(239,68,68,0.15)' }}>
+        <GlassCard title="📖 Справочник: Инсулин" icon="📖" color="#ef4444" style={{ border: '1px solid rgba(239,68,68,0.15)' }}>
           <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
             <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
               <strong style={{ color:'#ef4444' }}>🧮 Правило 10г/1ЕД:</strong> 1 единица короткого/быстрого инсулина покрывает ~10г углеводов. Доза × 10 = необходимые углеводы.
             </div>
             <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
-              <strong style={{ color:'#ef4444' }}>🥑 Жиры М�?Н�?МУМ:</strong> в окне 90 минут после инъекции — не более 5г жиров. Жиры замедляют опорожнение желудка, вызывая гипогликемию при уже принятых углеводах.
+              <strong style={{ color:'#ef4444' }}>🥑 Жиры МИНИМУМ:</strong> в окне 90 минут после инъекции — не более 5г жиров. Жиры замедляют опорожнение желудка, вызывая гипогликемию при уже принятых углеводах.
             </div>
             <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
-              <strong style={{ color:'#ef4444' }}>🚫 ПРОПУСК ЕДЫ КР�?Т�?ЧЕН:</strong> гипогликемия развивается за 15-30 минут. Каждый час после укола — минимум 10-15г углеводов.
+              <strong style={{ color:'#ef4444' }}>🚫 ПРОПУСК ЕДЫ КРИТИЧЕН:</strong> гипогликемия развивается за 15-30 минут. Каждый час после укола — минимум 10-15г углеводов.
             </div>
             <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
               <strong style={{ color:'#ef4444' }}>🩸 Глюкометр:</strong> замеры через 15, 30, 60, 90, 120 мин. Цель — не ниже 4.0 ммоль/л. При &lt;3.5 — 15-20г быстрых углеводов.
@@ -909,7 +909,7 @@ export const IndividualPlanResults: React.FC = () => {
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
-              <span>+ РљР»РµС‚С‡Р°С‚РєР°</span>
+              <span>+ Клетчатка</span>
               <span>+{waterCalc.fiberFactor} Р»</span>
             </div>
           </div>
@@ -926,7 +926,7 @@ export const IndividualPlanResults: React.FC = () => {
               <div style={{ fontSize:16, width:28, textAlign:'center' }}>{h.icon}</div>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:10, fontWeight:700, color:'#06b6d4' }}>{h.label}</div>
-                <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>{h.desc} — исключено {h.foodIds.length} продуктов</div>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>{h.desc} — иИсключено {h.foodIds.length} продуктов</div>
               </div>
               <div style={{ fontSize:8, color:'rgba(6,182,212,0.6)', background:'rgba(6,182,212,0.1)', padding:'2px 6px', borderRadius:6 }}>{h.foodIds.length}</div>
             </div>
@@ -987,11 +987,11 @@ export const IndividualPlanResults: React.FC = () => {
                   ⭐ Качество: {qualityReport.avgScore}/10
                 </div>
                 <div style={{ fontSize:7, padding:'1px 5px', borderRadius:4, background: qualityReport.budgetOk ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', color: qualityReport.budgetOk ? '#22c55e' : '#f59e0b' }}>
-                  {qualityReport.budgetRange} В· bb_quality {qualityReport.bbsAvg}
+                  {qualityReport.budgetRange} · bb_quality {qualityReport.bbsAvg}
                 </div>
               </div>
-              {qualityReport.bestItems.length > 0 && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>Р›СѓС‡С€РёРµ: {qualityReport.bestItems.join(', ')}</div>}
-              {qualityReport.weakItems.length > 0 && <div style={{ fontSize: 8, color: '#ef4444' }}>РЎР»Р°Р±С‹Рµ: {qualityReport.weakItems.join(', ')}</div>}
+              {qualityReport.bestItems.length > 0 && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>Лучшие: {qualityReport.bestItems.join(', ')}</div>}
+              {qualityReport.weakItems.length > 0 && <div style={{ fontSize: 8, color: '#ef4444' }}>Слабые: {qualityReport.weakItems.join(', ')}</div>}
               {qualityReport.recommendations.map((r: string, i: number) => <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', padding: '1px 0' }}>вЂў {r}</div>)}
             </div>
           )}
@@ -1005,9 +1005,9 @@ export const IndividualPlanResults: React.FC = () => {
                 <div key={sys} style={{ fontSize: 8, padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontWeight: 600, color: data.score >= 5 ? '#ef4444' : data.score >= 3 ? '#f59e0b' : '#22c55e' }}>
-                      {sys === 'hepatic' ? 'Печень' : sys === 'renal' ? 'Почки' : sys === 'inflammatory' ? 'Воспаление' : sys === 'insulin' ? '�?нсулин' : 'Электролиты'}
+                      {sys === 'hepatic' ? 'Печень' : sys === 'renal' ? 'Почки' : sys === 'inflammatory' ? 'Воспаление' : sys === 'insulin' ? 'Инсулин' : 'Электролиты'}
                     </span>
-                    <span style={{ color: 'rgba(255,255,255,0.85)' }}>вљ  {data.score}/7</span>
+                    <span style={{ color: 'rgba(255,255,255,0.85)' }}>⚠ {data.score}/7</span>
                   </div>
                   <div style={{ color: 'rgba(255,255,255,0.85)' }}>{data.impact}</div>
                   {data.score >= 3 && <div style={{ color: '#f59e0b' }}>в†’ {data.recommendation}</div>}
@@ -1032,9 +1032,9 @@ export const IndividualPlanResults: React.FC = () => {
                       <span style={{ fontSize: 11, fontWeight: 700, color: glColor }}>{gl} <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.9)' }}>({glLabel})</span></span>
                     </div>
                     <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.9)' }}>
-                      Средний Г�? рациона: ~{avgGI} · ГН на приём: ~{glPerMeal} · Углеводы: {Math.round(totalCarbs)}г
+                      Средний ГИ рациона: ~{avgGI} · ГН на приём: ~{glPerMeal} · Углеводы: {Math.round(totalCarbs)}г
                     </div>
-                    {gl > 120 && <div style={{ fontSize: 8, color: '#f59e0b', marginTop: 2 }}>💡 Высокая нагрузка — рекомендуется увеличить долю низко-Г�? продуктов (бобовые, цельнозерновые, овощи)</div>}
+                    {gl > 120 && <div style={{ fontSize: 8, color: '#f59e0b', marginTop: 2 }}>💡 Высокая нагрузка — рекомендуется увеличить долю низко-ГИ продуктов (бобовые, цельнозерновые, овощи)</div>}
                   </div>
                 );
               })()}
@@ -1116,7 +1116,7 @@ export const IndividualPlanResults: React.FC = () => {
           </div>
           <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
             <button onClick={() => generateLazyDayPlan()} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background: lazyDayMode ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.02)', border: lazyDayMode ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(255,255,255,0.06)', color: lazyDayMode ? '#f59e0b' : 'rgba(255,255,255,0.8)', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
-              �?� Ленивый день
+              ?🛋 Ленивый день
             </button>
             <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Минимум готовки, {lazyDayDays} {lazyDayDays === 1 ? 'день' : 'дней'}</div>
           </div>
@@ -1134,11 +1134,11 @@ export const IndividualPlanResults: React.FC = () => {
           <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>~{cravingPlan.kcal} ккал ({cravingPlan.days} {cravingPlan.days === 1 ? 'день' : 'дня'})</div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
             <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(59,130,246,0.06)', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Р‘РµР»РєРё</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Белки</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6' }}>{cravingPlan.bju.p}г</div>
             </div>
             <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Р–РёСЂС‹</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Жиры</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>{cravingPlan.bju.f}г</div>
             </div>
             <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', textAlign: 'center' }}>
@@ -1162,15 +1162,15 @@ export const IndividualPlanResults: React.FC = () => {
       )}
 
       {lazyDayPlan && (
-        <GlassCard title="Ленивый день" icon="�?�" color="#f59e0b" style={{ border: '1px solid rgba(245,158,11,0.15)' }}>
+        <GlassCard title="Ленивый день" icon="?" color="#f59e0b" style={{ border: '1px solid rgba(245,158,11,0.15)' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>~{lazyDayPlan.kcal} ккал (85% от нормы, {lazyDayPlan.days} {lazyDayPlan.days === 1 ? 'день' : 'дней'})</div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
             <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(59,130,246,0.06)', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Р‘РµР»РєРё</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Белки</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6' }}>{lazyDayPlan.bju.p}г</div>
             </div>
             <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Р–РёСЂС‹</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Жиры</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>{lazyDayPlan.bju.f}г</div>
             </div>
             <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(59,130,246,0.06)', textAlign: 'center' }}>
@@ -1198,11 +1198,11 @@ export const IndividualPlanResults: React.FC = () => {
           <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>~{cheatMealPlan.cals} ккал (35% от нормы)</div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
             <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Р‘РµР»РєРё</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Белки</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6' }}>{cheatMealPlan.bju.p}г</div>
             </div>
             <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Р–РёСЂС‹</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Жиры</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>{cheatMealPlan.bju.f}г</div>
             </div>
             <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', textAlign: 'center' }}>
@@ -1231,11 +1231,11 @@ export const IndividualPlanResults: React.FC = () => {
           <div style={{ fontSize: 10, fontWeight: 700, color: '#f97316', marginBottom: 4 }}>Всего: {carbloadPlan.totalCarbs} г ({Math.round(carbloadPlan.totalCarbs / weight)} г/кг)</div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
             <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Р‘РµР»РєРё</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Белки</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6' }}>{carbloadPlan.bju.p}г</div>
             </div>
             <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Р–РёСЂС‹</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Жиры</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>{carbloadPlan.bju.f}г</div>
             </div>
             <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', textAlign: 'center' }}>
@@ -1281,7 +1281,7 @@ export const IndividualPlanResults: React.FC = () => {
         <div style={{ borderRadius: 12, padding: 12, background: 'rgba(249,115,22,0.04)', border: '1px solid rgba(249,115,22,0.15)', marginTop: 4 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: '#f97316' }}>🍽️ Спецприём{specialMealReplaceMode ? ` (замена: ${specialMealReplaceTarget})` : ' (дополнительно)'}</span>
-            <span onClick={() => setSpecialMealMode(false)} style={{ cursor: 'pointer', fontSize: 10, color: 'rgba(255,255,255,0.9)' }}>вњ•</span>
+            <span onClick={() => setSpecialMealMode(false)} style={{ cursor: 'pointer', fontSize: 10, color: 'rgba(255,255,255,0.9)' }}>✕</span>
           </div>
           <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
             {specialMealGoal === 'pre_workout' ? '🏋️ Предтренировочный приём' :
@@ -1290,7 +1290,7 @@ export const IndividualPlanResults: React.FC = () => {
              specialMealGoal === 'high_protein' ? '🥩 Высокобелковый приём' :
              specialMealGoal === 'keto' ? '🥑 Кето-приём' :
              specialMealGoal === 'low_cal_day' ? '📉 Низкокалорийный приём' : '⚙️ Свой приём'}
-            · {specialMealTiming === 'breakfast' ? '🌅 Завтрак' : specialMealTiming === 'lunch' ? '�?�️ Обед' : specialMealTiming === 'dinner' ? '🌆 Ужин' : specialMealTiming === 'snack' ? '🍪 Перекус' : '🌙 Перед сном'}
+            · {specialMealTiming === 'breakfast' ? '🌅 Завтрак' : specialMealTiming === 'lunch' ? '?️ Обед' : specialMealTiming === 'dinner' ? '🌆 Ужин' : specialMealTiming === 'snack' ? '🍪 Перекус' : '🌙 Перед сном'}
           </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
             <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', textAlign: 'center' }}>
@@ -1425,7 +1425,7 @@ export const IndividualPlanResults: React.FC = () => {
           {mealPrepPlan.steps.map((st: any, i: number) => (
             <div key={i} style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#06b6d4' }}>РЁР°Рі {st.step}: {st.action}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#06b6d4' }}>Шаг {st.step}: {st.action}</span>
                 <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>{st.duration} мин</span>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
@@ -1450,7 +1450,7 @@ export const IndividualPlanResults: React.FC = () => {
                     <span style={{ fontSize: 8, color: '#00e68a', fontWeight: 600 }}>{p.dayPlan ? `${Math.round(p.dayPlan.totals.kcal)} ккал` : ''}</span>
                     <button onClick={(e) => { e.stopPropagation(); loadSavedPlan(p); }} style={{ padding: '3px 6px', borderRadius: 6, fontSize: 7, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', fontWeight: 600 }}>📋</button>
                     <button onClick={(e) => { e.stopPropagation(); const txt = `🍽 План питания ${p.name || p.date}\n${p.dayPlan?.meals?.map((m: any) => `${m.time} ${m.label}: ${m.items?.map((it: any) => `${it.name} ${it.amount}г`).join(', ')}`).join('\n') || ''}`; navigator.clipboard?.writeText(txt); }} style={{ padding: '3px 6px', borderRadius: 6, fontSize: 7, cursor: 'pointer', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)', color: '#60a5fa', fontWeight: 600 }}>📤</button>
-                    <button onClick={(e) => { e.stopPropagation(); const updated = savedPlans.filter((_: any, j: number) => j !== pi); setSavedPlans(updated); localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated)); }} style={{ padding: '3px 6px', borderRadius: 6, fontSize: 7, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 600 }}>вњ•</button>
+                    <button onClick={(e) => { e.stopPropagation(); const updated = savedPlans.filter((_: any, j: number) => j !== pi); setSavedPlans(updated); localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated)); }} style={{ padding: '3px 6px', borderRadius: 6, fontSize: 7, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 600 }}>✕</button>
                   </div>
                 </div>
                 {isExpanded && (
@@ -1487,7 +1487,7 @@ export const IndividualPlanResults: React.FC = () => {
           <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#18181b', display:'flex', flexDirection:'column' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 12px 0' }}>
               <div style={{ fontSize:15, fontWeight:800, color:'#00e68a' }}>🧬 Калькулятор полезности</div>
-              <span onClick={() => { setShowCalcPopup(false); setCalcResults(null); setCalcDailyReport(null); }} style={{ cursor:'pointer', fontSize:10, color:'rgba(255,255,255,0.9)', padding:'2px 6px' }}>вњ•</span>
+              <span onClick={() => { setShowCalcPopup(false); setCalcResults(null); setCalcDailyReport(null); }} style={{ cursor:'pointer', fontSize:10, color:'rgba(255,255,255,0.9)', padding:'2px 6px' }}>✕</span>
             </div>
             <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'0 12px 80px' }}>
 
@@ -1519,7 +1519,7 @@ export const IndividualPlanResults: React.FC = () => {
                       const sel = calcSelections.has(id);
                       return (
                         <div key={id} onClick={() => toggleCalcSelection(id)} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 9px', borderRadius:8, marginBottom:3, background: sel ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)', cursor:'pointer' }}>
-                          <div style={{ width:20, height:20, borderRadius:5, display:'flex', alignItems:'center', justifyContent:'center', background: sel ? '#00e68a' : 'rgba(255,255,255,0.06)', color: sel ? '#000' : 'transparent', fontSize:11, fontWeight:800, border: sel ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>{sel ? 'вњ“' : ''}</div>
+                          <div style={{ width:20, height:20, borderRadius:5, display:'flex', alignItems:'center', justifyContent:'center', background: sel ? '#00e68a' : 'rgba(255,255,255,0.06)', color: sel ? '#000' : 'transparent', fontSize:11, fontWeight:800, border: sel ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>{sel ? '✓' : ''}</div>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{m.label || `Приём ${i+1}`} {m.time && <span style={{ color:'rgba(255,255,255,0.9)', fontWeight:400, marginLeft:3 }}>{m.time}</span>}</div>
                             <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)' }}>{Math.round(m.totals?.kcal || 0)} ккал · Б{m.totals?.p||0}/Ж{m.totals?.f||0}/У{m.totals?.c||0} · {m.items?.length || 0} продуктов</div>
@@ -1539,13 +1539,13 @@ export const IndividualPlanResults: React.FC = () => {
                     {[
                       { id:'special_cheatmeal', label:'🍔 Читмил', desc: cheatMealPlan ? `~${cheatMealPlan.cals} ккал` : '', plan: cheatMealPlan },
                       { id:'special_carbload', label:'🍚 Углев. загрузка', desc: carbloadPlan ? `${carbloadPlan.totalCarbs}г углей` : '', plan: carbloadPlan },
-                      { id:'special_lazy', label:'�?� Ленивый день', desc: lazyDayPlan ? `~${lazyDayPlan.kcal} ккал` : '', plan: lazyDayPlan },
+                      { id:'special_lazy', label:'?🛋 Ленивый день', desc: lazyDayPlan ? `~${lazyDayPlan.kcal} ккал` : '', plan: lazyDayPlan },
                       { id:'special_craving', label:'🍬 Хочу сладкое', desc: cravingPlan ? `~${cravingPlan.kcal} ккал` : '', plan: cravingPlan },
                     ].filter(s => s.plan).map(s => {
                       const sel = calcSelections.has(s.id);
                       return (
                         <div key={s.id} onClick={() => toggleCalcSelection(s.id)} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 9px', borderRadius:8, marginBottom:3, background: sel ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)', cursor:'pointer' }}>
-                          <div style={{ width:20, height:20, borderRadius:5, display:'flex', alignItems:'center', justifyContent:'center', background: sel ? '#00e68a' : 'rgba(255,255,255,0.06)', color: sel ? '#000' : 'transparent', fontSize:11, fontWeight:800, border: sel ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>{sel ? 'вњ“' : ''}</div>
+                          <div style={{ width:20, height:20, borderRadius:5, display:'flex', alignItems:'center', justifyContent:'center', background: sel ? '#00e68a' : 'rgba(255,255,255,0.06)', color: sel ? '#000' : 'transparent', fontSize:11, fontWeight:800, border: sel ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>{sel ? '✓' : ''}</div>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{s.label}</div>
                             <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)' }}>{s.desc}</div>
@@ -1613,8 +1613,8 @@ export const IndividualPlanResults: React.FC = () => {
                       {/* Macros bar */}
                       <div style={{ display:'flex', gap:4, marginBottom:4 }}>
                         {[
-                          { label:'Р‘', val:sc.macros.protein, color:'#3b82f6' },
-                          { label:'Р–', val:sc.macros.fat, color:'#f59e0b' },
+                          { label:'Б', val:sc.macros.protein, color:'#3b82f6' },
+                          { label:'Ж', val:sc.macros.fat, color:'#f59e0b' },
                           { label:'У', val:sc.macros.carbs, color:'#ef4444' },
                           { label:'Кл', val:sc.macros.fiber, color:'#22c55e' },
                         ].map(m => (
@@ -1690,7 +1690,7 @@ export const IndividualPlanResults: React.FC = () => {
                         🧠 Кортизол: {calcDailyReport.cortisolRisk ? '⚠️ Риск' : '✅ Норма'}
                       </div>
                       <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.insulinRicohet ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.insulinRicohet ? '#ef4444' : '#22c55e' }}>
-                        💉 �?нсулин: {calcDailyReport.insulinRicohet ? '🚨 Рикшет' : '✅ Норма'}
+                        💉 Инсулин: {calcDailyReport.insulinRicohet ? '🚨 Рикшет' : '✅ Норма'}
                       </div>
                       <div style={{ padding:'3px 6px', borderRadius:4, background: (calcDailyReport.homaIr !== null && calcDailyReport.homaIr > 2.5) ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: (calcDailyReport.homaIr !== null && calcDailyReport.homaIr > 2.5) ? '#ef4444' : '#22c55e' }}>
                         🔬 HOMA-IR: {calcDailyReport.homaIr !== null ? calcDailyReport.homaIr.toFixed(1) : '—'} {(calcDailyReport.homaIr !== null && calcDailyReport.homaIr > 2.5) ? '🚨' : '✅'}
@@ -1719,7 +1719,7 @@ export const IndividualPlanResults: React.FC = () => {
                     {/* Micro deficits */}
                     {calcDailyReport.microDeficits.length > 0 && (
                       <div style={{ marginTop:3, fontSize:7, padding:'4px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', color:'#f59e0b' }}>
-                        вљ пёЏ Р”РµС„РёС†РёС‚С‹: {calcDailyReport.microDeficits.join(', ')}
+                        ⚠️ Дефициты: {calcDailyReport.microDeficits.join(', ')}
                       </div>
                     )}
                   </div>
@@ -1737,14 +1737,14 @@ export const IndividualPlanResults: React.FC = () => {
           <div onClick={e => e.stopPropagation()} style={{ width:'96%', maxWidth:440, maxHeight:'92vh', overflowY:'auto', padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(249,115,22,0.12)', boxShadow:'0 8px 40px rgba(0,0,0,0.4)' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
               <div style={{ fontSize:15, fontWeight:800, color:'#f97316' }}>🔀 Корректировка рациона</div>
-              <span onClick={() => { setShowCorrectPopup(false); setCorrectIssues(null); }} style={{ cursor:'pointer', fontSize:10, color:'rgba(255,255,255,0.9)', padding:'2px 6px' }}>вњ•</span>
+              <span onClick={() => { setShowCorrectPopup(false); setCorrectIssues(null); }} style={{ cursor:'pointer', fontSize:10, color:'rgba(255,255,255,0.9)', padding:'2px 6px' }}>✕</span>
             </div>
 
             {!correctIssues ? (
               <div style={{ textAlign:'center', padding:20, fontSize:9, color:'rgba(255,255,255,0.75)' }}>Анализ рациона...</div>
             ) : correctIssues.length === 0 ? (
               <div style={{ textAlign:'center', padding:20 }}>
-                <div style={{ fontSize:24, marginBottom:8 }}>вњ…</div>
+                <div style={{ fontSize:24, marginBottom:8 }}>✅</div>
                 <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:4 }}>Рацион сбалансирован</div>
                 <div style={{ fontSize:8, color:'rgba(255,255,255,0.75)' }}>Не найдено критических недочётов</div>
               </div>

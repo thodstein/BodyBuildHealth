@@ -10,7 +10,9 @@ import { calculateIndices } from '../../engines/clinical-indices.engine';
 import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../core/constants';
 import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 
-type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'analytics' | 'contacts' | 'bp_diary' | 'measurements' | 'diaries';
+type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' 
+  | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'analytics' 
+  | 'contacts' | 'bp_diary' | 'measurements' | 'diaries' | 'calculator_data';
 type ProfilePage = 'hero' | 'tabs';
 
 const SPORT_TYPES = [
@@ -557,6 +559,17 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
     load();
   }, []);
 
+  const [calcData, setCalcData] = React.useState<any>(() => {
+    try { return JSON.parse(localStorage.getItem('he_autocalc_state') || '{}'); } catch { return {}; }
+  });
+  const upCalc = (k: string, v: any) => {
+    const next = { ...calcData };
+    const keys = k.split('.');
+    let o = next; for (let i = 0; i < keys.length - 1; i++) { o[keys[i]] = o[keys[i]] || {}; o = o[keys[i]]; }
+    o[keys[keys.length - 1]] = v; setCalcData(next);
+    try { localStorage.setItem('he_autocalc_state', JSON.stringify(next)); } catch {}
+  };
+
   const save = (partial: Partial<UserProfile['settings']>) => {
     if (partial.weight !== undefined && partial.weight !== settings.weight) {
       const newEntry: WeightEntry = { date: new Date().toISOString().split('T')[0], weight: partial.weight };
@@ -591,10 +604,10 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
 
   const tabs: { id: ProfileTab; label: string }[] = [
     { id: 'overview', label: 'Обзор' }, { id: 'anthropometry', label: 'Тело' },
-    { id: 'sleep', label: 'Сон' }, { id: 'lifestyle', label: 'Образ жизни' },
+    { id: 'lifestyle', label: 'Образ жизни' },
     { id: 'diet', label: 'Питание' }, { id: 'injuries', label: 'Травмы' },
     { id: 'analytics', label: 'Аналитика' },
-    { id: 'bp_diary', label: 'Давление' }, { id: 'measurements', label: 'Замеры' }, { id: 'diaries', label: 'Дневники' }, { id: 'contacts', label: 'Контакты' }
+    { id: 'diaries', label: 'Дневники' }, { id: 'contacts', label: 'Контакты' }
   ];
 
   const initials = (profile.name || 'П').charAt(0).toUpperCase();
@@ -1058,6 +1071,23 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   const nm: MedicationEntry = { id: crypto.randomUUID(), name: '', doseMg: 0, doseUnit: 'mg', frequency: 'daily' };
                   save({ currentMedications: [...(settings.currentMedications ?? []), nm] });
                 }}>+ Добавить препарат</button>
+              </div>
+
+              <div style={glassCard}>
+                <div style={sectionLabel}>🧠 Нейро + 🧘 Псих (калькулятор)</div>
+                {[
+                  {k:'neuro.dopamineScore',l:'Дофамин',v:calcData.neuro?.dopamineScore||1},
+                  {k:'neuro.serotoninScore',l:'Серотонин',v:calcData.neuro?.serotoninScore||1},
+                  {k:'neuro.aggressionScore',l:'Агрессия',v:calcData.neuro?.aggressionScore||1},
+                  {k:'psych.fearOfLoss',l:'Страх потери',v:calcData.psych?.fearOfLoss||1},
+                  {k:'psych.mirrorObsession',l:'Одержимость зеркалом',v:calcData.psych?.mirrorObsession||1},
+                  {k:'psych.apathyOffCycle',l:'Апатия вне курса',v:calcData.psych?.apathyOffCycle||1},
+                ].map(f=><div key={f.k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:3}}>
+                  <span style={{fontSize:9,color:'rgba(255,255,255,0.6)'}}>{f.l}</span>
+                  <div style={{display:'flex',gap:2}}>{[1,2,3,4,5].map(n=>
+                    <button key={n} onClick={()=>upCalc(f.k,n)} style={{width:22,height:22,borderRadius:11,border:'none',cursor:'pointer',fontSize:9,fontWeight:700,background:f.v===n?'#00e68a':'rgba(255,255,255,0.06)',color:f.v===n?'#000':'rgba(255,255,255,0.4)'}}>{n}</button>
+                  )}</div>
+                </div>)}
               </div>
             </InfoErrorBoundary>
           )}
@@ -2208,13 +2238,13 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                 {[
                   { icon:'🏋️', title:'Тренировок', desc:'Упражнения, подходы, веса, объём, RPE. История тренировок, прогресс по упражнениям, сплиты.', color:'#3b82f6', tab:'progress' },
                   { icon:'🥗', title:'Питания', desc:'Продукты, калории, белки/жиры/углеводы. OCR сканирование, штрихкоды, рецепты.', color:'#22c55e', tab:'diet' },
-                  { icon:'🍽', title:'Приёмов пищи', desc:'Завтрак, обед, ужин, перекусы. Дневное/недельное меню, корзина продуктов.', color:'#f59e0b', tab:'diet' },
-                  { icon:'📏', title:'Замеров тела', desc:'Вес, обхваты (талия, грудь, бицепс, бедро), % жира. Фото прогресса с разных ракурсов.', color:'#a855f7', tab:'measurements' },
-                  { icon:'🩸', title:'Анализов', desc:'Результаты анализов, референсные диапазоны, отклонения, динамика по датам.', color:'#ef4444', tab:'analytics' },
+                  { icon:'🍽', title:'Приёмов пищи', desc:'Завтрак, обед, ужин, перекусы. Дневное/недельное меню, корзина продуктов.', color:'#f59e0b', tab:'diet', navScreen:'nutrition' },
+                  { icon:'📏', title:'Замеров тела', desc:'Вес, обхваты (талия, грудь, бицепс, бедро), % жира. Фото прогресса.', color:'#a855f7', tab:'diaries' },
+                  { icon:'🩸', title:'Анализов', desc:'Результаты анализов, референсные диапазоны, отклонения, динамика по датам.', color:'#ef4444', tab:'analytics', navScreen:'labs' },
                   { icon:'💊', title:'Курса', desc:'Препараты, дозировки, фазы. Календарь приёма, корзина покупок.', color:'#ec4899', tab:'overview', navScreen:'pharma' },
                   { icon:'🧪', title:'Поддержки', desc:'БАДы, протоколы, стеки, синергии. Недельный план приёма.', color:'#06b6d4', tab:'overview', navScreen:'support' },
-                  { icon:'❤️', title:'Давления', desc:'Систолическое/диастолическое давление, пульс. Дневник на день/неделю/месяц.', color:'#f43f5e', tab:'bp_diary' },
-                  { icon:'🛌', title:'Сна', desc:'Продолжительность, качество, пробуждения. Корреляция с тренировками.', color:'#8b5cf6', tab:'sleep' },
+                  { icon:'❤️', title:'Давления', desc:'Систолическое/диастолическое давление, пульс. График динамики.', color:'#f43f5e', tab:'diaries' },
+                  { icon:'🛌', title:'Сна', desc:'Продолжительность, качество, пробуждения. Корреляция с тренировками.', color:'#8b5cf6', tab:'diaries' },
                   { icon:'📊', title:'Отчётов', desc:'Полные отчёты по всем блокам: тренировки, анализы, риски, курс. Архив.', color:'#84cc16', tab:'analytics' },
                   { icon:'⚠️', title:'Рисков', desc:'Оценка рисков по системам, Монте-Карло, клинические модели, MDSS.', color:'#f97316', tab:'analytics', navScreen:'risks' },
                   { icon:'🩺', title:'Травм', desc:'Журнал травм, реабилитация, ограничения движений, восстановление.', color:'#14b8a6', tab:'injuries' },
@@ -2231,6 +2261,89 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                     <span style={{ color:d.color, fontSize:14, opacity:0.5 }}>→</span>
                   </div>
                 ))}
+              </div>
+
+              {/* Встроенные дневники: Сон, Давление, Замеры */}
+              <div style={{ marginTop: 14, display:'flex', flexDirection:'column', gap:10 }}>
+                <div style={glassCard}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#8b5cf6', marginBottom:8 }}>🛌 Дневник сна</div>
+                  <SleepDiary settings={settings} save={save} />
+                </div>
+                <div style={glassCard}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#f43f5e', marginBottom:8 }}>❤️ Давление и пульс</div>
+                  {(() => {
+                    const [bpSystolic, setBpSystolic] = React.useState('120');
+                    const [bpDiastolic, setBpDiastolic] = React.useState('80');
+                    const [bpHr, setBpHR] = React.useState('72');
+                    const [showBpForm, setShowBpForm] = React.useState(false);
+                    const [bpPeriod, setBpPeriod] = React.useState<'day'|'week'|'month'|'all'>('week');
+                    const [bpEntries, setBpEntries] = React.useState<BPEntry[]>(() => { try { return JSON.parse(localStorage.getItem('he_bp_diary') || '[]'); } catch { return []; } });
+                    const addBp = () => {
+                      const s = Math.round(Number(bpSystolic)); const d = Math.round(Number(bpDiastolic)); const h = Math.round(Number(bpHr));
+                      if (!s || !d || !h || isNaN(s) || isNaN(d) || isNaN(h) || s<50||s>250||d<30||d>160||h<30||h>250) return;
+                      const entry: BPEntry = { date: new Date().toISOString().slice(0,10), systolic: s, diastolic: d, hr: h };
+                      const updated = [...bpEntries, entry]; setBpEntries(updated); saveBPDiary(updated);
+                      setBpSystolic(''); setBpDiastolic(''); setBpHr(''); setShowBpForm(false);
+                    };
+                    const now = new Date(); const cutoff = new Date(now);
+                    if (bpPeriod === 'day') cutoff.setDate(cutoff.getDate()-1);
+                    else if (bpPeriod === 'week') cutoff.setDate(cutoff.getDate()-7);
+                    else if (bpPeriod === 'month') cutoff.setMonth(cutoff.getMonth()-1);
+                    else cutoff.setFullYear(cutoff.getFullYear()-10);
+                    const filtered = bpEntries.filter((e:BPEntry) => new Date(e.date) >= cutoff).sort((a:BPEntry,b:BPEntry) => b.date.localeCompare(a.date));
+                    const avgS = filtered.length ? Math.round(filtered.reduce((s:number,e:BPEntry)=>s+e.systolic,0)/filtered.length) : 0;
+                    const avgD = filtered.length ? Math.round(filtered.reduce((s:number,e:BPEntry)=>s+e.diastolic,0)/filtered.length) : 0;
+                    const avgH = filtered.length ? Math.round(filtered.reduce((s:number,e:BPEntry)=>s+e.hr,0)/filtered.length) : 0;
+                    return <div>
+                      <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+                        <button onClick={() => setShowBpForm(!showBpForm)} style={{ padding:'6px 14px', borderRadius:20, fontSize:10, fontWeight:700, cursor:'pointer', background:'#f43f5e', border:'none', color:'#fff' }}>{showBpForm ? '✕' : '+ Записать'}</button>
+                        {(['day','week','month','all'] as const).map(p => <button key={p} onClick={()=>setBpPeriod(p)} style={{ flex:1, padding:'6px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', background: bpPeriod===p?'rgba(244,63,94,0.15)':'rgba(255,255,255,0.03)', border: bpPeriod===p?'1px solid rgba(244,63,94,0.3)':'1px solid rgba(255,255,255,0.06)', color: bpPeriod===p?'#f43f5e':'rgba(255,255,255,0.5)' }}>{p==='day'?'День':p==='week'?'Нед':p==='month'?'Мес':'Всё'}</button>)}
+                        <button onClick={()=>{if(confirm('Очистить?')){setBpEntries([]);localStorage.removeItem('he_bp_diary')}}} style={{ padding:'6px 10px', borderRadius:10, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444' }}>🗑</button>
+                      </div>
+                      {showBpForm && <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:8 }}>
+                        <div><div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:2 }}>Систолическое</div><input type="number" value={bpSystolic} onChange={e=>setBpSystolic(e.target.value)} placeholder="120" style={{ width:'100%', padding:'6px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:12, textAlign:'center' }} /></div>
+                        <div><div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:2 }}>Диастолическое</div><input type="number" value={bpDiastolic} onChange={e=>setBpDiastolic(e.target.value)} placeholder="80" style={{ width:'100%', padding:'6px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:12, textAlign:'center' }} /></div>
+                        <div><div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:2 }}>Пульс</div><input type="number" value={bpHr} onChange={e=>setBpHR(e.target.value)} placeholder="70" style={{ width:'100%', padding:'6px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:12, textAlign:'center' }} /></div>
+                        <div style={{ gridColumn:'1/-1' }}><button onClick={addBp} style={{ width:'100%', padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#f43f5e,#e11d48)', color:'#fff', fontWeight:700, fontSize:11 }}>Сохранить</button></div>
+                      </div>}
+                      {filtered.length > 0 && <>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:8 }}>
+                          <div style={{ textAlign:'center', padding:10, borderRadius:8, background:'rgba(244,63,94,0.06)', border:'1px solid rgba(244,63,94,0.1)' }}>
+                            <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:2 }}>Среднее сист.</div>
+                            <div style={{ fontSize:20, fontWeight:800, color: avgS>140?'#ef4444':avgS>130?'#f59e0b':'#22c55e' }}>{avgS||'—'}</div>
+                          </div>
+                          <div style={{ textAlign:'center', padding:10, borderRadius:8, background:'rgba(244,63,94,0.06)', border:'1px solid rgba(244,63,94,0.1)' }}>
+                            <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:2 }}>Среднее диаст.</div>
+                            <div style={{ fontSize:20, fontWeight:800, color: avgD>90?'#ef4444':avgD>80?'#f59e0b':'#22c55e' }}>{avgD||'—'}</div>
+                          </div>
+                          <div style={{ textAlign:'center', padding:10, borderRadius:8, background:'rgba(244,63,94,0.06)', border:'1px solid rgba(244,63,94,0.1)' }}>
+                            <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:2 }}>Средний пульс</div>
+                            <div style={{ fontSize:20, fontWeight:800, color: avgH>100?'#ef4444':avgH>85?'#f59e0b':'#22c55e' }}>{avgH||'—'}</div>
+                          </div>
+                        </div>
+                        {filtered.length >= 2 && <div style={{ marginBottom:8, padding:'10px 8px', borderRadius:8, background:'rgba(255,255,255,0.02)' }}>
+                          <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:4 }}>📈 Динамика ({filtered.length} зап.)</div>
+                          <div style={{ display:'flex', alignItems:'flex-end', gap:2, height:60 }}>
+                            {filtered.slice().reverse().map((e:BPEntry,i:number) => { const maxV=200; const hS=Math.min(100,(e.systolic/maxV)*100); const hD=Math.min(100,(e.diastolic/maxV)*100); return <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:1 }}><div style={{ width:'60%', height:`${hS}%`, borderRadius:'3px 3px 0 0', background:'#ef4444', opacity:0.8 }} /><div style={{ width:'60%', height:`${hD}%`, borderRadius:'3px 3px 0 0', background:'#f59e0b', opacity:0.8 }} /></div>; })}
+                          </div>
+                          <div style={{ display:'flex', gap:8, fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:4, justifyContent:'center' }}>
+                            <span><span style={{ display:'inline-block', width:6, height:6, borderRadius:1, background:'#ef4444', marginRight:3 }} />Сист.</span>
+                            <span><span style={{ display:'inline-block', width:6, height:6, borderRadius:1, background:'#f59e0b', marginRight:3 }} />Диаст.</span>
+                            <span>Ø {avgS}/{avgD}</span>
+                          </div>
+                        </div>}
+                        <div style={{ maxHeight:120, overflowY:'auto' }}>
+                          {filtered.slice(0,20).map((e:BPEntry,i:number) => <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'3px 0', fontSize:9, color:'rgba(255,255,255,0.7)', borderBottom:'1px solid rgba(255,255,255,0.03)' }}><span>{e.date}</span><span style={{ fontWeight:700 }}>{e.systolic}/{e.diastolic} · {e.hr} уд/мин</span></div>)}
+                        </div>
+                      </>}
+                      {filtered.length === 0 && <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.4)', fontSize:10 }}>Нет записей. Добавьте первое измерение.</div>}
+                    </div>;
+                  })()}
+                </div>
+                <div style={glassCard}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#a855f7', marginBottom:8 }}>📏 Замеры тела</div>
+                  <ProfileMeasurementsTab />
+                </div>
               </div>
             </div></InfoErrorBoundary>
           )}
@@ -2315,6 +2428,17 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
               </div>
             </div></InfoErrorBoundary>
           )}
+
+          {/* ═══ CALCULATOR DATA TAB ═══ */}
+          {tab === 'calculator_data' && (
+            <InfoErrorBoundary label="Калькулятор"><div>
+              <div style={{ marginBottom:12 }}>
+                <h3 style={{ margin:'0 0 4px', fontSize:15, fontWeight:800, color:'#fff' }}>🧮 Данные калькулятора</h3>
+                <p style={{ fontSize:10, color:'rgba(255,255,255,0.5)', margin:0 }}>Заполните один раз — данные автоматически передаются в калькулятор поддержки. Сохраняются в вашем профиле.</p>
+              </div>
+              <ProfileCalcData />
+            </div></InfoErrorBoundary>
+          )}
           </div>
         </div>
       )}
@@ -2384,4 +2508,98 @@ const ProfileMeasurementsTab: React.FC = () => {
       {measLog.length === 0 && <div style={{ textAlign:'center', padding:30, fontSize:11, color:'rgba(255,255,255,0.5)' }}>Нет записей. Добавьте первый замер.</div>}
     </div>
   );
+};
+
+const ProfileCalcData: React.FC = () => {
+  const glassCard: React.CSSProperties = { background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 12, marginBottom: 6 };
+  const labelS: React.CSSProperties = { fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2, display: 'block' };
+  const inp: React.CSSProperties = { width: '100%', padding: '6px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 10, boxSizing: 'border-box' };
+
+  const [calcData, setCalcData] = React.useState<any>(() => {
+    try { return JSON.parse(localStorage.getItem('he_autocalc_state') || '{}'); } catch { return {}; }
+  });
+
+  const save = (partial: any) => {
+    const next = { ...calcData, ...partial };
+    setCalcData(next);
+    try { localStorage.setItem('he_autocalc_state', JSON.stringify(next)); } catch {}
+  };
+
+  const NumberPills = ({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) => (
+    <div style={{ marginBottom: 4 }}>
+      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 2 }}>{label} ({value || '-'})</span>
+      <div style={{ display: 'flex', gap: 3 }}>{[1,2,3,4,5].map(n => <button key={n} onClick={() => onChange(n)} style={{ width: 24, height: 24, borderRadius: '50%', cursor: 'pointer', fontSize: 10, fontWeight: 700, border: 'none', background: (value||0) === n ? '#00e68a' : 'rgba(255,255,255,0.06)', color: (value||0) === n ? '#000' : 'rgba(255,255,255,0.4)' }}>{n}</button>)}</div>
+    </div>
+  );
+
+  const SevPills = ({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) => (
+    <div style={{ marginBottom: 4 }}>
+      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 2 }}>{label}</span>
+      <div style={{ display: 'flex', gap: 2 }}>{['none','mild','moderate','severe'].map(s => <button key={s} onClick={() => onChange(s)} style={{ flex: 1, padding: '4px 2px', borderRadius: 6, fontSize: 8, fontWeight: 600, cursor: 'pointer', border: 'none', background: (value||'none') === s ? '#00e68a' : 'rgba(255,255,255,0.04)', color: (value||'none') === s ? '#000' : 'rgba(255,255,255,0.4)' }}>{s==='none'?'Нет':s==='mild'?'Лёгк':s==='moderate'?'Сред':'Тяж'}</button>)}</div>
+    </div>
+  );
+
+  const Toggle = ({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
+      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)' }}>{label}</span>
+      <button onClick={() => onChange(!value)} style={{ width: 32, height: 18, borderRadius: 9, border: 'none', cursor: 'pointer', background: value ? '#00e68a' : 'rgba(255,255,255,0.1)', position: 'relative', padding: 0 }}>
+        <div style={{ width: 14, height: 14, borderRadius: '50%', background: value ? '#000' : '#fff', position: 'absolute', top: 2, left: value ? 16 : 2, transition: 'left 0.15s' }} />
+      </button>
+    </div>
+  );
+
+  const up = (path: string, val: any) => {
+    const next = { ...calcData };
+    const keys = path.split('.');
+    let obj = next;
+    for (let i = 0; i < keys.length - 1; i++) { obj[keys[i]] = obj[keys[i]] || {}; obj = obj[keys[i]]; }
+    obj[keys[keys.length - 1]] = val;
+    save(next);
+  };
+
+  return <div style={{ display:'flex', flexDirection:'column', gap:4, paddingBottom: 70 }}>
+    <div style={glassCard}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#00e68a', marginBottom: 8 }}>👤 Профиль</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+        <div><span style={labelS}>Вес (кг)</span><input type="number" value={calcData.profile?.weight||80} onChange={e=>up('profile.weight',+e.target.value)} style={inp} /></div>
+        <div><span style={labelS}>Возраст</span><input type="number" value={calcData.profile?.age||30} onChange={e=>up('profile.age',+e.target.value)} style={inp} /></div>
+        <div><span style={labelS}>Тренировок/нед</span><input type="number" value={calcData.profile?.workoutsPerWeek||3} onChange={e=>up('profile.workoutsPerWeek',+e.target.value)} style={inp} /></div>
+        <div><span style={labelS}>Сон (ч)</span><input type="number" value={calcData.profile?.sleepHours||7} onChange={e=>up('profile.sleepHours',+e.target.value)} style={inp} /></div>
+      </div>
+      <NumberPills label="Стресс (1-10)" value={calcData.profile?.stressLevel||4} onChange={v=>up('profile.stressLevel',v)} />
+      <Toggle label="Курение" value={!!calcData.profile?.smoker} onChange={v=>up('profile.smoker',v)} />
+    </div>
+
+    <div style={glassCard}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 8 }}>🧠 Неврологический статус</div>
+      <NumberPills label="Дофамин" value={calcData.neuro?.dopamineScore||1} onChange={v=>up('neuro.dopamineScore',v)} />
+      <NumberPills label="Серотонин" value={calcData.neuro?.serotoninScore||1} onChange={v=>up('neuro.serotoninScore',v)} />
+      <NumberPills label="Агрессия" value={calcData.neuro?.aggressionScore||1} onChange={v=>up('neuro.aggressionScore',v)} />
+    </div>
+
+    <div style={glassCard}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 8 }}>🫁 Гепатобилиарная</div>
+      <SevPills label="АЛТ/АСТ" value={calcData.hepatobiliary?.altAstElevation||'none'} onChange={v=>up('hepatobiliary.altAstElevation',v)} />
+      <SevPills label="ГГТ" value={calcData.hepatobiliary?.ggtElevation||'none'} onChange={v=>up('hepatobiliary.ggtElevation',v)} />
+      <SevPills label="Билирубин" value={calcData.hepatobiliary?.bilirubinElevation||'none'} onChange={v=>up('hepatobiliary.bilirubinElevation',v)} />
+    </div>
+
+    <div style={glassCard}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', marginBottom: 8 }}>❤️ Сердечно-сосудистая</div>
+      <SevPills label="ЛПНП" value={calcData.cardio?.ldlElevation||'none'} onChange={v=>up('cardio.ldlElevation',v)} />
+      <SevPills label="Гематокрит" value={calcData.cardio?.hctElevation||'none'} onChange={v=>up('cardio.hctElevation',v)} />
+      <Toggle label="Низкий ЛПВП" value={!!calcData.cardio?.hdlLow} onChange={v=>up('cardio.hdlLow',v)} />
+    </div>
+
+    <div style={glassCard}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', marginBottom: 8 }}>🧘 Психологическая зависимость</div>
+      <NumberPills label="Страх потери" value={calcData.psych?.fearOfLoss||1} onChange={v=>up('psych.fearOfLoss',v)} />
+      <NumberPills label="Одержимость зеркалом" value={calcData.psych?.mirrorObsession||1} onChange={v=>up('psych.mirrorObsession',v)} />
+      <NumberPills label="Апатия вне курса" value={calcData.psych?.apathyOffCycle||1} onChange={v=>up('psych.apathyOffCycle',v)} />
+    </div>
+
+    <button onClick={() => { localStorage.setItem('he_autocalc_state', JSON.stringify(calcData)); alert('Данные сохранены. Калькулятор поддержки использует их автоматически.'); }} style={{ padding: '12px', borderRadius: 12, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 700, fontSize: 12, marginTop: 4 }}>
+      💾 Сохранить данные для калькулятора
+    </button>
+  </div>;
 };

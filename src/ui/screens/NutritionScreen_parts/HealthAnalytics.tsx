@@ -15,7 +15,7 @@ const HEALTH_ISSUES: { id: string; icon: string; label: string; desc: string; fo
   { id: 'oedema', icon: '🦶', label: 'Отёки', desc: 'Задержка жидкости — снизить натрий, добавить калий', foodIds: ['salt', 'soy_sauce', 'sausages', 'kfc_wings', 'canned_food', 'cheese', 'bread_white', 'pickles'] },
   { id: 'lactose_intolerance', icon: '🥛', label: 'Непереносимость лактозы', desc: 'Дефицит лактазы — исключить молочные продукты', foodIds: ['milk', 'cheese', 'yogurt', 'cream', 'ice_cream', 'whey', 'cottage_cheese', 'kefir'] },
   { id: 'gluten_intolerance', icon: '🌾', label: 'Непереносимость глютена', desc: 'Целиакия/чувствительность — исключить пшеницу, рожь, ячмень', foodIds: ['bread_white', 'bread_rye', 'pasta', 'cookies', 'pizza', 'couscous', 'barley', 'bulgur'] },
-  { id: 'diabetes', icon: '🍬', label: 'Диабет/�?нсулинорезистентность', desc: 'Контроль гликемии — низкие GI, клетчатка, белок', foodIds: ['sugar', 'honey', 'rice_white', 'bread_white', 'pasta', 'potato', 'juice_pack', 'chocolate_milk'] },
+  { id: 'diabetes', icon: '🍬', label: 'Диабет/Инсулинорезистентность', desc: 'Контроль гликемии — низкие GI, клетчатка, белок', foodIds: ['sugar', 'honey', 'rice_white', 'bread_white', 'pasta', 'potato', 'juice_pack', 'chocolate_milk'] },
   { id: 'hypertension', icon: '💓', label: 'Гипертония', desc: 'Высокое АД — снизить натрий, добавить K/Mg', foodIds: ['salt', 'soy_sauce', 'sausages', 'kfc_wings', 'canned_food', 'cheese', 'chips', 'pickles'] },
   { id: 'gi_issues', icon: '🫃', label: 'Проблемы ЖКТ', desc: 'Гастрит/СРК — термическая обработка, исключить раздражающее', foodIds: ['beans', 'lentils', 'cabbage', 'broccoli', 'milk', 'spicy', 'fried', 'coffee'] },
   { id: 'gout', icon: '🦶', label: 'Подагра', desc: 'Высокая мочевая кислота — ограничить пурины', foodIds: ['liver', 'red_meat', 'sardines', 'beer', 'shrimps', 'mussels', 'tuna', 'mushrooms'] },
@@ -27,7 +27,7 @@ const ALLERGEN_LIST: { id: string; icon: string; label: string }[] = [
   { id: 'gluten', icon: '🌾', label: 'Глютен' },
   { id: 'nuts', icon: '🥜', label: 'Орехи' },
   { id: 'eggs', icon: '🥚', label: 'Яйца' },
-  { id: 'soy', icon: '�?', label: 'Соя' },
+  { id: 'soy', icon: '?', label: 'Соя' },
   { id: 'seafood', icon: '🦐', label: 'Морепродукты' },
   { id: 'histamine', icon: '🧪', label: 'Гистамин' },
   { id: 'sulfites', icon: '🧴', label: 'Сульфиты' },
@@ -85,14 +85,14 @@ export const HealthAnalytics: React.FC = () => {
     const w: string[] = [];
     const hct = val('hematocrit');
     const hb = val('hemoglobin');
-    if (hct && hct > 51) w.push('🚨 КР�?Т�?ЧЕСК�?Й ГЕМАТОКР�?Т! Кровь слишком густая — риск тромбоза. Сдайте кровь или добавьте антикоагулянты.');
+    if (hct && hct > 51) w.push('🚨 КРИТИЧЕСКИЙ ГЕМАТОКРИТ! Кровь слишком густая — риск тромбоза. Сдайте кровь или добавьте антикоагулянты.');
     if (hct && hct < 37) w.push('⚠️ Низкий гематокрит — возможна анемия. Добавьте железо, B12, фолаты.');
     const ldl = val('ldl');
     if (ldl && ldl > 4.2) w.push('🚨 Высокий ЛПНП — риск атеросклероза. Снизьте насыщенные жиры, добавьте Омега-3, клетчатку, коэнзим Q10.');
     const hdl = val('hdl');
     if (hdl && hdl < 0.8) w.push('🚨 Низкий ЛПВП — риск атеросклероза. Добавьте жирную рыбу, оливковое масло, авокадо.');
     const alt = val('alt');
-    if (alt && alt > 80) w.push('🚨 АЛТ > 80 — токсическое поражение печени. �?сключите гепатотоксичные препараты, добавьте TUDCA+NAC.');
+    if (alt && alt > 80) w.push('🚨 АЛТ > 80 — токсическое поражение печени. Исключите гепатотоксичные препараты, добавьте TUDCA+NAC.');
     else if (alt && alt > 45) w.push('⚠️ АЛТ повышен — нагрузка на печень. Добавьте гепатопротекторы (TUDCA, NAC, силимарин).');
     const crp = val('crp');
     if (crp && crp > 3) w.push('🚨 СРБ > 3 — системное воспаление. Добавьте Омега-3, куркумин, проверьте ЖКТ.');
@@ -174,7 +174,7 @@ export const HealthAnalytics: React.FC = () => {
                       <span style={{ fontSize: 10, fontWeight: 600, color: isActive ? '#8b5cf6' : 'rgba(255,255,255,0.7)' }}>{h.label}</span>
                       <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.65)' }}>· {h.foodIds.length} продуктов</span>
                     </div>
-                    <span style={{ fontSize: 9, color: isActive ? '#8b5cf6' : 'rgba(255,255,255,0.2)' }}>{isActive ? 'вњ“' : '+'}</span>
+                    <span style={{ fontSize: 9, color: isActive ? '#8b5cf6' : 'rgba(255,255,255,0.2)' }}>{isActive ? '✓' : '+'}</span>
                   </div>
                   <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>{h.desc}</div>
                   {isActive && (
@@ -215,8 +215,8 @@ export const HealthAnalytics: React.FC = () => {
                   oedema: '⬇ Натрий: уберите соль, соусы, колбасы. ⬆ Калий: зелень, авокадо, батат.',
                   lactose_intolerance: '⬇ Лактоза: замените молоко на безлактозное, сыр на тофу. Фермент лактаза +.',
                   gluten_intolerance: '⬇ Глютен: замените пшеницу на рис, гречку, киноа. Чистые овёс (без клейковины).',
-                  diabetes: '⬇ GI: исключите сахар, белый рис, хлеб. ⬆ Клетчатка, белок, низкие GI (гречка, чечевица). Ужин низкоуглеводный.',
-                  hypertension: '⬇ Натрий <1500 мг/сут. ⬆ Калий, магний. �?сключите фастфуд, консервы, сыр, колбасы.',
+                  diabetes: '⬇ GI: иИИсключите сахар, белый рис, хлеб. ⬆ Клетчатка, белок, низкие GI (гречка, чечевица). Ужин низкоуглеводный.',
+                  hypertension: '⬇ Натрий <1500 мг/сут. ⬆ Калий, магний. Исключите фастфуд, консервы, сыр, колбасы.',
                   gi_issues: '⬆ Термически обработанные овощи. ⬇ Сырые овощи, бобовые, молочка, жареное. Дробное питание.',
                   gout: '⬇ Пурины: ограничьте печень, красное мясо, сардины, пиво. ⬆ Вода 2-3л.',
                   kidney_stones: '⬇ Оксалаты: шпинат, свёкла, орехи, шоколад. ⬆ Вода 2.5-3л. Лимонная вода ингибирует камни.',
@@ -241,7 +241,7 @@ export const HealthAnalytics: React.FC = () => {
           </div>
           <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.1)' }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#00e68a' }}>{totalExcluded}</div>
-            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)' }}>�?сключено продуктов</div>
+            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)' }}>Исключено продуктов</div>
           </div>
         </div>
       </>}

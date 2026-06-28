@@ -47,14 +47,14 @@ export const ProgressTracker: React.FC = () => {
             flex: 1, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: '#202023',
             border: '1px solid rgba(255,255,255,0.06)', color: '#fff', outline: 'none',
           }} />
-          <input value={fatInput} onChange={e => setFatInput(e.target.value)} type="number" step="0.1" placeholder="%Р¶РёСЂР°" style={{
+          <input value={fatInput} onChange={e => setFatInput(e.target.value)} type="number" step="0.1" placeholder="%жира" style={{
             width: 70, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: '#202023',
             border: '1px solid rgba(255,255,255,0.06)', color: '#fff', outline: 'none',
           }} />
           <button onClick={addEntry} style={{
             padding: '6px 12px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer',
             background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#000',
-          }}>вњ“</button>
+          }}>✓</button>
         </div>
         <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.9)' }}>
           {entries.length > 0 ? `Последняя запись: ${entries[entries.length - 1].date} — ${entries[entries.length - 1].weight} кг` : 'Нет записей'}
@@ -114,7 +114,7 @@ export const ProgressTracker: React.FC = () => {
                   )}
                   {report.microDeficiencies?.length > 0 && (
                     <div style={{ fontSize:7, color:'#f59e0b' }}>
-                      вљ пёЏ Р”РµС„РёС†РёС‚С‹: {report.microDeficiencies.join(', ')}
+                      ⚠️ Дефициты: {report.microDeficiencies.join(', ')}
                     </div>
                   )}
                 </div>

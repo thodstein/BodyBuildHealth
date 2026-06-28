@@ -2,10 +2,11 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { type GoalType } from '../../engines/biostack-ai.engine';
 import { findSupplements, type FinderMatch, type FinderQuery } from '../../engines/supplement-finder.engine';
+import { searchBioStack, buildSmartStack, findReplacements, type RecGoal, type RecReplacement } from '../../engines/biostack-recommender.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, MECHANISM_LABELS } from '../../data/support-database';
 import { GlassCard, PillBtn, inputS, PURE_GOALS, TARGET_SYSTEMS, ORGANS, SYSTEMS, TOP_MECHANISMS, SYMPTOMS, toFinderProfile } from './BioStackAIConstants';
 
-type FilterGroup = 'goals' | 'targets' | 'organs' | 'systems' | 'mechanisms';
+type FilterGroup = 'goals' | 'targets' | 'organs' | 'systems' | 'mechanisms' | 'replace';
 
 export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void }) {
   const [searchText, setSearchText] = useState('');
@@ -132,25 +133,38 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
           </div>
         )}
 
-        {/* Collapsible filter groups */}
-        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 4 }}>
-          {(['goals','targets','organs','systems','mechanisms'] as FilterGroup[]).map(g => (
-            <button key={g} onClick={() => setOpenGroup(openGroup === g ? null : g)} style={{
-              padding: '4px 10px', borderRadius: 8, fontSize: 7, cursor: 'pointer', fontWeight: 600,
-              background: openGroup === g ? 'rgba(139,92,246,0.1)' : '#202023',
-              border: `1px solid ${openGroup === g ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.04)'}`,
-              color: openGroup === g ? '#8b5cf6' : 'rgba(255,255,255,0.5)',
+        {/* Beautiful popup search buttons */}
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>🔎 Параметры поиска:</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+            {[
+              { id:'goals', emoji:'🎯', label:'По целям', desc:'Сон, энергия, фокус...', color:'#818cf8', count: selectedGoal ? 1 : 0 },
+              { id:'organs', emoji:'🫀', label:'По органам', desc:'Печень, сердце, мозг...', color:'#f59e0b', count: selectedOrgans.length },
+              { id:'systems', emoji:'⚙️', label:'По системам', desc:'Кардио, нейро, эндокринная...', color:'#22c55e', count: selectedSystems.length },
+              { id:'mechanisms', emoji:'🧬', label:'По механизмам', desc:'Антиоксидант, ГАМК, АТФ...', color:'#a855f7', count: selectedMechs.length },
+            ].map(b => (
+              <button key={b.id} onClick={() => setOpenGroup(openGroup === (b.id as FilterGroup) ? null : (b.id as FilterGroup))} style={{
+                padding: '10px 8px', borderRadius: 12, cursor: 'pointer', background: openGroup === (b.id as FilterGroup) ? b.color + '12' : 'rgba(255,255,255,0.03)',
+                border: openGroup === (b.id as FilterGroup) ? `1px solid ${b.color}44` : '1px solid rgba(255,255,255,0.06)',
+                color: '#fff', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s',
+              }}>
+                <span style={{ fontSize: 18 }}>{b.emoji}</span>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: openGroup === (b.id as FilterGroup) ? b.color : '#fff' }}>{b.label}</div>
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>{b.desc}</div>
+                </div>
+                {b.count > 0 && <span style={{ fontSize: 9, fontWeight: 700, color: b.color, background: b.color + '22', borderRadius: 10, padding: '1px 6px' }}>{b.count}</span>}
+              </button>
+            ))}
+            <button onClick={() => setOpenGroup('replace')} style={{
+              gridColumn: '1 / -1', padding: '10px', borderRadius: 12, cursor: 'pointer',
+              background: openGroup === 'replace' ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)',
+              border: openGroup === 'replace' ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(255,255,255,0.06)',
+              color: '#fff', display: 'flex', alignItems: 'center', gap: 6, fontSize: 10,
             }}>
-              {g === 'goals' ? '🎯 Цели' : g === 'targets' ? '📍 Мишени' : g === 'organs' ? '🫀 Органы' : g === 'systems' ? '⚙️ Системы' : '🧬 Механизмы'}
-              {g === 'goals' && selectedGoal ? ` (1)` : (g === 'organs' && selectedOrgans.length > 0) ? ` (${selectedOrgans.length})` : (g === 'systems' && selectedSystems.length > 0) ? ` (${selectedSystems.length})` : (g === 'mechanisms' && selectedMechs.length > 0) ? ` (${selectedMechs.length})` : ''}
+              <span style={{ fontSize: 16 }}>🔄</span> Интеллектуальные замены и аналоги
             </button>
-          ))}
-          <button onClick={() => setShowFavoritesOnly(!showFavoritesOnly)} style={{
-            padding: '4px 10px', borderRadius: 8, fontSize: 7, cursor: 'pointer', fontWeight: 600,
-            background: showFavoritesOnly ? 'rgba(251,191,36,0.1)' : '#202023',
-            border: `1px solid ${showFavoritesOnly ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.04)'}`,
-            color: showFavoritesOnly ? '#f59e0b' : 'rgba(255,255,255,0.5)',
-          }}>⭐ {showFavoritesOnly ? `(${favorites.length})` : ''}</button>
+          </div>
         </div>
 
         {openGroup === 'goals' && (

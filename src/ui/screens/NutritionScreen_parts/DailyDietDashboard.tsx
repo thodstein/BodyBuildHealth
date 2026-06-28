@@ -55,11 +55,11 @@ export const DailyDietDashboard: React.FC = () => {
   const bars = [
     { key: 'mtor', label: 'mTOR', pct: report.mtorTriggered ? 100 : Math.min(100, (3000 - report.mtorDeficitMg) / 3000 * 100), color: report.mtorTriggered ? '#22c55e' : '#f59e0b', icon: '🧬' },
     { key: 'gi', label: 'ЖКТ', pct: Math.min(100, report.giLoad / 60 * 100), color: report.giLoadWarning ? '#ef4444' : '#22c55e', icon: '🫁' },
-    { key: 'pral', label: 'PRAL', pct: report.pralWarning ? 80 : 30, color: report.pralWarning ? '#f59e0b' : '#22c55e', icon: 'вљ–' },
+    { key: 'pral', label: 'PRAL', pct: report.pralWarning ? 80 : 30, color: report.pralWarning ? '#f59e0b' : '#22c55e', icon: '⚖' },
     { key: 'ammonia', label: 'Аммиак', pct: report.ammoniaRisk ? 80 : Math.min(100, report.ammoniaScore / 3 * 100), color: report.ammoniaRisk ? '#ef4444' : '#22c55e', icon: '💨' },
     { key: 'omega', label: 'Омега', pct: report.omegaWarning ? 80 : report.omegaRatio < 4 ? 30 : 60, color: report.omegaWarning ? '#f59e0b' : '#22c55e', icon: '🐟' },
-    { key: 'electro', label: 'K/Mg', pct: report.electrolyteRisk ? 80 : 40, color: report.electrolyteRisk ? '#ef4444' : '#22c55e', icon: 'вљЎ' },
-    { key: 'insulin', label: '�?нсулин', pct: report.insulinRicohet ? 100 : 20, color: report.insulinRicohet ? '#ef4444' : '#22c55e', icon: '💉' },
+    { key: 'electro', label: 'K/Mg', pct: report.electrolyteRisk ? 80 : 40, color: report.electrolyteRisk ? '#ef4444' : '#22c55e', icon: '⚡' },
+    { key: 'insulin', label: 'Инсулин', pct: report.insulinRicohet ? 100 : 20, color: report.insulinRicohet ? '#ef4444' : '#22c55e', icon: '💉' },
     { key: 'cortisol', label: 'Кортизол', pct: report.cortisolRisk ? 80 : 20, color: report.cortisolRisk ? '#f59e0b' : '#22c55e', icon: '🧠' },
     { key: 'micro', label: 'Микро', pct: report.microDeficits.length > 0 ? 60 : 20, color: report.microDeficits.length > 0 ? '#f59e0b' : '#22c55e', icon: '💊' },
   ];
@@ -106,7 +106,7 @@ export const DailyDietDashboard: React.FC = () => {
       )}
       {report.pralWarning && (
         <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.1)', fontSize: 7, color: '#f59e0b' }}>
-          вљ–пёЏ {report.pralWarning} (PRAL {report.pralTotal.toFixed(1)})
+          ⚖️ {report.pralWarning} (PRAL {report.pralTotal.toFixed(1)})
         </div>
       )}
       {report.omegaWarning && (
@@ -116,7 +116,7 @@ export const DailyDietDashboard: React.FC = () => {
       )}
       {report.microDeficits.length > 0 && (
         <div style={{ marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>
-          вљ пёЏ Р”РµС„РёС†РёС‚: {report.microDeficits.join(', ')}
+          ⚠️ Дефицит: {report.microDeficits.join(', ')}
         </div>
       )}
       {report.homaIr !== null && report.homaIr > 2.5 && (
@@ -166,7 +166,7 @@ export const DailyDietDashboard: React.FC = () => {
         if (report.diaas < 0.9) recs.push({ priority: 'high', icon: '💪', text: `DIAAS ${report.diaas.toFixed(2)} — лимитирует ${report.diaasLimitingAA}. Смешайте источники белка (животный+растительный)` });
         if (report.antinutrientWarning) recs.push({ priority: 'low', icon: '🌿', text: `${report.antinutrientWarning} — замачивайте/проращивайте бобовые, термически обрабатывайте` });
         if (report.glutathioneWarning) recs.push({ priority: 'medium', icon: '🧪', text: `${report.glutathioneWarning} — добавьте NAC 600 мг, селен 200 мкг, серу (MSM/крестоцветные)` });
-        if (report.histamineWarning) recs.push({ priority: 'medium', icon: '🧪', text: `${report.histamineWarning} — исключите ферментированные продукты, добавьте DAO-фермент` });
+        if (report.histamineWarning) recs.push({ priority: 'medium', icon: '🧪', text: `${report.histamineWarning} — иИсключите ферментированные продукты, добавьте DAO-фермент` });
         if (recs.length === 0) return null;
         const prioColors = { high: '#ef4444', medium: '#f59e0b', low: '#8b5cf6' };
         const prioOrder = { high: 0, medium: 1, low: 2 };

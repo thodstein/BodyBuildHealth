@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { buildStack, explainStack, findReplacement, type ReplacementResult, type ReplacementType } from '../../engines/supplement-finder.engine';
+import { buildSmartStack } from '../../engines/biostack-recommender.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS, ALL_STACKS, ALL_SUBSTANCES, type SupportStack } from '../../data/support-database';
 import { decodeGarbled } from '../../utils/text-sanitizer';
 import { GlassCard, StatBox, ORGANS, toFinderProfile } from './BioStackAIConstants';
@@ -11,6 +12,56 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
     const fp = toFinderProfile(profile);
     return explainStack(stackIds, fp);
   }, [stackIds, profile]);
+
+  const synergyExplanation = useMemo(() => {
+    if (stackIds.length < 2) return null;
+    const parts: string[] = [];
+    // Find synergies among stack substances
+    for (let i = 0; i < stackIds.length; i++) {
+      for (let j = i + 1; j < stackIds.length; j++) {
+        const a = SUPPORT_CATALOG_DATA[stackIds[i]];
+        const b = SUPPORT_CATALOG_DATA[stackIds[j]];
+        if (!a || !b) continue;
+        // Check for synergistic pairs
+        const syns = ALL_INTERACTIONS.filter((int: any) =>
+          (int.substanceA === stackIds[i] && int.substanceB === stackIds[j]) ||
+          (int.substanceA === stackIds[j] && int.substanceB === stackIds[i])
+        ).filter((int: any) => int.type === 'synergy');
+        if (syns.length > 0) {
+          syns.forEach((s: any) => {
+            parts.push(`⊕ ${a.nameRu || a.name} + ${b.nameRu || b.name}: ${s.effect} (${s.mechanism || 'синергия'})`);
+          });
+        }
+        // Check shared mechanisms
+        const sharedMechs = (a.mechanisms || []).filter((m: string) => (b.mechanisms || []).includes(m));
+        if (sharedMechs.length > 0 && syns.length === 0) {
+          parts.push(`🔗 ${a.nameRu || a.name} + ${b.nameRu || b.name}: общие механизмы — ${sharedMechs.slice(0,2).join(', ')}`);
+        }
+      }
+    }
+    if (parts.length === 0) parts.push('Синергии между компонентами не выявлены — препараты работают независимо.');
+    return parts;
+  }, [stackIds]);
+
+  const stackMechanisms = useMemo(() => {
+    if (stackIds.length === 0) return [];
+    const mechs = new Set<string>();
+    for (const id of stackIds) {
+      const cat = SUPPORT_CATALOG_DATA[id];
+      (cat?.mechanisms || []).forEach(m => mechs.add(m));
+    }
+    return [...mechs].slice(0, 15);
+  }, [stackIds]);
+
+  const stackSystems = useMemo(() => {
+    if (stackIds.length === 0) return [];
+    const sys = new Set<string>();
+    for (const id of stackIds) {
+      const cat = SUPPORT_CATALOG_DATA[id];
+      (cat?.systems || []).forEach((s: string) => sys.add(s));
+    }
+    return [...sys];
+  }, [stackIds]);
 
   const [replaceState, setReplaceState] = useState<Record<string, { open: boolean; results: ReplacementResult[]; loading: boolean; activeType: ReplacementType }>>({});
 
@@ -423,6 +474,40 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
         )}
       </GlassCard>
 
+      {/* 🧬 Объяснение: почему этот стек работает */}
+      {synergyExplanation && synergyExplanation.length > 0 && (
+        <GlassCard title="🧬 Почему этот стек работает" icon="🧬" color="#a855f7">
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>⚡ Принцип синергии</div>
+            {synergyExplanation.map((s, i) => (
+              <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)', padding: '3px 0', lineHeight: 1.4, borderBottom: i < synergyExplanation.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
+                {s}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#22c55e', marginBottom: 4 }}>🔧 Механизмы в стеке ({stackMechanisms.length})</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                {stackMechanisms.map(m => <span key={m} style={{ fontSize: 7, padding: '2px 5px', borderRadius: 4, background: 'rgba(34,197,94,0.08)', color: '#22c55e' }}>{m.replace(/_/g, ' ').slice(0, 30)}</span>)}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>🎯 Системы ({stackSystems.length})</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                {stackSystems.map(s => <span key={s} style={{ fontSize: 7, padding: '2px 5px', borderRadius: 4, background: 'rgba(96,165,250,0.08)', color: '#60a5fa' }}>{SYSTEM_LABELS_RU[s] || s}</span>)}
+              </div>
+            </div>
+          </div>
+          {explanation?.warnings && explanation.warnings.length > 0 && (
+            <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.1)' }}>
+              <div style={{ fontSize: 8, fontWeight: 700, color: '#ef4444', marginBottom: 3 }}>⚠️ Предупреждения</div>
+              {explanation.warnings.slice(0, 5).map((w: string, i: number) => <div key={i} style={{ fontSize: 7, color: '#f87171', lineHeight: 1.3 }}>• {w}</div>)}
+            </div>
+          )}
+        </GlassCard>
+      )}
+
       {/* ✅ Compliance Check */}
       <GlassCard title={`✅ Комплаенс • ${todayPct}% сегодня`} icon="✅" color="#22c55e">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -457,6 +542,19 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
       {/* 🚀 Stack Actions */}
       <GlassCard title="🚀 Действия со стеком" icon="🚀" color="#8b5cf6">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+          {ACTIONS.map((a: any) => (
+            <button key={a.id} onClick={a.run} disabled={actionLoading === a.id} style={{
+              padding: '10px 6px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: actionLoading === a.id ? 'wait' : 'pointer',
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: a.color,
+              opacity: actionLoading === a.id ? 0.5 : 1, transition: 'all 0.15s',
+            }}>{a.icon} {a.label}{actionLoading === a.id ? '...' : ''}</button>
+          ))}
+          <button onClick={() => { const ids = stackIds.map(s => s); setActionLoading('complex' as any); setTimeout(() => { setActionResult({ title:'🔀 Замена на комплексный препарат', text:'Поиск комплексного препарата, заменяющего стек из ' + stackIds.length + ' компонентов...\n\nФункция в разработке — проверьте библиотеку стеков для готовых комплексных решений.' }); setActionLoading(null); }, 300); }} style={{ gridColumn: '1 / -1', padding: '10px 6px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: 'pointer', background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', color: '#22c55e' }}>
+            🔀 Заменить комплексным препаратом
+          </button>
+          <button onClick={() => { const fp = toFinderProfile(profile); const r = buildSmartStack(profile.goals as any || [], { maxSubstances: stackIds.length }, profile); setActionResult({ title:'⚖ Сравнение по действию', text:`Альтернативный стек: ${r.substances.map(s=>s.nameRu||s.name).join(', ')}\n\nОценка: ${r.totalScore}\nПокрытие: ${r.coverageSummary}\nСинергии: ${r.synergySummary}\n\n${r.timingSummary}` }); }} style={{ gridColumn: '1 / -1', padding: '10px 6px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: 'pointer', background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)', color: '#60a5fa' }}>
+            ⚖ Сравнить по действию (альтернативный стек)
+          </button>
           {ACTIONS.map(btn => (
             <button key={btn.id} onClick={btn.run} disabled={actionLoading !== null} style={{
               padding: '8px 6px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: actionLoading ? 'wait' : 'pointer',

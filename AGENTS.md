@@ -154,6 +154,41 @@
 
 ---
 
+## 🧮 Калькулятор поддержки — НАСТРОЙКА (осталось)
+
+### Сделано
+| № | Задача | Статус |
+|---|--------|--------|
+| C1 | PopupBool, PopupNumber, PopupText — кнопка-карточка с попапом | ✅ |
+| C2 | Card cols — сетка 2-3 колонки | ✅ |
+| C3 | 37 BoolToggle → PopupBool | ✅ |
+| C4 | 6 NumberSelect → PopupNumber | ✅ |
+| C5 | 16 inline `<input>` → PopupNumber/PopupText | ✅ |
+| C6 | hydrateState() — все поля (oda, dental, gi, toxic, epicrisis, inj, journal, labs, profile) | ✅ |
+| C7 | Очистка: BoolToggle, NumberSelect, SELECT, TITRATION_RULES | ✅ |
+| C8 | Budget pills → onLevelClick (синхронизация с supportLevel) | ✅ |
+| C9 | Единая карточка расчёта v3.0 | ✅ |
+| C10 | WeekSelect попап (единый для карточки и плана) | ✅ |
+| C11 | Избранное → подвкладка calculator (he_saved_calc_results) | ✅ |
+| C12 | Save calc result → Избранное | ✅ |
+| C13 | AutoCalculator save переименован в «Сохранить вводные» | ✅ |
+| C14 | tsc --noEmit 0 ошибок, vite build успешно | ✅ |
+
+### Нужно доделать
+| № | Задача | Статус | Описание |
+|---|--------|--------|----------|
+| C15 | **ХГЧ — автоназначение** | ❌ | Если курс содержит ААС → добавить hCG в план автоматически (сейчас только через boostEnabled). Логика: проверить `state.pharma.aas.length > 0 && !state.pharma.hasHCG → вставить hCG 500 МЕ 2р/нед` |
+| C16 | **«О подборе» — убрать/перенести** | ❌ | Сейчас текст «О подборе» рендерится внизу вкладки `genTab === 'calculator'`. Перенести в отдельную подвкладку `genTab === 'about'` или удалить. Файл: SupportScreen.tsx |
+| C17 | **Сохранить план → Мои планы** | ❌ | После расчёта поддержки нет кнопки «Сохранить в Мои планы». Нужно: кнопка в карточке результата → запись в `he_my_plans` localStorage. Формат: `{ id, name, date, level, subs[], result }` |
+| C18 | **Синхронизация RiskScreen ↔ support.engine.ts** | ❌ | Риски из support.engine.ts (TZ риск) должны отображаться в RiskScreen. Сейчас risk engine и support engine — разные. Нужен общий `riskStore` или передача через linked.risk |
+| C19 | **Недельный редактор AAS** | ❌ | У препаратов в курсе нет startWeek/endWeek. Нужно: при добавлении AAS в AutoCalculator → поля "старт нед" / "конец нед". Влияет на понедельный расчёт риска |
+| C20 | **AutoCalculator → результат → план (соединение)** | ❌ | После нажатия «Применить расчёт» результат AutoCalculator должен попадать в основной план поддержки (не только в setAutoCalcResult). Сейчас onApply только сохраняет в autoCalcResult, но не триггерит renderPlan |
+| C21 | **Manual принцип (каталог)** | ❌ | calcPrinciple === 'manual' → открыть каталог поддержки с возможностью ручного выбора веществ. Сейчас manual ведёт в `setShowModal('manual')`, но модалка не реализована |
+| C22 | **Week selector → влияние на рекомендации** | ❌ | Смена недели должна пересчитывать план: дозировки (титрация), риски (понедельная динамика), состав поддержки. Сейчас onWeekChange только показывает уведомление |
+| C23 | **Joint/Boost уведомления** | ❌ | Сейчас setJointNotification/setBoostNotification не отображаются в UI. Нужен toast-компонент или встроенный блок уведомлений |
+
+---
+
 ## Session Summary (Jun 27 — Part 3) — Substance ID mapping fix (critical)
 ### Done
 - **CRITICAL FIX: Substance ID mismatch** — `SYNERGY_ID_SUBSTANCES` used lowercase IDs (`nac`, `tudca`, `zinc`, `omega3`…) while `SUPPORT_CATALOG_DATA` keys were UPPERCASE (`NAC`, `TUDCA`…) and 28 substances were missing from catalog entirely. This caused `renderCatalogDetail` to return `null` for all plan substances.
@@ -267,6 +302,107 @@ $env:NODE_OPTIONS='--max-old-space-size=2048'; npx tsc --noEmit
 $env:NODE_OPTIONS='--max-old-space-size=2048'; npx vite build
 ```
 
+## Session Summary (Jun 28) — AutoCalculator refactoring: 21 cards → PopupXxx
+
+### Полный технический план калькулятора поддержки
+
+#### Цель
+Соединить старый IIFE-калькулятор с AutoCalculator в ОДИН цельный калькулятор с единой карточкой расчёта, единой save/load панелью и визуальной структурой кнопок-карточек с попапами.
+
+#### Constraints
+- Старый IIFE не удалять
+- Принцип расчёта: 🧠 Интеллектуально / 📋 Вручную
+- Week → PopupSelect (кнопка-карточка с попапом)
+- Избранное → подвкладка calculator
+- Все 21 карточка → PopupXxx (PopupBool, PopupNumber, PopupText)
+- Сетка 2-3 колонки, заголовки секций
+
+#### 1. МАППИНГ: 21 карточка → PopupXxx + Card cols
+
+| # | Карточка | cols | PopupBool | PopupNumber | PopupSelect | PopupText | Осталось inline |
+|---|----------|------|-----------|-------------|-------------|-----------|-----------------|
+| 1 | 👤 Профиль | 3 | 1 | 8 | 2 | — | — |
+| 2 | 🧠 Неврология | 2 | 6 | 3 | 2 | — | — |
+| 3 | 💉 Фарма стек | 2 | 8 | — | 1 | — | AAS picker |
+| 4 | 🎯 Цели / Цикл | 2 | 7 | 2 | 2 | — | — |
+| 5 | 🫁 Гепатобилиарная | 2 | 2 | — | 4 | — | — |
+| 6 | 💧 Мочевыделительная | 2 | 4 | — | 4 | — | — |
+| 7 | ❤️ ССС | 2 | 3 | 1 | 4 | — | — |
+| 8 | 🦴 ОДА / Суставы | 2 | 2 | — | 1 | — | травмы |
+| 9 | 🥗 Питание | 3 | 1 | 6 | 1 | — | — |
+| 10 | 🩺 Противопоказания | 3 | 9 | — | — | 1 | — |
+| 11 | 📓 Журнал | — | — | — | — | — | кнопка + список |
+| 12 | 📋 Эпикриз | 2 | 5 | — | — | — | — |
+| 13 | ☣️ Токсическая нагрузка | 2 | 3 | — | 1 | — | — |
+| 14 | 🦷 Стоматология | 2 | 5 | — | — | — | — |
+| 15 | 🧬 Генетика | 2 | — | — | 4 | — | — |
+| 16 | 🫀 ЖКТ | 2 | 7 | — | — | — | — |
+| 17 | 🧘 Психология | 3 | — | 3 | — | — | — |
+| 18 | 💉 Инъекции | 2 | — | — | 4 | — | — |
+| 19 | 🧪 Лаборатория | — | — | — | — | — | FullLabInput |
+| 20 | 🧠 Расчёт поддержки | — | — | — | — | — | рекомендации |
+| 21 | 📈 Динамика риска | — | — | — | — | — | график |
+
+#### 2. УДАЛЕННЫЕ КОМПОНЕНТЫ
+| Компонент | Причина |
+|-----------|---------|
+| `BoolToggle` | Дубликат `PopupBool` |
+| `NumberSelect` | Заменён на `PopupNumber` |
+| `SELECT` (CSS const) | Не использовался |
+| `TITRATION_RULES` (import) | Не использовался в AutoCalculator |
+
+#### 3. Replaced inline counts
+| Было | Стало | Количество |
+|------|-------|-----------|
+| `<BoolToggle>` | `<PopupBool>` | 37 |
+| `<NumberSelect>` | `<PopupNumber>` | 6 |
+| `<input type="number">` (в карточках) | `<PopupNumber>` | 16 |
+| `<input>` текст (в карточках) | `<PopupText>` | 1 |
+| `<div><span style={LABEL}>…<PopupSelect>` | `<PopupSelect>` flat | 8 |
+| `<div style="display:grid">` внутри Card | удалены (Card grid) | 10 |
+
+#### 4. DATA FLOW: AutoCalculator → hydrateState() → calcSupport()
+```
+AutoCalculator.useEffect()
+  → localStorage.setItem('he_autocalc_state', JSON.stringify(state))
+
+SupportScreen.calcSupport()
+  → const h = hydrateState()
+    → localStorage.getItem('he_autocalc_state')
+      → merge neuro, psych, genetics, hepatobiliary, cardio, urinary, goals,
+        nutrition, contraindications, oda, dental, gi, toxicLoad,
+        epicrisis, injection, journal, labs, profile [ВСЕ ПОЛЯ]
+  → const state = { ...defaults, ...h, powerLevel }
+  → calculateSupportTZ(state)
+```
+
+#### 5. hydrateState() — coverage до/после
+| Поле | Было | Стало |
+|------|------|-------|
+| oda | ❌ | ✅ |
+| dental | ❌ | ✅ |
+| gi | ❌ | ✅ |
+| toxicLoad | ❌ | ✅ |
+| epicrisis | ❌ | ✅ |
+| injection | ❌ | ✅ |
+| journal | ❌ | ✅ |
+| labs | ❌ | ✅ |
+| profile | ❌ | ✅ |
+| Все остальные | ✅ | ✅ |
+
+#### 6. Done
+- **PopupBool, PopupNumber, PopupText** — кнопка-карточка с попапом
+- **Card cols** — проп для сетки 2-3 колонки
+- **37 BoolToggle → PopupBool**
+- **6 NumberSelect → PopupNumber**
+- **16 inline `<input type="number">` → PopupNumber**
+- **inline `<input>` → PopupText** (аллергии)
+- **hydrateState()** — добавлены 8 недостающих полей
+- **8 `<div><span>PopupSelect` wrappers** → flat `<PopupSelect>`
+- **10 inner `<div style="grid">`** → Card grid
+- **Удалены**: `BoolToggle`, `NumberSelect`, `SELECT`, `TITRATION_RULES`
+- ✅ `tsc --noEmit` ✓, `vite build` ✓
+
 ## 🎯 ПЛАН НА СЛЕДУЮЩУЮ СЕССИЮ (приоритеты)
 
 ### Критические баги (проверить и исправить):
@@ -276,10 +412,10 @@ $env:NODE_OPTIONS='--max-old-space-size=2048'; npx vite build
 4. **ВСЕ** блоковые отчёты (Labs, Risks, Pharma, Training) — проверить что сохраняются в `he_X_reports_current`, а не сразу в archive. Отчёты должны открываться на редактирование.
 
 ### Функциональность (доработка):
-5. **Калькулятор поддержки** — ХГЧ должен назначаться автоматически при наличии ААС в курсе (сейчас только через `boostEnabled`). Добавить логику: если курс содержит ААС → добавить hCG в план независимо от уровня.
-6. **Калькулятор поддержки → "О подборе"** — сейчас размещён внизу вкладки калькулятора. Перенести в отдельную подвкладку или убрать.
-7. **Калькулятор поддержки → План** — план не сохраняется в "Мои планы". Добавить кнопку "Сохранить план" в localStorage.
-8. **Риски и поддержка** — не синхронизированы. Риски из support.engine.ts должны передаваться в riskScreen и наоборот.
+5. **Калькулятор поддержки — ХГЧ** — назначать автоматически при ААС (сейчас только через `boostEnabled`)
+6. **Калькулятор поддержки → "О подборе"** — перенести в отд. вкладку или убрать
+7. **Калькулятор поддержки → План** — кнопка "Сохранить план" в Мои планы
+8. **Риски и поддержка** — синхронизировать riskScreen ↔ support.engine.ts
 
 ### База данных (расширение):
 9. **catalog-enrichment.ts** — добавить `maxUsageWeeks`, `labMarkers`, `restrictions` для ВСЕХ core-препаратов (сейчас только NAC и telmisartan).

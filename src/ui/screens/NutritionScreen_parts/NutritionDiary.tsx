@@ -8,6 +8,8 @@ import { CAT_MAP_EMOJI } from '../../../core/nutrition-utils';
 import { calcMealQuality, getQualityLabel } from '../../../engines/nutrition-quality.engine';
 import { NutritionQualityCard } from '../../components/NutritionQualityCard';
 
+type FoodItemLike = { id: string; name: string; kcal: number; protein: number; fat: number; carbs: number; fiber?: number; category?: string; tier?: string; description?: string; isVegetarian?: boolean; isGlutenFree?: boolean; isDairyFree?: boolean };
+
 const MEAL_PRESETS = ['Завтрак', 'Второй завтрак', 'Обед', 'Полдник', 'Ужин', 'Перекус', 'До тренировки', 'После тренировки', 'Поздний перекус'];
 const DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
@@ -23,6 +25,12 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const [showOCR, setShowOCR] = useState(false);
   const [showBarcode, setShowBarcode] = useState(false);
   const [foodSearch, setFoodSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(foodSearch), 200);
+    return () => clearTimeout(t);
+  }, [foodSearch]);
   const [mealType, setMealType] = useState('');
   const [ocrText, setOcrText] = useState('');
   const [parsedItems, setParsedItems] = useState<DiaryItem[]>([]);
@@ -32,6 +40,16 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const [customMealInput, setCustomMealInput] = useState('');
   const [showCustomMeal, setShowCustomMeal] = useState(false);
   const [customMeals, setCustomMeals] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_custom_meals') || '[]'); } catch { return []; } });
+  const [usdaFoods, setUsdaFoods] = useState<FoodItemLike[]>([]);
+
+  // Lazy-load USDA database
+  useEffect(() => {
+    let cancelled = false;
+    import('../../../data/usda-foods').then(m => {
+      if (!cancelled && m.USDA_FOODS) setUsdaFoods(m.USDA_FOODS.slice(0, 5000));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
   const [diaryData, setDiaryData] = useState<any>(() => { try { return JSON.parse(localStorage.getItem('nutrition_diary') || '{}'); } catch { return {}; } });
   const [refreshKey, setRefreshKey] = useState(0);
   const [showCustomFood, setShowCustomFood] = useState(false);
@@ -73,13 +91,15 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   useEffect(() => { if (!mealType && allMealTypes.length > 0) setMealType(allMealTypes[0]); }, [tab]);
 
   const foodSearchResults = useMemo(() => {
-    if (!foodSearch.trim()) return [];
-    const q = foodSearch.toLowerCase();
-    return FOOD_DB.filter(f => (f.name||'').toLowerCase().includes(q)).slice(0, 10);
-  }, [foodSearch]);
+    if (!debouncedSearch.trim()) return [];
+    const q = debouncedSearch.toLowerCase();
+    const internal = FOOD_DB.filter((f: any) => (f.name||'').toLowerCase().indexOf(q) >= 0);
+    const usda = usdaFoods.filter((f: any) => (f.name||'').toLowerCase().indexOf(q) >= 0 || (f.description||'').toLowerCase().indexOf(q) >= 0);
+    return [...internal.slice(0, 5), ...usda.slice(0, 10)].slice(0, 15);
+  }, [debouncedSearch, usdaFoods]);
 
-  const addFoodFromDB = (food: typeof FOOD_DB[number]) => {
-    setParsedItems(prev => [...prev, { name: food.name, kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs, qty: 100, category: food.category }]);
+  const addFoodFromDB = (food: FoodItemLike) => {
+    setParsedItems(prev => [...prev, { name: food.name, kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs, qty: 100, category: food.category || 'other' }]);
     setFoodSearch('');
     try { const favs = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); const updated = [food.id, ...favs.filter((f: string) => f !== food.id)].slice(0, 12); localStorage.setItem('he_food_favs', JSON.stringify(updated)); } catch {}
   };
@@ -231,7 +251,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                     display:'flex', justifyContent:'space-between', alignItems:'center', color:'#fff', borderRadius:6,
                   }}>
                     <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                      <span style={{ fontSize:12 }}>{CAT_MAP_EMOJI[f.category] || '📦'}</span>
+                      <span style={{ fontSize:12 }}>{CAT_MAP_EMOJI[f.category || 'other'] || '📦'}</span>
                       <span style={{ fontWeight:500 }}>{f.name}</span>
                     </div>
                     <div style={{ display:'flex', gap:3, fontSize:8, color:'rgba(255,255,255,0.85)' }}>

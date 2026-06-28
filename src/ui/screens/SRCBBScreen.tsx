@@ -205,6 +205,17 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
 
   return (
     <div key={mainTab} style={{ padding: 12, color: '#fff', maxWidth: 720, margin: '0 auto' }}>
+      {/* Main tab selector: PL / BB / Ручной */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12, justifyContent: 'center' }}>
+        {(['pl','bb','manual'] as const).map(t => (
+          <button key={t} onClick={() => { setMainTab(t); if (t !== 'manual') setSubView('plan'); }} style={{
+            padding: '10px 20px', borderRadius: 14, fontSize: 12, fontWeight: mainTab === t ? 800 : 600, cursor: 'pointer',
+            border: mainTab === t ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+            background: mainTab === t ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)',
+            color: mainTab === t ? '#00e68a' : 'rgba(255,255,255,0.5)', transition: 'all 0.15s',
+          }}>{t === 'pl' ? '🏆 СРЦ' : t === 'bb' ? '💪 ББ' : '🛠 Ручной'}</button>
+        ))}
+      </div>
       {/* sub-view pill nav for PL/BB */}
       {mainTab !== 'manual' && subViewList[mainTab].length > 0 && (
         <div style={{ display: 'flex', gap: 4, marginBottom: 10, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4, scrollbarWidth: 'none' }}>
@@ -438,35 +449,39 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
         const saveWorkout = () => { if (!manualWorkout.name.trim() || manualWorkout.exercises.every(e => !e.name.trim())) return; const updated = [...saved, manualWorkout]; setSaved(updated); localStorage.setItem('he_manual_workouts', JSON.stringify(updated)); setManualWorkout({ name: '', exercises: [{ name: '', sets: 3, reps: 10, weight: 0 }], date: new Date().toISOString().slice(0, 10) }); };
         const delWorkout = (i: number) => { const updated = saved.filter((_, idx) => idx !== i); setSaved(updated); localStorage.setItem('he_manual_workouts', JSON.stringify(updated)); };
         return <div>
-          <div style={H}>🛠 Ручной сбор тренировки</div>
-          <div style={CARD}>
-            <div style={LABEL}>Название</div>
-            <input style={IN} value={manualWorkout.name} onChange={e => setManualWorkout(p => ({ ...p, name: e.target.value }))} placeholder="Например: Грудные + трицепс" />
+          <div style={{ ...CARD, marginBottom: 12 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#00e68a', marginBottom: 10 }}>🛠 Ручной сбор тренировки</div>
+            <div style={LABEL}>Название тренировки</div>
+            <input style={IN} value={manualWorkout.name} onChange={e => setManualWorkout(p => ({ ...p, name: e.target.value }))} placeholder="Грудные + трицепс" />
             <div style={LABEL}>Дата</div>
             <input style={IN} type="date" value={manualWorkout.date} onChange={e => setManualWorkout(p => ({ ...p, date: e.target.value }))} />
             {manualWorkout.exercises.map((ex, i) => (
               <div key={i} style={{ display: 'flex', gap: 4, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                <input style={{ ...IN, flex: '2 1 80px', minWidth: 60 }} value={ex.name} onChange={e => updEx(i, 'name', e.target.value)} placeholder="Упражнение" list="ex-list" />
-                <input style={{ ...IN, flex: '0 1 40px', width: 40 }} type="number" min={1} max={20} value={ex.sets} onChange={e => updEx(i, 'sets', +e.target.value)} placeholder="С" />
-                <input style={{ ...IN, flex: '0 1 40px', width: 40 }} type="number" min={1} max={100} value={ex.reps} onChange={e => updEx(i, 'reps', +e.target.value)} placeholder="П" />
-                <input style={{ ...IN, flex: '0 1 50px', width: 50 }} type="number" min={0} step={2.5} value={ex.weight} onChange={e => updEx(i, 'weight', +e.target.value)} placeholder="кг" />
-                <button style={{ ...BTN, background: '#ef4444', flex: '0 0 auto' }} onClick={() => setManualWorkout(p => ({ ...p, exercises: p.exercises.filter((_, idx) => idx !== i) }))}>✕</button>
+                <input style={{ ...IN, flex: 3, minWidth: 80 }} value={ex.name} onChange={e => updEx(i, 'name', e.target.value)} placeholder="Упражнение" list="ex-list" />
+                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>С</span>
+                <input style={{ ...IN, flex: 1, minWidth: 36, textAlign: 'center' }} type="number" min={1} max={20} value={ex.sets} onChange={e => updEx(i, 'sets', +e.target.value)} placeholder="С" />
+                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>П</span>
+                <input style={{ ...IN, flex: 1, minWidth: 36, textAlign: 'center' }} type="number" min={1} max={100} value={ex.reps} onChange={e => updEx(i, 'reps', +e.target.value)} placeholder="П" />
+                <input style={{ ...IN, flex: 1.5, minWidth: 50, textAlign: 'center' }} type="number" min={0} step={2.5} value={ex.weight} onChange={e => updEx(i, 'weight', +e.target.value)} placeholder="кг" />
+                {manualWorkout.exercises.length > 1 && <button style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 12 }} onClick={() => setManualWorkout(p => ({ ...p, exercises: p.exercises.filter((_, idx) => idx !== i) }))}>✕</button>}
               </div>
             ))}
-            <button style={{ ...BTN, width: '100%', marginTop: 8 }} onClick={addEx}>+ Упражнение</button>
-            <button style={{ ...BTN, width: '100%', marginTop: 6, background: '#00e68a', color: '#000' }} onClick={saveWorkout}>💾 Сохранить тренировку</button>
-            <datalist id="ex-list">{EXERCISE_CATALOG.slice(0, 50).map(e => <option key={e.id} value={e.name} />)}</datalist>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button style={{ ...BTN, flex: 1 }} onClick={addEx}>+ Упражнение</button>
+              <button style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 700, fontSize: 12 }} onClick={saveWorkout}>💾 Сохранить</button>
+            </div>
+            <datalist id="ex-list">{EXERCISE_CATALOG.slice(0, 100).map(e => <option key={e.id} value={e.name} />)}</datalist>
           </div>
-          {saved.length > 0 && <div style={{ marginTop: 12 }}>
-            <div style={H}>Сохранённые ({saved.length})</div>
+          {saved.length > 0 && <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 8 }}>Сохранённые тренировки ({saved.length})</div>
             {saved.map((w, i) => (
-              <div key={i} style={CARD}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <b>{w.name}</b>
-                  <span style={SMALL}>{w.date}</span>
+              <div key={i} style={{ ...CARD, marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontWeight: 700, color: '#00e68a', fontSize: 12 }}>{w.name}</span>
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>{w.date}</span>
                 </div>
-                <div style={SMALL}>{w.exercises.map(e => `${e.name}: ${e.sets}×${e.reps}@${e.weight}кг`).join(', ')}</div>
-                <button style={{ ...BTN, background: '#ef4444', fontSize: 10, padding: '4px 10px', marginTop: 6 }} onClick={() => delWorkout(i)}>✕ Удалить</button>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 6, lineHeight: 1.4 }}>{w.exercises.map(e => `${e.name}: ${e.sets}×${e.reps}@${e.weight}кг`).join(' · ')}</div>
+                <button style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444', borderRadius: 8, padding: '4px 12px', cursor: 'pointer', fontSize: 10 }} onClick={() => delWorkout(i)}>✕ Удалить</button>
               </div>
             ))}
           </div>}

@@ -20,6 +20,7 @@ import { runMDSS, type MDSSInput, type MDSSOutput, type BiomarkerInput } from '.
 const Risk3DModel = React.lazy(() => import('./RiskScreen_parts/Risk3DModel').then(m => ({ default: m.Risk3DModel })));
 import { TZRiskMatrix } from './RiskScreen_parts/TZRiskMatrix';
 import { HysteresisChart } from './RiskScreen_parts/HysteresisChart';
+import { PredictiveAnalytics } from './RiskScreen_parts/PredictiveAnalytics';
 import { calculateWeeklyRiskDynamics, type WeeklyRiskDynamics } from '../../engines/weekly-risk-dynamics.engine';
 import { useV7Risk } from '../hooks/useV7Risk';
 import { getProfile, updateProfile } from '../../core/profile-manager';
@@ -988,12 +989,14 @@ export const RiskScreen: React.FC = () => {
               </div>
               {/* BASIC CALC — multi-page */}
               {mainTab === 'calculations' && calcPage === 'basic' && riskResult && renderBasicCalc()}
+              {/* TZ Risk Matrix — вероятностная модель в базовом расчёте */}
+              {mainTab === 'calculations' && calcPage === 'basic' && basicPage === 'main' && linked.profile && <TZRiskMatrix />}
               {/* MONTE CARLO — multi-page */}
               {mainTab === 'calculations' && calcPage === 'montecarlo' && renderMonteCarlo()}
-              {/* TZ Risk Matrix — комплексные расчёты (вероятностная модель) */}
-              {mainTab === 'calculations' && calcPage === 'montecarlo' && linked.profile && <TZRiskMatrix />}
-              {/* Hysteresis chart — PK/PD simulation */}
-              {mainTab === 'calculations' && calcPage === 'montecarlo' && <HysteresisChart />}
+              {/* Hysteresis — PK/PD simulation visible in Monte Carlo */}
+              {mainTab === 'calculations' && calcPage === 'montecarlo' && (mcPage === 'main' || mcPage === 'pk') && <HysteresisChart />}
+              {/* Predictive Analytics — ARIMA + Holt-Winters */}
+              {mainTab === 'calculations' && calcPage === 'montecarlo' && (mcPage === 'main') && <PredictiveAnalytics />}
               {/* All other content */}
               {!((mainTab === 'calculations' && calcPage === 'basic') || (mainTab === 'calculations' && calcPage === 'montecarlo')) && renderContent()}
             </>

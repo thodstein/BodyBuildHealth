@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { buildStack, explainStack } from '../../engines/supplement-finder.engine';
+import { findReplacements, type RecReplacement } from '../../engines/biostack-recommender.engine';
 import { GlassCard, StatBox } from './BioStackAIConstants';
 import { toFinderProfile } from './BioStackAIConstants';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
@@ -42,6 +43,9 @@ export function CompareTab({ profile, stackIds, setStackIds }: { profile: BioSta
   const [loading, setLoading] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showCost, setShowCost] = useState(false);
+  const [selectedReplaceId, setSelectedReplaceId] = useState<string | null>(null);
+  const [replacements, setReplacements] = useState<RecReplacement[]>([]);
+  const [replaceFilter, setReplaceFilter] = useState<RecReplacement['type'] | 'all'>('all');
 
   const currentExplanation = useMemo(() => {
     if (stackIds.length === 0) return null;
@@ -213,6 +217,35 @@ export function CompareTab({ profile, stackIds, setStackIds }: { profile: BioSta
               ))}
             </GlassCard>
           )}
+
+          {/* Замены */}
+          <GlassCard title="🔄 Интеллектуальные замены" icon="🔄" color="#818cf8">
+            <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:6 }}>Выберите вещество для поиска замен:</div>
+            <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:8 }}>
+              {stackIds.map(id => { const e=SUPPORT_CATALOG_DATA[id]; return <button key={id} onClick={() => { const reps = findReplacements(id); setReplacements(reps); setSelectedReplaceId(id); }} style={{ padding:'3px 8px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer', background: selectedReplaceId===id?'#818cf8':'rgba(255,255,255,0.04)', border: selectedReplaceId===id?'1px solid #818cf8':'1px solid rgba(255,255,255,0.06)', color: selectedReplaceId===id?'#fff':'rgba(255,255,255,0.6)' }}>{e?.nameRu||e?.name||id}</button>; })}
+            </div>
+            {replacements.length > 0 && <>
+              <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
+                {(['all','direct_analog','functional_analog','safer','stronger'] as const).map(f => <button key={f} onClick={()=>setReplaceFilter(f)} style={{ padding:'2px 6px', borderRadius:6, fontSize:7, fontWeight:600, cursor:'pointer', background: replaceFilter===f?'rgba(129,140,248,0.2)':'rgba(255,255,255,0.03)', border: replaceFilter===f?'1px solid #818cf8':'1px solid rgba(255,255,255,0.06)', color: replaceFilter===f?'#818cf8':'rgba(255,255,255,0.5)' }}>{f==='all'?'Все':f==='direct_analog'?'Аналоги':f==='functional_analog'?'Функц.':f==='safer'?'Безопаснее':'Сильнее'}</button>)}
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:250, overflowY:'auto' }}>
+                {replacements.filter(r=>replaceFilter==='all'||r.type===replaceFilter).slice(0,12).map(r => { const rp=SUPPORT_CATALOG_DATA[r.id]; return <div key={r.id+r.type} style={{ padding:'6px 8px', borderRadius:8, background:'rgba(129,140,248,0.04)', border:'1px solid rgba(129,140,248,0.1)' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <span style={{ flex:1, fontSize:9, fontWeight:700, color:'#c7d2fe' }}>{rp?.nameRu||r.name}</span>
+                    <span style={{ fontSize:7, padding:'1px 5px', borderRadius:4, background: r.type==='direct_analog'?'rgba(34,197,94,0.15)':r.type==='functional_analog'?'rgba(96,165,250,0.15)':'rgba(168,85,247,0.15)', color: r.type==='direct_analog'?'#22c55e':r.type==='functional_analog'?'#60a5fa':'#a855f7' }}>{r.type==='direct_analog'?'Аналог':r.type==='functional_analog'?'Функц.':'Замена'}</span>
+                    <button onClick={()=>{setStackIds(stackIds.map(s=>s===selectedReplaceId?r.id:s))}} style={{ padding:'2px 6px', borderRadius:4, fontSize:7, cursor:'pointer', background:'rgba(129,140,248,0.2)', border:'1px solid rgba(129,140,248,0.3)', color:'#818cf8', fontWeight:600 }}>↻</button>
+                  </div>
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:2, lineHeight:1.3 }}>{r.reason}</div>
+                  <div style={{ display:'flex', gap:4, marginTop:2, flexWrap:'wrap' }}>
+                    {r.pros.map((p,i)=><span key={'p'+i} style={{ fontSize:6, padding:'1px 3px', borderRadius:3, background:'rgba(34,197,94,0.08)', color:'#22c55e' }}>+{p}</span>)}
+                    {r.cons.map((c,i)=><span key={'c'+i} style={{ fontSize:6, padding:'1px 3px', borderRadius:3, background:'rgba(239,68,68,0.08)', color:'#ef4444' }}>-{c}</span>)}
+                  </div>
+                </div>; })}
+              </div>
+            </>}
+            {selectedReplaceId && replacements.length === 0 && <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', textAlign:'center', padding:8 }}>Замены не найдены</div>}
+            {!selectedReplaceId && <div style={{ fontSize:8, color:'rgba(255,255,255,0.3)', textAlign:'center', padding:8 }}>Выберите вещество для поиска замен</div>}
+          </GlassCard>
         </>
       )}
     </div>

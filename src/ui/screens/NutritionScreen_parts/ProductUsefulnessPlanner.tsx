@@ -28,7 +28,7 @@ const ScoreBadge: React.FC<{ score: number; max: number; color: string; label: s
     </div>
     <div>
       <div style={{ fontSize: 9, fontWeight: 700, color }}>{label}</div>
-      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.9)' }}>РёР· {max}</div>
+      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.9)' }}>из {max}</div>
     </div>
   </div>
 );
@@ -173,7 +173,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         if (list.length === 0) { showToast('Нет сохранённого плана'); return; }
         const items = list.map((i: any) => ({ foodId: i.id || i.foodId, weightGrams: i.amount || i.weightGrams || 100 }));
         setMealProducts(prev => [...prev, ...items]);
-        showToast(`✅ Добавлено ${items.length} продуктов из плана`);
+        showToast(`✅ Добавлено ${items.length} продуктов иИз плана`);
         return;
       }
       if (source === 'recipe') {
@@ -201,7 +201,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         });
         if (entries.length === 0) { showToast('Нет записей в дневнике за сегодня'); return; }
         setMealProducts(prev => [...prev, ...entries]);
-        showToast(`✅ Добавлено ${entries.length} продуктов из дневника`);
+        showToast(`✅ Добавлено ${entries.length} продуктов иИз дневника`);
         return;
       }
     } catch { showToast('Ошибка загрузки'); }
@@ -247,9 +247,9 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   return (
     <div style={{ padding: '0 2px' }}>
       <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-        <button onClick={() => setPlannerTab('settings')} style={PILL(plannerTab === 'settings', '#f59e0b')}>вљ™пёЏ</button>
+        <button onClick={() => setPlannerTab('settings')} style={PILL(plannerTab === 'settings', '#f59e0b')}>⚙️</button>
         <button onClick={() => setPlannerTab('catalog')} style={PILL(plannerTab === 'catalog', '#3b82f6')}>📦 {filtered.length > 0 && `(${filtered.length})`}</button>
-        <button onClick={() => setPlannerTab('compare')} style={PILL(plannerTab === 'compare', '#8b5cf6')}>вљ–пёЏ {compareIds.length > 0 && `(${compareIds.length})`}</button>
+        <button onClick={() => setPlannerTab('compare')} style={PILL(plannerTab === 'compare', '#8b5cf6')}>⚖️ {compareIds.length > 0 && `(${compareIds.length})`}</button>
         <button onClick={() => setPlannerTab('meal')} style={PILL(plannerTab === 'meal', '#f97316')}>🍽️ Приём</button>
       </div>
 
@@ -258,7 +258,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
           <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 8 }}>⚙️ Параметры расчёта</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
             <div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>Р¦РµР»СЊ</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>Цель</div>
               <select value={manualGoal} onChange={e => setManualGoal(e.target.value)} style={{
                 ...INPUT('100%'), padding: '6px 8px', appearance: 'none' as const,
               }}>
@@ -283,7 +283,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
           </div>
           <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.9)', marginBottom: 4, lineHeight: 1.3 }}>
             🧬 <b>ААС (анаболические стероиды)</b> — влияет на рейтинг: продукты с атерогенными жирами получают штраф −4.5 (риск липидного профиля).<br />
-            💉 <b>�?нсулин</b> — влияет на рейтинг продуктов с высоким Г�?/�?�? (штраф при приёме HGH, проверка инсулинового рикошета).
+            💉 <b>Инсулин</b> — влияет на рейтинг продуктов с высоким ГИ/ИИ (штраф при приёме HGH, проверка инсулинового рикошета).
           </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
             <button onClick={() => setManualAAS(!manualAAS)} style={{
@@ -299,7 +299,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               border: manualInsulin ? 'none' : '1px solid rgba(255,255,255,0.06)',
               color: manualInsulin ? '#fff' : 'rgba(255,255,255,0.7)',
               fontWeight: 700, fontSize: 9, transition: 'all 0.15s',
-            }}>💉 {manualInsulin ? '�?нсулин активен' : '�?нсулин выключен'}</button>
+            }}>💉 {manualInsulin ? 'Инсулин активен' : 'Инсулин выключен'}</button>
             <button onClick={fillFromProfile} style={{
               padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
               background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a',
@@ -317,7 +317,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 <button key={m.key} onClick={() => { m.set(!m.state); setShowAll(false); }} style={{
                   ...PILL(m.state, m.color), fontSize: 7, padding: '4px 8px',
                 }}>
-                  {m.state ? 'вњ“' : 'в—‹'} {MODULE_LABELS[m.key].label}
+                  {m.state ? '✓' : '○'} {MODULE_LABELS[m.key].label}
                 </button>
               ))}
             </div>
@@ -355,11 +355,11 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
                   {[
                     { id:'AAS_ORAL', label:'Орал.ААС', color:'#ef4444' },
-                    { id:'AAS_INJECTABLE', label:'�?нъекц.ААС', color:'#ef4444' },
+                    { id:'AAS_INJECTABLE', label:'Инъекц.ААС', color:'#ef4444' },
                     { id:'HGH', label:'HGH', color:'#8b5cf6' },
-                    { id:'DIURETICS', label:'Р”РёСѓСЂРµС‚РёРєРё', color:'#f59e0b' },
+                    { id:'DIURETICS', label:'Диуретики', color:'#f59e0b' },
                     { id:'STIMULATORS', label:'Стимуляторы', color:'#f97316' },
-                    { id:'INSULIN_USE', label:'�?нсулин', color:'#8b5cf6' },
+                    { id:'INSULIN_USE', label:'Инсулин', color:'#8b5cf6' },
                     { id:'LIVER_SUPPORT', label:'Гепато', color:'#22c55e' },
                     { id:'GUT_SUPPORT', label:'ЖКТ', color:'#22c55e' },
                   ].map(p => (
@@ -418,7 +418,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               </button>
             ))}
             <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', marginLeft: 'auto' }}>
-              {filtered.length} РёР· {scored.length}
+              {filtered.length} из {scored.length}
             </span>
           </div>
           {activeModules.length > 0 && (
@@ -432,7 +432,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 <span style={{ fontSize: 6, padding: '2px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.9)' }}>
                   {manualGoal ? `${GOAL_MAP_RU[manualGoal] || manualGoal}` : ''}
                   {manualAAS ? ' · ААС' : ''}
-                  {manualInsulin ? ' · �?нсулин' : ''}
+                  {manualInsulin ? ' · Инсулин' : ''}
                 </span>
               )}
             </div>
@@ -497,7 +497,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         <span style={{ float: 'right', fontWeight: 700, color: '#00e68a' }}>{vs.bbScore.toFixed(1)}</span>
       </div>
       <div style={{ padding: '3px 6px', borderRadius: 6, background: vs.phaseMod !== 0 ? 'rgba(249,115,22,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${vs.phaseMod < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}` }}>
-        <span style={{ color: '#8b5cf6' }}>Р¤Р°Р·Р°</span>
+        <span style={{ color: '#8b5cf6' }}>Фаза</span>
         <span style={{ float: 'right', fontWeight: 700, color: vs.phaseMod < 0 ? '#ef4444' : '#22c55e' }}>{vs.phaseMod > 0 ? '+' : ''}{vs.phaseMod.toFixed(1)}</span>
       </div>
       <div style={{ padding: '3px 6px', borderRadius: 6, background: vs.pharmaMod !== 0 ? 'rgba(239,68,68,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${vs.pharmaMod < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}` }}>
@@ -505,7 +505,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         <span style={{ float: 'right', fontWeight: 700, color: vs.pharmaMod < 0 ? '#ef4444' : '#22c55e' }}>{vs.pharmaMod > 0 ? '+' : ''}{vs.pharmaMod.toFixed(1)}</span>
       </div>
       <div style={{ padding: '3px 6px', borderRadius: 6, background: vs.labMod !== 0 ? 'rgba(239,68,68,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${vs.labMod < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}` }}>
-        <span style={{ color: '#8b5cf6' }}>РђРЅР°Р»РёР·С‹</span>
+        <span style={{ color: '#8b5cf6' }}>Анализы</span>
         <span style={{ float: 'right', fontWeight: 700, color: vs.labMod < 0 ? '#ef4444' : '#22c55e' }}>{vs.labMod > 0 ? '+' : ''}{vs.labMod.toFixed(1)}</span>
       </div>
       {vs.timingMod !== 0 && (
@@ -544,7 +544,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   {enableA && <>
   <ScoreBar label="Белок" value={score.breakdown.proteinDensity} max={30} color="#3b82f6" />
   <ScoreBar label="Микро" value={score.breakdown.microDensity} max={30} color="#22c55e" />
-  <ScoreBar label="РљР»РµС‚С‡Р°С‚РєР°" value={score.breakdown.fiberQuality} max={20} color="#f97316" />
+  <ScoreBar label="Клетчатка" value={score.breakdown.fiberQuality} max={20} color="#f97316" />
   <ScoreBar label="Аминокислоты" value={score.breakdown.aminoScore} max={25} color="#ec4899" />
   <ScoreBar label="Категория" value={score.breakdown.tierScore} max={20} color="#f59e0b" /></>}
   {enableB && <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.65)' }}>
@@ -623,7 +623,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                     {score.breakdown && enableA && <>
                       <ScoreBar label="Белок" value={score.breakdown.proteinDensity} max={30} color="#3b82f6" />
                       <ScoreBar label="Микро" value={score.breakdown.microDensity} max={30} color="#22c55e" />
-                      <ScoreBar label="РљР»РµС‚С‡Р°С‚РєР°" value={score.breakdown.fiberQuality} max={20} color="#f97316" />
+                      <ScoreBar label="Клетчатка" value={score.breakdown.fiberQuality} max={20} color="#f97316" />
                       <ScoreBar label="АК" value={score.breakdown.aminoScore} max={25} color="#ec4899" />
                       <ScoreBar label="Категория" value={score.breakdown.tierScore} max={20} color="#f59e0b" />
                     </>}
@@ -683,10 +683,10 @@ export const ProductUsefulnessPlanner: React.FC = () => {
             <div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
                 {[
-                  { key: 'plan', icon: '📋', label: '�?з плана' },
-                  { key: 'recipe', icon: '📝', label: '�?з рецептов' },
-                  { key: 'saved', icon: '💾', label: '�?з сохранённых' },
-                  { key: 'diary', icon: '📓', label: '�?з дневника' },
+                  { key: 'plan', icon: '📋', label: 'Из плана' },
+                  { key: 'recipe', icon: '📝', label: 'Из рецептов' },
+                  { key: 'saved', icon: '💾', label: 'Из сохранённых' },
+                  { key: 'diary', icon: '📓', label: 'Из дневника' },
                 ].map(btn => (
                   <button key={btn.key} onClick={() => openSourcePicker(btn.key)} style={{
                     padding: '8px', borderRadius: 12, cursor: 'pointer', fontSize: 9, fontWeight: 600,
@@ -905,7 +905,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       ))}
                       {mealResult.microCoverage.length > 10 && (
                         <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', marginTop: 2 }}>
-                          + РµС‰С‘ {mealResult.microCoverage.length - 10}
+                          + ещё {mealResult.microCoverage.length - 10}
                         </div>
                       )}
                     </div>

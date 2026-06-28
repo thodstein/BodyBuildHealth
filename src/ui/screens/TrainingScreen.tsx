@@ -3158,7 +3158,7 @@ export const TrainingScreen: React.FC = () => {
             </p>
 
             <button onClick={() => {
-              const planWeeks = macrocycle?.totalWeeks ?? (trainingOutput?.plan?.length ? Math.ceil(trainingOutput.plan.length / daysPerWeek) : 0);
+              const planWeeks = macrocycle?.totalWeeks ?? (trainingOutput?.plan?.length && daysPerWeek > 0 ? Math.ceil(trainingOutput.plan.length / daysPerWeek) : 0);
               const totalVolume = trainingOutput?.weeklyVolume ?? 0;
               const avgIntensity = trainingOutput?.estimatedProgress ? Math.round(50 + trainingOutput.estimatedProgress * 5) : 0;
               const report = {

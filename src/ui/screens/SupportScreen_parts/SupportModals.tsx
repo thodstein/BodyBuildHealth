@@ -26,6 +26,11 @@ export interface SupportModalsProps {
   savedStacks: any[];
   MECH_TRANSLATIONS_RU: Record<string, string>;
   SUPPORT_LEVELS: Record<string, { label: string; desc: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }> }>;
+  // Week select
+  courseWeekState?: number;
+  setCourseWeekState?: (v: number) => void;
+  maxCourseWeek?: number;
+  onWeekChange?: (newWeek: number) => void;
 }
 
 export const SupportModals: React.FC<SupportModalsProps> = ({
@@ -47,6 +52,7 @@ export const SupportModals: React.FC<SupportModalsProps> = ({
   savedStacks,
   MECH_TRANSLATIONS_RU,
   SUPPORT_LEVELS,
+  courseWeekState, setCourseWeekState, maxCourseWeek, onWeekChange,
 }) => {
   return (<div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:12 }}>
     <div style={{ background:'var(--bg-primary)', borderRadius:16, maxWidth:400, width:'100%', maxHeight:'85vh', overflowY:'auto', padding:16 }}>
@@ -178,6 +184,37 @@ export const SupportModals: React.FC<SupportModalsProps> = ({
             <button onClick={() => { setShowModal(null); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10 }}>Отмена</button>
             <button onClick={() => { setBoostEnabled(true); calcSupport(); setShowModal(null); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#000', fontWeight:700, fontSize:10 }}>Усилить стек</button>
           </div>
+        </>
+      )}
+      {showModal === 'weekSelect' && (
+        <>
+          <h3 style={{ margin:'0 0 10px', fontSize:14, fontWeight:800 }}>📅 Выберите неделю курса</h3>
+          <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:'60vh', overflowY:'auto', marginBottom:8 }}>
+            {Array.from({ length: maxCourseWeek || 12 }, (_, i) => i + 1).map(w => {
+              const isActive = courseWeekState === w;
+              const isMid = w === Math.round((maxCourseWeek || 12) / 2);
+              const isEnd = w === (maxCourseWeek || 12);
+              return (
+                <button key={w} onClick={() => {
+                  if (setCourseWeekState) setCourseWeekState(w);
+                  if (onWeekChange) onWeekChange(w);
+                  setShowModal(null);
+                }} style={{
+                  padding:'12px 14px', borderRadius:10, cursor:'pointer', textAlign:'left',
+                  background: isActive ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)',
+                  border: isActive ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
+                  color:'var(--text-light)', fontWeight: isActive ? 800 : 600, fontSize:12,
+                  display:'flex', justifyContent:'space-between', alignItems:'center',
+                }}>
+                  <span>Неделя {w} {isActive ? '✓' : ''}</span>
+                  <span style={{ fontSize:9, color:'var(--text-dim)' }}>
+                    {w === 1 ? 'Старт' : isMid ? 'Пик нагрузки' : isEnd ? 'Финиш' : ''}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <button onClick={() => { setShowModal(null); }} style={{ width:'100%', padding:'10px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10 }}>Закрыть</button>
         </>
       )}
     </div>

@@ -28,7 +28,7 @@ export interface NeuroStatusData {
 
 // ─── Block 3: Course Phase & Pharma Stack ───
 export interface AASEntry {
-  id: string; doseMgWeek: number; weeks: number;
+  id: string; doseMgWeek: number; weeks: number; startWeek?: number; endWeek?: number;
 }
 export interface PharmaStackData {
   phase: CoursePhase;
@@ -81,12 +81,23 @@ export interface LabSlice {
   panelBiochem: Record<string, string>; // ALT, AST, GGT, Bilirubin, Glucose, Creatinine, Urea, Uric acid, CRP, Homocysteine
   panelHematology: Record<string, string>; // HCT, Hemoglobin, RBC, WBC, Platelets, Neutrophils, Lymphocytes
   panelThyroid: Record<string, string>; // TSH, T3 free, T4 free, Anti-TPO, Anti-TG
+  panelLipid: Record<string, string>; // Total Cholesterol, LDL, HDL, Triglycerides, VLDL, ApoB, ApoA1, Lp(a)
+  panelIron: Record<string, string>; // Ferritin, Iron, TIBC, Transferrin Sat, Transferrin
+  panelVitamin: Record<string, string>; // B12, Folate, Vitamin D (25-OH), Vitamin A, Vitamin E, Vitamin K
+  panelCardiac: Record<string, string>; // CK, CK-MB, Troponin I, Troponin T, NT-proBNP
+  panelCoagulation: Record<string, string>; // D-dimer, Fibrinogen, PT, APTT, INR
+  panelInflammatory: Record<string, string>; // IL-6, TNF-alpha, hsCRP, Ferritin (inflammation)
+  panelAdrenal: Record<string, string>; // DHEA-S, Androstenedione, 3a-ADG, Aldosterone, Renin, PTH
+  panelMineral: Record<string, string>; // Calcium, Phosphorus, Magnesium, Sodium, Potassium, Chloride
+  panelTumor: Record<string, string>; // PSA total, PSA free, CA-125, CEA, AFP
+  panelUrinalysis: Record<string, string>; // pH, Protein, Glucose, Ketones, Leukocytes, Nitrite
 }
 
 export interface LabPanelData {
   preCourse: LabSlice | null;
   midCourse: LabSlice | null;
   postPCT: LabSlice | null;
+  fullPanel: LabSlice | null;
 }
 
 // ─── Block 10: Integrated Risk ───

@@ -20,6 +20,7 @@ import {
   type BioavailabilityResult, type PKResult,
 } from '../../engines/peptide-calculator.engine';
 import { SYSTEM_INFO, SYSTEM_INFO_ALL } from '../../core/risk-info';
+import { getPharmaLabMarkers } from '../../data/pharma-lab-marker-map';
 import { PharmaCourseScreen } from './PharmaCourseScreen';
 import { useDataLink } from '../../core/data-link';
 import { mapStackToPathologies, getKnownDrugNames, DRUG_DATABASE } from '../../engines/drug-mapper.engine';
@@ -744,6 +745,16 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
           </div>
         </div>
       )}
+      {(() => { const m = getPharmaLabMarkers(sub.id); return m.length > 0 ? (
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>🩸 Контролировать анализы</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {m.map((marker: string) => (
+              <span key={marker} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(255,152,0,0.12)', color: '#ff9800', fontWeight: 500 }}>{marker}</span>
+            ))}
+          </div>
+        </div>
+      ) : null; })()}
 
       {/* linked risks chips */}
       {sub.linkedRisks && sub.linkedRisks.length > 0 && (
