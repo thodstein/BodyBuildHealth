@@ -5213,6 +5213,35 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_plan ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
                 </div>
                 {(expandedCategories.calc_plan ?? true) && (<>
+
+                  {/* 🧠 Карточка логики назначения — перед планом */}
+                  {calcResult && (() => {
+                    try {
+                      const h = hydrateState();
+                      const st = { ...h, powerLevel: supportLevel as PowerLevel, courseWeek: courseWeekState } as CalculatorState;
+                      const recs = evaluateRecommendations(st, calcResult as any, courseWeekState);
+                      const preApply = buildPreApplyCard(recs, st as any);
+                      if (preApply.lines.length === 0) return null;
+                      return (
+                        <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(0,230,138,0.03)', border:'1px solid rgba(0,230,138,0.12)' }}>
+                          <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>🧠 Почему назначены эти препараты</div>
+                          <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:'40vh', overflowY:'auto' }}>
+                            {preApply.lines.map((line, i) => (
+                              <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(0,0,0,0.08)', border:'1px solid var(--border)', fontSize:8 }}>
+                                <div style={{ fontWeight:700, color:'var(--text-light)', marginBottom:2 }}>{line.problem}</div>
+                                <div style={{ color:'var(--accent)', fontWeight:600, marginBottom:1 }}>{line.primarySubs}</div>
+                                {line.riskCoverage && <div style={{ color:'var(--text-dim)', fontSize:7, marginBottom:1 }}>{line.riskCoverage}</div>}
+                                {line.escalation && <div style={{ color:'#f59e0b', fontSize:7, marginTop:1 }}>⚠ {line.escalation}</div>}
+                                {line.monitoring && <div style={{ color:'#60a5fa', fontSize:7, marginTop:1 }}>📊 {line.monitoring}</div>}
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:4, padding:'3px 6px', borderRadius:4, background:'rgba(0,0,0,0.04)' }}>{preApply.summary}</div>
+                        </div>
+                      );
+                    } catch { return null; }
+                  })()}
+
                   <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'40vh', overflowY:'auto', marginBottom:8 }}>
                     {(effectiveLevel?.subs || []).map((id: string) => {
                       const sub = allSupport.find((s: any) => s.id === id);
@@ -5225,36 +5254,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       ) : null;
                     })}
                   </div>
-
-                  {/* buildPreApplyCard — почему каждый препарат */}
-                  {calcResult && (() => {
-                    try {
-                      const h = hydrateState();
-                      const st = { ...h, powerLevel: supportLevel as PowerLevel, courseWeek: courseWeekState } as CalculatorState;
-                      const recs = evaluateRecommendations(st, calcResult as any, courseWeekState);
-                      const preApply = buildPreApplyCard(recs, st as any);
-                      if (preApply.lines.length === 0) return null;
-                      return (
-                        <details style={{ marginBottom:8 }}>
-                          <summary style={{ fontSize:9, fontWeight:600, color:'var(--accent)', cursor:'pointer', padding:'4px 0' }}>
-                            🧠 Логика назначения ({preApply.lines.length} рекомендаций)
-                          </summary>
-                          <div style={{ marginTop:4, display:'flex', flexDirection:'column', gap:3, maxHeight:'30vh', overflowY:'auto' }}>
-                            {preApply.lines.map((line, i) => (
-                              <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(0,0,0,0.08)', border:'1px solid var(--border)', fontSize:8 }}>
-                                <div style={{ fontWeight:700, color:'var(--text-light)', marginBottom:2 }}>{line.problem}</div>
-                                <div style={{ color:'var(--accent)', fontWeight:600 }}>{line.primarySubs}</div>
-                                {line.escalation && <div style={{ color:'#f59e0b', fontSize:7, marginTop:1 }}>⚠ {line.escalation}</div>}
-                                {line.monitoring && <div style={{ color:'#60a5fa', fontSize:7, marginTop:1 }}>📊 {line.monitoring}</div>}
-                                {line.riskCoverage && <div style={{ color:'var(--text-dim)', fontSize:7, marginTop:1 }}>{line.riskCoverage}</div>}
-                              </div>
-                            ))}
-                          </div>
-                          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:4 }}>{preApply.summary}</div>
-                        </details>
-                      );
-                    } catch { return null; }
-                  })()}
 
                   <div style={{ display:'flex', gap:6 }}>
                     <button style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:10 }} onClick={() => setPlanSaved(true)}>✅ Утвердить план</button>
