@@ -6,6 +6,7 @@ import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine'
 import { computeLabIndexDetails, type LabIndexDetail } from '../../engines/labs-indices.engine';
 import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
+import { PHARMA_DB } from '../../core/pharma-database';
 import { LabsScoreCard } from '../components/LabsScoreCard';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
@@ -1300,7 +1301,7 @@ export const LabsScreen: React.FC = () => {
                           {a.severity === 'critical' ? 'КРИТ' : a.severity === 'high' ? 'ВЫСОК' : 'МОНИТ'}
                         </span>
                       </div>
-                      <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>{a.drugCause?.join(', ')} — {a.recommendation}</div>
+                      <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>{(a.drugCause || []).map((id: string) => { const p = PHARMA_DB[id]; return p?.name || id.replace(/_/g, ' '); }).join(', ')} — {a.recommendation}</div>
                     </div>
                   ))}
                 </div>

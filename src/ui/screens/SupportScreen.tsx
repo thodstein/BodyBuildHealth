@@ -42,7 +42,7 @@ import { AutoCalculator } from './SupportScreen_parts/AutoCalculator';
 import { calculateSupportTZ, hydrateState } from '../../engines/support-calculator.engine';
 import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engines/support-calculator.types';
 import { calculateTZRisk, toCompatibleResult, type TZRiskResult } from '../../engines/risk-engine-tz';
-import { buildPreApplyCard, evaluateRecommendations } from '../../engines/recommendation-engine';
+import { buildPreApplyCard, evaluateRecommendations, computeBudgetRisk } from '../../engines/recommendation-engine';
 // Force Vite to include SUPPORT_CATALOG_DATA and CANONICAL_ID_MAP (prevents tree-shaking)
 // @ts-ignore
 (window as any).__SUPPORT_CATALOG__ = SUPPORT_CATALOG_DATA;
@@ -5213,6 +5213,39 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_plan ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
                 </div>
                 {(expandedCategories.calc_plan ?? true) && (<>
+
+                  {/* ⚠️ Карточка предупреждения о недостаточности */}
+                  {calcResult && (() => {
+                    try {
+                      const h = hydrateState();
+                      const st = { ...h, powerLevel: supportLevel as PowerLevel, courseWeek: courseWeekState } as CalculatorState;
+                      const recs = evaluateRecommendations(st, calcResult as any, courseWeekState);
+                      const budgetWarn = computeBudgetRisk(recs, supportLevel, st, calcResult as any);
+                      if (!budgetWarn.warning) return null;
+                      return (
+                        <div style={{ marginBottom:8, padding:'10px 12px', borderRadius:10, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.2)' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                            <span style={{ fontSize:14 }}>⚠️</span>
+                            <span style={{ fontSize:10, fontWeight:700, color:'#ef4444' }}>Недостаточный уровень поддержки</span>
+                          </div>
+                          <div style={{ fontSize:8, color:'#ef4444', marginBottom:4, lineHeight:1.4 }}>{budgetWarn.warning}</div>
+                          <div style={{ display:'flex', gap:4, fontSize:7, color:'var(--text-dim)' }}>
+                            <span>Риск: <b>{budgetWarn.riskBefore}%</b> → <b style={{color:'#ef4444'}}>{budgetWarn.riskAfter}%</b></span>
+                            <span>· Покрытие: <b>{Math.round(budgetWarn.coverage * 100)}%</b></span>
+                            <span>· Синергия: <b>{budgetWarn.synergyScore}%</b></span>
+                          </div>
+                          {supportLevel !== 'boost' && (
+                            <button onClick={() => { setSupportLevel('boost'); setPlanSaved(false); calcSupport('boost'); }} style={{
+                              marginTop:6, padding:'6px 14px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer',
+                              background:'rgba(239,68,68,0.12)', border:'1px solid #ef4444', color:'#ef4444',
+                            }}>
+                              💎 Повысить до Буст
+                            </button>
+                          )}
+                        </div>
+                      );
+                    } catch { return null; }
+                  })()}
 
                   {/* 🧠 Карточка логики назначения — перед планом */}
                   {calcResult && (() => {
