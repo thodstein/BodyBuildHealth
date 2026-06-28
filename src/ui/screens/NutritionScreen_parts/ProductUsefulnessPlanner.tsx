@@ -380,7 +380,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                   {['HCT','LDL','HDL','ALT','AST','CRP'].map(lab => (
                     <div key={lab} style={{ display:'flex', alignItems:'center', gap:2 }}>
                       <span style={{ fontSize:6, color:'rgba(255,255,255,0.75)' }}>{lab}</span>
-                      <input type="number" value={(v2Profile.labs as any)[lab.toLowerCase()] ?? ''} onChange={e => setV2Profile(prev => ({ ...prev, labs: { ...prev.labs, [lab.toLowerCase()]: e.target.value ? parseFloat(e.target.value) : undefined } }))} placeholder="вЂ”" style={{ width:36, padding:'2px 4px', borderRadius:4, fontSize:6, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', color:'#fff', outline:'none' }} />
+                      <input type="number" value={(v2Profile.labs as any)[lab.toLowerCase()] ?? ''} onChange={e => setV2Profile(prev => ({ ...prev, labs: { ...prev.labs, [lab.toLowerCase()]: e.target.value ? parseFloat(e.target.value) : undefined } }))} placeholder="—" style={{ width:36, padding:'2px 4px', borderRadius:4, fontSize:6, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', color:'#fff', outline:'none' }} />
                     </div>
                   ))}
                 </div>
@@ -552,7 +552,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
     {score.contextBonus.timingMatch > 0 && <span style={{ color: '#60a5fa' }}>✓ Время подходит </span>}
     {score.contextBonus.pharmaMatch > 0 && <span style={{ color: '#8b5cf6' }}>✓ Фарма-синергия </span>}
     {score.contextBonus.pharmaMatch < 0 && <span style={{ color: '#ef4444' }}>⚠️ Фарма-конфликт </span>}
-    {(score.contextBonus.goalMatch === 0 && score.contextBonus.timingMatch === 0 && score.contextBonus.pharmaMatch === 0) && (<span style={{ color: 'rgba(255,255,255,0.2)' }}>вЂ”</span>)}
+    {(score.contextBonus.goalMatch === 0 && score.contextBonus.timingMatch === 0 && score.contextBonus.pharmaMatch === 0) && (<span style={{ color: 'rgba(255,255,255,0.2)' }}>—</span>)}
   </div>}
   {enableC && score.costEfficiency && (
     <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.65)', display: 'flex', gap: 8 }}>

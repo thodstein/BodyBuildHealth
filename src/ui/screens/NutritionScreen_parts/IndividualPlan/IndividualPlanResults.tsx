@@ -501,7 +501,7 @@ export const IndividualPlanResults: React.FC = () => {
                       <td style={{ padding: '4px 6px', background: '#202023', borderRadius: 6, fontSize: 7, color: 'rgba(255,255,255,0.85)', fontWeight: 600, whiteSpace: 'nowrap' }}>{label}</td>
                       {weekPlan.days.map((d: any, di: number) => {
                         const meal = d.meals.find((m: any) => m.label === label);
-                        if (!meal) return <td key={di} style={{ padding: '4px', textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: 6 }}>вЂ”</td>;
+                        if (!meal) return <td key={di} style={{ padding: '4px', textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: 6 }}>—</td>;
                         const kcal = Math.round(meal.totals?.kcal || 0);
                         return (
                           <td key={di} style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: 6, verticalAlign: 'top' }}>
@@ -959,7 +959,7 @@ export const IndividualPlanResults: React.FC = () => {
               </div>
               {allergenReport.conflicts.map((c: any, i: number) => (
                 <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', padding: '1px 0' }}>
-                  вЂў {c.food}: {c.allergens.join(', ')}
+                  • {c.food}: {c.allergens.join(', ')}
                 </div>
               ))}
             </div>
@@ -992,7 +992,7 @@ export const IndividualPlanResults: React.FC = () => {
               </div>
               {qualityReport.bestItems.length > 0 && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>Лучшие: {qualityReport.bestItems.join(', ')}</div>}
               {qualityReport.weakItems.length > 0 && <div style={{ fontSize: 8, color: '#ef4444' }}>Слабые: {qualityReport.weakItems.join(', ')}</div>}
-              {qualityReport.recommendations.map((r: string, i: number) => <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', padding: '1px 0' }}>вЂў {r}</div>)}
+              {qualityReport.recommendations.map((r: string, i: number) => <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', padding: '1px 0' }}>• {r}</div>)}
             </div>
           )}
           {riskReport && activeReports.includes('risk') && (
@@ -1045,7 +1045,7 @@ export const IndividualPlanResults: React.FC = () => {
               <div style={{ fontSize: 9, fontWeight: 700, color: '#8b5cf6', marginBottom: 4 }}>💉 Совместимость с препаратами</div>
               {drugCompatReport.interactions.map((int: any, i: number) => (
                 <div key={i} style={{ fontSize: 8, padding: '2px 0', color: int.severity === 'high' ? '#ef4444' : '#f59e0b' }}>
-                  вЂў {int.drug} + {int.food}: {int.effect}
+                  • {int.drug} + {int.food}: {int.effect}
                 </div>
               ))}
               <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginTop: 3 }}>
@@ -1148,7 +1148,7 @@ export const IndividualPlanResults: React.FC = () => {
           </div>
           {cravingPlan.items.map((it: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-              <span style={{ color: '#fff' }}>вЂў {it.name || it}</span>
+              <span style={{ color: '#fff' }}>• {it.name || it}</span>
               <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:8, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
             </div>
           ))}
@@ -1180,7 +1180,7 @@ export const IndividualPlanResults: React.FC = () => {
           </div>
           {lazyDayPlan.items.map((it: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-              <span style={{ color: '#fff' }}>вЂў {it.name || it}</span>
+              <span style={{ color: '#fff' }}>• {it.name || it}</span>
               <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:8, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
             </div>
           ))}
@@ -1213,7 +1213,7 @@ export const IndividualPlanResults: React.FC = () => {
           <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 6, textAlign: 'center' }}>{cheatMealPlan.bjuBreakdown}</div>
           {cheatMealPlan.items.map((it: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-              <span style={{ color: '#fff' }}>вЂў {it.name || it}</span>
+              <span style={{ color: '#fff' }}>• {it.name || it}</span>
               <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || (cheatMealPlan.cals / cheatMealPlan.items.length), amount: 100 })} style={{ cursor:'pointer', fontSize:8, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
             </div>
           ))}
@@ -1246,7 +1246,7 @@ export const IndividualPlanResults: React.FC = () => {
           <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 6, textAlign: 'center' }}>~{carbloadPlan.bju.kcal} ккал всего</div>
           {carbloadPlan.foods.map((f: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-              <span style={{ color: '#fff' }}>вЂў {f.name || f}</span>
+              <span style={{ color: '#fff' }}>• {f.name || f}</span>
               <span onClick={() => addToCart({ name: f.name || f, kcal: f.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:8, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
             </div>
           ))}
@@ -1410,7 +1410,7 @@ export const IndividualPlanResults: React.FC = () => {
         <GlassCard title="Рекомендации" icon="💡" color="#a855f7" style={{ border: '1px solid rgba(168,85,247,0.15)' }}>
           {recommendations.map((r: string, i: number) => (
             <div key={i} style={{ fontSize: 9, color: '#fff', padding: '4px 0', borderBottom: i < recommendations.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none', lineHeight: 1.4 }}>
-              вЂў {r}
+              • {r}
             </div>
           ))}
         </GlassCard>

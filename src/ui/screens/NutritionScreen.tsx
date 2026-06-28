@@ -441,7 +441,7 @@ const CatalogTab: React.FC = () => {
                   el.magnesium_mg !== undefined && <span>• Mg {el.magnesium_mg}мг</span>,
                   el.calcium_mg !== undefined && <span>• Ca {el.calcium_mg}мг</span>,
                   el.phosphorus_mg !== undefined && <span>• P {el.phosphorus_mg}мг</span>,
-                  el.pral_index !== undefined && <span>вЂў PRAL {el.pral_index}</span>,
+                  el.pral_index !== undefined && <span>• PRAL {el.pral_index}</span>,
                 ], '#60a5fa')}
                 {vit.vitamin_a_mcg !== undefined && row([
                   <span style={{color:'#f97316'}}>💊 Витамины:</span>,
@@ -1170,13 +1170,13 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
           {/* Allergens */}
           {fullReport.allergenWarnings.length > 0 && <div style={{ padding:'6px 10px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
             <div style={{ fontSize:10, fontWeight:700, color:'#ef4444', marginBottom:4 }}>🚫 Аллергены</div>
-            {fullReport.allergenWarnings.map((w, i) => <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.85)' }}>вЂў {w.food}: {w.allergens.join(', ')}</div>)}
+            {fullReport.allergenWarnings.map((w, i) => <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.85)' }}>• {w.food}: {w.allergens.join(', ')}</div>)}
           </div>}
 
           {/* Recommendations */}
           {fullReport.recommendations.length > 0 && <div style={{ padding:'6px 10px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
             <div style={{ fontSize:10, fontWeight:700, color:'#a855f7', marginBottom:4 }}>💡 Рекомендации</div>
-            {fullReport.recommendations.map((r, i) => <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.5, marginBottom:2 }}>вЂў {r}</div>)}
+            {fullReport.recommendations.map((r, i) => <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.5, marginBottom:2 }}>• {r}</div>)}
           </div>}
           {/* Edit/Save buttons */}
           <div style={{ display:'flex', gap:4, marginTop:4 }}>
@@ -1552,7 +1552,7 @@ export const NutritionScreen: React.FC = () => {
         </span>
       </div>
 
-      {/* V2 adjustments bar вЂ” shows on mealplan tab */}
+      {/* V2 adjustments bar — shows on mealplan tab */}
       {tab === 'mealplan' && (function() {
         const nv2 = getNutritionV2Data();
         const s = linked.profile?.settings;

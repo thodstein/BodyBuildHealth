@@ -231,6 +231,35 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
       'Пролактин, E2, ЛГ, ФСГ каждые 4 нед');
   }
 
+  // ── hCG auto-assign: any AAS → hCG 500 IU 2×/week, 3 weeks on / 1 week off ──
+  if (state.pharma.aas.length > 0 && !state.pharma.hasHCG) {
+    const hcgIds = ['hcg'];
+    const hcgReasoning: Record<string, string> = { hcg: 'ХГЧ 500 МЕ 2р/нед, схема 3/1 (3 нед приём, 1 нед отдых). Поддержка яичек, профилактика атрофии на курсе ААС' };
+    addRec('hcg', 'high', 'endocrine', 'ХГЧ',
+      `Курс ААС (${state.pharma.aas.map((a: any) => a.id).join(', ')}) — автоназначение ХГЧ`,
+      hcgIds, hcgReasoning,
+      'ХГЧ 500 МЕ 2р/нед, схема 3/1. Контроль E2 каждые 4 нед.',
+      'E2, тестостерон, ЛГ, ФСГ каждые 4 нед');
+  }
+
+  // ── Anastrozole note: always add note when AI not yet present ──
+  if (state.pharma.aas.length > 0 && !state.pharma.hasAI) {
+    addRec('anastrozole_note', 'medium', 'endocrine', 'Анастрозол',
+      'Анастрозол — доза по результатам анализов динамики эстрадиола',
+      [], {},
+      'Доза И ПРИЁМ по результатам анализов динамики эстрадиола. Контроль E2 каждые 4 нед.',
+      'E2 каждые 4 нед');
+  }
+
+  // ── Cabergoline note at 19-nor ──
+  if (has19Nor && !state.pharma.hasCaber) {
+    addRec('cabergoline_note', 'medium', 'endocrine', 'Каберголин',
+      'Каберголин — доза и приём по результатам анализов динамики пролактина',
+      [], {},
+      'Доза И ПРИЁМ по результатам анализов динамики пролактина. Контроль пролактина каждые 4 нед.',
+      'Пролактин каждые 4 нед');
+  }
+
   // ── Lipid impact ──
   const ldlVal = getV(fp, 'panelLipid', 'LDL');
   if (maxLipid > 0.2 || state.cardio.ldlElevation !== 'none' || state.goals.lipidCorrection) {

@@ -130,7 +130,7 @@ export const HealthAnalytics: React.FC = () => {
                   <span>{l.label}</span><span style={{ color: 'rgba(255,255,255,0.9)' }}>{l.refLow}-{l.refHigh} {l.unit}</span>
                 </div>
                 <input type="number" step="0.1" value={labs[l.id] || ''} onChange={e => saveLabs(l.id, e.target.value)}
-                  placeholder="вЂ”" style={{
+                    placeholder="—" style={{
                     width: '100%', padding: '3px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600,
                     background: labs[l.id] ? statusColor(l.id, parseFloat(labs[l.id] || '0')) + '20' : '#202023',
                     border: `1px solid ${labs[l.id] ? statusColor(l.id, parseFloat(labs[l.id] || '0')) + '40' : 'rgba(255,255,255,0.06)'}`,
