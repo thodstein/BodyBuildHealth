@@ -502,7 +502,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       pharma: { phase: 'course', aas: aasList, hasGH: false, hasIGF: false, hasInsulin: false, hasHCG: !!linked.course?.find((c: any) => c.substanceId === 'hcg'), hasAI: false, hasCaber: false, hasSERM: false, hasSARMs: aasList.some(a => a.id.includes('ostarine') || a.id.includes('lgd')) },
       oda: { jointPain: jointMode ? 'moderate' : 'none' as const, ligamentIssues: false, backPain: false, injuries: [] },
     };
-    const state: CalculatorState = { ...defaults, ...h, powerLevel: boostEnabled ? 'boost' : level } as CalculatorState;
+    const state: CalculatorState = { ...defaults, ...h, powerLevel: boostEnabled ? 'boost' : level, courseWeek: courseWeekState } as CalculatorState;
     const tzResult: CalculatorResult = calculateSupportTZ(state);
     // ── TZ Risk Engine: probabilistic 49-cell model ──
     const tzRiskInput = {

@@ -197,6 +197,7 @@ export interface CalculatorState {
   psych: PsychData;
   injection: InjectionData;
   powerLevel: PowerLevel;
+  courseWeek?: number; // 1+ — for per-week titration and risk scaling
 }
 
 // ─── Output ───

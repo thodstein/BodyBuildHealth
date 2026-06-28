@@ -286,27 +286,38 @@ function selectSynergyGroups(state: CalculatorState): SynergyId[] {
   const sel: SynergyId[] = [];
   const scores = calcAllRisks(state);
   const s = scores;
-  if (s.hepatic >= 20) { sel.push('HEPATIC_GSH'); if (s.hepatic >= 40) sel.push('HEPATIC_BILE'); }
-  if (s.hepatic >= 35) sel.push('LIVER_DETOX');
-  if (s.cardio >= 20) { sel.push('CARDIO_LIPID'); if (s.cardio >= 35) sel.push('CARDIO_ANTIAGG'); }
-  if (s.cardio >= 25) sel.push('CARDIO_BP');
-  if (s.renal >= 20) sel.push('RENAL_PROTECT');
-  if (s.neuro >= 20) { sel.push('NEURO_DOPAMINE'); if (s.neuro >= 35) sel.push('NEURO_GABA'); }
-  if (s.endocrine >= 20 || state.pharma.phase === 'pct') sel.push('ENDOCRINE');
-  if (s.reproductive >= 20) sel.push('ENDOCRINE');
-  if (s.musculoskeletal >= 20) sel.push('BONE_JOINT');
-  if (s.hematologic >= 20) sel.push('CARDIO_ANTIAGG');
+  const cw = state.courseWeek ?? 1;
+  const isLatePhase = cw > 6;
+  const isMidPhase = cw > 3 && cw <= 6;
+  const threshold = isLatePhase ? 15 : isMidPhase ? 18 : 20;
+  const midThreshold = threshold + (isLatePhase ? 10 : 15);
+  if (s.hepatic >= threshold) { sel.push('HEPATIC_GSH'); if (s.hepatic >= midThreshold) sel.push('HEPATIC_BILE'); }
+  if (s.hepatic >= threshold + 10) sel.push('LIVER_DETOX');
+  if (s.cardio >= threshold) { sel.push('CARDIO_LIPID'); if (s.cardio >= midThreshold) sel.push('CARDIO_ANTIAGG'); }
+  if (s.cardio >= threshold + 5) sel.push('CARDIO_BP');
+  if (s.renal >= threshold) sel.push('RENAL_PROTECT');
+  if (s.neuro >= threshold) { sel.push('NEURO_DOPAMINE'); if (s.neuro >= midThreshold) sel.push('NEURO_GABA'); }
+  if (s.endocrine >= threshold || state.pharma.phase === 'pct') sel.push('ENDOCRINE');
+  if (s.reproductive >= threshold) sel.push('ENDOCRINE');
+  if (s.musculoskeletal >= threshold) sel.push('BONE_JOINT');
+  if (s.hematologic >= threshold) sel.push('CARDIO_ANTIAGG');
   const pl = state.powerLevel;
-  if (pl === 'max' || pl === 'boost') {
+  if (isLatePhase) {
     if (!sel.includes('ANTIOXIDANT')) sel.push('ANTIOXIDANT');
     if (!sel.includes('IMMUNE')) sel.push('IMMUNE');
-    if (!sel.includes('METHYLATION') && s.neuro >= 15) sel.push('METHYLATION');
+    if (!sel.includes('OMEGA3') && s.cardio >= 10) sel.push('OMEGA3');
+    if (!sel.includes('MAGNESIUM')) sel.push('MAGNESIUM');
+  }
+  if (pl === 'max' || pl === 'boost' || isLatePhase) {
+    if (!sel.includes('ANTIOXIDANT')) sel.push('ANTIOXIDANT');
+    if (!sel.includes('IMMUNE')) sel.push('IMMUNE');
+    if (!sel.includes('METHYLATION') && s.neuro >= 10) sel.push('METHYLATION');
     if (!sel.includes('MAGNESIUM')) sel.push('MAGNESIUM');
     if (!sel.includes('ZINC')) sel.push('ZINC');
-    if (!sel.includes('OMEGA3') && s.cardio >= 15) sel.push('OMEGA3');
+    if (!sel.includes('OMEGA3') && s.cardio >= 10) sel.push('OMEGA3');
   }
-  if (pl === 'boost') {
-    if (!sel.includes('NEURO_SEROTONIN') && s.neuro >= 20) sel.push('NEURO_SEROTONIN');
+  if (pl === 'boost' || (isLatePhase && pl !== 'basic')) {
+    if (!sel.includes('NEURO_SEROTONIN') && s.neuro >= 15) sel.push('NEURO_SEROTONIN');
     if (!sel.includes('CARDIO_BP')) sel.push('CARDIO_BP');
     if (!sel.includes('VITAMIN_D')) sel.push('VITAMIN_D');
     if (!sel.includes('VITAMIN_B')) sel.push('VITAMIN_B');
@@ -318,7 +329,6 @@ function selectSynergyGroups(state: CalculatorState): SynergyId[] {
     const idx = sel.indexOf(sub);
     if (idx >= 0 && sel.includes(parent)) sel.splice(idx, 1);
   }
-  // Remove duplicates
   return [...new Set(sel)];
 }
 
@@ -340,19 +350,28 @@ function getSubstancesFromSynergies(synergies: SynergyId[], powerLevel: PowerLev
 function applyTitration(substances: string[], state: CalculatorState): Record<string, number> {
   const d: Record<string, number> = {};
   const c = state.cardio; const p = state.pharma;
+  const cw = state.courseWeek ?? 1;
+  // Week scaling: early = 0.5x, mid = 0.75x, late = 1.0x
+  const weekScale = cw <= 2 ? 0.5 : cw <= 4 ? 0.75 : cw <= 6 ? 0.9 : 1.0;
   if (substances.includes('telmisartan')) {
-    d.telmisartan = c.bpStage === 'hypertension2' ? 120 : c.bpStage === 'hypertension1' ? 80 : 40;
+    const baseDose = c.bpStage === 'hypertension2' ? 120 : c.bpStage === 'hypertension1' ? 80 : 40;
+    d.telmisartan = Math.round(baseDose * weekScale / 10) * 10;
   }
   if (substances.includes('nebivolol')) {
-    d.nebivolol = c.heartRate > 95 ? 7.5 : c.heartRate > 85 ? 5 : 2.5;
+    const baseDose = c.heartRate > 95 ? 7.5 : c.heartRate > 85 ? 5 : 2.5;
+    d.nebivolol = Math.round(baseDose * weekScale * 2) / 2;
   }
   if (p.hasAI && substances.some(s => s === 'anastro' || s === 'anastrozole')) {
     const totalTest = p.aas.filter(a => ['test_prop','test_enan','test_cyp','test_undec','test_mix'].includes(a.id)).reduce((s, a) => s + a.doseMgWeek, 0);
-    d.anastrozole = totalTest > 700 ? 1.5 : totalTest > 500 ? 1 : 0.5;
+    const baseDose = totalTest > 700 ? 1.5 : totalTest > 500 ? 1 : 0.5;
+    d.anastrozole = Math.round(baseDose * Math.max(0.75, weekScale) * 2) / 2;
   }
   if (p.hasCaber && substances.some(s => s === 'caberg' || s === 'cabergoline')) {
-    d.cabergoline = 0.25;
+    d.cabergoline = cw <= 2 ? 0.125 : 0.25;
   }
+  // NAC / TUDCA titration: build up to avoid GI upset
+  if (substances.includes('nac')) d.nac = cw <= 2 ? 1200 : 1800;
+  if (substances.includes('tudca')) d.tudca = cw <= 2 ? 500 : 1000;
   return d;
 }
 
@@ -467,7 +486,9 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   const scores = calcAllRisks(state);
   const labDeltas = calcLabDeltas(state);
   const overallRaw = Math.round(Math.max(...Object.values(scores)));
-  const protection = 0.3 + (synergyIds.length * 0.02);
+  const cw = state.courseWeek ?? 1;
+  const weekProtectionBonus = Math.min(0.15, cw * 0.015); // +1.5% protection per week up to 15%
+  const protection = Math.min(0.7, 0.3 + (synergyIds.length * 0.02) + weekProtectionBonus);
   const overallAfterSupport = Math.round(Math.max(...Object.values(scores))) - Math.round(Math.max(...Object.values(scores)) * Math.min(protection, 0.7));
   const schedule = generateSchedule(substances, synergyIds, titration);
   const result: CalculatorResult = {
