@@ -83,6 +83,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [calcPrinciple, setCalcPrinciple] = useState<'intel' | 'manual'>('intel');
   const [jointNotification, setJointNotification] = useState(false);
   const [boostNotification, setBoostNotification] = useState(false);
+  const [myPlansRefresh, setMyPlansRefresh] = useState(0);
   const [weekChangeMsg, setWeekChangeMsg] = useState('');
   const [supportPhase, setSupportPhase] = useState<SupportPhase>('course');
   const [selectedAnalogs, setSelectedAnalogs] = useState<Record<string, string>>({});
@@ -3347,6 +3348,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   <div style={{ padding:'0 0 80px' }}>
                     <div style={{ display:'flex', gap:6, marginBottom:8 }}>
                       <button onClick={() => setPlanSubTab('active')} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'active' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'active' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'active' ? 'var(--accent)' : 'var(--border)'}` }}>✅ Действующий план</button>
+                      <button onClick={() => setPlanSubTab('myplans')} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'myplans' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'myplans' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'myplans' ? 'var(--accent)' : 'var(--border)'}` }}>📋 Мои планы</button>
                       <button onClick={() => setPlanSubTab('archive')} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'archive' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'archive' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'archive' ? 'var(--accent)' : 'var(--border)'}` }}>📦 Архив ({archivedPlans.length})</button>
                     </div>
 
@@ -3536,6 +3538,60 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         )}
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* === MY SAVED PLANS === */}
+                {planSubTab === 'myplans' && (
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)', marginBottom:4 }}>📋 Мои планы поддержки</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8, lineHeight:1.3 }}>Сохранённые планы с уровнем, составом и рисками. Можно загрузить в калькулятор.</div>
+                    {(() => {
+                      let myPlans: any[] = [];
+                      try { myPlans = JSON.parse(localStorage.getItem('he_my_plans') || '[]'); } catch {}
+                      if (myPlans.length === 0) return (
+                        <div style={{ padding:24, textAlign:'center' }}>
+                          <div style={{ fontSize:24, marginBottom:6 }}>📋</div>
+                          <div style={{ fontSize:11, color:'var(--text-dim)' }}>Нет сохранённых планов.</div>
+                          <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>Выполните расчёт и сохраните его через кнопку «Сохранить план в Мои планы».</div>
+                        </div>
+                      );
+                      return (
+                        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                          {[...myPlans].reverse().map((p, i) => (
+                            <div key={p.id || i} style={{ padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
+                              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                                <div>
+                                  <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{p.name}</div>
+                                  <div style={{ fontSize:8, color:'var(--text-dim)' }}>{new Date(p.date).toLocaleDateString('ru-RU')} · ур. {p.level} · нед. {p.week}</div>
+                                </div>
+                                <div style={{ display:'flex', gap:4 }}>
+                                  <button onClick={() => {
+                                    if (p.level) setSupportLevel(p.level);
+                                    if (p.week) setCourseWeekState(p.week);
+                                    if (p.boostEnabled !== undefined) setBoostEnabled(p.boostEnabled);
+                                    if (p.jointMode !== undefined) setJointMode(p.jointMode);
+                                    if (p.enhancedSubs) setEnhancedSubs(p.enhancedSubs);
+                                    setPlanSaved('✅ План загружен в калькулятор');
+                                    setTimeout(() => setPlanSaved(''), 3000);
+                                  }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa' }}>📂</button>
+                                  <button onClick={() => {
+                                    try {
+                                      let arr: any[] = JSON.parse(localStorage.getItem('he_my_plans') || '[]');
+                                      localStorage.setItem('he_my_plans', JSON.stringify(arr.filter((x: any) => x.id !== p.id)));
+                                      setMyPlansRefresh(prev => prev + 1);
+                                    } catch {}
+                                  }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
+                                </div>
+                              </div>
+                              <div style={{ fontSize:8, color:'var(--text-dim)' }}>
+                                {p.subs?.length || 0} препаратов · Риск: {Math.round(p.riskBefore)}% → {Math.round(p.riskAfter)}% · Покрытие: {Math.round(p.supportScore)}/100
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -5000,9 +5056,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
               )}
               
-              {/* Save calc result to Избранное — Расчёты */}
+               {/* Save calc result + Save Plan to Мои планы */}
               {calcDone && calcResult && (
-                <div style={{ marginBottom:6 }}>
+                <div style={{ marginBottom:6, display:'flex', flexDirection:'column', gap:4 }}>
                   <button onClick={() => {
                     const saveData = {
                       id: Date.now(),
@@ -5020,10 +5076,33 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   }} style={{ width:'100%', padding:'8px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.12)', color:'var(--accent)' }}>
                     💾 Сохранить расчёт в избранное
                   </button>
+                  <button onClick={() => {
+                    const myPlans: any[] = JSON.parse(localStorage.getItem('he_my_plans') || '[]');
+                    const planData = {
+                      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+                      name: `План от ${new Date().toLocaleDateString('ru-RU')} (ур. ${supportLevel})`,
+                      date: new Date().toISOString(),
+                      level: supportLevel,
+                      week: courseWeekState,
+                      subs: effectiveLevel?.subs || [],
+                      dosages: effectiveLevel?.dosages || {},
+                      riskBefore: calcResult?.riskBeforeSupport ?? 0,
+                      riskAfter: calcResult?.riskAfterSupport ?? 0,
+                      supportScore: calcResult?.supportScore ?? 0,
+                      enhancedSubs: enhancedSubs,
+                      boostEnabled: boostEnabled,
+                      jointMode: jointMode,
+                    };
+                    myPlans.push(planData);
+                    localStorage.setItem('he_my_plans', JSON.stringify(myPlans));
+                    if (typeof setMyPlansRefresh !== 'undefined') setMyPlansRefresh((p: number) => p + 1);
+                    setPlanSaved('✅ План сохранён в Мои планы');
+                    setTimeout(() => setPlanSaved(''), 3000);
+                  }} style={{ width:'100%', padding:'8px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.15)', color:'#8b5cf6' }}>
+                    📋 Сохранить план в Мои планы
+                  </button>
                 </div>
               )}
-
-              {/* Result display */}
               {calcDone && calcResult && (
                 <div style={{ marginTop:10, padding:'12px', borderRadius:10, background:'rgba(0,230,138,0.03)', border:'1px solid rgba(0,230,138,0.1)' }}>
                   <div style={{ fontSize:11, fontWeight:700, color:'var(--text-light)', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
