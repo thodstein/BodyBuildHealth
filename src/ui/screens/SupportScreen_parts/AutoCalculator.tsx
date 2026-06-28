@@ -4,7 +4,7 @@ import { calculateSupportTZ, hydrateState } from '../../../engines/support-calcu
 import { SYNERGY_ID_LABELS } from '../../../engines/support-calculator.types';
 import { PHARMA_DB, PHARMA_CLASSES } from '../../../core/pharma-database';
 import { SUPPORT_COVERAGE_MAP } from '../../../data/support-coverage-map';
-import { evaluateRecommendations, applyBudget, computeBudgetRisk } from '../../../engines/recommendation-engine';
+import { evaluateRecommendations, applyBudget, computeBudgetRisk, buildPreApplyCard } from '../../../engines/recommendation-engine';
 import { calculateWeeklyRiskDynamics } from '../../../engines/weekly-risk-dynamics.engine';
 
 interface AutoCalculatorProps { onApply: (result: { level: string; subs: string[]; result: CalculatorResult }) => void; embedded?: boolean; courseWeek?: number; }
@@ -689,22 +689,36 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           )}
         </Card>
 
-        {/* Бюджет / уровень */}
-        <div style={{ display:'flex', gap:3, marginBottom:4 }}>
-          {(['basic','mid','max','boost'] as const).map(b => {
-            const active = (budget === b) || (boostOverride && b === 'boost');
-            const labels: Record<string,string> = { basic:'🟢 База', mid:'🟡 Средний', max:'🔴 Макс', boost:'💎 Буст' };
-            return <button key={b} onClick={() => {
-              setBudget(b);
-              setBoostOverride(false);
-              onApply({ level: b, subs: result.selectedSubstances || [], result });
-            }} style={{
-              flex:1, padding:'8px 4px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
-              background: active ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.04)',
-              border: active ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
-              color: active ? '#000' : 'var(--text-dim)',
-            }}>{labels[b]} {active && (b === 'boost' ? '✓' : '✓')}</button>;
-          })}
+        {/* Уровень поддержки — 4 бюджетные кнопки (старая карточка, разные цвета) */}
+        <div style={{ marginTop:6 }}>
+          <div style={{ fontSize:9, fontWeight:600, color:'var(--text-dim)', marginBottom:4 }}>📊 Выберите уровень поддержки:</div>
+          <div style={{ display:'flex', gap:4 }}>
+            {([
+              { id:'basic' as const, label:'🟢 База', color:'#22c55e', desc: 'Обязательный минимум' },
+              { id:'mid' as const, label:'🟡 Средний', color:'#eab308', desc: 'Расширенная защита' },
+              { id:'max' as const, label:'🔴 Макс', color:'#f97316', desc: 'Полное покрытие' },
+              { id:'boost' as const, label:'💎 Буст', color:'#ef4444', desc: 'Максимальная поддержка' },
+            ] as const).map(b => {
+              const active = (budget === b.id) || (boostOverride && b.id === 'boost');
+              return (
+                <button key={b.id} onClick={() => {
+                  setBudget(b.id);
+                  setBoostOverride(false);
+                }} style={{
+                  flex:1, padding:'8px 6px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
+                  background: active ? b.color : 'rgba(255,255,255,0.03)',
+                  border: active ? ('2px solid ' + b.color) : '1px solid rgba(255,255,255,0.06)',
+                  color: active ? '#000' : 'var(--text-dim)',
+                  transition:'all 0.15s',
+                }}>
+                  {b.label}
+                  <div style={{ fontSize:6, fontWeight:400, opacity: active ? 0.8 : 0.5, marginTop:1 }}>
+                    {b.desc}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Рекомендации с учётом бюджета */}

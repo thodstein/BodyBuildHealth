@@ -42,6 +42,7 @@ import { AutoCalculator } from './SupportScreen_parts/AutoCalculator';
 import { calculateSupportTZ, hydrateState } from '../../engines/support-calculator.engine';
 import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engines/support-calculator.types';
 import { calculateTZRisk, toCompatibleResult, type TZRiskResult } from '../../engines/risk-engine-tz';
+import { buildPreApplyCard, evaluateRecommendations } from '../../engines/recommendation-engine';
 // Force Vite to include SUPPORT_CATALOG_DATA and CANONICAL_ID_MAP (prevents tree-shaking)
 // @ts-ignore
 (window as any).__SUPPORT_CATALOG__ = SUPPORT_CATALOG_DATA;
@@ -5224,6 +5225,37 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       ) : null;
                     })}
                   </div>
+
+                  {/* buildPreApplyCard — почему каждый препарат */}
+                  {calcResult && (() => {
+                    try {
+                      const h = hydrateState();
+                      const st = { ...h, powerLevel: supportLevel as PowerLevel, courseWeek: courseWeekState } as CalculatorState;
+                      const recs = evaluateRecommendations(st, calcResult as any, courseWeekState);
+                      const preApply = buildPreApplyCard(recs, st as any);
+                      if (preApply.lines.length === 0) return null;
+                      return (
+                        <details style={{ marginBottom:8 }}>
+                          <summary style={{ fontSize:9, fontWeight:600, color:'var(--accent)', cursor:'pointer', padding:'4px 0' }}>
+                            🧠 Логика назначения ({preApply.lines.length} рекомендаций)
+                          </summary>
+                          <div style={{ marginTop:4, display:'flex', flexDirection:'column', gap:3, maxHeight:'30vh', overflowY:'auto' }}>
+                            {preApply.lines.map((line, i) => (
+                              <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(0,0,0,0.08)', border:'1px solid var(--border)', fontSize:8 }}>
+                                <div style={{ fontWeight:700, color:'var(--text-light)', marginBottom:2 }}>{line.problem}</div>
+                                <div style={{ color:'var(--accent)', fontWeight:600 }}>{line.primarySubs}</div>
+                                {line.escalation && <div style={{ color:'#f59e0b', fontSize:7, marginTop:1 }}>⚠ {line.escalation}</div>}
+                                {line.monitoring && <div style={{ color:'#60a5fa', fontSize:7, marginTop:1 }}>📊 {line.monitoring}</div>}
+                                {line.riskCoverage && <div style={{ color:'var(--text-dim)', fontSize:7, marginTop:1 }}>{line.riskCoverage}</div>}
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:4 }}>{preApply.summary}</div>
+                        </details>
+                      );
+                    } catch { return null; }
+                  })()}
+
                   <div style={{ display:'flex', gap:6 }}>
                     <button style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:10 }} onClick={() => setPlanSaved(true)}>✅ Утвердить план</button>
                     <button onClick={() => { setShowModal('manual'); setModalAddMode(true); setPlanSaved(false); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'1px solid var(--border)', cursor:'pointer', background:'transparent', color:'var(--text-dim)', fontWeight:600, fontSize:10 }}>✏️ Внести изменения</button>
