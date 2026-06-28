@@ -693,19 +693,19 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
   const [expandedPD, setExpandedPD] = useState<string | null>(null);
 
   const riskLabels: string[] = [];
-  if (pd.hepatotoxicity >= 2) riskLabels.push('');
-  if (pd.aromatization >= 0.7) riskLabels.push('');
-  if (pd.progestogenic >= 0.3) riskLabels.push('');
-  if (pd.neuro_toxicity >= 0.3) riskLabels.push('');
-  if (pd.lipid_impact <= -0.5) riskLabels.push('');
-  if (pd.hct_impact >= 4) riskLabels.push('');
+  if (pd.hepatotoxicity >= 2) riskLabels.push('Гепатотоксичен');
+  if (pd.aromatization >= 0.7) riskLabels.push('Ароматизируется');
+  if (pd.progestogenic >= 0.3) riskLabels.push('Прогестагенный');
+  if (pd.neuro_toxicity >= 0.3) riskLabels.push('Нейротоксичен');
+  if (pd.lipid_impact <= -0.5) riskLabels.push('Ухудшает липиды');
+  if (pd.hct_impact >= 4) riskLabels.push('Повышает HCT');
 
   const effectLabels: string[] = [];
-  if (pd.AR_affinity >= 1.0) effectLabels.push('');
-  else if (pd.AR_affinity >= 0.7) effectLabels.push('');
-  if (pd.five_alpha_reduction >= 0.5) effectLabels.push('');
-  if (pd.aromatization === 0) effectLabels.push('');
-  if (sub.class === 'sarm') effectLabels.push('');
+  if (pd.AR_affinity >= 1.0) effectLabels.push('Высокая андрогенность');
+  else if (pd.AR_affinity >= 0.7) effectLabels.push('Средняя андрогенность');
+  if (pd.five_alpha_reduction >= 0.5) effectLabels.push('Восст. в ДГТ');
+  if (pd.aromatization === 0) effectLabels.push('Не ароматизируется');
+  if (sub.class === 'sarm') effectLabels.push('SARM (селективный)');
 
   return (
     <div className="card" style={{ fontSize: 12, lineHeight: 1.6 }}>

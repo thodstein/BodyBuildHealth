@@ -488,11 +488,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
                 </div>
               )}
             </div>}
-            <div style={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
-              <button onClick={() => setShowPharmaPicker(true)} style={{ padding:'6px 10px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a' }}>+ Добавить препарат</button>
-              <input type="number" value={aasEditor.doseMgWeek || ''} onChange={e => setAasEditor(p => ({ ...p, doseMgWeek: +e.target.value }))} style={{ ...INPUT, width: 64, fontSize: 9 }} placeholder="мг/нед" />
-              <input type="number" value={aasEditor.weeks || ''} onChange={e => setAasEditor(p => ({ ...p, weeks: +e.target.value }))} style={{ ...INPUT, width: 44, fontSize: 9 }} placeholder="нед" />
-            </div>
+            <button onClick={() => setShowPharmaPicker(true)} style={{ padding:'6px 10px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a' }}>+ Добавить препарат</button>
           </div>
           <div style={{ fontSize:8, fontWeight:600, color:'var(--text-dim)', gridColumn:'1 / -1', marginTop:2, marginBottom:4 }}>— Флаги —</div>
           <PopupBool label="ГР" value={state.pharma.hasGH} onChange={v => uPharm({ hasGH: v })} />
@@ -807,7 +803,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
                 .filter(([id]) => PHARMA_CLASSES.includes((PHARMA_DB[id] as any)?.class))
                 .slice(0, 40)
                 .map(([id, ph]) => (
-                <button key={id} onClick={() => { setAasEditor(p => ({ ...p, id })); setShowPharmaPicker(false); }} style={{
+                <button key={id} onClick={() => { uPharm({ aas: [...state.pharma.aas, { id, doseMgWeek: 500, weeks: 12 }] }); setShowPharmaPicker(false); }} style={{
                   display: 'block', width: '100%', padding: '8px 10px', marginBottom: 2, borderRadius: 8, cursor: 'pointer', fontSize: 10, textAlign: 'left',
                   background: aasEditor.id === id ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
                   border: aasEditor.id === id ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
