@@ -1,6 +1,7 @@
 import type { CalculatorState, CalculatorResult, LabSlice } from './support-calculator.types';
 import { PHARMA_DB } from '../core/pharma-database';
 import { MECHANISM_TO_SUPPORT, ORGAN_TO_SUPPORT, SYSTEM_TO_SUPPORT, CATEGORY_TO_SUPPORT, DRUG_PD_EFFECT_TO_SUPPORT, getSupportEntry, findByMechanisms, findByLabMarker, findByCategoryAndMech, findByOrganAndMech, SUPPORT_CATALOG_DATA, ALL_SUPPORT_IDS, filterByBudget, getEntryTier, getSynergyScore, getConflictScore, scoreCombination, BUDGET_TIER_MAP } from '../data/support-index';
+import { getSupportByMechanism, getSupportBySystem, getFullChainSupport } from '../data/mechanism-support-bridge';
 
 export type RecSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 export type RecStatus = 'active' | 'escalated' | 'blocked' | 'covered';
@@ -560,21 +561,37 @@ export function applyBudget(recs: Recommendation[], budget: string, jointExclude
     scored.sort((a, b) => b.netScore - a.netScore);
     const sortedIds = scored.map(s => s.id);
 
-    // Conflict resolution: try to keep both if possible (time separation)
+    // Conflict resolution: try time separation across all 5 slots
+    // morning / afternoon / evening / night / fasting → any orthogonal pair = OK
+    let conflictWarnings: string[] = [];
+    const TIME_SLOTS = ['morning', 'afternoon', 'evening', 'night', 'fasting'];
     const keep: string[] = [];
     for (const id of sortedIds) {
-      const hasConflict = allIds.some(existing => getConflictScore(id, existing) > 0.5);
-      if (hasConflict) {
-        // Check if conflict can be resolved by time separation
+      const conflictsWith = allIds.filter(existing => getConflictScore(id, existing) > 0.5);
+      if (conflictsWith.length > 0) {
         const entryA = getSupportEntry(id);
-        const entryB = allIds.find(e => getConflictScore(id, e) > 0.5);
-        const entryBentry = entryB ? getSupportEntry(entryB) : null;
-        // If either can be morning-only or evening-only, keep both (time-separated)
-        const timeA = entryA?.dosage?.timing || '';
-        const timeB = entryBentry?.dosage?.timing || '';
-        const canSeparate = (timeA.includes('morning') && timeB.includes('evening')) || (timeA.includes('evening') && timeB.includes('morning'));
-        if (canSeparate) keep.push(id);
-        // else: exclude the worse-scored one (already sorted, so current is worse)
+        const timeA = (entryA as any)?.dosage?.timing || (entryA as any)?.timing || '';
+        // Assign default slot if none specified
+        const slotA = TIME_SLOTS.find(s => timeA.toLowerCase().includes(s)) || TIME_SLOTS[0];
+        const canSeparateAll = conflictsWith.every(conflictId => {
+          const entryB = getSupportEntry(conflictId);
+          const timeB = (entryB as any)?.dosage?.timing || (entryB as any)?.timing || '';
+          const slotB = TIME_SLOTS.find(s => timeB.toLowerCase().includes(s)) || TIME_SLOTS[TIME_SLOTS.length - 1];
+          return slotA !== slotB;
+        });
+        if (canSeparateAll) {
+          keep.push(id);
+          // Track time separation for the plan output
+          const sepMsg = conflictsWith.map(cid => {
+            const en = getSupportEntry(cid);
+            const tn = (en as any)?.dosage?.timing || '';
+            return `${getSupportEntry(id)?.name || id} (${slotA}) ↔ ${en?.name || cid} (${TIME_SLOTS.find(s => tn.toLowerCase().includes(s)) || 'вечер'}) — разнесены по времени`;
+          }).join('; ');
+          conflictWarnings.push(sepMsg);
+        } else {
+          // Cannot separate → exclude, warn user
+          conflictWarnings.push(`⚠ Исключён ${getSupportEntry(id)?.name || id}: конфликт с ${conflictsWith.map(c => getSupportEntry(c)?.name || c).join(', ')} — невозможно разнести по времени`);
+        }
       } else {
         keep.push(id);
       }
@@ -621,4 +638,77 @@ export function computeBudgetRisk(recs: Recommendation[], budget: string, state:
     : null;
 
   return { budget, riskBefore: Math.round(baseBefore), riskAfter: Math.round(riskAfter), coverage, warning, substanceCount: totalSubs, synergyScore: Math.round(synergyScore * 100) };
+}
+
+// ─── Risk detail builder: per-recommendation risk analysis ───
+function buildRiskDetail(rec: Recommendation, state?: CalculatorState): string | undefined {
+  const systemLabels: Record<string, string> = {
+    hepatic: 'Печень', cardio: 'ССС', renal: 'Почки', neuro: 'Нейротоксичность',
+    endocrine: 'Эндокринная', hematologic: 'Кровь', metabolic: 'Метаболизм',
+    reproductive: 'Репродуктивная', musculoskeletal: 'ОДА', immune: 'Иммунитет',
+  };
+
+  const sysLabel = systemLabels[rec.system] || rec.systemLabel || rec.system;
+  const severityLabel = { critical: '🔴 Критический', high: '🟠 Высокий', medium: '🟡 Средний', low: '🟢 Низкий' }[rec.severity] || rec.severity;
+
+  // Try to extract lab values from the recommendation title
+  const labMatch = rec.title.match(/\([^)]*:\s*([\d.]+)[^)]*\)/);
+  const labValue = labMatch ? labMatch[1] : null;
+
+  if (labValue) {
+    return `${severityLabel} риск · система: ${sysLabel} · значение: ${labValue}`;
+  }
+
+  // Check for specific known patterns
+  if (rec.title.includes('Ароматизация')) return `${severityLabel} риск · ${sysLabel} · ароматизация ААС → E2↑`;
+  if (rec.title.includes('Прогестиновая')) return `${severityLabel} риск · ${sysLabel} · 19-нор → пролактин↑`;
+  if (rec.title.includes('Липид') || rec.title.includes('ЛПНП')) return `${severityLabel} риск · ${sysLabel} · дислипидемия от ААС`;
+  if (rec.title.includes('Нейро') || rec.title.includes('нейротокс')) return `${severityLabel} риск · ${sysLabel} · нейротоксичность препаратов`;
+  if (rec.title.includes('Давление') || rec.title.includes('АД')) return `${severityLabel} риск · ${sysLabel} · гипертензия`;
+  if (rec.title.includes('Печень') || rec.title.includes('гепато')) return `${severityLabel} риск · ${sysLabel} · гепатотоксичность оральных ААС`;
+  if (rec.title.includes('Почк') || rec.title.includes('ренал')) return `${severityLabel} риск · ${sysLabel} · нефротоксичность`;
+  if (rec.title.includes('Курс ААС') && rec.id === 'hcg') return `🟡 Плановый · ${sysLabel} · автоназначение при ААС`;
+
+  return `${severityLabel} риск · система: ${sysLabel}`;
+}
+
+// ─── Pre-apply card: logic summary before plan output ───
+export interface PreApplyLine {
+  problem: string;          // e.g. "Гематокрит 53%"
+  primarySubs: string[];    // e.g. ["Серрапептаза", "Наттокиназа"]
+  escalation: string;       // e.g. "Если не изменится → +Нарингин +Люмброкиназа"
+  monitoring: string;       // e.g. "Контроль HCT каждые 4 нед"
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  riskDetail?: string;      // e.g. "Риск тромбоза: HCT 53% (норма <48%)"
+  riskCoverage?: string;    // e.g. "Покрытие: Серрапептаза 35%↓ + Наттокиназа 25%↓ = риск ↓ до среднего"
+}
+
+export function buildPreApplyCard(recs: Recommendation[], state?: CalculatorState): { lines: PreApplyLine[]; summary: string } {
+  const lines: PreApplyLine[] = [];
+
+  for (const rec of recs) {
+    if (rec.id === '__week_change' || rec.id.startsWith('anastrozole_note') || rec.id.startsWith('cabergoline_note')) continue;
+    const subNames = rec.substances.map(s => s.name).filter(Boolean);
+    if (subNames.length === 0 && !rec.escalation) continue;
+
+    lines.push({
+      problem: rec.title,
+      primarySubs: subNames.length > 0 ? subNames : [rec.escalation || '—'],
+      escalation: subNames.length > 0 ? rec.escalation || (subNames.length > 0 ? 'При неэффективности — усиление дозы или замена' : '') : '',
+      monitoring: rec.monitoring || 'Контроль анализов каждые 4 нед',
+      severity: rec.severity,
+      riskDetail: buildRiskDetail(rec, state),
+      riskCoverage: subNames.length > 0 ? `Покрытие: ${subNames.slice(0, 3).join(' + ')} → снижение риска по системе ${rec.systemLabel || rec.system}` : '',
+    });
+  }
+
+  // Sort: critical first, then high, medium, info
+  const order: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+  lines.sort((a, b) => (order[a.severity] || 5) - (order[b.severity] || 5));
+
+  const criticalCount = lines.filter(l => l.severity === 'critical').length;
+  const highCount = lines.filter(l => l.severity === 'high').length;
+  const summary = `Обнаружено ${criticalCount} критических и ${highCount} высоких рисков. Всего ${lines.length} рекомендаций.`;
+
+  return { lines, summary };
 }
