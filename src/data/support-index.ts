@@ -168,8 +168,34 @@ export const BUDGET_TIER_MAP: Record<string, ('base' | 'first' | 'second' | 'thi
   basic: ['base', 'first'],
   mid: ['base', 'first', 'second'],
   max: ['base', 'first', 'second', 'third'],
-  boost: ['base', 'second', 'third'], // skip basic first-tier forms, use only quality
+  boost: ['second', 'third'], // ONLY elite/quality tiers — use ON TOP of selected level
 };
+
+// Boost: add extra elite substances with synergy ON TOP of existing plan
+// Not a standalone budget — applied as an additional pass
+export function getBoostSubstances(existingIds: string[], limit: number = 6): string[] {
+  const boostTiers = BUDGET_TIER_MAP.boost;
+  const allIds = ALL_SUPPORT_IDS.filter(id => boostTiers.includes(getEntryTier(id)));
+  // Filter out already selected
+  const candidates = allIds.filter(id => !existingIds.includes(id));
+  // Score by synergy with existing
+  const scored = candidates.map(id => {
+    let synScore = 0;
+    for (const existing of existingIds) synScore += getSynergyScore(id, existing);
+    let conScore = 0;
+    for (const existing of existingIds) conScore += getConflictScore(id, existing);
+    return { id, netScore: synScore - conScore, synergy: synScore };
+  });
+  scored.sort((a, b) => b.netScore - a.netScore);
+  // Take top scoring + ensure no conflicts
+  const result: string[] = [];
+  for (const s of scored) {
+    if (result.length >= limit) break;
+    const hasConflict = result.some(r => getConflictScore(s.id, r) > 0.5) || existingIds.some(e => getConflictScore(s.id, e) > 0.5);
+    if (!hasConflict) result.push(s.id);
+  }
+  return result;
+}
 
 // Get tier from SUPPORT_CATALOG_DATA tier field
 export function getEntryTier(id: string): 'base' | 'first' | 'second' | 'third' {

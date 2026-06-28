@@ -1,6 +1,6 @@
 import type { CalculatorState, CalculatorResult, LabSlice } from './support-calculator.types';
 import { PHARMA_DB } from '../core/pharma-database';
-import { MECHANISM_TO_SUPPORT, ORGAN_TO_SUPPORT, SYSTEM_TO_SUPPORT, CATEGORY_TO_SUPPORT, DRUG_PD_EFFECT_TO_SUPPORT, getSupportEntry, findByMechanisms, findByLabMarker, findByCategoryAndMech, findByOrganAndMech, SUPPORT_CATALOG_DATA, ALL_SUPPORT_IDS, filterByBudget, getEntryTier, getSynergyScore, getConflictScore, scoreCombination, BUDGET_TIER_MAP } from '../data/support-index';
+import { MECHANISM_TO_SUPPORT, ORGAN_TO_SUPPORT, SYSTEM_TO_SUPPORT, CATEGORY_TO_SUPPORT, DRUG_PD_EFFECT_TO_SUPPORT, getSupportEntry, findByMechanisms, findByLabMarker, findByCategoryAndMech, findByOrganAndMech, SUPPORT_CATALOG_DATA, ALL_SUPPORT_IDS, filterByBudget, getEntryTier, getSynergyScore, getConflictScore, scoreCombination, BUDGET_TIER_MAP, getBoostSubstances } from '../data/support-index';
 import { getSupportByMechanism, getSupportBySystem, getFullChainSupport } from '../data/mechanism-support-bridge';
 
 export type RecSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
@@ -638,6 +638,55 @@ export function computeBudgetRisk(recs: Recommendation[], budget: string, state:
     : null;
 
   return { budget, riskBefore: Math.round(baseBefore), riskAfter: Math.round(riskAfter), coverage, warning, substanceCount: totalSubs, synergyScore: Math.round(synergyScore * 100) };
+}
+
+// ─── Boost: усилить выбранный уровень элитными препаратами ───
+export function applyBoost(recs: Recommendation[], budget: string): { recs: Recommendation[]; addedSubstances: string[]; riskReduction: number; message: string } {
+  const { recs: filtered } = applyBudget(recs, budget);
+  const allIds = new Set<string>();
+  filtered.forEach(r => r.substances.forEach(s => allIds.add(s.id)));
+
+  // Get boost substances — elite forms with HIGH synergy
+  const boostIds = getBoostSubstances(Array.from(allIds), 8);
+  if (boostIds.length === 0) {
+    return { recs: filtered, addedSubstances: [], riskReduction: 0, message: 'Нет доступных элитных препаратов для усиления. Выберите уровень Максимум.' };
+  }
+
+  // Add boost substances to the most relevant recommendations
+  const boostSubstances = boostIds.map(id => {
+    const entry = getSupportEntry(id);
+    return { id, name: entry?.name || id, dose: (entry as any)?.dosage?.timingDosage || (entry as any)?.dosage?.dose || '—', reasoning: `Усиление: элитная форма, максимальная биодоступность`, tier: getEntryTier(id) };
+  });
+
+  // Append to existing recs
+  const boosted = filtered.map(r => ({ ...r }));
+  if (boosted.length > 0) {
+    // Find the best rec to add boost substances to (by severity)
+    const criticalRec = boosted.find(r => r.severity === 'critical');
+    const target = criticalRec || boosted[0];
+    target.substances = [...target.substances, ...boostSubstances.filter(s => !target.substances.some(ts => ts.id === s.id))];
+  }
+
+  // Estimate additional risk reduction (elite forms = better coverage)
+  const extraReduction = Math.min(25, boostIds.length * 3);
+  const riskReduction = extraReduction;
+
+  // Build synergy scores for reporting
+  let totalSyn = 0;
+  for (const a of allIds) for (const b of boostIds) totalSyn += getSynergyScore(a, b);
+
+  const message = [
+    `⚡ Усиление: +${boostIds.length} элитных препаратов`,
+    `+${totalSyn.toFixed(1)} очков синергии`,
+    `Доп. снижение риска ≈ ${riskReduction}%`,
+  ].join(' · ');
+
+  return {
+    recs: boosted,
+    addedSubstances: boostIds,
+    riskReduction,
+    message,
+  };
 }
 
 // ─── Risk detail builder: per-recommendation risk analysis ───
