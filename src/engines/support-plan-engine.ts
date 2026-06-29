@@ -704,6 +704,7 @@ export function calculateSupportPlan(
   const ph = state.pharma || {};
   const aas = ph.aas || [];
   const totalDose = aas.reduce((a: number, b: any) => a + (b.doseMgWeek || 0), 0);
+  const trainingVolume = (p.workoutsPerWeek || 3) * (p.avgWorkoutMinutes || 60);
 
   const brd = (sys: string, reason: string) => { if (!riskBreakdown[sys]) riskBreakdown[sys] = []; riskBreakdown[sys].push(reason); };
 
@@ -731,7 +732,7 @@ export function calculateSupportPlan(
   if ((scores.hepatic || 0) > 0) {
     if (p.alcohol === 'regular') brd('hepatic', `Алкоголь регулярно (+20%)`);
     else if (p.alcohol === 'sometimes') brd('hepatic', `Алкоголь иногда (+8%)`);
-    if (p.bodyfat > 25) brd('hepatic', `% жира >25% (+5%)`);
+    if ((p.bodyfat || 0) > 25) brd('hepatic', `% жира >25% (+5%)`);
     if (totalDose > 0) {
       const hasOral = aas.some((a: any) => ['methandienone','oxandrolone','stanozolol','dianabol','anadrol','superdrol','turinabol'].some(n => a.id?.toLowerCase().includes(n)));
       if (hasOral) brd('hepatic', `Оральные ААС — высокая гепатотоксичность (+30%)`);
@@ -844,16 +845,16 @@ export function calculateSupportPlan(
   const dedupedReadings = [...readingByMarker.values()];
   const abnormalLabs = findAbnormalLabs(dedupedReadings);
 
-  // ─── Level thresholds ───
+  // ─── Level thresholds (risk % needed to activate system mechanisms) ───
   const levelThresholds: Record<string, number> = {
-    basic: 8, mid: 6, max: 4, boost: 2,
+    basic: 15, mid: 10, max: 6, boost: 4,
   };
   const levelMaxSubs: Record<string, number> = {
-    basic: 2, mid: 3, max: 4, boost: 5,
+    basic: 1, mid: 1, max: 2, boost: 3,
   };
-  const threshold = levelThresholds[level] || 12;
+  const threshold = levelThresholds[level] || 15;
   const maxSubsPerMech = levelMaxSubs[level] || 1;
-  const includeAllSystems = level === 'boost' || level === 'max';
+  const includeAllSystems = level === 'boost';
 
   // ─── Select substances via mechanism bridge ───
   const selectedIds = new Set<string>(existingSubs?.map(s => normalizeId(s)) || []);
@@ -866,7 +867,7 @@ export function calculateSupportPlan(
     const mechKeys = SYS_TO_MECH_KEYS[sysKey] || [];
     const activatedMechs: string[] = [];
 
-    if (sysScore >= threshold || (includeAllSystems && sysScore > 0)) {
+    if (sysScore >= threshold || (includeAllSystems && sysScore >= 2)) {
       for (const mechKey of mechKeys) {
         // Use auto-indexer: finds ALL catalog substances matching this mechanism
         const bridgeSubs = findCatalogSubstancesForBridgeMech(mechKey);

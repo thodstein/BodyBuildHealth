@@ -4096,119 +4096,104 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       {/* ===== INFO: КАК РАБОТАЕТ ПОДБОР ПОДДЕРЖКИ ===== */}
       {genTab === 'info' && section === 'generator' && (<InfoErrorBoundary label="Генератор — как работает">
         <div style={{ padding:'0 12px 80px', maxWidth:600, margin:'0 auto' }}>
-          <h2 style={{ fontSize:16, fontWeight:800, color:'#fff', margin:'0 0 16px', display:'flex', alignItems:'center', gap:6 }}>
-            <span>📖</span> Калькулятор поддержки: полная методология
-          </h2>
+          <h2 style={{ fontSize:16, fontWeight:800, color:'#fff', margin:'0 0 16px' }}>📖 Калькулятор поддержки v4 — методология</h2>
 
           <div style={{ display:'flex', flexDirection:'column', gap:10, fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.6 }}>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>1. Вводные данные — что собирает калькулятор</h3>
-              <p style={{ margin:'0 0 6px' }}>Перед расчётом собираются данные из 21 карточки по категориям:</p>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>1. Сбор данных — 21 карточка + профиль + курс + анализы</h3>
+              <p style={{ margin:'0 0 6px' }}>Калькулятор собирает данные из 4 источников:</p>
               <ul style={{ paddingLeft:16, margin:'4px 0' }}>
-                <li><b>👤 Профиль:</b> вес, возраст, пол, рост, % жира, тренировки, сон, стресс, курение, алкоголь, кофеин</li>
-                <li><b>🧠 Неврология:</b> дофамин, серотонин, агрессия, ГАМК-баланс, сон, память, фокус, мышление, координация, головные боли, метеозависимость</li>
-                <li><b>💉 Фарма стек:</b> список ААС (препарат + мг/нед + недели), ГР, ИГФ-1, инсулин, ХГЧ, АИ, каберголин, СЕРМ, SARMs</li>
-                <li><b>🎯 Цели:</b> масса/сушка/поддержка, здоровье, соревнования, сон, липиды, кровь, печень, АД, длительность цикла</li>
-                <li><b>🩺 Противопоказания:</b> 9 медицинских флагов (сердце, печень, почки, диабет, щитовидная, тромбоз, онкология, язва, психиатрия) + аллергии</li>
-                <li><b>🫁🫘❤️🦴🥗☣️🦷🧬🫀🧘💉:</b> гепатобилиарная, мочевыделительная, ССС, ОДА, питание, токсическая нагрузка, стоматология, генетика, ЖКТ, психология, инъекции</li>
-                <li><b>🧪 Лаборатория:</b> 15 панелей × 5-10 маркеров = 80+ показателей (гормоны, биохимия, гематология, липиды, железо, витамины, кардио, гемостаз, воспаление, минералы, онкомаркеры, моча)</li>
+                <li><b>AutoCalculator (21 карточка):</b> профиль, неврология, фарма-стек, цели, гепатобилиарная, мочевыделительная, ССС, ОДА, питание, противопоказания, токсическая нагрузка, стоматология, генетика (MTHFR, CYP19A1, SRD5A2, AR), ЖКТ, психология, инъекции, эпикриз, журнал, лаборатория</li>
+                <li><b>Профиль пользователя:</b> вес, возраст, пол, тренировки, сон, стресс — из he_user_profile</li>
+                <li><b>Курс ААС:</b> препараты, дозы, длительность — из PHARMA_DB с linkedRisks, cvProfile, pd</li>
+                <li><b>Анализы (80+ маркеров):</b> АЛТ, АСТ, ЛПНП, гематокрит, эстрадиол и др. — из linked.labs + LAB_MARKER_MAP</li>
               </ul>
-              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>Все данные сохраняются в localStorage (he_autocalc_state) и восстанавливаются при повторном входе.</p>
             </div>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>2. Риск-движок (TZ): вероятностная модель 49 ячеек</h3>
-              <p style={{ margin:'0 0 6px' }}>Ядро расчёта — вероятностная модель риска по 7 системам × 7 механизмам = 49 ячеек:</p>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>2. Расчёт рисков — 17 функций по 8 системам</h3>
+              <p style={{ margin:'0 0 6px' }}>Для каждой из 8 систем организма вычисляется риск по формуле:</p>
               <p style={{ margin:'0 0 4px', fontSize:9, fontFamily:'monospace', background:'rgba(0,0,0,0.2)', padding:'4px 8px', borderRadius:6 }}>
-                Risk<sub>s,m</sub> = 1 − ∏<sub>i</sub> (1 − baseRisk × D<sub>i</sub> × G × L × N × T)
+                Risk<sub>sys</sub> = Σ rProfile + rNeuro + rPharma + rGoals + rHepatic + rRenal + rCardio + rODA + rContraind + rEpicrisis + rToxic + rGenetics + rPsych + rNutrition
               </p>
+              <p style={{ margin:'4px 0 0' }}>Каждая функция учитывает специфические факторы:</p>
               <ul style={{ paddingLeft:16, margin:'4px 0' }}>
-                <li><b>D<sub>i</sub> = min(2.0, (dose/threshold)<sup>γ</sup>), γ=1.2</b> — пороговая модель доз (нелинейная)</li>
-                <li><b>G</b> — генетический множитель (COMT, MTHFR, ESR1, AGTR1, NOS3, SRD5A2, CYP3A4)</li>
-                <li><b>L = (value/ULN)<sup>β</sup> × (1 + α × trend)</b> — лабораторный множитель с трендом (missing=1.5×)</li>
-                <li><b>N</b> — нутритивный множитель (белок/клетчатка/омега-3/натрий/калий/вода)</li>
-                <li><b>T</b> — тренировочный множитель (HIIT/объём/LISS/длительность)</li>
+                <li><b>rPharma:</b> использует данные PHARMA_DB — linkedRisks (сила×направление), cvProfile (АД/ЧСС/тромбоз/ЦНС), pd (гепатотоксичность, нейротоксичность, липиды, HCT)</li>
+                <li><b>rLabs:</b> сверяет 80+ маркеров с LAB_MARKER_MAP — отклонения умножают риск системы</li>
+                <li><b>rProfile:</b> возраст, ИМТ, % жира, курение, алкоголь, кофеин, тренировочный объём</li>
               </ul>
-              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>Агрегация: геометрическое среднее по механизмам → SystemRisk; геометрическое среднее по системам → OverallRisk. Поддержка: net = raw × supportFactor (31 вещество с системно-механизмными редукциями).</p>
+              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>Общий риск = max × 0.6 + avg × 0.4 — пиковые риски доминируют (печень 65% не размывается средним).</p>
             </div>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>3. Анализ лабораторных данных</h3>
-              <p style={{ margin:'0 0 6px' }}>При наличии анализов система сверяет 80+ маркеров с референсными значениями:</p>
-              <ul style={{ paddingLeft:16, margin:'4px 0' }}>
-                <li><b>Печень:</b> АЛТ (&lt;40), АСТ (&lt;35), ГГТ (&lt;55), общий билирубин (&lt;21), прямой (&lt;5)</li>
-                <li><b>Сердце/сосуды:</b> ЛПНП (&lt;3.0), ЛПВП (&gt;1.0), триглицериды (&lt;1.7), гомоцистеин (&lt;15)</li>
-                <li><b>Почки:</b> креатинин (&lt;110), мочевина (&lt;8.3), СКФ (&gt;90)</li>
-                <li><b>Кровь:</b> гематокрит (&lt;50%), гемоглобин (&lt;175), эритроциты, тромбоциты</li>
-                <li><b>Гормоны:</b> эстрадиол (&lt;50 пг/мл), пролактин (&lt;15 нг/мл), ГСПГ (&lt;55), общ. тестостерон (&gt;10)</li>
-              </ul>
-              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>Каждое отклонение &gt;30% от верхней границы → статус «критический», умножает риск системы на 1.3-2.0×. Тренды (линейная регрессия по 3+ точкам) дают дополнительные множители.</p>
-            </div>
-
-            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>4. Уровни покрытия (не «бюджет»!)</h3>
-              <p style={{ margin:'0 0 6px' }}>Четыре уровня построены на <b>покрытии рисков</b>, а не на стоимости:</p>
-              <ul style={{ paddingLeft:16, margin:'4px 0' }}>
-                <li><b>🟢 База (tier: base + first):</b> самое необходимое. Минимальный набор для покрытия критических систем: NAC, TUDCA, Omega-3, D3+K2, Mg, CoQ10. ~15% покрытия</li>
-                <li><b>🟡 Средний (tier: base + first + second):</b> расширенный охват. + Цинк, селен, ашваганда, берберин, силимарин. ~30% покрытия</li>
-                <li><b>🔴 Макс (tier: all):</b> максимальный охват. + АЛК, куркумин, босвеллия, коллаген, глюкозамин, таурин. ~45% покрытия</li>
-                <li><b>💎 Буст (tier: second + third):</b> элитные формы с максимальной биодоступностью. Применяется СВЕРХ выбранного уровня. Добавляет 5-8 веществ с наивысшей синергией к текущему стеку</li>
-              </ul>
-              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>Фильтрация веществ по tier происходит через COVERAGE_TIER_MAP. Каждый tier определяет допустимые уровни доказательности (base=минимальный, first=стандартный, second=продвинутый, third=элитный).</p>
-            </div>
-
-            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>5. Рекомендательный движок (Recommendation Engine)</h3>
-              <p style={{ margin:'0 0 6px' }}>Трёхфазный алгоритм подбора веществ под выявленные риски:</p>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>3. Подбор веществ — авто-индексатор (133 механизма × 621 код)</h3>
+              <p style={{ margin:'0 0 6px' }}>Цепочка: Риск системы → Активация механизмов → Поиск веществ через авто-индексатор:</p>
               <ol style={{ paddingLeft:16, margin:'4px 0' }}>
-                <li><b>Фаза 1 — Выявление проблем:</b> анализ курса → токсичность (17α-алкилы, 19-норы), андрогенность, ароматизация, влияние на липиды/HCT. Сопоставление с лаб. отклонениями (АЛТ↑, HCT↑, ЛПНП↑). Генерация списка рекомендаций с severity (info→low→medium→high→critical)</li>
-                <li><b>Фаза 2 — Подбор веществ:</b> для каждой рекомендации подбираются вещества через обратные индексы (MECHANISM→SUPPORT, ORGAN→SUPPORT, SYSTEM→SUPPORT, CATEGORY→SUPPORT). Приоритет: прямое покрытие механизма &gt; орган &gt; система &gt; категория</li>
-                <li><b>Фаза 3 — applyCoverageLevel:</b> фильтрация по уровню (tier), разрешение конфликтов (разнесение по времени: утро/день/вечер/ночь/натощак — любые ортогональные слоты = OK), синергетическое ранжирование</li>
+                <li><b>Пороговая активация:</b> система с риском ≥ порога (База:15%, Средний:10%, Максимум:6%, Буст:4%) активирует свои механизмы</li>
+                <li><b>Авто-индексатор (mechanism-code-bridge.ts):</b> 133 bridge-ключа → 621 код каталога → поиск ВСЕХ веществ с matching mechanisms[]</li>
+                <li><b>Ранжирование:</b> tier-приоритет (core &gt; standard &gt; advanced) + синергия с уже выбранными + bestForCourse</li>
+                <li><b>Фильтрация:</b> исключение по противопоказаниям, конфликтам и чёрному списку</li>
               </ol>
-              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>Итог: computeCoverageRisk оценивает остаточный риск после применения подобранного стека (~8% покрытия на вещество, макс 80% на систему).</p>
+              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>При добавлении нового вещества в SUPPORT_CATALOG_DATA с полем mechanisms[] — оно автоматически обнаруживается без ручного маппинга.</p>
             </div>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>6. Синергии, конфликты и сеть взаимодействий</h3>
-              <p style={{ margin:'0 0 6px' }}>Каждая пара веществ в подобранном стеке проверяется через:</p>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>4. Уровни покрытия</h3>
+              <table style={{ width:'100%', fontSize:9, borderCollapse:'collapse', margin:'4px 0' }}>
+                <thead><tr style={{ background:'rgba(0,0,0,0.2)' }}><th style={{ padding:'4px 6px', textAlign:'left' }}>Уровень</th><th style={{ padding:'4px 6px' }}>Порог</th><th style={{ padding:'4px 6px' }}>Вещ/мех</th><th style={{ padding:'4px 6px' }}>Базовая защита</th><th style={{ padding:'4px 6px' }}>Макс. защита</th></tr></thead>
+                <tbody>
+                  <tr><td style={{ padding:'4px 6px' }}>🟢 База</td><td style={{ padding:'4px 6px', textAlign:'center' }}>15%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>1</td><td style={{ padding:'4px 6px', textAlign:'center' }}>30%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>45%</td></tr>
+                  <tr><td style={{ padding:'4px 6px' }}>🟡 Средний</td><td style={{ padding:'4px 6px', textAlign:'center' }}>10%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>1</td><td style={{ padding:'4px 6px', textAlign:'center' }}>45%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>60%</td></tr>
+                  <tr><td style={{ padding:'4px 6px' }}>🔴 Максимум</td><td style={{ padding:'4px 6px', textAlign:'center' }}>6%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>2</td><td style={{ padding:'4px 6px', textAlign:'center' }}>60%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>75%</td></tr>
+                  <tr><td style={{ padding:'4px 6px' }}>💎 Буст</td><td style={{ padding:'4px 6px', textAlign:'center' }}>4%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>3</td><td style={{ padding:'4px 6px', textAlign:'center' }}>70%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>85%</td></tr>
+                </tbody>
+              </table>
+              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>Защита = базовая + покрытие механизмов × бонус. Потолок 85%.</p>
+            </div>
+
+            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>5. Синергии, стеки и конфликты</h3>
               <ul style={{ paddingLeft:16, margin:'4px 0' }}>
-                <li><b>SYNERGY_NETWORK (~250+ записей):</b> клинически обоснованные пары с усилением эффекта. Примеры: NAC+TUDCA (глутатион + анти-ER-стресс), D3+K2+Mg (кальциевый треугольник), куркумин+пиперин (+2000% биодоступности)</li>
-                <li><b>ALL_INTERACTIONS (~450+ записей):</b> полный граф пар с силой связи (HIGH/MEDIUM/LOW), механизмом и рекомендациями</li>
-                <li><b>Конфликты:</b> пары, снижающие эффективность (Ca+Fe, Zn+Cu) или создающие риски (варфарин+Ω-3). Разрешаются через временное разнесение по 5 слотам</li>
+                <li><b>Синергии:</b> вещества с документированными синергиями (SUPPORT_CATALOG_DATA.synergies) получают приоритет при ранжировании</li>
+                <li><b>Стеки (52):</b> готовые комбинации с mechanismCodes[] оцениваются по покрытию × synergyScore. Стек с рейтингом ≥70 и синергией ≥80 применяется автоматически</li>
+                <li><b>Мг/кг дозировки:</b> NAC 15 мг/кг, TUDCA 10 мг/кг, CoQ10 2 мг/кг, Омега-3 30 мг/кг — 70% по весу + 30% фиксированная</li>
+                <li><b>Понедельное титрование:</b> нед.1-2=60%, 3-4=80%, 5-6=90%, 7+=100%. Фарма-препараты: 50%/75%/100%</li>
+                <li><b>Конфликты:</b> детектор проверяет все пары через SUPPORT_CATALOG_DATA.conflicts — показывает severity (HIGH/MEDIUM/LOW)</li>
               </ul>
-              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>Межмодульное обогащение: данные из Pharma (гепато-/кардио-/ренальная нагрузка) и Labs (PK/PD риски) дополнительно корректируют подбор поддержки.</p>
             </div>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>7. Понедельная динамика и дозирование</h3>
-              <p style={{ margin:'0 0 6px' }}>Расчёт учитывает фазу курса:</p>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>6. Персонализация</h3>
               <ul style={{ paddingLeft:16, margin:'4px 0' }}>
-                <li><b>Неделя курса:</b> селектор 1-20 нед. Влияет на титрацию доз, накопленный риск, late-phase синергии</li>
-                <li><b>Титрация:</b> дозировки масштабируются по неделе (старт 50% → пик 100% к середине курса)</li>
-                <li><b>Фазы:</b> курс / бридж / ПКТ / база — разные наборы веществ для каждой фазы через фазовые корректировки SUPPORT_LEVELS</li>
-                <li><b>Дозирование:</b> стандартные дозы из каталога + weight-based корректировки (мг/кг) для персонализации</li>
-                <li><b>Режим приёма:</b> утро/день/вечер/ночь/натощак — оптимальное время для каждого вещества (жирорастворимые → с едой, магний → на ночь, NAC → натощак)</li>
+                <li><b>Генетика:</b> MTHFR C677T → 5-MTHF + B12; CYP19A1 ↑ → DIM; SRD5A2 ↑ → пальма сереноа; AR ↑/↓ → коррекция</li>
+                <li><b>Фаза цикла:</b> 💉Курс / 🌉Мост / 🔄ПКТ / ⚧Фертильность — разные составы поддержки</li>
+                <li><b>Лаб-данные:</b> отклонения маркеров → авто-добавление корректирующих веществ (Средний+)</li>
+                <li><b>Противопоказания:</b> вещества конфликтующие с заболеваниями пользователя исключаются</li>
               </ul>
             </div>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>8. Результат: что вы получаете</h3>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>7. Результат — что вы получаете</h3>
               <ul style={{ paddingLeft:16, margin:'4px 0' }}>
-                <li><b>📊 Риск-бар:</b> общий риск без поддержки → с поддержкой (%). Визуализация снижения</li>
-                <li><b>📈 Покрытие по системам:</b> 8 баров (сердце, печень, почки, нейро, эндокринная, кровь, репродуктивная, ОДА) с % покрытия</li>
-                <li><b>💊 План поддержки:</b> список веществ с дозировками (мг) и временем приёма</li>
-                <li><b>🧠 Карточка логики:</b> почему назначено каждое вещество (проблема → механизм → вещество → мониторинг)</li>
-                <li><b>⚠️ Предупреждения:</b> если текущий уровень недостаточен — рекомендация повысить до следующего</li>
-                <li><b>💾 Сохранение:</b> расчёт → Избранное; план → Мои планы (localStorage). Экспорт в текст для врача</li>
+                <li><b>📊 Покрытие рисков:</b> прогресс-бар с риском до/после, недельным масштабом доз</li>
+                <li><b>📋 План по времени:</b> таблица Утро/День/Вечер с тирами и дозировками</li>
+                <li><b>🔍 Попап вещества:</b> полная карточка (механизм, формы, побочные, мониторинг, синергии, дозировка)</li>
+                <li><b>⚡ Синергии:</b> описание синергетических связей в стеке с клиническим обоснованием</li>
+                <li><b>⚠️ Конфликты:</b> предупреждения о несовместимых парах</li>
+                <li><b>📈 Динамика рисков:</b> бары до/после по 8 системам</li>
+                <li><b>🔬 Лаб-находки:</b> отклонения анализов с рекомендованными веществами</li>
+                <li><b>🧩 Стеки:</b> рекомендованные комбинации с рейтингом и кнопкой «+ В план»</li>
+                <li><b>📅 Таймлайн доз:</b> таблица дозировок по неделям 1→12</li>
+                <li><b>👨‍⚕️ Заключение:</b> структурированный отчёт для врача</li>
+                <li><b>💾 Сохранение:</b> в Мои планы с проверкой дубликатов, копирование заключения</li>
               </ul>
             </div>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#f59e0b' }}>⚠️ Важные замечания</h3>
-              <p style={{ margin:'0 0 4px', fontSize:9, lineHeight:1.3 }}><b>Информация носит ознакомительный характер.</b> Подбор поддержки должен производиться врачом с учётом индивидуальных особенностей: возраста, веса, генетических полиморфизмов (MTHFR, COMT, CYP), сопутствующих заболеваний и принимаемых лекарств.</p>
-              <p style={{ margin:'0 0 4px', fontSize:9, lineHeight:1.3 }}><b>Без лабораторных данных</b> система использует консервативные оценки риска (missing=1.5×). Для точного подбора необходимы свежие анализы.</p>
-              <p style={{ margin:'0', fontSize:9, lineHeight:1.3 }}><b>Противопоказания:</b> некоторые вещества несовместимы с определёнными заболеваниями. Если вы принимаете варфарин, антидепрессанты, антипсихотики — проконсультируйтесь со специалистом.</p>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#f59e0b' }}>⚠️ Важно</h3>
+              <p style={{ margin:'0 0 4px', fontSize:9, lineHeight:1.3 }}><b>Информация носит ознакомительный характер.</b> Подбор поддержки должен производиться врачом с учётом индивидуальных особенностей.</p>
+              <p style={{ margin:'0', fontSize:9, lineHeight:1.3 }}><b>Без лабораторных данных</b> система использует консервативные оценки. Для точного подбора необходимы свежие анализы.</p>
             </div>
 
           </div>
@@ -5143,6 +5128,13 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
               </div>
 
+              {/* Phase selector */}
+              <div style={{marginBottom:8}}>
+                <div style={{fontSize:9,fontWeight:600,color:'var(--text-dim)',marginBottom:4}}>🔄 Фаза цикла:</div>
+                <div style={{display:'flex',gap:4}}>
+                  {(['course','bridge','pct','fertility'] as const).map(ph => { const a = supportPhase === ph; const lab:Record<string,string> = {course:'💉 Курс',bridge:'🌉 Мост',pct:'🔄 ПКТ',fertility:'⚧ Ферт.'}; return <button key={ph} onClick={() => setSupportPhase(ph)} style={{flex:1,padding:'6px 2px',borderRadius:8,fontSize:9,fontWeight:600,cursor:'pointer',background:a?'rgba(139,92,246,0.15)':'rgba(255,255,255,0.03)',border:a?'1px solid rgba(139,92,246,0.4)':'1px solid rgba(255,255,255,0.06)',color:a?'#8b5cf6':'var(--text-dim)'}}>{lab[ph]}</button>; })}
+                </div>
+              </div>
               {/* Calculate button */}
               <button onClick={() => calcSupport(supportLevel)} style={{
                 width:'100%', padding:'14px', borderRadius:12, border:'2px solid var(--accent)', cursor:'pointer',
@@ -5358,6 +5350,18 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
                 {(expandedCategories.calc_plan ?? true) && (<>
 
+                  {(!linked.course || linked.course.length === 0) && (
+                    <div style={{marginBottom:10,padding:'10px 12px',borderRadius:10,background:'rgba(245,158,11,0.06)',border:'1px solid rgba(245,158,11,0.2)'}}>
+                      <div style={{fontSize:10,fontWeight:700,color:'#f59e0b',marginBottom:4}}>⚠️ Нет данных о курсе</div>
+                      <div style={{fontSize:8,color:'var(--text-dim)',lineHeight:1.4}}>Заполните <b>💉 Фарма стек</b> в AutoCalculator и <b>🧪 Лабораторию</b> для точного подбора с учётом реальных рисков.</div>
+                    </div>
+                  )}
+                  {supportPhase !== 'course' && (
+                    <div style={{marginBottom:10,padding:'10px 12px',borderRadius:10,background:'rgba(139,92,246,0.05)',border:'1px solid rgba(139,92,246,0.15)'}}>
+                      <div style={{fontSize:10,fontWeight:700,color:'#8b5cf6',marginBottom:4}}>{supportPhase==='bridge'?'🌉 Фаза: МОСТ':supportPhase==='pct'?'🔄 Фаза: ПКТ':'⚧ Фаза: Фертильность'}</div>
+                      <div style={{fontSize:8,color:'var(--text-dim)',lineHeight:1.4}}>{supportPhase==='bridge'?'Приоритет: восстановление ГГЯ, поддержка печени. Дозы NAC/TUDCA снижены, ашваганда/B12 усилены.':supportPhase==='pct'?'Приоритет: HPTA, сперматогенез. Телмисартан/небиволол исключены. Цинк×2, D3×1.5.':'Приоритет: качество спермы. Исключены ХГЧ/телмисартан/берберин. Цинк×2, Q10×1.5.'}</div>
+                    </div>
+                  )}
                   {/* ⚠️ Карточка предупреждения о недостаточности */}
                   {calcResult && (() => {
                     try {
@@ -5422,7 +5426,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   {/* ===== COVERAGE GAUGE ===== */}
                   {planResult && (
                     <div style={{ marginBottom:10, padding:'8px 12px', borderRadius:10, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)', textAlign:'center' }}>
-                      <div style={{ fontSize:9, fontWeight:700, color:'var(--accent)', marginBottom:4 }}>Покрытие рисков</div>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}><span style={{fontSize:9,fontWeight:700,color:'var(--accent)'}}>Покрытие рисков</span><span style={{fontSize:7,color:'var(--text-dim)'}}>Нед.{courseWeekState} · ×{planResult.weekScale.toFixed(1)}</span></div>
                       <div style={{ position:'relative', height:10, borderRadius:5, background:'rgba(255,255,255,0.06)', overflow:'hidden', marginBottom:4 }}>
                         <div style={{ position:'absolute', left:0, top:0, height:'100%', width:`${planResult.coveragePercent}%`, borderRadius:5, background:`linear-gradient(90deg, #ef4444, #f59e0b ${40}%, #22c55e)`, transition:'width 0.5s' }} />
                       </div>
@@ -5431,6 +5435,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         <span style={{fontSize:10,fontWeight:800,color:'var(--accent)'}}>{planResult.coveragePercent}%</span>
                         <span>Риск после: <b style={{color:'#22c55e'}}>{planResult.overallRiskAfter}%</b></span>
                       </div>
+                      {courseWeekState <= 6 && (<div style={{fontSize:7,color:'#f59e0b',marginTop:3,padding:'3px 6px',borderRadius:4,background:'rgba(245,158,11,0.06)'}}>⚠ Дозы снижены на {Math.round((1-planResult.weekScale)*100)}% — фаза адаптации (нед.{courseWeekState}). К неделе 7 — полные дозы.</div>)}
                     </div>
                   )}
 
@@ -5481,6 +5486,21 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       </div>
                     </div>
                   )}
+
+                  {/* ===== ADD SUBSTANCE SEARCH ===== */}
+                  <div style={{marginBottom:10}}>
+                    <input type="text" placeholder="+ Добавить вещество (поиск по каталогу)..." value={subSearch} onChange={e => setSubSearch(e.target.value)}
+                      style={{width:'100%',padding:'8px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)',fontSize:9,outline:'none'}} />
+                    {subSearch.length >= 2 && (
+                      <div style={{maxHeight:'20vh',overflowY:'auto',display:'flex',flexWrap:'wrap',gap:3,marginTop:4}}>
+                        {(() => {
+                          const q=subSearch.toLowerCase();const seen=new Set();const results=[];
+                          for(const k of Object.keys(SUPPORT_CATALOG_DATA)){if(k.length>30||seen.has(k.toLowerCase()))continue;seen.add(k.toLowerCase());const e=SUPPORT_CATALOG_DATA[k];if(!e)continue;if((e.nameRu||e.name||k).toLowerCase().includes(q))results.push({id:k,name:e.nameRu||e.name||k,tier:e.tier||'—'});}
+                          return results.slice(0,14).map(({id,name,tier})=>{const inPlan=effectiveLevel?.subs?.includes(id)||enhancedSubs?.includes(id);const tc={core:'#22c55e',standard:'#f59e0b',advanced:'#f97316',specialty:'#ef4444'};
+                            return <div key={id} onClick={()=>{if(!inPlan){setEnhancedSubs(p=>[...p,id]);setSubSearch('');showToast('+ '+name,'success');}}} style={{padding:'5px 10px',borderRadius:8,fontSize:8,cursor:inPlan?'default':'pointer',opacity:inPlan?0.5:1,background:inPlan?'rgba(0,230,138,0.08)':'rgba(255,255,255,0.03)',border:'1px solid '+(inPlan?'rgba(0,230,138,0.2)':'var(--border)'),color:inPlan?'var(--accent)':'var(--text-light)',display:'flex',gap:4,alignItems:'center'}}><span style={{flex:1}}>{name}</span><span style={{padding:'1px 5px',borderRadius:3,fontSize:6,fontWeight:600,background:(tc[tier]||'#fff')+'18',color:tc[tier]||'var(--text-dim)'}}>{inPlan?'✓':tier}</span></div>;});})()}
+                      </div>
+                    )}
+                  </div>
 
                   {/* ===== SUBSTANCE DETAIL LIST (D3: click to expand) ===== */}
                   <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'40vh', overflowY:'auto', marginBottom:8 }}>
@@ -5545,6 +5565,15 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                   <span style={{ color:'var(--text-dim)' }}>{catalogEntry.clinicalEffect}</span>
                                 </div>
                               )}
+                              {catalogEntry?.description && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#f59e0b',fontSize:7}}>Описание: </span><span style={{color:'var(--text-dim)',fontSize:7,lineHeight:1.3}}>{catalogEntry.description}</span></div>)}
+                              {catalogEntry?.forms && catalogEntry.forms.length>0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#f59e0b',fontSize:7}}>Формы выпуска: </span>{catalogEntry.forms.map((f,i)=><span key={i} style={{fontSize:6,color:f.best?'#22c55e':'var(--text-dim)',marginLeft:4}}>{f.best?'★ ':''}{f.nameRu||f.name} ({f.dose})</span>)}</div>)}
+                              {catalogEntry?.organs && catalogEntry.organs.length>0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#60a5fa',fontSize:7}}>Органы: </span><span style={{fontSize:6,color:'var(--text-dim)'}}>{catalogEntry.organs.join(', ')}</span></div>)}
+                              {catalogEntry?.systems && catalogEntry.systems.length>0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#8b5cf6',fontSize:7}}>Системы: </span><span style={{fontSize:6,color:'var(--text-dim)'}}>{catalogEntry.systems.join(', ')}</span></div>)}
+                              {catalogEntry?.sideEffects && catalogEntry.sideEffects.length>0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#ef4444',fontSize:7}}>Побочные: </span><span style={{color:'#ef4444',fontSize:6}}>{catalogEntry.sideEffects.slice(0,4).join('; ')}</span></div>)}
+                              {catalogEntry?.monitoring && catalogEntry.monitoring.length>0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#60a5fa',fontSize:7}}>Контроль анализов: </span>{catalogEntry.monitoring.slice(0,3).map((m,i)=><span key={i} style={{fontSize:6,color:'var(--text-dim)',marginLeft:4}}>{m.what} — {m.when}{m.targetRange?' ('+m.targetRange+')':''}</span>)}</div>)}
+                              {catalogEntry?.dosage && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'var(--accent)',fontSize:7}}>Дозировка: </span><span style={{fontSize:6,color:'var(--text-dim)'}}>{catalogEntry.dosage.mg}мг — {catalogEntry.dosage.timing}{catalogEntry.dosage.form?' ('+catalogEntry.dosage.form+')':''}</span></div>)}
+                              {catalogEntry?.specialInstructions && catalogEntry.specialInstructions.length>0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#f59e0b',fontSize:7}}>Особые указания: </span><span style={{fontSize:6,color:'var(--text-dim)'}}>{catalogEntry.specialInstructions.slice(0,3).join('; ')}</span></div>)}
+                              {catalogEntry?.targetOrgan && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#8b5cf6',fontSize:7}}>Орган-мишень: </span><span style={{fontSize:6,color:'var(--text-dim)'}}>{catalogEntry.targetOrgan}</span></div>)}
                               {catalogEntry?.bestForm && (
                                 <div style={{ marginBottom:4 }}>
                                   <span style={{ fontWeight:600, color:'#f59e0b' }}>Лучшая форма: </span>
@@ -5584,6 +5613,16 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     </div>
                   )}
 
+                  {/* ===== INTERACTION MATRIX ===== */}
+                  {planResult?.substances && planResult.substances.length > 4 && (
+                    <details style={{marginBottom:10}}>
+                      <summary style={{fontSize:10,fontWeight:700,color:'#22c55e',cursor:'pointer',marginBottom:4}}>🔗 Матрица взаимодействий в стеке</summary>
+                      <div style={{padding:'6px',borderRadius:8,background:'rgba(34,197,94,0.03)',border:'1px solid rgba(34,197,94,0.1)',overflowX:'auto'}}>
+                        {(()=>{const subs=planResult.substances.slice(0,12);const ints=[];for(let i=0;i<subs.length;i++){for(let j=i+1;j<subs.length;j++){const ea=SUPPORT_CATALOG_DATA[subs[i].id];if(!ea)continue;if(ea.synergies)for(const s of ea.synergies){if(s.with===subs[j].id||s.with.toUpperCase()===subs[j].id.toUpperCase())ints.push({a:subs[i].name,b:subs[j].name,t:'⊕',e:s.effect?.slice(0,60)});}if(ea.conflicts)for(const c of ea.conflicts){if(c.with===subs[j].id||c.with.toUpperCase()===subs[j].id.toUpperCase())ints.push({a:subs[i].name,b:subs[j].name,t:'⊖',e:c.effect?.slice(0,60)});}}}if(!ints.length)return <span style={{fontSize:8,color:'var(--text-dim)'}}>Нет известных взаимодействий.</span>;return <div><div style={{fontWeight:600,color:'var(--text-light)',marginBottom:4,fontSize:8}}>Найдено {ints.length} взаимодействий:</div>{ints.map((x,i)=><div key={i} style={{marginBottom:2,padding:'3px 8px',borderRadius:4,background:x.t==='⊖'?'rgba(239,68,68,0.05)':'rgba(34,197,94,0.03)',fontSize:7}}><span style={{color:'var(--text-light)',fontWeight:600}}>{x.a}</span><span style={{color:x.t==='⊖'?'#ef4444':'#22c55e',fontWeight:700,margin:'0 4px'}}>{x.t}</span><span style={{color:'var(--text-light)',fontWeight:600}}>{x.b}</span><span style={{color:'var(--text-dim)'}}> — {x.e}</span></div>)}</div>;})()}
+                        <div style={{display:'flex',gap:12,marginTop:6,fontSize:7}}><span style={{color:'#22c55e'}}>⊕ Синергия</span><span style={{color:'#ef4444'}}>⊖ Конфликт</span></div>
+                      </div>
+                    </details>
+                  )}
                   {/* ===== RISK DYNAMICS CARD ===== */}
 
                   {/* ===== LAB FINDINGS CARD ===== */}
@@ -5613,7 +5652,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
                         {planResult.coverageGaps.map((gap: any, i: number) => (
                           <div key={i} style={{ marginBottom:3 }}>
-                            <span style={{ fontWeight:600, color:'var(--text-light)' }}>{gap.label}</span>: риск {gap.raw}% → {gap.net}% (покрыто {100 - gap.gapPercent}%)
+                            <div style={{display:'flex',justifyContent:'space-between',marginBottom:1}}><span style={{fontWeight:600,color:'var(--text-light)'}}>{gap.label}</span><span style={{color:'#ef4444',fontSize:7}}>{gap.raw}% → {gap.net}%</span></div><div style={{height:5,borderRadius:3,background:'rgba(239,68,68,0.1)',overflow:'hidden',marginBottom:1}}><div style={{width:`${100-gap.gapPercent}%`,height:'100%',borderRadius:3,background:'#ef4444'}}/></div><div style={{fontSize:7,color:'var(--text-dim)',marginBottom:3}}>Покрыто {100-gap.gapPercent}% · Рекомендуется повысить уровень</div><span style={{fontWeight:600,color:'var(--text-light)'}}>{gap.label}</span>: риск {gap.raw}% → {gap.net}% (покрыто {100-gap.gapPercent}%)
                             <div style={{ height:4, borderRadius:2, background:'rgba(239,68,68,0.15)', marginTop:2, overflow:'hidden' }}>
                               <div style={{ width:`${100 - gap.gapPercent}%`, height:'100%', borderRadius:2, background:'#ef4444' }} />
                             </div>
@@ -5628,9 +5667,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     <details style={{ marginBottom:10 }}>
                       <summary style={{ fontSize:10, fontWeight:700, color:'#8b5cf6', cursor:'pointer', marginBottom:4 }}>🔍 Непокрытые механизмы ({planResult.uncoveredMechanisms.length})</summary>
                       <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(139,92,246,0.03)', border:'1px solid rgba(139,92,246,0.1)', fontSize:7, color:'var(--text-dim)', lineHeight:1.4, maxHeight:'25vh', overflowY:'auto' }}>
-                        {planResult.uncoveredMechanisms.map((um: any, i: number) => (
-                          <div key={i} style={{ marginBottom:1 }}>• {um.systemLabel} → {um.mechLabel} (риск: {um.risk}%)</div>
-                        ))}
+                        {planResult.uncoveredMechanisms.map((um,i)=>{const sev=um.risk>30?'⚠️':um.risk>15?'⚡':'·';return <div key={i} style={{marginBottom:2}}>{sev} <b>{um.systemLabel}</b> → {um.mechLabel} (риск:{um.risk}%)</div>;})}
+                        <div style={{marginTop:4,fontSize:6,color:'var(--text-dim)'}}>⚠️ Критический &gt;30% · ⚡ Повышенный &gt;15% · · Низкий</div>
                       </div>
                     </details>
                   )}
@@ -5646,9 +5684,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                               <span style={{ fontWeight:700, color:'var(--text-light)', fontSize:9 }}>{sr.stack.name}</span>
                               <div style={{ display:'flex', gap:4 }}>
                                 <span style={{ fontSize:8, fontWeight:700, color: sr.score >= 70 ? '#22c55e' : sr.score >= 40 ? '#f59e0b' : 'var(--text-dim)' }}>
-                                  {sr.score}/100
-                                </span>
-                                {sr.score >= 70 && sr.coveredSystems.length >= 3 && <span style={{ fontSize:7, color:'#22c55e' }}>Авто-применён</span>}
+                                  {sr.score}/100</span>{sr.score>=70&&sr.coveredSystems.length>=3&&<span style={{fontSize:7,color:'#22c55e'}}>Авто</span>}<button onClick={(e)=>{e.stopPropagation();const ns=sr.stack.substances.map((s:any)=>s.id).filter((id:string)=>!effectiveLevel?.subs?.includes(id));if(ns.length>0){setEnhancedSubs((p:string[])=>[...new Set([...p,...ns])]);showToast('+ Стек ('+ns.length+')','success');}else showToast('Уже в плане','warning');}} style={{marginLeft:'auto',padding:'2px 8px',borderRadius:6,fontSize:7,fontWeight:700,cursor:'pointer',background:'rgba(0,230,138,0.1)',border:'1px solid rgba(0,230,138,0.3)',color:'var(--accent)'}}>+ В план</button>
                               </div>
                             </div>
 
@@ -5732,6 +5768,23 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     </div>
                   )}
 
+                  {/* ===== RISK BREAKDOWN ===== */}
+                  {planResult?.riskBreakdown && Object.keys(planResult.riskBreakdown).length > 0 && (
+                    <details style={{marginBottom:10}}>
+                      <summary style={{fontSize:10,fontWeight:700,color:'#ef4444',cursor:'pointer',marginBottom:4}}>🔍 Источники риска по системам</summary>
+                      <div style={{padding:'8px 10px',borderRadius:8,background:'rgba(239,68,68,0.03)',border:'1px solid rgba(239,68,68,0.12)'}}>
+                        <div style={{fontSize:8,color:'var(--text-dim)',lineHeight:1.5}}>
+                          {Object.entries(planResult.riskBreakdown).map(([sys, reasons]) => {
+                            const m:Record<string,string>={cardio:'ССС',hepatic:'Печень',renal:'Почки',neuro:'НС',endocrine:'Энд.',hematologic:'Кровь',reproductive:'Реп.',musculoskeletal:'ОДА'};
+                            const raw=planResult.systems?.[sys]?.raw||0;
+                            if(!raw&&!(reasons as string[]).length)return null;
+                            return <div key={sys} style={{marginBottom:6,padding:'4px 8px',borderRadius:6,background:'rgba(0,0,0,0.04)',border:'1px solid var(--border)'}}><div style={{fontWeight:700,color:'var(--text-light)',marginBottom:3}}>{m[sys]||sys} — риск <span style={{color:'#ef4444'}}>{raw}%</span></div>{(reasons as string[]).map((r,i)=><div key={i} style={{fontSize:7,paddingLeft:6,borderLeft:'2px solid rgba(239,68,68,0.2)',marginBottom:1}}>{r}</div>)}</div>;
+                          })}
+                        </div>
+                        <div style={{fontSize:7,color:'var(--text-dim)',marginTop:4}}>💡 Риски рассчитаны на основе профиля, препаратов курса (PHARMA_DB: linkedRisks, cvProfile, pd), анализов (80+ маркеров), истории циклов и противопоказаний.</div>
+                      </div>
+                    </details>
+                  )}
                   {/* ===== C3: MECHANISM COVERAGE MATRIX ===== */}
                   {planResult?.mechanisms && planResult.mechanisms.length > 0 && (
                     <details style={{ marginBottom:10 }}>
@@ -5835,6 +5888,19 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     </details>
                   )}
 
+                  {/* ===== WEEKLY DOSE TIMELINE ===== */}
+                  {planResult?.substances && planResult.substances.length > 0 && (
+                    <details style={{marginBottom:10}}>
+                      <summary style={{fontSize:10,fontWeight:700,color:'#60a5fa',cursor:'pointer',marginBottom:4}}>📅 Динамика доз по неделям (1→12)</summary>
+                      <div style={{padding:'6px',borderRadius:8,background:'rgba(96,165,250,0.03)',border:'1px solid rgba(96,165,250,0.1)',overflowX:'auto'}}>
+                        <table style={{width:'100%',fontSize:7,borderCollapse:'collapse',minWidth:400}}>
+                          <thead><tr style={{borderBottom:'1px solid var(--border)'}}><th style={{padding:'2px 4px',textAlign:'left',color:'var(--text-dim)'}}>Вещество</th>{[1,2,4,6,8,12].map(w=><th key={w} style={{padding:'2px 4px',textAlign:'center',color:w===courseWeekState?'var(--accent)':'var(--text-dim)',fontWeight:w===courseWeekState?700:400}}>{w}н{w===courseWeekState?'✦':''}</th>)}</tr></thead>
+                          <tbody>{planResult.substances.slice(0,10).map((sub:PlanSubstance)=>{const bd=sub.doseMg/((sub.fromBoost||sub.fromJoint)?1.5:1);return <tr key={sub.id} style={{borderBottom:'1px solid var(--border)'}}><td style={{padding:'2px 4px',fontWeight:600,color:'var(--text-light)'}}>{sub.name}</td>{[1,2,4,6,8,12].map(w=>{const ws=w<=2?0.6:w<=4?0.8:w<=6?0.9:1;const wd=Math.round(bd*ws*(w>=8?1.3:w>=4?1.1:1));const ic=w===courseWeekState;return <td key={w} style={{padding:'2px 4px',textAlign:'center',fontWeight:ic?700:400,color:ic?'#00e68a':'var(--text-dim)',background:ic?'rgba(0,230,138,0.06)':'transparent'}}>{wd>=5000?(wd/1000).toFixed(1)+'г':wd+'мг'}</td>;})}</tr>;})}</tbody>
+                        </table>
+                        <div style={{fontSize:7,color:'var(--text-dim)',marginTop:4}}>✦ Текущая неделя · 1-2: старт (60%) · 3-4: разгон (80%) · 5-6: плато (90%) · 7+: полные дозы (100%)</div>
+                      </div>
+                    </details>
+                  )}
                   {/* ===== C5: DOCTOR'S CONCLUSION ===== */}
                   {planResult && (
                     <details style={{ marginBottom:10 }}>

@@ -891,6 +891,18 @@ export const TrainingScreen: React.FC = () => {
                           {PHASE_HINTS[currentMicrocycle.mesocycleType] || 'Рабочая неделя: сохраняйте заданный объём, интенсивность и RIR.'}
                         </div>
                       )}
+                      {/* MRV guardrail — анти-перетрен по объёму недели */}
+                      {currentMicrocycle && (() => {
+                        const mrv = (LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20;
+                        const wk: Record<string, number> = {};
+                        currentMicrocycle.days.filter((d: any) => d.isTraining).forEach((d: any) => (d.exercises || []).forEach((e: any) => { wk[e.group] = (wk[e.group] || 0) + (e.sets || 0); }));
+                        const over = Object.entries(wk).filter(([, s]) => s > mrv);
+                        if (over.length === 0) return null;
+                        const GRP_RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' };
+                        return <div style={{ padding: '6px 8px', background: 'rgba(239,68,68,0.08)', borderRadius: 6, fontSize: 10, color: '#ef4444', marginBottom: 6, lineHeight: 1.4, border: '1px solid rgba(239,68,68,0.2)' }}>
+                          ⚠ Объём превышает MRV ({mrv} сетов/нед): {over.map(([g, s]) => `${GRP_RU[g] || g} ${s}`).join(' · ')}. Снизьте число подходов или добавьте восстановление.
+                        </div>;
+                      })()}
                       {currentMicrocycle.days.filter((d: any) => d.isTraining).map((day: any, di: number) => {
                     const dayExCount = day.exercises?.length || 0;
                     const dayCompounds = day.exercises?.filter((e: any) => e.isCompound).length || 0;
@@ -2087,7 +2099,32 @@ export const TrainingScreen: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                <button onClick={() => { try { const data = { name: `Ручная: ${manualResult.splitName}`, date: new Date().toISOString().slice(0,10), cfg: manualCfg, days: manualResult.days, generatedAt: Date.now() }; const ex = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); ex.unshift(data); localStorage.setItem('myTrainingPlans', JSON.stringify(ex.slice(0,30))); refreshManualSaved(); } catch {} }} style={{ width: '100%', marginTop: 8, padding: 10, borderRadius: 8, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.06)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>💾 Сохранить программу в «Мои тренировки»</button>
+                {/* Сводка качества плана */}
+                {(() => {
+                  const mrv = (LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20;
+                  const wk: Record<string, number> = {};
+                  manualResult.days.forEach(d => d.exercises.forEach(e => { wk[e.group] = (wk[e.group] || 0) + e.sets; }));
+                  const groups = Object.keys(wk);
+                  const over = groups.filter(g => wk[g] > mrv);
+                  const weakCovered = tprofile.weakPoints.filter(w => (wk[w] || 0) > 0);
+                  const weakMissed = tprofile.weakPoints.filter(w => (wk[w] || 0) === 0);
+                  let score = 100; score -= over.length * 12; score -= weakMissed.length * 10; score -= groups.filter(g => wk[g] > 0 && wk[g] < Math.max(4, mrv * 0.4)).length * 4;
+                  score = Math.max(0, Math.min(100, score));
+                  const sc = score >= 85 ? '#22c55e' : score >= 65 ? '#eab308' : '#ef4444';
+                  const GRP_RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' };
+                  return <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid ' + sc + '33' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: sc }}>🎯 Качество плана</span>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: sc }}>{score}/100</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+                      {over.length === 0 ? '✅ Объём в пределах MRV. ' : '⚠ Превышение MRV: ' + over.map(g => (GRP_RU[g] || g) + ' ' + wk[g]).join(', ') + '. '}
+                      {tprofile.weakPoints.length === 0 ? '' : (weakMissed.length === 0 ? '✅ Слабые группы покрыты. ' : '⚠ Слабые группы без объёма: ' + weakMissed.map(g => GRP_RU[g] || g).join(', ') + '. ')}
+                      Всего сетов/нед: {Object.values(wk).reduce((a, b) => a + b, 0)}.
+                    </div>
+                  </div>;
+                })()}
+                <button onClick={() => { try { const data = { name: `Ручная: ${manualResult.splitName}'`, date: new Date().toISOString().slice(0,10), cfg: manualCfg, days: manualResult.days, generatedAt: Date.now() }; const ex = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); ex.unshift(data); localStorage.setItem('myTrainingPlans', JSON.stringify(ex.slice(0,30))); refreshManualSaved(); } catch {} }} style={{ width: '100%', marginTop: 8, padding: 10, borderRadius: 8, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.06)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>💾 Сохранить программу в «Мои тренировки»</button>
               </div>
             )}
 
