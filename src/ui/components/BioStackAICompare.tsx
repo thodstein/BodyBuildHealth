@@ -1,10 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { buildStack, explainStack } from '../../engines/supplement-finder.engine';
-import { findReplacements, type RecReplacement } from '../../engines/biostack-recommender.engine';
-import { GlassCard, StatBox } from './BioStackAIConstants';
-import { toFinderProfile } from './BioStackAIConstants';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
+import { GlassCard } from './BioStackAIConstants';
+import { toFinderProfile } from './BioStackAIConstants';
 
 const PRICE_RUB: Record<string, number> = {
   nac: 650, milk_thistle: 400, tudca: 900, omega3: 800, coq10: 1200, magnesium: 350,
@@ -26,40 +25,33 @@ const PRICE_RUB: Record<string, number> = {
   aspirin: 200, metformin: 400, atorvastatin: 500, rosuvastatin: 800,
   finasteride: 600, dutasteride: 900, tamoxifen: 800, clomid: 600,
   anastrozole: 700, letrozole: 700, exemestane: 800, cabergoline: 900,
-  dostinex: 1000, hcg: 2000, hmg: 3000, enclomiphene: 1200,
 };
 
-function estMonthlyCost(id: string): number {
+function estCost(id: string): number {
   const p = PRICE_RUB[id];
   if (p) return p;
   const cat = SUPPORT_CATALOG_DATA[id];
   if (!cat) return 500;
-  const tierMults: Record<string, number> = { core: 800, standard: 500, advanced: 300, specialty: 1200 };
-  return tierMults[cat.tier as string] || 500;
+  const tm: Record<string, number> = { core: 800, standard: 500, advanced: 300, specialty: 1200 };
+  return tm[cat.tier as string] || 500;
 }
 
 export function CompareTab({ profile, stackIds, setStackIds }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void }) {
   const [optimized, setOptimized] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
-  const [showCost, setShowCost] = useState(false);
-  const [selectedReplaceId, setSelectedReplaceId] = useState<string | null>(null);
-  const [replacements, setReplacements] = useState<RecReplacement[]>([]);
-  const [replaceFilter, setReplaceFilter] = useState<RecReplacement['type'] | 'all'>('all');
 
-  const currentExplanation = useMemo(() => {
+  const curExp = useMemo(() => {
     if (stackIds.length === 0) return null;
     return explainStack(stackIds, toFinderProfile(profile));
   }, [stackIds, profile]);
 
-  const optimizedExplanation = useMemo(() => {
+  const optExp = useMemo(() => {
     if (!optimized) return null;
     return explainStack(optimized, toFinderProfile(profile));
   }, [optimized, profile]);
 
-  const currentCost = useMemo(() => stackIds.reduce((s, id) => s + estMonthlyCost(id), 0), [stackIds]);
-  const optimizedCost = useMemo(() => optimized?.reduce((s, id) => s + estMonthlyCost(id), 0) ?? 0, [optimized]);
-  const costDiff = optimized ? ((optimizedCost - currentCost) / currentCost * 100).toFixed(0) : null;
+  const curCost = useMemo(() => stackIds.reduce((s, id) => s + estCost(id), 0), [stackIds]);
+  const optCost = useMemo(() => optimized?.reduce((s, id) => s + estCost(id), 0) ?? 0, [optimized]);
 
   const handleOptimize = useCallback(() => {
     if (stackIds.length === 0) return;
@@ -76,9 +68,23 @@ export function CompareTab({ profile, stackIds, setStackIds }: { profile: BioSta
     }, 300);
   }, [stackIds, profile]);
 
-  const handleReplace = useCallback(() => {
-    if (optimized) setStackIds(optimized);
-  }, [optimized, setStackIds]);
+  // Overlap analysis
+  const overlap = useMemo(() => {
+    if (!optimized) return null;
+    const aSet = new Set(stackIds);
+    const bSet = new Set(optimized);
+    const common = stackIds.filter(id => bSet.has(id));
+    const onlyA = stackIds.filter(id => !bSet.has(id));
+    const onlyB = optimized.filter(id => !aSet.has(id));
+    const aMechs = new Set<string>();
+    const bMechs = new Set<string>();
+    stackIds.forEach(id => SUPPORT_CATALOG_DATA[id]?.mechanisms?.forEach(m => aMechs.add(m)));
+    optimized.forEach(id => SUPPORT_CATALOG_DATA[id]?.mechanisms?.forEach(m => bMechs.add(m)));
+    const commonMechs = [...aMechs].filter(m => bMechs.has(m));
+    const onlyAMechs = [...aMechs].filter(m => !bMechs.has(m));
+    const onlyBMechs = [...bMechs].filter(m => !aMechs.has(m));
+    return { common, onlyA, onlyB, commonMechs, onlyAMechs, onlyBMechs };
+  }, [stackIds, optimized]);
 
   if (stackIds.length === 0) {
     return (
@@ -90,162 +96,196 @@ export function CompareTab({ profile, stackIds, setStackIds }: { profile: BioSta
     );
   }
 
-  const MetricRow: React.FC<{ label: string; current: string | number; optimized: string | number; color: string; better: 'up' | 'down' | 'same' }> =
-    ({ label, current, optimized, color, better }) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{label}</span>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{current}</span>
-        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)' }}>→</span>
-        <span style={{ fontSize: 10, color, fontWeight: 700 }}>{optimized}</span>
-        <span style={{ fontSize: 7 }}>
-          {better === 'up' ? '▲' : better === 'down' ? '▼' : '—'}
-        </span>
-      </div>
-    </div>
-  );
-
   return (
     <div style={{ paddingBottom: 80 }}>
+
+      {/* Header */}
       <GlassCard title="⚖ Сравнение стеков" icon="📊" color="#8b5cf6">
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 8, lineHeight: 1.4 }}>
-          Текущий стек: <strong style={{ color: '#fff' }}>{stackIds.length} компонентов</strong> · <strong style={{ color: '#f59e0b' }}>≈{currentCost}₽/мес</strong>
-          {optimized ? ` → Оптимизированный: ${optimized.length} компонентов · ≈${optimizedCost}₽/мес` : ''}
-        </div>
-        {!optimized && (
-          <button onClick={handleOptimize} disabled={loading} style={{
-            width: '100%', padding: '10px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: loading ? 'wait' : 'pointer',
-            background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#8b5cf6',
-          }}>
-            {loading ? '⏳ Оптимизация...' : '⚡ Оптимизировать стек'}
-          </button>
-        )}
-      </GlassCard>
-
-      {/* 💰 Cost Calculator */}
-      <GlassCard title="💰 Калькулятор стоимости" icon="💰" color="#f59e0b">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 4, marginBottom: 8 }}>
-          <StatBox label="Текущий стек" value={`${currentCost}₽`} color="#f59e0b" />
-          {optimized && <StatBox label="Оптимизированный" value={`${optimizedCost}₽`} color="#8b5cf6" />}
-          <StatBox label="Разница" value={optimized ? (costDiff || '0') + '%' : '—'} color={+(costDiff || 0) < 0 ? '#00e68a' : +(costDiff || 0) > 0 ? '#ef4444' : 'rgba(255,255,255,0.3)'} />
-        </div>
-        <button onClick={() => setShowCost(!showCost)} style={{
-          padding: '6px 12px', borderRadius: 8, fontSize: 8, cursor: 'pointer', fontWeight: 600, marginBottom: 4,
-          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)',
-        }}>
-          {showCost ? '▲ Скрыть детали' : '▼ Детали по препаратам'}
-        </button>
-        {showCost && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {stackIds.map(id => {
-              const cat = SUPPORT_CATALOG_DATA[id];
-              const cost = estMonthlyCost(id);
-              return (
-                <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', borderRadius: 5, background: 'rgba(255,255,255,0.02)', fontSize: 8 }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)' }}>{cat?.nameRu || cat?.name || id}</span>
-                  <span style={{ color: '#f59e0b', fontWeight: 700 }}>{cost}₽</span>
-                </div>
-              );
-            })}
-            <div style={{ padding: '3px 6px', fontSize: 7, color: 'rgba(255,255,255,0.3)', textAlign: 'right' }}>
-              * Цены ориентировочные, на основе Ozon/Яндекс.Маркет
-            </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 6, alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ textAlign: 'center', padding: '6px 8px', borderRadius: 8, background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.08)' }}>
+            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginBottom: 1 }}>Текущий</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#c4b5fd' }}>{stackIds.length}</div>
+            <div style={{ fontSize: 7, color: '#f59e0b' }}>{curCost}₽</div>
           </div>
-        )}
+          {!optimized ? (
+            <button onClick={handleOptimize} disabled={loading}
+              style={{ padding: '8px 12px', borderRadius: 8, fontSize: 9, fontWeight: 700, cursor: loading ? 'wait' : 'pointer', whiteSpace: 'nowrap',
+                background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a' }}>
+              {loading ? '⏳' : '⚡ Оптимизировать'}
+            </button>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '6px 8px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.08)' }}>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginBottom: 1 }}>Оптимизированный</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{optimized.length}</div>
+              <div style={{ fontSize: 7, color: '#f59e0b' }}>{optCost}₽</div>
+            </div>
+          )}
+        </div>
       </GlassCard>
 
-      {optimized && (
+      {optimized && overlap && (
         <>
-          <GlassCard title="📊 Метрики" icon="📈" color="#60a5fa">
-            <MetricRow label="Синергия" color="#8b5cf6"
-              current={currentExplanation?.totalSynergyScore ?? 0}
-              optimized={optimizedExplanation?.totalSynergyScore ?? 0}
-              better={(optimizedExplanation?.totalSynergyScore ?? 0) >= (currentExplanation?.totalSynergyScore ?? 0) ? 'up' : 'down'} />
-            <MetricRow label="Покрытие целей" color="#60a5fa"
-              current={`${currentExplanation?.completeness ?? 0}%`}
-              optimized={`${optimizedExplanation?.completeness ?? 0}%`}
-              better={(optimizedExplanation?.completeness ?? 0) >= (currentExplanation?.completeness ?? 0) ? 'up' : 'down'} />
-            <MetricRow label="Компонентов" color="#00e68a"
-              current={stackIds.length}
-              optimized={optimized.length}
-              better={optimized.length !== stackIds.length ? 'up' : 'same'} />
-            <MetricRow label="Стоимость" color="#f59e0b"
-              current={`${currentCost}₽`}
-              optimized={`${optimizedCost}₽`}
-              better={optimizedCost <= currentCost ? 'up' : 'down'} />
-            <MetricRow label="Предупреждений" color="#ef4444"
-              current={currentExplanation?.warnings.length ?? 0}
-              optimized={optimizedExplanation?.warnings.length ?? 0}
-              better={(optimizedExplanation?.warnings.length ?? 0) <= (currentExplanation?.warnings.length ?? 0) ? 'up' : 'down'} />
+          {/* Metrics comparison */}
+          <GlassCard title="📊 Сравнение метрик" icon="📈" color="#60a5fa">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+              {[
+                { label: 'Синергия', cur: curExp?.totalSynergyScore ?? 0, opt: optExp?.totalSynergyScore ?? 0, color: '#8b5cf6', up: true },
+                { label: 'Покрытие', cur: `${curExp?.completeness ?? 0}%`, opt: `${optExp?.completeness ?? 0}%`, color: '#60a5fa', up: true },
+                { label: 'Кол-во', cur: stackIds.length, opt: optimized.length, color: '#00e68a', up: true },
+                { label: 'Стоимость', cur: `${curCost}₽`, opt: `${optCost}₽`, color: '#f59e0b', up: false },
+                { label: 'Механизмы', cur: curExp?.coverage.mechanisms.length ?? 0, opt: optExp?.coverage.mechanisms.length ?? 0, color: '#22c55e', up: true },
+                { label: 'Предупреждения', cur: curExp?.warnings.length ?? 0, opt: optExp?.warnings.length ?? 0, color: '#ef4444', up: false },
+              ].map(m => {
+                const better = m.up
+                  ? (m.opt > m.cur ? 'up' : m.opt < m.cur ? 'down' : 'same')
+                  : (m.opt < m.cur ? 'up' : m.opt > m.cur ? 'down' : 'same');
+                return (
+                  <div key={m.label} style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginBottom: 1 }}>{m.label}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>{m.cur}</span>
+                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.15)' }}>→</span>
+                      <span style={{ fontSize: 10, color: m.color, fontWeight: 700 }}>{m.opt}</span>
+                      <span style={{ fontSize: 7 }}>{better === 'up' ? '▲' : better === 'down' ? '▼' : '—'}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </GlassCard>
 
-          <GlassCard title="🔍 Состав: текущий vs оптимизированный" icon="📋" color="#00e68a">
-            <button onClick={() => setShowDetails(!showDetails)}
-              style={{ padding: '6px 12px', borderRadius: 8, fontSize: 8, cursor: 'pointer', fontWeight: 600, marginBottom: 6,
-                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)' }}>
-              {showDetails ? '▲ Скрыть детали' : '▼ Показать детали'}
-            </button>
-            {showDetails && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                <div>
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', fontWeight: 600, marginBottom: 4 }}>Текущий стек:</div>
-                  {currentExplanation?.substances.map(s => (
-                    <div key={s.id} style={{ fontSize: 8, color: '#fff', padding: '2px 0' }}>• {s.name}</div>
-                  ))}
+          {/* Composition diff */}
+          <GlassCard title="🔍 Состав: что изменилось" icon="📋" color="#00e68a">
+            {overlap.common.length > 0 && (
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ fontSize: 8, color: '#4ade80', fontWeight: 600, marginBottom: 3 }}>✅ Общие ({overlap.common.length})</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                  {overlap.common.map(id => {
+                    const c = SUPPORT_CATALOG_DATA[id];
+                    return <span key={id} style={{ fontSize: 7, padding: '2px 6px', borderRadius: 4, background: 'rgba(34,197,94,0.06)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.1)' }}>{c?.nameRu || c?.name || id}</span>;
+                  })}
                 </div>
-                <div>
-                  <div style={{ fontSize: 8, color: '#00e68a', fontWeight: 600, marginBottom: 4 }}>Оптимизированный:</div>
-                  {optimizedExplanation?.substances.map(s => (
-                    <div key={s.id} style={{ fontSize: 8, color: '#00e68a', padding: '2px 0' }}>• {s.name}</div>
-                  ))}
+              </div>
+            )}
+            {overlap.onlyA.length > 0 && (
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ fontSize: 8, color: '#f59e0b', fontWeight: 600, marginBottom: 3 }}>➖ Только в текущем ({overlap.onlyA.length})</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                  {overlap.onlyA.map(id => {
+                    const c = SUPPORT_CATALOG_DATA[id];
+                    return <span key={id} style={{ fontSize: 7, padding: '2px 6px', borderRadius: 4, background: 'rgba(245,158,11,0.06)', color: '#f59e0b', textDecoration: 'line-through', border: '1px solid rgba(245,158,11,0.1)' }}>{c?.nameRu || c?.name || id}</span>;
+                  })}
+                </div>
+              </div>
+            )}
+            {overlap.onlyB.length > 0 && (
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ fontSize: 8, color: '#60a5fa', fontWeight: 600, marginBottom: 3 }}>➕ Только в оптимизированном ({overlap.onlyB.length})</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                  {overlap.onlyB.map(id => {
+                    const c = SUPPORT_CATALOG_DATA[id];
+                    return <span key={id} style={{ fontSize: 7, padding: '2px 6px', borderRadius: 4, background: 'rgba(96,165,250,0.06)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.1)' }}>{c?.nameRu || c?.name || id}</span>;
+                  })}
                 </div>
               </div>
             )}
           </GlassCard>
 
-          <button onClick={handleReplace} style={{
-            width: '100%', padding: '12px 0', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer', marginBottom: 8,
-            background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a',
-          }}>
-            📥 Заменить текущий стек оптимизированным
-          </button>
+          {/* Mechanism coverage overlap */}
+          <GlassCard title="🧬 Покрытие механизмов" icon="🧬" color="#a855f7">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 6 }}>
+              <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.08)' }}>
+                <div style={{ fontSize: 8, color: '#c4b5fd', fontWeight: 600 }}>Текущий</div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>{curExp?.coverage.mechanisms.length || 0} мех.</div>
+              </div>
+              <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.08)' }}>
+                <div style={{ fontSize: 8, color: '#4ade80', fontWeight: 600 }}>Оптимизированный</div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>{optExp?.coverage.mechanisms.length || 0} мех.</div>
+              </div>
+            </div>
+            <div style={{ fontSize: 8, color: '#4ade80', fontWeight: 600, marginBottom: 3 }}>Общие ({overlap.commonMechs.length})</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginBottom: 4 }}>
+              {overlap.commonMechs.slice(0, 8).map(m => (
+                <span key={m} style={{ fontSize: 6, padding: '2px 5px', borderRadius: 4, background: 'rgba(34,197,94,0.06)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.1)' }}>{m.replace(/_/g, ' ').slice(0, 20)}</span>
+              ))}
+              {overlap.commonMechs.length > 8 && <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)', alignSelf: 'center' }}>+{overlap.commonMechs.length - 8}</span>}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+              <div>
+                <div style={{ fontSize: 7, color: '#f59e0b', fontWeight: 600, marginBottom: 2 }}>Только в текущем ({overlap.onlyAMechs.length})</div>
+                {overlap.onlyAMechs.slice(0, 4).map(m => (
+                  <div key={m} style={{ fontSize: 6, color: '#f59e0b', padding: '1px 0' }}>{m.replace(/_/g, ' ').slice(0, 22)}</div>
+                ))}
+                {overlap.onlyAMechs.length > 4 && <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)' }}>+{overlap.onlyAMechs.length - 4}</div>}
+              </div>
+              <div>
+                <div style={{ fontSize: 7, color: '#60a5fa', fontWeight: 600, marginBottom: 2 }}>Только в оптим. ({overlap.onlyBMechs.length})</div>
+                {overlap.onlyBMechs.slice(0, 4).map(m => (
+                  <div key={m} style={{ fontSize: 6, color: '#60a5fa', padding: '1px 0' }}>{m.replace(/_/g, ' ').slice(0, 22)}</div>
+                ))}
+                {overlap.onlyBMechs.length > 4 && <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)' }}>+{overlap.onlyBMechs.length - 4}</div>}
+              </div>
+            </div>
+          </GlassCard>
 
-          {optimizedExplanation?.warnings && optimizedExplanation.warnings.length > 0 && (
+          {/* Cost comparison */}
+          <GlassCard title="💰 Стоимость" icon="💰" color="#f59e0b">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 4, marginBottom: 6 }}>
+              <div style={{ textAlign: 'center', padding: '4px', borderRadius: 6, background: 'rgba(245,158,11,0.04)' }}>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>Текущий</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b' }}>{curCost}₽</div>
+              </div>
+              <div style={{ textAlign: 'center', padding: '4px', borderRadius: 6, background: 'rgba(0,230,138,0.04)' }}>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>Оптимизир.</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#00e68a' }}>{optCost}₽</div>
+              </div>
+              <div style={{ textAlign: 'center', padding: '4px', borderRadius: 6, background: optCost <= curCost ? 'rgba(0,230,138,0.04)' : 'rgba(239,68,68,0.04)' }}>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>Разница</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: optCost <= curCost ? '#00e68a' : '#ef4444' }}>
+                  {optCost - curCost > 0 ? '+' : ''}{optCost - curCost}₽
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {optimized.map(id => {
+                const c = SUPPORT_CATALOG_DATA[id];
+                const cost = estCost(id);
+                const inCurrent = stackIds.includes(id);
+                return (
+                  <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', borderRadius: 5, background: 'rgba(255,255,255,0.015)', fontSize: 7 }}>
+                    <span style={{ color: inCurrent ? 'rgba(255,255,255,0.7)' : '#60a5fa' }}>
+                      {inCurrent ? '' : '+ '}{c?.nameRu || c?.name || id}
+                    </span>
+                    <span style={{ color: '#f59e0b', fontWeight: 700 }}>{cost}₽</span>
+                  </div>
+                );
+              })}
+            </div>
+          </GlassCard>
+
+          {/* Apply / Merge buttons */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+            <button onClick={() => setStackIds(optimized)} style={{
+              flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+              background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a',
+            }}>📥 Заменить оптимизированным</button>
+            <button onClick={() => {
+              const merged = [...new Set([...stackIds, ...optimized])];
+              setStackIds(merged);
+            }} style={{
+              flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+              background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#8b5cf6',
+            }}>🔀 Объединить (оба)</button>
+          </div>
+
+          {/* Warnings */}
+          {optExp?.warnings && optExp.warnings.length > 0 && (
             <GlassCard title="⚠ Предупреждения оптимизированного" icon="⚠" color="#ef4444">
-              {optimizedExplanation.warnings.slice(0, 5).map((w, i) => (
+              {optExp.warnings.slice(0, 5).map((w, i) => (
                 <div key={i} style={{ fontSize: 8, color: '#f87171', lineHeight: 1.3, padding: '2px 0' }}>• {w}</div>
               ))}
             </GlassCard>
           )}
-
-          {/* Замены */}
-          <GlassCard title="🔄 Интеллектуальные замены" icon="🔄" color="#818cf8">
-            <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:6 }}>Выберите вещество для поиска замен:</div>
-            <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:8 }}>
-              {stackIds.map(id => { const e=SUPPORT_CATALOG_DATA[id]; return <button key={id} onClick={() => { const reps = findReplacements(id); setReplacements(reps); setSelectedReplaceId(id); }} style={{ padding:'3px 8px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer', background: selectedReplaceId===id?'#818cf8':'rgba(255,255,255,0.04)', border: selectedReplaceId===id?'1px solid #818cf8':'1px solid rgba(255,255,255,0.06)', color: selectedReplaceId===id?'#fff':'rgba(255,255,255,0.6)' }}>{e?.nameRu||e?.name||id}</button>; })}
-            </div>
-            {replacements.length > 0 && <>
-              <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
-                {(['all','direct_analog','functional_analog','safer','stronger'] as const).map(f => <button key={f} onClick={()=>setReplaceFilter(f)} style={{ padding:'2px 6px', borderRadius:6, fontSize:7, fontWeight:600, cursor:'pointer', background: replaceFilter===f?'rgba(129,140,248,0.2)':'rgba(255,255,255,0.03)', border: replaceFilter===f?'1px solid #818cf8':'1px solid rgba(255,255,255,0.06)', color: replaceFilter===f?'#818cf8':'rgba(255,255,255,0.5)' }}>{f==='all'?'Все':f==='direct_analog'?'Аналоги':f==='functional_analog'?'Функц.':f==='safer'?'Безопаснее':'Сильнее'}</button>)}
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:250, overflowY:'auto' }}>
-                {replacements.filter(r=>replaceFilter==='all'||r.type===replaceFilter).slice(0,12).map(r => { const rp=SUPPORT_CATALOG_DATA[r.id]; return <div key={r.id+r.type} style={{ padding:'6px 8px', borderRadius:8, background:'rgba(129,140,248,0.04)', border:'1px solid rgba(129,140,248,0.1)' }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    <span style={{ flex:1, fontSize:9, fontWeight:700, color:'#c7d2fe' }}>{rp?.nameRu||r.name}</span>
-                    <span style={{ fontSize:7, padding:'1px 5px', borderRadius:4, background: r.type==='direct_analog'?'rgba(34,197,94,0.15)':r.type==='functional_analog'?'rgba(96,165,250,0.15)':'rgba(168,85,247,0.15)', color: r.type==='direct_analog'?'#22c55e':r.type==='functional_analog'?'#60a5fa':'#a855f7' }}>{r.type==='direct_analog'?'Аналог':r.type==='functional_analog'?'Функц.':'Замена'}</span>
-                    <button onClick={()=>{setStackIds(stackIds.map(s=>s===selectedReplaceId?r.id:s))}} style={{ padding:'2px 6px', borderRadius:4, fontSize:7, cursor:'pointer', background:'rgba(129,140,248,0.2)', border:'1px solid rgba(129,140,248,0.3)', color:'#818cf8', fontWeight:600 }}>↻</button>
-                  </div>
-                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:2, lineHeight:1.3 }}>{r.reason}</div>
-                  <div style={{ display:'flex', gap:4, marginTop:2, flexWrap:'wrap' }}>
-                    {r.pros.map((p,i)=><span key={'p'+i} style={{ fontSize:6, padding:'1px 3px', borderRadius:3, background:'rgba(34,197,94,0.08)', color:'#22c55e' }}>+{p}</span>)}
-                    {r.cons.map((c,i)=><span key={'c'+i} style={{ fontSize:6, padding:'1px 3px', borderRadius:3, background:'rgba(239,68,68,0.08)', color:'#ef4444' }}>-{c}</span>)}
-                  </div>
-                </div>; })}
-              </div>
-            </>}
-            {selectedReplaceId && replacements.length === 0 && <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', textAlign:'center', padding:8 }}>Замены не найдены</div>}
-            {!selectedReplaceId && <div style={{ fontSize:8, color:'rgba(255,255,255,0.3)', textAlign:'center', padding:8 }}>Выберите вещество для поиска замен</div>}
-          </GlassCard>
         </>
       )}
     </div>

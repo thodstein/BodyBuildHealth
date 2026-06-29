@@ -25,8 +25,6 @@ function estCost(id: string): number {
   return tm[c.tier as string] || 500;
 }
 
-const TIMING_ORDER: Record<string, number> = { morning:0, afternoon:1, evening:2, night:3, fasting:4 };
-
 export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; stackIds: string[] }) {
   const [reports, setReports] = useState<{ date: string; text: string }[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_biostack_reports') || '[]'); } catch { return []; }
@@ -36,7 +34,7 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
 
   const timingInfo = useMemo(() => {
     if (stackIds.length === 0) return null;
-    const byTime: Record<string, { id: string; name: string; dose: string }[]> = { morning:[], afternoon:[], evening:[], night:[], fasting:[] };
+    const byTime: Record<string, { id: string; name: string; dose: string; timing: string }[]> = { morning:[], afternoon:[], evening:[], night:[], fasting:[] };
     let totalCost = 0;
     stackIds.forEach(id => {
       const cat = SUPPORT_CATALOG_DATA[id];
@@ -45,16 +43,15 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
       const dose = cat.dosage?.mg ? `${cat.dosage.mg} мг` : '';
       const timing = (cat.dosage as any)?.timing || (cat as any)?.timingDosage || '';
       totalCost += estCost(id);
-      if (timing.toLowerCase().includes('утр')) byTime.morning.push({ id, name, dose });
-      else if (timing.toLowerCase().includes('дн') || timing.toLowerCase().includes('обед')) byTime.afternoon.push({ id, name, dose });
-      else if (timing.toLowerCase().includes('вечер') || timing.toLowerCase().includes('ноч')) byTime.evening.push({ id, name, dose });
-      else if (timing.toLowerCase().includes('нат') || timing.toLowerCase().includes('голод')) byTime.fasting.push({ id, name, dose });
-      else byTime.morning.push({ id, name, dose });
+      if (timing.toLowerCase().includes('утр')) byTime.morning.push({ id, name, dose, timing });
+      else if (timing.toLowerCase().includes('дн') || timing.toLowerCase().includes('обед')) byTime.afternoon.push({ id, name, dose, timing });
+      else if (timing.toLowerCase().includes('вечер') || timing.toLowerCase().includes('ноч')) byTime.evening.push({ id, name, dose, timing });
+      else if (timing.toLowerCase().includes('нат') || timing.toLowerCase().includes('голод')) byTime.fasting.push({ id, name, dose, timing });
+      else byTime.morning.push({ id, name, dose, timing });
     });
     return { byTime, totalCost };
   }, [stackIds]);
 
-  // ── Compatibility metrics ──
   const metrics = useMemo(() => {
     if (stackIds.length === 0) return null;
     const catData = SUPPORT_CATALOG_DATA;
@@ -71,10 +68,35 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
     const totalPairs = (stackIds.length * (stackIds.length - 1)) / 2;
     const synergyDensity = totalPairs > 0 ? Math.round(synergyPairs / totalPairs * 100) : 0;
     const warningsCount = expl.warnings.length;
+
+    // Organ mechanism grouping
+    const organMechs = new Map<string, string[]>();
+    stackIds.forEach(id => {
+      const c = catData[id];
+      if (!c) return;
+      (c.mechanisms || []).forEach((m: string) => {
+        const key = m.includes('LIVER') || m.includes('HEPAT') || m.includes('BILE') ? 'Печень'
+          : m.includes('HEART') || m.includes('CARDIO') || m.includes('VESSEL') ? 'ССС'
+          : m.includes('NEURO') || m.includes('GABA') || m.includes('DOPAMINE') || m.includes('COGNITIVE') || m.includes('MYELIN') ? 'Нервная'
+          : m.includes('IMMUNE') || m.includes('NFKB') || m.includes('ANTIINFLAMMATORY') ? 'Иммунитет'
+          : m.includes('ANTIOXIDANT') || m.includes('GLUTATHIONE') || m.includes('NRF2') ? 'Антиоксидантная'
+          : m.includes('INSULIN') || m.includes('AMPK') || m.includes('MITOCHONDRIAL') || m.includes('GLUCOSE') || m.includes('LIPID') ? 'Метаболизм'
+          : m.includes('TESTOSTERONE') || m.includes('AROMATASE') || m.includes('PROLACTIN') || m.includes('THYROID') || m.includes('ESTROGEN') ? 'Гормональная'
+          : m.includes('MEMBRANE') || m.includes('PHOSPHOLIPID') ? 'Мембраны'
+          : m.includes('DETOX') || m.includes('CYP450') || m.includes('PHASE_II') || m.includes('AMMONIA') ? 'Детоксикация'
+          : m.includes('ADAPTOGEN') || m.includes('CORTISOL') || m.includes('STRESS') ? 'Адаптогены'
+          : 'Прочие';
+        if (!organMechs.has(key)) organMechs.set(key, []);
+        if (!organMechs.get(key)!.includes(m)) organMechs.get(key)!.push(m);
+      });
+    });
+
     const compatScore = Math.max(0, Math.min(100,
       Math.round(synergyDensity * 0.7 + (expl.totalSynergyScore / 100) * 30 - warningsCount * 8)
     ));
-    return { ...expl, tiers, categories, synergyPairs, totalPairs, synergyDensity, compatScore, warningsCount };
+    const riskLevel = warningsCount >= 5 ? 'HIGH' : warningsCount >= 2 ? 'MEDIUM' : 'LOW';
+
+    return { ...expl, tiers, categories, synergyPairs, totalPairs, synergyDensity, compatScore, warningsCount, riskLevel, organMechs };
   }, [stackIds, profile]);
 
   const handleGenerate = useCallback(() => {
@@ -98,19 +120,26 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
           if (items.length === 0) return;
           lines.push(`${label}:`);
           items.forEach((it, i) => {
-            lines.push(`  ${i+1}. ${it.name}${it.dose ? ` (${it.dose})` : ''}`);
+            const ci = catData[it.id];
+            const warns: string[] = [];
+            if (ci?.contraindications) warns.push(...ci.contraindications.slice(0, 2));
+            lines.push(`  ${i+1}. ${it.name}${it.dose ? ` (${it.dose})` : ''}${warns.length > 0 ? ` ⚠ ${warns.join('; ')}` : ''}`);
           });
           lines.push('');
         });
       }
-      lines.push('💰 Ориентир. стоимость/мес: ' + totalCost.toLocaleString() + ' ₽');
+      lines.push(`💰 Ориентир. стоимость/мес: ${totalCost.toLocaleString()} ₽`);
       lines.push('');
-      lines.push('═══════════════════════════════════════════');
-      lines.push('  💡 Рекомендации:');
+      lines.push('💡 Рекомендации:');
       lines.push('  • Препараты с интервалом 30-60 мин от еды');
       lines.push('  • Жирорастворимые (D3, K2, A, E, CoQ10) — с жирной пищей');
       lines.push('  • Разделить Ca и Fe (интервал ≥2ч)');
       lines.push('  • Запивать водой, не чаем/кофе');
+      if (metrics.warnings.length > 0) {
+        lines.push('');
+        lines.push('⚠ Предупреждения:');
+        metrics.warnings.slice(0, 4).forEach(w => lines.push(`  • ${w}`));
+      }
       const text = lines.join('\n');
       setCurrentReport(text);
       return;
@@ -142,13 +171,23 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
         const timing = cat?.dosage?.timing || (cat as any)?.timingDosage || '—';
         const tier = cat?.tier || '';
         lines.push(`  • ${name} [${tier}]`);
-        lines.push(`    💊 Дозировка: ${dose} | ⏱ ${timing}`);
-        lines.push(`    🧬 Механизм: ${s.mechanism}`);
-        if (cat?.targetOrgan) lines.push(`    🫀 Орган-мишень: ${cat.targetOrgan}`);
-        if (cat?.contraindications && cat.contraindications.length > 0) lines.push(`    ⛔ Противопоказания: ${cat.contraindications.join(', ')}`);
+        lines.push(`    💊 Доза: ${dose} | ⏱ ${timing}`);
+        lines.push(`    🧬 Мех-м: ${s.mechanism}`);
+        if (cat?.organs && cat.organs.length > 0) lines.push(`    🫀 Органы: ${cat.organs.join(', ')}`);
+        if (cat?.contraindications && cat.contraindications.length > 0) lines.push(`    ⛔ Противоп.: ${cat.contraindications.join('; ')}`);
+        if (cat?.sideEffects && cat.sideEffects.length > 0) lines.push(`    ⚡ Побочные: ${cat.sideEffects.slice(0, 3).join(', ')}`);
       });
       lines.push('');
+      lines.push('🔬 ПОКРЫТИЕ МЕХАНИЗМОВ ПО ГРУППАМ:');
+      if (metrics.organMechs) {
+        metrics.organMechs.forEach((mechs, group) => {
+          lines.push(`  • ${group}: ${mechs.slice(0, 4).join(', ')}${mechs.length > 4 ? ` (+${mechs.length - 4})` : ''}`);
+        });
+      }
+      lines.push('');
       lines.push('🤝 МЕТРИКИ СОВМЕСТИМОСТИ:');
+      const riskLabel = metrics.riskLevel === 'HIGH' ? '🔴 Высокий' : metrics.riskLevel === 'MEDIUM' ? '🟡 Средний' : '🟢 Низкий';
+      lines.push(`  • Уровень риска: ${riskLabel}`);
       lines.push(`  • Совместимость стека: ${metrics.compatScore}/100`);
       lines.push(`  • Плотность синергий: ${metrics.synergyDensity}% (${metrics.synergyPairs}/${metrics.totalPairs} пар)`);
       lines.push(`  • Предупреждений: ${metrics.warningsCount}`);
@@ -196,6 +235,8 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
     lines.push(`  🤝 Совместимость: ${metrics.compatScore}/100`);
     lines.push(`  🔗 Плотность синергий: ${metrics.synergyDensity}% (${metrics.synergyPairs}/${metrics.totalPairs})`);
     lines.push(`  💰 Стоимость/мес: ${totalCost.toLocaleString()} ₽`);
+    const riskLabel = metrics.riskLevel === 'HIGH' ? '🔴 Высокий' : metrics.riskLevel === 'MEDIUM' ? '🟡 Средний' : '🟢 Низкий';
+    lines.push(`  ⚠ Уровень риска: ${riskLabel}`);
     lines.push('═══════════════════════════════════════════');
     lines.push('');
     lines.push('📋 СОСТАВ СТЕКА:');
@@ -207,8 +248,12 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
       lines.push(`  • ${name} (${s.role}) [${cat?.tier || ''}] ~${cost}₽`);
       lines.push(`    🧬 ${s.mechanism}`);
       lines.push(`    💊 ${dose}`);
+      if (cat?.organs && cat.organs.length > 0) lines.push(`    🫀 ${cat.organs.slice(0, 4).join(', ')}`);
       if (s.synergiesWith.length > 0) {
         lines.push(`    🤝 ${s.synergiesWith.map(x => x.with + ' → ' + x.effect).join(', ')}`);
+      }
+      if (cat?.contraindications && cat.contraindications.length > 0) {
+        lines.push(`    ⛔ ${cat.contraindications.slice(0, 2).join('; ')}`);
       }
     });
     if (metrics.pairwiseSynergies.length > 0) {
@@ -224,6 +269,13 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
       lines.push('');
       lines.push('⚠ ПРЕДУПРЕЖДЕНИЯ:');
       metrics.warnings.forEach(w => lines.push(`  • ${w}`));
+    }
+    lines.push('');
+    lines.push('🔬 МЕХАНИЗМЫ ПО ГРУППАМ:');
+    if (metrics.organMechs) {
+      metrics.organMechs.forEach((mechs, group) => {
+        lines.push(`  • ${group}: ${mechs.slice(0, 3).join(', ')}${mechs.length > 3 ? ` (+${mechs.length - 3})` : ''}`);
+      });
     }
     lines.push('');
     lines.push('📊 РАСПРЕДЕЛЕНИЕ ПО ТИРАМ:');
@@ -262,38 +314,30 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
           Стек: <strong>{stackIds.length} компонентов</strong>
           {metrics && ` • Синергия: ${metrics.totalSynergyScore} • Покрытие: ${metrics.completeness}%`}
-          {metrics && ` • Совместимость: ${metrics.compatScore}/100`}
+          {metrics && ` • Риск: ${metrics.riskLevel === 'HIGH' ? '🔴' : metrics.riskLevel === 'MEDIUM' ? '🟡' : '🟢'}`}
         </div>
         {metrics && (
-          <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
-            {/* compat bar */}
-            <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
-              <div style={{ width: metrics.compatScore + '%', height: '100%', borderRadius: 2,
-                background: metrics.compatScore >= 70 ? '#00e68a' : metrics.compatScore >= 40 ? '#f59e0b' : '#ef4444', transition: 'width 0.3s' }} />
+          <>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+              <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
+                <div style={{ width: metrics.compatScore + '%', height: '100%', borderRadius: 2, background: metrics.compatScore >= 70 ? '#00e68a' : metrics.compatScore >= 40 ? '#f59e0b' : '#ef4444', transition: 'width 0.3s' }} />
+              </div>
+              <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
+                <div style={{ width: metrics.synergyDensity + '%', height: '100%', borderRadius: 2, background: metrics.synergyDensity >= 60 ? '#60a5fa' : metrics.synergyDensity >= 30 ? '#f59e0b' : '#ef4444', transition: 'width 0.3s' }} />
+              </div>
+              <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
+                <div style={{ width: Math.min(metrics.completeness, 100) + '%', height: '100%', borderRadius: 2, background: metrics.completeness >= 80 ? '#a78bfa' : '#f59e0b', transition: 'width 0.3s' }} />
+              </div>
+              <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
+                <div style={{ width: (metrics.totalDoseCount / Math.max(stackIds.length, 1)) * 100 + '%', height: '100%', borderRadius: 2, background: metrics.totalDoseCount === stackIds.length ? '#00e68a' : '#f59e0b', transition: 'width 0.3s' }} />
+              </div>
             </div>
-            {/* synergy bar */}
-            <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
-              <div style={{ width: metrics.synergyDensity + '%', height: '100%', borderRadius: 2,
-                background: metrics.synergyDensity >= 60 ? '#60a5fa' : metrics.synergyDensity >= 30 ? '#f59e0b' : '#ef4444', transition: 'width 0.3s' }} />
+            <div style={{ display: 'flex', gap: 2, marginBottom: 6 }}>
+              <StatBox label="Совместимость" value={`${metrics.compatScore}`} sub="из 100" color={metrics.compatScore >= 70 ? '#00e68a' : metrics.compatScore >= 40 ? '#f59e0b' : '#ef4444'} />
+              <StatBox label="Синергии" value={`${metrics.synergyDensity}%`} sub={`${metrics.synergyPairs}/${metrics.totalPairs} пар`} color={metrics.synergyDensity >= 60 ? '#60a5fa' : '#f59e0b'} />
+              <StatBox label="Тиры" value={`${metrics.tiers.core}/${metrics.tiers.standard}/${metrics.tiers.advanced}`} sub="core/std/adv" color="#a78bfa" />
             </div>
-            {/* coverage bar */}
-            <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
-              <div style={{ width: Math.min(metrics.completeness, 100) + '%', height: '100%', borderRadius: 2,
-                background: metrics.completeness >= 80 ? '#a78bfa' : '#f59e0b', transition: 'width 0.3s' }} />
-            </div>
-            {/* dose bar */}
-            <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
-              <div style={{ width: (metrics.totalDoseCount / Math.max(stackIds.length, 1)) * 100 + '%', height: '100%', borderRadius: 2,
-                background: metrics.totalDoseCount === stackIds.length ? '#00e68a' : '#f59e0b', transition: 'width 0.3s' }} />
-            </div>
-          </div>
-        )}
-        {metrics && (
-          <div style={{ display: 'flex', gap: 2, marginBottom: 6 }}>
-            <StatBox label="Совместимость" value={`${metrics.compatScore}`} sub="из 100" color={metrics.compatScore >= 70 ? '#00e68a' : metrics.compatScore >= 40 ? '#f59e0b' : '#ef4444'} />
-            <StatBox label="Синергии" value={`${metrics.synergyDensity}%`} sub={`${metrics.synergyPairs}/${metrics.totalPairs} пар`} color={metrics.synergyDensity >= 60 ? '#60a5fa' : '#f59e0b'} />
-            <StatBox label="Тиры" value={`${metrics.tiers.core}/${metrics.tiers.standard}/${metrics.tiers.advanced}`} sub="core/std/adv" color="#a78bfa" />
-          </div>
+          </>
         )}
         <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
           <button onClick={() => setReportMode('standard')} style={{

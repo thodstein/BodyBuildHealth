@@ -554,6 +554,29 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
               padding: '8px 14px', borderRadius: 10, fontSize: 9, fontWeight: 700, cursor: 'pointer',
               background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)',
             }}>📋</button>
+            <button onClick={() => {
+              try {
+                let arr: any[] = JSON.parse(localStorage.getItem('he_my_stacks') || '[]');
+                const ids = result.stack;
+                const key = 'biostack_build_' + ids.join('_');
+                if (!arr.find((x:any) => x.id === key)) {
+                  const subNames = ids.slice(0,3).map((id:string) => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id).join(', ');
+                  arr.push({
+                    id: key, name: 'BioStack Build: ' + subNames + (ids.length > 3 ? ' и ещё ' + (ids.length-3) : ''),
+                    description: result.explanation.name || 'Собран в BioStack Build',
+                    system: (result.explanation.coverage?.goals || []).join(', ') || 'Мультисистемная', subs: ids,
+                    dosages: Object.fromEntries(result.explanation.substances.map(s => [s.id, s.dose || ''])),
+                    timingSummary: '', monitoring: '', specialInstructions: '', contraindications: '', warnings: '',
+                    synergyScore: result.explanation.totalSynergyScore ?? 0,
+                    source: 'BioStack Build', date: new Date().toISOString()
+                  });
+                  localStorage.setItem('he_my_stacks', JSON.stringify(arr));
+                }
+              } catch {}
+            }} style={{
+              padding: '8px 10px', borderRadius: 10, fontSize: 9, fontWeight: 700, cursor: 'pointer',
+              background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: '#818cf8',
+            }}>📦 В мои стеки</button>
           </div>
         </GlassCard>
       )}

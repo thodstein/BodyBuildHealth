@@ -503,6 +503,27 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
             flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
             background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a',
           }}>💾 Сохранить стек</button>
+          <button onClick={() => {
+            try {
+              let arr: any[] = JSON.parse(localStorage.getItem('he_my_stacks') || '[]');
+              if (!arr.find((x:any) => x.id === 'biostack_' + stackIds.join('_'))) {
+                const subNames = stackIds.slice(0,3).map((id:string) => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id).join(', ');
+                arr.push({
+                  id: 'biostack_' + stackIds.join('_'), name: 'BioStack AI: ' + subNames + (stackIds.length > 3 ? ' и ещё ' + (stackIds.length-3) : ''),
+                  description: synergyExplanation?.cascadeDesc || 'Собран в BioStack AI',
+                  system: (stackSystems || []).join(', ') || 'Мультисистемная', subs: stackIds,
+                  dosages: {}, timingSummary: '',
+                  monitoring: '', specialInstructions: '', contraindications: '', warnings: '',
+                  synergyScore: explanation?.totalSynergyScore ?? 0,
+                  source: 'BioStack AI', date: new Date().toISOString()
+                });
+                localStorage.setItem('he_my_stacks', JSON.stringify(arr));
+              }
+            } catch {}
+          }} style={{
+            flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+            background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: '#818cf8',
+          }}>📦 В мои стеки</button>
           <button onClick={handleClear} style={{
             flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
             background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444',

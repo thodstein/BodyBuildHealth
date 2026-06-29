@@ -8,6 +8,7 @@ import { calcReadiness } from '../../engines/readiness.engine';
 import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indices.engine';
 import { calculateIndices } from '../../engines/clinical-indices.engine';
 import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../core/constants';
+import { useDataLink } from '../../core/data-link';
 import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 
 type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' 
@@ -2768,6 +2769,7 @@ const ProfileCalcData: React.FC = () => {
 };
 
 const PlannerProfileData: React.FC = () => {
+  const linked = useDataLink();
   const glassCard: React.CSSProperties = { background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 12, marginBottom: 6 };
   const labelS: React.CSSProperties = { fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2, display: 'block' };
   const inp: React.CSSProperties = { width: '100%', padding: '6px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 10, boxSizing: 'border-box' };

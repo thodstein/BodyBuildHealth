@@ -1071,7 +1071,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       {mealResult.productScores.filter((ps:any)=>ps.score<50).slice(0,3).map((ps:any)=>{
                         const food = FOOD_DB.find(f=>f.id===ps.foodId);
                         if(!food) return null;
-                        const sameCat = scored.filter(({f})=>f.category===food.category&&f.id!==food.id);
+                        const sameCat = scored.filter((p:any)=>p.food.category===food.category&&p.food.id!==food.id);
                         const best = sameCat.sort((a,b)=>b.score.total-a.score.total)[0];
                         if(!best||best.score.total<=ps.score) return null;
                         const improvement = Math.round((best.score.total-ps.score)/ps.score*100);

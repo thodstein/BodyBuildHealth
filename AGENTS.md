@@ -72,6 +72,13 @@
 
 ---
 
+## Session Summary (Jun 29) — BioStack AI Complete: all 8 tabs rewritten + Reports + Periodization
+### Done
+- **BioStack AI Reports** — improved formatting: mechanism grouping by organ system, risk/safety section (🟢🟡🔴 level indicator), per-substance contraindications & side effects, profile section for doctor report, timing slots for schedule mode, 3 modes (Standard/Doctor/Schedule).
+- **BioStack AI Periodization** — rewritten: apply transition button with confirm modal → `setStackIds`, profile-aware phase keys (experience level + health conditions), cost per phase (~₽/мес), completeness indicator (% coverage), missing categories per phase, cost comparison chart with SVG bars.
+- **All 8 tabs complete**: Profile, Search, Build, Stack, Risks, Compare, Reports, Periodization.
+- `tsc --noEmit` ✓, `vite build` ✓
+
 ## 🎯 ГЕНЕРАЛЬНЫЙ ПЛАН (Gap Analysis: ТЗ vs Реализация)
 
 ### БЛОК 1: Support Engine (ТЗ раздел 10) — БАДы+аптека 🔴
@@ -132,7 +139,7 @@
 | U1 | Профиль→Дневники: 12 карточек — реальный контент | ❌ |
 | U2 | Профиль→Сон: дневник (часы, качество, график) | ❌ |
 | U3 | Профиль→Давление: архив + график | ❌ |
-| U4 | Биостак AI: 6/7 подвкладок (Сборка, Стек, Риски, Сравнение, Отчёты, AI) | ❌ |
+| U4 | Биостак AI: 8/8 подвкладок (Профиль, Поиск, Сборка, Стек, Риски, Сравнение, Отчёты, Циклы) | ✅ |
 | U5 | Фертильность→Анализы: ввод (поля, лейблы, spacing) | ❌ |
 | U6 | ProfileScreen: useState из IIFE в компоненты | ❌ |
 
@@ -839,15 +846,8 @@ export interface SupportStack {
 - **BioStackAIScreen.tsx**: 7-табовый компонент в стиле IndividualPlan (GlassCard, PillBtn, inputStyle). Профиль — 6 групп с автозаполнением из `getProfile()`.
 - **Интеграция в SupportScreen**: `InfoView` расширен (`'biostack'`), кнопка в навигации, `renderView` для BioStack AI.
 
-### Next Steps
-- Подвкладка 🔍 Поиск — расширить поиск по системам (SYSTEM_LABELS_CATALOG) + симптомы
-- Подвкладка 🧩 Сборка стека — auto stack generator с полным алгоритмом
-- Подвкладка 📋 Мой стек — active stack viewer
-- Подвкладка ⚠ Риски — три уровня взаимодействий
-- Подвкладка ⚖ Сравнение — метрики безопасности/эффективности/стоимости
-- Подвкладка 📊 Отчёты — генерация + архив в localStorage
-- Подвкладка 🔍 Поиск — ПОЛНОСТЬЮ РЕАЛИЗОВАНА: текстовый поиск + фильтры по целям (22), органам (24), системам (11), механизмам (15 top), симптомам (10) + rich карточки с раскрытием, скорингом, категориями, противопоказаниями; кнопка + Стек; персонализация через BioStackProfile→FinderProfile bridge
-- Подвкладка 🧠 AI — 5 кнопок-действий на правилах
+### Complete
+- Все 8 подвкладок реализованы: Профиль, 🔍 Поиск, 🧩 Сборка, 📋 Мой стек, ⚠ Риски, ⚖ Сравнение, 📊 Отчёты, 🔄 Циклы — каждая с карточками-попапами, профильной персонализацией, полным каталогом и интеграцией с support-database.
 
 ## Session Summary (Jun 26) — Plan restructured
 ### Done

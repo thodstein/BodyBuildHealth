@@ -203,6 +203,8 @@ export function calculateMixScore(substances: MixSubstance[], profile: MixProfil
     if (cl < 100) electrolyteWarnings.push(`Cl⁻ снижен (${cl} ммоль/л) — добавьте хлориды ${recCl} мг`);
   }
 
+  const suggestions: string[] = [];
+
   // NO depletion from drugs (nandrolone primarily, but also check dehydration)
   if (profile.hasNandrolone && profile.timing === 'pre') {
     suggestions.push('⚠ Нандролон снижает NO — добавьте цитруллин 8-10 г + свекольный экстракт для компенсации');
@@ -228,7 +230,6 @@ export function calculateMixScore(substances: MixSubstance[], profile: MixProfil
   const label = composite >= 85 ? '💎 Элитный' : composite >= 70 ? '⭐ Отличный' : composite >= 50 ? '👍 Хороший' : composite >= 30 ? '⚡ Базовый' : '⚠️ Слабый';
   const color = composite >= 85 ? '#a855f7' : composite >= 70 ? '#22c55e' : composite >= 50 ? '#3b82f6' : composite >= 30 ? '#f59e0b' : '#ef4444';
 
-  const suggestions: string[] = [];
   if (pump < 60) suggestions.push('Добавьте цитруллин 6-8 г или агматин 1 г для пампа');
   if (energy < 60 && profile.timing === 'pre') suggestions.push('Добавьте кофеин 200 мг или бета-аланин 3.2 г для энергии');
   if (focus < 60 && profile.timing === 'pre') suggestions.push('Добавьте тирозин 2 г или альфа-GPC 600 мг для фокуса');

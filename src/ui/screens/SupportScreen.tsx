@@ -2386,10 +2386,11 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     </div>
                                   </div>
                                   <button onClick={e => { e.stopPropagation(); if (sub?.id && !enhancedSubs.includes(sub.id)) setEnhancedSubs(prev => [...prev, sub.id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(sub?.id||'') ? '✓' : '+ Мой стек'}</button>
-                                  <button onClick={e => { e.stopPropagation(); try { let f:string[]=JSON.parse(localStorage.getItem('he_support_favorites')||'[]');const idx=f.indexOf(sub?.id||'');if(idx>=0)f.splice(idx,1);else f.push(sub?.id||'');localStorage.setItem('he_support_favorites',JSON.stringify(f));setFavRefresh(p=>p+1);}catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(()=>{try{return JSON.parse(localStorage.getItem('he_support_favorites')||'[]').includes(sub?.id||'')?'#fbbf24':'var(--text-dim)';}catch{return 'var(--text-dim)';}})() }}>★</button>
-                                  <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
-                                </div>
-                                {isSelected && sub && (
+                                   <button onClick={e => { e.stopPropagation(); try { let f:string[]=JSON.parse(localStorage.getItem('he_support_favorites')||'[]');const idx=f.indexOf(sub?.id||'');if(idx>=0)f.splice(idx,1);else f.push(sub?.id||'');localStorage.setItem('he_support_favorites',JSON.stringify(f));setFavRefresh(p=>p+1);}catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(()=>{try{return JSON.parse(localStorage.getItem('he_support_favorites')||'[]').includes(sub?.id||'')?'#fbbf24':'var(--text-dim)';}catch{return 'var(--text-dim)';}})() }}>★</button>
+                                   <button onClick={e => { e.stopPropagation(); try { let arr:any[]=JSON.parse(localStorage.getItem('he_my_substances')||'[]'); if(!arr.find((x:any)=>x.id===sub?.id)) { arr.push({id:sub?.id, name:sub?.name||sub?.id, source:'Каталог', date:new Date().toISOString()}); localStorage.setItem('he_my_substances',JSON.stringify(arr)); setFavRefresh(p=>p+1); } }catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
+                                   <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
+                                 </div>
+                                 {isSelected && sub && (
                                   <div style={{ padding:'6px 10px 8px 18px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
                                     <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
                                     <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
@@ -2456,7 +2457,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                         <div style={{ fontSize:8, color:'var(--text-dim)' }}>{(sub.categories||[]).slice(0,2).join(', ')}</div>
                                       </div>
                                       <button onClick={e => { e.stopPropagation(); if (!enhancedSubs.includes(id)) setEnhancedSubs(prev => [...prev, id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(id) ? '✓' : '+ Мой стек'}</button>
-                                      <button onClick={e => { e.stopPropagation(); try { let f:string[]=JSON.parse(localStorage.getItem('he_support_favorites')||'[]');const idx=f.indexOf(id);if(idx>=0)f.splice(idx,1);else f.push(id);localStorage.setItem('he_support_favorites',JSON.stringify(f));setFavRefresh(p=>p+1);}catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(()=>{try{return JSON.parse(localStorage.getItem('he_support_favorites')||'[]').includes(id)?'#fbbf24':'var(--text-dim)';}catch{return 'var(--text-dim)';}})() }}>★</button>
+                                       <button onClick={e => { e.stopPropagation(); try { let f:string[]=JSON.parse(localStorage.getItem('he_support_favorites')||'[]');const idx=f.indexOf(id);if(idx>=0)f.splice(idx,1);else f.push(id);localStorage.setItem('he_support_favorites',JSON.stringify(f));setFavRefresh(p=>p+1);}catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(()=>{try{return JSON.parse(localStorage.getItem('he_support_favorites')||'[]').includes(id)?'#fbbf24':'var(--text-dim)';}catch{return 'var(--text-dim)';}})() }}>★</button>
+                                       <button onClick={e => { e.stopPropagation(); try { let arr:any[]=JSON.parse(localStorage.getItem('he_my_substances')||'[]'); if(!arr.find((x:any)=>x.id===id)) { arr.push({id, name:sub?.name||id, source:'Каталог', date:new Date().toISOString()}); localStorage.setItem('he_my_substances',JSON.stringify(arr)); setFavRefresh(p=>p+1); } }catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
                                       <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
                                     </div>
                                     {isSelected && (
@@ -2520,6 +2522,23 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                 localStorage.setItem('he_finder_saved_stacks', JSON.stringify([ids, ...existing].slice(0,10)));
                                 setEnhancedSubs(prev => [...new Set([...prev, ...ids])]);
                               }} style={{ flex:1, padding:'4px 0', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.15)', color:'#00e68a' }}>📥 + Мой стек</button>
+                              <button onClick={() => {
+                                try {
+                                  let arr: any[] = JSON.parse(localStorage.getItem('he_my_stacks') || '[]');
+                                  if (!arr.find((x:any) => x.id === stk.id)) {
+                                    arr.push({
+                                      id: stk.id, name: stk.name, description: stk.description, system: stk.system,
+                                      subs: stk.substances.map(s => s.id), dosages: Object.fromEntries(stk.substances.map(s => [s.id, s.dose])),
+                                      timingSummary: stk.timingSummary, monitoring: stk.monitoring,
+                                      specialInstructions: stk.specialInstructions, contraindications: stk.contraindications,
+                                      warnings: stk.warnings, synergyScore: stk.synergyScore,
+                                      source: 'Каталог стеков', date: new Date().toISOString()
+                                    });
+                                    localStorage.setItem('he_my_stacks', JSON.stringify(arr));
+                                    setFavRefresh(p => p + 1);
+                                  }
+                                } catch {}
+                              }} style={{ padding:'4px 8px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer', background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.15)', color:'#818cf8' }}>📦 В мои стеки</button>
                               <button onClick={() => setStackExpanded(isExp ? null : stk.id)} style={{
                                 padding:'4px 10px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer',
                                 background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.12)', color:'#8b5cf6',
@@ -2589,11 +2608,12 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                         </div>
                                         <button onClick={e => { e.stopPropagation(); if (sub?.id && !enhancedSubs.includes(sub.id)) setEnhancedSubs(prev => [...prev, sub.id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(sub?.id||'') ? '✓' : '+ Мой стек'}</button>
                                         <button onClick={e => { e.stopPropagation(); try { let f:string[]=JSON.parse(localStorage.getItem('he_support_favorites')||'[]');const idx=f.indexOf(sub?.id||'');if(idx>=0)f.splice(idx,1);else f.push(sub?.id||'');localStorage.setItem('he_support_favorites',JSON.stringify(f));setFavRefresh(p=>p+1);}catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(()=>{try{return JSON.parse(localStorage.getItem('he_support_favorites')||'[]').includes(sub?.id||'')?'#fbbf24':'var(--text-dim)';}catch{return 'var(--text-dim)';}})() }}>★</button>
-                                        <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
-                                      </div>
-                                      {selectedSub === sub?.id && sub && (
-                                        <div style={{ padding:'6px 10px 8px 22px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
-                                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
+                                        <button onClick={e => { e.stopPropagation(); try { let arr:any[]=JSON.parse(localStorage.getItem('he_my_substances')||'[]'); if(!arr.find((x:any)=>x.id===sub?.id)) { arr.push({id:sub?.id, name:sub?.name||sub?.id, source:'Каталог', date:new Date().toISOString()}); localStorage.setItem('he_my_substances',JSON.stringify(arr)); setFavRefresh(p=>p+1); } }catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
+                                         <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
+                                       </div>
+                                       {selectedSub === sub?.id && sub && (
+                                         <div style={{ padding:'6px 10px 8px 22px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
+                                           <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
                                           <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
                                             {TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
                                           </div>
@@ -2665,6 +2685,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     </div>
                                     <button onClick={e => { e.stopPropagation(); if (sub?.id && !enhancedSubs.includes(sub.id)) setEnhancedSubs(prev => [...prev, sub.id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(sub?.id||'') ? '✓' : '+ Мой стек'}</button>
                                     <button onClick={e => { e.stopPropagation(); try { let f:string[]=JSON.parse(localStorage.getItem('he_support_favorites')||'[]');const idx=f.indexOf(sub?.id||'');if(idx>=0)f.splice(idx,1);else f.push(sub?.id||'');localStorage.setItem('he_support_favorites',JSON.stringify(f));setFavRefresh(p=>p+1);}catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(()=>{try{return JSON.parse(localStorage.getItem('he_support_favorites')||'[]').includes(sub?.id||'')?'#fbbf24':'var(--text-dim)';}catch{return 'var(--text-dim)';}})() }}>★</button>
+                                    <button onClick={e => { e.stopPropagation(); try { let arr:any[]=JSON.parse(localStorage.getItem('he_my_substances')||'[]'); if(!arr.find((x:any)=>x.id===sub?.id)) { arr.push({id:sub?.id, name:sub?.name||sub?.id, source:'Каталог', date:new Date().toISOString()}); localStorage.setItem('he_my_substances',JSON.stringify(arr)); setFavRefresh(p=>p+1); } }catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
                                     <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
                                   </div>
                                   {selectedSub === sub?.id && sub && (
@@ -3320,7 +3341,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               return (
               <div>
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  {[['favorites','⭐ Избранное'],['calculator','🧮 Расчёты'],['plan','📋 План'],['reports','📊 Отчеты']].map(([id,label]) => (
+                  {[['favorites','⭐ Избранное'],['mySubstances','💊 Мои препараты'],['myStacks','📦 Мои стеки'],['calculator','🧮 Расчёты'],['plan','📋 План'],['reports','📊 Отчеты']].map(([id,label]) => (
                     <button key={id} onClick={() => setFavTab(id)} style={{
                       padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
                       background: favTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
@@ -3366,7 +3387,114 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
                 )}
 
-                {/* === MYSTACKS TAB === */}
+                {/* === MY SUBSTANCES TAB === */}
+                {favTab === 'mySubstances' && (
+                <div style={{ paddingBottom:80 }}>
+                  <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+                    <input value={favSearch} onChange={e => setFavSearch(e.target.value)}
+                      placeholder="🔍 Поиск в Моих препаратах..."
+                      style={{ flex:1, padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
+                  </div>
+                  {(() => {
+                    let mySubs: any[] = [];
+                    try { mySubs = JSON.parse(localStorage.getItem('he_my_substances') || '[]'); } catch {}
+                    const filtered = favSearch ? mySubs.filter((s:any) => (s.name||s.id||'').toLowerCase().includes(favSearch.toLowerCase())) : mySubs;
+                    if (filtered.length === 0) return (
+                      <div style={{ padding:24, textAlign:'center' }}>
+                        <div style={{ fontSize:24, marginBottom:6 }}>💊</div>
+                        <div style={{ fontSize:11, color:'var(--text-dim)' }}>Нет сохранённых препаратов.</div>
+                        <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>Добавьте из каталога или BioStack AI (кнопка ★ или «В мои препараты»).</div>
+                      </div>
+                    );
+                    return (
+                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                        {filtered.map((s: any) => (
+                          <div key={s.id} style={{ display:'flex', alignItems:'center', gap:4, padding:'8px 10px', background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)', marginBottom:4 }}>
+                            <div style={{ flex:1 }}>
+                              <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{s.name || s.id}</div>
+                              {s.dose && <div style={{ fontSize:8, color:'var(--text-dim)' }}>{s.dose}</div>}
+                              {s.source && <div style={{ fontSize:8, color:'rgba(0,230,138,0.6)' }}>📌 {s.source}</div>}
+                            </div>
+                            <button onClick={() => {
+                              try {
+                                let arr: any[] = JSON.parse(localStorage.getItem('he_my_substances') || '[]');
+                                localStorage.setItem('he_my_substances', JSON.stringify(arr.filter((x:any) => x.id !== s.id)));
+                                setFavRefresh(prev => prev + 1);
+                              } catch {}
+                            }} style={{ padding:'3px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontWeight:600, whiteSpace:'nowrap', flexShrink:0 }}>✕ Убрать</button>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+                )}
+
+                {/* === MY STACKS TAB === */}
+                {favTab === 'myStacks' && (
+                <div style={{ paddingBottom:80 }}>
+                  <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+                    <input value={favSearch} onChange={e => setFavSearch(e.target.value)}
+                      placeholder="🔍 Поиск в Моих стеках..."
+                      style={{ flex:1, padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
+                  </div>
+                  {(() => {
+                    let myStacksArr: any[] = [];
+                    try { myStacksArr = JSON.parse(localStorage.getItem('he_my_stacks') || '[]'); } catch {}
+                    const filtered = favSearch ? myStacksArr.filter((st:any) => (st.name||st.id||'').toLowerCase().includes(favSearch.toLowerCase())) : myStacksArr;
+                    if (filtered.length === 0) return (
+                      <div style={{ padding:24, textAlign:'center' }}>
+                        <div style={{ fontSize:24, marginBottom:6 }}>📦</div>
+                        <div style={{ fontSize:11, color:'var(--text-dim)' }}>Нет сохранённых стеков.</div>
+                        <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>Добавьте из каталога стеков или BioStack AI (кнопка «В мои стеки»).</div>
+                      </div>
+                    );
+                    return (
+                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                        {filtered.map((st: any) => (
+                          <div key={st.id} style={{ padding:'8px 10px', background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)', marginBottom:4 }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                              <div>
+                                <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{st.name || st.id}</div>
+                                <div style={{ fontSize:8, color:'var(--text-dim)' }}>{st.subs?.length || 0} препаратов · {st.system || '—'}</div>
+                              </div>
+                              <button onClick={() => {
+                                try {
+                                  let arr: any[] = JSON.parse(localStorage.getItem('he_my_stacks') || '[]');
+                                  localStorage.setItem('he_my_stacks', JSON.stringify(arr.filter((x:any) => x.id !== st.id)));
+                                  setFavRefresh(prev => prev + 1);
+                                } catch {}
+                              }} style={{ padding:'3px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', whiteSpace:'nowrap', flexShrink:0 }}>✕ Удалить</button>
+                            </div>
+                            {st.description && <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4, lineHeight:1.3 }}>{st.description.slice(0, 120)}{st.description.length > 120 ? '...' : ''}</div>}
+                            {st.subs && st.subs.length > 0 && (
+                              <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                                {(st.subs as string[]).slice(0, 6).map((sid: string) => {
+                                  const cn = catalogSubstances.find((c:any) => c.id === sid);
+                                  return <span key={sid} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{cn?.name || sid}</span>;
+                                })}
+                                {st.subs.length > 6 && <span style={{ fontSize:7, color:'var(--text-dim)' }}>+{st.subs.length - 6}</span>}
+                              </div>
+                            )}
+                            <button onClick={() => {
+                              const subs = (st.subs || []).filter((id:string) => SUPPORT_LEVELS[supportLevel]?.subs ? !SUPPORT_LEVELS[supportLevel].subs.includes(id) : true);
+                              if (subs.length === 0) { alert('Все препараты стека уже в плане'); return; }
+                              const level = SUPPORT_LEVELS[supportLevel];
+                              if (level) {
+                                const newDosages = { ...level.dosages };
+                                subs.forEach((id:string) => { const d = (st.dosages||{})[id]; if (d) newDosages[id] = typeof d === 'number' ? { mg: d, timing: '' } : d; });
+                                SUPPORT_LEVELS[supportLevel] = { ...level, subs: [...level.subs, ...subs], dosages: newDosages };
+                              }
+                              alert(`✅ ${subs.length} препаратов добавлено в план`);
+                              setFavRefresh(prev => prev + 1);
+                            }} style={{ marginTop:4, padding:'4px 10px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', fontWeight:600 }}>📋 В план</button>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+                )}
 
                 {/* === PLAN TAB === */}
                 {favTab === 'plan' && (
@@ -5540,7 +5668,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   if (goalMap[calcData.goals.trainingCycle]) setMixGoal(goalMap[calcData.goals.trainingCycle]);
                 }
               } catch {}
-              if (found) showToast?.('✅ Фармакология определена из курса и профиля');
+              if (found) alert('✅ Фармакология определена из курса и профиля');
             }} style={{ width:'100%', padding:'6px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)', color:'#00e68a', marginBottom:8 }}>📋 Автозаполнение из профиля (фарма + цель)</button>
             {(() => {
               const bw = linked.profile?.settings?.weight ?? 80;
@@ -5690,7 +5818,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       <div style={{fontSize:16,fontWeight:800,color:'#06b6d4'}}>{(score.recommendedWaterMl/1000).toFixed(1)}л</div>
                     </div>
                   </div>
-                  {profile.timing === 'intra' && (
+                  {mixTiming === 'intra' && (
                     <div style={{ marginTop:8 }}>
                       <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', marginBottom:4 }}>💧 Изотоник на {durHrs}ч (на {score.recommendedWaterMl/1000}л воды):</div>
                       <div style={{ display:'flex', gap:6, fontSize:8 }}>
