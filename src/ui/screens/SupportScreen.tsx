@@ -44,7 +44,7 @@ import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engine
 import { calculateTZRisk, toCompatibleResult, type TZRiskResult } from '../../engines/risk-engine-tz';
 import { calculateSupportPlan, type PlanResult, type PlanSubstance } from '../../engines/support-plan-engine';
 import { buildPreApplyCard, evaluateRecommendations, computeCoverageRisk } from '../../engines/recommendation-engine';
-import { calculateMixScore, type MixSubstance, type MixProfile, MIX_MECHANISMS, MIX_SYNERGY, MIX_TEMPLATES, type MixTemplate, DRUG_COCKTAILS, type DrugCocktailMod } from '../../engines/training-mix-scoring.engine';
+import { calculateMixScore, type MixSubstance, type MixProfile, MIX_MECHANISMS, MIX_SYNERGY, MIX_TEMPLATES, type MixTemplate, buildBestRecipe, type MixRecipe, type MixRecipeItem, groupRecipeItemsByTiming } from '../../engines/training-mix-scoring.engine';
 // Force Vite to include SUPPORT_CATALOG_DATA and CANONICAL_ID_MAP (prevents tree-shaking)
 // @ts-ignore
 (window as any).__SUPPORT_CATALOG__ = SUPPORT_CATALOG_DATA;
@@ -6424,25 +6424,23 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
                 { name:'L-карнитин', id:'l_carnitine', dose:'1', unit:'г', note:'Сразу после. Восстановление мышц', mg:1000 },
               ];
               const activeStack = isPre ? preStack : isIntra ? intraStack : postStack;
-              // Drug cocktail augmentation — add drug-specific substances
-              const drugAugment: { name: string; id: string; dose: string; unit: string; note: string; mg: number; timing: 'pre' | 'intra' | 'post' }[] = [];
+              // Recipe engine — build best recipe from active drugs
               const drugProfile = { weightKg: bw, drugs: { insulin: mixInsulin>0, insulinDose: mixInsulin, insulinTiming: mixInsulinTiming, igf: mixDrugIGF>0, igfDose: mixDrugIGF, igfTiming: mixDrugIGFTiming, gh: mixDrugGH>0, ghDose: mixDrugGH, ghTiming: mixDrugGHTiming, mgf: mixDrugMGF>0, mgfDose: mixDrugMGF, mgfTiming: mixDrugMGFTiming, glp1: mixDrugGLP1 } };
-              if (mixInsulin > 0) { const mod = DRUG_COCKTAILS.insulin(drugProfile as any); drugAugment.push(...mod.substances.map(s => ({ ...s, name: ({ dextrose:'Глюкоза/декстроза', creatine:'Креатин', eaa:'EAA (2:1:1)' }[s.id] || s.id) }))); }
-              if (mixDrugIGF > 0) { const mod = DRUG_COCKTAILS.igf(drugProfile as any); drugAugment.push(...mod.substances.map(s => ({ ...s, name: ({ eaa:'EAA (2:1:1)', glutamine:'L-глютамин', protein:'Сывороточный протеин' }[s.id] || s.id) }))); }
-              if (mixDrugMGF > 0) { const mod = DRUG_COCKTAILS.mgf(drugProfile as any); drugAugment.push(...mod.substances.map(s => ({ ...s, name: ({ glutamine:'L-глютамин', hmb:'HMB', protein:'Сывороточный протеин' }[s.id] || s.id) }))); }
-              if (mixDrugGH > 0) { const mod = DRUG_COCKTAILS.gh(drugProfile as any); drugAugment.push(...mod.substances.map(s => ({ ...s, name: ({ l_carnitine:'L-карнитин', cordyceps:'Кордицепс', electrolyte:'Электролиты (Na/K/Mg)' }[s.id] || s.id) }))); }
-              // Filter to current timing only
-              const timedAugment = drugAugment.filter(s => s.timing === (isPre ? 'pre' : isIntra ? 'intra' : 'post'));
-              // Deduplicate by id — drug-specific overrides win (last wins)
+              const recipeResult = buildBestRecipe(drugProfile as any as MixProfile);
+              const drugItems = recipeResult ? recipeResult.items : [];
+              const groupedDrugItems = groupRecipeItemsByTiming(drugItems);
+              // Merge into current timing
+              const timedDrugItems = groupedDrugItems[isPre ? 'pre' : isIntra ? 'intra' : 'post'] || [];
+              // Deduplicate by id — drug overrides base stack items
               const stackMap = new Map<string, typeof activeStack[0]>();
               for (const item of activeStack) stackMap.set(item.id, item);
-              for (const item of timedAugment) stackMap.set(item.id, item);
+              for (const item of timedDrugItems) stackMap.set(item.id, { name: item.id, ...item });
               const dedupedStack = [...stackMap.values()];
               // Drug-augment all three stacks for overview
               const augStack = (items: typeof activeStack, timing: 'pre'|'intra'|'post') => {
                 const m = new Map<string, typeof activeStack[0]>();
                 for (const item of items) m.set(item.id, item);
-                for (const item of drugAugment) { if (item.timing === timing) m.set(item.id, item); }
+                for (const item of groupedDrugItems[timing] || []) m.set(item.id, { name: item.id, ...item });
                 return [...m.values()];
               };
               const allStacks = { pre: augStack(preStack, 'pre'), intra: augStack(intraStack, 'intra'), post: augStack(postStack, 'post') };
@@ -6742,6 +6740,30 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
                     })}
                   </div>}
                 </div>
+
+                {/* Recipe engine info card */}
+                {recipeResult && (
+                  <div className="card" style={{ padding:10, borderLeft:`3px solid ${recipeResult.recipe.synergyScore >= 90 ? '#22c55e' : recipeResult.recipe.synergyScore >= 70 ? '#eab308' : '#ef4444'}`, marginBottom:8 }}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <span style={{fontSize:10,fontWeight:700,color:'var(--accent)'}}>🧪 {recipeResult.recipe.name}</span>
+                      <span style={{fontSize:8,padding:'2px 6px',borderRadius:8,background:'rgba(0,230,138,0.1)',color:'var(--accent)'}}>score {recipeResult.recipe.synergyScore}</span>
+                    </div>
+                    <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.4,margin:'4px 0'}}>{recipeResult.recipe.synergyNote}</div>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:4,marginTop:4}}>
+                      {recipeResult.recipe.description && <span style={{fontSize:7,color:'var(--text-dim)'}}>{recipeResult.recipe.description}</span>}
+                    </div>
+                    {recipeResult.items.filter(i => i.alternatives && i.alternatives.length > 0).length > 0 && (
+                      <div style={{marginTop:6}}>
+                        <span style={{fontSize:7,color:'var(--text-dim)',fontWeight:600}}>Можно заменить:</span>
+                        {recipeResult.items.filter(i => i.alternatives && i.alternatives.length > 0).map((item, ai) => (
+                          <div key={ai} style={{fontSize:7,color:'var(--text-dim)',marginTop:2}}>
+                            {item.id} → {item.alternatives!.map(a => a.id).join(' / ')}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="card" style={{ padding:10, marginBottom:8 }}>
                   <h4 style={{ margin:'0 0 6px', fontSize:11, color:'var(--text)' }}>📋 Все три стека (обзор) · цель: {

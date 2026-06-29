@@ -254,49 +254,263 @@ export const MIX_TEMPLATES: MixTemplate[] = [
   },
 ];
 
-// ── Drug-specific cocktail augmentations ──
-// Each entry: what substances to ADD (+) or REMOVE (-) when drug is active
-export interface DrugCocktailMod {
-  substances: { id: string; dose: string; unit: string; note: string; mg: number; timing: 'pre' | 'intra' | 'post' }[];
-  replaceProto?: string; // id proto-вещества, которое ЗАМЕНИТЬ (если drug заменяет обычный предтрен)
+// ── MIX RECIPE ENGINE ──
+// Вместо жёсткой привязки drug->вещества — система рецептов, которые подбирают
+// коктейль по активным препаратам, профилю и цели. Рецепты конкурируют по synergyScore,
+// ротируются при равном счёт, а пользователь может заменять/удалять вещества.
+
+export interface MixRecipeItem {
+  id: string;
+  dose: string;
+  unit: string;
+  note: string;
+  mg: number;
+  timing: 'pre' | 'intra' | 'post';
+  alternatives?: { id: string; dose: string; unit: string; note: string }[];
 }
 
-export const DRUG_COCKTAILS: Record<string, (profile: MixProfile) => DrugCocktailMod> = {
-  insulin: (p) => {
-    const isPost = p.drugs.insulinTiming === 'post';
-    return {
-      substances: isPost ? [
-        { id:'dextrose', dose:`${Math.round(p.weightKg * 0.8)}`, unit:'г', note:'Сразу после — закрыть окно инсулина', mg:Math.round(p.weightKg * 0.8 * 1000), timing:'post' },
-        { id:'creatine', dose:'5', unit:'г', note:'С инсулином усвоение креатина +30%', mg:5000, timing:'post' },
-        { id:'eaa', dose:`${Math.round(p.weightKg * 0.3)}`, unit:'г', note:'Инсулин + EAA = макс. MPS', mg:Math.round(p.weightKg * 0.3 * 1000), timing:'post' },
-      ] : [
-        { id:'dextrose', dose:`${Math.round(p.weightKg * 0.5)}`, unit:'г', note:'Перед — профилактика гипогликемии', mg:Math.round(p.weightKg * 0.5 * 1000), timing:'pre' },
-        { id:'creatine', dose:'5', unit:'г', note:'За 30 мин до. Усвоение +30% с инсулином', mg:5000, timing:'pre' },
-      ],
-    };
+export interface MixRecipe {
+  id: string;
+  name: string;
+  description: string;
+  condition: (activeDrugs: { id: string; dose?: number; timing?: string }[], profile: MixProfile) => boolean;
+  build: (activeDrugs: { id: string; dose?: number; timing?: string }[], profile: MixProfile) => MixRecipeItem[];
+  synergyScore: number;
+  synergyNote: string;
+}
+
+function activeDrugsFromProfile(p: MixProfile): { id: string; dose?: number; timing?: string }[] {
+  const arr: { id: string; dose?: number; timing?: string }[] = [];
+  if (p.drugs.insulin) arr.push({ id:'insulin', dose:p.drugs.insulinDose, timing:p.drugs.insulinTiming });
+  if (p.drugs.igf) arr.push({ id:'igf', dose:p.drugs.igfDose, timing:p.drugs.igfTiming });
+  if (p.drugs.mgf) arr.push({ id:'mgf', dose:p.drugs.mgfDose, timing:p.drugs.mgfTiming });
+  if (p.drugs.gh) arr.push({ id:'gh', dose:p.drugs.ghDose, timing:p.drugs.ghTiming });
+  if (p.drugs.glp1) arr.push({ id:'glp1' });
+  return arr;
+}
+
+export const MIX_RECIPES: MixRecipe[] = [
+  // ── Комбинированные ──
+  {
+    id: 'max_anabolic',
+    name: 'Максимальный анаболизм (Insulin + IGF-1)',
+    description: 'Инсулин открывает клетки, IGF-1 запускает MPS. Декстроза + EAA + креатин.',
+    condition: (d) => d.filter(x=>['insulin','igf'].includes(x.id)).length === 2,
+    build: (d, p) => {
+      const isPost = d.find(x=>x.id==='insulin')?.timing === 'post';
+      const bw = p.weightKg;
+      const items: MixRecipeItem[] = [];
+      if (isPost) {
+        items.push({ id:'dextrose', dose:`${Math.round(bw*0.8)}`, unit:'г', note:'Закрыть окно инсулина + IGF-1', mg:Math.round(bw*0.8*1000), timing:'post' });
+        items.push({ id:'eaa', dose:`${Math.round(bw*0.3)}`, unit:'г', note:'Инсулин ↑ усвоение EAA, IGF-1 ↑ MPS — двойной анаболизм', mg:Math.round(bw*0.3*1000), timing:'post', alternatives:[{ id:'whey_hydro', dose:`${Math.round(bw*0.5)}`, unit:'г', note:'Сывороточный гидролизат — быстрее EAA, но + калории' }] });
+        items.push({ id:'creatine', dose:'5', unit:'г', note:'Транспорт креатина с инсулином +30%', mg:5000, timing:'post', alternatives:[{ id:'hmb', dose:'3', unit:'г', note:'HMB — анти-катаболизм' }] });
+      } else {
+        items.push({ id:'dextrose', dose:`${Math.round(bw*0.5)}`, unit:'г', note:'Профилактика гипогликемии', mg:Math.round(bw*0.5*1000), timing:'pre' });
+        items.push({ id:'eaa', dose:`${Math.round(bw*0.2)}`, unit:'г', note:'IGF-1 + EAA до тренировки', mg:Math.round(bw*0.2*1000), timing:'pre' });
+        items.push({ id:'creatine', dose:'5', unit:'г', note:'Креатин до — загрузка', mg:5000, timing:'pre' });
+      }
+      items.push({ id:'glutamine', dose:'10', unit:'г', note:'IGF-1 ↑ пролиферацию энтероцитов', mg:10000, timing:'post' });
+      return items;
+    },
+    synergyScore: 95,
+    synergyNote: 'Инсулин ↑ транспорт субстратов, IGF-1 ↑ синтез белка — синергия первого порядка.',
   },
-  igf: (p) => ({
-    substances: [
-      { id:'eaa', dose:`${Math.round(p.weightKg * 0.25)}`, unit:'г', note:'IGF-1 ↑ MPS — максимум субстрата', mg:Math.round(p.weightKg * 0.25 * 1000), timing:'intra' },
-      { id:'glutamine', dose:'10', unit:'г', note:'IGF-1 ↑ пролиферацию энтероцитов', mg:10000, timing:'post' },
-      { id:'protein', dose:`${Math.round(p.weightKg * 0.5)}`, unit:'г', note:'IGF-1 ↑ синтез белка — двойная доза протеина', mg:Math.round(p.weightKg * 0.5 * 1000), timing:'post' },
+  {
+    id: 'gh_mgf_regen',
+    name: 'Регенерация + Сателлиты (GH + MGF)',
+    description: 'GH ↑ липолиз и печёночный IGF-1, MGF ↑ сателлитные клетки локально.',
+    condition: (d) => d.filter(x=>['gh','mgf'].includes(x.id)).length === 2,
+    build: (d, p) => {
+      const bw = p.weightKg;
+      return [
+        { id:'glutamine', dose:'10', unit:'г', note:'МГФ ↑ сателлитные — глутамин для деления', mg:10000, timing:'post', alternatives:[{ id:'glycine', dose:'5', unit:'г', note:'Глицин — для коллагена' }] },
+        { id:'hmb', dose:'3', unit:'г', note:'МГФ + HMB = анти-катаболизм + регенерация', mg:3000, timing:'post', alternatives:[{ id:'creatine', dose:'5', unit:'г', note:'Креатин — если цель сила' }] },
+        { id:'protein', dose:`${Math.round(bw*0.5)}`, unit:'г', note:'Белок для регенерации', mg:Math.round(bw*0.5*1000), timing:'post' },
+        { id:'l_carnitine', dose:'2', unit:'г', note:'GH ↑ липолиз — транспорт ЖК', mg:2000, timing:'intra', alternatives:[{ id:'glycerol', dose:'3', unit:'г', note:'Глицерол — гидратация' }] },
+        { id:'cordyceps', dose:'3', unit:'г', note:'GH + кордицепс = митохондриальный биогенез', mg:3000, timing:'pre' },
+        { id:'electrolyte', dose:'1.5', unit:'г/л', note:'GH задерживает натрий — коррекция', mg:1500, timing:'intra' },
+      ];
+    },
+    synergyScore: 90,
+    synergyNote: 'GH ↑ системный IGF-1, MGF ↑ локальную регенерацию — полный охват.',
+  },
+  {
+    id: 'insulin_mgf_pump',
+    name: 'Гликоген + Сателлиты (Insulin + MGF)',
+    description: 'Инсулин ↑ гликоген и транспорт, MGF ↑ регенерацию волокон.',
+    condition: (d) => d.filter(x=>['insulin','mgf'].includes(x.id)).length === 2,
+    build: (d, p) => {
+      const bw = p.weightKg;
+      return [
+        { id:'dextrose', dose:`${Math.round(bw*0.6)}`, unit:'г', note:'Инсулин + MGF — гликоген + регенерация', mg:Math.round(bw*0.6*1000), timing:'post', alternatives:[{ id:'hbcd', dose:`${Math.round(bw*0.7)}`, unit:'г', note:'HBCD — медленнее, менее инсулиновый пик' }] },
+        { id:'creatine', dose:'5', unit:'г', note:'Транспорт креатина +30%', mg:5000, timing:'post' },
+        { id:'glutamine', dose:'10', unit:'г', note:'MGF ↑ сателлитные', mg:10000, timing:'post' },
+        { id:'hmb', dose:'3', unit:'г', note:'MGF + HMB', mg:3000, timing:'post' },
+      ];
+    },
+    synergyScore: 85,
+    synergyNote: 'Инсулин — субстраты, MGF — сателлиты. Два независимых пути роста.',
+  },
+  {
+    id: 'full_anabolic_cocktail',
+    name: 'Полный анаболический коктейль (Insulin + IGF + GH + MGF)',
+    description: 'Все 4 препарата — максимальный анаболизм, регенерация и сателлиты.',
+    condition: (d) => d.filter(x=>['insulin','igf','gh','mgf'].includes(x.id)).length === 4,
+    build: (d, p) => {
+      const bw = p.weightKg;
+      const isPost = d.find(x=>x.id==='insulin')?.timing === 'post';
+      const items: MixRecipeItem[] = [
+        { id:'dextrose', dose:`${Math.round(bw*0.8)}`, unit:'г', note:'Инсулин+IGF+GH — закрыть все окна', mg:Math.round(bw*0.8*1000), timing:'post' },
+        { id:'eaa', dose:`${Math.round(bw*0.3)}`, unit:'г', note:'Субстрат для MPS (IGF) + транспорт (инсулин)', mg:Math.round(bw*0.3*1000), timing:'post' },
+        { id:'creatine', dose:'5', unit:'г', note:'Транспорт +30% + контракт. функция (GH)', mg:5000, timing:'post' },
+        { id:'glutamine', dose:'10', unit:'г', note:'MGF ↑ сателлиты + GH ↑ IgA', mg:10000, timing:'post' },
+        { id:'hmb', dose:'3', unit:'г', note:'Анти-катаболизм (MGF + GH)', mg:3000, timing:'post' },
+        { id:'protein', dose:`${Math.round(bw*0.5)}`, unit:'г', note:'Белок для всех 4 препаратов', mg:Math.round(bw*0.5*1000), timing:'post' },
+        { id:'l_carnitine', dose:'2', unit:'г', note:'GH ↑ липолиз — транспорт ЖК', mg:2000, timing:'intra' },
+        { id:'electrolyte', dose:'1', unit:'г/л', note:'GH задерживает натрий', mg:1000, timing:'intra' },
+        { id:'cordyceps', dose:'3', unit:'г', note:'GH + кордицепс = митохондриальный биогенез', mg:3000, timing:'pre' },
+      ];
+      if (!isPost) items.push({ id:'dextrose', dose:`${Math.round(bw*0.5)}`, unit:'г', note:'Инсулин до — гипогликемия', mg:Math.round(bw*0.5*1000), timing:'pre' });
+      return items;
+    },
+    synergyScore: 98,
+    synergyNote: 'Максимальная синергия всех 4 препаратов: анаболизм, регенерация, сателлиты.',
+  },
+  // ── Insulin + GH (конфликт) ──
+  {
+    id: 'insulin_gh_compromise',
+    name: 'Insulin + GH (компромисс)',
+    description: 'GH ↑ контринсулярные гормоны, инсулин ↓ глюкозу. Баланс и коррекция.',
+    condition: (d) => d.filter(x=>['insulin','gh'].includes(x.id)).length === 2,
+    build: (d, p) => {
+      const bw = p.weightKg;
+      return [
+        { id:'dextrose', dose:`${Math.round(bw*0.7)}`, unit:'г', note:'Выше — GH ↑ глюконеогенез', mg:Math.round(bw*0.7*1000), timing:'post', alternatives:[{ id:'hbcd', dose:`${Math.round(bw*0.8)}`, unit:'г', note:'HBCD — плавный подъём глюкозы' }] },
+        { id:'eaa', dose:`${Math.round(bw*0.2)}`, unit:'г', note:'Субстрат для GH-зависимого IGF-1', mg:Math.round(bw*0.2*1000), timing:'post' },
+        { id:'creatine', dose:'5', unit:'г', note:'GH + креатин = сила', mg:5000, timing:'post' },
+        { id:'l_carnitine', dose:'2', unit:'г', note:'GH ↑ липолиз', mg:2000, timing:'intra' },
+        { id:'electrolyte', dose:'1.5', unit:'г/л', note:'GH задерж. Na, инсулин ↓ K — коррекция', mg:1500, timing:'intra' },
+      ];
+    },
+    synergyScore: 70,
+    synergyNote: 'GH контринсулярный — выше глюкоза + электролиты.',
+  },
+  // ── Одиночные ──
+  {
+    id: 'insulin_only',
+    name: 'Инсулин: субстратный коктейль',
+    description: 'Инсулин — транспорт субстратов. Декстроза + креатин + EAA.',
+    condition: (d) => d.filter(x=>x.id==='insulin').length === 1 && d.length === 1,
+    build: (d, p) => {
+      const isPost = d.find(x=>x.id==='insulin')?.timing === 'post';
+      const bw = p.weightKg;
+      return isPost ? [
+        { id:'dextrose', dose:`${Math.round(bw*0.8)}`, unit:'г', note:'Закрыть инсулиновое окно', mg:Math.round(bw*0.8*1000), timing:'post', alternatives:[{ id:'waxy_maize', dose:`${Math.round(bw*0.9)}`, unit:'г', note:'Восковая кукуруза — спокойный инс. ответ' }] },
+        { id:'creatine', dose:'5', unit:'г', note:'Транспорт +30%', mg:5000, timing:'post', alternatives:[{ id:'hmb', dose:'3', unit:'г', note:'HMB — анти-катаболизм' }] },
+        { id:'eaa', dose:`${Math.round(bw*0.2)}`, unit:'г', note:'MPS с инсулином', mg:Math.round(bw*0.2*1000), timing:'post' },
+      ] : [
+        { id:'dextrose', dose:`${Math.round(bw*0.5)}`, unit:'г', note:'Профилактика гипогликемии', mg:Math.round(bw*0.5*1000), timing:'pre' },
+        { id:'creatine', dose:'5', unit:'г', note:'Загрузка до', mg:5000, timing:'pre' },
+      ];
+    },
+    synergyScore: 80,
+    synergyNote: 'Инсулин — ключевой анаболический гормон: транспорт глюкозы, аминокислот, креатина.',
+  },
+  {
+    id: 'igf_only',
+    name: 'IGF-1: анаболический коктейль',
+    description: 'IGF-1 ↑ MPS и пролиферацию сателлитов. EAA + глютамин + белок.',
+    condition: (d) => d.filter(x=>x.id==='igf').length === 1 && d.length === 1,
+    build: (d, p) => {
+      const bw = p.weightKg;
+      return [
+        { id:'eaa', dose:`${Math.round(bw*0.25)}`, unit:'г', note:'Субстрат для IGF-1-зависимого MPS', mg:Math.round(bw*0.25*1000), timing:'intra', alternatives:[{ id:'whey_hydro', dose:`${Math.round(bw*0.4)}`, unit:'г', note:'Гидролизат сыворотки' }] },
+        { id:'glutamine', dose:'10', unit:'г', note:'IGF-1 ↑ пролиферацию энтероцитов', mg:10000, timing:'post' },
+        { id:'protein', dose:`${Math.round(bw*0.5)}`, unit:'г', note:'IGF-1 требует белка для синтеза', mg:Math.round(bw*0.5*1000), timing:'post' },
+      ];
+    },
+    synergyScore: 82,
+    synergyNote: 'IGF-1 запускает каскад синтеза белка — нужны субстраты.',
+  },
+  {
+    id: 'mgf_only',
+    name: 'MGF: сателлитный коктейль',
+    description: 'МГФ активирует сателлитные клетки. Глутамин + HMB + белок.',
+    condition: (d) => d.filter(x=>x.id==='mgf').length === 1 && d.length === 1,
+    build: (d, p) => {
+      const bw = p.weightKg;
+      return [
+        { id:'glutamine', dose:'10', unit:'г', note:'МГФ ↑ сателлитные — глутамин субстрат', mg:10000, timing:'post', alternatives:[{ id:'glycine', dose:'5', unit:'г', note:'Глицин — коллаген + сателлиты' }] },
+        { id:'hmb', dose:'3', unit:'г', note:'Анти-катаболизм + синергия с MGF', mg:3000, timing:'post' },
+        { id:'protein', dose:`${Math.round(bw*0.5)}`, unit:'г', note:'Белок для регенерации', mg:Math.round(bw*0.5*1000), timing:'post' },
+      ];
+    },
+    synergyScore: 78,
+    synergyNote: 'MGF — локальный фактор роста: сателлиты + анти-катаболизм.',
+  },
+  {
+    id: 'gh_only',
+    name: 'GH: липолиз + митохондрии',
+    description: 'GH ↑ липолиз и печёночный IGF-1. L-карнитин + кордицепс + электролиты.',
+    condition: (d) => d.filter(x=>x.id==='gh').length === 1 && d.length === 1,
+    build: () => [
+      { id:'l_carnitine', dose:'2', unit:'г', note:'GH ↑ липолиз — транспорт ЖК', mg:2000, timing:'intra', alternatives:[{ id:'acetyl_l_carnitine', dose:'1.5', unit:'г', note:'ALCAR — лучше ГЭБ' }] },
+      { id:'cordyceps', dose:'3', unit:'г', note:'Митохондриальный биогенез + GH', mg:3000, timing:'pre' },
+      { id:'electrolyte', dose:'1.5', unit:'г/л', note:'GH задерживает натрий', mg:1500, timing:'intra' },
     ],
-  }),
-  mgf: (p) => ({
-    substances: [
-      { id:'glutamine', dose:'10', unit:'г', note:'МГФ ↑ сателлитные клетки — глутамин для деления', mg:10000, timing:'post' },
-      { id:'hmb', dose:'3', unit:'г', note:'МГФ + HMB = синергия анти-катаболизма', mg:3000, timing:'post' },
-      { id:'protein', dose:`${Math.round(p.weightKg * 0.5)}`, unit:'г', note:'МГФ требует белка для регенерации', mg:Math.round(p.weightKg * 0.5 * 1000), timing:'post' },
+    synergyScore: 75,
+    synergyNote: 'GH ↑ IGF-1 и липолиз — поддержка митохондрий и электролитов.',
+  },
+  {
+    id: 'glp1_only',
+    name: 'GLP-1: метаболический коктейль',
+    description: 'GLP-1 ↑ инсулин чувствительность, ↓ аппетит. Электролиты + магний.',
+    condition: (d) => d.some(x=>x.id==='glp1'),
+    build: () => [
+      { id:'electrolyte', dose:'1', unit:'г/л', note:'GLP-1 ↑ диурез — коррекция', mg:1000, timing:'intra' },
+      { id:'magnesium', dose:'400', unit:'мг', note:'GLP-1 ↓ Mg — восполнение', mg:400, timing:'post' },
     ],
-  }),
-  gh: (p) => ({
-    substances: [
-      { id:'l_carnitine', dose:'2', unit:'г', note:'ГР ↑ липолиз — карнитин усиливает транспорт ЖК', mg:2000, timing:'intra' },
-      { id:'cordyceps', dose:'3', unit:'г', note:'ГР + кордицепс = митохондриальный биогенез', mg:3000, timing:'pre' },
-      { id:'electrolyte', dose:'1.5', unit:'г/л', note:'ГР задерживает натрий — корректировка электролитов', mg:1500, timing:'intra' },
-    ],
-  }),
-};
+    synergyScore: 60,
+    synergyNote: 'GLP-1: риск дефицита электролитов и магния.',
+  },
+];
+
+/** Выбрать лучший рецепт по активным препаратам. С ротацией при равном synergyScore. */
+export function buildBestRecipe(profile: MixProfile): {
+  recipe: MixRecipe;
+  items: MixRecipeItem[];
+} | null {
+  const drugs = activeDrugsFromProfile(profile);
+  if (drugs.length === 0) return null;
+
+  const candidates = MIX_RECIPES
+    .filter(r => r.condition(drugs, profile))
+    .sort((a, b) => b.synergyScore - a.synergyScore);
+
+  if (candidates.length === 0) return null;
+
+  const topScore = candidates[0].synergyScore;
+  const top = candidates.filter(r => r.synergyScore === topScore);
+  const picked = top.length === 1 ? top[0] : (() => {
+    const day = new Date().getDay();
+    return top[day % top.length];
+  })();
+
+  return { recipe: picked, items: picked.build(drugs, profile) };
+}
+
+/** Сгруппировать и дедуплицировать по таймингу */
+export function groupRecipeItemsByTiming(items: MixRecipeItem[]): Record<'pre'|'intra'|'post', MixRecipeItem[]> {
+  const grouped = { pre: [] as MixRecipeItem[], intra: [] as MixRecipeItem[], post: [] as MixRecipeItem[] };
+  const seen = new Set<string>();
+  for (const item of items) {
+    const key = `${item.id}_${item.timing}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    grouped[item.timing].push(item);
+  }
+  return grouped;
+}
 
 export function calculateMixScore(substances: MixSubstance[], profile: MixProfile): TrainingMixScore {
   const multiplier = profile.isOnCycle ? 1.25 : 1.0;
