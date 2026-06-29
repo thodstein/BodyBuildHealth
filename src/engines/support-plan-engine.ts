@@ -136,7 +136,7 @@ function rPharma(s: any): Record<string, number> {
   const r: Record<string, number> = {}; const p = s.pharma || {}; const aas = p.aas || [];
   if (aas.length > 0) {
     const totalDose = aas.reduce((a: number, b: any) => a + (b.doseMgWeek || 0), 0);
-    const hasOral = aas.some((a: any) => ['methand','oxan','stan','trena','halo','superdrol','m1t'].includes(a.id));
+    const hasOral = aas.some((a: any) => ['methandienone','oxandrolone','stanozolol','dianabol','anadrol','winstrol','anavar','turinabol','superdrol','m1t','halodrol','halotestin','methyltestosterone'].some(n => a.id?.toLowerCase().includes(n)));
     const hasTren = aas.some((a: any) => a.id.includes('tren'));
     const hasNand = aas.some((a: any) => a.id.includes('nand') || a.id.includes('deca'));
     r.endocrine = clamp(totalDose * 0.02, 0, 50);
@@ -502,11 +502,44 @@ function findAbnormalLabs(readings: LabReading[]): Array<{ marker: string; name:
 function parseLabDataFromExternal(labArray: any[] | undefined): LabReading[] {
   const readings: LabReading[] = [];
   if (!labArray || !Array.isArray(labArray)) return readings;
+
+  // Russian → English marker name mapping for LabPoint data
+  const RU_TO_EN: Record<string, string> = {
+    'АЛТ': 'ALT', 'АСТ': 'AST', 'ГГТ': 'GGT', 'Билирубин общий': 'Bilirubin',
+    'Креатинин': 'Creatinine', 'Мочевина': 'Urea', 'Глюкоза': 'GLU',
+    'ТТГ': 'TSH', 'Т3 свободный': 'FT3', 'Т4 свободный': 'FT4',
+    'ЛПНП': 'LDL', 'ЛПВП': 'HDL', 'Триглицериды': 'Triglycerides',
+    'Гематокрит': 'HCT', 'Гемоглобин': 'Hemoglobin', 'Эритроциты': 'RBC',
+    'Тромбоциты': 'PLT', 'Лейкоциты': 'WBC', 'СОЭ': 'ESR',
+    'Ферритин': 'FERRITIN', 'Железо': 'IRON', 'ОЖСС': 'TIBC',
+    'Тестостерон общий': 'TT', 'Эстрадиол': 'E2', 'Пролактин': 'PRL',
+    'ЛГ': 'LH', 'ФСГ': 'FSH', 'ГСПГ': 'SHBG', 'ДГТ': 'DHT',
+    'Кортизол': 'CORTISOL', 'ДГЭА-С': 'DHEA_S', 'ПСА общий': 'PSA',
+    'СРБ': 'CRP', 'Гомоцистеин': 'HOMOCYSTEINE', 'Витамин D 25-OH': 'VITD',
+    'Витамин B12': 'B12', 'Фолат': 'FOL', 'Магний': 'MAGNESIUM',
+    'Цинк': 'ZINC', 'Селен': 'SELENIUM', 'Калий': 'POTASSIUM', 'Натрий': 'SODIUM',
+    'Кальций': 'CALCIUM', 'Фосфор': 'PHOSPHORUS', 'Медь': 'COPPER',
+    'D-димер': 'D-dimer', 'Фибриноген': 'Fibrinogen', 'МНО': 'INR',
+    'СКФ': 'EGFR', 'Мочевая кислота': 'URIC_ACID',
+    'Гликированный Hb': 'HbA1c', 'Инсулин': 'INS',
+  };
+
   for (const entry of labArray) {
-    // Handle various data formats
-    if (entry.value !== undefined) {
-      readings.push({ marker: entry.marker || entry.name || '', value: parseFloat(entry.value) || 0, unit: entry.unit || '', date: entry.date });
+    // LabPoint format: {code, name, value, unit, date}
+    const rawCode = entry.code || entry.marker || entry.name || '';
+    // Try English code first, then Russian name lookup
+    let markerCode = rawCode;
+    if (!markerCode.match(/^[A-Z]/)) {
+      markerCode = RU_TO_EN[rawCode] || rawCode;
     }
+
+    if (entry.value !== undefined) {
+      const numVal = parseFloat(String(entry.value).replace(/[^\d.\-]/g, ''));
+      if (!isNaN(numVal) && numVal > 0) {
+        readings.push({ marker: markerCode, value: numVal, unit: entry.unit || '', date: entry.date });
+      }
+    }
+
     // Handle panel-style data
     const panels = ['panelBiochem', 'panelHematology', 'panelLipid', 'panelIron', 'panelThyroid',
       'panelSex', 'panelVitamin', 'panelCardiac', 'panelCoagulation', 'panelInflammatory',

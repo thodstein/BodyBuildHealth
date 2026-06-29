@@ -77,7 +77,7 @@ function rPharma(s: CalculatorState): Partial<Record<RiskSystemId, number>> {
   const r: Record<string, number> = {}; const p = s.pharma;
   if (p.aas.length > 0) {
     const totalDose = p.aas.reduce((a, b) => a + b.doseMgWeek, 0);
-    const hasOral = p.aas.some(a => ['methand','oxan','stan','trena','halo','superdrol','m1t'].includes(a.id));
+    const hasOral = p.aas.some(a => ['methandienone','oxandrolone','stanozolol','dianabol','anadrol','winstrol','anavar','turinabol','superdrol','m1t','halodrol','halotestin','methyltestosterone','fluoxymesterone'].some(n => a.id?.toLowerCase().includes(n)));
     const hasTren = p.aas.some(a => a.id.includes('tren'));
     const hasNand = p.aas.some(a => a.id.includes('nand') || a.id.includes('deca'));
     const has19nor = p.aas.some(a => a.id.includes('tren') || a.id.includes('nand') || a.id === 'bold' || a.id === 'eq');

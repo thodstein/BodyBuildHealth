@@ -467,8 +467,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       courseWeek: courseWeekState,
     };
     const result = calculateSupportPlan(state, supportLevel as PowerLevel, jointMode, boostEnabled, enhancedSubs, linked.labs);
-    // Store result for detailed UI
-    setTimeout(() => setPlanResult(result), 0);
+    setPlanResult(result);
     // Map to a backwards-compatible effectiveLevel format
     const subs = result.substances.map(s => s.id);
     const dosages: Record<string, { mg: number; timing: string }> = {};
@@ -525,9 +524,22 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const defaults: Partial<CalculatorState> = {
       profile: { weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male' | 'female', workoutsPerWeek: s?.workoutsPerWeek ?? 3, avgWorkoutMinutes: s?.avgWorkoutMinutes ?? 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
       pharma: { phase: 'course', aas: aasList, hasGH: false, hasIGF: false, hasInsulin: false, hasHCG: !!linked.course?.find((c: any) => c.substanceId === 'hcg'), hasAI: false, hasCaber: false, hasSERM: false, hasSARMs: aasList.some(a => a.id.includes('ostarine') || a.id.includes('lgd')), hasMGF: false, hasGLP1: false },
-      oda: { jointPain: jointMode ? 'moderate' : 'none' as const, ligamentIssues: false, backPain: false, injuries: [] },
+      oda: { jointPain: (h.oda?.jointPain || 'none') as string, ligamentIssues: h.oda?.ligamentIssues || false, backPain: h.oda?.backPain || false, injuries: h.oda?.injuries || [] },
     };
-    const state: CalculatorState = { ...defaults, ...h, powerLevel: level, courseWeek: courseWeekState } as CalculatorState;
+    const state: CalculatorState = {
+      ...defaults,
+      ...h,
+      pharma: {
+        ...defaults.pharma,
+        ...(h.pharma || {}),
+        // Merge AAS from both sources: linked.course (primary) + saved data
+        aas: [...(defaults.pharma?.aas || []), ...((h.pharma?.aas || []) as any[]).filter((a: any) => !defaults.pharma?.aas?.some((d: any) => d.id === a.id))],
+        // Preserve hasHCG from linked.course
+        hasHCG: defaults.pharma?.hasHCG || h.pharma?.hasHCG || false,
+      },
+      powerLevel: level,
+      courseWeek: courseWeekState,
+    } as CalculatorState;
     const tzResult: CalculatorResult = calculateSupportTZ(state);
     // ── TZ Risk Engine: probabilistic 49-cell model ──
     const tzRiskInput = {
