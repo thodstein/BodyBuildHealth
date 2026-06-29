@@ -623,6 +623,23 @@ export const RiskScreen: React.FC = () => {
                       <div style={{ fontSize:18, fontWeight:800, color: reduction > 0 ? '#00e68a' : '#ef4444' }}>-{reductionPct}%</div>
                     </div>
                   </div>
+                  {sr.systemSupport && Object.keys(sr.systemSupport).length > 0 && (
+                    <div style={{ marginTop:6, display:'flex', flexDirection:'column', gap:2 }}>
+                      {Object.entries(sr.systemSupport as Record<string, number>).sort(([,a],[,b]) => b-a).slice(0, 5).map(([sys, cov]) => {
+                        const sysNames: Record<string,string> = { cardio:'ССС', hepatic:'Печень', renal:'Почки', neuro:'НС', endocrine:'Энд.', hematologic:'Кровь', reproductive:'Реп.', musculoskeletal:'ОДА' };
+                        const color = cov >= 70 ? '#22c55e' : cov >= 40 ? '#f59e0b' : '#ef4444';
+                        return (
+                          <div key={sys} style={{ display:'flex', alignItems:'center', gap:4 }}>
+                            <span style={{ width:30, fontSize:7, color:'var(--text-dim)', textAlign:'right' }}>{sysNames[sys]||sys}</span>
+                            <div style={{ flex:1, height:4, borderRadius:2, background:'rgba(255,255,255,0.05)', overflow:'hidden' }}>
+                              <div style={{ width:`${cov}%`, height:'100%', borderRadius:2, background:color }} />
+                            </div>
+                            <span style={{ fontSize:7, fontWeight:700, color, minWidth:30 }}>{cov}%</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'center' }}>Данные из калькулятора поддержки · {sr.subs?.length || 0} веществ</div>
                 </div>
               );

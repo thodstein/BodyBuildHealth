@@ -74,6 +74,9 @@ export const TrainingScreen: React.FC = () => {
   const [bodyWeight, setBodyWeight] = useState(80);
   const [sleepHours, setSleepHours] = useState(linked.profile?.settings?.baselineSleepHours ?? 7);
   const [stressLevel, setStressLevel] = useState(linked.profile?.settings?.baselineStressLevel ?? 5);
+  const [tprofile, updateTProfile] = useTrainingProfile();
+  // Синхронизируем локальные состояния из единого профиля (профиль — мастер для конструктора)
+  useEffect(() => { setGoal(tprofile.goal); setLevel(tprofile.level); setDaysPerWeek(tprofile.daysPerWeek); setRecovery(tprofile.recovery); setFatigue(tprofile.fatigue); setWeakPoints(tprofile.weakPoints); setBodyWeight(tprofile.bodyWeight); setSleepHours(tprofile.sleepHours); setStressLevel(tprofile.stressLevel); }, [tprofile]);
   const [customExercises, setCustomExercises] = useState<{ name: string; sets: number; reps: number; rir: number }[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingExercises') || '[]'); } catch { return []; } });
   const [lastAddedEx, setLastAddedEx] = useState<string | null>(null);
   const [trainingOutput, setTrainingOutput] = useState<TrainingOutput | null>(null);
@@ -144,6 +147,9 @@ export const TrainingScreen: React.FC = () => {
   const setManualWm = (k: string, v: number) => setManualWorkMax(p => ({ ...p, [k]: v }));
   const PCT_FOR_RIR_MAN: Record<number, number> = { 0: 1.0, 1: 0.96, 2: 0.92, 3: 0.88, 4: 0.84, 5: 0.80 };
   const [manualResult, setManualResult] = useState<{ splitName: string; days: { day: number; groups: string[]; exercises: { name: string; sets: number; reps: string; rir: number; rest: number; group: string; weight: number }[] }[] } | null>(null);
+  const [manualSavedPlans, setManualSavedPlans] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); } catch { return []; } });
+  const loadManualPlan = (plan: any) => { if (plan?.cfg) setManualCfg(plan.cfg); if (plan?.days) setManualResult({ splitName: plan.name || 'Загруженный план', days: plan.days }); };
+  const refreshManualSaved = () => { try { setManualSavedPlans(JSON.parse(localStorage.getItem('myTrainingPlans') || '[]')); } catch { setManualSavedPlans([]); } };
   const generateManualPlan = () => {
     const inp = { goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as TrainingInput;
     const auto = selectSplit(inp);
@@ -157,17 +163,20 @@ export const TrainingScreen: React.FC = () => {
     const days = cycle.map((groups, di) => {
       const exs: { name: string; sets: number; reps: string; rir: number; rest: number; group: string; weight: number }[] = [];
       groups.forEach(g => {
-        const pool = getExercisesByGroup(g);
+        const allPool = getExercisesByGroup(g);
+        const eqFilter = (e: typeof allPool[number]) => tprofile.equipment.length === 0 || tprofile.equipment.includes(e.equipment);
+        const pool = allPool.filter(eqFilter);
+        const poolFinal = pool.length > 0 ? pool : allPool; // fallback если по оборудованию ничего не нашлось
         // отбор по релевантности: соединения сначала (сортировка по приоритету инвентаря/типа), затем изоляции
-        const rank = (e: typeof pool[number]) => (e.type === 'compound' ? 100 : 0) + (e.equipment === 'barbell' ? 10 : e.equipment === 'dumbbell' ? 5 : 0) + (isWeak(g) ? 5 : 0);
-        const compounds = [...pool].filter(e => e.type === 'compound').sort((a, b) => rank(b) - rank(a)).slice(0, 2);
-        const isolations = [...pool].filter(e => e.type === 'isolation').sort((a, b) => rank(b) - rank(a)).slice(0, 2);
+        const rank = (e: typeof allPool[number]) => (e.type === 'compound' ? 100 : 0) + (e.equipment === 'barbell' ? 10 : e.equipment === 'dumbbell' ? 5 : 0) + (isWeak(g) ? 5 : 0);
+        const compounds = [...poolFinal].filter(e => e.type === 'compound').sort((a, b) => rank(b) - rank(a)).slice(0, 2);
+        const isolations = [...poolFinal].filter(e => e.type === 'isolation').sort((a, b) => rank(b) - rank(a)).slice(0, 2);
         const chosen = [...compounds, ...isolations];
         for (const ex of chosen) {
           const already = weeklySets[g] || 0;
           if (already >= mrv) break; // кап объёма по MRV — анти-перетрен
           const pr = calcExercisePrescription(ex, goal, level, isWeak(g), false, 1, 1, mesoLength);
-          const wm = manualWorkMax[g] || 80;
+          const wm = (tprofile.workMax[g] || manualWorkMax[g] || 80);
           const pct = PCT_FOR_RIR_MAN[Math.max(0, Math.min(5, pr.rir))] ?? 0.9;
           const weight = Math.round(wm * pct);
           exs.push({ name: ex.name, sets: pr.sets, reps: pr.reps, rir: pr.rir, rest: pr.rest, group: g, weight });
@@ -531,6 +540,7 @@ export const TrainingScreen: React.FC = () => {
               </div>
             ))}
           </div>
+          {(() => { const srpe = loadSRPESessions(); if (srpe.length < 2) return null; const acwr = acuteChronicRatio(toDailyLoads(srpe)); const zoneColor = acwr.ratio > 1.5 ? '#ef4444' : acwr.ratio > 1.3 ? '#eab308' : acwr.ratio < 0.8 ? '#3b82f6' : '#22c55e'; const zoneLabel = acwr.ratio > 1.5 ? 'опасно' : acwr.ratio > 1.3 ? 'осторожно' : acwr.ratio < 0.8 ? 'недотрен' : 'оптимум'; return <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}><span style={{ color: 'var(--text-dim)', minWidth: 44 }}>Нагрузка</span><div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 4, height: 5, overflow: 'hidden' }}><div style={{ width: Math.min(100, acwr.ratio * 50) + '%', height: '100%', background: zoneColor, borderRadius: 4 }} /></div><span style={{ fontWeight: 700, color: zoneColor, minWidth: 60, textAlign: 'right' }}>ACWR {acwr.ratio.toFixed(2)} · {zoneLabel}</span></div>; })()}
         </div>
       )}
 
@@ -2009,6 +2019,7 @@ export const TrainingScreen: React.FC = () => {
           {/* ═══════ UNIFIED PROGRAM BUILDER (только в Ручном конструкторе) ═══════ */}
           {tab === 'programcalc' && (<>
           <div className="card" style={{ padding: '10px 12px' }}>
+            <TrainingProfileCard profile={tprofile} update={updateTProfile} />
             <h3 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 800, color: 'var(--accent)' }}>🛠 Ручной конструктор программы</h3>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 10 }}>Выберите параметры сверху вниз и нажмите «Собрать программу» — получите готовый план по дням.</div>
             <div style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: 12, marginBottom: 10 }}>
@@ -2040,10 +2051,7 @@ export const TrainingScreen: React.FC = () => {
 
             {/* Кнопка генерации по ручной конфигурации + результат */}
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 6, marginTop: 8 }}>💪 Рабочие максимумы (кг) — для расчёта весов</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
-                {Object.keys(manualWorkMax).map(k => { const RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' }; return <PopupNumber key={k} label={RU[k] || k} value={manualWorkMax[k]} min={10} max={400} suffix=' кг' onChange={v => setManualWm(k, v)} />; })}
-              </div>
+
               <button onClick={generateManualPlan} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13 }}>🔧 Собрать программу по конфигурации</button>
               <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>Соберёт план из выбранного сплита (или авто) + цель/уровень/дни/недели с назначением через calcExercisePrescription.</div>
             </div>
@@ -2079,9 +2087,21 @@ export const TrainingScreen: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                <button onClick={() => { try { const data = { name: `Ручная: ${manualResult.splitName}`, date: new Date().toISOString().slice(0,10), cfg: manualCfg, days: manualResult.days, generatedAt: Date.now() }; const ex = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); ex.unshift(data); localStorage.setItem('myTrainingPlans', JSON.stringify(ex.slice(0,30))); } catch {} }} style={{ width: '100%', marginTop: 8, padding: 10, borderRadius: 8, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.06)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>💾 Сохранить программу в «Мои тренировки»</button>
+                <button onClick={() => { try { const data = { name: `Ручная: ${manualResult.splitName}`, date: new Date().toISOString().slice(0,10), cfg: manualCfg, days: manualResult.days, generatedAt: Date.now() }; const ex = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); ex.unshift(data); localStorage.setItem('myTrainingPlans', JSON.stringify(ex.slice(0,30))); refreshManualSaved(); } catch {} }} style={{ width: '100%', marginTop: 8, padding: 10, borderRadius: 8, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.06)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>💾 Сохранить программу в «Мои тренировки»</button>
               </div>
             )}
+
+            {/* Загрузить сохранённый план обратно в конструктор */}
+            {(() => { const plans = manualSavedPlans.filter((p: any) => p && p.days); if (plans.length === 0) return null; return <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>📁 Сохранённые программы ({plans.length}) — загрузить в конструктор</div>
+              {plans.map((p: any, i: number) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, padding: '5px 8px', marginBottom: 4, borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ fontSize: 10, color: '#fff', fontWeight: 600 }}>{p.name} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>· {p.date} · {p.days?.length} дн</span></span>
+                <span style={{ display: 'flex', gap: 4 }}>
+                  <button onClick={() => loadManualPlan(p)} style={{ padding: '3px 8px', borderRadius: 5, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', cursor: 'pointer', fontSize: 9, fontWeight: 700 }}>↩ Загрузить</button>
+                  <button onClick={() => { try { const ex = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); const upd = ex.filter((x: any, j: number) => x !== p); localStorage.setItem('myTrainingPlans', JSON.stringify(upd)); refreshManualSaved(); } catch {} }} style={{ padding: '3px 8px', borderRadius: 5, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 9 }}>✕</button>
+                </span>
+              </div>)}
+            </div>; })()}
 
             <button onClick={() => setShowWizard(w => !w)} style={{ width: '100%', padding: 10, borderRadius: 10, border: '1px dashed rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.04)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 700, marginBottom: 10 }}>{showWizard ? '▲ Скрыть пошаговый мастер' : '▼ Расширенный пошаговый мастер'}</button>
             {/* Step indicators */}
@@ -2187,7 +2207,9 @@ export const TrainingScreen: React.FC = () => {
                     cycle.forEach((groups, di) => {
                       const dayExs: any[] = [];
                       groups.forEach(g => {
-                        const catalogExs = [...getExercisesByGroup(g)];
+                        const _allEx = getExercisesByGroup(g);
+                        const _eqF = (e: typeof _allEx[number]) => tprofile.equipment.length === 0 || tprofile.equipment.includes(e.equipment);
+                        const catalogExs = [...(_allEx.filter(_eqF).length > 0 ? _allEx.filter(_eqF) : _allEx)];
                         const shuffled = catalogExs.sort(() => (Math.random() + shuffleSeed) % 1 - 0.5);
                         const compounds = shuffled.filter(e => e.type === 'compound');
                         const isolations = shuffled.filter(e => e.type === 'isolation');
@@ -2290,7 +2312,9 @@ export const TrainingScreen: React.FC = () => {
                       const dayExs: any[] = [];
                       groups.forEach(g => {
                         const isWk = isWeak(g);
-                        const catalogExs = [...getExercisesByGroup(g)];
+                        const _allEx = getExercisesByGroup(g);
+                        const _eqF = (e: typeof _allEx[number]) => tprofile.equipment.length === 0 || tprofile.equipment.includes(e.equipment);
+                        const catalogExs = [...(_allEx.filter(_eqF).length > 0 ? _allEx.filter(_eqF) : _allEx)];
                         // Score exercises by relevance using calcExercisePrescription
                         const scored = catalogExs.map(ex => {
                           const presc = calcExercisePrescription(ex, goal, level, isWk, false, 1.0, 1, mesoLength || 12);
@@ -2355,7 +2379,9 @@ export const TrainingScreen: React.FC = () => {
                       }
                       const dayExs: any[] = [];
                       newGroup.forEach(g => {
-                        const catalogExs = [...getExercisesByGroup(g)];
+                        const _allEx = getExercisesByGroup(g);
+                        const _eqF = (e: typeof _allEx[number]) => tprofile.equipment.length === 0 || tprofile.equipment.includes(e.equipment);
+                        const catalogExs = [...(_allEx.filter(_eqF).length > 0 ? _allEx.filter(_eqF) : _allEx)];
                         const shuffled = catalogExs.sort(() => Math.random() - 0.5);
                         shuffled.slice(0, 2).forEach((ex, i) => {
                           dayExs.push({
@@ -3389,6 +3415,10 @@ import { VolumeOptimizerTab } from './TrainingScreen_parts/VolumeOptimizerTab';
 import { ExerciseCalcTab } from './TrainingScreen_parts/ExerciseCalcTab';
 import { TrainingLoadCalculator } from './TrainingScreen_parts/TrainingLoadCalculator';
 import { TonnageCalculator } from './TrainingScreen_parts/TonnageCalculator';
+import { useTrainingProfile } from './TrainingScreen_parts/training-profile';
+import { TrainingProfileCard } from './TrainingScreen_parts/TrainingProfileCard';
+import { loadSRPESessions } from '../../engines/pro/srpe-store';
+import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import { PopupSelect, PopupNumber, ExpandableCard } from './SRCBBScreen_parts/TrainingPopups';
 import { LMS_CYCLES } from '../../data/lms-cycles/lms-cycle-index';
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './TrainingScreen_parts/programs-data';

@@ -29,6 +29,7 @@ import { TRAINING_SPLITS } from '../../engines/training.engine';
 import { getMethodsByCategory } from '../../engines/training-methodology.engine';
 import { FULL_PROGRAM_LIBRARY } from '../../engines/complete-program-library.engine';
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './TrainingScreen_parts/programs-data';
+import { loadTrainingProfile, saveTrainingProfile } from './TrainingScreen_parts/training-profile';
 import { StrengthDiary } from '../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../core/types';
 import { AnalyticsTab } from './TrainingScreen_parts/AnalyticsTab';
@@ -59,21 +60,23 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   };
   const [subView, setSubView] = useState<string>('plan');
 
-  // ── СРЦ ──
-  const [level, setLevel] = useState<string>('II-KMS');
-  const [goal, setGoal] = useState<string>('strength');
-  const [dir, setDir] = useState<string>('powerlifting');
-  const [bw, setBw] = useState<number>(85);
-  const [days, setDays] = useState<number>(3);
-  const [pmSquat, setPmSquat] = useState<number>(120);
-  const [pmBench, setPmBench] = useState<number>(100);
-  const [pmDead, setPmDead] = useState<number>(140);
+  // ── СРЦ ── (инициализация из сессии PL и единого профиля тренированности)
   const _plSaved: any = (() => { try { return JSON.parse(localStorage.getItem('he_pl_session') || 'null'); } catch { return null; } })();
+  const _profPL = loadTrainingProfile();
+  const [level, setLevel] = useState<string>(_plSaved?.plLevel || 'II-KMS');
+  const [goal, setGoal] = useState<string>(_plSaved?.plGoal || 'strength');
+  const [dir, setDir] = useState<string>(_plSaved?.plDir || 'powerlifting');
+  const [bw, setBw] = useState<number>(_plSaved?.plBw ?? _profPL.bodyWeight ?? 85);
+  const [days, setDays] = useState<number>(_plSaved?.plDays ?? 3);
+  const [pmSquat, setPmSquat] = useState<number>(_plSaved?.pmSquat ?? _profPL.pmSquat ?? 120);
+  const [pmBench, setPmBench] = useState<number>(_plSaved?.pmBench ?? _profPL.pmBench ?? 100);
+  const [pmDead, setPmDead] = useState<number>(_plSaved?.pmDead ?? _profPL.pmDead ?? 140);
   const [selectedCycleId, setSelectedCycleId] = useState<string>(_plSaved?.selectedCycleId || 'cycle-01');
   const [cycleWeeks, setCycleWeeks] = useState<number>(_plSaved?.cycleWeeks ?? 12);
   const [builtSrc, setBuiltSrc] = useState<LMSBuildOutput | null>(_plSaved?.builtSrc ?? null);
   const [srcWeek, setSrcWeek] = useState<number>(_plSaved?.srcWeek ?? 1);
-  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc]);
+  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, level, goal, dir, bw, days, pmSquat, pmBench, pmDead]);
+  useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), pmSquat, pmBench, pmDead, bodyWeight: bw }); } catch { /* ignore */ } }, [pmSquat, pmBench, pmDead, bw]);
   // U4: ручная правка поверх сгенерированного плана (оверлей правок по позиции сета)
   const [editMode, setEditMode] = useState<boolean>(false);
   const [srcEdits, setSrcEdits] = useState<Record<string, { weight?: number; reps?: number; sets?: number }>>({});
@@ -131,9 +134,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [bbWeekSel, setBbWeekSel] = useState<number>(_bbSaved?.bbWeekSel ?? 1);
   const BB_WM_KEYS = ['chest','back','quads','hamstrings','shoulders','biceps','triceps','glutes','calves','abs'] as const;
   const BB_WM_RU: Record<string,string> = { chest:'Грудь', back:'Спина', quads:'Квадрицепсы', hamstrings:'Бицепс бедра', shoulders:'Плечи', biceps:'Бицепс', triceps:'Трицепс', glutes:'Ягодичные', calves:'Икры', abs:'Пресс' };
-  const [bbWorkMax, setBbWorkMax] = useState<Record<string, number>>(_bbSaved?.bbWorkMax ?? { chest: 100, back: 110, quads: 140, hamstrings: 90, shoulders: 60, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60 });
+  const [bbWorkMax, setBbWorkMax] = useState<Record<string, number>>({ chest: 100, back: 110, quads: 140, hamstrings: 90, shoulders: 60, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60, ...(_profPL?.workMax || {}), ...(_bbSaved?.bbWorkMax || {}) });
   const setBbWm = (k: string, v: number) => setBbWorkMax(p => ({ ...p, [k]: v }));
   useEffect(() => { try { localStorage.setItem('he_bb_session', JSON.stringify({ bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel, bbWorkMax })); } catch { /* ignore */ } }, [bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel]);
+  useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax }); } catch { /* ignore */ } }, [bbWorkMax]);
   const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
   const [appliedMethods, setAppliedMethods] = useState<Record<string, string>>({});
   const [methodNote, setMethodNote] = useState<string | null>(null);
@@ -560,18 +564,20 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               </MetricCard>
               {/* Объём по мышцам */}
               <MetricCard title="Объём по мышцам (сетов/нед)" icon="🏋️" accent="#a855f7">
-                <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.6fr 0.6fr 0.6fr', gap:2, fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', padding:'2px 0' }}>
-                  <span>Мышца</span><span>Сетов</span><span>Тяж</span><span>Памп</span>
+                <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', padding:'2px 0' }}>
+                  <span>Мышца</span><span>Сетов</span><span>Тяж</span><span>Памп</span><span>MRV</span>
                 </div>
-                {m.perMuscle.map(mm => (
-                  <div key={mm.muscle} style={{ display:'grid', gridTemplateColumns:'1.4fr 0.6fr 0.6fr 0.6fr', gap:2, fontSize:10, color:'rgba(255,255,255,0.85)', padding:'3px 0', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
-                    <span style={{ fontWeight:600 }}>{mm.muscle}</span>
-                    <span style={{ color:ACCENT, fontWeight:700 }}>{mm.totalSets}</span>
+                {m.perMuscle.map(mm => { const over = mm.totalSets > (mm.mrv || 999); return (
+                  <div key={mm.muscle} style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:10, color:'rgba(255,255,255,0.85)', padding:'3px 0', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
+                    <span style={{ fontWeight:600 }}>{mm.muscle}{over ? ' ⚠' : ''}</span>
+                    <span style={{ color: over ? '#ef4444' : ACCENT, fontWeight:700 }}>{mm.totalSets}</span>
                     <span style={{ color:'#ef4444' }}>{mm.тяжSets}</span>
                     <span style={{ color:'#60a5fa' }}>{mm.пампSets}</span>
+                    <span style={{ color:'rgba(255,255,255,0.5)' }}>{mm.mrv}</span>
                   </div>
-                ))}
+                ); })}
               </MetricCard>
+              {(() => { const wkStats = W.map(w => { const exs = w.sessions.flatMap(s => s.exercises); const sets = exs.reduce((s, e) => s + e.sets, 0); const rir = sets > 0 ? exs.reduce((s, e) => s + e.rir * e.sets, 0) / sets : 0; return { week: w.week, sets, rir }; }); const maxS = Math.max(1, ...wkStats.map(x => x.sets)); const px = (i: number) => 24 + (i / Math.max(1, W.length - 1)) * 280; const py = (v: number) => 60 - (v / 5) * 44; return <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.15)' }}><div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>📈 Прогрессия объёма и RIR по неделям</div><svg width='100%' viewBox='0 0 320 70' style={{ maxWidth: 360, margin: '0 auto', display: 'block' }}>{wkStats.map(x => <rect key={'b'+x.week} x={px(x.week-1)-8} y={60 - (x.sets / maxS) * 44} width={16} height={(x.sets / maxS) * 44} rx={3} fill='rgba(0,230,138,0.4)' />)}<polyline points={wkStats.map(x => px(x.week-1) + ',' + py(x.rir)).join(' ')} fill='none' stroke='#a855f7' strokeWidth={1.6} />{wkStats.map(x => <circle key={'r'+x.week} cx={px(x.week-1)} cy={py(x.rir)} r={2} fill='#a855f7' />)}</svg><div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 4 }}><span style={{ fontSize: 9, color: 'rgba(0,230,138,0.8)' }}>▮ Сеты/нед</span><span style={{ fontSize: 9, color: '#a855f7' }}>● RIR</span></div></div>; })()}
               <div style={{ ...SMALL, marginTop: 8, padding: 8, background:'rgba(96,165,250,0.06)', borderRadius:8, border:'1px solid rgba(96,165,250,0.15)' }}>{explainBBMetrics(m)}</div>
             </div>;
           })()}

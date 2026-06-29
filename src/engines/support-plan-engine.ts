@@ -11,6 +11,7 @@ import { SYSTEM_MECHANISMS } from '../core/system-mechanisms';
 import { LAB_MARKER_MAP, LAB_MARKER_MAP_BY_NAME, type LabMarkerMap } from '../data/lab-marker-map';
 import { ALL_STACKS, type SupportStack } from '../data/support-stacks';
 import { findBridgeMechsForStack, getStackSystemCoverage } from '../data/mechanism-code-bridge';
+import { PHARMA_DB } from '../core/pharma-database';
 
 // ═══════════════════════════════════════════════════════════════
 //  SUPPORT PLAN ENGINE v4 — Professional
@@ -113,6 +114,11 @@ function rProfile(s: any): Record<string, number> {
   else if (p.alcohol === 'sometimes') r.hepatic = (r.hepatic || 0) + 8;
   if ((p.caffeineMg || 0) > 400) { r.neuro = (r.neuro || 0) + 8; r.cardio += 5; }
   if (p.bodyfat > 25) { r.cardio += 8; r.hepatic = (r.hepatic || 0) + 5; }
+  // Training load → joint/recovery stress
+  const trainingVolume = (p.workoutsPerWeek || 3) * (p.avgWorkoutMinutes || 60);
+  if (trainingVolume > 600) { r.musculoskeletal = (r.musculoskeletal || 0) + 10; r.neuro = (r.neuro || 0) + 5; }
+  else if (trainingVolume > 400) r.musculoskeletal = (r.musculoskeletal || 0) + 5;
+  if (p.sleepHours < 6 && trainingVolume > 400) r.neuro = (r.neuro || 0) + 8;
   return r;
 }
 
@@ -135,7 +141,8 @@ function rNeuro(s: any): Record<string, number> {
 function rPharma(s: any): Record<string, number> {
   const r: Record<string, number> = {}; const p = s.pharma || {}; const aas = p.aas || [];
   if (aas.length > 0) {
-    const totalDose = aas.reduce((a: number, b: any) => a + (b.doseMgWeek || 0), 0);
+  const totalDose = aas.reduce((a: number, b: any) => a + (b.doseMgWeek || 0), 0);
+  const trainingVolume = (p.workoutsPerWeek || 3) * (p.avgWorkoutMinutes || 60);
     const hasOral = aas.some((a: any) => ['methandienone','oxandrolone','stanozolol','dianabol','anadrol','winstrol','anavar','turinabol','superdrol','m1t','halodrol','halotestin','methyltestosterone'].some(n => a.id?.toLowerCase().includes(n)));
     const hasTren = aas.some((a: any) => a.id.includes('tren'));
     const hasNand = aas.some((a: any) => a.id.includes('nand') || a.id.includes('deca'));
@@ -147,6 +154,32 @@ function rPharma(s: any): Record<string, number> {
     if (hasNand) r.reproductive = clamp((r.reproductive || 0) + 10, 0, 50);
     r.hematologic = clamp(totalDose * 0.01, 0, 35);
     if (totalDose > 1000) r.cardio = clamp((r.cardio || 0) + 10, 0, 50);
+
+    // PHARMA_DB integration: per-drug linkedRisks + cvProfile + pd
+    for (const ae of aas) {
+      const ph = PHARMA_DB[ae.id];
+      if (!ph) continue;
+      if (ph.linkedRisks) {
+        for (const lr of ph.linkedRisks) {
+          const m: Record<string,string> = { cardio:'cardio', hepatic:'hepatic', renal:'renal', neuro:'neuro', neuro_toxicity:'neuro', endocrine:'endocrine', hematologic:'hematologic', reproductive:'reproductive', musculoskeletal:'musculoskeletal', prostate:'reproductive', skin:'musculoskeletal', metabolic:'cardio', vessels:'cardio', blood:'hematologic', immunity:'hematologic', ins_axis:'endocrine', ghigf:'endocrine', thyroid:'endocrine' };
+          const sys = m[lr.system]; if (!sys) continue;
+          if (lr.direction === 'up') r[sys] = clamp((r[sys]||0) + Math.round(lr.strength * 30), 0, 100);
+          else r[sys] = Math.max(0, (r[sys]||0) - Math.round(lr.strength * 15));
+        }
+      }
+      if (ph.cvProfile) {
+        if (ph.cvProfile.bloodPressure === 'up') r.cardio = (r.cardio||0) + 8;
+        if (ph.cvProfile.heartRate === 'up') r.cardio = (r.cardio||0) + 5;
+        if (ph.cvProfile.thrombosisRisk === 'high') r.hematologic = (r.hematologic||0) + 12;
+        if (ph.cvProfile.cnsLoad === 'high') r.neuro = (r.neuro||0) + 10;
+      }
+      if (ph.pd) {
+        if (ph.pd.hepatotoxicity > 1) r.hepatic = (r.hepatic||0) + Math.round(ph.pd.hepatotoxicity * 10);
+        if (ph.pd.neuro_toxicity > 0.3) r.neuro = (r.neuro||0) + Math.round(ph.pd.neuro_toxicity * 40);
+        if (ph.pd.lipid_impact < -0.4) r.cardio = (r.cardio||0) + Math.round(Math.abs(ph.pd.lipid_impact) * 30);
+        if (ph.pd.hct_impact > 3) r.hematologic = (r.hematologic||0) + Math.round(ph.pd.hct_impact * 4);
+      }
+    }
   }
   if (p.hasGH) { r.endocrine = (r.endocrine || 0) + 15; r.cardio = (r.cardio || 0) + 5; }
   if (p.hasIGF) r.endocrine = (r.endocrine || 0) + 8;
@@ -426,6 +459,10 @@ export interface PlanResult {
   weekScale: number;
   /** Рекомендованные стеки, отсортированные по релевантности */
   stackRecommendations: StackRecommendation[];
+  /** Конфликты между выбранными веществами */
+  conflicts: Array<{ a: string; b: string; aName: string; bName: string; effect: string; severity: string }>;
+  /** Расшифровка источников риска по системам */
+  riskBreakdown: Record<string, string[]>;
 }
 
 // ─── Lab Data Analysis ───
@@ -660,7 +697,110 @@ export function calculateSupportPlan(
   externalLabs?: any[],
 ): PlanResult {
   const scores = calcAllRisks(state);
+
+  // ─── RISK BREAKDOWN: explain sources of each system's risk ───
+  const riskBreakdown: Record<string, string[]> = {};
+  const p = state.profile || {};
+  const ph = state.pharma || {};
+  const aas = ph.aas || [];
+  const totalDose = aas.reduce((a: number, b: any) => a + (b.doseMgWeek || 0), 0);
+
+  const brd = (sys: string, reason: string) => { if (!riskBreakdown[sys]) riskBreakdown[sys] = []; riskBreakdown[sys].push(reason); };
+
+  // Cardio
+  if ((scores.cardio || 0) > 0) {
+    if (p.workoutsPerWeek < 2) brd('cardio', `Низкая активность: ${p.workoutsPerWeek || 0} тренировок/нед (+10%)`);
+    if (p.sleepHours < 7) brd('cardio', `Недостаток сна: ${p.sleepHours || 0} ч (+5-10%)`);
+    if ((p.stressLevel || 4) > 5) brd('cardio', `Стресс: уровень ${p.stressLevel || 4}/10 (+5-10%)`);
+    if (p.smoker) brd('cardio', `Курение (+15%)`);
+    if ((p.bodyfat || 0) > 25) brd('cardio', `% жира >25% (+8%)`);
+    if (totalDose > 0) brd('cardio', `ААС: суммарная доза ${totalDose} мг/нед (+${Math.round(totalDose * 0.015)}%)`);
+    if (aas.some((a: any) => a.id.includes('tren'))) brd('cardio', `Тренболон: дополнительная нагрузка (+10%)`);
+    if (state.cardio?.bpStage === 'hypertension1') brd('cardio', `Гипертензия 1 ст. (+25%)`);
+    else if (state.cardio?.bpStage === 'prehypertension') brd('cardio', `Предгипертензия (+10%)`);
+    if (state.cardio?.ldlElevation !== 'none' && state.cardio?.ldlElevation) brd('cardio', `Повышен ЛПНП (+5-15%)`);
+    if (state.cardio?.previousCVD) brd('cardio', `ССЗ в анамнезе (+25%)`);
+    if (state.cardio?.familyCVD) brd('cardio', `Семейный анамнез ССЗ (+10%)`);
+    if (state.contraindications?.hasCVD) brd('cardio', `Диагностированные ССЗ (+20%)`);
+    if (state.contraindications?.hasDiabetes) brd('cardio', `Диабет (+10%)`);
+    if (ph.hasGH) brd('cardio', `Гормон роста (+5%)`);
+    if (ph.hasInsulin) brd('cardio', `Инсулин (+10%)`);
+  }
+
+  // Hepatic
+  if ((scores.hepatic || 0) > 0) {
+    if (p.alcohol === 'regular') brd('hepatic', `Алкоголь регулярно (+20%)`);
+    else if (p.alcohol === 'sometimes') brd('hepatic', `Алкоголь иногда (+8%)`);
+    if (p.bodyfat > 25) brd('hepatic', `% жира >25% (+5%)`);
+    if (totalDose > 0) {
+      const hasOral = aas.some((a: any) => ['methandienone','oxandrolone','stanozolol','dianabol','anadrol','superdrol','turinabol'].some(n => a.id?.toLowerCase().includes(n)));
+      if (hasOral) brd('hepatic', `Оральные ААС — высокая гепатотоксичность (+30%)`);
+      else brd('hepatic', `Инъекционные ААС — умеренная нагрузка (+5%)`);
+    }
+    if (state.hepatobiliary?.fattyLiver) brd('hepatic', `Жировой гепатоз (+20%)`);
+    if (state.contraindications?.hasLiverDisease) brd('hepatic', `Заболевания печени (+20%)`);
+    if (state.epicrisis?.pastLiverIssues) brd('hepatic', `Проблемы печени в прошлом (+15%)`);
+  }
+
+  // Neuro
+  if ((scores.neuro || 0) > 0) {
+    if ((p.caffeineMg || 0) > 400) brd('neuro', `Кофеин >400 мг/д (+8%)`);
+    if (aas.some((a: any) => a.id.includes('tren'))) brd('neuro', `Тренболон — нейротоксичность (+35%)`);
+    if (state.neuro?.sleepQuality === 'poor') brd('neuro', `Плохой сон (+15%)`);
+    else if (state.neuro?.sleepQuality === 'fair') brd('neuro', `Нестабильный сон (+5%)`);
+    if (trainingVolume > 600) brd('neuro', `Высокий тренировочный объём: ${trainingVolume} мин/нед (+5%)`);
+    if (ph.hasInsulin) brd('neuro', `Инсулин (+5%)`);
+    if (state.contraindications?.hasEpilepsy) brd('neuro', `Эпилепсия (+15%)`);
+    if (state.contraindications?.hasMentalIllness) brd('neuro', `Психиатрический диагноз (+10%)`);
+  }
+
+  // Renal
+  if ((scores.renal || 0) > 0) {
+    if (state.urinary?.proteinuria) brd('renal', `Протеинурия (+20%)`);
+    if (state.urinary?.nephrotoxicDrugs) brd('renal', `Нефротоксичные препараты (+15%)`);
+    if (state.urinary?.hypertension) brd('renal', `Гипертензия (+15%)`);
+    if (state.urinary?.diabetes) brd('renal', `Диабет (+20%)`);
+    if (state.contraindications?.hasKidneyDisease) brd('renal', `Заболевания почек (+20%)`);
+    if (state.contraindications?.hasDiabetes) brd('renal', `Диабет (+10%)`);
+    if (state.epicrisis?.pastKidneyIssues) brd('renal', `Проблемы почек в прошлом (+15%)`);
+  }
+
+  // Endocrine
+  if ((scores.endocrine || 0) > 0) {
+    if (totalDose > 0) brd('endocrine', `ААС подавляют ГГЯ (+${Math.round(totalDose * 0.02)}%)`);
+    if (ph.hasGH) brd('endocrine', `Гормон роста (+15%)`);
+    if (ph.hasIGF) brd('endocrine', `IGF-1 (+8%)`);
+    if (state.goals?.previousCycles > 5) brd('endocrine', `${state.goals.previousCycles} циклов в истории (+10%)`);
+  }
+
+  // Hematologic
+  if ((scores.hematologic || 0) > 0) {
+    if (totalDose > 0) brd('hematologic', `ААС повышают гематокрит (+${Math.round(totalDose * 0.01)}%)`);
+    if (state.contraindications?.hasThrombophilia) brd('hematologic', `Тромбофилия (+25%)`);
+    if (state.epicrisis?.pastHctSpike) brd('hematologic', `Скачки гематокрита в прошлом (+15%)`);
+    if (state.cardio?.hctElevation !== 'none' && state.cardio?.hctElevation) brd('hematologic', `Повышен гематокрит (+5-15%)`);
+  }
+
+  // Reproductive
+  if ((scores.reproductive || 0) > 0) {
+    if (totalDose > 0) brd('reproductive', `ААС подавляют сперматогенез (+${Math.round(totalDose * 0.015)}%)`);
+    if (state.epicrisis?.pastGyno) brd('reproductive', `Гинекомастия в прошлом (+15%)`);
+    if (state.epicrisis?.pastLibidoDrop) brd('reproductive', `Падение либидо в прошлом (+10%)`);
+    if (state.goals?.previousCycles > 5) brd('reproductive', `${state.goals.previousCycles} циклов (+10%)`);
+  }
+
+  // Musculoskeletal
+  if ((scores.musculoskeletal || 0) > 0) {
+    if (trainingVolume > 600) brd('musculoskeletal', `Высокий объём тренировок: ${trainingVolume} мин/нед (+10%)`);
+    else if (trainingVolume > 400) brd('musculoskeletal', `Умеренный объём: ${trainingVolume} мин/нед (+5%)`);
+    if (state.oda?.jointPain === 'severe' || state.oda?.jointPain === 'moderate') brd('musculoskeletal', `Боль в суставах: ${state.oda.jointPain} (+15-30%)`);
+    if (state.oda?.ligamentIssues) brd('musculoskeletal', `Проблемы со связками (+15%)`);
+    if (state.oda?.backPain) brd('musculoskeletal', `Боли в спине (+10%)`);
+    if ((state.oda?.injuries || []).length > 0) brd('musculoskeletal', `${state.oda.injuries.length} травм в истории (+${state.oda.injuries.length * 5}%)`);
+  }
   const excludedSubs = new Set(state.journal?.negative?.map((n: any) => normalizeId(n.substanceId)) || []);
+  // Protection levels: base % + coverage bonus (up to 85%)
+  const levelBaseProtection: Record<string, number> = { basic: 0.30, mid: 0.45, max: 0.60, boost: 0.70 };
 
   // ─── CONTRAINDICATION FILTER: exclude substances that conflict with user health data ───
   const userCI = new Set<string>();
@@ -944,6 +1084,38 @@ export function calculateSupportPlan(
     }
   }
 
+  // ─── SNP / GENETIC PERSONALIZATION ───
+  if (state.genetics?.mthfr === 'c677t') {
+    if (!selectedIds.has('folate') && !isContraindicated('folate')) {
+      selectedIds.add('folate');
+      substanceReasons['folate'] = substanceReasons['folate'] || [];
+      substanceReasons['folate'].push({ mechInfo: 'Генетика MTHFR C677T: обязателен 5-MTHF (активный фолат)', system: 'general' });
+    }
+    if (!selectedIds.has('vitamin_b12') && !isContraindicated('vitamin_b12')) {
+      selectedIds.add('vitamin_b12');
+      substanceReasons['vitamin_b12'] = substanceReasons['vitamin_b12'] || [];
+      substanceReasons['vitamin_b12'].push({ mechInfo: 'Генетика MTHFR: метилкобаламин для обхода дефекта метилирования', system: 'general' });
+    }
+    if (!selectedIds.has('vitamin_b6') && !isContraindicated('vitamin_b6')) {
+      selectedIds.add('vitamin_b6');
+      substanceReasons['vitamin_b6'] = substanceReasons['vitamin_b6'] || [];
+      substanceReasons['vitamin_b6'].push({ mechInfo: 'Генетика MTHFR: P5P для транссульфурации гомоцистеина', system: 'general' });
+    }
+  }
+  if (state.genetics?.cyp19a1 === 'high') {
+    if (!selectedIds.has('dim') && !isContraindicated('dim')) { selectedIds.add('dim'); if (!substanceReasons['dim']) substanceReasons['dim'] = []; substanceReasons['dim'].push({ mechInfo: 'Генетика CYP19A1 ↑: контроль ароматизации', system: 'endocrine' }); }
+  }
+  if (state.genetics?.srd5a2 === 'hypersensitive') {
+    if (!selectedIds.has('saw_palmetto') && !isContraindicated('saw_palmetto')) { selectedIds.add('saw_palmetto'); if (!substanceReasons['saw_palmetto']) substanceReasons['saw_palmetto'] = []; substanceReasons['saw_palmetto'].push({ mechInfo: 'Генетика SRD5A2 ↑: контроль ДГТ', system: 'reproductive' }); }
+  }
+  if (state.genetics?.arSensitivity === 'high') {
+    // Higher androgen receptor sensitivity = higher risk of polycythemia, BP issues
+    if (!selectedIds.has('omega3') && !isContraindicated('omega3')) { selectedIds.add('omega3'); if (!substanceReasons['omega3']) substanceReasons['omega3'] = []; substanceReasons['omega3'].push({ mechInfo: 'Генетика AR ↑: кардиопротекция при высокой чувствительности', system: 'cardio' }); }
+  }
+  if (state.genetics?.arSensitivity === 'low') {
+    if (!selectedIds.has('zinc') && !isContraindicated('zinc')) { selectedIds.add('zinc'); if (!substanceReasons['zinc']) substanceReasons['zinc'] = []; substanceReasons['zinc'].push({ mechInfo: 'Генетика AR ↓: повышение чувствительности рецепторов', system: 'endocrine' }); }
+  }
+
   // ─── Build PlanSubstance list ───
   const substances: PlanSubstance[] = [];
   for (const id of selectedIds) {
@@ -1033,8 +1205,8 @@ export function calculateSupportPlan(
       totalCoverage += Math.min(0.85, subCount * 0.15);
     }
     const avgCoverage = Math.min(0.75, totalCoverage / totalMechs);
-    const levelBase = level === 'basic' ? 0.25 : level === 'mid' ? 0.40 : level === 'max' ? 0.55 : 0.65;
-    const effectiveProtection = Math.min(0.80, levelBase + avgCoverage * 0.25);
+    const levelBase = levelBaseProtection[level] || 0.30;
+    const effectiveProtection = Math.min(0.85, levelBase + avgCoverage * 0.25);
     systemsResult[sys] = {
       raw: score,
       net: Math.max(0, Math.round(score * (1 - effectiveProtection))),
@@ -1053,8 +1225,8 @@ export function calculateSupportPlan(
       totalCoverage += Math.min(0.85, subCount * 0.15);
     }
     const avgCoverage = Math.min(0.75, totalCoverage / totalMechs);
-    const levelBase = level === 'basic' ? 0.25 : level === 'mid' ? 0.40 : level === 'max' ? 0.55 : 0.65;
-    const effectiveProtection = Math.min(0.80, levelBase + avgCoverage * 0.25);
+    const levelBase = levelBaseProtection[level] || 0.30;
+    const effectiveProtection = Math.min(0.85, levelBase + avgCoverage * 0.25);
     return { system: sys, before: raw, after: Math.max(0, Math.round(raw * (1 - effectiveProtection))), mechanisms: sysMechs };
   });
 
@@ -1072,13 +1244,17 @@ export function calculateSupportPlan(
   const specialInstructions = buildSpecialInstructions(substances);
 
   const systemScores = Object.values(scores);
-  const overallRaw = systemScores.length > 0 ? Math.round(systemScores.reduce((a, b) => a + b, 0) / systemScores.length) : 0;
+  const maxRisk = systemScores.length > 0 ? Math.max(...systemScores) : 0;
+  const avgRisk = systemScores.length > 0 ? Math.round(systemScores.reduce((a, b) => a + b, 0) / systemScores.length) : 0;
+  // Weighted: max risk dominates (60%), average supports (40%) — so hepatic 65% with cardio 20% = 65*0.6 + 21*0.4 = 47%
+  const overallRaw = Math.round(maxRisk * 0.6 + avgRisk * 0.4);
+
   let weightedProtectionSum = 0;
   let activeSystems = 0;
   for (const [sys, score] of Object.entries(scores)) {
     if (score > 0) {
       const sysResult = systemsResult[sys];
-      const ep = Math.max(0, Math.min(0.8, score > 0 ? (score - (sysResult?.net || score)) / score : 0));
+      const ep = Math.max(0, Math.min(0.85, score > 0 ? (score - (sysResult?.net || score)) / score : 0));
       weightedProtectionSum += ep;
       activeSystems++;
     }
@@ -1103,6 +1279,28 @@ export function calculateSupportPlan(
   // ─── Stack recommendations ───
   const stackRecommendations = recommendStacks(scores, selectedIds, level);
 
+  // ─── Conflict detection ───
+  const conflicts: PlanResult['conflicts'] = [];
+  const subList = Array.from(selectedIds);
+  for (let i = 0; i < subList.length; i++) {
+    for (let j = i + 1; j < subList.length; j++) {
+      const a = subList[i]; const b = subList[j];
+      const entryA = getCatalogEntry(a); const entryB = getCatalogEntry(b);
+      if (!entryA?.conflicts || !entryB) continue;
+      for (const c of entryA.conflicts) {
+        if (c.with === b || normalizeId(c.with) === normalizeId(b) || c.with.toUpperCase() === b.toUpperCase()) {
+          conflicts.push({
+            a, b,
+            aName: entryA.nameRu || entryA.name || a,
+            bName: entryB.nameRu || entryB.name || b,
+            effect: c.effect,
+            severity: c.severity,
+          });
+        }
+      }
+    }
+  }
+
   return {
     substances,
     dosages,
@@ -1121,6 +1319,8 @@ export function calculateSupportPlan(
     coverageGaps,
     weekScale: weekScale,
     stackRecommendations,
+    conflicts,
+    riskBreakdown,
   };
 }
 

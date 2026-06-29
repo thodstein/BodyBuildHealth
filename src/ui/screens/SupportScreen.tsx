@@ -90,6 +90,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [weekChangeMsg, setWeekChangeMsg] = useState('');
   const [planHistory, setPlanHistory] = useState<Array<{ level: string; subs: string[]; date: string; riskBefore: number; riskAfter: number }>>([]);
   const [supportPhase, setSupportPhase] = useState<SupportPhase>('course');
+  const [subSearch, setSubSearch] = useState('');
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'warning' | 'error' } | null>(null);
+  const showToast = (msg: string, type: 'success' | 'warning' | 'error' = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
   const [selectedAnalogs, setSelectedAnalogs] = useState<Record<string, string>>({});
   const [enhancedSubs, setEnhancedSubs] = useState<string[]>([]);
   const [supportGoal, setSupportGoal] = useState('muscle_gain');
@@ -2665,7 +2668,16 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                                   <span style={{ fontSize:9, fontWeight: f.best ? 700 : 400, color: f.best ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>{f.best ? '★' : '○'} {f.name}</span>
                                                   <span style={{ fontSize:8, color:'rgba(255,255,255,0.6)' }}>{f.dose}</span>
                                                   {f.best && <span style={{ fontSize:7, padding:'0px 4px', borderRadius:3, background:'rgba(0,230,138,0.1)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.2)' }}>Рекоменд.</span>}
-                                                </div>
+      {/* ===== TOAST ===== */}
+      {toast && (
+        <div style={{ position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', zIndex:1000,
+          padding:'8px 20px', borderRadius:12, fontSize:10, fontWeight:700,
+          background: toast.type==='success'?'rgba(0,230,138,0.9)':toast.type==='warning'?'rgba(245,158,11,0.9)':'rgba(239,68,68,0.9)',
+          color: toast.type==='success'?'#000':'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.4)' }}>
+          {toast.msg}
+        </div>
+      )}
+    </div>
                                               ))}
                                             </div>
                                           )}
@@ -5062,8 +5074,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <AutoCalculator embedded
               onApply={(applied: { level: string; subs: string[]; result: any }) => {
                 setAutoCalcResult(applied);
-                setSupportLevel(applied.level as 'basic' | 'mid' | 'max' | 'boost');
+                setSupportLevel(applied.level as any);
                 setEnhancedSubs(applied.subs || []);
+                showToast(`✅ ${SUPPORT_LEVELS[applied.level]?.label || applied.level}`, 'success');
+                setTimeout(() => calcSupport(applied.level as any), 100);
               }}
             />
 
