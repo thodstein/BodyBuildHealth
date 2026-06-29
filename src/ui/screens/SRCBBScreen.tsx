@@ -129,7 +129,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [peds, setPeds] = useState<PED[]>(_bbSaved?.peds ?? []);
   const [builtBb, setBuiltBb] = useState<BBPlan | null>(_bbSaved?.builtBb ?? null);
   const [bbWeekSel, setBbWeekSel] = useState<number>(_bbSaved?.bbWeekSel ?? 1);
-  useEffect(() => { try { localStorage.setItem('he_bb_session', JSON.stringify({ bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel })); } catch { /* ignore */ } }, [bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel]);
+  const BB_WM_KEYS = ['chest','back','quads','hamstrings','shoulders','biceps','triceps','glutes','calves','abs'] as const;
+  const BB_WM_RU: Record<string,string> = { chest:'Грудь', back:'Спина', quads:'Квадрицепсы', hamstrings:'Бицепс бедра', shoulders:'Плечи', biceps:'Бицепс', triceps:'Трицепс', glutes:'Ягодичные', calves:'Икры', abs:'Пресс' };
+  const [bbWorkMax, setBbWorkMax] = useState<Record<string, number>>(_bbSaved?.bbWorkMax ?? { chest: 100, back: 110, quads: 140, hamstrings: 90, shoulders: 60, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60 });
+  const setBbWm = (k: string, v: number) => setBbWorkMax(p => ({ ...p, [k]: v }));
+  useEffect(() => { try { localStorage.setItem('he_bb_session', JSON.stringify({ bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel, bbWorkMax })); } catch { /* ignore */ } }, [bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel]);
   const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
   const [appliedMethods, setAppliedMethods] = useState<Record<string, string>>({});
   const [methodNote, setMethodNote] = useState<string | null>(null);
@@ -152,7 +156,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
 
   const buildBb = () => {
     if (!bbBest) return;
-    const plan = buildBBPlan({ patternId: bbBest.pattern.id, level: bbLevel, goal: bbGoal as any, weeks: bbWeeks, workMax: { chest: 100, back: 110, quads: 140, hamstrings: 90, shoulders: 60, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60 } });
+    const plan = buildBBPlan({ patternId: bbBest.pattern.id, level: bbLevel, goal: bbGoal as any, weeks: bbWeeks, workMax: bbWorkMax });
     setBuiltBb(plan); setBbWeekSel(1);
   };
   const baseMrv = useMemo(() => Object.fromEntries(Object.entries(getAllVolumeLandmarks(bbLevel)).map(([k, v]) => [k, v.mrv])), [bbLevel]);
@@ -483,6 +487,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             {(['AAS','insulin','MGF','IGF1','GH'] as PED[]).map(p => <button key={p} style={peds.includes(p) ? BTN : BTN_GHOST} onClick={() => togglePed(p)}>{p}{peds.includes(p) ? ' ✓' : ''}</button>)}
           </div>
           {peds.length > 0 && <ExpandableCard title="Адаптация объёмов под PED" icon="💉" short={explainPEDAdaptation(pedAdapt)} full={null} />}
+          <div style={{ ...H, marginTop: 10 }}>💪 Рабочие максимумы (кг) — для расчёта весов</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+            {BB_WM_KEYS.map(k => <PopupNumber key={k} label={BB_WM_RU[k]} value={bbWorkMax[k] || 80} min={10} max={400} suffix=' кг' onChange={v => setBbWm(k, v)} />)}
+          </div>
           <button style={{ ...BTN, width: '100%', marginTop: 10 }} onClick={buildBb}>Сгенерировать BB-план ({bbWeeks} нед)</button>
           {builtBb && (() => {
             const W = builtBb.weeks;

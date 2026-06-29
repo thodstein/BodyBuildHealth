@@ -661,6 +661,35 @@ export function calculateSupportPlan(
 ): PlanResult {
   const scores = calcAllRisks(state);
   const excludedSubs = new Set(state.journal?.negative?.map((n: any) => normalizeId(n.substanceId)) || []);
+
+  // ─── CONTRAINDICATION FILTER: exclude substances that conflict with user health data ───
+  const userCI = new Set<string>();
+  const ci = state.contraindications || {};
+  if (ci.hasCVD) userCI.add('сердечно-сосудистые').add('ССЗ').add('гипертония').add('CVD');
+  if (ci.hasThrombophilia) userCI.add('тромбофилия').add('тромбоз').add('коагуляция');
+  if (ci.hasLiverDisease) userCI.add('печен').add('гепатит').add('цирроз').add('печёночная');
+  if (ci.hasKidneyDisease) userCI.add('почк').add('почечная').add('нефро').add('ХБП');
+  if (ci.hasDiabetes) userCI.add('диабет').add('инсулин').add('гликемия');
+  if (ci.hasEpilepsy) userCI.add('эпилепсия').add('судорог');
+  if (ci.hasMentalIllness) userCI.add('психи').add('шизофрения').add('биполяр');
+  if (ci.hasGI) userCI.add('язва').add('гастрит').add('ЖКТ');
+  if (ci.allergies) userCI.add(ci.allergies.toLowerCase());
+
+  function isContraindicated(subId: string): boolean {
+    const entry = getCatalogEntry(subId);
+    if (!entry?.contraindications) return false;
+    for (const contra of entry.contraindications) {
+      const low = contra.toLowerCase();
+      for (const term of userCI) {
+        if (low.includes(term)) return true;
+      }
+    }
+    return false;
+  }
+
+  // Also exclude substances with conflicts to current pharma
+  const pharmaSubs = new Set((state.pharma?.aas || []).map((a: any) => a.id?.toLowerCase()));
+  // ...
   const cw = state.courseWeek ?? 1;
 
   // ─── WEEK-BASED DOSE SCALING ───
@@ -701,7 +730,7 @@ export function calculateSupportPlan(
       for (const mechKey of mechKeys) {
         // Use auto-indexer: finds ALL catalog substances matching this mechanism
         const bridgeSubs = findCatalogSubstancesForBridgeMech(mechKey);
-        const normSubs = bridgeSubs.map(normalizeId).filter(id => !excludedSubs.has(id) && catalogExists(id));
+        const normSubs = bridgeSubs.map(normalizeId).filter(id => !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id));
         if (normSubs.length === 0) {
           uncoveredMechanisms.push({ mechKey, mechLabel: MECH_LABELS[mechKey] || mechKey, systemLabel: SYS_LABELS[sysKey] || sysKey, risk: sysScore });
           continue;
@@ -719,9 +748,23 @@ export function calculateSupportPlan(
           const tier = entry?.tier || 'standard';
           const tierPriority = tierOrder.indexOf(tier);
           const isCore = tier === 'core' ? 10 : 0;
-          return { id, tierPriority, isCore, tier };
+          // B1: Synergy bonus — prioritize substances with documented synergies to already-selected substances
+          let synergyBoost = 0;
+          if (entry?.synergies) {
+            for (const syn of entry.synergies) {
+              if (selectedIds.has(syn.with)) { synergyBoost += 3; break; }
+            }
+          }
+          // B2: bestForm priority
+          const bestFormBonus = entry?.bestForCourse ? 5 : 0;
+          return { id, tierPriority, isCore, tier, synergyBoost, bestFormBonus };
         });
-        scoredSubs.sort((a, b) => a.tierPriority - b.tierPriority || b.isCore - a.isCore);
+        scoredSubs.sort((a, b) =>
+          (a.tierPriority - b.tierPriority)
+          || (b.isCore - a.isCore)
+          || (b.synergyBoost - a.synergyBoost)
+          || (b.bestFormBonus - a.bestFormBonus)
+        );
 
         const picked: string[] = [];
         for (const s of scoredSubs) {
@@ -749,7 +792,7 @@ export function calculateSupportPlan(
   // ─── LAB-BASED SUBSTANCE SELECTION ───
   const labFindings: PlanResult['labFindings'] = [];
   for (const abn of abnormalLabs) {
-    const suggestedSubs = abn.correctionIds.filter(id => !selectedIds.has(id) && !excludedSubs.has(id));
+    const suggestedSubs = abn.correctionIds.filter(id => !selectedIds.has(id) && !excludedSubs.has(id) && !isContraindicated(id));
     const normSuggested = suggestedSubs.map(normalizeId).filter(id => catalogExists(id));
     labFindings.push({
       marker: abn.marker, name: abn.name, value: `${abn.value} ${abn.unit}`,
@@ -771,7 +814,7 @@ export function calculateSupportPlan(
   // ─── Add essential base substances for all levels ───
   const alwaysInclude = ['magnesium', 'vitamin_d3', 'zinc', 'omega3', 'coq10'];
   for (const id of alwaysInclude) {
-    if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id)) {
+    if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id)) {
       selectedIds.add(id);
       if (!substanceReasons[id]) substanceReasons[id] = [];
       substanceReasons[id].push({ mechInfo: 'Базовая поддержка (обязательно)', system: 'general' });
@@ -780,17 +823,17 @@ export function calculateSupportPlan(
 
   // ─── Add hepatoprotection if any hepatic risk ───
   const hepaticScore = scores.hepatic || 0;
-  if (hepaticScore >= 10 && !selectedIds.has('nac')) {
+  if (hepaticScore >= 10 && !selectedIds.has('nac') && !isContraindicated('nac')) {
     selectedIds.add('nac');
     if (!substanceReasons['nac']) substanceReasons['nac'] = [];
     substanceReasons['nac'].push({ mechInfo: 'Печень: цитолиз, окислительный стресс, детоксикация', system: 'hepatic' });
   }
-  if (hepaticScore >= 15 && !selectedIds.has('tudca')) {
+  if (hepaticScore >= 15 && !selectedIds.has('tudca') && !isContraindicated('tudca')) {
     selectedIds.add('tudca');
     if (!substanceReasons['tudca']) substanceReasons['tudca'] = [];
     substanceReasons['tudca'].push({ mechInfo: 'Печень: холестаз, желчеотток, ER-стресс', system: 'hepatic' });
   }
-  if (hepaticScore >= 15 && !selectedIds.has('milk_thistle')) {
+  if (hepaticScore >= 15 && !selectedIds.has('milk_thistle') && !isContraindicated('milk_thistle')) {
     selectedIds.add('milk_thistle');
     if (!substanceReasons['milk_thistle']) substanceReasons['milk_thistle'] = [];
     substanceReasons['milk_thistle'].push({ mechInfo: 'Печень: стабилизация мембран гепатоцитов', system: 'hepatic' });
@@ -798,12 +841,12 @@ export function calculateSupportPlan(
 
   // ─── Add cardio protection ───
   const cardioScore = scores.cardio || 0;
-  if (cardioScore >= 20 && !selectedIds.has('telmisartan')) {
+  if (cardioScore >= 20 && !selectedIds.has('telmisartan') && !isContraindicated('telmisartan')) {
     selectedIds.add('telmisartan');
     if (!substanceReasons['telmisartan']) substanceReasons['telmisartan'] = [];
     substanceReasons['telmisartan'].push({ mechInfo: 'ССС: контроль АД, ARB-защита', system: 'cardio' });
   }
-  if (cardioScore >= 15 && !selectedIds.has('nebivolol')) {
+  if (cardioScore >= 15 && !selectedIds.has('nebivolol') && !isContraindicated('nebivolol')) {
     selectedIds.add('nebivolol');
     if (!substanceReasons['nebivolol']) substanceReasons['nebivolol'] = [];
     substanceReasons['nebivolol'].push({ mechInfo: 'ССС: контроль ЧСС, NO-модуляция', system: 'cardio' });
@@ -814,7 +857,7 @@ export function calculateSupportPlan(
   if ((level === 'max' || level === 'boost') && neuroScore >= 10) {
     const neuroExtras = ['lions_mane', 'phosphatidylserine', 'theanine', 'glycine'];
     for (const id of neuroExtras) {
-      if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id)) {
+      if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id)) {
         selectedIds.add(id);
         if (!substanceReasons[id]) substanceReasons[id] = [];
         substanceReasons[id].push({ mechInfo: 'Нейропротекция: когнитивная поддержка, нейрогенез', system: 'neuro' });
@@ -824,7 +867,7 @@ export function calculateSupportPlan(
   if (level === 'boost' && neuroScore >= 5) {
     const boostNeuro = ['ashwagandha', 'melatonin', 'vitamin_b6'];
     for (const id of boostNeuro) {
-      if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id)) {
+      if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id)) {
         selectedIds.add(id);
         if (!substanceReasons[id]) substanceReasons[id] = [];
         substanceReasons[id].push({ mechInfo: 'Расширенная нейропротекция: адаптация, сон, нейромедиаторы', system: 'neuro' });
@@ -859,7 +902,7 @@ export function calculateSupportPlan(
     }
     // Also ensure basic joint vitamins
     for (const id of ['vitamin_d3', 'vitamin_k2', 'magnesium', 'calcium']) {
-      if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id)) {
+      if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id)) {
         selectedIds.add(id);
         if (!substanceReasons[id]) substanceReasons[id] = [];
         substanceReasons[id].push({ mechInfo: 'Кости/суставы: минеральная поддержка', system: 'musculoskeletal' });
@@ -871,7 +914,7 @@ export function calculateSupportPlan(
   if (boostEnabled) {
     const boostExtras = ['astragalus', 'melatonin', 'ginseng', 'egcg', 'l_carnitine', 'saw_palmetto', 'selenium', 'iron', 'copper', 'potassium'];
     for (const id of boostExtras) {
-      if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id)) {
+      if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id)) {
         selectedIds.add(id);
         if (!substanceReasons[id]) substanceReasons[id] = [];
         substanceReasons[id].push({ mechInfo: 'Буст-защита: дополнительная поддержка всех систем', system: 'general' });
@@ -879,10 +922,25 @@ export function calculateSupportPlan(
     }
     // Add hCG if AAS detected
     const hasAAS = (state.pharma?.aas || []).length > 0;
-    if (hasAAS && !selectedIds.has('hcg')) {
+    if (hasAAS && !selectedIds.has('hcg') && !isContraindicated('hcg')) {
       selectedIds.add('hcg');
       if (!substanceReasons['hcg']) substanceReasons['hcg'] = [];
       substanceReasons['hcg'].push({ mechInfo: 'ГГЯ: поддержка функции яичек на курсе ААС, 500 МЕ 2р/нед', system: 'endocrine' });
+    }
+  }
+
+  // B5: Auto-apply high-scoring stacks (score >70, covers ≥3 systems, synergy > 80)
+  const autoStacks = recommendStacks(scores, selectedIds, level);
+  for (const rec of autoStacks) {
+    if (rec.score >= 70 && rec.coveredSystems.length >= 3 && rec.stack.synergyScore >= 80) {
+      for (const sub of rec.stack.substances) {
+        const normId = normalizeId(sub.id);
+        if (!selectedIds.has(normId) && !excludedSubs.has(normId) && catalogExists(normId) && !isContraindicated(normId) && !rec.wasteSubstances.includes(sub.id)) {
+          selectedIds.add(normId);
+          if (!substanceReasons[normId]) substanceReasons[normId] = [];
+          substanceReasons[normId].push({ mechInfo: `Стек «${rec.stack.name}»: ${sub.mechanism || 'синергия стека'}`, system: rec.stack.system });
+        }
+      }
     }
   }
 
@@ -906,8 +964,20 @@ export function calculateSupportPlan(
     const pharmaWeekScale = cw <= 2 ? 0.5 : cw <= 4 ? 0.75 : 1.0;
     if (pharmaIds.includes(id)) doseMultiplier = pharmaWeekScale;
 
-    // Special dose adjustments
-    let adjustedDose = dose.mg;
+    // B3: mg/kg dosing for weight-dependent substances
+    const bodyWeight = state.profile?.weight || 80;
+    const perKgSubs: Record<string, number> = {
+      nac: 15, tudca: 10, coq10: 2, omega3: 30, magnesium: 5,
+      alpha_lipoic: 5, taurine: 20, vitamin_c: 10, milk_thistle: 5,
+    };
+    let adjustedDose: number;
+    if (perKgSubs[id] && bodyWeight > 60) {
+      const kgDose = Math.round(bodyWeight * perKgSubs[id] * doseMultiplier);
+      // Blend with default: 70% mg/kg, 30% fixed
+      adjustedDose = Math.round(kgDose * 0.7 + dose.mg * doseMultiplier * 0.3);
+    } else {
+      adjustedDose = Math.round(dose.mg * doseMultiplier);
+    }
     let adjustedTiming = dose.timing;
     if (id === 'bcp157' && jointMode) {
       const isSymptomatic = (state.oda?.jointPain || 'none') === 'moderate' || (state.oda?.jointPain || 'none') === 'severe';

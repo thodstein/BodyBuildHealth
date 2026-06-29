@@ -140,7 +140,10 @@ export const TrainingScreen: React.FC = () => {
   const [manualCfg, setManualCfg] = useState<Record<string, string>>({});
   const setManual = (k: string, v: string) => setManualCfg(p => ({ ...p, [k]: v }));
   const [showWizard, setShowWizard] = useState(false);
-  const [manualResult, setManualResult] = useState<{ splitName: string; days: { day: number; groups: string[]; exercises: { name: string; sets: number; reps: string; rir: number; rest: number; group: string }[] }[] } | null>(null);
+  const [manualWorkMax, setManualWorkMax] = useState<Record<string, number>>({ chest: 100, back: 110, legs: 140, shoulders: 60, arms: 50, core: 60 });
+  const setManualWm = (k: string, v: number) => setManualWorkMax(p => ({ ...p, [k]: v }));
+  const PCT_FOR_RIR_MAN: Record<number, number> = { 0: 1.0, 1: 0.96, 2: 0.92, 3: 0.88, 4: 0.84, 5: 0.80 };
+  const [manualResult, setManualResult] = useState<{ splitName: string; days: { day: number; groups: string[]; exercises: { name: string; sets: number; reps: string; rir: number; rest: number; group: string; weight: number }[] }[] } | null>(null);
   const generateManualPlan = () => {
     const inp = { goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as TrainingInput;
     const auto = selectSplit(inp);
@@ -148,16 +151,28 @@ export const TrainingScreen: React.FC = () => {
     const sp = manualSp ? { id: manualCfg.split!, name: manualSp.name, desc: manualSp.desc, groupsPerDay: manualSp.groupsPerDay, score: 100, rationale: ['Ручной выбор'] } as SplitCandidate : auto[0];
     if (!sp) { setManualResult(null); return; }
     const cycle: string[][] = []; let gi = 0; while (cycle.length < daysPerWeek) { cycle.push(sp.groupsPerDay[gi % sp.groupsPerDay.length]); gi++; }
+    const mrv = (LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20;
+    const weeklySets: Record<string, number> = {};
+    const isWeak = (g: string) => weakPoints.includes(g);
     const days = cycle.map((groups, di) => {
-      const exs: { name: string; sets: number; reps: string; rir: number; rest: number; group: string }[] = [];
+      const exs: { name: string; sets: number; reps: string; rir: number; rest: number; group: string; weight: number }[] = [];
       groups.forEach(g => {
         const pool = getExercisesByGroup(g);
-        const compounds = pool.filter(e => e.type === 'compound').slice(0, 2);
-        const isolations = pool.filter(e => e.type === 'isolation').slice(0, 2);
-        [...compounds, ...isolations].slice(0, 3).forEach(ex => {
-          const pr = calcExercisePrescription(ex, goal, level, weakPoints.includes(g), false, 1, 1, mesoLength);
-          exs.push({ name: ex.name, sets: pr.sets, reps: pr.reps, rir: pr.rir, rest: pr.rest, group: g });
-        });
+        // отбор по релевантности: соединения сначала (сортировка по приоритету инвентаря/типа), затем изоляции
+        const rank = (e: typeof pool[number]) => (e.type === 'compound' ? 100 : 0) + (e.equipment === 'barbell' ? 10 : e.equipment === 'dumbbell' ? 5 : 0) + (isWeak(g) ? 5 : 0);
+        const compounds = [...pool].filter(e => e.type === 'compound').sort((a, b) => rank(b) - rank(a)).slice(0, 2);
+        const isolations = [...pool].filter(e => e.type === 'isolation').sort((a, b) => rank(b) - rank(a)).slice(0, 2);
+        const chosen = [...compounds, ...isolations];
+        for (const ex of chosen) {
+          const already = weeklySets[g] || 0;
+          if (already >= mrv) break; // кап объёма по MRV — анти-перетрен
+          const pr = calcExercisePrescription(ex, goal, level, isWeak(g), false, 1, 1, mesoLength);
+          const wm = manualWorkMax[g] || 80;
+          const pct = PCT_FOR_RIR_MAN[Math.max(0, Math.min(5, pr.rir))] ?? 0.9;
+          const weight = Math.round(wm * pct);
+          exs.push({ name: ex.name, sets: pr.sets, reps: pr.reps, rir: pr.rir, rest: pr.rest, group: g, weight });
+          weeklySets[g] = already + pr.sets;
+        }
       });
       return { day: di + 1, groups, exercises: exs };
     });
@@ -2025,6 +2040,10 @@ export const TrainingScreen: React.FC = () => {
 
             {/* Кнопка генерации по ручной конфигурации + результат */}
             <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 6, marginTop: 8 }}>💪 Рабочие максимумы (кг) — для расчёта весов</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+                {Object.keys(manualWorkMax).map(k => { const RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' }; return <PopupNumber key={k} label={RU[k] || k} value={manualWorkMax[k]} min={10} max={400} suffix=' кг' onChange={v => setManualWm(k, v)} />; })}
+              </div>
               <button onClick={generateManualPlan} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13 }}>🔧 Собрать программу по конфигурации</button>
               <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>Соберёт план из выбранного сплита (или авто) + цель/уровень/дни/недели с назначением через calcExercisePrescription.</div>
             </div>
@@ -2044,14 +2063,15 @@ export const TrainingScreen: React.FC = () => {
                         <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>🏋️ День {d.day}</span>
                         <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 700 }}>{d.groups.join(' · ')}</span>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 0.7fr 0.7fr 0.5fr 0.6fr', gap: 2, padding: '4px 10px', fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
-                        <span>Упражнение</span><span>Сеты×повт</span><span>RIR</span><span>Группа</span><span>Отдых</span>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 0.7fr 0.7fr 0.5fr 0.5fr 0.5fr', gap: 2, padding: '4px 10px', fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
+                        <span>Упражнение</span><span>Сеты×повт</span><span>RIR</span><span>Вес</span><span>Группа</span><span>Отдых</span>
                       </div>
                       {d.exercises.map((e, ei) => (
-                        <div key={ei} style={{ display: 'grid', gridTemplateColumns: '2fr 0.7fr 0.7fr 0.5fr 0.6fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                        <div key={ei} style={{ display: 'grid', gridTemplateColumns: '2fr 0.7fr 0.7fr 0.5fr 0.5fr 0.5fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                           <span style={{ fontWeight: 600 }}>{e.name}</span>
                           <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{e.sets}×{e.reps}</span>
                           <span style={{ color: '#f59e0b' }}>{e.rir}</span>
+                          <span style={{ color: '#60a5fa', fontWeight: 700 }}>{e.weight} кг</span>
                           <span style={{ color: 'rgba(255,255,255,0.6)' }}>{e.group}</span>
                           <span style={{ color: 'rgba(255,255,255,0.6)' }}>{e.rest}с</span>
                         </div>

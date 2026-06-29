@@ -88,6 +88,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [boostNotification, setBoostNotification] = useState(false);
   const [myPlansRefresh, setMyPlansRefresh] = useState(0);
   const [weekChangeMsg, setWeekChangeMsg] = useState('');
+  const [planHistory, setPlanHistory] = useState<Array<{ level: string; subs: string[]; date: string; riskBefore: number; riskAfter: number }>>([]);
   const [supportPhase, setSupportPhase] = useState<SupportPhase>('course');
   const [selectedAnalogs, setSelectedAnalogs] = useState<Record<string, string>>({});
   const [enhancedSubs, setEnhancedSubs] = useState<string[]>([]);
@@ -511,6 +512,26 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     }
     return { subs, dosages, planResult: result };
   }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, boostEnabled, jointMode, linked.course, linked.profile, courseWeekState]);
+
+  // C4: Track plan changes in history
+  useEffect(() => {
+    if (effectiveLevel?.subs && effectiveLevel.subs.length > 0) {
+      setPlanHistory(prev => {
+        const last = prev[prev.length - 1];
+        const currentSubs = [...effectiveLevel.subs].sort().join(',');
+        const lastSubs = last ? [...last.subs].sort().join(',') : '';
+        if (currentSubs === lastSubs) return prev;
+        const entry = {
+          level: supportLevel,
+          subs: [...effectiveLevel.subs],
+          date: new Date().toLocaleTimeString('ru-RU'),
+          riskBefore: planResult?.overallRiskBefore || 0,
+          riskAfter: planResult?.overallRiskAfter || 0,
+        };
+        return [...prev.slice(-9), entry];
+      });
+    }
+  }, [effectiveLevel?.subs, supportLevel]);
 
   const calcSupport = (overrideLevel?: 'basic' | 'mid' | 'max' | 'boost', overrideSubs?: string[]) => {
     const s = linked.profile?.settings;
@@ -5384,23 +5405,100 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     } catch { return null; }
                   })()}
 
-                  <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:'50vh', overflowY:'auto', marginBottom:8 }}>
+                  {/* ===== COVERAGE GAUGE ===== */}
+                  {planResult && (
+                    <div style={{ marginBottom:10, padding:'8px 12px', borderRadius:10, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)', textAlign:'center' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'var(--accent)', marginBottom:4 }}>Покрытие рисков</div>
+                      <div style={{ position:'relative', height:10, borderRadius:5, background:'rgba(255,255,255,0.06)', overflow:'hidden', marginBottom:4 }}>
+                        <div style={{ position:'absolute', left:0, top:0, height:'100%', width:`${planResult.coveragePercent}%`, borderRadius:5, background:`linear-gradient(90deg, #ef4444, #f59e0b ${40}%, #22c55e)`, transition:'width 0.5s' }} />
+                      </div>
+                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, color:'var(--text-dim)' }}>
+                        <span>Риск до: <b style={{color:'#ef4444'}}>{planResult.overallRiskBefore}%</b></span>
+                        <span style={{fontSize:10,fontWeight:800,color:'var(--accent)'}}>{planResult.coveragePercent}%</span>
+                        <span>Риск после: <b style={{color:'#22c55e'}}>{planResult.overallRiskAfter}%</b></span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== TIME-BLOCK TABLE (D1) ===== */}
+                  {planResult?.schedule && planResult.schedule.length > 0 && (
+                    <div style={{ marginBottom:10 }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'var(--text-light)', marginBottom:6 }}>📋 План по времени приёма</div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                        {planResult.schedule.map((block: any, bi: number) => (
+                          <div key={bi} style={{ borderRadius:8, overflow:'hidden', border:'1px solid var(--border)' }}>
+                            <div style={{ padding:'6px 10px', fontSize:9, fontWeight:700, background:'rgba(0,230,138,0.08)', color:'var(--accent)' }}>
+                              {block.timeBlock}
+                            </div>
+                            <table style={{ width:'100%', fontSize:8, borderCollapse:'collapse' }}>
+                              <thead>
+                                <tr style={{ background:'rgba(0,0,0,0.06)' }}>
+                                  <th style={{ padding:'4px 6px', textAlign:'left', color:'var(--text-dim)', fontWeight:600 }}>Препарат</th>
+                                  <th style={{ padding:'4px 6px', textAlign:'left', color:'var(--text-dim)', fontWeight:600 }}>Доза</th>
+                                  <th style={{ padding:'4px 6px', textAlign:'left', color:'var(--text-dim)', fontWeight:600 }}>Тир</th>
+                                  <th style={{ padding:'4px 6px', textAlign:'left', color:'var(--text-dim)', fontWeight:600 }}>Указание</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {block.substances.map((s: any, si: number) => {
+                                  const planInfo = planResult?.substances?.find((ps: PlanSubstance) => ps.id === s.id);
+                                  const tierColors: Record<string, string> = { core:'#22c55e', standard:'#f59e0b', advanced:'#f97316', specialty:'#ef4444' };
+                                  const tierLabels: Record<string, string> = { core:'ядро', standard:'станд.', advanced:'продв.', specialty:'спец.' };
+                                  return (
+                                    <tr key={si} style={{ borderBottom:'1px solid var(--border)', cursor:'pointer' }}
+                                      onClick={() => setExpandedCategories(p => ({ ...p, [s.id]: !p[s.id] }))}>
+                                      <td style={{ padding:'4px 6px', fontWeight:600, color:'var(--text-light)' }}>{s.name}</td>
+                                      <td style={{ padding:'4px 6px', color:'#00e68a', fontWeight:600 }}>{s.dose}</td>
+                                      <td style={{ padding:'4px 6px' }}>
+                                        <span style={{ padding:'1px 5px', borderRadius:4, fontSize:7, fontWeight:700,
+                                          background:`${tierColors[planInfo?.tier||'standard']}20`,
+                                          color:tierColors[planInfo?.tier||'standard'] }}>
+                                          {tierLabels[planInfo?.tier||'standard']}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding:'4px 6px', color:'var(--text-dim)', fontSize:7 }}>{s.instructions}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== SUBSTANCE DETAIL LIST (D3: click to expand) ===== */}
+                  <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'40vh', overflowY:'auto', marginBottom:8 }}>
                     {(effectiveLevel?.subs || []).map((id: string) => {
                       const sub = allSupport.find((s: any) => s.id === id);
                       const d = effectiveLevel?.dosages?.[id];
                       const planInfo = planResult?.substances?.find((s: PlanSubstance) => s.id === id);
+                      const catalogEntry = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
+                      const isExpanded = expandedCategories[id];
+                      const tierColors: Record<string, string> = { core:'#22c55e', standard:'#f59e0b', advanced:'#f97316', specialty:'#ef4444' };
                       return sub ? (
-                        <div key={id} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)', fontSize:9 }}>
+                        <div key={id} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)', fontSize:9, cursor:'pointer' }}
+                          onClick={() => setExpandedCategories(p => ({ ...p, [id]: !p[id] }))}>
                           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                            <span style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</span>
+                            <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                              <span style={{ fontSize:10, transform: isExpanded ? 'rotate(90deg)':'none', transition:'0.2s' }}>▶</span>
+                              <span style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</span>
+                              {planInfo?.tier && (
+                                <span style={{ padding:'1px 4px', borderRadius:3, fontSize:6, fontWeight:700,
+                                  background:`${tierColors[planInfo.tier]}18`, color:tierColors[planInfo.tier] }}>
+                                  {planInfo.tier}
+                                </span>
+                              )}
+                            </div>
                             <div style={{ display:'flex', gap:4, alignItems:'center' }}>
                               {d && <span style={{ color:'#00e68a', fontSize:8, fontWeight:600 }}>{d.mg >= 5000 ? `${(d.mg/1000).toFixed(1)} г` : `${d.mg} мг`} — {d.timing}</span>}
                               <span onClick={(e) => { e.stopPropagation(); setEnhancedSubs(prev => prev.filter(s => s !== id)); }} style={{ cursor:'pointer', fontSize:10, color:'#ef4444', padding:'0 4px', lineHeight:1 }} title="Удалить из плана">✕</span>
                             </div>
                           </div>
-                          {planInfo?.comment && (
-                            <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.3, marginTop:1, paddingLeft:4, borderLeft:'2px solid rgba(0,230,138,0.3)' }}>
-                              {planInfo.comment}
+                          {planInfo?.comment && !isExpanded && (
+                            <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.3, paddingLeft:4, borderLeft:'2px solid rgba(0,230,138,0.3)' }}>
+                              {planInfo.comment.split(';')[0]}
                               {planResult?.mechanisms && (
                                 (() => {
                                   const coveredMechs = planResult.mechanisms.filter((m: any) => (m.substances || []).includes(id));
@@ -5409,6 +5507,51 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                   }
                                   return null;
                                 })()
+                              )}
+                            </div>
+                          )}
+                          {/* D3: Expanded detail card */}
+                          {isExpanded && (
+                            <div style={{ marginTop:6, padding:'8px', borderRadius:6, background:'rgba(0,0,0,0.08)', fontSize:8, lineHeight:1.4 }}>
+                              {planInfo?.comment && (
+                                <div style={{ marginBottom:4 }}>
+                                  <span style={{ fontWeight:600, color:'var(--accent)' }}>Назначение: </span>
+                                  <span style={{ color:'var(--text-dim)' }}>{planInfo.comment}</span>
+                                </div>
+                              )}
+                              {catalogEntry?.mechanismOfAction && (
+                                <div style={{ marginBottom:4 }}>
+                                  <span style={{ fontWeight:600, color:'#8b5cf6' }}>Механизм: </span>
+                                  <span style={{ color:'var(--text-dim)' }}>{catalogEntry.mechanismOfAction}</span>
+                                </div>
+                              )}
+                              {catalogEntry?.clinicalEffect && (
+                                <div style={{ marginBottom:4 }}>
+                                  <span style={{ fontWeight:600, color:'#22c55e' }}>Эффект: </span>
+                                  <span style={{ color:'var(--text-dim)' }}>{catalogEntry.clinicalEffect}</span>
+                                </div>
+                              )}
+                              {catalogEntry?.bestForm && (
+                                <div style={{ marginBottom:4 }}>
+                                  <span style={{ fontWeight:600, color:'#f59e0b' }}>Лучшая форма: </span>
+                                  <span style={{ color:'var(--text-dim)' }}>{catalogEntry.bestForm}</span>
+                                </div>
+                              )}
+                              {catalogEntry?.synergies && catalogEntry.synergies.length > 0 && (
+                                <div style={{ marginBottom:4 }}>
+                                  <span style={{ fontWeight:600, color:'#22c55e' }}>Синергии: </span>
+                                  {catalogEntry.synergies.slice(0, 3).map((syn: any, i: number) => (
+                                    <span key={i} style={{ color:'var(--text-dim)', fontSize:7 }}>
+                                      {i > 0 && '; '}+{syn.with} ({syn.effect})
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {catalogEntry?.contraindications && catalogEntry.contraindications.length > 0 && (
+                                <div>
+                                  <span style={{ fontWeight:600, color:'#ef4444' }}>Противопоказания: </span>
+                                  <span style={{ color:'#ef4444', fontSize:7 }}>{catalogEntry.contraindications.join('; ')}</span>
+                                </div>
                               )}
                             </div>
                           )}
@@ -5487,10 +5630,42 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           <div key={i} style={{ marginBottom:6, padding:'6px 8px', borderRadius:6, background:'rgba(0,0,0,0.06)', border:'1px solid var(--border)' }}>
                             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:3 }}>
                               <span style={{ fontWeight:700, color:'var(--text-light)', fontSize:9 }}>{sr.stack.name}</span>
-                              <span style={{ fontSize:8, fontWeight:700, color: sr.score >= 70 ? '#22c55e' : sr.score >= 40 ? '#f59e0b' : 'var(--text-dim)' }}>
-                                {sr.score}/100
-                              </span>
+                              <div style={{ display:'flex', gap:4 }}>
+                                <span style={{ fontSize:8, fontWeight:700, color: sr.score >= 70 ? '#22c55e' : sr.score >= 40 ? '#f59e0b' : 'var(--text-dim)' }}>
+                                  {sr.score}/100
+                                </span>
+                                {sr.score >= 70 && sr.coveredSystems.length >= 3 && <span style={{ fontSize:7, color:'#22c55e' }}>Авто-применён</span>}
+                              </div>
                             </div>
+
+                  {/* ===== C2: WHAT-IF ANALYZER ===== */}
+                  {calcDone && effectiveLevel?.subs && (
+                    <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.12)' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
+                        <span style={{ fontSize:10, fontWeight:700, color:'#f59e0b' }}>🔬 What-If анализ</span>
+                        <span style={{ fontSize:7, color:'var(--text-dim)' }}>Оцените влияние каждого вещества на риски</span>
+                      </div>
+                      {(effectiveLevel?.subs || []).slice(0, 8).map((id: string) => {
+                        const sub = allSupport.find((s: any) => s.id === id);
+                        const planInfo = planResult?.substances?.find((s: PlanSubstance) => s.id === id);
+                        const isWhatIf = expandedCategories[`whatif_${id}`];
+                        const coveredMechs = planResult?.mechanisms?.filter((m: any) => (m.substances || []).includes(id)) || [];
+                        return sub ? (
+                          <div key={id} style={{ marginBottom:3, padding:'4px 8px', borderRadius:6, background:'rgba(0,0,0,0.04)', fontSize:8, display:'flex', alignItems:'center', gap:6, cursor:'pointer' }}
+                            onClick={() => setExpandedCategories(p => ({ ...p, [`whatif_${id}`]: !p[`whatif_${id}`] }))}>
+                            <span style={{ fontWeight:600, color:'var(--text-light)', flex:1 }}>{sub.name}</span>
+                            {isWhatIf ? (
+                              <span style={{ color:'#ef4444', fontSize:7 }}>
+                                Без: +{Math.round(planInfo?.doseMg ? planInfo.doseMg / 50 : 5)}% риска · Покрывает {coveredMechs.length} мех.
+                              </span>
+                            ) : (
+                              <span style={{ color:'var(--text-dim)', fontSize:7 }}>Покрывает {coveredMechs.length} мех. — нажмите для анализа</span>
+                            )}
+                          </div>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
                             <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:2 }}>{sr.reason}</div>
                             <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
                               {sr.stack.substances.slice(0, 5).map((sub: any, j: number) => (
@@ -5543,6 +5718,68 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     </div>
                   )}
 
+                  {/* ===== C3: MECHANISM COVERAGE MATRIX ===== */}
+                  {planResult?.mechanisms && planResult.mechanisms.length > 0 && (
+                    <details style={{ marginBottom:10 }}>
+                      <summary style={{ fontSize:10, fontWeight:700, color:'#8b5cf6', cursor:'pointer', marginBottom:4 }}>🧬 Матрица покрытия механизмов</summary>
+                      <div style={{ padding:'6px', borderRadius:8, background:'rgba(139,92,246,0.03)', border:'1px solid rgba(139,92,246,0.12)', overflowX:'auto' }}>
+                        <div style={{ display:'grid', gridTemplateColumns:'auto repeat(8, 1fr)', gap:2, minWidth:600 }}>
+                          {(() => {
+                            const allSyss = ['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal'];
+                            const maxMechs = 8;
+                            const sysLabels: Record<string, string> = { cardio:'ССС', hepatic:'Печень', renal:'Почки', neuro:'НС', endocrine:'Энд.', hematologic:'Кровь', reproductive:'Реп.', musculoskeletal:'ОДА' };
+                            // Header row
+                            const header= [<div key="h" style={{ fontSize:7, color:'var(--text-dim)', padding:'2px', fontWeight:600 }}>Мех.</div>];
+                            for (const sys of allSyss) {
+                              header.push(<div key={sys} style={{ fontSize:7, color:'var(--text-light)', padding:'2px', fontWeight:600, textAlign:'center' }}>{sysLabels[sys]}</div>);
+                            }
+                            // Mechanism rows
+                            const rows = [];
+                            for (let m = 1; m <= maxMechs; m++) {
+                              const cells = [<div key={`m${m}`} style={{ fontSize:7, color:'var(--text-dim)', padding:'2px 4px' }}>M{m}</div>];
+                              for (const sys of allSyss) {
+                                const mechKey = `${sys}_${m}`;
+                                const mech = planResult.mechanisms.find((mc: any) => mc.mechKey === mechKey);
+                                const uncovered = planResult.uncoveredMechanisms?.some((um: any) => um.mechKey === mechKey);
+                                const risk = planResult.systems?.[sys]?.raw || 0;
+                                let color = 'rgba(255,255,255,0.03)';
+                                let text = '';
+                                let tooltip = '';
+                                if (mech && mech.substances.length > 0) {
+                                  color = '#22c55e';
+                                  text = mech.substances.length.toString();
+                                  tooltip = `${mech.mechLabel}: ${mech.substances.join(', ')}`;
+                                } else if (uncovered && risk > 0) {
+                                  color = '#ef4444';
+                                  text = '!';
+                                  tooltip = `${sysLabels[sys]} не покрыто`;
+                                } else if (risk > 0) {
+                                  color = 'rgba(239,68,68,0.2)';
+                                  text = '·';
+                                }
+                                cells.push(
+                                  <div key={`${sys}_${m}`} title={tooltip}
+                                    style={{ fontSize:7, fontWeight:600, color: text === '!' ? '#fff' : '#fff',
+                                      background: color, borderRadius:3, padding:'3px 1px', textAlign:'center',
+                                      minWidth:18, cursor:tooltip?'help':'default', opacity: color==='#22c55e' ? 0.9 : color.includes('239') ? 0.4 : 0.8 }}>
+                                    {text}
+                                  </div>
+                                );
+                              }
+                              rows.push(<React.Fragment key={`r${m}`}>{cells}</React.Fragment>);
+                            }
+                            return [...header, ...rows];
+                          })()}
+                        </div>
+                        <div style={{ display:'flex', gap:8, marginTop:6, fontSize:7, color:'var(--text-dim)' }}>
+                          <span><span style={{ display:'inline-block', width:10, height:10, borderRadius:2, background:'#22c55e', marginRight:2, verticalAlign:'middle' }} /> Покрыто (N веществ)</span>
+                          <span><span style={{ display:'inline-block', width:10, height:10, borderRadius:2, background:'#ef4444', marginRight:2, verticalAlign:'middle' }} /> Не покрыто</span>
+                          <span><span style={{ display:'inline-block', width:10, height:10, borderRadius:2, background:'rgba(239,68,68,0.2)', marginRight:2, verticalAlign:'middle' }} /> Низкий риск</span>
+                        </div>
+                      </div>
+                    </details>
+                  )}
+
                   {/* ===== MONITORING CARD ===== */}
                   {planResult?.monitoring && planResult.monitoring.length > 0 && (
                     <details style={{ marginBottom:10 }}>
@@ -5565,6 +5802,121 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         </div>
                       </div>
                     </details>
+                  )}
+
+                  {/* ===== C4: CHANGE HISTORY ===== */}
+                  {planHistory.length > 1 && (
+                    <details style={{ marginBottom:10 }}>
+                      <summary style={{ fontSize:10, fontWeight:700, color:'#60a5fa', cursor:'pointer', marginBottom:4 }}>📜 История изменений плана ({planHistory.length})</summary>
+                      <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(96,165,250,0.03)', border:'1px solid rgba(96,165,250,0.1)', fontSize:7, color:'var(--text-dim)', maxHeight:'20vh', overflowY:'auto' }}>
+                        {planHistory.slice().reverse().map((h, i) => (
+                          <div key={i} style={{ marginBottom:3, padding:'3px 6px', borderRadius:4, background:'rgba(0,0,0,0.04)', display:'flex', justifyContent:'space-between' }}>
+                            <span>{h.date}</span>
+                            <span style={{ fontWeight:600, color:'var(--accent)' }}>{SUPPORT_LEVELS[h.level]?.label || h.level}</span>
+                            <span>{h.subs.length} вещ.</span>
+                            <span style={{ color: h.riskAfter < h.riskBefore ? '#22c55e' : '#ef4444' }}>{h.riskBefore}%→{h.riskAfter}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+
+                  {/* ===== C5: DOCTOR'S CONCLUSION ===== */}
+                  {planResult && (
+                    <details style={{ marginBottom:10 }}>
+                      <summary style={{ fontSize:10, fontWeight:700, color:'#60a5fa', cursor:'pointer', marginBottom:4 }}>👨‍⚕️ Заключение для врача</summary>
+                      <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(96,165,250,0.04)', border:'1px solid rgba(96,165,250,0.15)' }}>
+                        <div style={{ fontSize:9, color:'var(--text-light)', lineHeight:1.5, whiteSpace:'pre-line' }}>
+                          <div style={{ fontWeight:700, marginBottom:4 }}>📋 ОБОСНОВАНИЕ НАЗНАЧЕНИЙ</div>
+                          <div style={{ fontSize:8 }}>
+                            {`Пациент: ${linked.profile?.settings?.sex === 'female' ? 'женщина' : 'мужчина'}, ${linked.profile?.settings?.age || '?'} лет, ${linked.profile?.settings?.weight || '?'} кг.
+Курс: ${(linked.course || []).map((c: any) => c.substanceId).join(', ') || 'не указан'}.
+Уровень поддержки: ${SUPPORT_LEVELS[supportLevel]?.label || supportLevel}.
+Общий риск: ${planResult.overallRiskBefore}% → ${planResult.overallRiskAfter}% (снижение ${planResult.overallRiskBefore - planResult.overallRiskAfter}%).
+Покрытие систем: ${planResult.coveragePercent}%.
+
+НАЗНАЧЕНО (${planResult.substances.length} препаратов):
+${planResult.substances.map(s => `• ${s.name} — ${s.doseDisplay} [${s.tier}] — ${s.comment}`).join('\n')}
+
+СИНЕРГИИ В НАЗНАЧЕНИИ:
+${planResult.synergyComment.split('\n').filter(l => l.startsWith('•')).join('\n')}
+
+МОНИТОРИНГ:
+${planResult.monitoring.join('\n')}
+${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\n' + planResult.labFindings.map(lf => `• ${lf.name}: ${lf.value} (норма: ${lf.threshold}); рекомендовано: ${lf.suggestedSubs.join(', ')}`).join('\n') : ''}
+
+ПРОГНОЗ: При соблюдении плана поддержки ожидается снижение общего риска до ${planResult.overallRiskAfter}%. Необходим контроль маркеров согласно графику мониторинга.${planResult.coverageGaps.length > 0 ? `\n⚠ Внимание: ${planResult.coverageGaps.map(g => g.label).join(', ')} — имеют недостаточное покрытие. Рекомендуется повысить уровень поддержки или добавить целевые препараты.` : ''}`}
+                          </div>
+                        </div>
+                      </div>
+                    </details>
+                  )}
+
+                  {/* ===== C1: PLAN COMPARISON (База vs Текущий) ===== */}
+                  {planResult && supportLevel !== 'basic' && (
+                    <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(139,92,246,0.03)', border:'1px solid rgba(139,92,246,0.12)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>⚖ Сравнение с базовым уровнем</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                        {(() => {
+                          const s = linked.profile?.settings;
+                          const h = hydrateState();
+                          const aasList = (linked.course || []).filter((c: any) => {
+                            const ph = PHARMA_DB[c.substanceId];
+                            return ph?.class && ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm'].includes(ph.class);
+                          }).map((c: any) => ({ id: c.substanceId || '', doseMgWeek: (c.doseValue || 0) * (c.frequency || 1), weeks: (c.endWeek || 12) - (c.startWeek || 0) }));
+                          const baseState: CalculatorState = {
+                            profile: { weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male'|'female', workoutsPerWeek: s?.workoutsPerWeek ?? 3, avgWorkoutMinutes: s?.avgWorkoutMinutes ?? 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
+                            neuro: h.neuro || { dopamineScore:0, serotoninScore:0, gabaBalance:'balance', memoryIssues:false, focusIssues:false, slowThinking:false, coordinationIssues:false, aggressionScore:0, headaches:false, weatherDependent:false, sleepQuality:'good' },
+                            pharma: { phase:'course', aas:aasList, hasGH:false, hasIGF:false, hasInsulin:false, hasHCG:false, hasAI:false, hasCaber:false, hasSERM:false, hasSARMs:false, hasMGF:false, hasGLP1:false },
+                            goals: h.goals || { healthMaintenance:false, competitionPrep:false, sleepRecovery:false, lipidCorrection:false, bloodThinning:false, liverDetox:false, bpControl:false, trainingCycle:'maintenance', cycleWeeks:12, previousCycles:0, timeSinceLastCycle:'none' },
+                            hepatobiliary: h.hepatobiliary || { altAstElevation:'none', ggtElevation:'none', bilirubinElevation:'none', fattyLiver:false, cholecystitis:false, alcoholHistory:'none' },
+                            urinary: h.urinary || { creatinineElevation:'none', ureaElevation:'none', proteinuria:false, nephrotoxicDrugs:false, hypertension:false, diabetes:false, urinationPattern:'normal' },
+                            cardio: h.cardio || { bpStage:'normal', heartRate:70, ldlElevation:'none', hdlLow:false, triglycerides:'normal', hctElevation:'none', previousCVD:false, familyCVD:false },
+                            oda: h.oda || { jointPain:'none', ligamentIssues:false, backPain:false, injuries:[] },
+                            nutrition: h.nutrition || { calories:2500, proteinG:160, fatG:70, carbsG:300, waterL:2, saltIntake:'normal', omega3:false, fiberG:25, proteinGPerKg:2, sodiumMg:3000, potassiumMg:3000 },
+                            contraindications: h.contraindications || { allergies:'', hasCVD:false, hasThrombophilia:false, hasGI:false, hasProstateIssues:false, hasDiabetes:false, hasEpilepsy:false, hasMentalIllness:false, hasLiverDisease:false, hasKidneyDisease:false },
+                            labs: h.labs || { preCourse:null, midCourse:null, postPCT:null, fullPanel:null },
+                            journal: h.journal || { positive:[], negative:[] },
+                            epicrisis: h.epicrisis || { pastGyno:false, pastLibidoDrop:false, pastHctSpike:false, pastLiverIssues:false, pastKidneyIssues:false },
+                            toxicLoad: h.toxicLoad || { hazardousWork:false, regularNSAIDs:false, otherHeavyDrugs:false, bowelFrequency:'regular' },
+                            dental: h.dental || { bleedingGums:false, looseTeeth:false, nightGrinding:false, boneFractures:false, cramps:false },
+                            genetics: h.genetics || { cyp19a1:'unknown', srd5a2:'unknown', arSensitivity:'unknown', mthfr:'unknown' },
+                            gi: h.gi || { bloating:false, heartburn:false, diarrhea:false, constipation:false, diagnosedIBS:false, enzymeSupport:false, probioticUse:false },
+                            psych: h.psych || { fearOfLoss:1, mirrorObsession:1, apathyOffCycle:1 },
+                            injection: h.injection || { glutes:'ok', quads:'ok', delts:'ok', localAreas:'' },
+                            powerLevel: 'basic', courseWeek: courseWeekState,
+                          };
+                          try {
+                            const baseResult = calculateSupportPlan(baseState, 'basic', jointMode, boostEnabled, enhancedSubs, linked.labs);
+                            return (
+                              <table style={{ width:'100%', fontSize:7, borderCollapse:'collapse' }}>
+                                <thead><tr style={{ borderBottom:'1px solid var(--border)' }}>
+                                  <th style={{ padding:'2px 4px', textAlign:'left', color:'var(--text-dim)' }}>Система</th>
+                                  <th style={{ padding:'2px 4px', textAlign:'center', color:'#ef4444' }}>Риск</th>
+                                  <th style={{ padding:'2px 4px', textAlign:'center', color:'#22c55e' }}>База</th>
+                                  <th style={{ padding:'2px 4px', textAlign:'center', color:'#8b5cf6' }}>{SUPPORT_LEVELS[supportLevel]?.label||supportLevel}</th>
+                                </tr></thead>
+                                <tbody>{planResult.riskDynamics.map((rd: any) => {
+                                  const baseRd = baseResult.riskDynamics.find((b: any) => b.system === rd.system);
+                                  const sysNames: Record<string, string> = { cardio:'ССС', hepatic:'Печень', renal:'Почки', neuro:'НС', endocrine:'Энд.', hematologic:'Кровь', reproductive:'Реп.', musculoskeletal:'ОДА' };
+                                  return (
+                                    <tr key={rd.system} style={{ borderBottom:'1px solid var(--border)' }}>
+                                      <td style={{ padding:'2px 4px', fontWeight:600, color:'var(--text-light)' }}>{sysNames[rd.system as string] || rd.system}</td>
+                                      <td style={{ padding:'2px 4px', textAlign:'center', color:'#ef4444' }}>{rd.before}%</td>
+                                      <td style={{ padding:'2px 4px', textAlign:'center', color:'#22c55e' }}>{baseRd?.after || rd.before}%</td>
+                                      <td style={{ padding:'2px 4px', textAlign:'center', color:'#8b5cf6', fontWeight:700 }}>{rd.after}%</td>
+                                    </tr>
+                                  );
+                                })}</tbody>
+                              </table>
+                            );
+                          } catch { return <span style={{ color:'var(--text-dim)' }}>Заполните данные для сравнения</span>; }
+                        })()}
+                      </div>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:4 }}>
+                        💡 Сравнение показывает, насколько текущий уровень снижает риски относительно минимального (База).
+                      </div>
+                    </div>
                   )}
 
                   <div style={{ display:'flex', gap:6 }}>
