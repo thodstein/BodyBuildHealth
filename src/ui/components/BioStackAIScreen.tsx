@@ -32,7 +32,7 @@ export const BioStackAIScreen: React.FC = () => {
     search: <SearchTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
     build: <BuildTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
     stack: <StackTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
-    risks: <RisksTab profile={profile} stackIds={stackIds} />,
+    risks: <RisksTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
     compare: <CompareTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
     reports: <ReportsTab profile={profile} stackIds={stackIds} />,
     periodization: <PeriodizationTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,

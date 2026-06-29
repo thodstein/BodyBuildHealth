@@ -486,6 +486,20 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
 
   useEffect(() => { if (profile) { try { updateProfile({ settings: { ...profile.settings, primaryGoal: goal as any } } as any); } catch {} } }, [goal]);
 
+  // Auto-recalc macros when course changes
+  useEffect(() => {
+    const aasCount = injections.filter(i => i.type === 'ААС').length;
+    if (aasCount > 0 && goal === 'mass') {
+      setManualGPerKg(prev => ({ ...prev, protein: 2.5 }));
+    } else if (aasCount === 0 && manualGPerKg.protein > 2.2) {
+      setManualGPerKg(prev => ({ ...prev, protein: 1.8 }));
+    }
+    const insulinCount = injections.filter(i => i.type === 'инсулин').length;
+    if (insulinCount > 0) {
+      setManualKcal(prev => prev || Math.round(effectiveKcal * 1.1));
+    }
+  }, [injections.length]);
+
   // Sync from Profile Planner data (he_nutrition_profile)
   useEffect(() => {
     try {

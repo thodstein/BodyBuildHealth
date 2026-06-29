@@ -27,6 +27,8 @@ export interface MixProfile {
   drugs: { insulin: boolean; igf: boolean; gh: boolean; mgf: boolean; glp1: boolean };
   hasNandrolone: boolean;
   userElectrolytes: { sodiumMmolL: number; potassiumMmolL: number; chlorideMmolL: number };
+  workoutType: 'heavy' | 'moderate' | 'light';
+  timeOfDay: 'morning' | 'afternoon' | 'evening';
   workoutDurationMin: number;
 }
 
@@ -173,6 +175,11 @@ export function calculateMixScore(substances: MixSubstance[], profile: MixProfil
   // EAA calculation
   let recEAA = profile.timing === 'intra' ? bw * 0.15 * multiplier : profile.timing === 'post' ? bw * 0.4 * multiplier : bw * 0.1 * multiplier;
   if (profile.drugs.insulin || profile.drugs.gh) recEAA *= 1.2;
+  if (profile.workoutType === 'heavy') recEAA *= 1.3;
+
+  // Time-of-day adjustments
+  if (profile.timeOfDay === 'morning') { energy = Math.round(energy * 1.1); }
+  if (profile.timeOfDay === 'evening') { recovery = Math.round(recovery * 1.15); }
 
   // Water
   const recWater = bw * 35 + durHrs * 500;

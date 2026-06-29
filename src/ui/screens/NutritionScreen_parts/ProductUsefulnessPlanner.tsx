@@ -93,6 +93,9 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   const [swapFrom, setSwapFrom] = useState('');
   const [swapResults, setSwapResults] = useState<{ food: any; score: any; improvement: number }[]>([]);
   const [mealTiming, setMealTiming] = useState<'any' | 'pre' | 'post'>('any');
+  const [scoreHistory, setScoreHistory] = useState<{ date: string; avg: number; count: number }[]>(() => {
+    try { return JSON.parse(localStorage.getItem('he_usefulness_history') || '[]'); } catch { return []; }
+  });
 
   const [useV2, setUseV2] = useState(true);
   const [v2Profile, setV2Profile] = useState<UserDietProfile>(getDefaultProfile());
@@ -280,6 +283,16 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         const rec = phaseRecs[goal] || phaseRecs.maintenance;
         const avgScore = scored.length > 0 ? Math.round(scored.reduce((s, x) => s + x.score.total, 0) / scored.length) : 0;
 
+        // Save score to history (once per session)
+        React.useEffect(() => {
+          if (avgScore > 0) {
+            const today = new Date().toLocaleDateString('ru-RU');
+            const updated = [...scoreHistory.filter(h => h.date !== today), { date: today, avg: avgScore, count: scored.length }].slice(-30);
+            setScoreHistory(updated);
+            localStorage.setItem('he_usefulness_history', JSON.stringify(updated));
+          }
+        }, []);
+
         return <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           <div style={{ borderRadius:12, padding:14, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.1)', textAlign:'center' }}>
             <div style={{ fontSize:28, fontWeight:800, color:'#00e68a' }}>{avgScore}</div>
@@ -289,6 +302,27 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               <div style={{ textAlign:'center' }}><div style={{ fontSize:18, fontWeight:800, color:'#ef4444' }}>{worst5.length}</div><div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>худшие-5</div></div>
               <div style={{ textAlign:'center' }}><div style={{ fontSize:18, fontWeight:800, color:'#8b5cf6' }}>{Object.keys(catAvg).length}</div><div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>категорий</div></div>
             </div>
+            {scoreHistory.length > 1 && (
+              <div style={{ marginTop:10, padding:'8px 10px', borderRadius:8, background:'rgba(0,0,0,0.08)' }}>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', marginBottom:4 }}>📈 Тренд качества</div>
+                <div style={{ display:'flex', gap:2, alignItems:'flex-end', justifyContent:'center', height:30 }}>
+                  {scoreHistory.slice(-10).map((h, i) => {
+                    const maxH = Math.max(...scoreHistory.map(x => x.avg), 1);
+                    const hPct = Math.round(h.avg / maxH * 100);
+                    return <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
+                      <div style={{ width:'80%', height:Math.max(2,Math.round(hPct/100*25)), borderRadius:2, background:h.avg>=7?'#22c55e':h.avg>=5?'#f59e0b':'#ef4444' }} />
+                      <div style={{ fontSize:5, color:'rgba(255,255,255,0.3)', marginTop:1 }}>{h.avg}</div>
+                    </div>;
+                  })}
+                </div>
+                <div style={{ fontSize:6, color:'rgba(255,255,255,0.3)', marginTop:2 }}>
+                  {scoreHistory[0]?.date} — {scoreHistory[scoreHistory.length-1]?.date}
+                  {scoreHistory.length>=2&&<span style={{marginLeft:4,color:scoreHistory[scoreHistory.length-1].avg>=scoreHistory[0].avg?'#22c55e':'#ef4444'}}>
+                    {scoreHistory[scoreHistory.length-1].avg>=scoreHistory[0].avg?'↑':'↓'} {Math.abs(scoreHistory[scoreHistory.length-1].avg-scoreHistory[0].avg)} пунктов
+                  </span>}
+                </div>
+              </div>
+            )}
           </div>
 
           <div style={{ borderRadius:12, padding:12, background:'rgba(34,197,94,0.05)', border:'1px solid rgba(34,197,94,0.1)' }}>
@@ -1029,6 +1063,27 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                     <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.1)' }}>
                       <div style={{ fontSize: 7, color: '#ef4444', fontWeight: 600 }}>⚠️ Слабый продукт: {mealResult.weakLink.name}</div>
                       <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>{mealResult.weakLink.reason}</div>
+                    </div>
+                  )}
+                  {mealResult.productScores.some((ps:any)=>ps.score<50) && (
+                    <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#00e68a', marginBottom:6 }}>🔄 Точечные замены (улучшение скора)</div>
+                      {mealResult.productScores.filter((ps:any)=>ps.score<50).slice(0,3).map((ps:any)=>{
+                        const food = FOOD_DB.find(f=>f.id===ps.foodId);
+                        if(!food) return null;
+                        const sameCat = scored.filter(({f})=>f.category===food.category&&f.id!==food.id);
+                        const best = sameCat.sort((a,b)=>b.score.total-a.score.total)[0];
+                        if(!best||best.score.total<=ps.score) return null;
+                        const improvement = Math.round((best.score.total-ps.score)/ps.score*100);
+                        return (
+                          <div key={ps.foodId} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 0',fontSize:8}}>
+                            <span style={{color:'#ef4444',textDecoration:'line-through'}}>{ps.name} ({ps.score})</span>
+                            <span style={{color:'rgba(255,255,255,0.3)'}}>→</span>
+                            <span style={{color:'#22c55e',fontWeight:600}}>{best.food.name} ({best.score.total})</span>
+                            <span style={{color:'#22c55e',fontWeight:700,marginLeft:'auto'}}>+{improvement}%</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                   {mealResult.microCoverage.length > 0 && (

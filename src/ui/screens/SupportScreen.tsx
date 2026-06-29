@@ -670,6 +670,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [mixDrugGH, setMixDrugGH] = useState(false);
   const [mixDrugMGF, setMixDrugMGF] = useState(false);
   const [mixDrugGLP1, setMixDrugGLP1] = useState(false);
+  const [mixWorkoutType, setMixWorkoutType] = useState<'heavy'|'moderate'|'light'>('moderate');
+  const [mixTimeOfDay, setMixTimeOfDay] = useState<'morning'|'afternoon'|'evening'>('morning');
+  const [mixHistory, setMixHistory] = useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem('he_training_mixes') || '[]'); } catch { return []; }
+  });
   const [mixMGF, setMixMGF] = useState<number>(0);
   const [mixMGFTiming, setMixMGFTiming] = useState<'pre'|'post'>('pre');
   const [mixIGF, setMixIGF] = useState<number>(0);
@@ -5485,6 +5490,24 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               <input type="number" value={linked.profile?.settings?.weight ?? 80} readOnly
                 style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
             </div>
+            <div style={{ display:'flex', gap:4, marginBottom:6 }}>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:2 }}>Тип тренировки</div>
+                <select value={mixWorkoutType} onChange={e=>setMixWorkoutType(e.target.value as any)} style={{ width:'100%',padding:'4px 6px',borderRadius:5,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:9 }}>
+                  <option value="heavy">🏋️ Тяжёлая (присед/тяга)</option>
+                  <option value="moderate">🏃 Средняя (подсобка)</option>
+                  <option value="light">🩸 Лёгкая (пампинг)</option>
+                </select>
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:2 }}>Время суток</div>
+                <select value={mixTimeOfDay} onChange={e=>setMixTimeOfDay(e.target.value as any)} style={{ width:'100%',padding:'4px 6px',borderRadius:5,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:9 }}>
+                  <option value="morning">🌅 Утро (6-12)</option>
+                  <option value="afternoon">☀️ День (12-18)</option>
+                  <option value="evening">🌙 Вечер (18-24)</option>
+                </select>
+              </div>
+            </div>
             <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>💉 Фармакология (влияет на скор)</div>
             <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
               {[{ id:'insulin', label:'Инсулин', st:mixInsulin>0, fn:()=>setMixInsulin(mixInsulin>0?0:5) },
@@ -5571,7 +5594,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               const k = (linked.labs || []).find((l:any)=>l.code==='POTASSIUM')?.value || 4.2;
               const cl = (linked.labs || []).find((l:any)=>l.code==='CHLORIDE')?.value || 102;
 
-              const mixProfile: MixProfile = { goal: mixGoal as any, timing: mixTiming as any, weightKg: bw, isOnCycle, drugs: { insulin: mixInsulin>0, igf: mixDrugIGF, gh: mixDrugGH, mgf: mixDrugMGF, glp1: mixDrugGLP1 }, hasNandrolone, userElectrolytes: { sodiumMmolL: na, potassiumMmolL: k, chlorideMmolL: cl }, workoutDurationMin: Math.round(durHrs*60) };
+              const mixProfile: MixProfile = { goal: mixGoal as any, timing: mixTiming as any, weightKg: bw, isOnCycle, drugs: { insulin: mixInsulin>0, igf: mixDrugIGF, gh: mixDrugGH, mgf: mixDrugMGF, glp1: mixDrugGLP1 }, hasNandrolone, userElectrolytes: { sodiumMmolL: na, potassiumMmolL: k, chlorideMmolL: cl }, workoutType: mixWorkoutType, timeOfDay: mixTimeOfDay, workoutDurationMin: Math.round(durHrs*60) };
               const mixSubstances: MixSubstance[] = activeStack.filter(s=>s.mg>0).map(s=>({ id:s.id, name:s.name, doseMg:s.mg, category:'pump' as any }));
               const score = calculateMixScore(mixSubstances, mixProfile);
 
@@ -5599,6 +5622,14 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       <div style={{ fontSize:22, fontWeight:800, color:score.color }}>{score.compositeScore}</div>
                       <div style={{ fontSize:7, color:score.color }}>{score.label}</div>
                     </div>
+                  </div>
+                  <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+                    <button onClick={()=>{
+                      const entry={goal:mixGoal,timing:mixTiming,type:mixWorkoutType,tod:mixTimeOfDay,score:score.compositeScore,label:score.label,date:new Date().toLocaleDateString('ru-RU')};
+                      const updated=[...mixHistory,entry].slice(-20);setMixHistory(updated);
+                      localStorage.setItem('he_training_mixes',JSON.stringify(updated));
+                    }} style={{flex:1,padding:'4px',borderRadius:6,cursor:'pointer',fontSize:8,fontWeight:600,background:'rgba(139,92,246,0.08)',border:'1px solid rgba(139,92,246,0.15)',color:'#a78bfa'}}>💾 Сохранить микс</button>
+                    {mixHistory.length>0&&<button onClick={()=>{setMixHistory([]);localStorage.setItem('he_training_mixes','[]')}} style={{padding:'4px 8px',borderRadius:6,cursor:'pointer',fontSize:8,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.1)',color:'#ef4444'}}>✕</button>}
                   </div>
 
                   <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
@@ -5718,6 +5749,21 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
               </>);
             })()}
+            {mixHistory.length > 0 && (
+              <div className="card" style={{ padding:10, marginTop:8 }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#8b5cf6', marginBottom:6, display:'flex', justifyContent:'space-between' }}>
+                  <span>📂 История миксов ({mixHistory.length})</span>
+                  <button onClick={()=>{setMixHistory([]);localStorage.setItem('he_training_mixes','[]')}} style={{fontSize:7,color:'#ef4444',background:'none',border:'none',cursor:'pointer'}}>✕ очистить</button>
+                </div>
+                {mixHistory.slice(-5).reverse().map((h:any,i:number)=>(
+                  <div key={i} style={{padding:'6px 8px',borderRadius:6,marginBottom:3,background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.04)',fontSize:8}}>
+                    <span style={{color:'var(--accent)',fontWeight:700}}>{h.goal} · {h.timing} · {h.type}</span>
+                    <span style={{color:'rgba(255,255,255,0.5)',marginLeft:6}}>{h.score}/100 · {h.date}</span>
+                    <button onClick={()=>{setMixGoal(h.goal);setMixTiming(h.timing);setMixWorkoutType(h.type);setMixTimeOfDay(h.tod);}} style={{marginLeft:6,fontSize:7,color:'#60a5fa',background:'none',border:'none',cursor:'pointer'}}>↩ загрузить</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </InfoErrorBoundary>)}

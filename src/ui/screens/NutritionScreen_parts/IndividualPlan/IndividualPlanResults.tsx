@@ -366,7 +366,7 @@ export const IndividualPlanResults: React.FC = () => {
         </GlassCard>
       )}
 
-      {generated && planDays === 1 && dayPlan && (
+      {generated && planDays === 1 && dayPlan && (<>
         <GlassCard title={`План на день${cyclingMode !== 'none' ? (dayPlan.isTrainingDay ? ' 🏋️ Тренировочный' : ' 🛌 Отдых') : ''}`} icon="📋" color={dayPlan.isTrainingDay ? '#00e68a' : '#8b5cf6'} style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
           {dayPlan.isTrainingDay !== undefined && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>{dayPlan.isTrainingDay ? 'Тренировочный день' : 'День отдыха'}{cyclingMode !== 'none' && ` · циклирование: ${{macro:'макросы',butch:'БУЧ',cheatmeal:'читмил',carbload:'угл.загрузка'}[cyclingMode] || ''}`}{workScheduleEnabled && ` · 💼${dayPlan.isWorkDay ? ' Рабочий' : ' Выходной'}${dayPlan.isWorkDay && workStartTime ? ` ${workStartTime}-${workEndTime}` : ''}`}</div>}
           {renderMealList(dayPlan)}
@@ -383,7 +383,40 @@ export const IndividualPlanResults: React.FC = () => {
             );
           })()}
         </GlassCard>
-      )}
+
+        {(() => {
+          try {
+            const diaryRaw = localStorage.getItem('nutrition_diary');
+            if (!diaryRaw) return null;
+            const diary: any[] = JSON.parse(diaryRaw);
+            if (!Array.isArray(diary) || diary.length === 0) return null;
+            const today = new Date().toISOString().split('T')[0];
+            const todayEntries = diary.filter((d: any) => (d.date || d.createdAt || '').startsWith(today));
+            if (todayEntries.length === 0) return null;
+            const factKcal = Math.round(todayEntries.reduce((s: number, d: any) => s + (d.kcal || 0), 0));
+            const factP = Math.round(todayEntries.reduce((s: number, d: any) => s + (d.p || d.protein || 0), 0));
+            const factF = Math.round(todayEntries.reduce((s: number, d: any) => s + (d.f || d.fat || 0), 0));
+            const factC = Math.round(todayEntries.reduce((s: number, d: any) => s + (d.c || d.carbs || 0), 0));
+            const planKcal = dayPlan?.totals?.kcal || 0;
+            const planP = dayPlan?.totals?.p || 0;
+            if (factKcal === 0) return null;
+            const kcalPct = planKcal > 0 ? Math.round(factKcal / planKcal * 100) : 0;
+            return (
+              <GlassCard title="📊 План vs Факт" icon="⚖️" color={kcalPct >= 90 && kcalPct <= 110 ? '#22c55e' : '#f59e0b'}>
+                <div style={{ fontSize:8 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4, marginBottom:6 }}>
+                    {[{label:'Ккал', plan:planKcal, fact:factKcal, unit:'', color:'#00e68a'},{label:'Белок', plan:planP, fact:factP, unit:'г', color:'#3b82f6'},{label:'Жиры', plan:dayPlan?.totals?.f||0, fact:factF, unit:'г', color:'#f59e0b'},{label:'Угл.', plan:dayPlan?.totals?.c||0, fact:factC, unit:'г', color:'#f97316'}].map(m=>(<div key={m.label} style={{textAlign:'center',padding:'4px',borderRadius:6,background:'rgba(255,255,255,0.02)'}}><div style={{color:m.color,fontWeight:700,fontSize:10}}>{m.fact}</div><div style={{color:'rgba(255,255,255,0.5)',fontSize:7}}>План: {m.plan}{m.unit}</div></div>))}
+                  </div>
+                  <div style={{ color: kcalPct >= 90 && kcalPct <= 110 ? '#22c55e' : '#f59e0b', fontWeight:600 }}>
+                    {kcalPct >= 90 && kcalPct <= 110 ? '✅ В рамках плана' : kcalPct > 110 ? `⚠️ Перебор на ${kcalPct-100}%` : `⚠️ Недобор на ${100-kcalPct}%`}
+                    <span style={{fontWeight:400,color:'rgba(255,255,255,0.5)',marginLeft:4}}>({factKcal}/{planKcal} ккал)</span>
+                  </div>
+                </div>
+              </GlassCard>
+            );
+          } catch { return null; }
+        })()}
+      </>)}
 
       {generated && planDays === 3 && threeDayPlan && (
         <GlassCard title="План на 3 дня" icon="📋" color="#00e68a" style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
