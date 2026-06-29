@@ -56,6 +56,7 @@ type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mys
 type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'research' | 'favorites' | 'protocols' | 'biostack';
 
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
+import { PopupBool, PopupNumber, PopupSelect } from '../components/PopupXxx';
 import { BioStackAIScreen } from '../components/BioStackAIScreen';
 export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTab }) => {
   const linked = useDataLink();
@@ -208,16 +209,30 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (stkFilterSystem !== 'all' && !(stk.system||'').includes(stkFilterSystem)) return false;
     if (stkFilterQty !== 'all') {
       if (stkFilterQty === '1-3' && (stk.substances.length < 1 || stk.substances.length > 3)) return false;
-      if (stkFilterQty === '4-6' && (stk.substances.length < 4 || stk.substances.length > 6)) return false;
-      if (stkFilterQty === '7+' && stk.substances.length < 7) return false;
+      if (stkFilterQty === '4-7' && (stk.substances.length < 4 || stk.substances.length > 7)) return false;
+      if (stkFilterQty === '8-15' && (stk.substances.length < 8 || stk.substances.length > 15)) return false;
+      if (stkFilterQty === '16-25' && (stk.substances.length < 16 || stk.substances.length > 25)) return false;
+      if (stkFilterQty === '25+' && stk.substances.length < 25) return false;
     }
     if (stkFilterScore !== 'all') {
-      if (stkFilterScore === '70-79' && (stk.synergyScore < 70 || stk.synergyScore > 79)) return false;
-      if (stkFilterScore === '80-89' && (stk.synergyScore < 80 || stk.synergyScore > 89)) return false;
-      if (stkFilterScore === '90-100' && (stk.synergyScore < 90 || stk.synergyScore > 100)) return false;
+      if (stkFilterScore === '0-50' && (stk.synergyScore < 0 || stk.synergyScore > 50)) return false;
+      if (stkFilterScore === '51-74' && (stk.synergyScore < 51 || stk.synergyScore > 74)) return false;
+      if (stkFilterScore === '75-84' && (stk.synergyScore < 75 || stk.synergyScore > 84)) return false;
+      if (stkFilterScore === '85-100' && stk.synergyScore < 85) return false;
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const nameMatch = (stk.name||'').toLowerCase().includes(q);
+      const problemMatch = (stk.problem||'').toLowerCase().includes(q);
+      const descMatch = (stk.description||'').toLowerCase().includes(q);
+      const subMatch = stk.substances.some(s => {
+        const cat = SUPPORT_CATALOG_DATA[s.id];
+        return (cat?.nameRu||cat?.name||s.id||'').toLowerCase().includes(q);
+      });
+      if (!nameMatch && !problemMatch && !descMatch && !subMatch) return false;
     }
     return true;
-  }), [stkFilterSystem, stkFilterQty, stkFilterScore]);
+  }), [stkFilterSystem, stkFilterQty, stkFilterScore, searchQuery]);
   const stackSystems = useMemo(() => [...new Set(ALL_STACKS.map(s => s.system).filter(Boolean))].sort(), []);
   const [interactSearch2, setInteractSearch2] = useState('');
   const [interactTypeFilter, setInteractTypeFilter] = useState<string>('all');
@@ -502,10 +517,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     }).map(c => ({ id: c.substanceId, doseMgWeek: (c.doseValue || 0) * ((typeof c.frequency === 'number' ? c.frequency : parseFloat(String(c.frequency)) || 0) > 0 ? (typeof c.frequency === 'number' ? c.frequency : parseFloat(String(c.frequency)) || 0) : 1), weeks: (c.endWeek || 12) - (c.startWeek || 0) }));
     const defaults: Partial<CalculatorState> = {
       profile: { weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male' | 'female', workoutsPerWeek: s?.workoutsPerWeek ?? 3, avgWorkoutMinutes: s?.avgWorkoutMinutes ?? 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
-      pharma: { phase: 'course', aas: aasList, hasGH: false, hasIGF: false, hasInsulin: false, hasHCG: !!linked.course?.find((c: any) => c.substanceId === 'hcg'), hasAI: false, hasCaber: false, hasSERM: false, hasSARMs: aasList.some(a => a.id.includes('ostarine') || a.id.includes('lgd')) },
+      pharma: { phase: 'course', aas: aasList, hasGH: false, hasIGF: false, hasInsulin: false, hasHCG: !!linked.course?.find((c: any) => c.substanceId === 'hcg'), hasAI: false, hasCaber: false, hasSERM: false, hasSARMs: aasList.some(a => a.id.includes('ostarine') || a.id.includes('lgd')), hasMGF: false, hasGLP1: false },
       oda: { jointPain: jointMode ? 'moderate' : 'none' as const, ligamentIssues: false, backPain: false, injuries: [] },
     };
-    const state: CalculatorState = { ...defaults, ...h, powerLevel: boostEnabled ? 'boost' : level, courseWeek: courseWeekState } as CalculatorState;
+    const state: CalculatorState = { ...defaults, ...h, powerLevel: level, courseWeek: courseWeekState } as CalculatorState;
     const tzResult: CalculatorResult = calculateSupportTZ(state);
     // ── TZ Risk Engine: probabilistic 49-cell model ──
     const tzRiskInput = {
@@ -549,7 +564,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     setSupportResult(calcResultData as any);
     setCalcResult(calcResultData);
     setCalcDone(true);
-    const allSubs = [...supportDrugs, ...(effectiveLevel?.subs || SUPPORT_LEVELS[level]?.subs || [])].filter(Boolean);
+    const allSubs = [...supportDrugs, ...(SUPPORT_LEVELS[level]?.subs || [])].filter(Boolean);
     setDbInteractions(checkSupportInteractions(allSubs));
     setGoalRecommendations(findSupportByGoal(supportGoal, 20));
 
@@ -1176,6 +1191,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     INFANT: { key: 'other', label: 'Прочее', emoji: '📦' },
     TISSUES: { key: 'other', label: 'Прочее', emoji: '📦' },
     ORGANS: { key: 'other', label: 'Прочее', emoji: '📦' },
+    BREAST: { key: 'reproductive', label: 'Грудные железы', emoji: '🫃' },
+    breast: { key: 'reproductive', label: 'Грудные железы', emoji: '🫃' },
     MUCOSA: { key: 'skin_hair', label: 'Кожа и слизистые', emoji: '🧴' },
     THYMUS: { key: 'immune', label: 'Иммунная система', emoji: '🛡️' },
     INTESTINES: { key: 'gi', label: 'ЖКТ и пищеварение', emoji: '🫃' },
@@ -2254,7 +2271,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['mixcalc','💪 Тренировочные миксы'],['interactions','⚠ Взаимодействия'],['research','Исследования'],['favorites','Избранное']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['mixcalc','💪 Тренировочные миксы'],['biostack','🧬 BioStack AI'],['interactions','⚠ Взаимодействия'],['research','Исследования'],['favorites','Избранное']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 if (id === 'peptides') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); }
                 else if (id === 'mixcalc') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); }
@@ -2304,18 +2321,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
                 <span style={{ color:'#60a5fa', fontSize:18, opacity:0.6 }}>→</span>
               </div>
-              {/* Тренировочные миксы */}
-              <div onClick={() => { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); }} style={{
-                display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
-                background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', color:'var(--text)', transition:'all 0.2s',
-              }}>
-                <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(245,158,11,0.15)', fontSize:24 }}>💪</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:15, fontWeight:800, marginBottom:4, color:'#f59e0b' }}>Тренировочные миксы</div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Подбор пред-/интра-/пост-тренировочных стеков по цели, весу и фазе курса</div>
-                </div>
-                <span style={{ color:'#f59e0b', fontSize:18, opacity:0.6 }}>→</span>
-              </div>
+              {/* Тренировочные миксы — удалены по запросу пользователя */}
 
               {/* Примерные протоколы поддержки — одна кнопка */}
               <div onClick={() => { setSection('protocols'); setProtocolTab('pct'); }} style={{
@@ -2358,7 +2364,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
                 <div style={{height:4}} />
                 <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:6 }}>
-            {searchQuery ? `Найдено: ${groupedSubstances.reduce((a, g) => a + g.count, 0)} из ${catalogSubstances.length}` : `Всего: ${catalogSubstances.length} препаратов`}
+            {catalogSubTab === 'stack' ? (searchQuery ? `Найдено стеков: ${filteredStacks.length} из ${ALL_STACKS.length}` : `Всего стеков: ${ALL_STACKS.length}`) : (searchQuery ? `Найдено: ${groupedSubstances.reduce((a, g) => a + g.count, 0)} из ${catalogSubstances.length}` : `Всего: ${catalogSubstances.length} препаратов`)}
                 </div>
                 {catalogSubTab === 'organ' && (
                   /* По органам */
@@ -2402,20 +2408,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                         <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
                                           {(sub.mechanisms||[]).map((m,i) => <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')||''}</span>)}
                                         </div>
-                                      </div>
-                                    )}
-                                    {(sub.organs||[]).length > 0 && (
-                                      <div style={{ marginBottom:3 }}>
-                                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Органы-мишени:</div>
-                                        <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                                           {[...new Set(sub.organs||[])].map(o => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{o||''}</span>)}
-                                         </div>
-                                       </div>
-                                     )}
-                                     {SUPPLEMENT_DESCRIPTIONS[sub.id] && (
-                                      <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(0,230,138,0.05)', borderRadius:4, border:'1px solid rgba(0,230,138,0.1)' }}>
-                                        <div style={{ fontSize:8, color:'#00e68a', fontWeight:600, marginBottom:1 }}>📋 Подробнее:</div>
-                                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.9)', lineHeight:1.4 }}>{SUPPLEMENT_DESCRIPTIONS[sub.id]}</div>
                                       </div>
                                     )}
                                     {catDetailInteractions(sub, ALL_INTERACTIONS)}
@@ -2487,17 +2479,12 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 )}
                    {catalogSubTab === 'stack' && (
                     <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                      <div style={{ display:'flex', gap:3, flexWrap:'wrap', padding:'4px 0', overflowX:'auto', scrollbarWidth:'none' }}>
-                        <select value={stkFilterSystem} onChange={e => setStkFilterSystem(e.target.value)} style={{ padding:'4px 8px', borderRadius:10, fontSize:7, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.7)', outline:'none', maxWidth:100 }}>
-                          <option value="all">🫀 Все системы</option>
-                          {stackSystems.map(sys => <option key={sys} value={sys}>{sys}</option>)}
-                        </select>
-                        <button onClick={() => setStkFilterQty(stkFilterQty === 'all' ? '1-3' : 'all')} style={{ padding:'4px 8px', borderRadius:10, fontSize:7, fontWeight: stkFilterQty !== 'all' ? 700 : 400, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0, background: stkFilterQty !== 'all' ? '#00e68a18' : '#202023', border: stkFilterQty !== 'all' ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', color: stkFilterQty !== 'all' ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>
-                          🧪 {stkFilterQty === 'all' ? 'Любое кол-во' : stkFilterQty}</button>
-                        <button onClick={() => setStkFilterScore(stkFilterScore === 'all' ? '80-89' : 'all')} style={{ padding:'4px 8px', borderRadius:10, fontSize:7, fontWeight: stkFilterScore !== 'all' ? 700 : 400, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0, background: stkFilterScore !== 'all' ? '#8b5cf618' : '#202023', border: stkFilterScore !== 'all' ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.06)', color: stkFilterScore !== 'all' ? '#8b5cf6' : 'rgba(255,255,255,0.6)' }}>
-                          ⭐ {stkFilterScore === 'all' ? 'Любой рейтинг' : stkFilterScore}</button>
-                        <span style={{ fontSize:7, color:'rgba(255,255,255,0.4)', alignSelf:'center' }}>{filteredStacks.length} из {ALL_STACKS.length}</span>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+                        <PopupSelect label="🫀 Система" value={stkFilterSystem} options={[{id:'all',label:'🫀 Все системы'},...stackSystems.map(sys=>({id:sys,label:SYSTEM_LABELS_CATALOG[sys]||sys}))]} onChange={setStkFilterSystem} />
+                        <PopupSelect label="🧪 Количество" value={stkFilterQty} options={[{id:'all',label:'🧪 Любое кол-во'},{id:'1-3',label:'1-3 вещества'},{id:'4-7',label:'4-7 веществ'},{id:'8-15',label:'8-15 веществ'},{id:'16-25',label:'16-25 веществ'},{id:'25+',label:'25+ веществ'}]} onChange={setStkFilterQty} />
+                        <PopupSelect label="⭐ Рейтинг" value={stkFilterScore} options={[{id:'all',label:'⭐ Любой рейтинг'},{id:'0-50',label:'⭐ до 50'},{id:'51-74',label:'⭐ 51-74'},{id:'75-84',label:'⭐ 75-84'},{id:'85-100',label:'⭐ 85+'}]} onChange={setStkFilterScore} />
                       </div>
+                      <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', textAlign:'center' }}>{filteredStacks.length} из {ALL_STACKS.length}</div>
                       {filteredStacks.map(stk => {
                         const isExp = stackExpanded === stk.id;
                         return (
@@ -2627,23 +2614,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                               </div>
                                             </div>
                                           )}
-                                          {(sub.organs||[]).length > 0 && (
-                                            <div style={{ marginBottom:3 }}>
-                                              <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Органы-мишени:</div>
-                                              <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                                                 {[...new Set(sub.organs||[])].map(o => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{o||''}</span>)}
-                                               </div>
-                                             </div>
-                                           )}
                                            {sub.deficiency && sub.deficiency !== 'NONE' && (
-                                             <div style={{ fontSize:9, color:'#f59e0b', marginTop:2 }}>⚠ Дефицит: {sub.deficiency}</div>
-                                          )}
-                                          {SUPPLEMENT_DESCRIPTIONS[sub.id] && (
-                                            <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(0,230,138,0.05)', borderRadius:4, border:'1px solid rgba(0,230,138,0.1)' }}>
-                                              <div style={{ fontSize:8, color:'#00e68a', fontWeight:600, marginBottom:1 }}>📋 Подробнее:</div>
-                                              <div style={{ fontSize:9, color:'rgba(255,255,255,0.9)', lineHeight:1.4 }}>{SUPPLEMENT_DESCRIPTIONS[sub.id]}</div>
-                                            </div>
-                                          )}
+                                              <div style={{ fontSize:9, color:'#f59e0b', marginTop:2 }}>⚠ Дефицит: {sub.deficiency}</div>
+                                           )}
                                           {(sub as any).forms && (sub as any).forms.length > 0 && (
                                             <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(59,130,246,0.05)', borderRadius:4, border:'1px solid rgba(59,130,246,0.1)' }}>
                                               <div style={{ fontSize:8, color:'#60a5fa', fontWeight:600, marginBottom:2 }}>💊 Формы выпуска:</div>
@@ -2715,13 +2688,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                        {sub.deficiency && sub.deficiency !== 'NONE' && (
                                          <div style={{ fontSize:9, color:'#f59e0b', marginTop:2 }}>⚠ Дефицит: {sub.deficiency}</div>
                                        )}
-                                       {SUPPLEMENT_DESCRIPTIONS[sub.id] && (
-                                        <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(0,230,138,0.05)', borderRadius:4, border:'1px solid rgba(0,230,138,0.1)' }}>
-                                          <div style={{ fontSize:8, color:'#00e68a', fontWeight:600, marginBottom:1 }}>📋 Подробнее:</div>
-                                          <div style={{ fontSize:9, color:'rgba(255,255,255,0.9)', lineHeight:1.4 }}>{SUPPLEMENT_DESCRIPTIONS[sub.id]}</div>
-                                        </div>
-                                      )}
-                                      {(sub as any).forms && (sub as any).forms.length > 0 && (
+                                       {(sub as any).forms && (sub as any).forms.length > 0 && (
                                         <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(59,130,246,0.05)', borderRadius:4, border:'1px solid rgba(59,130,246,0.1)' }}>
                                           <div style={{ fontSize:8, color:'#60a5fa', fontWeight:600, marginBottom:2 }}>💊 Формы выпуска:</div>
                                           {((sub as any).forms as any[]).map((f, fi) => (
@@ -5112,7 +5079,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   {(['basic','mid','max','boost'] as const).map(b => {
                     const active = supportLevel === b;
                     const labels: Record<string,string> = { basic:'🟢 База', mid:'🟡 Средний', max:'🔴 Макс', boost:'💎 Буст' };
-                    return <button key={b} onClick={() => { setSupportLevel(b); }} style={{
+                    return <button key={b} onClick={() => { setSupportLevel(b); calcSupport(b); }} style={{
                       flex:1, padding:'8px 4px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer',
                       background: active ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.04)',
                       border: active ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
@@ -5151,11 +5118,14 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 <button onClick={() => {
                   const newVal = !boostEnabled;
                   setBoostEnabled(newVal);
-                  if (newVal && calcResult) {
+                  if (newVal) {
+                    setSupportLevel('boost');
                     setBoostNotification(true);
                     setTimeout(() => setBoostNotification(false), 5000);
+                  } else {
+                    setSupportLevel('max');
                   }
-                  calcSupport(newVal ? 'boost' : supportLevel);
+                  calcSupport(newVal ? 'boost' : 'max');
                 }} style={{
                   flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
                   border: boostEnabled ? '1px solid #ef4444' : '1px solid var(--border)',
@@ -5468,7 +5438,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                             <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Синергии</th>
                           </tr></thead>
                           <tbody>
-                            {(effectiveLevel?.subs || []).map((id: string) => {
+                    {((calcResult as any)?.selectedSubstances || effectiveLevel?.subs || []).map((id: string) => {
                               const sub = allSupport.find((s: any) => s.id === id);
                               const subDb = catalogSubstances.find((s: any) => s.id === id);
                               if (!sub) return null;
@@ -5589,63 +5559,24 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
 
           <div className="card" style={{ marginBottom:10, padding:10 }}>
             <h4 style={{ margin:'0 0 8px', fontSize:11, color:'var(--text)' }}>⚙️ Параметры</h4>
-            <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' }}>
-              <div style={{ flex:'1 1 45%', minWidth:100 }}>
-                <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Цель</div>
-                <select value={mixGoal} onChange={e => setMixGoal(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
-                  <option value="pump">🩸 Памп (ББ)</option>
-                  <option value="endurance">🏃 Выносливость</option>
-                  <option value="strength">🏋️ Сила</option>
-                  <option value="recovery">🔄 Восстановление</option>
-                  <option value="focus">🧠 Фокус</option>
-                  <option value="powerlifting">💪 Пауэрлифтинг</option>
-                  <option value="competition">🏆 Соревнования</option>
-                  <option value="crossfit">🔁 CrossFit</option>
-                  <option value="post_comp">🔄 Пост-соревнования</option>
-                </select>
-              </div>
-              <div style={{ flex:'1 1 45%', minWidth:100 }}>
-                <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Тайминг</div>
-                <select value={mixTiming} onChange={e => setMixTiming(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
-                  <option value="pre">🔥 Пред-тренировочный</option>
-                  <option value="intra">💧 Интра-тренировочный</option>
-                  <option value="post">🍗 Пост-тренировочный</option>
-                </select>
-              </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
+              <PopupSelect label="🎯 Цель" value={mixGoal} options={[{id:'pump',label:'🩸 Памп (ББ)'},{id:'endurance',label:'🏃 Выносливость'},{id:'strength',label:'🏋️ Сила'},{id:'recovery',label:'🔄 Восстановление'},{id:'focus',label:'🧠 Фокус'},{id:'powerlifting',label:'💪 Пауэрлифтинг'},{id:'competition',label:'🏆 Соревнования'},{id:'crossfit',label:'🔁 CrossFit'},{id:'post_comp',label:'🔄 Пост-соревнования'}]} onChange={setMixGoal} />
+              <PopupSelect label="⏰ Тайминг" value={mixTiming} options={[{id:'pre',label:'🔥 Пред-тренировочный'},{id:'intra',label:'💧 Интра-тренировочный'},{id:'post',label:'🍗 Пост-тренировочный'}]} onChange={setMixTiming} />
             </div>
             <div style={{ marginBottom:8 }}>
-              <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Вес тела (кг)</div>
-              <input type="number" value={linked.profile?.settings?.weight ?? 80} readOnly
-                style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
+              <PopupNumber label="⚖️ Вес тела (кг)" value={linked.profile?.settings?.weight ?? 80} min={40} max={200} suffix="кг" onChange={()=>{}} />
             </div>
-            <div style={{ display:'flex', gap:4, marginBottom:6 }}>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:2 }}>Тип тренировки</div>
-                <select value={mixWorkoutType} onChange={e=>setMixWorkoutType(e.target.value as any)} style={{ width:'100%',padding:'4px 6px',borderRadius:5,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:9 }}>
-                  <option value="heavy">🏋️ Тяжёлая (присед/тяга)</option>
-                  <option value="moderate">🏃 Средняя (подсобка)</option>
-                  <option value="light">🩸 Лёгкая (пампинг)</option>
-                </select>
-              </div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:2 }}>Время суток</div>
-                <select value={mixTimeOfDay} onChange={e=>setMixTimeOfDay(e.target.value as any)} style={{ width:'100%',padding:'4px 6px',borderRadius:5,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:9 }}>
-                  <option value="morning">🌅 Утро (6-12)</option>
-                  <option value="afternoon">☀️ День (12-18)</option>
-                  <option value="evening">🌙 Вечер (18-24)</option>
-                </select>
-              </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
+              <PopupSelect label="🏋️ Тип тренировки" value={mixWorkoutType} options={[{id:'heavy',label:'🏋️ Тяжёлая (присед/тяга)'},{id:'moderate',label:'🏃 Средняя (подсобка)'},{id:'light',label:'🩸 Лёгкая (пампинг)'}]} onChange={v=>setMixWorkoutType(v as any)} />
+              <PopupSelect label="🌅 Время суток" value={mixTimeOfDay} options={[{id:'morning',label:'🌅 Утро (6-12)'},{id:'afternoon',label:'☀️ День (12-18)'},{id:'evening',label:'🌙 Вечер (18-24)'}]} onChange={v=>setMixTimeOfDay(v as any)} />
             </div>
             <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>💉 Фармакология (влияет на скор)</div>
-            <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
-              {[{ id:'insulin', label:'Инсулин', st:mixInsulin>0, fn:()=>setMixInsulin(mixInsulin>0?0:5) },
-                { id:'igf', label:'ИГФ-1', st:mixDrugIGF, fn:()=>setMixDrugIGF(!mixDrugIGF) },
-                { id:'gh', label:'ГР', st:mixDrugGH, fn:()=>setMixDrugGH(!mixDrugGH) },
-                { id:'mgf', label:'МГФ', st:mixDrugMGF, fn:()=>setMixDrugMGF(!mixDrugMGF) },
-                { id:'glp1', label:'ГПП-1', st:mixDrugGLP1, fn:()=>setMixDrugGLP1(!mixDrugGLP1) },
-              ].map(d => (
-                <button key={d.id} onClick={d.fn} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, fontWeight:600, cursor:'pointer', background:d.st?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', border:d.st?'1px solid rgba(0,230,138,0.25)':'1px solid rgba(255,255,255,0.06)', color:d.st?'#00e68a':'rgba(255,255,255,0.7)' }}>{d.st?'✓ ':''}{d.label}</button>
-              ))}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:6 }}>
+              <PopupBool label={mixInsulin>0?'💉 Инсулин ✓':'💉 Инсулин'} value={mixInsulin>0} onChange={v=>setMixInsulin(v?5:0)} />
+              <PopupBool label="🧬 ИГФ-1" value={mixDrugIGF} onChange={setMixDrugIGF} />
+              <PopupBool label="💉 ГР" value={mixDrugGH} onChange={setMixDrugGH} />
+              <PopupBool label="🧬 МГФ" value={mixDrugMGF} onChange={setMixDrugMGF} />
+              <PopupBool label="💊 ГПП-1" value={mixDrugGLP1} onChange={setMixDrugGLP1} />
             </div>
             <button onClick={() => {
               const course = linked.course || [];
@@ -5958,24 +5889,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
               <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#60a5fa' }}>💧 Калькулятор разведения</h4>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                <div>
-                  <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Кол-во пептида (мг)</div>
-                  <input type="number" value={pepAmount} onChange={e => setPepAmount(Math.max(0.1, Number(e.target.value) || 1))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
-                </div>
-                <div>
-                  <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Объём бака (мл)</div>
-                  <input type="number" value={pepDilution} onChange={e => setPepDilution(Math.max(0.1, Number(e.target.value) || 1))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
-                </div>
-                <div>
-                  <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Дозировка (мкг)</div>
-                  <input type="number" value={pepDose} onChange={e => setPepDose(Math.max(1, Number(e.target.value) || 100))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
-                </div>
-                <div>
-                  <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Шприц</div>
-                  <select value={pepSyringe} onChange={e => setPepSyringe(e.target.value as keyof typeof SYRINGE_TYPES)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }}>
-                    {Object.entries(SYRINGE_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                  </select>
-                </div>
+                <PopupNumber label="💊 Кол-во пептида" value={pepAmount} min={0.1} max={100} step={0.1} suffix="мг" onChange={v => setPepAmount(Math.max(0.1, v))} />
+                <PopupNumber label="💧 Объём бака" value={pepDilution} min={0.1} max={50} step={0.1} suffix="мл" onChange={v => setPepDilution(Math.max(0.1, v))} />
+                <PopupNumber label="💉 Дозировка" value={pepDose} min={1} max={10000} step={10} suffix="мкг" onChange={v => setPepDose(Math.max(1, v))} />
+                <PopupSelect label="💉 Шприц" value={pepSyringe} options={Object.entries(SYRINGE_TYPES).map(([k, v]) => ({ id: k, label: v.label }))} onChange={v => setPepSyringe(v as keyof typeof SYRINGE_TYPES)} />
               </div>
               {(() => {
                 const conc = pepAmount / pepDilution; // mg/mL
@@ -6035,7 +5952,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
               <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#f59e0b' }}>📅 График дозирования</h4>
               <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>
-                {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => {
+                {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(day => {
                   const active = pepSchedule.includes(day);
                   return (
                     <button key={day} onClick={() => setPepSchedule(active ? pepSchedule.filter(d => d !== day) : [...pepSchedule, day])} style={{
@@ -6048,8 +5965,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 })}
               </div>
               <div>
-                <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Длительность (дней)</div>
-                <input type="number" value={pepTotalDays} onChange={e => setPepTotalDays(Math.max(1, Number(e.target.value) || 30))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
+                <PopupNumber label="📅 Длительность (дней)" value={pepTotalDays} min={1} max={365} step={1} suffix="дн" onChange={v => setPepTotalDays(Math.max(1, v))} />
               </div>
               <div style={{ marginTop:8, padding:'10px 12px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
                 <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>📊 Итого</div>

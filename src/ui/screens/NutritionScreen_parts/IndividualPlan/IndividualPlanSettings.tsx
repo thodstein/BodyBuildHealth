@@ -10,6 +10,7 @@ import {
 } from "./types";
 import { GlassCard, PillBtn, inputStyle, selectStyle, greenBtn } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
+import { PopupNumber, PopupSelect } from '../../../components/PopupXxx';
 
 export const IndividualPlanSettings: React.FC = () => {
   const {
@@ -124,21 +125,14 @@ export const IndividualPlanSettings: React.FC = () => {
   return (
     <>
       <GlassCard title="Пользователь" icon="👤" color="#a78bfa">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
-          <div><label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Вес (кг)</label><input type="number" value={weight} onChange={e => setWeight(+e.target.value || 0)} style={inputStyle} /></div>
-          <div><label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Рост (см)</label><input type="number" value={height} onChange={e => setHeight(+e.target.value || 0)} style={inputStyle} /></div>
-          <div><label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Возраст</label><input type="number" value={age} onChange={e => setAge(+e.target.value || 0)} style={inputStyle} /></div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
+          <PopupNumber label="⚖️ Вес (кг)" value={weight} min={30} max={250} suffix="кг" onChange={setWeight} />
+          <PopupNumber label="📏 Рост (см)" value={height} min={100} max={250} suffix="см" onChange={setHeight} />
+          <PopupNumber label="🎂 Возраст" value={age} min={10} max={120} suffix="лет" onChange={setAge} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-          <div>
-            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Пол</label>
-            {pickerBtn('Выберите пол', [{value:'male',label:'Мужской'},{value:'female',label:'Женский'}], sex, setShowSexPicker)}
-            {pickerModal('Выберите пол', [{value:'male',label:'Мужской'},{value:'female',label:'Женский'}], sex, setSex, showSexPicker, setShowSexPicker)}
-          </div>
-          <div>
-            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Шагов/день</label>
-            <input type="number" value={dailySteps} onChange={e => setDailySteps(+e.target.value || 0)} style={inputStyle} />
-          </div>
+          <PopupSelect label="🧑 Пол" value={sex} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} onChange={v => setSex(v as 'male'|'female')} />
+          <PopupNumber label="🚶 Шагов/день" value={dailySteps} min={0} max={50000} step={500} suffix="шаг" onChange={setDailySteps} />
         </div>
         <button onClick={() => {
           setWeight(s?.weight || weight);
@@ -149,54 +143,27 @@ export const IndividualPlanSettings: React.FC = () => {
         }} style={{
           width:'100%', padding:'5px 8px', borderRadius:8, cursor:'pointer', fontSize:8, fontWeight:600,
           background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.2)', color:'#60a5fa',
-          marginBottom:8,
+          marginBottom:6,
         }}>👤 Автозаполнение из профиля</button>
-        <div>
-          <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Время на готовку (мин/день)</label>
-          <input type="number" value={cookTimeMin} onChange={e => setCookTimeMin(+e.target.value || 0)} style={inputStyle} />
+        <div style={{ marginBottom: 6 }}>
+          <PopupNumber label="🍳 Время на готовку" value={cookTimeMin} min={0} max={300} step={5} suffix="мин" onChange={setCookTimeMin} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-          <div>
-            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Тип тренировок</label>
-            {pickerBtn('Тип тренировок', [{value:'strength',label:'Силовые'},{value:'cardio',label:'Кардио'},{value:'mixed',label:'Смешанные'},{value:'hiit',label:'HIIT'}], trainType, setShowTrainTypePicker)}
-            {pickerModal('Тип тренировок', [{value:'strength',label:'Силовые'},{value:'cardio',label:'Кардио'},{value:'mixed',label:'Смешанные'},{value:'hiit',label:'HIIT'}], trainType, setTrainType, showTrainTypePicker, setShowTrainTypePicker)}
-          </div>
-          <div>
-            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Интенсивность</label>
-            {pickerBtn('Интенсивность', [{value:'low',label:'Низкая'},{value:'medium',label:'Средняя'},{value:'high',label:'Высокая'}], trainIntensity, setShowIntensityPicker)}
-            {pickerModal('Интенсивность', [{value:'low',label:'Низкая'},{value:'medium',label:'Средняя'},{value:'high',label:'Высокая'}], trainIntensity, setTrainIntensity, showIntensityPicker, setShowIntensityPicker)}
-          </div>
+          <PopupSelect label="🏋️ Тип тренировок" value={trainType} options={[{id:'strength',label:'Силовые'},{id:'cardio',label:'Кардио'},{id:'mixed',label:'Смешанные'},{id:'hiit',label:'HIIT'}]} onChange={v => setTrainType(v as string)} />
+          <PopupSelect label="📊 Интенсивность" value={trainIntensity} options={[{id:'low',label:'Низкая'},{id:'medium',label:'Средняя'},{id:'high',label:'Высокая'}]} onChange={v => setTrainIntensity(v as string)} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-          <div>
-            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>% жира</label>
-            <input type="number" value={bodyFatPct} onChange={e => setBodyFatPct(+e.target.value || 0)} style={inputStyle} />
-          </div>
-          <div>
-            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Бытовая активность</label>
-            {pickerBtn('Бытовая активность', [{value:'sedentary',label:'Сидячий'},{value:'light',label:'Лёгкая'},{value:'moderate',label:'Умеренная'},{value:'active',label:'Активная'}], householdActivity, setShowActivityPicker)}
-            {pickerModal('Бытовая активность', [{value:'sedentary',label:'Сидячий'},{value:'light',label:'Лёгкая'},{value:'moderate',label:'Умеренная'},{value:'active',label:'Активная'}], householdActivity, setHouseholdActivity, showActivityPicker, setShowActivityPicker)}
-          </div>
+          <PopupNumber label="🧈 % жира" value={bodyFatPct} min={3} max={60} step={0.5} suffix="%" onChange={setBodyFatPct} />
+          <PopupSelect label="🏠 Быт. активность" value={householdActivity} options={[{id:'sedentary',label:'Сидячий'},{id:'light',label:'Лёгкая'},{id:'moderate',label:'Умеренная'},{id:'active',label:'Активная'}]} onChange={v => setHouseholdActivity(v as string)} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
-          <div>
-            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Сон (часы)</label>
-            <input type="number" min="3" max="14" value={sleepHours} onChange={e => setSleepHours(+e.target.value || 7)} style={inputStyle} />
-          </div>
-          <div>
-            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Качество сна</label>
-            <input type="number" min="1" max="10" value={sleepQuality} onChange={e => setSleepQuality(+e.target.value || 7)} style={inputStyle} />
-          </div>
-          <div>
-            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Стресс (1-10)</label>
-            <input type="number" min="1" max="10" value={stressLevel} onChange={e => setStressLevel(+e.target.value || 5)} style={inputStyle} />
-          </div>
+          <PopupNumber label="😴 Сон (часы)" value={sleepHours} min={3} max={14} step={0.5} suffix="ч" onChange={setSleepHours} />
+          <PopupNumber label="🌟 Качество сна" value={sleepQuality} min={1} max={10} suffix="/10" onChange={setSleepQuality} />
+          <PopupNumber label="😰 Стресс" value={stressLevel} min={1} max={10} suffix="/10" onChange={setStressLevel} />
         </div>
         {sex === 'female' && (
           <div style={{ marginBottom: 6 }}>
-            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Фаза цикла</label>
-            {pickerBtn('Фаза цикла', [{value:'none',label:'Не указана'},{value:'follicular',label:'Фолликулярная'},{value:'ovulation',label:'Овуляция'},{value:'luteal',label:'Лютеиновая'},{value:'menstrual',label:'Менструация'}], cyclePhase, setShowCyclePicker)}
-            {pickerModal('Фаза цикла', [{value:'none',label:'Не указана'},{value:'follicular',label:'Фолликулярная'},{value:'ovulation',label:'Овуляция'},{value:'luteal',label:'Лютеиновая'},{value:'menstrual',label:'Менструация'}], cyclePhase, setCyclePhase, showCyclePicker, setShowCyclePicker)}
+            <PopupSelect label="🌸 Фаза цикла" value={cyclePhase} options={[{id:'none',label:'Не указана'},{id:'follicular',label:'Фолликулярная'},{id:'ovulation',label:'Овуляция'},{id:'luteal',label:'Лютеиновая'},{id:'menstrual',label:'Менструация'}]} onChange={v => setCyclePhase(v as CycleType)} />
           </div>
         )}
         <div style={{ marginBottom: 6 }}>
@@ -205,6 +172,98 @@ export const IndividualPlanSettings: React.FC = () => {
           <div style={{ fontSize: 8, color: 'var(--text-dim)', textAlign: 'right' }}>{hungerLevel}/10</div>
         </div>
       </GlassCard>
+
+        {/* 💧 Electrolytes & Pharma — quick settings */}
+        <GlassCard title="💧 Электролиты и фарма" icon="💧" color="#06b6d4">
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:6 }}>
+            <div><label style={{ fontSize:7, color:'rgba(255,255,255,0.6)', display:'block', marginBottom:2 }}>Натрий (мг)</label>
+              <input type="number" value={v2Labs.sodium||3500} onChange={e=>setV2Labs((p:any)=>({...p,sodium:+e.target.value||3500}))} style={inputStyle} /></div>
+            <div><label style={{ fontSize:7, color:'rgba(255,255,255,0.6)', display:'block', marginBottom:2 }}>Калий (мг)</label>
+              <input type="number" value={v2Labs.potassium||4500} onChange={e=>setV2Labs((p:any)=>({...p,potassium:+e.target.value||4500}))} style={inputStyle} /></div>
+            <div><label style={{ fontSize:7, color:'rgba(255,255,255,0.6)', display:'block', marginBottom:2 }}>Магний (мг)</label>
+              <input type="number" value={v2Labs.magnesium||400} onChange={e=>setV2Labs((p:any)=>({...p,magnesium:+e.target.value||400}))} style={inputStyle} /></div>
+          </div>
+          <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', marginBottom:4 }}>💉 Фармакология</div>
+          <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
+            {[{id:'AAS_ORAL',label:'💊 Оральные ААС'},{id:'AAS_INJECTABLE',label:'💉 Инъекционные ААС'},{id:'HGH',label:'📈 ГР'},{id:'INSULIN_USE',label:'💉 Инсулин'},{id:'DIURETICS',label:'💧 Диуретики'},{id:'STIMULATORS',label:'⚡ Стимуляторы'}].map(p=>(
+              <button key={p.id} onClick={()=>setV2Pharma((prev:any)=>({...prev,[p.id]:!prev[p.id]}))} style={{
+                padding:'3px 8px', borderRadius:6, fontSize:7, fontWeight:600, cursor:'pointer',
+                background:v2Pharma[p.id]?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.03)',
+                border:v2Pharma[p.id]?'1px solid rgba(239,68,68,0.25)':'1px solid rgba(255,255,255,0.06)',
+                color:v2Pharma[p.id]?'#ef4444':'rgba(255,255,255,0.7)',
+              }}>{v2Pharma[p.id]?'✓ ':''}{p.label}</button>
+            ))}
+          </div>
+        </GlassCard>
+
+        {/* v2 Scoring Profile — moved to top */}
+        <GlassCard title="🧬 v2 Скоринг" icon="🧬" color="#00e68a">
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 6, lineHeight: 1.3 }}>
+            <div style={{ marginBottom: 4 }}>Качество рациона оценивается по шкале 0–10 на основе: состава макронутриентов, содержания клетчатки, профиля аминокислот и микронутриентной плотности. Результат влияет на подбор продуктов и расчёт итогового скоринга каждого приёма пищи.</div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              <span style={{ padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#22c55e', fontSize:7 }}>7–10 — 🟢 Отлично</span>
+              <span style={{ padding:'2px 6px', borderRadius:4, background:'rgba(245,158,11,0.08)', color:'#f59e0b', fontSize:7 }}>4–6 — 🟡 Средне</span>
+              <span style={{ padding:'2px 6px', borderRadius:4, background:'rgba(239,68,68,0.08)', color:'#ef4444', fontSize:7 }}>1–3 — 🔴 Низко</span>
+            </div>
+          </div>
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Фаза</div>
+            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+              {['LEAN_MASS', 'EXTREME_CUT', 'PEAK_WEEK', 'POST_CYCLE', 'MOST'].map(ph => (
+                <button key={ph} onClick={() => setV2Phase(ph)} style={{
+                  padding: '4px 10px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+                  background: v2Phase === ph ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+                  border: v2Phase === ph ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                  color: v2Phase === ph ? '#000' : 'rgba(255,255,255,0.7)',
+                }}>{ph === 'LEAN_MASS' ? '💪 Набор' : ph === 'EXTREME_CUT' ? '🔥 Сушка' : ph === 'PEAK_WEEK' ? '⚡ Пик' : ph === 'POST_CYCLE' ? '🔄 ПКТ' : '🌉 Мост'}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Фармакология</div>
+            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+              {[
+                { id: 'AAS_ORAL', label: '💊 Оральные ААС', color: '#ef4444' },
+                { id: 'AAS_INJECTABLE', label: '💉 Инъекционные ААС', color: '#ef4444' },
+                { id: 'HGH', label: '🧬 HGH/Пептиды', color: '#8b5cf6' },
+                { id: 'DIURETICS', label: '💧 Диуретики', color: '#f59e0b' },
+                { id: 'STIMULATORS', label: '⚡ Стимуляторы', color: '#f97316' },
+                { id: 'INSULIN_USE', label: '💉 Инсулин', color: '#8b5cf6' },
+                { id: 'LIVER_SUPPORT', label: '🫁 Гепатопротекторы', color: '#22c55e' },
+                { id: 'GUT_SUPPORT', label: '🫃 Поддержка ЖКТ', color: '#22c55e' },
+              ].map(p => (
+                <button key={p.id} onClick={() => setV2Pharma((prev: Record<string, boolean>) => ({ ...prev, [p.id]: !prev[p.id] }))} style={{
+                  padding: '3px 8px', borderRadius: 8, fontSize: 7, fontWeight: 600, cursor: 'pointer',
+                  background: v2Pharma[p.id] ? p.color + '20' : '#202023',
+                  border: v2Pharma[p.id] ? `1px solid ${p.color}40` : '1px solid rgba(255,255,255,0.04)',
+                  color: v2Pharma[p.id] ? p.color : 'rgba(255,255,255,0.5)',
+                }}>{p.label}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Лабораторные (v2)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3 }}>
+              {['hematocrit','hemoglobin','hdl','ldl','alt','ast','crp','testosterone'].map(lab => (
+                <div key={lab} style={{ display:'flex', flexDirection:'column', gap:1 }}>
+                  <span style={{ fontSize:6, color:'rgba(255,255,255,0.35)', textTransform:'capitalize' }}>{lab}</span>
+                  <input value={v2Labs[lab] || ''} onChange={e => setV2Labs((prev:any) => ({...prev, [lab]: e.target.value}))}
+                    placeholder="—" style={{ padding:'3px 5px', borderRadius:4, fontSize:7, background:'#202023',
+                    border:'1px solid rgba(255,255,255,0.06)', color:'#fff', outline:'none', width:'100%', boxSizing:'border-box' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Чувствительность к гистамину</div>
+            <button onClick={() => setHistamineSensitive(!histamineSensitive)} style={{
+              padding: '4px 10px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+              background: histamineSensitive ? 'rgba(239,68,68,0.15)' : '#202023',
+              border: histamineSensitive ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(255,255,255,0.06)',
+              color: histamineSensitive ? '#ef4444' : 'rgba(255,255,255,0.5)',
+            }}>{histamineSensitive ? '⚠️ Чувствителен к гистамину' : '✅ Не чувствителен'}</button>
+          </div>
+        </GlassCard>
 
       <GlassCard title="Диетические паузы" icon="🔄" color="#a78bfa">
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
@@ -1907,69 +1966,7 @@ export const IndividualPlanSettings: React.FC = () => {
         )}
       </GlassCard>
 
-        {/* v2 Scoring Profile */}
-        <GlassCard title="🧬 v2 Скоринг" icon="🧬" color="#00e68a">
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 6, lineHeight: 1.3 }}>
-            Настройте параметры для v2-движка.
-          </div>
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Фаза</div>
-            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-              {['LEAN_MASS', 'EXTREME_CUT', 'PEAK_WEEK', 'POST_CYCLE', 'MOST'].map(ph => (
-                <button key={ph} onClick={() => setV2Phase(ph)} style={{
-                  padding: '4px 10px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: 'pointer',
-                  background: v2Phase === ph ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
-                  border: v2Phase === ph ? 'none' : '1px solid rgba(255,255,255,0.06)',
-                  color: v2Phase === ph ? '#000' : 'rgba(255,255,255,0.7)',
-                }}>{ph === 'LEAN_MASS' ? '💪 Набор' : ph === 'EXTREME_CUT' ? '🔥 Сушка' : ph === 'PEAK_WEEK' ? '⚡ Пик' : ph === 'POST_CYCLE' ? '🔄 ПКТ' : '🌉 Мост'}</button>
-              ))}
-            </div>
-          </div>
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Фармакология</div>
-            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-              {[
-                { id: 'AAS_ORAL', label: '💊 Оральные ААС', color: '#ef4444' },
-                { id: 'AAS_INJECTABLE', label: '💉 Инъекционные ААС', color: '#ef4444' },
-                { id: 'HGH', label: '🧬 HGH/Пептиды', color: '#8b5cf6' },
-                { id: 'DIURETICS', label: '💧 Диуретики', color: '#f59e0b' },
-                { id: 'STIMULATORS', label: '⚡ Стимуляторы', color: '#f97316' },
-                { id: 'INSULIN_USE', label: '💉 Инсулин', color: '#8b5cf6' },
-                { id: 'LIVER_SUPPORT', label: '🫁 Гепатопротекторы', color: '#22c55e' },
-                { id: 'GUT_SUPPORT', label: '🫃 Поддержка ЖКТ', color: '#22c55e' },
-              ].map(p => (
-                <button key={p.id} onClick={() => setV2Pharma((prev: Record<string, boolean>) => ({ ...prev, [p.id]: !prev[p.id] }))} style={{
-                  padding: '3px 8px', borderRadius: 8, fontSize: 7, fontWeight: 600, cursor: 'pointer',
-                  background: v2Pharma[p.id] ? p.color + '20' : '#202023',
-                  border: v2Pharma[p.id] ? `1px solid ${p.color}40` : '1px solid rgba(255,255,255,0.04)',
-                  color: v2Pharma[p.id] ? p.color : 'rgba(255,255,255,0.5)',
-                }}>{p.label}</button>
-              ))}
-            </div>
-          </div>
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Лабораторные (v2)</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3 }}>
-              {['hematocrit','hemoglobin','hdl','ldl','alt','ast','crp','testosterone'].map(lab => (
-                <div key={lab} style={{ display:'flex', flexDirection:'column', gap:1 }}>
-                  <span style={{ fontSize:6, color:'rgba(255,255,255,0.35)', textTransform:'capitalize' }}>{lab}</span>
-                  <input value={v2Labs[lab] || ''} onChange={e => setV2Labs((prev:any) => ({...prev, [lab]: e.target.value}))}
-                    placeholder="—" style={{ padding:'3px 5px', borderRadius:4, fontSize:7, background:'#202023',
-                    border:'1px solid rgba(255,255,255,0.06)', color:'#fff', outline:'none', width:'100%', boxSizing:'border-box' }} />
-                </div>
-              ))}
-            </div>
-          </div>
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Чувствительность к гистамину</div>
-            <button onClick={() => setHistamineSensitive(!histamineSensitive)} style={{
-              padding: '4px 10px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: 'pointer',
-              background: histamineSensitive ? 'rgba(239,68,68,0.15)' : '#202023',
-              border: histamineSensitive ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(255,255,255,0.06)',
-              color: histamineSensitive ? '#ef4444' : 'rgba(255,255,255,0.5)',
-            }}>{histamineSensitive ? '⚠️ Чувствителен к гистамину' : '✅ Не чувствителен'}</button>
-          </div>
-        </GlassCard>
+        {/* v2 Scoring Profile moved to top */}
 
       {showSpecialMealPopup && (
         <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}

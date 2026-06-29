@@ -35,7 +35,7 @@ export interface PharmaStackData {
   aas: AASEntry[];
   hasGH: boolean; hasIGF: boolean; hasInsulin: boolean;
   hasHCG: boolean; hasAI: boolean; hasCaber: boolean; hasSERM: boolean;
-  hasSARMs: boolean;
+  hasSARMs: boolean; hasMGF: boolean; hasGLP1: boolean;
 }
 
 // ─── Block 4: Goals & Cycle ───
@@ -109,6 +109,7 @@ export interface SystemRisk { id: RiskSystemId; label: string; icon: string; raw
 export interface NutritionData {
   calories: number; proteinG: number; fatG: number; carbsG: number;
   waterL: number; saltIntake: string; omega3: boolean; fiberG: number;
+  proteinGPerKg: number; sodiumMg: number; potassiumMg: number;
 }
 
 // ─── Block 12: Medical Contraindications ───

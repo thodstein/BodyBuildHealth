@@ -4,6 +4,7 @@ import { useDataLink } from '../../../core/data-link';
 import { scoreAllProducts, compareProducts, calcMealScore, CATEGORY_LABELS, GOAL_MAP_RU } from '../../../engines/product-usefulness.engine';
 import type { MealProduct, SavedMeal, MealScore } from '../../../engines/product-usefulness.engine';
 import { calculateOverallScore, scoreAllProductsV2, compareProductsV2, calcMealScoreV2, calcDIAAS, analyzeDailyDiet, getDefaultProfile, type UserDietProfile, type V2ScoreResult } from '../../../engines/product-usefulness-v2.engine';
+import { PopupBool, PopupNumber, PopupSelect } from '../../components/PopupXxx';
 
 type PlannerTab = 'dashboard' | 'settings' | 'catalog' | 'compare' | 'meal' | 'swap';
 type SortKey = 'score' | 'name' | 'protein' | 'kcal';
@@ -386,69 +387,26 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         <div style={{ borderRadius: 12, padding: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 8 }}>⚙️ Параметры расчёта</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-            <div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>Цель</div>
-              <select value={manualGoal} onChange={e => setManualGoal(e.target.value)} style={{
-                ...INPUT('100%'), padding: '6px 8px', appearance: 'none' as const,
-              }}>
-                <option value="">Авто ({profileGoal ? GOAL_MAP_RU[profileGoal] || profileGoal : 'не указана'})</option>
-                {Object.entries(GOAL_MAP_RU).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>Вес (кг)</div>
-              <input type="number" value={manualWeight} onChange={e => setManualWeight(e.target.value)} style={INPUT('100%')} />
-            </div>
-            <div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>Тренировок/нед</div>
-              <input type="number" value={manualWorkouts} onChange={e => setManualWorkouts(e.target.value)} style={INPUT('100%')} />
-            </div>
-            <div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>Цена за кг (₽)</div>
-              <input type="number" value={manualPrice} onChange={e => setManualPrice(e.target.value)} placeholder="Авто" style={INPUT('100%')} />
-            </div>
+            <PopupSelect label="🎯 Цель" value={manualGoal} options={[{id:'',label:`Авто (${profileGoal?GOAL_MAP_RU[profileGoal]||profileGoal:'не указана'})`},...Object.entries(GOAL_MAP_RU).map(([k,v])=>({id:k,label:v}))]} onChange={setManualGoal} />
+            <PopupNumber label="⚖️ Вес (кг)" value={parseInt(manualWeight)||0} min={40} max={200} suffix="кг" onChange={v=>setManualWeight(String(v))} />
+            <PopupNumber label="🏋️ Тренировок/нед" value={parseInt(manualWorkouts)||0} min={0} max={14} suffix="раз" onChange={v=>setManualWorkouts(String(v))} />
+            <PopupNumber label="💰 Цена за кг (₽)" value={manualPrice?parseInt(manualPrice):0} min={0} max={5000} step={50} suffix="₽" onChange={v=>setManualPrice(v?String(v):'')} />
           </div>
           <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.9)', marginBottom: 4, lineHeight: 1.3 }}>
-            🧬 <b>ААС (анаболические стероиды)</b> — влияет на рейтинг: продукты с атерогенными жирами получают штраф −4.5 (риск липидного профиля).<br />
-            💉 <b>Инсулин</b> — влияет на рейтинг продуктов с высоким ГИ/ИИ (штраф при приёме HGH, проверка инсулинового рикошета).
+            🧬 <b>ААС</b> — штраф −4.5 продуктам с атерогенными жирами.&nbsp;
+            💉 <b>Инсулин</b> — штраф продуктам с высоким ГИ/ИИ.
           </div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-            <button onClick={() => setManualAAS(!manualAAS)} style={{
-              flex: 1, padding: '8px 6px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
-              background: manualAAS ? 'linear-gradient(135deg,#ef4444,#dc2626)' : '#202023',
-              border: manualAAS ? 'none' : '1px solid rgba(255,255,255,0.06)',
-              color: manualAAS ? '#fff' : 'rgba(255,255,255,0.7)',
-              fontWeight: 700, fontSize: 9, transition: 'all 0.15s',
-            }}>💉 {manualAAS ? 'ААС активен' : 'ААС выключен'}</button>
-            <button onClick={() => setManualInsulin(!manualInsulin)} style={{
-              flex: 1, padding: '8px 6px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
-              background: manualInsulin ? 'linear-gradient(135deg,#8b5cf6,#7c3aed)' : '#202023',
-              border: manualInsulin ? 'none' : '1px solid rgba(255,255,255,0.06)',
-              color: manualInsulin ? '#fff' : 'rgba(255,255,255,0.7)',
-              fontWeight: 700, fontSize: 9, transition: 'all 0.15s',
-            }}>💉 {manualInsulin ? 'Инсулин активен' : 'Инсулин выключен'}</button>
-            <button onClick={fillFromProfile} style={{
-              padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
-              background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a',
-              fontWeight: 600, fontSize: 8, transition: 'all 0.15s',
-            }}>📋 Авто</button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 60px', gap: 6, marginBottom: 8 }}>
+            <PopupBool label={manualAAS?'💉 ААС активен':'💉 ААС выключен'} value={manualAAS} onChange={setManualAAS} />
+            <PopupBool label={manualInsulin?'💉 Инсулин активен':'💉 Инсулин выключен'} value={manualInsulin} onChange={setManualInsulin} />
+            <button onClick={fillFromProfile} style={{ padding:'8px 6px', borderRadius:10, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.15)', color:'#00e68a', fontWeight:600, fontSize:8 }}>📋 Авто</button>
           </div>
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: 8, marginTop: 4 }}>
             <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', marginBottom: 6 }}>Модули оценки:</div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
-              {([
-                { key: 'A', color: '#22c55e', state: enableA, set: setEnableA },
-                { key: 'B', color: '#3b82f6', state: enableB, set: setEnableB },
-                { key: 'C', color: '#f59e0b', state: enableC, set: setEnableC },
-              ] as const).map(m => (
-                <button key={m.key} onClick={() => { m.set(!m.state); setShowAll(false); }} style={{
-                  ...PILL(m.state, m.color), fontSize: 7, padding: '4px 8px',
-                }}>
-                  {m.state ? '✓' : '○'} {MODULE_LABELS[m.key].label}
-                </button>
-              ))}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6 }}>
+              <PopupBool label={`${enableA?'✓':'○'} ${MODULE_LABELS.A.label}`} value={enableA} onChange={v=>{setEnableA(v);setShowAll(false)}} />
+              <PopupBool label={`${enableB?'✓':'○'} ${MODULE_LABELS.B.label}`} value={enableB} onChange={v=>{setEnableB(v);setShowAll(false)}} />
+              <PopupBool label={`${enableC?'✓':'○'} ${MODULE_LABELS.C.label}`} value={enableC} onChange={v=>{setEnableC(v);setShowAll(false)}} />
             </div>
             {modulesDesc.length > 0 && (
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', lineHeight: 1.4 }}>
@@ -457,27 +415,14 @@ export const ProductUsefulnessPlanner: React.FC = () => {
             )}
           </div>
           <div style={{ borderTop: '1px solid rgba(0,230,138,0.1)', paddingTop: 6, marginTop: 6 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
-              <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>🧬 v2 Скоринг</span>
-              <button onClick={() => setUseV2(!useV2)} style={{
-                padding:'3px 10px', borderRadius:10, fontSize:7, fontWeight:700, cursor:'pointer',
-                background: useV2 ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)',
-                border: useV2 ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                color: useV2 ? '#00e68a' : 'rgba(255,255,255,0.75)',
-              }}>{useV2 ? '✅ Включён' : '○ Выключен'}</button>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:4 }}>
+              <PopupBool label={useV2?'🧬 v2 Скоринг ✅ Включён':'🧬 v2 Скоринг ○ Выключен'} value={useV2} onChange={setUseV2} />
+              {useV2 && (
+                <PopupSelect label="📋 Фаза" value={v2Profile.phase} options={[
+                  {id:'LEAN_MASS',label:'💪 Набор'},{id:'EXTREME_CUT',label:'🔥 Сушка'},{id:'PEAK_WEEK',label:'⚡ Пик'},{id:'POST_CYCLE',label:'🔄 ПКТ'},{id:'MOST',label:'🌉 Мост'}
+                ]} onChange={v=>setV2Profile(prev=>({...prev,phase:v as any}))} />
+              )}
             </div>
-            {useV2 && (
-              <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:4 }}>
-                {['LEAN_MASS','EXTREME_CUT','PEAK_WEEK','POST_CYCLE','MOST'].map(ph => (
-                  <button key={ph} onClick={() => setV2Profile(prev => ({...prev, phase: ph as any}))} style={{
-                    padding:'2px 6px', borderRadius:6, fontSize:7, fontWeight:600, cursor:'pointer',
-                    background: v2Profile.phase === ph ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.03)',
-                    border: v2Profile.phase === ph ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(255,255,255,0.04)',
-                    color: v2Profile.phase === ph ? '#c4b5fd' : 'rgba(255,255,255,0.8)',
-                  }}>{ph === 'LEAN_MASS' ? '💪 Набор' : ph === 'EXTREME_CUT' ? '🔥 Сушка' : ph === 'PEAK_WEEK' ? '⚡ Пик' : ph === 'POST_CYCLE' ? '🔄 ПКТ' : '🌉 Мост'}</button>
-                ))}
-              </div>
-            )}
             {useV2 && (
               <div style={{ marginTop:4 }}>
                 <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>💊 Фармакология</div>

@@ -867,6 +867,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // ── v2-анализ сгенерированного рациона и правил справочника ──
     if (generated && dayPlan) {
       const profile = getDefaultProfile();
+      profile.sex = sex;
+      profile.bodyFatPct = bodyFatPct || 15;
+      profile.discipline = (trainType === 'strength' ? 'powerlifting' : 'bodybuilding') as any;
       profile.phase = (v2Phase as any) || 'LEAN_MASS';
       profile.pharma.AAS_ORAL = v2Pharma.AAS_ORAL || false;
       profile.pharma.AAS_INJECTABLE = v2Pharma.AAS_INJECTABLE || false;
@@ -878,12 +881,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       profile.pharma.GUT_SUPPORT = v2Pharma.GUT_SUPPORT || false;
       profile.histamineSensitive = histamineSensitive;
       profile.labs.hematocrit = v2Labs.hematocrit ? parseFloat(v2Labs.hematocrit) : undefined;
+      profile.labs.hemoglobin = v2Labs.hemoglobin ? parseFloat(v2Labs.hemoglobin) : undefined;
       profile.labs.ldl = v2Labs.ldl ? parseFloat(v2Labs.ldl) : undefined;
       profile.labs.alt = v2Labs.alt ? parseFloat(v2Labs.alt) : undefined;
       profile.labs.ast = v2Labs.ast ? parseFloat(v2Labs.ast) : undefined;
       profile.labs.crp = v2Labs.crp ? parseFloat(v2Labs.crp) : undefined;
       profile.weightKg = weight || 80;
-      profile.lbm = profile.weightKg * 0.85;
+      profile.lbm = profile.weightKg * (100 - profile.bodyFatPct) / 100;
 
       const meals = dayPlan.meals || [];
       const allMeals = meals.map((m: any) => ({

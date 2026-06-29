@@ -36,6 +36,8 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
   const visuals = React.useMemo(() => getSplitVisuals(), []);
   const [methodCat, setMethodCat] = React.useState('all');
   const [analysisLoaded, setAnalysisLoaded] = React.useState(false);
+  const [volLevel, setVolLevel] = React.useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
+  const [expandedSplit, setExpandedSplit] = React.useState<number | null>(null);
   const filtered = methodCat === 'all' ? methods : getMethodsByCategory(methodCat);
   const cats = [...new Set(methods.map(m => m.category))];
 
@@ -392,22 +394,45 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
       )}
     </div>)}
 
-    <h4 style={{ margin:'12px 0 8px', fontSize:12 }}>📊 Volume Landmarks (MEV/MAV/MRV)</h4>
-    {volumes.map((v,i) => <div key={i} className="card" style={{ marginBottom:4, padding:8 }}>
-      <div style={{ fontWeight:600, fontSize:11 }}>{v.muscle}</div>
-      <div style={{ display:'flex', gap:6, fontSize:9, marginTop:2 }}>
-        <span>Новичок: {v.beginner.mev}-{v.beginner.mav}-{v.beginner.mrv}</span>
-        <span>Средний: {v.intermediate.mev}-{v.intermediate.mav}-{v.intermediate.mrv}</span>
-        <span>Продв: {v.advanced.mev}-{v.advanced.mav}-{v.advanced.mrv}</span>
+    <h4 style={{ margin:'12px 0 8px', fontSize:12 }}>📊 Объёмные ориентиры (MEV / MAV / MRV)</h4>
+    <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
+      {([['beginner','Новичок'],['intermediate','Средний'],['advanced','Продвинутый']] as const).map(([id,l]) => <button key={id} onClick={() => setVolLevel(id)} style={{ padding:'5px 12px', borderRadius:14, fontSize:10, fontWeight: volLevel===id?700:500, cursor:'pointer', border: volLevel===id?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background: volLevel===id?'rgba(0,230,138,0.14)':'rgba(255,255,255,0.02)', color: volLevel===id?'#00e68a':'rgba(255,255,255,0.6)' }}>{l}</button>)}
+    </div>
+    {volumes.map((v,i) => { const lvl = v[volLevel]; return <div key={i} className="card" style={{ marginBottom:4, padding:8 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
+        <div style={{ fontWeight:700, fontSize:11, color:'#fff' }}>{v.muscle}</div>
+        <div style={{ fontSize:9, color:'#00e68a', fontWeight:700 }}>MEV {lvl.mev} · MAV {lvl.mav} · MRV {lvl.mrv}</div>
       </div>
-      <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>{v.notes}</div>
-    </div>)}
+      <div style={{ display:'flex', gap:6, fontSize:9, color:'rgba(255,255,255,0.6)', marginTop:3 }}>
+        <span>📡 {lvl.frequency}</span>
+        <span style={{ flex:1 }}>
+          <span style={{ display:'inline-block', width:100, height:5, background:'rgba(255,255,255,0.06)', borderRadius:3, verticalAlign:'middle', marginRight:4 }}>
+            <span style={{ display:'inline-block', width:`${Math.min(100, (lvl.mav/(lvl.mrv||1))*100)}%`, height:5, background:'linear-gradient(90deg,#22c55e,#eab308,#ef4444)', borderRadius:3 }} />
+          </span>
+        </span>
+      </div>
+      <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:3 }}>{v.notes}</div>
+      <div style={{ fontSize:8, color:'rgba(0,230,138,0.7)', marginTop:2 }}>🏋️ {v.bestExercises.join(' · ')}</div>
+    </div>; })}
 
-    <h4 style={{ margin:'12px 0 8px', fontSize:12 }}>📐 Визуализация сплитов</h4>
-    {visuals.map((s,i) => <div key={i} className="card" style={{ marginBottom:4, padding:8 }}>
-      <div style={{ fontWeight:600, fontSize:11 }}>{s.name}</div>
-      <div style={{ fontSize:9, color:'var(--text-dim)' }}>{s.totalVolume} | {s.totalFrequency}</div>
-      <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>Подходит: {s.suitability.join(', ')}</div>
+    <h4 style={{ margin:'12px 0 8px', fontSize:12 }}>📐 Визуализация сплитов (нажмите для раскрытия)</h4>
+    {visuals.map((s,i) => <div key={i} className="card" style={{ marginBottom:6, padding:8, cursor:'pointer', border: expandedSplit===i?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)' }} onClick={() => setExpandedSplit(expandedSplit===i?null:i)}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div style={{ fontWeight:700, fontSize:11, color: expandedSplit===i?'#00e68a':'#fff' }}>{s.name}</div>
+        <span style={{ fontSize:9, color:'#00e68a' }}>{expandedSplit===i?'▲':'▼'}</span>
+      </div>
+      <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>📊 {s.totalVolume} · 🔁 {s.totalFrequency}</div>
+      <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:1 }}>✅ Подходит: {s.suitability.join(', ')}</div>
+      {expandedSplit===i && <div style={{ marginTop:8, borderTop:'1px solid rgba(255,255,255,0.06)', paddingTop:8 }}>
+        {s.days.map((d,di) => <div key={di} style={{ background:'rgba(255,255,255,0.02)', borderRadius:6, padding:'6px 8px', marginBottom:4, borderLeft:'2px solid #00e68a' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, fontWeight:700, color:'#fff' }}>
+            <span>Д{d.day}: {d.name}</span>
+            <span style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>{d.volume} объём · {d.intensity} инт.</span>
+          </div>
+          <div style={{ fontSize:9, color:'rgba(0,230,138,0.8)', marginTop:2 }}>🎯 {d.focus}</div>
+          <div style={{ fontSize:8, color:'rgba(255,255,255,0.55)', marginTop:2 }}>Шаблоны: {d.patterns.join(' · ')}</div>
+        </div>)}
+      </div>}
     </div>)}
   </div>);
 };

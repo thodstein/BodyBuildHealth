@@ -28,7 +28,7 @@ export const IndividualPlanResults: React.FC = () => {
     recipePickerMeal, setRecipePickerMeal,
     replaceMealWithRecipe, undoStack, setUndoStack,
     saveCurrentPlan, savedPlans, setSavedPlans, expandedSavedId, setExpandedSavedId,
-    loadSavedPlan, weight, budget, age, sex,
+    loadSavedPlan, weight, budget, age, sex, bodyFatPct, trainType,
     generateCheatMeal, cheatMealPlan, setCheatMealPlan,
     generateCarbload, carbloadPlan, setCarbloadPlan,
     generateBUTCH, butchPlan, setButchPlan,
@@ -58,6 +58,7 @@ export const IndividualPlanResults: React.FC = () => {
   const [calcTab, setCalcTab] = useState<'day' | 'week'>('day');
   const [calcSelections, setCalcSelections] = useState<Set<string>>(new Set());
   const [calcResults, setCalcResults] = useState<{ id: string; name: string; score: MealScoreV2; diaas: { diaas: number; limitingAA: string } }[] | null>(null);
+  const [recipeDetail, setRecipeDetail] = useState<any | null>(null);
   const [calcDailyReport, setCalcDailyReport] = useState<DailyDietReport | null>(null);
 
   const [showCorrectPopup, setShowCorrectPopup] = useState(false);
@@ -157,6 +158,9 @@ export const IndividualPlanResults: React.FC = () => {
 
   const handleCalcUsefulness = () => {
     const profile = getDefaultProfile();
+    profile.sex = sex;
+    profile.bodyFatPct = bodyFatPct || 15;
+    profile.discipline = (trainType === 'strength' ? 'powerlifting' : 'bodybuilding') as any;
     profile.phase = (v2Phase as any) || 'LEAN_MASS';
     profile.pharma.AAS_ORAL = v2Pharma.AAS_ORAL || false;
     profile.pharma.AAS_INJECTABLE = v2Pharma.AAS_INJECTABLE || false;
@@ -168,6 +172,7 @@ export const IndividualPlanResults: React.FC = () => {
     profile.pharma.GUT_SUPPORT = v2Pharma.GUT_SUPPORT || false;
     profile.histamineSensitive = histamineSensitive;
     profile.labs.hematocrit = v2Labs.hematocrit ? parseFloat(v2Labs.hematocrit) : undefined;
+    profile.labs.hemoglobin = v2Labs.hemoglobin ? parseFloat(v2Labs.hemoglobin) : undefined;
     profile.labs.ldl = v2Labs.ldl ? parseFloat(v2Labs.ldl) : undefined;
     profile.labs.hdl = v2Labs.hdl ? parseFloat(v2Labs.hdl) : undefined;
     profile.labs.alt = v2Labs.alt ? parseFloat(v2Labs.alt) : undefined;
@@ -179,7 +184,7 @@ export const IndividualPlanResults: React.FC = () => {
     profile.labs.glucose_fasting = v2Labs.glucose ? parseFloat(v2Labs.glucose) : undefined;
     profile.labs.insulin_fasting = v2Labs.insulin ? parseFloat(v2Labs.insulin) : undefined;
     profile.weightKg = weight || 80;
-    profile.lbm = profile.weightKg * 0.85;
+    profile.lbm = profile.weightKg * (100 - profile.bodyFatPct) / 100;
 
     const allMeals: { timing?: MealTiming; products: { foodId: string; weightGrams: number }[] }[] = [];
     const results: { id: string; name: string; score: MealScoreV2; diaas: { diaas: number; limitingAA: string } }[] = [];
@@ -222,7 +227,7 @@ export const IndividualPlanResults: React.FC = () => {
             const score = calcMealScoreV2(products, profile, 'regular');
             const diaas = calcMealDIAAS(products);
             allMeals.push({ products });
-            results.push({ id, name: '?🛋 Ленивый день', score, diaas });
+            results.push({ id, name: '🛋 Ленивый день', score, diaas });
           }
         }
         if (id === 'special_craving' && cravingPlan) {
@@ -597,16 +602,82 @@ export const IndividualPlanResults: React.FC = () => {
               {getRecipesByMeal(recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack').length === 0 ? (
                 <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', textAlign:'center', padding:10 }}>Нет рецептов для этого приёма.</div>
               ) : getRecipesByMeal(recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack').map((r, i) => (
-                <button key={i} onClick={() => replaceMealWithRecipe(r, recipePickerMeal.mealIdx)} style={{ width:'100%', padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9, transition:'all 0.15s' }}
-                  onMouseEnter={e => (e.target as HTMLElement).style.borderColor = 'rgba(139,92,246,0.3)'}
-                  onMouseLeave={e => (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'}>
-                  <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{r.name}</div>
-                  <div style={{ color:'rgba(255,255,255,0.85)', marginBottom:4 }}>⏱{r.prepTimeMin}мин · {r.kcal}ккал · Б{r.protein}/Ж{r.fat}/У{r.carbs}</div>
-                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', display:'flex', gap:2, flexWrap:'wrap' }}>{(r.tags || []).map(t => <span key={t} style={{ padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.08)', color:'rgba(167,139,250,0.5)' }}>{t}</span>)}</div>
-                </button>
+                <div key={i} style={{ display:'flex', gap:4, width:'100%' }}>
+                  <button onClick={() => replaceMealWithRecipe(r, recipePickerMeal.mealIdx)} style={{ flex:1, padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9, transition:'all 0.15s' }}
+                    onMouseEnter={e => (e.target as HTMLElement).style.borderColor = 'rgba(139,92,246,0.3)'}
+                    onMouseLeave={e => (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'}>
+                    <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{r.name}</div>
+                    <div style={{ color:'rgba(255,255,255,0.85)', marginBottom:4 }}>⏱{r.prepTimeMin}мин · {r.kcal}ккал · Б{r.protein}/Ж{r.fat}/У{r.carbs}</div>
+                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', display:'flex', gap:2, flexWrap:'wrap' }}>{(r.tags || []).map(t => <span key={t} style={{ padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.08)', color:'rgba(167,139,250,0.5)' }}>{t}</span>)}</div>
+                  </button>
+                  <button onClick={() => setRecipeDetail(r)} style={{ width:36, height:36, borderRadius:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.4)', fontSize:14, flexShrink:0, alignSelf:'flex-start', marginTop:8 }}>ℹ️</button>
+                </div>
               ))}
             </div>
             <button onClick={() => setRecipePickerMeal(null)} style={{ width:'100%', marginTop:8, padding:'6px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'rgba(255,255,255,0.85)', fontSize:8, fontWeight:600 }}>✕ Отмена</button>
+          </div>
+        </div>
+      )}
+
+      {/* Recipe detail popup */}
+      {recipeDetail && (
+        <div style={{ position:'fixed', inset:0, zIndex:110, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
+          onClick={() => setRecipeDetail(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'90%', maxWidth:380, maxHeight:'80vh', padding:18, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', boxShadow:'0 8px 40px rgba(0,0,0,0.4)', overflowY:'auto' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>{recipeDetail.name}</div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>⏱ {recipeDetail.prepTimeMin} мин · {recipeDetail.kcal} ккал</div>
+              </div>
+              <button onClick={() => setRecipeDetail(null)} style={{ width:28, height:28, borderRadius:'50%', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'none', color:'rgba(255,255,255,0.5)', fontSize:12 }}>✕</button>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4, marginBottom:10 }}>
+              <div style={{ padding:'6px 4px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.1)', textAlign:'center' }}>
+                <div style={{ fontSize:14, fontWeight:700, color:'#22c55e' }}>{recipeDetail.protein}</div>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>Белки</div>
+              </div>
+              <div style={{ padding:'6px 4px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.1)', textAlign:'center' }}>
+                <div style={{ fontSize:14, fontWeight:700, color:'#f59e0b' }}>{recipeDetail.fat}</div>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>Жиры</div>
+              </div>
+              <div style={{ padding:'6px 4px', borderRadius:8, background:'rgba(249,115,22,0.06)', border:'1px solid rgba(249,115,22,0.1)', textAlign:'center' }}>
+                <div style={{ fontSize:14, fontWeight:700, color:'#f97316' }}>{recipeDetail.carbs}</div>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>Угл</div>
+              </div>
+              <div style={{ padding:'6px 4px', borderRadius:8, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.1)', textAlign:'center' }}>
+                <div style={{ fontSize:14, fontWeight:700, color:'#8b5cf6' }}>{Math.round(recipeDetail.protein*4/recipeDetail.kcal*100)}%</div>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>% белка</div>
+              </div>
+            </div>
+            {recipeDetail.ingredients?.length > 0 && (
+              <div style={{ marginBottom:10 }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#f97316', marginBottom:4 }}>🥕 Ингредиенты</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                  {recipeDetail.ingredients.map((ing:string, i:number) => (
+                    <div key={i} style={{ fontSize:9, color:'rgba(255,255,255,0.85)', padding:'2px 6px', background:'rgba(249,115,22,0.04)', borderRadius:4 }}>• {ing}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {recipeDetail.instructions?.length > 0 && (
+              <div style={{ marginBottom:10 }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>📝 Инструкция</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                  {recipeDetail.instructions.map((step:string, i:number) => (
+                    <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.85)', padding:'4px 6px', background:'rgba(96,165,250,0.04)', borderRadius:4, lineHeight:1.4 }}>
+                      <span style={{ fontWeight:700, color:'#60a5fa', marginRight:4 }}>{i+1}.</span>{step}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {recipeDetail.tags?.length > 0 && (
+              <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
+                {recipeDetail.tags.map((t:string, i:number) => (
+                  <span key={i} style={{ padding:'2px 7px', borderRadius:5, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.12)', color:'#a78bfa', fontSize:7, fontWeight:600 }}>{t}</span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -710,9 +781,10 @@ export const IndividualPlanResults: React.FC = () => {
       {generated && shoppingList && (
         <GlassCard title="Список покупок" icon="🛒" color="#f97316" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
           {(() => {
+            const CAT_RU: Record<string, string> = { protein:'🥩 Мясо/Рыба/Яйца', dairy:'🥛 Молочные продукты', grain:'🌾 Крупы/Хлеб', carb:'🥔 Овощи/Корнеплоды', veg_fruit:'🥦 Овощи/Фрукты', fat:'🥑 Жиры/Масла/Орехи', supplement:'💊 Спортпит', fast_food:'🍔 Фастфуд', other:'📦 Прочее' };
             const groups: Record<string, any[]> = {};
             shoppingList.forEach((item: any) => {
-              const cat = item.catLabel || item.category || '📦 Прочее';
+              const cat = CAT_RU[item.catLabel || item.category] || item.catLabel || item.category || '📦 Прочее';
               if (!groups[cat]) groups[cat] = [];
               groups[cat].push(item);
             });

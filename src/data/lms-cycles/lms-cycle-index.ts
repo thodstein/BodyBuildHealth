@@ -36,44 +36,44 @@ import { EMBED_BIC_INT } from './embed-bic-int';
 import { EMBED_BIC_EXP } from './embed-bic-exp';
 
 export const LMS_CYCLES: SRCycleTemplate[] = [
-  CYCLE_01,
-  CYCLE_02,
-  CYCLE_03,
-  CYCLE_04,
-  CYCLE_05,
-  CYCLE_06,
-  CYCLE_07,
-  CYCLE_08,
-  CYCLE_09K,
-  CYCLE_09S,
-  CYCLE_10,
-  CYCLE_11,
-  CYCLE_12K,
-  CYCLE_12S,
-  CYCLE_13,
-  CYCLE_14,
-  CYCLE_15,
-  CYCLE_16,
-  BLOCK_BENCH_BEG,
-  BLOCK_BENCH_INT,
-  BLOCK_BENCH_EXP,
-  BLOCK_LIFT_BEG,
-  BLOCK_LIFT_INT,
-  BLOCK_LIFT_EXP,
-  EMBED_MP_BEG,
-  EMBED_MP_INT,
-  EMBED_MP_EXP,
-  EMBED_BIC_BEG,
-  EMBED_BIC_INT,
-  EMBED_BIC_EXP,
+ CYCLE_01,
+ CYCLE_02,
+ CYCLE_03,
+ CYCLE_04,
+ CYCLE_05,
+ CYCLE_06,
+ CYCLE_07,
+ CYCLE_08,
+ CYCLE_09K,
+ CYCLE_09S,
+ CYCLE_10,
+ CYCLE_11,
+ CYCLE_12K,
+ CYCLE_12S,
+ CYCLE_13,
+ CYCLE_14,
+ CYCLE_15,
+ CYCLE_16,
+ BLOCK_BENCH_BEG,
+ BLOCK_BENCH_INT,
+ BLOCK_BENCH_EXP,
+ BLOCK_LIFT_BEG,
+ BLOCK_LIFT_INT,
+ BLOCK_LIFT_EXP,
+ EMBED_MP_BEG,
+ EMBED_MP_INT,
+ EMBED_MP_EXP,
+ EMBED_BIC_BEG,
+ EMBED_BIC_INT,
+ EMBED_BIC_EXP,
 ];
 
 export function getCycleById(id: string): SRCycleTemplate | undefined {
-  return LMS_CYCLES.find(c => c.meta.id === id);
+ return LMS_CYCLES.find(c => c.meta.id === id);
 }
 export function getCyclesByDirection(dir: string): SRCycleTemplate[] {
-  return LMS_CYCLES.filter(c => c.meta.direction === dir);
+ return LMS_CYCLES.filter(c => c.meta.direction === dir);
 }
 export function getCyclesByLevel(level: string): SRCycleTemplate[] {
-  return LMS_CYCLES.filter(c => c.meta.level === level);
+ return LMS_CYCLES.filter(c => c.meta.level === level);
 }

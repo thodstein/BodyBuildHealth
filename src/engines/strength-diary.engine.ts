@@ -1,5 +1,6 @@
 import { db } from '../core/db';
 import type { StrengthLogEntry, WorkoutLog } from '../core/types';
+import { loadSessions, type WorkoutSession } from './workout-logger.engine';
 
 export interface StrengthStats {
   exerciseId: string;
@@ -34,6 +35,33 @@ export interface ProgressionAlert {
  * Strength Diary Engine v6
  * Manages strength logs and workout tracking in IndexedDB
  */
+// Преобразование сессии SessionPlayer (localStorage) в WorkoutLog для единого дневника.
+const COMPOUND_PATTERNS = new Set(['squat', 'hinge', 'horizontal_push', 'horizontal_pull', 'vertical_push', 'vertical_pull']);
+function sessionToWorkoutLog(s: WorkoutSession): WorkoutLog {
+  return {
+    id: s.sessionId || `plsession_${s.date}_${s.startTime}`,
+    date: s.date,
+    duration: s.durationMin,
+    exercises: s.exercises.map(ex => ({
+      id: `${s.sessionId}_${ex.exerciseId}_${ex.order}`,
+      date: s.date,
+      exerciseId: ex.exerciseId || ex.exerciseName,
+      exerciseName: ex.exerciseName,
+      sets: ex.sets.map(st => ({ weight: st.weightKg, reps: st.reps, rir: st.rir, rpe: st.rpe })),
+      totalVolume: ex.totalVolume,
+      estimated1RM: ex.best1RM,
+      isCompound: COMPOUND_PATTERNS.has(ex.pattern),
+      weekNumber: s.weekNumber,
+      notes: ex.sets.map(st => st.notes).filter(Boolean).join(' '),
+    })),
+    overallRPE: s.avgIntensity,
+    recoveryBefore: 0,
+    split: s.focus,
+    weekNumber: s.weekNumber,
+    mesocycleId: undefined,
+    notes: s.notes,
+  };
+}
 export class StrengthDiary {
   /**
    * Save strength log entry
@@ -72,7 +100,13 @@ export class StrengthDiary {
    */
   async getWorkoutLogs(): Promise<WorkoutLog[]> {
     const logs = await db.getAll<WorkoutLog>('workout_log');
-    return logs.sort((a, b) => b.date.localeCompare(a.date));
+    // Объединяем с сессиями, записанными SessionPlayer (localStorage he_workout_log_v2),
+    // чтобы дневник/история учитывали выполнения планов СРЦ/ББ.
+    const lsLogs = loadSessions().map(sessionToWorkoutLog);
+    const merged = [...logs, ...lsLogs];
+    const seen = new Set<string>();
+    const dedup = merged.filter(l => { if (seen.has(l.id)) return false; seen.add(l.id); return true; });
+    return dedup.sort((a, b) => b.date.localeCompare(a.date));
   }
 
   /**

@@ -5,6 +5,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { calculatePlates, getPlateLoadingOrder, warmupPlateSequence } from '../../../engines/gym-competition.engine';
+import { PopupNumber } from './TrainingPopups';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -37,14 +38,8 @@ export const PlateCalculator: React.FC<PlateCalculatorProps> = ({ initialWeight 
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        <div>
-          <div style={LABEL}>Рабочий вес, кг</div>
-          <input style={IN} type="number" min={bar} max={500} value={weight || ''} onChange={e => setWeight(Math.max(0, +e.target.value))} />
-        </div>
-        <div>
-          <div style={LABEL}>Гриф, кг</div>
-          <input style={IN} type="number" min={5} max={30} value={bar || ''} onChange={e => setBar(Math.max(5, +e.target.value))} />
-        </div>
+        <PopupNumber label="Рабочий вес" value={weight} min={bar} max={500} suffix=" кг" hint="Целевой вес штанги на рабочем подходе. Учитывает вес грифа." onChange={v => setWeight(Math.max(0, v))} />
+        <PopupNumber label="Гриф" value={bar} min={5} max={30} suffix=" кг" hint="Вес пустого грифа: олимпийский — 20 кг, для тяжёлой атлетики — 15 кг, EZ — 10 кг, тренажёрный — 12.5 кг." onChange={v => setBar(Math.max(5, v))} />
       </div>
 
       <div style={CARD}>

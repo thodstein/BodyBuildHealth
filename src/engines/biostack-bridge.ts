@@ -1,4 +1,4 @@
-import { SUPPORT_CATALOG_DATA } from '../data/support-database';
+import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS } from '../data/support-database';
 import type { SupportCatalogEntry } from '../data/support-catalog-data';
 
 const BIO_STACK_KEY = 'he_biostack_active';
@@ -60,9 +60,71 @@ export function getStackRiskCoverage(): Record<string, { ids: string[]; names: s
   return coverage;
 }
 
+export function getStackCoverageStats(): { totalSystems: number; coveredSystems: number; coveragePct: number; systemList: { system: string; label: string; count: number }[] } {
+  const coverage = getStackRiskCoverage();
+  const allSystems = Object.keys(RISK_ORGANS);
+  const covered = allSystems.filter(sys => coverage[sys]);
+  const systemList = covered.map(sys => ({
+    system: sys,
+    label: RISK_SYSTEM_LABELS[sys] || sys,
+    count: coverage[sys]?.ids.length || 0,
+  }));
+  return {
+    totalSystems: allSystems.length,
+    coveredSystems: covered.length,
+    coveragePct: Math.round(covered.length / allSystems.length * 100),
+    systemList,
+  };
+}
+
+type InteractionPair = {
+  a: string; b: string; nameA: string; nameB: string;
+  type: string; effect: string; severity: string; mechanisms: string[]; notes: string;
+};
+
+export function getStackInteractions(stackIds: string[]): {
+  pairs: InteractionPair[];
+  critical: InteractionPair[];
+  moderate: InteractionPair[];
+  safe: InteractionPair[];
+} {
+  const pairs: InteractionPair[] = [];
+  for (let i = 0; i < stackIds.length; i++) {
+    for (let j = i + 1; j < stackIds.length; j++) {
+      const idA = stackIds[i], idB = stackIds[j];
+      const direct = ALL_INTERACTIONS.filter(inx =>
+        (inx.substanceA === idA && inx.substanceB === idB) ||
+        (inx.substanceA === idB && inx.substanceB === idA));
+      if (direct.length > 0) {
+        direct.forEach(inx => {
+          pairs.push({
+            a: idA, b: idB,
+            nameA: SUPPORT_CATALOG_DATA[idA]?.nameRu || SUPPORT_CATALOG_DATA[idA]?.name || idA,
+            nameB: SUPPORT_CATALOG_DATA[idB]?.nameRu || SUPPORT_CATALOG_DATA[idB]?.name || idB,
+            type: inx.type, effect: inx.effect, severity: inx.severity,
+            mechanisms: inx.mechanisms || [], notes: inx.notes || '',
+          });
+        });
+      } else {
+        pairs.push({
+          a: idA, b: idB,
+          nameA: SUPPORT_CATALOG_DATA[idA]?.nameRu || SUPPORT_CATALOG_DATA[idA]?.name || idA,
+          nameB: SUPPORT_CATALOG_DATA[idB]?.nameRu || SUPPORT_CATALOG_DATA[idB]?.name || idB,
+          type: 'no_interaction', effect: 'Взаимодействий не найдено',
+          severity: 'LOW', mechanisms: [], notes: '',
+        });
+      }
+    }
+  }
+  const critical = pairs.filter(p => p.severity === 'HIGH' && (p.type === 'conflict' || p.type === 'caution'));
+  const moderate = pairs.filter(p => p.severity === 'MEDIUM' && (p.type === 'conflict' || p.type === 'caution'));
+  const safe = pairs.filter(p => (p.severity === 'LOW' || p.type === 'synergy' || p.type === 'no_interaction'));
+  return { pairs, critical, moderate, safe };
+}
+
 export function getStackNutritional(): SupportCatalogEntry[] {
   return getBioStackSubstances().filter(s => {
     const cats = (s as any).categories || (s as any).category || [];
-    return cats.some((c: string) => ['vitamin', 'mineral', 'amino', 'fatty_acid', 'electrolyte'].includes(c));
+    return cats.some((c: string) => ['vitamin', 'mineral', 'amino', 'fatty_acid', 'electrolyte', 'vitamin_like', 'omega', 'antioxidant'].includes(c));
   });
 }

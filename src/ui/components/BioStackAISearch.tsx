@@ -70,6 +70,7 @@ const SEARCH_TERM_MAP = buildSearchTermMap();
 function searchByIndex(query: string): Set<string> {
   const q = query.toLowerCase().trim();
   const found = new Set<string>();
+  if (!SEARCH_TERM_MAP || Object.keys(SEARCH_TERM_MAP).length === 0) return found;
   Object.entries(SEARCH_TERM_MAP).forEach(([term, ids]) => {
     if (term.includes(q)) ids.forEach(id => found.add(id));
   });

@@ -18,6 +18,8 @@ export interface LMSBuildInput {
   mode?: ProgressionMode;
   weeklyPercent?: number;
   courseIntensity?: 'mild' | 'moderate' | 'heavy';
+  /** Переопределение длины мезоцикла (нед). Если задано — цикл растягивается/сжимается сверх template.meta.weeks. */
+  weeksOverride?: number;
 }
 
 export interface LMSWorkSet {
@@ -89,18 +91,19 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   const { template, pmMap, fallbackPm = 100 } = input;
   const mode = input.mode ?? 'natural';
   const exercises = extractExercises(template);
+  const totalWeeks = Math.max(1, Math.round(input.weeksOverride ?? template.meta.weeks));
   const pm0Map: Record<string, number> = {};
   for (const name of exercises) pm0Map[name] = pmFor(name, pmMap, fallbackPm);
 
   // прогрессия PM для каждого упражнения
   const progInput: PMProgressionInput = {
-    pm0: 100, weeks: template.meta.weeks, mode,
+    pm0: 100, weeks: totalWeeks, mode,
     weeklyPercent: input.weeklyPercent, courseIntensity: input.courseIntensity,
   };
   const rationale = progressionRationale({ ...progInput, pm0: 100 });
 
   const weeks: LMSPlanWeek[] = [];
-  for (let w = 0; w < template.meta.weeks; w++) {
+  for (let w = 0; w < totalWeeks; w++) {
     const pmRow: Record<string, number> = {};
     for (const name of exercises) {
       const k = (input.weeklyPercent != null ? input.weeklyPercent
@@ -133,7 +136,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
     sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
   } as SRExercise))));
-  const cycleMetrics = calcCycleMetricsAggregate(allSessions, template.meta.weeks);
+  const cycleMetrics = calcCycleMetricsAggregate(allSessions, totalWeeks);
 
   return { template, progressionRationale: rationale, weeks, cycleMetrics };
 }

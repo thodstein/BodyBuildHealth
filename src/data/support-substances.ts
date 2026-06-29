@@ -192,6 +192,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
   { id:'TRIBULUS', name:'TRIBULUS', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'TRYPTOPHAN', name:'Триптофан', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'TUDCA', name:'TUDCA', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
+  { id:'UDCA', name:'UDCA (Урсодезоксихолевая кислота)', type:'supplement', description:'Гидрофильная жёлчная кислота для защиты печени и желчеоттока', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'TYROSINE', name:'TYROSINE', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'VANADIUM', name:'VANADIUM', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },
   { id:'VINPOCETINE', name:'Винпоцетин', type:'supplement', description:'', mechanisms:[], organs:[], categories:[], deficiency:'' },

@@ -532,6 +532,46 @@ const SUPPLEMENT: Record<string, any> = {
     sideEffects:['Диарея', 'Дискомфорт в правом подреберье'],
     dosage:{ mg:250, timing:'с едой (обед/ужин)', form:'капсулы' }, bestForCourse:false,
   },
+  udca: {
+    id:'udca', name:'Ursodeoxycholic Acid (UDCA)', nameRu:'Урсодезоксихолевая кислота (УДХК, Урсосан)',
+    tier:'core', category:['hepatoprotector','bile_acid','detox'],
+    forms:[
+      { id:'udca_250', name:'UDCA 250mg', nameRu:'УДХК 250 мг', dose:'250 мг с едой', best:false, notes:'Стандартная доза при холестазе' },
+      { id:'udca_500', name:'UDCA 500mg', nameRu:'УДХК 500 мг', dose:'500 мг 2x/д', best:true, notes:'Оптимальная доза на курсе ААС' },
+    ],
+    organs:['LIVER','GALLBLADDER','INTESTINES'],
+    systems:['hepatic','gi'],
+    mechanisms:['BILE_FLOW_STIMULATION','ANTIAPOPTOTIC','MEMBRANE_PHOSPHOLIPID','CYP450_MODULATION','NFKB_INHIBITION'],
+    description:'Урсодезоксихолевая кислота (УДХК) — гидрофильная жёлчная кислота, вытесняет токсичные гидрофобные ЖК из энтерогепатической циркуляции. Защищает гепатоциты от апоптоза через ингибицию митохондриального пути (Bax→Bcl-2), стимулирует BSEP-зависимый желчеотток, снижает ER-стресс. Обязательна на курсе пероральных 17-алкилированных ААС. Растворяет холестериновые камни жёлчного пузыря.',
+    synergies:[
+      { with:'tudca', effect:'Двойная УДХК + ТУДХК', mechanism:'UDCA ↓ гидрофобные ЖК, TUDCA ↓ ER-стресс — полное покрытие холестаза', severity:'HIGH' },
+      { with:'nac', effect:'Глутатион + УДХК', mechanism:'NAC ↑ GSH, UDCA ↓ апоптоз — разные пути гепатопротекции', severity:'HIGH' },
+      { with:'milk_thistle', effect:'Мембраны + ЖК', mechanism:'Силимарин ↑ мембраны, UDCA ↑ ток — синергия желчеоттока', severity:'HIGH' },
+      { with:'artichoke', effect:'Холерез + холекинетика', mechanism:'Артишок ↑ продукцию желчи, UDCA ↑ её текучесть', severity:'MEDIUM' },
+      { with:'lecithin', effect:'Фосфолипиды + ЖК', mechanism:'Лецитин ↑ PC в желчь, UDCA ↓ литогенность', severity:'MEDIUM' },
+    ],
+    conflicts:[
+      { with:'colestyramine', effect:'Связывание УДХК', mechanism:'Анионообменные смолы связывают УДХК в кишечнике', severity:'HIGH' },
+      { with:'aluminum_hydroxide', effect:'↓ абсорбцию УДХК', mechanism:'Антациды с Al(OH)3 снижают всасывание', severity:'MEDIUM' },
+      { with:'ciprofloxacin', effect:'↓ эффективность ципрофлоксацина', mechanism:'УДХК ↑ растворимость камней → ↑ абсорбцию токсинов', severity:'LOW' },
+    ],
+    monitoring:[
+      { what:'ГГТ, ЩФ, билирубин', when:'Каждые 4 нед', targetRange:'ГГТ <55, ЩФ <150, билирубин <21 мкмоль/л' },
+      { what:'АЛТ, АСТ', when:'Каждые 4 нед', targetRange:'<40 Ед/л' },
+      { what:'УЗИ печени и ЖП', when:'Каждые 12 нед', targetRange:'Без камней >5мм, без холестаза' },
+    ],
+    contraindications:['Полная обструкция желчевыводящих путей','Камни ЖП >10 мм (риск закупорки)','Острый холангит','Билиарный цирроз печени (декомпенсированный)'],
+    sideEffects:['Диарея (первые 2-4 нед)','Дискомфорт в правом подреберье','Кальцификация камней (редко)'],
+    dosage:{ mg:1000, timing:'500 мг 2x/д за 2 ч до сна', form:'капсулы' },
+    bestForCourse:true,
+    analog:['tudca','bile_acids'],
+    specialInstructions:['Принимать за 2 ч до сна, отдельно от других препаратов','Начинать с 250 мг 2x/д, титровать до 500 мг 2x/д','При диарее → снизить дозу на 2-4 нед','Курс не менее 8-12 нед'],
+    targetOrgan:'Печень (гепатоциты, холангиоциты), жёлчный пузырь',
+    organMechanism:'Желчеобразование и желчеотток, детоксикация ксенобиотиков, энтерогепатическая циркуляция ЖК',
+    mechanismOfAction:'Конкурентное вытеснение гидрофобных ЖК из энтерогепатической циркуляции → ↓ пула токсичных ЖК; ингибиция митохондриального пути апоптоза (↑ Bcl-2, ↓ Bax, ↓ цитохром C); ↑ экспрессию BSEP/ABCB11 → ↑ транспорт ЖК в канальцы; ингибиция NF-κB → ↓ воспалительных цитокинов; модуляция CYP7A1 → ↓ синтеза холестерина',
+    clinicalEffect:'Снижение холестаза (↓ ГГТ, ЩФ), ↓ цитолиза (↓ АЛТ, АСТ), растворение холестериновых конкрементов <10 мм, ↓ риска гепато-целлюлярного повреждения на ААС',
+    bestForm:'УДХК 500 мг 2x/д за 2 ч до сна',
+  },
 };
 
 // Append to catalog

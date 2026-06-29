@@ -6,30 +6,10 @@ import { ORGAN_LABELS, SYSTEM_LABELS_CATALOG } from '../../data/support-database
 import { LAB_MARKER_MAP, type LabMarkerMap } from '../../data/lab-marker-map';
 import { STACK_TEMPLATES, type BioStackTemplate } from '../../engines/biostack-templates';
 import { SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX } from '../../data/support-meta';
-import { GlassCard, PillBtn, StatBox, ORGANS, SYSTEMS, PURE_GOALS, TARGET_SYSTEMS, toFinderProfile } from './BioStackAIConstants';
+import { GlassCard, PillBtn, StatBox, ORGANS, SYSTEMS, PURE_GOALS, TARGET_SYSTEMS, toFinderProfile, showToast, estCost } from './BioStackAIConstants';
+import { buildSmartStackMulti, type BuildVariant } from '../../engines/biostack-recommender.engine';
 
 type LMState = Record<string, 'off' | 'maintain' | 'correct'>;
-
-const PRICE_RUB: Record<string, number> = {
-  nac: 650, milk_thistle: 400, tudca: 900, omega3: 800, coq10: 1200, magnesium: 350,
-  zinc: 200, vitamin_d3: 300, vitamin_c: 250, vitamin_e: 350, selenium: 200,
-  berberine: 600, curcumin: 500, alpha_lipoic: 700, collagen: 1200, glucosamine: 800,
-  msm: 500, chondroitin: 900, ashwagandha: 600, rhodiola: 550, theanine: 450,
-  glycine: 300, creatine: 400, l_carnitine: 700, taurine: 350, inositol: 500,
-  probiotics: 1200, glutamine: 500, astragalus: 600, borax: 200, potassium: 250,
-  calcium: 300, citicoline: 1200, alpha_gpc: 900, huperzine_a: 400, noopept: 800,
-  piracetam: 500, lions_mane: 900, phosphatidylserine: 900, magnesium_l_threonate: 1200,
-  serrapeptase: 900, nattokinase: 800, bromelain: 500, vitamin_a: 200,
-  zinc_carnosine: 800, l_glutamine: 600,
-};
-
-function estCost(id: string): number {
-  if (PRICE_RUB[id]) return PRICE_RUB[id];
-  const c = SUPPORT_CATALOG_DATA[id];
-  if (!c) return 500;
-  const tm: Record<string, number> = { core: 800, standard: 500, advanced: 300, specialty: 1200 };
-  return tm[c.tier as string] || 500;
-}
 
 const GOAL_GROUPS: { key: string; label: string; goal: GoalType }[] = [
   { key: 'physique', label: '🏋️ Физическая форма', goal: 'muscle_gain' },
@@ -298,6 +278,7 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
   const [targetSize, setTargetSize] = useState(() => profile.stackComplexity === 'minimal' ? 5 : profile.stackComplexity === 'balanced' ? 10 : 18);
   const [lmState, setLmState] = useState<LMState>({});
   const [result, setResult] = useState<{ stack: string[]; explanation: StackExplanation } | null>(null);
+  const [multiResult, setMultiResult] = useState<{ variant: BuildVariant; stack: string[]; estCost: number; synergyScore: number; coverage: string; substanceCount: number }[] | null>(null);
   const [avoidConflicts, setAvoidConflicts] = useState(true);
   const [stkQuery, setStkQuery] = useState('');
   const [stkFilter, setStkFilter] = useState('all');
@@ -390,6 +371,22 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
     localStorage.setItem('he_finder_saved_stacks', JSON.stringify(updated));
   }, [result]);
 
+  const handleMultiBuild = useCallback(() => {
+    const allGoals = [...new Set([...goals, ...selTargets, ...profile.goals])] as GoalType[];
+    const recGoals = allGoals.map(g => g === 'muscle_gain' ? 'performance' as const : g === 'fat_loss' ? 'energy' as const : g === 'concentration' ? 'focus' as const : g === 'brain' ? 'focus' as const : g === 'cardio_health' ? 'longevity' as const : g === 'liver_health' ? 'detox' as const : g === 'kidney' ? 'detox' as const : g === 'sleep' ? 'sleep' as const : g === 'recovery' ? 'recovery' as const : g === 'energy' ? 'energy' as const : g === 'immunity' ? 'immunity' as const : g === 'stress' ? 'stress' as const : g === 'libido' ? 'libido' as const : g === 'joints' ? 'joints' as const : g === 'digestion' ? 'digestion' as const : g === 'detox' ? 'detox' as const : g === 'longevity' ? 'longevity' as const : g === 'mood' ? 'stress' as const : g === 'hormones' ? 'libido' as const : 'immunity' as const);
+    if (recGoals.length === 0) { showToast('Выберите хотя бы одну цель', 'error'); return; }
+    const variants = buildSmartStackMulti(recGoals, profile);
+    setMultiResult(variants.map(v => ({
+      variant: v.variant,
+      stack: v.stack.substances.map(s => s.id),
+      estCost: v.estCost,
+      synergyScore: v.stack.totalScore,
+      coverage: v.stack.coverageSummary,
+      substanceCount: v.stack.substances.length,
+    })));
+    showToast('🧩 Собрано 3 варианта', 'success');
+  }, [goals, selTargets, profile]);
+
   const handleLoadIds = useCallback((ids: string[]) => {
     setStackIds(ids);
   }, [setStackIds]);
@@ -398,7 +395,7 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
     <div style={{ paddingBottom: 80 }}>
       {/* ─── Card 1: Параметры сборки ─── */}
       <GlassCard title="🎯 Параметры сборки" icon="🎯" color="#00e68a">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 4, marginBottom: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 6, marginBottom: 8 }}>
           <PopupChips label="🎯 Цели"
             options={GOAL_GROUPS.map(g => ({ id: g.goal, label: g.label }))}
             selected={goals} onChange={ids => setGoals(ids as GoalType[])}
@@ -416,14 +413,21 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
             options={TARGET_SYSTEMS.map(t => ({ id: t.key, label: t.label }))}
             selected={selTargets} onChange={ids => setSelTargets(ids as GoalType[])}
           />
-          <button onClick={() => setTargetSize(Math.max(1, targetSize - 2))} style={{
-            padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700,
-            background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)', color: '#60a5fa',
-          }}>📏 − {targetSize}</button>
-          <button onClick={() => setTargetSize(Math.min(40, targetSize + 2))} style={{
-            padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700,
-            background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)', color: '#60a5fa',
-          }}>📏 + {targetSize}</button>
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>📏 Размер стека: <strong style={{ color: '#60a5fa', fontSize: 16 }}>{targetSize}</strong></span>
+          <input type="range" min={1} max={40} value={targetSize} onChange={e => setTargetSize(+e.target.value)}
+            style={{ flex: 1, height: 4, accentColor: '#60a5fa', cursor: 'pointer' }} />
+          <div style={{ display: 'flex', gap: 3 }}>
+            <button onClick={() => setTargetSize(Math.max(1, targetSize - 2))} style={{
+              padding: '10px 14px', borderRadius: 10, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+              background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)', color: '#60a5fa',
+            }}>−</button>
+            <button onClick={() => setTargetSize(Math.min(40, targetSize + 2))} style={{
+              padding: '10px 14px', borderRadius: 10, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+              background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)', color: '#60a5fa',
+            }}>+</button>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
           <div style={{ flex: 1, padding: '5px 10px', borderRadius: 8, background: '#202023', border: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -485,15 +489,25 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
         </div>
       </GlassCard>
 
-      {/* ─── Build button ─── */}
-      <button onClick={handleBuild} style={{
-        width: '100%', padding: '16px 0', borderRadius: 14, fontSize: 14, fontWeight: 800,
-        cursor: 'pointer', marginBottom: 10,
-        background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#000',
-        boxShadow: '0 4px 20px rgba(0,230,138,0.2)',
-      }}>
-        🧩 Собрать стек
-      </button>
+      {/* ─── Build buttons ─── */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+        <button onClick={handleBuild} style={{
+          flex: 1, padding: '14px 0', borderRadius: 14, fontSize: 12, fontWeight: 800,
+          cursor: 'pointer',
+          background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#000',
+          boxShadow: '0 4px 20px rgba(0,230,138,0.2)',
+        }}>
+          🧩 Собрать стек
+        </button>
+        <button onClick={handleMultiBuild} style={{
+          flex: 1, padding: '14px 0', borderRadius: 14, fontSize: 12, fontWeight: 800,
+          cursor: 'pointer',
+          background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)', border: 'none', color: '#fff',
+          boxShadow: '0 4px 20px rgba(139,92,246,0.2)',
+        }}>
+          🎲 3 варианта
+        </button>
+      </div>
 
       {/* ─── Result ─── */}
       {result && (
@@ -542,17 +556,18 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
               ))}
             </div>
           )}
-          <div style={{ display: 'flex', gap: 4 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={() => { setStackIds(result.stack); handleSaveStack(); }} style={{
-              flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
-              background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a',
+              flex: 1, padding: '12px 0', borderRadius: 12, fontSize: 11, fontWeight: 800, cursor: 'pointer',
+              background: 'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(0,198,83,0.05))', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a',
+              letterSpacing: 0.3,
             }}>💾 Сохранить стек</button>
             <button onClick={() => {
               const txt = result.explanation.substances.map(s => `${s.name} — ${s.dose || s.role}`).join('\n');
               navigator.clipboard.writeText(txt);
             }} style={{
-              padding: '8px 14px', borderRadius: 10, fontSize: 9, fontWeight: 700, cursor: 'pointer',
-              background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)',
+              padding: '12px 16px', borderRadius: 12, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+              background: '#202023', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)',
             }}>📋</button>
             <button onClick={() => {
               try {
@@ -574,9 +589,79 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
                 }
               } catch {}
             }} style={{
-              padding: '8px 10px', borderRadius: 10, fontSize: 9, fontWeight: 700, cursor: 'pointer',
-              background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: '#818cf8',
-            }}>📦 В мои стеки</button>
+              padding: '12px 16px', borderRadius: 12, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+              background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', color: '#818cf8',
+            }}>📦 В стеки</button>
+          </div>
+        </GlassCard>
+      )}
+
+      {/* ─── Multi-variant result ─── */}
+      {multiResult && (
+        <GlassCard title="🎲 3 варианта сборки" icon="🎲" color="#8b5cf6">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {multiResult.map((vr, idx) => {
+              const labels: Record<string, { label: string; icon: string; color: string; size: string }> = {
+                economy: { label: 'Бюджетный', icon: '💰', color: '#22c55e', size: '5-7 веществ' },
+                balanced: { label: 'Сбалансированный', icon: '⚖️', color: '#f59e0b', size: '8-12 веществ' },
+                maximum: { label: 'Максимальный', icon: '💎', color: '#ef4444', size: '12-18 веществ' },
+              };
+              const l = labels[vr.variant] || { label: vr.variant, icon: '📦', color: '#60a5fa', size: '' };
+              const costLevel = vr.estCost > 10000 ? 2 : vr.estCost > 5000 ? 1 : 0;
+              const costLabel = ['🟢 Доступный', '💰 Средний', '💰💰 Дорогой'][costLevel];
+              return (
+                <div key={vr.variant} style={{
+                  padding: '10px 12px', borderRadius: 12,
+                  background: `${l.color}08`, border: `1px solid ${l.color}15`,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 16 }}>{l.icon}</span>
+                      <div>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: l.color }}>{l.label}</span>
+                        <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', marginLeft: 4 }}>{l.size}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>{vr.substanceCount} веществ</span>
+                      <span style={{ fontSize: 8, fontWeight: 600, color: l.color }}>{vr.estCost.toLocaleString()} ₽</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, fontSize: 7, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>
+                    <span>⭐ Синергия: <strong style={{ color: l.color }}>{vr.synergyScore}</strong></span>
+                    <span>•</span>
+                    <span>{vr.coverage}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 3 }}>
+                    <div style={{
+                      padding: '2px 6px', borderRadius: 4, fontSize: 6, fontWeight: 600,
+                      background: costLevel === 0 ? 'rgba(34,197,94,0.1)' : costLevel === 1 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
+                      color: [ '#22c55e', '#f59e0b', '#ef4444' ][costLevel],
+                    }}>{costLabel}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                    <button onClick={() => {
+                      setStackIds(vr.stack);
+                      const fp = toFinderProfile(profile);
+                      const exp = explainStack(vr.stack, fp);
+                      setResult({ stack: vr.stack, explanation: exp });
+                      setMultiResult(null);
+                      showToast(`✅ Загружен ${l.label.toLowerCase()} вариант`, 'success');
+                    }} style={{
+                      flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+                      background: `${l.color}15`, border: `1px solid ${l.color}25`, color: l.color,
+                    }}>📥 Этот вариант</button>
+                    <button onClick={() => {
+                      const txt = vr.stack.map(id => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id).join('\n');
+                      navigator.clipboard.writeText(txt);
+                    }} style={{
+                      padding: '6px 10px', borderRadius: 8, fontSize: 8, fontWeight: 600, cursor: 'pointer',
+                      background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
+                    }}>📋</button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </GlassCard>
       )}
@@ -652,15 +737,15 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
                         </span>
                       ))}
                     </div>
-                    <button onClick={() => {
-                      const newStack = curStack.filter(id => !m.ids.includes(id));
-                      newStack.push(m.targetId);
-                      const exp = explainStack(newStack, toFinderProfile(profile));
-                      setResult({ stack: newStack, explanation: exp });
-                    }} style={{
-                      padding: '4px 12px', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
-                      background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#fbbf24',
-                    }}>🔄 Заменить {m.ids.length}→1</button>
+            <button onClick={() => {
+              const newStack = curStack.filter(id => !m.ids.includes(id));
+              newStack.push(m.targetId);
+              const exp = explainStack(newStack, toFinderProfile(profile));
+              setResult({ stack: newStack, explanation: exp });
+            }} style={{
+              padding: '8px 14px', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+              background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#fbbf24',
+            }}>🔄 Заменить {m.ids.length}→1</button>
                   </div>
                 ))}
               </div>

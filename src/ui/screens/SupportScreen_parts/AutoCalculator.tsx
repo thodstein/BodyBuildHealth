@@ -19,14 +19,14 @@ const SEV_OPTS = [{id:'none',label:'Нет'},{id:'mild',label:'Лёгкая'},{i
 const DEFAULT_STATE: CalculatorState = {
   profile: { weight: 80, age: 30, sex: 'male', workoutsPerWeek: 3, avgWorkoutMinutes: 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
   neuro: { dopamineScore: 1, serotoninScore: 1, gabaBalance: 'balance', memoryIssues: false, focusIssues: false, slowThinking: false, coordinationIssues: false, aggressionScore: 1, headaches: false, weatherDependent: false, sleepQuality: 'good' },
-  pharma: { phase: 'course', aas: [], hasGH: false, hasIGF: false, hasInsulin: false, hasHCG: false, hasAI: false, hasCaber: false, hasSERM: false, hasSARMs: false },
+  pharma: { phase: 'course', aas: [], hasGH: false, hasIGF: false, hasInsulin: false, hasHCG: false, hasAI: false, hasCaber: false, hasSERM: false, hasSARMs: false, hasMGF: false, hasGLP1: false },
   goals: { healthMaintenance: true, competitionPrep: false, sleepRecovery: false, lipidCorrection: false, bloodThinning: false, liverDetox: false, bpControl: false, trainingCycle: 'mass', cycleWeeks: 12, previousCycles: 0, timeSinceLastCycle: 'none' },
   hepatobiliary: { altAstElevation: 'none', ggtElevation: 'none', bilirubinElevation: 'none', fattyLiver: false, cholecystitis: false, alcoholHistory: 'none' },
   urinary: { creatinineElevation: 'none', ureaElevation: 'none', proteinuria: false, nephrotoxicDrugs: false, hypertension: false, diabetes: false, urinationPattern: 'normal' },
   cardio: { bpStage: 'normal', heartRate: 72, ldlElevation: 'none', hdlLow: false, triglycerides: 'normal', hctElevation: 'none', previousCVD: false, familyCVD: false },
   oda: { jointPain: 'none', ligamentIssues: false, backPain: false, injuries: [] },
   labs: { preCourse: null, midCourse: null, postPCT: null, fullPanel: null },
-  nutrition: { calories: 2500, proteinG: 160, fatG: 80, carbsG: 300, waterL: 2, saltIntake: 'normal', omega3: false, fiberG: 25 },
+  nutrition: { calories: 2500, proteinG: 160, fatG: 80, carbsG: 300, waterL: 2, saltIntake: 'normal', omega3: false, fiberG: 25, proteinGPerKg: 1.8, sodiumMg: 3500, potassiumMg: 4500 },
   contraindications: { allergies: '', hasCVD: false, hasThrombophilia: false, hasGI: false, hasProstateIssues: false, hasDiabetes: false, hasEpilepsy: false, hasMentalIllness: false, hasLiverDisease: false, hasKidneyDisease: false },
   journal: { positive: [], negative: [] },
   epicrisis: { pastGyno: false, pastLibidoDrop: false, pastHctSpike: false, pastLiverIssues: false, pastKidneyIssues: false },
@@ -521,6 +521,8 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           <PopupBool label="Каберголин" value={state.pharma.hasCaber} onChange={v => uPharm({ hasCaber: v })} />
           <PopupBool label="СЕРМ" value={state.pharma.hasSERM} onChange={v => uPharm({ hasSERM: v })} />
           <PopupBool label="SARMs" value={state.pharma.hasSARMs} onChange={v => uPharm({ hasSARMs: v })} />
+          <PopupBool label="МГФ" value={state.pharma.hasMGF} onChange={v => uPharm({ hasMGF: v })} />
+          <PopupBool label="ГПП-1" value={state.pharma.hasGLP1} onChange={v => uPharm({ hasGLP1: v })} />
           {/* Анализ курса */}
           {state.pharma.aas.length > 0 && (() => {
             const countOral = state.pharma.aas.filter(a => a.id.includes('stan')||a.id.includes('oxan')||a.id.includes('meth')||a.id.includes('trena')||a.id.includes('halo')||a.id.includes('superdrol')||a.id.includes('anadrol')).length;
@@ -607,6 +609,8 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           <PopupNumber label="Вода" value={state.nutrition.waterL} min={0.5} max={6} step={0.1} suffix="л" onChange={v => uNutr({ waterL: v })} />
           <PopupNumber label="Клетчатка" value={state.nutrition.fiberG} min={0} max={100} suffix="г" onChange={v => uNutr({ fiberG: v })} />
           <PopupBool label="Омега-3" value={state.nutrition.omega3} onChange={v => uNutr({ omega3: v })} />
+          <PopupNumber label="Натрий" value={state.nutrition.sodiumMg||3500} min={500} max={8000} step={100} suffix="мг" onChange={v => uNutr({ sodiumMg: v })} />
+          <PopupNumber label="Калий" value={state.nutrition.potassiumMg||4500} min={500} max={8000} step={100} suffix="мг" onChange={v => uNutr({ potassiumMg: v })} />
           <PopupSelect label="Соль" value={state.nutrition.saltIntake} options={[{id:'low',label:'Мало'},{id:'normal',label:'Норма'},{id:'high',label:'Много'}]} onChange={v => uNutr({ saltIntake: v as any })} />
         </Card>
 

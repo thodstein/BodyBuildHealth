@@ -38,23 +38,24 @@ export const PHASE_HINTS: Record<string, string> = {
   deload: 'Разгрузка: снижаем объём и интенсивность, восстанавливаем суставы и нервную систему.',
 };
 
-export type TrainingTab = 'plan' | 'runtime' | 'exercises' | 'calculators' | 'diary' | 'cycles' | 'history' | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress' | 'mytraining' | 'programcalc' | 'reports' | 'srcbb';
+export type TrainingTab = 'plan' | 'runtime' | 'exercises' | 'excalc' | 'calculators' | 'diary' | 'cycles' | 'history' | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress' | 'mytraining' | 'programcalc' | 'reports' | 'srcbb' | 'volume' | 'library';
 export type TrainingPage = 'hero' | 'tabs';
 export type TrainingGroup = 'training' | 'planning' | 'info' | null;
 
 export const TAB_GROUPS: Record<string, { title: string; icon: string; tabs: TrainingTab[]; color: string }> = {
   training: { title: '🏋️ Тренировки', icon: '🏋️', tabs: ['runtime', 'timers'], color: 'var(--accent)' },
-  planning: { title: '📐 Планирование', icon: '📐', tabs: ['srcbb', 'plan', 'cycles', 'programs', 'mytraining', 'methods', 'programcalc'], color: '#3b82f6' },
-  info: { title: '📊 Инфо', icon: '📊', tabs: ['analytics', 'visual', 'progress', 'calculators', 'exercises', 'diary', 'history', 'reports'], color: '#8b5cf6' },
+  planning: { title: '📐 Планирование', icon: '📐', tabs: ['srcbb', 'plan', 'cycles', 'programs', 'mytraining', 'programcalc', 'volume', 'library'], color: '#3b82f6' },
+  info: { title: '📊 Инфо', icon: '📊', tabs: ['analytics', 'visual', 'progress', 'exercises', 'excalc', 'calculators', 'diary', 'history', 'reports'], color: '#8b5cf6' },
 };
 
 export const TAB_LABELS: Record<TrainingTab, string> = {
-  plan: '📋 План', runtime: '▶ Тренировка', exercises: '🏋️ Упражнения', calculators: '📐 Калькуляторы',
-  diary: '📝 Дневник', cycles: '🔄 Циклы', history: '📜 История', analytics: '📊 Аналитика',
-  methods: '🧠 Методики', visual: '📈 Визуализация', programs: '📚 Программы', timers: '⏱ Таймеры',
-  progress: '📏 Прогресс', mytraining: '⭐ Мои', programcalc: '🛠️ Ручной конструктор',
+  plan: '📋 План тренировок', runtime: '▶ Проведение тренировки', exercises: '🏋️ Упражнения', calculators: '📐 Калькуляторы',
+  diary: '📝 Дневник тренировок', cycles: '🔄 Циклы', history: '📜 История тренировок', analytics: '📊 Аналитика',
+  methods: '🧠 Методики', visual: '📈 Визуализация', programs: '📚 Программы', timers: '⏱ Таймеры отдыха',
+  progress: '📏 Прогресс', mytraining: '⭐ Мои тренировки', programcalc: '🛠️ Ручной конструктор', excalc: '🧮 Калькулятор упражнений', volume: '📐 Расчёт объёма и оптимизация',
   reports: '📄 Отчёты',
-  srcbb: '🏆 СРЦ/BB',
+  srcbb: '🏆 Силовой цикл / Бодибилдинг',
+  library: '📚 Библиотека',
 };
 
 // ── Этап R/U: 3 плоские трассы планировщика (ПЛ / ББ / Ручной сбор), одна вкладка — один клик.
@@ -69,9 +70,9 @@ export function getPlanningTrack(): PlanningTrack {
 export function setPlanningTrack(t: PlanningTrack): void {
   try { localStorage.setItem(PT_KEY, t); } catch { /* ignore */ }
 }
-export const PL_PLANNING_TABS: TrainingTab[] = ['srcbb'];
-export const BB_PLANNING_TABS: TrainingTab[] = ['srcbb'];
-export const MANUAL_PLANNING_TABS: TrainingTab[] = ['plan', 'cycles', 'programs', 'mytraining', 'methods', 'programcalc'];
+export const PL_PLANNING_TABS: TrainingTab[] = ['srcbb', 'volume'];
+export const BB_PLANNING_TABS: TrainingTab[] = ['srcbb', 'volume'];
+export const MANUAL_PLANNING_TABS: TrainingTab[] = ['plan', 'cycles', 'programs', 'mytraining', 'programcalc', 'volume', 'library'];
 export function planningTabsFor(track: PlanningTrack): TrainingTab[] {
   if (track === 'manual') return MANUAL_PLANNING_TABS;
   return track === 'bb' ? BB_PLANNING_TABS : PL_PLANNING_TABS;

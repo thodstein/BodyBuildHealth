@@ -2151,15 +2151,15 @@ const PeptideCalcTab: React.FC = () => {
 const InteractionCheckerTab: React.FC = () => {
   const linked = useDataLink();
   const [interactSub, setInteractSub] = useState<'interactions' | 'synergies'>('interactions');
-  // Filter to show only pharma core substances (exclude peptides, PCT, support)
-  const PHARMA_INTERACT_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin']);
+  // Filter to show only pharma core substances (AAS, PCT, peptides — everything in PHARMA_DB)
+  const PHARMA_INTERACT_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other']);
   const allSubstances = useMemo(() => {
     return Object.values(PHARMA_DB).filter(s => 
       !!s?.name && PHARMA_INTERACT_FILTER.has(s.class)
     );
   }, []);
-  // Pharma-only synergy pairs (AAS/insulin only, exclude peptides/PCT/support)
-  const PHARMA_INTERACT_FILTER_SYNERGY = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin']);
+  // Pharma-only synergy pairs (AAS + peptides + PCT)
+  const PHARMA_INTERACT_FILTER_SYNERGY = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other']);
   // Map SYNERGY_PAIRS substance IDs to PHARMA_DB keys
   const synergyToPharmaId = (id: string): string => {
     const map: Record<string, string> = {
@@ -2174,19 +2174,26 @@ const InteractionCheckerTab: React.FC = () => {
     return map[id] || id;
   };
 
-  const pharmaSynergies = useMemo(() => {
-    // Include drugs from SYNERGY_PAIRS that match pharma classes (AAS, peptides, PCT)
-    const ALLOWED_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','peptide_ghrh']);
-    return SYNERGY_PAIRS.filter(p => {
+  // Build per-substance synergy map: substanceId → list of synergy pairs
+  const pharmaSynergyMap = useMemo(() => {
+    const map: Record<string, Array<{ partnerId: string; partnerName: string; pair: typeof SYNERGY_PAIRS[0] }>> = {};
+    const pharmaIds = new Set(allSubstances.map(s => s.id));
+    for (const p of SYNERGY_PAIRS) {
       const aKey = synergyToPharmaId(p.substanceA);
       const bKey = synergyToPharmaId(p.substanceB);
-      const a = PHARMA_DB[aKey];
-      const b = PHARMA_DB[bKey];
-      // Both must be pharma drugs (not support supplements)
-      if (!a || !b) return false;
-      // At least one must be AAS/PCT/peptide class
-      return ALLOWED_CLASSES.has(a.class) && ALLOWED_CLASSES.has(b.class);
-    });
+      if (!pharmaIds.has(aKey) || !pharmaIds.has(bKey)) continue;
+      if (!map[aKey]) map[aKey] = [];
+      if (!map[bKey]) map[bKey] = [];
+      const aName = (PHARMA_DB[aKey]?.name || p.substanceA).replace(/\(.*\)/, '').trim();
+      const bName = (PHARMA_DB[bKey]?.name || p.substanceB).replace(/\(.*\)/, '').trim();
+      map[aKey].push({ partnerId: bKey, partnerName: bName, pair: p });
+      map[bKey].push({ partnerId: aKey, partnerName: aName, pair: p });
+    }
+    return map;
+  }, []);
+
+  const pharmaSubstancesWithSynergies = useMemo(() => {
+    return allSubstances.filter(s => pharmaSynergyMap[s.id]?.length > 0).sort((a, b) => (b.name||'').localeCompare(a.name||''));
   }, []);
 
   const [selectedIds, setSelectedIds] = useState<string[]>(['', '']);
@@ -2277,71 +2284,41 @@ const InteractionCheckerTab: React.FC = () => {
           background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
           borderRadius: 12, padding: '14px 16px',
         }}>
-          <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>💥 Синергии и комбинации</h3>
+          <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>💥 Синергии по препаратам</h3>
           <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
-            Ключевые синергетические пары между фармакологическими препаратами
+            Синергетические пары для каждого препарата каталога фармакологии и пептидов
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
-            {pharmaSynergies.map((pair, i) => {
-              const synergyColors: Record<string, string> = {
-                synergistic: 'rgba(0,230,138,0.1)',
-                additive: 'rgba(59,130,246,0.1)',
-                potentiative: 'rgba(249,115,22,0.1)',
-                complementary: 'rgba(168,85,247,0.1)',
-              };
-              const synergyColorsText: Record<string, string> = {
-                synergistic: '#00e68a',
-                additive: '#3b82f6',
-                potentiative: '#f97316',
-                complementary: '#a855f7',
-              };
-              const aKey = synergyToPharmaId(pair.substanceA);
-              const bKey = synergyToPharmaId(pair.substanceB);
-              const aName = (PHARMA_DB[aKey]?.name || pair.substanceA).replace(/\(.*\)/, '').trim();
-              const bName = (PHARMA_DB[bKey]?.name || pair.substanceB).replace(/\(.*\)/, '').trim();
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {pharmaSubstancesWithSynergies.map(sub => {
+              const synergies = pharmaSynergyMap[sub.id] || [];
               return (
-                <div key={i} style={{
-                  background: synergyColors[pair.synergyType] || 'rgba(255,255,255,0.03)',
-                  borderRadius: 10, padding: '12px 14px',
-                  border: '1px solid ' + (synergyColorsText[pair.synergyType] || '#888') + '50',
-                  transition: 'all 0.15s',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
-                      background: synergyColorsText[pair.synergyType] + '20', color: synergyColorsText[pair.synergyType],
-                    }}>
-                      {pair.synergyType === 'synergistic' ? '⊕ Синергия' : pair.synergyType === 'additive' ? '+ Аддитивно' : pair.synergyType === 'potentiative' ? '↗ Усиление' : '↔ Дополнение'}
-                    </span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: synergyColorsText[pair.synergyType] }}>
-                      {Math.round(pair.strength * 100)}%
-                    </span>
+                <div key={sub.id} style={{ borderRadius: 10, padding: '12px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>
+                    💊 {sub.name}
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: 'var(--text)' }}>
-                    {aName} + {bName}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {synergies.map((s, i) => {
+                      const p = s.pair;
+                      const stColor = p.synergyType === 'synergistic' ? '#00e68a' : p.synergyType === 'additive' ? '#3b82f6' : p.synergyType === 'potentiative' ? '#f97316' : '#a855f7';
+                      const stBg = p.synergyType === 'synergistic' ? 'rgba(0,230,138,0.08)' : p.synergyType === 'additive' ? 'rgba(59,130,246,0.08)' : p.synergyType === 'potentiative' ? 'rgba(249,115,22,0.08)' : 'rgba(168,85,247,0.08)';
+                      return (
+                        <div key={i} style={{ padding: '8px 10px', borderRadius: 8, background: stBg, border: `1px solid ${stColor}30` }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: `${stColor}20`, color: stColor }}>
+                              {p.synergyType === 'synergistic' ? '⊕ Синергия' : p.synergyType === 'additive' ? '+ Аддитивно' : p.synergyType === 'potentiative' ? '↗ Усиление' : '↔ Дополнение'}
+                            </span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: stColor }}>{Math.round(p.strength * 100)}%</span>
+                          </div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>+ {s.partnerName}</div>
+                          <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.3 }}>{decodeGarbled(p.mechanism).slice(0, 150)}</div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div style={{ fontSize: 10, lineHeight: 1.4, color: 'var(--text-dim)' }}>
-                    {decodeGarbled(pair.mechanism).slice(0,120)}{pair.mechanism && decodeGarbled(pair.mechanism).length > 120 ? '...' : ''}
-                  </div>
-                  {pair.clinicalNote && (() => { const d = decodeGarbled(pair.clinicalNote!); return d.length > 0 ? (
-                    <div style={{ marginTop: 4, fontSize: 9, color: '#22c55e' }}>
-                      💡 {d.slice(0, 100)}
-                    </div>
-                  ) : null; })()}
-                  {pair.affectedSystems && pair.affectedSystems.length > 0 && (
-                    <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                      {pair.affectedSystems.map(sys => (
-                        <span key={sys} style={{
-                          fontSize: 9, padding: '2px 6px', borderRadius: 4,
-                          background: synergyColorsText[pair.synergyType] + '20',
-                          color: synergyColorsText[pair.synergyType],
-                        }}>{SYSTEM_INFO[sys]?.label || sys}</span>
-                      ))}
-                    </div>
-                  )}
                 </div>
               );
             })}
-            {pharmaSynergies.length === 0 && (
+            {pharmaSubstancesWithSynergies.length === 0 && (
               <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)', fontSize: 12 }}>
                 Нет синергий для отображения
               </div>
@@ -2349,215 +2326,65 @@ const InteractionCheckerTab: React.FC = () => {
           </div>
         </div>
       ) : (<>
-      {/* Header */}
       <div style={{
         background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
-        borderRadius: 12, padding: '14px 16px', marginBottom: 12,
+        borderRadius: 12, padding: '14px 16px',
       }}>
-        <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>⚡ Проверка взаимодействий</h3>
-        <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>Выберите 2+ препарата для анализа синергий и конфликтов</p>
-      </div>
-
-      {/* Drug selectors */}
-      <div style={{
-        background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
-        borderRadius: 12, padding: '14px 16px', marginBottom: 12,
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-          {selectedIds.map((id, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', minWidth: 18, fontWeight: 600, marginTop: 6 }}>#{idx + 1}</div>
-              {id ? (
-                <div style={{
-                  flex: 1, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.12)',
-                  border: '1px solid rgba(0,230,138,0.3)',
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                }}>
-                  <div>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>{PHARMA_DB[id]?.name || id}</span>
-                    <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>
-                      {id && PHARMA_DB[id] ? CLASS_LABELS[PHARMA_DB[id]?.class as string] || '' : ''}
-                    </span>
-                  </div>
-                  <button onClick={() => updateDrug(idx, '')} style={{
-                    padding: '2px 8px', borderRadius: 4, fontSize: 10, cursor: 'pointer',
-                    background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444',
-                  }}>✕</button>
-                </div>
-              ) : (
-                <div style={{ flex: 1 }}>
-                  <input
-                    type="text" value={interactSearch}
-                    onChange={(e) => setInteractSearch(e.target.value)}
-                    placeholder="Поиск препарата..."
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)',
-                      border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box', marginBottom: 6 }}
-                  />
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 130, overflowY: 'auto' }}>
-                    {unusedSubstances.map((s) => (
-                      <div key={s.id} onClick={() => { updateDrug(idx, s.id); setInteractSearch(''); }} style={{
-                        padding: '5px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11,
-                        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                        transition: 'all 0.1s',
-                        whiteSpace: 'nowrap',
-                      }}>
-                        {s.name}
-                      </div>
-                    ))}
-                    {unusedSubstances.length === 0 && (
-                      <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: 4 }}>Нет доступных препаратов</div>
-                    )}
-                  </div>
-                  {selectedIds.length > 2 && (
-                    <button onClick={() => removeDrug(idx)} style={{ marginTop: 4, padding: '3px 10px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}>
-                      ✕ Удалить
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button onClick={addDrug} style={{
-            padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', color: 'var(--accent)',
-          }}>+ Добавить препарат</button>
-          {validIds.length >= 2 && (
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>
-              {validIds.length} препаратов
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* No interaction message */}
-      {validIds.length < 2 && (
-        <div style={{
-          background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
-          borderRadius: 12, textAlign: 'center', padding: '24px 16px',
-        }}>
-          <div style={{ fontSize: 28, marginBottom: 8 }}>⚡</div>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Выберите минимум 2 препарата для проверки взаимодействий</div>
-        </div>
-      )}
-
-      {/* No alerts found */}
-      {alerts !== null && !hasAlerts && (
-        <div style={{
-          border: '1px solid rgba(0,230,138,0.3)',
-          borderRadius: 12, textAlign: 'center', padding: '16px',
-          background: 'rgba(0,230,138,0.05)',
-        }}>
-          <div style={{ fontSize: 11, color: '#4caf50', fontWeight: 600 }}>✓ Критических взаимодействий не обнаружено</div>
-        </div>
-      )}
-
-      {/* Alerts */}
-      {hasAlerts && (
+        <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>⚡ Взаимодействия по препаратам</h3>
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
+          Информация о взаимодействиях для каждого препарата каталога фармакологии и пептидов
+        </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <h4 style={{ margin: '0 0 4px 0', fontSize: 12, color: 'var(--text-dim)' }}>Обнаруженные взаимодействия ({alerts!.length})</h4>
-          {alerts!.map((alert, i) => {
-            const severityColor = SEVERITY_COLORS[alert.type] || '#666';
-            const severityBg = `${severityColor}18`;
+          {allSubstances.map(sub => {
+            const conflicts = sub.conflicts || [];
+            const linkedSubs = (sub.linkedSubstances || []).filter(ls => PHARMA_DB[ls.id]);
+            const instructions = sub.specialInstructions || [];
+            if (conflicts.length === 0 && linkedSubs.length === 0 && instructions.length === 0) return null;
             return (
-              <div key={i} style={{
-                borderLeft: `4px solid ${severityColor}`,
-                borderRadius: 12, fontSize: 12, padding: '12px 14px',
-                background: severityBg,
-                border: `1px solid ${severityColor}40`,
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{
-                    fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px',
-                    color: severityColor, padding: '3px 10px', borderRadius: 4,
-                    background: `${severityColor}22`,
-                  }}>
-                    {alert.type === 'critical' ? '⚠ КРИТИЧЕСКОЕ' : alert.type === 'warning' ? '⚠ ПРЕДУПРЕЖДЕНИЕ' : 'ℹ ИНФО'}
-                  </span>
-                  <span style={{ color: 'var(--text-dim)', fontSize: 11, fontWeight: 500 }}>
-                    {alert.drugs.join(' + ')}
-                  </span>
+              <div key={sub.id} style={{ borderRadius: 10, padding: '12px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>
+                  💊 {sub.name}
                 </div>
-                <div style={{ marginBottom: 6, lineHeight: 1.5 }}>
-                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>Механизм:</span>{' '}
-                  <span style={{ color: 'var(--text-light)' }}>{alert.mechanism}</span>
-                </div>
-                <div style={{ lineHeight: 1.5 }}>
-                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>Рекомендация:</span>{' '}
-                  <span style={{ color: 'var(--text-light)' }}>{alert.recommendation}</span>
-                </div>
+                {conflicts.length > 0 && (
+                  <div style={{ marginBottom: 6 }}>
+                    <div style={{ fontSize: 9, fontWeight: 600, color: '#ef4444', marginBottom: 4 }}>🔴 Конфликты</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      {conflicts.map((c, i) => (
+                        <div key={i} style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: `1px solid rgba(239,68,68,0.15)` }}>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: '#ef4444' }}>{c.with}</div>
+                          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)', lineHeight: 1.3 }}>{c.effect}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {linkedSubs.length > 0 && (
+                  <div style={{ marginBottom: 6 }}>
+                    <div style={{ fontSize: 9, fontWeight: 600, color: '#22c55e', marginBottom: 4 }}>🟢 Связанные вещества</div>
+                    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                      {linkedSubs.map((ls, i) => (
+                        <span key={i} style={{ fontSize: 8, padding: '3px 6px', borderRadius: 4,
+                          background: ls.type === 'synergy' ? 'rgba(34,197,94,0.08)' : 'rgba(255,23,68,0.08)',
+                          border: `1px solid ${ls.type === 'synergy' ? 'rgba(34,197,94,0.2)' : 'rgba(255,23,68,0.2)'}`,
+                          color: ls.type === 'synergy' ? '#22c55e' : '#ff1744',
+                        }}>
+                          {ls.type === 'synergy' ? '⊕' : '⊖'} {PHARMA_DB[ls.id]?.name || ls.id}: {ls.mechanism}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {instructions.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 600, color: '#f59e0b', marginBottom: 2 }}>📋 Указания</div>
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)', lineHeight: 1.3 }}>{instructions.join(' · ')}</div>
+                  </div>
+                )}
               </div>
             );
           })}
-          {hasSupportAlerts && (
-            <div style={{ marginTop: 8 }}>
-              <h4 style={{ margin: '0 0 4px 0', fontSize: 11, color: '#8b5cf6' }}>💊 Поддержка: взаимодействия ({supportCrossAlerts.length})</h4>
-              {supportCrossAlerts.map((inter, i) => (
-                <div key={i} style={{ padding: '6px 10px', marginBottom: 4, borderRadius: 8, fontSize: 10,
-                  background: inter.type === 'conflict' ? 'rgba(239,68,68,0.08)' : inter.type === 'caution' ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)',
-                  borderLeft: `3px solid ${inter.type === 'conflict' ? '#ef4444' : inter.type === 'caution' ? '#f59e0b' : '#22c55e'}`,
-                }}>
-                  <span style={{ fontWeight: 600, color: inter.type === 'conflict' ? '#ef4444' : inter.type === 'caution' ? '#f59e0b' : '#22c55e' }}>{inter.substanceA} + {inter.substanceB}</span>
-                  <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>{inter.notes}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
-      )}
-
-      {/* Per-entry conflicts & instructions */}
-      {validIds.length >= 1 && (
-        <div style={{ marginTop: 12 }}>
-          <h4 style={{ margin: '0 0 6px 0', fontSize: 11, color: 'var(--text-dim)' }}>📋 Данные по каждому препарату</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {validIds.map((id, idx) => {
-              const sub = PHARMA_DB[id];
-              if (!sub) return null;
-              return (
-                <div key={idx} style={{
-                  background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
-                  borderRadius: 10, padding: '10px 12px',
-                }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 4 }}>{sub.name}</div>
-                  
-                  {sub.conflicts && sub.conflicts.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 3 }}>
-                      <span style={{ fontSize: 8, color: '#ef4444', fontWeight: 600 }}>🔴 Конфликты:</span>
-                      {sub.conflicts.map((c, i) => (
-                        <span key={i} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3,
-                          background: c.severity === 'HIGH' ? 'rgba(239,68,68,0.12)' : 'rgba(234,179,8,0.12)',
-                          color: c.severity === 'HIGH' ? '#ef4444' : '#eab308',
-                        }}>{c.with}: {c.effect}</span>
-                      ))}
-                    </div>
-                  )}
-
-                  {sub.linkedSubstances && sub.linkedSubstances.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 3 }}>
-                      <span style={{ fontSize: 8, color: '#22c55e', fontWeight: 600 }}>🟢 Связанные:</span>
-                      {sub.linkedSubstances.map((ls, i) => (
-                        <span key={i} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3,
-                          background: ls.type === 'synergy' ? 'rgba(34,197,94,0.12)' : 'rgba(255,23,68,0.12)',
-                          color: ls.type === 'synergy' ? '#22c55e' : '#ff1744',
-                        }}>{PHARMA_DB[ls.id]?.name || ls.id}: {ls.mechanism}</span>
-                      ))}
-                    </div>
-                  )}
-
-                  {sub.specialInstructions && sub.specialInstructions.length > 0 && (
-                    <div>
-                      <span style={{ fontSize: 8, color: '#f59e0b', fontWeight: 600 }}>📋 Указания: </span>
-                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)' }}>{sub.specialInstructions.join(' · ')}</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      </div>
 
       </>)}
     </div>

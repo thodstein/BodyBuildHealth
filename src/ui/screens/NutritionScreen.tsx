@@ -34,7 +34,7 @@ const SECTION_TABS: Record<NutritionSection, string[]> = {
   overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests'],
   analytics: ['charts', 'reports'],
   diary: ['diary', 'charts', 'reports'],
-  planning: ['mealplan', 'catalog', 'reference', 'info', 'usefulness', 'recipes'],
+  planning: ['mealplan', 'catalog', 'favorites', 'reference', 'info', 'usefulness', 'recipes'],
   all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests'],
 };
 
@@ -304,14 +304,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CatalogTab: React.FC = () => {
   const [catSearch, setCatSearch] = React.useState('');
-  const [debouncedSearch, setDebouncedSearch] = React.useState('');
   const [catFilter, setCatFilter] = React.useState('all');
-
-  // Debounce search
-  React.useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(catSearch), 250);
-    return () => clearTimeout(t);
-  }, [catSearch]);
   const [showExclusive, setShowExclusive] = React.useState(false);
   const [catExpanded, setCatExpanded] = React.useState<string | null>(null);
   const [usdaFoods, setUsdaFoods] = React.useState<Array<{id:string;name:string;kcal:number;protein:number;fat:number;carbs:number;fiber?:number;category?:string;tier?:string;description?:string}>>([]);
@@ -329,16 +322,15 @@ const CatalogTab: React.FC = () => {
     try { const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); const updated = [food.id, ...ids.filter(f => f !== food.id)].slice(0, 100); localStorage.setItem('he_food_favs', JSON.stringify(updated)); } catch {}
   };
   const filtered = React.useMemo(() => {
-    const q = debouncedSearch.toLowerCase();
+    const q = (catSearch || '').toLowerCase().trim();
     let result = allFoods;
     if (catFilter !== 'all') result = result.filter((f: any) => f.category === catFilter);
     if (showExclusive) result = result.filter((f: any) => f.tier === 'max');
     if (q) {
-      // Use indexOf for faster substring matching than regex
-      result = result.filter((f: any) => (f.name||'').toLowerCase().indexOf(q) >= 0 || (f.description||'').toLowerCase().indexOf(q) >= 0);
+      result = result.filter((f: any) => (f.name || '').toLowerCase().includes(q) || (f.description || '').toLowerCase().includes(q));
     }
-    return result.slice(0, 100); // Limit to 100 results for performance
-  }, [catFilter, debouncedSearch, showExclusive, allFoods]);
+    return result.slice(0, 100);
+  }, [catFilter, catSearch, showExclusive, allFoods]);
   const filterBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode) => (
     <button onClick={onClick} style={{ padding:'5px 10px', borderRadius:8, fontSize:8, cursor:'pointer', fontWeight: isActive ? 700 : 400, letterSpacing:0.2, whiteSpace:'nowrap', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>{children}</button>
   );
@@ -358,7 +350,7 @@ const CatalogTab: React.FC = () => {
           border: showExclusive ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.06)',
           background: showExclusive ? 'rgba(168,85,247,0.14)' : '#202023',
           color: showExclusive ? '#a855f7' : 'rgba(255,255,255,0.85)',
-        }}>в­ђ Exclusive ({FOOD_DB.filter(f => f.tier === 'max').length})</button>
+        }}>⭐ Exclusive ({FOOD_DB.filter(f => f.tier === 'max').length})</button>
       </div>
       <div style={{ marginTop:6, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>
@@ -381,7 +373,7 @@ const CatalogTab: React.FC = () => {
                 <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', marginTop:1 }}>{CATEGORY_LABELS[f.category] || f.category} • {f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs} {f.fiber ? `• В{f.fiber}г` : ''}</div>
               </div>
               <div style={{ display:'flex', gap:3, alignItems:'center' }}>
-                <button onClick={e => { e.stopPropagation(); addFav(f); }} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6' }}>в­ђ</button>
+                <button onClick={e => { e.stopPropagation(); addFav(f); }} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6' }}>⭐</button>
                 <button onClick={e => { e.stopPropagation(); addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category }); }} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(0,230,138,0.15)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a' }}>🛒</button>
               </div>
             </div>

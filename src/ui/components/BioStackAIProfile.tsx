@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
-import { autoFillFromMainProfile, saveBioStackProfile } from '../../engines/biostack-ai.engine';
+import { autoFillFromMainProfile, saveBioStackProfile, loadBioStackProfile } from '../../engines/biostack-ai.engine';
 import { buildStack } from '../../engines/supplement-finder.engine';
 import { PillBtn, Slider, toFinderProfile, PURE_GOALS, ORGANS, SYSTEMS, HEALTH_CONDS, TOP_MECHANISMS } from './BioStackAIConstants';
-import { type GoalType, type GutSensitivity, type AlcoholLevel, type AASStatus, type CognitiveTask, type StimSensitivity, type CaffeineLevel, type ADClass, type DietType, type Chronotype, type BudgetLevel, type StackComplexity, type ExperienceLevel } from '../../engines/biostack-ai.engine';
+import { type GoalType, type GutSensitivity, type AlcoholLevel, type AASStatus, type CognitiveTask, type StimSensitivity, type CaffeineLevel, type ADClass, type DietType, type Chronotype, type BudgetLevel, type StackComplexity, type ExperienceLevel, type HealthCondition, type BioStackProfile as BSP } from '../../engines/biostack-ai.engine';
 
 /* ─── Popup Overlay ─── */
 function PopupOverlay({ title, icon, color, children, onClose }: { title: string; icon: string; color: string; children: React.ReactNode; onClose: () => void }) {
@@ -342,57 +342,118 @@ function PopupSupplements({ profile, u, onClose }: { profile: BioStackProfile; u
   </PopupOverlay>;
 }
 
-/* ─── Popup: Пресеты ─── */
+/* ─── Пресет: тип ─── */
+type PresetEntry = {
+  id: string; icon: string; name: string; desc: string;
+  category: 'male' | 'female' | 'goal' | 'aas';
+  p: Partial<BioStackProfile>;
+};
+
+/* ─── Popup: Пресеты (расширенные) ─── */
 function PopupPresets({ profile, u, onClose }: { profile: BioStackProfile; u: (p: Partial<BioStackProfile>) => void; onClose: () => void }) {
-  const presets = [
-    {
-      id:'bodybuilder', icon:'🏋️', name:'Бодибилдер',
-      desc:'Масса, сила, восстановление. Максимальный стек, премиум',
-      p: { goals:['muscle_gain','recovery'] as any, experience:'advanced' as ExperienceLevel, budget:'premium' as BudgetLevel, stackComplexity:'maximum' as StackComplexity, targetSystems:['musculoskeletal','endocrine'] as any, maxStackSize: 20 }
-    },
-    {
-      id:'health', icon:'🧘', name:'ЗОЖ',
-      desc:'Иммунитет, энергия, долголетие. Сбалансированный стек',
-      p: { goals:['immunity','energy','longevity','detox'] as any, experience:'intermediate' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['immune','metabolic','gastrointestinal'] as any, maxStackSize: 10 }
-    },
-    {
-      id:'nootropic', icon:'🧠', name:'Ноотроп',
-      desc:'Фокус, настроение, анти-стресс. Минимальный стек',
-      p: { goals:['brain','concentration','stress','mood'] as any, experience:'beginner' as ExperienceLevel, budget:'premium' as BudgetLevel, stackComplexity:'minimal' as StackComplexity, cognitiveTask:'focus' as any, targetSystems:['neuro'] as any, maxStackSize: 6 }
-    },
-    {
-      id:'athlete', icon:'🏃', name:'Спортсмен',
-      desc:'Выносливость, cardio, восстановление. Средний стек',
-      p: { goals:['endurance','recovery','energy','cardio_health'] as any, experience:'advanced' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['cardio','musculoskeletal','metabolic'] as any, maxStackSize: 12 }
-    },
-    {
-      id:'hormonal', icon:'⚖️', name:'Гормональный',
-      desc:'Баланс гормонов, щитовидная, либидо. Эндокринная поддержка',
-      p: { goals:['hormones','libido','energy','sleep'] as any, experience:'intermediate' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['endocrine','reproductive'] as any, maxStackSize: 8 }
-    },
-    {
-      id:'detox_liver', icon:'🧪', name:'Детокс + печень',
-      desc:'Очищение, печень, антиоксиданты. Восстановление после курса',
-      p: { goals:['detox','recovery','immunity','digestion'] as any, experience:'intermediate' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['hepatic','gastrointestinal','immune'] as any, maxStackSize: 8 }
-    },
+  const presets: PresetEntry[] = [
+    // ── ♂ Мужские ──
+    { id:'male_bodybuilder', icon:'🏋️', name:'Бодибилдер', desc:'Рост массы и силы. Полный стек поддержки для тяжёлых тренировок',
+      category:'male',
+      p: { goals:['muscle_gain','recovery','joints'] as GoalType[], experience:'advanced' as ExperienceLevel, budget:'premium' as BudgetLevel, stackComplexity:'maximum' as StackComplexity, targetSystems:['musculoskeletal','endocrine','cardio'] as string[], targetOrgans:['MUSCLES','BONES','JOINTS','HEART','LIVER'] as string[], maxStackSize: 20 }},
+    { id:'male_athlete', icon:'🏃', name:'Спортсмен', desc:'Выносливость, кардио, восстановление между тренировками',
+      category:'male',
+      p: { goals:['endurance','recovery','energy','cardio_health'] as GoalType[], experience:'advanced' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['cardio','musculoskeletal','metabolic'] as string[], targetOrgans:['HEART','VESSELS','MUSCLES','LUNGS'] as string[], maxStackSize: 12 }},
+    { id:'male_hormonal', icon:'⚖️', name:'Гормональный баланс', desc:'Поддержка тестостерона, либидо, щитовидной железы',
+      category:'male',
+      p: { goals:['hormones','libido','energy','sleep'] as GoalType[], experience:'intermediate' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['endocrine','reproductive','neuro'] as string[], targetOrgans:['ENDOCRINE','REPRODUCTIVE','THYROID','ADRENALS'] as string[], maxStackSize: 8 }},
+    { id:'male_antiage', icon:'⏳', name:'Антивозрастной', desc:'Долголетие, энергия, когнитивные функции, митохондрии',
+      category:'male',
+      p: { goals:['longevity','energy','brain','cardio_health'] as GoalType[], experience:'intermediate' as ExperienceLevel, budget:'premium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['neuro','cardio','metabolic','immune'] as string[], targetOrgans:['BRAIN','HEART','MITOCHONDRIA','CELLS'] as string[], maxStackSize: 10 }},
+    // ── ♀ Женские ──
+    { id:'female_fitness', icon:'💪', name:'Фитнес / Тонус', desc:'Жиросжигание, энергия, подтянутое тело, здоровье кожи',
+      category:'female',
+      p: { goals:['fat_loss','energy','skin','muscle_gain'] as GoalType[], sex:'female', experience:'intermediate' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['musculoskeletal','endocrine','metabolic'] as string[], targetOrgans:['MUSCLES','SKIN','THYROID'] as string[], maxStackSize: 8 }},
+    { id:'female_health', icon:'🧘', name:'ЗОЖ / Иммунитет', desc:'Профилактика, детокс, иммунитет, общее здоровье',
+      category:'female',
+      p: { goals:['immunity','detox','digestion','energy'] as GoalType[], sex:'female', experience:'beginner' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['immune','gastrointestinal','metabolic'] as string[], targetOrgans:['IMMUNE_SYSTEM','GUT','LIVER'] as string[], maxStackSize: 8 }},
+    { id:'female_hormonal', icon:'🌸', name:'Гормональный женский', desc:'Цикл, ПМС, кожа, волосы, настроение',
+      category:'female',
+      p: { goals:['hormones','mood','skin','hair','stress'] as GoalType[], sex:'female', experience:'intermediate' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['endocrine','reproductive','neuro'] as string[], targetOrgans:['ENDOCRINE','REPRODUCTIVE','SKIN','BRAIN'] as string[], maxStackSize: 8 }},
+    { id:'female_antistress', icon:'😌', name:'Антистресс / Сон', desc:'Снижение тревожности, улучшение сна, восстановление нервной системы',
+      category:'female',
+      p: { goals:['stress','sleep','mood','recovery'] as GoalType[], sex:'female', experience:'beginner' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'minimal' as StackComplexity, targetSystems:['neuro','endocrine'] as string[], targetOrgans:['BRAIN','NERVES','ADRENALS'] as string[], maxStackSize: 6 }},
+    // ── 🎯 По целям ──
+    { id:'goal_nootropic', icon:'🧠', name:'Ноотроп / Фокус', desc:'Память, концентрация, креативность, нейропластичность',
+      category:'goal',
+      p: { goals:['brain','concentration','mood','energy'] as GoalType[], cognitiveTask:'focus' as CognitiveTask, experience:'beginner' as ExperienceLevel, budget:'premium' as BudgetLevel, stackComplexity:'minimal' as StackComplexity, targetSystems:['neuro'] as string[], targetOrgans:['BRAIN','NERVES'] as string[], maxStackSize: 6 }},
+    { id:'goal_immunity', icon:'🛡️', name:'Иммунитет', desc:'Укрепление защитных сил, профилактика, адаптогены',
+      category:'goal',
+      p: { goals:['immunity','recovery','energy'] as GoalType[], experience:'beginner' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['immune','metabolic'] as string[], targetOrgans:['IMMUNE_SYSTEM','BLOOD','GUT'] as string[], maxStackSize: 8 }},
+    { id:'goal_detox', icon:'🧪', name:'Детокс + Печень', desc:'Очищение организма, поддержка печени, антиоксиданты',
+      category:'goal',
+      p: { goals:['detox','liver_health','digestion'] as GoalType[], experience:'intermediate' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['hepatic','gastrointestinal','immune'] as string[], targetOrgans:['LIVER','GUT','KIDNEYS'] as string[], maxStackSize: 8, healthConditions:['liver'] as HealthCondition[] }},
+    { id:'goal_longevity', icon:'⏳', name:'Долголетие', desc:'Митохондрии, омега-3, антиоксиданты, кардиопротекция',
+      category:'goal',
+      p: { goals:['longevity','cardio_health','brain','energy'] as GoalType[], experience:'intermediate' as ExperienceLevel, budget:'premium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['cardio','neuro','metabolic','immune'] as string[], targetOrgans:['HEART','BRAIN','MITOCHONDRIA','CELLS','VESSELS'] as string[], maxStackSize: 10 }},
+    // ── 💉 По AAS ──
+    { id:'aas_course', icon:'💉', name:'Курс ААС', desc:'Максимальная поддержка на курсе: печень, сердце,давление, липиды',
+      category:'aas',
+      p: { goals:['liver_health','cardio_health','detox','kidney'] as GoalType[], aasStatus:'course' as AASStatus, experience:'advanced' as ExperienceLevel, budget:'premium' as BudgetLevel, stackComplexity:'maximum' as StackComplexity, targetSystems:['hepatic','cardio','renal','hematologic','endocrine'] as string[], targetOrgans:['LIVER','HEART','KIDNEYS','BLOOD','ENDOCRINE'] as string[], maxStackSize: 16, healthConditions:[] as HealthCondition[] }},
+    { id:'aas_pct', icon:'🔄', name:'ПКТ', desc:'Восстановление HPTA, антиэстрогены, гонадотропины, печень',
+      category:'aas',
+      p: { goals:['hormones','recovery','detox','mood'] as GoalType[], aasStatus:'pct' as AASStatus, experience:'advanced' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'maximum' as StackComplexity, targetSystems:['endocrine','reproductive','hepatic','neuro'] as string[], targetOrgans:['ENDOCRINE','REPRODUCTIVE','LIVER','BRAIN','PITUITARY'] as string[], maxStackSize: 12, healthConditions:[] as HealthCondition[] }},
+    { id:'aas_trt', icon:'♾️', name:'TRT', desc:'Долгосрочная поддержка на TRT: кардио, гематокрит, эстрадиол, простата',
+      category:'aas',
+      p: { goals:['cardio_health','hormones','liver_health','kidney'] as GoalType[], aasStatus:'trt' as AASStatus, experience:'advanced' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['cardio','hematologic','endocrine','reproductive'] as string[], targetOrgans:['HEART','BLOOD','ENDOCRINE','PROSTATE','KIDNEYS'] as string[], maxStackSize: 10, healthConditions:[] as HealthCondition[] }},
+    { id:'aas_fertility', icon:'🧬', name:'Фертильность', desc:'Подготовка к зачатию: сперматогенез, антиоксиданты, гормоны',
+      category:'aas',
+      p: { goals:['hormones','recovery','immunity','energy'] as GoalType[], aasStatus:'fertility' as AASStatus, experience:'beginner' as ExperienceLevel, budget:'premium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['reproductive','endocrine','immune'] as string[], targetOrgans:['REPRODUCTIVE','ENDOCRINE','TESTES','PITUITARY'] as string[], maxStackSize: 10, healthConditions:[] as HealthCondition[] }},
+    { id:'aas_bridge', icon:'🌉', name:'Бридж / Off-сезон', desc:'Поддержка между курсами: печень, кардио, общее здоровье',
+      category:'aas',
+      p: { goals:['recovery','liver_health','cardio_health','immunity'] as GoalType[], aasStatus:'bridge' as AASStatus, experience:'intermediate' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['hepatic','cardio','immune','metabolic'] as string[], targetOrgans:['LIVER','HEART','IMMUNE_SYSTEM','KIDNEYS'] as string[], maxStackSize: 8, healthConditions:[] as HealthCondition[] }},
   ];
-  return <PopupOverlay title="Быстрые пресеты" icon="🚀" color="#00e68a" onClose={onClose}>
+
+  const catLabels: Record<string, { label: string; color: string }> = {
+    male: { label: '🏋️ ♂ Мужские', color: '#60a5fa' },
+    female: { label: '🌸 ♀ Женские', color: '#f472b6' },
+    goal: { label: '🎯 По целям', color: '#f59e0b' },
+    aas: { label: '💉 По статусу ААС', color: '#ef4444' },
+  };
+  const catOrder = ['male', 'female', 'goal', 'aas'];
+
+  return <PopupOverlay title="🚀 Быстрые пресеты" icon="🚀" color="#00e68a" onClose={onClose}>
     <div style={{fontSize:9,color:'rgba(255,255,255,0.45)',marginBottom:8,lineHeight:1.3}}>
-      Выберите пресет — цели, уровень, бюджет и системы-мишени заполнятся автоматически.
+      Выберите пресет — цели, уровень, системы-мишени и органы заполнятся автоматически. 16 шаблонов в 4 категориях.
     </div>
-    <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:4 }}>
-      {presets.map(pre => (
-        <button key={pre.id} onClick={() => { u(pre.p as any); onClose(); }}
-          style={{ padding:'12px 14px', borderRadius:12, cursor:'pointer', textAlign:'left',
-            background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)',
-            transition:'all 0.15s', display:'flex', alignItems:'center', gap:12 }}>
-          <div style={{ fontSize:20, flexShrink:0 }}>{pre.icon}</div>
-          <div>
-            <div style={{ fontSize:11, fontWeight:700, color:'#00e68a', marginBottom:2 }}>{pre.name}</div>
-            <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>{pre.desc}</div>
+    <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+      {catOrder.map(cat => {
+        const items = presets.filter(p => p.category === cat);
+        if (items.length === 0) return null;
+        return (
+          <div key={cat} style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: catLabels[cat].color, marginBottom: 4, padding: '4px 0', borderBottom: `1px solid ${catLabels[cat].color}15` }}>
+              {catLabels[cat].label}
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+              {items.map(pre => (
+                <button key={pre.id} onClick={() => { u(pre.p); onClose(); }}
+                  style={{ padding:'10px 12px', borderRadius:10, cursor:'pointer', textAlign:'left',
+                    background:'rgba(255,255,255,0.015)', border:'1px solid rgba(255,255,255,0.04)',
+                    transition:'all 0.15s', display:'flex', alignItems:'center', gap:10 }}>
+                  <div style={{ fontSize:18, flexShrink:0 }}>{pre.icon}</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:1 }}>{pre.name}</div>
+                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', lineHeight:1.3 }}>{pre.desc}</div>
+                    <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:2 }}>
+                      {(pre.p.goals as GoalType[] || []).slice(0,3).map(g => {
+                        const gl = PURE_GOALS.find(x => x.key === g);
+                        return gl ? <span key={g} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.06)', color:'#00e68a', whiteSpace:'nowrap' }}>{gl.label.replace(/^.{1,2}\s/, '')}</span> : null;
+                      })}
+                      {((pre.p.goals as GoalType[])?.length || 0) > 3 && <span style={{ fontSize:6, color:'rgba(255,255,255,0.25)' }}>+{(pre.p.goals as GoalType[]).length - 3}</span>}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
-        </button>
-      ))}
+        );
+      })}
     </div>
   </PopupOverlay>;
 }
@@ -497,6 +558,74 @@ export function ProfileTab({ profile, setProfile, setStackIds }: { profile: BioS
       {popup === 'mechanisms' && <PopupMechanisms profile={profile} u={u} onClose={() => setPopup(null)} />}
       {popup === 'supplements' && <PopupSupplements profile={profile} u={u} onClose={() => setPopup(null)} />}
       {popup === 'presets' && <PopupPresets profile={profile} u={u} onClose={() => setPopup(null)} />}
+    </div>
+  );
+}
+
+/* ─── BioStackAISettings — упрощённая версия ProfileTab для ProfileScreen (без пресетов и кнопки быстрого стека) ─── */
+export function BioStackAISettings({ onProfileChange }: { onProfileChange?: (p: BioStackProfile) => void }) {
+  const [profile, setProfile] = useState<BioStackProfile>(() => loadBioStackProfile());
+  const u = (patch: Partial<BioStackProfile>) => {
+    const n = { ...profile, ...patch };
+    setProfile(n);
+    saveBioStackProfile(n);
+    if (onProfileChange) onProfileChange(n);
+  };
+  const [popup, setPopup] = useState<string | null>(null);
+
+  const goalLabel = (g: string) => PURE_GOALS.find(x => x.key === g)?.label || g;
+
+  return (
+    <div style={{ paddingBottom: 80 }}>
+      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginBottom: 8, lineHeight: 1.4 }}>
+        🧬 Настройки профиля для BioStack AI. Данные сохраняются автоматически и используются при подборе БАДов.
+      </div>
+      <CardBtn icon="👤" title="Личные данные" color="#60a5fa"
+        subtitle={`${profile.age} лет · ${profile.weight} кг · ${profile.height} см · ${profile.sex === 'male' ? '♂' : '♀'} · ${profile.experience === 'beginner' ? 'Новичок' : profile.experience === 'intermediate' ? 'Средний' : 'Продвинутый'}`}
+        onClick={() => setPopup('personal')} />
+      <CardBtn icon="🫀" title="Здоровье" color="#ef4444"
+        subtitle={`${profile.bpSystolic}/${profile.bpDiastolic} · ${profile.gutSensitivity === 'normal' ? 'ЖКТ: норма' : profile.gutSensitivity === 'sensitive' ? 'ЖКТ: чувствит.' : 'ЖКТ: проблемный'}${profile.healthConditions.length ? ` · +${profile.healthConditions.length} состояний` : ''}`}
+        count={profile.healthConditions.length}
+        onClick={() => setPopup('health')} />
+      <CardBtn icon="🧠" title="Нейро статус" color="#a78bfa"
+        subtitle={`${profile.cognitiveTask === 'memory' ? 'Память' : profile.cognitiveTask === 'focus' ? 'Фокус' : profile.cognitiveTask === 'creativity' ? 'Креативность' : profile.cognitiveTask === 'reaction_speed' ? 'Быстрота реакции' : 'Учёба'} · стресс ${profile.stressLevel}/10 · сон ${profile.sleepQuality}/10`}
+        onClick={() => setPopup('neuro')} />
+      <CardBtn icon="🌍" title="Образ жизни" color="#22c55e"
+        subtitle={`${profile.dietType === 'mixed' ? 'Смешанное' : profile.dietType === 'vegetarian' ? 'Вегетарианство' : profile.dietType === 'vegan' ? 'Веганство' : profile.dietType === 'keto' ? 'Кето' : profile.dietType === 'paleo' ? 'Палео' : 'Средиземноморское'} · ${profile.budget === 'economy' ? 'Эконом' : profile.budget === 'medium' ? 'Средний' : 'Премиум'}`}
+        onClick={() => setPopup('lifestyle')} />
+      <CardBtn icon="🎯" title="Цели" color="#f59e0b"
+        subtitle={profile.goals.length ? profile.goals.map(g => goalLabel(g)).join(', ') : 'Не выбраны'}
+        count={profile.goals.length}
+        onClick={() => setPopup('goals')} />
+      <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+        <SmallBtn icon="🫀" title="Органы" color="#60a5fa"
+          subtitle={`${profile.targetOrgans.length} выбрано`}
+          count={profile.targetOrgans.length}
+          onClick={() => setPopup('organs')} />
+        <SmallBtn icon="⚙️" title="Системы" color="#8b5cf6"
+          subtitle={`${profile.targetSystems.length} выбрано`}
+          count={profile.targetSystems.length}
+          onClick={() => setPopup('systems')} />
+        <SmallBtn icon="🔬" title="Механизмы" color="#22c55e"
+          subtitle="Топ-15"
+          onClick={() => setPopup('mechanisms')} />
+      </div>
+      <CardBtn icon="💊" title="Текущие БАДы / Избегать" color="#8b5cf6"
+        subtitle={profile.currentSupplements.length ? `${profile.currentSupplements.length} БАДов` : 'Не указаны'}
+        count={profile.currentSupplements.length}
+        onClick={() => setPopup('supplements')} />
+      <div style={{ textAlign:'center', fontSize:8, color:'rgba(255,255,255,0.25)', marginTop:4 }}>
+        ⚡ Профиль BioStack сохраняется автоматически
+      </div>
+      {popup === 'personal' && <PopupPersonal profile={profile} u={u} onClose={() => setPopup(null)} />}
+      {popup === 'health' && <PopupHealth profile={profile} u={u} onClose={() => setPopup(null)} />}
+      {popup === 'neuro' && <PopupNeuro profile={profile} u={u} onClose={() => setPopup(null)} />}
+      {popup === 'lifestyle' && <PopupLifestyle profile={profile} u={u} onClose={() => setPopup(null)} />}
+      {popup === 'goals' && <PopupGoals profile={profile} u={u} onClose={() => setPopup(null)} />}
+      {popup === 'organs' && <PopupOrgans profile={profile} u={u} onClose={() => setPopup(null)} />}
+      {popup === 'systems' && <PopupSystems profile={profile} u={u} onClose={() => setPopup(null)} />}
+      {popup === 'mechanisms' && <PopupMechanisms profile={profile} u={u} onClose={() => setPopup(null)} />}
+      {popup === 'supplements' && <PopupSupplements profile={profile} u={u} onClose={() => setPopup(null)} />}
     </div>
   );
 }

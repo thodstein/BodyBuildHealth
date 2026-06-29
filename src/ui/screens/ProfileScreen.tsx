@@ -10,10 +10,11 @@ import { calculateIndices } from '../../engines/clinical-indices.engine';
 import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../core/constants';
 import { useDataLink } from '../../core/data-link';
 import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
+import { BioStackAISettings } from '../components/BioStackAIProfile';
 
 type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' 
   | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'analytics' 
-  | 'contacts' | 'bp_diary' | 'measurements' | 'diaries' | 'calculator_data' | 'nutrition_planner';
+  | 'contacts' | 'bp_diary' | 'measurements' | 'diaries' | 'calculator_data' | 'nutrition_planner' | 'biostack_profile';
 type ProfilePage = 'hero' | 'tabs';
 
 const SPORT_TYPES = [
@@ -610,6 +611,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
     { id: 'analytics', label: 'Аналитика' },
     { id: 'diaries', label: 'Дневники' }, { id: 'contacts', label: 'Контакты' },
     { id: 'calculator_data', label: '🧮 Калькулятор' },
+    { id: 'biostack_profile', label: '🧬 BioStack' },
     { id: 'nutrition_planner', label: '🥗 Планировщик' },
   ];
 
@@ -2453,6 +2455,13 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                 <p style={{ fontSize:10, color:'rgba(255,255,255,0.5)', margin:0 }}>Ваши параметры для генерации плана питания. Сохраняются и используются планировщиком автоматически.</p>
               </div>
               <PlannerProfileData />
+            </div></InfoErrorBoundary>
+          )}
+
+          {/* ═══ BIOSTACK PROFILE TAB ═══ */}
+          {tab === 'biostack_profile' && (
+            <InfoErrorBoundary label="BioStack"><div>
+              <BioStackAISettings />
             </div></InfoErrorBoundary>
           )}
           </div>

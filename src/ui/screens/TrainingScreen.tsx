@@ -8,7 +8,6 @@ import { RIR_MATRIX, generateWeeklyPlan } from '../../engines/rir-matrix.engine'
 import { StrengthDiary, type StrengthStats, type WeeklyProgress, type ProgressionAlert } from '../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../core/types';
 import { generateWarmup } from '../../engines/warmup.engine';
-import { TrainingScoreCard } from '../components/TrainingScoreCard';
 import { generateCooldown } from '../../engines/cooldown.engine';
 import { selectSetScheme } from '../../engines/set-scheme.engine';
 import { selectTempo, formatTempo } from '../../engines/tempo.engine';
@@ -138,6 +137,32 @@ export const TrainingScreen: React.FC = () => {
 
   // Unified program builder state
   const [builderStep, setBuilderStep] = useState(1);
+  const [manualCfg, setManualCfg] = useState<Record<string, string>>({});
+  const setManual = (k: string, v: string) => setManualCfg(p => ({ ...p, [k]: v }));
+  const [showWizard, setShowWizard] = useState(false);
+  const [manualResult, setManualResult] = useState<{ splitName: string; days: { day: number; groups: string[]; exercises: { name: string; sets: number; reps: string; rir: number; rest: number; group: string }[] }[] } | null>(null);
+  const generateManualPlan = () => {
+    const inp = { goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as TrainingInput;
+    const auto = selectSplit(inp);
+    const manualSp = manualCfg.split ? TRAINING_SPLITS[manualCfg.split] : null;
+    const sp = manualSp ? { id: manualCfg.split!, name: manualSp.name, desc: manualSp.desc, groupsPerDay: manualSp.groupsPerDay, score: 100, rationale: ['Ручной выбор'] } as SplitCandidate : auto[0];
+    if (!sp) { setManualResult(null); return; }
+    const cycle: string[][] = []; let gi = 0; while (cycle.length < daysPerWeek) { cycle.push(sp.groupsPerDay[gi % sp.groupsPerDay.length]); gi++; }
+    const days = cycle.map((groups, di) => {
+      const exs: { name: string; sets: number; reps: string; rir: number; rest: number; group: string }[] = [];
+      groups.forEach(g => {
+        const pool = getExercisesByGroup(g);
+        const compounds = pool.filter(e => e.type === 'compound').slice(0, 2);
+        const isolations = pool.filter(e => e.type === 'isolation').slice(0, 2);
+        [...compounds, ...isolations].slice(0, 3).forEach(ex => {
+          const pr = calcExercisePrescription(ex, goal, level, weakPoints.includes(g), false, 1, 1, mesoLength);
+          exs.push({ name: ex.name, sets: pr.sets, reps: pr.reps, rir: pr.rir, rest: pr.rest, group: g });
+        });
+      });
+      return { day: di + 1, groups, exercises: exs };
+    });
+    setManualResult({ splitName: sp.name, days });
+  };
   const [builderSplit, setBuilderSplit] = useState<SplitCandidate | null>(null);
   const [builderDayExercises, setBuilderDayExercises] = useState<Record<number, { name: string; sets: number; reps: string; rir: number; rest: number; group: string; type?: string; rpeHint?: string; dropSet?: boolean; backoffSet?: boolean; substitutes?: string[] }[]>>({});
   const [builderMacroResult, setBuilderMacroResult] = useState<any[] | null>(null);
@@ -162,6 +187,9 @@ export const TrainingScreen: React.FC = () => {
   const [runtimeExIdx, setRuntimeExIdx] = useState(0);
   const [runtimeLogs, setRuntimeLogs] = useState<Record<string, { sets: { weight: number; reps: number; rpe: number; rir: number }[]; completed: boolean }>>({});
   const [runtimeStarted, setRuntimeStarted] = useState(false);
+  const [plRuntime, setPlRuntime] = useState<{ days: PlayerDay[]; focus: string; week: number; track: string } | null>(() => { try { const v = localStorage.getItem('he_pl_runtime'); return v ? JSON.parse(v) : null; } catch { return null; } });
+  const [plRunOpen, setPlRunOpen] = useState(false);
+  useEffect(() => { if (tab === 'runtime') { try { const v = localStorage.getItem('he_pl_runtime'); setPlRuntime(v ? JSON.parse(v) : null); } catch { /* ignore */ } } }, [tab]);
   const [showWarmup, setShowWarmup] = useState(false);
   const [showCooldown, setShowCooldown] = useState(false);
   const [runtimeSetW, setRuntimeSetW] = useState(80);
@@ -477,6 +505,7 @@ export const TrainingScreen: React.FC = () => {
               { label: 'Питание', value: readiness.nutrition ?? 50, color: (readiness.nutrition ?? 50) >= 70 ? '#22c55e' : '#eab308' },
               { label: 'Сон', value: (readiness.sleep ?? 0) * 10, color: (readiness.sleep ?? 5) >= 7 ? '#22c55e' : '#eab308' },
               { label: 'Стресс', value: 100 - (readiness.stress ?? 50), color: (readiness.stress ?? 3) < 4 ? '#22c55e' : '#ef4444' },
+              { label: 'Усталость', value: 100 - (readiness.recovery ?? 70), color: (readiness.recovery ?? 70) >= 60 ? '#22c55e' : '#eab308' },
             ].map(item => (
               <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 10, color: 'var(--text-dim)', minWidth: 44 }}>{item.label}</span>
@@ -490,21 +519,7 @@ export const TrainingScreen: React.FC = () => {
         </div>
       )}
 
-      {/* Training Score Card */}
-      <TrainingScoreCard
-        workoutsPerWeek={linked.profile?.settings?.workoutsPerWeek || 3}
-        avgMinutes={60}
-        intensity="moderate"
-        goal={(linked.profile?.settings?.goal as any) || 'hypertrophy'}
-        experience={(linked.profile?.settings?.trainingLevel as any) || 'intermediate'}
-        sleepHours={linked.profile?.settings?.sleepHours || 7}
-        stressLevel={linked.profile?.settings?.stressLevel || 3}
-        jointPain={[]}
-        deloadWeeksAgo={99}
-        weight={linked.profile?.settings?.weight || 80}
-        age={linked.profile?.settings?.age || 30}
-        sex={linked.profile?.settings?.sex || 'male'}
-      />
+      {/* Training Score Card перенесён в подвкладку Восстановление тренировочного блока */}
 
       {/* ═══════════ PLAN TAB ═══════════ */}
       {tab === 'srcbb' && <InfoErrorBoundary label="СРЦ"><SRCBBScreen key={planningTrack} track={planningTrack === 'manual' ? 'auto' : planningTrack} /></InfoErrorBoundary>}
@@ -1209,6 +1224,23 @@ export const TrainingScreen: React.FC = () => {
       {tab === 'runtime' && (
         <InfoErrorBoundary label="Тренировка">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Запуск построенного плана СРЦ/ББ (перенесено из подвкладки «Выполнение») */}
+          {plRuntime && plRuntime.days.length > 0 && !plRunOpen && !runtimeStarted && (
+            <div className="card" style={{ padding: '12px', border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.06)' }}>
+              <h3 style={{ margin: '0 0 4px', fontSize: 13, color: 'var(--accent)' }}>▶ Запустить построенный план ({plRuntime.track === 'bb' ? 'ББ' : 'ПЛ'})</h3>
+              <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 8px' }}>Неделя {plRuntime.week} · {plRuntime.days.length} дн. · фокус: {plRuntime.focus}. Выполнение записывается в дневник тренировок.</p>
+              <button onClick={() => setPlRunOpen(true)} style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, var(--accent), #00c853)', color: '#000', fontWeight: 700, fontSize: 14 }}>▶ Начать выполнение</button>
+            </div>
+          )}
+          {plRunOpen && plRuntime && plRuntime.days.length > 0 && (
+            <div className="card" style={{ padding: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <h3 style={{ margin: 0, fontSize: 13, color: 'var(--accent)' }}>▶ Выполнение плана · {plRuntime.focus}</h3>
+                <button onClick={() => setPlRunOpen(false)} style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 11 }}>✕ Закрыть</button>
+              </div>
+              <SessionPlayer days={plRuntime.days} weekNumber={plRuntime.week} focus={plRuntime.focus} />
+            </div>
+          )}
           {!runtimeStarted ? (
             <div className="card" style={{ padding: '12px' }}>
               <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>🏃 Начать тренировку</h3>
@@ -1634,6 +1666,8 @@ export const TrainingScreen: React.FC = () => {
       {(tab === 'calculators' || tab === 'programcalc') && (
         <InfoErrorBoundary label="Калькуляторы">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {tab === 'calculators' && <TrainingLoadCalculator />}
+          {tab === 'calculators' && <TonnageCalculator />}
           {showNonBuilder && (<>
           <div className="card" style={{ padding: '12px 14px', background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)', borderRadius:14 }}>
             <h3 style={{ margin: '0 0 4px', fontSize: 13, color:'var(--accent)' }}>📐 Калькулятор 1RM</h3>
@@ -1960,10 +1994,78 @@ export const TrainingScreen: React.FC = () => {
           {/* ═══════ UNIFIED PROGRAM BUILDER (только в Ручном конструкторе) ═══════ */}
           {tab === 'programcalc' && (<>
           <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🧬 Конструктор программы</h3>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 8 }}>4 шага: параметры → сплит → упражнения → цикл</div>
+            <h3 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 800, color: 'var(--accent)' }}>🛠 Ручной конструктор программы</h3>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 10 }}>Выберите параметры сверху вниз и нажмите «Собрать программу» — получите готовый план по дням.</div>
+            <div style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: 12, marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 8 }}>⚙️ Базовые параметры</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <PopupSelect label='Цель' value={goal} onChange={setGoal} options={GOALS.map(g => ({ id: g.value, label: g.icon + ' ' + g.label }))} />
+                <PopupSelect label='Уровень' value={level} onChange={setLevel} options={LEVELS.map(l => ({ id: l.value, label: l.icon + ' ' + l.label }))} />
+                <PopupNumber label='Дней в неделю' value={daysPerWeek} min={2} max={6} onChange={v => setDaysPerWeek(v)} />
+                <PopupSelect label='Длина мезоцикла' value={String(mesoLength)} onChange={v => setMesoLength(+v)} options={[['12','12 недель'],['16','16 недель'],['20','20 недель'],['24','24 недели']].map(([id,label]) => ({ id, label }))} />
+              </div>
+            </div>
 
+            {/* Ручная конфигурация — выбор всех параметров программы */}
+            <div style={{ background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.15)', borderRadius: 10, padding: 10, marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>⚙️ Ручная конфигурация программы</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <PopupSelect label="Тип сплита" value={manualCfg.split || ''} onChange={v => setManual('split', v)} options={Object.entries(TRAINING_SPLITS).map(([id, s]) => ({ id, label: s.name, desc: s.desc }))} hint="Все сплиты из библиотеки. Выбор переопределяет авто-подбор на шаге 1." />
+                <PopupSelect label="Тип цикла" value={manualCfg.cycle || ''} onChange={v => setManual('cycle', v)} options={LMS_CYCLES.map(c => ({ id: c.meta.id, label: c.meta.title, desc: (c.meta.id.startsWith('block') ? 'Блок' : c.meta.id.startsWith('embed') ? 'Встроенная' : 'СРЦ') + ' · ' + c.meta.level }))} hint="Все циклы (СРЦ, блоки, встроенные) по категориям." />
+                <PopupSelect label="Программа тренировок" value={manualCfg.program || ''} onChange={v => setManual('program', v)} options={[...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS].map((p: any) => ({ id: p.id, label: p.name, desc: p.type + ' · ' + p.goal + ' · ' + p.level }))} hint="Готовые программы из библиотеки." />
+                <PopupSelect label="Периодизация" value={manualCfg.periodization || ''} onChange={v => setManual('periodization', v)} options={getMethodsByCategory('periodization').map(m => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+                <PopupSelect label="Прогрессия" value={manualCfg.progression || ''} onChange={v => setManual('progression', v)} options={getMethodsByCategory('progression').map(m => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+                <PopupSelect label="Интенсивность" value={manualCfg.intensity || ''} onChange={v => setManual('intensity', v)} options={getMethodsByCategory('intensity').map(m => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+                <PopupSelect label="Техника" value={manualCfg.technique || ''} onChange={v => setManual('technique', v)} options={getMethodsByCategory('technique').map(m => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+                <PopupSelect label="Объём" value={manualCfg.volume || ''} onChange={v => setManual('volume', v)} options={getMethodsByCategory('volume').map(m => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+                <PopupSelect label="Частота" value={manualCfg.frequency || ''} onChange={v => setManual('frequency', v)} options={getMethodsByCategory('frequency').map(m => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+              </div>
+              {Object.values(manualCfg).some(Boolean) && <div style={{ marginTop: 8, fontSize: 10, color: 'var(--accent)' }}>✓ Выбрано: {Object.entries(manualCfg).filter(([, v]) => v).map(([k, v]) => k).join(' · ')}</div>}
+            </div>
+
+            {/* Кнопка генерации по ручной конфигурации + результат */}
+            <div style={{ marginTop: 8 }}>
+              <button onClick={generateManualPlan} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13 }}>🔧 Собрать программу по конфигурации</button>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>Соберёт план из выбранного сплита (или авто) + цель/уровень/дни/недели с назначением через calcExercisePrescription.</div>
+            </div>
+            {manualResult && (
+              <div style={{ marginTop: 10, padding: 10, borderRadius: 12, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)' }}>📋 Результат: {manualResult.splitName}</div>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', background: 'rgba(0,230,138,0.12)', padding: '3px 8px', borderRadius: 8 }}>{manualResult.days.length} дн/нед · {mesoLength} нед</span>
+                </div>
+                {Object.values(manualCfg).some(Boolean) && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 6, lineHeight: 1.6 }}>
+                  <b style={{ color: 'var(--accent)' }}>Параметры:</b> {Object.entries(manualCfg).filter(([, v]) => v).map(([k, v]) => { const L: Record<string,string> = { split: 'сплит', cycle: 'цикл', program: 'программа', periodization: 'периодизация', progression: 'прогрессия', intensity: 'интенсивность', technique: 'техника', volume: 'объём', frequency: 'частота' }; return `${L[k] || k}: ${v}`; }).join(' · ')}
+                </div>}
+                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {manualResult.days.map(d => (
+                    <div key={d.day} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'rgba(0,230,138,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>🏋️ День {d.day}</span>
+                        <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 700 }}>{d.groups.join(' · ')}</span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 0.7fr 0.7fr 0.5fr 0.6fr', gap: 2, padding: '4px 10px', fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
+                        <span>Упражнение</span><span>Сеты×повт</span><span>RIR</span><span>Группа</span><span>Отдых</span>
+                      </div>
+                      {d.exercises.map((e, ei) => (
+                        <div key={ei} style={{ display: 'grid', gridTemplateColumns: '2fr 0.7fr 0.7fr 0.5fr 0.6fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                          <span style={{ fontWeight: 600 }}>{e.name}</span>
+                          <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{e.sets}×{e.reps}</span>
+                          <span style={{ color: '#f59e0b' }}>{e.rir}</span>
+                          <span style={{ color: 'rgba(255,255,255,0.6)' }}>{e.group}</span>
+                          <span style={{ color: 'rgba(255,255,255,0.6)' }}>{e.rest}с</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => { try { const data = { name: `Ручная: ${manualResult.splitName}`, date: new Date().toISOString().slice(0,10), cfg: manualCfg, days: manualResult.days, generatedAt: Date.now() }; const ex = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); ex.unshift(data); localStorage.setItem('myTrainingPlans', JSON.stringify(ex.slice(0,30))); } catch {} }} style={{ width: '100%', marginTop: 8, padding: 10, borderRadius: 8, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.06)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>💾 Сохранить программу в «Мои тренировки»</button>
+              </div>
+            )}
+
+            <button onClick={() => setShowWizard(w => !w)} style={{ width: '100%', padding: 10, borderRadius: 10, border: '1px dashed rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.04)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 700, marginBottom: 10 }}>{showWizard ? '▲ Скрыть пошаговый мастер' : '▼ Расширенный пошаговый мастер'}</button>
             {/* Step indicators */}
+            {showWizard && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 10 }}>
               {[1,2,3,4].map(s => (
                 <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -1981,9 +2083,10 @@ export const TrainingScreen: React.FC = () => {
                 </div>
               ))}
             </div>
+            )}
 
             {/* STEP 1: Параметры */}
-            {builderStep === 1 && (<>
+            {showWizard && builderStep === 1 && (<>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
                 <div>
                   <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Цель</label>
@@ -2014,8 +2117,9 @@ export const TrainingScreen: React.FC = () => {
                 const shuffleSeed = (newSeed % 1000) / 1000;
                 const inp = { goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as TrainingInput;
                 const best = selectSplit(inp);
-                setBuilderSplit(best[0] || null);
-                const s = best[0];
+                const manualSp = manualCfg.split ? TRAINING_SPLITS[manualCfg.split] : null;
+                const s = manualSp ? { id: manualCfg.split, name: manualSp.name, desc: manualSp.desc, groupsPerDay: manualSp.groupsPerDay, score: 100, rationale: ['Ручной выбор сплита'] } as SplitCandidate : best[0];
+                setBuilderSplit(s || null);
                 if (s) {
                   const dayKeys = Object.keys(TRAINING_SPLITS);
                   const matchKey = dayKeys.find(k => TRAINING_SPLITS[k].name === s.name);
@@ -2092,7 +2196,7 @@ export const TrainingScreen: React.FC = () => {
             </>)}
 
             {/* STEP 2: Сплит */}
-            {builderStep === 2 && (<>
+            {showWizard && builderStep === 2 && (<>
               {builderSplit ? (
                 <div style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 8, padding: 10, marginBottom: 8, border: '1px solid rgba(0,230,138,0.12)' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>🏆 {builderSplit.name}</div>
@@ -2148,7 +2252,7 @@ export const TrainingScreen: React.FC = () => {
             </>)}
 
             {/* STEP 3: Упражнения */}
-            {builderStep === 3 && (<>
+            {showWizard && builderStep === 3 && (<>
               <button onClick={() => {
                 const s = builderSplit;
                 if (s) {
@@ -2410,7 +2514,7 @@ export const TrainingScreen: React.FC = () => {
             </>)}
 
             {/* STEP 4: Цикл */}
-            {builderStep === 4 && (<>
+            {showWizard && builderStep === 4 && (<>
               {/* Mesocycle length control */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                 <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Длина мезоцикла:</span>
@@ -3132,11 +3236,30 @@ export const TrainingScreen: React.FC = () => {
       })()}</InfoErrorBoundary>}
       {/* ═══════════ ANALYTICS TAB ═══════════ */}
       {tab === 'analytics' && <InfoErrorBoundary label="Аналитика"><><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /></></InfoErrorBoundary>}
-      {tab === 'methods' && <InfoErrorBoundary label="Методы"><MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} appliedMethods={appliedMethods} onToggleMethod={(name, category) => setAppliedMethods(prev => { const next = { ...prev }; if (next[category] === name) delete next[category]; else next[category] = name; return next; })} onApplyComposition={() => { applyMethodComposition(); setTab('plan'); }} /></InfoErrorBoundary>}
+      {tab === 'library' && (
+  <InfoErrorBoundary label="Библиотека">
+    <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)', marginBottom: 2 }}>📚 Библиотека тренировочного блока</div>
+      <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Справочник: методики с подробным описанием, объёмные ориентиры, визуализация сплитов, каталог циклов и программы.</div>
+      <ExpandableCard title="🔄 Каталог циклов (СРЦ / блоки / встроенные)" icon="📖" short="Все доступные циклы с полным описанием. Нажмите, чтобы развернуть." full={
+        <div>
+          {LMS_CYCLES.map(c => (
+            <ExpandableCard key={c.meta.id} title={c.meta.title} icon="" accent="#00e68a" short={c.meta.description} full={<><div style={{ marginBottom: 6 }}>{c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 2 }}>{cond}</li>)}</ul></div>}</>} />
+          ))}
+        </div>
+      } />
+      <ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} onAddToMyTraining={(exs) => setCustomExercises(prev => [...prev, ...exs])} />
+      <MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} appliedMethods={appliedMethods} onToggleMethod={(name, category) => setAppliedMethods(prev => { const next = { ...prev }; if (next[category] === name) delete next[category]; else next[category] = name; return next; })} onApplyComposition={() => { applyMethodComposition(); setTab('plan'); }} />
+    </div>
+  </InfoErrorBoundary>
+)}
+{tab === 'methods' && <InfoErrorBoundary label="Методы"><MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} appliedMethods={appliedMethods} onToggleMethod={(name, category) => setAppliedMethods(prev => { const next = { ...prev }; if (next[category] === name) delete next[category]; else next[category] = name; return next; })} onApplyComposition={() => { applyMethodComposition(); setTab('plan'); }} /></InfoErrorBoundary>}
       {tab === 'visual' && <InfoErrorBoundary label="Визуализация"><VisualTab sessions={historyWorkouts} /></InfoErrorBoundary>}
       {tab === 'programs' && <InfoErrorBoundary label="Программы"><ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} onAddToMyTraining={(exs) => setCustomExercises(prev => [...prev, ...exs])} /></InfoErrorBoundary>}
       {tab === 'timers' && <InfoErrorBoundary label="Таймеры"><TimersTab /></InfoErrorBoundary>}
       {tab === 'progress' && <InfoErrorBoundary label="Прогресс"><ProgressTab historyWorkouts={historyWorkouts} /></InfoErrorBoundary>}
+      {tab === 'excalc' && <InfoErrorBoundary label="Калькулятор упражнений"><ExerciseCalcTab /></InfoErrorBoundary>}
+      {tab === 'volume' && <InfoErrorBoundary label="Расчёт объёма"><VolumeOptimizerTab /></InfoErrorBoundary>}
 
       {/* ═══════════ MY TRAINING TAB ═══════════ */}
       {tab === 'mytraining' && (
@@ -3242,6 +3365,14 @@ import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
 import { VisualTab } from './TrainingScreen_parts/VisualTab';
 import { AnalyticsTab } from './TrainingScreen_parts/AnalyticsTab';
 import { ProgramsTab } from './TrainingScreen_parts/ProgramsTab';
+import { VolumeOptimizerTab } from './TrainingScreen_parts/VolumeOptimizerTab';
+import { ExerciseCalcTab } from './TrainingScreen_parts/ExerciseCalcTab';
+import { TrainingLoadCalculator } from './TrainingScreen_parts/TrainingLoadCalculator';
+import { TonnageCalculator } from './TrainingScreen_parts/TonnageCalculator';
+import { PopupSelect, PopupNumber, ExpandableCard } from './SRCBBScreen_parts/TrainingPopups';
+import { LMS_CYCLES } from '../../data/lms-cycles/lms-cycle-index';
+import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './TrainingScreen_parts/programs-data';
+import { SessionPlayer, type PlayerDay } from './SRCBBScreen_parts/SessionPlayer';
 import { TimersTab } from './TrainingScreen_parts/TimersTab';
 import { ProgressTab } from './TrainingScreen_parts/ProgressTab';
 import { StrengthLevelCard } from './TrainingScreen_parts/StrengthLevelCard';

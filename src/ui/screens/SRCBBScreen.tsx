@@ -25,11 +25,17 @@ import { ProgramsTab } from './TrainingScreen_parts/ProgramsTab';
 import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
 import { useDataLink } from '../../core/data-link';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
+import { TRAINING_SPLITS } from '../../engines/training.engine';
+import { getMethodsByCategory } from '../../engines/training-methodology.engine';
+import { FULL_PROGRAM_LIBRARY } from '../../engines/complete-program-library.engine';
+import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './TrainingScreen_parts/programs-data';
 import { StrengthDiary } from '../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../core/types';
 import { AnalyticsTab } from './TrainingScreen_parts/AnalyticsTab';
 import { VisualTab } from './TrainingScreen_parts/VisualTab';
 import { ProMetricsPanel } from './SRCBBScreen_parts/ProMetricsPanel';
+import { PopupNumber, PopupSelect, ExpandableCard, MetricCard, SaveButton } from './SRCBBScreen_parts/TrainingPopups';
+import { TrainingScoreCard } from '../components/TrainingScoreCard';
 type Mode = 'pl' | 'bb' | 'manual';
 
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: '12px', margin: '6px 0' };
@@ -45,10 +51,10 @@ const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 1
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: '#00e68a', marginBottom: 8 };
 
 export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
-  const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'pl');
+  const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
-    pl: [['plan', '📋 План'], ['plates', '🧮 Блины'], ['run', '▶ Выполнение'], ['autoreg', '🧠 Авто'], ['peak', '🏁 Пик'], ['recovery', '🔋 Восст'], ['safety', '🛡 Безоп'], ['demo', '🎬 Демо']].map(([k, l]) => ({ key: k, label: l })),
-    bb: [['plan', '📋 План'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 Про'], ['charts', '📊 График']].map(([k, l]) => ({ key: k, label: l })),
+    pl: [['plan', '📋 План цикла'], ['plates', '🧮 Калькулятор блинов'], ['autoreg', '🧠 Авторегуляция'], ['peak', '🏁 Пиковая фаза'], ['recovery', '🔋 Восстановление'], ['safety', '🛡 Безопасность'], ['demo', '🎬 Демонстрация']].map(([k, l]) => ({ key: k, label: l })),
+    bb: [['plan', '📋 План сплита'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
     manual: [],
   };
   const [subView, setSubView] = useState<string>('plan');
@@ -62,9 +68,12 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [pmSquat, setPmSquat] = useState<number>(120);
   const [pmBench, setPmBench] = useState<number>(100);
   const [pmDead, setPmDead] = useState<number>(140);
-  const [selectedCycleId, setSelectedCycleId] = useState<string>('cycle-01');
-  const [builtSrc, setBuiltSrc] = useState<LMSBuildOutput | null>(null);
-  const [srcWeek, setSrcWeek] = useState<number>(1);
+  const _plSaved: any = (() => { try { return JSON.parse(localStorage.getItem('he_pl_session') || 'null'); } catch { return null; } })();
+  const [selectedCycleId, setSelectedCycleId] = useState<string>(_plSaved?.selectedCycleId || 'cycle-01');
+  const [cycleWeeks, setCycleWeeks] = useState<number>(_plSaved?.cycleWeeks ?? 12);
+  const [builtSrc, setBuiltSrc] = useState<LMSBuildOutput | null>(_plSaved?.builtSrc ?? null);
+  const [srcWeek, setSrcWeek] = useState<number>(_plSaved?.srcWeek ?? 1);
+  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc]);
   // U4: ручная правка поверх сгенерированного плана (оверлей правок по позиции сета)
   const [editMode, setEditMode] = useState<boolean>(false);
   const [srcEdits, setSrcEdits] = useState<Record<string, { weight?: number; reps?: number; sets?: number }>>({});
@@ -107,17 +116,20 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const buildSrc = () => {
     const tpl = getCycleById(selectedCycleId);
     if (!tpl) return;
-    const plan = buildLMSPlan({ template: tpl, pmMap: { 'Присед': pmSquat, 'Жим лежа': pmBench, 'Становая тяга': pmDead }, fallbackPm: 80, mode: 'natural' });
+    const plan = buildLMSPlan({ template: tpl, pmMap: { 'Присед': pmSquat, 'Жим лежа': pmBench, 'Становая тяга': pmDead }, fallbackPm: 80, mode: 'natural', weeksOverride: cycleWeeks });
     setBuiltSrc(plan); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setSrcAdditions({}); setPickerDay(null);
   };
 
   // ── BB ──
-  const [bbLevel, setBbLevel] = useState<string>('intermediate');
-  const [bbGoal, setBbGoal] = useState<string>('mass');
-  const [bbDays, setBbDays] = useState<number>(4);
-  const [bbWeeks, setBbWeeks] = useState<number>(4);
-  const [peds, setPeds] = useState<PED[]>([]);
-  const [builtBb, setBuiltBb] = useState<BBPlan | null>(null);
+  const _bbSaved: any = (() => { try { return JSON.parse(localStorage.getItem('he_bb_session') || 'null'); } catch { return null; } })();
+  const [bbLevel, setBbLevel] = useState<string>(_bbSaved?.bbLevel || 'intermediate');
+  const [bbGoal, setBbGoal] = useState<string>(_bbSaved?.bbGoal || 'mass');
+  const [bbDays, setBbDays] = useState<number>(_bbSaved?.bbDays ?? 4);
+  const [bbWeeks, setBbWeeks] = useState<number>(_bbSaved?.bbWeeks ?? 4);
+  const [peds, setPeds] = useState<PED[]>(_bbSaved?.peds ?? []);
+  const [builtBb, setBuiltBb] = useState<BBPlan | null>(_bbSaved?.builtBb ?? null);
+  const [bbWeekSel, setBbWeekSel] = useState<number>(_bbSaved?.bbWeekSel ?? 1);
+  useEffect(() => { try { localStorage.setItem('he_bb_session', JSON.stringify({ bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel })); } catch { /* ignore */ } }, [bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel]);
   const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
   const [appliedMethods, setAppliedMethods] = useState<Record<string, string>>({});
   const [methodNote, setMethodNote] = useState<string | null>(null);
@@ -141,7 +153,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const buildBb = () => {
     if (!bbBest) return;
     const plan = buildBBPlan({ patternId: bbBest.pattern.id, level: bbLevel, goal: bbGoal as any, weeks: bbWeeks, workMax: { chest: 100, back: 110, quads: 140, hamstrings: 90, shoulders: 60, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60 } });
-    setBuiltBb(plan);
+    setBuiltBb(plan); setBbWeekSel(1);
   };
   const baseMrv = useMemo(() => Object.fromEntries(Object.entries(getAllVolumeLandmarks(bbLevel)).map(([k, v]) => [k, v.mrv])), [bbLevel]);
   const pedAdapt = useMemo(() => adaptForPEDs(peds, baseMrv), [peds, baseMrv]);
@@ -203,18 +215,18 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     return calcBBPlanMetrics(builtBb).perMuscle.map(p => ({ muscle: p.muscle, sets: Math.round(p.totalSets * mult), тяж: Math.round(p.тяжSets * mult), памп: Math.round(p.пампSets * mult), mrv: p.mrv }));
   }, [builtBb]);
 
+  // Сохраняем построенный план (дни + фокус + неделя) в localStorage, чтобы
+  // вкладка «Тренировки» (runtime) могла запустить его выполнение.
+  useEffect(() => {
+    if (playerDays.length > 0) {
+      try { localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: runFocus, week: srcWeek, track: mainTab })); } catch { /* ignore */ }
+    }
+  }, [playerDays, runFocus, srcWeek, mainTab]);
   return (
     <div key={mainTab} style={{ padding: 12, color: '#fff', maxWidth: 720, margin: '0 auto' }}>
-      {/* Main tab selector: PL / BB / Ручной */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12, justifyContent: 'center' }}>
-        {(['pl','bb','manual'] as const).map(t => (
-          <button key={t} onClick={() => { setMainTab(t); if (t !== 'manual') setSubView('plan'); }} style={{
-            padding: '10px 20px', borderRadius: 14, fontSize: 12, fontWeight: mainTab === t ? 800 : 600, cursor: 'pointer',
-            border: mainTab === t ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-            background: mainTab === t ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)',
-            color: mainTab === t ? '#00e68a' : 'rgba(255,255,255,0.5)', transition: 'all 0.15s',
-          }}>{t === 'pl' ? '🏆 СРЦ' : t === 'bb' ? '💪 ББ' : '🛠 Ручной'}</button>
-        ))}
+      {/* Заголовок текущего режима планирования (выбор режима — в навигации блока) */}
+      <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)', textAlign: 'center' }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: '#00e68a' }}>{mainTab === 'pl' ? '🏆 Силовой цикл (ПЛ)' : mainTab === 'bb' ? '💪 Бодибилдинг (ББ)' : '🛠 Ручной конструктор'}</span>
       </div>
       {/* sub-view pill nav for PL/BB */}
       {mainTab !== 'manual' && subViewList[mainTab].length > 0 && (
@@ -229,31 +241,26 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
         <div>
           <div style={H}>🏆 Авто-подбор силового цикла</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <div><div style={LABEL}>Уровень</div><select style={SEL} value={level} onChange={e => setLevel(e.target.value)}>
-              {['novice','II-KMS','KMS-MS','MS-MSMK','II-MS','intermediate'].map(l => <option key={l} value={l}>{l}</option>)}
-            </select></div>
-            <div><div style={LABEL}>Цель</div><select style={SEL} value={goal} onChange={e => setGoal(e.target.value)}>
-              {['strength','mass','endurance','peak','mixed'].map(g => <option key={g} value={g}>{g}</option>)}
-            </select></div>
-            <div><div style={LABEL}>Направление</div><select style={SEL} value={dir} onChange={e => setDir(e.target.value)}>
-              {['powerlifting','bench','deadlift_bench','armwrestling','bodybuilding'].map(d => <option key={d} value={d}>{d}</option>)}
-            </select></div>
-            <div><div style={LABEL}>Дней/нед</div><input style={IN} type="number" min={2} max={7} value={days} onChange={e => setDays(+e.target.value)} /></div>
-            <div><div style={LABEL}>Вес тела, кг</div><input style={IN} type="number" value={bw} onChange={e => setBw(+e.target.value)} /></div>
+            <PopupSelect label="Уровень спортсмена" value={level} onChange={setLevel} options={[['novice','Новичок'],['II-KMS','II разряд — КМС'],['KMS-MS','КМС — МС'],['MS-MSMK','МС — МСМК'],['II-MS','II разряд — МС'],['intermediate','Средний']].map(([id,label]) => ({ id, label }))} />
+            <PopupSelect label="Цель тренировок" value={goal} onChange={setGoal} options={[['strength','Сила'],['mass','Мышечная масса'],['endurance','Выносливость'],['peak','Выход на пик'],['mixed','Смешанная']].map(([id,label]) => ({ id, label }))} />
+            <PopupSelect label="Направление" value={dir} onChange={setDir} options={[['powerlifting','Троеборье'],['bench','Жим лёжа'],['deadlift_bench','Тяга + Жим'],['armwrestling','Армрестлинг'],['bodybuilding','Бодибилдинг']].map(([id,label]) => ({ id, label }))} />
+            <PopupNumber label="Дней в неделю" value={days} min={2} max={7} suffix="" onChange={v => setDays(v)} />
+            <PopupNumber label="Вес тела" value={bw} min={40} max={200} suffix=" кг" onChange={v => setBw(v)} />
           </div>
-          {best && <div style={CARD}><div style={H}>🏆 Рекомендован: {best.cycle.meta.title}</div><div style={SMALL}>{explainSelection(best)}</div></div>}
-          <div style={H}>Каталог ({LMS_CYCLES.length})</div>
-          <select style={SEL} value={selectedCycleId} onChange={e => setSelectedCycleId(e.target.value)}>
-            {LMS_CYCLES.map(c => <option key={c.meta.id} value={c.meta.id}>{c.meta.title} — {c.meta.direction}/{c.meta.period}/{c.meta.level}</option>)}
-          </select>
-          {(() => { const c = getCycleById(selectedCycleId); return c ? <div style={CARD}><div style={SMALL}><b>Как работает:</b> {c.meta.howItWorks.slice(0, 280)}…</div>{c.meta.conditions.length > 0 && <div style={{ ...SMALL, marginTop: 6 }}><b>Условия:</b> {c.meta.conditions.slice(0, 2).join(' ')}</div>}</div> : null; })()}
-          <div style={H}>Предельные максимумы (PM), кг</div>
+          {best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { setSelectedCycleId(best.cycle.meta.id); setTimeout(buildSrc, 0); }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,#00e68a,#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
+          <div style={H}>📂 Каталог циклов ({LMS_CYCLES.length})</div>
+          <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог саморасчитывающихся циклов (СРЦ), блоков и встроенных программ. Нажмите, чтобы открыть." options={LMS_CYCLES.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${({ powerlifting: 'Троеборье', bench: 'Жим лёжа', deadlift_bench: 'Тяга+Жим', armwrestling: 'Армрестлинг', bodybuilding: 'Бодибилдинг' } as Record<string,string>)[c.meta.direction] || c.meta.direction} · ${c.meta.period} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
+          {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
+          <div style={H}>💪 Предельные максимумы (ПМ)</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            <div><div style={LABEL}>Присед</div><input style={IN} type="number" value={pmSquat} onChange={e => setPmSquat(+e.target.value)} /></div>
-            <div><div style={LABEL}>Жим лёжа</div><input style={IN} type="number" value={pmBench} onChange={e => setPmBench(+e.target.value)} /></div>
-            <div><div style={LABEL}>Тяга</div><input style={IN} type="number" value={pmDead} onChange={e => setPmDead(+e.target.value)} /></div>
+            <PopupNumber label="Присед" value={pmSquat} min={20} max={500} suffix=" кг" onChange={v => setPmSquat(v)} />
+            <PopupNumber label="Жим лёжа" value={pmBench} min={20} max={400} suffix=" кг" onChange={v => setPmBench(v)} />
+            <PopupNumber label="Становая тяга" value={pmDead} min={20} max={500} suffix=" кг" onChange={v => setPmDead(v)} />
           </div>
-          <button style={{ ...BTN, width: '100%', marginTop: 10 }} onClick={buildSrc}>Сгенерировать план (12 нед)</button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+            <PopupSelect label="Длина мезоцикла" value={String(cycleWeeks)} onChange={v => setCycleWeeks(+v)} options={[['12','12 недель'],['16','16 недель'],['20','20 недель'],['24','24 недели']].map(([id,label]) => ({ id, label }))} />
+          </div>
+          <button style={{ ...BTN, width: '100%', marginTop: 10 }} onClick={buildSrc}>Сгенерировать план ({cycleWeeks} нед)</button>
           {builtSrc && (() => {
             const W = builtSrc.weeks;
             const wk = W[Math.min(srcWeek, W.length) - 1] || W[0];
@@ -323,28 +330,79 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   </div>
                 </div>
               )}
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, marginTop:10, padding:'6px 8px', borderRadius:10, background:'rgba(255,255,255,0.03)' }}>
-                <button onClick={() => setSrcWeek(w => Math.max(1, w-1))} disabled={srcWeek<=1} style={{ ...BTN_GHOST, padding:'6px 12px', minHeight:36, opacity: srcWeek<=1?0.4:1 }}>◀</button>
-                <div style={{ textAlign:'center' }}><div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>Неделя {wk.week} / {totalW}</div><div style={{ fontSize:9, color:PH_COLOR[phase] }}>{PH_RU[phase]}</div></div>
-                <button onClick={() => setSrcWeek(w => Math.min(totalW, w+1))} disabled={srcWeek>=totalW} style={{ ...BTN_GHOST, padding:'6px 12px', minHeight:36, opacity: srcWeek>=totalW?0.4:1 }}>▶</button>
+              <div style={{ marginTop:10 }}>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', marginBottom:6, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span style={{ fontWeight:700, color:'#fff' }}>Неделя {wk.week} из {totalW}</span>
+                  <span style={{ fontSize:10, fontWeight:700, color:PH_COLOR[phase], background:PH_COLOR[phase]+'22', padding:'2px 8px', borderRadius:8 }}>{PH_RU[phase]}</span>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(36px, 1fr))', gap:4 }}>
+                  {W.map(w => { const ph = mesocyclePhaseForWeek(w.week, totalW); const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+PH_RU[ph]} style={{ padding:'7px 0', borderRadius:7, border: active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: active ? PH_COLOR[ph] : PH_COLOR[ph]+'1a', color: active ? '#000' : '#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>{w.week}</button>; })}
+                </div>
               </div>
-              <div style={{ display:'flex', gap:1, marginTop:6, height:8 }}>
-                {W.map(w => { const ph = mesocyclePhaseForWeek(w.week, totalW); return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+PH_RU[ph]} style={{ flex:1, border:'none', cursor:'pointer', borderRadius:2, background: w.week===wk.week ? PH_COLOR[ph] : PH_COLOR[ph]+'66', opacity: w.week===wk.week?1:0.6 }} />; })}
+              {/* Визуальный календарь мезоцикла: недели × дни с тоннажём и фазой */}
+              <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>📅 Календарь мезоцикла (нед × дни, тоннаж)</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {W.map(w => { const ph = mesocyclePhaseForWeek(w.week, totalW); const active = w.week === wk.week; const maxT = Math.max(1, ...W.map(ww => ww.days.reduce((s, d) => s + d.metrics.tonnage, 0))); const wTotal = w.days.reduce((s, d) => s + d.metrics.tonnage, 0); return (
+                    <div key={w.week} onClick={() => setSrcWeek(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 6px', borderRadius: 6, cursor: 'pointer', background: active ? 'rgba(0,230,138,0.08)' : 'transparent', border: active ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent' }}>
+                      <span style={{ fontSize: 9, fontWeight: 700, color: active ? '#00e68a' : 'rgba(255,255,255,0.7)', minWidth: 26 }}>Н{w.week}</span>
+                      <span style={{ width: 4, height: 14, borderRadius: 2, background: PH_COLOR[ph], flexShrink: 0 }} title={PH_RU[ph]} />
+                      <div style={{ flex: 1, display: 'flex', gap: 2 }}>
+                        {w.days.map((d, di) => { const t = d.metrics.tonnage; return <div key={di} title={'Д' + (di+1) + ': ' + t.toFixed(0) + ' кг·пов'} style={{ flex: 1, height: 14, borderRadius: 3, background: t > 0 ? `linear-gradient(180deg, ${PH_COLOR[ph]}, ${PH_COLOR[ph]}88)` : 'rgba(255,255,255,0.04)', opacity: 0.4 + 0.6 * (t / maxT) }} />; })}
+                      </div>
+                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', minWidth: 38, textAlign: 'right' }}>{wTotal.toFixed(0)}</span>
+                    </div>
+                  ); })}
+                </div>
               </div>
               <div style={{ ...SMALL, marginTop:6, color:'rgba(255,255,255,0.7)' }}>{PH_DESC[phase]}</div>
-              <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)' }}>
-                <div style={{ ...LABEL, color: ACCENT, margin:0 }}>ПМ на неделю {wk.week} (прогрессия)</div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:4 }}>{Object.entries(wk.pmRow).map(([n, pm]) => <span key={n} style={{ ...SMALL, color:'#fff' }}><b>{n}:</b> {pm.toFixed(1)}кг</span>)}</div>
+              <MetricCard title={'ПМ на неделю '+wk.week+' (прогрессия)'} icon="📈" accent="#60a5fa">
+                <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>{Object.entries(wk.pmRow).map(([n, pm]) => <span key={n} style={{ ...SMALL, color:'#fff', background:'rgba(96,165,250,0.08)', padding:'3px 8px', borderRadius:6, border:'1px solid rgba(96,165,250,0.15)' }}><b>{n}:</b> {pm.toFixed(1)} кг</span>)}</div>
+              </MetricCard>
+              {/* График прогрессии ПМ по неделям */}
+              {(() => {
+                const exNames = Object.keys(builtSrc.weeks[0]?.pmRow || {}).slice(0, 3);
+                if (exNames.length === 0) return null;
+                const allVals = builtSrc.weeks.flatMap(w => exNames.map(n => w.pmRow[n] || 0));
+                const minV = Math.min(...allVals), maxV = Math.max(...allVals);
+                const W2 = builtSrc.weeks.length;
+                const colors = ['#00e68a', '#60a5fa', '#a855f7'];
+                const px = (i: number) => 24 + (i / Math.max(1, W2 - 1)) * 280;
+                const py = (v: number) => 70 - ((v - minV) / Math.max(1, maxV - minV)) * 56;
+                return <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.15)' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>📈 Прогрессия ПМ по неделям</div>
+                  <svg width="100%" viewBox="0 0 320 80" style={{ maxWidth: 360, margin: '0 auto', display: 'block' }}>
+                    {[0,1,2,3].map(g => <line key={g} x1={24} x2={304} y1={14 + g * 18} y2={14 + g * 18} stroke="rgba(255,255,255,0.06)" strokeWidth={0.5} />)}
+                    {exNames.map((n, ei) => { const pts = builtSrc.weeks.map((w, i) => `${px(i)},${py(w.pmRow[n] || 0)}`).join(' '); return <polyline key={n} points={pts} fill="none" stroke={colors[ei]} strokeWidth={1.6} />; })}
+                    {exNames.map((n, ei) => builtSrc.weeks.map((w, i) => <circle key={n + i} cx={px(i)} cy={py(w.pmRow[n] || 0)} r={2} fill={colors[ei]} />))}
+                  </svg>
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>{exNames.map((n, ei) => <span key={n} style={{ fontSize: 9, color: colors[ei] }}>● {n}</span>)}</div>
+                </div>;
+              })()}
+              <div style={{ marginTop:8 }}>
+                <SaveButton label="💾 Сохранить программу" savedLabel="✓ Программа сохранена" onSave={() => { try { const cycle = LMS_CYCLES.find(c => c.meta.id === selectedCycleId); const data = { name: `PL ${cycle?.meta.title || selectedCycleId || 'цикл'}`, date: new Date().toISOString().slice(0,10), goal: level, weekCount: totalW, cycleWeeks, generatedAt: Date.now() }; const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); existing.unshift(data); localStorage.setItem('myTrainingPlans', JSON.stringify(existing.slice(0,30))); } catch {} }} />
               </div>
-              {/* Save program button */}
-              <button onClick={() => { try { const cycle = LMS_CYCLES.find(c => c.meta.id === selectedCycleId); const data = { name: `PL ${cycle?.meta.title || selectedCycleId || 'цикл'}`, date: new Date().toISOString().slice(0,10), goal: level, weekCount: totalW, generatedAt: Date.now() }; const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); existing.unshift(data); localStorage.setItem('myTrainingPlans', JSON.stringify(existing.slice(0,30))); } catch {} }} style={{ width:'100%', padding:'8px 0', borderRadius:8, border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.06)', color:'#00e68a', cursor:'pointer', fontSize:9, fontWeight:600, marginTop:6 }}>💾 Сохранить программу</button>
               {wk.days.map((d, di) => (
                 <div key={di} style={{ ...CARD, marginTop:10, borderLeft:`3px solid ${ACCENT}` }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, gap:6 }}>
                     <span style={{ fontSize:13, fontWeight:700, color:'#fff' }}>🏋️ День {di+1}{d.exercises[0]?.load ? ' · '+d.exercises[0].load : ''}</span>
                     <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)', textAlign:'right' }}>{d.metrics.tonnage.toFixed(0)}т · {d.metrics.kpsh}КПШ · УОИ {d.metrics.uoi.toFixed(2)}</span>
                   </div>
-                  {d.exercises.map((e, ei) => (
+                  {!editMode && (
+                    <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:8, overflow:'hidden', border:'1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'2.2fr 0.5fr 1.3fr', gap:2, padding:'5px 8px', fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', background:'rgba(0,230,138,0.05)' }}>
+                        <span>Упражнение</span><span>Нагр.</span><span>Подходы</span>
+                      </div>
+                      {d.exercises.map((e, ei) => (
+                        <div key={ei} style={{ display:'grid', gridTemplateColumns:'2.2fr 0.5fr 1.3fr', gap:2, padding:'5px 8px', fontSize:10, color:'rgba(255,255,255,0.9)', borderTop:'1px solid rgba(255,255,255,0.04)', alignItems:'center' }}>
+                          <span style={{ fontWeight:600 }}>{e.name}</span>
+                          <span style={{ fontSize:9, fontWeight:700, color:e.load === 'main' ? '#00e68a' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.4)' }}>{e.load === 'main' ? 'ОСН' : e.load === 'additional' ? 'ДОП' : 'АКС'}</span>
+                          <span style={{ color:'rgba(255,255,255,0.85)' }}>{e.workSets.map((ws, si) => setStr(effSet(wk.week, di, ei, si, ws))).join('  ·  ')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {editMode && d.exercises.map((e, ei) => (
                     <div key={ei} style={{ background:'rgba(255,255,255,0.02)', borderRadius:8, padding:'6px 8px', marginBottom:4, border:'1px solid rgba(255,255,255,0.04)' }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
                         <span style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{e.name}</span>
@@ -389,15 +447,14 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   {editMode && <button onClick={() => { setPickerDay(dayKey(wk.week, di)); setPickerExName(''); }} style={{ marginTop:6, padding:'5px 10px', borderRadius:6, fontSize:10, fontWeight:600, border:'1px dashed rgba(0,230,138,0.4)', background:'rgba(0,230,138,0.06)', color:'#00e68a', cursor:'pointer' }}>＋ Добавить упражнение из каталога</button>}
                 </div>
               ))}
-              <div style={{ marginTop:10, padding:10, borderRadius:10, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)' }}>
-                <div style={{ ...LABEL, color: ACCENT, margin:'0 0 6px' }}>📊 Итоги мезоцикла ({totalW} нед)</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-                  <div style={SMALL}>Тоннаж: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.tonnage.toFixed(0)}</b> кг·пов</div>
-                  <div style={SMALL}>КПШ: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.kpsh}</b></div>
-                  <div style={SMALL}>Инт.отн: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.relIntensity.toFixed(3)}</b></div>
-                  <div style={SMALL}>УОИ: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.uoi.toFixed(3)}</b></div>
+              <MetricCard title={'Итоги мезоцикла ('+totalW+' нед)'} icon="📊">
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                  <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>Тоннаж: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.tonnage.toFixed(0)}</b> кг·пов</div>
+                  <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>КПШ: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.kpsh}</b></div>
+                  <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>Инт. отн: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.relIntensity.toFixed(3)}</b></div>
+                  <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>УОИ: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.uoi.toFixed(3)}</b></div>
                 </div>
-              </div>
+              </MetricCard>
               <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
                 <div style={{ ...LABEL, color:'#60a5fa', margin:'0 0 4px' }}>➡️ Что дальше</div>
                 <div style={SMALL}>{phase === 'peak'
@@ -413,44 +470,140 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
 
       {mainTab === 'bb' && subView === 'plan' && (
         <div>
-          <div style={H}>Авто-подбор бодибилдинг-сплита</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            <div><div style={LABEL}>Уровень</div><select style={SEL} value={bbLevel} onChange={e => setBbLevel(e.target.value)}>
-              {['beginner','intermediate','advanced','enhanced'].map(l => <option key={l} value={l}>{l}</option>)}
-            </select></div>
-            <div><div style={LABEL}>Цель</div><select style={SEL} value={bbGoal} onChange={e => setBbGoal(e.target.value)}>
-              {['mass','cut','recomp','maintenance','strength_mass'].map(g => <option key={g} value={g}>{g}</option>)}
-            </select></div>
-            <div><div style={LABEL}>Дней/нед</div><input style={IN} type="number" min={3} max={6} value={bbDays} onChange={e => setBbDays(+e.target.value)} /></div>
-            <div><div style={LABEL}>Недель мезо</div><input style={IN} type="number" min={4} max={12} value={bbWeeks} onChange={e => setBbWeeks(+e.target.value)} /></div>
+          <div style={H}>💪 Авто-подбор бодибилдинг-сплита</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <PopupSelect label="Уровень спортсмена" value={bbLevel} onChange={setBbLevel} options={[['beginner','Новичок'],['intermediate','Средний'],['advanced','Опытный'],['enhanced','Enhanced (на курсе)']].map(([id,label]) => ({ id, label }))} />
+            <PopupSelect label="Цель" value={bbGoal} onChange={setBbGoal} options={[['mass','Мышечная масса'],['cut','Сушка'],['recomp','Рекомпозиция'],['maintenance','Поддержание'],['strength_mass','Сила + Масса']].map(([id,label]) => ({ id, label }))} />
+            <PopupNumber label="Дней в неделю" value={bbDays} min={3} max={6} onChange={v => setBbDays(v)} />
+            <PopupNumber label="Недель мезоцикла" value={bbWeeks} min={4} max={24} suffix=" нед" onChange={v => setBbWeeks(v)} />
           </div>
-          {bbBest && <div style={CARD}><div style={H}>Рекомендован: {bbBest.pattern.name}</div><div style={SMALL}>{explainBBSelection(bbBest)}</div></div>}
-          <div style={H}>Фармакология (PED-адаптация)</div>
+          {bbBest && <ExpandableCard title={'🏆 Рекомендован: ' + bbBest.pattern.name} icon='🏆' short={bbBest.pattern.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот сплит:</b> {explainBBSelection(bbBest)}</div><button onClick={buildBb} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 700, fontSize: 12 }}>✅ Применить сплит и собрать план</button></>} />}
+          <div style={H}>💉 Фармакология (PED-адаптация объёмов)</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {(['AAS','insulin','MGF','IGF1','GH'] as PED[]).map(p => <button key={p} style={peds.includes(p) ? BTN : BTN_GHOST} onClick={() => togglePed(p)}>{p}{peds.includes(p) ? ' ✓' : ''}</button>)}
           </div>
-          {peds.length > 0 && <div style={CARD}><div style={SMALL}>{explainPEDAdaptation(pedAdapt)}</div></div>}
+          {peds.length > 0 && <ExpandableCard title="Адаптация объёмов под PED" icon="💉" short={explainPEDAdaptation(pedAdapt)} full={null} />}
           <button style={{ ...BTN, width: '100%', marginTop: 10 }} onClick={buildBb}>Сгенерировать BB-план ({bbWeeks} нед)</button>
-          {builtBb && <div style={CARD}>
-            <div style={H}>План: {builtBb.pattern.name}</div>
-            {builtBb.rationale.map((r, i) => <div key={i} style={SMALL}>{r}</div>)}
-            {builtBb.weeks[0].sessions.map((s, si) => <div key={si} style={{ ...SMALL, marginTop: 6 }}><b>Д{si + 1} {s.character} {s.sessionTag}:</b> {s.exercises.map(e => `${e.muscle}(${e.character},${e.sets}×${e.workSets[0].reps}@RIR${e.rir},${e.workSets[0].weight}кг)`).join(', ')}</div>)}
-            <div style={{ ...SMALL, marginTop: 8 }}>{explainBBMetrics(calcBBPlanMetrics(builtBb))}</div>
-          </div>}
+          {builtBb && (() => {
+            const W = builtBb.weeks;
+            const wk = W[Math.min(bbWeekSel, W.length) - 1] || W[0];
+            const m = calcBBPlanMetrics(builtBb);
+            return <div style={{ ...CARD, borderLeft: `3px solid ${ACCENT}`, boxShadow: '0 0 0 1px rgba(0,230,138,0.08)' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8 }}>
+                <div style={{ ...H, margin:0 }}>📋 План: {builtBb.pattern.name}</div>
+                <span style={{ fontSize:10, fontWeight:700, color: ACCENT, background:'rgba(0,230,138,0.12)', padding:'3px 8px', borderRadius:8 }}>{W.length} нед</span>
+              </div>
+              {builtBb.rationale.map((r, i) => <div key={i} style={{ ...SMALL, marginTop: 4 }}>{r}</div>)}
+              {/* Выбор недели */}
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', marginBottom:6, fontWeight:700 }}>Неделя {wk.week} из {W.length}</div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(36px, 1fr))', gap:4 }}>
+                  {W.map(w => { const active = w.week === wk.week; return <button key={w.week} onClick={() => setBbWeekSel(w.week)} style={{ padding:'7px 0', borderRadius:7, border: active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: active ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.02)', color: active ? '#000' : '#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>{w.week}</button>; })}
+                </div>
+              </div>
+              {/* Визуальный календарь ББ: недели × дни (объём по сетам) */}
+              <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>📅 Календарь мезоцикла (нед × дни, объём сетов)</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {W.map(w => { const active = w.week === wk.week; const daySets = w.sessions.map(s => s.exercises.reduce((ss, e) => ss + e.sets, 0)); const maxD = Math.max(1, ...W.flatMap(ww => ww.sessions.map(s => s.exercises.reduce((ss, e) => ss + e.sets, 0)))); return (
+                    <div key={w.week} onClick={() => setBbWeekSel(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 6px', borderRadius: 6, cursor: 'pointer', background: active ? 'rgba(0,230,138,0.08)' : 'transparent', border: active ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent' }}>
+                      <span style={{ fontSize: 9, fontWeight: 700, color: active ? '#00e68a' : 'rgba(255,255,255,0.7)', minWidth: 26 }}>Н{w.week}</span>
+                      <div style={{ flex: 1, display: 'flex', gap: 2 }}>
+                        {daySets.map((ds, di) => <div key={di} title={'Д' + (di+1) + ': ' + ds + ' сетов'} style={{ flex: 1, height: 14, borderRadius: 3, background: ds > 0 ? 'linear-gradient(180deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.04)', opacity: 0.35 + 0.65 * (ds / maxD) }} />)}
+                      </div>
+                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', minWidth: 30, textAlign: 'right' }}>{daySets.reduce((a, b) => a + b, 0)}</span>
+                    </div>
+                  ); })}
+                </div>
+              </div>
+              {/* Дни выбранной недели — таблицы-карточки */}
+              <div style={{ marginTop: 10, display:'flex', flexDirection:'column', gap: 8 }}>
+                {wk.sessions.map((s, si) => (
+                  <div key={si} style={{ background:'rgba(255,255,255,0.02)', borderRadius:10, border:'1px solid rgba(255,255,255,0.06)', overflow:'hidden' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', background:'rgba(0,230,138,0.06)', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+                      <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>🏋️ День {si + 1} · {s.character}</span>
+                      <span style={{ fontSize:9, color:ACCENT, fontWeight:700 }}>{s.sessionTag}</span>
+                    </div>
+                    <div style={{ padding: '4px 0' }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'1.6fr 0.8fr 0.7fr 0.7fr 0.8fr', gap:2, padding:'4px 10px', fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase' }}>
+                        <span>Мышца</span><span>Характер</span><span>Сеты×повт</span><span>RIR</span><span>Вес</span>
+                      </div>
+                      {s.exercises.map((e, ei) => (
+                        <div key={ei} style={{ display:'grid', gridTemplateColumns:'1.6fr 0.8fr 0.7fr 0.7fr 0.8fr', gap:2, padding:'5px 10px', fontSize:10, color:'rgba(255,255,255,0.85)', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
+                          <span style={{ fontWeight:600 }}>{e.muscle}</span>
+                          <span style={{ color:'rgba(255,255,255,0.6)' }}>{e.character}</span>
+                          <span>{e.sets}×{e.workSets[0].reps}</span>
+                          <span style={{ color:'#f59e0b' }}>{e.rir}</span>
+                          <span style={{ color:ACCENT, fontWeight:700 }}>{e.workSets[0].weight} кг</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Итоги мезоцикла */}
+              <MetricCard title={`Итоги мезоцикла (${W.length} нед)`} icon="📊">
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                  <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>Всего сетов/ротация: <b style={{ color:'#fff' }}>{m.totalSets}</b></div>
+                  <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>Тяжёлых: <b style={{ color:'#fff' }}>{(m.тяжPct * 100).toFixed(0)}%</b></div>
+                  <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>Памп: <b style={{ color:'#fff' }}>{(m.пампPct * 100).toFixed(0)}%</b></div>
+                  <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>Средний RIR: <b style={{ color:'#fff' }}>{m.avgRir.toFixed(1)}</b></div>
+                </div>
+              </MetricCard>
+              {/* Объём по мышцам */}
+              <MetricCard title="Объём по мышцам (сетов/нед)" icon="🏋️" accent="#a855f7">
+                <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.6fr 0.6fr 0.6fr', gap:2, fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', padding:'2px 0' }}>
+                  <span>Мышца</span><span>Сетов</span><span>Тяж</span><span>Памп</span>
+                </div>
+                {m.perMuscle.map(mm => (
+                  <div key={mm.muscle} style={{ display:'grid', gridTemplateColumns:'1.4fr 0.6fr 0.6fr 0.6fr', gap:2, fontSize:10, color:'rgba(255,255,255,0.85)', padding:'3px 0', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
+                    <span style={{ fontWeight:600 }}>{mm.muscle}</span>
+                    <span style={{ color:ACCENT, fontWeight:700 }}>{mm.totalSets}</span>
+                    <span style={{ color:'#ef4444' }}>{mm.тяжSets}</span>
+                    <span style={{ color:'#60a5fa' }}>{mm.пампSets}</span>
+                  </div>
+                ))}
+              </MetricCard>
+              <div style={{ ...SMALL, marginTop: 8, padding: 8, background:'rgba(96,165,250,0.06)', borderRadius:8, border:'1px solid rgba(96,165,250,0.15)' }}>{explainBBMetrics(m)}</div>
+            </div>;
+          })()}
         </div>
       )}
 
       {/* ── Ручной сбор ── */}
       {mainTab === 'manual' && (() => {
-        const [manualWorkout, setManualWorkout] = React.useState<{ name: string; exercises: { name: string; sets: number; reps: number; weight: number }[]; date: string }>({ name: '', exercises: [{ name: '', sets: 3, reps: 10, weight: 0 }], date: new Date().toISOString().slice(0, 10) });
+        const [manualWorkout, setManualWorkout] = React.useState<{ name: string; exercises: { name: string; sets: number; reps: number; weight: number }[]; date: string; cfg?: Record<string, string> }>({ name: '', exercises: [{ name: '', sets: 3, reps: 10, weight: 0 }], date: new Date().toISOString().slice(0, 10) });
         const [saved, setSaved] = React.useState<typeof manualWorkout[]>(() => { try { return JSON.parse(localStorage.getItem('he_manual_workouts') || '[]'); } catch { return []; } });
         const addEx = () => setManualWorkout(p => ({ ...p, exercises: [...p.exercises, { name: '', sets: 3, reps: 10, weight: 0 }] }));
         const updEx = (i: number, field: string, val: any) => setManualWorkout(p => { const ex = [...p.exercises]; ex[i] = { ...ex[i], [field]: val }; return { ...p, exercises: ex }; });
-        const saveWorkout = () => { if (!manualWorkout.name.trim() || manualWorkout.exercises.every(e => !e.name.trim())) return; const updated = [...saved, manualWorkout]; setSaved(updated); localStorage.setItem('he_manual_workouts', JSON.stringify(updated)); setManualWorkout({ name: '', exercises: [{ name: '', sets: 3, reps: 10, weight: 0 }], date: new Date().toISOString().slice(0, 10) }); };
+        const [cfg, setCfg] = React.useState<Record<string, string>>({});
+        const setCfgField = (k: string, v: string) => setCfg(p => ({ ...p, [k]: v }));
+        const saveWorkout = () => { if (!manualWorkout.name.trim() || manualWorkout.exercises.every(e => !e.name.trim())) return; const item = { ...manualWorkout, cfg }; const updated = [...saved, item]; setSaved(updated); localStorage.setItem('he_manual_workouts', JSON.stringify(updated)); setCfg({}); setManualWorkout({ name: '', exercises: [{ name: '', sets: 3, reps: 10, weight: 0 }], date: new Date().toISOString().slice(0, 10) }); };
         const delWorkout = (i: number) => { const updated = saved.filter((_, idx) => idx !== i); setSaved(updated); localStorage.setItem('he_manual_workouts', JSON.stringify(updated)); };
+        const splitOpts = Object.entries(TRAINING_SPLITS).map(([id, s]: [string, { name: string; desc: string }]) => ({ id, label: s.name, desc: s.desc }));
+        const DIR_RU: Record<string, string> = { powerlifting: 'Троеборье', bench: 'Жим лёжа', deadlift_bench: 'Тяга+Жим', armwrestling: 'Армрестлинг', bodybuilding: 'Бодибилдинг' };
+        const cycleOpts = LMS_CYCLES.map(c => { const cat = c.meta.id.startsWith("block") ? "Блок" : c.meta.id.startsWith("embed") ? "Встроенная программа" : "СРЦ-цикл"; return { id: c.meta.id, label: c.meta.title, desc: cat + " · " + (DIR_RU[c.meta.direction] || c.meta.direction) + " · " + c.meta.level }; });
+        const progOpts = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS].map((p: any) => ({ id: p.id, label: p.name, desc: p.type + " · " + p.goal + " · " + p.level }));
+        const methodOpts = (cat: string) => getMethodsByCategory(cat).map(m => ({ id: m.name, label: m.name, desc: m.bestFor }));
+        const CFG_LABEL: Record<string, string> = { split: 'сплит', cycle: 'цикл', program: 'программа', periodization: 'периодизация', progression: 'прогрессия', intensity: 'интенсивность', technique: 'техника', volume: 'объём', frequency: 'частота' };
+        const cfgSummary = Object.entries(cfg).filter(([, v]) => v);
         return <div>
           <div style={{ ...CARD, marginBottom: 12 }}>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#00e68a', marginBottom: 10 }}>🛠 Ручной сбор тренировки</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#00e68a', marginBottom: 10 }}>🛠 Ручной конструктор тренировки</div>
+            <div style={{ ...H, margin: '4px 0 8px' }}>⚙️ Конфигурация программы</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <PopupSelect label='Тип сплита' value={cfg.split || ''} onChange={v => setCfgField('split', v)} options={splitOpts} hint='Все доступные сплиты из библиотеки.' />
+              <PopupSelect label='Тип цикла' value={cfg.cycle || ''} onChange={v => setCfgField('cycle', v)} options={cycleOpts} hint='Все циклы (СРЦ, блоки, встроенные программы) по категориям.' />
+              <PopupSelect label='Программа тренировок' value={cfg.program || ''} onChange={v => setCfgField('program', v)} options={progOpts} hint='Готовые программы из библиотеки.' />
+              <PopupSelect label='Периодизация' value={cfg.periodization || ''} onChange={v => setCfgField('periodization', v)} options={methodOpts('periodization')} />
+              <PopupSelect label='Прогрессия' value={cfg.progression || ''} onChange={v => setCfgField('progression', v)} options={methodOpts('progression')} />
+              <PopupSelect label='Интенсивность' value={cfg.intensity || ''} onChange={v => setCfgField('intensity', v)} options={methodOpts('intensity')} />
+              <PopupSelect label='Техника' value={cfg.technique || ''} onChange={v => setCfgField('technique', v)} options={methodOpts('technique')} />
+              <PopupSelect label='Объём' value={cfg.volume || ''} onChange={v => setCfgField('volume', v)} options={methodOpts('volume')} />
+              <PopupSelect label='Частота' value={cfg.frequency || ''} onChange={v => setCfgField('frequency', v)} options={methodOpts('frequency')} />
+            </div>
+            {cfgSummary.length > 0 && <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', fontSize: 10, color: '#00e68a', lineHeight: 1.6 }}>✓ Выбрано: {cfgSummary.map(([k, v]) => (CFG_LABEL[k] || k) + ': ' + v).join(' · ')}</div>}
+            <div style={{ ...H, margin: '12px 0 8px' }}>📝 Состав тренировки</div>
             <div style={LABEL}>Название тренировки</div>
             <input style={IN} value={manualWorkout.name} onChange={e => setManualWorkout(p => ({ ...p, name: e.target.value }))} placeholder="Грудные + трицепс" />
             <div style={LABEL}>Дата</div>
@@ -468,7 +621,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             ))}
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button style={{ ...BTN, flex: 1 }} onClick={addEx}>+ Упражнение</button>
-              <button style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 700, fontSize: 12 }} onClick={saveWorkout}>💾 Сохранить</button>
+              <SaveButton label="💾 Сохранить тренировку" savedLabel="✓ Тренировка сохранена" disabled={!manualWorkout.name.trim() || manualWorkout.exercises.every(e => !e.name.trim())} onSave={saveWorkout} />
             </div>
             <datalist id="ex-list">{EXERCISE_CATALOG.slice(0, 100).map(e => <option key={e.id} value={e.name} />)}</datalist>
           </div>
@@ -489,11 +642,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       })()}
 
       {subView === 'plates' && <PlateCalculator initialWeight={workingWeight} />}
-      {subView === 'run' && playerDays.length > 0 && <SessionPlayer days={playerDays} weekNumber={1} focus={runFocus} />}
-      {subView === 'run' && playerDays.length === 0 && <div style={SMALL}>Сначала сгенерируйте план во вкладке «План».</div>}
+
       {subView === 'autoreg' && <AutoregPanel />}
       {subView === 'peak' && <PeakingPanel />}
-      {subView === 'recovery' && <RecoveryPanel />}
+      {subView === 'recovery' && (<><RecoveryPanel /><div style={{ marginTop: 10 }}><div style={{ fontSize: 14, fontWeight: 700, color: '#00e68a', margin: '10px 0 6px' }}>🧮 Training Score Engine</div><TrainingScoreCard workoutsPerWeek={mainTab === 'pl' ? days : bbDays} avgMinutes={75} intensity={autoRegResult.deload ? 'low' : 'moderate'} goal={mainTab === 'pl' ? 'strength' : 'hypertrophy'} experience={(mainTab === 'pl' ? (level === 'novice' ? 'beginner' : level === 'intermediate' ? 'intermediate' : 'advanced') : (bbLevel === 'beginner' ? 'beginner' : bbLevel === 'intermediate' ? 'intermediate' : 'advanced')) as 'beginner' | 'intermediate' | 'advanced'} sleepHours={(linked.readiness?.sleep ?? 7) as number} stressLevel={Math.round((linked.readiness?.stress ?? 3) as number)} jointPain={[]} deloadWeeksAgo={autoRegResult.deload ? 0 : 99} weight={mainTab === 'pl' ? bw : 80} age={30} sex={'male'} /></div></>)}
       {subView === 'safety' && <ExerciseSafetyPanel />}
       {subView === 'demo' && <ExerciseDemoPanel />}
       {subView === 'programs' && <ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} onAddToMyTraining={() => {}} />}

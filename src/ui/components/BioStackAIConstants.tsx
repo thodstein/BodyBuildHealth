@@ -1,6 +1,7 @@
 import React from 'react';
 import { type GoalType, type HealthCondition, type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { type FinderProfile, type GoalType as FinderGoal } from '../../engines/supplement-finder.engine';
+import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 
 export type BSTab = 'profile' | 'search' | 'build' | 'stack' | 'risks' | 'compare' | 'reports' | 'periodization';
 
@@ -211,13 +212,112 @@ export function toFinderProfile(bp: BioStackProfile): FinderProfile {
     age: bp.age, weight: bp.weight, height: bp.height, sex: bp.sex,
     experience: bp.experience,
     goals: bp.goals.filter(g => g !== undefined) as FinderGoal[],
-    aasStatus: bp.aasStatus as any,
-    healthConditions: bp.healthConditions as any,
+    aasStatus: bp.aasStatus,
+    healthConditions: bp.healthConditions,
     budget: bp.budget, avoidIds: bp.avoidIds, maxStackSize: bp.maxStackSize,
   };
 }
 
+export const PRICE_RUB: Record<string, number> = {
+  nac: 650, milk_thistle: 400, tudca: 900, omega3: 800, coq10: 1200, magnesium: 350,
+  zinc: 200, vitamin_d3: 300, vitamin_c: 250, vitamin_e: 350, selenium: 200,
+  berberine: 600, curcumin: 500, alpha_lipoic: 700, collagen: 1200, glucosamine: 800,
+  msm: 500, chondroitin: 900, ashwagandha: 600, rhodiola: 550, theanine: 450,
+  glycine: 300, creatine: 400, l_carnitine: 700, taurine: 350, inositol: 500,
+  probiotics: 1200, glutamine: 500, astragalus: 600, borax: 200, potassium: 250,
+  calcium: 300, citicoline: 1200, alpha_gpc: 900, huperzine_a: 400, noopept: 800,
+  piracetam: 500, lions_mane: 900, phosphatidylserine: 900, magnesium_l_threonate: 1200,
+  serrapeptase: 900, nattokinase: 800, bromelain: 500, vitamin_a: 200,
+  zinc_carnosine: 800, l_glutamine: 600, tongkat_ali: 1200, kefir: 300, chia: 400,
+  flax_oil: 400, idebenone: 800, pqq: 900, bone_broth: 300, gelatin: 350,
+  schisandra: 500, fadogia: 900, shilajit: 800,
+};
+
+export function estCost(id: string): number {
+  if (PRICE_RUB[id]) return PRICE_RUB[id];
+  const c = SUPPORT_CATALOG_DATA[id];
+  if (!c) return 500;
+  const tm: Record<string, number> = { core: 800, standard: 500, advanced: 300, specialty: 1200 };
+  return tm[c.tier as string] || 500;
+}
+
 /* ─── Animation CSS ─── */
+/* ─── Toast ─── */
+let toastTimer: ReturnType<typeof setTimeout> | null = null;
+export function showToast(msg: string, type: 'success' | 'error' | 'info' = 'info') {
+  const el = document.getElementById('bio-toast');
+  if (!el) return;
+  const colors = { success: '#00e68a', error: '#ef4444', info: '#60a5fa' };
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.style.background = `${colors[type]}15`;
+  el.style.borderColor = `${colors[type]}30`;
+  el.style.color = colors[type];
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.style.display = 'none'; }, 3000);
+}
+
+/* ─── ConfirmModal ─── */
+export function ConfirmModal({ title, text, confirmLabel, cancelLabel, onConfirm, onCancel, confirmColor }: {
+  title: string; text: string; confirmLabel?: string; cancelLabel?: string;
+  onConfirm: () => void; onCancel: () => void; confirmColor?: string;
+}) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)' }} onClick={onCancel}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '88%', maxWidth: 340, borderRadius: 18, background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+        <div style={{ height: 4, background: `linear-gradient(90deg, ${confirmColor || '#00e68a'}, ${confirmColor || '#00e68a'}66, transparent)` }} />
+        <div style={{ padding: '20px 18px' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 8 }}>{title}</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.4, marginBottom: 16 }}>{text}</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={onCancel} style={{
+              flex: 1, padding: '10px 0', borderRadius: 10, cursor: 'pointer',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontWeight: 600, fontSize: 11,
+            }}>{cancelLabel || 'Отмена'}</button>
+            <button onClick={onConfirm} style={{
+              flex: 1, padding: '10px 0', borderRadius: 10, cursor: 'pointer',
+              background: `${confirmColor || '#00e68a'}18`, border: `1px solid ${confirmColor || '#00e68a'}30`, color: confirmColor || '#00e68a', fontWeight: 700, fontSize: 11,
+            }}>{confirmLabel || 'Подтвердить'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── SkeletonLoader ─── */
+export function SkeletonLoader({ count = 3 }: { count?: number }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} style={{
+          borderRadius: 18, height: 80, background: '#18181b',
+          border: '1px solid rgba(255,255,255,0.04)',
+          animation: 'bioPulse 1.5s ease-in-out infinite',
+          opacity: 1 - i * 0.1,
+        }} />
+      ))}
+    </div>
+  );
+}
+
+/* ─── Toast container element — call once at app init ─── */
+export function initBioToast() {
+  if (document.getElementById('bio-toast')) return;
+  const div = document.createElement('div');
+  div.id = 'bio-toast';
+  div.style.cssText = `
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+    z-index: 9999; display: none;
+    padding: 10px 20px; border-radius: 12px;
+    font-size: 11px; font-weight: 600;
+    border: 1px solid; backdrop-filter: blur(8px);
+    max-width: 90%; text-align: center;
+    transition: all 0.2s;
+  `;
+  document.body.appendChild(div);
+}
+
 export const BIO_ANIM_CSS = `
 @keyframes bioFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes bioFadeOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-6px); } }

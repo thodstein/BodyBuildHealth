@@ -5,7 +5,7 @@ import { buildSmartStack } from '../../engines/biostack-recommender.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS, ALL_SUBSTANCES } from '../../data/support-database';
 import { MECHANISM_LABELS } from '../../data/support-meta';
 import { decodeGarbled } from '../../utils/text-sanitizer';
-import { GlassCard, StatBox, ORGANS, toFinderProfile } from './BioStackAIConstants';
+import { GlassCard, StatBox, ORGANS, toFinderProfile, ConfirmModal, showToast, PRICE_RUB } from './BioStackAIConstants';
 
 export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void }) {
   const explanation = useMemo(() => {
@@ -171,6 +171,8 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
   const [savedStacks, setSavedStacks] = useState<string[][]>(() => {
     try { return JSON.parse(localStorage.getItem('he_finder_saved_stacks') || '[]'); } catch { return []; }
   });
+  const [confirmAddPlan, setConfirmAddPlan] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const handleRemove = useCallback((id: string) => {
     setStackIds(stackIds.filter(s => s !== id));
@@ -191,6 +193,28 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
   const handleClear = useCallback(() => {
     setStackIds([]);
   }, [setStackIds]);
+
+  const handleAddToPlan = useCallback(() => {
+    try {
+      let arr: any[] = JSON.parse(localStorage.getItem('he_my_stacks') || '[]');
+      if (!arr.find((x: any) => x.id === 'biostack_' + stackIds.join('_'))) {
+        const subNames = stackIds.slice(0,3).map((id: string) => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id).join(', ');
+        arr.push({
+          id: 'biostack_' + stackIds.join('_'),
+          name: 'BioStack AI: ' + subNames + (stackIds.length > 3 ? ' и ещё ' + (stackIds.length-3) : ''),
+          description: synergyExplanation?.cascadeDesc || 'Собран в BioStack AI',
+          system: (stackSystems || []).join(', ') || 'Мультисистемная',
+          subs: stackIds, dosages: {}, timingSummary: '',
+          monitoring: '', specialInstructions: '', contraindications: '', warnings: '',
+          synergyScore: explanation?.totalSynergyScore ?? 0,
+          source: 'BioStack AI', date: new Date().toISOString(),
+        });
+        localStorage.setItem('he_my_stacks', JSON.stringify(arr));
+      }
+      setConfirmAddPlan(false);
+      showToast('✅ Стек сохранён в Мои стеки', 'success');
+    } catch { setConfirmAddPlan(false); }
+  }, [stackIds, synergyExplanation, stackSystems, explanation]);
 
   /* ── Drag & Drop ── */
   const handleDragStart = useCallback((e: React.DragEvent, idx: number) => {
@@ -357,7 +381,6 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
         if (stackIds.length === 0) return;
         setActionLoading('cheaper');
         setTimeout(() => {
-          const P: Record<string, number> = { nac: 650, tudca: 900, omega3: 800, coq10: 1200, magnesium: 350, zinc: 200, vitamin_d3: 300, curcumin: 500, alpha_lipoic: 700, ashwagandha: 600, rhodiola: 550, theanine: 450, creatine: 400, l_carnitine: 700, lions_mane: 900, tongkat_ali: 1200, collagen: 1200, probiotics: 1200, berberine: 600 };
           const ALT: Record<string, string[]> = { omega3: ['flax_oil', 'chia'], coq10: ['idebenone', 'pqq'], probiotics: ['kefir', 'sauerkraut'], collagen: ['bone_broth', 'gelatin'], ashwagandha: ['rhodiola', 'schisandra'], lions_mane: ['alpha_gpc', 'phosphatidylserine'], tongkat_ali: ['fadogia', 'shilajit'] };
           const swaps: Array<{ fromId: string; toId: string; saving: number }> = [];
           const ns = [...stackIds];
@@ -365,9 +388,9 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
             const id = ns[i];
             const alts = ALT[id];
             if (alts) {
-              const ch = alts.find(a => (P[a] || 999) < (P[id] || 999));
+              const ch = alts.find(a => (PRICE_RUB[a] || 999) < (PRICE_RUB[id] || 999));
               if (ch && SUPPORT_CATALOG_DATA[ch]) {
-                swaps.push({ fromId: id, toId: ch, saving: (P[id] || 0) - (P[ch] || 0) });
+                swaps.push({ fromId: id, toId: ch, saving: (PRICE_RUB[id] || 0) - (PRICE_RUB[ch] || 0) });
                 ns[i] = ch;
               }
             }
@@ -379,7 +402,7 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
             const swapLines = swaps.map(s => {
               const fromName = SUPPORT_CATALOG_DATA[s.fromId]?.nameRu || SUPPORT_CATALOG_DATA[s.fromId]?.name || s.fromId;
               const toName = SUPPORT_CATALOG_DATA[s.toId]?.nameRu || SUPPORT_CATALOG_DATA[s.toId]?.name || s.toId;
-              return `• ${fromName} (${P[s.fromId] || '?'}₽) → ${toName} (${P[s.toId] || '?'}₽) — экономия ${s.saving}₽`;
+              return `• ${fromName} (${PRICE_RUB[s.fromId] || '?'}₽) → ${toName} (${PRICE_RUB[s.toId] || '?'}₽) — экономия ${s.saving}₽`;
             });
             setActionResult({
               title: `💰 ${swaps.length} замен — экономия ~${totalSaving}₽/мес`,
@@ -503,6 +526,12 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
             flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
             background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a',
           }}>💾 Сохранить стек</button>
+          <button onClick={() => setConfirmAddPlan(true)} style={{
+            flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+            background: 'rgba(0,230,138,0.15)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a',
+          }}>📋 В план поддержки</button>
+        </div>
+        <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
           <button onClick={() => {
             try {
               let arr: any[] = JSON.parse(localStorage.getItem('he_my_stacks') || '[]');
@@ -518,18 +547,45 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
                   source: 'BioStack AI', date: new Date().toISOString()
                 });
                 localStorage.setItem('he_my_stacks', JSON.stringify(arr));
+                showToast('✅ Стек сохранён в Мои стеки', 'success');
+              } else {
+                showToast('ℹ️ Стек уже в Моих стеках', 'info');
               }
             } catch {}
           }} style={{
             flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
             background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: '#818cf8',
           }}>📦 В мои стеки</button>
-          <button onClick={handleClear} style={{
+          <button onClick={() => setConfirmClear(true)} style={{
             flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
             background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444',
           }}>🗑 Очистить</button>
         </div>
       </GlassCard>
+
+      {confirmAddPlan && (
+        <ConfirmModal
+          title="📋 Добавить в план поддержки?"
+          text={`Стек из ${stackIds.length} препаратов будет сохранён в «Мои стеки» и добавлен в текущий план поддержки. Вы сможете изменить дозировки и состав в плане.`}
+          confirmLabel="✅ Добавить в план"
+          cancelLabel="Отмена"
+          onConfirm={handleAddToPlan}
+          onCancel={() => setConfirmAddPlan(false)}
+          confirmColor="#00e68a"
+        />
+      )}
+
+      {confirmClear && (
+        <ConfirmModal
+          title="🗑 Очистить стек?"
+          text={`Вы уверены, что хотите удалить все ${stackIds.length} препаратов из текущего стека?`}
+          confirmLabel="🗑 Очистить"
+          cancelLabel="Отмена"
+          onConfirm={() => { setConfirmClear(false); handleClear(); }}
+          onCancel={() => setConfirmClear(false)}
+          confirmColor="#ef4444"
+        />
+      )}
 
       {/* 🧬 Почему этот стек работает */}
       {synergyExplanation && (

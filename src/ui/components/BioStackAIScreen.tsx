@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { loadBioStackProfile } from '../../engines/biostack-ai.engine';
-import { SUB_TABS, BIO_ANIM_CSS, type BSTab } from './BioStackAIConstants';
+import { SUB_TABS, BIO_ANIM_CSS, type BSTab, initBioToast, SkeletonLoader, showToast } from './BioStackAIConstants';
 import { ProfileTab } from './BioStackAIProfile';
 import { SearchTab } from './BioStackAISearch';
 import { BuildTab } from './BioStackAIBuild';
@@ -11,15 +11,30 @@ import { CompareTab } from './BioStackAICompare';
 import { ReportsTab } from './BioStackAIReports';
 import { PeriodizationTab } from './BioStackAIPeriodization';
 
+const BIO_TAB_KEY = 'he_biostack_tab';
+
 export const BioStackAIScreen: React.FC = () => {
-  const [tab, setTab] = useState<BSTab>('profile');
+  const [tab, setTab] = useState<BSTab>(() => {
+    try { const saved = localStorage.getItem(BIO_TAB_KEY); return saved && SUB_TABS.find(t => t.id === saved) ? (saved as BSTab) : 'profile'; } catch { return 'profile'; }
+  });
   const [profile, setProfile] = useState<BioStackProfile>(() => loadBioStackProfile());
+  const [loading, setLoading] = useState(true);
   const [stackIds, setStackIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('he_biostack_active');
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
+
+  useEffect(() => { initBioToast(); setLoading(false); }, []);
+
+  useEffect(() => { localStorage.setItem(BIO_TAB_KEY, tab); }, [tab]);
+
+  useEffect(() => {
+    if (stackIds.length > 0 && !loading) {
+      showToast(`🔵 Активный стек: ${stackIds.length} веществ`, 'info');
+    }
+  }, [loading]);
 
   // auto-save active stack for other screens to read
   const setStackIdsAndSync = (ids: string[]) => {
@@ -59,7 +74,7 @@ export const BioStackAIScreen: React.FC = () => {
         ))}
       </div>
 
-      <div key={tab} className="bio-fade">{tabContent[tab]}</div>
+      {loading ? <SkeletonLoader count={4} /> : <div key={tab} className="bio-fade">{tabContent[tab]}</div>}
     </div>
   );
 };
