@@ -42,6 +42,7 @@ import { AutoCalculator } from './SupportScreen_parts/AutoCalculator';
 import { calculateSupportTZ, hydrateState } from '../../engines/support-calculator.engine';
 import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engines/support-calculator.types';
 import { calculateTZRisk, toCompatibleResult, type TZRiskResult } from '../../engines/risk-engine-tz';
+import { calculateSupportPlan, type PlanResult, type PlanSubstance } from '../../engines/support-plan-engine';
 import { buildPreApplyCard, evaluateRecommendations, computeCoverageRisk } from '../../engines/recommendation-engine';
 import { calculateMixScore, type MixSubstance, type MixProfile } from '../../engines/training-mix-scoring.engine';
 // Force Vite to include SUPPORT_CATALOG_DATA and CANONICAL_ID_MAP (prevents tree-shaking)
@@ -432,79 +433,85 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (!manualLevelSelected) setSupportLevel(level);
   }, [supportDrugs, linked.risk, linked.labAnalysis, manualLevelSelected]);
 
-  // Compute effective level considering phase, analogs, and enhancers
+  // Compute effective level using NEW plan engine (mapping-based)
+  const [planResult, setPlanResult] = useState<PlanResult | null>(null);
   const effectiveLevel = useMemo(() => {
+    // Build CalculatorState from linked data for the new engine
+    const s = linked.profile?.settings;
+    const aasList = (linked.course || []).filter((c: any) => {
+      const ph = PHARMA_DB[c.substanceId];
+      return ph?.class && ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm'].includes(ph.class);
+    }).map((c: any) => ({ id: c.substanceId || '', doseMgWeek: (c.doseValue || 0) * (c.frequency || 1), weeks: (c.endWeek || 12) - (c.startWeek || 0) }));
+    const h = hydrateState();
+    const state: CalculatorState = {
+      profile: h.profile || { weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male' | 'female', workoutsPerWeek: s?.workoutsPerWeek ?? 3, avgWorkoutMinutes: s?.avgWorkoutMinutes ?? 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
+      neuro: h.neuro || { dopamineScore: 0, serotoninScore: 0, gabaBalance: 'balance', memoryIssues: false, focusIssues: false, slowThinking: false, coordinationIssues: false, aggressionScore: 0, headaches: false, weatherDependent: false, sleepQuality: 'good' },
+      pharma: h.pharma || { phase: 'course', aas: aasList, hasGH: false, hasIGF: false, hasInsulin: false, hasHCG: false, hasAI: false, hasCaber: false, hasSERM: false, hasSARMs: false, hasMGF: false, hasGLP1: false },
+      goals: h.goals || { healthMaintenance: false, competitionPrep: false, sleepRecovery: false, lipidCorrection: false, bloodThinning: false, liverDetox: false, bpControl: false, trainingCycle: 'maintenance', cycleWeeks: 12, previousCycles: 0, timeSinceLastCycle: 'none' },
+      hepatobiliary: h.hepatobiliary || { altAstElevation: 'none', ggtElevation: 'none', bilirubinElevation: 'none', fattyLiver: false, cholecystitis: false, alcoholHistory: 'none' },
+      urinary: h.urinary || { creatinineElevation: 'none', ureaElevation: 'none', proteinuria: false, nephrotoxicDrugs: false, hypertension: false, diabetes: false, urinationPattern: 'normal' },
+      cardio: h.cardio || { bpStage: 'normal', heartRate: 70, ldlElevation: 'none', hdlLow: false, triglycerides: 'normal', hctElevation: 'none', previousCVD: false, familyCVD: false },
+      oda: h.oda || { jointPain: 'none', ligamentIssues: false, backPain: false, injuries: [] },
+      nutrition: h.nutrition || { calories: 2500, proteinG: 160, fatG: 70, carbsG: 300, waterL: 2, saltIntake: 'normal', omega3: false, fiberG: 25, proteinGPerKg: 2, sodiumMg: 3000, potassiumMg: 3000 },
+      contraindications: h.contraindications || { allergies: '', hasCVD: false, hasThrombophilia: false, hasGI: false, hasProstateIssues: false, hasDiabetes: false, hasEpilepsy: false, hasMentalIllness: false, hasLiverDisease: false, hasKidneyDisease: false },
+      labs: h.labs || { preCourse: null, midCourse: null, postPCT: null, fullPanel: null },
+      journal: h.journal || { positive: [], negative: [] },
+      epicrisis: h.epicrisis || { pastGyno: false, pastLibidoDrop: false, pastHctSpike: false, pastLiverIssues: false, pastKidneyIssues: false },
+      toxicLoad: h.toxicLoad || { hazardousWork: false, regularNSAIDs: false, otherHeavyDrugs: false, bowelFrequency: 'regular' },
+      dental: h.dental || { bleedingGums: false, looseTeeth: false, nightGrinding: false, boneFractures: false, cramps: false },
+      genetics: h.genetics || { cyp19a1: 'unknown', srd5a2: 'unknown', arSensitivity: 'unknown', mthfr: 'unknown' },
+      gi: h.gi || { bloating: false, heartburn: false, diarrhea: false, constipation: false, diagnosedIBS: false, enzymeSupport: false, probioticUse: false },
+      psych: h.psych || { fearOfLoss: 1, mirrorObsession: 1, apathyOffCycle: 1 },
+      injection: h.injection || { glutes: 'ok', quads: 'ok', delts: 'ok', localAreas: '' },
+      powerLevel: (supportLevel as PowerLevel),
+      courseWeek: courseWeekState,
+    };
+    const result = calculateSupportPlan(state, supportLevel as PowerLevel, jointMode, boostEnabled, enhancedSubs);
+    // Store result for detailed UI
+    setTimeout(() => setPlanResult(result), 0);
+    // Map to a backwards-compatible effectiveLevel format
+    const subs = result.substances.map(s => s.id);
+    const dosages: Record<string, { mg: number; timing: string }> = {};
+    for (const s of result.substances) {
+      dosages[s.id] = { mg: s.doseMg, timing: s.timing };
+    }
+    // Also ensure phase mods are applied for hCG and fertile-specific items
     const phaseResult = getPhaseLevel(supportLevel, supportPhase, SUPPORT_LEVELS);
-    const subs = [...phaseResult.subs];
-    const dosages = { ...phaseResult.dosages };
-    // Replace substances with selected analogs — use form/mg/timing from SUBSTANCE_ANALOGS if available
+    // Merge phase-specific adds
+    for (const addId of (phaseResult as any).subs || []) {
+      if (!subs.includes(addId)) {
+        subs.push(addId);
+        dosages[addId] = (phaseResult as any).dosages?.[addId] || dosages[addId] || DEFAULT_DOSAGES[addId] || { mg: 500, timing: 'с едой' };
+      }
+    }
+    // Apply analog replacements
     for (const [originalId, analogId] of Object.entries(selectedAnalogs)) {
       const idx = subs.indexOf(originalId);
       if (idx >= 0 && analogId !== originalId) {
         subs[idx] = analogId;
-        // Find analog entry to get its dosage info
-        const analogEntry = (SUBSTANCE_ANALOGS[originalId] || []).find(a => a.id === analogId);
-        const analogDosage = (analogEntry?.mg ? { mg: analogEntry.mg, timing: analogEntry.timing || 'с едой' } : null) || SUPPORT_LEVELS[supportLevel]?.dosages?.[analogId] || DEFAULT_DOSAGES[analogId] || { mg: 500, timing: 'с едой' };
+        const analogDosage = DEFAULT_DOSAGES[analogId] || { mg: 500, timing: 'с едой' };
         delete dosages[originalId];
         dosages[analogId] = analogDosage;
       }
     }
-    // Manual mode: replace default subs entirely with enhancedSubs
-    if (enhancedSubs.length > 0 && enhancedSubs.some(id => !subs.includes(id))) {
-      // If enhancedSubs has items not in default subs → manual mode, replace everything
-      subs.length = 0;
-      for (const enhId of enhancedSubs) {
-        if (!subs.includes(enhId)) {
-          subs.push(enhId);
-          dosages[enhId] = DEFAULT_DOSAGES[enhId] || { mg: 500, timing: 'с едой' };
-        }
-      }
-    } else {
-      // Add enhancers on top of default
-      for (const enhId of enhancedSubs) {
-        if (!subs.includes(enhId)) {
-          subs.push(enhId);
-          dosages[enhId] = DEFAULT_DOSAGES[enhId] || { mg: 500, timing: 'с едой' };
-        }
+    // Add enhancedSubs (manual additions)
+    for (const enhId of enhancedSubs) {
+      if (!subs.includes(enhId)) {
+        subs.push(enhId);
+        dosages[enhId] = dosages[enhId] || DEFAULT_DOSAGES[enhId] || { mg: 500, timing: 'с едой' };
       }
     }
-    // Boost mode: add boost substances to the current stack
-    if (boostEnabled) {
-      for (const bs of BOOST_SUBS) {
-        if (!subs.includes(bs)) {
-          subs.push(bs);
-          dosages[bs] = BOOST_DOSAGES[bs] || DEFAULT_DOSAGES[bs] || { mg: 500, timing: 'с едой' };
-        }
-      }
-    }
-    // Normal mode: exclude joints (they have separate calculator)
-    // Joint mode: only include joints
-    let finalSubs = subs;
-    let finalDosages = dosages;
-    if (jointMode) {
-      finalSubs = subs.filter(s => JOINT_SUBS.includes(s));
-      finalDosages = {};
-      for (const s of finalSubs) {
-        finalDosages[s] = dosages[s] || DEFAULT_DOSAGES[s] || { mg: 500, timing: 'с едой' };
-      }
-    } else {
-      finalSubs = subs.filter(s => !JOINT_SUBS.includes(s));
-      finalDosages = {};
-      for (const s of finalSubs) {
-        finalDosages[s] = dosages[s] || DEFAULT_DOSAGES[s] || { mg: 500, timing: 'с едой' };
-      }
-    }
-    // Auto-add hCG if AAS are in the course
+    // Auto-add hCG if AAS in course
     const hasAAS = (linked.course || []).some((c: any) => {
       const ph = PHARMA_DB[c.substanceId];
       return ph?.class && ['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone','oral_17aa','sarm'].includes(ph.class);
     });
-    if (hasAAS && !finalSubs.includes('hcg')) {
-      finalSubs = [...finalSubs, 'hcg'];
-      finalDosages = { ...finalDosages, hcg: DEFAULT_DOSAGES['hcg'] || BOOST_DOSAGES['hcg'] || { mg: 500, timing: '2x/нед, схема 3/1 (МЕ)' } };
+    if (hasAAS && !subs.includes('hcg')) {
+      subs.push('hcg');
+      dosages['hcg'] = DEFAULT_DOSAGES['hcg'] || { mg: 500, timing: '2x/нед, схема 3/1 (МЕ)' };
     }
-    return { ...phaseResult, subs: finalSubs, dosages: finalDosages };
-  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, boostEnabled, jointMode, linked.course]);
+    return { subs, dosages, planResult: result };
+  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, boostEnabled, jointMode, linked.course, linked.profile, courseWeekState]);
 
   const calcSupport = (overrideLevel?: 'basic' | 'mid' | 'max' | 'boost', overrideSubs?: string[]) => {
     const s = linked.profile?.settings;
@@ -564,7 +571,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     setSupportResult(calcResultData as any);
     setCalcResult(calcResultData);
     setCalcDone(true);
-    const allSubs = [...supportDrugs, ...(SUPPORT_LEVELS[level]?.subs || [])].filter(Boolean);
+    const allSubs = [...new Set([...supportDrugs, ...(effectiveLevel?.subs || [])])].filter(Boolean);
     setDbInteractions(checkSupportInteractions(allSubs));
     setGoalRecommendations(findSupportByGoal(supportGoal, 20));
 
@@ -5119,13 +5126,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   const newVal = !boostEnabled;
                   setBoostEnabled(newVal);
                   if (newVal) {
-                    setSupportLevel('boost');
                     setBoostNotification(true);
                     setTimeout(() => setBoostNotification(false), 5000);
-                  } else {
-                    setSupportLevel('max');
                   }
-                  calcSupport(newVal ? 'boost' : 'max');
+                  calcSupport(supportLevel);
                 }} style={{
                   flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
                   border: boostEnabled ? '1px solid #ef4444' : '1px solid var(--border)',
@@ -5368,18 +5372,92 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     } catch { return null; }
                   })()}
 
-                  <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'40vh', overflowY:'auto', marginBottom:8 }}>
+                  <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:'50vh', overflowY:'auto', marginBottom:8 }}>
                     {(effectiveLevel?.subs || []).map((id: string) => {
                       const sub = allSupport.find((s: any) => s.id === id);
                       const d = effectiveLevel?.dosages?.[id];
+                      const planInfo = planResult?.substances?.find((s: PlanSubstance) => s.id === id);
                       return sub ? (
-                        <div key={id} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)', fontSize:9, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                          <span style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</span>
-                          {d && <span style={{ color:'#00e68a', fontSize:8 }}>{d.mg}мг — {d.timing}</span>}
+                        <div key={id} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)', fontSize:9 }}>
+                          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                            <span style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</span>
+                            {d && <span style={{ color:'#00e68a', fontSize:8, fontWeight:600 }}>{d.mg >= 5000 ? `${(d.mg/1000).toFixed(1)} г` : `${d.mg} мг`} — {d.timing}</span>}
+                          </div>
+                          {planInfo?.comment && (
+                            <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.3, marginTop:1, paddingLeft:4, borderLeft:'2px solid rgba(0,230,138,0.3)' }}>
+                              {planInfo.comment}
+                            </div>
+                          )}
                         </div>
                       ) : null;
                     })}
                   </div>
+
+                  {/* ===== SYNERGY COMMENT CARD ===== */}
+                  {planResult?.synergyComment && (
+                    <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(0,230,138,0.03)', border:'1px solid rgba(0,230,138,0.12)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>⚡ Принцип синергии стека</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5, whiteSpace:'pre-line' }}>
+                        {planResult.synergyComment}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== RISK DYNAMICS CARD ===== */}
+                  {planResult?.riskDynamics && planResult.riskDynamics.length > 0 && (
+                    <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(96,165,250,0.03)', border:'1px solid rgba(96,165,250,0.12)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📈 Динамика рисков по системам</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                        {planResult.riskDynamics.map((rd: any) => {
+                          const sysLabelMap: Record<string, string> = { cardio:'ССС', hepatic:'Печень', renal:'Почки', neuro:'НС', endocrine:'Эндокр.', hematologic:'Кровь', reproductive:'Репрод.', musculoskeletal:'ОДА' };
+                          const sysLabel = sysLabelMap[rd.system as string] || rd.system;
+                          const delta = rd.before - rd.after;
+                          const color = delta > 20 ? '#22c55e' : delta > 10 ? '#f59e0b' : '#ef4444';
+                          return (
+                            <div key={rd.system} style={{ display:'flex', alignItems:'center', gap:4, marginBottom:3 }}>
+                              <span style={{ width:50, fontWeight:600, color:'var(--text-light)' }}>{sysLabel}</span>
+                              <div style={{ flex:1, height:6, borderRadius:3, background:'rgba(255,255,255,0.05)', position:'relative', overflow:'hidden' }}>
+                                <div style={{ position:'absolute', left:0, top:0, height:'100%', width:`${rd.before}%`, borderRadius:3, background:'rgba(239,68,68,0.3)', transition:'width 0.5s' }} />
+                                <div style={{ position:'absolute', left:0, top:0, height:'100%', width:`${rd.after}%`, borderRadius:3, background:color, transition:'width 0.5s', opacity:0.7 }} />
+                              </div>
+                              <span style={{ fontSize:7, minWidth:70, textAlign:'right' }}>
+                                <span style={{ color:'#ef4444' }}>{rd.before}%</span> → <span style={{ color, fontWeight:600 }}>{rd.after}%</span>
+                                <span style={{ color, fontSize:6, marginLeft:2 }}>({delta > 0 ? `-${delta}` : delta}%)</span>
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:6, textAlign:'center' }}>
+                        Общий риск: <b style={{ color:'#ef4444' }}>{planResult.overallRiskBefore}%</b> → <b style={{ color:'#22c55e' }}>{planResult.overallRiskAfter}%</b>
+                        {' · '}Покрытие систем: <b style={{ color:'var(--accent)' }}>{planResult.coveragePercent}%</b>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== MONITORING CARD ===== */}
+                  {planResult?.monitoring && planResult.monitoring.length > 0 && (
+                    <details style={{ marginBottom:10 }}>
+                      <summary style={{ fontSize:10, fontWeight:700, color:'#f59e0b', cursor:'pointer', marginBottom:4 }}>📊 Мониторинг: что и когда контролировать</summary>
+                      <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.03)', border:'1px solid rgba(245,158,11,0.12)' }}>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5, whiteSpace:'pre-line' }}>
+                          {planResult.monitoring.slice(0, 12).join('\n')}
+                        </div>
+                      </div>
+                    </details>
+                  )}
+
+                  {/* ===== SPECIAL INSTRUCTIONS CARD ===== */}
+                  {planResult?.specialInstructions && planResult.specialInstructions.length > 0 && (
+                    <details style={{ marginBottom:10 }}>
+                      <summary style={{ fontSize:10, fontWeight:700, color:'#ef4444', cursor:'pointer', marginBottom:4 }}>⚠️ Особые указания по совмещению</summary>
+                      <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.03)', border:'1px solid rgba(239,68,68,0.12)' }}>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5, whiteSpace:'pre-line' }}>
+                          {planResult.specialInstructions.join('\n')}
+                        </div>
+                      </div>
+                    </details>
+                  )}
 
                   <div style={{ display:'flex', gap:6 }}>
                     <button style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:10 }} onClick={() => setPlanSaved(true)}>✅ Утвердить план</button>
@@ -5394,92 +5472,43 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           <th style={{ padding:'3px 5px', textAlign:'left' }}>Время</th>
                           <th style={{ padding:'3px 5px', textAlign:'left' }}>Препарат</th>
                           <th style={{ padding:'3px 5px', textAlign:'left' }}>Доза</th>
-                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Примечание</th>
+                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Зачем назначен</th>
                         </tr></thead>
                         <tbody>
                           {(effectiveLevel?.subs || []).map((id: string) => {
                             const sub = allSupport.find((s: any) => s.id === id);
                             const d = effectiveLevel?.dosages?.[id];
+                            const planInfo = planResult?.substances?.find((s: PlanSubstance) => s.id === id);
                             if (!sub || !d) return null;
                             return (
                               <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
-                                <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{d.timing}</td>
+                                <td style={{ padding:'3px 5px', color:'var(--text-dim)', fontSize:7 }}>{d.timing}</td>
                                 <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub.name}</td>
-                                <td style={{ padding:'3px 5px', color:'#00e68a' }}>{d.mg} мг</td>
-                                <td style={{ padding:'3px 5px', color:'var(--text-dim)', maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sub.description || ''}</td>
+                                <td style={{ padding:'3px 5px', color:'#00e68a' }}>{d.mg >= 5000 ? `${(d.mg/1000).toFixed(1)} г` : `${d.mg} мг`}</td>
+                                <td style={{ padding:'3px 5px', color:'var(--text-dim)', maxWidth:250, fontSize:7, lineHeight:1.3 }}>{planInfo?.comment || sub.description || ''}</td>
                               </tr>
                             );
                           })}
                         </tbody>
                       </table>
-                      {/* Synergies info */}
+                      {/* Synergies in stack */}
                       <div style={{ marginTop:8, fontSize:8, color:'var(--text-dim)' }}>
                         <div style={{ fontWeight:600, color:'var(--text-light)', marginBottom:3 }}>⚡ Синергии в стеке:</div>
-                        {effectiveLevel.subs.slice(0, 6).map((id: string, i: number) => {
+                        {effectiveLevel.subs.slice(0, 8).map((id: string, i: number) => {
                           const sub = allSupport.find((s: any) => s.id === id);
                           if (!sub) return null;
-                          const syn = ALL_INTERACTIONS.filter((int: any) => 
+                          const syn = ALL_INTERACTIONS.filter((int: any) =>
                             (int.substanceA === id || int.substanceB === id) && int.type === 'synergy'
                           ).slice(0, 2);
                           return syn.length > 0 ? syn.map((s: any, j: number) => (
                             <div key={`${i}-${j}`} style={{ padding:'2px 0' }}>
-                              ⊕ {sub.name} + {allSupport.find((x: any) => x.id === (s.substanceA === id ? s.substanceB : s.substanceA))?.name || ''}: {s.effect}
+                              ⊕ {sub.name} + {allSupport.find((x: any) => x.id === (s.substanceA === id ? s.substanceB : s.substanceA))?.name || ''}: {s.effect?.slice(0, 60)}
                             </div>
                           )) : null;
                         })}
                       </div>
-                      {/* Second table: mechanisms, synergies, interactions per substance */}
-                      <div style={{ marginTop:10, fontSize:8, color:'var(--text-dim)' }}>
-                        <div style={{ fontWeight:700, color:'#8b5cf6', marginBottom:4, fontSize:9 }}>🧬 Механизмы, препараты и синергии</div>
-                        <table style={{ width:'100%', fontSize:7.5, borderCollapse:'collapse' }}>
-                          <thead><tr style={{ background:'rgba(139,92,246,0.08)' }}>
-                            <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Препарат</th>
-                            <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Механизм</th>
-                            <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Синергии</th>
-                          </tr></thead>
-                          <tbody>
-                    {((calcResult as any)?.selectedSubstances || effectiveLevel?.subs || []).map((id: string) => {
-                              const sub = allSupport.find((s: any) => s.id === id);
-                              const subDb = catalogSubstances.find((s: any) => s.id === id);
-                              if (!sub) return null;
-                              const mechanisms = (subDb?.mechanisms || []).slice(0, 3);
-                              const syns = ALL_INTERACTIONS.filter((int: any) => 
-                                (int.substanceA === id || int.substanceB === id) && int.type === 'synergy'
-                              ).slice(0, 2);
-                              const conflicts = ALL_INTERACTIONS.filter((int: any) => 
-                                (int.substanceA === id || int.substanceB === id) && int.type === 'conflict'
-                              ).slice(0, 1);
-                              return (
-                                <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
-                                  <td style={{ padding:'3px 4px', fontWeight:600, color:'var(--text-light)' }}>{sub.name}</td>
-                                  <td style={{ padding:'3px 4px', color:'var(--text-dim)' }}>
-                              {mechanisms.length > 0 ? mechanisms.map((m: string) => (
-                                <div key={m} style={{ lineHeight:1.3, marginBottom:1 }}>• {MECH_LABELS[m] || m.replace(/_/g, ' ')}</div>
-                              )) : <span style={{ color:'rgba(255,255,255,0.3)' }}>—</span>}
-                            </td>
-                            <td style={{ padding:'3px 4px' }}>
-                              {syns.map((s: any, j: number) => {
-                                const partner = catalogSubstances.find((x: any) => x.id === (s.substanceA === id ? s.substanceB : s.substanceA));
-                                return (
-                                  <div key={j} style={{ color:'#22c55e', lineHeight:1.3 }}>⊕ {partner?.name || '?'} — {s.effect?.slice(0,35)}</div>
-                                );
-                              })}
-                              {conflicts.length > 0 && conflicts.map((c: any, j: number) => {
-                                const partner = catalogSubstances.find((x: any) => x.id === (c.substanceA === id ? c.substanceB : c.substanceA));
-                                return (
-                                  <div key={`c${j}`} style={{ color:'#ef4444', lineHeight:1.3 }}>⊖ {partner?.name || '?'} — {c.effect?.slice(0,35)}</div>
-                                );
-                              })}
-                              {syns.length === 0 && conflicts.length === 0 && <span style={{ color:'rgba(255,255,255,0.3)' }}>—</span>}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+                    </div>
+                  )}
             </>)}
           </div>
       )}
