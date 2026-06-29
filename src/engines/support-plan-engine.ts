@@ -5,12 +5,17 @@ import {
   SYNERGY_ID_SUBSTANCES, TITRATION_RULES, SYNERGY_ID_LABELS,
 } from './support-calculator.types';
 import { MECHANISM_TO_SUPPORT_SUBSTANCE } from '../data/mechanism-support-bridge';
+import { BRIDGE_MECH_TO_CATALOG, findCatalogSubstancesForBridgeMech, findBridgeMechsForSubstance, countCoveredMechanisms } from '../data/mechanism-code-bridge';
 import { SUPPORT_CATALOG_DATA } from '../data/support-catalog-data';
 import { SYSTEM_MECHANISMS } from '../core/system-mechanisms';
+import { LAB_MARKER_MAP, LAB_MARKER_MAP_BY_NAME, type LabMarkerMap } from '../data/lab-marker-map';
+import { ALL_STACKS, type SupportStack } from '../data/support-stacks';
+import { findBridgeMechsForStack, getStackSystemCoverage } from '../data/mechanism-code-bridge';
 
 // ═══════════════════════════════════════════════════════════════
-//  SUPPORT PLAN ENGINE v3 — Полный маппинг
+//  SUPPORT PLAN ENGINE v4 — Professional
 //  Риск → Система → Механизм → Вещество (через все мосты)
+//  + Лаб-данные + Понедельное титрование + Непокрытые механизмы
 //  + Синергии + Покрытие + Комментарии + Мониторинг + Динамика
 // ═══════════════════════════════════════════════════════════════
 
@@ -415,6 +420,202 @@ export interface PlanResult {
   riskDynamics: Array<{ system: string; before: number; after: number; mechanisms: PlanMechanism[] }>;
   overallRiskBefore: number;
   overallRiskAfter: number;
+  labFindings: Array<{ marker: string; name: string; value: string; threshold: string; organ: string; suggestedSubs: string[] }>;
+  uncoveredMechanisms: Array<{ mechKey: string; mechLabel: string; systemLabel: string; risk: number }>;
+  coverageGaps: Array<{ system: string; label: string; raw: number; net: number; gapPercent: number }>;
+  weekScale: number;
+  /** Рекомендованные стеки, отсортированные по релевантности */
+  stackRecommendations: StackRecommendation[];
+}
+
+// ─── Lab Data Analysis ───
+interface LabReading { marker: string; value: number; unit: string; date?: string; }
+
+function analyzeLabData(state: CalculatorState): LabReading[] {
+  const readings: LabReading[] = [];
+  const labs = state.labs;
+  if (!labs) return readings;
+
+  // Parse all lab panels from available slices
+  const slices = [labs.preCourse, labs.midCourse, labs.postPCT, labs.fullPanel].filter(Boolean) as LabSlice[];
+  if (slices.length === 0) return readings;
+
+  // Use the most recent slice
+  const slice = slices[slices.length - 1];
+  const allPanels: Record<string, string>[] = [
+    slice.panelBiochem || {}, slice.panelHematology || {},
+    slice.panelLipid || {}, slice.panelIron || {}, slice.panelThyroid || {},
+    slice.panelSex || {}, slice.panelVitamin || {}, slice.panelCardiac || {},
+    slice.panelCoagulation || {}, slice.panelInflammatory || {},
+    slice.panelAdrenal || {}, slice.panelMineral || {}, slice.panelTumor || {},
+    slice.panelUrinalysis || {},
+  ];
+
+  for (const panel of allPanels) {
+    for (const [marker, val] of Object.entries(panel)) {
+      if (!val || val === 'N/A' || val === '') continue;
+      const numVal = parseFloat(String(val).replace(/[^\d.\-]/g, ''));
+      if (isNaN(numVal)) continue;
+      readings.push({ marker, value: numVal, unit: '', date: slice.date });
+    }
+  }
+  return readings;
+}
+
+function findAbnormalLabs(readings: LabReading[]): Array<{ marker: string; name: string; value: number; unit: string; threshold: number; higherIsWorse: boolean; correctionIds: string[]; organ: string; system: string; isAbnormal: boolean }> {
+  const results: Array<{ marker: string; name: string; value: number; unit: string; threshold: number; higherIsWorse: boolean; correctionIds: string[]; organ: string; system: string; isAbnormal: boolean }> = [];
+
+  for (const reading of readings) {
+    // Try to find matching marker in LAB_MARKER_MAP
+    let match: LabMarkerMap | undefined = LAB_MARKER_MAP_BY_NAME[reading.marker];
+    if (!match) {
+      // Try case-insensitive matching
+      for (const [key, val] of Object.entries(LAB_MARKER_MAP_BY_NAME)) {
+        if (key.toUpperCase() === reading.marker.toUpperCase()) { match = val; break; }
+      }
+    }
+    if (!match) continue;
+
+    const isAbnormal: boolean = match.higherIsWorse
+      ? reading.value > match.defaultValue
+      : reading.value < match.defaultValue;
+
+    if (isAbnormal) {
+      const normCorrectionIds = match.correctionIds.map(normalizeId).filter(id => catalogExists(id) || getSubDose(id).mg > 0);
+      results.push({
+        marker: match.marker,
+        name: match.name,
+        value: reading.value,
+        unit: match.unit,
+        threshold: match.defaultValue,
+        higherIsWorse: match.higherIsWorse,
+        correctionIds: normCorrectionIds,
+        organ: match.organ,
+        system: match.system,
+        isAbnormal: true,
+      });
+    }
+  }
+  return results;
+}
+
+function parseLabDataFromExternal(labArray: any[] | undefined): LabReading[] {
+  const readings: LabReading[] = [];
+  if (!labArray || !Array.isArray(labArray)) return readings;
+  for (const entry of labArray) {
+    // Handle various data formats
+    if (entry.value !== undefined) {
+      readings.push({ marker: entry.marker || entry.name || '', value: parseFloat(entry.value) || 0, unit: entry.unit || '', date: entry.date });
+    }
+    // Handle panel-style data
+    const panels = ['panelBiochem', 'panelHematology', 'panelLipid', 'panelIron', 'panelThyroid',
+      'panelSex', 'panelVitamin', 'panelCardiac', 'panelCoagulation', 'panelInflammatory',
+      'panelAdrenal', 'panelMineral', 'panelTumor', 'panelUrinalysis'];
+    for (const panelKey of panels) {
+      if (entry[panelKey] && typeof entry[panelKey] === 'object') {
+        for (const [marker, val] of Object.entries(entry[panelKey])) {
+          if (typeof val === 'string' && val && val !== 'N/A') {
+            const numVal = parseFloat(val.replace(/[^\d.\-]/g, ''));
+            if (!isNaN(numVal)) {
+              readings.push({ marker, value: numVal, unit: '', date: entry.date });
+            }
+          }
+        }
+      }
+    }
+  }
+  return readings;
+}
+
+// ─── STACK RECOMMENDATION ENGINE ───
+export interface StackRecommendation {
+  stack: SupportStack;
+  score: number;
+  coveragePercent: number;
+  coveredSystems: string[];
+  coveredMechanisms: string[];
+  synergyBonus: number;
+  wasteSubstances: string[];
+  reason: string;
+}
+
+export function recommendStacks(
+  scores: Record<string, number>,
+  selectedIds: Set<string>,
+  level: PowerLevel,
+): StackRecommendation[] {
+  const levelMultiplier = level === 'basic' ? 1.5 : level === 'mid' ? 1.2 : level === 'max' ? 1.0 : 0.8;
+  const recommendations: StackRecommendation[] = [];
+
+  for (const stack of ALL_STACKS) {
+    const mechCodes = stack.anatomicalMapping?.mechanismCodes || [];
+    if (mechCodes.length === 0) continue;
+
+    // Map stack mechanismCodes → bridge keys
+    const bridgeKeys = findBridgeMechsForStack(mechCodes);
+    if (bridgeKeys.length === 0) continue;
+
+    // Count how many bridge mechanisms are "activated" (high risk)
+    let coveredMechs = 0;
+    let totalCoveredMechs = 0;
+    const coveredSystems = new Set<string>();
+    const wasteSubs: string[] = [];
+
+    for (const key of bridgeKeys) {
+      const sysKey = key.split('_')[0];
+      const sysScore = scores[sysKey] || 0;
+      if (sysScore > 0) {
+        coveredMechs++;
+        coveredSystems.add(sysKey);
+      }
+      totalCoveredMechs++;
+    }
+
+    // Waste: substances that don't cover any activated mechanism
+    const stackSubs = stack.substances.map(s => s.id);
+    for (const subId of stackSubs) {
+      let useful = false;
+      for (const key of bridgeKeys) {
+        const sysKey = key.split('_')[0];
+        if ((scores[sysKey] || 0) > 0) { useful = true; break; }
+      }
+      if (!useful && !selectedIds.has(subId)) wasteSubs.push(subId);
+    }
+
+    if (coveredMechs === 0) continue;
+
+    // Score formula:
+    // coverageRatio × synergyScore × levelMultiplier - waste penalty
+    const coverageRatio = coveredMechs / Math.max(1, totalCoveredMechs);
+    const synergyBonus = (stack.synergyScore / 100) * coverageRatio;
+    const systemsBonus = coveredSystems.size / 8;
+    const wastePenalty = (wasteSubs.length / Math.max(1, stackSubs.length)) * 0.3;
+
+    const score = Math.round(
+      (coverageRatio * 0.4 + synergyBonus * 0.35 + systemsBonus * 0.25 - wastePenalty)
+      * 100 * levelMultiplier
+    );
+
+    const reason = coveredSystems.size >= 3
+      ? `Покрывает ${coveredSystems.size} систем (${coveredMechs}/${totalCoveredMechs} мех.), синергия ${stack.synergyScore}/100`
+      : coveredSystems.size >= 2
+        ? `Покрывает ${coveredSystems.size} системы: ${[...coveredSystems].map(s => SYS_LABELS[s] || s).join(', ')}`
+        : `Точечно: ${SYS_LABELS[[...coveredSystems][0]] || [...coveredSystems][0]}`;
+
+    recommendations.push({
+      stack,
+      score,
+      coveragePercent: Math.round(coverageRatio * 100),
+      coveredSystems: [...coveredSystems],
+      coveredMechanisms: bridgeKeys,
+      synergyBonus: Math.round(synergyBonus * 100),
+      wasteSubstances: wasteSubs,
+      reason: `${reason}${wasteSubs.length > 0 ? ` · ${wasteSubs.length} лишних` : ''}`,
+    });
+  }
+
+  recommendations.sort((a, b) => b.score - a.score);
+  return recommendations.slice(0, 10);
 }
 
 export function calculateSupportPlan(
@@ -423,17 +624,30 @@ export function calculateSupportPlan(
   jointMode: boolean,
   boostEnabled: boolean,
   existingSubs?: string[],
+  externalLabs?: any[],
 ): PlanResult {
   const scores = calcAllRisks(state);
   const excludedSubs = new Set(state.journal?.negative?.map((n: any) => normalizeId(n.substanceId)) || []);
   const cw = state.courseWeek ?? 1;
 
+  // ─── WEEK-BASED DOSE SCALING ───
+  const weekScale = cw <= 2 ? 0.6 : cw <= 4 ? 0.8 : cw <= 6 ? 0.9 : 1.0;
+
+  // ─── ANALYZE LAB DATA ───
+  const internalReadings = analyzeLabData(state);
+  const externalReadings = parseLabDataFromExternal(externalLabs);
+  const allReadings = [...internalReadings, ...externalReadings];
+  const readingByMarker = new Map<string, LabReading>();
+  for (const r of allReadings) readingByMarker.set(r.marker, r);
+  const dedupedReadings = [...readingByMarker.values()];
+  const abnormalLabs = findAbnormalLabs(dedupedReadings);
+
   // ─── Level thresholds ───
   const levelThresholds: Record<string, number> = {
-    basic: 12, mid: 8, max: 5, boost: 3,
+    basic: 8, mid: 6, max: 4, boost: 2,
   };
   const levelMaxSubs: Record<string, number> = {
-    basic: 1, mid: 2, max: 3, boost: 4,
+    basic: 2, mid: 3, max: 4, boost: 5,
   };
   const threshold = levelThresholds[level] || 12;
   const maxSubsPerMech = levelMaxSubs[level] || 1;
@@ -444,6 +658,7 @@ export function calculateSupportPlan(
   const substanceReasons: Record<string, { mechInfo: string; system: string }[]> = {};
   const systemMechanisms: Record<string, string[]> = {};
   const allMechanisms: PlanMechanism[] = [];
+  const uncoveredMechanisms: Array<{ mechKey: string; mechLabel: string; systemLabel: string; risk: number }> = [];
 
   for (const [sysKey, sysScore] of Object.entries(scores)) {
     const mechKeys = SYS_TO_MECH_KEYS[sysKey] || [];
@@ -451,11 +666,13 @@ export function calculateSupportPlan(
 
     if (sysScore >= threshold || (includeAllSystems && sysScore > 0)) {
       for (const mechKey of mechKeys) {
-        const bridgeSubs = MECHANISM_TO_SUPPORT_SUBSTANCE[mechKey] || [];
-        if (bridgeSubs.length === 0) continue;
-
+        // Use auto-indexer: finds ALL catalog substances matching this mechanism
+        const bridgeSubs = findCatalogSubstancesForBridgeMech(mechKey);
         const normSubs = bridgeSubs.map(normalizeId).filter(id => !excludedSubs.has(id) && catalogExists(id));
-        if (normSubs.length === 0) continue;
+        if (normSubs.length === 0) {
+          uncoveredMechanisms.push({ mechKey, mechLabel: MECH_LABELS[mechKey] || mechKey, systemLabel: SYS_LABELS[sysKey] || sysKey, risk: sysScore });
+          continue;
+        }
 
         activatedMechs.push(mechKey);
 
@@ -494,6 +711,28 @@ export function calculateSupportPlan(
       }
     }
     if (activatedMechs.length > 0) systemMechanisms[sysKey] = activatedMechs;
+  }
+
+  // ─── LAB-BASED SUBSTANCE SELECTION ───
+  const labFindings: PlanResult['labFindings'] = [];
+  for (const abn of abnormalLabs) {
+    const suggestedSubs = abn.correctionIds.filter(id => !selectedIds.has(id) && !excludedSubs.has(id));
+    const normSuggested = suggestedSubs.map(normalizeId).filter(id => catalogExists(id));
+    labFindings.push({
+      marker: abn.marker, name: abn.name, value: `${abn.value} ${abn.unit}`,
+      threshold: `${abn.higherIsWorse ? '>' : '<'}${abn.threshold} ${abn.unit}`,
+      organ: abn.organ, suggestedSubs: normSuggested,
+    });
+    // For mid+ levels, auto-add lab-indicated substances
+    if ((level === 'mid' || level === 'max' || level === 'boost') && normSuggested.length > 0) {
+      for (const subId of normSuggested.slice(0, 2)) {
+        if (!selectedIds.has(subId)) {
+          selectedIds.add(subId);
+          if (!substanceReasons[subId]) substanceReasons[subId] = [];
+          substanceReasons[subId].push({ mechInfo: `Лаб-индикация: ${abn.name} (${abn.marker}) отклонён от нормы`, system: abn.system });
+        }
+      }
+    }
   }
 
   // ─── Add essential base substances for all levels ───
@@ -623,11 +862,16 @@ export function calculateSupportPlan(
     const mechReason = reasons.map(r => r.mechInfo).join('; ') || 'Общая поддержка';
     const systems = reasons.map(r => r.system).filter((v, i, a) => a.indexOf(v) === i);
 
-    // Adjust doses based on level
+    // Adjust doses based on level AND week scaling
     let doseMultiplier = 1;
     if (level === 'mid') doseMultiplier = 1.2;
     else if (level === 'max') doseMultiplier = 1.5;
     else if (level === 'boost') doseMultiplier = 1.8;
+    doseMultiplier *= weekScale;
+    // Pharma drugs: slower ramp-up
+    const pharmaIds = ['telmisartan', 'nebivolol', 'anastrozole', 'cabergoline'];
+    const pharmaWeekScale = cw <= 2 ? 0.5 : cw <= 4 ? 0.75 : 1.0;
+    if (pharmaIds.includes(id)) doseMultiplier = pharmaWeekScale;
 
     // Special dose adjustments
     let adjustedDose = dose.mg;
@@ -674,23 +918,41 @@ export function calculateSupportPlan(
     dosages[s.id] = { mg: s.doseMg, timing: s.timing };
   }
 
-  // ─── Build systems map ───
+  // ─── Build systems map with weighted mechanism coverage ───
   const systemsResult: Record<string, { raw: number; net: number; mechanisms: string[] }> = {};
   for (const [sys, score] of Object.entries(scores)) {
     const mechs = systemMechanisms[sys] || [];
-    const protection = level === 'basic' ? 0.3 : level === 'mid' ? 0.5 : level === 'max' ? 0.65 : 0.75;
+    const totalMechs = (SYS_TO_MECH_KEYS[sys] || []).length || 1;
+    let totalCoverage = 0;
+    for (const mechKey of mechs) {
+      const mechData = allMechanisms.find(m => m.mechKey === mechKey);
+      const subCount = mechData?.substances?.length || 0;
+      totalCoverage += Math.min(0.85, subCount * 0.15);
+    }
+    const avgCoverage = Math.min(0.75, totalCoverage / totalMechs);
+    const levelBase = level === 'basic' ? 0.25 : level === 'mid' ? 0.40 : level === 'max' ? 0.55 : 0.65;
+    const effectiveProtection = Math.min(0.80, levelBase + avgCoverage * 0.25);
     systemsResult[sys] = {
       raw: score,
-      net: Math.max(0, Math.round(score * (1 - protection))),
+      net: Math.max(0, Math.round(score * (1 - effectiveProtection))),
       mechanisms: mechs,
     };
   }
 
-  // ─── Risk dynamics ───
+  // ─── Risk dynamics with substance-aware coverage ───
   const riskDynamics = Object.entries(scores).map(([sys, raw]) => {
     const sysMechs = allMechanisms.filter(m => SYS_TO_MECH_KEYS[sys]?.includes(m.mechKey));
-    const protection = level === 'basic' ? 0.3 : level === 'mid' ? 0.5 : level === 'max' ? 0.65 : 0.75;
-    return { system: sys, before: raw, after: Math.max(0, Math.round(raw * (1 - protection))), mechanisms: sysMechs };
+    const totalMechs = (SYS_TO_MECH_KEYS[sys] || []).length || 1;
+    let totalCoverage = 0;
+    for (const mechKey of (systemMechanisms[sys] || [])) {
+      const mechData = sysMechs.find(m => m.mechKey === mechKey);
+      const subCount = mechData?.substances?.length || 0;
+      totalCoverage += Math.min(0.85, subCount * 0.15);
+    }
+    const avgCoverage = Math.min(0.75, totalCoverage / totalMechs);
+    const levelBase = level === 'basic' ? 0.25 : level === 'mid' ? 0.40 : level === 'max' ? 0.55 : 0.65;
+    const effectiveProtection = Math.min(0.80, levelBase + avgCoverage * 0.25);
+    return { system: sys, before: raw, after: Math.max(0, Math.round(raw * (1 - effectiveProtection))), mechanisms: sysMechs };
   });
 
   // ─── Coverage percent ───
@@ -706,9 +968,37 @@ export function calculateSupportPlan(
   // ─── Special instructions ───
   const specialInstructions = buildSpecialInstructions(substances);
 
-  const overallRaw = Math.round(Math.max(...Object.values(scores)));
-  const protection = level === 'basic' ? 0.3 : level === 'mid' ? 0.5 : level === 'max' ? 0.65 : 0.75;
-  const overallAfter = Math.round(overallRaw * (1 - protection));
+  const systemScores = Object.values(scores);
+  const overallRaw = systemScores.length > 0 ? Math.round(systemScores.reduce((a, b) => a + b, 0) / systemScores.length) : 0;
+  let weightedProtectionSum = 0;
+  let activeSystems = 0;
+  for (const [sys, score] of Object.entries(scores)) {
+    if (score > 0) {
+      const sysResult = systemsResult[sys];
+      const ep = Math.max(0, Math.min(0.8, score > 0 ? (score - (sysResult?.net || score)) / score : 0));
+      weightedProtectionSum += ep;
+      activeSystems++;
+    }
+  }
+  const avgProtection = activeSystems > 0 ? weightedProtectionSum / activeSystems : 0.3;
+  const overallAfter = Math.round(overallRaw * (1 - Math.min(0.8, avgProtection)));
+
+  // ─── Coverage gaps ───
+  const coverageGaps: PlanResult['coverageGaps'] = [];
+  for (const [sys, score] of Object.entries(scores)) {
+    if (score > 0) {
+      const sysLabel = SYS_LABELS[sys] || sys;
+      const sysResult = systemsResult[sys];
+      const net = sysResult?.net || score;
+      const gapPercent = Math.round(((score - net) / Math.max(1, score)) * 100);
+      if (gapPercent > 50) {
+        coverageGaps.push({ system: sys, label: sysLabel, raw: score, net, gapPercent });
+      }
+    }
+  }
+
+  // ─── Stack recommendations ───
+  const stackRecommendations = recommendStacks(scores, selectedIds, level);
 
   return {
     substances,
@@ -723,6 +1013,11 @@ export function calculateSupportPlan(
     riskDynamics,
     overallRiskBefore: overallRaw,
     overallRiskAfter: overallAfter,
+    labFindings,
+    uncoveredMechanisms,
+    coverageGaps,
+    weekScale: weekScale,
+    stackRecommendations,
   };
 }
 

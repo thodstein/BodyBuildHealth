@@ -466,7 +466,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       powerLevel: (supportLevel as PowerLevel),
       courseWeek: courseWeekState,
     };
-    const result = calculateSupportPlan(state, supportLevel as PowerLevel, jointMode, boostEnabled, enhancedSubs);
+    const result = calculateSupportPlan(state, supportLevel as PowerLevel, jointMode, boostEnabled, enhancedSubs, linked.labs);
     // Store result for detailed UI
     setTimeout(() => setPlanResult(result), 0);
     // Map to a backwards-compatible effectiveLevel format
@@ -5381,11 +5381,23 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         <div key={id} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)', fontSize:9 }}>
                           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
                             <span style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</span>
-                            {d && <span style={{ color:'#00e68a', fontSize:8, fontWeight:600 }}>{d.mg >= 5000 ? `${(d.mg/1000).toFixed(1)} г` : `${d.mg} мг`} — {d.timing}</span>}
+                            <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                              {d && <span style={{ color:'#00e68a', fontSize:8, fontWeight:600 }}>{d.mg >= 5000 ? `${(d.mg/1000).toFixed(1)} г` : `${d.mg} мг`} — {d.timing}</span>}
+                              <span onClick={(e) => { e.stopPropagation(); setEnhancedSubs(prev => prev.filter(s => s !== id)); }} style={{ cursor:'pointer', fontSize:10, color:'#ef4444', padding:'0 4px', lineHeight:1 }} title="Удалить из плана">✕</span>
+                            </div>
                           </div>
                           {planInfo?.comment && (
                             <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.3, marginTop:1, paddingLeft:4, borderLeft:'2px solid rgba(0,230,138,0.3)' }}>
                               {planInfo.comment}
+                              {planResult?.mechanisms && (
+                                (() => {
+                                  const coveredMechs = planResult.mechanisms.filter((m: any) => (m.substances || []).includes(id));
+                                  if (coveredMechs.length > 0) {
+                                    return <span style={{ color:'#60a5fa', marginLeft:4 }}>({coveredMechs.length} мех.)</span>;
+                                  }
+                                  return null;
+                                })()
+                              )}
                             </div>
                           )}
                         </div>
@@ -5399,6 +5411,90 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>⚡ Принцип синергии стека</div>
                       <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5, whiteSpace:'pre-line' }}>
                         {planResult.synergyComment}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== RISK DYNAMICS CARD ===== */}
+
+                  {/* ===== LAB FINDINGS CARD ===== */}
+                  {planResult?.labFindings && planResult.labFindings.length > 0 && (
+                    <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(96,165,250,0.03)', border:'1px solid rgba(96,165,250,0.12)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>🔬 Находки по анализам</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                        {planResult.labFindings.map((lf: any, i: number) => (
+                          <div key={i} style={{ marginBottom:4, padding:'4px 6px', borderRadius:4, background:'rgba(255,255,255,0.03)' }}>
+                            <span style={{ fontWeight:600, color:'#f59e0b' }}>{lf.name}</span>
+                            <span style={{ color:'var(--text-dim)' }}>: {lf.value} (норма: {lf.threshold})</span>
+                            {lf.suggestedSubs.length > 0 && (
+                              <div style={{ fontSize:7, color:'#22c55e', marginTop:2 }}>
+                                💊 Рекомендовано: {lf.suggestedSubs.join(', ')}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== COVERAGE GAPS CARD ===== */}
+                  {planResult?.coverageGaps && planResult.coverageGaps.length > 0 && (
+                    <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(239,68,68,0.03)', border:'1px solid rgba(239,68,68,0.12)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#ef4444', marginBottom:6 }}>⚠️ Системы с недостаточным покрытием</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                        {planResult.coverageGaps.map((gap: any, i: number) => (
+                          <div key={i} style={{ marginBottom:3 }}>
+                            <span style={{ fontWeight:600, color:'var(--text-light)' }}>{gap.label}</span>: риск {gap.raw}% → {gap.net}% (покрыто {100 - gap.gapPercent}%)
+                            <div style={{ height:4, borderRadius:2, background:'rgba(239,68,68,0.15)', marginTop:2, overflow:'hidden' }}>
+                              <div style={{ width:`${100 - gap.gapPercent}%`, height:'100%', borderRadius:2, background:'#ef4444' }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== UNCOVERED MECHANISMS CARD ===== */}
+                  {planResult?.uncoveredMechanisms && planResult.uncoveredMechanisms.length > 0 && (
+                    <details style={{ marginBottom:10 }}>
+                      <summary style={{ fontSize:10, fontWeight:700, color:'#8b5cf6', cursor:'pointer', marginBottom:4 }}>🔍 Непокрытые механизмы ({planResult.uncoveredMechanisms.length})</summary>
+                      <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(139,92,246,0.03)', border:'1px solid rgba(139,92,246,0.1)', fontSize:7, color:'var(--text-dim)', lineHeight:1.4, maxHeight:'25vh', overflowY:'auto' }}>
+                        {planResult.uncoveredMechanisms.map((um: any, i: number) => (
+                          <div key={i} style={{ marginBottom:1 }}>• {um.systemLabel} → {um.mechLabel} (риск: {um.risk}%)</div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+
+                  {/* ===== STACK RECOMMENDATIONS CARD ===== */}
+                  {planResult?.stackRecommendations && planResult.stackRecommendations.length > 0 && (
+                    <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.15)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>🧩 Рекомендованные стеки</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                        {planResult.stackRecommendations.slice(0, 3).map((sr: any, i: number) => (
+                          <div key={i} style={{ marginBottom:6, padding:'6px 8px', borderRadius:6, background:'rgba(0,0,0,0.06)', border:'1px solid var(--border)' }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:3 }}>
+                              <span style={{ fontWeight:700, color:'var(--text-light)', fontSize:9 }}>{sr.stack.name}</span>
+                              <span style={{ fontSize:8, fontWeight:700, color: sr.score >= 70 ? '#22c55e' : sr.score >= 40 ? '#f59e0b' : 'var(--text-dim)' }}>
+                                {sr.score}/100
+                              </span>
+                            </div>
+                            <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:2 }}>{sr.reason}</div>
+                            <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                              {sr.stack.substances.slice(0, 5).map((sub: any, j: number) => (
+                                <span key={j} style={{ padding:'1px 5px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'var(--accent)', fontSize:7 }}>{sub.id}</span>
+                              ))}
+                              {sr.stack.substances.length > 5 && <span style={{ fontSize:7, color:'var(--text-dim)' }}>+{sr.stack.substances.length - 5}</span>}
+                            </div>
+                            {sr.wasteSubstances && sr.wasteSubstances.length > 0 && (
+                              <div style={{ fontSize:6, color:'#ef4444', marginTop:2 }}>⚠ Избыточно: {sr.wasteSubstances.join(', ')}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:4 }}>
+                        💡 Стеки оцениваются по покрытию рисков, синергии и отсутствию избыточных веществ.
+                        Приоритет — стеки, которые закрывают максимум механизмов минимумом препаратов.
                       </div>
                     </div>
                   )}
