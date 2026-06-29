@@ -27,7 +27,7 @@ const ALLERGEN_LIST: { id: string; icon: string; label: string }[] = [
   { id: 'gluten', icon: '🌾', label: 'Глютен' },
   { id: 'nuts', icon: '🥜', label: 'Орехи' },
   { id: 'eggs', icon: '🥚', label: 'Яйца' },
-  { id: 'soy', icon: '?', label: 'Соя' },
+  { id: 'soy', icon: '🫘', label: 'Соя' },
   { id: 'seafood', icon: '🦐', label: 'Морепродукты' },
   { id: 'histamine', icon: '🧪', label: 'Гистамин' },
   { id: 'sulfites', icon: '🧴', label: 'Сульфиты' },

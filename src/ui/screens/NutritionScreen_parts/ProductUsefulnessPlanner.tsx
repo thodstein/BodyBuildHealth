@@ -5,7 +5,7 @@ import { scoreAllProducts, compareProducts, calcMealScore, CATEGORY_LABELS, GOAL
 import type { MealProduct, SavedMeal, MealScore } from '../../../engines/product-usefulness.engine';
 import { calculateOverallScore, scoreAllProductsV2, compareProductsV2, calcMealScoreV2, calcDIAAS, analyzeDailyDiet, getDefaultProfile, type UserDietProfile, type V2ScoreResult } from '../../../engines/product-usefulness-v2.engine';
 
-type PlannerTab = 'settings' | 'catalog' | 'compare' | 'meal';
+type PlannerTab = 'dashboard' | 'settings' | 'catalog' | 'compare' | 'meal' | 'swap';
 type SortKey = 'score' | 'name' | 'protein' | 'kcal';
 
 const PILL = (active: boolean, color = '#00e68a') => ({
@@ -90,6 +90,9 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   const [mealTab, setMealTab] = useState<'compose' | 'saved'>('compose');
   const [sourcePicker, setSourcePicker] = useState<{ source: string; title: string; items: Array<{ id: string; name: string; label?: string }> } | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [swapFrom, setSwapFrom] = useState('');
+  const [swapResults, setSwapResults] = useState<{ food: any; score: any; improvement: number }[]>([]);
+  const [mealTiming, setMealTiming] = useState<'any' | 'pre' | 'post'>('any');
 
   const [useV2, setUseV2] = useState(true);
   const [v2Profile, setV2Profile] = useState<UserDietProfile>(getDefaultProfile());
@@ -247,11 +250,103 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   return (
     <div style={{ padding: '0 2px' }}>
       <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+        <button onClick={() => setPlannerTab('dashboard')} style={PILL(plannerTab === 'dashboard', '#00e68a')}>📊 Дашборд</button>
         <button onClick={() => setPlannerTab('settings')} style={PILL(plannerTab === 'settings', '#f59e0b')}>⚙️</button>
         <button onClick={() => setPlannerTab('catalog')} style={PILL(plannerTab === 'catalog', '#3b82f6')}>📦 {filtered.length > 0 && `(${filtered.length})`}</button>
         <button onClick={() => setPlannerTab('compare')} style={PILL(plannerTab === 'compare', '#8b5cf6')}>⚖️ {compareIds.length > 0 && `(${compareIds.length})`}</button>
         <button onClick={() => setPlannerTab('meal')} style={PILL(plannerTab === 'meal', '#f97316')}>🍽️ Приём</button>
+        <button onClick={() => setPlannerTab('swap')} style={PILL(plannerTab === 'swap', '#ec4899')}>🔄 Замена</button>
       </div>
+
+      {plannerTab === 'dashboard' && (() => {
+        const sorted = [...scored].sort((a, b) => b.score.total - a.score.total);
+        const top5 = sorted.slice(0, 5);
+        const worst5 = sorted.slice(-5).reverse();
+        const catAvg: Record<string, { total: number; count: number }> = {};
+        scored.forEach(({ food, score }) => {
+          const cat = CATEGORY_LABELS[food.category] || food.category;
+          if (!catAvg[cat]) catAvg[cat] = { total: 0, count: 0 };
+          catAvg[cat].total += score.total; catAvg[cat].count++;
+        });
+        const avgByCat = Object.entries(catAvg).map(([cat, d]) => ({ cat, avg: Math.round(d.total / d.count), count: d.count }));
+        avgByCat.sort((a, b) => b.avg - a.avg);
+        const phaseRecs: Record<string, { title: string; tips: string[] }> = {
+          mass: { title: '🏋️ Набор массы', tips: ['Высокий белок (≥20г/100г)','Высокая калорийная плотность','Быстрые углеводы вокруг тренировки','Красное мясо, яйца, рис, картофель','Молочные продукты для доп. калорий'] },
+          cut: { title: '🔥 Сушка', tips: ['Низкая калорийная плотность','Высокий белок (≥25г/100г)','Много клетчатки (≥3г/100г)','Овощи, куриная грудка, рыба','Минимум насыщенных жиров'] },
+          strength: { title: '💪 Сила', tips: ['Белок 2.0-2.5 г/кг','Углеводы для энергии','Креатин-богатые продукты','Калий для нервно-мышечной','Достаточно калорий для восстановления'] },
+          maintenance: { title: '⚖️ Поддержка', tips: ['Сбалансированные макросы','Разнообразие продуктов','Контроль порций','Минимум переработанного','Омега-3 ежедневно'] },
+        };
+        const goal = manualGoal || profileGoal || 'maintenance';
+        const rec = phaseRecs[goal] || phaseRecs.maintenance;
+        const avgScore = scored.length > 0 ? Math.round(scored.reduce((s, x) => s + x.score.total, 0) / scored.length) : 0;
+
+        return <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ borderRadius:12, padding:14, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.1)', textAlign:'center' }}>
+            <div style={{ fontSize:28, fontWeight:800, color:'#00e68a' }}>{avgScore}</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)' }}>средний скор по {scored.length} продуктам</div>
+            <div style={{ marginTop:8, display:'flex', justifyContent:'center', gap:12 }}>
+              <div style={{ textAlign:'center' }}><div style={{ fontSize:18, fontWeight:800, color:'#22c55e' }}>{top5.length}</div><div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>топ-5</div></div>
+              <div style={{ textAlign:'center' }}><div style={{ fontSize:18, fontWeight:800, color:'#ef4444' }}>{worst5.length}</div><div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>худшие-5</div></div>
+              <div style={{ textAlign:'center' }}><div style={{ fontSize:18, fontWeight:800, color:'#8b5cf6' }}>{Object.keys(catAvg).length}</div><div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>категорий</div></div>
+            </div>
+          </div>
+
+          <div style={{ borderRadius:12, padding:12, background:'rgba(34,197,94,0.05)', border:'1px solid rgba(34,197,94,0.1)' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:8 }}>🏆 Топ-5 продуктов</div>
+            {top5.map(({ food, score }) => (
+              <div key={food.id} style={{ display:'flex',alignItems:'center',gap:6,padding:'6px 8px',borderRadius:8,marginBottom:3,background:'rgba(34,197,94,0.04)',border:'1px solid rgba(34,197,94,0.08)' }}>
+                <div style={{ width:28,height:28,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',background:'#22c55e20',fontSize:13,fontWeight:800,color:'#22c55e',flexShrink:0 }}>{score.total}</div>
+                <div style={{ flex:1,minWidth:0 }}>
+                  <div style={{ fontSize:9,fontWeight:600,color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{food.name}</div>
+                  <div style={{ fontSize:7,color:'rgba(255,255,255,0.9)' }}>{food.kcal}ккал · Б{food.protein} Ж{food.fat} У{food.carbs}</div>
+                </div>
+                <span style={{ fontSize:7,color:'#22c55e',fontWeight:700 }}>{score.label}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ borderRadius:12, padding:12, background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.1)' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:8 }}>⚠️ Требуют улучшения</div>
+            {worst5.map(({ food, score }) => (
+              <div key={food.id} style={{ display:'flex',alignItems:'center',gap:6,padding:'6px 8px',borderRadius:8,marginBottom:3,background:'rgba(239,68,68,0.04)',border:'1px solid rgba(239,68,68,0.08)' }}>
+                <div style={{ width:28,height:28,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',background:'#ef444420',fontSize:13,fontWeight:800,color:'#ef4444',flexShrink:0 }}>{score.total}</div>
+                <div style={{ flex:1,minWidth:0 }}>
+                  <div style={{ fontSize:9,fontWeight:600,color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{food.name}</div>
+                  <div style={{ fontSize:7,color:'rgba(255,255,255,0.9)' }}>{food.kcal}ккал · Б{food.protein} Ж{food.fat} У{food.carbs}</div>
+                </div>
+                <span style={{ fontSize:7,color:'#ef4444',fontWeight:700 }}>{score.label}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ borderRadius:12, padding:12, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.1)' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#8b5cf6', marginBottom:8 }}>📊 Средний скор по категориям</div>
+            {avgByCat.map(({ cat, avg, count }) => (
+              <div key={cat} style={{ display:'flex',alignItems:'center',gap:6,marginBottom:4 }}>
+                <span style={{ fontSize:8,color:'rgba(255,255,255,0.8)',minWidth:80 }}>{cat}</span>
+                <div style={{ flex:1,height:5,borderRadius:3,background:'rgba(255,255,255,0.06)',overflow:'hidden' }}>
+                  <div style={{ width:`${Math.min(100,avg*10)}%`,height:'100%',borderRadius:3,background:avg>=7?'#22c55e':avg>=5?'#f59e0b':'#ef4444',transition:'width 0.3s' }}/>
+                </div>
+                <span style={{ fontSize:8,fontWeight:700,color:avg>=7?'#22c55e':avg>=5?'#f59e0b':'#ef4444',minWidth:24,textAlign:'right' }}>{avg}</span>
+                <span style={{ fontSize:6,color:'rgba(255,255,255,0.4)',minWidth:16 }}>({count})</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.05)', border:'1px solid rgba(245,158,11,0.1)' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>{rec.title}</div>
+            {rec.tips.map((tip, i) => (
+              <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.85)', padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
+                • {tip}
+              </div>
+            ))}
+            <div style={{ marginTop:6, fontSize:7, color:'rgba(255,255,255,0.5)', lineHeight:1.4 }}>
+              💡 Используйте фильтры в каталоге и сортировку по скору, чтобы найти лучшие продукты под вашу цель.
+              Включите модули A (нутриенты), B (контекст) и C (цена) для полной оценки.
+            </div>
+          </div>
+        </div>;
+      })()}
 
       {plannerTab === 'settings' && (
         <div style={{ borderRadius: 12, padding: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
@@ -387,6 +482,30 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               </div>
             )}
           </div>
+          {useV2 && (
+            <div style={{ borderTop:'1px solid rgba(255,255,255,0.04)', paddingTop:8, marginTop:8 }}>
+              <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>🧬 Как считается скор (v2)</div>
+              <div style={{ display:'flex',flexDirection:'column',gap:4 }}>
+                {[
+                  { label:'🥩 Белок/калории', desc:'Белок (г) × 4 / ккал. Идеал >0.35. Базовый фактор качества.', max:'40%' },
+                  { label:'🧬 Аминокислоты', desc:'Лейцин (мг/100г) + EAA баланс. Критично для mTOR.', max:'15%' },
+                  { label:'🌾 Клетчатка', desc:'г/100г. Сытость, микробиом, гликемический контроль.', max:'10%' },
+                  { label:'📊 ГИ/ИИ', desc:'Гликемический и инсулиновый индекс. Ниже = лучше (кроме pre-workout).', max:'10%' },
+                  { label:'🧈 Жиры', desc:'Насыщенные vs омега-3. Штраф при ААС/курсе.', max:'10%' },
+                  { label:'⚡ Микронутриенты', desc:'Плотность витаминов и минералов на 100 ккал.', max:'15%' },
+                ].map((f,i) => (
+                  <div key={i} style={{ display:'flex',alignItems:'center',gap:6,padding:'4px 6px',borderRadius:6,background:'rgba(255,255,255,0.02)' }}>
+                    <span style={{ fontSize:7,color:'rgba(255,255,255,0.8)',minWidth:80 }}>{f.label}</span>
+                    <span style={{ fontSize:6,color:'rgba(255,255,255,0.5)',flex:1 }}>{f.desc}</span>
+                    <span style={{ fontSize:7,fontWeight:700,color:'#8b5cf6' }}>{f.max}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop:6,fontSize:7,color:'rgba(255,255,255,0.5)',lineHeight:1.4 }}>
+                Финальный скор = средневзвешенная сумма модулей с поправками: контекст (фаза ×0.15, фарма ×0.15, анализы ×0.10), цена (белок/₽ ×0.10). Итог: 0-100.
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -715,6 +834,20 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                   </div>
                 </div>
               )}
+              <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+                {([
+                  { key: 'any', label: '🕐 Любое время' },
+                  { key: 'pre', label: '🔥 Пред-тренировка' },
+                  { key: 'post', label: '🍗 Пост-тренировка' },
+                ] as const).map(t => (
+                  <button key={t.key} onClick={() => setMealTiming(t.key)} style={{
+                    flex:1, padding:'6px 4px', borderRadius:8, cursor:'pointer', fontSize:8, fontWeight:600,
+                    background: mealTiming===t.key?'rgba(249,115,22,0.12)':'rgba(255,255,255,0.03)',
+                    border: mealTiming===t.key?'1px solid rgba(249,115,22,0.25)':'1px solid rgba(255,255,255,0.06)',
+                    color: mealTiming===t.key?'#f97316':'rgba(255,255,255,0.7)',
+                  }}>{t.label}</button>
+                ))}
+              </div>
               <div style={{ position: 'relative', marginBottom: 8 }}>
                 <input value={mealSearch} onChange={e => setMealSearch(e.target.value)} placeholder="🔍 Добавить продукт к приёму..." style={{
                   width: '100%', padding: '8px 10px', borderRadius: 10, fontSize: 10, background: '#202023',
@@ -800,6 +933,12 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                   <button onClick={() => {
                     const result = useV2 ? calcMealScoreV2(mealProducts, v2Profile) : calcMealScore(mealProducts, opts);
+                    if (result && mealTiming !== 'any') {
+                      const timingMod = mealTiming === 'pre' ? 1.05 : 1.08;
+                      (result as any).compositeScore = Math.min(100, Math.round((result as any).compositeScore * timingMod));
+                      (result as any).label = (result as any).compositeScore >= 85 ? '💎 Элитный' : (result as any).compositeScore >= 70 ? '⭐ Отличный' : (result as any).compositeScore >= 50 ? '👍 Хороший' : (result as any).compositeScore >= 30 ? '⚡ Базовый' : '⚠️ Слабый';
+                      (result as any).timingNote = mealTiming === 'pre' ? '🔥 Pre-workout: +5% за быстрые углеводы, кофеин' : '🍗 Post-workout: +8% за белок и восстановление';
+                    }
                     setMealResult(result as any);
                   }} style={{
                     padding: '7px 14px', borderRadius: 8, fontSize: 9, border: 'none',
@@ -840,6 +979,11 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                     </div>
                     <ScoreBadge score={mealResult.compositeScore} max={mealResult.maxPossible} color={mealResult.color} label={mealResult.label} />
                   </div>
+                  {(mealResult as any).timingNote && (
+                    <div style={{ fontSize:7, color:'#f97316', marginBottom:8, padding:'4px 8px', borderRadius:6, background:'rgba(249,115,22,0.06)', border:'1px solid rgba(249,115,22,0.1)' }}>
+                      {(mealResult as any).timingNote}
+                    </div>
+                  )}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 8 }}>
                     {[
                       ['🔥', 'Калории', `${mealResult.totalKcal} ккал`],
@@ -912,6 +1056,44 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                   )}
                 </div>
               )}
+              {mealResult && mealProducts.length > 0 && (() => {
+                const diets = analyzeDailyDiet(
+                  [{ products: mealProducts.map(mp => ({ foodId: mp.foodId, weightGrams: mp.weightGrams })) }],
+                  v2Profile
+                );
+                if (!diets) return null;
+                const bars = [
+                  { label:'🥩 mTOR-активация', value:diets.mtorDeficitMg>0?Math.max(0,100-Math.round(diets.mtorDeficitMg/30*100)):100, max:100, color:'#22c55e', ok:diets.mtorTriggered },
+                  { label:'🧬 Гликемическая нагрузка', value:Math.min(100,Math.round((1-diets.giLoad/100)*100)), max:100, color:diets.giLoadWarning?'#f59e0b':'#22c55e', hint:diets.giLoad.toFixed(0)+' GL' },
+                  { label:'⚖️ PRAL (кислотность)', value:Math.max(0,Math.min(100,50-diets.pralTotal*2)), max:100, color:diets.pralWarning?'#ef4444':'#8b5cf6', hint:diets.pralTotal.toFixed(1) },
+                  { label:'🩸 Аммиак-риск', value:100-diets.ammoniaScore, max:100, color:diets.ammoniaRisk?'#ef4444':'#22c55e' },
+                  { label:'🐟 Омега-баланс', value:Math.min(100,Math.round((1/Math.max(0.1,diets.omegaRatio))*10)), max:100, color:diets.omegaWarning?'#ef4444':'#3b82f6', hint:diets.omegaRatio.toFixed(1)+':1' },
+                  { label:'⚡ Электролиты', value:diets.electrolyteRisk?40:80, max:100, color:diets.electrolyteRisk?'#f59e0b':'#06b6d4', hint:'K:'+diets.potassiumMg.toFixed(0)+' Mg:'+diets.magnesiumMg.toFixed(0) },
+                  { label:'🍬 Инсулин-риск', value:diets.insulinRicohet?30:85, max:100, color:diets.insulinRicohet?'#f97316':'#22c55e' },
+                ];
+                return (
+                  <div style={{ borderRadius:12, padding:12, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.1)', marginTop:8 }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#8b5cf6', marginBottom:8 }}>📊 Анализ дневного рациона</div>
+                    <div style={{ display:'flex',flexDirection:'column',gap:4 }}>
+                      {bars.map(b => (
+                        <div key={b.label} style={{ display:'flex',alignItems:'center',gap:6 }}>
+                          <span style={{ fontSize:7,color:'rgba(255,255,255,0.8)',minWidth:110 }}>{b.label}</span>
+                          <div style={{ flex:1,height:5,borderRadius:3,background:'rgba(255,255,255,0.06)',overflow:'hidden' }}>
+                            <div style={{ width:`${Math.min(100,b.value)}%`,height:'100%',borderRadius:3,background:b.color,transition:'width 0.5s' }}/>
+                          </div>
+                          <span style={{ fontSize:7,fontWeight:700,color:b.color,minWidth:28,textAlign:'right' }}>{b.value}</span>
+                          {(b as any).hint && <span style={{ fontSize:6,color:'rgba(255,255,255,0.4)',minWidth:30,textAlign:'right' }}>{(b as any).hint}</span>}
+                        </div>
+                      ))}
+                    </div>
+                    {(diets.pralWarning || diets.omegaWarning || diets.diaasWarning || diets.antinutrientWarning || diets.glutathioneWarning || diets.histamineWarning) && (
+                      <div style={{ marginTop:8,fontSize:7,color:'#ef4444',lineHeight:1.4 }}>
+                        {[diets.pralWarning,diets.omegaWarning,diets.diaasWarning,diets.antinutrientWarning,diets.glutathioneWarning,diets.histamineWarning].filter(Boolean).map((w,i)=><div key={i}>⚠️ {w}</div>)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -962,6 +1144,78 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {plannerTab === 'swap' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ borderRadius:12, padding:12, background:'rgba(236,72,153,0.05)', border:'1px solid rgba(236,72,153,0.1)' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#ec4899', marginBottom:6 }}>🔄 Найти лучшую замену</div>
+            <div style={{ fontSize:8, color:'rgba(255,255,255,0.8)', marginBottom:8, lineHeight:1.4 }}>
+              Выберите продукт — алгоритм найдёт лучшие альтернативы в той же категории с более высоким скором полезности.
+            </div>
+            <div style={{ position:'relative', marginBottom:10 }}>
+              <input value={swapFrom} onChange={e => setSwapFrom(e.target.value)} placeholder="🔍 Название продукта..." style={{
+                width:'100%', padding:'10px 12px', borderRadius:10, fontSize:11, background:'#202023',
+                border:'1px solid rgba(236,72,153,0.2)', color:'#fff', outline:'none', boxSizing:'border-box',
+              }} />
+              {swapFrom && <span onClick={()=>{setSwapFrom('');setSwapResults([]);}} style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',color:'rgba(255,255,255,0.8)',cursor:'pointer',fontSize:14}}>✕</span>}
+            </div>
+            <button onClick={() => {
+              const searchQ = swapFrom.toLowerCase().trim();
+              if (!searchQ) return;
+              const found = scored.filter(({food}) => food.name.toLowerCase().includes(searchQ));
+              if (found.length === 0) { setSwapResults([]); return; }
+              const target = found[0];
+              const targetCat = target.food.category;
+              const sameCat = scored.filter(({food}) => food.category === targetCat && food.id !== target.food.id);
+              const withImprovement = sameCat
+                .filter(({score}) => score.total > target.score.total)
+                .sort((a,b) => b.score.total - a.score.total)
+                .slice(0, 8)
+                .map(({food,score}) => ({ food, score, improvement: Math.round((score.total - target.score.total) / target.score.total * 100) }));
+              setSwapResults(withImprovement);
+              if (withImprovement.length === 0) showToast('Нет продуктов с более высоким скором в этой категории');
+            }} style={{
+              width:'100%', padding:'10px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700,
+              background:'linear-gradient(135deg,#ec4899,#db2777)', border:'none', color:'#fff',
+            }}>🔍 Найти замену</button>
+          </div>
+
+          {swapResults.length > 0 && (
+            <div style={{ borderRadius:12, padding:12, background:'rgba(34,197,94,0.05)', border:'1px solid rgba(34,197,94,0.1)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:8 }}>
+                ✅ Найдено {swapResults.length} улучшений для «{swapFrom}»
+              </div>
+              {swapResults.map(({ food, score, improvement }) => (
+                <div key={food.id} style={{ display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderRadius:10,marginBottom:4,background:'rgba(34,197,94,0.04)',border:'1px solid rgba(34,197,94,0.08)' }}>
+                  <div style={{ width:32,height:32,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',background:'#22c55e18',fontSize:14,fontWeight:800,color:'#22c55e',flexShrink:0 }}>
+                    +{improvement}%
+                  </div>
+                  <div style={{ flex:1,minWidth:0 }}>
+                    <div style={{ fontSize:10,fontWeight:600,color:'#fff' }}>{food.name}</div>
+                    <div style={{ fontSize:7,color:'rgba(255,255,255,0.9)' }}>
+                      Скор {score.total}/100 · {food.kcal}ккал · Б{food.protein} Ж{food.fat} У{food.carbs} · {CATEGORY_LABELS[food.category]||food.category}
+                    </div>
+                  </div>
+                  <div style={{ fontSize:9,fontWeight:700,color:'#22c55e' }}>↑{improvement}%</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {swapResults.length === 0 && swapFrom && (
+            <div style={{ borderRadius:12, padding:20, textAlign:'center', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.04)' }}>
+              <div style={{ fontSize:36, marginBottom:8 }}>🔍</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)', marginBottom:4 }}>
+                Введите название продукта и нажмите «Найти замену»
+              </div>
+              <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', lineHeight:1.4 }}>
+                Алгоритм найдёт продукты той же категории с более высоким<br/>
+                скором полезности (v2 или классическим) и покажет % улучшения.
+              </div>
             </div>
           )}
         </div>

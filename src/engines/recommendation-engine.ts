@@ -1,6 +1,6 @@
 import type { CalculatorState, CalculatorResult, LabSlice } from './support-calculator.types';
 import { PHARMA_DB } from '../core/pharma-database';
-import { MECHANISM_TO_SUPPORT, ORGAN_TO_SUPPORT, SYSTEM_TO_SUPPORT, CATEGORY_TO_SUPPORT, DRUG_PD_EFFECT_TO_SUPPORT, getSupportEntry, findByMechanisms, findByLabMarker, findByCategoryAndMech, findByOrganAndMech, SUPPORT_CATALOG_DATA, ALL_SUPPORT_IDS, filterByBudget, getEntryTier, getSynergyScore, getConflictScore, scoreCombination, BUDGET_TIER_MAP, getBoostSubstances } from '../data/support-index';
+import { MECHANISM_TO_SUPPORT, ORGAN_TO_SUPPORT, SYSTEM_TO_SUPPORT, CATEGORY_TO_SUPPORT, DRUG_PD_EFFECT_TO_SUPPORT, getSupportEntry, findByMechanisms, findByLabMarker, findByCategoryAndMech, findByOrganAndMech, SUPPORT_CATALOG_DATA, ALL_SUPPORT_IDS, filterByCoverageLevel, getEntryTier, getSynergyScore, getConflictScore, scoreCombination, COVERAGE_TIER_MAP, getBoostSubstances } from '../data/support-index';
 import { getSupportByMechanism, getSupportBySystem, getFullChainSupport } from '../data/mechanism-support-bridge';
 
 export type RecSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
@@ -27,11 +27,12 @@ export interface Recommendation {
   conflicts: string[];
 }
 
-export interface BudgetResult {
-  budget: string;
+export interface CoverageResult {
+  level: string;
   riskBefore: number;
   riskAfter: number;
   coverage: Record<string, number>;
+  avgCoverage: number;
   warning: string | null;
   substanceCount: number;
   synergyScore: number;
@@ -437,7 +438,7 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
     { condition: state.urinary.nephrotoxicDrugs, id:'state_nephrotoxic', severity:'high', system:'renal', label:'Почки', title:'Нефротоксичные препараты', organs:['KIDNEYS'], mechanisms:['RENOPROTECTION'], fallback:['astragalus','taurine','cordyceps'], reasoning:'Нефропротекция', escalation:'Креатинин, мочевина, eGFR каждые 2 нед', monitoring:'Креатинин, eGFR, мочевина каждые 2 нед' },
     { condition: state.urinary.urinationPattern !== 'normal', id:'state_urination', severity:'low', system:'renal', label:'Мочевое', title:'Нарушение мочеиспускания', categories:['urinary_protector'], fallback:['d_mannose','taurine'], reasoning:'Поддержка МВП', escalation:'ОАМ, PSA', monitoring:'ОАМ, PSA каждые 4 нед' },
 
-    // ── ODA/Joints (separate button, excluded in applyBudget) ──
+    // ── ODA/Joints (separate button, excluded in applyCoverageLevel) ──
     { condition: state.oda.jointPain !== 'none' || state.oda.ligamentIssues || state.oda.backPain, id:'state_oda', severity: state.oda.jointPain === 'severe' ? 'high' : 'medium', system:'musculoskeletal', label:'ОДА', title:`ОДА: ${state.oda.jointPain !== 'none' ? 'боль ' + state.oda.jointPain : ''}${state.oda.ligamentIssues ? '· связки ' : ''}${state.oda.backPain ? '· спина ' : ''}${state.oda.injuries.length > 0 ? '· травмы' : ''}`, categories:['joint'], fallback:['collagen_ii','vitamin_c','msm','hyaluronic_acid'], reasoning:'Поддержка ОДА', escalation: state.oda.jointPain === 'severe' ? '+Глюкозамин +Хондроитин' : '', monitoring:'Боль VAS, объем движений, функция' },
 
     // ── Sleep / Cortisol ──
@@ -538,7 +539,7 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
 }
 
 // ─── Budget-aware filtering + synergy ranking ───
-export function applyBudget(recs: Recommendation[], budget: string, jointExclude: boolean = true): { recs: Recommendation[]; synergyScore: number; allIds: string[] } {
+export function applyCoverageLevel(recs: Recommendation[], level: string, jointExclude: boolean = true): { recs: Recommendation[]; synergyScore: number; allIds: string[] } {
   const result: Recommendation[] = [];
   const allIds: string[] = [];
 
@@ -547,7 +548,7 @@ export function applyBudget(recs: Recommendation[], budget: string, jointExclude
     if (jointExclude && (rec.id === 'oda' || rec.system === 'musculoskeletal')) continue;
     if (rec.id === '__week_change') continue;
 
-    const allowed = filterByBudget(rec.substances.map(s => s.id), budget);
+    const allowed = filterByCoverageLevel(rec.substances.map(s => s.id), level);
     if (allowed.length === 0) continue;
 
     // Sort by synergy with already-selected substances
@@ -611,9 +612,9 @@ export function applyBudget(recs: Recommendation[], budget: string, jointExclude
   return { recs: result, synergyScore, allIds };
 }
 
-// ─── Estimate risk after budget ───
-export function computeBudgetRisk(recs: Recommendation[], budget: string, state: CalculatorState, result: CalculatorResult): BudgetResult {
-  const { recs: filtered, synergyScore, allIds } = applyBudget(recs, budget);
+// ─── Estimate risk after coverage level ───
+export function computeCoverageRisk(recs: Recommendation[], level: string, state: CalculatorState, result: CalculatorResult): CoverageResult {
+  const { recs: filtered, synergyScore, allIds } = applyCoverageLevel(recs, level);
   const totalSubs = allIds.length;
 
   // Estimate risk reduction: each substance reduces risk proportionally
@@ -631,18 +632,18 @@ export function computeBudgetRisk(recs: Recommendation[], budget: string, state:
   const avgCov = Object.values(coverage).length > 0 ? Object.values(coverage).reduce((a, b) => a + b, 0) / Object.values(coverage).length : 0;
   const riskAfter = Math.max(5, baseBefore - avgCov);
 
-  const budgetLevels = ['basic', 'mid', 'max', 'boost'];
-  const currentIdx = budgetLevels.indexOf(budget);
+  const coverageLevels = ['basic', 'mid', 'max', 'boost'];
+  const currentIdx = coverageLevels.indexOf(level);
   const warning = riskAfter > 50 && currentIdx < 3
-    ? `⚠️ Текущий уровень «${budget}» не обеспечивает достаточного снижения рисков (${Math.round(riskAfter)}%). Рекомендуется уровень «${budgetLevels[currentIdx + 1]}».`
+    ? `⚠️ Текущий уровень «${level}» не обеспечивает достаточного снижения рисков (${Math.round(riskAfter)}%). Рекомендуется уровень «${coverageLevels[currentIdx + 1]}».`
     : null;
 
-  return { budget, riskBefore: Math.round(baseBefore), riskAfter: Math.round(riskAfter), coverage, warning, substanceCount: totalSubs, synergyScore: Math.round(synergyScore * 100) };
+  return { level, riskBefore: Math.round(baseBefore), riskAfter: Math.round(riskAfter), coverage, avgCoverage: Math.round(avgCov), warning, substanceCount: totalSubs, synergyScore: Math.round(synergyScore * 100) };
 }
 
 // ─── Boost: усилить выбранный уровень элитными препаратами ───
-export function applyBoost(recs: Recommendation[], budget: string): { recs: Recommendation[]; addedSubstances: string[]; riskReduction: number; message: string } {
-  const { recs: filtered } = applyBudget(recs, budget);
+export function applyBoost(recs: Recommendation[], level: string): { recs: Recommendation[]; addedSubstances: string[]; riskReduction: number; message: string } {
+  const { recs: filtered } = applyCoverageLevel(recs, level);
   const allIds = new Set<string>();
   filtered.forEach(r => r.substances.forEach(s => allIds.add(s.id)));
 
@@ -698,7 +699,7 @@ function buildRiskDetail(rec: Recommendation, state?: CalculatorState): string |
   };
 
   const sysLabel = systemLabels[rec.system] || rec.systemLabel || rec.system;
-  const severityLabel = { critical: '🔴 Критический', high: '🟠 Высокий', medium: '🟡 Средний', low: '🟢 Низкий' }[rec.severity] || rec.severity;
+  const severityLabel = { critical: '🔴 Критический', high: '🟠 Высокий', medium: '🟡 Средний', low: '🟢 Низкий', info: 'ℹ️ Информация' }[rec.severity] || rec.severity;
 
   // Try to extract lab values from the recommendation title
   const labMatch = rec.title.match(/\([^)]*:\s*([\d.]+)[^)]*\)/);
@@ -727,7 +728,7 @@ export interface PreApplyLine {
   primarySubs: string[];    // e.g. ["Серрапептаза", "Наттокиназа"]
   escalation: string;       // e.g. "Если не изменится → +Нарингин +Люмброкиназа"
   monitoring: string;       // e.g. "Контроль HCT каждые 4 нед"
-  severity: 'critical' | 'high' | 'medium' | 'low';
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
   riskDetail?: string;      // e.g. "Риск тромбоза: HCT 53% (норма <48%)"
   riskCoverage?: string;    // e.g. "Покрытие: Серрапептаза 35%↓ + Наттокиназа 25%↓ = риск ↓ до среднего"
 }

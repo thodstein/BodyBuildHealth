@@ -486,6 +486,47 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
 
   useEffect(() => { if (profile) { try { updateProfile({ settings: { ...profile.settings, primaryGoal: goal as any } } as any); } catch {} } }, [goal]);
 
+  // Sync from Profile Planner data (he_nutrition_profile)
+  useEffect(() => {
+    try {
+      const pd = JSON.parse(localStorage.getItem('he_nutrition_profile') || '{}');
+      if (!pd || Object.keys(pd).length === 0) return;
+      if (pd.primaryGoal && !goalUserSet) { setGoal(pd.primaryGoal as GoalId); setGoalUserSet(true); }
+      if (pd.budget) setBudget(pd.budget as BudgetLevel);
+      if (pd.mealsCount) setMealsCount(pd.mealsCount);
+      if (pd.dietType && pd.dietType !== 'omnivore') { setDietPrefs([pd.dietType === 'vegetarian' ? 'vegetarian' : pd.dietType]); }
+      if (pd.allergens) {
+        const newAl = Object.entries(pd.allergens).filter(([_,v]) => v).map(([k]) => k);
+        if (newAl.length > 0) setAllergens(newAl);
+      }
+      if (pd.healthIssues) {
+        const newHi = Object.entries(pd.healthIssues).filter(([_,v]) => v).map(([k]) => k);
+        if (newHi.length > 0) setHealthIssues(newHi);
+      }
+      if (pd.targetKcal) { setManualKcal(pd.targetKcal); setKbjuMode('manual'); }
+      if (pd.targetProtein) setManualP(pd.targetProtein);
+      if (pd.targetFat) setManualF(pd.targetFat);
+      if (pd.targetCarbs) setManualC(pd.targetCarbs);
+      if (pd.lazyDayMode) setLazyDayMode(true);
+      if (pd.carbCycling) setCyclingMode('macro');
+      if (pd.trainingDays) setTrainingDays([...Array(pd.trainingDays)].map((_, i) => i < pd.trainingDays));
+      if (pd.sodiumMg) { /* stored for future use in meal generation */ }
+      if (pd.potassiumMg) { /* stored for future use */ }
+      if (pd.magnesiumMg) { /* stored for future use */ }
+      if (pd.pharma) {
+        const ph = typeof pd.pharma === 'object' ? pd.pharma : {};
+        setV2Pharma((prev:any) => ({ ...prev,
+          AAS_ORAL: !!ph.aas_oral || prev.AAS_ORAL,
+          AAS_INJECTABLE: !!ph.aas_inj || prev.AAS_INJECTABLE,
+          HGH: !!ph.hgh || prev.HGH,
+          INSULIN_USE: !!ph.insulin || prev.INSULIN_USE,
+          DIURETICS: !!ph.diuretics || prev.DIURETICS,
+          STIMULATORS: !!ph.stimulants || prev.STIMULATORS,
+        }));
+      }
+    } catch {}
+  }, []); // only on mount
+
   // ─── Generate Plan ───
   const generatePlan = (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number) => {
     setPlanDays(days);

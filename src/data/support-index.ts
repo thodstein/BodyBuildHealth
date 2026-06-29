@@ -164,7 +164,7 @@ export function scoreCombination(ids: string[]): number {
 }
 
 // ─── TIER-based filtering: each budget level maps to different tier compositions ───
-export const BUDGET_TIER_MAP: Record<string, ('base' | 'first' | 'second' | 'third')[]> = {
+export const COVERAGE_TIER_MAP: Record<string, ('base' | 'first' | 'second' | 'third')[]> = {
   basic: ['base', 'first'],
   mid: ['base', 'first', 'second'],
   max: ['base', 'first', 'second', 'third'],
@@ -174,7 +174,7 @@ export const BUDGET_TIER_MAP: Record<string, ('base' | 'first' | 'second' | 'thi
 // Boost: add extra elite substances with synergy ON TOP of existing plan
 // Not a standalone budget — applied as an additional pass
 export function getBoostSubstances(existingIds: string[], limit: number = 6): string[] {
-  const boostTiers = BUDGET_TIER_MAP.boost;
+  const boostTiers = COVERAGE_TIER_MAP.boost;
   const allIds = ALL_SUPPORT_IDS.filter(id => boostTiers.includes(getEntryTier(id)));
   // Filter out already selected
   const candidates = allIds.filter(id => !existingIds.includes(id));
@@ -206,8 +206,8 @@ export function getEntryTier(id: string): 'base' | 'first' | 'second' | 'third' 
 }
 
 // Filter substances by budget level
-export function filterByBudget(ids: string[], budget: string): string[] {
-  const allowedTiers = BUDGET_TIER_MAP[budget] || BUDGET_TIER_MAP.basic;
+export function filterByCoverageLevel(ids: string[], level: string): string[] {
+  const allowedTiers = COVERAGE_TIER_MAP[level] || COVERAGE_TIER_MAP.basic;
   return ids.filter(id => allowedTiers.includes(getEntryTier(id)));
 }
 

@@ -14,17 +14,36 @@ type ResultView = 'cards' | 'compare' | 'report';
 
 /* ─── CONSTANTS ──────────────────────────────────────────────────────────── */
 const GOALS: { key: GoalType; label: string; emoji: string }[] = [
-  { key:'sleep', label:'Сон', emoji:'😴' }, { key:'energy', label:'Энергия', emoji:'⚡' },
-  { key:'concentration', label:'Фокус', emoji:'🎯' }, { key:'muscle_gain', label:'Мышцы', emoji:'💪' },
-  { key:'fat_loss', label:'Жиросжигание', emoji:'🔥' }, { key:'endurance', label:'Выносливость', emoji:'🏃' },
-  { key:'recovery', label:'Восстановление', emoji:'🔄' }, { key:'immunity', label:'Иммунитет', emoji:'🛡️' },
-  { key:'liver_health', label:'Печень', emoji:'🫁' }, { key:'cardio_health', label:'Сердце', emoji:'❤️' },
-  { key:'joints', label:'Суставы', emoji:'🦴' }, { key:'skin', label:'Кожа', emoji:'🧴' },
-  { key:'hair', label:'Волосы', emoji:'💇' }, { key:'hormones', label:'Гормоны', emoji:'⚖️' },
-  { key:'stress', label:'Стресс', emoji:'🧘' }, { key:'longevity', label:'Долголетие', emoji:'⏳' },
-  { key:'detox', label:'Детокс', emoji:'🧹' }, { key:'libido', label:'Либидо', emoji:'🔥' },
-  { key:'mood', label:'Настроение', emoji:'😊' }, { key:'brain', label:'Мозг', emoji:'🧠' },
-  { key:'digestion', label:'ЖКТ', emoji:'🫃' }, { key:'kidney', label:'Почки', emoji:'🫘' },
+  // 🏋️ Физическая форма
+  { key:'muscle_gain', label:'Рост мышц', emoji:'💪' },
+  { key:'fat_loss', label:'Снижение жира', emoji:'🔥' },
+  { key:'endurance', label:'Выносливость', emoji:'🏃' },
+  // 🔄 Восстановление
+  { key:'sleep', label:'Качество сна', emoji:'😴' },
+  { key:'recovery', label:'Восстановление', emoji:'🔄' },
+  // ⚡ Энергия и тонус
+  { key:'energy', label:'Энергия', emoji:'⚡' },
+  { key:'libido', label:'Либидо', emoji:'🔥' },
+  // 🧠 Когнитивные
+  { key:'concentration', label:'Фокус', emoji:'🎯' },
+  { key:'brain', label:'Память и когниция', emoji:'🧠' },
+  // 😊 Психоэмоциональное
+  { key:'mood', label:'Настроение', emoji:'😊' },
+  { key:'stress', label:'Стресс', emoji:'🧘' },
+  // ❤️ Системное здоровье
+  { key:'cardio_health', label:'ССС', emoji:'❤️' },
+  { key:'immunity', label:'Иммунитет', emoji:'🛡️' },
+  { key:'hormones', label:'Гормоны', emoji:'⚖️' },
+  { key:'joints', label:'Суставы', emoji:'🦴' },
+  { key:'digestion', label:'ЖКТ', emoji:'🫃' },
+  { key:'detox', label:'Детокс', emoji:'🧹' },
+  // ⏳ Долгосрочные
+  { key:'longevity', label:'Долголетие', emoji:'⏳' },
+  // 🔬 Органы-мишени
+  { key:'liver_health', label:'Печень', emoji:'🫁' },
+  { key:'skin', label:'Кожа', emoji:'🧴' },
+  { key:'hair', label:'Волосы', emoji:'💇' },
+  { key:'kidney', label:'Почки', emoji:'🫘' },
 ];
 
 const ORGANS: { key: string; label: string; emoji: string }[] = [

@@ -12,7 +12,6 @@ import { addToCart, getCarts, saveCarts, getActiveStoreId, setActiveStoreId, CAR
 import { NutritionCustomFood } from './NutritionScreen_parts/NutritionCustomFood';
 import { NutritionOverview } from './NutritionScreen_parts/NutritionOverview';
 import { ProductUsefulnessPlanner } from './NutritionScreen_parts/ProductUsefulnessPlanner';
-import { HealthAnalytics } from './NutritionScreen_parts/HealthAnalytics';
 import { ProgressTracker } from './NutritionScreen_parts/ProgressTracker';
 import { NutriAdvisor } from './NutritionScreen_parts/NutriAdvisor';
 import { CustomProducts } from './NutritionScreen_parts/CustomProducts';
@@ -29,13 +28,13 @@ import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
 type NutritionPage = 'hero' | 'tabs';
 type NutritionSection = 'diary' | 'planning' | 'overview' | 'analytics' | 'all';
-type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info' | 'customfood' | 'overview' | 'usefulness' | 'health' | 'progress' | 'nutria' | 'visualize' | 'achievements' | 'quests';
+type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info' | 'customfood' | 'overview' | 'usefulness' | 'progress' | 'nutria' | 'visualize' | 'achievements' | 'quests';
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
   overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests'],
   analytics: ['charts', 'reports'],
   diary: ['diary', 'charts', 'reports'],
-  planning: ['mealplan', 'catalog', 'reference', 'info', 'usefulness', 'health', 'recipes'],
+  planning: ['mealplan', 'catalog', 'reference', 'info', 'usefulness', 'recipes'],
   all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests'],
 };
 
@@ -46,7 +45,6 @@ const TAB_LABELS: Record<string, string> = {
   favorites: '⭐ Избранное', catalog: '📦 Каталог',
   reference: '📖 Справочник', recipes: '🍳 Рецепты', reports: '📊 Отчёты', info: 'ℹ️ Инфо',
   usefulness: '🧮 Полезность',
-  health: '🩺 Здоровье',
   progress: '📈 Прогресс',
   nutria: '🧑‍⚕️ Нутрициолог',
   customfood: '📝 Свои',
@@ -378,7 +376,7 @@ const CatalogTab: React.FC = () => {
                 <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                   <span style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{f.name}</span>
                   {bbScore && <span style={{ fontSize:8, padding:'1px 5px', borderRadius:4, background: bbScore >= 7 ? 'rgba(0,230,138,0.1)' : bbScore >= 5 ? 'rgba(249,115,22,0.1)' : 'rgba(239,68,68,0.1)', color: bbScore >= 7 ? '#00e68a' : bbScore >= 5 ? '#f97316' : '#ef4444' }}>{bbScore.toFixed(1)}</span>}
-                  <span style={{ fontSize:7, color:'rgba(255,255,255,0.9)' }}>{isExpanded ? 'в–І' : 'в–ј'}</span>
+                  <span style={{ fontSize:7, color:'rgba(255,255,255,0.9)' }}>{isExpanded ? '▲' : '▼'}</span>
                 </div>
                 <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', marginTop:1 }}>{CATEGORY_LABELS[f.category] || f.category} • {f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs} {f.fiber ? `• В{f.fiber}г` : ''}</div>
               </div>
@@ -601,7 +599,7 @@ const RecipesTab: React.FC = () => {
             background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.1)',
           }}>
             <span style={{ fontSize:9, color:'#a78bfa', fontWeight:600 }}>📝 Мои рецепты ({myRecipes.length})</span>
-            <span style={{ fontSize:10, color:'rgba(255,255,255,0.8)' }}>{myRecExpanded ? 'в–І' : 'в–ј'}</span>
+            <span style={{ fontSize:10, color:'rgba(255,255,255,0.8)' }}>{myRecExpanded ? '▲' : '▼'}</span>
           </div>
           {myRecExpanded && (
             <div style={{ marginTop:4, maxHeight:200, overflowY:'auto' }}>
@@ -697,14 +695,15 @@ const RecipesTab: React.FC = () => {
                   <span style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{mealLabel(r.meal)} {r.name}</span>
                   <span style={{ fontSize:8, color:'rgba(255,255,255,0.75)' }}>{r.prepTimeMin} мин</span>
                 </div>
-                <div style={{ fontSize:10, display:'flex', gap:4, marginTop:2 }}>
+                <div style={{ fontSize:10, display:'flex', gap:4, marginTop:2, alignItems:'center' }}>
                   <span style={{ color:'#00e68a', fontWeight:700 }}>{r.kcal} ккал</span>
                   <span style={{ color:'#60a5fa' }}>Б{r.protein}</span>
                   <span style={{ color:'#fbbf24' }}>Ж{r.fat}</span>
                   <span style={{ color:'#fb923c' }}>У{r.carbs}</span>
+                  {(() => { const qs = r.kcal > 0 ? Math.min(10, Math.round((r.protein * 4 / r.kcal) * 25)) : 0; const qc = qs >= 8 ? '#22c55e' : qs >= 5 ? '#f59e0b' : '#ef4444'; return <span style={{ fontSize:8, fontWeight:700, padding:'1px 5px', borderRadius:4, background:qc+'20', color:qc, border:'1px solid '+qc+'30' }}>⭐{qs}/10</span>; })()}
                 </div>
               </div>
-              <button onClick={() => setRecExpanded(prev => ({...prev, [i]: !prev[i]}))} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', border:'1px solid rgba(255,255,255,0.06)', background:'#18181b', color:'rgba(255,255,255,0.7)' }}>{isExpanded ? 'в–І' : 'в–ј'}</button>
+              <button onClick={() => setRecExpanded(prev => ({...prev, [i]: !prev[i]}))} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', border:'1px solid rgba(255,255,255,0.06)', background:'#18181b', color:'rgba(255,255,255,0.7)' }}>{isExpanded ? '▲' : '▼'}</button>
             </div>
             {r.tags && <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginTop:3 }}>
               {r.tags.map((t: string, j: number) => <span key={j} style={{ padding:'1px 6px', borderRadius:8, fontSize:8, background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.65)' }}>{t}</span>)}
@@ -1283,28 +1282,17 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
 
 const InfoTab: React.FC = () => {
   const sections = [
-    { title: '🎯 Расчёт целей КБЖУ', body: 'Калькулятор использует формулу Миффлина-Сан-Жеора для определения базового метаболизма (BMR), умножает на коэффициент активности (PAL) и корректирует под цель: дефицит 20% для похудения, профицит 10-15% для набора массы, поддержание на уровне TDEE.' },
-    { title: '🔄 Циклирование углеводов', body: 'Чередование высоко- и низкоуглеводных дней для ускорения метаболизма. В тренировочные дни — норма или повышение углеводов, в дни отдыха — снижение на 30-50%. Автоматически привязывается к дням тренировок из профиля.' },
-    { title: '⏱ Тайминг белка', body: 'Равномерное распределение белка (20-40г на приём) каждые 3-4 часа для максимальной стимуляции MPS (мышечного протеинового синтеза). Приоритет: после тренировки (быстрый белок), перед сном (казеин).' },
-    { title: '💉 ИИнсулиновое правило', body: '10г углеводов на 1 ЕД инсулина короткого действия — базовое правило коррекции. Алгоритм учитывает гликемический индекс продуктов и подбирает источники углеводов так, чтобы избежать резких скачков сахара.' },
-    { title: '🥦 Алгоритм подбора продуктов', body: '1) Выбор категории под цель 2) Фильтр по бюджету и предпочтениям 3) Проверка аллергенов 4) Исключение конфликтующих с фармакологией продуктов 5) Рандомизация в рамках пула для разнообразия.' },
-    { title: '⚠ Типичные ошибки', body: '• Пропуск углеводов в тренировочный день\n• Недостаток жиров (ниже 0.8г/кг)\n• Слишком быстрый дефицит (>30% от TDEE)\n• Игнорирование клетчатки (нужно 25-35г/день)\n• Однообразный рацион (дефицит микронутриентов)' },
-    { title: '🛒 Корзина с магазинами', body: 'Поддержка нескольких магазинов: добавляйте, переименовывайте, удаляйте списки покупок. Итоговая сумма и калорийность по магазину. Активный магазин сохраняется между сессиями.' },
-    { title: '🎚 Контроль разнообразия', body: 'Три режима: «Минимум» (2 продукта на категорию), «Средний» (4), «Максимум» (весь пул). Пул сортируется детерминированно по seed.' },
-    { title: '🩺 Проблемы со здоровьем', body: '8 предустановленных проблем: отёки, непереносимость лактозы/глютена, диабет, гипертония, ЖКТ, подагра, камни в почках. Выбор автоматически исключает продукты.' },
-    { title: '📋 Полный отчёт о питании', body: 'Генерирует детальный отчёт: КБЖУ, микронутриенты vs RDA, дефициты, динамика веса, качество продуктов, риски, аллергены, рекомендации, итоговая оценка A/B/C/D.' },
-    { title: '👨‍🍳 Рецепты с инструкциями', body: '60 рецептов с пошаговыми инструкциями, временем приготовления, тегами и типом приёма пищи. Фильтр по типу и поиск.' },
-    { title: '⚡ Быстрые пресеты', body: 'Готовые наборы настроек: мясной, вегетарианский, средиземноморский, кето, High Carb, бюджетный, массонаборный, жиросжигающий.' },
-    // НОВОЕ:
-    { title: '🧬 v2 Скоринг продуктов (BB Quality + Overall Dietary)', body: 'Новый движок оценки продуктов: BB Quality Score (1-10) — статический рейтинг качества для бодибилдинга на основе макронутриентов, аминокислот, клетчатки. Overall Dietary Score — динамический рейтинг с учётом фазы (набор/сушка/ПКТ/мост), фармакологии (ААС, инсулин, HGH, диуретики), анализов крови (гематокрит, липиды, печень, CRP, HOMA-IR) и тайминга приёма. Включите в ⚙️ Параметры → вкладка v2.' },
-    { title: '📊 DailyDietDashboard', body: 'Панель анализа суточного рациона в планировщике: 7 прогресс-баров (mTOR, ЖКТ-нагрузка, PRAL, Аммиак-риск, Омега-баланс, Электролиты, Инсулин-риск). Автоматические предупреждения: дефицит лейцина, риск гипогликемии, нехватка микронутриентов.' },
-    { title: '🩺 Аналитика здоровья', body: 'Вкладка «Здоровье»: ввод анализов крови (12 маркеров) с автоматической цветовой индикацией (зелёный/жёлтый/красный). Текстовые предупреждения и рекомендации при отклонениях. Карта дефицитов микронутриентов (цинк, магний, железо, кальций, D, B12, омега-3, йод). Кнопка «Оптимизировать каталог» — скрыть продукты с рейтингом <4.0.' },
-    { title: '📈 Трекер прогресса', body: 'Вкладка «Прогресс»: ежедневный ввод веса и %жира. График динамики веса с цветовой индикацией (зелёный — снижение, красный — повышение). Старт/текущий вес и дельта. В планах: графики анализов крови и «умных» показателей (аммиак, омега, ЖКТ, микронутриенты).' },
-    { title: '🧑‍⚕️ Нутрициолог (FAQ)', body: 'Вкладка «Нутрициолог»: 8 карточек-ответов на частые вопросы (почему низкий рейтинг, HOMA-IR, защита печени, тестостерон, CRP, mTOR, K/Na, энергия). Фильтр по тегам. Ответы адаптированы под профиль пользователя.' },
-    { title: '📝 Свои продукты', body: 'Вкладка «Свои»: добавление пользовательских продуктов с указанием названия, КБЖУ и клетчатки. Сохранение в localStorage. Продукты отображаются в списке с возможностью удаления.' },
-    { title: '🍽 Визуализатор блюда', body: 'Вкладка «Блюдо»: цветовая гистограмма состава блюда с прозрачностью по BB Quality Score. Каждый продукт — цветной сегмент с подписью веса.' },
-    { title: '🏆 Достижения (12)', body: 'Вкладка «Достижения»: 12 бейджей (железная воля, биохимик, mTOR-мастер, пик формы, гурман, мастер детокса, омега-баланс, чистые почки, анти-аммиак, инсулиновый контроль, витаминный баланс, квест-мастер). Прогресс-бар общего выполнения.' },
-    { title: '🎯 Ежедневные квесты', body: 'Вкладка «Квесты»: 8 квестов (белок 2.5г/кг, клетчатка 30г, омега-баланс, детокс, ферменты, избегать атерогенности, хром/берберин, йод 100мкг). Квест дня +10 баллов. Система баллов сохраняется в localStorage.' },
+    { title: '🎯 Расчёт КБЖУ — формула Миффлина-Сан-Жеора', body: 'BMR (базовый обмен):\n• Мужчины: 10×вес(кг) + 6.25×рост(см) − 5×возраст − 161 + 166\n• Женщины: 10×вес(кг) + 6.25×рост(см) − 5×возраст − 161\n\nTDEE = BMR × PAL (уровень активности). PAL рассчитывается как 1.2 + тренировки/нед × 0.075 + бонус за длительность >60 мин.\n\nЦелевые ккал: набор массы +10-15%, сушка −20%, поддержание = TDEE. Белок: 1.8-2.5 г/кг. Жиры: 0.8-1.2 г/кг. Остаток — углеводы.' },
+    { title: '🥗 Как работает генерация плана питания', body: '1) Определяются целевые КБЖУ по вашим параметрам\n2) Выбираются приёмы пищи (3-5 в день) с учётом тренировок и предпочтений\n3) Для каждого приёма подбираются продукты из FOOD_DB (500+ продуктов) по категориям: белки, углеводы, жиры, овощи\n4) Алгоритм учитывает: аллергены, проблемы здоровья, предпочтения (веган, без глютена, без молочки), бюджет, разнообразие\n5) Проверяется DIAAS (усвояемость белка), PRAL (кислотная нагрузка), mTOR-стимуляция, гликемическая нагрузка\n6) Применяется v2-движок: BB Quality Score (1-10) + Overall Dietary Score с учётом фазы и фармакологии' },
+    { title: '🔄 Циклирование и специальные режимы', body: '• Циклирование углеводов: высокоуглеводные дни в дни тренировок, низкоуглеводные — в дни отдыха. Автоматическая привязка к дням из профиля\n• Ленивый день: минимум готовки, простые блюда (tier=basic), 1 продукт на приём, 85% калорий\n• Читмил: запланированное отклонение от диеты с контролем калорий\n• Углеводная загрузка: повышенные углеводы перед соревнованиями/тяжёлыми тренировками\n• Компенсация: автоматическая корректировка калорий при переедании\n• Адаптация метаболизма: при длительном дефиците калорий алгоритм снижает TDEE на 5-15%' },
+    { title: '⏱ Тайминг и распределение нутриентов', body: '• Белок: равномерно 20-40 г каждые 3-4 часа для максимальной стимуляции MPS. Быстрый белок (сыворотка) — после тренировки, медленный (казеин) — перед сном\n• Углеводы: основная масса вокруг тренировки (до и после). Предтренировочный приём за 1.5-2 часа\n• Жиры: равномерно в течение дня. Омега-3 не менее 1.6 г/день. Насыщенные жиры <15% от общих калорий\n• Вода: 30-40 мл/кг + 500-1000 мл за час тренировки' },
+    { title: '🧬 v2 Скоринг: BB Quality + Overall Dietary', body: 'BB Quality Score (1-10): статический рейтинг продукта для бодибилдинга. Учитывает: белок/100 ккал, лейцин, аминокислотный профиль, клетчатку, гликемический индекс, насыщенные жиры, натрий.\n\nOverall Dietary Score: динамический рейтинг с учётом:\n• Фазы (набор/сушка/ПКТ/мост)\n• Фармакологии (ААС оральные/инъекционные, HGH, инсулин, диуретики, стимуляторы)\n• Лабораторных данных (гематокрит, ЛПНП, ЛПВП, АЛТ, АСТ, СРБ, эстрадиол, пролактин, тестостерон, глюкоза, инсулин, HOMA-IR)\n• Тайминга приёма\n\nВключите в ⚙️ Настройки → вкладка v2.' },
+    { title: '🍳 Компоновщик приёмов', body: 'После генерации плана вкладка «Компоновщик» позволяет:\n• Заменить любой продукт на аналогичный (кнопка «🔄» на карточке)\n• Изменить количество продукта (кнопка «✏️»)\n• Удалить продукт из приёма\n• Добавить рецепт в приём целиком\n\nВсе изменения сохраняются в текущем плане. Дни недели переключаются кнопками Пн-Вс.' },
+    { title: '📊 DailyDietDashboard — анализ рациона', body: '7 прогресс-баров в реальном времени:\n• mTOR-активация: достаточно ли лейцина для стимуляции синтеза белка\n• ЖКТ-нагрузка: FODMAP, клетчатка, ферментная нагрузка\n• PRAL (кислотная нагрузка): баланс кислых/щелочных продуктов\n• Аммиак-риск: избыток белка без достаточного выведения\n• Омега-баланс: соотношение Омега-6/Омега-3\n• Электролиты: Na/K/Mg баланс\n• Инсулин-риск: гликемическая нагрузка + HOMA-IR' },
+    { title: '📋 Отчёт о питании', body: 'Полный отчёт включает:\n• КБЖУ факт vs цель с процентным отклонением\n• Микронутриенты vs RDA (витамины, минералы)\n• Качество продуктов: средний tier, лучшие позиции\n• Водный баланс: выпито vs норма (мл/кг)\n• Натрий/Калий: соотношение, рекомендации\n• Тайминг белка: равномерность, максимальный разрыв между приёмами\n• Гликемическая нагрузка: общая ГН, средний GI, максимум на приём\n• Качество жиров: % насыщенных, Омега-3, соотношение Ом-6/3\n• Клетчатка: факт vs 25-35 г норма\n• Итоговая оценка: A (>85%), B (>70%), C (>55%), D (<55%)' },
+    { title: '🛒 Корзина с магазинами', body: '• Поддержка нескольких магазинов (добавление, переименование, удаление)\n• Каждый продукт в корзине сохраняет: название, количество, категорию, цену, заметку, магазин\n• Итоговая сумма и калорийность по каждому магазину\n• Активный магазин сохраняется между сессиями\n• Кнопка «В корзину» доступна в каталоге и на карточках продуктов' },
+    { title: '🩺 Здоровье — интеграция с планировщиком', body: 'Вкладка «Здоровье» (внутри Планировщика):\n• Ввод 8+ маркеров крови (гематокрит, гемоглобин, ЛПВП, ЛПНП, АЛТ, АСТ, СРБ, тестостерон) с цветовой индикацией\n• 8 предустановленных проблем здоровья: отёки, непереносимость лактозы/глютена, диабет, гипертония, ЖКТ, подагра, камни в почках\n• При выборе проблемы — автоматическое исключение конфликтующих продуктов из плана\n• Список аллергенов: лактоза, глютен, орехи, яйца, соя, морепродукты, гистамин, сульфиты\n• Данные синхронизируются с v2-движком скоринга' },
+    { title: '⚡ Быстрые пресеты настроек', body: '🥩 Мясной — высокий белок, стандартные жиры\n🥬 Вегетарианский — растительные источники белка, без мяса/рыбы\n🫒 Средиземноморский — оливковое масло, рыба, овощи, орехи\n🥑 Кето — <50 г углеводов, высокие жиры\n🍚 High Carb — повышенные углеводы для массонабора\n💰 Бюджетный — недорогие продукты (курица, гречка, яйца)\n💪 Массонаборный — профицит 15%, белок 2.2 г/кг, частые приёмы\n🔥 Жиросжигающий — дефицит 20%, белок 2.5 г/кг, клетчатка 35 г' },
   ];
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
     <div style={{ padding:14, ...cardBg }}>
@@ -1498,7 +1486,6 @@ export const NutritionScreen: React.FC = () => {
       case 'achievements': return <InfoErrorBoundary label="Достижения"><Achievements /></InfoErrorBoundary>;
       case 'quests': return <InfoErrorBoundary label="Квесты"><DailyQuests /></InfoErrorBoundary>;
       case 'usefulness': return <InfoErrorBoundary label="Полезность"><ProductUsefulnessPlanner /></InfoErrorBoundary>;
-      case 'health': return <InfoErrorBoundary label="Аналитика здоровья"><HealthAnalytics /></InfoErrorBoundary>;
       default: return null;
     }
   };
@@ -1525,7 +1512,7 @@ export const NutritionScreen: React.FC = () => {
                   <div style={{ fontSize:13, fontWeight:700, marginBottom:1, color: card.color, letterSpacing:-0.2 }}>{card.title}</div>
                   <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)' }}>{card.desc}</div>
                 </div>
-                <span style={{ color: card.color, fontSize:16, opacity:0.5 }}>в†’</span>
+                <span style={{ color: card.color, fontSize:16, opacity:0.5 }}>→</span>
               </button>
             ))}
           </div>
@@ -1545,7 +1532,7 @@ export const NutritionScreen: React.FC = () => {
         <button onClick={() => setPage('hero')} style={{
           padding:'4px 8px', cursor:'pointer', fontSize:20, color:'rgba(255,255,255,0.85)',
           border:'none', background:'transparent', display:'flex', alignItems:'center',
-        }}>в†ђ</button>
+        }}>←</button>
         <div style={{ flex:1, fontSize:15, fontWeight:700, color:'#fff', letterSpacing:-0.3 }}>Питание</div>
         <span style={{ fontSize:9, color:'#fff' }}>
           {nutritionSection === 'diary' ? 'Дневник' : 'Всё'}
@@ -1567,7 +1554,7 @@ export const NutritionScreen: React.FC = () => {
         if (nv2.lazyDayActive) active.push('🛋 Ленивый день');
         if (nv2.cravingMode) active.push('🍬 Хочу сладкое');
         if (nv2.compensationActive) active.push(`⚖ Компенсация ${nv2.compensationRemaining}ккал`);
-        if (nv2.hungryLevel > 7) active.push('? Высокий голод');
+        if (nv2.hungryLevel > 7) active.push('🔴 Высокий голод');
         if (nv2.metabolicAdaptation > 0) active.push(`📉 Адаптация -${Math.round(nv2.metabolicAdaptation * 100)}%`);
         if (v2Result && v2Result.adjustment !== 0) active.push(`📊 TDEE корр. ${v2Result.adjustment > 0 ? '+' : ''}${v2Result.adjustment}ккал`);
         if (s.bodyFat) active.push(`🧬 %жира: ${s.bodyFat}%`);

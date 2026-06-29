@@ -1010,7 +1010,7 @@ export const IndividualPlanResults: React.FC = () => {
                     <span style={{ color: 'rgba(255,255,255,0.85)' }}>⚠ {data.score}/7</span>
                   </div>
                   <div style={{ color: 'rgba(255,255,255,0.85)' }}>{data.impact}</div>
-                  {data.score >= 3 && <div style={{ color: '#f59e0b' }}>в†’ {data.recommendation}</div>}
+                  {data.score >= 3 && <div style={{ color: '#f59e0b' }}>→ {data.recommendation}</div>}
                 </div>
               ))}
             </div>
@@ -1388,12 +1388,22 @@ export const IndividualPlanResults: React.FC = () => {
             </div>
           )}
           {generated && (
+            <>
+            <div style={{ background:'rgba(139,92,246,0.04)', borderRadius:10, padding:'8px 10px', border:'1px solid rgba(139,92,246,0.08)', marginBottom:6 }}>
+              <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:3 }}>🧬 v2 Скоринг — что это?</div>
+              <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.4 }}>
+                <b>BB Quality Score (1-10)</b> — статический рейтинг качества продукта для бодибилдинга на основе макронутриентов, аминокислот и клетчатки.<br/>
+                <b>Overall Dietary Score</b> — динамический рейтинг с учётом фазы (набор/сушка/ПКТ), фармакологии (ААС, инсулин, HGH, диуретики), анализов крови (гематокрит, липиды, печень, CRP) и тайминга приёма.<br/>
+                <b>Почему дублируются кнопки?</b> Скоринг анализирует рацион в целом, а не отдельные приёмы. Кнопка «Рассчитать полезность» запускает общий анализ. Кнопка DIAAS на карточке приёма — показывает усвояемость белка конкретного приёма.
+              </div>
+            </div>
             <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(0,230,138,0.05)', padding:'8px 6px', textAlign:'center' }}>
               <button onClick={() => { setShowCalcPopup(true); setCalcResults(null); setCalcDailyReport(null); }} style={{ width:'100%', padding:'12px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(0,200,160,0.12))', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', fontWeight:800, fontSize:11, transition:'all 0.15s' }}>
                 🧬 Рассчитать полезность
               </button>
               <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>v2 скоринг выбранных приёмов + спецприёмов</div>
             </div>
+            </>
           )}
           {generated && (
             <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(249,115,22,0.05)', padding:'8px 6px', textAlign:'center' }}>
@@ -1539,7 +1549,7 @@ export const IndividualPlanResults: React.FC = () => {
                     {[
                       { id:'special_cheatmeal', label:'🍔 Читмил', desc: cheatMealPlan ? `~${cheatMealPlan.cals} ккал` : '', plan: cheatMealPlan },
                       { id:'special_carbload', label:'🍚 Углев. загрузка', desc: carbloadPlan ? `${carbloadPlan.totalCarbs}г углей` : '', plan: carbloadPlan },
-                      { id:'special_lazy', label:'?🛋 Ленивый день', desc: lazyDayPlan ? `~${lazyDayPlan.kcal} ккал` : '', plan: lazyDayPlan },
+                      { id:'special_lazy', label:'🛋 Ленивый день', desc: lazyDayPlan ? `~${lazyDayPlan.kcal} ккал` : '', plan: lazyDayPlan },
                       { id:'special_craving', label:'🍬 Хочу сладкое', desc: cravingPlan ? `~${cravingPlan.kcal} ккал` : '', plan: cravingPlan },
                     ].filter(s => s.plan).map(s => {
                       const sel = calcSelections.has(s.id);

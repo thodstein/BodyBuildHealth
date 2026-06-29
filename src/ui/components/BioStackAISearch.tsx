@@ -1,409 +1,519 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { type GoalType } from '../../engines/biostack-ai.engine';
-import { findSupplements, type FinderMatch, type FinderQuery } from '../../engines/supplement-finder.engine';
-import { searchBioStack, buildSmartStack, findReplacements, type RecGoal, type RecReplacement } from '../../engines/biostack-recommender.engine';
+import { findSupplements } from '../../engines/supplement-finder.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, MECHANISM_LABELS } from '../../data/support-database';
-import { GlassCard, PillBtn, inputS, PURE_GOALS, TARGET_SYSTEMS, ORGANS, SYSTEMS, TOP_MECHANISMS, SYMPTOMS, toFinderProfile } from './BioStackAIConstants';
+import { PillBtn, inputS, PURE_GOALS, ORGANS, SYSTEMS, TOP_MECHANISMS, SYMPTOMS, toFinderProfile } from './BioStackAIConstants';
+import { resolveLabMarker } from '../../core/labs-mapping';
+import { LAB_MARKER_MAP } from '../../data/lab-marker-map';
 
-type FilterGroup = 'goals' | 'targets' | 'organs' | 'systems' | 'mechanisms' | 'replace';
+const TIERS = [
+  { key: 'core', label: '🟢 Core', color: '#22c55e', desc: 'Обязательно на любом курсе' },
+  { key: 'standard', label: '🟡 Standard', color: '#eab308', desc: 'Рекомендовано при дозах >500 мг/нед' },
+  { key: 'advanced', label: '🟠 Advanced', color: '#f97316', desc: 'При специфических целях' },
+  { key: 'specialty', label: '🔴 Specialty', color: '#ef4444', desc: 'Фармакология, рецептурные' },
+];
+
+/* ─── Поисковый индекс: термин → ID веществ ─── */
+function buildSearchTermMap(): Record<string, string[]> {
+  const map: Record<string, string[]> = {};
+  const add = (term: string, ids: string[]) => {
+    const key = term.toLowerCase().trim();
+    if (!key) return;
+    if (!map[key]) map[key] = [];
+    ids.forEach(id => { if (!map[key].includes(id)) map[key].push(id); });
+  };
+
+  // 1. Lab markers: название маркера → correctionIds
+  LAB_MARKER_MAP.forEach(m => {
+    add(m.name, m.correctionIds);
+    add(m.marker, m.correctionIds);
+    // добавляем слова-части для частичного поиска
+    m.name.split(/[\s,/-]+/).forEach(word => { if (word.length > 1) add(word, m.correctionIds); });
+  });
+
+  // 2. Все вещества: nameRu / name
+  Object.values(SUPPORT_CATALOG_DATA).forEach(c => {
+    const names = [c.nameRu, c.name, c.id].filter(Boolean);
+    names.forEach(n => add(n, [c.id]));
+  });
+
+  // 3. Органы (из ORGANS) → вещества с этим органом
+  ORGANS.forEach(o => {
+    const ids = Object.values(SUPPORT_CATALOG_DATA).filter(c => c.organs?.includes(o.key)).map(c => c.id);
+    if (ids.length) add(o.label.replace(/[🫀🧠❤️🫁💪🦴🛡️⚡🫃🩸⚖️🧬🔴👁️🔬🔋]/g,'').trim(), ids);
+  });
+
+  // 4. Системы (из SYSTEMS) → вещества с этой системой
+  SYSTEMS.forEach(s => {
+    const ids = Object.values(SUPPORT_CATALOG_DATA).filter(c => c.systems?.includes(s.key)).map(c => c.id);
+    if (ids.length) add(s.label.replace(/[🫀🧠❤️🫁💪🦴🛡️⚡🫃🩸⚖️🧬🔴👁️🔬🔋]/g,'').trim(), ids);
+  });
+
+  // 5. Механизмы → вещества
+  TOP_MECHANISMS.forEach(m => {
+    const ids = Object.values(SUPPORT_CATALOG_DATA).filter(c => c.mechanisms?.includes(m.key)).map(c => c.id);
+    if (ids.length) add(m.label.replace(/[🛡️😌💎😊⚡🔥🔋🩸🧠💪🫁]/g,'').trim(), ids);
+  });
+
+  // 6. Категории → вещества
+  Object.entries(CATEGORY_LABELS).forEach(([key, label]) => {
+    const ids = Object.values(SUPPORT_CATALOG_DATA).filter(c => c.category?.includes(key)).map(c => c.id);
+    if (ids.length) add(label.replace(/[🛡️🫁❤️💊🧬🐟🌿🔥🦠🫘🦴⚖️🧠💪⚡🕰🔋🦋🩸😌😊🦴🧴💅👁️💧🍄🔄💊🫐🧪🔬💉]/g,'').trim(), ids);
+  });
+
+  return map;
+}
+const SEARCH_TERM_MAP = buildSearchTermMap();
+
+/* ─── Есть ли в индексе по части слова ─── */
+function searchByIndex(query: string): Set<string> {
+  const q = query.toLowerCase().trim();
+  const found = new Set<string>();
+  Object.entries(SEARCH_TERM_MAP).forEach(([term, ids]) => {
+    if (term.includes(q)) ids.forEach(id => found.add(id));
+  });
+  return found;
+}
+
+type FilterType = 'cat' | 'tier' | 'organ' | 'system' | 'mech' | 'goal';
 
 export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void }) {
   const [searchText, setSearchText] = useState('');
-  const [selectedGoal, setSelectedGoal] = useState<GoalType | null>(null);
-  const [selectedOrgans, setSelectedOrgans] = useState<string[]>([]);
-  const [selectedSystems, setSelectedSystems] = useState<string[]>([]);
-  const [selectedMechs, setSelectedMechs] = useState<string[]>([]);
-  const [results, setResults] = useState<FinderMatch[]>([]);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [openGroup, setOpenGroup] = useState<FilterGroup | null>(null);
-  const [expandedCard, setExpandedCard] = useState<Record<string, boolean>>({});
+  const [catFilter, setCatFilter] = useState<string[]>([]);
+  const [tierFilter, setTierFilter] = useState<string[]>([]);
+  const [organFilter, setOrganFilter] = useState<string[]>([]);
+  const [systemFilter, setSystemFilter] = useState<string[]>([]);
+  const [mechFilter, setMechFilter] = useState<string[]>([]);
+  const [goalFilter, setGoalFilter] = useState<GoalType | null>(null);
+  const [openFilter, setOpenFilter] = useState<FilterType | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [favorites, setFavorites] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_biostack_favorites') || '[]'); } catch { return []; }
   });
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 12;
-  type BrowseMode = 'search' | 'by_type' | 'by_organ' | 'by_tier';
-  const [browseMode, setBrowseMode] = useState<BrowseMode>('search');
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [favOnly, setFavOnly] = useState(false);
 
   const toggleFav = useCallback((id: string) => {
-    const updated = favorites.includes(id) ? favorites.filter(f => f !== id) : [...favorites, id];
-    setFavorites(updated);
-    localStorage.setItem('he_biostack_favorites', JSON.stringify(updated));
+    const u = favorites.includes(id) ? favorites.filter(f => f !== id) : [...favorites, id];
+    setFavorites(u);
+    localStorage.setItem('he_biostack_favorites', JSON.stringify(u));
   }, [favorites]);
 
-  const displayedResults = useMemo(() => {
-    if (!showFavoritesOnly) return results;
-    return results.filter(r => favorites.includes(r.id));
-  }, [results, showFavoritesOnly, favorites]);
+  const activeCats = [...new Set(Object.values(SUPPORT_CATALOG_DATA).flatMap(c => c.category || []))].filter(Boolean).sort();
 
-  const clearSearch = useCallback(() => {
-    setSearchText(''); setSelectedGoal(null); setSelectedOrgans([]);
-    setSelectedSystems([]); setSelectedMechs([]); setResults([]); setHasSearched(false);
+  const filtered = useMemo(() => {
+    let list = Object.values(SUPPORT_CATALOG_DATA);
+    if (catFilter.length > 0) list = list.filter(c => c.category?.some(cat => catFilter.includes(cat)));
+    if (tierFilter.length > 0) list = list.filter(c => tierFilter.includes(c.tier || ''));
+    if (organFilter.length > 0) list = list.filter(c => c.organs?.some(o => organFilter.includes(o)));
+    if (systemFilter.length > 0) list = list.filter(c => c.systems?.some(s => systemFilter.includes(s)));
+    if (mechFilter.length > 0) list = list.filter(c => c.mechanisms?.some(m => mechFilter.includes(m)));
+    if (goalFilter) {
+      const matched = findSupplements({ goal: goalFilter, profile: toFinderProfile(profile), maxResults: 999 });
+      const ids = new Set(matched.map(m => m.id));
+      list = list.filter(c => ids.has(c.id));
+    }
+    if (searchText.trim()) {
+      const q = searchText.toLowerCase();
+      const indexedIds = searchByIndex(q);
+      const directMatch = (c: typeof list[0]) =>
+        (c.nameRu || c.name || '').toLowerCase().includes(q) ||
+        (c.description || '').toLowerCase().includes(q) ||
+        c.category?.some(cat => (CATEGORY_LABELS[cat] || cat).toLowerCase().includes(q)) ||
+        c.organs?.some(o => o.toLowerCase().includes(q)) ||
+        c.mechanisms?.some(m => (MECHANISM_LABELS[m] || m).toLowerCase().includes(q));
+      list = list.filter(c => directMatch(c) || indexedIds.has(c.id));
+    }
+    if (favOnly) list = list.filter(c => favorites.includes(c.id));
+    return list;
+  }, [catFilter, tierFilter, organFilter, systemFilter, mechFilter, goalFilter, searchText, profile, favOnly, favorites]);
+
+  const grouped = useMemo(() => {
+    const g: Record<string, typeof filtered> = {};
+    filtered.forEach(c => {
+      const cats = (c.category?.length ? c.category : ['other'] as string[]);
+      cats.forEach(cat => {
+        if (!g[cat]) g[cat] = [];
+        g[cat].push(c);
+      });
+    });
+    // sort groups: by count desc, then alpha
+    const entries = Object.entries(g).sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
+    return entries;
+  }, [filtered]);
+
+  const hasAnyFilter = catFilter.length > 0 || tierFilter.length > 0 || organFilter.length > 0 || systemFilter.length > 0 || mechFilter.length > 0 || goalFilter !== null || searchText.trim() || favOnly;
+
+  const clearAll = useCallback(() => {
+    setCatFilter([]); setTierFilter([]); setOrganFilter([]); setSystemFilter([]);
+    setMechFilter([]); setGoalFilter(null); setSearchText(''); setFavOnly(false);
   }, []);
 
-  const hasAnyFilter = searchText || selectedGoal || selectedOrgans.length > 0 || selectedSystems.length > 0 || selectedMechs.length > 0;
+  const toggleArr = (arr: string[], set: (v: string[]) => void, v: string) => {
+    set(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]);
+  };
 
-  const handleSearch = useCallback(() => {
-    const organs = selectedOrgans.length > 0 ? selectedOrgans : undefined;
-    const query: FinderQuery = {
-      searchText: searchText || undefined,
-      goal: selectedGoal || undefined,
-      organs,
-      profile: toFinderProfile(profile),
-    };
-    if (selectedMechs.length > 0) query.mechanisms = selectedMechs;
-    const res = findSupplements(query);
-    setResults([...res].sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, 50));
-    setHasSearched(true);
-  }, [searchText, selectedGoal, selectedOrgans, selectedMechs, profile]);
-
-  const toggleGoal = useCallback((g: GoalType) => { setSelectedGoal(prev => prev === g ? null : g); }, []);
-
-  const toggleArray = useCallback((arr: string[], set: (v: string[]) => void, val: string) => {
-    set(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
-  }, []);
-
-  const addToStack = useCallback((id: string) => {
-    if (!stackIds.includes(id)) setStackIds([...stackIds, id]);
-  }, [stackIds, setStackIds]);
-
-  const removeFromStack = useCallback((id: string) => {
-    setStackIds(stackIds.filter(s => s !== id));
-  }, [stackIds, setStackIds]);
-
-  const catLabel = (c: string) => CATEGORY_LABELS[c as keyof typeof CATEGORY_LABELS] || c;
-  const mechLabel = (m: string) => MECHANISM_LABELS[m] || m;
-
-  const filterBtn = (label: string, active: boolean, onClick: () => void) => (
+  const renderFilterPill = (label: string, active: boolean, onClick: () => void, color?: string) => (
     <button onClick={onClick} style={{
-      padding: '4px 8px', borderRadius: 10, fontSize: 8, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-      background: active ? 'rgba(0,230,138,0.1)' : '#202023',
-      border: active ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)',
-      color: active ? '#00e68a' : 'rgba(255,255,255,0.5)',
+      padding: '5px 10px', borderRadius: 14, fontSize: 8, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+      background: active ? `${color || '#00e68a'}18` : 'rgba(255,255,255,0.04)',
+      border: active ? `1.5px solid ${color || '#00e68a'}` : '1px solid rgba(255,255,255,0.06)',
+      color: active ? (color || '#00e68a') : 'rgba(255,255,255,0.5)',
+      transition: 'all 0.12s',
     }}>{label}</button>
   );
 
+  const renderActiveChips = () => {
+    const chips: { label: string; onRemove: () => void }[] = [];
+    catFilter.forEach(c => chips.push({ label: CATEGORY_LABELS[c] || c, onRemove: () => toggleArr(catFilter, setCatFilter, c) }));
+    tierFilter.forEach(t => chips.push({ label: TIERS.find(x => x.key === t)?.label || t, onRemove: () => toggleArr(tierFilter, setTierFilter, t) }));
+    organFilter.forEach(o => chips.push({ label: o, onRemove: () => toggleArr(organFilter, setOrganFilter, o) }));
+    systemFilter.forEach(s => chips.push({ label: s, onRemove: () => toggleArr(systemFilter, setSystemFilter, s) }));
+    mechFilter.forEach(m => chips.push({ label: MECHANISM_LABELS[m] || m, onRemove: () => toggleArr(mechFilter, setMechFilter, m) }));
+    if (goalFilter) chips.push({ label: '🎯 ' + (PURE_GOALS.find(g => g.key === goalFilter)?.label || goalFilter), onRemove: () => setGoalFilter(null) });
+    if (favOnly) chips.push({ label: '⭐ Избранное', onRemove: () => setFavOnly(false) });
+    return chips;
+  };
+
+  const filterPopups: { key: FilterType; icon: string; label: string; color: string; count: number }[] = [
+    { key: 'cat', icon: '📂', label: 'Категория', color: '#60a5fa', count: catFilter.length },
+    { key: 'tier', icon: '📊', label: 'Уровень', color: '#f59e0b', count: tierFilter.length },
+    { key: 'organ', icon: '🫀', label: 'Орган', color: '#ef4444', count: organFilter.length },
+    { key: 'system', icon: '⚙️', label: 'Система', color: '#22c55e', count: systemFilter.length },
+    { key: 'mech', icon: '🧬', label: 'Механизм', color: '#a855f7', count: mechFilter.length },
+    { key: 'goal', icon: '🎯', label: 'Цель', color: '#f59e0b', count: goalFilter ? 1 : 0 },
+  ];
+
+  const catLabel = (c: string) => CATEGORY_LABELS[c as keyof typeof CATEGORY_LABELS] || c;
+
+  const matchedLabMarkers = useMemo(() => {
+    if (!searchText.trim()) return [];
+    const q = searchText.toLowerCase();
+    return LAB_MARKER_MAP.filter(m =>
+      m.name.toLowerCase().includes(q) ||
+      m.marker.toLowerCase().includes(q) ||
+      m.organ.toLowerCase().includes(q) ||
+      m.system.toLowerCase().includes(q)
+    );
+  }, [searchText]);
+
+  const sysLabel = (s: string) => {
+    const found = SYSTEMS.find(x => x.key.toLowerCase() === s.toLowerCase());
+    return found?.label || s;
+  };
+  const organEmoji: Record<string, string> = {
+    LIVER:'🫁', KIDNEYS:'🫘', HEART:'❤️', BRAIN:'🧠', LUNGS:'🫁', MUSCLES:'💪',
+    BONES:'🦴', JOINTS:'🦴', SKIN:'🧴', IMMUNE_SYSTEM:'🛡️', NERVES:'⚡', GUT:'🫃',
+    VESSELS:'🩸', ADRENALS:'⚖️', THYROID:'🦋', REPRODUCTIVE:'🧬', PROSTATE:'🔴',
+    BLOOD:'🩸', EYES:'👁️', PANCREAS:'🫁', CELLS:'🔬', MITOCHONDRIA:'🔋',
+    ENDOCRINE:'⚖️', PITUITARY:'🧠',
+  };
+
   return (
     <div style={{ paddingBottom: 80 }}>
-      {/* Search input + filters */}
-      {/* Browse mode tabs */}
-      <div style={{ display: 'flex', gap: 3, marginBottom: 8, overflowX: 'auto', scrollbarWidth:'none', paddingBottom:2 }}>
-        {[
-          { id:'search' as BrowseMode, label:'🔍 Поиск' },
-          { id:'by_type' as BrowseMode, label:'📂 Категории' },
-          { id:'by_organ' as BrowseMode, label:'🫀 Органы' },
-          { id:'by_tier' as BrowseMode, label:'📊 Уровни' },
-        ].map(m => (
-          <button key={m.id} onClick={() => setBrowseMode(m.id)} style={{
-            flexShrink:0, padding:'5px 12px', borderRadius:12, fontSize:8, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap',
-            background: browseMode === m.id ? 'rgba(96,165,250,0.12)' : '#202023',
-            border: browseMode === m.id ? '1.5px solid #60a5fa' : '1px solid rgba(255,255,255,0.04)',
-            color: browseMode === m.id ? '#60a5fa' : 'rgba(255,255,255,0.5)',
-            transition:'all 0.12s',
-          }}>{m.label}</button>
-        ))}
+
+      {/* Search bar */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+        <input value={searchText} onChange={e => setSearchText(e.target.value)}
+          placeholder="🔍 Название, орган, механизм, категория..."
+          style={{ ...inputS, fontSize: 11 }} />
+        {hasAnyFilter && (
+          <button onClick={clearAll} style={{
+            padding: '8px 12px', borderRadius: 10, fontSize: 9, cursor: 'pointer',
+            background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap',
+          }}>✕</button>
+        )}
       </div>
 
-      {/* Search mode */}
-      {browseMode === 'search' && (
-      <GlassCard title="🔍 Поиск препаратов" icon="🔍" color="#60a5fa">
-        <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-          <input value={searchText} onChange={e => setSearchText(e.target.value)} placeholder="Название, механизм, орган..." style={inputS} />
-          <button onClick={handleSearch} style={{
-            padding: '10px 16px', borderRadius: 12, fontSize: 10, fontWeight: 700, cursor: 'pointer',
-            background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', whiteSpace: 'nowrap',
-          }}>🔍</button>
-          {hasAnyFilter && <button onClick={clearSearch} style={{
-            padding: '10px 12px', borderRadius: 12, fontSize: 10, cursor: 'pointer',
-            background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap',
-          }}>✕</button>}
-        </div>
-
-        {/* Quick symptom chips */}
-        {!hasAnyFilter && !hasSearched && (
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 3 }}>Быстрый поиск по симптомам:</div>
-            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-              {SYMPTOMS.map(s => (
-                <PillBtn key={s.label} small onClick={() => { setSelectedGoal(s.goal); setTimeout(handleSearch, 0); }}>{s.label}</PillBtn>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Beautiful popup search buttons */}
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>🔎 Параметры поиска:</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-            {[
-              { id:'goals', emoji:'🎯', label:'По целям', desc:'Сон, энергия, фокус...', color:'#818cf8', count: selectedGoal ? 1 : 0 },
-              { id:'organs', emoji:'🫀', label:'По органам', desc:'Печень, сердце, мозг...', color:'#f59e0b', count: selectedOrgans.length },
-              { id:'systems', emoji:'⚙️', label:'По системам', desc:'Кардио, нейро, эндокринная...', color:'#22c55e', count: selectedSystems.length },
-              { id:'mechanisms', emoji:'🧬', label:'По механизмам', desc:'Антиоксидант, ГАМК, АТФ...', color:'#a855f7', count: selectedMechs.length },
-            ].map(b => (
-              <button key={b.id} onClick={() => setOpenGroup(openGroup === (b.id as FilterGroup) ? null : (b.id as FilterGroup))} style={{
-                padding: '10px 8px', borderRadius: 12, cursor: 'pointer', background: openGroup === (b.id as FilterGroup) ? b.color + '12' : 'rgba(255,255,255,0.03)',
-                border: openGroup === (b.id as FilterGroup) ? `1px solid ${b.color}44` : '1px solid rgba(255,255,255,0.06)',
-                color: '#fff', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s',
-              }}>
-                <span style={{ fontSize: 18 }}>{b.emoji}</span>
-                <div style={{ flex: 1, textAlign: 'left' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: openGroup === (b.id as FilterGroup) ? b.color : '#fff' }}>{b.label}</div>
-                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>{b.desc}</div>
-                </div>
-                {b.count > 0 && <span style={{ fontSize: 9, fontWeight: 700, color: b.color, background: b.color + '22', borderRadius: 10, padding: '1px 6px' }}>{b.count}</span>}
-              </button>
-            ))}
-            <button onClick={() => setOpenGroup('replace')} style={{
-              gridColumn: '1 / -1', padding: '10px', borderRadius: 12, cursor: 'pointer',
-              background: openGroup === 'replace' ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)',
-              border: openGroup === 'replace' ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(255,255,255,0.06)',
-              color: '#fff', display: 'flex', alignItems: 'center', gap: 6, fontSize: 10,
+      {/* Filter buttons */}
+      <div style={{ display: 'flex', gap: 3, marginBottom: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}>
+        {filterPopups.map(fp => (
+          <button key={fp.key} onClick={() => setOpenFilter(openFilter === fp.key ? null : fp.key)}
+            style={{
+              flexShrink: 0, padding: '6px 10px', borderRadius: 12, fontSize: 8, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+              background: openFilter === fp.key ? fp.color + '15' : 'rgba(255,255,255,0.03)',
+              border: openFilter === fp.key ? `1.5px solid ${fp.color}55` : '1px solid rgba(255,255,255,0.06)',
+              color: openFilter === fp.key ? fp.color : 'rgba(255,255,255,0.5)',
+              display: 'flex', alignItems: 'center', gap: 4,
             }}>
-              <span style={{ fontSize: 16 }}>🔄</span> Интеллектуальные замены и аналоги
-            </button>
+            <span>{fp.icon}</span> {fp.label}
+            {fp.count > 0 && <span style={{ padding: '1px 5px', borderRadius: 8, background: fp.color + '25', color: fp.color, fontSize: 7, fontWeight: 700 }}>{fp.count}</span>}
+          </button>
+        ))}
+        <button onClick={() => setFavOnly(!favOnly)} style={{
+          flexShrink: 0, padding: '6px 10px', borderRadius: 12, fontSize: 8, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+          background: favOnly ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.03)',
+          border: favOnly ? '1.5px solid #f59e0b' : '1px solid rgba(255,255,255,0.06)',
+          color: favOnly ? '#f59e0b' : 'rgba(255,255,255,0.5)',
+        }}>⭐ Избранное</button>
+      </div>
+
+      {/* Filter popups */}
+      {openFilter === 'cat' && (
+        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', padding: '4px 0', marginBottom: 6 }}>
+          {activeCats.map(c => renderFilterPill(catLabel(c), catFilter.includes(c), () => toggleArr(catFilter, setCatFilter, c), '#60a5fa'))}
+        </div>
+      )}
+      {openFilter === 'tier' && (
+        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', padding: '4px 0', marginBottom: 6 }}>
+          {TIERS.map(t => renderFilterPill(t.label, tierFilter.includes(t.key), () => toggleArr(tierFilter, setTierFilter, t.key), t.color))}
+        </div>
+      )}
+      {openFilter === 'organ' && (
+        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', padding: '4px 0', marginBottom: 6 }}>
+          {ORGANS.map(o => renderFilterPill(o.label, organFilter.includes(o.key), () => toggleArr(organFilter, setOrganFilter, o.key), '#ef4444'))}
+        </div>
+      )}
+      {openFilter === 'system' && (
+        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', padding: '4px 0', marginBottom: 6 }}>
+          {SYSTEMS.map(s => renderFilterPill(s.label, systemFilter.includes(s.key), () => toggleArr(systemFilter, setSystemFilter, s.key), '#22c55e'))}
+        </div>
+      )}
+      {openFilter === 'mech' && (
+        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', padding: '4px 0', marginBottom: 6 }}>
+          {TOP_MECHANISMS.map(m => renderFilterPill(m.label, mechFilter.includes(m.key), () => toggleArr(mechFilter, setMechFilter, m.key), '#a855f7'))}
+        </div>
+      )}
+      {openFilter === 'goal' && (
+        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', padding: '4px 0', marginBottom: 6 }}>
+          {PURE_GOALS.map(g => renderFilterPill(g.label, goalFilter === g.key, () => setGoalFilter(goalFilter === g.key ? null : g.key), '#f59e0b'))}
+        </div>
+      )}
+
+      {/* Active filter chips */}
+      {renderActiveChips().length > 0 && (
+        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
+          {renderActiveChips().map((chip, i) => (
+            <span key={i} style={{ padding: '2px 6px', borderRadius: 6, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.1)', fontSize: 7, display: 'flex', alignItems: 'center', gap: 3 }}>
+              {chip.label}
+              <span onClick={chip.onRemove} style={{ cursor: 'pointer', marginLeft: 2, color: '#ef4444' }}>✕</span>
+            </span>
+          ))}
+          <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', alignSelf: 'center' }}>{filtered.length} препаратов</span>
+        </div>
+      )}
+
+      {/* Quick symptoms when no filter */}
+      {!hasAnyFilter && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginBottom: 3 }}>Быстрый подбор по симптомам:</div>
+          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            {SYMPTOMS.map(s => (
+              <PillBtn key={s.label} small onClick={() => setGoalFilter(s.goal)}>{s.label}</PillBtn>
+            ))}
           </div>
         </div>
+      )}
 
-        {openGroup === 'goals' && (
-          <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', padding: '4px 0', marginBottom: 4 }}>
-            {PURE_GOALS.map(g => filterBtn(g.label, selectedGoal === g.key, () => toggleGoal(g.key)))}
-          </div>
-        )}
-        {openGroup === 'targets' && (
-          <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', padding: '4px 0', marginBottom: 4 }}>
-            {TARGET_SYSTEMS.map(t => filterBtn(t.label, selectedGoal === t.key, () => toggleGoal(t.key)))}
-          </div>
-        )}
-        {openGroup === 'organs' && (
-          <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', padding: '4px 0', marginBottom: 4 }}>
-            {ORGANS.map(o => filterBtn(o.label, selectedOrgans.includes(o.key), () => toggleArray(selectedOrgans, setSelectedOrgans, o.key)))}
-          </div>
-        )}
-        {openGroup === 'systems' && (
-          <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', padding: '4px 0', marginBottom: 4 }}>
-            {SYSTEMS.map(s => filterBtn(s.label, selectedSystems.includes(s.key), () => toggleArray(selectedSystems, setSelectedSystems, s.key)))}
-          </div>
-        )}
-        {openGroup === 'mechanisms' && (
-          <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', padding: '4px 0', marginBottom: 4 }}>
-            {TOP_MECHANISMS.map(m => filterBtn(m.label, selectedMechs.includes(m.key), () => toggleArray(selectedMechs, setSelectedMechs, m.key)))}
-          </div>
-        )}
-
-        {/* Active chips */}
-        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 4 }}>
-          {stackIds.slice(-5).map(id => {
-            const cat = SUPPORT_CATALOG_DATA[id];
+      {/* Current stack chips */}
+      {stackIds.length > 0 && (
+        <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginBottom: 6 }}>
+          <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', alignSelf: 'center' }}>📋 Стек:</span>
+          {stackIds.slice(0, 8).map(id => {
+            const c = SUPPORT_CATALOG_DATA[id];
             return (
               <span key={id} style={{ padding: '2px 6px', borderRadius: 6, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.1)', fontSize: 7, display: 'flex', alignItems: 'center', gap: 3 }}>
-                {cat?.nameRu || cat?.name || id}
-                <span onClick={() => removeFromStack(id)} style={{ cursor: 'pointer', marginLeft: 2 }}>✕</span>
+                {c?.nameRu || c?.name || id}
+                <span onClick={() => setStackIds(stackIds.filter(s => s !== id))} style={{ cursor: 'pointer', marginLeft: 2, color: '#ef4444' }}>✕</span>
               </span>
             );
           })}
-          {stackIds.length > 5 && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>+{stackIds.length - 5}...</span>}
+          {stackIds.length > 8 && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)' }}>+{stackIds.length - 8}</span>}
         </div>
-      </GlassCard>
       )}
 
-      {/* Search mode results */}
-      {browseMode === 'search' && (
-        <>
-        {hasSearched && displayedResults.length === 0 && (
-          <GlassCard title="Результаты" icon="🔍" color="#f59e0b">
-            <div style={{ textAlign:'center', fontSize:10, color:'rgba(255,255,255,0.3)', padding:12 }}>
-              {showFavoritesOnly ? '⭐ Нет избранных препаратов. Нажмите ☆ чтобы добавить.' : 'Ничего не найдено. Попробуйте изменить фильтры.'}
-            </div>
-          </GlassCard>
-        )}
-        {(() => {
-          const visibleCount = page * PAGE_SIZE;
-          const paginated = displayedResults.slice(0, visibleCount);
-          return paginated.map(match => {
-          const cat = SUPPORT_CATALOG_DATA[match.id];
-          if (!cat) return null;
-          const isInStack = stackIds.includes(match.id);
-          const exp = expandedCard[match.id];
-          return (
-            <GlassCard key={match.id} style={{ marginBottom: 6 }}>
-              <div onClick={() => setExpandedCard(prev => ({ ...prev, [match.id]: !exp }))} style={{ cursor: 'pointer' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{cat.nameRu || cat.name}</span>
-                    <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 7, fontWeight: 700,
-                      background: match.relevanceScore > 80 ? 'rgba(0,230,138,0.12)' : match.relevanceScore > 50 ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.04)',
-                      color: match.relevanceScore > 80 ? '#00e68a' : match.relevanceScore > 50 ? '#f59e0b' : 'rgba(255,255,255,0.3)',
-                    }}>{(match.relevanceScore)}%</span>
-                    <span onClick={e => { e.stopPropagation(); toggleFav(match.id); }} style={{ cursor: 'pointer', fontSize: 9 }}>
-                      {favorites.includes(match.id) ? '⭐' : '☆'}
+      {/* Lab markers section */}
+      {matchedLabMarkers.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{
+            padding: '6px 10px', borderRadius: 10, background: 'rgba(139,92,246,0.06)',
+            border: '1px solid rgba(139,92,246,0.08)', marginBottom: 4,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: '#a78bfa' }}>🧪 Анализы (лабораторные маркеры)</span>
+            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>{matchedLabMarkers.length}</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {matchedLabMarkers.map(m => {
+              const orgEmoji = organEmoji[m.organ] || '🫀';
+              const sysLabelText = sysLabel(m.system);
+              return (
+                <div key={m.marker} style={{
+                  borderRadius: 12, background: 'rgba(24,24,27,0.6)',
+                  border: '1px solid rgba(139,92,246,0.08)', overflow: 'hidden',
+                  padding: '10px 12px',
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#c4b5fd', marginBottom: 4 }}>
+                    {m.name} <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', fontWeight: 400 }}>({m.marker})</span>
+                    <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', marginLeft: 6 }}>норма: до {m.defaultValue} {m.unit}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 4 }}>
+                    <span style={{ padding: '2px 7px', borderRadius: 6, fontSize: 7, fontWeight: 600,
+                      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.12)', color: '#f87171' }}>
+                      {orgEmoji} {m.organ}
+                    </span>
+                    <span style={{ padding: '2px 7px', borderRadius: 6, fontSize: 7, fontWeight: 600,
+                      background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.12)', color: '#22c55e' }}>
+                      ⚙️ {sysLabelText}
+                    </span>
+                    {m.mechanisms.slice(0, 4).map(mc => (
+                      <span key={mc} style={{ padding: '2px 7px', borderRadius: 6, fontSize: 7,
+                        background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.1)', color: '#60a5fa' }}>
+                        🧬 {MECHANISM_LABELS[mc as keyof typeof MECHANISM_LABELS] || mc}
+                      </span>
+                    ))}
+                    <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', alignSelf: 'center' }}>
+                      {m.higherIsWorse ? '↑ опасен' : '↓ опасен'}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', gap: 3 }}>
-                    {isInStack ? (
-                      <button onClick={e => { e.stopPropagation(); removeFromStack(match.id); }}
-                        style={{ padding: '3px 8px', borderRadius: 6, fontSize: 7, cursor: 'pointer', fontWeight: 600,
-                          background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>
-                        ✕ Убрать
-                      </button>
-                    ) : (
-                      <button onClick={e => { e.stopPropagation(); addToStack(match.id); }}
-                        style={{ padding: '3px 8px', borderRadius: 6, fontSize: 7, cursor: 'pointer', fontWeight: 600,
-                          background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a' }}>
-                        + Стек
-                      </button>
-                    )}
+
+                  <div>
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginBottom: 3 }}>💊 Рекомендуемые препараты:</div>
+                    <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                      {m.correctionIds.map(id => {
+                        const cat = SUPPORT_CATALOG_DATA[id];
+                        if (!cat) return null;
+                        const inStack = stackIds.includes(id);
+                        return (
+                          <div key={id} style={{
+                            padding: '3px 8px', borderRadius: 6, fontSize: 8, cursor: 'pointer',
+                            background: inStack ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)',
+                            border: inStack ? '1px solid rgba(0,230,138,0.15)' : '1px solid rgba(255,255,255,0.06)',
+                            color: inStack ? '#00e68a' : 'rgba(255,255,255,0.5)',
+                            display: 'flex', alignItems: 'center', gap: 4,
+                          }}
+                            onClick={() => inStack ? setStackIds(stackIds.filter(s => s !== id)) : setStackIds([...stackIds, id])}>
+                            {cat.nameRu || cat.name}
+                            <span style={{ fontSize: 7, color: inStack ? '#ef4444' : '#00e68a' }}>
+                              {inStack ? '✕' : '+'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 3 }}>
-                  {cat.tier && <span style={{ padding: '1px 5px', borderRadius: 3, fontSize: 7, background: 'rgba(0,230,138,0.06)', color: '#00e68a' }}>{catLabel(cat.tier)}</span>}
-                  {cat.category?.slice(0, 3).map((c: string, i: number) => (
-                    <span key={i} style={{ padding: '1px 5px', borderRadius: 3, fontSize: 7, background: 'rgba(96,165,250,0.06)', color: '#60a5fa' }}>{catLabel(c)}</span>
-                  ))}
-                </div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', lineHeight: 1.3 }}>
-                  {match.matchReasons?.slice(0, 1).join('; ')}
-                </div>
-              </div>
-              {exp && (
-                <div className="bio-fade-fast" style={{ marginTop: 6 }}>
-                  {cat.description && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, marginBottom: 4 }}>📝 {cat.description}</div>}
-                  {match.personalNotes?.length > 0 && (
-                    <div style={{ fontSize: 7, color: '#00e68a', marginBottom: 2 }}>🎯 Совпадения: {match.personalNotes.slice(0, 3).join(', ')}</div>
-                  )}
-                  {cat.organs?.length > 0 && (
-                    <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginBottom: 3 }}>
-                      {cat.organs.map((o: string, i: number) => (
-                        <span key={i} style={{ padding: '1px 5px', borderRadius: 3, fontSize: 7, background: 'rgba(96,165,250,0.06)', color: '#60a5fa' }}>{o}</span>
-                      ))}
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Catalog groups */}
+      {grouped.length === 0 && matchedLabMarkers.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '24px 0', fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
+          {favOnly ? '⭐ Нет избранных препаратов' : 'Ничего не найдено. Измените фильтры.'}
+        </div>
+      )}
+
+      {grouped.map(([cat, items]) => (
+        <div key={cat} style={{ marginBottom: 8 }}>
+          <div style={{
+            padding: '6px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.06)',
+            border: '1px solid rgba(96,165,250,0.08)', marginBottom: 4,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: '#60a5fa' }}>{catLabel(cat)}</span>
+            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>{items.length}</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {items.map(c => {
+              const isFav = favorites.includes(c.id);
+              const inStack = stackIds.includes(c.id);
+              const exp = expanded[c.id];
+              const tierInfo = TIERS.find(t => t.key === c.tier);
+              return (
+                <div key={c.id} style={{
+                  borderRadius: 10, background: inStack ? 'rgba(0,230,138,0.04)' : 'rgba(24,24,27,0.5)',
+                  border: inStack ? '1px solid rgba(0,230,138,0.12)' : '1px solid rgba(255,255,255,0.04)',
+                  overflow: 'hidden',
+                }}>
+                  <div onClick={() => setExpanded(prev => ({ ...prev, [c.id]: !exp }))}
+                    style={{ padding: '8px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div onClick={e => { e.stopPropagation(); toggleFav(c.id); }} style={{ cursor: 'pointer', fontSize: 10, flexShrink: 0 }}>
+                      {isFav ? '⭐' : '☆'}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 2 }}>
+                        {c.nameRu || c.name}
+                      </div>
+                      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                        {tierInfo && (
+                          <span style={{ padding: '1px 5px', borderRadius: 3, fontSize: 6, fontWeight: 700, background: tierInfo.color + '18', color: tierInfo.color }}>
+                            {tierInfo.label}
+                          </span>
+                        )}
+                        {c.category?.slice(0, 3).map((cc: string) => (
+                          <span key={cc} style={{ padding: '1px 4px', borderRadius: 3, fontSize: 6, background: 'rgba(96,165,250,0.08)', color: '#60a5fa' }}>
+                            {catLabel(cc)}
+                          </span>
+                        ))}
+                        {c.organs?.slice(0, 2).map((o: string) => (
+                          <span key={o} style={{ padding: '1px 4px', borderRadius: 3, fontSize: 6, background: 'rgba(239,68,68,0.06)', color: '#f87171' }}>
+                            {o}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 3, alignItems: 'center', flexShrink: 0 }}>
+                      {inStack ? (
+                        <button onClick={e => { e.stopPropagation(); setStackIds(stackIds.filter(s => s !== c.id)); }}
+                          style={{ padding: '4px 8px', borderRadius: 6, fontSize: 7, fontWeight: 700, cursor: 'pointer',
+                            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>
+                          ✕
+                        </button>
+                      ) : (
+                        <button onClick={e => { e.stopPropagation(); setStackIds([...stackIds, c.id]); }}
+                          style={{ padding: '4px 8px', borderRadius: 6, fontSize: 7, fontWeight: 700, cursor: 'pointer',
+                            background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a' }}>
+                          +
+                        </button>
+                      )}
+                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.2)' }}>{exp ? '▲' : '▼'}</span>
+                    </div>
+                  </div>
+                  {exp && (
+                    <div style={{ padding: '0 10px 8px' }}>
+                      {c.description && (
+                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3, marginBottom: 4 }}>
+                          📝 {c.description}
+                        </div>
+                      )}
+                      {c.organs && c.organs.length > 0 && (
+                        <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginBottom: 3 }}>
+                          <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', marginRight: 2 }}>🫀</span>
+                          {c.organs.map((o: string) => (
+                            <span key={o} style={{ padding: '1px 5px', borderRadius: 3, fontSize: 7, background: 'rgba(239,68,68,0.06)', color: '#f87171' }}>{o}</span>
+                          ))}
+                        </div>
+                      )}
+                      {c.synergies && c.synergies.length > 0 && (
+                        <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.06)', marginBottom: 3 }}>
+                          <div style={{ fontSize: 7, color: '#8b5cf6', fontWeight: 600 }}>🤝 Синергии:</div>
+                          {c.synergies.slice(0, 3).map((s: any, i: number) => (
+                            <div key={i} style={{ fontSize: 7, color: '#a78bfa' }}>• {s.effect}</div>
+                          ))}
+                        </div>
+                      )}
+                      {c.conflicts && c.conflicts.length > 0 && (
+                        <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.06)', marginBottom: 3 }}>
+                          <div style={{ fontSize: 7, color: '#ef4444', fontWeight: 600 }}>🚫 Конфликты:</div>
+                          {c.conflicts.slice(0, 2).map((cc: any, i: number) => (
+                            <div key={i} style={{ fontSize: 7, color: '#f87171' }}>• {cc.effect}</div>
+                          ))}
+                        </div>
+                      )}
+                      {c.dosage && <div style={{ fontSize: 7, color: '#60a5fa', marginTop: 2 }}>💊 {c.dosage.mg} мг{c.dosage.timing ? ` • ${c.dosage.timing}` : ''}</div>}
+                      {tierInfo && <div style={{ fontSize: 7, color: tierInfo.color, marginTop: 2 }}>{tierInfo.desc}</div>}
                     </div>
                   )}
-                  {cat.synergies?.length > 0 && (
-                    <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.06)', marginBottom: 3 }}>
-                      <div style={{ fontSize: 7, color: '#8b5cf6', fontWeight: 600 }}>🤝 Синергии:</div>
-                      {cat.synergies.slice(0, 3).map((s, i) => (
-                        <div key={i} style={{ fontSize: 7, color: '#a78bfa' }}>• {s.effect}</div>
-                      ))}
-                    </div>
-                  )}
-                  {cat.conflicts?.length > 0 && (
-                    <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.06)', marginBottom: 3 }}>
-                      <div style={{ fontSize: 7, color: '#ef4444', fontWeight: 600 }}>🚫 Конфликты:</div>
-                      {cat.conflicts.slice(0, 2).map((c, i) => (
-                        <div key={i} style={{ fontSize: 7, color: '#f87171' }}>• {c.effect}</div>
-                      ))}
-                    </div>
-                  )}
-                  {cat.contraindications?.length > 0 && (
-                    <div style={{ fontSize: 7, color: '#f59e0b', marginBottom: 2 }}>⚠ {cat.contraindications.slice(0, 2).join(', ')}</div>
-                  )}
-                  {cat.dosage && <div style={{ fontSize: 7, color: '#60a5fa', marginTop: 2 }}>💊 {cat.dosage.mg} мг {cat.dosage.timing ? `• ${cat.dosage.timing}` : ''}</div>}
                 </div>
-              )}
-              {!exp && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', textAlign: 'right', marginTop: 2 }}>▼</div>}
-            </GlassCard>
-          );
-        });
-      })()
-    }
-    {displayedResults.length > page * PAGE_SIZE && (
-      <div style={{ textAlign: 'center', marginTop: 8 }}>
-        <button onClick={() => setPage(p => p + 1)} style={{
-          padding: '8px 24px', borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: 'pointer',
-          background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.12)', color: '#00e68a',
-        }}>
-          Показать ещё {Math.min(PAGE_SIZE, displayedResults.length - page * PAGE_SIZE)} из {displayedResults.length}
-        </button>
-      </div>
-    )}
-    </>
-    )}
-
-    {/* Browse by type */}
-    {browseMode === 'by_type' && (
-      <div>
-        {Array.from(new Set(Object.values(SUPPORT_CATALOG_DATA).flatMap(c => c.category || []).filter(Boolean))).sort().map(cat => {
-          const subs = Object.values(SUPPORT_CATALOG_DATA).filter(c => c.category?.includes(cat));
-          if (subs.length === 0) return null;
-          return (
-            <GlassCard key={cat} title={`${catLabel(cat)} (${subs.length})`}>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                {subs.slice(0,12).map(s => {
-                  const sel = stackIds.includes(s.id);
-                  return (
-                    <span key={s.id} onClick={() => sel ? removeFromStack(s.id) : addToStack(s.id)} style={{
-                      padding:'3px 7px', borderRadius:6, fontSize:8, cursor:'pointer', whiteSpace:'nowrap',
-                      background: sel ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
-                      border: sel ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)',
-                      color: sel ? '#00e68a' : 'rgba(255,255,255,0.6)',
-                    }}>{s.nameRu || s.name}</span>
-                  );
-                })}
-                {subs.length > 12 && <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)', padding:'3px 4px' }}>+{subs.length-12}</span>}
-              </div>
-            </GlassCard>
-          );
-        })}
-      </div>
-    )}
-
-    {/* Browse by organ */}
-    {browseMode === 'by_organ' && (
-      <div>
-        {ORGANS.map(o => {
-          const subs = Object.values(SUPPORT_CATALOG_DATA).filter(c => c.organs?.includes(o.key));
-          if (subs.length === 0) return null;
-          return (
-            <GlassCard key={o.key} title={`${o.label} (${subs.length})`}>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                {subs.slice(0,10).map(s => {
-                  const sel = stackIds.includes(s.id);
-                  return (
-                    <span key={s.id} onClick={() => sel ? removeFromStack(s.id) : addToStack(s.id)} style={{
-                      padding:'3px 7px', borderRadius:6, fontSize:8, cursor:'pointer', whiteSpace:'nowrap',
-                      background: sel ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
-                      border: sel ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)',
-                      color: sel ? '#00e68a' : 'rgba(255,255,255,0.6)',
-                    }}>{s.nameRu || s.name}</span>
-                  );
-                })}
-                {subs.length > 10 && <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)', padding:'3px 4px' }}>+{subs.length-10}</span>}
-              </div>
-            </GlassCard>
-          );
-        })}
-      </div>
-    )}
-
-    {/* Browse by tier */}
-    {browseMode === 'by_tier' && (
-      <div>
-        {[['core','🔵 Core'],['standard','🟢 Standard'],['advanced','🟠 Advanced'],['specialty','🔴 Specialty']].map(([tier, label]) => {
-          const subs = Object.values(SUPPORT_CATALOG_DATA).filter(c => c.tier === tier);
-          if (subs.length === 0) return null;
-          return (
-            <GlassCard key={tier} title={`${label} (${subs.length})`}>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                {subs.slice(0,12).map(s => {
-                  const sel = stackIds.includes(s.id);
-                  return (
-                    <span key={s.id} onClick={() => sel ? removeFromStack(s.id) : addToStack(s.id)} style={{
-                      padding:'3px 7px', borderRadius:6, fontSize:8, cursor:'pointer', whiteSpace:'nowrap',
-                      background: sel ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
-                      border: sel ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)',
-                      color: sel ? '#00e68a' : 'rgba(255,255,255,0.6)',
-                    }}>{s.nameRu || s.name}</span>
-                  );
-                })}
-                {subs.length > 12 && <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)', padding:'3px 4px' }}>+{subs.length-12}</span>}
-              </div>
-            </GlassCard>
-          );
-        })}
-      </div>
-    )}
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

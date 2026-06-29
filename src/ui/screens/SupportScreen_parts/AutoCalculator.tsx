@@ -4,7 +4,7 @@ import { calculateSupportTZ, hydrateState } from '../../../engines/support-calcu
 import { SYNERGY_ID_LABELS } from '../../../engines/support-calculator.types';
 import { PHARMA_DB, PHARMA_CLASSES } from '../../../core/pharma-database';
 import { SUPPORT_COVERAGE_MAP } from '../../../data/support-coverage-map';
-import { evaluateRecommendations, applyBudget, computeBudgetRisk, buildPreApplyCard } from '../../../engines/recommendation-engine';
+import { evaluateRecommendations, applyCoverageLevel, computeCoverageRisk, buildPreApplyCard } from '../../../engines/recommendation-engine';
 import { calculateWeeklyRiskDynamics } from '../../../engines/weekly-risk-dynamics.engine';
 
 interface AutoCalculatorProps { onApply: (result: { level: string; subs: string[]; result: CalculatorResult }) => void; embedded?: boolean; courseWeek?: number; }
@@ -65,7 +65,7 @@ function PopupSelect({ label, value, options, onChange, style }: { label: string
   const selected = options.find(o => o.id === value);
   return <>
     <button onClick={() => setOpen(true)} style={{ width: '100%', padding: '6px 10px', borderRadius: 8, fontSize: 9, cursor: 'pointer', background: value ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: value ? 'var(--accent)' : 'rgba(255,255,255,0.5)', textAlign: 'left' as const, ...style }}>
-      {selected ? selected.label : `▸ ${label}`}
+      {label}
     </button>
     {open && <div style={{ position: 'fixed', inset: 0, zIndex: 250, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)' }} onClick={() => setOpen(false)}>
       <div onClick={e => e.stopPropagation()} style={{ width: '88%', maxWidth: 360, maxHeight: '70vh', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
@@ -89,7 +89,7 @@ function PopupBool({ label, value, onChange }: { label: string; value: boolean; 
       border: value ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
       color: value ? '#000' : 'var(--text-dim)',
     }}>
-      {value ? '✓ ' : '✗ '}{label}
+      {label}
     </button>
     {open && <div style={{ position:'fixed', inset:0, zIndex:250, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.85)' }} onClick={() => setOpen(false)}>
       <div onClick={e => e.stopPropagation()} style={{ width:'80%', maxWidth:300, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden' }}>
@@ -114,7 +114,7 @@ function PopupNumber({ label, value, min, max, step, onChange, suffix }: { label
       width:'100%', padding:'8px 10px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:700, textAlign:'center',
       background: 'rgba(0,230,138,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'var(--text-light)',
     }}>
-      {label}: <span style={{ color:'var(--accent)' }}>{display}</span>
+      {label}
     </button>
     {open && <div style={{ position:'fixed', inset:0, zIndex:250, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.85)' }} onClick={() => setOpen(false)}>
       <div onClick={e => e.stopPropagation()} style={{ width:'80%', maxWidth:300, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden' }}>
@@ -145,7 +145,7 @@ function PopupText({ label, value, onChange, placeholder }: { label: string; val
       width:'100%', padding:'8px 10px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:700, textAlign:'center',
       background: 'rgba(0,230,138,0.04)', border:'1px solid rgba(255,255,255,0.06)', color: value ? 'var(--text-light)' : 'var(--text-dim)',
     }}>
-      {label}: <span style={{ color: value ? 'var(--accent)' : 'var(--text-dim)' }}>{display}</span>
+      {label}
     </button>
     {open && <div style={{ position:'fixed', inset:0, zIndex:250, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.85)' }} onClick={() => setOpen(false)}>
       <div onClick={e => e.stopPropagation()} style={{ width:'80%', maxWidth:300, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden' }}>
@@ -172,28 +172,28 @@ function LabSliceInput({ label, slice, onChange }: { label: string; slice: { dat
       <div style={{ fontSize: 8, fontWeight: 600, color: '#818cf8', marginBottom: 2 }}>Половые гормоны</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3, marginBottom: 4 }}>
         {['LH','FSH','Total T','Free T','E2','Prolactin','SHBG','DHT','Progesterone','Cortisol'].map(m =>
-          <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{m}</span>
+          <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{ruMarker(m)}</span>
             <input value={slice.panelSex?.[m] || ''} onChange={e => onChange({ ...slice, panelSex: { ...slice.panelSex, [m]: e.target.value } })} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
           </div>)}
       </div>
       <div style={{ fontSize: 8, fontWeight: 600, color: '#22c55e', marginBottom: 2 }}>Биохимия</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3, marginBottom: 4 }}>
         {['ALT','AST','GGT','Bilirubin','Glucose','Creatinine','Urea','Uric acid','CRP','Homocysteine'].map(m =>
-          <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{m}</span>
+          <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{ruMarker(m)}</span>
             <input value={slice.panelBiochem?.[m] || ''} onChange={e => onChange({ ...slice, panelBiochem: { ...slice.panelBiochem, [m]: e.target.value } })} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
           </div>)}
       </div>
       <div style={{ fontSize: 8, fontWeight: 600, color: '#fbbf24', marginBottom: 2 }}>Гематология</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3, marginBottom: 4 }}>
         {['HCT','Hemoglobin','RBC','WBC','Platelets','Neutrophils','Lymphocytes'].map(m =>
-          <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{m}</span>
+          <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{ruMarker(m)}</span>
             <input value={slice.panelHematology?.[m] || ''} onChange={e => onChange({ ...slice, panelHematology: { ...slice.panelHematology, [m]: e.target.value } })} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
           </div>)}
       </div>
       <div style={{ fontSize: 8, fontWeight: 600, color: '#a855f7', marginBottom: 2 }}>Тиреоидные</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3 }}>
         {['TSH','T3 free','T4 free','Anti-TPO','Anti-TG'].map(m =>
-          <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{m}</span>
+          <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{ruMarker(m)}</span>
             <input value={slice.panelThyroid?.[m] || ''} onChange={e => onChange({ ...slice, panelThyroid: { ...slice.panelThyroid, [m]: e.target.value } })} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
           </div>)}
       </div>
@@ -218,6 +218,28 @@ const FULL_PANELS: { key: keyof LabSlice; label: string; color: string; markers:
   { key:'panelUrinalysis', label:'Общий анализ мочи', color:'#65a30d', markers:['pH','Protein','Glucose','Ketones','Leukocytes','Nitrite'] },
 ];
 
+const LAB_MARKER_RU: Record<string, string> = {
+  LH:'ЛГ', FSH:'ФСГ', 'Total T':'Общий тестостерон', 'Free T':'Своб. тестостерон', E2:'Эстрадиол',
+  Prolactin:'Пролактин', SHBG:'ГСПГ', DHT:'ДГТ', Progesterone:'Прогестерон', Cortisol:'Кортизол',
+  ALT:'АЛТ', AST:'АСТ', GGT:'ГГТ', Bilirubin:'Билирубин', Glucose:'Глюкоза',
+  Creatinine:'Креатинин', Urea:'Мочевина', 'Uric acid':'Моч. кислота', CRP:'СРБ', Homocysteine:'Гомоцистеин',
+  HCT:'Гематокрит', Hemoglobin:'Гемоглобин', RBC:'Эритроциты', WBC:'Лейкоциты',
+  Platelets:'Тромбоциты', Neutrophils:'Нейтрофилы', Lymphocytes:'Лимфоциты',
+  TSH:'ТТГ', 'T3 free':'Т3 своб.', 'T4 free':'Т4 своб.', 'Anti-TPO':'Анти-ТПО', 'Anti-TG':'Анти-ТГ',
+  'Total Cholesterol':'Общий холестерин', LDL:'ЛПНП', HDL:'ЛПВП', Triglycerides:'Триглицериды',
+  VLDL:'ЛПОНП', ApoB:'АпоВ', ApoA1:'АпоА1', 'Lp(a)':'Лп(а)',
+  Ferritin:'Ферритин', Iron:'Железо', TIBC:'ОЖСС', 'Transferrin Sat':'Насыщ. трансферрина', Transferrin:'Трансферрин',
+  B12:'В12', Folate:'Фолат', 'Vitamin D (25-OH)':'Вит. D', 'Vitamin A':'Вит. A', 'Vitamin E':'Вит. E', 'Vitamin K':'Вит. K',
+  CK:'КФК', 'CK-MB':'КФК-МВ', 'Troponin I':'Тропонин I', 'Troponin T':'Тропонин T', 'NT-proBNP':'NT-proBNP',
+  'D-dimer':'Д-димер', Fibrinogen:'Фибриноген', PT:'ПВ', APTT:'АЧТВ', INR:'МНО',
+  'IL-6':'ИЛ-6', 'TNF-alpha':'ФНО-α', hsCRP:'вчСРБ',
+  'DHEA-S':'ДГЭА-С', Androstenedione:'Андростендион', '3a-ADG':'3α-АДГ', Aldosterone:'Альдостерон', Renin:'Ренин', PTH:'ПТГ',
+  Calcium:'Кальций', Phosphorus:'Фосфор', Magnesium:'Магний', Sodium:'Натрий', Potassium:'Калий', Chloride:'Хлориды',
+  'PSA total':'ПСА общий', 'PSA free':'ПСА своб.', 'CA-125':'CA-125', CEA:'РЭА', AFP:'АФП',
+  pH:'pH', Protein:'Белок', Ketones:'Кетоны', Leukocytes:'Лейкоциты', Nitrite:'Нитриты',
+};
+const ruMarker = (m: string) => LAB_MARKER_RU[m] || m;
+
 function FullLabInput({ values, onChange }: { values: LabSlice | null; onChange: (v: LabSlice) => void }) {
   const s = values || { date:'', panelSex:{}, panelBiochem:{}, panelHematology:{}, panelThyroid:{}, panelLipid:{}, panelIron:{}, panelVitamin:{}, panelCardiac:{}, panelCoagulation:{}, panelInflammatory:{}, panelAdrenal:{}, panelMineral:{}, panelTumor:{}, panelUrinalysis:{} };
   const upd = (panel: keyof LabSlice, marker: string, val: string) => {
@@ -228,7 +250,7 @@ function FullLabInput({ values, onChange }: { values: LabSlice | null; onChange:
     {FULL_PANELS.map(pan => <div key={pan.key} style={{ marginBottom:6 }}>
       <div style={{ fontSize:8, fontWeight:600, color:pan.color, marginBottom:2 }}>{pan.label}</div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:3 }}>
-        {pan.markers.map(m => <div key={m}><span style={{ fontSize:7, color:'var(--text-dim)' }}>{m}</span>
+        {pan.markers.map(m => <div key={m}><span style={{ fontSize:7, color:'var(--text-dim)' }}>{ruMarker(m)}</span>
           <input value={(s[pan.key] as Record<string,string>)?.[m] || ''} onChange={e => upd(pan.key, m, e.target.value)} style={{ ...INPUT, padding:'3px 6px', fontSize:9 }} />
         </div>)}
       </div>
@@ -321,7 +343,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
   const [showPharmaPicker, setShowPharmaPicker] = useState(false);
   const [showNegPicker, setShowNegPicker] = useState(false);
   const [pharmaSearch, setPharmaSearch] = useState('');
-  const [budget, setBudget] = useState<'basic' | 'mid' | 'max' | 'boost'>('mid');
+  const [coverageLevel, setCoverageLevel] = useState<'basic' | 'mid' | 'max' | 'boost'>('mid');
   const [boostOverride, setBoostOverride] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
 
@@ -691,7 +713,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         </div>
         <div style={{ display:'flex', gap:4 }}>
           <button onClick={() => {
-            const saveData = { state, budget, boostOverride, timestamp: new Date().toISOString() };
+            const saveData = { state, coverageLevel, boostOverride, timestamp: new Date().toISOString() };
             try { localStorage.setItem('he_autocalc_save', JSON.stringify(saveData)); setSaveStatus('✅ Вводные сохранены'); setTimeout(() => setSaveStatus(''), 2000); } catch { setSaveStatus('❌ Ошибка'); }
           }} style={{
             flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
@@ -705,7 +727,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
               if (!raw) { setSaveStatus('❌ Нет сохранения вводных'); setTimeout(() => setSaveStatus(''), 2000); return; }
               const data = JSON.parse(raw);
               if (data.state) setState(data.state);
-              if (data.budget) setBudget(data.budget);
+              if (data.coverageLevel) setCoverageLevel(data.coverageLevel); else if (data.budget) setCoverageLevel(data.budget);
               if (data.boostOverride !== undefined) setBoostOverride(data.boostOverride);
               setSaveStatus('✅ Вводные восстановлены');
               setTimeout(() => setSaveStatus(''), 2000);

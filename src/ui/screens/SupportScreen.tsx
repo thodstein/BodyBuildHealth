@@ -42,7 +42,8 @@ import { AutoCalculator } from './SupportScreen_parts/AutoCalculator';
 import { calculateSupportTZ, hydrateState } from '../../engines/support-calculator.engine';
 import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engines/support-calculator.types';
 import { calculateTZRisk, toCompatibleResult, type TZRiskResult } from '../../engines/risk-engine-tz';
-import { buildPreApplyCard, evaluateRecommendations, computeBudgetRisk } from '../../engines/recommendation-engine';
+import { buildPreApplyCard, evaluateRecommendations, computeCoverageRisk } from '../../engines/recommendation-engine';
+import { calculateMixScore, type MixSubstance, type MixProfile } from '../../engines/training-mix-scoring.engine';
 // Force Vite to include SUPPORT_CATALOG_DATA and CANONICAL_ID_MAP (prevents tree-shaking)
 // @ts-ignore
 (window as any).__SUPPORT_CATALOG__ = SUPPORT_CATALOG_DATA;
@@ -51,7 +52,7 @@ import { buildPreApplyCard, evaluateRecommendations, computeBudgetRisk } from '.
 
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
-type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'plan' | 'reports';
+type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'plan' | 'reports' | 'mixcalc';
 type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'research' | 'favorites' | 'protocols' | 'biostack';
 
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
@@ -81,7 +82,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [manualLevelSelected, setManualLevelSelected] = useState(false);
   const [boostEnabled, setBoostEnabled] = useState(false);
   const [jointMode, setJointMode] = useState(false);
-  const [calcPrinciple, setCalcPrinciple] = useState<'intel' | 'manual'>('intel');
   const [jointNotification, setJointNotification] = useState(false);
   const [boostNotification, setBoostNotification] = useState(false);
   const [myPlansRefresh, setMyPlansRefresh] = useState(0);
@@ -172,7 +172,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (section === 'protocols') { goHome(); return; }
     if (calcView !== 'main') {
       if (section === 'generator') { setSection('home'); resetMain(); } 
-      else if (calcView === 'peptides') { setCalcView('info'); setInfoView('catalog'); setInfoTab('catalog'); setSection('home'); } 
+      else if (calcView === 'peptides') { setCalcView('info'); setInfoView('catalog'); setInfoTab('catalog'); setSection('home'); }
+      else if (calcView === 'mixcalc') { setCalcView('info'); setInfoView('catalog'); setInfoTab('catalog'); setSection('home'); }
       else if (calcView === 'info') { goHome(); } 
       else { setCalcView('main'); }
       return;
@@ -632,7 +633,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [planView, setPlanView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [planSaved, setPlanSaved] = useState<string | boolean>(false);
   const [reportGenerated, setReportGenerated] = useState(false);
-  const [planSubTab, setPlanSubTab] = useState<'active' | 'archive'>('active');
+  const [planSubTab, setPlanSubTab] = useState<'active' | 'archive' | 'myplans'>('active');
   const [favSearch, setFavSearch] = useState('');
   const [archivedPlans, setArchivedPlans] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('supportPlanArchive') || '[]'); } catch { return []; }
@@ -665,6 +666,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [mixTiming, setMixTiming] = useState<string>('pre');
   const [mixInsulin, setMixInsulin] = useState<number>(0);
   const [mixInsulinTiming, setMixInsulinTiming] = useState<'pre'|'post'>('post');
+  const [mixDrugIGF, setMixDrugIGF] = useState(false);
+  const [mixDrugGH, setMixDrugGH] = useState(false);
+  const [mixDrugMGF, setMixDrugMGF] = useState(false);
+  const [mixDrugGLP1, setMixDrugGLP1] = useState(false);
   const [mixMGF, setMixMGF] = useState<number>(0);
   const [mixMGFTiming, setMixMGFTiming] = useState<'pre'|'post'>('pre');
   const [mixIGF, setMixIGF] = useState<number>(0);
@@ -2201,7 +2206,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'protocols' ? '40px' : section === 'generator' ? '55px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '100px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'protocols' ? '40px' : section === 'generator' ? '85px' : (section === 'info' || calcView === 'info' || calcView === 'peptides' || calcView === 'mixcalc') ? '100px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (with back/home) ===== */}
       {section === 'generator' && (
@@ -2238,15 +2243,16 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       )}
 
       {/* ===== INFO HEADER (back/home + pills) ===== */}
-      {(section === 'info' || calcView === 'info' || calcView === 'peptides') && (
+      {(section === 'info' || calcView === 'info' || calcView === 'peptides' || calcView === 'mixcalc') && (
         <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
           <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center', overflowX:'auto' }}>
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['interactions','⚠ Взаимодействия'],['research','Исследования'],['favorites','Избранное']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['mixcalc','💪 Тренировочные миксы'],['interactions','⚠ Взаимодействия'],['research','Исследования'],['favorites','Избранное']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 if (id === 'peptides') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); }
+                else if (id === 'mixcalc') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); }
                 else { setTab('main'); setSupportView('calc'); setCalcView('info'); setSection('home'); setInfoView(id as InfoView); }
               }} style={{
                 padding:'5px 12px', borderRadius:16, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
@@ -2293,6 +2299,19 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
                 <span style={{ color:'#60a5fa', fontSize:18, opacity:0.6 }}>→</span>
               </div>
+              {/* Тренировочные миксы */}
+              <div onClick={() => { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); }} style={{
+                display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
+                background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', color:'var(--text)', transition:'all 0.2s',
+              }}>
+                <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(245,158,11,0.15)', fontSize:24 }}>💪</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:15, fontWeight:800, marginBottom:4, color:'#f59e0b' }}>Тренировочные миксы</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Подбор пред-/интра-/пост-тренировочных стеков по цели, весу и фазе курса</div>
+                </div>
+                <span style={{ color:'#f59e0b', fontSize:18, opacity:0.6 }}>→</span>
+              </div>
+
               {/* Примерные протоколы поддержки — одна кнопка */}
               <div onClick={() => { setSection('protocols'); setProtocolTab('pct'); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
@@ -3926,123 +3945,118 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       {genTab === 'info' && section === 'generator' && (<InfoErrorBoundary label="Генератор — как работает">
         <div style={{ padding:'0 12px 80px', maxWidth:600, margin:'0 auto' }}>
           <h2 style={{ fontSize:16, fontWeight:800, color:'#fff', margin:'0 0 16px', display:'flex', alignItems:'center', gap:6 }}>
-            <span>📖</span> Как работает подбор поддержки
+            <span>📖</span> Калькулятор поддержки: полная методология
           </h2>
 
           <div style={{ display:'flex', flexDirection:'column', gap:10, fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.6 }}>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>1. Оценка рисков от курса</h3>
-              <p style={{ margin:0 }}>
-                Первый шаг — анализ всех активных соединений вашего курса. Каждое вещество в базе PHARMA_DB содержит PK/PD-профиль с показателями гепатотоксичности, андрогенности, ароматизации, кардиотоксичности и т.д. Система суммирует риски по 8 системам организма:
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>1. Вводные данные — что собирает калькулятор</h3>
+              <p style={{ margin:'0 0 6px' }}>Перед расчётом собираются данные из 21 карточки по категориям:</p>
+              <ul style={{ paddingLeft:16, margin:'4px 0' }}>
+                <li><b>👤 Профиль:</b> вес, возраст, пол, рост, % жира, тренировки, сон, стресс, курение, алкоголь, кофеин</li>
+                <li><b>🧠 Неврология:</b> дофамин, серотонин, агрессия, ГАМК-баланс, сон, память, фокус, мышление, координация, головные боли, метеозависимость</li>
+                <li><b>💉 Фарма стек:</b> список ААС (препарат + мг/нед + недели), ГР, ИГФ-1, инсулин, ХГЧ, АИ, каберголин, СЕРМ, SARMs</li>
+                <li><b>🎯 Цели:</b> масса/сушка/поддержка, здоровье, соревнования, сон, липиды, кровь, печень, АД, длительность цикла</li>
+                <li><b>🩺 Противопоказания:</b> 9 медицинских флагов (сердце, печень, почки, диабет, щитовидная, тромбоз, онкология, язва, психиатрия) + аллергии</li>
+                <li><b>🫁🫘❤️🦴🥗☣️🦷🧬🫀🧘💉:</b> гепатобилиарная, мочевыделительная, ССС, ОДА, питание, токсическая нагрузка, стоматология, генетика, ЖКТ, психология, инъекции</li>
+                <li><b>🧪 Лаборатория:</b> 15 панелей × 5-10 маркеров = 80+ показателей (гормоны, биохимия, гематология, липиды, железо, витамины, кардио, гемостаз, воспаление, минералы, онкомаркеры, моча)</li>
+              </ul>
+              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>Все данные сохраняются в localStorage (he_autocalc_state) и восстанавливаются при повторном входе.</p>
+            </div>
+
+            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>2. Риск-движок (TZ): вероятностная модель 49 ячеек</h3>
+              <p style={{ margin:'0 0 6px' }}>Ядро расчёта — вероятностная модель риска по 7 системам × 7 механизмам = 49 ячеек:</p>
+              <p style={{ margin:'0 0 4px', fontSize:9, fontFamily:'monospace', background:'rgba(0,0,0,0.2)', padding:'4px 8px', borderRadius:6 }}>
+                Risk<sub>s,m</sub> = 1 − ∏<sub>i</sub> (1 − baseRisk × D<sub>i</sub> × G × L × N × T)
               </p>
               <ul style={{ paddingLeft:16, margin:'4px 0' }}>
-                <li><b>❤️ Сердце:</b> кардиотоксичность соединений + влияние на липидный профиль + АД</li>
-                <li><b>🧪 Печень:</b> 17-алкилированные оральные стероиды — основной фактор. Внутривенная нагрузка метаболитами</li>
-                <li><b>🫘 Почки:</b> нагрузка на нефроны, влияние на РААС, гипертензия</li>
-                <li><b>🧠 Нейро:</b> нейротоксичность (особенно тренболон, нандролон), дофаминовая регуляция</li>
-                <li><b>🔄 Эндокринная:</b> подавление ГГЯ-оси, влияние на кортизол, Т3/Т4</li>
-                <li><b>🩸 Кровь:</b> гематокрит, эритроцитоз, тромбоцитарный фактор</li>
-                <li><b>⚧ Репродуктивная:</b> супрессия ЛГ/ФСГ, снижение ингибина B, атрофия Лейдига-клеток</li>
-                <li><b>🦴 Опорно-двиг.:</b> влияние на коллаген, сухожилия, суставы, костную плотность</li>
+                <li><b>D<sub>i</sub> = min(2.0, (dose/threshold)<sup>γ</sup>), γ=1.2</b> — пороговая модель доз (нелинейная)</li>
+                <li><b>G</b> — генетический множитель (COMT, MTHFR, ESR1, AGTR1, NOS3, SRD5A2, CYP3A4)</li>
+                <li><b>L = (value/ULN)<sup>β</sup> × (1 + α × trend)</b> — лабораторный множитель с трендом (missing=1.5×)</li>
+                <li><b>N</b> — нутритивный множитель (белок/клетчатка/омега-3/натрий/калий/вода)</li>
+                <li><b>T</b> — тренировочный множитель (HIIT/объём/LISS/длительность)</li>
               </ul>
+              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>Агрегация: геометрическое среднее по механизмам → SystemRisk; геометрическое среднее по системам → OverallRisk. Поддержка: net = raw × supportFactor (31 вещество с системно-механизмными редукциями).</p>
             </div>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>2. Анализ лабораторных данных</h3>
-              <p style={{ margin:0 }}>
-                Если у вас есть загруженные анализы крови, система автоматически сверяет ваши показатели с референсными значениями:
-              </p>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>3. Анализ лабораторных данных</h3>
+              <p style={{ margin:'0 0 6px' }}>При наличии анализов система сверяет 80+ маркеров с референсными значениями:</p>
               <ul style={{ paddingLeft:16, margin:'4px 0' }}>
-                <li>Печень: АСТ, АЛТ, ГГТ, общий билирубин</li>
-                <li>Сердце: ЛПНП, ЛПВП, триглицериды, гомоцистеин</li>
-                <li>Почки: креатинин, мочевина, СКФ, цистатин C</li>
-                <li>Кровь: гематокрит, гемоглобин, эритроциты</li>
-                <li>Гормоны: ТТГ, Т3, кортизол, ЛГ, ФСГ, тестостерон</li>
+                <li><b>Печень:</b> АЛТ (&lt;40), АСТ (&lt;35), ГГТ (&lt;55), общий билирубин (&lt;21), прямой (&lt;5)</li>
+                <li><b>Сердце/сосуды:</b> ЛПНП (&lt;3.0), ЛПВП (&gt;1.0), триглицериды (&lt;1.7), гомоцистеин (&lt;15)</li>
+                <li><b>Почки:</b> креатинин (&lt;110), мочевина (&lt;8.3), СКФ (&gt;90)</li>
+                <li><b>Кровь:</b> гематокрит (&lt;50%), гемоглобин (&lt;175), эритроциты, тромбоциты</li>
+                <li><b>Гормоны:</b> эстрадиол (&lt;50 пг/мл), пролактин (&lt;15 нг/мл), ГСПГ (&lt;55), общ. тестостерон (&gt;10)</li>
               </ul>
-              <p style={{ margin:'4px 0 0' }}>Каждое отклонение увеличивает риск соответствующей системы.</p>
+              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>Каждое отклонение &gt;30% от верхней границы → статус «критический», умножает риск системы на 1.3-2.0×. Тренды (линейная регрессия по 3+ точкам) дают дополнительные множители.</p>
             </div>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>3. Выбор уровня поддержки</h3>
-              <p style={{ margin:0 }}>
-                На основе суммарного риска выбирается уровень поддержки:
-              </p>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>4. Уровни покрытия (не «бюджет»!)</h3>
+              <p style={{ margin:'0 0 6px' }}>Четыре уровня построены на <b>покрытии рисков</b>, а не на стоимости:</p>
               <ul style={{ paddingLeft:16, margin:'4px 0' }}>
-                <li><b>🟢 Базовый (lvl 1, 0–20%):</b> минимальная профилактика. Omega-3, Витамин D3+K2, Магний, Цинк, CoQ10</li>
-                <li><b>🟡 Средний (lvl 2, 20–45%):</b> расширенная поддержка. Добавляются: NAC, TUDCA, пальметто, ашваганда, В-комплекс</li>
-                <li><b>🟠 Повышенный (lvl 3, 45–70%):</b> усиленная поддержка. Полный набор: берберин, астаксантин, АЛК, ALCAR</li>
-                <li><b>🔴 Интенсивный (lvl 4, 70%+):</b> максимальная поддержка. Все доступные механизмы, нейропротекция, гепатопротекция</li>
+                <li><b>🟢 База (tier: base + first):</b> самое необходимое. Минимальный набор для покрытия критических систем: NAC, TUDCA, Omega-3, D3+K2, Mg, CoQ10. ~15% покрытия</li>
+                <li><b>🟡 Средний (tier: base + first + second):</b> расширенный охват. + Цинк, селен, ашваганда, берберин, силимарин. ~30% покрытия</li>
+                <li><b>🔴 Макс (tier: all):</b> максимальный охват. + АЛК, куркумин, босвеллия, коллаген, глюкозамин, таурин. ~45% покрытия</li>
+                <li><b>💎 Буст (tier: second + third):</b> элитные формы с максимальной биодоступностью. Применяется СВЕРХ выбранного уровня. Добавляет 5-8 веществ с наивысшей синергией к текущему стеку</li>
               </ul>
-              <p style={{ margin:'4px 0 0' }}>Вы также можете вручную указать желаемый уровень — он будет использован как целевой при генерации стека.</p>
+              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>Фильтрация веществ по tier происходит через COVERAGE_TIER_MAP. Каждый tier определяет допустимые уровни доказательности (base=минимальный, first=стандартный, second=продвинутый, third=элитный).</p>
             </div>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>4. Подбор веществ по механизмам</h3>
-              <p style={{ margin:0 }}>
-                Каждое вещество в базе catalogSubstances имеет один или несколько механизмов действия (из 553+ возможных). Для каждой системы подбираются вещества, которые:
-              </p>
-              <ol style={{ paddingLeft:16, margin:'4px 0' }} type="a">
-                <li><b>Покрывают проблемные механизмы</b> — например, при высоком гематокрите добавляются вещества с механизмами крови (Ω-3, наттокиназа)</li>
-                <li><b>Синергируют друг с другом</b> — комбинации с подтверждённой эффективностью (D3+K2, Mg+B6, C+железо)</li>
-                <li><b>Не конфликтуют</b> — система проверяет все пары на наличие известных взаимодействий</li>
-              </ol>
-              <p style={{ margin:'4px 0 0' }}>Подбор учитывает до 6 механизмов на вещество и до 5 синергий на пару.</p>
-            </div>
-
-            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>5. Дозирование и режим приёма</h3>
-              <p style={{ margin:0 }}>
-                Для каждого вещества определена стандартная дозировка (мг/день) и рекомендуемое время приёма:
-              </p>
-              <ul style={{ paddingLeft:16, margin:'4px 0' }}>
-                <li><b>Утром</b> — энергия, жирорастворимые витамины, дофаминергические</li>
-                <li><b>С едой</b> — жирорастворимые (D3, K2, CoQ10, куркумин), гепатопротекторы</li>
-                <li><b>На ночь</b> — магний, ZMA, адаптогены, сонные</li>
-                <li><b>До тренировки</b> — NO-бустеры, креатин, бета-аланин</li>
-                <li><b>После тренировки</b> — протеин, ALCAR, HMB</li>
-              </ul>
-              <p style={{ margin:'4px 0 0' }}>Длительность курса поддержки обычно совпадает с курсом ААС + 2–4 недели после для восстановления.</p>
-            </div>
-
-            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>6. Генерация стека</h3>
-              <p style={{ margin:0 }}>
-                Алгоритм генератора стеков работает в 4 этапа:
-              </p>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>5. Рекомендательный движок (Recommendation Engine)</h3>
+              <p style={{ margin:'0 0 6px' }}>Трёхфазный алгоритм подбора веществ под выявленные риски:</p>
               <ol style={{ paddingLeft:16, margin:'4px 0' }}>
-                <li><b>Фильтрация:</b> отбираются вещества, соответствующие вашей цели (печень, сердце, нейро, общая поддержка)</li>
-                <li><b>Ранжирование:</b> каждое вещество получает оценку по 3 критериям: покрытие механизмов (40%), уровень доказательности (35%), безопасность (25%)</li>
-                <li><b>Оптимизация:</b> из топ-50 выбирается оптимальная комбинация 5–10 веществ с максимальным покрытием и минимальными конфликтами</li>
-                <li><b>Валидация:</b> проверка всех пар на синергии и конфликты из базы ALL_INTERACTIONS (206 записей)</li>
+                <li><b>Фаза 1 — Выявление проблем:</b> анализ курса → токсичность (17α-алкилы, 19-норы), андрогенность, ароматизация, влияние на липиды/HCT. Сопоставление с лаб. отклонениями (АЛТ↑, HCT↑, ЛПНП↑). Генерация списка рекомендаций с severity (info→low→medium→high→critical)</li>
+                <li><b>Фаза 2 — Подбор веществ:</b> для каждой рекомендации подбираются вещества через обратные индексы (MECHANISM→SUPPORT, ORGAN→SUPPORT, SYSTEM→SUPPORT, CATEGORY→SUPPORT). Приоритет: прямое покрытие механизма &gt; орган &gt; система &gt; категория</li>
+                <li><b>Фаза 3 — applyCoverageLevel:</b> фильтрация по уровню (tier), разрешение конфликтов (разнесение по времени: утро/день/вечер/ночь/натощак — любые ортогональные слоты = OK), синергетическое ранжирование</li>
               </ol>
+              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>Итог: computeCoverageRisk оценивает остаточный риск после применения подобранного стека (~8% покрытия на вещество, макс 80% на систему).</p>
             </div>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>7. Проверка взаимодействий</h3>
-              <p style={{ margin:0 }}>
-                Финальная проверка на взаимодействия между всеми веществами курса и поддержки. База ALL_INTERACTIONS содержит 206 записей:
-              </p>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>6. Синергии, конфликты и сеть взаимодействий</h3>
+              <p style={{ margin:'0 0 6px' }}>Каждая пара веществ в подобранном стеке проверяется через:</p>
               <ul style={{ paddingLeft:16, margin:'4px 0' }}>
-                <li><b>🟢 Синергии (положительные):</b> пары, усиливающие действие друг друга. Например, D3+K2 → кальциевый транспорт, Mg+B6 → GABA</li>
-                <li><b>🔴 Конфликты (отрицательные):</b> пары, снижающие эффективность. Например, кальций+железо → конкуренция за всасывание</li>
-                <li><b>🟡 Осторожность:</b> пары, требующие временного разнесения или контроля. Например, цинк+медь → антагонизм при высоких дозах</li>
+                <li><b>SYNERGY_NETWORK (~250+ записей):</b> клинически обоснованные пары с усилением эффекта. Примеры: NAC+TUDCA (глутатион + анти-ER-стресс), D3+K2+Mg (кальциевый треугольник), куркумин+пиперин (+2000% биодоступности)</li>
+                <li><b>ALL_INTERACTIONS (~450+ записей):</b> полный граф пар с силой связи (HIGH/MEDIUM/LOW), механизмом и рекомендациями</li>
+                <li><b>Конфликты:</b> пары, снижающие эффективность (Ca+Fe, Zn+Cu) или создающие риски (варфарин+Ω-3). Разрешаются через временное разнесение по 5 слотам</li>
               </ul>
-              <p style={{ margin:'4px 0 0' }}>Взаимодействия проверяются как внутри класса (Поддержка—Поддержка), так и между классами (Фарма—Поддержка).</p>
+              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>Межмодульное обогащение: данные из Pharma (гепато-/кардио-/ренальная нагрузка) и Labs (PK/PD риски) дополнительно корректируют подбор поддержки.</p>
             </div>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>8. Формирование недельного плана</h3>
-              <p style={{ margin:0 }}>
-                Готовый стек раскладывается в недельный план с указанием:
-              </p>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>7. Понедельная динамика и дозирование</h3>
+              <p style={{ margin:'0 0 6px' }}>Расчёт учитывает фазу курса:</p>
               <ul style={{ paddingLeft:16, margin:'4px 0' }}>
-                <li>Конкретной дозировки (мг/мкг/МЕ)</li>
-                <li>Времени приёма (утро/день/вечер/ночь, до/после еды, до/после тренировки)</li>
-                <li>Дней недели (ежедневно/через день/2 раза в неделю)</li>
-                <li>Продолжительности приёма (недели цикла)</li>
+                <li><b>Неделя курса:</b> селектор 1-20 нед. Влияет на титрацию доз, накопленный риск, late-phase синергии</li>
+                <li><b>Титрация:</b> дозировки масштабируются по неделе (старт 50% → пик 100% к середине курса)</li>
+                <li><b>Фазы:</b> курс / бридж / ПКТ / база — разные наборы веществ для каждой фазы через фазовые корректировки SUPPORT_LEVELS</li>
+                <li><b>Дозирование:</b> стандартные дозы из каталога + weight-based корректировки (мг/кг) для персонализации</li>
+                <li><b>Режим приёма:</b> утро/день/вечер/ночь/натощак — оптимальное время для каждого вещества (жирорастворимые → с едой, магний → на ночь, NAC → натощак)</li>
               </ul>
-              <p style={{ margin:'4px 0 0' }}>План можно сохранить в избранное, экспортировать или добавить всё в корзину магазина.</p>
+            </div>
+
+            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>8. Результат: что вы получаете</h3>
+              <ul style={{ paddingLeft:16, margin:'4px 0' }}>
+                <li><b>📊 Риск-бар:</b> общий риск без поддержки → с поддержкой (%). Визуализация снижения</li>
+                <li><b>📈 Покрытие по системам:</b> 8 баров (сердце, печень, почки, нейро, эндокринная, кровь, репродуктивная, ОДА) с % покрытия</li>
+                <li><b>💊 План поддержки:</b> список веществ с дозировками (мг) и временем приёма</li>
+                <li><b>🧠 Карточка логики:</b> почему назначено каждое вещество (проблема → механизм → вещество → мониторинг)</li>
+                <li><b>⚠️ Предупреждения:</b> если текущий уровень недостаточен — рекомендация повысить до следующего</li>
+                <li><b>💾 Сохранение:</b> расчёт → Избранное; план → Мои планы (localStorage). Экспорт в текст для врача</li>
+              </ul>
+            </div>
+
+            <div style={{ borderRadius:12, padding:14, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#f59e0b' }}>⚠️ Важные замечания</h3>
+              <p style={{ margin:'0 0 4px', fontSize:9, lineHeight:1.3 }}><b>Информация носит ознакомительный характер.</b> Подбор поддержки должен производиться врачом с учётом индивидуальных особенностей: возраста, веса, генетических полиморфизмов (MTHFR, COMT, CYP), сопутствующих заболеваний и принимаемых лекарств.</p>
+              <p style={{ margin:'0 0 4px', fontSize:9, lineHeight:1.3 }}><b>Без лабораторных данных</b> система использует консервативные оценки риска (missing=1.5×). Для точного подбора необходимы свежие анализы.</p>
+              <p style={{ margin:'0', fontSize:9, lineHeight:1.3 }}><b>Противопоказания:</b> некоторые вещества несовместимы с определёнными заболеваниями. Если вы принимаете варфарин, антидепрессанты, антипсихотики — проконсультируйтесь со специалистом.</p>
             </div>
 
           </div>
@@ -4958,49 +4972,25 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
               )}
 
-              {/* Principle selector */}
+              {/* Level selector (always visible) */}
               <div style={{ marginBottom:8 }}>
-                <div style={{ fontSize:9, fontWeight:600, color:'var(--text-dim)', marginBottom:4 }}>🎯 Выберите принцип расчёта:</div>
+                <div style={{ fontSize:9, fontWeight:600, color:'var(--text-dim)', marginBottom:4 }}>📊 Уровень поддержки:</div>
                 <div style={{ display:'flex', gap:4 }}>
-                  <button onClick={() => setCalcPrinciple('intel')} style={{
-                    flex:1, padding:'8px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer',
-                    background: calcPrinciple === 'intel' ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.04)',
-                    border: calcPrinciple === 'intel' ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
-                    color: calcPrinciple === 'intel' ? '#000' : 'var(--text-dim)',
-                  }}>🧠 Интеллектуально<br/><span style={{ fontSize:7, fontWeight:400, opacity:0.7 }}>Алгоритм: риск + анализы → подбор</span></button>
-                  <button onClick={() => setCalcPrinciple('manual')} style={{
-                    flex:1, padding:'8px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer',
-                    background: calcPrinciple === 'manual' ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.04)',
-                    border: calcPrinciple === 'manual' ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
-                    color: calcPrinciple === 'manual' ? '#000' : 'var(--text-dim)',
-                  }}>📋 Вручную<br/><span style={{ fontSize:7, fontWeight:400, opacity:0.7 }}>Каталог: выбор препаратов вручную</span></button>
+                  {(['basic','mid','max','boost'] as const).map(b => {
+                    const active = supportLevel === b;
+                    const labels: Record<string,string> = { basic:'🟢 База', mid:'🟡 Средний', max:'🔴 Макс', boost:'💎 Буст' };
+                    return <button key={b} onClick={() => { setSupportLevel(b); }} style={{
+                      flex:1, padding:'8px 4px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer',
+                      background: active ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.04)',
+                      border: active ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
+                      color: active ? '#000' : 'var(--text-dim)',
+                    }}>{labels[b]}</button>;
+                  })}
                 </div>
               </div>
 
-              {/* Level selector (only for intel) */}
-              {calcPrinciple === 'intel' && (
-                <div style={{ marginBottom:8 }}>
-                  <div style={{ fontSize:9, fontWeight:600, color:'var(--text-dim)', marginBottom:4 }}>📊 Уровень поддержки:</div>
-                  <div style={{ display:'flex', gap:4 }}>
-                    {(['basic','mid','max','boost'] as const).map(b => {
-                      const active = supportLevel === b;
-                      const labels: Record<string,string> = { basic:'🟢 База', mid:'🟡 Средний', max:'🔴 Макс', boost:'💎 Буст' };
-                      return <button key={b} onClick={() => { setSupportLevel(b); }} style={{
-                        flex:1, padding:'8px 4px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer',
-                        background: active ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.04)',
-                        border: active ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
-                        color: active ? '#000' : 'var(--text-dim)',
-                      }}>{labels[b]}</button>;
-                    })}
-                  </div>
-                </div>
-              )}
-
               {/* Calculate button */}
-              <button onClick={() => {
-                if (calcPrinciple === 'intel') calcSupport(supportLevel);
-                else setShowModal('manual');
-              }} style={{
+              <button onClick={() => calcSupport(supportLevel)} style={{
                 width:'100%', padding:'14px', borderRadius:12, border:'2px solid var(--accent)', cursor:'pointer',
                 background:'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,198,83,0.05))', color:'#00e68a', fontWeight:800, fontSize:13, marginBottom:8, letterSpacing:0.5,
               }}>
@@ -5016,7 +5006,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     setJointNotification(true);
                     setTimeout(() => setJointNotification(false), 5000);
                   }
-                  if (calcPrinciple === 'intel') calcSupport(supportLevel);
+                  calcSupport(supportLevel);
                 }} style={{
                   flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
                   border: jointMode ? '1px solid #8b5cf6' : '1px solid var(--border)',
@@ -5032,7 +5022,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     setBoostNotification(true);
                     setTimeout(() => setBoostNotification(false), 5000);
                   }
-                  if (calcPrinciple === 'intel') calcSupport(newVal ? 'boost' : supportLevel);
+                  calcSupport(newVal ? 'boost' : supportLevel);
                 }} style={{
                   flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
                   border: boostEnabled ? '1px solid #ef4444' : '1px solid var(--border)',
@@ -5220,19 +5210,19 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       const h = hydrateState();
                       const st = { ...h, powerLevel: supportLevel as PowerLevel, courseWeek: courseWeekState } as CalculatorState;
                       const recs = evaluateRecommendations(st, calcResult as any, courseWeekState);
-                      const budgetWarn = computeBudgetRisk(recs, supportLevel, st, calcResult as any);
-                      if (!budgetWarn.warning) return null;
+                      const coverageWarn = computeCoverageRisk(recs, supportLevel, st, calcResult as any);
+                      if (!coverageWarn.warning) return null;
                       return (
                         <div style={{ marginBottom:8, padding:'10px 12px', borderRadius:10, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.2)' }}>
                           <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
                             <span style={{ fontSize:14 }}>⚠️</span>
                             <span style={{ fontSize:10, fontWeight:700, color:'#ef4444' }}>Недостаточный уровень поддержки</span>
                           </div>
-                          <div style={{ fontSize:8, color:'#ef4444', marginBottom:4, lineHeight:1.4 }}>{budgetWarn.warning}</div>
+                          <div style={{ fontSize:8, color:'#ef4444', marginBottom:4, lineHeight:1.4 }}>{coverageWarn.warning}</div>
                           <div style={{ display:'flex', gap:4, fontSize:7, color:'var(--text-dim)' }}>
-                            <span>Риск: <b>{budgetWarn.riskBefore}%</b> → <b style={{color:'#ef4444'}}>{budgetWarn.riskAfter}%</b></span>
-                            <span>· Покрытие: <b>{Math.round(budgetWarn.coverage * 100)}%</b></span>
-                            <span>· Синергия: <b>{budgetWarn.synergyScore}%</b></span>
+                            <span>Риск: <b>{coverageWarn.riskBefore}%</b> → <b style={{color:'#ef4444'}}>{coverageWarn.riskAfter}%</b></span>
+                            <span>· Покрытие: <b>{coverageWarn.avgCoverage}%</b></span>
+                            <span>· Синергия: <b>{coverageWarn.synergyScore}%</b></span>
                           </div>
                           {supportLevel !== 'boost' && (
                             <button onClick={() => { setSupportLevel('boost'); setPlanSaved(false); calcSupport('boost'); }} style={{
@@ -5457,6 +5447,280 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         );
         } catch(e) { return <div style={{ padding:40, textAlign:'center', color:'#ef4444', background:'var(--bg-secondary)', borderRadius:12, margin:20 }}>⚠️ Ошибка калькулятора: {String(e)}<br/><button onClick={goBack} style={{ marginTop:12, padding:'6px 16px', borderRadius:8, cursor:'pointer', background:'var(--accent)', border:'none', color:'#000', fontWeight:600 }}>← Назад</button></div>; }
       })()}
+
+      {/* ===== TRAINING MIX CALCULATOR ===== */}
+      {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'mixcalc' && (<InfoErrorBoundary label="Тренировочные миксы">
+        <div style={{ padding:'0 12px 80px', maxWidth:600, margin:'0 auto' }}>
+          <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>💪 Тренировочные миксы</h2>
+          <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Подбор пред-/интра-/пост-тренировочных стеков по цели и весу</p>
+
+          <div className="card" style={{ marginBottom:10, padding:10 }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:11, color:'var(--text)' }}>⚙️ Параметры</h4>
+            <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' }}>
+              <div style={{ flex:'1 1 45%', minWidth:100 }}>
+                <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Цель</div>
+                <select value={mixGoal} onChange={e => setMixGoal(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
+                  <option value="pump">🩸 Памп (ББ)</option>
+                  <option value="endurance">🏃 Выносливость</option>
+                  <option value="strength">🏋️ Сила</option>
+                  <option value="recovery">🔄 Восстановление</option>
+                  <option value="focus">🧠 Фокус</option>
+                  <option value="powerlifting">💪 Пауэрлифтинг</option>
+                  <option value="competition">🏆 Соревнования</option>
+                  <option value="crossfit">🔁 CrossFit</option>
+                  <option value="post_comp">🔄 Пост-соревнования</option>
+                </select>
+              </div>
+              <div style={{ flex:'1 1 45%', minWidth:100 }}>
+                <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Тайминг</div>
+                <select value={mixTiming} onChange={e => setMixTiming(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
+                  <option value="pre">🔥 Пред-тренировочный</option>
+                  <option value="intra">💧 Интра-тренировочный</option>
+                  <option value="post">🍗 Пост-тренировочный</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ marginBottom:8 }}>
+              <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Вес тела (кг)</div>
+              <input type="number" value={linked.profile?.settings?.weight ?? 80} readOnly
+                style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
+            </div>
+            <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>💉 Фармакология (влияет на скор)</div>
+            <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
+              {[{ id:'insulin', label:'Инсулин', st:mixInsulin>0, fn:()=>setMixInsulin(mixInsulin>0?0:5) },
+                { id:'igf', label:'ИГФ-1', st:mixDrugIGF, fn:()=>setMixDrugIGF(!mixDrugIGF) },
+                { id:'gh', label:'ГР', st:mixDrugGH, fn:()=>setMixDrugGH(!mixDrugGH) },
+                { id:'mgf', label:'МГФ', st:mixDrugMGF, fn:()=>setMixDrugMGF(!mixDrugMGF) },
+                { id:'glp1', label:'ГПП-1', st:mixDrugGLP1, fn:()=>setMixDrugGLP1(!mixDrugGLP1) },
+              ].map(d => (
+                <button key={d.id} onClick={d.fn} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, fontWeight:600, cursor:'pointer', background:d.st?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', border:d.st?'1px solid rgba(0,230,138,0.25)':'1px solid rgba(255,255,255,0.06)', color:d.st?'#00e68a':'rgba(255,255,255,0.7)' }}>{d.st?'✓ ':''}{d.label}</button>
+              ))}
+            </div>
+            <button onClick={() => {
+              const course = linked.course || [];
+              const detect = (kw: string) => course.some((c:any) => (c.substanceId||'').toLowerCase().includes(kw.toLowerCase()));
+              let found = false;
+              if (detect('insulin')||detect('humalog')||detect('novorapid')||detect('lantus')) { setMixInsulin(5); setMixInsulinTiming('post'); found=true; }
+              if (detect('igf')||detect('igf1')||detect('mecasermin')) { setMixDrugIGF(true); found=true; }
+              if (detect('hgh')||detect('somatropin')||detect('genotropin')||detect('ghrp')||detect('cjc')) { setMixDrugGH(true); found=true; }
+              if (detect('mgf')||detect('mechano')) { setMixDrugMGF(true); found=true; }
+              if (detect('semaglutide')||detect('tirzepatide')||detect('liraglutide')||detect('dulaglutide')||detect('glp')) { setMixDrugGLP1(true); found=true; }
+              try {
+                const calcData = JSON.parse(localStorage.getItem('he_autocalc_state') || '{}');
+                if (calcData.pharma?.hasInsulin && mixInsulin===0) { setMixInsulin(5); setMixInsulinTiming('post'); found=true; }
+                if (calcData.pharma?.hasIGF && !mixDrugIGF) { setMixDrugIGF(true); found=true; }
+                if (calcData.pharma?.hasGH && !mixDrugGH) { setMixDrugGH(true); found=true; }
+                if (calcData.pharma?.hasMGF && !mixDrugMGF) { setMixDrugMGF(true); found=true; }
+                if (calcData.pharma?.hasGLP1 && !mixDrugGLP1) { setMixDrugGLP1(true); found=true; }
+                if (calcData.goals?.trainingCycle) {
+                  const goalMap: Record<string,string> = { mass:'pump', cut:'endurance', maintenance:'recovery', endurance:'endurance', strength:'powerlifting' } as any;
+                  if (goalMap[calcData.goals.trainingCycle]) setMixGoal(goalMap[calcData.goals.trainingCycle]);
+                }
+              } catch {}
+              if (found) showToast?.('✅ Фармакология определена из курса и профиля');
+            }} style={{ width:'100%', padding:'6px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)', color:'#00e68a', marginBottom:8 }}>📋 Автозаполнение из профиля (фарма + цель)</button>
+            {(() => {
+              const bw = linked.profile?.settings?.weight ?? 80;
+              const hasCourse = (linked.course || []).length > 0;
+              const isOnCycle = hasCourse;
+              const multiplier = isOnCycle ? 1.25 : 1.0;
+              const isPre = mixTiming === 'pre';
+              const isIntra = mixTiming === 'intra';
+              const isPost = mixTiming === 'post';
+              const durHrs = mixGoal === 'endurance' ? 2 : 1.5;
+
+              const isPL = mixGoal === 'powerlifting' || mixGoal === 'competition';
+              const isCompetition = mixGoal === 'competition';
+              const preStack: { name: string; id: string; dose: string; note: string; mg: number }[] = isPL ? [
+                { name:'Креатин (загрузка)', id:'creatine', dose:`${(8*multiplier).toFixed(1)}`, note:'За 45 мин до. АТФ для максимальных усилий', mg: Math.round(8000*multiplier) },
+                { name:'Кофеин', id:'caffeine', dose:`${isCompetition?'400':'300'}`, note:'За 30 мин до. CNS-активация', mg: isCompetition?400:300 },
+                { name:'Бета-аланин', id:'beta_alanine', dose:'4.0', note:'За 30 мин до. Буфер H⁺ ионов', mg:4000 },
+                { name:'L-тирозин', id:'tyrosine', dose:`${(3*multiplier).toFixed(1)}`, note:'За 30 мин до. Фокус, дофамин', mg: Math.round(3000*multiplier) },
+                { name:'OKG (орнитин)', id:'glutamine', dose:'5.0', note:'За 30 мин до. Аммиак-буфер для ЦНС', mg:5000 },
+                { name:'Цитруллин', id:'citrulline', dose:`${(6*multiplier).toFixed(1)}`, note:'За 45 мин. NO для кровотока', mg: Math.round(6000*multiplier) },
+              ] : [
+                { name:'Цитруллин (малат)', id:'citrulline', dose:`${Math.min(8,4+(mixGoal==='pump'?2:0)+(mixGoal==='focus'?1:0))*bw*multiplier/1000}`, note:'За 30-45 мин до. NO-бустер, пампинг', mg: Math.round(Math.min(8000,(4000+(mixGoal==='pump'?2000:0))*multiplier)) },
+                { name:'Бета-аланин', id:'beta_alanine', dose:'3.2', note:'За 30 мин до. Буфер молочной кислоты', mg:3200 },
+                { name:'L-тирозин', id:'tyrosine', dose:`${(2*multiplier).toFixed(1)}`, note:'За 30 мин до. Фокус, дофамин', mg: Math.round(2000*multiplier) },
+                { name:'Креатин', id:'creatine', dose:`${(5*multiplier).toFixed(1)}`, note:'За 30 мин до. АТФ, взрывная сила', mg: Math.round(5000*multiplier) },
+                { name:'Таурин', id:'taurine', dose:`${(2*multiplier).toFixed(1)}`, note:'За 30 мин до. Осморегуляция, пампинг', mg: Math.round(2000*multiplier) },
+              ];
+              const intraStack = [
+                { name:'HBCD', id:'hbcd', dose:`${Math.round(40*durHrs)}`, note:'Каждые 15-20 мин. Быстрый углевод', mg: Math.round(40000*durHrs) },
+                { name:'EAA (2:1:1)', id:'eaa', dose:`${(10*multiplier).toFixed(1)}`, note:'Каждые 30 мин. Анти-катаболизм', mg: Math.round(10000*multiplier) },
+                { name:'L-глютамин', id:'glutamine', dose:`${(5*multiplier).toFixed(1)}`, note:'Каждые 30 мин. ЖКТ, иммунитет', mg: Math.round(5000*multiplier) },
+                { name:'Электролиты (Na/K/Mg)', id:'electrolyte', dose:'комплекс', note:'Каждые 15-20 мин. Гидратация', mg: Math.round(1500*durHrs) },
+              ];
+              const postStack = [
+                { name:'Сывороточный протеин', id:'protein', dose:`${(0.4*bw).toFixed(0)}`, note:'Сразу после. Быстрое усвоение', mg: Math.round(0.4*bw*1000) },
+                { name:'Креатин моногидрат', id:'creatine', dose:'5', note:'Сразу после. Креатин-фосфат', mg:5000 },
+                { name:'L-глютамин', id:'glutamine', dose:`${(5*multiplier).toFixed(0)}`, note:'Сразу после. Восстановление', mg: Math.round(5000*multiplier) },
+                { name:'HMB', id:'hmb', dose:isOnCycle?'3':'—', note:'Сразу после. Анти-катаболизм', mg:isOnCycle?3000:0 },
+                { name:'Цинк + Магний (ZMA)', id:'zinc', dose:'30+450', note:'Перед сном. Тестостерон, сон', mg:480 },
+                { name:'Витамин C', id:'vitamin_c', dose:'500', note:'Сразу после. Антиоксидант', mg:500 },
+              ];
+              const activeStack = isPre ? preStack : isIntra ? intraStack : postStack;
+              const stackTitle = isPre ? '🔥 Пред-тренировочный стек' : isIntra ? '💧 Интра-тренировочный стек' : '🍗 Пост-тренировочный стек';
+              const timingLabel = isPre ? 'За 30-60 мин до тренировки' : isIntra ? 'В течение тренировки (каждые 15-20 мин)' : 'Сразу после тренировки';
+
+              const hasNandrolone = (linked.course || []).some((c:any) => {
+                const id = (c.substanceId||'').toLowerCase();
+                return id.includes('nandrolon') || id.includes('npp') || id.includes('deca') || id.includes('trest');
+              });
+              const na = (linked.labs || []).find((l:any)=>l.code==='SODIUM')?.value || 140;
+              const k = (linked.labs || []).find((l:any)=>l.code==='POTASSIUM')?.value || 4.2;
+              const cl = (linked.labs || []).find((l:any)=>l.code==='CHLORIDE')?.value || 102;
+
+              const mixProfile: MixProfile = { goal: mixGoal as any, timing: mixTiming as any, weightKg: bw, isOnCycle, drugs: { insulin: mixInsulin>0, igf: mixDrugIGF, gh: mixDrugGH, mgf: mixDrugMGF, glp1: mixDrugGLP1 }, hasNandrolone, userElectrolytes: { sodiumMmolL: na, potassiumMmolL: k, chlorideMmolL: cl }, workoutDurationMin: Math.round(durHrs*60) };
+              const mixSubstances: MixSubstance[] = activeStack.filter(s=>s.mg>0).map(s=>({ id:s.id, name:s.name, doseMg:s.mg, category:'pump' as any }));
+              const score = calculateMixScore(mixSubstances, mixProfile);
+
+              const ScoreRow = ({ l, v, c }: { l: string; v: number; c: string }) => (
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ fontSize:8, color:'rgba(255,255,255,0.8)', minWidth:100 }}>{l}</span>
+                  <div style={{ flex:1, height:5, borderRadius:3, background:'rgba(255,255,255,0.06)', overflow:'hidden' }}>
+                    <div style={{ width:`${Math.min(100,v)}%`, height:'100%', borderRadius:3, background:c, transition:'width 0.5s' }}/>
+                  </div>
+                  <span style={{ fontSize:8, fontWeight:700, color:c, minWidth:24, textAlign:'right' }}>{v}</span>
+                </div>
+              );
+
+              return (<>
+                {isOnCycle && <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', fontSize:9, color:'#a78bfa', marginBottom:8 }}>🔥 На курсе: дозы ×{multiplier}. Скор увеличен на 25%.</div>}
+
+                <div className="card" style={{ marginBottom:10, padding:12, background:'linear-gradient(135deg, rgba(0,230,138,0.04), rgba(139,92,246,0.04))', border:'1px solid var(--glass-border)' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                    <span style={{ fontSize:24 }}>{isPre?'🔥':isIntra?'💧':'🍗'}</span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>{stackTitle}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>{timingLabel}</div>
+                    </div>
+                    <div style={{ textAlign:'center' }}>
+                      <div style={{ fontSize:22, fontWeight:800, color:score.color }}>{score.compositeScore}</div>
+                      <div style={{ fontSize:7, color:score.color }}>{score.label}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                    {activeStack.map((item,i)=>(
+                      <div key={i} style={{ display:'flex', alignItems:'center', gap:8, padding:'3px 0' }}>
+                        <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--accent)', flexShrink:0 }} />
+                        <div style={{ flex:1, fontSize:10 }}>
+                          <span style={{ color:'var(--text-light)' }}>{item.name}</span>
+                          <span style={{ color:'var(--text-dim)', fontSize:8, marginLeft:4 }}>— {item.note}</span>
+                        </div>
+                        <span style={{ fontSize:10, fontWeight:600, color:'#00e68a', whiteSpace:'nowrap' }}>{item.dose} г</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="card" style={{ padding:10, marginBottom:8, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.12)' }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>📊 Разбор скора ({score.compositeScore}/100)</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                    {isPre && [
+                      { l:'🩸 Памп (NO)', v:score.pumpScore, c:'#ef4444' },
+                      { l:'⚡ Энергия', v:score.energyScore, c:'#f59e0b' },
+                      { l:'🧠 Фокус', v:score.focusScore, c:'#8b5cf6' },
+                      { l:'🏋️ Сила', v:score.strengthScore, c:'#22c55e' },
+                    ].map(b=><ScoreRow key={b.l} {...b}/>)}
+                    {isIntra && [
+                      { l:'💧 Гидратация', v:score.hydrationScore, c:'#06b6d4' },
+                      { l:'🏃 Выносливость', v:score.enduranceScore, c:'#f97316' },
+                      { l:'🛡️ Анти-катаболизм', v:score.anticatabolicScore, c:'#ef4444' },
+                      { l:'🍚 Гликоген', v:score.glycogenScore, c:'#f59e0b' },
+                    ].map(b=><ScoreRow key={b.l} {...b}/>)}
+                    {isPost && [
+                      { l:'🔄 Восстановление', v:score.recoveryScore, c:'#22c55e' },
+                      { l:'🥩 Белок (MPS)', v:score.proteinScore, c:'#3b82f6' },
+                      { l:'🍚 Гликоген', v:score.glycogenScore, c:'#f59e0b' },
+                      { l:'🛡️ Анти-катаболизм', v:score.anticatabolicScore, c:'#ef4444' },
+                    ].map(b=><ScoreRow key={b.l} {...b}/>)}
+                  </div>
+                  <div style={{ marginTop:6, padding:'6px 8px', borderRadius:6, background:'rgba(0,0,0,0.08)', fontSize:7, color:'#8b5cf6' }}>
+                    ⚡ NO-оптимизация: <b>{score.noScore}/100</b>
+                    {score.drugModifiers.map((d,i)=><div key={i} style={{marginTop:2}}>{d.drug}: {d.effect} ({d.bonus>0?'+':''}{d.bonus}%)</div>)}
+                  </div>
+                </div>
+
+                <div className="card" style={{ padding:10, marginBottom:8, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.12)' }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:'#22c55e', marginBottom:6 }}>📐 Расчёт нутриентов (вес {bw} кг{isOnCycle?' ×1.25':' ×1.0'}{mixInsulin>0||mixDrugGH?' + фарма':''})</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, fontSize:9 }}>
+                    <div style={{textAlign:'center',padding:'6px',borderRadius:8,background:'rgba(249,115,22,0.06)',border:'1px solid rgba(249,115,22,0.1)'}}>
+                      <div style={{fontSize:7,color:'rgba(255,255,255,0.7)'}}>Углеводы</div>
+                      <div style={{fontSize:16,fontWeight:800,color:'#f97316'}}>{score.recommendedCarbsG}г</div>
+                    </div>
+                    <div style={{textAlign:'center',padding:'6px',borderRadius:8,background:'rgba(59,130,246,0.06)',border:'1px solid rgba(59,130,246,0.1)'}}>
+                      <div style={{fontSize:7,color:'rgba(255,255,255,0.7)'}}>EAA/BCAA</div>
+                      <div style={{fontSize:16,fontWeight:800,color:'#3b82f6'}}>{score.recommendedEAAG}г</div>
+                    </div>
+                    <div style={{textAlign:'center',padding:'6px',borderRadius:8,background:'rgba(6,182,212,0.06)',border:'1px solid rgba(6,182,212,0.1)'}}>
+                      <div style={{fontSize:7,color:'rgba(255,255,255,0.7)'}}>Вода</div>
+                      <div style={{fontSize:16,fontWeight:800,color:'#06b6d4'}}>{(score.recommendedWaterMl/1000).toFixed(1)}л</div>
+                    </div>
+                  </div>
+                  {profile.timing === 'intra' && (
+                    <div style={{ marginTop:8 }}>
+                      <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', marginBottom:4 }}>💧 Изотоник на {durHrs}ч (на {score.recommendedWaterMl/1000}л воды):</div>
+                      <div style={{ display:'flex', gap:6, fontSize:8 }}>
+                        <span style={{ color:'#fbbf24' }}>Na⁺ {score.recommendedNaMg}мг</span>
+                        <span style={{ color:'#818cf8' }}>K⁺ {score.recommendedKMg}мг</span>
+                        <span style={{ color:'#06b6d4' }}>Cl⁻ {score.recommendedClMg}мг</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {score.electrolyteWarnings.length > 0 && (
+                  <div className="card" style={{ padding:10, marginBottom:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.12)' }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'#ef4444', marginBottom:4 }}>⚠️ Электролитный баланс</div>
+                    {score.electrolyteWarnings.map((w,i)=><div key={i} style={{fontSize:8,color:'rgba(255,255,255,0.8)',padding:'2px 0'}}>• {w}</div>)}
+                    <div style={{ marginTop:4, fontSize:7, color:'rgba(255,255,255,0.5)', lineHeight:1.4 }}>
+                      Анализы: Na {na} ммоль/л (N:135-145) · K {k} ммоль/л (N:3.5-5.2) · Cl {cl} ммоль/л (N:98-108)
+                      {hasNandrolone && <div style={{marginTop:2,color:'#ff1744'}}>⚠ Обнаружен нандролон (19-нор) — подавляет eNOS, снижает синтез NO на ~20%. Рекомендуется усиление пампа.</div>}
+                    </div>
+                  </div>
+                )}
+
+                {score.suggestions.length > 0 && (
+                  <div className="card" style={{ padding:10, marginBottom:8, background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.12)' }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>💡 Рекомендации</div>
+                    {score.suggestions.map((s,i)=><div key={i} style={{fontSize:8,color:'rgba(255,255,255,0.8)',padding:'2px 0'}}>• {s}</div>)}
+                  </div>
+                )}
+
+                <div className="card" style={{ padding:10, marginBottom:8 }}>
+                  <h4 style={{ margin:'0 0 6px', fontSize:11, color:'var(--text)' }}>📋 Все три стека (обзор)</h4>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                    {[
+                      { label:'🔥 Пред', items:preStack.slice(0,4).map(i=>`${i.name.split('(')[0].trim()}: ${i.dose} г`).join(' • ') },
+                      { label:'💧 Интра', items:intraStack.slice(0,3).map(i=>`${i.name.split('(')[0].trim()}: ${i.dose} г`).join(' • ') },
+                      { label:'🍗 Пост', items:postStack.slice(0,4).map(i=>`${i.name.split('(')[0].trim()}: ${i.dose} г`).join(' • ') },
+                    ].map((grp, gi) => (
+                      <div key={gi} style={{ padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
+                        <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:3 }}>{grp.label}-тренировочный</div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>{grp.items}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="card" style={{ padding:10 }}>
+                  <h4 style={{ margin:'0 0 4px', fontSize:10, color:'var(--text-dim)' }}>📌 Как считается скор</h4>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>
+                    • Каждое вещество имеет базовый скор (65-90) × курс (×1.25) × фарма-модификаторы (инсулин +15%, ГР +10%, ИГФ +10%, МГФ +8%)<br/>
+                    • Pre-workout вес: пампинг 25% + энергия 25% + фокус 25% + сила 25%<br/>
+                    • Intra-workout вес: гидратация 30% + выносливость 25% + анти-катаболизм 15% + пампинг 10%<br/>
+                    • Post-workout вес: восстановление 35% + белок 25% + гликоген 10% + сила 10%<br/>
+                    • Углеводы: вес×0.6-1.2×множитель × инсулин-буст (×1.3)<br/>
+                    • Аминокислоты: intra 0.15 г/кг, post 0.4 г/кг, pre 0.1 г/кг × инсулин/ГР-буст<br/>
+                  </div>
+                </div>
+              </>);
+            })()}
+          </div>
+        </div>
+      </InfoErrorBoundary>)}
 
       {/* ===== PEPTIDE CALCULATOR ===== */}
       {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'peptides' && (<InfoErrorBoundary label="Пептидный калькулятор">

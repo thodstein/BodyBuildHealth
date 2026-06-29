@@ -2,7 +2,8 @@ import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { buildStack, explainStack, findReplacement, type ReplacementResult, type ReplacementType } from '../../engines/supplement-finder.engine';
 import { buildSmartStack } from '../../engines/biostack-recommender.engine';
-import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS, ALL_STACKS, ALL_SUBSTANCES, type SupportStack } from '../../data/support-database';
+import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS, ALL_SUBSTANCES } from '../../data/support-database';
+import { MECHANISM_LABELS } from '../../data/support-meta';
 import { decodeGarbled } from '../../utils/text-sanitizer';
 import { GlassCard, StatBox, ORGANS, toFinderProfile } from './BioStackAIConstants';
 
@@ -15,32 +16,106 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
 
   const synergyExplanation = useMemo(() => {
     if (stackIds.length < 2) return null;
-    const parts: string[] = [];
-    // Find synergies among stack substances
+
+    const pairDetails: Array<{ a: string; b: string; text: string; strength: string; domain: string }> = [];
+    const roles: Record<string, string> = {};
+    const domainSet = new Set<string>();
+    const mechCoverage = new Map<string, string[]>();
+
+    for (const id of stackIds) {
+      const cat = SUPPORT_CATALOG_DATA[id];
+      if (!cat) continue;
+      const name = cat.nameRu || cat.name || id;
+      (cat.mechanisms || []).forEach(m => {
+        if (!mechCoverage.has(m)) mechCoverage.set(m, []);
+        mechCoverage.get(m)!.push(name);
+      });
+    }
+
+    const DOMAIN_KEYWORDS: Record<string, string[]> = {
+      antioxidant: ['ANTIOXIDANT', 'GLUTATHIONE', 'NRF2', 'ROS', 'OXIDATIVE'],
+      hepatic: ['LIVER', 'HEPAT', 'BILE', 'CHOLESTASIS', 'GLUTATHIONE'],
+      cardio: ['HEART', 'CARDIO', 'VESSEL', 'COENZYME', 'COQ'],
+      neuro: ['NEURO', 'GABA', 'DOPAMINE', 'NMDA', 'MYELIN', 'COGNITIVE'],
+      metabolic: ['AMPK', 'INSULIN', 'MITOCHONDRIAL', 'GLUCOSE', 'LIPID'],
+      detox: ['DETOX', 'CYP450', 'PHASE_II', 'AMMONIA'],
+      immune: ['IMMUNE', 'ANTIINFLAMMATORY', 'NFKB', 'CYTOKINE'],
+      hormonal: ['TESTOSTERONE', 'AROMATASE', 'PROLACTIN', 'THYROID', 'ESTROGEN'],
+      membrane: ['MEMBRANE', 'PHOSPHOLIPID', 'BILE_ACID'],
+      adaptogen: ['ADAPTOGEN', 'CORTISOL', 'STRESS', 'ADRENAL'],
+    };
+
     for (let i = 0; i < stackIds.length; i++) {
       for (let j = i + 1; j < stackIds.length; j++) {
         const a = SUPPORT_CATALOG_DATA[stackIds[i]];
         const b = SUPPORT_CATALOG_DATA[stackIds[j]];
         if (!a || !b) continue;
-        // Check for synergistic pairs
+
+        const nameA = a.nameRu || a.name || '';
+        const nameB = b.nameRu || b.name || '';
+        const allMechs = [...(a.mechanisms || []), ...(b.mechanisms || [])];
+
+        let domain = 'general';
+        for (const [d, kws] of Object.entries(DOMAIN_KEYWORDS)) {
+          if (allMechs.some(m => kws.some(kw => m.includes(kw)))) {
+            domain = d; domainSet.add(d); break;
+          }
+        }
+
         const syns = ALL_INTERACTIONS.filter((int: any) =>
           (int.substanceA === stackIds[i] && int.substanceB === stackIds[j]) ||
           (int.substanceA === stackIds[j] && int.substanceB === stackIds[i])
-        ).filter((int: any) => int.type === 'synergy');
+        );
+
         if (syns.length > 0) {
-          syns.forEach((s: any) => {
-            parts.push(`⊕ ${a.nameRu || a.name} + ${b.nameRu || b.name}: ${s.effect} (${s.mechanism || 'синергия'})`);
-          });
-        }
-        // Check shared mechanisms
-        const sharedMechs = (a.mechanisms || []).filter((m: string) => (b.mechanisms || []).includes(m));
-        if (sharedMechs.length > 0 && syns.length === 0) {
-          parts.push(`🔗 ${a.nameRu || a.name} + ${b.nameRu || b.name}: общие механизмы — ${sharedMechs.slice(0,2).join(', ')}`);
+          const maxS = syns.reduce((max: number, s: any) => Math.max(max, ['LOW','MEDIUM','HIGH'].indexOf(s.severity || 'MEDIUM')), 0);
+          const strength = ['LOW','MEDIUM','HIGH'][maxS];
+          const desc = syns.map((s: any) => `${s.effect}${s.mechanism ? ` (${s.mechanism})` : ''}`).join('; ');
+          pairDetails.push({ a: nameA, b: nameB, text: desc, strength, domain });
+        } else {
+          const shared = (a.mechanisms || []).filter((m: string) => (b.mechanisms || []).includes(m));
+          if (shared.length > 0) {
+            pairDetails.push({ a: nameA, b: nameB, text: `Общие механизмы: ${shared.slice(0, 2).map(m => MECHANISM_LABELS[m as keyof typeof MECHANISM_LABELS] || m).join(', ')}`, strength: 'MEDIUM', domain });
+          } else {
+            pairDetails.push({ a: nameA, b: nameB, text: 'Независимые механизмы — взаимодополнение', strength: 'LOW', domain });
+          }
         }
       }
     }
-    if (parts.length === 0) parts.push('Синергии между компонентами не выявлены — препараты работают независимо.');
-    return parts;
+
+    for (const id of stackIds) {
+      const cat = SUPPORT_CATALOG_DATA[id];
+      if (!cat) { roles[id] = 'support'; continue; }
+      const uniqueMechs = (cat.mechanisms || []).filter(m => (mechCoverage.get(m)?.length || 0) === 1);
+      const isCore = cat.tier === 'core' || cat.bestForCourse;
+      if (isCore) roles[id] = 'core';
+      else if (uniqueMechs.length > 0) roles[id] = 'coverage';
+      else if ((cat.mechanisms || []).length >= 2) roles[id] = 'synergy';
+      else roles[id] = 'support';
+    }
+
+    const contributions: Array<{ id: string; text: string }> = [];
+    for (const id of stackIds) {
+      const cat = SUPPORT_CATALOG_DATA[id];
+      if (!cat) continue;
+      const uniqueMechs = (cat.mechanisms || []).filter(m => (mechCoverage.get(m)?.length || 0) === 1);
+      if (uniqueMechs.length > 0) {
+        contributions.push({ id, text: `Единственный источник ${uniqueMechs.slice(0,2).map(m => MECHANISM_LABELS[m as keyof typeof MECHANISM_LABELS] || m).join(', ')}` });
+      }
+    }
+
+    const domainLabels: Record<string, string> = {
+      antioxidant: 'антиоксидантная защита', hepatic: 'гепатопротекция', cardio: 'кардиопротекция',
+      neuro: 'нейропротекция', metabolic: 'метаболическая поддержка', detox: 'детоксикация',
+      immune: 'иммунная модуляция', hormonal: 'гормональная регуляция', membrane: 'мембранная защита',
+      adaptogen: 'адаптогенная поддержка',
+    };
+    const activeDomains = [...domainSet];
+    const cascadeDesc = activeDomains.length > 0
+      ? `Принцип: ${activeDomains.map(d => domainLabels[d] || d).join(' → ')}. ${pairDetails.length} синергетических пар, ${contributions.length} уникальных механизмов.`
+      : `Стек из ${stackIds.length} препаратов: ${pairDetails.length} взаимодействий.`;
+
+    return { cascadeDesc, pairs: pairDetails, roles, contributions, domains: activeDomains, coverage: [...mechCoverage.entries()].map(([m, ids]) => ({ mechanism: m, coveredBy: ids })) };
   }, [stackIds]);
 
   const stackMechanisms = useMemo(() => {
@@ -63,7 +138,22 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
     return [...sys];
   }, [stackIds]);
 
-  const [replaceState, setReplaceState] = useState<Record<string, { open: boolean; results: ReplacementResult[]; loading: boolean; activeType: ReplacementType }>>({});
+  const [replacePopup, setReplacePopup] = useState<{ id: string; type: ReplacementType; results: ReplacementResult[]; loading: boolean; name: string } | null>(null);
+
+  const openReplacePopup = useCallback((id: string, name: string) => {
+    setReplacePopup({ id, type: 'functional', results: [], loading: true, name });
+    const fp = toFinderProfile(profile);
+    const results = findReplacement(id, 'functional', fp);
+    setReplacePopup(prev => prev && prev.id === id ? { ...prev, results, loading: false } : prev);
+  }, [profile]);
+
+  const switchReplaceType = useCallback((type: ReplacementType) => {
+    if (!replacePopup) return;
+    setReplacePopup(prev => prev ? { ...prev, type, loading: true } : null);
+    const fp = toFinderProfile(profile);
+    const results = findReplacement(replacePopup.id, type, fp);
+    setReplacePopup(prev => prev ? { ...prev, results, loading: false } : null);
+  }, [profile, replacePopup]);
 
   const REPLACE_TYPES: { key: ReplacementType; label: string; icon: string }[] = [
     { key: 'direct_analog', label: 'Прямые аналоги', icon: '🔄' },
@@ -86,24 +176,8 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
     setStackIds(stackIds.filter(s => s !== id));
   }, [stackIds, setStackIds]);
 
-  const handleOpenReplace = useCallback((id: string) => {
-    if (replaceState[id]?.open) { setReplaceState(prev => ({ ...prev, [id]: { ...prev[id], open: false } })); return; }
-    setReplaceState(prev => ({ ...prev, [id]: { open: true, results: [], loading: true, activeType: prev[id]?.activeType || 'functional' } }));
-    const fp = toFinderProfile(profile);
-    const results = findReplacement(id, replaceState[id]?.activeType || 'functional', fp);
-    setReplaceState(prev => ({ ...prev, [id]: { open: true, results, loading: false, activeType: prev[id]?.activeType || 'functional' } }));
-  }, [profile, replaceState]);
-
-  const handleChangeReplaceType = useCallback((id: string, rtype: ReplacementType) => {
-    setReplaceState(prev => ({ ...prev, [id]: { ...prev[id], activeType: rtype, loading: true } }));
-    const fp = toFinderProfile(profile);
-    const results = findReplacement(id, rtype, fp);
-    setReplaceState(prev => ({ ...prev, [id]: { ...prev[id], activeType: rtype, results, loading: false } }));
-  }, [profile]);
-
   const handleReplace = useCallback((oldId: string, newId: string) => {
     setStackIds(stackIds.map(s => s === oldId ? newId : s));
-    setReplaceState(prev => ({ ...prev, [oldId]: { open: false, results: [], loading: false, activeType: prev[oldId]?.activeType || 'functional' } }));
   }, [stackIds, setStackIds]);
 
   const handleSaveStack = useCallback(() => {
@@ -187,7 +261,7 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
   })();
 
   /* ── Stack Actions ── */
-  const [actionResult, setActionResult] = useState<{ title: string; text: string; resultStack?: string[] } | null>(null);
+  const [actionResult, setActionResult] = useState<{ title: string; sections: Array<{ icon: string; text: string; color?: string }>; resultStack?: string[] } | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const ACTIONS: { id: string; label: string; icon: string; color: string; run: () => void }[] = useMemo(() => [
@@ -199,9 +273,19 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
           const r = buildStack({ baseIds: [], targetSize: profile.maxStackSize || 10, autoFill: true, profile: fp });
           const exp = explainStack(r.stack, fp);
           const lines = r.stack.map(id => { const c = SUPPORT_CATALOG_DATA[id]; return `• ${c?.nameRu || c?.name || id}`; });
-          setActionResult({ title: '🏆 Лучший стек под ваш профиль', text: `Состав (${r.stack.length} компонентов):\n${lines.join('\n')}\n\nСинергия: ${exp.totalSynergyScore}\nПокрытие: ${exp.completeness}%`, resultStack: r.stack });
+          const disp = synergyExplanation;
+          setActionResult({
+            title: '🏆 Лучший стек под ваш профиль',
+            sections: [
+              { icon: '📋', text: `Состав (${r.stack.length}):\n${lines.join('\n')}`, color: '#8b5cf6' },
+              { icon: '🎯', text: `Синергия: ${exp.totalSynergyScore} • Покрытие: ${exp.completeness}% • Механизмов: ${exp.coverage.mechanisms.length}`, color: '#22c55e' },
+              { icon: '🔄', text: `Пар синергии: ${exp.pairwiseSynergies.length} из ${(r.stack.length * (r.stack.length - 1)) / 2} возможных`, color: '#60a5fa' },
+              { icon: '⚡', text: disp ? disp.cascadeDesc : `Принцип: ${r.stack.length} компонентов, подобранных под профиль`, color: '#f59e0b' },
+            ],
+            resultStack: r.stack,
+          });
           setActionLoading(null);
-        }, 400);
+        }, 500);
       }},
     { id: 'optimize', label: 'Оптимизировать', icon: '⚡', color: '#f59e0b',
       run: () => {
@@ -212,10 +296,21 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
           const r = buildStack({ baseIds: stackIds, targetSize: Math.max(stackIds.length, 10), autoFill: true, profile: fp });
           const exp = explainStack(r.stack, fp);
           const added = r.stack.filter(id => !stackIds.includes(id));
-          const lines = added.map(id => { const c = SUPPORT_CATALOG_DATA[id]; return `• ${c?.nameRu || c?.name || id} (добавлен)`; });
-          setActionResult({ title: '⚡ Оптимизированный стек', text: `Добавлено ${added.length} компонентов:\n${lines.join('\n')}\n\nСинергия: ${exp.totalSynergyScore} (было ${explanation?.totalSynergyScore ?? 0})\nПокрытие: ${exp.completeness}% (было ${explanation?.completeness ?? 0}%)`, resultStack: r.stack });
+          const removed = stackIds.filter(id => !r.stack.includes(id));
+          const addedLines = added.map(id => { const c = SUPPORT_CATALOG_DATA[id]; return `• +${c?.nameRu || c?.name || id}`; });
+          const removedLines = removed.map(id => { const c = SUPPORT_CATALOG_DATA[id]; return `• -${c?.nameRu || c?.name || id}`; });
+          setActionResult({
+            title: '⚡ Оптимизированный стек',
+            sections: [
+              ...(addedLines.length > 0 ? [{ icon: '✅', text: `Добавлено (${addedLines.length}):\n${addedLines.join('\n')}`, color: '#22c55e' }] : []),
+              ...(removedLines.length > 0 ? [{ icon: '❌', text: `Удалено (${removedLines.length}):\n${removedLines.join('\n')}`, color: '#ef4444' }] : []),
+              ...(addedLines.length === 0 && removedLines.length === 0 ? [{ icon: '💡', text: 'Стек оптимален — изменений не требуется', color: '#22c55e' }] : []),
+              { icon: '📊', text: `Синергия: ${exp.totalSynergyScore} (было ${explanation?.totalSynergyScore ?? 0}) • Покрытие: ${exp.completeness}% (было ${explanation?.completeness ?? 0}%)`, color: '#60a5fa' },
+            ],
+            resultStack: r.stack,
+          });
           setActionLoading(null);
-        }, 400);
+        }, 500);
       }},
     { id: 'risks', label: 'Убрать риски', icon: '🛡️', color: '#ef4444',
       run: () => {
@@ -223,25 +318,39 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
         setActionLoading('risks');
         setTimeout(() => {
           const risky = new Set<string>();
+          const conflictDetails: string[] = [];
           for (const a of stackIds) {
             for (const b of stackIds) {
               if (a === b) continue;
               const pair = ALL_INTERACTIONS.find(inx =>
                 (inx.substanceA === a && inx.substanceB === b) || (inx.substanceA === b && inx.substanceB === a));
               if (pair && pair.severity === 'HIGH' && (pair.type === 'conflict' || pair.type === 'caution')) {
+                if (!risky.has(a) || !risky.has(b)) {
+                  const nA = SUPPORT_CATALOG_DATA[a]?.nameRu || SUPPORT_CATALOG_DATA[a]?.name || a;
+                  const nB = SUPPORT_CATALOG_DATA[b]?.nameRu || SUPPORT_CATALOG_DATA[b]?.name || b;
+                  conflictDetails.push(`• ${nA} + ${nB}: ${pair.effect || 'конфликт'}`);
+                }
                 risky.add(a); risky.add(b);
               }
             }
           }
           const clean = stackIds.filter(id => !risky.has(id));
           if (clean.length === stackIds.length) {
-            setActionResult({ title: '🛡️ Риски не найдены', text: 'В вашем стеке нет критических взаимодействий.' });
+            setActionResult({ title: '🛡️ Риски не найдены', sections: [{ icon: '✅', text: 'В вашем стеке нет критических взаимодействий.', color: '#22c55e' }] });
           } else {
             const lines = stackIds.filter(id => risky.has(id)).map(id => { const c = SUPPORT_CATALOG_DATA[id]; return `• ${c?.nameRu || c?.name || id} (удалён)`; });
-            setActionResult({ title: `🛡️ Убрано ${risky.size} рискованных компонентов`, text: `Удалены:\n${lines.join('\n')}\n\nОсталось: ${clean.length} компонентов`, resultStack: clean });
+            setActionResult({
+              title: `🛡️ Убрано ${risky.size} рискованных`,
+              sections: [
+                { icon: '🚫', text: `Найдены конфликты:\n${conflictDetails.join('\n')}`, color: '#ef4444' },
+                { icon: '🗑', text: `Удалены:\n${lines.join('\n')}`, color: '#f59e0b' },
+                { icon: '✅', text: `Осталось: ${clean.length} компонентов`, color: '#22c55e' },
+              ],
+              resultStack: clean,
+            });
           }
           setActionLoading(null);
-        }, 300);
+        }, 400);
       }},
     { id: 'cheaper', label: 'Сделать дешевле', icon: '💰', color: '#22c55e',
       run: () => {
@@ -250,7 +359,7 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
         setTimeout(() => {
           const P: Record<string, number> = { nac: 650, tudca: 900, omega3: 800, coq10: 1200, magnesium: 350, zinc: 200, vitamin_d3: 300, curcumin: 500, alpha_lipoic: 700, ashwagandha: 600, rhodiola: 550, theanine: 450, creatine: 400, l_carnitine: 700, lions_mane: 900, tongkat_ali: 1200, collagen: 1200, probiotics: 1200, berberine: 600 };
           const ALT: Record<string, string[]> = { omega3: ['flax_oil', 'chia'], coq10: ['idebenone', 'pqq'], probiotics: ['kefir', 'sauerkraut'], collagen: ['bone_broth', 'gelatin'], ashwagandha: ['rhodiola', 'schisandra'], lions_mane: ['alpha_gpc', 'phosphatidylserine'], tongkat_ali: ['fadogia', 'shilajit'] };
-          const swaps: string[] = [];
+          const swaps: Array<{ fromId: string; toId: string; saving: number }> = [];
           const ns = [...stackIds];
           for (let i = 0; i < ns.length; i++) {
             const id = ns[i];
@@ -258,18 +367,31 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
             if (alts) {
               const ch = alts.find(a => (P[a] || 999) < (P[id] || 999));
               if (ch && SUPPORT_CATALOG_DATA[ch]) {
-                swaps.push(`• ${SUPPORT_CATALOG_DATA[id]?.nameRu || id} (${P[id]}₽) → ${SUPPORT_CATALOG_DATA[ch]?.nameRu || ch} (${P[ch]}₽) — экономия ${P[id] - (P[ch]||0)}₽/мес`);
+                swaps.push({ fromId: id, toId: ch, saving: (P[id] || 0) - (P[ch] || 0) });
                 ns[i] = ch;
               }
             }
           }
           if (swaps.length === 0) {
-            setActionResult({ title: '💰 Оптимизация стоимости', text: 'Не найдено более дешёвых аналогов в базе.' });
+            setActionResult({ title: '💰 Оптимизация стоимости', sections: [{ icon: '💡', text: 'Не найдено более дешёвых аналогов в базе.', color: '#f59e0b' }] });
           } else {
-            setActionResult({ title: `💰 ${swaps.length} замен на более дешёвые`, text: swaps.join('\n'), resultStack: ns });
+            const totalSaving = swaps.reduce((s, x) => s + x.saving, 0);
+            const swapLines = swaps.map(s => {
+              const fromName = SUPPORT_CATALOG_DATA[s.fromId]?.nameRu || SUPPORT_CATALOG_DATA[s.fromId]?.name || s.fromId;
+              const toName = SUPPORT_CATALOG_DATA[s.toId]?.nameRu || SUPPORT_CATALOG_DATA[s.toId]?.name || s.toId;
+              return `• ${fromName} (${P[s.fromId] || '?'}₽) → ${toName} (${P[s.toId] || '?'}₽) — экономия ${s.saving}₽`;
+            });
+            setActionResult({
+              title: `💰 ${swaps.length} замен — экономия ~${totalSaving}₽/мес`,
+              sections: [
+                { icon: '🔄', text: swapLines.join('\n'), color: '#22c55e' },
+                { icon: '💰', text: `Экономия: ${totalSaving}₽/мес (${totalSaving * 12}₽/год)`, color: '#22c55e' },
+              ],
+              resultStack: ns,
+            });
           }
           setActionLoading(null);
-        }, 300);
+        }, 400);
       }},
     { id: 'why', label: 'Почему мне хуже', icon: '🤔', color: '#60a5fa',
       run: () => {
@@ -277,6 +399,7 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
         setActionLoading('why');
         setTimeout(() => {
           const issues: string[] = [];
+          const goods: string[] = [];
           for (const id of stackIds) {
             const cat = SUPPORT_CATALOG_DATA[id];
             if (!cat) continue;
@@ -284,19 +407,28 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
             if (profile.healthConditions?.includes('hypertension' as any) && organs.some((o: string) => ['HEART', 'VESSELS'].includes(o))) {
               issues.push(`• ${cat.nameRu || cat.name} — влияет на ССС. При гипертонии — контроль давления.`);
             }
+            if (profile.healthConditions?.includes('kidney' as any) && organs.some((o: string) => ['KIDNEY', 'RENAL'].includes(o))) {
+              issues.push(`• ${cat.nameRu || cat.name} — нагрузка на почки. Требуется контроль креатинина.`);
+            }
             if (organs.some((o: string) => ['LIVER'].includes(o)) && profile.goals?.includes('liver_health' as any)) {
-              issues.push(`• ${cat.nameRu || cat.name} — ✅ поддерживает печень, совпадает с целями.`);
+              goods.push(`• ${cat.nameRu || cat.name} — ✅ поддерживает печень`);
+            }
+            if (organs.some((o: string) => ['HEART', 'CARDIO'].includes(o)) && profile.goals?.includes('cardio_health' as any)) {
+              goods.push(`• ${cat.nameRu || cat.name} — ✅ поддерживает ССС`);
             }
             if (!cat.dosage) {
               issues.push(`• ${cat.nameRu || cat.name} — ⚠ нет дозировки.`);
             }
           }
-          if (issues.length === 0) issues.push('✅ Все компоненты соответствуют профилю.');
-          setActionResult({ title: '🤔 Анализ совместимости с профилем', text: issues.join('\n\n') });
+          const secs: Array<{ icon: string; text: string; color?: string }> = [];
+          if (issues.length > 0) secs.push({ icon: '⚠️', text: `Проблемы:\n${issues.join('\n')}`, color: '#ef4444' });
+          if (goods.length > 0) secs.push({ icon: '✅', text: `Совпадения с профилем:\n${goods.join('\n')}`, color: '#22c55e' });
+          if (issues.length === 0 && goods.length === 0) secs.push({ icon: '💡', text: 'Все компоненты соответствуют профилю.', color: '#22c55e' });
+          setActionResult({ title: '🤔 Анализ совместимости с профилем', sections: secs });
           setActionLoading(null);
-        }, 400);
+        }, 500);
       }},
-  ], [stackIds, profile, explanation]);
+  ], [stackIds, profile, explanation, synergyExplanation]);
 
   const catLabel = (c: string) => CATEGORY_LABELS[c as keyof typeof CATEGORY_LABELS] || c;
 
@@ -316,16 +448,6 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
     musculo: '💪 Опорно-двиг.', metabolic: '⚡ Метаболизм', gi: '🫃 ЖКТ',
     покровная: '🧴 Кожа', гепатобилиарная: '🫁 Печень+Жёлчь', иммунная: '🛡️ Иммунная',
   };
-  const [libFilter, setLibFilter] = useState<string>('all');
-  const [libOpen, setLibOpen] = useState(false);
-  const filteredLib = useMemo(() => {
-    if (libFilter === 'all') return ALL_STACKS;
-    return ALL_STACKS.filter(s => {
-      const sys = s.system?.toLowerCase() || '';
-      return sys.includes(libFilter) || s.anatomicalMapping?.organSystems?.some((o: string) => o.toLowerCase().includes(libFilter));
-    });
-  }, [libFilter]);
-
   if (stackIds.length === 0) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 60, color: 'rgba(255,255,255,0.3)' }}>
@@ -362,62 +484,7 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
           </GlassCard>
         )}
 
-        {/* ═══ Ready-made stacks library ═══ */}
-        <div style={{ marginTop: 12 }}>
-          <button onClick={() => setLibOpen(!libOpen)} style={{
-            padding: '8px 20px', borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: 'pointer',
-            background: libOpen ? 'rgba(139,92,246,0.15)' : 'rgba(139,92,246,0.08)',
-            border: '1px solid rgba(139,92,246,0.25)', color: '#8b5cf6',
-          }}>
-            📚 {libOpen ? 'Скрыть библиотеку' : 'Библиотека готовых стеков'} ({ALL_STACKS.length})
-          </button>
-        </div>
 
-        {libOpen && (
-          <div style={{ marginTop: 8, textAlign: 'left' }}>
-            {/* Filters */}
-            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 8, justifyContent: 'center' }}>
-              {['all', 'hepatic', 'cardio', 'renal', 'neuro', 'endocrine', 'immune', 'gi', 'reproductive', 'metabolic'].map(f => (
-                <button key={f} onClick={() => setLibFilter(f)} style={{
-                  padding: '3px 8px', borderRadius: 10, fontSize: 7, fontWeight: 600, cursor: 'pointer',
-                  background: libFilter === f ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${libFilter === f ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.06)'}`,
-                  color: libFilter === f ? '#8b5cf6' : 'rgba(255,255,255,0.5)',
-                }}>{SYSTEM_LABELS_RU[f] || f}</button>
-              ))}
-            </div>
-
-            {filteredLib.map(stk => (
-              <GlassCard key={stk.id} style={{ marginBottom: 6, cursor: 'pointer', textAlign: 'left' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 2 }}>{stk.name}</div>
-                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, marginBottom: 4 }}>{stk.description}</div>
-                    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 4 }}>
-                      {stk.substances.slice(0, 5).map(sub => {
-                        const c = SUPPORT_CATALOG_DATA[sub.id];
-                        return <span key={sub.id} style={{ padding: '1px 5px', borderRadius: 4, fontSize: 7, background: 'rgba(0,230,138,0.08)', color: '#00e68a' }}>{c?.nameRu || c?.name || sub.id}</span>;
-                      })}
-                      {stk.substances.length > 5 && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>+{stk.substances.length - 5}</span>}
-                    </div>
-                    <div style={{ display: 'flex', gap: 4, fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>
-                      <span>🎯 {stk.synergyScore}/100</span>
-                      <span>🧪 {stk.substances.length} компонентов</span>
-                      {stk.system && <span>📂 {stk.system}</span>}
-                    </div>
-                  </div>
-                  <button onClick={() => setStackIds(stk.substances.map(s => s.id))} style={{
-                    flexShrink: 0, padding: '6px 12px', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
-                    background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', marginTop: 2,
-                  }}>📥</button>
-                </div>
-              </GlassCard>
-            ))}
-            {filteredLib.length === 0 && (
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>Нет стеков по этому фильтру</div>
-            )}
-          </div>
-        )}
       </div>
     );
   }
@@ -436,69 +503,69 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
             flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
             background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a',
           }}>💾 Сохранить стек</button>
-          <button onClick={() => setLibOpen(!libOpen)} style={{
-            padding: '8px 10px', borderRadius: 10, fontSize: 9, fontWeight: 700, cursor: 'pointer',
-            background: libOpen ? 'rgba(139,92,246,0.12)' : 'rgba(139,92,246,0.08)',
-            border: '1px solid rgba(139,92,246,0.2)', color: '#8b5cf6',
-          }}>📚 {libOpen ? '✕' : 'Библиотека'}</button>
           <button onClick={handleClear} style={{
-            padding: '8px 14px', borderRadius: 10, fontSize: 9, fontWeight: 700, cursor: 'pointer',
+            flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
             background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444',
           }}>🗑 Очистить</button>
         </div>
-        {libOpen && (
-          <div style={{ marginTop: 8, textAlign: 'left', maxHeight: 300, overflowY: 'auto' }}>
-            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
-              {['all', 'hepatic', 'cardio', 'renal', 'neuro', 'endocrine', 'immune', 'gi', 'reproductive', 'metabolic'].map(f => (
-                <button key={f} onClick={() => setLibFilter(f)} style={{
-                  padding: '2px 6px', borderRadius: 8, fontSize: 7, fontWeight: 600, cursor: 'pointer',
-                  background: libFilter === f ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${libFilter === f ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.06)'}`,
-                  color: libFilter === f ? '#8b5cf6' : 'rgba(255,255,255,0.5)',
-                }}>{SYSTEM_LABELS_RU[f] || f}</button>
-              ))}
-            </div>
-            {filteredLib.map(stk => (
-              <div key={stk.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', marginBottom: 4, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: '#fff', marginBottom: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stk.name}</div>
-                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>{stk.substances.length} комп. • {stk.synergyScore}/100</div>
-                </div>
-                <button onClick={() => setStackIds(stk.substances.map(s => s.id))} style={{
-                  flexShrink: 0, padding: '4px 10px', borderRadius: 6, fontSize: 7, fontWeight: 700, cursor: 'pointer',
-                  background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a',
-                }}>📥</button>
-              </div>
-            ))}
-          </div>
-        )}
       </GlassCard>
 
-      {/* 🧬 Объяснение: почему этот стек работает */}
-      {synergyExplanation && synergyExplanation.length > 0 && (
+      {/* 🧬 Почему этот стек работает */}
+      {synergyExplanation && (
         <GlassCard title="🧬 Почему этот стек работает" icon="🧬" color="#a855f7">
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>⚡ Принцип синергии</div>
-            {synergyExplanation.map((s, i) => (
-              <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)', padding: '3px 0', lineHeight: 1.4, borderBottom: i < synergyExplanation.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
-                {s}
-              </div>
-            ))}
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, marginBottom: 8, padding: '6px 8px', borderRadius: 6, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.1)' }}>
+            {synergyExplanation.cascadeDesc}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#22c55e', marginBottom: 4 }}>🔧 Механизмы в стеке ({stackMechanisms.length})</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                {stackMechanisms.map(m => <span key={m} style={{ fontSize: 7, padding: '2px 5px', borderRadius: 4, background: 'rgba(34,197,94,0.08)', color: '#22c55e' }}>{m.replace(/_/g, ' ').slice(0, 30)}</span>)}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>🎯 Системы ({stackSystems.length})</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                {stackSystems.map(s => <span key={s} style={{ fontSize: 7, padding: '2px 5px', borderRadius: 4, background: 'rgba(96,165,250,0.08)', color: '#60a5fa' }}>{SYSTEM_LABELS_RU[s] || s}</span>)}
-              </div>
+
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: '#22c55e', marginBottom: 4 }}>🔬 Покрытие механизмов ({synergyExplanation.coverage.length})</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+              {synergyExplanation.coverage.slice(0, 14).map(({ mechanism, coveredBy }) => (
+                <span key={mechanism} title={`${coveredBy.join(', ')}`} style={{ fontSize: 7, padding: '2px 5px', borderRadius: 4, background: 'rgba(34,197,94,0.08)', color: '#22c55e' }}>
+                  {MECHANISM_LABELS[mechanism as keyof typeof MECHANISM_LABELS] || mechanism.replace(/_/g, ' ').slice(0, 25)}
+                </span>
+              ))}
             </div>
           </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>🎯 Роли в стеке</div>
+              {(['core','synergy','coverage','support'] as const).map(role => {
+                const subs = stackIds.filter(id => synergyExplanation.roles[id] === role);
+                if (subs.length === 0) return null;
+                const rl: Record<string, string> = { core: 'Основные', synergy: 'Синергисты', coverage: 'Покрытие', support: 'Вспомог.' };
+                const rc: Record<string, string> = { core: '#00e68a', synergy: '#8b5cf6', coverage: '#60a5fa', support: 'rgba(255,255,255,0.4)' };
+                return <div key={role} style={{ fontSize: 7, color: rc[role], marginBottom: 1 }}><strong>{rl[role]}</strong> ({subs.length})</div>;
+              })}
+            </div>
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>🔄 Пары ({synergyExplanation.pairs.length})</div>
+              {synergyExplanation.pairs.slice(0, 4).map((p, i) => (
+                <div key={i} style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', lineHeight: 1.3, padding: '1px 0' }}>
+                  {p.a.split(' ').slice(0, 2).join(' ')} + {p.b.split(' ').slice(0, 2).join(' ')}
+                  <span style={{
+                    fontSize: 5, padding: '1px 3px', borderRadius: 2, marginLeft: 3,
+                    background: p.strength === 'HIGH' ? 'rgba(34,197,94,0.1)' : p.strength === 'MEDIUM' ? 'rgba(251,191,36,0.1)' : 'rgba(255,255,255,0.04)',
+                    color: p.strength === 'HIGH' ? '#22c55e' : p.strength === 'MEDIUM' ? '#f59e0b' : 'rgba(255,255,255,0.3)',
+                  }}>{p.strength === 'HIGH' ? '🟢' : p.strength === 'MEDIUM' ? '🟡' : '⚪'}</span>
+                </div>
+              ))}
+              {synergyExplanation.pairs.length > 4 && <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.25)', marginTop: 1 }}>+{synergyExplanation.pairs.length - 4} ещё</div>}
+            </div>
+          </div>
+
+          {synergyExplanation.contributions.length > 0 && (
+            <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.06)' }}>
+              <div style={{ fontSize: 7, color: '#22c55e', fontWeight: 600, marginBottom: 2 }}>💡 Уникальный вклад:</div>
+              {synergyExplanation.contributions.map((c, i) => (
+                <div key={i} style={{ fontSize: 8, color: '#4ade80', lineHeight: 1.3 }}>
+                  • <strong>{SUPPORT_CATALOG_DATA[c.id]?.nameRu || SUPPORT_CATALOG_DATA[c.id]?.name || c.id}</strong> — {c.text}
+                </div>
+              ))}
+            </div>
+          )}
+
           {explanation?.warnings && explanation.warnings.length > 0 && (
             <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.1)' }}>
               <div style={{ fontSize: 8, fontWeight: 700, color: '#ef4444', marginBottom: 3 }}>⚠️ Предупреждения</div>
@@ -539,60 +606,133 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
         </div>
       </GlassCard>
 
-      {/* 🚀 Stack Actions */}
-      <GlassCard title="🚀 Действия со стеком" icon="🚀" color="#8b5cf6">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-          {ACTIONS.map((a: any) => (
-            <button key={a.id} onClick={a.run} disabled={actionLoading === a.id} style={{
-              padding: '10px 6px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: actionLoading === a.id ? 'wait' : 'pointer',
-              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: a.color,
-              opacity: actionLoading === a.id ? 0.5 : 1, transition: 'all 0.15s',
-            }}>{a.icon} {a.label}{actionLoading === a.id ? '...' : ''}</button>
-          ))}
-          <button onClick={() => { const ids = stackIds.map(s => s); setActionLoading('complex' as any); setTimeout(() => { setActionResult({ title:'🔀 Замена на комплексный препарат', text:'Поиск комплексного препарата, заменяющего стек из ' + stackIds.length + ' компонентов...\n\nФункция в разработке — проверьте библиотеку стеков для готовых комплексных решений.' }); setActionLoading(null); }, 300); }} style={{ gridColumn: '1 / -1', padding: '10px 6px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: 'pointer', background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', color: '#22c55e' }}>
-            🔀 Заменить комплексным препаратом
-          </button>
-          <button onClick={() => { const fp = toFinderProfile(profile); const r = buildSmartStack(profile.goals as any || [], { maxSubstances: stackIds.length }, profile); setActionResult({ title:'⚖ Сравнение по действию', text:`Альтернативный стек: ${r.substances.map(s=>s.nameRu||s.name).join(', ')}\n\nОценка: ${r.totalScore}\nПокрытие: ${r.coverageSummary}\nСинергии: ${r.synergySummary}\n\n${r.timingSummary}` }); }} style={{ gridColumn: '1 / -1', padding: '10px 6px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: 'pointer', background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)', color: '#60a5fa' }}>
-            ⚖ Сравнить по действию (альтернативный стек)
-          </button>
-          {ACTIONS.map(btn => (
-            <button key={btn.id} onClick={btn.run} disabled={actionLoading !== null} style={{
-              padding: '8px 6px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: actionLoading ? 'wait' : 'pointer',
-              background: actionLoading === btn.id ? `${btn.color}15` : `${btn.color}08`,
-              border: `1px solid ${actionLoading === btn.id ? btn.color : btn.color + '25'}`,
-              color: actionLoading === btn.id ? btn.color : btn.color,
-              transition: 'all 0.15s',
+      {/* 🚀 Действия со стеком — компактная кнопка-попап */}
+      {(() => {
+        const [actOpen, setActOpen] = useState(false);
+        return (
+          <>
+            <button onClick={() => setActOpen(true)} style={{
+              width: '100%', padding: '14px 0', borderRadius: 14, fontSize: 13, fontWeight: 800,
+              cursor: 'pointer', marginBottom: 10,
+              background: 'linear-gradient(135deg,#8b5cf6,#6d28d9)', border: 'none', color: '#fff',
+              boxShadow: '0 4px 20px rgba(139,92,246,0.2)',
             }}>
-              {actionLoading === btn.id ? '⏳' : btn.icon} {btn.label}
+              🚀 Действия со стеком
             </button>
-          ))}
-        </div>
 
-        {actionResult && (
-          <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.04)' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{actionResult.title}</div>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>{actionResult.text}</div>
-            {actionResult.resultStack && (
-              <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                <button onClick={() => { setStackIds(actionResult.resultStack!); setActionResult(null); }} style={{
-                  flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
-                  background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a',
-                }}>📥 Применить стек</button>
-                <button onClick={() => setActionResult(null)} style={{
-                  padding: '6px 10px', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
-                  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
-                }}>✕</button>
+            {actOpen && <div style={{
+              position: 'fixed', inset: 0, zIndex: 250,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(0,0,0,0.85)'
+            }} onClick={() => setActOpen(false)}>
+              <div onClick={e => e.stopPropagation()} style={{
+                width: '88%', maxWidth: 360, maxHeight: '75vh', borderRadius: 16,
+                background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden',
+              }}>
+                <div style={{ height: 3, background: 'linear-gradient(90deg,#8b5cf6,#6d28d9)' }} />
+                <div style={{ padding: '14px 16px', maxHeight: 'calc(75vh - 3px)', overflowY: 'auto' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#c4b5fd', marginBottom: 10 }}>🚀 Действия со стеком</div>
+
+                  {ACTIONS.map(a => (
+                    <button key={a.id} onClick={() => { a.run(); setActOpen(false); }} style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      width: '100%', padding: '10px 14px', marginBottom: 4, borderRadius: 10,
+                      cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                      background: actionLoading === a.id ? `${a.color}15` : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${actionLoading === a.id ? a.color : 'rgba(255,255,255,0.06)'}`,
+                      color: actionLoading === a.id ? a.color : 'rgba(255,255,255,0.8)',
+                    }}>
+                      <span style={{ fontSize: 18 }}>{a.icon}</span>
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: a.color }}>{a.label}</div>
+                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>
+                          {a.id === 'best' ? 'Сборка оптимального стека под ваш профиль' :
+                           a.id === 'optimize' ? 'Добавить недостающие компоненты' :
+                           a.id === 'risks' ? 'Убрать конфликтующие препараты' :
+                           a.id === 'cheaper' ? 'Найти бюджетные аналоги' :
+                           'Анализ совместимости с профилем'}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+
+                  <button onClick={() => {
+                    setActOpen(false);
+                    const r = buildSmartStack(profile.goals as any || [], { maxSubstances: stackIds.length }, profile);
+                    const curNames = stackIds.map(id => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id);
+                    const altNames = r.substances.map(s => s.nameRu || s.name);
+                    const common = curNames.filter(n => altNames.includes(n));
+                    const onlyCur = curNames.filter(n => !altNames.includes(n));
+                    const onlyAlt = altNames.filter(n => !curNames.includes(n));
+                    setActionResult({
+                      title: '⚖ Сравнение: текущий vs smart-алгоритм',
+                      sections: [
+                        { icon: '📋', text: `Текущий (${stackIds.length}): ${curNames.join(', ')}`, color: '#8b5cf6' },
+                        { icon: '🤖', text: `Smart (${r.substances.length}): ${altNames.join(', ')}`, color: '#60a5fa' },
+                        ...(common.length > 0 ? [{ icon: '🔄', text: `Общие (${common.length}): ${common.join(', ')}`, color: '#22c55e' }] : []),
+                        ...(onlyCur.length > 0 ? [{ icon: '➖', text: `Только в текущем: ${onlyCur.join(', ')}`, color: '#f59e0b' }] : []),
+                        ...(onlyAlt.length > 0 ? [{ icon: '➕', text: `Только в Smart: ${onlyAlt.join(', ')}`, color: '#22c55e' }] : []),
+                        { icon: '📊', text: `Smart оценка: ${r.totalScore} | Покрытие: ${r.coverageSummary} | ${r.synergySummary}`, color: '#60a5fa' },
+                      ],
+                    });
+                  }} style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    width: '100%', padding: '10px 14px', marginBottom: 4, borderRadius: 10,
+                    cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                    background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)', color: '#60a5fa',
+                  }}>
+                    <span style={{ fontSize: 18 }}>⚖</span>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa' }}>Сравнить по действию</div>
+                      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>Smart-алгоритм vs текущий стек</div>
+                    </div>
+                  </button>
+
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', textAlign: 'center', padding: '8px 0 4px' }}>
+                    Нажмите вне окна для закрытия
+                  </div>
+                </div>
               </div>
-            )}
-            {!actionResult.resultStack && (
-              <button onClick={() => setActionResult(null)} style={{
-                padding: '4px 10px', borderRadius: 6, fontSize: 7, fontWeight: 600, cursor: 'pointer', marginTop: 4,
-                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)',
-              }}>✕ Закрыть</button>
-            )}
+            </div>}
+          </>
+        );
+      })()}
+
+      {actionResult && (
+        <GlassCard title={actionResult.title} icon="📊" color="#8b5cf6">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {actionResult.sections.map((sec, i) => (
+              <div key={i} style={{
+                padding: '5px 8px', borderRadius: 6,
+                background: sec.color ? `${sec.color}08` : 'rgba(255,255,255,0.02)',
+                border: sec.color ? `1px solid ${sec.color}15` : '1px solid rgba(255,255,255,0.03)',
+              }}>
+                <div style={{ fontSize: 9, color: sec.color || 'rgba(255,255,255,0.6)', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+                  {sec.icon && <span style={{ marginRight: 4 }}>{sec.icon}</span>}{sec.text}
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-      </GlassCard>
+          {actionResult.resultStack && (
+            <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+              <button onClick={() => { setStackIds(actionResult.resultStack!); setActionResult(null); }} style={{
+                flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 9, fontWeight: 700, cursor: 'pointer',
+                background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a',
+              }}>📥 Применить стек</button>
+              <button onClick={() => setActionResult(null)} style={{
+                padding: '8px 14px', borderRadius: 8, fontSize: 9, fontWeight: 700, cursor: 'pointer',
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
+              }}>✕</button>
+            </div>
+          )}
+          {!actionResult.resultStack && (
+            <button onClick={() => setActionResult(null)} style={{
+              padding: '4px 10px', borderRadius: 6, fontSize: 7, fontWeight: 600, cursor: 'pointer', marginTop: 4,
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)',
+            }}>✕ Закрыть</button>
+          )}
+        </GlassCard>
+      )}
 
       {explanation?.warnings && explanation.warnings.length > 0 && (
         <GlassCard title="⚠ Предупреждения" icon="⚠" color="#ef4444">
@@ -620,7 +760,6 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
           );
         }
         const isExpanded = expanded[entry.id];
-        const replace = replaceState[entry.id];
         const isDragging = draggedIdx === idx;
         const isDropOver = dropTarget === idx && draggedIdx !== idx;
         const synergiesInStack = explanation.substances
@@ -641,7 +780,17 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
               <div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 2 }}>
                   {cat.nameRu || cat.name}
-                  <span style={{ fontSize: 8, color: '#00e68a', marginLeft: 6, fontWeight: 600 }}>({entry.role})</span>
+                  <span style={{
+                    fontSize: 8, marginLeft: 6, fontWeight: 600,
+                    color: synergyExplanation?.roles[entry.id] === 'core' ? '#00e68a'
+                      : synergyExplanation?.roles[entry.id] === 'coverage' ? '#60a5fa'
+                      : synergyExplanation?.roles[entry.id] === 'synergy' ? '#8b5cf6'
+                      : '#00e68a',
+                  }}>
+                    ({synergyExplanation?.roles[entry.id]
+                      ? ({ core: 'основной', synergy: 'синергист', coverage: 'покрытие', support: 'вспом.' } as Record<string, string>)[synergyExplanation.roles[entry.id]]
+                      : entry.role})
+                  </span>
                 </div>
                 <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   {[cat.tier, ...(cat.category?.slice(0, 2) || [])].filter(Boolean).map((c: any, i: number) => (
@@ -666,6 +815,16 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
                     📝 {decodeGarbled(cat.description)}
                   </div>
                 )}
+
+                {(() => {
+                  const contrib = synergyExplanation?.contributions.find(c => c.id === entry.id);
+                  if (!contrib) return null;
+                  return (
+                    <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.06)', marginBottom: 6 }}>
+                      <div style={{ fontSize: 7, color: '#22c55e', fontWeight: 600 }}>💡 {contrib.text}</div>
+                    </div>
+                  );
+                })()}
 
                 {entry.dose && (
                   <div style={{ fontSize: 9, color: '#60a5fa', marginBottom: 6 }}>
@@ -712,78 +871,17 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
                 )}
 
                 <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-                  <button onClick={() => handleOpenReplace(entry.id)} style={{
+                  <button onClick={() => openReplacePopup(entry.id, cat.nameRu || cat.name)} style={{
                     flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
                     background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', color: '#8b5cf6',
                   }}>
-                    {replace?.open ? '✕ Закрыть замены' : '🔄 Заменить'}
+                    🔄 Заменить
                   </button>
                   <button onClick={() => handleRemove(entry.id)} style={{
                     padding: '6px 10px', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
                     background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444',
                   }}>✕ Удалить</button>
                 </div>
-
-                {replace?.open && (
-                  <div style={{ marginTop: 8 }}>
-                    <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
-                      {REPLACE_TYPES.map(rt => (
-                        <button key={rt.key} onClick={() => handleChangeReplaceType(entry.id, rt.key)} style={{
-                          padding:'3px 8px', borderRadius:8, fontSize:7, fontWeight:600, cursor:'pointer',
-                          background: replace.activeType === rt.key ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
-                          border: replace.activeType === rt.key ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)',
-                          color: replace.activeType === rt.key ? '#00e68a' : 'rgba(255,255,255,0.4)',
-                        }}>{rt.icon} {rt.label}</button>
-                      ))}
-                    </div>
-                    {replace.loading ? (
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>Загрузка замен...</div>
-                    ) : replace.results.length > 0 ? (
-                      <>
-                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>🔁 Рекомендуемые замены ({replace.activeType}):</div>
-                        {replace.results.slice(0, 6).map((r, i) => (
-                          <div key={i} onClick={() => handleReplace(entry.id, r.replacementId)}
-                            style={{
-                              padding: '8px 10px', marginBottom: 4, borderRadius: 8, cursor: 'pointer',
-                              background: r.personalMatch ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)',
-                              border: `1px solid ${r.personalMatch ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)'}`,
-                            }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                              <span style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{r.replacementName}</span>
-                              <div style={{ display: 'flex', gap: 3 }}>
-                                <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 7, fontWeight: 600,
-                                  background: r.tierChange === 'upgrade' ? 'rgba(0,230,138,0.1)' : r.tierChange === 'downgrade' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
-                                  color: r.tierChange === 'upgrade' ? '#00e68a' : r.tierChange === 'downgrade' ? '#ef4444' : 'rgba(255,255,255,0.3)',
-                                }}>
-                                  {r.tierChange === 'upgrade' ? '↑ UPGRADE' : r.tierChange === 'downgrade' ? '↓ DOWNGRADE' : '∼ SAME'}
-                                </span>
-                                <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 7, fontWeight: 600,
-                                  background: r.priceDelta === 'cheaper' ? 'rgba(0,230,138,0.1)' : r.priceDelta === 'expensive' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
-                                  color: r.priceDelta === 'cheaper' ? '#00e68a' : r.priceDelta === 'expensive' ? '#ef4444' : 'rgba(255,255,255,0.3)',
-                                }}>
-                                  {r.priceDelta === 'cheaper' ? '💰 Дешевле' : r.priceDelta === 'expensive' ? '💰 Дороже' : '💰 ∼'}
-                                </span>
-                              </div>
-                            </div>
-                            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{r.reason}</div>
-                            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', lineHeight: 1.3 }}>
-                              {r.explanation}
-                              {r.bestForm && <span style={{ color: '#60a5fa' }}> • 💊 {r.bestForm}</span>}
-                            </div>
-                            {r.safetyNote && (
-                              <div style={{ fontSize: 7, color: '#f59e0b', marginTop: 2 }}>🛡️ {r.safetyNote}</div>
-                            )}
-                            {r.personalMatch && (
-                              <div style={{ fontSize: 7, color: '#00e68a', marginTop: 2 }}>🎯 Персональная рекомендация</div>
-                            )}
-                          </div>
-                        ))}
-                      </>
-                    ) : (
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 8 }}>Нет подходящих замен</div>
-                    )}
-                  </div>
-                )}
               </div>
             )}
           </GlassCard>
@@ -791,6 +889,72 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
           </div>
         );
       })}
+
+      {/* Global replace popup */}
+      {replacePopup && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 251,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.85)'
+        }} onClick={() => setReplacePopup(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '90%', maxWidth: 360, maxHeight: '75vh', borderRadius: 16,
+            background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden',
+          }}>
+            <div style={{ height: 3, background: 'linear-gradient(90deg,#8b5cf6,#6d28d9)' }} />
+            <div style={{ padding: '14px 16px', maxHeight: 'calc(75vh - 3px)', overflowY: 'auto' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#c4b5fd', marginBottom: 8 }}>
+                🔄 Замена: {replacePopup.name}
+              </div>
+              <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginBottom: 8 }}>
+                {REPLACE_TYPES.map(rt => (
+                  <button key={rt.key} onClick={() => switchReplaceType(rt.key)} style={{
+                    padding:'3px 8px', borderRadius:8, fontSize:7, fontWeight:600, cursor:'pointer',
+                    background: replacePopup.type === rt.key ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                    border: replacePopup.type === rt.key ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)',
+                    color: replacePopup.type === rt.key ? '#00e68a' : 'rgba(255,255,255,0.4)',
+                  }}>{rt.icon} {rt.label}</button>
+                ))}
+              </div>
+              {replacePopup.loading ? (
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>Загрузка...</div>
+              ) : replacePopup.results.length > 0 ? replacePopup.results.slice(0, 6).map((r, i) => (
+                <div key={i} onClick={() => { handleReplace(replacePopup.id, r.replacementId); setReplacePopup(null); }}
+                  style={{
+                    padding: '8px 10px', marginBottom: 4, borderRadius: 8, cursor: 'pointer',
+                    background: r.personalMatch ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${r.personalMatch ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)'}`,
+                  }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 2 }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{r.replacementName}</span>
+                    <div style={{ display:'flex', gap:3 }}>
+                      <span style={{ padding:'1px 5px', borderRadius:4, fontSize:7, fontWeight:600,
+                        background: r.tierChange === 'upgrade' ? 'rgba(0,230,138,0.1)' : r.tierChange === 'downgrade' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
+                        color: r.tierChange === 'upgrade' ? '#00e68a' : r.tierChange === 'downgrade' ? '#ef4444' : 'rgba(255,255,255,0.3)',
+                      }}>{r.tierChange === 'upgrade' ? '↑' : r.tierChange === 'downgrade' ? '↓' : '∼'}</span>
+                      <span style={{ padding:'1px 5px', borderRadius:4, fontSize:7, fontWeight:600,
+                        background: r.priceDelta === 'cheaper' ? 'rgba(0,230,138,0.1)' : r.priceDelta === 'expensive' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
+                        color: r.priceDelta === 'cheaper' ? '#00e68a' : r.priceDelta === 'expensive' ? '#ef4444' : 'rgba(255,255,255,0.3)',
+                      }}>{r.priceDelta === 'cheaper' ? '💰-' : r.priceDelta === 'expensive' ? '💰+' : '💰='}</span>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{r.reason}</div>
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', lineHeight: 1.3 }}>
+                    {r.explanation}
+                    {r.bestForm && <span style={{ color:'#60a5fa' }}> • 💊 {r.bestForm}</span>}
+                  </div>
+                </div>
+              )) : (
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 8 }}>Нет подходящих замен</div>
+              )}
+              <button onClick={() => setReplacePopup(null)} style={{
+                width:'100%', padding:'8px 0', borderRadius:8, marginTop:4, cursor:'pointer',
+                background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.5)', fontSize:9, fontWeight:700,
+              }}>✕ Закрыть</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

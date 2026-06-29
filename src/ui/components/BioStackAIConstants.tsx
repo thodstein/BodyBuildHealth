@@ -29,15 +29,33 @@ export const GOALS: { key: GoalType; label: string }[] = [
   { key:'digestion', label:'🫃 ЖКТ' }, { key:'kidney', label:'🫘 Почки' },
 ];
 
-// Чистые цели (что ХОТИМ достичь) — без органов
+// Цели (что ХОТИМ достичь) — только outcome-цели, без органов и систем
 export const PURE_GOALS: { key: GoalType; label: string }[] = [
-  { key:'sleep', label:'😴 Сон' }, { key:'energy', label:'⚡ Энергия' },
-  { key:'concentration', label:'🎯 Фокус' }, { key:'muscle_gain', label:'💪 Мышцы' },
-  { key:'fat_loss', label:'🔥 Жиросжигание' }, { key:'endurance', label:'🏃 Выносливость' },
-  { key:'recovery', label:'🔄 Восстановление' },
-  { key:'stress', label:'🧘 Стресс' }, { key:'longevity', label:'⏳ Долголетие' },
-  { key:'detox', label:'🧹 Детокс' }, { key:'libido', label:'🔥 Либидо' },
-  { key:'mood', label:'😊 Настроение' },
+  // 🏋️ Физическая форма
+  { key:'muscle_gain', label:'💪 Рост мышечной массы' },
+  { key:'fat_loss', label:'🔥 Снижение жировой массы' },
+  { key:'endurance', label:'🏃 Повышение выносливости' },
+  // 🔄 Восстановление
+  { key:'sleep', label:'😴 Улучшение качества сна' },
+  { key:'recovery', label:'🔄 Ускорение восстановления' },
+  // ⚡ Энергия и тонус
+  { key:'energy', label:'⚡ Повышение энергии' },
+  { key:'libido', label:'🔥 Повышение либидо' },
+  // 🧠 Когнитивные функции
+  { key:'concentration', label:'🎯 Улучшение фокуса' },
+  { key:'brain', label:'🧠 Память и когнитивные функции' },
+  // 😊 Психоэмоциональное состояние
+  { key:'mood', label:'😊 Стабилизация настроения' },
+  { key:'stress', label:'🧘 Снижение стресса' },
+  // ❤️ Системное здоровье
+  { key:'cardio_health', label:'❤️ Здоровье ССС' },
+  { key:'immunity', label:'🛡️ Укрепление иммунитета' },
+  { key:'hormones', label:'⚖️ Гормональный баланс' },
+  { key:'joints', label:'🦴 Здоровье суставов' },
+  { key:'digestion', label:'🫃 Улучшение пищеварения' },
+  { key:'detox', label:'🧹 Детоксикация организма' },
+  // ⏳ Долгосрочные
+  { key:'longevity', label:'⏳ Продление долголетия' },
 ];
 
 // Системы-мишени (на какой ОРГАН/СИСТЕМУ влияем)

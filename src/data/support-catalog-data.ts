@@ -11267,6 +11267,26 @@ kpv: {
     contraindications: ['Аллергия на грибы', 'Аутоиммунные заболевания (с осторожностью)'],
     sideEffects: ['Аллергические реакции (редко)', 'Дискомфорт в ЖКТ'],
   },
+  collagen_uc2: {
+    id: 'collagen_uc2',
+    name: 'UC-II (Коллаген II типа)',
+    nameRu: 'Неденатурированный коллаген UC-II',
+    tier: 'advanced',
+    category: ['joint', 'antiinflammatory'],
+    forms: [{ id: 'caps', name: 'UC-II 40mg', nameRu: 'UC-II 40 мг капсулы', dose: '40 мг', best: true, notes: 'Натощак за 30 мин до еды' }],
+    organs: ['JOINTS', 'BONES'],
+    systems: ['musculoskeletal', 'immune'],
+    mechanisms: ['COLLAGEN_SYNTHESIS', 'IMMUNE_MODULATION', 'ANTIINFLAMMATORY', 'TISSUE_REPAIR'],
+    description: 'Запатентованный неденатурированный коллаген II типа. Работает через механизм оральной толерантности — обучает иммунную систему не атаковать собственный коллаген суставов. Клинически доказанное снижение боли и улучшение подвижности.',
+    synergies: [{ with: 'boswellia', effect: 'Противовоспалительная синергия', mechanism: 'UC-II + Босвеллия = двойной путь подавления воспаления', severity: 'HIGH' }, { with: 'msm', effect: 'Структурная поддержка', mechanism: 'Коллаген + сера для синтеза ГАГ', severity: 'HIGH' }, { with: 'vitamin_c', effect: 'Стимуляция синтеза коллагена', mechanism: 'Витамин C — кофактор синтеза коллагена', severity: 'HIGH' }],
+    conflicts: [],
+    monitoring: [{ what: 'Боль VAS', when: 'Каждые 4 нед' }, { what: 'WOMAC индекс', when: 'Каждые 12 нед' }],
+    contraindications: ['Аллергия на говяжий белок'],
+    sideEffects: ['Редко: лёгкое расстройство ЖКТ'],
+    dosage: { mg: 40, timing: 'morning' },
+    bestForCourse: true,
+    clinicalEffect: 'Снижение боли, улучшение подвижности суставов, регенерация хрящевой ткани через оральную толерантность',
+  },
 };
 
 // ── Lowercase aliases for case-insensitive catalog lookup ──

@@ -2808,6 +2808,34 @@ export const SUBSTANCE_ENHANCERS: Record<string, { id: string; name: string; rea
   probiotics: [{ id: 'prebiotics', name: 'Пребиотики', reason: 'Пища для пробиотиков', form: 'порошок', mg: 5000, timing: 'с едой' }],
 };
 
+// ── COMPLEX → COMPONENTS: explicit composition map ──
+export const SUPPLEMENT_COMPOSITION: Record<string, string[]> = {
+  vitamin_b_complex: ['vitamin_b1','vitamin_b2','vitamin_b3','vitamin_b5','vitamin_b6','biotin','folate','vitamin_b12'],
+  vitamin_b_complex_2: ['vitamin_b1','vitamin_b2','vitamin_b3','vitamin_b5','vitamin_b6','biotin','folate','vitamin_b12','choline'],
+  omega3: ['epa','dha'],
+  collagen: ['glycine','proline','hydroxyproline'],
+  probiotics: ['lactobacillus','bifidobacterium'],
+  vitamin_d3: ['vitamin_d3','vitamin_k2'],
+  magnesium: ['magnesium_glycinate','taurine'],
+  antioxidant_complex: ['vitamin_c','vitamin_e','selenium','alpha_lipoic'],
+  electrolyte_complex: ['potassium','sodium','magnesium','calcium'],
+  amino_complex: ['l_glutamine','l_arginine','l_carnitine','taurine'],
+  adaptogen_complex: ['ashwagandha','rhodiola','holy_basil','ginseng'],
+  mushroom_complex: ['reishi','lions_mane','cordyceps','chaga'],
+  polyphenol_complex: ['curcumin','egcg','resveratrol','quercetin'],
+};
+
+// Reverse map: component ID → list of complex IDs that contain it
+export const COMPONENT_TO_COMPLEX: Record<string, string[]> = {};
+(() => {
+  for (const [complexId, components] of Object.entries(SUPPLEMENT_COMPOSITION)) {
+    for (const c of components) {
+      if (!COMPONENT_TO_COMPLEX[c]) COMPONENT_TO_COMPLEX[c] = [];
+      COMPONENT_TO_COMPLEX[c].push(complexId);
+    }
+  }
+})();
+
 // Phase-specific modifications
 export const PHASE_MODS: Record<SupportPhase, { label: string; emoji: string; desc: string; addSubs: string[]; removeSubs: string[]; doseMultipliers: Record<string, number> }> = {
   course: { label: 'Курс', emoji: '💉', desc: 'Поддержка во время курса ААС — гепатопротекция, кардио, эндокринная система', addSubs: ['milk_thistle', 'saw_palmetto'], removeSubs: ['hcg'], doseMultipliers: { nac: 1.5, tudca: 1.5, omega3: 1.25, coq10: 1.5 } },

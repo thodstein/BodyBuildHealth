@@ -12,7 +12,7 @@ import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 
 type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' 
   | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'analytics' 
-  | 'contacts' | 'bp_diary' | 'measurements' | 'diaries' | 'calculator_data';
+  | 'contacts' | 'bp_diary' | 'measurements' | 'diaries' | 'calculator_data' | 'nutrition_planner';
 type ProfilePage = 'hero' | 'tabs';
 
 const SPORT_TYPES = [
@@ -607,7 +607,9 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
     { id: 'lifestyle', label: 'Образ жизни' },
     { id: 'diet', label: 'Питание' }, { id: 'injuries', label: 'Травмы' },
     { id: 'analytics', label: 'Аналитика' },
-    { id: 'diaries', label: 'Дневники' }, { id: 'contacts', label: 'Контакты' }
+    { id: 'diaries', label: 'Дневники' }, { id: 'contacts', label: 'Контакты' },
+    { id: 'calculator_data', label: '🧮 Калькулятор' },
+    { id: 'nutrition_planner', label: '🥗 Планировщик' },
   ];
 
   const initials = (profile.name || 'П').charAt(0).toUpperCase();
@@ -646,6 +648,8 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
                 { id: 'overview', icon: '📋', title: 'Сведения о пользователе', desc: 'Обзор, антропометрия, сон, образ жизни, питание, травмы', color: '#00e68a' },
+                { id: 'calculator_data', icon: '🧮', title: 'Данные для калькулятора поддержки', desc: 'Вес, анализы, фарма, цели — всё для точного расчёта поддержки', color: '#f59e0b' },
+                { id: 'nutrition_planner', icon: '🥗', title: 'Данные планировщика питания', desc: 'Параметры КБЖУ, аллергии, предпочтения для генерации плана', color: '#22c55e' },
                 { id: 'analytics', icon: '📊', title: 'Аналитика', desc: 'Отчёты для тренера/врача, дневник прогресса, дневники по категориям', color: '#3b82f6' },
                 { id: 'contacts', icon: '📞', title: 'Контакты и друзья', desc: 'Список друзей, шаринг, поддержка и контакты', color: '#8b5cf6' },
               ].map(card => (
@@ -2439,6 +2443,17 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
               <ProfileCalcData />
             </div></InfoErrorBoundary>
           )}
+
+          {/* ═══ NUTRITION PLANNER DATA TAB ═══ */}
+          {tab === 'nutrition_planner' && (
+            <InfoErrorBoundary label="Планировщик"><div>
+              <div style={{ marginBottom:12 }}>
+                <h3 style={{ margin:'0 0 4px', fontSize:15, fontWeight:800, color:'#fff' }}>🥗 Данные планировщика питания</h3>
+                <p style={{ fontSize:10, color:'rgba(255,255,255,0.5)', margin:0 }}>Ваши параметры для генерации плана питания. Сохраняются и используются планировщиком автоматически.</p>
+              </div>
+              <PlannerProfileData />
+            </div></InfoErrorBoundary>
+          )}
           </div>
         </div>
       )}
@@ -2512,41 +2527,96 @@ const ProfileMeasurementsTab: React.FC = () => {
 
 const ProfileCalcData: React.FC = () => {
   const glassCard: React.CSSProperties = { background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 12, marginBottom: 6 };
-  const labelS: React.CSSProperties = { fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2, display: 'block' };
-  const inp: React.CSSProperties = { width: '100%', padding: '6px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 10, boxSizing: 'border-box' };
+
+  // Popup button-cards
+  const PopToggle: React.FC<{ label: string; value: boolean; onChange: (v: boolean) => void }> = ({ label, value, onChange }) => {
+    const [open, setOpen] = React.useState(false);
+    return <><button onClick={()=>setOpen(true)} style={{width:'100%',padding:'8px 10px',borderRadius:8,cursor:'pointer',fontSize:10,textAlign:'center',fontWeight:700,background:value?'linear-gradient(135deg,#00e68a,#00c853)':'rgba(255,255,255,0.04)',border:value?'2px solid var(--accent)':'1px solid rgba(255,255,255,0.06)',color:value?'#000':'var(--text-dim)'}}>{label}</button>
+    {open && <div style={{position:'fixed',inset:0,zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.85)'}} onClick={()=>setOpen(false)}>
+      <div onClick={e=>e.stopPropagation()} style={{width:'80%',maxWidth:300,borderRadius:16,background:'#18181b',border:'1px solid rgba(255,255,255,0.1)',overflow:'hidden'}}>
+        <div style={{height:3,background:'linear-gradient(90deg,#00e68a,#00c853)'}}/>
+        <div style={{padding:'14px 16px'}}>
+          <div style={{fontSize:14,fontWeight:700,color:'var(--accent)',marginBottom:10}}>{label}</div>
+          <button onClick={()=>{onChange(true);setOpen(false)}} style={{width:'100%',padding:'12px',borderRadius:10,cursor:'pointer',fontSize:12,fontWeight:700,textAlign:'left',background:value?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.03)',border:value?'1px solid rgba(0,230,138,0.3)':'1px solid rgba(255,255,255,0.06)',color:value?'#00e68a':'rgba(255,255,255,0.8)'}}>✓ Да</button>
+          <button onClick={()=>{onChange(false);setOpen(false)}} style={{width:'100%',padding:'12px',borderRadius:10,cursor:'pointer',fontSize:12,fontWeight:700,textAlign:'left',marginTop:4,background:!value?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.03)',border:!value?'1px solid rgba(239,68,68,0.3)':'1px solid rgba(255,255,255,0.06)',color:!value?'#ef4444':'rgba(255,255,255,0.8)'}}>✗ Нет</button>
+        </div>
+      </div>
+    </div>}</>;
+  };
+
+  const PopSelect: React.FC<{ label: string; value: string; options: { id: string; label: string }[]; onChange: (v: string) => void }> = ({ label, value, options, onChange }) => {
+    const [open, setOpen] = React.useState(false);
+    const sel = options.find(o=>o.id===value);
+    return <><button onClick={()=>setOpen(true)} style={{width:'100%',padding:'8px 10px',borderRadius:8,cursor:'pointer',fontSize:10,textAlign:'left',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.06)',color:value?'var(--text)':'var(--text-dim)'}}>{sel?sel.label:`▸ ${label}`}</button>
+    {open && <div style={{position:'fixed',inset:0,zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.85)'}} onClick={()=>setOpen(false)}>
+      <div onClick={e=>e.stopPropagation()} style={{width:'88%',maxWidth:360,maxHeight:'70vh',borderRadius:16,background:'#18181b',border:'1px solid rgba(255,255,255,0.1)',overflow:'hidden'}}>
+        <div style={{height:3,background:'linear-gradient(90deg,#00e68a,#00c853)'}}/>
+        <div style={{padding:'14px 16px',maxHeight:'calc(70vh - 3px)',overflowY:'auto'}}>
+          <div style={{fontSize:14,fontWeight:700,color:'var(--accent)',marginBottom:10}}>{label}</div>
+          {options.map(o=>(<button key={o.id} onClick={()=>{onChange(o.id);setOpen(false)}} style={{width:'100%',padding:'10px 14px',marginBottom:3,borderRadius:10,cursor:'pointer',fontSize:11,fontWeight:value===o.id?700:400,textAlign:'left',background:value===o.id?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.03)',border:value===o.id?'1px solid rgba(0,230,138,0.3)':'1px solid rgba(255,255,255,0.06)',color:value===o.id?'#00e68a':'rgba(255,255,255,0.8)'}}>{o.label}{value===o.id?' ✓':''}</button>))}
+        </div>
+      </div>
+    </div>}</>;
+  };
+
+  const PopNum: React.FC<{ label: string; value: number; min?: number; max?: number; step?: number; suffix?: string; onChange: (v: number) => void }> = ({ label, value, min, max, step, suffix, onChange }) => {
+    const [open, setOpen] = React.useState(false);
+    const [edit, setEdit] = React.useState(String(value||0));
+    return <><button onClick={()=>{setEdit(String(value||0));setOpen(true)}} style={{width:'100%',padding:'8px 10px',borderRadius:8,cursor:'pointer',fontSize:10,textAlign:'center',fontWeight:value?700:400,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.06)',color:value?'var(--accent)':'var(--text-dim)'}}>{label}: {value||'-'}{suffix?` ${suffix}`:''}</button>
+    {open && <div style={{position:'fixed',inset:0,zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.85)'}} onClick={()=>setOpen(false)}>
+      <div onClick={e=>e.stopPropagation()} style={{width:'80%',maxWidth:300,borderRadius:16,background:'#18181b',border:'1px solid rgba(255,255,255,0.1)',overflow:'hidden'}}>
+        <div style={{height:3,background:'linear-gradient(90deg,#00e68a,#00c853)'}}/>
+        <div style={{padding:'14px 16px'}}>
+          <div style={{fontSize:14,fontWeight:700,color:'var(--accent)',marginBottom:10}}>{label}</div>
+          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+            <input type="number" value={edit} onChange={e=>setEdit(e.target.value)} style={{flex:1,padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.08)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:18,fontWeight:700,textAlign:'center',boxSizing:'border-box'}} />
+            <button onClick={()=>{const v=parseFloat(edit);if(!isNaN(v))onChange(v);setOpen(false)}} style={{padding:'10px 18px',borderRadius:8,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#00e68a,#00c853)',color:'#000',fontWeight:700,fontSize:13}}>OK</button>
+          </div>
+        </div>
+      </div>
+    </div>}</>;
+  };
+
+  const SevSelect: React.FC<{ label: string; value: string; onChange: (v: string) => void }> = ({ label, value, onChange }) => {
+    const opts = [{id:'none',label:'Нет'},{id:'mild',label:'Лёгкая'},{id:'moderate',label:'Средняя'},{id:'severe',label:'Тяжёлая'}];
+    return <PopSelect label={label} value={value||'none'} options={opts} onChange={onChange} />;
+  };
+
+  const NumPillsCard: React.FC<{ label: string; value: number; onChange: (v: number) => void }> = ({ label, value, onChange }) => {
+    const [open, setOpen] = React.useState(false);
+    return <><button onClick={()=>setOpen(true)} style={{width:'100%',padding:'8px 10px',borderRadius:8,cursor:'pointer',fontSize:10,textAlign:'center',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.06)',color:value?'var(--accent)':'var(--text-dim)'}}>{label}: {value||1}/5</button>
+    {open && <div style={{position:'fixed',inset:0,zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.85)'}} onClick={()=>setOpen(false)}>
+      <div onClick={e=>e.stopPropagation()} style={{width:'80%',maxWidth:300,borderRadius:16,background:'#18181b',border:'1px solid rgba(255,255,255,0.1)',overflow:'hidden'}}>
+        <div style={{height:3,background:'linear-gradient(90deg,#00e68a,#00c853)'}}/>
+        <div style={{padding:'14px 16px',textAlign:'center'}}>
+          <div style={{fontSize:14,fontWeight:700,color:'var(--accent)',marginBottom:12}}>{label}</div>
+          <div style={{display:'flex',gap:6,justifyContent:'center'}}>
+            {[1,2,3,4,5].map(n=><button key={n} onClick={()=>{onChange(n);setOpen(false)}} style={{width:40,height:40,borderRadius:'50%',cursor:'pointer',fontSize:14,fontWeight:700,border:'none',background:value===n?'#00e68a':'rgba(255,255,255,0.06)',color:value===n?'#000':'rgba(255,255,255,0.4)'}}>{n}</button>)}
+          </div>
+        </div>
+      </div>
+    </div>}</>;
+  };
+
+  const Card: React.FC<{ title: string; color: string; defaultOpen?: boolean; cols?: number } & React.PropsWithChildren> = ({ title, color, defaultOpen, cols, children }) => {
+    const [open, setOpen] = React.useState(defaultOpen !== false);
+    return <div style={glassCard}>
+      <div onClick={()=>setOpen(!open)} style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',marginBottom:open?8:0}}>
+        <span style={{fontSize:11,fontWeight:700,color}}>{title}</span>
+        <span style={{fontSize:9,color:'var(--text-dim)',marginLeft:'auto',transform:open?'rotate(180deg)':'none',transition:'transform 0.2s'}}>▼</span>
+      </div>
+      {open && <div style={{display:'grid',gridTemplateColumns:cols?`repeat(${cols},1fr)`:'1fr',gap:4}}>{children}</div>}
+    </div>;
+  };
 
   const [calcData, setCalcData] = React.useState<any>(() => {
     try { return JSON.parse(localStorage.getItem('he_autocalc_state') || '{}'); } catch { return {}; }
   });
-
   const save = (partial: any) => {
     const next = { ...calcData, ...partial };
     setCalcData(next);
     try { localStorage.setItem('he_autocalc_state', JSON.stringify(next)); } catch {}
   };
-
-  const NumberPills = ({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) => (
-    <div style={{ marginBottom: 4 }}>
-      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 2 }}>{label} ({value || '-'})</span>
-      <div style={{ display: 'flex', gap: 3 }}>{[1,2,3,4,5].map(n => <button key={n} onClick={() => onChange(n)} style={{ width: 24, height: 24, borderRadius: '50%', cursor: 'pointer', fontSize: 10, fontWeight: 700, border: 'none', background: (value||0) === n ? '#00e68a' : 'rgba(255,255,255,0.06)', color: (value||0) === n ? '#000' : 'rgba(255,255,255,0.4)' }}>{n}</button>)}</div>
-    </div>
-  );
-
-  const SevPills = ({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) => (
-    <div style={{ marginBottom: 4 }}>
-      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 2 }}>{label}</span>
-      <div style={{ display: 'flex', gap: 2 }}>{['none','mild','moderate','severe'].map(s => <button key={s} onClick={() => onChange(s)} style={{ flex: 1, padding: '4px 2px', borderRadius: 6, fontSize: 8, fontWeight: 600, cursor: 'pointer', border: 'none', background: (value||'none') === s ? '#00e68a' : 'rgba(255,255,255,0.04)', color: (value||'none') === s ? '#000' : 'rgba(255,255,255,0.4)' }}>{s==='none'?'Нет':s==='mild'?'Лёгк':s==='moderate'?'Сред':'Тяж'}</button>)}</div>
-    </div>
-  );
-
-  const Toggle = ({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) => (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
-      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)' }}>{label}</span>
-      <button onClick={() => onChange(!value)} style={{ width: 32, height: 18, borderRadius: 9, border: 'none', cursor: 'pointer', background: value ? '#00e68a' : 'rgba(255,255,255,0.1)', position: 'relative', padding: 0 }}>
-        <div style={{ width: 14, height: 14, borderRadius: '50%', background: value ? '#000' : '#fff', position: 'absolute', top: 2, left: value ? 16 : 2, transition: 'left 0.15s' }} />
-      </button>
-    </div>
-  );
 
   const up = (path: string, val: any) => {
     const next = { ...calcData };
@@ -2558,48 +2628,344 @@ const ProfileCalcData: React.FC = () => {
   };
 
   return <div style={{ display:'flex', flexDirection:'column', gap:4, paddingBottom: 70 }}>
-    <div style={glassCard}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#00e68a', marginBottom: 8 }}>👤 Профиль</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-        <div><span style={labelS}>Вес (кг)</span><input type="number" value={calcData.profile?.weight||80} onChange={e=>up('profile.weight',+e.target.value)} style={inp} /></div>
-        <div><span style={labelS}>Возраст</span><input type="number" value={calcData.profile?.age||30} onChange={e=>up('profile.age',+e.target.value)} style={inp} /></div>
-        <div><span style={labelS}>Тренировок/нед</span><input type="number" value={calcData.profile?.workoutsPerWeek||3} onChange={e=>up('profile.workoutsPerWeek',+e.target.value)} style={inp} /></div>
-        <div><span style={labelS}>Сон (ч)</span><input type="number" value={calcData.profile?.sleepHours||7} onChange={e=>up('profile.sleepHours',+e.target.value)} style={inp} /></div>
-      </div>
-      <NumberPills label="Стресс (1-10)" value={calcData.profile?.stressLevel||4} onChange={v=>up('profile.stressLevel',v)} />
-      <Toggle label="Курение" value={!!calcData.profile?.smoker} onChange={v=>up('profile.smoker',v)} />
-    </div>
+    <Card title="👤 Профиль" color="#00e68a" defaultOpen cols={2}>
+      <PopNum label="Вес" value={calcData.profile?.weight||80} min={30} max={250} suffix="кг" onChange={v=>up('profile.weight',v)} />
+      <PopNum label="Возраст" value={calcData.profile?.age||30} min={14} max={90} suffix="лет" onChange={v=>up('profile.age',v)} />
+      <PopNum label="Рост" value={calcData.profile?.height||175} min={140} max={220} suffix="см" onChange={v=>up('profile.height',v)} />
+      <PopNum label="Жир" value={calcData.profile?.bodyfat||15} min={4} max={50} suffix="%" onChange={v=>up('profile.bodyfat',v)} />
+      <PopNum label="Тренировок/нед" value={calcData.profile?.workoutsPerWeek||3} min={0} max={14} suffix="раз" onChange={v=>up('profile.workoutsPerWeek',v)} />
+      <PopNum label="Длит. трен." value={calcData.profile?.avgWorkoutMinutes||60} min={15} max={180} suffix="мин" onChange={v=>up('profile.avgWorkoutMinutes',v)} />
+      <PopNum label="Сон" value={calcData.profile?.sleepHours||7} min={3} max={12} suffix="ч" onChange={v=>up('profile.sleepHours',v)} />
+      <PopNum label="Кофеин" value={calcData.profile?.caffeineMg||200} min={0} max={2000} step={50} suffix="мг" onChange={v=>up('profile.caffeineMg',v)} />
+      <PopSelect label="Пол" value={calcData.profile?.sex||'male'} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} onChange={v=>up('profile.sex',v)} />
+      <PopSelect label="Алкоголь" value={calcData.profile?.alcohol||'rare'} options={[{id:'never',label:'Никогда'},{id:'rare',label:'Редко'},{id:'sometimes',label:'Иногда'},{id:'regular',label:'Регулярно'}]} onChange={v=>up('profile.alcohol',v)} />
+      <PopToggle label="Курение" value={!!calcData.profile?.smoker} onChange={v=>up('profile.smoker',v)} />
+      <NumPillsCard label="Стресс" value={calcData.profile?.stressLevel||4} onChange={v=>up('profile.stressLevel',v)} />
+    </Card>
 
-    <div style={glassCard}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 8 }}>🧠 Неврологический статус</div>
-      <NumberPills label="Дофамин" value={calcData.neuro?.dopamineScore||1} onChange={v=>up('neuro.dopamineScore',v)} />
-      <NumberPills label="Серотонин" value={calcData.neuro?.serotoninScore||1} onChange={v=>up('neuro.serotoninScore',v)} />
-      <NumberPills label="Агрессия" value={calcData.neuro?.aggressionScore||1} onChange={v=>up('neuro.aggressionScore',v)} />
-    </div>
+    <Card title="🧠 Неврологический статус" color="#a855f7" cols={2}>
+      <NumPillsCard label="Дофамин" value={calcData.neuro?.dopamineScore||1} onChange={v=>up('neuro.dopamineScore',v)} />
+      <NumPillsCard label="Серотонин" value={calcData.neuro?.serotoninScore||1} onChange={v=>up('neuro.serotoninScore',v)} />
+      <NumPillsCard label="Агрессия" value={calcData.neuro?.aggressionScore||1} onChange={v=>up('neuro.aggressionScore',v)} />
+      <PopSelect label="ГАМК баланс" value={calcData.neuro?.gabaBalance||'balance'} options={[{id:'balance',label:'Норма'},{id:'overexcited',label:'Возбуждение'},{id:'inhibited',label:'Заторможенность'}]} onChange={v=>up('neuro.gabaBalance',v)} />
+      <PopSelect label="Качество сна" value={calcData.neuro?.sleepQuality||'good'} options={[{id:'good',label:'Хорошее'},{id:'fair',label:'Среднее'},{id:'poor',label:'Плохое'}]} onChange={v=>up('neuro.sleepQuality',v)} />
+      <PopToggle label="Проблемы с памятью" value={!!calcData.neuro?.memoryIssues} onChange={v=>up('neuro.memoryIssues',v)} />
+      <PopToggle label="Проблемы с фокусом" value={!!calcData.neuro?.focusIssues} onChange={v=>up('neuro.focusIssues',v)} />
+      <PopToggle label="Замедл. мышление" value={!!calcData.neuro?.slowThinking} onChange={v=>up('neuro.slowThinking',v)} />
+      <PopToggle label="Координация" value={!!calcData.neuro?.coordinationIssues} onChange={v=>up('neuro.coordinationIssues',v)} />
+      <PopToggle label="Головные боли" value={!!calcData.neuro?.headaches} onChange={v=>up('neuro.headaches',v)} />
+      <PopToggle label="Метеозависимость" value={!!calcData.neuro?.weatherDependent} onChange={v=>up('neuro.weatherDependent',v)} />
+    </Card>
 
-    <div style={glassCard}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 8 }}>🫁 Гепатобилиарная</div>
-      <SevPills label="АЛТ/АСТ" value={calcData.hepatobiliary?.altAstElevation||'none'} onChange={v=>up('hepatobiliary.altAstElevation',v)} />
-      <SevPills label="ГГТ" value={calcData.hepatobiliary?.ggtElevation||'none'} onChange={v=>up('hepatobiliary.ggtElevation',v)} />
-      <SevPills label="Билирубин" value={calcData.hepatobiliary?.bilirubinElevation||'none'} onChange={v=>up('hepatobiliary.bilirubinElevation',v)} />
-    </div>
+    <Card title="💉 Фарма стек" color="#f59e0b" cols={2}>
+      <PopSelect label="Фаза курса" value={calcData.pharma?.phase||'course'} options={[{id:'course',label:'Курс'},{id:'bridge',label:'Бридж'},{id:'pct',label:'ПКТ'},{id:'base',label:'База'}]} onChange={v=>up('pharma.phase',v)} />
+      <PopToggle label="ГР" value={!!calcData.pharma?.hasGH} onChange={v=>up('pharma.hasGH',v)} />
+      <PopToggle label="ИГФ-1" value={!!calcData.pharma?.hasIGF} onChange={v=>up('pharma.hasIGF',v)} />
+      <PopToggle label="Инсулин" value={!!calcData.pharma?.hasInsulin} onChange={v=>up('pharma.hasInsulin',v)} />
+      <PopToggle label="ХГЧ" value={!!calcData.pharma?.hasHCG} onChange={v=>up('pharma.hasHCG',v)} />
+      <PopToggle label="АИ" value={!!calcData.pharma?.hasAI} onChange={v=>up('pharma.hasAI',v)} />
+      <PopToggle label="Каберголин" value={!!calcData.pharma?.hasCaber} onChange={v=>up('pharma.hasCaber',v)} />
+      <PopToggle label="СЕРМ" value={!!calcData.pharma?.hasSERM} onChange={v=>up('pharma.hasSERM',v)} />
+      <PopToggle label="SARMs" value={!!calcData.pharma?.hasSARMs} onChange={v=>up('pharma.hasSARMs',v)} />
+      <PopToggle label="МГФ" value={!!calcData.pharma?.hasMGF} onChange={v=>up('pharma.hasMGF',v)} />
+      <PopToggle label="ГПП-1 (сема/тирз)" value={!!calcData.pharma?.hasGLP1} onChange={v=>up('pharma.hasGLP1',v)} />
+    </Card>
 
-    <div style={glassCard}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', marginBottom: 8 }}>❤️ Сердечно-сосудистая</div>
-      <SevPills label="ЛПНП" value={calcData.cardio?.ldlElevation||'none'} onChange={v=>up('cardio.ldlElevation',v)} />
-      <SevPills label="Гематокрит" value={calcData.cardio?.hctElevation||'none'} onChange={v=>up('cardio.hctElevation',v)} />
-      <Toggle label="Низкий ЛПВП" value={!!calcData.cardio?.hdlLow} onChange={v=>up('cardio.hdlLow',v)} />
-    </div>
+    <Card title="🎯 Цели / Цикл" color="#06b6d4" cols={2}>
+      <PopSelect label="Тип цикла" value={calcData.goals?.trainingCycle||'mass'} options={[{id:'mass',label:'Масса'},{id:'cut',label:'Сушка'},{id:'maintenance',label:'Поддержка'},{id:'endurance',label:'Выносливость'}]} onChange={v=>up('goals.trainingCycle',v)} />
+      <PopToggle label="Здоровье" value={!!calcData.goals?.healthMaintenance} onChange={v=>up('goals.healthMaintenance',v)} />
+      <PopToggle label="Подготовка к соревн." value={!!calcData.goals?.competitionPrep} onChange={v=>up('goals.competitionPrep',v)} />
+      <PopToggle label="Восст. сна" value={!!calcData.goals?.sleepRecovery} onChange={v=>up('goals.sleepRecovery',v)} />
+      <PopToggle label="Коррекция липидов" value={!!calcData.goals?.lipidCorrection} onChange={v=>up('goals.lipidCorrection',v)} />
+      <PopToggle label="Разжижение крови" value={!!calcData.goals?.bloodThinning} onChange={v=>up('goals.bloodThinning',v)} />
+      <PopToggle label="Детокс печени" value={!!calcData.goals?.liverDetox} onChange={v=>up('goals.liverDetox',v)} />
+      <PopToggle label="Контроль АД" value={!!calcData.goals?.bpControl} onChange={v=>up('goals.bpControl',v)} />
+      <PopNum label="Длит. цикла" value={calcData.goals?.cycleWeeks||12} min={1} max={52} suffix="нед" onChange={v=>up('goals.cycleWeeks',v)} />
+      <PopNum label="Прошло циклов" value={calcData.goals?.previousCycles||1} min={0} max={20} suffix="раз" onChange={v=>up('goals.previousCycles',v)} />
+    </Card>
 
-    <div style={glassCard}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', marginBottom: 8 }}>🧘 Психологическая зависимость</div>
-      <NumberPills label="Страх потери" value={calcData.psych?.fearOfLoss||1} onChange={v=>up('psych.fearOfLoss',v)} />
-      <NumberPills label="Одержимость зеркалом" value={calcData.psych?.mirrorObsession||1} onChange={v=>up('psych.mirrorObsession',v)} />
-      <NumberPills label="Апатия вне курса" value={calcData.psych?.apathyOffCycle||1} onChange={v=>up('psych.apathyOffCycle',v)} />
-    </div>
+    <Card title="🩺 Медицинские противопоказания" color="#ef4444" cols={3}>
+      <PopToggle label="Сердце" value={!!calcData.contraindications?.heart} onChange={v=>up('contraindications.heart',v)} />
+      <PopToggle label="Печень" value={!!calcData.contraindications?.liver} onChange={v=>up('contraindications.liver',v)} />
+      <PopToggle label="Почки" value={!!calcData.contraindications?.kidney} onChange={v=>up('contraindications.kidney',v)} />
+      <PopToggle label="Диабет" value={!!calcData.contraindications?.diabetes} onChange={v=>up('contraindications.diabetes',v)} />
+      <PopToggle label="Щитовидная" value={!!calcData.contraindications?.thyroid} onChange={v=>up('contraindications.thyroid',v)} />
+      <PopToggle label="Тромбоз" value={!!calcData.contraindications?.thrombosis} onChange={v=>up('contraindications.thrombosis',v)} />
+      <PopToggle label="Онкология" value={!!calcData.contraindications?.oncology} onChange={v=>up('contraindications.oncology',v)} />
+      <PopToggle label="Язва/ЖКТ" value={!!calcData.contraindications?.ulcer} onChange={v=>up('contraindications.ulcer',v)} />
+      <PopToggle label="Психиатрия" value={!!calcData.contraindications?.psychiatric} onChange={v=>up('contraindications.psychiatric',v)} />
+    </Card>
+
+    <Card title="🫁 Гепатобилиарная" color="#f59e0b">
+      <SevSelect label="АЛТ/АСТ" value={calcData.hepatobiliary?.altAstElevation||'none'} onChange={v=>up('hepatobiliary.altAstElevation',v)} />
+      <SevSelect label="ГГТ" value={calcData.hepatobiliary?.ggtElevation||'none'} onChange={v=>up('hepatobiliary.ggtElevation',v)} />
+      <SevSelect label="Билирубин" value={calcData.hepatobiliary?.bilirubinElevation||'none'} onChange={v=>up('hepatobiliary.bilirubinElevation',v)} />
+      <SevSelect label="Жировой гепатоз" value={calcData.hepatobiliary?.fattyLiver||'none'} onChange={v=>up('hepatobiliary.fattyLiver',v)} />
+    </Card>
+
+    <Card title="💧 Мочевыделительная" color="#22c55e">
+      <SevSelect label="СКФ снижение" value={calcData.urinary?.gfrReduction||'none'} onChange={v=>up('urinary.gfrReduction',v)} />
+      <SevSelect label="Креатинин ↑" value={calcData.urinary?.creatinineElevation||'none'} onChange={v=>up('urinary.creatinineElevation',v)} />
+      <SevSelect label="Протеинурия" value={calcData.urinary?.proteinuria||'none'} onChange={v=>up('urinary.proteinuria',v)} />
+      <SevSelect label="МКБ/камни" value={calcData.urinary?.kidneyStones||'none'} onChange={v=>up('urinary.kidneyStones',v)} />
+    </Card>
+
+    <Card title="❤️ Сердечно-сосудистая" color="#ef4444">
+      <SevSelect label="ЛПНП" value={calcData.cardio?.ldlElevation||'none'} onChange={v=>up('cardio.ldlElevation',v)} />
+      <SevSelect label="Гематокрит" value={calcData.cardio?.hctElevation||'none'} onChange={v=>up('cardio.hctElevation',v)} />
+      <SevSelect label="АД" value={calcData.cardio?.bpElevation||'none'} onChange={v=>up('cardio.bpElevation',v)} />
+      <SevSelect label="Триглицериды" value={calcData.cardio?.triglycerides||'none'} onChange={v=>up('cardio.triglycerides',v)} />
+      <PopToggle label="Низкий ЛПВП" value={!!calcData.cardio?.hdlLow} onChange={v=>up('cardio.hdlLow',v)} />
+    </Card>
+
+    <Card title="🦴 ОДА / Суставы" color="#8b5cf6">
+      <SevSelect label="Артралгия" value={calcData.oda?.arthralgia||'none'} onChange={v=>up('oda.arthralgia',v)} />
+      <SevSelect label="Тендинит" value={calcData.oda?.tendinitis||'none'} onChange={v=>up('oda.tendinitis',v)} />
+    </Card>
+
+    <Card title="🥗 Питание" color="#f97316" cols={2}>
+      <PopNum label="Белок" value={calcData.nutrition?.proteinGPerKg||1.8} min={0.5} max={4} step={0.1} suffix="г/кг" onChange={v=>up('nutrition.proteinGPerKg',v)} />
+      <PopNum label="Клетчатка" value={calcData.nutrition?.fiberG||25} min={0} max={80} suffix="г" onChange={v=>up('nutrition.fiberG',v)} />
+      <PopNum label="Омега-3" value={calcData.nutrition?.omega3G||2} min={0} max={10} step={0.5} suffix="г" onChange={v=>up('nutrition.omega3G',v)} />
+      <PopNum label="Натрий" value={calcData.nutrition?.sodiumMg||3500} min={500} max={8000} step={100} suffix="мг" onChange={v=>up('nutrition.sodiumMg',v)} />
+      <PopNum label="Калий" value={calcData.nutrition?.potassiumMg||4500} min={1000} max={8000} step={100} suffix="мг" onChange={v=>up('nutrition.potassiumMg',v)} />
+      <PopNum label="Вода" value={calcData.nutrition?.waterLiters||3} min={1} max={6} step={0.5} suffix="л/д" onChange={v=>up('nutrition.waterLiters',v)} />
+    </Card>
+
+    <Card title="🫀 ЖКТ" color="#fbbf24" cols={2}>
+      <PopToggle label="Гастрит" value={!!calcData.gi?.gastritis} onChange={v=>up('gi.gastritis',v)} />
+      <PopToggle label="Язва" value={!!calcData.gi?.ulcer} onChange={v=>up('gi.ulcer',v)} />
+      <PopToggle label="СРК" value={!!calcData.gi?.ibs} onChange={v=>up('gi.ibs',v)} />
+      <PopToggle label="Запор" value={!!calcData.gi?.constipation} onChange={v=>up('gi.constipation',v)} />
+      <PopToggle label="Диарея" value={!!calcData.gi?.diarrhea} onChange={v=>up('gi.diarrhea',v)} />
+      <PopToggle label="Вздутие" value={!!calcData.gi?.bloating} onChange={v=>up('gi.bloating',v)} />
+      <PopToggle label="Рефлюкс" value={!!calcData.gi?.reflux} onChange={v=>up('gi.reflux',v)} />
+    </Card>
+
+    <Card title="☣️ Токсическая нагрузка" color="#ec4899" cols={3}>
+      <PopToggle label="Курение" value={!!calcData.toxicLoad?.smoking} onChange={v=>up('toxicLoad.smoking',v)} />
+      <PopToggle label="Алкоголь регулярно" value={!!calcData.toxicLoad?.alcoholRegular} onChange={v=>up('toxicLoad.alcoholRegular',v)} />
+      <PopToggle label="Наркотики" value={!!calcData.toxicLoad?.drugs} onChange={v=>up('toxicLoad.drugs',v)} />
+    </Card>
+
+    <Card title="🧘 Психология" color="#8b5cf6" cols={3}>
+      <NumPillsCard label="Страх потери" value={calcData.psych?.fearOfLoss||1} onChange={v=>up('psych.fearOfLoss',v)} />
+      <NumPillsCard label="Одержимость зеркалом" value={calcData.psych?.mirrorObsession||1} onChange={v=>up('psych.mirrorObsession',v)} />
+      <NumPillsCard label="Апатия вне курса" value={calcData.psych?.apathyOffCycle||1} onChange={v=>up('psych.apathyOffCycle',v)} />
+    </Card>
+
+    <Card title="💉 Мониторинг зон инъекций" color="#06b6d4" cols={2}>
+      <SevSelect label="Боль в месте" value={calcData.injection?.sitePain||'none'} onChange={v=>up('injection.sitePain',v)} />
+      <SevSelect label="Отёк" value={calcData.injection?.swelling||'none'} onChange={v=>up('injection.swelling',v)} />
+      <SevSelect label="Гематома" value={calcData.injection?.hematoma||'none'} onChange={v=>up('injection.hematoma',v)} />
+      <SevSelect label="Инфильтрат" value={calcData.injection?.infiltration||'none'} onChange={v=>up('injection.infiltration',v)} />
+    </Card>
 
     <button onClick={() => { localStorage.setItem('he_autocalc_state', JSON.stringify(calcData)); alert('Данные сохранены. Калькулятор поддержки использует их автоматически.'); }} style={{ padding: '12px', borderRadius: 12, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 700, fontSize: 12, marginTop: 4 }}>
       💾 Сохранить данные для калькулятора
+    </button>
+   </div>;
+};
+
+const PlannerProfileData: React.FC = () => {
+  const glassCard: React.CSSProperties = { background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 12, marginBottom: 6 };
+  const labelS: React.CSSProperties = { fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2, display: 'block' };
+  const inp: React.CSSProperties = { width: '100%', padding: '6px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 10, boxSizing: 'border-box' };
+  const Toggle = ({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
+      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)' }}>{label}</span>
+      <button onClick={() => onChange(!value)} style={{ width: 32, height: 18, borderRadius: 9, border: 'none', cursor: 'pointer', background: value ? '#00e68a' : 'rgba(255,255,255,0.1)', position: 'relative', padding: 0 }}>
+        <div style={{ width: 14, height: 14, borderRadius: '50%', background: value ? '#000' : '#fff', position: 'absolute', top: 2, left: value ? 16 : 2, transition: 'left 0.15s' }} />
+      </button>
+    </div>
+  );
+
+  const [data, setData] = React.useState<any>(() => {
+    try { return JSON.parse(localStorage.getItem('he_nutrition_profile') || '{}'); } catch { return {}; }
+  });
+  const up = (path: string, val: any) => {
+    const next = { ...data }; const keys = path.split('.');
+    let obj = next; for (let i = 0; i < keys.length - 1; i++) { obj[keys[i]] = obj[keys[i]] || {}; obj = obj[keys[i]]; }
+    obj[keys[keys.length - 1]] = val; setData(next);
+    try { localStorage.setItem('he_nutrition_profile', JSON.stringify(next)); } catch {}
+  };
+
+  return <div style={{ display:'flex', flexDirection:'column', gap:4, paddingBottom: 70 }}>
+    <div style={glassCard}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginBottom: 8 }}>🎯 Целевые КБЖУ</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:4}}>
+        <div><span style={labelS}>Калории (ккал)</span><input type="number" value={data.targetKcal||2800} onChange={e=>up('targetKcal',+e.target.value)} style={inp} /></div>
+        <div><span style={labelS}>Белок (г)</span><input type="number" value={data.targetProtein||180} onChange={e=>up('targetProtein',+e.target.value)} style={inp} /></div>
+        <div><span style={labelS}>Жиры (г)</span><input type="number" value={data.targetFat||80} onChange={e=>up('targetFat',+e.target.value)} style={inp} /></div>
+        <div><span style={labelS}>Углеводы (г)</span><input type="number" value={data.targetCarbs||350} onChange={e=>up('targetCarbs',+e.target.value)} style={inp} /></div>
+        <div><span style={labelS}>Клетчатка (г)</span><input type="number" value={data.fiberG||30} onChange={e=>up('fiberG',+e.target.value)} style={inp} /></div>
+        <div><span style={labelS}>Вода (мл)</span><input type="number" value={data.waterMl||3000} onChange={e=>up('waterMl',+e.target.value)} style={inp} /></div>
+      </div>
+    </div>
+
+    <div style={glassCard}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#f97316', marginBottom: 8 }}>⚙️ Параметры планировщика</div>
+      <div><span style={labelS}>Цель</span>
+        <select value={data.primaryGoal||'mass'} onChange={e=>up('primaryGoal',e.target.value)} style={inp}>
+          <option value="mass">Масса</option><option value="strength">Сила</option><option value="fat_loss">Жиросжигание</option><option value="maintenance">Поддержка</option><option value="recomposition">Рекомпозиция</option>
+        </select></div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:4,marginTop:4}}>
+        <div><span style={labelS}>Приёмов в день</span><input type="number" value={data.mealsCount||4} min={2} max={7} onChange={e=>up('mealsCount',+e.target.value)} style={inp} /></div>
+        <div><span style={labelS}>Тренировочных дней</span><input type="number" value={data.trainingDays||4} min={0} max={7} onChange={e=>up('trainingDays',+e.target.value)} style={inp} /></div>
+        <div><span style={labelS}>Профицит (%)</span><input type="number" value={data.surplusPct||10} min={0} max={30} onChange={e=>up('surplusPct',+e.target.value)} style={inp} /></div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4,marginTop:4}}>
+        <div><span style={labelS}>Тип диеты</span>
+          <select value={data.dietType||'omnivore'} onChange={e=>up('dietType',e.target.value)} style={inp}>
+            <option value="omnivore">Всеядное</option><option value="vegetarian">Вегетарианское</option><option value="vegan">Веганское</option><option value="keto">Кето</option>
+          </select></div>
+        <div><span style={labelS}>Бюджет</span>
+          <select value={data.budget||'mid'} onChange={e=>up('budget',e.target.value)} style={inp}>
+            <option value="low">Эконом</option><option value="mid">Средний</option><option value="max">Максимум</option><option value="enhanced">Улучшенный</option>
+          </select></div>
+      </div>
+    </div>
+
+    <div style={glassCard}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', marginBottom: 8 }}>⚠️ Аллергии и непереносимости</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:2}}>
+        {[{id:'dairy',label:'Молочные'},{id:'gluten',label:'Глютен'},{id:'soy',label:'Соя'},{id:'eggs',label:'Яйца'},{id:'fish',label:'Рыба'},{id:'nuts',label:'Орехи'},{id:'histamine',label:'Гистамин'},{id:'seafood',label:'Морепродукты'}].map(a=>(
+          <Toggle key={a.id} label={a.label} value={!!data.allergens?.[a.id]} onChange={v=>up('allergens.'+a.id,v)} />
+        ))}
+      </div>
+    </div>
+
+    <div style={glassCard}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 8 }}>🩺 Проблемы здоровья</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:2}}>
+        {[{id:'oedema',label:'Отёки'},{id:'lactose_intolerance',label:'Непереносимость лактозы'},{id:'gluten_intolerance',label:'Непереносимость глютена'},{id:'diabetes',label:'Диабет/инсулинорезистентность'},{id:'hypertension',label:'Гипертония'},{id:'gi_issues',label:'Проблемы ЖКТ'},{id:'gout',label:'Подагра'},{id:'kidney_stones',label:'Камни в почках'}].map(h=>(
+          <Toggle key={h.id} label={h.label} value={!!data.healthIssues?.[h.id]} onChange={v=>up('healthIssues.'+h.id,v)} />
+        ))}
+      </div>
+    </div>
+
+    <div style={glassCard}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#f97316', marginBottom: 8 }}>⚖️ Спортивный режим</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4}}>
+        <div><span style={labelS}>Дисциплина</span>
+          <select value={data.sportType||'bodybuilding'} onChange={e=>up('sportType',e.target.value)} style={inp}>
+            <option value="bodybuilding">Бодибилдинг</option><option value="powerlifting">Пауэрлифтинг</option><option value="crossfit">Кроссфит</option><option value="fitness">Фитнес</option>
+          </select></div>
+        <div><span style={labelS}>Вес. категория (кг)</span><input type="number" value={data.weightClass||0} onChange={e=>up('weightClass',+e.target.value)} placeholder="Для ПЛ" style={inp} /></div>
+      </div>
+      <div style={{marginTop:6}}><span style={labelS}>Соревновательная дата</span><input type="date" value={data.compDate||''} onChange={e=>up('compDate',e.target.value)} style={inp} /></div>
+      {data.weightClass > 0 && data.sportType === 'powerlifting' && (
+        <div style={{marginTop:6,padding:'6px 8px',borderRadius:6,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.1)',fontSize:8,color:'rgba(255,255,255,0.8)'}}>
+          📉 До веса {(data.weightClass)} кг: дефицит {Math.max(0,Math.round(((linked.profile?.settings?.weight||80)-data.weightClass)*100/(data.weightClass||1)))}%.
+          {data.compDate && (()=>{const days=Math.max(0,Math.round((new Date(data.compDate).getTime()-Date.now())/86400000));return <div>📅 {days} дней до старта</div>;})()}
+        </div>
+      )}
+    </div>
+
+    <div style={glassCard}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#06b6d4', marginBottom: 8 }}>💧 Электролиты и фарма</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:4,marginBottom:6}}>
+        <div><span style={labelS}>Натрий (мг)</span><input type="number" value={data.sodiumMg||3500} onChange={e=>up('sodiumMg',+e.target.value)} style={inp} /></div>
+        <div><span style={labelS}>Калий (мг)</span><input type="number" value={data.potassiumMg||4500} onChange={e=>up('potassiumMg',+e.target.value)} style={inp} /></div>
+        <div><span style={labelS}>Магний (мг)</span><input type="number" value={data.magnesiumMg||400} onChange={e=>up('magnesiumMg',+e.target.value)} style={inp} /></div>
+      </div>
+      <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)', marginBottom:6 }}>💉 Фармакология (влияет на план)</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:2}}>
+        {[{id:'aas_oral',label:'Оральные ААС'},{id:'aas_inj',label:'Инъекционные ААС'},{id:'hgh',label:'ГР'},{id:'insulin',label:'Инсулин'},{id:'diuretics',label:'Диуретики'},{id:'stimulants',label:'Стимуляторы'}].map(d=>(
+          <Toggle key={d.id} label={d.label} value={!!data.pharma?.[d.id]} onChange={v=>up('pharma.'+d.id,v)} />
+        ))}
+      </div>
+    </div>
+
+    <div style={glassCard}>
+      <div style={{ fontSize: 11, fontWeight: 700, color:'#8b5cf6', marginBottom:8 }}>🔄 Специальные режимы</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:2}}>
+        <Toggle label="Ленивый день" value={!!data.lazyDayMode} onChange={v=>up('lazyDayMode',v)} />
+        <Toggle label="Циклирование углеводов" value={!!data.carbCycling} onChange={v=>up('carbCycling',v)} />
+        <Toggle label="Читмил разрешён" value={!!data.allowCheatMeal} onChange={v=>up('allowCheatMeal',v)} />
+      </div>
+      <div style={{marginTop:4}}><span style={labelS}>Предпочтения (через запятую)</span>
+        <input value={data.preferences||''} onChange={e=>up('preferences',e.target.value)} placeholder="напр: курица, гречка, яйца" style={inp} />
+      </div>
+    </div>
+
+    {data.sportType === 'powerlifting' && data.weightClass > 0 && (
+      <div style={glassCard}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#06b6d4', marginBottom: 8 }}>💧 Протокол весогонки (водная манипуляция)</div>
+        <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', marginBottom:8, lineHeight:1.4 }}>
+          Стандартный протокол на 5 дней до взвешивания. Рассчитан на сброс 2-4% веса тела водой.
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr',gap:4,marginBottom:8}}>
+          <div><span style={labelS}>Целевой вес взвешивания (кг)</span><input type="number" value={data.targetWeighInKg||data.weightClass} onChange={e=>up('targetWeighInKg',+e.target.value)} style={inp} /></div>
+        </div>
+        {(() => {
+          const bw = linked.profile?.settings?.weight || 80;
+          const target = data.targetWeighInKg || data.weightClass || bw;
+          const toLose = Math.max(0, bw - target);
+          if (toLose <= 0) return <div style={{fontSize:8,color:'#22c55e'}}>✅ Вы уже в весе. Фокус на удержание.</div>;
+          const days = Math.max(1, Math.ceil(toLose / 0.3));
+          return (
+            <div>
+              <div style={{ fontSize:9, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>План на {Math.min(7,days)} дней (сброс ~{toLose.toFixed(1)} кг)</div>
+              {[
+                { day:'День -5/-4', water:'8-10 л/д', sodium:'6-8 г', carbs:'обычные', note:'Водная загрузка — гипергидратация' },
+                { day:'День -3/-2', water:'5-6 л/д', sodium:'3-4 г', carbs:'↓ на 30%', note:'Снижение натрия, начало сушки' },
+                { day:'День -1', water:'2-3 л/д', sodium:'1-2 г', carbs:'↓ на 50%', note:'Активная сушка, гликоген ↓' },
+                { day:'Взвешивание', water:'глотками', sodium:'мин.', carbs:'минимум', note:'Только поддержание. Никакой еды до взвешивания.' },
+                { day:'После взвешивания', water:'постепенно', sodium:'3-5 г', carbs:`${Math.round(target*8)} г`, note:'Регидратация + углеводы + электролиты. Пить медленно!' },
+              ].map((row,i) => (
+                <div key={i} style={{padding:'6px 8px',borderRadius:6,marginBottom:3,background:'rgba(6,182,212,0.04)',border:'1px solid rgba(6,182,212,0.08)',fontSize:8}}>
+                  <div style={{fontWeight:700,color:'#06b6d4',marginBottom:2}}>{row.day}</div>
+                  <div style={{color:'rgba(255,255,255,0.8)'}}>💧 {row.water} · 🧂 Na: {row.sodium} · 🍚 {row.carbs}</div>
+                  <div style={{color:'rgba(255,255,255,0.5)',marginTop:1}}>{row.note}</div>
+                </div>
+              ))}
+              <div style={{marginTop:4,fontSize:7,color:'#ef4444',lineHeight:1.3}}>
+                ⚠️ Не применять при заболеваниях почек, сердца, гипертонии. Консультация врача обязательна. Резкое обезвоживание опасно для здоровья.
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    )}
+
+    <div style={glassCard}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', marginBottom: 8 }}>🏋️ Тренировочная фаза</div>
+      <div><span style={labelS}>Текущая фаза</span>
+        <select value={data.trainPhase||'hypertrophy'} onChange={e=>up('trainPhase',e.target.value)} style={inp}>
+          <option value="hypertrophy">💪 Гипертрофия (8-12 повт)</option>
+          <option value="strength">🏋️ Сила (1-5 повт)</option>
+          <option value="peak">🏆 Пик/Соревнования</option>
+          <option value="deload">🔄 Разгрузка</option>
+          <option value="offseason">🌴 Межсезонье</option>
+        </select></div>
+      <div style={{marginTop:6,padding:'6px 8px',borderRadius:6,background:'rgba(139,92,246,0.04)',border:'1px solid rgba(139,92,246,0.08)',fontSize:8,color:'rgba(255,255,255,0.7)',lineHeight:1.4}}>
+        {data.trainPhase==='hypertrophy'&&'Белок 2.2 г/кг, профицит 10-15%, углеводы высокие, креатин 5 г/д.'}
+        {data.trainPhase==='strength'&&'Белок 2.5 г/кг, профицит 5-10%, жиры 1.0 г/кг, креатин 5-10 г/д.'}
+        {data.trainPhase==='peak'&&'Белок 2.8 г/кг, калории = TDEE, натрий контролируемый, вода по протоколу.'}
+        {data.trainPhase==='deload'&&'Белок 1.8 г/кг, калории = TDEE, углеводы снижены, объём тренировок -50%.'}
+        {data.trainPhase==='offseason'&&'Белок 1.6 г/кг, калории = TDEE, свободное питание, восстановление.'}
+        {!data.trainPhase&&'Выберите фазу для рекомендаций по макросам.'}
+      </div>
+    </div>
+
+    <div style={glassCard}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#f97316', marginBottom: 8 }}>🔄 Рефид / Читмил калькулятор</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4}}>
+        <div><span style={labelS}>Частота рефидов (дней)</span>
+          <select value={data.refeedFreq||7} onChange={e=>up('refeedFreq',+e.target.value)} style={inp}>
+            <option value={3}>Каждые 3 дня</option><option value={5}>Каждые 5 дней</option><option value={7}>Раз в неделю</option><option value={14}>Раз в 2 недели</option>
+          </select></div>
+        <div><span style={labelS}>Тип рефида</span>
+          <select value={data.refeedType||'carb'} onChange={e=>up('refeedType',e.target.value)} style={inp}>
+            <option value="carb">Углеводный (+50% углей)</option><option value="maintenance">Поддерживающий (TDEE)</option><option value="surplus">Профицит (+15%)</option>
+          </select></div>
+      </div>
+      {(()=>{const bw=linked.profile?.settings?.weight||80;const tdee=Math.round(bw*33);const extra=data.refeedType==='carb'?Math.round(tdee*0.3):data.refeedType==='surplus'?Math.round(tdee*0.15):0;return(<div style={{marginTop:6,fontSize:8,color:'rgba(255,255,255,0.7)',lineHeight:1.4,padding:'6px 8px',borderRadius:6,background:'rgba(249,115,22,0.04)',border:'1px solid rgba(249,115,22,0.08)'}}>📊 Рефид-день: {tdee+extra} ккал (TDEE {tdee} + {extra} ккал) · Белок {Math.round(bw*2.2)}г · Углеводы {Math.round((tdee+extra)*0.55/4)}г</div>)})()}
+    </div>
+
+    <button onClick={() => { alert('Данные сохранены. Планировщик питания использует их автоматически.'); }} style={{ padding: '12px', borderRadius: 12, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#fff', fontWeight: 700, fontSize: 12, marginTop: 4 }}>
+      💾 Сохранить данные планировщика
     </button>
   </div>;
 };
