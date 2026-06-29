@@ -23,6 +23,8 @@ export interface TrainingProfile {
   pmBench: number;
   pmDead: number;
   workMax: Record<string, number>;
+  onCourse: boolean;
+  courseIntensity: 'mild' | 'moderate' | 'heavy';
 }
 
 export const DEFAULT_PROFILE: TrainingProfile = {
@@ -41,6 +43,8 @@ export const DEFAULT_PROFILE: TrainingProfile = {
   pmDead: 140,
   workMax: { chest: 100, back: 110, legs: 140, shoulders: 60, arms: 50, core: 60,
     quads: 140, hamstrings: 90, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60 },
+  onCourse: false,
+  courseIntensity: 'moderate',
 };
 
 export function loadTrainingProfile(): TrainingProfile {

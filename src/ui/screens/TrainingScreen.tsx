@@ -80,7 +80,8 @@ export const TrainingScreen: React.FC = () => {
   const [customExercises, setCustomExercises] = useState<{ name: string; sets: number; reps: number; rir: number }[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingExercises') || '[]'); } catch { return []; } });
   const [lastAddedEx, setLastAddedEx] = useState<string | null>(null);
   const [trainingOutput, setTrainingOutput] = useState<TrainingOutput | null>(null);
-  const [macrocycle, setMacrocycle] = useState<MacrocyclePlan | null>(null);
+  const [macrocycle, setMacrocycle] = useState<MacrocyclePlan | null>(() => { try { return JSON.parse(localStorage.getItem('he_macro_session') || 'null'); } catch { return null; } });
+  useEffect(() => { try { localStorage.setItem('he_macro_session', JSON.stringify(macrocycle)); } catch {} }, [macrocycle]);
   const [trainingReportGenerated, setTrainingReportGenerated] = useState(false);
   useEffect(() => { try { if (localStorage.getItem('he_training_report_current')) setTrainingReportGenerated(true); } catch {} }, []);
   const [trainingArchive, setTrainingArchive] = useState<any[]>(() => {
@@ -150,6 +151,9 @@ export const TrainingScreen: React.FC = () => {
   const [manualSavedPlans, setManualSavedPlans] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); } catch { return []; } });
   const loadManualPlan = (plan: any) => { if (plan?.cfg) setManualCfg(plan.cfg); if (plan?.days) setManualResult({ splitName: plan.name || 'Загруженный план', days: plan.days }); };
   const refreshManualSaved = () => { try { setManualSavedPlans(JSON.parse(localStorage.getItem('myTrainingPlans') || '[]')); } catch { setManualSavedPlans([]); } };
+  const [planCopied, setPlanCopied] = useState(false);
+  const printManualPlan = () => { if (!manualResult) return; const rows = manualResult.days.map(d => '<h3>День ' + d.day + ' (' + d.groups.join(', ') + ')</h3><table border=1 cellpadding=4 style=border-collapse:collapse;width:100%><tr><th>Упражнение</th><th>Сеты×повт</th><th>RIR</th><th>Вес</th><th>Отдых</th></tr>' + d.exercises.map(e => '<tr><td>' + e.name + '</td><td>' + e.sets + '×' + e.reps + '</td><td>' + e.rir + '</td><td>' + e.weight + ' кг</td><td>' + e.rest + 'с</td></tr>').join('') + '</table>').join(''); const html = '<html><head><meta charset=utf-8><title>' + manualResult.splitName + '</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#111}h1{color:#008}h3{margin-top:14px;color:#060}table{font-size:12px}</style></head><body><h1>' + manualResult.splitName + '</h1><p>Уровень: ' + level + ' · Цель: ' + goal + ' · ' + daysPerWeek + ' дн/нед · ' + mesoLength + ' нед</p>' + rows + '</body></html>'; const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(() => w.print(), 300); } };
+  const exportManualPlanText = () => { if (!manualResult) return; const lines: string[] = []; lines.push('Тренировочный план: ' + manualResult.splitName); lines.push('Параметры: ' + Object.entries(manualCfg).filter(([,v]) => v).map(([k,v]) => k + '=' + v).join(', ')); lines.push('Уровень: ' + level + ' · Цель: ' + goal + ' · Дней/нед: ' + daysPerWeek + ' · Длина: ' + mesoLength + ' нед'); lines.push(''); manualResult.days.forEach(d => { lines.push('День ' + d.day + ' (' + d.groups.join(', ') + ')'); d.exercises.forEach(e => lines.push('  ' + e.name + ' — ' + e.sets + 'x' + e.reps + ' @ RIR' + e.rir + ' · ' + e.weight + ' кг · отдых ' + e.rest + 'с (' + e.group + ')')); lines.push(''); }); const txt = lines.join(String.fromCharCode(10)); try { navigator.clipboard?.writeText(txt); } catch {} setPlanCopied(true); setTimeout(() => setPlanCopied(false), 1800); };
   const generateManualPlan = () => {
     const inp = { goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as TrainingInput;
     const auto = selectSplit(inp);
@@ -157,7 +161,7 @@ export const TrainingScreen: React.FC = () => {
     const sp = manualSp ? { id: manualCfg.split!, name: manualSp.name, desc: manualSp.desc, groupsPerDay: manualSp.groupsPerDay, score: 100, rationale: ['Ручной выбор'] } as SplitCandidate : auto[0];
     if (!sp) { setManualResult(null); return; }
     const cycle: string[][] = []; let gi = 0; while (cycle.length < daysPerWeek) { cycle.push(sp.groupsPerDay[gi % sp.groupsPerDay.length]); gi++; }
-    const mrv = (LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20;
+    const mrv = ((LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20) * (tprofile.onCourse ? (tprofile.courseIntensity === 'heavy' ? 1.3 : tprofile.courseIntensity === 'mild' ? 1.15 : 1.2) : 1);
     const weeklySets: Record<string, number> = {};
     const isWeak = (g: string) => weakPoints.includes(g);
     const days = cycle.map((groups, di) => {
@@ -255,6 +259,20 @@ export const TrainingScreen: React.FC = () => {
     setCyclesError(null);
     } catch (e) { setCyclesError('Ошибка генерации: ' + String(e)); }
   }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, splitType, periodizationType, cycleType]);
+  // Мост макроцикл -> выполнение (единый поток через SessionPlayer)
+  const applyMacroToRuntime = () => {
+    if (!currentMicrocycle) return;
+    const days: PlayerDay[] = currentMicrocycle.days.filter((d: any) => d.isTraining).map((d: any, i: number) => ({
+      label: 'Д' + (i + 1),
+      exercises: (d.exercises || []).map((e: any) => ({
+        name: e.name,
+        muscleGroup: e.group,
+        targetSets: Array.from({ length: e.sets || 3 }, () => ({ weight: Math.round((e.weight || tprofile.workMax[e.group] || 80) * 0.8), reps: parseInt(e.reps) || 10, rir: e.rir ?? 2 })),
+      })),
+    }));
+    try { localStorage.setItem('he_pl_runtime', JSON.stringify({ days, focus: 'Макроцикл ' + (currentMicrocycle.mesocycleType || ''), week: selectedWeek, track: 'macro' })); } catch {}
+    setTab('runtime');
+  };
 
   // Auto-regenerate when days/sparse
   const loadDiaryStats = async () => {
@@ -739,6 +757,7 @@ export const TrainingScreen: React.FC = () => {
                 flex: 1, padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer',
                 background: 'linear-gradient(135deg, var(--accent), #00c853)', color: '#000', fontWeight: 700, fontSize: 13,
               }}>▶ Сгенерировать план</button>
+              {currentMicrocycle ? <button onClick={applyMacroToRuntime} title="Перенести текущую неделю макроцикла во вкладку Тренировки для выполнения через SessionPlayer" style={{ padding: 10, borderRadius: 8, border: '1px solid var(--accent)', cursor: 'pointer', background: 'rgba(0,230,138,0.08)', color: 'var(--accent)', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>▶ К выполнению</button> : null}
               {trainingOutput && (
                 <button onClick={() => { generatePlan(); }} style={{
                   padding: 10, borderRadius: 8, border: '1px solid var(--accent)', cursor: 'pointer',
@@ -893,7 +912,7 @@ export const TrainingScreen: React.FC = () => {
                       )}
                       {/* MRV guardrail — анти-перетрен по объёму недели */}
                       {currentMicrocycle && (() => {
-                        const mrv = (LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20;
+                        const mrv = ((LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20) * (tprofile.onCourse ? (tprofile.courseIntensity === 'heavy' ? 1.3 : tprofile.courseIntensity === 'mild' ? 1.15 : 1.2) : 1);
                         const wk: Record<string, number> = {};
                         currentMicrocycle.days.filter((d: any) => d.isTraining).forEach((d: any) => (d.exercises || []).forEach((e: any) => { wk[e.group] = (wk[e.group] || 0) + (e.sets || 0); }));
                         const over = Object.entries(wk).filter(([, s]) => s > mrv);
@@ -1705,6 +1724,7 @@ export const TrainingScreen: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {tab === 'calculators' && <TrainingLoadCalculator />}
           {tab === 'calculators' && <TonnageCalculator />}
+          {tab === 'calculators' && <WhatIfCard baseRisk={linked.risk?.overallNet ?? 5} baseReadiness={linked.readiness?.recovery ?? 70} />}
           {showNonBuilder && (<>
           <div className="card" style={{ padding: '12px 14px', background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)', borderRadius:14 }}>
             <h3 style={{ margin: '0 0 4px', fontSize: 13, color:'var(--accent)' }}>📐 Калькулятор 1RM</h3>
@@ -2101,7 +2121,7 @@ export const TrainingScreen: React.FC = () => {
                 </div>
                 {/* Сводка качества плана */}
                 {(() => {
-                  const mrv = (LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20;
+                  const mrv = ((LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20) * (tprofile.onCourse ? (tprofile.courseIntensity === 'heavy' ? 1.3 : tprofile.courseIntensity === 'mild' ? 1.15 : 1.2) : 1);
                   const wk: Record<string, number> = {};
                   manualResult.days.forEach(d => d.exercises.forEach(e => { wk[e.group] = (wk[e.group] || 0) + e.sets; }));
                   const groups = Object.keys(wk);
@@ -2125,6 +2145,8 @@ export const TrainingScreen: React.FC = () => {
                   </div>;
                 })()}
                 <button onClick={() => { try { const data = { name: `Ручная: ${manualResult.splitName}'`, date: new Date().toISOString().slice(0,10), cfg: manualCfg, days: manualResult.days, generatedAt: Date.now() }; const ex = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); ex.unshift(data); localStorage.setItem('myTrainingPlans', JSON.stringify(ex.slice(0,30))); refreshManualSaved(); } catch {} }} style={{ width: '100%', marginTop: 8, padding: 10, borderRadius: 8, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.06)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>💾 Сохранить программу в «Мои тренировки»</button>
+                <button onClick={exportManualPlanText} style={{ width: '100%', marginTop: 6, padding: 10, borderRadius: 8, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>{planCopied ? '✓ Скопировано в буфер' : '📋 Копировать план (текст)'}</button>
+                <button onClick={printManualPlan} style={{ width: '100%', marginTop: 6, padding: 10, borderRadius: 8, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>🖨 Печать / сохранить в PDF</button>
               </div>
             )}
 
@@ -3452,6 +3474,7 @@ import { VolumeOptimizerTab } from './TrainingScreen_parts/VolumeOptimizerTab';
 import { ExerciseCalcTab } from './TrainingScreen_parts/ExerciseCalcTab';
 import { TrainingLoadCalculator } from './TrainingScreen_parts/TrainingLoadCalculator';
 import { TonnageCalculator } from './TrainingScreen_parts/TonnageCalculator';
+import { WhatIfCard } from './TrainingScreen_parts/WhatIfCard';
 import { useTrainingProfile } from './TrainingScreen_parts/training-profile';
 import { TrainingProfileCard } from './TrainingScreen_parts/TrainingProfileCard';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';

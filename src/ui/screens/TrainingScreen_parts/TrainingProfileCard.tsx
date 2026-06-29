@@ -70,6 +70,12 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
           return <button key={o.id} onClick={() => toggleArr('equipment', o.id)} style={{ padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: on ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: on ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>{o.label}{on ? ' ✓' : ''}</button>;
         })}
       </div>
+      <div style={LABEL}>Курс (PED-адаптация объёмов)</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <PopupSelect label='На курсе' value={profile.onCourse ? 'yes' : 'no'} onChange={v => update({ onCourse: v === 'yes' })} options={[['no','Нет (натурал)'],['yes','Да (на курсе)']].map(([id,l]) => ({ id, label: l }))} />
+        <PopupSelect label='Интенсивность курса' value={profile.courseIntensity} onChange={v => update({ courseIntensity: v as any })} options={[['mild','Лёгкая'],['moderate','Умеренная'],['heavy','Тяжёлая']].map(([id,l]) => ({ id, label: l }))} />
+      </div>
+      {profile.onCourse && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>На курсе MRV повышается (~+20-30%), восстановление учитывается в готовности.</div>}
       {compact !== true && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>Эти данные используются ПЛ, ББ, ручным конструктором и калькуляторами для расчётов.</div>}
     </div>
   );

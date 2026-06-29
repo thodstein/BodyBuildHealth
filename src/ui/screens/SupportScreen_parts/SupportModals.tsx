@@ -17,6 +17,7 @@ export interface SupportModalsProps {
   setEnhancedSubs: (v: string[] | ((prev: string[]) => string[])) => void;
   setBoostEnabled: (v: boolean) => void;
   setSupportLevel: (v: any) => void;
+  setManualLevelSelected?: (v: boolean) => void;
   calcSupport: (level?: any) => void;
   catalogSupport: any[];
   allSupport: any[];
@@ -43,6 +44,7 @@ export const SupportModals: React.FC<SupportModalsProps> = ({
   setEnhancedSubs,
   setBoostEnabled,
   setSupportLevel,
+  setManualLevelSelected,
   calcSupport,
   catalogSupport,
   allSupport,
@@ -102,7 +104,7 @@ export const SupportModals: React.FC<SupportModalsProps> = ({
               );
             })}
           </div>
-          <button onClick={() => { setSupportLevel(modalLevel); calcSupport(modalLevel); setShowModal(null); setModalLevel(null); }} style={{
+          <button onClick={() => { setSupportLevel(modalLevel); if (setManualLevelSelected) setManualLevelSelected(true); calcSupport(modalLevel); setShowModal(null); setModalLevel(null); }} style={{
             width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer',
             background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:12, marginBottom:6,
           }}>Применить уровень</button>

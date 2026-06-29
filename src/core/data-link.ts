@@ -4,6 +4,8 @@ import { getProfile, updateProfile, onProfileChange } from './profile-manager';
 import { db } from './db';
 import { UCUM_MAP, ALL_RISK_SYSTEMS } from './constants';
 import { calcReadiness } from '../engines/readiness.engine';
+import { loadSRPESessions } from '../engines/pro/srpe-store';
+import { acuteChronicRatio, toDailyLoads } from '../engines/pro/training-load.engine';
 import { calculateRisks } from '../engines/risk.engine';
 import { calculateSupport, type SupportInput } from '../engines/support.engine';
 import { interpretLabs, type LabCompositeResult } from '../engines/lab-analysis.engine';
@@ -148,6 +150,12 @@ export function useDataLink(): LinkedData {
   const pal = derivePAL(s.workoutsPerWeek, s.avgWorkoutMinutes);
   const trainingLoad = deriveTrainingLoad(s.workoutsPerWeek, s.avgWorkoutMinutes);
 
+  // sRPE-оверлей: реальная тренировочная нагрузка из дневника sRPE → корректирует readiness
+  const _srpe = loadSRPESessions();
+  const _acwr = _srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(_srpe)) : null;
+  const sRpeFatigueAdj = _acwr ? Math.max(0, (_acwr.ratio - 1.3) * 4) : 0;  // доп. пункты усталости при ACWR>1.3
+  const sRpeLoadAdj = _acwr ? (_acwr.ratio < 0.8 ? -0.15 : _acwr.ratio > 1.5 ? 0.2 : 0) : 0; // коррекция trainingLoad
+
   const readiness = (() => {
     const altVal = getLatestLabValue(labs, 'ALT');
     const astVal = getLatestLabValue(labs, 'AST');
@@ -175,15 +183,15 @@ export function useDataLink(): LinkedData {
       nightAwakenings: s.nightAwakenings ?? 1,
       chronotype: s.chronotype, bedtime: s.bedtime, wakeTime: s.wakeTime,
       hrvRatio: s.baselineHrvRatio ?? 1.0,
-      doms: Math.min(10, (s.fatigueLevel ?? 3) * 1.5),
+      doms: Math.min(10, (s.fatigueLevel ?? 3) * 1.5 + sRpeFatigueAdj),
       stress: s.baselineStressLevel ?? 3,
       calRatio: s.nutritionFactor ?? 0.8,
       proteinRatio: 0.8,
       waterRatio: Math.min(1, (s.dailyWaterLiters ?? 2) / 3),
       fiberRatio: 0.6,
       omega3Flag: (s.currentSupplements ?? []).some(sup => /omega|омега/i.test(sup.name)),
-      trainingLoadRatio: trainingLoad,
-      subjFatigue: s.fatigueLevel ?? 3,
+      trainingLoadRatio: Math.max(0.2, Math.min(1.5, trainingLoad + sRpeLoadAdj)),
+      subjFatigue: Math.min(10, (s.fatigueLevel ?? 3) + sRpeFatigueAdj),
       hrIncrease: crpNorm > 0.6 ? 0.3 : 0.1,
     });
   })();
@@ -246,7 +254,7 @@ export function useDataLink(): LinkedData {
     activeDrugs,
     supportCoverage: (risk as any)?.coverageMap ?? {},
     pal,
-    trainingLoadRatio: trainingLoad,
+    trainingLoadRatio: Math.max(0.2, Math.min(1.5, trainingLoad + sRpeLoadAdj)),
     refetch,
   };
 }
