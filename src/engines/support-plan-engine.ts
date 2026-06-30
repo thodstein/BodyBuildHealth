@@ -617,31 +617,36 @@ export function recommendStacks(
   const levelMultiplier = level === 'basic' ? 1.5 : level === 'mid' ? 1.2 : level === 'max' ? 1.0 : 0.8;
   const recommendations: StackRecommendation[] = [];
 
+  // Find highest-risk systems to prioritize relevant stacks
+  const sortedSystems = Object.entries(scores)
+    .filter(([, v]) => v > 0)
+    .sort(([, a], [, b]) => b - a);
+  const topSystems = new Set(sortedSystems.slice(0, 4).map(([k]) => k));
+
   for (const stack of ALL_STACKS) {
     const mechCodes = stack.anatomicalMapping?.mechanismCodes || [];
     if (mechCodes.length === 0) continue;
 
-    // Map stack mechanismCodes → bridge keys
     const bridgeKeys = findBridgeMechsForStack(mechCodes);
     if (bridgeKeys.length === 0) continue;
 
-    // Count how many bridge mechanisms are "activated" (high risk)
     let coveredMechs = 0;
     let totalCoveredMechs = 0;
     const coveredSystems = new Set<string>();
+    let topSystemMatches = 0;
     const wasteSubs: string[] = [];
 
     for (const key of bridgeKeys) {
       const sysKey = key.split('_')[0];
       const sysScore = scores[sysKey] || 0;
+      totalCoveredMechs++;
       if (sysScore > 0) {
         coveredMechs++;
         coveredSystems.add(sysKey);
+        if (topSystems.has(sysKey)) topSystemMatches++;
       }
-      totalCoveredMechs++;
     }
 
-    // Waste: substances that don't cover any activated mechanism
     const stackSubs = stack.substances.map(s => s.id);
     for (const subId of stackSubs) {
       let useful = false;
@@ -654,23 +659,24 @@ export function recommendStacks(
 
     if (coveredMechs === 0) continue;
 
-    // Score formula:
-    // coverageRatio × synergyScore × levelMultiplier - waste penalty
+    // Score formula: prioritize covering highest-risk systems
     const coverageRatio = coveredMechs / Math.max(1, totalCoveredMechs);
     const synergyBonus = (stack.synergyScore / 100) * coverageRatio;
-    const systemsBonus = coveredSystems.size / 8;
+    const systemsBonus = Math.min(1, coveredSystems.size / 5);
+    const topPriority = topSystemMatches / Math.max(1, topSystems.size || 1);
     const wastePenalty = (wasteSubs.length / Math.max(1, stackSubs.length)) * 0.3;
 
     const score = Math.round(
-      (coverageRatio * 0.4 + synergyBonus * 0.35 + systemsBonus * 0.25 - wastePenalty)
+      (coverageRatio * 0.25 + synergyBonus * 0.3 + systemsBonus * 0.15 + topPriority * 0.3 - wastePenalty)
       * 100 * levelMultiplier
     );
 
+    const topMatchesList = [...coveredSystems].filter(s => topSystems.has(s));
     const reason = coveredSystems.size >= 3
-      ? `Покрывает ${coveredSystems.size} систем (${coveredMechs}/${totalCoveredMechs} мех.), синергия ${stack.synergyScore}/100`
+      ? `Покрывает ${coveredSystems.size} систем (${coveredMechs}/${totalCoveredMechs} мех.) · синергия ${stack.synergyScore}/100${topMatchesList.length > 0 ? ` · приоритет: ${topMatchesList.slice(0, 3).map(s => SYS_LABELS[s] || s).join(', ')}` : ''}`
       : coveredSystems.size >= 2
         ? `Покрывает ${coveredSystems.size} системы: ${[...coveredSystems].map(s => SYS_LABELS[s] || s).join(', ')}`
-        : `Точечно: ${SYS_LABELS[[...coveredSystems][0]] || [...coveredSystems][0]}`;
+        : `Точечно: ${SYS_LABELS[[...coveredSystems][0]] || [...coveredSystems][0]}${topMatchesList.length > 0 ? ' (приоритет)' : ''}`;
 
     recommendations.push({
       stack,
@@ -691,8 +697,6 @@ export function recommendStacks(
 export function calculateSupportPlan(
   state: CalculatorState,
   level: PowerLevel,
-  jointMode: boolean,
-  boostEnabled: boolean,
   existingSubs?: string[],
   externalLabs?: any[],
 ): PlanResult {
@@ -849,11 +853,8 @@ export function calculateSupportPlan(
   const levelThresholds: Record<string, number> = {
     basic: 15, mid: 10, max: 6, boost: 4,
   };
-  const levelMaxSubs: Record<string, number> = {
-    basic: 1, mid: 1, max: 2, boost: 3,
-  };
   const threshold = levelThresholds[level] || 15;
-  const maxSubsPerMech = levelMaxSubs[level] || 1;
+  const maxSubsPerMech = 999;
   const includeAllSystems = level === 'boost';
 
   // ─── Select substances via mechanism bridge ───
@@ -909,7 +910,7 @@ export function calculateSupportPlan(
 
         const picked: string[] = [];
         for (const s of scoredSubs) {
-          if (picked.length >= maxSubsPerMech) break;
+          if (picked.length >= maxSubsPerMech || false) break;
           if (!selectedIds.has(s.id)) {
             picked.push(s.id);
             selectedIds.add(s.id);
@@ -955,6 +956,7 @@ export function calculateSupportPlan(
   // ─── Add essential base substances for all levels ───
   const alwaysInclude = ['magnesium', 'vitamin_d3', 'zinc', 'omega3', 'coq10'];
   for (const id of alwaysInclude) {
+    if (false) break;
     if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id)) {
       selectedIds.add(id);
       if (!substanceReasons[id]) substanceReasons[id] = [];
@@ -998,6 +1000,7 @@ export function calculateSupportPlan(
   if ((level === 'max' || level === 'boost') && neuroScore >= 10) {
     const neuroExtras = ['lions_mane', 'phosphatidylserine', 'theanine', 'glycine'];
     for (const id of neuroExtras) {
+      if (false) break;
       if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id)) {
         selectedIds.add(id);
         if (!substanceReasons[id]) substanceReasons[id] = [];
@@ -1008,6 +1011,7 @@ export function calculateSupportPlan(
   if (level === 'boost' && neuroScore >= 5) {
     const boostNeuro = ['ashwagandha', 'melatonin', 'vitamin_b6'];
     for (const id of boostNeuro) {
+      if (false) break;
       if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id)) {
         selectedIds.add(id);
         if (!substanceReasons[id]) substanceReasons[id] = [];
@@ -1016,8 +1020,10 @@ export function calculateSupportPlan(
     }
   }
 
-  // ─── Add joint support if jointMode ───
-  if (jointMode) {
+  // ─── Add joint support if user reports joint pain ───
+  const hasJointPain = (state.oda?.jointPain || 'none') !== 'none' && (state.oda?.jointPain || 'none') !== '';
+  const isBoostEnabled = level === 'boost';
+  if (hasJointPain) {
     const jointSubs = [
       { id: 'collagen', reason: 'Коллаген UC-II: восстановление хрящевой ткани, сухожилий и связок' },
       { id: 'glucosamine', reason: 'Глюкозамин: строительный блок протеогликанов хряща' },
@@ -1032,6 +1038,7 @@ export function calculateSupportPlan(
     const odaPain = (state.oda?.jointPain || 'none');
     const isSymptomatic = odaPain === 'moderate' || odaPain === 'severe';
     for (const js of jointSubs) {
+      if (false) break;
       if (!selectedIds.has(js.id) && !excludedSubs.has(js.id) && catalogExists(js.id)) {
         selectedIds.add(js.id);
         if (!substanceReasons[js.id]) substanceReasons[js.id] = [];
@@ -1043,6 +1050,7 @@ export function calculateSupportPlan(
     }
     // Also ensure basic joint vitamins
     for (const id of ['vitamin_d3', 'vitamin_k2', 'magnesium', 'calcium']) {
+      if (false) break;
       if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id)) {
         selectedIds.add(id);
         if (!substanceReasons[id]) substanceReasons[id] = [];
@@ -1052,9 +1060,10 @@ export function calculateSupportPlan(
   }
 
   // ─── Boost mode: add extra protection ───
-  if (boostEnabled) {
+  if (isBoostEnabled) {
     const boostExtras = ['astragalus', 'melatonin', 'ginseng', 'egcg', 'l_carnitine', 'saw_palmetto', 'selenium', 'iron', 'copper', 'potassium'];
     for (const id of boostExtras) {
+      if (false) break;
       if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id)) {
         selectedIds.add(id);
         if (!substanceReasons[id]) substanceReasons[id] = [];
@@ -1063,12 +1072,14 @@ export function calculateSupportPlan(
     }
     // Add hCG if AAS detected
     const hasAAS = (state.pharma?.aas || []).length > 0;
-    if (hasAAS && !selectedIds.has('hcg') && !isContraindicated('hcg')) {
+    if (hasAAS && !selectedIds.has('hcg') && !isContraindicated('hcg') && true) {
       selectedIds.add('hcg');
       if (!substanceReasons['hcg']) substanceReasons['hcg'] = [];
       substanceReasons['hcg'].push({ mechInfo: 'ГГЯ: поддержка функции яичек на курсе ААС, 500 МЕ 2р/нед', system: 'endocrine' });
     }
   }
+
+  // ─── SUBSTANCE CAP REMOVED — unlimited coverage ───
 
   // B5: Auto-apply high-scoring stacks (score >70, covers ≥3 systems, synergy > 80)
   const autoStacks = recommendStacks(scores, selectedIds, level);
@@ -1152,12 +1163,12 @@ export function calculateSupportPlan(
       adjustedDose = Math.round(dose.mg * doseMultiplier);
     }
     let adjustedTiming = dose.timing;
-    if (id === 'bcp157' && jointMode) {
+    if (id === 'bcp157' && hasJointPain) {
       const isSymptomatic = (state.oda?.jointPain || 'none') === 'moderate' || (state.oda?.jointPain || 'none') === 'severe';
       adjustedDose = isSymptomatic ? 500 : 350;
       adjustedTiming = isSymptomatic ? 'ежедневно' : '2-3x/нед';
     }
-    if (id === 'tb500' && jointMode) {
+    if (id === 'tb500' && hasJointPain) {
       const isSymptomatic = (state.oda?.jointPain || 'none') === 'moderate' || (state.oda?.jointPain || 'none') === 'severe';
       adjustedDose = isSymptomatic ? 10 : 5;
       adjustedTiming = isSymptomatic ? 'ежедневно' : '2-3x/нед';
@@ -1180,8 +1191,8 @@ export function calculateSupportPlan(
       targetSystems: systems.length > 0 ? systems : (entry?.systems || []),
       comment: mechReason,
       mechanismReason: mechReason,
-      fromJoint: jointMode && ['collagen','glucosamine','msm','boswellia','chondroitin_sulfate','hyaluronic_acid','bcp157','tb500','calcium'].includes(id),
-      fromBoost: boostEnabled && !['collagen','glucosamine','msm','boswellia','chondroitin_sulfate','hyaluronic_acid','bcp157','tb500','calcium'].includes(id),
+      fromJoint: false,
+      fromBoost: false,
     });
   }
 
@@ -1263,16 +1274,17 @@ export function calculateSupportPlan(
   const avgProtection = activeSystems > 0 ? weightedProtectionSum / activeSystems : 0.3;
   const overallAfter = Math.round(overallRaw * (1 - Math.min(0.8, avgProtection)));
 
-  // ─── Coverage gaps ───
+  // ─── Coverage gaps (systems where support reduced risk by <40%) ───
   const coverageGaps: PlanResult['coverageGaps'] = [];
   for (const [sys, score] of Object.entries(scores)) {
     if (score > 0) {
       const sysLabel = SYS_LABELS[sys] || sys;
       const sysResult = systemsResult[sys];
       const net = sysResult?.net || score;
-      const gapPercent = Math.round(((score - net) / Math.max(1, score)) * 100);
-      if (gapPercent > 50) {
-        coverageGaps.push({ system: sys, label: sysLabel, raw: score, net, gapPercent });
+      const reductionPercent = Math.round(((score - net) / Math.max(1, score)) * 100);
+      // Show as gap when coverage is insufficient (reduction < 40%)
+      if (reductionPercent < 40 && net > 20) {
+        coverageGaps.push({ system: sys, label: sysLabel, raw: score, net, gapPercent: reductionPercent });
       }
     }
   }
@@ -1323,6 +1335,55 @@ export function calculateSupportPlan(
     conflicts,
     riskBreakdown,
   };
+}
+
+// ─── Apply joint/boost substances on top of existing plan ───
+export function applyJointToPlan(plan: PlanResult): PlanResult {
+  const jointIds = ['collagen','glucosamine','msm','boswellia','chondroitin_sulfate','hyaluronic_acid','bcp157','tb500','calcium'];
+  const jointDoses: Record<string,{mg:number;timing:string}> = {
+    collagen:{mg:15000,timing:'на ночь'}, glucosamine:{mg:1500,timing:'с едой'}, msm:{mg:3000,timing:'с едой'},
+    boswellia:{mg:500,timing:'с едой'}, chondroitin_sulfate:{mg:1200,timing:'с едой'}, hyaluronic_acid:{mg:200,timing:'вечер'},
+    bcp157:{mg:500,timing:'натощак'}, tb500:{mg:10,timing:'ежедневно'}, calcium:{mg:1000,timing:'вечер'},
+  };
+  const existing = new Set(plan.substances.map(s => s.id));
+  const added: PlanSubstance[] = [];
+  for (const id of jointIds) {
+    if (existing.has(id)) continue;
+    const entry = getCatalogEntry(id);
+    const dose = jointDoses[id] || { mg: 500, timing: 'с едой' };
+    added.push({
+      id, name: entry?.nameRu || entry?.name || id, doseMg: dose.mg,
+      doseDisplay: dose.mg >= 1000 ? `${(dose.mg / 1000).toFixed(1)} г (${dose.mg} мг)` : `${dose.mg} мг`,
+      timing: dose.timing, category: entry?.category || [], tier: 'standard',
+      targetSystems: ['musculoskeletal'], comment: 'Суставы/связки: дополнительная поддержка',
+      mechanismReason: 'Суставы/связки', fromJoint: true, fromBoost: false,
+    });
+  }
+  return { ...plan, substances: [...plan.substances, ...added] };
+}
+
+export function applyBoostToPlan(plan: PlanResult): PlanResult {
+  const boostIds = ['ashwagandha','berberine','vitamin_k2','probiotics','l_carnitine','astragalus','saw_palmetto','curcumin','taurine','vitamin_e'];
+  const boostDoses: Record<string,{mg:number;timing:string}> = {
+    ashwagandha:{mg:300,timing:'вечер'}, berberine:{mg:500,timing:'с едой'}, vitamin_k2:{mg:200,timing:'с едой'},
+    probiotics:{mg:20,timing:'натощак'}, l_carnitine:{mg:2000,timing:'натощак'}, astragalus:{mg:1500,timing:'утро'},
+    saw_palmetto:{mg:640,timing:'с едой'}, curcumin:{mg:1000,timing:'с пиперином'}, taurine:{mg:1500,timing:'натощак'}, vitamin_e:{mg:200,timing:'с едой'},
+  };
+  const existing = new Set(plan.substances.map(s => s.id));
+  const added: PlanSubstance[] = [];
+  for (const id of boostIds) {
+    if (existing.has(id)) continue;
+    const entry = getCatalogEntry(id);
+    const dose = boostDoses[id] || { mg: 500, timing: 'с едой' };
+    added.push({
+      id, name: entry?.nameRu || entry?.name || id, doseMg: dose.mg,
+      doseDisplay: dose.mg >= 1000 ? `${(dose.mg / 1000).toFixed(1)} г (${dose.mg} мг)` : `${dose.mg} мг`,
+      timing: dose.timing, category: entry?.category || [], tier: 'advanced',
+      targetSystems: ['general'], comment: 'Усиление поддержки: расширенный спектр',
+      mechanismReason: 'Усиление', fromJoint: false, fromBoost: true,
+    });
+  }
+  return { ...plan, substances: [...plan.substances, ...added] };
 }
 
 function buildSchedule(substances: PlanSubstance[]): Array<{ timeBlock: string; substances: Array<{ id: string; name: string; dose: string; instructions: string }> }> {

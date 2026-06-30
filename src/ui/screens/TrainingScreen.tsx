@@ -3507,6 +3507,8 @@ export const TrainingScreen: React.FC = () => {
 };
 
 import { MyTrainingTab } from './TrainingScreen_parts/MyTrainingTab';
+import { PowerliftingTab } from './TrainingScreen_parts/PowerliftingTab';
+import { BodybuildingTab } from './TrainingScreen_parts/BodybuildingTab';
 import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
 import { VisualTab } from './TrainingScreen_parts/VisualTab';
 import { AnalyticsTab } from './TrainingScreen_parts/AnalyticsTab';

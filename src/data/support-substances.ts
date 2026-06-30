@@ -1,5 +1,6 @@
 import { resolveCanonicalId } from './support-meta';
 import { INTERACTIONS_DB } from './support-interactions-db';
+import { SYNERGY_NETWORK } from './support-synergy-network';
 
 export interface SupportSubstance {
   id: string;
@@ -445,17 +446,52 @@ export function isGhostId(id: string): boolean {
   return GHOST_IDS.has(id);
 }
 
-// Mapped from INTERACTIONS_DB (support-interactions-db.ts) — field `id` → `interactionId`
-export const ALL_INTERACTIONS: SupportInteraction[] = INTERACTIONS_DB.map(i => ({
-  interactionId: i.id,
-  substanceA: i.substanceA,
-  substanceB: i.substanceB,
-  type: i.type,
-  effect: i.effect,
-  mechanisms: i.mechanisms,
-  severity: i.severity,
-  notes: i.notes,
-}));
+function synergyToPairs(entry: typeof SYNERGY_NETWORK[number]): { a: string; b: string }[] {
+  const subs: string[] = [];
+  if (entry.a) subs.push(entry.a);
+  if (entry.b) subs.push(entry.b);
+  if (entry.c) subs.push(entry.c);
+  if (entry.d) subs.push(entry.d);
+  if (entry.e) subs.push(entry.e);
+  if (entry.f) subs.push(entry.f);
+  if (entry.g) subs.push(entry.g);
+  if (entry.substances) subs.push(...entry.substances);
+  const pairs: { a: string; b: string }[] = [];
+  for (let i = 1; i < subs.length; i++) pairs.push({ a: subs[0], b: subs[i] });
+  return pairs;
+}
+
+const NETWORK_PAIRS: SupportInteraction[] = [];
+for (const entry of SYNERGY_NETWORK) {
+  const pairs = synergyToPairs(entry);
+  for (const p of pairs) {
+    NETWORK_PAIRS.push({
+      interactionId: `NET_${entry.a}_${p.b}`,
+      substanceA: p.a,
+      substanceB: p.b,
+      type: entry.type,
+      effect: entry.effect,
+      mechanisms: entry.mechanism ? [entry.mechanism] : [],
+      severity: entry.severity,
+      notes: entry.notes || '',
+    });
+  }
+}
+
+// Mapped from INTERACTIONS_DB (support-interactions-db.ts) + SYNERGY_NETWORK
+export const ALL_INTERACTIONS: SupportInteraction[] = [
+  ...INTERACTIONS_DB.map(i => ({
+    interactionId: i.id,
+    substanceA: i.substanceA,
+    substanceB: i.substanceB,
+    type: i.type,
+    effect: i.effect,
+    mechanisms: i.mechanisms,
+    severity: i.severity,
+    notes: i.notes,
+  })),
+  ...NETWORK_PAIRS,
+];
 export const ALL_RISKS: SupportRisk[] = [];
 
 // Aliases for backward compatibility

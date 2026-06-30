@@ -1,11 +1,12 @@
-/**
+﻿/**
  * TonnageCalcTab.tsx – Калькулятор тоннажа v2
  * Рассчитывает общий тоннаж, тоннаж по мышцам и по зонам интенсивности (%1RM).
  * Позволяет добавлять упражнения из каталога, указывать вес, повторения, подходы.
+ * Кнопка «Сохранить в план» сохраняет план в localStorage и дает визуальную обратную связь.
  */
 import React, { useMemo, useState } from 'react';
 import { EXERCISE_CATALOG, getExerciseById } from '../../../core/exercise-catalog';
-import { PopupSelect, PopupNumber, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
+import { PopupSelect, PopupNumber, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
@@ -27,6 +28,7 @@ export const TonnageCalcTab: React.FC = () => {
     { id: 'r1', exerciseId: 'bench_bar', weight: 80, reps: 5, sets: 4 },
     { id: 'r2', exerciseId: 'row_bar', weight: 60, reps: 8, sets: 3 },
   ]);
+  const [saved, setSaved] = useState(false);
 
   const upd = (id: string, field: keyof Row, val: any) => setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: val } : r));
   const addRow = () => setRows(prev => [...prev, { id: 'r' + Date.now(), exerciseId: 'bench_bar', weight: 60, reps: 6, sets: 3 }]);
@@ -35,6 +37,7 @@ export const TonnageCalcTab: React.FC = () => {
   const memo = useMemo(() => {
     let totalTonnage = 0;
     let totalReps = 0; // сумма sets*reps (для среднего веса)
+    let totalSets = 0; // сумма сетов
     const tonnageByMuscle: Record<string, number> = {};
     const tonnageByZone = { light: 0, medium: 0, heavy: 0 }; // в кг·повт
 
@@ -48,6 +51,7 @@ export const TonnageCalcTab: React.FC = () => {
       const setVolume = weight * reps * sets; // кг·повт per set group
       totalTonnage += setVolume;
       totalReps += sets * reps;
+      totalSets += sets;
 
       // по мышце
       const muscle = ex.group; // упрощенно, можно маппить group->читаемое название
@@ -70,6 +74,7 @@ export const TonnageCalcTab: React.FC = () => {
     return {
       totalTonnage,
       totalReps,
+      totalSets,
       avgWeight,
       relInt,
       tonnageByMuscle,
@@ -79,6 +84,7 @@ export const TonnageCalcTab: React.FC = () => {
 
   const totalTonnage = memo.totalTonnage;
   const totalReps = memo.totalReps;
+  const totalSets = memo.totalSets;
   const avgWeight = memo.avgWeight;
   const relInt = memo.relInt;
   const tonnageByMuscle = memo.tonnageByMuscle;
@@ -91,6 +97,17 @@ export const TonnageCalcTab: React.FC = () => {
     desc: `${e.group} · ${e.type === 'compound' ? 'Базовое' : 'Изолированное'}`,
   }));
 
+  const handleSave = () => {
+    const plan = {
+      timestamp: Date.now(),
+      oneRMGlobal,
+      rows,
+    };
+    localStorage.setItem('he_saved_training_plan', JSON.stringify(plan));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>
@@ -98,10 +115,10 @@ export const TonnageCalcTab: React.FC = () => {
       </div>
 
       {/* Ввод 1RM глобального */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 10 }}>
+        <div>
           <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>1RM (global)</label>
-          <input type="number" value={oneRMGlobal} onChange={e => setOneRMGlobal(+e.target.value)} style={IN} />
+          <input type="number" value={oneRMGlobal} onChange={e => setOneRMGlobal(+e.target.value)} style={IN} min={0} max={500} />
         </div>
       </div>
 
@@ -117,14 +134,15 @@ export const TonnageCalcTab: React.FC = () => {
         </div>
         {rows.map(r => (
           <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', gap: 6, marginBottom: 4, alignItems: 'start' }}>
-            <PopupSelect
-              label=""
-              value={r.exerciseId}
-              options={exerciseOptions}
-              hint="Начните вводить для поиска"
-              onChange={v => upd(r.id, 'exerciseId', v)}
-              style={{ width: '100%' }}
-            />
+            <div style={{ width: '100%' }}>
+              <PopupSelect
+                label=""
+                value={r.exerciseId}
+                options={exerciseOptions}
+                hint="Начните вводить для поиска"
+                onChange={v => upd(r.id, 'exerciseId', v)}
+              />
+            </div>
             <div style={{ flex: 1 }}>
               <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Вес (кг)</label>
               <input type="number" value={r.weight} onChange={e => upd(r.id, 'weight', +e.target.value)} style={IN} min={0} max={500} />
@@ -152,18 +170,20 @@ export const TonnageCalcTab: React.FC = () => {
         </div>
       </div>
 
-      {/* Результаты */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-        <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center', border: '1px solid rgba(0,230,138,0.15)' }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>РњР°Р»СЊРєСѓР»СЏС‚РѕСЂ</div>
+      {/* Общие показатели */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
+        <MetricCard title="РњР°Р»СЊРєСѓР»СЏС‚РѕСЂ" icon="рџ“¦" accent={ACCENT}>
           <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{totalTonnage.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>кг·повт</div>
-        </div>
-        <div style={{ background: 'rgba(59,130,246,0.08)', borderRadius: 8, padding: 10, textAlign: 'center', border: '1px solid rgba(59,130,246,0.15)' }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>РЈРћР (%1РџРњ)</div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{relInt.toFixed(1)}%</div>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>средняя интенсивность</div>
-        </div>
+          <div style={{ ...SMALL }}>кг·повт</div>
+        </MetricCard>
+        <MetricCard title="Средний вес" icon="рџ”ё" accent={ACCENT}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{(totalTonnage / Math.max(totalReps, 1)).toFixed(1)}</div>
+          <div style={{ ...SMALL }}>кг</div>
+        </MetricCard>
+        <MetricCard title="Общее количество подходов" icon="рџ”љ" accent={ACCENT}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{totalSets}</div>
+          <div style={{ ...SMALL }}>подходов</div>
+        </MetricCard>
       </div>
 
       {/* По мышцам */}
@@ -194,9 +214,29 @@ export const TonnageCalcTab: React.FC = () => {
         ))}
       </div>
 
-      {/* Кнопка сохранения в план (заглушка) */}
+      {/* Кнопка сохранения в план */}
       <div style={{ marginTop: 20 }}>
-        <button onClick={() => alert('Сохранено (заглушка)')} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 12 }}>Сохранить в план тренировки</button>
+        <button
+          onClick={handleSave}
+          disabled={saved}
+          style={{
+            width: '100%',
+            padding: '12px',
+            borderRadius: 10,
+            border: 'none',
+            cursor: saved ? 'not-allowed' : 'pointer',
+            background: saved
+              ? 'linear-gradient(135deg,#22c55e,#16a34a)'
+              : 'linear-gradient(135deg,#00e68a,#00c853)',
+            color: '#000',
+            fontWeight: 800,
+            fontSize: 12,
+            opacity: saved ? 0.4 : 1,
+            transition: 'all 0.2s',
+          }}
+        >
+          {saved ? 'вњ“ Сохранено' : 'Сохранить в план тренировки'}
+        </button>
       </div>
     </div>
   );

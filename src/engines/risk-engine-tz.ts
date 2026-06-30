@@ -89,14 +89,17 @@ export interface TZRiskResult {
 // Calibrated to produce 70-90% raw risk for typical AAS cycles
 
 const BASE_RISK: Record<string, Record<number, number>> = {
-  cardio: { 1: 0.25, 2: 0.20, 3: 0.15, 4: 0.18, 5: 0.15, 6: 0.12, 7: 0.18 },
-  hepatic: { 1: 0.22, 2: 0.25, 3: 0.18, 4: 0.15, 5: 0.12, 6: 0.18, 7: 0.20 },
-  renal: { 1: 0.18, 2: 0.15, 3: 0.16, 4: 0.12, 5: 0.10, 6: 0.08, 7: 0.15 },
-  neuro: { 1: 0.20, 2: 0.16, 3: 0.16, 4: 0.14, 5: 0.14, 6: 0.10, 7: 0.16 },
-  endocrine: { 1: 0.30, 2: 0.22, 3: 0.16, 4: 0.14, 5: 0.10, 6: 0.14, 7: 0.16 },
-  hematologic: { 1: 0.22, 2: 0.16, 3: 0.10, 4: 0.16, 5: 0.10, 6: 0.14, 7: 0.10 },
-  reproductive: { 1: 0.25, 2: 0.22, 3: 0.16, 4: 0.14, 5: 0.14, 6: 0.10, 7: 0.16 },
+  cardio: { 1: 0.35, 2: 0.35, 3: 0.25, 4: 0.30, 5: 0.20, 6: 0.18, 7: 0.28 },
+  hepatic: { 1: 0.30, 2: 0.35, 3: 0.25, 4: 0.22, 5: 0.18, 6: 0.25, 7: 0.30 },
+  renal: { 1: 0.25, 2: 0.22, 3: 0.22, 4: 0.18, 5: 0.15, 6: 0.12, 7: 0.22 },
+  neuro: { 1: 0.28, 2: 0.22, 3: 0.22, 4: 0.20, 5: 0.20, 6: 0.15, 7: 0.22 },
+  endocrine: { 1: 0.45, 2: 0.35, 3: 0.22, 4: 0.20, 5: 0.15, 6: 0.20, 7: 0.22 },
+  hematologic: { 1: 0.35, 2: 0.22, 3: 0.15, 4: 0.25, 5: 0.15, 6: 0.22, 7: 0.15 },
+  reproductive: { 1: 0.40, 2: 0.35, 3: 0.22, 4: 0.20, 5: 0.22, 6: 0.15, 7: 0.22 },
 };
+
+// Systems used for OverallRisk aggregation (musculoskeletal excluded — anabolic effect, not risk)
+const OVERALL_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive'];
 
 // Mechanism weights for geometric mean
 const MECH_WEIGHTS: Record<string, Record<number, number>> = {
@@ -130,20 +133,13 @@ function computeDrugDoseFactor(substanceId: string, dosePerWeek: number, courseW
   const ratio = dosePerWeek / threshold.dosePerWeek;
   let doseF = Math.min(2.0, Math.pow(ratio, GAMMA));
 
-  // Accumulation model: steady-state ratio from half-life
+  // Steady-state accumulation (capped)
   const ph = PHARMA_DB[substanceId] as any;
   const halfLifeDays = ph?.pk?.halfLifeHours ? ph.pk.halfLifeHours / 24 : 7;
-  const dosingIntervalDays = halfLifeDays > 3 ? 7 : halfLifeDays > 1 ? 3.5 : 1;
-  const k = Math.LN2 / halfLifeDays;
-  const ssr = 1 / (1 - Math.exp(-k * dosingIntervalDays));
-  const accumFactor = Math.max(1.0, Math.min(2.5, ssr));
+  const dosesPerHalfLife = halfLifeDays <= 0 ? 1 : Math.min(4, halfLifeDays / 1.5);
+  const accumFactor = Math.min(1.5, 1 + 0.08 * dosesPerHalfLife);
 
-  // Course progress: how far into the course (0 = first week, 1 = steady state)
-  const weeksToSteady = halfLifeDays * 0.7;
-  const progress = Math.min(1.0, Math.max(0, courseWeek / weeksToSteady));
-  const effectiveAccum = 1.0 + (accumFactor - 1.0) * progress;
-
-  return doseF * effectiveAccum;
+  return doseF * accumFactor;
 }
 
 // ─── Compute Drug Contribution per Mechanism ───
@@ -151,20 +147,40 @@ function computeDrugDoseFactor(substanceId: string, dosePerWeek: number, courseW
 function getDrugContribution(substanceId: string, system: string, mechIdx: number): number {
   const threshold = DRUG_THRESHOLDS_V7[substanceId];
   if (!threshold || !threshold.systems) return 0;
+
+  // 1. Explicit mapping exists → use it directly
   if (threshold.systems[system] && threshold.systems[system][mechIdx] !== undefined) {
     return threshold.systems[system][mechIdx];
   }
-  // Fallback: use PD_SYSTEM_MAP
+
+  // 2. Drug has SOME mapping for this system (other mechanisms) → distribute remaining power
+  if (threshold.systems[system]) {
+    // Drug targets this system — distribute a residual effect across unmapped mechanisms
+    // proportional to their base risk weight
+    const baseRisks = BASE_RISK[system] ?? {};
+    const totalBaseRisk = Object.values(baseRisks).reduce((a: number, b: number) => a + b, 0) || 1;
+    const thisBaseRisk = baseRisks[mechIdx] ?? 0.02;
+    // Each unmapped mechanism gets a fraction of 15% total residual, scaled by base risk
+    return (thisBaseRisk / totalBaseRisk) * 0.15;
+  }
+
+  // 3. PD_SYSTEM_MAP fallback for drugs NOT in DRUG_THRESHOLDS_V7 systems
   const pdMapping = PD_SYSTEM_MAP[system];
   if (pdMapping) {
     const ph = PHARMA_DB[substanceId] as any;
     if (ph?.pd) {
       const pdVal = ph.pd[pdMapping.pdKey as keyof typeof ph.pd] as number;
       if (pdVal !== undefined && pdVal !== 0) {
-        return Math.abs(pdVal) * pdMapping.weight * 0.1;
+        const totalPd = Math.abs(pdVal) * pdMapping.weight * 0.3;
+        // Distribute across all 7 mechanisms proportional to base risk
+        const baseRisks = BASE_RISK[system] ?? {};
+        const totalBaseRisk = Object.values(baseRisks).reduce((a: number, b: number) => a + b, 0) || 1;
+        const thisBaseRisk = baseRisks[mechIdx] ?? 0.02;
+        return totalPd * (thisBaseRisk / totalBaseRisk) * 0.5;
       }
     }
   }
+
   return 0;
 }
 
@@ -337,6 +353,102 @@ function ensureSupportReductions(): Record<string, Record<string, Record<number,
       anastrozole: { endocrine: { 2: 0.4 }, reproductive: { 7: 0.1 } },
       clomiphene: { endocrine: { 1: 0.3, 3: 0.2 }, reproductive: { 7: 0.15 } },
       tamoxifen: { endocrine: { 2: 0.3, 1: 0.2 }, reproductive: { 7: 0.2 } },
+      // ─── EXTENDED COVERAGE (40+ additional substances) ───
+      vitamin_b6: { neuro: { 1: 0.12, 3: 0.1 }, hematologic: { 5: 0.1 } },
+      vitamin_b12: { hematologic: { 5: 0.2 }, neuro: { 5: 0.1, 7: 0.15 } },
+      folate: { hematologic: { 5: 0.25 }, neuro: { 7: 0.1 }, hepatic: { 3: 0.1 } },
+      iron: { hematologic: { 5: 0.3 } },
+      potassium: { cardio: { 2: 0.2, 7: 0.25 }, renal: { 4: 0.1 } },
+      sodium: { cardio: { 2: 0.05 } },
+      calcium: { musculoskeletal: { 1: 0.15, 7: 0.1 } },
+      phosphorus: { musculoskeletal: { 7: 0.1 } },
+      vitamin_a: { hepatic: { 3: 0.1 }, neuro: { 5: 0.1 } },
+      vitamin_e: { hepatic: { 3: 0.15, 7: 0.1 }, cardio: { 5: 0.1 } },
+      vitamin_b1: { neuro: { 2: 0.12, 5: 0.12 }, cardio: { 6: 0.1 } },
+      vitamin_b2: { hepatic: { 3: 0.1 }, neuro: { 5: 0.1 } },
+      vitamin_b3: { cardio: { 1: 0.15 }, hepatic: { 7: 0.05 } },
+      vitamin_b5: { endocrine: { 6: 0.1 } },
+      vitamin_b7: { endocrine: { 5: 0.08 } },
+      inositol: { neuro: { 3: 0.1, 7: 0.1 }, endocrine: { 4: 0.1 } },
+      choline: { hepatic: { 7: 0.1 }, neuro: { 1: 0.1, 2: 0.08 } },
+      chromium: { endocrine: { 4: 0.15 } },
+      vanadium: { endocrine: { 4: 0.1 } },
+      iodine: { endocrine: { 5: 0.2 } },
+      boron: { endocrine: { 1: 0.12 }, reproductive: { 7: 0.1 } },
+      manganese: { neuro: { 5: 0.1 }, musculoskeletal: { 7: 0.08 } },
+      molybdenum: { hepatic: { 3: 0.08 } },
+      silicon: { musculoskeletal: { 7: 0.1 } },
+      l_carnitine: { cardio: { 5: 0.15, 6: 0.1 }, hepatic: { 3: 0.12 } },
+      l_arginine: { cardio: { 2: 0.15, 7: 0.1 } },
+      l_citrulline: { cardio: { 2: 0.12 } },
+      l_glutamine: { gi: { 7: 0.15 }, neuro: { 2: 0.08 } },
+      l_lysine: { cardio: { 1: 0.1 } },
+      l_proline: { musculoskeletal: { 7: 0.1 } },
+      tmg: { hepatic: { 7: 0.12, 3: 0.1 }, neuro: { 7: 0.1 } },
+      same: { hepatic: { 7: 0.15, 3: 0.1 }, neuro: { 7: 0.1 } },
+      probiotics: { gi: { 7: 0.2 }, immunity: { 1: 0.15 } },
+      psyllium: { cardio: { 1: 0.15 }, hepatic: { 7: 0.05 } },
+      spirulina: { hepatic: { 3: 0.1 }, immunity: { 1: 0.1 } },
+      resveratrol: { cardio: { 5: 0.1, 2: 0.05 }, neuro: { 5: 0.1 } },
+      quercetin: { cardio: { 5: 0.1 }, hepatic: { 3: 0.1 }, neuro: { 4: 0.1 } },
+      egcg: { hepatic: { 3: 0.15, 7: 0.1 }, cardio: { 1: 0.1 } },
+      pycnogenol: { cardio: { 2: 0.12, 5: 0.1 } },
+      hesperidin: { cardio: { 2: 0.1, 5: 0.08 } },
+      diosmin: { cardio: { 2: 0.12, 4: 0.1 } },
+      nattokinase: { cardio: { 4: 0.25 }, hematologic: { 4: 0.2, 6: 0.2 } },
+      serrapeptase: { cardio: { 4: 0.15, 5: 0.1 } },
+      bromelain: { neuro: { 4: 0.1 }, hepatic: { 3: 0.1 } },
+      papain: { hepatic: { 3: 0.08 } },
+      collagen: { musculoskeletal: { 7: 0.2 } },
+      glucosamine: { musculoskeletal: { 7: 0.15 } },
+      chondroitin: { musculoskeletal: { 7: 0.15 } },
+      msm: { musculoskeletal: { 7: 0.1 }, neuro: { 4: 0.05 } },
+      hyaluronic_acid: { musculoskeletal: { 7: 0.1 } },
+      bcp157: { musculoskeletal: { 7: 0.15 }, gi: { 7: 0.1 } },
+      tb500: { musculoskeletal: { 7: 0.12 } },
+      melatonin: { neuro: { 7: 0.2, 3: 0.15 } },
+      l_tryptophan: { neuro: { 7: 0.15 }, neuro_toxicity: { 7: 0.08 } },
+      l_theanine: { neuro: { 3: 0.15, 7: 0.1 } },
+      gaba: { neuro: { 3: 0.2 } },
+      phenibut: { neuro: { 3: 0.15 } },
+      uridine: { neuro: { 1: 0.1, 7: 0.08 } },
+      pqq: { neuro: { 5: 0.12 }, cardio: { 5: 0.1 } },
+      alcar: { neuro: { 5: 0.15, 2: 0.05 }, hepatic: { 3: 0.08 } },
+      r_ala: { hepatic: { 3: 0.15 }, neuro: { 5: 0.2 } },
+      milk_thistle_extract: { hepatic: { 2: 0.2, 3: 0.25, 7: 0.2 } },
+      artichoke: { hepatic: { 1: 0.15, 7: 0.1 } },
+      dandelion: { hepatic: { 1: 0.1 }, renal: { 1: 0.08 } },
+      schisandra: { hepatic: { 7: 0.15, 3: 0.12 }, neuro: { 3: 0.08 } },
+      andrographis: { hepatic: { 3: 0.12 }, immunity: { 1: 0.1 } },
+      reishi: { immunity: { 1: 0.15, 2: 0.1 } },
+      shiitake: { immunity: { 1: 0.1 }, cardio: { 1: 0.08 } },
+      maitake: { immunity: { 1: 0.1 }, endocrine: { 4: 0.08 } },
+      lions_mane: { neuro: { 1: 0.12, 5: 0.1, 2: 0.08 } },
+      phosphatidylserine: { neuro: { 3: 0.12, 6: 0.1, 7: 0.1 } },
+      phosphatidylcholine: { hepatic: { 7: 0.1, 1: 0.08 }, neuro: { 2: 0.08 } },
+      glycerophosphocholine: { neuro: { 1: 0.1, 7: 0.08 } },
+      huperzine_a: { neuro: { 2: 0.15 } },
+      noopept: { neuro: { 2: 0.1, 7: 0.08 } },
+      piracetam: { neuro: { 2: 0.1, 1: 0.08 } },
+      oxiracetam: { neuro: { 2: 0.12 } },
+      phenylpiracetam: { neuro: { 1: 0.1, 2: 0.08 } },
+      agmatine: { neuro: { 3: 0.1, 2: 0.05 }, cardio: { 2: 0.08 } },
+      nigella_sativa: { immunity: { 1: 0.1 }, hepatic: { 3: 0.1 } },
+      colostrum: { immunity: { 1: 0.12, 2: 0.08 }, gi: { 7: 0.1 } },
+      echinacea: { immunity: { 1: 0.1 } },
+      garlic: { cardio: { 1: 0.15, 2: 0.1 }, immunity: { 1: 0.08 } },
+      ginger: { neuro: { 4: 0.08 }, hepatic: { 3: 0.08 } },
+      cayenne: { cardio: { 4: 0.08, 2: 0.05 } },
+      cinnamon: { endocrine: { 4: 0.12 } },
+      fenugreek: { endocrine: { 1: 0.1, 4: 0.08 } },
+      tribulus: { endocrine: { 1: 0.08 } },
+      maca: { endocrine: { 1: 0.08 }, reproductive: { 7: 0.08 } },
+      rhodiola: { neuro: { 3: 0.1, 7: 0.08 }, endocrine: { 6: 0.12 } },
+      holy_basil: { neuro: { 3: 0.1 }, endocrine: { 6: 0.1 } },
+      eleuthero: { neuro: { 3: 0.08 }, endocrine: { 6: 0.08 } },
+      ginseng: { neuro: { 1: 0.08, 5: 0.08 }, endocrine: { 4: 0.08 } },
+      gotu_kola: { neuro: { 2: 0.08, 5: 0.08 }, cardio: { 5: 0.05 } },
+      bacopa: { neuro: { 1: 0.1, 2: 0.08, 5: 0.1 } },
     });
     _supportReductionsLoaded = true;
   } catch {}
@@ -385,13 +497,23 @@ function computeSupportFactor(supportIds: string[], system: string, mechIdx: num
   return Math.max(0.1, factor);
 }
 
-// ─── Geometric Mean ───
+// ─── Geometric Mean (with minimum floor per value) ───
 
-function geometricMean(values: number[]): number {
+function geometricMean(values: number[], minFloorPct: number = 2.0): number {
   if (!values.length) return 0;
-  const MIN_VAL = 0.01;
-  const sumLog = values.reduce((a, v) => a + Math.log(Math.max(MIN_VAL, v / 100)), 0);
-  return Math.exp(sumLog / values.length) * 100;
+  const clamped = values.map(v => Math.max(v, minFloorPct));
+  const sumLog = clamped.reduce((a, v) => a + Math.log(v / 100), 0);
+  return Math.exp(sumLog / clamped.length) * 100;
+}
+
+// ─── Trimmed Arithmetic Mean (drop lowest N, then average) ───
+
+function trimmedMean(values: number[], dropLowest: number = 2): number {
+  if (!values.length) return 0;
+  if (values.length <= dropLowest) return values.reduce((a, v) => a + v, 0) / values.length;
+  const sorted = [...values].sort((a, b) => a - b);
+  const trimmed = sorted.slice(dropLowest);
+  return trimmed.reduce((a, v) => a + v, 0) / trimmed.length;
 }
 
 // ─── Main TZ Risk Calculation ───
@@ -444,32 +566,31 @@ export function calculateTZRisk(input: TZRiskInput): TZRiskResult {
 
       // ─── PROBABILISTIC FORMULA ───
       // Risk_{s,m} = 1 − ∏_i (1 − baseRisk × D_i × G × L × N × T)
-      // where i iterates over all drugs affecting this mechanism
+      // where i iterates over all drugs with genuine contribution to this mechanism
       const contributingDrugs: string[] = [];
       let product = 1.0;
       for (const [substanceId, dosePerWeek] of Object.entries(weeklyDoses)) {
+        if (dosePerWeek <= 0) continue;
         const drugContribution = getDrugContribution(substanceId, sys, mechIdx);
-        if (drugContribution <= 0 && dosePerWeek <= 0) continue;
+        if (drugContribution <= 0) continue; // Only contribute to mechanisms the drug actually affects
         const Di = doseFactors[substanceId] || 1.0;
-        const effectiveContrib = drugContribution > 0 ? drugContribution : 0.01;
         // Cell risk contribution from drug i
-        const cellRisk = baseRisk * effectiveContrib * Di * G * L * N * T;
-        if (cellRisk > 0) {
+        const cellRisk = baseRisk * drugContribution * Di * G * L * N * T;
+        if (cellRisk > 0.001) {
           product *= (1 - Math.min(0.99, cellRisk));
           contributingDrugs.push(substanceId);
         }
       }
 
-      // If no drugs contribute, use base risk with multipliers
+      // If no drugs contribute, use base risk with multipliers (lower default without drug driver)
       const rawRisk = contributingDrugs.length > 0
         ? 1 - product
-        : baseRisk * G * L * N * T * 0.5;
+        : baseRisk * G * L * N * T * 0.3;
 
       // Net risk after support
-      const supportF = contributingDrugs.length > 0
-        ? computeSupportFactor(supportSubstances, sys, mechIdx)
-        : 1.0;
-      const netRisk = Math.min(rawRisk, rawRisk * supportF + (1 - supportF) * baseRisk * G * L * N * T * 0.1);
+      const supportF = computeSupportFactor(supportSubstances, sys, mechIdx);
+      // Apply support as direct reduction: net = raw × supportFactor (more intuitive)
+      const netRisk = rawRisk * supportF;
 
       sysRisk.mechanisms[mechIdx] = {
         raw: Math.round(rawRisk * 1000) / 10,
@@ -485,7 +606,7 @@ export function calculateTZRisk(input: TZRiskInput): TZRiskResult {
       };
     }
 
-    // System risk = geometric mean of mechanism risks (weighted)
+    // System risk = geometric mean of mechanism risks (floor 1%)
     const rawVals: number[] = [];
     const netVals: number[] = [];
     for (let mechIdx = 1; mechIdx <= 7; mechIdx++) {
@@ -495,16 +616,16 @@ export function calculateTZRisk(input: TZRiskInput): TZRiskResult {
         netVals.push(mech.net);
       }
     }
-    sysRisk.raw = Math.round(geometricMean(rawVals) * 10) / 10;
-    sysRisk.net = Math.round(geometricMean(netVals) * 10) / 10;
+    sysRisk.raw = Math.round(geometricMean(rawVals, 1.0) * 10) / 10;
+    sysRisk.net = Math.round(geometricMean(netVals, 1.0) * 10) / 10;
     systems[sys] = sysRisk;
   }
 
-  // 4. Overall risk = geometric mean of system risks
-  const allRaw = CORE_SYSTEMS_V7.map(s => systems[s]?.raw ?? 0).filter(v => v > 0);
-  const allNet = CORE_SYSTEMS_V7.map(s => systems[s]?.net ?? 0).filter(v => v > 0);
-  const overallRaw = Math.round(geometricMean(allRaw) * 10) / 10;
-  const overallNet = Math.round(geometricMean(allNet) * 10) / 10;
+  // 4. Overall risk = trimmed arithmetic mean of system risks (drop 2 lowest)
+  const allRaw = OVERALL_SYSTEMS.map(s => systems[s]?.raw ?? 0).filter(v => v > 0);
+  const allNet = OVERALL_SYSTEMS.map(s => systems[s]?.net ?? 0).filter(v => v > 0);
+  const overallRaw = Math.round(trimmedMean(allRaw, 2) * 10) / 10;
+  const overallNet = Math.round(trimmedMean(allNet, 2) * 10) / 10;
 
   return {
     overallRaw,

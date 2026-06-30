@@ -3,11 +3,22 @@
 // Calculates risk per week considering PK accumulation/washout
 // ============================================================
 
-import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, BASE_RISK, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE, GENETIC_MULTIPLIERS, MRR_FACTORS } from '../core/constants';
+import { ALL_RISK_SYSTEMS } from '../core/constants';
 import { PHARMA_DB } from '../core/pharma-database';
-import type { RiskResult, MechanismCell, CourseEntry } from '../core/types';
+import type { RiskResult, CourseEntry } from '../core/types';
 import { eliminationConstant } from './pk-pd.engine';
-import { PD_SYSTEM_MAP, DRUG_MECH_WEIGHTS, getDrugMechWeight } from '../core/risk-shared';
+import { DRUG_THRESHOLDS_V7, getGeneticMultiplier, CORE_SYSTEMS_V7 } from './risk-engine-v7-matrix';
+
+// TZ-compatible base risk values (mirrors risk-engine-tz.ts BASE_RISK)
+const BASE_RISK_V7: Record<string, Record<number, number>> = {
+  cardio: { 1: 0.35, 2: 0.35, 3: 0.25, 4: 0.30, 5: 0.20, 6: 0.18, 7: 0.28 },
+  hepatic: { 1: 0.30, 2: 0.35, 3: 0.25, 4: 0.22, 5: 0.18, 6: 0.25, 7: 0.30 },
+  renal: { 1: 0.25, 2: 0.22, 3: 0.22, 4: 0.18, 5: 0.15, 6: 0.12, 7: 0.22 },
+  neuro: { 1: 0.28, 2: 0.22, 3: 0.22, 4: 0.20, 5: 0.20, 6: 0.15, 7: 0.22 },
+  endocrine: { 1: 0.45, 2: 0.35, 3: 0.22, 4: 0.20, 5: 0.15, 6: 0.20, 7: 0.22 },
+  hematologic: { 1: 0.35, 2: 0.22, 3: 0.15, 4: 0.25, 5: 0.15, 6: 0.22, 7: 0.15 },
+  reproductive: { 1: 0.40, 2: 0.35, 3: 0.22, 4: 0.20, 5: 0.22, 6: 0.15, 7: 0.22 },
+};
 
 function geom(arr: number[]): number {
   if (!arr.length) return 0;
@@ -148,50 +159,70 @@ export function calculateWeeklyRiskDynamics(
     const oR: number[] = [];
     const oN: number[] = [];
 
-    const G = baseInput.genetics || {};
+    const genetics = baseInput.genetics || {};
     const N = Math.max(0.5, Math.min(1.5, baseInput.nutritionFactor ?? 0.8));
     const T = Math.max(1, Math.min(1.5, baseInput.trainingFactor ?? 0.7));
     const cov = baseInput.supportCoverage || {};
 
     for (const s of ALL_RISK_SYSTEMS) {
+      // Skip non-core systems for dynamics (only CORE_SYSTEMS_V7 have full 7-mechanism baseRisk)
+      if (!CORE_SYSTEMS_V7.includes(s as any)) continue;
       const rM: number[] = [];
       const nM: number[] = [];
 
       for (let m = 1; m <= 7; m++) {
         let prod = 1;
-        let pdFactor = 0;
-        const pdMapping = PD_SYSTEM_MAP[s];
+        const baseRisk = BASE_RISK_V7[s]?.[m] ?? 0.02;
 
+        // Genetic multiplier (same as TZ engine)
+        const G = getGeneticMultiplier(genetics as any, s, m);
+
+        // Cumulative product over drugs that affect this (system, mechanism)
+        let hasDrugContrib = false;
         for (const [drug, d] of Object.entries(scaledDrugs)) {
-          const cfg = DRUG_THRESHOLDS[drug.replace(/[-\s]/g, '_').toLowerCase()] || DRUG_THRESHOLDS[drug];
-          const pdEntry = Object.values(PHARMA_DB).find((p: any) => p.id === drug || drug.startsWith((p as any).id?.replace(/_/g, '_') ?? ''));
-          if (pdEntry && pdMapping) {
-            const pdVal = (pdEntry.pd as any)?.[pdMapping.pdKey] ?? 0;
-            pdFactor += Math.abs(pdVal) * pdMapping.weight * (d.dosePerWeek / ((pdEntry as any).ec50 || 300));
+          const threshold = DRUG_THRESHOLDS_V7[drug];
+          let contr = 0;
+          if (threshold?.systems?.[s]?.[m] !== undefined) {
+            contr = threshold.systems[s][m];
+          } else if (threshold?.systems?.[s]) {
+            // Drug targets this system → distribute residual
+            const sysBase = BASE_RISK_V7[s] || {};
+            const totalBase = Object.values(sysBase).reduce((a: number, b: number) => a + b, 0) || 1;
+            const thisBase = sysBase[m] ?? 0.02;
+            contr = (thisBase / totalBase) * 0.15;
           }
-          const mechWeight = getDrugMechWeight(drug, m);
-          const doseRatio = cfg ? Math.min(2, Math.pow((d.dosePerWeek || 0) / cfg.dosePerWeek, 1.2)) : mechWeight > 0 ? Math.min(1.5, (d.dosePerWeek || 0) / 300) : 0;
-          const mechContribution = Math.max(0, BASE_RISK * doseRatio * 1 * N * T * (1 + mechWeight * 3));
-          if (mechContribution > 0.005 || (cfg && doseRatio > 0.1)) {
-            prod *= (1 - Math.min(0.99, BASE_RISK * (doseRatio || 0.01) * 1 * N * T));
+          if (contr > 0) {
+            hasDrugContrib = true;
+            const doseF = Math.min(2.0, Math.pow((d.dosePerWeek || 0) / Math.max(1, threshold?.dosePerWeek || 300), 1.2));
+            const cellRisk = baseRisk * contr * doseF * G * N * T;
+            if (cellRisk > 0.001) {
+              prod *= (1 - Math.min(0.99, cellRisk));
+            }
           }
         }
 
-        const raw = Math.max(7, Math.min(100, (1 - prod) * 100 + pdFactor * 15));
+        const raw = hasDrugContrib
+          ? Math.max(5, Math.min(100, (1 - prod) * 100))
+          : baseRisk * G * N * T * 30; // No-drug baseline (×30 to scale 0.02→~1.8%)
+
+        // Apply support coverage as direct reduction
         const id = `${s}_${m}`;
         const cellCov = cov[id] || 0;
-        const net = Math.max(0, raw * (1 - cellCov));
+        const net = Math.max(0, raw * (1 - Math.min(0.8, cellCov)));
+
         rM.push(raw / 100);
         nM.push(net / 100);
       }
 
-      brk[s] = { raw: geom(rM), net: geom(nM) };
-      oR.push(brk[s].raw / 100);
-      oN.push(brk[s].net / 100);
+      if (rM.length > 0) {
+        brk[s] = { raw: geom(rM), net: geom(nM) };
+        oR.push(brk[s].raw / 100);
+        oN.push(brk[s].net / 100);
+      }
     }
 
-    const overallRaw = Math.min(100, Math.max(0, geom(oR)));
-    const overallNet = Math.min(100, Math.max(0, geom(oN)));
+    const overallRaw = oR.length > 0 ? Math.min(100, Math.max(0, geom(oR))) : 7;
+    const overallNet = oN.length > 0 ? Math.min(100, Math.max(0, geom(oN))) : 5;
 
     weeklyPoints.push({
       week: w,

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, findSupportByGoal, getSupportDatabaseStats, type SupportInput, type SupplementTarget } from '../../engines/support.engine';
 import { decodeGarbled, cleanDesc } from '../../utils/text-sanitizer';
 import { SupportModals } from './SupportScreen_parts/SupportModals';
@@ -42,7 +42,7 @@ import { AutoCalculator } from './SupportScreen_parts/AutoCalculator';
 import { calculateSupportTZ, hydrateState } from '../../engines/support-calculator.engine';
 import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engines/support-calculator.types';
 import { calculateTZRisk, toCompatibleResult, type TZRiskResult } from '../../engines/risk-engine-tz';
-import { calculateSupportPlan, type PlanResult, type PlanSubstance } from '../../engines/support-plan-engine';
+import { calculateSupportPlan, applyJointToPlan, applyBoostToPlan, type PlanResult, type PlanSubstance } from '../../engines/support-plan-engine';
 import { buildPreApplyCard, evaluateRecommendations, computeCoverageRisk } from '../../engines/recommendation-engine';
 import { calculateMixScore, type TrainingMixScore, type MixSubstance, type MixProfile, MIX_MECHANISMS, MIX_SYNERGY, MIX_TEMPLATES, type MixTemplate, buildBestRecipe, type MixRecipe, type MixRecipeItem, groupRecipeItemsByTiming } from '../../engines/training-mix-scoring.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
@@ -88,6 +88,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [jointMode, setJointMode] = useState(false);
   const [jointNotification, setJointNotification] = useState(false);
   const [boostNotification, setBoostNotification] = useState(false);
+  const stateRef = useRef<CalculatorState | null>(null);
   const [myPlansRefresh, setMyPlansRefresh] = useState(0);
   const [weekChangeMsg, setWeekChangeMsg] = useState('');
   const [planHistory, setPlanHistory] = useState<Array<{ level: string; subs: string[]; date: string; riskBefore: number; riskAfter: number }>>([]);
@@ -472,7 +473,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       powerLevel: (supportLevel as PowerLevel),
       courseWeek: courseWeekState,
     };
-    const result = calculateSupportPlan(state, supportLevel as PowerLevel, jointMode, boostEnabled, enhancedSubs, linked.labs);
+    let result = calculateSupportPlan(state, supportLevel as PowerLevel, enhancedSubs, linked.labs);
+    if (jointMode) result = applyJointToPlan(result);
+    if (boostEnabled) result = applyBoostToPlan(result);
     setPlanResult(result);
     // Map to a backwards-compatible effectiveLevel format
     const subs = result.substances.map(s => s.id);
@@ -516,7 +519,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       dosages['hcg'] = DEFAULT_DOSAGES['hcg'] || { mg: 500, timing: '2x/нед, схема 3/1 (МЕ)' };
     }
     return { subs, dosages, planResult: result };
-  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, boostEnabled, jointMode, linked.course, linked.profile, courseWeekState]);
+  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, linked.course, linked.profile, courseWeekState]);
 
   // C4: Track plan changes in history
   useEffect(() => {
@@ -566,6 +569,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       powerLevel: level,
       courseWeek: courseWeekState,
     } as CalculatorState;
+    stateRef.current = state;
     const tzResult: CalculatorResult = calculateSupportTZ(state);
     // ── TZ Risk Engine: probabilistic 49-cell model ──
     const tzRiskInput = {
@@ -593,6 +597,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       riskAfterSupport: tzRiskResult.overallNet,
       supportScore: Math.round(100 - tzRiskResult.overallNet),
       systemSupport: Object.fromEntries(Object.entries(tzCompat.systemBreakdown).map(([k, v]) => [k, 100 - v.net])),
+      // coverageMap: per-system risk reduction fraction (for RiskOverview display)
+      coverageMap: Object.fromEntries(Object.entries(tzCompat.systemBreakdown).map(([k, v]) => [k, Math.max(0, Math.min(1, (v.raw - v.net) / Math.max(1, v.raw)))])),
       riskAssessment: {
         systemBreakdown: Object.fromEntries(Object.entries(tzCompat.systemBreakdown).map(([k, v]) => [k, { raw: v.raw, net: v.net }])),
         mechanismBreakdown: tzCompat.mechanismBreakdown,
@@ -2303,7 +2309,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'protocols' ? '40px' : section === 'generator' ? '85px' : (section === 'info' || calcView === 'info' || calcView === 'peptides' || calcView === 'mixcalc') ? '100px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'protocols' ? '40px' : section === 'generator' ? '85px' : (section === 'info' || calcView === 'info' || calcView === 'peptides' || calcView === 'mixcalc') ? '120px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (with back/home) ===== */}
       {section === 'generator' && (
@@ -2825,25 +2831,12 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 {/* Interactions: все 3 типа с закрытыми секциями */}
                 {/* Sub-tab bar removed — show all types at once */}
 
-                {/* Severity / Count / Organ filters */}
-                  <div style={{ fontSize:7, color:'var(--text-dim)', fontWeight:600, marginBottom:3 }}>По эффективности:</div>
-                  <div style={{ display:'flex', gap:3, marginBottom:4, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                    {[['all','Все'],['LOW','Низкая'],['MEDIUM','Средняя'],['HIGH','Высокая']].map(([v,l]) => (
-                      <button key={v} onClick={() => setInfoSynergySeverity(v)} style={{ padding:'3px 8px', borderRadius:8, fontSize:7, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', background: infoSynergySeverity === v ? 'var(--accent)' : 'transparent', color: infoSynergySeverity === v ? '#000' : 'var(--text-dim)', border:`1px solid ${infoSynergySeverity === v ? 'var(--accent)' : 'var(--border)'}` }}>{l}</button>
-                    ))}
-                  </div>
-                  <div style={{ fontSize:7, color:'var(--text-dim)', fontWeight:600, marginBottom:3 }}>По количеству веществ:</div>
-                  <div style={{ display:'flex', gap:3, marginBottom:4, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                    {[[0,'Любое'],[2,'2'],[3,'3'],[5,'5'],[10,'10+']].map(([v,l]) => (
-                      <button key={String(v)} onClick={() => setSynergyCountFilter(v as number)} style={{ padding:'3px 8px', borderRadius:8, fontSize:7, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', background: synergyCountFilter === v ? 'var(--accent)' : 'transparent', color: synergyCountFilter === v ? '#000' : 'var(--text-dim)', border:`1px solid ${synergyCountFilter === v ? 'var(--accent)' : 'var(--border)'}` }}>{l}</button>
-                    ))}
-                  </div>
-                  <div style={{ fontSize:7, color:'var(--text-dim)', fontWeight:600, marginBottom:3 }}>По органам:</div>
-                  <div style={{ display:'flex', gap:3, marginBottom:6, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                    {[['','Все'], ...Object.entries(ORGAN_CATEGORY_MAP).filter(([k,v],i,a)=>a.findIndex(x=>x[1].key===v.key)===i).map(([k,v])=>[v.key,v.emoji+v.label])].map(([v,l]) => (
-                      <button key={String(v)} onClick={() => setSynergyOrganFilter(v as string)} style={{ padding:'3px 8px', borderRadius:8, fontSize:7, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', background: synergyOrganFilter === v ? 'var(--accent)' : 'transparent', color: synergyOrganFilter === v ? '#000' : 'var(--text-dim)', border:`1px solid ${synergyOrganFilter === v ? 'var(--accent)' : 'var(--border)'}` }}>{l}</button>
-                    ))}
-                  </div>
+                {/* Severity / Count / Organ filters — кнопки-карточки с попапом */}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:6 }}>
+                  <PopupSelect label="⚡ Эффективность" value={infoSynergySeverity} options={[['all','Все'],['LOW','Низкая'],['MEDIUM','Средняя'],['HIGH','Высокая']].map(([v,l])=>({id:v as string,label:l as string}))} onChange={setInfoSynergySeverity} />
+                  <PopupSelect label="🧪 Веществ" value={String(synergyCountFilter)} options={[[0,'Любое'],[2,'2'],[3,'3'],[5,'5'],[10,'10+']].map(([v,l])=>({id:String(v),label:l as string}))} onChange={v=>setSynergyCountFilter(Number(v))} />
+                  <PopupSelect label="🫀 Орган" value={synergyOrganFilter} options={[['','Все'], ...Object.entries(ORGAN_CATEGORY_MAP).filter(([k,v],i,a)=>a.findIndex(x=>x[1].key===v.key)===i).map(([k,v])=>[v.key,v.emoji+v.label])].map(([v,l])=>({id:v as string,label:l as string}))} onChange={setSynergyOrganFilter} />
+                </div>
 
                 {synergySubTab === 'calculator' ? (
                   /* ─── КАЛЬКУЛЯТОР ВЗАИМОДЕЙСТВИЙ ─── */
@@ -5256,16 +5249,24 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 🧮 Рассчитать поддержку
               </button>
 
-              {/* Joint + Boost toggles */}
+              {/* Joint + Boost toggles — NO recalc, just add/remove substances on top */}
               <div style={{ display:'flex', gap:6 }}>
                 <button onClick={() => {
                   const newVal = !jointMode;
                   setJointMode(newVal);
-                  if (newVal && calcResult) {
-                    setJointNotification(true);
-                    setTimeout(() => setJointNotification(false), 5000);
+                  if (calcResult) {
+                    // Apply joint on existing result — no recalc
+                    if (newVal) {
+                      setPlanResult(applyJointToPlan(calcResult));
+                      setJointNotification(true);
+                      setTimeout(() => setJointNotification(false), 5000);
+                    } else {
+                      // Remove joint: recalc without joint
+                      let r = calculateSupportPlan(stateRef.current || { profile: {} as any, pharma: {} as any } as CalculatorState, supportLevel as PowerLevel, enhancedSubs, linked.labs);
+                      if (boostEnabled) r = applyBoostToPlan(r);
+                      setPlanResult(r);
+                    }
                   }
-                  calcSupport(supportLevel);
                 }} style={{
                   flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
                   border: jointMode ? '1px solid #8b5cf6' : '1px solid var(--border)',
@@ -5277,11 +5278,17 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 <button onClick={() => {
                   const newVal = !boostEnabled;
                   setBoostEnabled(newVal);
-                  if (newVal) {
-                    setBoostNotification(true);
-                    setTimeout(() => setBoostNotification(false), 5000);
+                  if (calcResult) {
+                    if (newVal) {
+                      setPlanResult(applyBoostToPlan(calcResult));
+                      setBoostNotification(true);
+                      setTimeout(() => setBoostNotification(false), 5000);
+                    } else {
+                      let r = calculateSupportPlan(stateRef.current || { profile: {} as any, pharma: {} as any } as CalculatorState, supportLevel as PowerLevel, enhancedSubs, linked.labs);
+                      if (jointMode) r = applyJointToPlan(r);
+                      setPlanResult(r);
+                    }
                   }
-                  calcSupport(supportLevel);
                 }} style={{
                   flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
                   border: boostEnabled ? '1px solid #ef4444' : '1px solid var(--border)',
@@ -6080,7 +6087,7 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
                             powerLevel: 'basic', courseWeek: courseWeekState,
                           };
                           try {
-                            const baseResult = calculateSupportPlan(baseState, 'basic', jointMode, boostEnabled, enhancedSubs, linked.labs);
+                            const baseResult = calculateSupportPlan(baseState, 'basic', enhancedSubs, linked.labs);
                             return (
                               <table style={{ width:'100%', fontSize:7, borderCollapse:'collapse' }}>
                                 <thead><tr style={{ borderBottom:'1px solid var(--border)' }}>
