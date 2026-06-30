@@ -65,5 +65,51 @@ export const ProgressTab: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ histo
       <h4 style={{ margin:'0 0 4px',fontSize:12 }}>📋 Недельный отчёт</h4>
       <div style={{ fontSize:9,color:'var(--text-light)' }}>{repData.insights?.slice(0,3).map((r:any,i:number)=><div key={i}>• {r}</div>)}</div>
     </div>}
+
+    {/* Графики прогресса из дневника: ПМ (e1RM) по топ-упражнениям и тоннаж по неделям */}
+    {historyWorkouts.length > 0 && (() => {
+      // e1RM по упражнению по датам
+      const byEx: Record<string, { date: string; e1rm: number }[]> = {};
+      historyWorkouts.forEach((w: any) => (w.exercises || []).forEach((e: any) => {
+        const best = (e.sets || []).reduce((m: number, s: any) => Math.max(m, s.weight * (1 + (s.reps || 0) / 30)), 0);
+        if (best <= 0) return;
+        const name = e.exerciseName || e.exerciseId || '—';
+        (byEx[name] = byEx[name] || []).push({ date: w.date, e1rm: Math.round(best) });
+      }));
+      const top = Object.entries(byEx).map(([n, arr]) => ({ n, arr: arr.sort((a, b) => a.date.localeCompare(b.date)) }))
+        .sort((a, b) => b.arr.length - a.arr.length).slice(0, 3).filter(x => x.arr.length >= 2);
+      // тоннаж по неделям
+      const wkMap: Record<string, number> = {};
+      historyWorkouts.forEach((w: any) => { const wn = w.date.slice(0, 10).slice(0, 7) + '-' + Math.floor(new Date(w.date).getDate() / 7); const vol = (w.exercises || []).reduce((s: number, e: any) => s + (e.totalVolume || (e.sets || []).reduce((ss: number, st: any) => ss + (st.weight || 0) * (st.reps || 0), 0)), 0); wkMap[wn] = (wkMap[wn] || 0) + vol; });
+      const wkArr = Object.entries(wkMap).sort((a, b) => a[0].localeCompare(b[0])).slice(-8);
+      const renderLine = (series: { date: string; e1rm: number }[], color: string, x0: number, allMin: number, allMax: number, W: number, H: number) => {
+        if (series.length < 2) return null;
+        const px = (i: number) => 6 + (i / Math.max(1, series.length - 1)) * (W - 12);
+        const py = (v: number) => H - 8 - ((v - allMin) / Math.max(1, allMax - allMin)) * (H - 16);
+        return <polyline points={series.map((p, i) => `${px(i)},${py(p.e1rm)}`).join(' ')} fill="none" stroke={color} strokeWidth={1.6} />;
+      };
+      const colors = ['#00e68a', '#60a5fa', '#a855f7'];
+      const W = 320, H = 70;
+      const allVals = top.flatMap(t => t.arr.map(a => a.e1rm));
+      const minV = Math.min(...allVals, 0), maxV = Math.max(...allVals, 1);
+      const maxWk = Math.max(1, ...wkArr.map(([, v]) => v));
+      return <div className="card" style={{ padding: 10, marginTop: 8 }}>
+        <h4 style={{ margin: '0 0 4px', fontSize: 12 }}>📈 Прогресс из дневника</h4>
+        {top.length === 0 ? <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Недостаточно данных (нужно ≥2 тренировок на упражнение с весами).</div> : <>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>ПМ (e1RM) по топ-упражнениям:</div>
+          <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ maxWidth: 360, margin: '0 auto', display: 'block' }}>
+            {top.map((t, i) => renderLine(t.arr, colors[i % colors.length], 0, minV, maxV, W, H))}
+            {top.flatMap((t, i) => t.arr.map((p, j) => <circle key={t.n + j} cx={6 + (j / Math.max(1, t.arr.length - 1)) * (W - 12)} cy={H - 8 - ((p.e1rm - minV) / Math.max(1, maxV - minV)) * (H - 16)} r={2} fill={colors[i % colors.length]} />))}
+          </svg>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>{top.map((t, i) => <span key={t.n} style={{ fontSize: 8, color: colors[i % colors.length] }}>● {t.n.slice(0, 18)}</span>)}</div>
+        </>}
+        {wkArr.length >= 2 && <>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 8, marginBottom: 4 }}>Тоннаж по неделям:</div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 60 }}>
+            {wkArr.map(([wk, v], i) => <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}><div style={{ width: '100%', maxWidth: 28, height: Math.max(2, (v / maxWk) * 48), borderRadius: 3, background: 'linear-gradient(180deg,#00e68a,#00c853)' }} /><span style={{ fontSize: 6, color: 'rgba(255,255,255,0.4)' }}>{wk.slice(5)}</span></div>)}
+          </div>
+        </>}
+      </div>;
+    })()}
   </div>);
 };

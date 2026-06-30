@@ -147,38 +147,56 @@ export const TrainingScreen: React.FC = () => {
   const [manualWorkMax, setManualWorkMax] = useState<Record<string, number>>({ chest: 100, back: 110, legs: 140, shoulders: 60, arms: 50, core: 60 });
   const setManualWm = (k: string, v: number) => setManualWorkMax(p => ({ ...p, [k]: v }));
   const PCT_FOR_RIR_MAN: Record<number, number> = { 0: 1.0, 1: 0.96, 2: 0.92, 3: 0.88, 4: 0.84, 5: 0.80 };
-  const [manualResult, setManualResult] = useState<{ splitName: string; days: { day: number; groups: string[]; exercises: { name: string; sets: number; reps: string; rir: number; rest: number; group: string; weight: number }[] }[] } | null>(null);
+  const [manualResult, setManualResult] = useState<{ splitName: string; corrections: string[]; days: { day: number; groups: string[]; exercises: { name: string; sets: number; reps: string; rir: number; rest: number; group: string; weight: number }[] }[] } | null>(null);
   const [manualSavedPlans, setManualSavedPlans] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); } catch { return []; } });
-  const loadManualPlan = (plan: any) => { if (plan?.cfg) setManualCfg(plan.cfg); if (plan?.days) setManualResult({ splitName: plan.name || 'Загруженный план', days: plan.days }); };
+  const loadManualPlan = (plan: any) => { if (plan?.cfg) setManualCfg(plan.cfg); if (plan?.days) setManualResult({ splitName: plan.name || 'Загруженный план', corrections: plan.corrections || [], days: plan.days }); };
   const refreshManualSaved = () => { try { setManualSavedPlans(JSON.parse(localStorage.getItem('myTrainingPlans') || '[]')); } catch { setManualSavedPlans([]); } };
   const [planCopied, setPlanCopied] = useState(false);
+  const applyMethodicToPlan = () => { if (!manualResult) return; const corr: string[] = []; const name = manualCfg.intensity || manualCfg.technique || manualCfg.volume || ''; if (!name) { corr.push('Выберите методику (Интенсивность/Техника/Объём), чтобы применить к плану.'); setManualResult({ ...manualResult, corrections: [...manualResult.corrections, ...corr] }); return; } const days = manualResult.days.map(d => ({ ...d, exercises: d.exercises.map(e => { const wm = tprofile.workMax[e.group] || 80; let ne = { ...e }; if (/10×10|GVT|German Volume/i.test(name)) { ne = { ...e, sets: 10, reps: '10', weight: Math.round(wm * 0.6), rir: 3, rest: 90 }; corr.push(e.name + ': → 10×10 @60% (GVT)'); } else if (/Cluster 5×5|Кластер/i.test(name)) { ne = { ...e, sets: 5, reps: '5', weight: Math.round(wm * 0.85), rir: 1, rest: 180 }; corr.push(e.name + ': → 5×5 кластерами @85% (RIR 1)'); } else if (/Rest-Pause/i.test(name)) { ne = { ...e, sets: 1, reps: 'до отказа +3-5', weight: Math.round(wm * 0.8), rir: 0, rest: 180 }; corr.push(e.name + ': → 1 подход rest-pause @80% до отказа + мини-сеты'); } else if (/Tempo|Темп/i.test(name)) { ne = { ...e, weight: Math.round(wm * 0.7), rir: 2, rest: 60 }; corr.push(e.name + ': → темп 3-1-1-0, вес снижен до 70%, отдых 60с'); } else if (/Drop|Дроп/i.test(name)) { ne = { ...e, rir: 0, rest: 90 }; corr.push(e.name + ': → последний подход до отказа + 2 дропа −20%'); } else { corr.push(e.name + ': методика «' + name + '» применена концептуально (вес/объём без авто-изменения — отредактируйте вручную)'); } return ne; }) })); corr.unshift('Применена методика: «' + name + '» к ' + days.reduce((s, d) => s + d.exercises.length, 0) + ' упражнениям.'); setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, ...corr] }); };
+  const manualToRuntime = () => { if (!manualResult) return; const days: PlayerDay[] = manualResult.days.map(d => ({ label: 'Д' + d.day, exercises: d.exercises.map(e => ({ name: e.name, muscleGroup: e.group, targetSets: Array.from({ length: e.sets }, () => ({ weight: e.weight, reps: parseInt(e.reps) || 10, rir: e.rir })) })) })); try { localStorage.setItem('he_pl_runtime', JSON.stringify({ days, focus: manualResult.splitName, week: 1, track: 'manual' })); } catch {} setTab('runtime'); };
   const printManualPlan = () => { if (!manualResult) return; const rows = manualResult.days.map(d => '<h3>День ' + d.day + ' (' + d.groups.join(', ') + ')</h3><table border=1 cellpadding=4 style=border-collapse:collapse;width:100%><tr><th>Упражнение</th><th>Сеты×повт</th><th>RIR</th><th>Вес</th><th>Отдых</th></tr>' + d.exercises.map(e => '<tr><td>' + e.name + '</td><td>' + e.sets + '×' + e.reps + '</td><td>' + e.rir + '</td><td>' + e.weight + ' кг</td><td>' + e.rest + 'с</td></tr>').join('') + '</table>').join(''); const html = '<html><head><meta charset=utf-8><title>' + manualResult.splitName + '</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#111}h1{color:#008}h3{margin-top:14px;color:#060}table{font-size:12px}</style></head><body><h1>' + manualResult.splitName + '</h1><p>Уровень: ' + level + ' · Цель: ' + goal + ' · ' + daysPerWeek + ' дн/нед · ' + mesoLength + ' нед</p>' + rows + '</body></html>'; const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(() => w.print(), 300); } };
-  const exportManualPlanText = () => { if (!manualResult) return; const lines: string[] = []; lines.push('Тренировочный план: ' + manualResult.splitName); lines.push('Параметры: ' + Object.entries(manualCfg).filter(([,v]) => v).map(([k,v]) => k + '=' + v).join(', ')); lines.push('Уровень: ' + level + ' · Цель: ' + goal + ' · Дней/нед: ' + daysPerWeek + ' · Длина: ' + mesoLength + ' нед'); lines.push(''); manualResult.days.forEach(d => { lines.push('День ' + d.day + ' (' + d.groups.join(', ') + ')'); d.exercises.forEach(e => lines.push('  ' + e.name + ' — ' + e.sets + 'x' + e.reps + ' @ RIR' + e.rir + ' · ' + e.weight + ' кг · отдых ' + e.rest + 'с (' + e.group + ')')); lines.push(''); }); const txt = lines.join(String.fromCharCode(10)); try { navigator.clipboard?.writeText(txt); } catch {} setPlanCopied(true); setTimeout(() => setPlanCopied(false), 1800); };
+  const exportManualPlanText = () => { if (!manualResult) return; const lines: string[] = []; lines.push('Тренировочный план: ' + manualResult.splitName); lines.push('Параметры: ' + Object.entries(manualCfg).filter(([,v]) => v).map(([k,v]) => k + '=' + v).join(', ')); lines.push('Уровень: ' + level + ' · Цель: ' + goal + ' · Дней/нед: ' + daysPerWeek + ' · Длина: ' + mesoLength + ' нед'); lines.push(''); if (manualResult.corrections && manualResult.corrections.length) { lines.push('Комментарии к плану:'); manualResult.corrections.forEach(corr => lines.push('  • ' + corr)); lines.push(''); } manualResult.days.forEach(d => { lines.push('День ' + d.day + ' (' + d.groups.join(', ') + ')'); d.exercises.forEach(e => lines.push('  ' + e.name + ' — ' + e.sets + 'x' + e.reps + ' @ RIR' + e.rir + ' · ' + e.weight + ' кг · отдых ' + e.rest + 'с (' + e.group + ')')); lines.push(''); }); const txt = lines.join(String.fromCharCode(10)); try { navigator.clipboard?.writeText(txt); } catch {} setPlanCopied(true); setTimeout(() => setPlanCopied(false), 1800); };
+  const detectGroup = (name: string): string => { const n = name.toLowerCase(); if (/squat|присед|leg|quad|ножн|выпад|lunge/.test(n)) return 'legs'; if (/bench|жим|chest|груд|press|плеч|shoulder|delt/.test(n)) return n.includes('shoulder')||/delt|плеч/.test(n) ? 'shoulders' : 'chest'; if (/deadlift|станов|тяга|row|pull|спин|back|chin|lat/.test(n)) return 'back'; if (/curl|бицеп|bicep/.test(n)) return 'arms'; if (/tricep|трицеп|extension|пресс|ab|core/.test(n)) return /пресс|ab|core/.test(n) ? 'core' : 'arms'; return 'full'; };
+  const loadProgramToConstructor = (programId: string) => { const lib = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS] as any[]; const prog = lib.find(p => p.id === programId); if (!prog || !prog.weeks?.length) return; const wk = prog.weeks[0]; const days = wk.days.map((d: any, di: number) => ({ day: di + 1, groups: Array.from(new Set((d.exercises || []).map((e: any) => detectGroup(e.name)))), exercises: (d.exercises || []).map((e: any) => { const g = detectGroup(e.name); const rir = e.rir ?? (e.rpe ? Math.max(0, 10 - e.rpe) : 2); const pct = PCT_FOR_RIR_MAN[Math.max(0, Math.min(5, rir))] ?? 0.9; const reps = parseInt(e.reps) || (parseInt(String(e.reps).replace(/[^0-9]/g,'')) || 8); const weight = Math.round((tprofile.workMax[g] || 80) * pct); return { name: e.name, sets: e.sets, reps: String(e.reps), rir, rest: e.restSec || 120, group: g, weight }; }) })); const corrections: string[] = []; corrections.push('Загружена готовая программа «' + prog.name + '» (' + (prog.author || '') + ', ' + prog.goal + ', ' + prog.level + ') — неделя 1, ' + days.length + ' дн.'); corrections.push('Программа доступна для редактирования, применения методик и выполнения. Веса рассчитаны из workMax×%1RM(RIR); отредактируйте при необходимости.'); if (prog.warnings?.length) corrections.push('Предупреждения программы: ' + prog.warnings.join('; ')); setManualResult({ splitName: prog.name + ' (неделя 1)', corrections, days }); };
   const generateManualPlan = () => {
+    const corrections: string[] = [];
     const inp = { goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as TrainingInput;
     const auto = selectSplit(inp);
     const manualSp = manualCfg.split ? TRAINING_SPLITS[manualCfg.split] : null;
     const sp = manualSp ? { id: manualCfg.split!, name: manualSp.name, desc: manualSp.desc, groupsPerDay: manualSp.groupsPerDay, score: 100, rationale: ['Ручной выбор'] } as SplitCandidate : auto[0];
     if (!sp) { setManualResult(null); return; }
+    if (manualSp) corrections.push(`Сплит выбран вручную: «${sp.name}» (вместо авто-подбора).`); else corrections.push(`Сплит подобран автоматически: «${sp.name}».`);
     const cycle: string[][] = []; let gi = 0; while (cycle.length < daysPerWeek) { cycle.push(sp.groupsPerDay[gi % sp.groupsPerDay.length]); gi++; }
-    const mrv = ((LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20) * (tprofile.onCourse ? (tprofile.courseIntensity === 'heavy' ? 1.3 : tprofile.courseIntensity === 'mild' ? 1.15 : 1.2) : 1);
+    const _labAdj = labTrainingAdjust(linked.labAnalysis);
+    const courseMult = tprofile.onCourse ? (tprofile.courseIntensity === 'heavy' ? 1.3 : tprofile.courseIntensity === 'mild' ? 1.15 : 1.2) : 1;
+    const baseMrv = (LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20;
+    const mrv = baseMrv * courseMult * _labAdj.mrvMultiplier;
+    if (tprofile.onCourse) corrections.push(`MRV повышен на курсе: база ${baseMrv} × ${courseMult} (интенсивность курса) = ${Math.round(baseMrv * courseMult)}.`);
+    if (_labAdj.mrvMultiplier < 1) corrections.push(`MRV снижен по лаборатории ×${_labAdj.mrvMultiplier.toFixed(2)}: ${_labAdj.warnings.join(' ')}`);
+    corrections.push(`Допустимый объём (MRV): ${Math.round(mrv)} сетов/нед на группу.`);
     const weeklySets: Record<string, number> = {};
     const isWeak = (g: string) => weakPoints.includes(g);
+    if (weakPoints.length > 0) corrections.push(`Слабые группы (${weakPoints.join(', ')}): приоритет в отборе + RIR ↓ (ближе к отказу) для акцента.`);
+    if (tprofile.equipment.length > 0) corrections.push(`Фильтр оборудования: только ${tprofile.equipment.join(', ')}.`);
     const days = cycle.map((groups, di) => {
       const exs: { name: string; sets: number; reps: string; rir: number; rest: number; group: string; weight: number }[] = [];
       groups.forEach(g => {
         const allPool = getExercisesByGroup(g);
         const eqFilter = (e: typeof allPool[number]) => tprofile.equipment.length === 0 || tprofile.equipment.includes(e.equipment);
         const pool = allPool.filter(eqFilter);
-        const poolFinal = pool.length > 0 ? pool : allPool; // fallback если по оборудованию ничего не нашлось
-        // отбор по релевантности: соединения сначала (сортировка по приоритету инвентаря/типа), затем изоляции
+        let poolFinal = pool;
+        if (tprofile.equipment.length > 0) {
+          if (pool.length === 0) { poolFinal = allPool; corrections.push(`Группа «${g}»: нет упражнений по выбранному оборудованию — взят полный каталог (без фильтра).`); }
+          else if (pool.length < allPool.length) corrections.push(`Группа «${g}»: исключено ${allPool.length - pool.length} упражнений без доступного оборудования.`);
+        }
         const rank = (e: typeof allPool[number]) => (e.type === 'compound' ? 100 : 0) + (e.equipment === 'barbell' ? 10 : e.equipment === 'dumbbell' ? 5 : 0) + (isWeak(g) ? 5 : 0);
         const compounds = [...poolFinal].filter(e => e.type === 'compound').sort((a, b) => rank(b) - rank(a)).slice(0, 2);
         const isolations = [...poolFinal].filter(e => e.type === 'isolation').sort((a, b) => rank(b) - rank(a)).slice(0, 2);
         const chosen = [...compounds, ...isolations];
+        let capped = false;
         for (const ex of chosen) {
           const already = weeklySets[g] || 0;
-          if (already >= mrv) break; // кап объёма по MRV — анти-перетрен
+          if (already >= mrv) { capped = true; break; }
           const pr = calcExercisePrescription(ex, goal, level, isWeak(g), false, 1, 1, mesoLength);
           const wm = (tprofile.workMax[g] || manualWorkMax[g] || 80);
           const pct = PCT_FOR_RIR_MAN[Math.max(0, Math.min(5, pr.rir))] ?? 0.9;
@@ -186,10 +204,12 @@ export const TrainingScreen: React.FC = () => {
           exs.push({ name: ex.name, sets: pr.sets, reps: pr.reps, rir: pr.rir, rest: pr.rest, group: g, weight });
           weeklySets[g] = already + pr.sets;
         }
+        if (capped) corrections.push(`Группа «${g}»: объём достиг MRV (${Math.round(mrv)}) — лишние упражнения убраны (анти-перетрен).`);
       });
       return { day: di + 1, groups, exercises: exs };
     });
-    setManualResult({ splitName: sp.name, days });
+    Object.entries(weeklySets).forEach(([g, s]) => { if (s < Math.max(4, mrv * 0.4) && s > 0) corrections.push(`Группа «${g}»: низкий объём (${s} сетов) — ниже зоны адаптации, рассмотрите добор.`); });
+    setManualResult({ splitName: sp.name, corrections, days });
   };
   const [builderSplit, setBuilderSplit] = useState<SplitCandidate | null>(null);
   const [builderDayExercises, setBuilderDayExercises] = useState<Record<number, { name: string; sets: number; reps: string; rir: number; rest: number; group: string; type?: string; rpeHint?: string; dropSet?: boolean; backoffSet?: boolean; substitutes?: string[] }[]>>({});
@@ -218,6 +238,7 @@ export const TrainingScreen: React.FC = () => {
   const [plRuntime, setPlRuntime] = useState<{ days: PlayerDay[]; focus: string; week: number; track: string } | null>(() => { try { const v = localStorage.getItem('he_pl_runtime'); return v ? JSON.parse(v) : null; } catch { return null; } });
   const [plRunOpen, setPlRunOpen] = useState(false);
   useEffect(() => { if (tab === 'runtime') { try { const v = localStorage.getItem('he_pl_runtime'); setPlRuntime(v ? JSON.parse(v) : null); } catch { /* ignore */ } } }, [tab]);
+  useEffect(() => { if (linked.readiness) appendReadinessToday(linked.readiness.recovery ?? 70, linked.readiness.fatigue ?? 30); }, [linked.readiness]);
   const [showWarmup, setShowWarmup] = useState(false);
   const [showCooldown, setShowCooldown] = useState(false);
   const [runtimeSetW, setRuntimeSetW] = useState(80);
@@ -912,7 +933,8 @@ export const TrainingScreen: React.FC = () => {
                       )}
                       {/* MRV guardrail — анти-перетрен по объёму недели */}
                       {currentMicrocycle && (() => {
-                        const mrv = ((LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20) * (tprofile.onCourse ? (tprofile.courseIntensity === 'heavy' ? 1.3 : tprofile.courseIntensity === 'mild' ? 1.15 : 1.2) : 1);
+                        const _labAdj = labTrainingAdjust(linked.labAnalysis);
+    const mrv = ((LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20) * (tprofile.onCourse ? (tprofile.courseIntensity === 'heavy' ? 1.3 : tprofile.courseIntensity === 'mild' ? 1.15 : 1.2) : 1) * _labAdj.mrvMultiplier;
                         const wk: Record<string, number> = {};
                         currentMicrocycle.days.filter((d: any) => d.isTraining).forEach((d: any) => (d.exercises || []).forEach((e: any) => { wk[e.group] = (wk[e.group] || 0) + (e.sets || 0); }));
                         const over = Object.entries(wk).filter(([, s]) => s > mrv);
@@ -2052,6 +2074,7 @@ export const TrainingScreen: React.FC = () => {
           {tab === 'programcalc' && (<>
           <div className="card" style={{ padding: '10px 12px' }}>
             <TrainingProfileCard profile={tprofile} update={updateTProfile} />
+            {(() => { const la = labTrainingAdjust(linked.labAnalysis); if (la.warnings.length === 0 && la.mrvMultiplier >= 1) return null; return <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: la.deloadRecommended ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border: '1px solid ' + (la.deloadRecommended ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.2)') }}><div style={{ fontSize: 11, fontWeight: 800, color: la.deloadRecommended ? '#ef4444' : '#f59e0b', marginBottom: 4 }}>🧪 Лабораторная коррекция плана (MRV ×{la.mrvMultiplier.toFixed(2)})</div>{la.warnings.map((w, i) => <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.4, marginBottom: 2 }}>• {w}</div>)}{la.intensityNote && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>{la.intensityNote}</div>}</div>; })()}
             <h3 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 800, color: 'var(--accent)' }}>🛠 Ручной конструктор программы</h3>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 10 }}>Выберите параметры сверху вниз и нажмите «Собрать программу» — получите готовый план по дням.</div>
             <div style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: 12, marginBottom: 10 }}>
@@ -2079,6 +2102,7 @@ export const TrainingScreen: React.FC = () => {
                 <PopupSelect label="Частота" value={manualCfg.frequency || ''} onChange={v => setManual('frequency', v)} options={getMethodsByCategory('frequency').map(m => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
               </div>
               {Object.values(manualCfg).some(Boolean) && <div style={{ marginTop: 8, fontSize: 10, color: 'var(--accent)' }}>✓ Выбрано: {Object.entries(manualCfg).filter(([, v]) => v).map(([k, v]) => k).join(' · ')}</div>}
+              {manualCfg.program && <button onClick={() => loadProgramToConstructor(manualCfg.program)} style={{ width: '100%', marginTop: 8, padding: 10, borderRadius: 8, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>📥 Загрузить программу в конструктор</button>}
             </div>
 
             {/* Кнопка генерации по ручной конфигурации + результат */}
@@ -2096,6 +2120,12 @@ export const TrainingScreen: React.FC = () => {
                 {Object.values(manualCfg).some(Boolean) && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 6, lineHeight: 1.6 }}>
                   <b style={{ color: 'var(--accent)' }}>Параметры:</b> {Object.entries(manualCfg).filter(([, v]) => v).map(([k, v]) => { const L: Record<string,string> = { split: 'сплит', cycle: 'цикл', program: 'программа', periodization: 'периодизация', progression: 'прогрессия', intensity: 'интенсивность', technique: 'техника', volume: 'объём', frequency: 'частота' }; return `${L[k] || k}: ${v}`; }).join(' · ')}
                 </div>}
+                {manualResult.corrections && manualResult.corrections.length > 0 && (
+                  <div style={{ marginTop: 6, padding: 10, borderRadius: 10, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>📝 Комментарии к плану (что изменено и почему)</div>
+                    {manualResult.corrections.map((corr, i) => <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginBottom: 3, paddingLeft: 4, borderLeft: '2px solid rgba(59,130,246,0.4)' }}>{corr}</div>)}
+                  </div>
+                )}
                 <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {manualResult.days.map(d => (
                     <div key={d.day} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
@@ -2121,7 +2151,8 @@ export const TrainingScreen: React.FC = () => {
                 </div>
                 {/* Сводка качества плана */}
                 {(() => {
-                  const mrv = ((LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20) * (tprofile.onCourse ? (tprofile.courseIntensity === 'heavy' ? 1.3 : tprofile.courseIntensity === 'mild' ? 1.15 : 1.2) : 1);
+                  const _labAdj = labTrainingAdjust(linked.labAnalysis);
+    const mrv = ((LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20) * (tprofile.onCourse ? (tprofile.courseIntensity === 'heavy' ? 1.3 : tprofile.courseIntensity === 'mild' ? 1.15 : 1.2) : 1) * _labAdj.mrvMultiplier;
                   const wk: Record<string, number> = {};
                   manualResult.days.forEach(d => d.exercises.forEach(e => { wk[e.group] = (wk[e.group] || 0) + e.sets; }));
                   const groups = Object.keys(wk);
@@ -2147,6 +2178,8 @@ export const TrainingScreen: React.FC = () => {
                 <button onClick={() => { try { const data = { name: `Ручная: ${manualResult.splitName}'`, date: new Date().toISOString().slice(0,10), cfg: manualCfg, days: manualResult.days, generatedAt: Date.now() }; const ex = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); ex.unshift(data); localStorage.setItem('myTrainingPlans', JSON.stringify(ex.slice(0,30))); refreshManualSaved(); } catch {} }} style={{ width: '100%', marginTop: 8, padding: 10, borderRadius: 8, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.06)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>💾 Сохранить программу в «Мои тренировки»</button>
                 <button onClick={exportManualPlanText} style={{ width: '100%', marginTop: 6, padding: 10, borderRadius: 8, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>{planCopied ? '✓ Скопировано в буфер' : '📋 Копировать план (текст)'}</button>
                 <button onClick={printManualPlan} style={{ width: '100%', marginTop: 6, padding: 10, borderRadius: 8, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>🖨 Печать / сохранить в PDF</button>
+                <button onClick={manualToRuntime} style={{ width: '100%', marginTop: 6, padding: 10, borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(0,230,138,0.08)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>▶ К выполнению (SessionPlayer)</button>
+                {(manualCfg.intensity || manualCfg.technique || manualCfg.volume) && <button onClick={applyMethodicToPlan} style={{ width: '100%', marginTop: 6, padding: 10, borderRadius: 8, border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.08)', color: '#f59e0b', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>🔧 Применить методику к плану</button>}
               </div>
             )}
 
@@ -3353,6 +3386,7 @@ export const TrainingScreen: React.FC = () => {
           ))}
         </div>
       } />
+      <MethodologyEncyclopedia />
       <ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} onAddToMyTraining={(exs) => setCustomExercises(prev => [...prev, ...exs])} />
       <MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} appliedMethods={appliedMethods} onToggleMethod={(name, category) => setAppliedMethods(prev => { const next = { ...prev }; if (next[category] === name) delete next[category]; else next[category] = name; return next; })} onApplyComposition={() => { applyMethodComposition(); setTab('plan'); }} />
     </div>
@@ -3475,6 +3509,10 @@ import { ExerciseCalcTab } from './TrainingScreen_parts/ExerciseCalcTab';
 import { TrainingLoadCalculator } from './TrainingScreen_parts/TrainingLoadCalculator';
 import { TonnageCalculator } from './TrainingScreen_parts/TonnageCalculator';
 import { WhatIfCard } from './TrainingScreen_parts/WhatIfCard';
+import { ReadinessForecastCard } from './TrainingScreen_parts/ReadinessForecastCard';
+import { MethodologyEncyclopedia } from './TrainingScreen_parts/MethodologyEncyclopedia';
+import { labTrainingAdjust } from './TrainingScreen_parts/lab-training-adjust';
+import { appendReadinessToday } from './TrainingScreen_parts/readiness-history';
 import { useTrainingProfile } from './TrainingScreen_parts/training-profile';
 import { TrainingProfileCard } from './TrainingScreen_parts/TrainingProfileCard';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';

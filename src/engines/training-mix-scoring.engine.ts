@@ -30,7 +30,7 @@ export interface TrainingMixScore {
 }
 
 export interface MixProfile {
-  goal: 'pump' | 'endurance' | 'strength' | 'recovery' | 'focus' | 'powerlifting' | 'competition' | 'crossfit' | 'post_comp';
+  goal: 'pump' | 'endurance' | 'strength' | 'recovery' | 'focus' | 'powerlifting' | 'competition' | 'crossfit' | 'post_comp' | 'hiit' | 'mma' | 'sprint';
   timing: 'pre' | 'intra' | 'post';
   weightKg: number;
   isOnCycle: boolean;
@@ -185,6 +185,9 @@ export const MIX_SYNERGY: Record<string, string> = {
   competition: 'Экстремальный CNS-фокус (кофеин 400 мг), аммиак-буфер (OKG), NO-каскад (агматин + цитруллин), умеренная гипергидратация (глицерол). Минимум объёма, максимум CNS-активации.',
   crossfit: 'Митохондриальная ёмкость (кордицепс) + H⁺-буферизация (β-аланин) + гидратация (глицерол) + NO для кровотока (цитруллин) + адаптоген (родиола) + осморегуляция (таурин).',
   post_comp: 'Гормональная стабилизация (ZMA + ашваганда + родиола), полный MPS (протеин + глютамин), креатин-загрузка, антиоксиданты (вит. C), глутатион (NAC), системное воспаление (омега-3).',
+  hiit: 'Анаэробная ёмкость (β-аланин + креатин), гидратация (глицерол + электролиты), NO-буст (цитруллин), CNS-активация (кофеин), быстрый ресинтез АТФ (кордицепс), буфер лактата (таурин).',
+  mma: 'Взрывная сила (креатин), CNS-ready (кофеин 200 мг + тирозин), лактат-буфер (β-аланин), гидратация (глицерол), NO-кровоток (цитруллин), адаптоген (родиола), защита мозга (АЦЛ-карнитин + таурин).',
+  sprint: 'Быстрая АТФ-регенерация (креатин 8 г + кордицепс), NO-пампинг (цитруллин + глицерол), CNS-стимуляция (кофеин), H⁺-буфер (β-аланин), нейромышечная передача (магний + таурин).',
 };
 
 export interface MixTemplate {
@@ -251,6 +254,34 @@ export const MIX_TEMPLATES: MixTemplate[] = [
     pre: [{ id:'caffeine', dose:'300', unit:'мг' }, { id:'beta_alanine', dose:'4', unit:'г' }, { id:'cordyceps', dose:'3', unit:'г' }, { id:'citrulline', dose:'6', unit:'г' }],
     intra: [{ id:'hbcd', dose:'60', unit:'г' }, { id:'eaa', dose:'15', unit:'г' }, { id:'electrolyte', dose:'2', unit:'г/л' }, { id:'glycerol', dose:'3', unit:'г' }],
     post: [{ id:'protein', dose:'0.35', unit:'г/кг' }, { id:'creatine', dose:'5', unit:'г' }, { id:'omega3', dose:'2', unit:'г' }, { id:'curcumin', dose:'800', unit:'мг' }],
+  },
+  {
+    id: 'post_comp_recovery', name: 'Пост-соревновательное восстановление', description: 'Гормональный откат + кортизол + сон. ZMA, ашваганда, витамин C, родиола.',
+    goal: 'post_comp', tags: ['post', 'recovery', 'гормоны', 'кортизол'],
+    pre: [{ id:'ashwagandha', dose:'600', unit:'мг' }, { id:'rhodiola', dose:'500', unit:'мг' }, { id:'magnesium', dose:'400', unit:'мг' }],
+    intra: [{ id:'electrolyte', dose:'1', unit:'г/л' }, { id:'eaa', dose:'5', unit:'г' }],
+    post: [{ id:'protein', dose:'0.4', unit:'г/кг' }, { id:'zinc', dose:'30', unit:'мг' }, { id:'magnesium', dose:'450', unit:'мг' }, { id:'vitamin_c', dose:'1000', unit:'мг' }, { id:'ashwagandha', dose:'600', unit:'мг' }, { id:'omega3', dose:'2', unit:'г' }, { id:'melatonin', dose:'3', unit:'мг' }, { id:'gaba', dose:'750', unit:'мг' }],
+  },
+  {
+    id: 'hiit_stack', name: 'HIIT: анаэробная ёмкость', description: 'β-аланин + креатин + глицерол + кофеин. Для спринтов и интервалов.',
+    goal: 'hiit', tags: ['pre', 'intra', 'post', 'HIIT', 'анаэробика'],
+    pre: [{ id:'caffeine', dose:'200', unit:'мг' }, { id:'beta_alanine', dose:'4', unit:'г' }, { id:'creatine', dose:'5', unit:'г' }, { id:'citrulline', dose:'6', unit:'г' }, { id:'taurine', dose:'2', unit:'г' }],
+    intra: [{ id:'hbcd', dose:'30', unit:'г' }, { id:'electrolyte', dose:'1.5', unit:'г/л' }, { id:'glycerol', dose:'3', unit:'г' }],
+    post: [{ id:'protein', dose:'0.35', unit:'г/кг' }, { id:'creatine', dose:'5', unit:'г' }, { id:'omega3', dose:'2', unit:'г' }, { id:'cordyceps', dose:'2', unit:'г' }],
+  },
+  {
+    id: 'mma_stack', name: 'MMA: взрыв + защита мозга', description: 'Креатин + β-аланин + глицерол + родиола + АЦЛ-карнитин.',
+    goal: 'mma', tags: ['pre', 'intra', 'post', 'MMA', 'единоборства'],
+    pre: [{ id:'creatine', dose:'5', unit:'г' }, { id:'caffeine', dose:'200', unit:'мг' }, { id:'beta_alanine', dose:'4', unit:'г' }, { id:'citrulline', dose:'6', unit:'г' }, { id:'tyrosine', dose:'2', unit:'г' }, { id:'alcar', dose:'1.5', unit:'г' }, { id:'taurine', dose:'2', unit:'г' }, { id:'rhodiola', dose:'500', unit:'мг' }],
+    intra: [{ id:'hbcd', dose:'40', unit:'г' }, { id:'eaa', dose:'10', unit:'г' }, { id:'electrolyte', dose:'2', unit:'г/л' }, { id:'glycerol', dose:'3', unit:'г' }],
+    post: [{ id:'protein', dose:'0.4', unit:'г/кг' }, { id:'glutamine', dose:'10', unit:'г' }, { id:'creatine', dose:'5', unit:'г' }, { id:'omega3', dose:'3', unit:'г' }, { id:'ashwagandha', dose:'600', unit:'мг' }, { id:'curcumin', dose:'800', unit:'мг' }],
+  },
+  {
+    id: 'sprint_stack', name: 'Спринт: АТФ-регенерация', description: 'Креатин 8 г + кордицепс + цитруллин. Для бега на 100-400м.',
+    goal: 'sprint', tags: ['pre', 'post', 'спринт', 'скорость'],
+    pre: [{ id:'creatine', dose:'8', unit:'г' }, { id:'caffeine', dose:'250', unit:'мг' }, { id:'beta_alanine', dose:'4', unit:'г' }, { id:'citrulline', dose:'8', unit:'г' }, { id:'cordyceps', dose:'3', unit:'г' }, { id:'taurine', dose:'2', unit:'г' }, { id:'magnesium', dose:'400', unit:'мг' }],
+    intra: [{ id:'electrolyte', dose:'1', unit:'г/л' }, { id:'glycerol', dose:'3', unit:'г' }],
+    post: [{ id:'protein', dose:'0.3', unit:'г/кг' }, { id:'creatine', dose:'5', unit:'г' }, { id:'hmb', dose:'3', unit:'г' }, { id:'l_carnitine', dose:'1', unit:'г' }],
   },
 ];
 
@@ -599,9 +630,9 @@ export function calculateMixScore(substances: MixSubstance[], profile: MixProfil
 
   // Carb calculation based on goal and drugs
   let recCarbs = 0;
-  if (profile.timing === 'pre') recCarbs = bw * (profile.goal === 'endurance' ? 1.2 : profile.goal === 'crossfit' ? 1.0 : profile.goal === 'powerlifting' || profile.goal === 'competition' ? 1.0 : profile.goal === 'post_comp' ? 0.6 : profile.goal === 'strength' ? 0.8 : 0.6) * multiplier;
-  if (profile.timing === 'intra') recCarbs = bw * durHrs * (profile.goal === 'crossfit' ? 0.8 : profile.goal === 'powerlifting' ? 0.5 : profile.goal === 'competition' ? 0.4 : 0.6) * multiplier;
-  if (profile.timing === 'post') recCarbs = bw * (profile.goal === 'crossfit' || profile.goal === 'post_comp' ? 1.4 : profile.goal === 'competition' ? 1.2 : 0.8) * multiplier;
+  if (profile.timing === 'pre') recCarbs = bw * (profile.goal === 'endurance' ? 1.2 : profile.goal === 'crossfit' ? 1.0 : profile.goal === 'powerlifting' || profile.goal === 'competition' ? 1.0 : profile.goal === 'post_comp' ? 0.6 : profile.goal === 'strength' ? 0.8 : profile.goal === 'hiit' ? 0.7 : profile.goal === 'mma' ? 0.7 : profile.goal === 'sprint' ? 0.6 : 0.6) * multiplier;
+  if (profile.timing === 'intra') recCarbs = bw * durHrs * (profile.goal === 'crossfit' ? 0.8 : profile.goal === 'powerlifting' ? 0.5 : profile.goal === 'competition' ? 0.4 : profile.goal === 'hiit' ? 0.3 : profile.goal === 'mma' ? 0.4 : profile.goal === 'sprint' ? 0.2 : 0.6) * multiplier;
+  if (profile.timing === 'post') recCarbs = bw * (profile.goal === 'crossfit' || profile.goal === 'post_comp' ? 1.4 : profile.goal === 'competition' ? 1.2 : profile.goal === 'hiit' ? 1.0 : profile.goal === 'mma' ? 1.0 : profile.goal === 'sprint' ? 0.8 : 0.8) * multiplier;
   if (profile.drugs.insulin) {
     const insulinFactor = profile.drugs.insulinTiming === 'post' ? 1.3 : 1.5;
     recCarbs *= insulinFactor;
@@ -661,11 +692,14 @@ export function calculateMixScore(substances: MixSubstance[], profile: MixProfil
   const isEndurance = profile.goal === 'endurance';
   const isFocus = profile.goal === 'focus';
   const isRecovery = profile.goal === 'recovery';
+  const isHIIT = profile.goal === 'hiit';
+  const isMMA = profile.goal === 'mma';
+  const isSprint = profile.goal === 'sprint';
   const weights = profile.timing === 'pre'
-    ? { pump: isPump ? 0.35 : isStrength ? 0.10 : isEndurance ? 0.10 : isFocus ? 0.05 : isCF ? 0.15 : 0.15, energy: isPump ? 0.15 : isStrength ? 0.20 : isEndurance ? 0.30 : isFocus ? 0.20 : isCF ? 0.30 : 0.25, focus: isPump ? 0.05 : isStrength ? 0.10 : isEndurance ? 0.10 : isFocus ? 0.40 : isCF ? 0.25 : 0.25, strength: isPump ? 0.10 : isStrength ? 0.40 : isEndurance ? 0.10 : isFocus ? 0.10 : isPL ? 0.25 : 0.25, endurance: isPump ? 0.10 : isStrength ? 0.05 : isEndurance ? 0.35 : isFocus ? 0.05 : isCF ? 0.15 : 0.05 }
+    ? { pump: isPump ? 0.35 : isStrength ? 0.10 : isEndurance ? 0.10 : isFocus ? 0.05 : isCF ? 0.15 : isHIIT ? 0.08 : isMMA ? 0.05 : isSprint ? 0.05 : 0.15, energy: isPump ? 0.15 : isStrength ? 0.20 : isEndurance ? 0.30 : isFocus ? 0.20 : isCF ? 0.30 : isHIIT ? 0.35 : isMMA ? 0.25 : isSprint ? 0.30 : 0.25, focus: isPump ? 0.05 : isStrength ? 0.10 : isEndurance ? 0.10 : isFocus ? 0.40 : isCF ? 0.25 : isHIIT ? 0.05 : isMMA ? 0.20 : isSprint ? 0.05 : 0.25, strength: isPump ? 0.10 : isStrength ? 0.40 : isEndurance ? 0.10 : isFocus ? 0.10 : isPL ? 0.25 : isHIIT ? 0.20 : isMMA ? 0.25 : isSprint ? 0.40 : 0.25, endurance: isPump ? 0.10 : isStrength ? 0.05 : isEndurance ? 0.35 : isFocus ? 0.05 : isCF ? 0.15 : isHIIT ? 0.25 : isMMA ? 0.15 : isSprint ? 0.10 : 0.05 }
     : profile.timing === 'intra'
-    ? { pump: isPump ? 0.20 : isStrength ? 0.10 : 0.10, energy: isEndurance ? 0.20 : isCF ? 0.10 : 0.10, focus: 0.05, strength: isStrength ? 0.15 : 0.05, hydration: isCF ? 0.35 : isEndurance ? 0.35 : 0.30, endurance: isEndurance ? 0.25 : isCF ? 0.20 : 0.20, anticatabolic: 0.15 }
-    : { pump: 0.05, energy: 0.05, focus: 0.05, strength: isStrength ? 0.20 : isPL ? 0.15 : 0.1, hydration: 0.05, recovery: isRecovery ? 0.50 : isPostComp ? 0.45 : isPL ? 0.40 : 0.35, protein: isRecovery ? 0.20 : isStrength ? 0.30 : isPostComp ? 0.25 : 0.25, glycogen: isPostComp ? 0.10 : isPL ? 0.05 : 0.10, antiinflammatory: isRecovery ? 0.10 : isPostComp ? 0.10 : 0 };
+    ? { pump: isPump ? 0.20 : isStrength ? 0.10 : isHIIT ? 0.08 : isMMA ? 0.10 : isSprint ? 0.20 : 0.10, energy: isEndurance ? 0.20 : isCF ? 0.10 : 0.10, focus: 0.05, strength: isStrength ? 0.15 : isSprint ? 0.05 : isHIIT ? 0.05 : 0.05, hydration: isCF ? 0.35 : isEndurance ? 0.35 : isHIIT ? 0.40 : isMMA ? 0.35 : isSprint ? 0.40 : 0.30, endurance: isEndurance ? 0.25 : isCF ? 0.20 : isHIIT ? 0.30 : isMMA ? 0.25 : isSprint ? 0.20 : 0.20, anticatabolic: isMMA ? 0.20 : isHIIT ? 0.15 : isSprint ? 0.10 : 0.15 }
+    : { pump: 0.05, energy: 0.05, focus: 0.05, strength: isStrength ? 0.20 : isPL ? 0.15 : isSprint ? 0.15 : 0.1, hydration: 0.05, recovery: isRecovery ? 0.50 : isPostComp ? 0.45 : isPL ? 0.40 : isHIIT ? 0.40 : isMMA ? 0.35 : isSprint ? 0.30 : 0.35, protein: isRecovery ? 0.20 : isStrength ? 0.30 : isPostComp ? 0.25 : isMMA ? 0.30 : isSprint ? 0.30 : 0.25, glycogen: isPostComp ? 0.10 : isPL ? 0.05 : isHIIT ? 0.15 : isMMA ? 0.10 : isSprint ? 0.10 : 0.10, antiinflammatory: isRecovery ? 0.10 : isPostComp ? 0.10 : isMMA ? 0.05 : isSprint ? 0.05 : 0 };
 
   for (const [key, w] of Object.entries(weights)) {
     const val = key === 'pump' ? pump : key === 'energy' ? energy : key === 'focus' ? focus : key === 'strength' ? strength : key === 'hydration' ? hydration : key === 'endurance' ? endurance : key === 'anticatabolic' ? anticatabolic : key === 'recovery' ? recovery : key === 'protein' ? protein : glycogen;
@@ -698,6 +732,21 @@ export function calculateMixScore(substances: MixSubstance[], profile: MixProfil
     if (profile.timing === 'pre') suggestions.push('💪 CrossFit: кофеин 200-400 мг + бета-аланин 4 г + кордицепс 3 г + электролиты для WOD');
     if (profile.timing === 'intra') suggestions.push('💪 CF (2-3 сессии): HBCD 60-80 г + EAA 15 г + L-карнитин 1 г + Na/K/Mg между WODами для восстановления');
     if (profile.timing === 'post') suggestions.push('💪 CF: протеин 0.5 г/кг + HBCD 1.5 г/кг + креатин 5 г + куркумин + омега-3 для системного воспаления');
+  }
+  if (profile.goal === 'hiit') {
+    if (profile.timing === 'pre') suggestions.push('💨 HIIT: β-аланин 4 г для буферизации H⁺, креатин 5 г для АТФ, кофеин 200 мг для CNS, цитруллин 6 г для NO');
+    if (profile.timing === 'intra') suggestions.push('💨 HIIT intra: HBCD 30 г + электролиты + глицерол 3 г для гидратации между спринтами');
+    if (profile.timing === 'post') suggestions.push('💨 HIIT post: протеин 0.35 г/кг + креатин 5 г + омега-3 2 г + кордицепс 2 г для восстановления');
+  }
+  if (profile.goal === 'mma') {
+    if (profile.timing === 'pre') suggestions.push('🥊 MMA: креатин 5 г для взрывной, тирозин + кофеин 200 мг для CNS, β-аланин 4 г, цитруллин 6 г для NO, родиола 500 мг адаптоген');
+    if (profile.timing === 'intra') suggestions.push('🥊 MMA intra: HBCD 40 г + EAA 10 г + электролиты + глицерол 3 г между раундами');
+    if (profile.timing === 'post') suggestions.push('🥊 MMA post: протеин 0.4 г/кг + глютамин 10 г для GABA/восстановление, креатин 5 г, омега-3 3 г, ашваганда 600 мг для кортизола');
+  }
+  if (profile.goal === 'sprint') {
+    if (profile.timing === 'pre') suggestions.push('🏃 Спринт: креатин 8 г для фосфокреатина, β-аланин 4 г, кофеин 250 мг, кордицепс 3 г для АТФ, цитруллин 8 г');
+    if (profile.timing === 'intra') suggestions.push('🏃 Спринт intra: электролиты + глицерол 3 г — короткая работа, только гидратация');
+    if (profile.timing === 'post') suggestions.push('🏃 Спринт post: протеин 0.3 г/кг + креатин 5 г + HMB 3 г анти-катаболизм + L-карнитин 1 г');
   }
   if (profile.goal === 'post_comp') {
     suggestions.push('🔄 Пост-соревнования: гормональный откат — ZMA, ашваганда 600 мг, витамин C 1 г, родиола 500 мг (кортизол + восстановление)');
