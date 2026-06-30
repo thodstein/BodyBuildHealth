@@ -24,6 +24,15 @@ export const TZRiskMatrix: React.FC = () => {
   }, [linked.course]);
   const [sliderWeek, setSliderWeek] = useState(() => Math.round(maxCourseWeeks * 0.5));
 
+  // Load support substance IDs from same source as RiskScreen
+  const supportIds = useMemo(() => {
+    try {
+      const sr = JSON.parse(localStorage.getItem('he_support_risk') || 'null');
+      if (sr && Array.isArray(sr.subs)) return sr.subs.map((id: string) => id.toLowerCase());
+    } catch {}
+    return [];
+  }, []);
+
   const tzResult = useMemo<TZRiskResult | null>(() => {
     if (!linked.profile) return null;
     const s = linked.profile.settings;
@@ -43,11 +52,11 @@ export const TZRiskMatrix: React.FC = () => {
         },
         weight: s.weight ?? 80, age: s.age ?? 30,
         sex: (s.sex ?? 'male') as 'male' | 'female',
-        supportSubstances: [],
+        supportSubstances: supportIds,
         courseWeek: sliderWeek,
       });
     } catch { return null; }
-  }, [linked.profile, linked.course, linked.labs, sliderWeek]);
+  }, [linked.profile, linked.course, linked.labs, sliderWeek, supportIds]);
 
   if (!tzResult) {
     return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Загрузка данных профиля и курса...</div>;

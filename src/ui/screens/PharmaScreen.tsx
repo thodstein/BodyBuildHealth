@@ -915,14 +915,17 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
       {(detail?.synergies && detail.synergies.length > 0) && (
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>Синергия и комбинации</div>
-          {detail.synergies.map((s, i) => (
-            <div key={i} style={{ marginBottom: 4, padding: '4px 8px', borderRadius: 4, background: s.type === 'synergistic' ? 'rgba(0,230,138,0.08)' : s.type === 'antagonistic' ? 'rgba(255,23,68,0.08)' : 'rgba(41,121,255,0.08)' }}>
-              <span style={{ fontWeight: 600, color: s.type === 'synergistic' ? '#00e68a' : s.type === 'antagonistic' ? '#ff1744' : '#2979ff' }}>
-                {s.type === 'synergistic' ? '⊕' : s.type === 'antagonistic' ? '⊖' : '→'} {PHARMA_DB[s.with]?.name || s.with}
-              </span>
-              <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>{s.desc}</span>
-            </div>
-          ))}
+          {(() => { try { return detail!.synergies.map((s: any, i: number) => {
+            const linkedName = (typeof s.with === 'string' && PHARMA_DB[s.with]) ? PHARMA_DB[s.with].name : s.with || '—';
+            return (
+              <div key={i} style={{ marginBottom: 4, padding: '4px 8px', borderRadius: 4, background: s.type === 'synergistic' ? 'rgba(0,230,138,0.08)' : s.type === 'antagonistic' ? 'rgba(255,23,68,0.08)' : 'rgba(41,121,255,0.08)' }}>
+                <span style={{ fontWeight: 600, color: s.type === 'synergistic' ? '#00e68a' : s.type === 'antagonistic' ? '#ff1744' : '#2979ff' }}>
+                  {s.type === 'synergistic' ? '⊕' : s.type === 'antagonistic' ? '⊖' : '→'} {linkedName}
+                </span>
+                <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>{s.desc || ''}</span>
+              </div>
+            );
+          }); } catch { return null; }})()}
         </div>
       )}
       {((detail?.sideEffects && detail.sideEffects.length > 0) || (sub.sideEffects && sub.sideEffects.length > 0)) && (

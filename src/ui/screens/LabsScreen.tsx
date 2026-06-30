@@ -15,6 +15,7 @@ import { LabsResults } from './LabsScreen_parts/LabsResults';
 import { LabsSchedule } from './LabsScreen_parts/LabsSchedule';
 import { LabsInvestigations } from './LabsScreen_parts/LabsInvestigations';
 import { LabsOverview } from './LabsScreen_parts/LabsOverview';
+import ExtendedLabsTab from './LabsScreen_parts/ExtendedLabsTab';
 import { processUploadedFile, saveParsedLabs, type ParsedLabValue, type OCRResult } from '../../core/ocr-engine';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 
@@ -140,9 +141,10 @@ const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
   { id: 'chart', label: 'Динамика', icon: '📈' },
   { id: 'schedule', label: 'График сдачи', icon: '📅' },
   { id: 'reports', label: 'Отчёты', icon: '📄' },
+  { id: 'extended', label: 'Все маркеры', icon: '🔬' },
 ];
 
-type LabSubTab = 'hero' | 'overview' | 'current' | 'archive' | 'catalog' | 'chart' | 'schedule' | 'reports';
+type LabSubTab = 'hero' | 'overview' | 'current' | 'archive' | 'catalog' | 'chart' | 'schedule' | 'reports' | 'extended';
 
 export const LabsScreen: React.FC = () => {
   const linked = useDataLink();
@@ -160,7 +162,7 @@ export const LabsScreen: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [inputUnit, setInputUnit] = useState('');
   const [inputDate, setInputDate] = useState(new Date().toISOString().split('T')[0]);
-  const [, setTick] = useState(0);
+  const [tick, setTick] = useState(0);
   const [showImport, setShowImport] = useState(false);
   const [ocrResult, setOcrResult] = useState<OCRResult | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -175,7 +177,7 @@ export const LabsScreen: React.FC = () => {
   const [catalogDetail, setCatalogDetail] = useState<{ code: string; name: string; unit: string; uln: number; lln: number; system: string; description: string } | null>(null);
   const [catFilterSys, setCatFilterSys] = useState('all');
   const [riskSections, setRiskSections] = useState<Record<string, boolean>>({
-    pharma: true, indices: true, systems: true, markers: true,
+    pharma: true, indices: true, systems: true, markers: true, requiredLabs: false,
   });
   const [addError, setAddError] = useState('');
   const [labReportGenerated, setLabReportGenerated] = useState(false);
@@ -1232,6 +1234,16 @@ export const LabsScreen: React.FC = () => {
         </div>
       )}
 
+      {/* ≡≡≡ ALL MARKERS TAB ≡≡≡ */}
+      {mainTab === 'lab' && subTab === 'extended' && (
+        <ExtendedLabsTab
+          labs={labs}
+          selectedPhase={selectedPhase}
+          onPhaseChange={handlePhaseChange}
+          tick={tick}
+        />
+      )}
+
       {/* ≡≡≡ INVESTIGATIONS TAB ≡≡≡ */}
       {mainTab === 'investigations' && (
         <div style={{ paddingTop: 8 }}>
@@ -1445,6 +1457,62 @@ export const LabsScreen: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Required Lab Markers for MDSS + Support Calculator */}
+            <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 8 }}>
+              <button onClick={() => setRiskSections(s => ({ ...s, requiredLabs: !s.requiredLabs }))} style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
+                background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 12, fontWeight: 700,
+              }}>
+                <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: riskSections.requiredLabs ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+                📋 Требуемые анализы (MDSS + Калькулятор поддержки)
+              </button>
+              {riskSections.requiredLabs && (<div style={{ padding: '0 12px 12px' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>
+                  Сводка маркеров, необходимых для полного расчёта рисков MDSS, подбора поддержки и лабораторных индексов.
+                </div>
+                {[
+                  { title: '🧬 MDSS — 14 систем', icon: '🧬', markers: [
+                    'Почки: KIM-1, Cystatin C, Nephrin, UACR, Creatinine, eGFR, Microalbumin',
+                    'Печень: CK-18, GLDH, GGT, Bile Acids, ALT, AST, ALP, Bilirubin',
+                    'Сердце: Galectin-3, NT-proBNP, Troponin I/T, ADMA, CK-MB',
+                    'Сосуды: ApoB, oxLDL, HDL, LDL, Lp(a), TC, TG, ApoA1',
+                    'ЦНС: Cortisol, HVA, Prolactin, BDNF, Serotonin, Dopamine',
+                    'HPTA: LH, FSH, TT, FT, Prolactin, SHBG, Inhibin B, DHEA-S',
+                    'Кровь: HCT, HGB, Ferritin, EPO, RBC, PLT',
+                    'Воспаление: hsCRP, CRP, Homocysteine, ESR, WBC, Fibrinogen',
+                    'Метаболизм: HOMA-IR, HbA1c, C-Peptide, Glucose, Insulin, TG',
+                    'GH/IGF: IGF-1, Glucose, Insulin, Cortisol',
+                    'Кости: CTX, COMP, P1NP, Osteocalcin, Ca, Vit D, PTH',
+                    'Щитовидная: TSH, FT3, FT4',
+                    'Простата: PSA, PSA Free, DHT, TT',
+                    'Кожа: DHT, TT, SHBG, Zn, Vit D',
+                  ]},
+                  { title: '💊 Калькулятор поддержки', icon: '💊', markers: [
+                    'Гормоны: TT, FT, E2, LH, FSH, PRL, SHBG, DHEA-S, Cortisol, Progesterone',
+                    'Биохимия: ALT, AST, GGT, ALP, Bilirubin, Creatinine, Urea, UA, GLU, TP, ALB, K, Na',
+                    'Гематология: HGB, HCT, RBC, WBC, PLT, Ferritin, Iron, TIBC',
+                    'Липиды: LDL, HDL, TG, TC, ApoA1, ApoB, Lp(a)',
+                    'Щитовидная: TSH, FT3, FT4',
+                    'Метаболизм: HOMA-IR, HbA1c, Insulin, Glucose, C-Peptide',
+                    'Воспаление: hsCRP, CRP, ESR, Fibrinogen, Homocysteine',
+                    'Маркеры: IGF-1, PSA, Vitamin D, B12, Folate, Mg, Zn, Se',
+                  ]},
+                  { title: '📊 Базовый минимум (8 маркеров)', icon: '📊', markers: [
+                    'ALT, AST, GGT (печень), Creatinine, eGFR (почки)',
+                    'LDL, HDL, TG (липиды), HCT, HGB (кровь)',
+                    'TT, E2, LH (гормоны), TSH (щитовидная)',
+                    'CRP (воспаление), GLU (метаболизм)',
+                  ]},
+                ].map(group => (
+                  <div key={group.title} style={{ marginBottom: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 2 }}>{group.icon} {group.title}</div>
+                    {group.markers.map((m, i) => (
+                      <div key={i} style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.5, paddingLeft: 6 }}>• {m}</div>
+                    ))}
+                  </div>
+                ))}
+              </div>)}</div>
           </div>
         );
       })()}

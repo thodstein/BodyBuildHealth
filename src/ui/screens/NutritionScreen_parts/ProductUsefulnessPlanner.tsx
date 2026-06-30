@@ -507,20 +507,21 @@ export const ProductUsefulnessPlanner: React.FC = () => {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 8 }}>
-            <button key="all" onClick={() => { setCategory('all'); setShowAll(false); }} style={PILL(category === 'all', '#3b82f6')}>Все</button>
             {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
               <button key={key} onClick={() => { setCategory(key); setShowAll(false); }} style={PILL(category === key, '#3b82f6')}>{label}</button>
             ))}
           </div>
+          {category !== 'all' && (
+            <div style={{ fontSize:10, fontWeight:700, color:'#3b82f6', background:'rgba(59,130,246,0.12)', padding:'4px 10px', borderRadius:6, marginBottom:6, border:'1px solid rgba(59,130,246,0.3)' }}>
+              🔍 Фильтр: {CATEGORY_LABELS[category]} — {filtered.length} из {scored.length}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 3, marginBottom: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             {(['score', 'name', 'protein', 'kcal'] as SortKey[]).map(k => (
               <button key={k} onClick={() => setSortKey(k)} style={PILL(sortKey === k, '#f59e0b')}>
                 {k === 'score' ? '⭐ По скору' : k === 'name' ? '📝 По имени' : k === 'protein' ? '🥩 По белку' : '🔥 По калориям'}
               </button>
             ))}
-            <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', marginLeft: 'auto' }}>
-              {filtered.length} из {scored.length}
-            </span>
           </div>
           {activeModules.length > 0 && (
             <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>

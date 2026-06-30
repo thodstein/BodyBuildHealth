@@ -1747,7 +1747,7 @@ export const TrainingScreen: React.FC = () => {
         <InfoErrorBoundary label="Калькуляторы">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {tab === 'calculators' && <TrainingLoadCalculator />}
-          {tab === 'calculators' && <TonnageCalcTab />}
+          {tab === 'calculators' && <TonnageCalculator />}
           {tab === 'calculators' && <WhatIfCard baseRisk={linked.risk?.overallNet ?? 5} baseReadiness={linked.readiness?.recovery ?? 70} />}
           {showNonBuilder && (<>
           <div className="card" style={{ padding: '12px 14px', background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)', borderRadius:14 }}>
@@ -3533,5 +3533,4 @@ import { ProgressTab } from './TrainingScreen_parts/ProgressTab';
 import { StrengthLevelCard } from './TrainingScreen_parts/StrengthLevelCard';
 import { StructuredAnalyticsCard } from './TrainingScreen_parts/StructuredAnalyticsCard';
 import { ExerciseGeneratorContent } from './TrainingScreen_parts/ExerciseGenerator';
-
 

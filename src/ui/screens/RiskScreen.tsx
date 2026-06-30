@@ -141,8 +141,51 @@ export const RiskScreen: React.FC = () => {
   // Determine if penalty should be applied
   const shouldApplyPenalty = globalNoLabs || noLabsSystems.length > 0;
 
+  // Load support substance IDs from the support plan (for calculating support effect on risk)
+  const supportSubstanceIds = useMemo<string[]>(() => {
+    try {
+      const sr = JSON.parse(localStorage.getItem('he_support_risk') || 'null');
+      if (sr && Array.isArray(sr.subs)) return sr.subs.map((id: string) => id.toLowerCase());
+    } catch {}
+    return [];
+  }, [tick]);
+
   // Compute pharma risk — using TZ engine (single source of truth)
+  // WITH support substances applied → overallRaw = raw risk, overallNet = risk after support reduction
   const pharmaRisk = useMemo<RiskResult | null>(() => {
+    if (!linked.profile) return null;
+    try {
+      const s = linked.profile.settings;
+      const tzResult: TZRiskResult = calculateTZRisk({
+        course: linked.course || [],
+        labs: linked.labs || [],
+        genetics: (s.genetics || {}) as any,
+        nutrition: {
+          proteinPerKg: (s.weight || 80) > 0 ? ((s.nutritionFactor ?? 0.8) * 160) / (s.weight || 80) : 1.8,
+          fiberG: 25, omega3G: 1.5, sodiumG: 3, potassiumG: 3, waterL: 2, calories: 2500,
+        },
+        training: {
+          hasHIIT: (s.workoutsPerWeek ?? 3) >= 4,
+          weeklyMinutes: (s.workoutsPerWeek ?? 3) * (s.avgWorkoutMinutes ?? 60),
+          volumeTonnes: 8000, lissMinutesPerWeek: 60,
+        },
+        weight: s.weight ?? 80, age: s.age ?? 30,
+        sex: (s.sex ?? 'male') as 'male' | 'female',
+        supportSubstances: supportSubstanceIds,
+      });
+      const compat = toCompatibleResult(tzResult);
+      return {
+        overallRaw: tzResult.overallRaw,
+        overallNet: tzResult.overallNet,
+        systemBreakdown: compat.systemBreakdown,
+        mechanismBreakdown: compat.mechanismBreakdown as any,
+        mechanismDetail: compat.mechanismDetail as any,
+      } as unknown as RiskResult;
+    } catch { return null; }
+  }, [linked.profile, linked.course, linked.labs, supportSubstanceIds]);
+
+  // Also compute pharma risk WITHOUT support for comparison display
+  const pharmaRiskRaw = useMemo<RiskResult | null>(() => {
     if (!linked.profile) return null;
     try {
       const s = linked.profile.settings;
@@ -580,52 +623,77 @@ export const RiskScreen: React.FC = () => {
             )}
           </div>
 
-          {/* Источники рисков */}
+          {/* Источники рисков — система breakdown из единого TZ-движка */}
           <div className="card" style={{ marginBottom:10, padding:12 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>📋 Источники рисков</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-              {[
-                { label:'Фармакология', value:pharmaRisk?.overallNet ?? 0, color:'#8b5cf6' },
-                { label:'Лаборатория', value:hasLabs ? (labRiskContributions?.totalRisk ?? 0) : (shouldApplyPenalty ? (syntheticLabContrib?.totalRisk ?? 0) : 0), color:'#3b82f6' },
-                { label:'Тренировки', value:trainingRisk.overallNet ?? 0, color:'#f97316' },
-                { label:'Питание', value:nutritionRisk.overallNet ?? 0, color:'#22c55e' },
-              ].map(s => (
-                <div key={s.label} style={{ padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
-                  <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>{s.label}</div>
-                  <div style={{ fontSize:18, fontWeight:700, color:getRiskColor(s.value) }}>{Math.round(s.value)}%</div>
-                </div>
-              ))}
-            </div>
+            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>📋 Риск по системам организма (TZ engine)</div>
+            {pharmaRisk?.systemBreakdown ? (
+              <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                {Object.entries(pharmaRisk.systemBreakdown)
+                  .filter(([,v]) => (v as any).net > 0)
+                  .sort(([,a],[,b]) => (b as any).net - (a as any).net)
+                  .slice(0, 7)
+                  .map(([sys, val]) => {
+                    const v = val as { raw: number; net: number };
+                    const sysLabel: Record<string,string> = { cardio:'ССС', hepatic:'Печень', renal:'Почки', neuro:'НС', endocrine:'Энд.', hematologic:'Кровь', reproductive:'Репродуктивная', musculoskeletal:'ОДА', metabolic:'Метаболизм' };
+                    return (
+                      <div key={sys} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 8px', borderRadius:6, background:'var(--bg-secondary)' }}>
+                        <span style={{ fontSize:9, fontWeight:600, minWidth:70, color:'var(--text)' }}>{sysLabel[sys]||sys}</span>
+                        <div style={{ flex:1, height:6, borderRadius:3, background:'rgba(255,255,255,0.06)', overflow:'hidden', position:'relative' }}>
+                          <div style={{ position:'absolute', top:0, left:0, height:'100%', width:`${Math.min(100,v.raw)}%`, background:getRiskColor(v.raw), borderRadius:3, opacity:0.3 }} />
+                          <div style={{ position:'absolute', top:0, left:0, height:'100%', width:`${Math.min(100,v.net)}%`, background:getRiskColor(v.net), borderRadius:3 }} />
+                        </div>
+                        <span style={{ fontSize:9, fontWeight:700, minWidth:55, textAlign:'right', color:getRiskColor(v.net) }}>{Math.round(v.raw)}→{Math.round(v.net)}%</span>
+                      </div>
+                    );
+                  })}
+              </div>
+            ) : (
+              <div style={{ fontSize:10, color:'var(--text-dim)', textAlign:'center', padding:8 }}>Нет данных для расчёта</div>
+            )}
+            {pharmaRiskRaw && pharmaRisk && (
+              <div style={{ marginTop:6, fontSize:8, color:'var(--text-dim)', textAlign:'center' }}>
+                Общий: {Math.round(pharmaRiskRaw.overallRaw)}% → {Math.round(pharmaRisk.overallNet)}% · {supportSubstanceIds.length} веществ поддержки
+              </div>
+            )}
           </div>
 
-          {/* Поддержка — эффективность */}
-          {(() => {
-            try {
-              const sr = JSON.parse(localStorage.getItem('he_support_risk') || 'null');
-              if (!sr || !sr.riskBeforeSupport) return null;
-              const reduction = sr.riskBeforeSupport - sr.riskAfterSupport;
-              const reductionPct = sr.riskBeforeSupport > 0 ? Math.round((reduction / sr.riskBeforeSupport) * 100) : 0;
-              return (
-                <div className="card" style={{ marginBottom:10, padding:12 }}>
-                  <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>🧪 Эффективность поддержки</div>
-                  <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:4 }}>
-                    <div style={{ flex:1, textAlign:'center', padding:'6px', borderRadius:8, background:'var(--bg-secondary)' }}>
-                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Без поддержки</div>
-                      <div style={{ fontSize:18, fontWeight:800, color:'#ef4444' }}>{Math.round(sr.riskBeforeSupport)}%</div>
-                    </div>
-                    <div style={{ fontSize:16, color:'var(--text-dim)' }}>→</div>
-                    <div style={{ flex:1, textAlign:'center', padding:'6px', borderRadius:8, background:'var(--bg-secondary)' }}>
-                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>С поддержкой</div>
-                      <div style={{ fontSize:18, fontWeight:800, color:'#22c55e' }}>{Math.round(sr.riskAfterSupport)}%</div>
-                    </div>
-                    <div style={{ flex:1, textAlign:'center', padding:'6px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)' }}>
-                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Снижение</div>
-                      <div style={{ fontSize:18, fontWeight:800, color: reduction > 0 ? '#00e68a' : '#ef4444' }}>-{reductionPct}%</div>
-                    </div>
+          {/* Поддержка — эффективность — из ЕДИНОГО TZ-движка (raw vs net) */}
+          {pharmaRiskRaw && pharmaRisk && (() => {
+            const before = pharmaRiskRaw.overallRaw;
+            const after = pharmaRisk.overallNet;
+            const reduction = before - after;
+            const reductionPct = before > 0 ? Math.round((reduction / before) * 100) : 0;
+            return (
+              <div className="card" style={{ marginBottom:10, padding:12 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>🧪 Эффективность поддержки (TZ engine)</div>
+                <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:4 }}>
+                  <div style={{ flex:1, textAlign:'center', padding:'6px', borderRadius:8, background:'var(--bg-secondary)' }}>
+                    <div style={{ fontSize:8, color:'var(--text-dim)' }}>Без поддержки</div>
+                    <div style={{ fontSize:18, fontWeight:800, color:'#ef4444' }}>{Math.round(before)}%</div>
                   </div>
-                  {sr.systemSupport && Object.keys(sr.systemSupport).length > 0 && (
+                  <div style={{ fontSize:16, color:'var(--text-dim)' }}>→</div>
+                  <div style={{ flex:1, textAlign:'center', padding:'6px', borderRadius:8, background:'var(--bg-secondary)' }}>
+                    <div style={{ fontSize:8, color:'var(--text-dim)' }}>С поддержкой</div>
+                    <div style={{ fontSize:18, fontWeight:800, color:'#22c55e' }}>{Math.round(after)}%</div>
+                  </div>
+                  <div style={{ flex:1, textAlign:'center', padding:'6px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)' }}>
+                    <div style={{ fontSize:8, color:'var(--text-dim)' }}>Снижение</div>
+                    <div style={{ fontSize:18, fontWeight:800, color: reduction > 0 ? '#00e68a' : '#ef4444' }}>-{reductionPct}%</div>
+                  </div>
+                </div>
+                {pharmaRisk?.systemBreakdown && (() => {
+                  const sysCov: Record<string, number> = {};
+                  for (const [sys, val] of Object.entries(pharmaRisk.systemBreakdown)) {
+                    const rawVal = pharmaRiskRaw?.systemBreakdown?.[sys] as { raw: number } | undefined;
+                    const v = val as { raw: number; net: number };
+                    if (rawVal && rawVal.raw > 0) {
+                      sysCov[sys] = Math.round((1 - v.net / rawVal.raw) * 100);
+                    }
+                  }
+                  const topSys = Object.entries(sysCov).filter(([,c]) => c > 0).sort(([,a],[,b]) => b-a).slice(0, 5);
+                  if (topSys.length > 0) return (
                     <div style={{ marginTop:6, display:'flex', flexDirection:'column', gap:2 }}>
-                      {Object.entries(sr.systemSupport as Record<string, number>).sort(([,a],[,b]) => b-a).slice(0, 5).map(([sys, cov]) => {
+                      {topSys.map(([sys, cov]) => {
                         const sysNames: Record<string,string> = { cardio:'ССС', hepatic:'Печень', renal:'Почки', neuro:'НС', endocrine:'Энд.', hematologic:'Кровь', reproductive:'Реп.', musculoskeletal:'ОДА' };
                         const color = cov >= 70 ? '#22c55e' : cov >= 40 ? '#f59e0b' : '#ef4444';
                         return (
@@ -639,11 +707,12 @@ export const RiskScreen: React.FC = () => {
                         );
                       })}
                     </div>
-                  )}
-                  <div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'center' }}>Данные из калькулятора поддержки · {sr.subs?.length || 0} веществ</div>
-                </div>
-              );
-            } catch { return null; }
+                  );
+                  return null;
+                })()}
+                <div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'center' }}>Единый TZ engine · {supportSubstanceIds.length} веществ поддержки</div>
+              </div>
+            );
           })()}
 
           {/* 4 nav cards */}

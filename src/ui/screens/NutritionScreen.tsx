@@ -353,9 +353,13 @@ const CatalogTab: React.FC = () => {
         }}>⭐ Exclusive ({allFoods.filter((f: any) => f.tier === 'max').length})</button>
       </div>
       <div style={{ marginTop:6, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>
-          {catFilter === 'all' ? 'Показаны все продукты' : `${CATEGORY_LABELS[catFilter] || catFilter} — ${filtered.length} продуктов`}
-        </div>
+        {catFilter === 'all' ? (
+          <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>Показаны все продукты</div>
+        ) : (
+          <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', background:'rgba(0,230,138,0.12)', padding:'4px 10px', borderRadius:6, border:'1px solid rgba(0,230,138,0.3)' }}>
+            🔍 Фильтр: {CATEGORY_LABELS[catFilter] || catFilter} — {filtered.length} из {allFoods.length}
+          </div>
+        )}
       </div>
       <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:3, borderRadius:8 }}>
         {filtered.map(f => {
