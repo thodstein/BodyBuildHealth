@@ -101,8 +101,6 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   const [useV2, setUseV2] = useState(true);
   const [v2Profile, setV2Profile] = useState<UserDietProfile>(getDefaultProfile());
 
-  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 2000); };
-
   const opts = useMemo(() => ({
     goal: manualGoal || profileGoal,
     weightKg: parseInt(manualWeight) || profileWeight,
@@ -113,6 +111,10 @@ export const ProductUsefulnessPlanner: React.FC = () => {
     enableA, enableB, enableC,
   }), [manualGoal, profileGoal, manualWeight, profileWeight, manualWorkouts, profileWorkouts, manualAAS, manualInsulin, manualPrice, enableA, enableB, enableC]);
 
+  const scored = useMemo(() => {
+    return scoreAllProducts({ ...opts, category: category === 'all' ? undefined : category });
+  }, [opts, category]);
+
   const fillFromProfile = () => {
     setManualGoal(profileGoal || '');
     setManualWeight(profileWeight.toString());
@@ -122,9 +124,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
     setManualPrice('');
   };
 
-  const scored = useMemo(() => {
-    return scoreAllProducts({ ...opts, category: category === 'all' ? undefined : category });
-  }, [opts, category]);
+  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 2000); };
 
   const v2Scored = useMemo(() => {
     if (!useV2) return new Map<string, V2ScoreResult>();
@@ -156,6 +156,18 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   }, [filtered, sortKey, useV2, v2Scored]);
 
   const displayed = useMemo(() => showAll ? sorted : sorted.slice(0, 50), [sorted, showAll]);
+
+  React.useEffect(() => {
+    if (plannerTab === 'dashboard') {
+      const avgScore = scored.length > 0 ? Math.round(scored.reduce((s, x) => s + x.score.total, 0) / scored.length) : 0;
+      if (avgScore > 0) {
+        const today = new Date().toLocaleDateString('ru-RU');
+        const updated = [...scoreHistory.filter(h => h.date !== today), { date: today, avg: avgScore, count: scored.length }].slice(-30);
+        setScoreHistory(updated);
+        localStorage.setItem('he_usefulness_history', JSON.stringify(updated));
+      }
+    }
+  }, [plannerTab, scored]);
 
   const compareData = useMemo(() => {
     if (compareIds.length < 2) return [];
@@ -283,16 +295,6 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         const goal = manualGoal || profileGoal || 'maintenance';
         const rec = phaseRecs[goal] || phaseRecs.maintenance;
         const avgScore = scored.length > 0 ? Math.round(scored.reduce((s, x) => s + x.score.total, 0) / scored.length) : 0;
-
-        // Save score to history (once per session)
-        React.useEffect(() => {
-          if (avgScore > 0) {
-            const today = new Date().toLocaleDateString('ru-RU');
-            const updated = [...scoreHistory.filter(h => h.date !== today), { date: today, avg: avgScore, count: scored.length }].slice(-30);
-            setScoreHistory(updated);
-            localStorage.setItem('he_usefulness_history', JSON.stringify(updated));
-          }
-        }, []);
 
         return <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           <div style={{ borderRadius:12, padding:14, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.1)', textAlign:'center' }}>
@@ -500,11 +502,12 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 <span onClick={() => setSearch('')} style={{
                   position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
                   color: 'rgba(255,255,255,0.9)', cursor: 'pointer', fontSize: 12, fontWeight: 700,
-                }}>Г—</span>
+                }}>✕</span>
               )}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 8 }}>
+            <button key="all" onClick={() => { setCategory('all'); setShowAll(false); }} style={PILL(category === 'all', '#3b82f6')}>Все</button>
             {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
               <button key={key} onClick={() => { setCategory(key); setShowAll(false); }} style={PILL(category === key, '#3b82f6')}>{label}</button>
             ))}
@@ -702,7 +705,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                   return (
                     <span key={id} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 8, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 4 }}>
                       {f?.name || id}
-                      <span onClick={() => toggleCompare(id)} style={{ cursor: 'pointer', fontWeight: 700, color: '#ef4444' }}>Г—</span>
+                      <span onClick={() => toggleCompare(id)} style={{ cursor: 'pointer', fontWeight: 700, color: '#ef4444' }}>✕</span>
                     </span>
                   );
                 })}
@@ -756,9 +759,87 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                         💰 {score.costEfficiency.proteinCostRub} ₽/10г белка · <span style={{ color: score.costEfficiency.efficiencyScore >= 50 ? '#22c55e' : '#f59e0b' }}>{score.costEfficiency.efficiencyScore}/100</span>
                       </div>
                     )}
+                    {(() => {
+                      const found = FOOD_DB.find(f => f.id === food.id);
+                      if (!found) return null;
+                      const f = found as any;
+                      const diaas = calcDIAAS(food);
+                      return (
+                        <div style={{ marginTop:6, borderTop:`1px solid ${score.color}10`, paddingTop:4 }}>
+                          <div style={{ fontSize:7, fontWeight:700, color:'#8b5cf6', marginBottom:4, cursor:'pointer', userSelect:'none' }}
+                            onClick={() => { const el = document.getElementById(`compare_detail_${food.id}`); if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none'; }}>
+                            📊 Полный профиль ▾
+                          </div>
+                          <div id={`compare_detail_${food.id}`} style={{ display:'none', fontSize:7, color:'rgba(255,255,255,0.75)' }}>
+                            {f.carbs !== undefined && (
+                              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:2, marginBottom:4, padding:'3px 6px', borderRadius:6, background:'rgba(255,255,255,0.02)' }}>
+                                <div>🔥 Ккал: <b>{f.kcal||'—'}</b></div>
+                                <div>🥩 Белок: <b>{f.protein||'—'}г</b></div>
+                                <div>🧈 Жиры: <b>{f.fat||'—'}г</b></div>
+                                <div>🍚 Углеводы: <b>{f.carbs||'—'}г</b></div>
+                                <div>🌾 Клетчатка: <b>{f.carbs_fiber||'—'}г</b></div>
+                              </div>
+                            )}
+                            {diaas.diaas > 0 && (
+                              <div style={{ marginBottom:4, padding:'3px 6px', borderRadius:6, background: diaas.diaas >= 1 ? 'rgba(0,230,138,0.04)' : diaas.diaas >= 0.75 ? 'rgba(245,158,11,0.04)' : 'rgba(239,68,68,0.04)', border:`1px solid ${diaas.diaas >= 1 ? 'rgba(0,230,138,0.1)' : diaas.diaas >= 0.75 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)'}` }}>
+                                💪 DIAAS: <b style={{color: diaas.diaas >= 1 ? '#22c55e' : diaas.diaas >= 0.75 ? '#f59e0b' : '#ef4444'}}>{diaas.diaas.toFixed(2)}</b> · лимит: {diaas.limitingAA}
+                              </div>
+                            )}
+                            {(f.leucine_mg || f.isoleucine_mg || f.valine_mg) && (
+                              <div style={{ marginBottom:4, padding:'3px 6px', borderRadius:6, background:'rgba(0,230,138,0.03)' }}>
+                                🧬 АК (мг): Лейцин <b>{f.leucine_mg||'—'}</b> · Илей <b>{f.isoleucine_mg||'—'}</b> · Валин <b>{f.valine_mg||'—'}</b>
+                              </div>
+                            )}
+                            {(f.sodium_mg || f.potassium_mg || f.magnesium_mg) && (
+                              <div style={{ marginBottom:4, padding:'3px 6px', borderRadius:6, background:'rgba(59,130,246,0.03)' }}>
+                                ⚡ Электролиты (мг): Na <b>{f.sodium_mg||'—'}</b> · K <b>{f.potassium_mg||'—'}</b> · Mg <b>{f.magnesium_mg||'—'}</b>
+                              </div>
+                            )}
+                            {f.fodmap_group && (
+                              <div style={{ marginBottom:4, padding:'3px 6px', borderRadius:6, background:'rgba(245,158,11,0.03)' }}>
+                                🏷️ FODMAP: <b style={{color: f.fodmap_group === 'LOW' ? '#22c55e' : '#ef4444'}}>{f.fodmap_group}</b>
+                                {f.enzyme_demand_score && <span> · Ферм.нагрузка: <b>{f.enzyme_demand_score}/10</b></span>}
+                                {f.gastric_emptying_speed && <span> · Опорожн.: <b>{f.gastric_emptying_speed}</b></span>}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>
+              {compareData.length >= 2 && (() => {
+                const catKeys = ['kcal','protein','fat','carbs','carbs_fiber','leucine_mg','isoleucine_mg','valine_mg','sodium_mg','potassium_mg','magnesium_mg'] as const;
+                const catLabels: Record<string,string> = {kcal:'🔥 Ккал', protein:'🥩 Белок', fat:'🧈 Жиры', carbs:'🍚 Углев.', carbs_fiber:'🌾 Клетч.', leucine_mg:'🧬 Лейцин', isoleucine_mg:'🧬 Илей', valine_mg:'🧬 Валин', sodium_mg:'⚡ Na', potassium_mg:'⚡ K', magnesium_mg:'⚡ Mg'};
+                const rows = catKeys.map(key => {
+                  const vals = compareData.map((c:any) => { const ff = FOOD_DB.find((x:any) => x.id === c.food.id); return { id: c.food.id, v: ff ? (ff as any)[key] ?? null : null }; });
+                  const numeric = vals.filter(v => v.v !== null && typeof v.v === 'number');
+                  if (numeric.length < 2) return null;
+                  const best = key === 'kcal' ? Math.min(...numeric.map(v=>v.v)) : Math.max(...numeric.map(v=>v.v));
+                  return { label: catLabels[key] || key, vals: vals.map(v => ({ id: v.id, v: v.v, win: v.v !== null && typeof v.v === 'number' && v.v === best })) };
+                }).filter(Boolean);
+                return (
+                  <div style={{ marginTop:10, borderRadius:12, padding:10, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.1)' }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>🏆 Сравнение метрик (победитель)</div>
+                    <div style={{ display:'grid', gridTemplateColumns:`60px repeat(${compareData.length}, 1fr)`, gap:2, fontSize:7 }}>
+                      <div style={{ fontWeight:600, color:'rgba(255,255,255,0.5)', padding:'2px 4px' }}>Метрика</div>
+                      {compareData.map((c:any) => <div key={c.food.id} style={{ fontWeight:600, color:'#fff', textAlign:'center', padding:'2px 4px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontSize:6 }}>{c.food.name}</div>)}
+                      {(rows as any[]).map((row:any, ri:number) => (
+                        <React.Fragment key={ri}>
+                          <div style={{ padding:'2px 4px', color:'rgba(255,255,255,0.6)' }}>{row.label}</div>
+                          {row.vals.map((v:any) => (
+                            <div key={v.id} style={{ textAlign:'center', padding:'2px 4px', borderRadius:4, background:v.win ? 'rgba(0,230,138,0.08)' : 'transparent' }}>
+                              {v.v !== null && v.v !== undefined ? <span style={{ color: v.win ? '#00e68a' : 'rgba(255,255,255,0.65)', fontWeight: v.win ? 700 : 400 }}>{typeof v.v === 'number' ? v.v.toFixed(1) : v.v}</span> : <span style={{ color:'rgba(255,255,255,0.2)' }}>—</span>}
+                              {v.win && <span style={{ marginLeft:2 }}>✅</span>}
+                            </div>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -798,7 +879,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 <div style={{ marginBottom: 8, borderRadius: 10, padding: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <span style={{ fontSize: 10, fontWeight: 700, color: '#00e68a' }}>{sourcePicker.title}</span>
-                    <span onClick={() => setSourcePicker(null)} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: 700 }}>Г—</span>
+                    <span onClick={() => setSourcePicker(null)} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: 700 }}>✕</span>
                   </div>
                   <div style={{ maxHeight: 180, overflowY: 'auto' }}>
                     {sourcePicker.items.map(item => (
@@ -880,7 +961,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                         </span>
                         <span onClick={() => setMealProducts(mealProducts.filter((_, i) => i !== idx))} style={{
                           cursor: 'pointer', color: '#ef4444', fontWeight: 700, fontSize: 10, padding: '0 4px',
-                        }}>Г—</span>
+                        }}>✕</span>
                       </div>
                     );
                   })}
@@ -1002,6 +1083,11 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       <span style={{ flex: 1, fontSize: 8, color: '#fff' }}>{ps.name}</span>
                       <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.9)' }}>{ps.weight}г</span>
                       <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>вклад {ps.contribution}%</span>
+                      <div style={{ display:'flex', gap:2, justifyContent:'flex-end' }}>
+                        <button onClick={() => { try { const favs = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); const updated = [ps.foodId, ...favs.filter((f: string) => f !== ps.foodId)].slice(0, 100); localStorage.setItem('he_food_favs', JSON.stringify(updated)); showToast(`✅ ${ps.name} в избранном`); } catch {} }} style={{
+                          padding:'1px 5px', borderRadius:4, fontSize:6, cursor:'pointer', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.15)', color:'#8b5cf6'
+                        }}>⭐</button>
+                      </div>
                     </div>
                   ))}
                   {mealResult.weakLink && (
@@ -1054,6 +1140,21 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       )}
                     </div>
                   )}
+                  <div style={{ display:'flex', gap:6, marginTop:8 }}>
+                    <button onClick={() => {
+                      try {
+                        const plan = JSON.parse(localStorage.getItem('he_daily_plan') || '[]');
+                        mealProducts.forEach(mp => {
+                          const food = FOOD_DB.find(f => f.id === mp.foodId);
+                          if (food) plan.push({ id: food.id, name: food.name, amount: mp.weightGrams, kcal: (food.kcal || 0) * mp.weightGrams / 100, protein: (food.protein || 0) * mp.weightGrams / 100, fat: (food.fat || 0) * mp.weightGrams / 100, carbs: (food.carbs || 0) * mp.weightGrams / 100 });
+                        });
+                        localStorage.setItem('he_daily_plan', JSON.stringify(plan));
+                        showToast(`✅ Рацион (${mealProducts.length} продуктов) добавлен в план`);
+                      } catch {}
+                    }} style={{
+                      padding:'6px 12px', borderRadius:8, fontSize:8, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontWeight:600
+                    }}>📋 Добавить рацион в план</button>
+                  </div>
                 </div>
               )}
               {mealResult && mealProducts.length > 0 && (() => {
@@ -1201,6 +1302,14 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                     </div>
                   </div>
                   <div style={{ fontSize:9,fontWeight:700,color:'#22c55e' }}>↑{improvement}%</div>
+                  <div style={{ display:'flex', gap:4 }}>
+                    <button onClick={() => { try { const favs = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); const updated = [food.id, ...favs.filter((f: string) => f !== food.id)].slice(0, 100); localStorage.setItem('he_food_favs', JSON.stringify(updated)); showToast(`✅ ${food.name} добавлен в избранное`); } catch {} }} style={{
+                      padding:'3px 8px', borderRadius:6, fontSize:7, cursor:'pointer', background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.2)', color:'#8b5cf6'
+                    }}>⭐ В избранное</button>
+                    <button onClick={() => { try { const plan = JSON.parse(localStorage.getItem('he_daily_plan') || '[]'); plan.push({ id: food.id, name: food.name, amount: 100, kcal: food.kcal, protein: food.protein, fat: food.fat, carbs: food.carbs }); localStorage.setItem('he_daily_plan', JSON.stringify(plan)); showToast(`✅ ${food.name} добавлен в план`); } catch {} }} style={{
+                      padding:'3px 8px', borderRadius:6, fontSize:7, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a'
+                    }}>📋 В план</button>
+                  </div>
                 </div>
               ))}
             </div>

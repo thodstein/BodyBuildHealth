@@ -350,7 +350,7 @@ const CatalogTab: React.FC = () => {
           border: showExclusive ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.06)',
           background: showExclusive ? 'rgba(168,85,247,0.14)' : '#202023',
           color: showExclusive ? '#a855f7' : 'rgba(255,255,255,0.85)',
-        }}>⭐ Exclusive ({FOOD_DB.filter(f => f.tier === 'max').length})</button>
+        }}>⭐ Exclusive ({allFoods.filter((f: any) => f.tier === 'max').length})</button>
       </div>
       <div style={{ marginTop:6, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>
@@ -548,7 +548,7 @@ const RecipesTab: React.FC = () => {
   const mealBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode) => (
     <button onClick={onClick} style={{ padding:'5px 12px', borderRadius:8, fontSize:10, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: isActive ? 700 : 400 }}>{children}</button>
   );
-  const mealLabel = (m: string) => m === 'breakfast' ? '🌅' : m === 'lunch' ? '?️' : m === 'dinner' ? '🌙' : m === 'snack' ? '🍿' : '';
+  const mealLabel = (m: string) => m === 'breakfast' ? '🌅' : m === 'lunch' ? '☀️' : m === 'dinner' ? '🌙' : m === 'snack' ? '🍿' : '';
   const saveRecipe = () => {
     if (!recName.trim()) return;
     const newRecipe = {

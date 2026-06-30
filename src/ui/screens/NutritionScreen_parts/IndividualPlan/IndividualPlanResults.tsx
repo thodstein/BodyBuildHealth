@@ -1907,10 +1907,44 @@ export const IndividualPlanResults: React.FC = () => {
                     )}
                     {/* Micro deficits */}
                     {calcDailyReport.microDeficits.length > 0 && (
-                      <div style={{ marginTop:3, fontSize:7, padding:'4px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', color:'#f59e0b' }}>
-                        ⚠️ Дефициты: {calcDailyReport.microDeficits.join(', ')}
+                      <div style={{ marginTop:3 }}>
+                        <div style={{ fontSize:7, color:'#f59e0b', fontWeight:600, marginBottom:2 }}>⚠️ Дефициты микронутриентов ({calcDailyReport.microDeficits.length})</div>
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
+                          {calcDailyReport.microDeficits.map((def: string) => {
+                            const criticalDefs = ['Железо','B12','Витамин D','Кальций','B9','C','Фолат','B6'];
+                            const isCritical = criticalDefs.some(c => def.toLowerCase().includes(c.toLowerCase()));
+                            return (
+                              <span key={def} style={{ fontSize:6, padding:'1px 5px', borderRadius:3,
+                                background: isCritical ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.08)',
+                                color: isCritical ? '#ef4444' : '#f59e0b' }}>
+                                {isCritical ? '🔴' : '🟡'} {def}
+                              </span>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
+
+                    {/* Weight dynamics prediction */}
+                    {(() => {
+                      const tdeeEst = (weight || 80) * 35;
+                      const kcalDiff = calcDailyReport.totalKcal - tdeeEst;
+                      const weeklyKg = kcalDiff * 7 / 7700;
+                      const direction = weeklyKg > 0.2 ? 'gain' : weeklyKg < -0.2 ? 'loss' : 'maintenance';
+                      const arrow = direction === 'gain' ? '📈' : direction === 'loss' ? '📉' : '➡️';
+                      const color = direction === 'gain' ? '#22c55e' : direction === 'loss' ? '#ef4444' : '#8b5cf6';
+                      return (
+                        <div style={{ marginTop:3, padding:'4px 8px', borderRadius:6, background:'rgba(6,182,212,0.04)', border:'1px solid rgba(6,182,212,0.08)' }}>
+                          <div style={{ fontSize:7, color:'#06b6d4', fontWeight:600, marginBottom:2 }}>⚖️ Прогноз динамики веса</div>
+                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>
+                            Ккал: {Math.round(calcDailyReport.totalKcal)}/день · TDEE: ~{Math.round(tdeeEst)} · Баланс: {kcalDiff > 0 ? '+' : ''}{Math.round(kcalDiff)} ккал/день
+                          </div>
+                          <div style={{ fontSize:8, fontWeight:600, color, marginTop:1 }}>
+                            {arrow} ~{Math.abs(weeklyKg).toFixed(2)} кг/нед ({direction === 'gain' ? 'набор' : direction === 'loss' ? 'снижение' : 'поддержание'})
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {/* Food quality breakdown */}
                     {(() => {
                       const allProductScores = calcResults.flatMap((r: any) => r.score.productScores || []);
