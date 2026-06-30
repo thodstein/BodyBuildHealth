@@ -1,16 +1,9 @@
-﻿/**
- * ExerciseCalcTab.tsx – Калькулятор упражнений v2
- * Рассчитывает предписание для выбранного упражнения на основе цели, уровня, недели и т.д.
- * Добавляет:
- *   - Кнопка «Подобрать замену» с подробным списком замен (getSubstitutes + canReplace) и обоснованием.
- *   - Блок «Слабый пункт»: сравнивает предписанный объём (сеты) с рекомендованным диапазоном MEV/MAV/MRV
- *     для мышцы упражнения и выдаёт рекомендацию по увеличению/уменьшению объёма.
- */
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState, useEffect } from 'react';
 import { EXERCISE_CATALOG, getExerciseById, getSubstitutes, canReplace } from '../../../core/exercise-catalog';
 import { calcExercisePrescription } from '../../../engines/training.engine';
 import { getVolumeByMuscle } from '../../../engines/training-methodology.engine';
 import { PopupSelect, PopupNumber, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
+import { useDataLink } from '../../../core/data-link';
 import type { Exercise } from '../../../core/types';
 
 const ACCENT = '#00e68a';
@@ -29,17 +22,40 @@ const GROUP_RU: Record<string, string> = {
 };
 
 export const ExerciseCalcTab: React.FC = () => {
+  const { profile } = useDataLink();
   const [group, setGroup] = useState<string>('chest');
   const [exId, setExId] = useState<string>('');
-  const [oneRM, setOneRM] = useState<number>(100);
+  const [oneRM, setOneRM] = useState<number>(0);
   const [goal, setGoal] = useState<string>('strength');
-  const [level, setLevel] = useState<string>('intermediate');
+  const [level, setLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
   const [week, setWeek] = useState<number>(1);
   const [totalWeeks, setTotalWeeks] = useState<number>(12);
 
   // Состояние для отображения списка замен
   const [showSubstitutes, setShowSubstitutes] = useState(false);
   const [substituteList, setSubstituteList] = useState<Array<{id: string; name: string; reason: string}>>([]);
+
+  // Initialize level, goal, and oneRM from profile when profile changes
+  useEffect(() => {
+    if (!profile) return;
+    const lvl = profile?.settings.trainingLevel ?? 'intermediate';
+    const levelVal = lvl === 'enhanced' ? 'advanced' : lvl;
+    setLevel(levelVal as 'beginner' | 'intermediate' | 'advanced');
+    setGoal(profile?.settings.primaryGoal ?? 'strength');
+    // oneRM will be updated when exId changes via another effect
+  }, [profile]);
+
+  // Update oneRM when exercise changes (based on profile's strengthBaselines)
+  useEffect(() => {
+    if (!exId || !profile) { setOneRM(0); return; }
+    const baseline = profile?.settings.strengthBaselines?.[exId];
+    if (baseline && baseline > 0) {
+      setOneRM(baseline);
+    } else {
+      // fallback to a default value
+      setOneRM(100);
+    }
+  }, [exId, profile]);
 
   const exList = useMemo(() => group === 'all' ? EXERCISE_CATALOG : EXERCISE_CATALOG.filter(e => e.group === group), [group]);
   const ex: Exercise | undefined = useMemo(() => EXERCISE_CATALOG.find(e => e.id === exId), [exId]);
@@ -83,82 +99,125 @@ export const ExerciseCalcTab: React.FC = () => {
     return advice;
   }, [ex, presc, level]);
 
-  // Функция получения замен для выбранного упражнения
-  const getSubstitutesFor = (exId: string) => {
-    const subs = getSubstitutes(exId);
-    if (!subs) return [];
-    return subs.substitutes.filter(sub => canReplace(exId, sub.id));
-  };
-
   const handleSubstituteButton = () => {
-    const subs = getSubstitutesFor(exId);
+    if (!ex) {
+      alert('Сначала выберите упражнение');
+      return;
+    }
+    const subs = getSubstitutesFor(ex.id);
     if (subs.length === 0) {
       alert('Замены для данного упражнения не найдены');
       return;
     }
-    setSubstituteList(
-      subs.map(sub => ({
-        id: sub.id,
-        name: getExerciseById(sub.id)?.name ?? sub.id,
-        reason: sub.reason,
-      }))
-    );
+    setSubstituteList(subs);
     setShowSubstitutes(true);
+  };
+
+  const getSubstitutesFor = (exerciseId: string) => {
+    const ex = getExerciseById(exerciseId);
+    if (!ex) return [];
+    // Filter by equipment if we had user equipment data; for now, we return all
+    return getSubstitutes(exerciseId).filter(sub => canReplace(exerciseId, sub.id));
   };
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>
-        рџ§® РљР°Р»СЊРєСѓР»СЏС‚РѕСЂ СѓРїСЂР°Р¶РЅРµРЅРёР№
-      </div>
-      <div style={{ ...SMALL, marginBottom: 10 }}>
-        Р’С‹Р±РµСЂРёС‚Рµ СѓРїСЂР°Р¶РЅРµРЅРёРµ Рё РІРІРµРґРёС‚Рµ СЃРІРѕР№ 1РџРњ вЂ” СЃРёСЃС‚РµРјР° СЂР°СЃСЃС‡РёС‚Р°РµС‚ РЅР°Р·РЅР°С‡РµРЅРёРµ: РїРѕРґС…РѕРґС‹, РїРѕРІСтРѕСЂРµРЅРёСЏ, %1RM, СЂР°Р±РѕС‡РёР№ РІРµСЃ, RIR Рё РѕС‚РґС‹С….
+        рџ“¦ Калькулятор упражнений v2
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-        <PopupSelect label="Р“СЂСѓРїРїР° РјС‹С€С†" value={group} onChange={setGroup} options={GROUPS.map(g => ({ id: g, label: GROUP_RU[g] }))} />
-        <PopupSelect label="РЈРїСЂР°Р¶РЅРµРЅРёРµ" value={exId} onChange={setExId} hint="Р’С‹Р±РµСЂРёС‚Рµ СѓРїСЂР°Р¶РЅРµРЅРёРµ РёР· РєР°С‚Р°Р»РѕРіР°." options={exList.slice(0, 200).map(e => ({ id: e.id, label: e.name, desc: `${e.type === 'compound' ? 'Р‘Р°Р·РѕРІРѕРµ' : 'РР·Рѕ»РёСЂСѓСЋС‰РµРµ'} В· ${e.equipment}` }))} />
+      {/* Controls */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 12 }}>
+        <div>
+          <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Группа мышц</label>
+          <PopupSelect
+            value={group}
+            options={GROUPS.map(g => ({ id: g, label: GROUP_RU[g], desc: '' }))}
+            hint="Выберите группу"
+            onChange={v => setGroup(v)}
+          />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Упражнение</label>
+          <PopupSelect
+            value={exId}
+            options={exList.map(e => ({ id: e.id, label: e.name, desc: `${e.group} · ${e.type === 'compound' ? 'Базовое' : 'Изолированное'}`}))}
+            hint="Начните вводить для поиска"
+            onChange={v => setExId(v)}
+          />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Цель</label>
+          <PopupSelect
+            value={goal}
+            options={[
+              { id: 'strength', label: 'Сила' },
+              { id: 'hypertrophy', label: 'Гипертрофия' },
+              { id: 'endurance', label: 'Выносливость' },
+              { id: 'power', label: 'Взрывная сила' },
+            ]}
+            hint="Выберите цель"
+            onChange={v => setV(v)}
+          />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Неделя</label>
+          <PopupNumber
+            value={week}
+            min={1}
+            max={52}
+            step={1}
+            onChange={v => setWeek(v)}
+          />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Всего недель</label>
+          <PopupNumber
+            value={totalWeeks}
+            min={1}
+            max={52}
+            step={1}
+            onChange={v => setTotalWeeks(v)}
+          />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>1RM (кг)</label>
+          <PopupNumber
+            value={oneRM}
+            min={0}
+            max={500}
+            step={0.5}
+            onChange={v => setOneRM(v)}
+          />
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-        <PopupNumber label="Р’Р°С€ 1РџРњ" value={oneRM} min={5} max={600} suffix=" РєРі" onChange={v => setOneRM(v)} />
-        <PopupSelect label="Р¦РµР»СЊ" value={goal} onChange={setGoal} options={[['strength','РЎРёР»Р°'],['mass','Р“РёРїРµСЂС‚СЂРѕС„РёСЏ'],['endurance','Р’С‹РЅРѕСЃР»РёРІРѕСЃС‚СЊ'],['peak','РџРёРє'],['mixed','РЎРјРµС€Р°РЅРЅР°СЏ']].map(([id,label]) => ({ id, label }))} />
-        <PopupSelect label="РЈСЂРѕРІРµРЅСЊ" value={level} onChange={v => setLevel(v)} options={[['beginner','РќРѕРІРёС‡РѕРє'],['intermediate','РЎСЂРµРґРЅРёР№'],['advanced','РџСЂРѕРґРІРёРЅСѓС‚С‹Р№'],['enhanced','Enhanced']].map(([id,label]) => ({ id, label }))} />
-        <PopupNumber label="РќРµРґРµР»СЏ С†РёРєР»Р°" value={week} min={1} max={24} onChange={v => setWeek(v)} />
-      </div>
-
-      {ex && presc && (
+      {!ex ? (
+        <div style={{ ...SMALL, textAlign: 'center', padding: 20 }}>Р’С‹Р±РµСЂРёС‚Рµ СѓРїСЂР°Р¶РЅРµРЅРёРµ РІС‹С€Рµ.</div>
+      ) : (
         <>
-          <MetricCard title={`РќР°Р·РЅР°С‡РµРЅРёРµ: ${ex.name}`} icon="рџЋЇ">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>РџРѕРґС…РѕРґС‹ Г— РїРѕРІСтРѕСЂРµРЅРёСЏ</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: ACCENT }}>{presc.sets} Г— {presc.reps}</div>
-              </div>
-              <div style={{ background: 'rgba(59,130,246,0.06)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Р Р°Р±РѕС‡РёР№ РІРµСЃ ({pct}% 1RM)</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#60a5fa' }}>{workWeight} РєРі</div>
-              </div>
-              <div style={{ background: 'rgba(245,158,11,0.06)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>RIR (РїРѕРІСтРѕСЂРµРЅРёСЏ РІ СЂРµР·РµСЂРІРµ)</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#f59e0b' }}>{presc.rir}</div>
-              </div>
-              <div style={{ background: 'rgba(168,85,247,0.06)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>РћС‚РґС‹С… РјРµР¶РґСѓ РїРѕРґС…РѕРґР°РјРё</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#a855f7' }}>{presc.rest} СЃ</div>
-              </div>
-            </div>
-            {presc.dropSet && <div style={{ ...SMALL, marginTop: 8 }}>рџ”» Р”СЂРѕРї-СЃРµС‚: {presc.dropSetReps}</div>}
-            {presc.backoffSet && <div style={{ ...SMALL }}>в†©пёЏ Р’РєР»СЋС‡РёС‚СЊ backoff‑СЃРµС‚ (РѕР±СЉС‘РјРЅС‹Р№ РґРѕР±РѕСЂРЅС‹Р№ РїРѕРґС…РѕРґ).</div>}
+          <MetricCard title="Предопределённый вес" icon="рџ”ё" accent={ACCENT}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{workWeight}</div>
+            <div style={{ ...SMALL }}>кг</div>
           </MetricCard>
-
-          <ExpandableCard title="РљР°Рє СЃС‚СЂРѕРёС‚СЃСЏ РЅР°Р·РЅР°С‡РµРЅРёРµ" icon="рџ“–" short={presc.progressionNote} full={
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', lineHeight: 1.55 }}>
-              <div>Р¤Р°Р·Р° РјРµР·РѕС†РёРєР»Р° РґР»СЏ РЅРµРґРµР»Рё {week} РёР· {totalWeeks} РѕРїСЂРµРґРµР»СЏРµС‚ RIR Рё РёРЅС‚РµРЅСЃРёРІРЅРѕСЃС‚СЊ. RIR‑РјР°С‚СЂРёС†Р° СѓС‡РёС‚С‹РІР°РµС‚ С†РµР»СЊ (В«{goal}В») Рё СѓСЂРѕРІРµРЅСЊ (В«{level}В»).</div>
-              <div style={{ marginTop: 6 }}>Р Р°Р±РѕС‡РёР№ РІРµСЃ = 1РџРњ Г— %1RM, РіРґРµ %1RM РѕС†РµЅС‘РЅ РїРѕ РїРѕРІСтРѕСЂРµРЅРёСЏРј (в‰€ 100/(1+reps/30)). Р”Р»СЏ С‚РѕС‡РЅРѕРіРѕ %1RM РёСЃРїРѕР»СЊР·СѓР№СтРµ РІРєР»Р°РґРєСѓ В«РљР°Р»СЊРєСѓР»СЏС‚РѕСЂС‹В» в†’ RPEв†”%1RM.</div>
-              <div style={{ marginTop: 6 }}>{presc.progressionNote}</div>
-            </div>
-          } />
+          <MetricCard title="Повторения" icon="рџ”ё" accent={ACCENT}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{presc?.reps ?? '-'}</div>
+            <div style={{ ...SMALL }}>повт</div>
+          </MetricCard>
+          <MetricCard title="Подходы" icon="рџ”љ" accent={ACCENT}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{presc?.sets ?? '-'}</div>
+            <div style={{ ...SMALL }}>подходов</div>
+          </MetricCard>
+          <MetricCard title="RIR" icon="рџ”ё" accent={ACCENT}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{presc?.rir ?? '-'}</div>
+            <div style={{ ...SMALL }}>пунктов</div>
+          </MetricCard>
+          <MetricCard title="Отдых" icon="рџ”ё" accent={ACCENT}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{presc?.rest ?? '-'}</div>
+            <div style={{ ...SMALL }}>сек</div>
+          </MetricCard>
+          {presc.dropSet && <div style={{ ...SMALL, marginTop: 8 }}>рџ”» Р”СЂРѕРї-СЃРµС‚: {presc.dropSetReps}</div>}
+          {presc.backoffSet && <div style={{ ...SMALL }}>в†©пёЏ Р’РєР»СЋС‡РёС‚СЊ backoff‑СЃРµС‚ (РѕР±СЉС‘РјРЅС‹Р№ РґРѕР±РѕСЂРЅС‹Р№ РїРѕРґС…РѕРґ).</div>}
 
           {/* Блок рекомендаций по замене */}
           <div style={{ marginTop: 16 }}>
@@ -194,8 +253,6 @@ export const ExerciseCalcTab: React.FC = () => {
           )}
         </>
       )}
-
-      {!ex && <div style={{ ...SMALL, textAlign: 'center', padding: 20 }}>Р’С‹Р±РµСЂРёС‚Рµ СѓРїСЂР°Р¶РЅРµРЅРёРµ РІС‹С€Рµ.</div>}
     </div>
   );
 };

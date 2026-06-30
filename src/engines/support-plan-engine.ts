@@ -5,7 +5,7 @@ import {
   SYNERGY_ID_SUBSTANCES, TITRATION_RULES, SYNERGY_ID_LABELS,
 } from './support-calculator.types';
 import { MECHANISM_TO_SUPPORT_SUBSTANCE } from '../data/mechanism-support-bridge';
-import { BRIDGE_MECH_TO_CATALOG, findCatalogSubstancesForBridgeMech, findBridgeMechsForSubstance, countCoveredMechanisms } from '../data/mechanism-code-bridge';
+import { BRIDGE_MECH_TO_CATALOG, findCatalogSubstancesForBridgeMech, findBridgeMechsForSubstance, countCoveredMechanisms, findBestSubstancesForBridgeMech } from '../data/mechanism-code-bridge';
 import { SUPPORT_CATALOG_DATA } from '../data/support-catalog-data';
 import { SYSTEM_MECHANISMS } from '../core/system-mechanisms';
 import { LAB_MARKER_MAP, LAB_MARKER_MAP_BY_NAME, type LabMarkerMap } from '../data/lab-marker-map';
@@ -851,84 +851,221 @@ export function calculateSupportPlan(
 
   // ─── Level thresholds (risk % needed to activate system mechanisms) ───
   const levelThresholds: Record<string, number> = {
-    basic: 15, mid: 10, max: 6, boost: 4,
+    basic: 30, mid: 20, max: 12, boost: 6,
   };
   const threshold = levelThresholds[level] || 15;
-  const maxSubsPerMech = 999;
   const includeAllSystems = level === 'boost';
+  const tierOrder = ['core', 'standard', 'advanced', 'specialty'];
 
-  // ─── Select substances via mechanism bridge ───
+  // ─── Select substances via mechanism bridge (breadth-of-coverage) ───
   const selectedIds = new Set<string>(existingSubs?.map(s => normalizeId(s)) || []);
   const substanceReasons: Record<string, { mechInfo: string; system: string }[]> = {};
   const systemMechanisms: Record<string, string[]> = {};
   const allMechanisms: PlanMechanism[] = [];
   const uncoveredMechanisms: Array<{ mechKey: string; mechLabel: string; systemLabel: string; risk: number }> = [];
 
+  // Cache: substance → bridge keys (to avoid repeated full scans)
+  const bridgeCache = new Map<string, string[]>();
+  function getBridgeKeys(id: string): string[] {
+    if (!bridgeCache.has(id)) bridgeCache.set(id, findBridgeMechsForSubstance(id));
+    return bridgeCache.get(id)!;
+  }
+
+  // ─── Phase 1: Collect activated mechanisms & their candidates ───
+  type Activation = { sysKey: string; sysScore: number; mechKey: string; candidates: string[] };
+  const activations: Activation[] = [];
+  // Tier allowlist per level
+  const maxTierIdx: Record<string, number> = { basic: 1, mid: 2, max: 2, boost: 3 }; // 0=core,1=std,2=adv,3=spec
+  const maxTier = maxTierIdx[level] ?? 2;
   for (const [sysKey, sysScore] of Object.entries(scores)) {
     const mechKeys = SYS_TO_MECH_KEYS[sysKey] || [];
-    const activatedMechs: string[] = [];
-
     if (sysScore >= threshold || (includeAllSystems && sysScore >= 2)) {
       for (const mechKey of mechKeys) {
-        // Use auto-indexer: finds ALL catalog substances matching this mechanism
-        const bridgeSubs = findCatalogSubstancesForBridgeMech(mechKey);
-        const normSubs = bridgeSubs.map(normalizeId).filter(id => !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id));
-        if (normSubs.length === 0) {
+        const { curated, autoIndexed } = findBestSubstancesForBridgeMech(mechKey);
+        // Try curated first-line substances; fall back to auto-indexed if none survive filtering
+        let subs = curated
+          .map(normalizeId)
+          .filter(id => !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id) && (tierOrder.indexOf(getCatalogEntry(id)?.tier || 'standard') <= maxTier));
+        if (subs.length === 0) {
+          subs = autoIndexed
+            .map(normalizeId)
+            .filter(id => !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id) && (tierOrder.indexOf(getCatalogEntry(id)?.tier || 'standard') <= maxTier));
+        }
+        if (subs.length === 0) {
           uncoveredMechanisms.push({ mechKey, mechLabel: MECH_LABELS[mechKey] || mechKey, systemLabel: SYS_LABELS[sysKey] || sysKey, risk: sysScore });
           continue;
         }
-
-        activatedMechs.push(mechKey);
-
-        const mechLabel = MECH_LABELS[mechKey] || mechKey;
-        const sysLabel = SYS_LABELS[sysKey] || sysKey;
-
-        // Select best substances for this mechanism (limited by level)
-        const tierOrder = ['core', 'standard', 'advanced', 'specialty'];
-        const scoredSubs = normSubs.map(id => {
-          const entry = getCatalogEntry(id);
-          const tier = entry?.tier || 'standard';
-          const tierPriority = tierOrder.indexOf(tier);
-          const isCore = tier === 'core' ? 10 : 0;
-          // B1: Synergy bonus — prioritize substances with documented synergies to already-selected substances
-          let synergyBoost = 0;
-          if (entry?.synergies) {
-            for (const syn of entry.synergies) {
-              if (selectedIds.has(syn.with)) { synergyBoost += 3; break; }
-            }
-          }
-          // B2: bestForm priority
-          const bestFormBonus = entry?.bestForCourse ? 5 : 0;
-          return { id, tierPriority, isCore, tier, synergyBoost, bestFormBonus };
-        });
-        scoredSubs.sort((a, b) =>
-          (a.tierPriority - b.tierPriority)
-          || (b.isCore - a.isCore)
-          || (b.synergyBoost - a.synergyBoost)
-          || (b.bestFormBonus - a.bestFormBonus)
-        );
-
-        const picked: string[] = [];
-        for (const s of scoredSubs) {
-          if (picked.length >= maxSubsPerMech || false) break;
-          if (!selectedIds.has(s.id)) {
-            picked.push(s.id);
-            selectedIds.add(s.id);
-          }
-        }
-
-        for (const id of picked) {
-          if (!substanceReasons[id]) substanceReasons[id] = [];
-          substanceReasons[id].push({ mechInfo: `${sysLabel}: ${mechLabel}`, system: sysKey });
-        }
-
-        allMechanisms.push({
-          mechKey, mechLabel, systemLabel: sysLabel,
-          substances: picked, riskBefore: sysScore, riskAfter: Math.max(0, sysScore * 0.6),
-        });
+        activations.push({ sysKey, sysScore, mechKey, candidates: subs });
+        if (!systemMechanisms[sysKey]) systemMechanisms[sysKey] = [];
+        systemMechanisms[sysKey].push(mechKey);
       }
     }
-    if (activatedMechs.length > 0) systemMechanisms[sysKey] = activatedMechs;
+  }
+
+  const activatedMechSet = new Set(activations.map(a => a.mechKey));
+  const coveredMechsSet = new Set<string>();
+
+  // Helper: synergy weight between a substance and the already-selected set
+  function calcSynergyWeight(id: string): number {
+    const entry = getCatalogEntry(id);
+    if (!entry?.synergies) return 0;
+    let w = 0;
+    for (const syn of entry.synergies) {
+      const synId = syn.with.toLowerCase();
+      const sev = syn.severity || 'MEDIUM';
+      const sv = sev === 'HIGH' ? 15 : sev === 'MEDIUM' ? 10 : 5;
+      if (selectedIds.has(synId)) w += sv;
+    }
+    return w;
+  }
+
+  // ─── Phase 2: Score EVERY candidate by synergy + new coverage ───
+  // score = synergyWeight × 50 (main driver: substances that work together)
+  //       + newCovScore × 8  (how many NEW activated mechs this substance adds)
+  //       + tierScore + bestFormScore
+  // Synergy is weighted 6× higher than breadth — the engine PREFERS synergistic pairs.
+  const candidateMeta = new Map<string, {
+    newCoverage: number; synergyWeight: number; tierScore: number; bestFormScore: number;
+    coveredMechs: string[]; coveredSys: string[];
+  }>();
+
+  for (const act of activations) {
+    for (const id of act.candidates) {
+      if (candidateMeta.has(id)) continue;
+      const bridgeKeys = getBridgeKeys(id);
+      const coveredMechs = bridgeKeys.filter(bk => activatedMechSet.has(bk));
+      const coveredSys = [...new Set(activations.filter(a => coveredMechs.includes(a.mechKey)).map(a => a.sysKey))];
+      const entry = getCatalogEntry(id);
+      const tier = entry?.tier || 'standard';
+      const tierIdx = tierOrder.indexOf(tier);
+      const tierMult: Record<string, number> = { basic: 30, mid: 20, max: 15, boost: 12 };
+      const tierScore = Math.max(0, 3 - tierIdx) * (tierMult[level] || 12);
+      const bestFormScore = entry?.bestForCourse ? 8 : 0;
+      const synergyWeight = calcSynergyWeight(id);
+      // How many of the covered mechanisms are NOT yet covered by selected set
+      const newCoverage = coveredMechs.filter(mk => !coveredMechsSet.has(mk)).length;
+      candidateMeta.set(id, {
+        newCoverage, synergyWeight, tierScore, bestFormScore,
+        coveredMechs, coveredSys,
+      });
+    }
+  }
+
+  // ─── Phase 3: Iterative selection — re-score after each pick ───
+  // Each iteration: pick the candidate with highest total score,
+  // add it to selected set, re-score remaining (synergy changes).
+  function scoreCandidate(id: string): number {
+    const m = candidateMeta.get(id);
+    if (!m) return -999;
+    // Recalc synergy every time (selectedIds changed)
+    const sw = calcSynergyWeight(id);
+    m.synergyWeight = sw;
+    // Recalc new coverage every time (coveredMechsSet changed)
+    const nc = m.coveredMechs.filter(mk => !coveredMechsSet.has(mk)).length;
+    m.newCoverage = nc;
+    // Tier penalty: substances above level's tier get massive penalty
+    const entry = getCatalogEntry(id);
+    const tierIdx = tierOrder.indexOf(entry?.tier || 'standard');
+    const tierPenalty = tierIdx > maxTier ? -10000 : 0;
+    return sw * 50 + nc * 8 + m.tierScore + m.bestFormScore + tierPenalty;
+  }
+
+  // Max iterations: prevent infinite loops
+  const MAX_PICKS = 50;
+  // Coverage stop-target per level — stop adding once enough mechanisms covered
+  const coverageTargets: Record<string, number> = { basic: 0.50, mid: 0.65, max: 0.80, boost: 0.95 };
+  const coverageTarget = coverageTargets[level] || 0.65;
+  const totalMechs = activatedMechSet.size;
+  for (let iter = 0; iter < MAX_PICKS; iter++) {
+    // Check if coverage is sufficient for this level
+    if (totalMechs > 0 && coveredMechsSet.size / totalMechs >= coverageTarget) break;
+    let bestId = '';
+    let bestScore = -1;
+    for (const id of candidateMeta.keys()) {
+      if (selectedIds.has(id)) continue;
+      const s = scoreCandidate(id);
+      if (s > bestScore) { bestScore = s; bestId = id; }
+    }
+    if (!bestId || bestScore <= 0) break;
+    const best = candidateMeta.get(bestId)!;
+    const addsNewMech = best.newCoverage > 0;
+    const hasSynergy = best.synergyWeight > 0;
+    if (!addsNewMech && !hasSynergy) break;
+    selectedIds.add(bestId);
+    best.coveredMechs.forEach(mk => coveredMechsSet.add(mk));
+    for (const mk of best.coveredMechs) {
+      const act = activations.find(a => a.mechKey === mk);
+      if (!act) continue;
+      if (!substanceReasons[bestId]) substanceReasons[bestId] = [];
+      substanceReasons[bestId].push({
+        mechInfo: `${SYS_LABELS[act.sysKey] || act.sysKey}: ${MECH_LABELS[mk] || mk}`,
+        system: act.sysKey,
+      });
+    }
+  }
+
+  // ─── Soft substance caps per level (±30% flexibility) ───
+  const maxSubstances: Record<string, number> = { basic: 14, mid: 22, max: 32, boost: 44 };
+  const maxSub = maxSubstances[level] || 24;
+  const canAdd = () => selectedIds.size < maxSub;
+
+  // ─── Phase 3b: Synergy-only picks ───
+  // with already-selected set even if all mechs covered (synergy stack boost)
+  for (let iter = 0; iter < 6; iter++) {
+    let bestId = '';
+    let bestScore = 0;
+    for (const id of candidateMeta.keys()) {
+      if (selectedIds.has(id)) continue;
+      const entry = getCatalogEntry(id);
+      const tierIdx = tierOrder.indexOf(entry?.tier || 'standard');
+      if (tierIdx > maxTier) continue; // skip if above level's tier
+      const sw = calcSynergyWeight(id);
+      if (sw > bestScore) { bestScore = sw; bestId = id; }
+    }
+    if (!bestId || bestScore < 30) break; // need at least HIGH synergy
+    if (!canAdd()) break;
+    selectedIds.add(bestId);
+  }
+
+  // ─── Phase 4: Fill uncovered mechanisms with best specialist ───
+  // Only for mechanisms with score >= threshold, max gap fills per level
+  const uncoveredActs = activations.filter(a => ![...selectedIds].some(id => getBridgeKeys(id).includes(a.mechKey)));
+  const sortedUncovered = uncoveredActs.sort((a, b) => b.sysScore - a.sysScore);
+  const gapFillMax = level === 'boost' ? 8 : level === 'max' ? 6 : level === 'mid' ? 4 : 2;
+  let gapFillCount = 0;
+  for (const act of sortedUncovered) {
+    if (gapFillCount >= gapFillMax) break;
+    if (!canAdd()) break;
+    const alreadyCovered = [...selectedIds].some(id => getBridgeKeys(id).includes(act.mechKey));
+    // Pick the highest-tier candidate for this mechanism (within level's tier limit)
+    const best = act.candidates
+      .filter(id => !selectedIds.has(id) && !excludedSubs.has(id) && (tierOrder.indexOf(getCatalogEntry(id)?.tier || 'standard') <= maxTier))
+      .sort((a, b) => {
+        const ta = tierOrder.indexOf(getCatalogEntry(a)?.tier || 'standard');
+        const tb = tierOrder.indexOf(getCatalogEntry(b)?.tier || 'standard');
+        return ta - tb;
+      });
+    if (best.length === 0) continue;
+    const pick = best[0];
+    selectedIds.add(pick);
+    if (!substanceReasons[pick]) substanceReasons[pick] = [];
+    substanceReasons[pick].push({
+      mechInfo: `${SYS_LABELS[act.sysKey] || act.sysKey}: ${MECH_LABELS[act.mechKey] || act.mechKey}`,
+      system: act.sysKey,
+    });
+  }
+
+  // ─── Phase 5: Build allMechanisms from final selection ───
+  for (const act of activations) {
+    const mechSubs = [...selectedIds].filter(id => getBridgeKeys(id).includes(act.mechKey));
+    allMechanisms.push({
+      mechKey: act.mechKey,
+      mechLabel: MECH_LABELS[act.mechKey] || act.mechKey,
+      systemLabel: SYS_LABELS[act.sysKey] || act.sysKey,
+      substances: mechSubs,
+      riskBefore: act.sysScore,
+      riskAfter: Math.max(0, act.sysScore * (mechSubs.length > 0 ? 0.15 : 0.85)),
+    });
   }
 
   // ─── LAB-BASED SUBSTANCE SELECTION ───
@@ -966,17 +1103,17 @@ export function calculateSupportPlan(
 
   // ─── Add hepatoprotection if any hepatic risk ───
   const hepaticScore = scores.hepatic || 0;
-  if (hepaticScore >= 10 && !selectedIds.has('nac') && !isContraindicated('nac')) {
+  if (hepaticScore >= 10 && !selectedIds.has('nac') && !isContraindicated('nac') && canAdd()) {
     selectedIds.add('nac');
     if (!substanceReasons['nac']) substanceReasons['nac'] = [];
     substanceReasons['nac'].push({ mechInfo: 'Печень: цитолиз, окислительный стресс, детоксикация', system: 'hepatic' });
   }
-  if (hepaticScore >= 15 && !selectedIds.has('tudca') && !isContraindicated('tudca')) {
+  if (hepaticScore >= 15 && !selectedIds.has('tudca') && !isContraindicated('tudca') && canAdd()) {
     selectedIds.add('tudca');
     if (!substanceReasons['tudca']) substanceReasons['tudca'] = [];
     substanceReasons['tudca'].push({ mechInfo: 'Печень: холестаз, желчеотток, ER-стресс', system: 'hepatic' });
   }
-  if (hepaticScore >= 15 && !selectedIds.has('milk_thistle') && !isContraindicated('milk_thistle')) {
+  if (hepaticScore >= 20 && !selectedIds.has('milk_thistle') && !isContraindicated('milk_thistle') && canAdd() && (level === 'max' || level === 'boost')) {
     selectedIds.add('milk_thistle');
     if (!substanceReasons['milk_thistle']) substanceReasons['milk_thistle'] = [];
     substanceReasons['milk_thistle'].push({ mechInfo: 'Печень: стабилизация мембран гепатоцитов', system: 'hepatic' });
@@ -984,12 +1121,12 @@ export function calculateSupportPlan(
 
   // ─── Add cardio protection ───
   const cardioScore = scores.cardio || 0;
-  if (cardioScore >= 20 && !selectedIds.has('telmisartan') && !isContraindicated('telmisartan')) {
+  if (cardioScore >= 20 && !selectedIds.has('telmisartan') && !isContraindicated('telmisartan') && canAdd()) {
     selectedIds.add('telmisartan');
     if (!substanceReasons['telmisartan']) substanceReasons['telmisartan'] = [];
     substanceReasons['telmisartan'].push({ mechInfo: 'ССС: контроль АД, ARB-защита', system: 'cardio' });
   }
-  if (cardioScore >= 15 && !selectedIds.has('nebivolol') && !isContraindicated('nebivolol')) {
+  if (cardioScore >= 20 && !selectedIds.has('nebivolol') && !isContraindicated('nebivolol') && canAdd() && (level === 'max' || level === 'boost')) {
     selectedIds.add('nebivolol');
     if (!substanceReasons['nebivolol']) substanceReasons['nebivolol'] = [];
     substanceReasons['nebivolol'].push({ mechInfo: 'ССС: контроль ЧСС, NO-модуляция', system: 'cardio' });
@@ -1086,8 +1223,9 @@ export function calculateSupportPlan(
   for (const rec of autoStacks) {
     if (rec.score >= 70 && rec.coveredSystems.length >= 3 && rec.stack.synergyScore >= 80) {
       for (const sub of rec.stack.substances) {
+        if (!canAdd()) break;
         const normId = normalizeId(sub.id);
-        if (!selectedIds.has(normId) && !excludedSubs.has(normId) && catalogExists(normId) && !isContraindicated(normId) && !rec.wasteSubstances.includes(sub.id)) {
+        if (!selectedIds.has(normId) && !excludedSubs.has(normId) && catalogExists(normId) && !isContraindicated(normId) && !rec.wasteSubstances.includes(sub.id) && (tierOrder.indexOf(getCatalogEntry(normId)?.tier || 'standard') <= maxTier)) {
           selectedIds.add(normId);
           if (!substanceReasons[normId]) substanceReasons[normId] = [];
           substanceReasons[normId].push({ mechInfo: `Стек «${rec.stack.name}»: ${sub.mechanism || 'синергия стека'}`, system: rec.stack.system });
@@ -1339,50 +1477,89 @@ export function calculateSupportPlan(
 
 // ─── Apply joint/boost substances on top of existing plan ───
 export function applyJointToPlan(plan: PlanResult): PlanResult {
-  const jointIds = ['collagen','glucosamine','msm','boswellia','chondroitin_sulfate','hyaluronic_acid','bcp157','tb500','calcium'];
-  const jointDoses: Record<string,{mg:number;timing:string}> = {
-    collagen:{mg:15000,timing:'на ночь'}, glucosamine:{mg:1500,timing:'с едой'}, msm:{mg:3000,timing:'с едой'},
-    boswellia:{mg:500,timing:'с едой'}, chondroitin_sulfate:{mg:1200,timing:'с едой'}, hyaluronic_acid:{mg:200,timing:'вечер'},
-    bcp157:{mg:500,timing:'натощак'}, tb500:{mg:10,timing:'ежедневно'}, calcium:{mg:1000,timing:'вечер'},
-  };
   const existing = new Set(plan.substances.map(s => s.id));
   const added: PlanSubstance[] = [];
-  for (const id of jointIds) {
-    if (existing.has(id)) continue;
-    const entry = getCatalogEntry(id);
-    const dose = jointDoses[id] || { mg: 500, timing: 'с едой' };
-    added.push({
-      id, name: entry?.nameRu || entry?.name || id, doseMg: dose.mg,
-      doseDisplay: dose.mg >= 1000 ? `${(dose.mg / 1000).toFixed(1)} г (${dose.mg} мг)` : `${dose.mg} мг`,
-      timing: dose.timing, category: entry?.category || [], tier: 'standard',
-      targetSystems: ['musculoskeletal'], comment: 'Суставы/связки: дополнительная поддержка',
-      mechanismReason: 'Суставы/связки', fromJoint: true, fromBoost: false,
-    });
+  const seen = new Set<string>();
+
+  // Find substances targeting musculoskeletal mechanisms
+  const muscKeys = Object.keys(BRIDGE_MECH_TO_CATALOG).filter(k => k.startsWith('musculoskeletal_'));
+  for (const bk of muscKeys) {
+    const { curated, autoIndexed } = findBestSubstancesForBridgeMech(bk);
+    for (const rawId of [...curated, ...autoIndexed]) {
+      const id = normalizeId(rawId);
+      if (existing.has(id) || seen.has(id)) continue;
+      seen.add(id);
+      const entry = getCatalogEntry(id);
+      if (!entry) continue;
+      // Only add joint-relevant substances (collagen, glucosamine, chondroitin, msm, vitamin_c, etc.)
+      if (!id.includes('collagen') && !id.includes('glucosamine') && !id.includes('chondroitin')
+        && !id.includes('msm') && !id.includes('hyaluronic') && !id.includes('boswellia')
+        && !id.includes('bromelain') && !id.includes('bcp') && !id.includes('tb500')
+        && !id.includes('vitamin_c') && !id.includes('vitamin_d3') && !id.includes('magnesium')
+        && !id.includes('calcium') && !id.includes('curcumin') && !id.includes('omega3')) continue;
+      added.push({
+        id, name: entry?.nameRu || entry?.name || id,
+        doseMg: entry?.dosage?.mg || 500,
+        doseDisplay: (entry?.dosage?.mg || 500) >= 1000 ? `${((entry?.dosage?.mg || 500) / 1000).toFixed(1)} г` : `${entry?.dosage?.mg || 500} мг`,
+        timing: entry?.dosage?.timing || 'с едой',
+        category: entry?.category || [], tier: 'standard',
+        targetSystems: ['musculoskeletal'],
+        comment: 'Суставы/связки: поддержка опорно-двигательной системы',
+        mechanismReason: 'Суставы/связки', fromJoint: true, fromBoost: false,
+      });
+    }
   }
+
   return { ...plan, substances: [...plan.substances, ...added] };
 }
 
 export function applyBoostToPlan(plan: PlanResult): PlanResult {
-  const boostIds = ['ashwagandha','berberine','vitamin_k2','probiotics','l_carnitine','astragalus','saw_palmetto','curcumin','taurine','vitamin_e'];
-  const boostDoses: Record<string,{mg:number;timing:string}> = {
-    ashwagandha:{mg:300,timing:'вечер'}, berberine:{mg:500,timing:'с едой'}, vitamin_k2:{mg:200,timing:'с едой'},
-    probiotics:{mg:20,timing:'натощак'}, l_carnitine:{mg:2000,timing:'натощак'}, astragalus:{mg:1500,timing:'утро'},
-    saw_palmetto:{mg:640,timing:'с едой'}, curcumin:{mg:1000,timing:'с пиперином'}, taurine:{mg:1500,timing:'натощак'}, vitamin_e:{mg:200,timing:'с едой'},
-  };
   const existing = new Set(plan.substances.map(s => s.id));
   const added: PlanSubstance[] = [];
-  for (const id of boostIds) {
-    if (existing.has(id)) continue;
+  const candidates: Array<{ id: string; score: number }> = [];
+
+  // Scan ALL bridge mechanisms, find high-priority candidates NOT in plan
+  for (const [bridgeKey, codes] of Object.entries(BRIDGE_MECH_TO_CATALOG)) {
+    const { curated, autoIndexed } = findBestSubstancesForBridgeMech(bridgeKey);
+    for (const rawId of [...curated, ...autoIndexed]) {
+      const id = normalizeId(rawId);
+      if (existing.has(id) || added.some(a => a.id === id)) continue;
+      const entry = getCatalogEntry(id);
+      if (!entry) continue;
+      // Score: tier + synergy weight with existing plan
+      const tierIdx = ['core', 'standard', 'advanced', 'specialty'].indexOf(entry.tier || 'standard');
+      const tierScore = Math.max(0, 3 - tierIdx) * 10;
+      let synScore = 0;
+      for (const sub of plan.substances) {
+        if (entry.synergies?.some((syn: any) => syn.with.toLowerCase() === sub.id)) synScore += 15;
+      }
+      candidates.push({ id, score: tierScore + synScore + (entry.bestForCourse ? 5 : 0) });
+    }
+  }
+
+  // Deduplicate by keeping highest score per candidate
+  const best = new Map<string, number>();
+  for (const c of candidates) {
+    best.set(c.id, Math.max(best.get(c.id) || 0, c.score));
+  }
+
+  // Pick top 6 by (synergy, tier) — NOT hardcoded
+  const picked = [...best.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+
+  for (const [id] of picked) {
     const entry = getCatalogEntry(id);
-    const dose = boostDoses[id] || { mg: 500, timing: 'с едой' };
+    const dose = { mg: entry?.dosage?.mg || 500, timing: entry?.dosage?.timing || 'с едой' };
     added.push({
       id, name: entry?.nameRu || entry?.name || id, doseMg: dose.mg,
       doseDisplay: dose.mg >= 1000 ? `${(dose.mg / 1000).toFixed(1)} г (${dose.mg} мг)` : `${dose.mg} мг`,
       timing: dose.timing, category: entry?.category || [], tier: 'advanced',
-      targetSystems: ['general'], comment: 'Усиление поддержки: расширенный спектр',
+      targetSystems: ['general'], comment: 'Усиление: закрытие пробелов покрытия по механизмам',
       mechanismReason: 'Усиление', fromJoint: false, fromBoost: true,
     });
   }
+
   return { ...plan, substances: [...plan.substances, ...added] };
 }
 

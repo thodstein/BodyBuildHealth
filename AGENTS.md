@@ -522,30 +522,78 @@ SupportScreen.calcSupport()
 ## 7. Профессиональная объективность
 * Агент обязан приоритизировать техническую точность, мобильную адаптивность и правдивость над вежливостью. Скрытие недоработок кода, сиротские (неподключенные) файлы или создание избыточных модулей считается критической ошибкой.
 
-## 8. Интеграция новых препаратов/веществ (Обязательная полнота)
-При добавлении любого нового препарата или вещества в базу данных (support-database.ts, pharma-database.ts и т.д.) Агент ОБЯЗАН обеспечить **полное заполнение всей информации**:
+## 8. Интеграция новых препаратов/веществ (ОБЯЗАТЕЛЬНАЯ ПОЛНОТА — нарушение = ПРОВАЛ)
 
-1. **Полная карточка препарата** — все поля SUPPORT_CATALOG_DATA: id, name, typeEn, ru, description, mechanisms, targetOrgans, dosageForms, timingDosage, duration, contraindications, sideEffects, monitoring, tier, categories, source, researchLinks, activeSubstance, halfLife, bioavailability, metabolism, excretion, synonyms.
-2. **Описание** — развёрнутое русскоязычное описание (50-300 символов), механизм действия, показания.
-3. **Взаимодействия** — заполнить `synergies` (с указанием типа, эффекта, механизма) и `conflicts` в карточке каталога.
-4. **Синергии и антисинергии** — добавить записи в ALL_INTERACTIONS (`support-substances.ts`) для всех известных клинически значимых пар (не менее 2-3 на вещество).
-5. **Конфликты и особые указания** — внести противопоказания (contraindications), особые указания (specialInstructions), мониторинг (monitoring).
-6. **Анализы/лабораторный контроль** — указать labMarkers, какие маркеры отслеживать, с какой периодичностью.
-7. **Маппинги** — добавить вещество во все необходимые структуры:
-   - ALL_SUBSTANCES (`support-substances.ts`)
-   - L mapping (`name-mapping` в `support-synergy-stacks.ts`)
-   - CATALOG_ENRICHMENT (`support-enrichment.ts`) — если нужны дополнительные поля обогащения
-   - При необходимости — в `pharma-database.ts`, `drug-mapper.engine.ts`, `interaction-engine.ts`.
-8. **Полная интеграция во все разделы приложения** — препарат должен быть виден и функционален в:
-   - Каталоге (поиск, фильтрация по категории/типу)
-   - Детальном просмотре (все поля, синергии, взаимодействия)
-   - Калькуляторе поддержки (расчёт доз, проверка конфликтов)
-   - Отчётах (генерация плана с новым веществом)
-   - Рисках (если вещество влияет на риски — добавить в risk-engine)
-   - Взаимодействиях (ALL_INTERACTIONS)
-9. **Валидация** — после внесения изменений обязательно запустить `tsc --noEmit` и `vite build`. Все ошибки типизации и сборки исправить до завершения задачи.
+### 8.1. Полнота карточки препарата
+При добавлении ЛЮБОГО нового вещества в `SUPPORT_CATALOG_DATA` агент ОБЯЗАН заполнить ВСЕ поля:
+- `id, name, typeEn, ru, description, mechanisms[], targetOrgans[], dosageForms[], timingDosage, duration`
+- `contraindications[]` — **только substance-specific, ни одной generic-строки** (`'Индивидуальная непереносимость'` — только как дополнение к реальным, не как единственное)
+- `sideEffects[]` — **только substance-specific**, ни одной строки `'желудочный дискомфорт'` без конкретики
+- `specialInstructions[]` — **минимум 1 substance-specific инструкция** (не только `'Принимать с едой'`/`'Курс 8-12 нед'`)
+- `monitoring[]` — **минимум 2 substance-specific маркера** с `what/when/targetRange` (не только `'Липидограмма'`)
+- `synergies[]` — **минимум 2 substance-specific синергии** (не `'Синергия: усиление взаимного эффекта'`)
+- `conflicts[]` — **минимум 1 substance-specific конфликт** (не `'Комбинированное действие'`)
+- `mechanisms[]` — массив UPPER_SNAKE_CASE кодов из `BRIDGE_MECH_TO_CATALOG` (см. 9.7)
 
-**Нарушение этих правил считается критической ошибкой.** Недозаполненные карточки, отсутствие в ALL_INTERACTIONS или пропущенные маппинги недопустимы.
+### 8.2. Полнота карточки фарма-препарата (pharma-database.ts)
+При добавлении фарма-препарата ОБЯЗАТЕЛЬНО заполнить ВСЕ поля из раздела 11 (PharmaSubstance):
+- `targetSystems[]` — минимум 3 системы
+- `targetMechanisms[]` — минимум 2 механизма
+- `linkedRisks[]` — минимум 2 записи (system + direction + strength)
+- `linkedSubstances[]` — минимум 1 запись (id + type + mechanism + strength)
+- `cvProfile` — ВСЕ 5 полей (bloodPressure, heartRate, vascularTone, thrombosisRisk, cnsLoad)
+
+### 8.3. МАППИНГ-ЧЕКЛИСТ (ОБЯЗАТЕЛЬНЫЙ — 8 ФАЙЛОВ)
+При добавлении ЛЮБОГО нового вещества или стека агент ОБЯЗАН обновить ВСЕ перечисленные файлы. Пропуск любого = КРИТИЧЕСКАЯ ОШИБКА:
+
+| # | Файл | Что сделать |
+|---|------|-------------|
+| 1 | `support-substances.ts` | Добавить в `ALL_SUBSTANCES[]` + проверить `allIds` |
+| 2 | `support-synergy-stacks.ts` (const L) | Добавить name-mapping `id → русское название` |
+| 3 | `support-enrichment.ts` (`CATALOG_ENRICHMENT`) | Добавить, если нужны доп. поля обогащения |
+| 4 | `mechanism-code-bridge.ts` | Если вещество использует НОВЫЙ код механизма — добавить код в соответствующий bridge-ключ (cardio_1..musculoskeletal_7). **Все коды из `mechanisms[]` вещества должны существовать в `BRIDGE_MECH_TO_CATALOG`** |
+| 5 | `mechanism-support-bridge.ts` | Для новых механизмов — добавить `mechanismId → supportIds[]` |
+| 6 | `system-mechanisms.ts` | Если вещество затрагивает новый механизм — дополнить `drugs[]` и `markers[]` |
+| 7 | `support-index.ts` | Проверить, что вещество попадает в обратные индексы (`MECHANISM_TO_SUPPORT`, `ORGAN_TO_SUPPORT`, `SYSTEM_TO_SUPPORT`) |
+| 8 | `ALL_INTERACTIONS` | Добавить минимум 2-3 пары взаимодействий с существующими веществами |
+
+Для фарма-препаратов дополнительно:
+| # | Файл | Что сделать |
+|---|------|-------------|
+| 9 | `pharma-lab-marker-map.ts` | Добавить `drugId → markers[]` |
+| 10 | `lab-marker-map.ts` | Если новый маркер — добавить `marker → correctionIds[]` |
+| 11 | `pharma-database.ts` | Добавить запись с полным PharmaSubstance |
+| 12 | `drug-mapper.engine.ts` | Добавить маппинг, если препарат имеет синонимы |
+| 13 | `interaction-engine.ts` | Добавить, если есть значимые межлекарственные взаимодействия |
+
+### 8.4. ПРОВЕРКА ПОСЛЕ ДОБАВЛЕНИЯ (ОБЯЗАТЕЛЬНАЯ)
+```typescript
+// 1. Вещество видно в каталоге
+import { SUPPORT_CATALOG_DATA } from './support-catalog-data';
+console.log('В каталоге:', SUPPORT_CATALOG_DATA['new_id'] ? '✅' : '❌');
+
+// 2. mechanisms[] привязаны к bridge
+import { findBridgeMechsForSubstance } from './mechanism-code-bridge';
+const bridgeKeys = findBridgeMechsForSubstance('new_id');
+console.log('Bridge-ключи:', bridgeKeys.length > 0 ? `✅ (${bridgeKeys.length})` : '❌');
+// Для core: минимум 5 bridge-ключей, для standard: 3-8, для advanced: 1-5
+
+// 3. Вещество участвует в подборе поддержки
+import { findCatalogSubstancesForBridgeMech } from './mechanism-code-bridge';
+const bridgeKey = bridgeKeys[0]; // первый bridge-ключ
+const substances = findCatalogSubstancesForBridgeMech(bridgeKey);
+console.log(`Участвует в подборе (${bridgeKey}):`, substances.includes('new_id') ? '✅' : '❌');
+
+// 4. Нет generic-строк
+const entry = SUPPORT_CATALOG_DATA['new_id'];
+console.log('contraindications substance-specific:', !entry.contraindications.some(c => c === 'Индивидуальная непереносимость' && entry.contraindications.length === 1) ? '✅' : '❌');
+console.log('sideEffects substance-specific:', !entry.sideEffects.some(s => s.includes('желудочный дискомфорт')) ? '✅' : '❌');
+console.log('specialInstructions has specific:', entry.specialInstructions.some(s => !s.includes('Принимать с едой') && !s.includes('Курс')) ? '✅' : '❌');
+
+// 5. tsc --noEmit && vite build — 0 ошибок
+```
+
+**Нарушение любого пункта 8.1–8.4 = КРИТИЧЕСКАЯ ОШИБКА.** Недозаполненные карточки, пропущенные маппинги, generic-строки и отсутствие проверок недопустимы.
 
 ## 9. Аудит и структурирование каталога поддержки (СКВОЗНАЯ РАБОТА С БАЗОЙ)
 
@@ -579,7 +627,7 @@ SupportScreen.calcSupport()
     "Целевой_орган": "Конкретный орган или ткань воздействия",
     "Механизмы_этого_органа": "Физиологический процесс органа, на который идёт влияние (регуляция тонуса, фильтрация, секреция, сокращение и т.д.)",
     "Механизм_действия_препарата": "Биохимический/молекулярный уровень (ингибирование фермента, активация рецепторов, модуляция каналов и т.д.)",
-    "Механизмы_(коды)": ["Список кодов механизмов для маппинга: ELECTRON_TRANSPORT_CHAIN, ANTIOXIDANT, AMPK_ACTIVATION и др."],
+    "Механизмы_(коды)": ["Список кодов механизмов для маппинга: GLUTATHIONE_SYNTHESIS, ANTIOXIDANT, AMPK_ACTIVATION и др."],
     "Эффект_препарата": "Конечный клинический/терапевтический результат"
   },
   "Совместимость_и_комбинации": {
@@ -642,13 +690,13 @@ SupportScreen.calcSupport()
 
 **Нарушение:** пропуск маппинга = препарат не участвует в подборе поддержки = КРИТИЧЕСКАЯ ОШИБКА.
 
-### 9.7. ОБЯЗАТЕЛЬНЫЙ МАППИНГ МЕХАНИЗМОВ (НОВОЕ ПРАВИЛО — Jun 29)
+### 9.7. ОБЯЗАТЕЛЬНЫЙ МАППИНГ МЕХАНИЗМОВ
 
 **Каждое вещество в `SUPPORT_CATALOG_DATA` ОБЯЗАНО иметь заполненное поле `mechanisms[]` с кодами из каталога.**
 
 Это поле — единственный источник для авто-индексатора (`mechanism-code-bridge.ts`), который связывает вещество с системами и механизмами риска. Без `mechanisms[]` вещество **никогда не будет назначено** калькулятором поддержки.
 
-**Формат кодов:** `UPPER_SNAKE_CASE` из закрытого списка (621 код). Примеры:
+**Формат кодов:** `UPPER_SNAKE_CASE` из `BRIDGE_MECH_TO_CATALOG`. Примеры:
 - `GLUTATHIONE_SYNTHESIS` — синтез глутатиона
 - `BILE_FLOW_STIMULATION` — стимуляция желчеоттока
 - `ANTIOXIDANT` — антиоксидантная защита
@@ -667,18 +715,20 @@ SupportScreen.calcSupport()
 
 **Нарушение = КРИТИЧЕСКАЯ ОШИБКА.** Вещество без mechanisms[] — мёртвый груз в каталоге.
 
-### 9.8. ОБЯЗАТЕЛЬНЫЙ МАППИНГ СТЕКОВ (НОВОЕ ПРАВИЛО — Jun 29)
+### 9.8. ОБЯЗАТЕЛЬНЫЙ МАППИНГ СТЕКОВ
 
 **Каждый стек в `ALL_STACKS` ОБЯЗАН иметь заполненное поле `anatomicalMapping.mechanismCodes[]`.**
 
 Без `mechanismCodes` стек **не участвует в подборе** калькулятором, не оценивается по покрытию рисков и не показывается в «Рекомендованных стеках».
 
-**Формат:** массив строк — коды механизмов из каталога (те же 621 кода, что и для веществ).
+**Формат:** массив строк — коды механизмов из каталога (те же коды, что и для веществ, из `BRIDGE_MECH_TO_CATALOG`).
 Пример: `mechanismCodes: ['GLUTATHIONE_SYNTHESIS', 'BILE_FLOW_STIMULATION', 'ANTIOXIDANT', 'NRF2_ACTIVATION']`
 
 **Принцип заполнения:**
 - Указывать ВСЕ механизмы, которые стек покрывает (не только основной)
-- Коды брать из `mechanism-code-bridge.ts` → `BRIDGE_MECH_TO_CATALOG`
+- Коды брать ТОЛЬКО из `mechanism-code-bridge.ts` → `BRIDGE_MECH_TO_CATALOG`
+- **Запрещено** использовать коды, которых нет в `BRIDGE_MECH_TO_CATALOG` — они не будут найдены авто-индексатором
+- Если нужного кода нет в `BRIDGE_MECH_TO_CATALOG` — сначала добавить его туда, затем использовать
 - **Каждый указанный код должен иметь реальное вещество в стеке, которое его обеспечивает**
 - Не копировать коды «на всякий случай» — только то, что стек реально делает
 
@@ -688,6 +738,7 @@ import { findBridgeMechsForStack } from './mechanism-code-bridge';
 const mechs = findBridgeMechsForStack(stack.anatomicalMapping.mechanismCodes);
 console.log('Покрывает bridge-механизмы:', mechs);
 // Должен вернуть непустой массив
+// Должен содержать >=3 bridge-ключей для стека с synergyScore >=80
 ```
 
 **Стек без mechanismCodes = КРИТИЧЕСКАЯ ОШИБКА.** Стек не попадёт в рекомендации и не будет учитываться при подборе поддержки.
@@ -706,6 +757,48 @@ console.log('Покрывает bridge-механизмы:', mechs);
 - Избыточные вещества в стеке (не покрывающие активированные механизмы) снижают рейтинг
 
 **Расширение базы = расширение маппинга.** Новый препарат без `mechanisms[]` невидим для калькулятора. Новый стек без `mechanismCodes[]` невидим для рекомендателя.
+
+### 9.10. ПРИНЦИП ШИРОКОСПЕКТОРНОГО ОТБОРА (BREADTH-OF-COVERAGE)
+
+Движок поддержки (`support-plan-engine.ts`) использует **глобальный скоринг по широте покрытия** вместо per-mechanism cap:
+
+**Как это работает:**
+1. Собираются ВСЕ активированные механизмы риска (systems × mechanisms с порогом по уровню)
+2. Для КАЖДОГО вещества-кандидата считается `breadth = количество активированных bridge-механизмов, которые оно покрывает`
+3. Сортировка: `breadth × 20 + tierScore + synergyScore + bestFormScore`
+4. **Phase 3 — Global selection:** выбираются вещества с наибольшим breadth, пока все системы не получили покрытие
+5. **Phase 4 — Gap filling:** для механизмов без покрытия добавляется 1 лучший specialist (core → standard → advanced)
+
+**Что это значит для добавления веществ:**
+- **Вещества, покрывающие МНОГО механизмов (broad-spectrum),** автоматически выбираются первыми — NAC, магний, D3, цинк, омега-3, CoQ10
+- **Узкие специалисты** (покрывают 1-2 механизма) выбираются только если broad-spectrum не закрыл их механизм
+- **Количество препаратов НЕ ФИКСИРОВАНО** — определяется числом активированных механизмов: 
+  - Low risk (2-3 системы) → 6-12 препаратов
+  - Medium risk (4-6 систем) → 12-20 препаратов  
+  - High risk (6-8 систем) → 18-30 препаратов
+  - Boost + high risk → 25-40 препаратов
+
+**Правило для агентов при добавлении новых веществ:**
+- `mechanisms[]` должен содержать ВСЕ механизмы, которые вещество реально покрывает (не только основной!)
+- Чем больше механизмов указано — тем выше breadth-скоринг и тем раньше вещество будет выбрано
+- **Запрещено** указывать механизмы, которые вещество НЕ покрывает (накрутка breadth)
+- Каждый код в `mechanisms[]` должен быть в `BRIDGE_MECH_TO_CATALOG` (см. 9.7)
+- После добавления проверить `findBridgeMechsForSubstance('id')` — чем длиннее массив, тем шире спектр
+
+**Правило для стеков:**
+- `mechanismCodes[]` стека участвует в breadth-скоринге: стек, покрывающий 5+ активированных механизмов, получает приоритет
+- Стеки с `synergyScore ≥ 80`, покрывающие ≥3 системы, автоматически применяются (через `recommendStacks`)
+- **Запрещено** добавлять в стек вещества, не покрывающие активированные механизмы (wasteSubstances) — они снижают рейтинг стека
+
+**Проверка после добавления:**
+```typescript
+// breadth = количество bridge-механизмов, которые покрывает вещество
+import { findBridgeMechsForSubstance } from './mechanism-code-bridge';
+console.log(findBridgeMechsForSubstance('new_id').length);
+// Для core-веществ ожидается 5-15 механизмов
+// Для standard — 3-8
+// Для advanced/specialty — 1-5
+```
 
 ## 10. Правила создания стеков (обязательно)
 
@@ -894,18 +987,19 @@ export interface SupportStack {
 - Запрещено создавать стек с неполными расширенными полями (anatomicalMapping, structuredInteractions, structuredLabControl — обязательны).
 
 ### 10.7. ОБЯЗАТЕЛЬНОЕ ПРАВИЛО ЗАПОЛНЕНИЯ СТЕКА (для всех агентов)
-При добавлении или редактировании ЛЮБОГО стека в `support-stacks-bformat.ts` агент ОБЯЗАН соблюдать **полный макет** (B-формат) без пропусков:
+При добавлении или редактировании ЛЮБОГО стека агент ОБЯЗАН соблюдать **полный макет** (B-формат) без пропусков:
 
 1. **Все 23+ поля** из `SupportStack` интерфейса должны быть заполнены. Ни одно поле не может быть пустым или пропущено.
 2. **`description`** — только УСИЛЕНИЕ существующего. Запрещено сокращать или упрощать. Если стек уже имеет описание — агент может ДОБАВИТЬ детали, но НЕ УДАЛЯЕТ.
 3. **`substances[].mechanism`** — для КАЖДОГО вещества описать его роль ИМЕННО В ЭТОМ СТЕКЕ (30-50 символов). Не копировать общее описание из SUPPORT_CATALOG_DATA.
 4. **`anatomicalMapping`** — ВСЕ 6 полей заполнить (organSystems, targetOrgans, organMechanisms, drugMechanisms, mechanismCodes, finalEffect).
-5. **`structuredInteractions`** — минимум 3 синергии (`synergies[]`) и 1 конфликт (`conflicts[]`). ВСЕ поля внутри каждой записи (with, effect, mechanism, strength) обязательны.
-6. **`structuredLabControl`** — минимум 5 маркеров (`markers[]`). Каждый маркер: marker, when, targetRange — ВСЕ поля обязательны.
-7. **Запрещено** использовать `as any`, оставлять `undefined`, использовать плейсхолдеры.
-8. После заполнения — `tsc --noEmit && vite build`.
+5. **`mechanismCodes[]` — ОБЯЗАТЕЛЬНО проверить, что КАЖДЫЙ код существует в `BRIDGE_MECH_TO_CATALOG` (`mechanism-code-bridge.ts`). Если кода там нет — сначала добавить код в соответствующий bridge-ключ, затем использовать в стеке. После добавления запустить `findBridgeMechsForStack(codes)` — должен вернуть непустой массив bridge-ключей.**
+6. **`structuredInteractions`** — минимум 3 синергии (`synergies[]`) и 1 конфликт (`conflicts[]`). ВСЕ поля внутри каждой записи (with, effect, mechanism, strength) обязательны.
+7. **`structuredLabControl`** — минимум 5 маркеров (`markers[]`). Каждый маркер: marker, when, targetRange — ВСЕ поля обязательны.
+8. **Запрещено** использовать `as any`, оставлять `undefined`, использовать плейсхолдеры.
+9. **После заполнения — запустить `tsc --noEmit && vite build`.** Если в процессе сборки выяснилось, что не хватает маппинга — вернуться и добавить.
 
-Нарушение любого из пунктов 10.7 считается **критической ошибкой**. Стек с неполными полями не принимается.
+Нарушение любого из пунктов 10.7 считается **критической ошибкой**. Стек с неполными полями или mechanismCodes без привязки к `BRIDGE_MECH_TO_CATALOG` не принимается.
 
 ## Session Summary (Jun 25) — BioStack AI + B-format стеки
 ### Done

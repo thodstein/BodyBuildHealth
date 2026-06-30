@@ -18,16 +18,17 @@ export interface SupportModalsProps {
   setBoostEnabled: (v: boolean) => void;
   setSupportLevel: (v: any) => void;
   setManualLevelSelected?: (v: boolean) => void;
+  setJointMode?: (v: boolean) => void;
+  jointMode?: boolean;
+  boostEnabled?: boolean;
   calcSupport: (level?: any) => void;
   catalogSupport: any[];
   allSupport: any[];
   catalogSubstances: any[];
-  BOOST_SUBS: string[];
   getStackDisplayName: (stack: any) => string;
   savedStacks: any[];
   MECH_TRANSLATIONS_RU: Record<string, string>;
   SUPPORT_LEVELS: Record<string, { label: string; desc: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }> }>;
-  // Week select
   courseWeekState?: number;
   setCourseWeekState?: (v: number) => void;
   maxCourseWeek?: number;
@@ -45,28 +46,48 @@ export const SupportModals: React.FC<SupportModalsProps> = ({
   setBoostEnabled,
   setSupportLevel,
   setManualLevelSelected,
+  setJointMode,
+  jointMode,
+  boostEnabled,
   calcSupport,
   catalogSupport,
   allSupport,
   catalogSubstances,
-  BOOST_SUBS,
   getStackDisplayName,
   savedStacks,
   MECH_TRANSLATIONS_RU,
   SUPPORT_LEVELS,
   courseWeekState, setCourseWeekState, maxCourseWeek, onWeekChange,
 }) => {
+  const [modalWantJoint, setModalWantJoint] = React.useState(false);
+  const [modalWantBoost, setModalWantBoost] = React.useState(false);
+  const [modalSubScreen, setModalSubScreen] = React.useState<'result' | 'joint' | 'boost'>('result');
+
+  const handleApply = () => {
+    if (setJointMode && modalWantJoint !== jointMode) setJointMode(modalWantJoint);
+    if (modalWantBoost !== boostEnabled) setBoostEnabled(modalWantBoost);
+    setSupportLevel(modalLevel);
+    if (setManualLevelSelected) setManualLevelSelected(true);
+    calcSupport(modalLevel);
+    setShowModal(null);
+    setModalLevel(null);
+    setModalSubScreen('result');
+    setModalWantJoint(false);
+    setModalWantBoost(false);
+  };
+
   return (<div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:12 }}>
     <div style={{ background:'var(--bg-primary)', borderRadius:16, maxWidth:400, width:'100%', maxHeight:'85vh', overflowY:'auto', padding:16 }}>
       {showModal === 'intel' && !modalLevel && (
         <>
           <h3 style={{ margin:'0 0 10px', fontSize:14, fontWeight:800 }}>Выберите уровень поддержки</h3>
+          <p style={{ fontSize:8, color:'var(--text-dim)', marginBottom:8 }}>После выбора уровня можно добавить усиление и суставы</p>
           <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
             {[
-              { v:'basic', l:'База', c:'#22c55e', d:() => (SUPPORT_LEVELS.basic?.subs?.length || 0) + ' препаратов, обязательный минимум' },
-              { v:'mid', l:'Средний', c:'#eab308', d:() => (SUPPORT_LEVELS.mid?.subs?.length || 0) + ' препарата, расширенная защита' },
-              { v:'max', l:'Максимум', c:'#f97316', d:() => (SUPPORT_LEVELS.max?.subs?.length || 0) + ' препаратов, полное покрытие' },
-              { v:'boost', l:'Усиление', c:'#ef4444', d:() => (SUPPORT_LEVELS.boost?.subs?.length || 0) + ' препаратов, максимальная поддержка' },
+              { v:'basic', l:'🟢 База', c:'#22c55e', d:'Только активные риски (порог 15%)' },
+              { v:'mid', l:'🟡 Средний', c:'#eab308', d:'Стандартное покрытие (порог 10%)' },
+              { v:'max', l:'🟠 Максимум', c:'#f97316', d:'Глубокое покрытие всех систем (порог 6%)' },
+              { v:'boost', l:'🔴 Усиление', c:'#ef4444', d:'Максимальная защита (порог 4%)' },
             ].map(btn => (
               <button key={btn.v} onClick={() => setModalLevel(btn.v)} style={{
                 padding:'12px 14px', borderRadius:10, cursor:'pointer', textAlign:'left',
@@ -74,41 +95,73 @@ export const SupportModals: React.FC<SupportModalsProps> = ({
                 color:'var(--text-light)', fontWeight:700, fontSize:12,
               }}>
                 <span style={{ color:btn.c, fontWeight:800 }}>{btn.l}</span>
-                <span style={{ color:'var(--text-dim)', fontWeight:400, marginLeft:6 }}>— {btn.d()}</span>
+                <span style={{ color:'var(--text-dim)', fontWeight:400, marginLeft:6 }}>— {btn.d}</span>
               </button>
             ))}
           </div>
           <button onClick={() => { setShowModal(null); setModalLevel(null); }} style={{ width:'100%', marginTop:10, padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10 }}>Отмена</button>
         </>
       )}
-      {showModal === 'intel' && modalLevel && (
+      {showModal === 'intel' && modalLevel && modalSubScreen === 'result' && (
         <>
-          <h3 style={{ margin:'0 0 10px', fontSize:14, fontWeight:800 }}>Рекомендуемые препараты</h3>
-          <p style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8 }}>Уровень: <b style={{ color:'#00e68a' }}>{modalLevel}</b> — <b style={{ color:'var(--text-light)' }}>{(SUPPORT_LEVELS[modalLevel]?.subs || []).length}</b> препаратов</p>
-          <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:'50vh', overflowY:'auto', marginBottom:8 }}>
-            {(SUPPORT_LEVELS[modalLevel]?.subs || []).map((id: string) => {
-              const sub = allSupport.find((s: any) => s.id === id);
-              if (!sub) return null;
-              return (
-                <div key={id} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', fontSize:10 }}>
-                  <div style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</div>
-                  {sub.description && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{cleanDesc(sub)}</div>}
-                  {sub.mechanisms && sub.mechanisms.length > 0 && (
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-                      {sub.mechanisms.slice(0,3).map((m: string, mi: number) => (
-                        <span key={mi} style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.08)', color:'#a78bfa' }}>{(MECH_TRANSLATIONS_RU)[m] || m.replace(/_/g, ' ')}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <h3 style={{ margin:'0 0 10px', fontSize:14, fontWeight:800 }}>Уровень: {modalLevel}</h3>
+          <p style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8 }}>Препараты подбираются динамически по вашим рискам, анализам, синергиям и конфликтам. Нажмите «Применить» для расчёта.</p>
+          <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+            <button onClick={() => setModalSubScreen('joint')} style={{
+              flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
+              border: modalWantJoint ? '2px solid #8b5cf6' : '1px solid var(--border)',
+              background: modalWantJoint ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.03)',
+              color: modalWantJoint ? '#c4b5fd' : 'var(--text-dim)',
+            }}>
+              🦴 {modalWantJoint ? '✅ Суставы (в плане)' : '➕ Суставы'}
+            </button>
+            <button onClick={() => setModalSubScreen('boost')} style={{
+              flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
+              border: modalWantBoost ? '2px solid #ef4444' : '1px solid var(--border)',
+              background: modalWantBoost ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)',
+              color: modalWantBoost ? '#fca5a5' : 'var(--text-dim)',
+            }}>
+              🔥 {modalWantBoost ? '✅ Буст (в плане)' : '➕ Буст'}
+            </button>
           </div>
-          <button onClick={() => { setSupportLevel(modalLevel); if (setManualLevelSelected) setManualLevelSelected(true); calcSupport(modalLevel); setShowModal(null); setModalLevel(null); }} style={{
+
+          <button onClick={handleApply} style={{
             width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer',
             background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:12, marginBottom:6,
-          }}>Применить уровень</button>
+          }}>✅ Применить уровень{modalWantJoint ? ' + суставы' : ''}{modalWantBoost ? ' + буст' : ''}</button>
           <button onClick={() => setModalLevel(null)} style={{ width:'100%', padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10 }}>Назад</button>
+        </>
+      )}
+      {showModal === 'intel' && modalLevel && modalSubScreen === 'joint' && (
+        <>
+          <h3 style={{ margin:'0 0 10px', fontSize:14, fontWeight:800, color:'#8b5cf6' }}>🦴 Препараты для суставов</h3>
+          <p style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8 }}>Подбираются по механизмам опорно-двигательной системы и вашим данным (травмы, боли) для уровня <b>{modalLevel}</b></p>
+          <div style={{ display:'flex', gap:6 }}>
+            <button onClick={() => setModalSubScreen('result')} style={{
+              flex:1, padding:'10px', borderRadius:8, border:'1px solid var(--border)', cursor:'pointer',
+              background:'transparent', color:'var(--text-dim)', fontWeight:600, fontSize:11,
+            }}>❌ Отклонить</button>
+            <button onClick={() => { setModalWantJoint(true); setModalSubScreen('result'); }} style={{
+              flex:1, padding:'10px', borderRadius:8, border:'none', cursor:'pointer',
+              background:'linear-gradient(135deg,#8b5cf6,#7c3aed)', color:'#fff', fontWeight:700, fontSize:11,
+            }}>✅ Принять и добавить</button>
+          </div>
+        </>
+      )}
+      {showModal === 'intel' && modalLevel && modalSubScreen === 'boost' && (
+        <>
+          <h3 style={{ margin:'0 0 10px', fontSize:14, fontWeight:800, color:'#ef4444' }}>🔥 Усиление стека (Буст)</h3>
+          <p style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8 }}>Буст-препараты подбираются динамически по механизмам и рискам — закрывают оставшиеся пробелы покрытия для уровня <b>{modalLevel}</b></p>
+          <div style={{ display:'flex', gap:6 }}>
+            <button onClick={() => setModalSubScreen('result')} style={{
+              flex:1, padding:'10px', borderRadius:8, border:'1px solid var(--border)', cursor:'pointer',
+              background:'transparent', color:'var(--text-dim)', fontWeight:600, fontSize:11,
+            }}>❌ Отклонить</button>
+            <button onClick={() => { setModalWantBoost(true); setModalSubScreen('result'); }} style={{
+              flex:1, padding:'10px', borderRadius:8, border:'none', cursor:'pointer',
+              background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', fontWeight:700, fontSize:11,
+            }}>✅ Принять и усилить</button>
+          </div>
         </>
       )}
       {showModal === 'manual' && (
@@ -163,25 +216,8 @@ export const SupportModals: React.FC<SupportModalsProps> = ({
       )}
       {showModal === 'boost' && (
         <>
-          <h3 style={{ margin:'0 0 10px', fontSize:14, fontWeight:800, color:'#ef4444' }}>Усиление стека</h3>
-          <p style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8 }}>Бустер-препараты для максимального покрытия рисков. +20 веществ к текущему стеку.</p>
-          <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:'40vh', overflowY:'auto', marginBottom:8 }}>
-            {(BOOST_SUBS || []).map((id: string) => {
-              const sub = allSupport.find((s: any) => s.id === id);
-              if (!sub) return null;
-              return (
-                <div key={id} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.1)', fontSize:10 }}>
-                  <div style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</div>
-                  {sub.description && <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>{sub.description}</div>}
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
-            <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => { setShowModal('manual'); setModalAddMode(false); }}>Заменить на аналог</button>
-            <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => setShowSavedPicker(true)}>Из сохранённых</button>
-            <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => { setShowModal('manual'); setModalAddMode(false); }}>Из каталога</button>
-          </div>
+          <h3 style={{ margin:'0 0 10px', fontSize:14, fontWeight:800, color:'#ef4444' }}>🔥 Усиление стека</h3>
+          <p style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8 }}>Буст-препараты подбираются динамически по механизмам риска — закрывают пробелы покрытия. Нажмите «Усилить» для активации.</p>
           <div style={{ display:'flex', gap:6 }}>
             <button onClick={() => { setShowModal(null); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10 }}>Отмена</button>
             <button onClick={() => { setBoostEnabled(true); calcSupport(); setShowModal(null); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#000', fontWeight:700, fontSize:10 }}>Усилить стек</button>

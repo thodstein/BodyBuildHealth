@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, findSupportByGoal, getSupportDatabaseStats, type SupportInput, type SupplementTarget } from '../../engines/support.engine';
 import { decodeGarbled, cleanDesc } from '../../utils/text-sanitizer';
 import { SupportModals } from './SupportScreen_parts/SupportModals';
@@ -365,39 +365,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   ], [neuroScore]);
 
   const SUPPORT_LEVELS: Record<string, { label: string; desc: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }> }> = {
-    basic: { label: '🟢 База', desc: 'Минимум — покрытие всех систем', subs: ['nac', 'tudca', 'vitamin_d3', 'vitamin_k2', 'magnesium', 'folate', 'taurine', 'selenium'], dosages: { nac: { mg: 600, timing: 'утро, натощак' }, tudca: { mg: 500, timing: 'перед едой' }, vitamin_d3: { mg: 5000, timing: 'с едой (МЕ)' }, vitamin_k2: { mg: 200, timing: 'с едой (мкг)' }, magnesium: { mg: 400, timing: 'на ночь (бисглицинат)' }, folate: { mg: 800, timing: 'с едой (мкг, 5-MTHF)' }, taurine: { mg: 1000, timing: 'натощак' }, selenium: { mg: 200, timing: 'с едой (мкг, селен метионин)' } } },
-    mid: { label: '🟡 Средний', desc: 'Стандарт — глубокое покрытие + конкретные формы', subs: ['nac', 'tudca', 'magnesium', 'vitamin_d3', 'vitamin_k2', 'coq10', 'folate', 'taurine', 'selenium', 'milk_thistle', 'alpha_lipoic', 'curcumin', 'vitamin_b12', 'vitamin_c', 'hcg'], dosages: { nac: { mg: 1200, timing: 'утро/вечер, натощак' }, tudca: { mg: 1000, timing: 'перед едой, 2x/д' }, magnesium: { mg: 400, timing: 'на ночь (бисглицинат)' }, vitamin_d3: { mg: 5000, timing: 'с едой (МЕ)' }, vitamin_k2: { mg: 200, timing: 'с едой (мкг)' }, coq10: { mg: 200, timing: 'с едой (убихинол)' }, folate: { mg: 800, timing: 'с едой (мкг, 5-MTHF)' }, taurine: { mg: 1500, timing: 'натощак' }, selenium: { mg: 200, timing: 'с едой (мкг, селен метионин)' }, milk_thistle: { mg: 600, timing: 'с едой (силимарин 80%)' }, alpha_lipoic: { mg: 600, timing: 'натощак (R-форма)' }, curcumin: { mg: 1000, timing: 'с пиперином, с едой' }, vitamin_b12: { mg: 1000, timing: 'утро (мкг, метилкобаламин)' }, vitamin_c: { mg: 1000, timing: 'натощак' }, hcg: { mg: 500, timing: '2x/нед, схема 3/1 (МЕ)' } } },
-    max: { label: '🟠 Максимум', desc: 'Максимальное покрытие всех рисков', subs: ['nac', 'tudca', 'magnesium', 'vitamin_d3', 'vitamin_k2', 'coq10', 'folate', 'taurine', 'selenium', 'milk_thistle', 'alpha_lipoic', 'curcumin', 'vitamin_b12', 'vitamin_c', 'ashwagandha', 'berberine', 'probiotics', 'glucosamine', 'collagen', 'vitamin_e', 'phosphatidylcholine'], dosages: { nac: { mg: 1800, timing: 'утро/вечер, натощак' }, tudca: { mg: 1500, timing: 'перед едой, 2-3x/д' }, magnesium: { mg: 600, timing: 'на ночь (L-треонат)' }, vitamin_d3: { mg: 5000, timing: 'с едой (МЕ)' }, vitamin_k2: { mg: 400, timing: 'с едой (мкг, MK-7)' }, coq10: { mg: 300, timing: 'с едой (убихинол)' }, folate: { mg: 1000, timing: 'с едой (мкг, 5-MTHF)' }, taurine: { mg: 2000, timing: 'натощак' }, selenium: { mg: 400, timing: 'с едой (мкг, селен метионин)' }, milk_thistle: { mg: 900, timing: 'с едой, 2x/д (силимарин 80%)' }, alpha_lipoic: { mg: 900, timing: 'натощак, 2x/д (R-форма)' }, curcumin: { mg: 1000, timing: 'с пиперином, с едой' }, vitamin_b12: { mg: 2000, timing: 'утро (мкг, метилкобаламин)' }, vitamin_c: { mg: 2000, timing: 'натощак, 2x/д' }, ashwagandha: { mg: 600, timing: 'вечер (KSM-66)' }, berberine: { mg: 500, timing: 'с едой, 2x/д' }, probiotics: { mg: 20, timing: 'натощак (млрд КОЕ)' }, glucosamine: { mg: 1500, timing: 'с едой' }, collagen: { mg: 15000, timing: 'с едой (мг, гидролизат + вит.C)' }, vitamin_e: { mg: 400, timing: 'с едой (МЕ, смесь токоферолов)' }, phosphatidylcholine: { mg: 1200, timing: 'с едой' } } },
-    boost: { label: '🔴 Усиление', desc: 'Максимальная защита + рецептурные', subs: ['nac', 'tudca', 'magnesium', 'vitamin_d3', 'vitamin_k2', 'coq10', 'folate', 'taurine', 'selenium', 'milk_thistle', 'alpha_lipoic', 'curcumin', 'vitamin_b12', 'vitamin_c', 'ashwagandha', 'berberine', 'probiotics', 'glucosamine', 'collagen', 'vitamin_e', 'phosphatidylcholine', 'telmisartan', 'nebivolol', 'saw_palmetto', 'hcg', 'iron', 'copper', 'astragalus', 'melatonin', 'ginseng', 'egcg', 'l_carnitine', 'chondroitin', 'msm', 'hyaluronic', 'boswellia', 'bromelain', 'bpc157', 'tb500', 'omega3', 'zinc'], dosages: { nac: { mg: 2400, timing: 'натощак, 2-3x/д' }, tudca: { mg: 1500, timing: 'перед едой, 2-3x/д' }, magnesium: { mg: 800, timing: 'на ночь (L-треонат)' }, vitamin_d3: { mg: 10000, timing: 'с едой (МЕ)' }, vitamin_k2: { mg: 400, timing: 'с едой (мкг, MK-7)' }, coq10: { mg: 400, timing: 'с едой (убихинол)' }, folate: { mg: 1000, timing: 'с едой (мкг, 5-MTHF)' }, taurine: { mg: 3000, timing: 'натощак, 2x/д' }, selenium: { mg: 400, timing: 'с едой (мкг, селен метионин)' }, milk_thistle: { mg: 900, timing: 'с едой, 2x/д (силимарин 80%)' }, alpha_lipoic: { mg: 900, timing: 'натощак, 2x/д (R-форма)' }, curcumin: { mg: 1000, timing: 'с пиперином, с едой' }, vitamin_b12: { mg: 5000, timing: 'утро (мкг, метилкобаламин)' }, vitamin_c: { mg: 2000, timing: 'натощак, 2x/д' }, ashwagandha: { mg: 900, timing: 'вечер (KSM-66)' }, berberine: { mg: 500, timing: 'с едой, 2x/д' }, probiotics: { mg: 20, timing: 'натощак (млрд КОЕ)' }, glucosamine: { mg: 1500, timing: 'с едой' }, collagen: { mg: 20000, timing: 'с едой (мг, гидролизат + вит.C)' }, vitamin_e: { mg: 400, timing: 'с едой (МЕ, смесь токоферолов)' }, phosphatidylcholine: { mg: 1200, timing: 'с едой' }, telmisartan: { mg: 40, timing: 'утро (КАД и ЧСС контроль!)' }, nebivolol: { mg: 5, timing: 'утро (ЧСС контроль!)' }, saw_palmetto: { mg: 640, timing: 'с едой, 2x/д' }, hcg: { mg: 500, timing: '2x/нед, схема 3/1 (МЕ)' }, iron: { mg: 18, timing: 'натощак (контроль ферритина!)' }, copper: { mg: 2, timing: 'отдельно от цинка (мг)' }, astragalus: { mg: 1500, timing: 'с едой' }, melatonin: { mg: 5, timing: 'на ночь' }, ginseng: { mg: 400, timing: 'утро' }, egcg: { mg: 400, timing: 'натощак' }, l_carnitine: { mg: 2000, timing: 'натощак' }, chondroitin: { mg: 1200, timing: 'с едой' }, msm: { mg: 3000, timing: 'с едой' }, hyaluronic: { mg: 200, timing: 'с едой (мг)' }, boswellia: { mg: 500, timing: 'с едой, 2x/д' }, bromelain: { mg: 500, timing: 'натощак' }, bpc157: { mg: 500, timing: 'натощак (мкг)' }, tb500: { mg: 500, timing: 'натощак (мкг)' }, omega3: { mg: 4000, timing: 'с едой, 2x/д (EPA+DHA 60%)' }, zinc: { mg: 50, timing: 'на ночь (пиколинат, контроль СЖК!)' } } },
-  };
-
-  const BOOST_SUBS = ['telmisartan','nebivolol','omega3','iron','copper','zinc',
-    'bpc157','tb500','chondroitin','msm','hyaluronic','boswellia','bromelain',
-    'saw_palmetto','hcg','astragalus','melatonin','ginseng','egcg','l_carnitine'];
-
-  const JOINT_SUBS = ['glucosamine','chondroitin','msm','collagen','hyaluronic','boswellia','bromelain','bpc157','tb500','vitamin_c'];
-
-  const BOOST_DOSAGES: Record<string, { mg: number; timing: string }> = {
-    telmisartan: { mg: 40, timing: 'утро (КАД и ЧСС контроль!)' },
-    nebivolol: { mg: 5, timing: 'утро (ЧСС контроль!)' },
-    omega3: { mg: 4000, timing: 'с едой, 2x/д (EPA+DHA 60%)' },
-    iron: { mg: 27, timing: 'натощак (контроль ферритина!)' },
-    copper: { mg: 2, timing: 'отдельно от цинка (мг)' },
-    zinc: { mg: 50, timing: 'на ночь (пиколинат, контроль СЖК!)' },
-    bpc157: { mg: 500, timing: 'натощак (мкг)' },
-    tb500: { mg: 10, timing: 'натощак (мкг)' },
-    chondroitin: { mg: 1200, timing: 'с едой' },
-    msm: { mg: 3000, timing: 'с едой' },
-    hyaluronic: { mg: 200, timing: 'с едой (мг)' },
-    boswellia: { mg: 500, timing: 'с едой, 2x/д' },
-    bromelain: { mg: 500, timing: 'натощак' },
-    saw_palmetto: { mg: 640, timing: 'с едой, 2x/д' },
-    hcg: { mg: 500, timing: '2x/нед, схема 3/1 (МЕ)' },
-    astragalus: { mg: 1500, timing: 'с едой' },
-    melatonin: { mg: 5, timing: 'на ночь' },
-    ginseng: { mg: 400, timing: 'утро' },
-    egcg: { mg: 400, timing: 'натощак' },
-    l_carnitine: { mg: 2000, timing: 'натощак' },
+    basic: { label: '🟢 База', desc: 'Только активные риски (порог 15%)', subs: [], dosages: {} },
+    mid: { label: '🟡 Средний', desc: 'Стандартное покрытие (порог 10%)', subs: [], dosages: {} },
+    max: { label: '🟠 Максимум', desc: 'Глубокое покрытие (порог 6%)', subs: [], dosages: {} },
+    boost: { label: '🔴 Усиление', desc: 'Максимальная защита (порог 4%)', subs: [], dosages: {} },
   };
 
   useEffect(() => {
@@ -5220,18 +5191,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     <div style={{ fontSize:8, color:'var(--text-dim)' }}>{enhancedSubs.length > 0 ? `${enhancedSubs.length} веществ вручную` : 'Выбрать из каталога'}</div>
                   </button>
                 </div>
-                <div style={{ display:'flex', gap:4 }}>
-                  {(['basic','mid','max','boost'] as const).map(b => {
-                    const active = supportLevel === b;
-                    const labels: Record<string,string> = { basic:'🟢', mid:'🟡', max:'🔴', boost:'💎' };
-                    return <button key={b} onClick={() => { setSupportLevel(b); setManualLevelSelected(true); calcSupport(b); }} style={{
-                      flex:1, padding:'6px 2px', borderRadius:6, fontSize:11, fontWeight:700, cursor:'pointer',
-                      background: active ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.03)',
-                      border: active ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.05)',
-                      color: active ? '#000' : 'var(--text-dim)',
-                    }}>{labels[b]}</button>;
-                  })}
-                </div>
               </div>
 
               {/* Phase selector */}
@@ -5249,69 +5208,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 🧮 Рассчитать поддержку
               </button>
 
-              {/* Joint + Boost toggles — NO recalc, just add/remove substances on top */}
-              <div style={{ display:'flex', gap:6 }}>
-                <button onClick={() => {
-                  const newVal = !jointMode;
-                  setJointMode(newVal);
-                  if (calcResult) {
-                    // Apply joint on existing result — no recalc
-                    if (newVal) {
-                      setPlanResult(applyJointToPlan(calcResult));
-                      setJointNotification(true);
-                      setTimeout(() => setJointNotification(false), 5000);
-                    } else {
-                      // Remove joint: recalc without joint
-                      let r = calculateSupportPlan(stateRef.current || { profile: {} as any, pharma: {} as any } as CalculatorState, supportLevel as PowerLevel, enhancedSubs, linked.labs);
-                      if (boostEnabled) r = applyBoostToPlan(r);
-                      setPlanResult(r);
-                    }
-                  }
-                }} style={{
-                  flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
-                  border: jointMode ? '1px solid #8b5cf6' : '1px solid var(--border)',
-                  background: jointMode ? 'rgba(139,92,246,0.1)' : 'var(--bg-secondary)',
-                  color: jointMode ? '#8b5cf6' : 'var(--text-dim)',
-                }}>
-                  🦴 {jointMode ? '✅ Суставы и связки' : 'Суставы и связки'}
-                </button>
-                <button onClick={() => {
-                  const newVal = !boostEnabled;
-                  setBoostEnabled(newVal);
-                  if (calcResult) {
-                    if (newVal) {
-                      setPlanResult(applyBoostToPlan(calcResult));
-                      setBoostNotification(true);
-                      setTimeout(() => setBoostNotification(false), 5000);
-                    } else {
-                      let r = calculateSupportPlan(stateRef.current || { profile: {} as any, pharma: {} as any } as CalculatorState, supportLevel as PowerLevel, enhancedSubs, linked.labs);
-                      if (jointMode) r = applyJointToPlan(r);
-                      setPlanResult(r);
-                    }
-                  }
-                }} style={{
-                  flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
-                  border: boostEnabled ? '1px solid #ef4444' : '1px solid var(--border)',
-                  background: boostEnabled ? 'rgba(239,68,68,0.1)' : 'var(--bg-secondary)',
-                  color: boostEnabled ? '#ef4444' : 'var(--text-dim)',
-                }}>
-                  🔥 {boostEnabled ? '✅ Усиление стека' : 'Усилить стек'}
-                </button>
-              </div>
-
-              {/* Joint notification */}
-              {jointNotification && (
-                <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.15)', fontSize:9, color:'#8b5cf6' }}>
-                  🦴 <b>Добавлены препараты для суставов и связок:</b> глюкозамин 1500 мг, хондроитин 800 мг, MSM 1000 мг, коллаген 10 г, витамин C 1000 мг, Босвеллия 500 мг, витамин D3 2000 МЕ, куркумин 1000 мг
-                </div>
-              )}
-
-              {/* Boost notification */}
-              {boostNotification && (
-                <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.15)', fontSize:9, color:'#ef4444' }}>
-                  🔥 <b>Стек усилен до Boost:</b> добавлены препараты для максимального покрытия всех систем
-                </div>
-              )}
+              {/* Joint/Boost moved to Intel popup (SupportModals) */}
               
                {/* Save calc result + Save Plan to Мои планы */}
               {calcDone && calcResult && (
@@ -5645,8 +5542,31 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                 </span>
                               )}
                             </div>
-                            <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                            <div style={{ display:'flex', gap:2, alignItems:'center' }}>
                               {d && <span style={{ color:'#00e68a', fontSize:8, fontWeight:600 }}>{d.mg >= 5000 ? `${(d.mg/1000).toFixed(1)} г` : `${d.mg} мг`} — {d.timing}</span>}
+                              <span onClick={(e) => {
+                                e.stopPropagation();
+                                // Find analogs and offer replacement via search pre-fill
+                                const analogs = catalogEntry?.analog || [];
+                                if (analogs.length > 0) {
+                                  // Replace with first analog directly
+                                  const analog = analogs[0];
+                                  const analogEntry = SUPPORT_CATALOG_DATA[analog] || SUPPORT_CATALOG_DATA[analog.toUpperCase()];
+                                  if (analogEntry) {
+                                    setEnhancedSubs(prev => {
+                                      const next = prev.filter(s => s !== id);
+                                      if (!next.includes(analog)) next.push(analog);
+                                      return next;
+                                    });
+                                    showToast(`🔁 ${sub.name} → ${analogEntry.nameRu || analogEntry.name}`, 'success');
+                                  }
+                                } else {
+                                  // No known analog — open search for this substance
+                                  const subName = (sub.name || id).toLowerCase();
+                                  setSubSearch(subName);
+                                  showToast('🔍 Введите аналог в поиске', 'warning');
+                                }
+                              }} style={{ cursor:'pointer', fontSize:10, color:'#818cf8', padding:'0 4px', lineHeight:1 }} title="Заменить аналогом">🔁</span>
                               <span onClick={(e) => { e.stopPropagation(); setEnhancedSubs(prev => prev.filter(s => s !== id)); }} style={{ cursor:'pointer', fontSize:10, color:'#ef4444', padding:'0 4px', lineHeight:1 }} title="Удалить из плана">✕</span>
                             </div>
                           </div>
@@ -5679,6 +5599,22 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                   <span style={{ color:'var(--text-dim)' }}>{catalogEntry.mechanismOfAction}</span>
                                 </div>
                               )}
+                              {planResult?.mechanisms && (() => {
+                                const mechsForSub = planResult.mechanisms.filter((m: any) => (m.substances || []).includes(id));
+                                if (mechsForSub.length === 0) return null;
+                                return (
+                                  <div style={{ marginBottom:4 }}>
+                                    <span style={{ fontWeight:600, color:'#60a5fa' }}>Покрывает механизмы: </span>
+                                    <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                                      {mechsForSub.map((m: any, i: number) => (
+                                        <span key={i} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(96,165,250,0.08)', color:'#60a5fa' }}>
+                                          {m.mechLabel || m.mechKey}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                               {catalogEntry?.clinicalEffect && (
                                 <div style={{ marginBottom:4 }}>
                                   <span style={{ fontWeight:600, color:'#22c55e' }}>Эффект: </span>
@@ -5690,9 +5626,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                               {catalogEntry?.organs && catalogEntry.organs.length>0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#60a5fa',fontSize:7}}>Органы: </span><span style={{fontSize:6,color:'var(--text-dim)'}}>{catalogEntry.organs.join(', ')}</span></div>)}
                               {catalogEntry?.systems && catalogEntry.systems.length>0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#8b5cf6',fontSize:7}}>Системы: </span><span style={{fontSize:6,color:'var(--text-dim)'}}>{catalogEntry.systems.join(', ')}</span></div>)}
                               {catalogEntry?.sideEffects && catalogEntry.sideEffects.length>0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#ef4444',fontSize:7}}>Побочные: </span><span style={{color:'#ef4444',fontSize:6}}>{catalogEntry.sideEffects.slice(0,4).join('; ')}</span></div>)}
-                              {catalogEntry?.monitoring && catalogEntry.monitoring.length>0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#60a5fa',fontSize:7}}>Контроль анализов: </span>{catalogEntry.monitoring.slice(0,3).map((m,i)=><span key={i} style={{fontSize:6,color:'var(--text-dim)',marginLeft:4}}>{m.what} — {m.when}{m.targetRange?' ('+m.targetRange+')':''}</span>)}</div>)}
+                              {catalogEntry?.monitoring && catalogEntry.monitoring.length>0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#60a5fa',fontSize:7}}>Мониторинг: </span><div style={{display:'flex',flexDirection:'column',gap:1,marginTop:2}}>{catalogEntry.monitoring.map((m:any,i:number)=><div key={i} style={{fontSize:7,padding:'2px 6px',borderRadius:4,background:'rgba(96,165,250,0.04)',display:'flex',gap:4}}><span style={{color:'#60a5fa',fontWeight:600}}>{m.what}</span><span style={{color:'var(--text-dim)'}}>— {m.when}</span>{m.targetRange&&<span style={{color:'#f59e0b'}}>→ {m.targetRange}</span>}</div>)}</div></div>)}
                               {catalogEntry?.dosage && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'var(--accent)',fontSize:7}}>Дозировка: </span><span style={{fontSize:6,color:'var(--text-dim)'}}>{catalogEntry.dosage.mg}мг — {catalogEntry.dosage.timing}{catalogEntry.dosage.form?' ('+catalogEntry.dosage.form+')':''}</span></div>)}
-                              {catalogEntry?.specialInstructions && catalogEntry.specialInstructions.length>0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#f59e0b',fontSize:7}}>Особые указания: </span><span style={{fontSize:6,color:'var(--text-dim)'}}>{catalogEntry.specialInstructions.slice(0,3).join('; ')}</span></div>)}
+                              {catalogEntry?.specialInstructions && catalogEntry.specialInstructions.length>0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#f59e0b',fontSize:7}}>Особые указания: </span><div style={{display:'flex',flexDirection:'column',gap:1,marginTop:2}}>{catalogEntry.specialInstructions.map((si: string, i: number) => <div key={i} style={{fontSize:7,padding:'2px 6px',borderRadius:4,background:'rgba(245,158,11,0.04)',color:'var(--text-dim)'}}>• {si}</div>)}</div></div>)}
                               {catalogEntry?.targetOrgan && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#8b5cf6',fontSize:7}}>Орган-мишень: </span><span style={{fontSize:6,color:'var(--text-dim)'}}>{catalogEntry.targetOrgan}</span></div>)}
                               {catalogEntry?.bestForm && (
                                 <div style={{ marginBottom:4 }}>
@@ -5703,17 +5639,45 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                               {catalogEntry?.synergies && catalogEntry.synergies.length > 0 && (
                                 <div style={{ marginBottom:4 }}>
                                   <span style={{ fontWeight:600, color:'#22c55e' }}>Синергии: </span>
-                                  {catalogEntry.synergies.slice(0, 3).map((syn: any, i: number) => (
-                                    <span key={i} style={{ color:'var(--text-dim)', fontSize:7 }}>
-                                      {i > 0 && '; '}+{syn.with} ({syn.effect})
-                                    </span>
-                                  ))}
+                                  <div style={{ display:'flex', flexDirection:'column', gap:1, marginTop:2 }}>
+                                    {catalogEntry.synergies.map((syn: any, i: number) => {
+                                      const synName = syn.with;
+                                      const synEntry = SUPPORT_CATALOG_DATA[synName] || SUPPORT_CATALOG_DATA[synName.toUpperCase()];
+                                      const displayName = synEntry?.nameRu || synEntry?.name || synName;
+                                      const sevColor = syn.severity === 'HIGH' ? '#22c55e' : syn.severity === 'MEDIUM' ? '#eab308' : '#6b7280';
+                                      return (
+                                        <div key={i} style={{ fontSize:7, padding:'3px 6px', borderRadius:4, background:'rgba(34,197,94,0.04)', display:'flex', gap:4 }}>
+                                          <span style={{ color:'#22c55e', fontWeight:600, minWidth:50 }}>⊕ {displayName}</span>
+                                          <span style={{ color:'var(--text-dim)', flex:1 }}>{syn.effect}</span>
+                                          <span style={{ color:sevColor, fontWeight:600, fontSize:6 }}>{syn.severity}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
                               )}
                               {catalogEntry?.contraindications && catalogEntry.contraindications.length > 0 && (
-                                <div>
-                                  <span style={{ fontWeight:600, color:'#ef4444' }}>Противопоказания: </span>
-                                  <span style={{ color:'#ef4444', fontSize:7 }}>{catalogEntry.contraindications.join('; ')}</span>
+                                <div style={{marginBottom:4}}>
+                                  <span style={{ fontWeight:600, color:'#ef4444', fontSize:7 }}>Противопоказания: </span>
+                                  <div style={{display:'flex',flexWrap:'wrap',gap:2,marginTop:1}}>
+                                    {catalogEntry.contraindications.map((c: string, i: number) => (
+                                      <span key={i} style={{fontSize:6,padding:'1px 5px',borderRadius:3,background:'rgba(239,68,68,0.08)',color:'#ef4444'}}>{c}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {catalogEntry?.conflicts && catalogEntry.conflicts.length > 0 && (
+                                <div style={{marginBottom:4}}>
+                                  <span style={{ fontWeight:600, color:'#ef4444', fontSize:7 }}>Конфликты: </span>
+                                  <div style={{display:'flex',flexDirection:'column',gap:1,marginTop:2}}>
+                                    {catalogEntry.conflicts.map((c: any, i: number) => (
+                                      <div key={i} style={{fontSize:7,padding:'2px 6px',borderRadius:4,background:'rgba(239,68,68,0.04)',display:'flex',gap:4}}>
+                                        <span style={{color:'#ef4444',fontWeight:600,minWidth:50}}>⊖ {c.with}</span>
+                                        <span style={{color:'var(--text-dim)',flex:1}}>{c.effect}</span>
+                                        <span style={{color:c.severity==='HIGH'?'#ef4444':c.severity==='MEDIUM'?'#eab308':'#6b7280',fontWeight:600,fontSize:6}}>{c.severity}</span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -7488,7 +7452,9 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
         catalogSupport={catalogSupport}
         allSupport={allSupport}
         catalogSubstances={catalogSubstances}
-        BOOST_SUBS={BOOST_SUBS}
+        jointMode={jointMode}
+        setJointMode={setJointMode}
+        boostEnabled={boostEnabled}
         getStackDisplayName={getStackDisplayName}
         savedStacks={savedStacks}
         MECH_TRANSLATIONS_RU={MECH_TRANSLATIONS_RU}
