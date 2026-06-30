@@ -44,7 +44,9 @@ import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engine
 import { calculateTZRisk, toCompatibleResult, type TZRiskResult } from '../../engines/risk-engine-tz';
 import { calculateSupportPlan, type PlanResult, type PlanSubstance } from '../../engines/support-plan-engine';
 import { buildPreApplyCard, evaluateRecommendations, computeCoverageRisk } from '../../engines/recommendation-engine';
-import { calculateMixScore, type MixSubstance, type MixProfile, MIX_MECHANISMS, MIX_SYNERGY, MIX_TEMPLATES, type MixTemplate, buildBestRecipe, type MixRecipe, type MixRecipeItem, groupRecipeItemsByTiming } from '../../engines/training-mix-scoring.engine';
+import { calculateMixScore, type TrainingMixScore, type MixSubstance, type MixProfile, MIX_MECHANISMS, MIX_SYNERGY, MIX_TEMPLATES, type MixTemplate, buildBestRecipe, type MixRecipe, type MixRecipeItem, groupRecipeItemsByTiming } from '../../engines/training-mix-scoring.engine';
+import { loadSRPESessions } from '../../engines/pro/srpe-store';
+import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 // Force Vite to include SUPPORT_CATALOG_DATA and CANONICAL_ID_MAP (prevents tree-shaking)
 // @ts-ignore
 (window as any).__SUPPORT_CATALOG__ = SUPPORT_CATALOG_DATA;
@@ -720,7 +722,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [fdaResults, setFdaResults] = useState<any[]>([]);
   const [fdaLoading, setFdaLoading] = useState(false);
   const [fdaError, setFdaError] = useState('');
-  const [mixGoal, setMixGoal] = useState<string>('pump');
+  const [mixGoals, setMixGoals] = useState<string[]>(['pump']);
+  const mixGoal = mixGoals[0] || 'pump'; // primary goal for stacks
   const [mixTiming, setMixTiming] = useState<string>('pre');
   const [mixInsulin, setMixInsulin] = useState<number>(0);
   const [mixInsulinTiming, setMixInsulinTiming] = useState<'pre'|'post'>('post');
@@ -743,7 +746,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [appliedTemplate, setAppliedTemplate] = useState<MixTemplate | null>(() => {
     try { return JSON.parse(localStorage.getItem('he_mix_applied_template') || 'null'); } catch { return null; }
   });
-  const [mixWorkoutType, setMixWorkoutType] = useState<'heavy'|'moderate'|'light'>('moderate');
+  const profileSettings = linked.profile?.settings;
+  const [mixWorkoutType, setMixWorkoutType] = useState<'heavy'|'moderate'|'light'>(() => {
+    const wpw = profileSettings?.workoutsPerWeek ?? 3;
+    const am = profileSettings?.avgWorkoutMinutes ?? 60;
+    if (wpw >= 5 && am >= 90) return 'heavy';
+    if (wpw >= 3) return 'moderate';
+    return 'light';
+  });
   const [mixTimeOfDay, setMixTimeOfDay] = useState<'morning'|'afternoon'|'evening'>('morning');
   const [mixHistory, setMixHistory] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_training_mixes') || '[]'); } catch { return []; }
@@ -3875,7 +3885,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                 </div>
                                 <div style={{ display:'flex', gap:4 }}>
                                   <button onClick={() => {
-                                    setMixGoal(kit.goal);
+                                    setMixGoals([kit.goal]);
                                     setMixWorkoutType(kit.workoutType);
                                     setMixTimeOfDay(kit.timeOfDay);
                                     setPlanSaved('✅ Комплект загружен, переключите тайминги');
@@ -6232,7 +6242,15 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
           <div className="card" style={{ marginBottom:10, padding:10 }}>
             <h4 style={{ margin:'0 0 8px', fontSize:11, color:'var(--text)' }}>⚙️ Параметры</h4>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
-              <PopupSelect label="🎯 Цель" value={mixGoal} options={[{id:'pump',label:'🩸 Памп (ББ)'},{id:'endurance',label:'🏃 Выносливость'},{id:'strength',label:'🏋️ Сила'},{id:'recovery',label:'🔄 Восстановление'},{id:'focus',label:'🧠 Фокус'},{id:'powerlifting',label:'💪 Пауэрлифтинг'},{id:'competition',label:'🏆 Соревнования'},{id:'crossfit',label:'🔁 CrossFit'},{id:'post_comp',label:'🔄 Пост-соревнования'},{id:'hiit',label:'💨 HIIT'},{id:'mma',label:'🥊 MMA'},{id:'sprint',label:'🏃 Спринт'}]} onChange={setMixGoal} />
+              <div>
+                <div style={{fontSize:8,fontWeight:600,color:'var(--text-dim)',marginBottom:4}}>🎯 Цели (можно несколько)</div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
+                  {[{id:'pump',label:'🩸 Памп'},{id:'endurance',label:'🏃 Выносл.'},{id:'strength',label:'🏋️ Сила'},{id:'recovery',label:'🔄 Восст.'},{id:'focus',label:'🧠 Фокус'},{id:'powerlifting',label:'💪 ПЛ'},{id:'competition',label:'🏆 Сорев.'},{id:'crossfit',label:'🔁 CF'},{id:'post_comp',label:'🔄 Пост-сор.'},{id:'hiit',label:'💨 HIIT'},{id:'mma',label:'🥊 MMA'},{id:'sprint',label:'🏃 Спринт'}].map(o => (
+                    <div key={o.id} onClick={() => setMixGoals(prev => prev.includes(o.id) ? prev.filter(g => g !== o.id) : [...prev, o.id])} style={{padding:'3px 7px',borderRadius:8,cursor:'pointer',fontSize:7,fontWeight:600,background:mixGoals.includes(o.id)?'rgba(139,92,246,0.2)':'rgba(255,255,255,0.04)',border:mixGoals.includes(o.id)?'1px solid rgba(139,92,246,0.4)':'1px solid rgba(255,255,255,0.08)',color:mixGoals.includes(o.id)?'#a78bfa':'rgba(255,255,255,0.7)',transition:'all 0.15s'}}>{o.label}</div>
+                  ))}
+                </div>
+                {mixGoals.length > 1 && <div style={{fontSize:7,color:'#f59e0b',marginTop:2}}>Выбрано {mixGoals.length} целей · скор = среднее</div>}
+              </div>
               <PopupSelect label="⏰ Тайминг" value={mixTiming} options={[{id:'pre',label:'🔥 Пред-тренировочный'},{id:'intra',label:'💧 Интра-тренировочный'},{id:'post',label:'🍗 Пост-тренировочный'}]} onChange={setMixTiming} />
             </div>
             <div style={{ marginBottom:8 }}>
@@ -6304,7 +6322,7 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
                 if (calcData.pharma?.hasGLP1 && !mixDrugGLP1) { setMixDrugGLP1(true); found=true; }
                 if (calcData.goals?.trainingCycle) {
                   const goalMap: Record<string,string> = { mass:'pump', cut:'endurance', maintenance:'recovery', endurance:'endurance', strength:'powerlifting' } as any;
-                  if (goalMap[calcData.goals.trainingCycle]) setMixGoal(goalMap[calcData.goals.trainingCycle]);
+                  if (goalMap[calcData.goals.trainingCycle]) setMixGoals([goalMap[calcData.goals.trainingCycle]]);
                 }
               } catch {}
               if (found) alert('✅ Фармакология определена из курса и профиля');
@@ -6317,7 +6335,8 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
               const isPre = mixTiming === 'pre';
               const isIntra = mixTiming === 'intra';
               const isPost = mixTiming === 'post';
-              const durHrs = mixGoal === 'endurance' ? 2 : 1.5;
+              const avgMin = linked.profile?.settings?.avgWorkoutMinutes ?? 90;
+              const durHrs = (mixGoal === 'endurance' ? Math.max(1.5, avgMin/60) : Math.min(2, avgMin/60)) || 1.5;
 
               const isPL = mixGoal === 'powerlifting' || mixGoal === 'competition';
               const isCompetition = mixGoal === 'competition';
@@ -6571,6 +6590,33 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
               const allStacks = { pre: augStack(preStack, 'pre'), intra: augStack(intraStack, 'intra'), post: augStack(postStack, 'post') };
               const stackTitle = isPre ? '🔥 Пред-тренировочный стек' : isIntra ? '💧 Интра-тренировочный стек' : '🍗 Пост-тренировочный стек';
               const timingLabel = isPre ? 'За 30-60 мин до тренировки' : isIntra ? 'В течение тренировки (каждые 15-20 мин)' : 'Сразу после тренировки';
+              // Synergy warnings: template ↔ recipe conflicts
+              const synWarnings: string[] = [];
+              if (appliedTemplate && timedDrugItemsX.length > 0) {
+                const templateIds = new Set([...(appliedTemplate.pre||[]).map(i=>i.id),...(appliedTemplate.intra||[]).map(i=>i.id),...(appliedTemplate.post||[]).map(i=>i.id)].filter(Boolean));
+                const recipeIds = new Set(timedDrugItemsX.map(i=>i.id));
+                const duplicates = [...templateIds].filter(id => recipeIds.has(id));
+                if (duplicates.length > 0) {
+                  const names = duplicates.map(id => { const e=SUPPORT_CATALOG_DATA[id]; return e?.nameRu||e?.name||id; }).filter(Boolean);
+                  synWarnings.push('⚠ Одинаковые вещества в шаблоне и рецепте: ' + names.join(', ') + ' — рецепт приоритетен (доза из рецепта)');
+                }
+                const highDosePair: { a: string; b: string; id: string }[] = [];
+                for (const id of ['caffeine','beta_alanine','citrulline','creatine','taurine','glycerol','l_carnitine','alpha_gpc','agmatine','tyrosine']) {
+                  const inTmpl = (appliedTemplate.pre||[]).some(i=>i.id===id)||(appliedTemplate.intra||[]).some(i=>i.id===id)||(appliedTemplate.post||[]).some(i=>i.id===id);
+                  const inRecipe = timedDrugItemsX.some(i=>i.id===id);
+                  if (inTmpl && inRecipe) highDosePair.push({ a:'шаблон', b:'рецепт', id });
+                }
+                if (highDosePair.length > 0) synWarnings.push('⚠ Препараты дублируются (' + highDosePair.map(p=>p.id).join(', ') + ') — суммарная доза может превышать рекомендуемую');
+              }
+              // ACWR-readiness коррекция
+              const _srpe = loadSRPESessions();
+              const _acwr = _srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(_srpe)) : null;
+              const acwrWarnings: string[] = [];
+              if (_acwr) {
+                if (_acwr.ratio > 1.5) acwrWarnings.push('🚨 ACWR ' + _acwr.ratio.toFixed(2) + ' — опасная зона (перетрен). Снизьте стимуляторы, добавьте восстановители: ашваганда 600 мг, глицин 3 г, ZMA, магний 400 мг');
+                else if (_acwr.ratio > 1.3) acwrWarnings.push('⚠️ ACWR ' + _acwr.ratio.toFixed(2) + ' — высокая нагрузка. Рассмотрите цитруллин 6 г для NO + бета-аланин 3.2 г для буферизации + магний 200 мг');
+                else if (_acwr.ratio < 0.8) acwrWarnings.push('📈 ACWR ' + _acwr.ratio.toFixed(2) + ' — недотрен. Можно усилить стимуляторы: кофеин 400 мг, тирозин 2 г, ALCAR 1.5 г, креатин 10 г для загрузки');
+              }
 
               const hasNandrolone = (linked.course || []).some((c:any) => {
                 const id = (c.substanceId||'').toLowerCase();
@@ -6580,12 +6626,38 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
               const k = (linked.labs || []).find((l:any)=>l.code==='POTASSIUM')?.value || 4.2;
               const cl = (linked.labs || []).find((l:any)=>l.code==='CHLORIDE')?.value || 102;
 
-              const mixProfile: MixProfile = { goal: mixGoal as any, timing: mixTiming as any, weightKg: bw, isOnCycle, drugs: { insulin: mixInsulin>0, igf: mixDrugIGF>0, gh: mixDrugGH>0, mgf: mixDrugMGF>0, glp1: mixDrugGLP1, insulinDose: mixInsulin, insulinTiming: mixInsulinTiming, igfDose: mixDrugIGF, igfTiming: mixDrugIGFTiming, ghDose: mixDrugGH, ghTiming: mixDrugGHTiming, mgfDose: mixDrugMGF, mgfTiming: mixDrugMGFTiming }, hasNandrolone, userElectrolytes: { sodiumMmolL: na, potassiumMmolL: k, chlorideMmolL: cl }, workoutType: mixWorkoutType, timeOfDay: mixTimeOfDay, workoutDurationMin: Math.round(durHrs*60) };
               const mixSubstances: MixSubstance[] = dedupedStack.filter(s=>s.mg>0).map(s=>({ id:s.id, name:s.name, doseMg:s.mg }));
-              const score = calculateMixScore(mixSubstances, mixProfile);
-              // Build comparison score for opposite timing (pre ↔ post or pre ↔ intra)
+              // Multi-goal score calculation
+              const scoresByGoal = mixGoals.map(g => {
+                const p: MixProfile = { goal: g as any, timing: mixTiming as any, weightKg: bw, isOnCycle, drugs: { insulin: mixInsulin>0, igf: mixDrugIGF>0, gh: mixDrugGH>0, mgf: mixDrugMGF>0, glp1: mixDrugGLP1, insulinDose: mixInsulin, insulinTiming: mixInsulinTiming, igfDose: mixDrugIGF, igfTiming: mixDrugIGFTiming, ghDose: mixDrugGH, ghTiming: mixDrugGHTiming, mgfDose: mixDrugMGF, mgfTiming: mixDrugMGFTiming }, hasNandrolone, userElectrolytes: { sodiumMmolL: na, potassiumMmolL: k, chlorideMmolL: cl }, workoutType: mixWorkoutType, timeOfDay: mixTimeOfDay, workoutDurationMin: Math.round(durHrs*60) };
+                return { goal: g, score: calculateMixScore(mixSubstances, p) };
+              });
+              // Average scores across goals
+              const avg = (arr: number[]) => Math.round(arr.reduce((s,v) => s+v, 0) / arr.length);
+              const score: TrainingMixScore = {
+                ...scoresByGoal[0].score,
+                pumpScore: avg(scoresByGoal.map(s => s.score.pumpScore)),
+                energyScore: avg(scoresByGoal.map(s => s.score.energyScore)),
+                focusScore: avg(scoresByGoal.map(s => s.score.focusScore)),
+                strengthScore: avg(scoresByGoal.map(s => s.score.strengthScore)),
+                hydrationScore: avg(scoresByGoal.map(s => s.score.hydrationScore)),
+                enduranceScore: avg(scoresByGoal.map(s => s.score.enduranceScore)),
+                anticatabolicScore: avg(scoresByGoal.map(s => s.score.anticatabolicScore)),
+                recoveryScore: avg(scoresByGoal.map(s => s.score.recoveryScore)),
+                proteinScore: avg(scoresByGoal.map(s => s.score.proteinScore)),
+                glycogenScore: avg(scoresByGoal.map(s => s.score.glycogenScore)),
+                noScore: avg(scoresByGoal.map(s => s.score.noScore)),
+                compositeScore: avg(scoresByGoal.map(s => s.score.compositeScore)),
+                label: mixGoals.length > 1 ? `среднее ${mixGoals.length} целей` : scoresByGoal[0].score.label,
+                color: scoresByGoal[0].score.color,
+                suggestions: [...new Set(scoresByGoal.flatMap(s => s.score.suggestions))],
+                electrolyteWarnings: [...new Set(scoresByGoal.flatMap(s => s.score.electrolyteWarnings))],
+                drugModifiers: mixGoals.length > 1 ? scoresByGoal[0].score.drugModifiers : scoresByGoal[0].score.drugModifiers,
+                substanceBreakdown: scoresByGoal[0].score.substanceBreakdown,
+              };
+              // Build comparison score for opposite timing
               const compareTiming = mixTiming === 'pre' ? 'intra' : mixTiming === 'intra' ? 'pre' : 'pre';
-              const compareProfile = { ...mixProfile, timing: compareTiming as MixProfile['timing'] };
+              const compareProfile: MixProfile = { goal: mixGoal as any, timing: compareTiming as MixProfile['timing'], weightKg: bw, isOnCycle, drugs: score.drugModifiers as any, hasNandrolone, userElectrolytes: { sodiumMmolL: na, potassiumMmolL: k, chlorideMmolL: cl }, workoutType: mixWorkoutType, timeOfDay: mixTimeOfDay, workoutDurationMin: Math.round(durHrs*60) };
               const compareScore = calculateMixScore(mixSubstances, compareProfile);
 
               const ScoreRow = ({ l, v, c }: { l: string; v: number; c: string }) => (
@@ -6673,6 +6745,16 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
                       setPlanSaved('✅ План сохранён');
                       setTimeout(() => setPlanSaved(''), 3000);
                     }} style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',fontSize:8,fontWeight:600,background:'rgba(139,92,246,0.08)',border:'1px solid rgba(139,92,246,0.15)',color:'#a78bfa',marginLeft:4}}>📋 План</button>
+                    <button onClick={()=>{
+                      const subsSet = new Set(enhancedSubs);
+                      const mixItems = [...preStack.filter(s=>s.id&&s.mg>0), ...intraStack.filter(s=>s.id&&s.mg>0), ...postStack.filter(s=>s.id&&s.mg>0)];
+                      mixItems.forEach(s => subsSet.add(s.id));
+                      (customMixItems||[]).forEach(s => subsSet.add(s.id));
+                      setEnhancedSubs([...subsSet]);
+                      setTimeout(() => calcSupport(supportLevel), 50);
+                      setPlanSaved('✅ Микс добавлен в план поддержки');
+                      setTimeout(() => setPlanSaved(''), 3000);
+                    }} style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',fontSize:8,fontWeight:600,background:'rgba(255,183,77,0.08)',border:'1px solid rgba(255,183,77,0.15)',color:'#ffb74d',marginLeft:4}}>➕ План подд.</button>
                     {mixHistory.length>0&&<button onClick={()=>{setMixHistory([]);localStorage.setItem('he_training_mixes','[]')}} style={{padding:'4px 8px',borderRadius:6,cursor:'pointer',fontSize:8,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.1)',color:'#ef4444'}}>✕</button>}
                   </div>
 
@@ -6803,20 +6885,43 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
                     ⚡ NO-оптимизация: <b>{score.noScore}/100</b>
                     {score.drugModifiers.map((d,i)=><div key={i} style={{marginTop:2}}>{d.drug}: {d.effect} ({d.bonus>0?'+':''}{d.bonus}%)</div>)}
                   </div>
+                  {synWarnings.length > 0 && <div style={{marginTop:4,padding:'4px 6px',borderRadius:4,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.1)',fontSize:7,color:'#ef4444',lineHeight:1.4}}>
+                    {synWarnings.map((w,i)=><div key={i}>• {w}</div>)}
+                  </div>}
+                  {acwrWarnings.length > 0 && <div style={{marginTop:4,padding:'4px 6px',borderRadius:4,background:_acwr&&_acwr.ratio>1.5?'rgba(239,68,68,0.08)':_acwr&&_acwr.ratio>1.3?'rgba(234,179,8,0.08)':'rgba(59,130,246,0.08)',border:'1px solid rgba(255,255,255,0.04)',fontSize:7,color:_acwr&&_acwr.ratio>1.5?'#ef4444':_acwr&&_acwr.ratio>1.3?'#eab308':'#60a5fa',lineHeight:1.4}}>
+                    {acwrWarnings.map((w,i)=><div key={i}>• {w}</div>)}
+                  </div>}
                   <div style={{ marginTop:6 }}>
                     <div onClick={()=>setExpandedSection(prev=>{const n=new Set(prev);n.has('subscores')?n.delete('subscores'):n.add('subscores');return n;})} style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',fontSize:8,color:'var(--text-dim)'}}>
                       <span>📊 Вклад каждого вещества</span>
                       <span>{expandedSection.has('subscores')?'▾':'▸'}</span>
                     </div>
-                    {expandedSection.has('subscores') && <div style={{marginTop:4,display:'flex',flexDirection:'column',gap:2}}>
-                      {score.substanceBreakdown.map((sb,i)=>(
-                        <div key={i} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:4,padding:'3px 6px',borderRadius:4,background:'rgba(255,255,255,0.02)',fontSize:7}}>
-                          <span style={{fontWeight:600,color:'var(--text-light)',minWidth:80}}>{sb.name}</span>
-                          <span style={{color:'#8b5cf6',fontWeight:700}}>{sb.baseScore}</span>
-                          {sb.categories.map((c,ci)=><span key={ci} style={{padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.08)',border:'1px solid rgba(139,92,246,0.15)',color:'#a78bfa'}}>{c.label}:{c.score}</span>)}
-                        </div>
-                      ))}
-                    </div>}
+                    {expandedSection.has('subscores') && <>
+                      {/* Waterfall stacked bar: вклад каждого вещества в общий скор */}
+                      {(() => {
+                        const subs = score.substanceBreakdown;
+                        const total = subs.reduce((s,b) => s + b.baseScore, 0) || 1;
+                        const palette = ['#8b5cf6','#22c55e','#3b82f6','#f59e0b','#ef4444','#06b6d4','#a855f7','#f97316','#14b8a6','#6366f1'];
+                        return <div style={{marginTop:4,marginBottom:6,display:'flex',height:22,borderRadius:6,overflow:'hidden',background:'rgba(255,255,255,0.03)'}}>
+                          {subs.map((sb,i) => {
+                            const pct = (sb.baseScore / total) * 100;
+                            return <div key={i} style={{width:pct+'%',minWidth:2,height:'100%',background:palette[i%palette.length],display:'flex',alignItems:'center',justifyContent:'center',position:'relative',overflow:'hidden'}} title={`${sb.name}: ${sb.baseScore} (${pct.toFixed(0)}%)`}>
+                              {pct > 18 && <span style={{fontSize:6,fontWeight:700,color:'#000',lineHeight:1,whiteSpace:'nowrap',padding:'0 2px'}}>{sb.name}</span>}
+                              {pct > 40 && <span style={{fontSize:5,fontWeight:600,color:'rgba(0,0,0,0.6)',position:'absolute',bottom:1,right:2}}>{sb.baseScore}</span>}
+                            </div>;
+                          })}
+                        </div>;
+                      })()}
+                      <div style={{display:'flex',flexDirection:'column',gap:2}}>
+                        {score.substanceBreakdown.map((sb,i)=>(
+                          <div key={i} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:4,padding:'3px 6px',borderRadius:4,background:'rgba(255,255,255,0.02)',fontSize:7}}>
+                            <span style={{fontWeight:600,color:'var(--text-light)',minWidth:80}}>{sb.name}</span>
+                            <span style={{color:'#8b5cf6',fontWeight:700}}>{sb.baseScore}</span>
+                            {sb.categories.map((c,ci)=><span key={ci} style={{padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.08)',border:'1px solid rgba(139,92,246,0.15)',color:'#a78bfa'}}>{c.label}:{c.score}</span>)}
+                          </div>
+                        ))}
+                      </div>
+                    </>}
                   </div>
                 </div>
 
@@ -6952,7 +7057,7 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
                           onClick={() => {
                             setAppliedTemplate(t);
                             localStorage.setItem('he_mix_applied_template', JSON.stringify(t));
-                            setMixGoal(t.goal);
+                            setMixGoals([t.goal]);
                             setPlanSaved(`✅ Применён шаблон: ${t.name}`);
                             setTimeout(() => setPlanSaved(''), 3000);
                           }}
@@ -6979,7 +7084,7 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
                       {mixSavedPlans.slice().reverse().map((plan:any, i:number) => (
                         <div key={plan.id||i} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.04)', cursor:'pointer' }}
                           onClick={() => {
-                            setMixGoal(plan.goal);
+                            setMixGoals([plan.goal]);
                             setMixTiming(plan.timing || 'pre');
                             setMixWorkoutType(plan.workoutType || 'moderate');
                             setMixTimeOfDay(plan.timeOfDay || 'morning');
@@ -7197,7 +7302,7 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
                   <div key={i} style={{padding:'6px 8px',borderRadius:6,marginBottom:3,background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.04)',fontSize:8}}>
                     <span style={{color:'var(--accent)',fontWeight:700}}>{h.goal} · {h.timing} · {h.type}</span>
                     <span style={{color:'rgba(255,255,255,0.5)',marginLeft:6}}>{h.score}/100 · {h.date}</span>
-                    <button onClick={()=>{setMixGoal(h.goal);setMixTiming(h.timing);setMixWorkoutType(h.type);setMixTimeOfDay(h.tod);}} style={{marginLeft:6,fontSize:7,color:'#60a5fa',background:'none',border:'none',cursor:'pointer'}}>↩ загрузить</button>
+                    <button onClick={()=>{setMixGoals([h.goal]);setMixTiming(h.timing);setMixWorkoutType(h.type);setMixTimeOfDay(h.tod);}} style={{marginLeft:6,fontSize:7,color:'#60a5fa',background:'none',border:'none',cursor:'pointer'}}>↩ загрузить</button>
                   </div>
                 ))}
               </div>

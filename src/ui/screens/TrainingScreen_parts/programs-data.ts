@@ -1581,6 +1581,169 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
       ],
     }],
   },
+  // ── Качественные проверенные программы (ПЛ/ББ) ──
+  {
+    id: 'texas_method', name: 'Texas Method', author: 'Glenn Pendlay / Mark Rippetoe',
+    type: 'Full Body 3x/week', goal: 'strength', level: 'intermediate',
+    durationWeeks: 8, daysPerWeek: 3, sessionTimeMin: '60-90',
+    description: 'Классическая промежуточная силовая программа: день объёма (5×5), лёгкий день (активное восстановление/техника), день интенсивности (1 рабочий подход 5 с новым ПМ). Прогресс за счёт еженедельного повышения рабочего веса в интенсивный день.',
+    targetAudience: 'Атлеты после линейной прогрессии (Starting Strength), средний уровень.',
+    equipmentNeeded: ['barbell', 'rack', 'bench'],
+    warnings: ['Требует точного выбора рабочего веса в пятницу.', 'При застое — микроцикл 10% и снова рост.'],
+    expectedResults: 'Рост ПМ в приседе/жиме/тяге на 2.5-5 кг/мес.',
+    progressionModel: 'Еженедельная линейная прогрессия (объём в пн → пик в пт).',
+    deloadProtocol: 'При застое: неделя −10% объёма, затем продолжить рост.',
+    customization: ['Можно добавить аксессуары в лёгкий день.'],
+    weeks: [
+      { week: 1, phase: 'Накопление/Пик', volumeMultiplier: 1, intensityMultiplier: 1, deload: false, days: [
+        { day: 1, name: 'Пн — Объём', focus: 'Сила 5×5', warmup: '3-4 разминочных', exercises: [
+          { name: 'Squat', sets: 5, reps: '5', rpe: 8, rir: 2, restSec: 180, notes: 'Рабочий вес ~80% ПМ', progression: '+2.5 кг/нед если пт прошёл' },
+          { name: 'Bench Press', sets: 5, reps: '5', rpe: 8, rir: 2, restSec: 150, notes: '', progression: '' },
+          { name: 'Deadlift', sets: 1, reps: '5', rpe: 8, rir: 2, restSec: 180, notes: 'Объёмная тяга', progression: '' },
+        ], cooldown: 'Растяжка' },
+        { day: 2, name: 'Ср — Лёгкий', focus: 'Активное восстановление/техника', warmup: 'Разминка', exercises: [
+          { name: 'Front Squat', sets: 2, reps: '3', rpe: 6, rir: 4, restSec: 120, notes: '50% от пн', progression: '' },
+          { name: 'Overhead Press', sets: 3, reps: '5', rpe: 7, rir: 3, restSec: 120, notes: '', progression: '' },
+          { name: 'Pull-up', sets: 3, reps: 'AMRAP', rpe: 7, rir: 3, restSec: 90, notes: '', progression: '' },
+        ], cooldown: 'Мобилити' },
+        { day: 3, name: 'Пт — Интенсивность', focus: 'Новый 5ПМ', warmup: '4-5 разминочных', exercises: [
+          { name: 'Squat', sets: 1, reps: '5', rpe: 9, rir: 1, restSec: 240, notes: 'Новый рабочий 5ПМ', progression: '+2.5 кг/нед' },
+          { name: 'Bench Press', sets: 1, reps: '5', rpe: 9, rir: 1, restSec: 240, notes: 'Новый 5ПМ', progression: '+1.25 кг/нед' },
+          { name: 'Deadlift', sets: 1, reps: '3', rpe: 9, rir: 1, restSec: 240, notes: 'Тяжёлая тяга', progression: '+2.5-5 кг/нед' },
+        ], cooldown: 'Растяжка' },
+      ] },
+    ],
+  },
+  {
+    id: 'madcow_5x5', name: 'Madcow 5x5', author: 'Bill Starr / Madcow',
+    type: 'Full Body 3x/week', goal: 'strength', level: 'intermediate',
+    durationWeeks: 12, daysPerWeek: 3, sessionTimeMin: '60-90',
+    description: 'Промежуточная линейная программа с волнообразной нагрузкой внутри недели: пн средний, ср лёгкий, пт тяжёлый (новый рекорд 5×5). Еженедельная прогрессия 2.5%.',
+    targetAudience: 'После Texas Method / линейной прогрессии.',
+    equipmentNeeded: ['barbell', 'rack', 'bench'],
+    warnings: ['При застое — дeload 10% и снова рост.', 'Контролировать восстановление.'],
+    expectedResults: 'Стабильный рост ПМ на 2.5 кг/нед (присед).',
+    progressionModel: 'Еженедельная 2.5% прогрессия, волна внутри недели.',
+    deloadProtocol: '−10% при застое.',
+    customization: ['Можно добавить аксессуары в ср.'],
+    weeks: [
+      { week: 1, phase: 'Волна', volumeMultiplier: 1, intensityMultiplier: 1, deload: false, days: [
+        { day: 1, name: 'Пн', focus: 'Средний 5×5', warmup: 'рамп', exercises: [
+          { name: 'Squat', sets: 4, reps: '5', rpe: 8, rir: 2, restSec: 180, notes: 'рамп до 5×5 рабочего', progression: '' },
+          { name: 'Bench Press', sets: 4, reps: '5', rpe: 8, rir: 2, restSec: 150, notes: 'рамп', progression: '' },
+          { name: 'Barbell Row', sets: 4, reps: '5', rpe: 8, rir: 2, restSec: 150, notes: '', progression: '' },
+        ], cooldown: '' },
+        { day: 2, name: 'Ср', focus: 'Лёгкий 4×5 (80% пн)', warmup: 'рамп', exercises: [
+          { name: 'Squat', sets: 4, reps: '5', rpe: 6, rir: 4, restSec: 150, notes: '80% пн', progression: '' },
+          { name: 'Overhead Press', sets: 4, reps: '5', rpe: 7, rir: 3, restSec: 120, notes: '', progression: '' },
+          { name: 'Deadlift', sets: 1, reps: '5', rpe: 8, rir: 2, restSec: 180, notes: '', progression: '' },
+        ], cooldown: '' },
+        { day: 3, name: 'Пт', focus: 'Тяжёлый 5×5 рекорд', warmup: 'рамп', exercises: [
+          { name: 'Squat', sets: 4, reps: '5', rpe: 9, rir: 1, restSec: 240, notes: '+2.5% от пн', progression: '+2.5% /нед' },
+          { name: 'Bench Press', sets: 4, reps: '5', rpe: 9, rir: 1, restSec: 240, notes: '+2.5%', progression: '+2.5% /нед' },
+          { name: 'Barbell Row', sets: 4, reps: '5', rpe: 9, rir: 1, restSec: 240, notes: '+2.5%', progression: '+2.5% /нед' },
+        ], cooldown: '' },
+      ] },
+    ],
+  },
+  {
+    id: 'doggcrap_dc', name: 'Doggcrapp (DC) Training', author: 'Dante Trudel',
+    type: 'High-Intensity Split 3-5x/week', goal: 'hypertrophy', level: 'advanced',
+    durationWeeks: 12, daysPerWeek: 3, sessionTimeMin: '45-60',
+    description: 'Высокоинтенсивный бодибилдинг-протокол: низкая частота, 1 рабочий подход до отказа с rest-pause, негативы, растяжка мышцы после. Прогресс = рост веса/повторений.',
+    targetAudience: 'Продвинутые бодибилдеры (часто на курсе), строгое ведение журнала.',
+    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
+    warnings: ['Только продвинутые; высокий риск перетрена при неверном восстановлении.', 'Rest-pause до отказа — травмоопасно без контроля.'],
+    expectedResults: 'Гипертрофия при минимальном объёме за счёт интенсивности.',
+    progressionModel: 'Прогрессия веса/повторений в rest-pause (целевые окна).',
+    deloadProtocol: 'Смена упражнений каждые 4-6 нед (cruise неделя).',
+    customization: ['Растяжка мышцы 60с после каждого рабочего подхода.'],
+    weeks: [
+      { week: 1, phase: 'Rest-pause', volumeMultiplier: 0.6, intensityMultiplier: 1.2, deload: false, days: [
+        { day: 1, name: 'Верх А', focus: 'Грудь/Спина/Плечи/Трицепс', warmup: '2 ramp', exercises: [
+          { name: 'Incline DB Press', sets: 1, reps: 'rest-pause 11-15', rpe: 10, rir: 0, restSec: 20, notes: 'до отказа +2 паузы по 20с', progression: '+1 повт или вес' },
+          { name: 'Lat Pulldown', sets: 1, reps: 'rest-pause 11-15', rpe: 10, rir: 0, restSec: 20, notes: '', progression: '' },
+          { name: 'Overhead Press', sets: 1, reps: 'rest-pause 11-15', rpe: 10, rir: 0, restSec: 20, notes: '', progression: '' },
+        ], cooldown: 'Растяжка 60с/мышца' },
+        { day: 2, name: 'Низ А', focus: 'Квадры/Бицепс бедра/Икры', warmup: '2 ramp', exercises: [
+          { name: 'Hack Squat', sets: 1, reps: 'rest-pause 11-15', rpe: 10, rir: 0, restSec: 20, notes: '', progression: '' },
+          { name: 'Romanian Deadlift', sets: 1, reps: 'rest-pause 11-15', rpe: 10, rir: 0, restSec: 20, notes: '', progression: '' },
+          { name: 'Standing Calf Raise', sets: 1, reps: 'static hold 5с + 10-12', rpe: 10, rir: 0, restSec: 30, notes: '', progression: '' },
+        ], cooldown: 'Растяжка' },
+        { day: 3, name: 'Верх Б (другие упр.)', focus: 'Грудь/Спина/Бицепс', warmup: '2 ramp', exercises: [
+          { name: 'Hammer Strength Press', sets: 1, reps: 'rest-pause 11-15', rpe: 10, rir: 0, restSec: 20, notes: '', progression: '' },
+          { name: 'Barbell Row', sets: 1, reps: 'rest-pause 11-15', rpe: 10, rir: 0, restSec: 20, notes: '', progression: '' },
+          { name: 'Barbell Curl', sets: 1, reps: 'rest-pause 6-8', rpe: 10, rir: 0, restSec: 20, notes: '', progression: '' },
+        ], cooldown: 'Растяжка' },
+      ] },
+    ],
+  },
+  {
+    id: 'nsuns_531', name: 'nSuns 5/3/1 (4-day)', author: 'nSuns (по Wendler)',
+    type: 'Upper/Lower 4x/week', goal: 'strength', level: 'intermediate',
+    durationWeeks: 12, daysPerWeek: 4, sessionTimeMin: '70-100',
+    description: 'Популярный гибрид 5/3/1 + большой объём (5/3/1 + FSL AMRAP + дополнительные тяги/жимы с % от тренировочного максимума). Высокий объём КПШ, прогресс за счёт +протяжки ТМ.',
+    targetAudience: 'Средний-продвинутый пауэрлифтинг/пауэрбилдинг.',
+    equipmentNeeded: ['barbell', 'rack', 'bench', 'dumbbell', 'cable'],
+    warnings: ['Высокий объём — следить за восстановлением.', 'Тренировочный максимум (ТМ) = 90% ПМ, +2.5/1.25 кг/мес.'],
+    expectedResults: 'Рост ПМ + гипертрофия.',
+    progressionModel: '5/3/1 + FSL, ежемесячный +ТМ.',
+    deloadProtocol: '7-я неделя — разгрузка (объём −40%).',
+    customization: ['Можно заменить аксессуары.'],
+    weeks: [
+      { week: 1, phase: '5/3/1 + FSL', volumeMultiplier: 1, intensityMultiplier: 1, deload: false, days: [
+        { day: 1, name: 'Пн — Жим 5/3/1 + объём тяги', focus: 'Сила жима', warmup: 'рамп', exercises: [
+          { name: 'Bench Press', sets: 9, reps: '5/3/1+FSL 5×5', rpe: 9, rir: 1, restSec: 180, notes: '5@65,3@75,1@85, FSL 5×5@65', progression: 'TM +1.25/мес' },
+          { name: 'Close-Grip Bench', sets: 8, reps: 'FSL 5×5', rpe: 8, rir: 2, restSec: 120, notes: '', progression: '' },
+          { name: 'Barbell Row', sets: 5, reps: '8-12', rpe: 8, rir: 2, restSec: 120, notes: '', progression: '' },
+        ], cooldown: '' },
+        { day: 2, name: 'Вт — Присед 5/3/1 + объём тяги', focus: 'Сила приседа', warmup: 'рамп', exercises: [
+          { name: 'Squat', sets: 9, reps: '5/3/1+FSL 5×5', rpe: 9, rir: 1, restSec: 240, notes: '', progression: 'TM +2.5/мес' },
+          { name: 'Deadlift', sets: 8, reps: 'FSL 5×3', rpe: 8, rir: 2, restSec: 180, notes: '', progression: '' },
+          { name: 'Lat Pulldown', sets: 5, reps: '8-12', rpe: 8, rir: 2, restSec: 120, notes: '', progression: '' },
+        ], cooldown: '' },
+        { day: 3, name: 'Чт — Жим (отдых-пауза) + OHP', focus: 'Гипертрофия жима', warmup: 'рамп', exercises: [
+          { name: 'Overhead Press', sets: 9, reps: '5/3/1+FSL 5×5', rpe: 9, rir: 1, restSec: 150, notes: '', progression: '' },
+          { name: 'Incline DB Press', sets: 5, reps: '8-12', rpe: 8, rir: 2, restSec: 120, notes: '', progression: '' },
+          { name: 'Barbell Curl', sets: 5, reps: '8-12', rpe: 8, rir: 2, restSec: 90, notes: '', progression: '' },
+        ], cooldown: '' },
+        { day: 4, name: 'Пт — Тяга 5/3/1 + объём приседа', focus: 'Сила тяги', warmup: 'рамп', exercises: [
+          { name: 'Deadlift', sets: 9, reps: '5/3/1+FSL 5×3', rpe: 9, rir: 1, restSec: 240, notes: '', progression: 'TM +2.5/мес' },
+          { name: 'Front Squat', sets: 8, reps: 'FSL 5×5', rpe: 8, rir: 2, restSec: 180, notes: '', progression: '' },
+          { name: 'Barbell Row', sets: 5, reps: '8-12', rpe: 8, rir: 2, restSec: 120, notes: '', progression: '' },
+        ], cooldown: '' },
+      ] },
+    ],
+  },
+  {
+    id: 'smolov_jr_bench', name: 'Smolov Jr (жим)', author: 'Смолов',
+    type: 'Bench specialisation 4x/week', goal: 'peaking', level: 'advanced',
+    durationWeeks: 3, daysPerWeek: 4, sessionTimeMin: '45-70',
+    description: 'Специализация на жиме лёжа 4×/нед с высокой частотой и прогрессией веса. Короткий пик-блок 3 недели. Высокая нагрузка на плечи/трицепс.',
+    targetAudience: 'Продвинутые, нужен опыт и восстановление; не чаще 1-2 раза в год.',
+    equipmentNeeded: ['barbell', 'bench', 'rack'],
+    warnings: ['Высокий риск перетрена плечевых суставов.', 'Строго 3 недели, затем разгрузка/тест ПМ.', 'Контролировать объём аксессуаров.'],
+    expectedResults: '+5-15 кг к ПМ жима за 3 нед.',
+    progressionModel: 'Прогрессия веса по дням (6×6, 7×5, 8×4, 10×3).',
+    deloadProtocol: 'После — неделя разгрузки, затем тест ПМ.',
+    customization: ['Можно добавить лёгкую спину/ноги.'],
+    weeks: [
+      { week: 1, phase: 'Объём жима', volumeMultiplier: 1, intensityMultiplier: 1, deload: false, days: [
+        { day: 1, name: 'Пн', focus: '6×6', warmup: 'рамп', exercises: [
+          { name: 'Bench Press', sets: 6, reps: '6', rpe: 8, rir: 2, restSec: 180, notes: '~70-75% ПМ', progression: '+5 кг к среде' },
+        ], cooldown: '' },
+        { day: 2, name: 'Ср', focus: '7×5', warmup: 'рамп', exercises: [
+          { name: 'Bench Press', sets: 7, reps: '5', rpe: 8, rir: 2, restSec: 180, notes: '+5 кг от пн', progression: '+5 кг к пт' },
+        ], cooldown: '' },
+        { day: 3, name: 'Пт', focus: '8×4', warmup: 'рамп', exercises: [
+          { name: 'Bench Press', sets: 8, reps: '4', rpe: 8, rir: 2, restSec: 180, notes: '+5 кг от ср', progression: '+5 кг к сб' },
+        ], cooldown: '' },
+        { day: 4, name: 'Сб', focus: '10×3', warmup: 'рамп', exercises: [
+          { name: 'Bench Press', sets: 10, reps: '3', rpe: 8, rir: 2, restSec: 150, notes: '+5 кг от пт', progression: 'нед 2: +5% ко всем' },
+        ], cooldown: '' },
+      ] },
+    ],
+  },
 ];
 
 export const PROGRAM_LEVEL_MAP: Record<string, string> = {

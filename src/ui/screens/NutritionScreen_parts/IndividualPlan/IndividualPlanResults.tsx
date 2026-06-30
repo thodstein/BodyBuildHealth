@@ -1221,7 +1221,7 @@ export const IndividualPlanResults: React.FC = () => {
           </div>
           <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
             <button onClick={() => generateLazyDayPlan()} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background: lazyDayMode ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.02)', border: lazyDayMode ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(255,255,255,0.06)', color: lazyDayMode ? '#f59e0b' : 'rgba(255,255,255,0.8)', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
-              ?🛋 Ленивый день
+              🛋 Ленивый день
             </button>
             <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Минимум готовки, {lazyDayDays} {lazyDayDays === 1 ? 'день' : 'дней'}</div>
           </div>
@@ -1715,48 +1715,70 @@ export const IndividualPlanResults: React.FC = () => {
                 {/* Per-meal results */}
                 {calcResults.map((r, i) => {
                   const sc = r.score;
-                  const color = sc.compositeScore >= 8 ? '#22c55e' : sc.compositeScore >= 5 ? '#f59e0b' : '#ef4444';
+                  const grade = sc.compositeScore >= 8 ? 'A' : sc.compositeScore >= 6 ? 'B' : sc.compositeScore >= 4 ? 'C' : 'D';
+                  const gradeColor = grade === 'A' ? '#00e68a' : grade === 'B' ? '#8b5cf6' : grade === 'C' ? '#f59e0b' : '#ef4444';
+                  const color = gradeColor;
+                  const totalKcal = sc.macros.protein * 4 + sc.macros.fat * 9 + sc.macros.carbs * 4;
+                  const totalW = sc.productScores.reduce((s: number, p: any) => s + (p.weightG || 0), 0);
+                  const pctP = totalKcal > 0 ? Math.round(sc.macros.protein * 4 / totalKcal * 100) : 0;
+                  const pctF = totalKcal > 0 ? Math.round(sc.macros.fat * 9 / totalKcal * 100) : 0;
+                  const pctC = totalKcal > 0 ? Math.round(sc.macros.carbs * 4 / totalKcal * 100) : 0;
+                  const kcalPerG = totalW > 0 ? (totalKcal / totalW).toFixed(1) : '—';
+                  const bestItems = sc.productScores.filter((p: any) => p.score >= 7).map((p: any) => p.name);
+                  const weakItems = sc.productScores.filter((p: any) => p.score < 4).map((p: any) => p.name);
                   return (
                     <div key={r.id} style={{ marginBottom:6, borderRadius:10, padding:10, background:'rgba(24,24,27,0.8)', border:`1px solid ${color}20` }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
                         <span style={{ fontSize:9, fontWeight:700, color:'#fff' }}>{r.name}</span>
                         <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                          <div style={{ width:28, height:28, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+                            background:`${gradeColor}18`, border:`2px solid ${gradeColor}`, fontSize:12, fontWeight:800, color:gradeColor }}>{grade}</div>
                           <span style={{ fontSize:11, fontWeight:800, color }}>{sc.compositeScore.toFixed(1)}</span>
                           <span style={{ fontSize:6, color, opacity:0.6 }}>{sc.label}</span>
                         </div>
                       </div>
-                      {/* Macros bar */}
-                      <div style={{ display:'flex', gap:4, marginBottom:4 }}>
+                      {/* Full macros grid */}
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:3, marginBottom:6 }}>
                         {[
-                          { label:'Б', val:sc.macros.protein, color:'#3b82f6' },
-                          { label:'Ж', val:sc.macros.fat, color:'#f59e0b' },
-                          { label:'У', val:sc.macros.carbs, color:'#ef4444' },
-                          { label:'Кл', val:sc.macros.fiber, color:'#22c55e' },
-                        ].map(m => (
-                          <div key={m.label} style={{ flex:1, padding:'3px 4px', borderRadius:5, background:`${m.color}0a`, textAlign:'center' }}>
-                            <div style={{ fontSize:6, color:`${m.color}aa` }}>{m.label}</div>
-                            <div style={{ fontSize:8, fontWeight:700, color:m.color }}>{m.val}г</div>
+                          ['🔥','Ккал',`${totalKcal} ккал`, '#fff'],
+                          ['🥩','Белок',`${sc.macros.protein}г`,'#22c55e'],
+                          ['🧈','Жиры',`${sc.macros.fat}г`,'#f59e0b'],
+                          ['🍚','Углеводы',`${sc.macros.carbs}г`,'#3b82f6'],
+                          ['🌾','Клетчатка',`${sc.macros.fiber}г`,'#22c55e'],
+                          ['⚖️','Вес',`${totalW}г`,'rgba(255,255,255,0.8)'],
+                          ['📊','Ккал/г',kcalPerG,'rgba(255,255,255,0.8)'],
+                          ['💪','DIAAS',`${r.diaas.diaas.toFixed(2)}`,'#8b5cf6'],
+                        ].map(([icon, label, val, c]) => (
+                          <div key={label} style={{ padding:'3px 5px', borderRadius:5, background:'rgba(255,255,255,0.02)' }}>
+                            <div style={{ fontSize:6, color:'rgba(255,255,255,0.8)' }}>{icon} {label}</div>
+                            <div style={{ fontSize:9, fontWeight:700, color:c }}>{val}</div>
                           </div>
                         ))}
-                        <div style={{ flex:1, padding:'3px 4px', borderRadius:5, background:'rgba(139,92,246,0.08)', textAlign:'center' }}>
-                          <div style={{ fontSize:6, color:'#8b5cf6aa' }}>DIAAS</div>
-                          <div style={{ fontSize:8, fontWeight:700, color: r.diaas.diaas >= 1 ? '#22c55e' : r.diaas.diaas >= 0.75 ? '#f59e0b' : '#ef4444' }}>{r.diaas.diaas.toFixed(2)}</div>
+                      </div>
+                      {/* PFC ratio bar */}
+                      <div style={{ marginBottom:6 }}>
+                        <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>БЖУ %</div>
+                        <div style={{ display:'flex', gap:3, height:5, borderRadius:3, overflow:'hidden' }}>
+                          <div style={{ flex:pctP, background:'#22c55e' }} />
+                          <div style={{ flex:pctF, background:'#f59e0b' }} />
+                          <div style={{ flex:pctC, background:'#3b82f6' }} />
+                        </div>
+                        <div style={{ display:'flex', gap:6, marginTop:1, fontSize:6, color:'rgba(255,255,255,0.8)' }}>
+                          <span>🥩 {pctP}%</span>
+                          <span>🧈 {pctF}%</span>
+                          <span>🍚 {pctC}%</span>
                         </div>
                       </div>
                       {/* Quality breakdown */}
-                      <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:2 }}>
-                        <span style={{ fontSize:6, color:'rgba(255,255,255,0.9)' }}>⭐ Качество: {sc.compositeScore.toFixed(1)}</span>
-                        {sc.productScores.slice(0,3).map((p,pi) => (
-                          <span key={pi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background: p.score >= 7 ? 'rgba(0,230,138,0.08)' : p.score >= 4 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', color: p.score >= 7 ? '#22c55e' : p.score >= 4 ? '#f59e0b' : '#ef4444' }}>
-                            {p.name} ({p.score.toFixed(1)})
-                          </span>
-                        ))}
+                      <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginBottom:4 }}>
+                        {bestItems.length > 0 && <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#22c55e' }}>✅ {bestItems.join(', ')}</span>}
+                        {weakItems.length > 0 && <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(239,68,68,0.08)', color:'#ef4444' }}>⚠️ {weakItems.join(', ')}</span>}
                       </div>
                       {/* Modifiers */}
                       {sc.modifiers.length > 0 && (
-                        <div style={{ marginTop:4 }}>
+                        <div style={{ marginBottom:4 }}>
                           <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>🧬 Факторы:</div>
-                          {sc.modifiers.map((m, mi) => (
+                          {sc.modifiers.map((m: any, mi: number) => (
                             <div key={mi} style={{ fontSize:7, padding:'2px 5px', marginBottom:1, borderRadius:4, background: m.value > 0 ? 'rgba(0,230,138,0.04)' : 'rgba(239,68,68,0.04)', color: m.value > 0 ? '#22c55e' : '#ef4444' }}>
                               {m.name} <b>({m.value > 0 ? '+' : ''}{m.value.toFixed(1)})</b>
                             </div>
@@ -1765,13 +1787,49 @@ export const IndividualPlanResults: React.FC = () => {
                       )}
                       {/* Weak links */}
                       {sc.weakLinks.length > 0 && (
-                        <div style={{ marginTop:3, fontSize:7, color:'#f59e0b' }}>
-                          ⚠️ Cлабые звенья: {sc.weakLinks.join(', ')}
+                        <div style={{ marginBottom:4, padding:'4px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.1)' }}>
+                          <div style={{ fontSize:7, color:'#f59e0b', fontWeight:600 }}>⚠️ Слабые звенья: {sc.weakLinks.join(', ')}</div>
+                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginTop:2 }}>Добавьте продукты с более высоким скором в эту категорию</div>
                         </div>
                       )}
-                      {/* Products */}
-                      <div style={{ marginTop:4, fontSize:7, color:'rgba(255,255,255,0.9)' }}>
-                        Продукты: {sc.productScores.map(p => `${p.name} (${p.weightG}г)`).join(', ')}
+                      {/* Product details */}
+                      <div style={{ marginBottom:4 }}>
+                        <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>📦 Продукты и скоры</div>
+                        {sc.productScores.map((p: any) => (
+                          <div key={p.foodId} style={{ display:'flex', alignItems:'center', gap:4, padding:'2px 0', fontSize:7 }}>
+                            <div style={{ width:18, height:18, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+                              fontSize:6, fontWeight:800, border:`1.5px solid ${p.score >= 7 ? '#22c55e' : p.score >= 4 ? '#f59e0b' : '#ef4444'}`,
+                              color: p.score >= 7 ? '#22c55e' : p.score >= 4 ? '#f59e0b' : '#ef4444' }}>{p.score}</div>
+                            <span style={{ flex:1, color:'#fff' }}>{p.name}</span>
+                            <span style={{ color:'rgba(255,255,255,0.6)' }}>{p.weightG}г</span>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Micro coverage */}
+                      {(sc as any).microCoverage && (sc as any).microCoverage.length > 0 && (
+                        <div style={{ marginTop:4 }}>
+                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>💊 Микронутриенты (% от нормы)</div>
+                          {(sc as any).microCoverage.slice(0, 8).map((m: any) => (
+                            <div key={m.key} style={{ display:'flex', alignItems:'center', gap:4, marginBottom:1 }}>
+                              <span style={{ fontSize:6, color:'rgba(255,255,255,0.8)', minWidth:20 }}>{m.name}</span>
+                              <div style={{ flex:1, height:3, borderRadius:2, background:'rgba(255,255,255,0.06)', overflow:'hidden' }}>
+                                <div style={{ width:`${Math.min(100, m.percent)}%`, height:'100%', borderRadius:2,
+                                  background: m.percent >= 50 ? '#22c55e' : m.percent >= 20 ? '#f59e0b' : '#ef4444' }} />
+                              </div>
+                              <span style={{ fontSize:6, color:'rgba(255,255,255,0.8)', minWidth:20, textAlign:'right' }}>{m.percent}%</span>
+                            </div>
+                          ))}
+                          {(sc as any).microCoverage.length > 8 && (
+                            <div style={{ fontSize:6, color:'rgba(255,255,255,0.2)', marginTop:1 }}>+ ещё {(sc as any).microCoverage.length - 8}</div>
+                          )}
+                        </div>
+                      )}
+                      {/* Recommendations */}
+                      <div style={{ marginTop:4, fontSize:7, color:'#8b5cf6' }}>
+                        {grade === 'A' && '🏆 Отличный состав — идеально для вашей фазы'}
+                        {grade === 'B' && '👍 Хороший приём — добавьте зелени или клетчатки'}
+                        {grade === 'C' && '⚡ Улучшите: больше белка, овощей, замените переработанное'}
+                        {grade === 'D' && '⚠️ Слабый приём — замените низкокачественные продукты'}
                       </div>
                     </div>
                   );
@@ -1781,7 +1839,23 @@ export const IndividualPlanResults: React.FC = () => {
                 {calcDailyReport && calcResults.length > 1 && (
                   <div style={{ marginTop:8, borderRadius:10, padding:10, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.12)' }}>
                     <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>📈 Совокупный анализ ({calcResults.length} приёма)</div>
-                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:4 }}>Ккал: {Math.round(calcDailyReport.totalKcal)} | DIAAS: {calcDailyReport.diaas.toFixed(2)} | Лимит.АК: {calcDailyReport.diaasLimitingAA} {calcDailyReport.histamineSensitive ? '| ⚠️ Чувствителен к гистамину' : ''}</div>
+                    {/* Overall grade */}
+                    {(() => {
+                      const avgScore = calcResults.reduce((s: number, r: any) => s + r.score.compositeScore, 0) / calcResults.length;
+                      const overallGrade = avgScore >= 8 ? 'A' : avgScore >= 6 ? 'B' : avgScore >= 4 ? 'C' : 'D';
+                      const overallColor = overallGrade === 'A' ? '#00e68a' : overallGrade === 'B' ? '#8b5cf6' : overallGrade === 'C' ? '#f59e0b' : '#ef4444';
+                      return (
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                          <div style={{ width:32, height:32, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+                            background:`${overallColor}18`, border:`2px solid ${overallColor}`, fontSize:14, fontWeight:800, color:overallColor }}>{overallGrade}</div>
+                          <span style={{ fontSize:10, color:overallColor, fontWeight:700 }}>Качество рациона: {avgScore.toFixed(1)}/10</span>
+                        </div>
+                      );
+                    })()}
+                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:4 }}>
+                      Ккал: {Math.round(calcDailyReport.totalKcal)} | DIAAS: {calcDailyReport.diaas.toFixed(2)} | Лимит.АК: {calcDailyReport.diaasLimitingAA}
+                      {calcDailyReport.histamineSensitive ? ' | ⚠️ Чувствителен к гистамину' : ''}
+                    </div>
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:3, fontSize:7, color:'rgba(255,255,255,0.85)' }}>
                       <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.mtorTriggered ? 'rgba(0,230,138,0.06)' : 'rgba(239,68,68,0.06)', color: calcDailyReport.mtorTriggered ? '#22c55e' : '#ef4444' }}>
                         🧬 mTOR: {calcDailyReport.mtorTriggered ? '✅ Запущен' : `❌ Дефицит ${calcDailyReport.mtorDeficitMg}мг лейцина`}
@@ -1837,6 +1911,43 @@ export const IndividualPlanResults: React.FC = () => {
                         ⚠️ Дефициты: {calcDailyReport.microDeficits.join(', ')}
                       </div>
                     )}
+                    {/* Food quality breakdown */}
+                    {(() => {
+                      const allProductScores = calcResults.flatMap((r: any) => r.score.productScores || []);
+                      const bestItems = allProductScores.filter((p: any) => p.score >= 7).map((p: any) => p.name);
+                      const weakItems = allProductScores.filter((p: any) => p.score < 4).map((p: any) => p.name);
+                      return (
+                        <>
+                          {bestItems.length > 0 && (
+                            <div style={{ marginTop:4, fontSize:7, padding:'4px 8px', borderRadius:6, background:'rgba(0,230,138,0.04)', color:'#22c55e' }}>
+                              ✅ Лучшие продукты: {bestItems.join(', ')}
+                            </div>
+                          )}
+                          {weakItems.length > 0 && (
+                            <div style={{ marginTop:3, fontSize:7, padding:'4px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', color:'#ef4444' }}>
+                              ⚠️ Слабые продукты: {weakItems.join(', ')}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                    {/* Recommendations */}
+                    {(() => {
+                      const recs: string[] = [];
+                      if (!calcDailyReport.mtorTriggered) recs.push('🥩 Увеличьте лейцин (красное мясо, яйца, сывороточный протеин)');
+                      if (calcDailyReport.giLoadWarning) recs.push('🍚 Замените быстрые углеводы на медленные (овсянка, гречка, бурый рис)');
+                      if (calcDailyReport.omegaWarning) recs.push('🐟 Добавьте Омега-3 (лосось, скумбрия, льняное масло)');
+                      if (calcDailyReport.electrolyteRisk) recs.push('🥑 Увеличьте калий (авокадо, шпинат, бананы) и магний (орехи, семена)');
+                      if (calcDailyReport.microDeficits.length > 0) recs.push('💊 Обратите внимание на дефициты: ' + calcDailyReport.microDeficits.slice(0,3).join(', '));
+                      return recs.length > 0 ? (
+                        <div style={{ marginTop:4 }}>
+                          <div style={{ fontSize:7, color:'#8b5cf6', fontWeight:600, marginBottom:2 }}>📋 Рекомендации</div>
+                          {recs.map((rec, ri) => (
+                            <div key={ri} style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:1 }}>• {rec}</div>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 )}
               </div>

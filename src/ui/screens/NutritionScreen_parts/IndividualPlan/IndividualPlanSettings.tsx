@@ -10,7 +10,7 @@ import {
 } from "./types";
 import { GlassCard, PillBtn, inputStyle, selectStyle, greenBtn } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
-import { PopupNumber, PopupSelect } from '../../../components/PopupXxx';
+import { PopupNumber, PopupSelect, PopupText } from '../../../components/PopupXxx';
 
 export const IndividualPlanSettings: React.FC = () => {
   const {
@@ -121,6 +121,7 @@ export const IndividualPlanSettings: React.FC = () => {
   const timingLabels: Record<string,string> = { breakfast:'🌅 Завтрак', lunch:'☀️ Обед', dinner:'🌆 Ужин', snack:'🍪 Перекус', before_bed:'🌙 Перед сном' };
   const specialMealGoalLabel = goalLabels[specialMealGoal] || specialMealGoal;
   const specialMealTimingLabel = timingLabels[specialMealTiming] || specialMealTiming;
+  const TIME_OPTIONS = Array.from({length:48},(_,i)=>{const h=Math.floor(i/2);const m=i%2===0?'00':'30';return{id:`${String(h).padStart(2,'0')}:${m}`,label:`${String(h).padStart(2,'0')}:${m}`};});
 
   return (
     <>
@@ -166,22 +167,15 @@ export const IndividualPlanSettings: React.FC = () => {
             <PopupSelect label="🌸 Фаза цикла" value={cyclePhase} options={[{id:'none',label:'Не указана'},{id:'follicular',label:'Фолликулярная'},{id:'ovulation',label:'Овуляция'},{id:'luteal',label:'Лютеиновая'},{id:'menstrual',label:'Менструация'}]} onChange={v => setCyclePhase(v as CycleType)} />
           </div>
         )}
-        <div style={{ marginBottom: 6 }}>
-          <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>Голод/сытость (1 — сыт, 10 — очень голоден)</label>
-          <input type="range" min="1" max="10" value={hungerLevel} onChange={e => setHungerLevel(+e.target.value)} style={{ width: '100%' }} />
-          <div style={{ fontSize: 8, color: 'var(--text-dim)', textAlign: 'right' }}>{hungerLevel}/10</div>
-        </div>
+        <PopupNumber label="🍽 Голод/сытость (1–сыт, 10–голоден)" value={hungerLevel} min={1} max={10} suffix="/10" onChange={setHungerLevel} />
       </GlassCard>
 
         {/* 💧 Electrolytes & Pharma — quick settings */}
         <GlassCard title="💧 Электролиты и фарма" icon="💧" color="#06b6d4">
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:6 }}>
-            <div><label style={{ fontSize:7, color:'rgba(255,255,255,0.6)', display:'block', marginBottom:2 }}>Натрий (мг)</label>
-              <input type="number" value={v2Labs.sodium||3500} onChange={e=>setV2Labs((p:any)=>({...p,sodium:+e.target.value||3500}))} style={inputStyle} /></div>
-            <div><label style={{ fontSize:7, color:'rgba(255,255,255,0.6)', display:'block', marginBottom:2 }}>Калий (мг)</label>
-              <input type="number" value={v2Labs.potassium||4500} onChange={e=>setV2Labs((p:any)=>({...p,potassium:+e.target.value||4500}))} style={inputStyle} /></div>
-            <div><label style={{ fontSize:7, color:'rgba(255,255,255,0.6)', display:'block', marginBottom:2 }}>Магний (мг)</label>
-              <input type="number" value={v2Labs.magnesium||400} onChange={e=>setV2Labs((p:any)=>({...p,magnesium:+e.target.value||400}))} style={inputStyle} /></div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:6 }}>
+            <PopupNumber label="Натрий" value={Number(v2Labs.sodium)||3500} min={0} max={10000} step={100} suffix="мг" onChange={v=>setV2Labs((p:any)=>({...p,sodium:v}))} />
+            <PopupNumber label="Калий" value={Number(v2Labs.potassium)||4500} min={0} max={10000} step={100} suffix="мг" onChange={v=>setV2Labs((p:any)=>({...p,potassium:v}))} />
+            <PopupNumber label="Магний" value={Number(v2Labs.magnesium)||400} min={0} max={2000} step={50} suffix="мг" onChange={v=>setV2Labs((p:any)=>({...p,magnesium:v}))} />
           </div>
           <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', marginBottom:4 }}>💉 Фармакология</div>
           <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
@@ -242,16 +236,16 @@ export const IndividualPlanSettings: React.FC = () => {
             </div>
           </div>
           <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Лабораторные (v2)</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3 }}>
-              {['hematocrit','hemoglobin','hdl','ldl','alt','ast','crp','testosterone'].map(lab => (
-                <div key={lab} style={{ display:'flex', flexDirection:'column', gap:1 }}>
-                  <span style={{ fontSize:6, color:'rgba(255,255,255,0.35)', textTransform:'capitalize' }}>{lab}</span>
-                  <input value={v2Labs[lab] || ''} onChange={e => setV2Labs((prev:any) => ({...prev, [lab]: e.target.value}))}
-                    placeholder="—" style={{ padding:'3px 5px', borderRadius:4, fontSize:7, background:'#202023',
-                    border:'1px solid rgba(255,255,255,0.06)', color:'#fff', outline:'none', width:'100%', boxSizing:'border-box' }} />
-                </div>
-              ))}
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Лабораторные (v2)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+              <PopupNumber label="Гематокрит" value={parseFloat(v2Labs.hematocrit)||0} min={0} max={70} step={0.1} suffix="%" onChange={v=>setV2Labs((p:any)=>({...p,hematocrit:String(v)}))} />
+              <PopupNumber label="Гемоглобин" value={parseFloat(v2Labs.hemoglobin)||0} min={0} max={250} step={1} suffix="г/л" onChange={v=>setV2Labs((p:any)=>({...p,hemoglobin:String(v)}))} />
+              <PopupNumber label="ЛПВП" value={parseFloat(v2Labs.hdl)||0} min={0} max={3} step={0.1} suffix="ммоль/л" onChange={v=>setV2Labs((p:any)=>({...p,hdl:String(v)}))} />
+              <PopupNumber label="ЛПНП" value={parseFloat(v2Labs.ldl)||0} min={0} max={10} step={0.1} suffix="ммоль/л" onChange={v=>setV2Labs((p:any)=>({...p,ldl:String(v)}))} />
+              <PopupNumber label="АЛТ" value={parseFloat(v2Labs.alt)||0} min={0} max={500} step={1} suffix="Ед/л" onChange={v=>setV2Labs((p:any)=>({...p,alt:String(v)}))} />
+              <PopupNumber label="АСТ" value={parseFloat(v2Labs.ast)||0} min={0} max={500} step={1} suffix="Ед/л" onChange={v=>setV2Labs((p:any)=>({...p,ast:String(v)}))} />
+              <PopupNumber label="СРБ" value={parseFloat(v2Labs.crp)||0} min={0} max={200} step={0.5} suffix="мг/л" onChange={v=>setV2Labs((p:any)=>({...p,crp:String(v)}))} />
+              <PopupNumber label="Тестостерон" value={parseFloat(v2Labs.testosterone)||0} min={0} max={60} step={0.5} suffix="нмоль/л" onChange={v=>setV2Labs((p:any)=>({...p,testosterone:String(v)}))} />
             </div>
           </div>
           <div style={{ marginBottom: 6 }}>
@@ -910,11 +904,11 @@ export const IndividualPlanSettings: React.FC = () => {
       </GlassCard>
 
       <GlassCard title="Расписание" icon="⏰" color="#06b6d4">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
-          <div><label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:3,display:'block'}}>Пробуждение</label><input type="time" value={wakeTime} onChange={e => setWakeTime(e.target.value)} style={inputStyle} /></div>
-          <div><label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:3,display:'block'}}>Обед</label><input type="time" value={lunchTime} onChange={e => setLunchTime(e.target.value)} style={inputStyle} /></div>
-          <div><label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:3,display:'block'}}>Ужин</label><input type="time" value={dinnerTime} onChange={e => setDinnerTime(e.target.value)} style={inputStyle} /></div>
-          <div><label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:3,display:'block'}}>Отход ко сну</label><input type="time" value={bedTime} onChange={e => setBedTime(e.target.value)} style={inputStyle} /></div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+          <PopupSelect label="Пробуждение" value={wakeTime} options={TIME_OPTIONS} onChange={setWakeTime} />
+          <PopupSelect label="Обед" value={lunchTime} options={TIME_OPTIONS} onChange={setLunchTime} />
+          <PopupSelect label="Ужин" value={dinnerTime} options={TIME_OPTIONS} onChange={setDinnerTime} />
+          <PopupSelect label="Отход ко сну" value={bedTime} options={TIME_OPTIONS} onChange={setBedTime} />
           <div style={{ gridColumn: 'span 2' }}>
             <label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:3,display:'block'}}>Еда на работе</label>
             {pickerBtn('Еда на работе', [{value:'any',label:'Любая (можно разогреть)'},{value:'portable',label:'Только порошок/хлопья/протеин'}], workFood, setShowWorkFoodPicker)}
@@ -979,18 +973,10 @@ export const IndividualPlanSettings: React.FC = () => {
               </div>
               <div style={{ display:'flex', gap:6, marginBottom:6 }}>
                 <div style={{ flex:1 }}>
-                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', marginBottom:2 }}>Начало работы</div>
-                  <input type="time" value={workStartTime} onChange={e => setWorkStartTime(e.target.value)} style={{
-                    width:'100%', padding:'5px 8px', borderRadius:6, fontSize:8, background:'#202023',
-                    border:'1px solid rgba(255,255,255,0.06)', color:'#fff', outline:'none', boxSizing:'border-box',
-                  }} />
+                  <PopupSelect label="Начало работы" value={workStartTime} options={TIME_OPTIONS} onChange={setWorkStartTime} />
                 </div>
                 <div style={{ flex:1 }}>
-                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', marginBottom:2 }}>Конец работы</div>
-                  <input type="time" value={workEndTime} onChange={e => setWorkEndTime(e.target.value)} style={{
-                    width:'100%', padding:'5px 8px', borderRadius:6, fontSize:8, background:'#202023',
-                    border:'1px solid rgba(255,255,255,0.06)', color:'#fff', outline:'none', boxSizing:'border-box',
-                  }} />
+                  <PopupSelect label="Конец работы" value={workEndTime} options={TIME_OPTIONS} onChange={setWorkEndTime} />
                 </div>
               </div>
               {(() => {
@@ -1216,10 +1202,7 @@ export const IndividualPlanSettings: React.FC = () => {
             })}
           </div>
         </div>
-        <div>
-          <label style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>📝 Дополнительные заметки по питанию:</label>
-          <textarea value={customNotes} onChange={e => { setCustomNotes(e.target.value); localStorage.setItem('he_nutrition_notes', e.target.value); }} placeholder="Например: не ем после 20:00, аллергия на пенициллин, проблемы с ЖКТ, не переношу лактозу..." style={{ ...inputStyle, resize: 'vertical', minHeight: 50, fontSize: 9 }} rows={2} />
-        </div>
+        <PopupText label="📝 Заметки по питанию" value={customNotes} onChange={v => { setCustomNotes(v); localStorage.setItem('he_nutrition_notes', v); }} placeholder="Например: не ем после 20:00, аллергия на пенициллин, проблемы с ЖКТ..." />
       </GlassCard>
 
       {/* Preferred foods modal */}

@@ -93,3 +93,28 @@ export const PopupSelect: React.FC<{ label: string; value: string; options: { id
     </div>}
   </>;
 };
+
+export const PopupText: React.FC<{ label: string; value: string; onChange: (v: string) => void; placeholder?: string }> = ({ label, value, onChange, placeholder = '' }) => {
+  const [open, setOpen] = useState(false);
+  const [edit, setEdit] = useState(value);
+  return <>
+    <button onClick={() => { setEdit(value); setOpen(true); }} style={cardBtn(false)}>
+      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 11, color: value ? '#00e68a' : 'rgba(255,255,255,0.4)' }}>{value || 'Не указано'}</div>
+    </button>
+    {open && <div style={overlay} onClick={() => setOpen(false)}>
+      <div onClick={e => e.stopPropagation()} style={sheet}>
+        <div style={{ height:3, background:'linear-gradient(90deg,#00e68a,#00c853)' }} />
+        <div style={sheetPad}>
+          <div style={sheetTitle}>{label}</div>
+          <textarea value={edit} onChange={e => setEdit(e.target.value)} placeholder={placeholder}
+            style={{ width:'100%', minHeight:60, padding:'8px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:12, resize:'vertical', boxSizing:'border-box', fontFamily:'inherit' }} />
+          <button onClick={() => { onChange(edit); setOpen(false); }} style={{
+            width:'100%', marginTop:8, padding:'10px', borderRadius:8, border:'none',
+            background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:12, cursor:'pointer',
+          }}>OK</button>
+        </div>
+      </div>
+    </div>}
+  </>;
+};
