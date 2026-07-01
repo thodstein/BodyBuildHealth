@@ -11,7 +11,7 @@ import { ALL_SUBSTANCES, ALL_INTERACTIONS, type SupportSubstance, type SupportIn
 import { INTERACTION_ENRICHMENT } from '../../data/support-interaction-enrichment';
 import { getSubstanceTier, TIER_LABELS } from '../../data/support-database';
 import { getBpRiskLevel } from '../../core/bp-hr-data';
-import { SUPPORT_CATALOG_DATA, CATALOG_ENRICHMENT, MECHANISM_LABELS, ORGAN_LABELS as CATALOG_ORGAN_LABELS, SYSTEM_LABELS_CATALOG, CATEGORY_LABELS as CATALOG_CATEGORY_LABELS, TIER_LABELS_CATALOG, type SupportCatalogEntry } from '../../data/support-database';
+import { SUPPORT_CATALOG_DATA, CATALOG_ENRICHMENT, ORGAN_LABELS as CATALOG_ORGAN_LABELS, SYSTEM_LABELS_CATALOG, CATEGORY_LABELS as CATALOG_CATEGORY_LABELS, TIER_LABELS_CATALOG, type SupportCatalogEntry } from '../../data/support-database';
 
 import { CANONICAL_ID_MAP } from '../../data/support-database';
 import { SUBSTANCE_ANALOGS, PHASE_MODS, DEFAULT_DOSAGES, getPhaseLevel, type SupportPhase } from '../../data/support-database';
@@ -42,6 +42,7 @@ import { AutoCalculator } from './SupportScreen_parts/AutoCalculator';
 import { calculateSupportTZ, hydrateState } from '../../engines/support-calculator.engine';
 import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engines/support-calculator.types';
 import { calculateTZRisk, toCompatibleResult, type TZRiskResult } from '../../engines/risk-engine-tz';
+import { getDrugTzMechanisms, getSupportTzDisplay, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../data/support-db';
 import { calculateSupportPlan, applyJointToPlan, applyBoostToPlan, type PlanResult, type PlanSubstance } from '../../engines/support-plan-engine';
 import { buildPreApplyCard, evaluateRecommendations, computeCoverageRisk } from '../../engines/recommendation-engine';
 import { calculateMixScore, type TrainingMixScore, type MixSubstance, type MixProfile, MIX_MECHANISMS, MIX_SYNERGY, MIX_TEMPLATES, type MixTemplate, buildBestRecipe, type MixRecipe, type MixRecipeItem, groupRecipeItemsByTiming } from '../../engines/training-mix-scoring.engine';
@@ -72,6 +73,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [protocolTab, setProtocolTab] = useState<'pct'|'fertility'|'hrt'|'neuro'|'joints'|'acne'>('pct');
   const [infoTab, setInfoTab] = useState<string>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
+  const [catalogOrgans, setCatalogOrgans] = useState<string[]>([]);
+  const [showOrganPopup, setShowOrganPopup] = useState(false);
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
   const [systemFilter, setSystemFilter] = useState<string>('all');
   const [supportClassFilter, setSupportClassFilter] = useState<string>('all');
@@ -1074,6 +1077,24 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (categoryFilter !== 'all') {
       filtered = filtered.filter(s => (s.categories||[]).some(c => c === categoryFilter));
     }
+    // Apply TZ organ filter
+    if (catalogOrgans.length > 0) {
+      filtered = filtered.filter(s => {
+        const subId = (s.id||'').toLowerCase();
+        const tzEntry = getDrugTzMechanisms(subId);
+        if (tzEntry.length) {
+          const entryOrgans = new Set(tzEntry.map(m => m.organId));
+          return catalogOrgans.some(o => entryOrgans.has(o));
+        }
+        // Fallback: check if old organ names match TZ systems
+        const oldOrgans = (s as any).organs || [];
+        if (oldOrgans.length) {
+          const tzToOld: Record<string, string[]> = { cardio:['cardio','heart'], hepatic:['hepatic','liver'], renal:['renal','kidney'], cns:['cns','neuro','nerve','brain'], reproductive:['reproductive','sexual','hpta','gonad'], hematologic:['hematologic','blood','metabolic'] };
+          return catalogOrgans.some(o => (tzToOld[o]||[]).some(old => oldOrgans.some((org: string) => org.toLowerCase().includes(old))));
+        }
+        return false;
+      });
+    }
     // Apply search query
     if (searchQuery) {
       const sq = searchQuery.toLowerCase();
@@ -1906,13 +1927,52 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         </div>
       )}
 
+      {/* ── ТЗ механизмы (DRUG_DB + SUPPORT_DB) ── */}
+      {(() => {
+        const subIdLc = subId.toLowerCase();
+        const drugMechs = getDrugTzMechanisms(subIdLc);
+        const suppMechs = getSupportTzDisplay(subIdLc);
+        if (!drugMechs?.length && !suppMechs?.length) return null;
+        const byOrgan: Record<string, { lines: { label: string; source: string; kq: string }[] }> = {};
+        for (const m of drugMechs || []) {
+          if (!byOrgan[m.organId]) byOrgan[m.organId] = { lines: [] };
+          const l = TZ_MECH_LABELS[m.mechId] || m.mechId;
+          if (!byOrgan[m.organId].lines.some(x => x.label === l)) byOrgan[m.organId].lines.push({ label: l, source: `w=${m.weight}`, kq: '' });
+        }
+        for (const s of suppMechs || []) {
+          if (!byOrgan[s.organId]) byOrgan[s.organId] = { lines: [] };
+          if (!byOrgan[s.organId].lines.some(x => x.label === s.mechLabel)) byOrgan[s.organId].lines.push({ label: s.mechLabel, source: s.source, kq: `k=${s.k} q=${s.q}` });
+        }
+        return (
+          <div style={{ marginTop: 3, padding: '6px 8px', borderRadius: 6, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.1)' }}>
+            <div style={{ fontSize: 7, color: '#00e68a', fontWeight: 700, marginBottom: 3 }}>🧬 Механизм-ориентированная модель (ТЗ)</div>
+            {Object.entries(byOrgan).map(([orgId, info]) => (
+              <details key={orgId} style={{ marginBottom: 2 }}>
+                <summary style={{ cursor:'pointer', fontSize:7, color:'rgba(255,255,255,0.8)', fontWeight:600, listStyle:'none', display:'flex', alignItems:'center', gap:4 }}>
+                  {TZ_SYSTEM_ICONS[orgId] || '•'} {TZ_SYSTEM_LABELS[orgId] || orgId} <span style={{ color:'#00e68a', fontSize:6 }}>({info.lines.length})</span>
+                  <span style={{ marginLeft:'auto', fontSize:6, color:'rgba(255,255,255,0.3)' }}>▼</span>
+                </summary>
+                <div style={{ padding:'2px 0 0 10px' }}>
+                  {info.lines.map((line, i) => (
+                    <div key={i} style={{ fontSize:6, color:'rgba(255,255,255,0.7)', marginBottom:2, lineHeight:1.4 }}>
+                      <b>{line.label}</b>
+                      {line.kq && <span style={{ color:'#00e68a', marginLeft:2 }}>[{line.kq}]</span>}
+                      <br/><span style={{ color:'rgba(255,255,255,0.5)' }}>{line.source}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ))}
+          </div>
+        );
+      })()}
+
       {entry.bestForm && (
         <div style={{ marginTop: 3, padding: '4px 6px', borderRadius: 6, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)' }}>
           <div style={{ fontSize: 7, color: '#00e68a', fontWeight: 600, marginBottom: 1 }}>🏆 Лучшая форма:</div>
           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>{entry.bestForm}</div>
         </div>
       )}
-
       {entry.analog && entry.analog.length > 0 && (
         <div style={{ marginTop: 3 }}>
           <div style={{ fontSize: 7, color: '#818cf8', fontWeight: 600, marginBottom: 2 }}>🔗 Аналоги/синергисты:</div>
@@ -4672,6 +4732,59 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>
             <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
           </div>
+          {/* ── ТЗ-системы фильтр (Popup) ── */}
+          <div style={{ marginBottom: 6 }}>
+            <button onClick={() => setShowOrganPopup(!showOrganPopup)} style={{
+              width:'100%', padding:'10px 12px', borderRadius:10, cursor:'pointer',
+              fontSize:10, fontWeight:700, textAlign:'center',
+              background: catalogOrgans.length > 0 ? 'rgba(0,230,138,0.1)' : 'rgba(24,24,27,0.6)',
+              border: catalogOrgans.length > 0 ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
+              color: catalogOrgans.length > 0 ? '#00e68a' : 'rgba(255,255,255,0.7)',
+            }}>
+              {catalogOrgans.length > 0
+                ? `🧬 Системы (${catalogOrgans.length}): ${catalogOrgans.map(o => TZ_SYSTEM_LABELS[o]?.slice(0,10)||o).join(', ')}`
+                : '🧬 Все системы организма'}
+            </button>
+            {showOrganPopup && (
+              <div style={{ position:'fixed', inset:0, zIndex:250, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.85)' }}
+                onClick={() => setShowOrganPopup(false)}>
+                <div onClick={e => e.stopPropagation()} style={{ width:'85%', maxWidth:320, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden' }}>
+                  <div style={{ height:3, background:'linear-gradient(90deg,#00e68a,#00c853)' }} />
+                  <div style={{ padding:'14px 16px' }}>
+                    <div style={{ fontSize:14, fontWeight:700, color:'#00e68a', marginBottom:10 }}>🧬 Системы организма (ТЗ)</div>
+                    <button onClick={() => { setCatalogOrgans([]); setShowOrganPopup(false); }}
+                      style={{ display:'block', width:'100%', padding:'10px 12px', marginBottom:4, borderRadius:10, cursor:'pointer', textAlign:'left',
+                        fontSize:11, fontWeight: catalogOrgans.length === 0 ? 700 : 400,
+                        background: catalogOrgans.length === 0 ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                        border: catalogOrgans.length === 0 ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                        color: catalogOrgans.length === 0 ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>
+                      🏠 Все системы {catalogOrgans.length === 0 ? ' ✓' : ''}
+                    </button>
+                    {['cardio','hepatic','renal','cns','reproductive','hematologic'].map(sys => {
+                      const active = catalogOrgans.includes(sys);
+                      return (
+                        <button key={sys} onClick={() => {
+                          setCatalogOrgans(prev => active ? prev.filter(x=>x!==sys) : [...prev, sys]);
+                        }}
+                          style={{ display:'block', width:'100%', padding:'10px 12px', marginBottom:4, borderRadius:10, cursor:'pointer', textAlign:'left',
+                            fontSize:11, fontWeight: active ? 700 : 400,
+                            background: active ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                            border: active ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                            color: active ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>
+                          {TZ_SYSTEM_ICONS[sys] || '•'} {TZ_SYSTEM_LABELS[sys] || sys}{active ? ' ✓' : ''}
+                        </button>
+                      );
+                    })}
+                    <button onClick={() => setShowOrganPopup(false)}
+                      style={{ width:'100%', marginTop:6, padding:'10px', borderRadius:8, border:'none',
+                        background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                      OK
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>
             {searchQuery ? `Найдено: ${groupedSubstances.reduce((a, g) => a + g.count, 0)} из ${catalogSubstances.length}` : `Всего: ${catalogSubstances.length} препаратов`}
           </div>
@@ -4701,9 +4814,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                 {(sub.categories||[]).slice(0, 3).map(c => (
                                   <span key={c} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{c}</span>
                                 ))}
-                                {(sub.mechanisms||[]).slice(0, 2).map(m => (
-                                  <span key={m} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(0,230,138,0.06)', color: 'var(--accent-green, #00e68a)' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ').slice(0, 30)}</span>
-                                ))}
+                                {(sub.mechanisms||[]).slice(0, 3).map(m => {
+                                  const tzLabel = TZ_MECH_LABELS[m as keyof typeof TZ_MECH_LABELS];
+                                  return <span key={m} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(0,230,138,0.06)', color: 'var(--accent-green, #00e68a)' }}>{tzLabel || m.replace(/_/g, ' ').toLowerCase()}</span>;
+                                })}
                               </div>
                             </div>
                             <span style={{ fontSize: 10, color: 'var(--text-dim)', transform: selectedSub === sub.id ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>▼</span>

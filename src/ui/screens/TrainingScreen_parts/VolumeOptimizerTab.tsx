@@ -3,6 +3,7 @@ import { EXERCISE_CATALOG, getExerciseById, getSubstitutes, canReplace } from '.
 import { getVolumeReferences, getVolumeByMuscle } from '../../../engines/training-methodology.engine';
 import { PopupSelect, PopupNumber, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { useDataLink } from '../../../core/data-link';
+import { useVolumeOptimization } from '../../hooks/useVolumeOptimization';
 
 const ACCENT = '#00e68a';
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
@@ -16,6 +17,7 @@ interface ExerciseRow {
   reps: number;
   sets: number;
   oneRM?: number;
+  day: number;
 }
 
 interface Suggestion {
@@ -35,8 +37,8 @@ export const VolumeOptimizerTab: React.FC = () => {
   const volumeLevel = level === 'enhanced' ? 'advanced' : level;
   const [oneRMGlobal, setOneRMGlobal] = useState<number>(100);
   const [rows, setRows] = useState<ExerciseRow[]>([
-    { id: 'r1', exerciseId: 'bench_bar', weight: 80, reps: 5, sets: 4 },
-    { id: 'r2', exerciseId: 'row_bar', weight: 60, reps: 8, sets: 3 },
+    { id: 'r1', exerciseId: 'bench_bar', weight: 80, reps: 5, sets: 4, day: 1 },
+    { id: 'r2', exerciseId: 'row_bar', weight: 60, reps: 8, sets: 3, day: 2 },
   ]);
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -57,7 +59,7 @@ export const VolumeOptimizerTab: React.FC = () => {
   };
 
   const addRow = () => {
-    setRows(prev => [...prev, { id: 'r' + Date.now(), exerciseId: 'bench_bar', weight: 60, reps: 6, sets: 3 }]);
+    setRows(prev => [...prev, { id: 'r' + Date.now(), exerciseId: 'bench_bar', weight: 60, reps: 6, sets: 3, day: 1 }]);
   };
 
   const delRow = (id: string) => {
@@ -70,31 +72,8 @@ export const VolumeOptimizerTab: React.FC = () => {
     return ex?.group ?? '';
   };
 
-  // Compute muscle stats: sets per muscle, and MEV/MAV/MRV for the user's level
-  const muscleStats = useMemo(() => {
-    const map: Record<string, { sets: number; mev: number; mav: number; mrv: number }> = {};
-    rows.forEach(r => {
-      const ex = getExercise(r.exerciseId);
-      if (!ex) return;
-      const muscle = ex.group;
-      const sets = r.sets;
-      if (!map[muscle]) {
-        const volRef = getVolumeByMuscle(muscle);
-        if (!volRef) return;
-        const levelData = volRef[volumeLevel as 'beginner' | 'intermediate' | 'advanced'];
-        if (!levelData) return;
-        map[muscle] = {
-          sets: 0,
-          mev: levelData.mev,
-          mav: levelData.mav,
-          mrv: levelData.mrv,
-        };
-      }
-      const stat = map[muscle];
-      stat.sets += sets;
-    });
-    return map;
-  }, [rows, volumeLevel]);
+  // Статистика по мышцам + интенсивность по дням + частота (extracted hook — testable)
+  const { muscleStats, intensityByDay, freqByMuscle } = useVolumeOptimization(rows, volumeLevel, getExerciseOneRM);
 
   // Compute total sets, tonnage, and KPSh
   const { totalSets, totalTonnage, totalKpSh } = useMemo(() => {
@@ -295,6 +274,7 @@ export const VolumeOptimizerTab: React.FC = () => {
               weight: 60, // default weight, could be based on oneRM
               reps: 8,
               sets: sug.deltaSets,
+              day: 1,
             };
             newRows.push(newRow);
           }
@@ -308,9 +288,6 @@ export const VolumeOptimizerTab: React.FC = () => {
     setSuggestions(null);
     setShowModal(false);
   };
-
-  // Frequency and intensity balance (placeholder)
-  // We'll skip for now but can add a simple warning if needed.
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
@@ -358,6 +335,12 @@ export const VolumeOptimizerTab: React.FC = () => {
                 hint="Начните вводить для поиска"
                 onChange={v => upd(row.id, 'exerciseId', v)}
               />
+            </div>
+            <div style={{ flex: 0.5 }}>
+              <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>День</label>
+              <select value={row.day} onChange={e => upd(row.id, 'day', +e.target.value)} style={IN}>
+                {[1,2,3,4,5,6,7].map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
             </div>
             <div style={{ flex: 1 }}>
               <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Вес (кг)</label>
@@ -465,6 +448,60 @@ export const VolumeOptimizerTab: React.FC = () => {
         </>
       )}
 
+      {(() => {
+        const maxT = Math.max(1, ...Object.values(intensityByDay).map(d => d.heavy + d.medium + d.light));
+        const DAY_RU = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+        return (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>📊 Интенсивность по дням (зоны %1RM)</div>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 110 }}>
+              {[1, 2, 3, 4, 5, 6, 7].map(d => {
+                const z = intensityByDay[d]; const tot = z.heavy + z.medium + z.light;
+                const h = tot > 0 ? Math.max(6, (tot / maxT) * 100) : 2;
+                const heavyH = tot > 0 ? (z.heavy / tot) * h : 0;
+                const mediumH = tot > 0 ? (z.medium / tot) * h : 0;
+                const lightH = tot > 0 ? (z.light / tot) * h : 0;
+                return (
+                  <div key={d} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                    <div title={`День ${d}: тяж ${Math.round(z.heavy)} · сред ${Math.round(z.medium)} · лёг ${Math.round(z.light)} кг·повт`} style={{ width: '100%', height: h, borderRadius: 4, overflow: 'hidden', display: 'flex', flexDirection: 'column-reverse' }}>
+                      <div style={{ height: heavyH, background: '#ef4444' }} />
+                      <div style={{ height: mediumH, background: '#f59e0b' }} />
+                      <div style={{ height: lightH, background: '#22c55e' }} />
+                    </div>
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>{DAY_RU[d]}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 10, fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 6 }}>
+              <span>🔴 Тяжёлая ≥80%</span><span>🟡 Средняя 60–80%</span><span>🟢 Лёгкая &lt;60%</span>
+            </div>
+          </div>
+        );
+      })()}
+      {(() => {
+        const groups = Object.keys(freqByMuscle);
+        if (groups.length === 0) return null;
+        const GROUP_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор' };
+        const refFreq = (g: string) => { const v = getVolumeByMuscle(g); const ld = v ? v[volumeLevel as 'beginner' | 'intermediate' | 'advanced'] : undefined; return ld?.frequency ?? '—'; };
+        return (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🔁 Частота на мышцу (сессий/нед)</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {groups.map(g => {
+                const cur = freqByMuscle[g];
+                return (
+                  <div key={g} style={{ display: 'grid', gridTemplateColumns: '1fr 0.5fr 0.7fr', gap: 4, fontSize: 11, color: 'rgba(255,255,255,0.85)', alignItems: 'center', padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)' }}>
+                    <span style={{ fontWeight: 700 }}>{GROUP_RU[g] || g}</span>
+                    <span style={{ textAlign: 'center', color: cur >= 2 ? '#22c55e' : cur === 1 ? '#eab308' : '#ef4444', fontWeight: 700 }}>{cur}×/нед</span>
+                    <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>реф: {refFreq(g)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
       {/* Suggestions for improvement */}
       <div style={{ marginTop: 16, padding: 12, background: 'rgba(255,255,255,0.05)', borderRadius: 8 }}>
         <div style={{ fontWeight: 600, color: ACCENT, marginBottom: 4 }}>Рекомендации по улучшению</div>
@@ -476,10 +513,16 @@ export const VolumeOptimizerTab: React.FC = () => {
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>{s.detail}</div>
               </div>
             ))}
-            <div style={{ marginTop: 12, textAlign: 'right' }}>
+            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setSuggestions(null)}
+                style={{ flex: 1, padding: '10px 16px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-dim)', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}
+              >
+                Сбросить
+              </button>
               <button
                 onClick={applyImprovements}
-                style={{ width: '100%', padding: '10px 16px', background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.3)', color: ACCENT, borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}
+                style={{ flex: 2, padding: '10px 16px', background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.3)', color: ACCENT, borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}
               >
                 Применить рекомендации
               </button>

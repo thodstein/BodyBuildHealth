@@ -25,6 +25,7 @@ export interface TrainingProfile {
   workMax: Record<string, number>;
   onCourse: boolean;
   courseIntensity: 'mild' | 'moderate' | 'heavy';
+  injuries: { muscle: string; from: string; to?: string }[];
 }
 
 export const DEFAULT_PROFILE: TrainingProfile = {
@@ -45,6 +46,7 @@ export const DEFAULT_PROFILE: TrainingProfile = {
     quads: 140, hamstrings: 90, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60 },
   onCourse: false,
   courseIntensity: 'moderate',
+  injuries: [],
 };
 
 export function loadTrainingProfile(): TrainingProfile {

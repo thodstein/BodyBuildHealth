@@ -34,6 +34,18 @@ export const ExerciseCalcTab: React.FC = () => {
   // Состояние для отображения списка замен
   const [showSubstitutes, setShowSubstitutes] = useState(false);
   const [substituteList, setSubstituteList] = useState<Array<{id: string; name: string; reason: string}>>([]);
+const [savedCalcs, setSavedCalcs] = useState<Array<{ id: number; name: string; goal: string; level: string; week: number; oneRM: number; reps: string; sets: number; rir: number; rest: number; weight: number; date: string }>>(() => { try { return JSON.parse(localStorage.getItem('he_excalc_saved') || '[]'); } catch { return []; } });
+  const saveCalc = () => {
+    if (!ex || !presc) return;
+    try {
+      const item = { id: Date.now(), name: ex.name, goal, level, week, oneRM, reps: presc.reps, sets: presc.sets, rir: presc.rir, rest: presc.rest, weight: workWeight, date: new Date().toISOString().slice(0, 10) };
+      const arr = JSON.parse(localStorage.getItem('he_excalc_saved') || '[]');
+      arr.unshift(item);
+      localStorage.setItem('he_excalc_saved', JSON.stringify(arr.slice(0, 30)));
+      setSavedCalcs(arr.slice(0, 30));
+    } catch { /* ignore */ }
+  };
+  const deleteCalc = (id: number) => { try { const arr = (JSON.parse(localStorage.getItem('he_excalc_saved') || '[]') as any[]).filter(x => x.id !== id); localStorage.setItem('he_excalc_saved', JSON.stringify(arr)); setSavedCalcs(arr); } catch { /* ignore */ } };
 
   // Initialize level, goal, and oneRM from profile when profile changes
   useEffect(() => {
@@ -80,7 +92,7 @@ export const ExerciseCalcTab: React.FC = () => {
     const volRef = getVolumeByMuscle(muscle);
     if (!volRef) return null;
     // volRef has properties: beginner, intermediate, advanced each with {mev, mav, mrv, frequency}
-    const levelData = (volRef as any)[level];
+    const levelData = volRef[level];
     if (!levelData) return null;
     const { mev, mav, mrv } = levelData as { mev: number; mav: number; mrv: number; frequency: string };
     const prescribedSets = presc.sets;
@@ -223,10 +235,9 @@ export const ExerciseCalcTab: React.FC = () => {
           {presc?.backoffSet && <div style={{ ...SMALL }}>↩️ Включить backoff‑сет (объёмный доборный подход).</div>}
 
           {/* Блок рекомендаций по замене */}
-          <div style={{ marginTop: 16 }}>
-            <button onClick={handleSubstituteButton} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 600 }}>
-              Подобрать замену
-            </button>
+          <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+            <button onClick={handleSubstituteButton} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 600 }}>Подобрать замену</button>
+            <button onClick={saveCalc} disabled={!ex || !presc} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid rgba(59,130,246,0.3)', background: ex && presc ? 'rgba(59,130,246,0.08)' : 'transparent', color: ex && presc ? '#60a5fa' : 'var(--text-dim)', cursor: ex && presc ? 'pointer' : 'not-allowed', fontWeight: 600 }}>💾 Сохранить расчёт</button>
           </div>
 
           {/* Отображаем список замен, если нужно */}
@@ -252,6 +263,20 @@ export const ExerciseCalcTab: React.FC = () => {
             <div style={{ marginTop: 16, padding: 12, background: 'rgba(255,255,255,0.05)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT }}>Слабый пункт</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>{weakPointAdvice}</div>
+            </div>
+          )}
+          {savedCalcs.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>💾 Сохранённые расчёты ({savedCalcs.length})</div>
+              {savedCalcs.map(s => (
+                <div key={s.id} style={{ marginBottom: 6, padding: 8, background: 'rgba(255,255,255,0.03)', borderRadius: 6, border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700 }}>{s.name}</span>
+                    <button onClick={() => deleteCalc(s.id)} style={{ padding: '2px 7px', borderRadius: 5, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 10 }}>✕</button>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{s.sets}×{s.reps} · RIR {s.rir} · {s.weight} кг · нед {s.week} · {s.date}</div>
+                </div>
+              ))}
             </div>
           )}
         </>

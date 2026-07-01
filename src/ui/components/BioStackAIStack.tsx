@@ -3,7 +3,7 @@ import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { buildStack, explainStack, findReplacement, type ReplacementResult, type ReplacementType } from '../../engines/supplement-finder.engine';
 import { buildSmartStack } from '../../engines/biostack-recommender.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS, ALL_SUBSTANCES } from '../../data/support-database';
-import { MECHANISM_LABELS } from '../../data/support-meta';
+import { TZ_MECH_LABELS } from '../../data/support-db';
 import { decodeGarbled } from '../../utils/text-sanitizer';
 import { GlassCard, StatBox, ORGANS, toFinderProfile, ConfirmModal, showToast, PRICE_RUB } from './BioStackAIConstants';
 
@@ -75,7 +75,7 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
         } else {
           const shared = (a.mechanisms || []).filter((m: string) => (b.mechanisms || []).includes(m));
           if (shared.length > 0) {
-            pairDetails.push({ a: nameA, b: nameB, text: `Общие механизмы: ${shared.slice(0, 2).map(m => MECHANISM_LABELS[m as keyof typeof MECHANISM_LABELS] || m).join(', ')}`, strength: 'MEDIUM', domain });
+            pairDetails.push({ a: nameA, b: nameB, text: `Общие механизмы: ${shared.slice(0, 2).map(m => TZ_MECH_LABELS[m as keyof typeof TZ_MECH_LABELS] || m).join(', ')}`, strength: 'MEDIUM', domain });
           } else {
             pairDetails.push({ a: nameA, b: nameB, text: 'Независимые механизмы — взаимодополнение', strength: 'LOW', domain });
           }
@@ -100,7 +100,7 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
       if (!cat) continue;
       const uniqueMechs = (cat.mechanisms || []).filter(m => (mechCoverage.get(m)?.length || 0) === 1);
       if (uniqueMechs.length > 0) {
-        contributions.push({ id, text: `Единственный источник ${uniqueMechs.slice(0,2).map(m => MECHANISM_LABELS[m as keyof typeof MECHANISM_LABELS] || m).join(', ')}` });
+        contributions.push({ id, text: `Единственный источник ${uniqueMechs.slice(0,2).map(m => TZ_MECH_LABELS[m as keyof typeof TZ_MECH_LABELS] || m).join(', ')}` });
       }
     }
 
@@ -599,7 +599,7 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
               {synergyExplanation.coverage.slice(0, 14).map(({ mechanism, coveredBy }) => (
                 <span key={mechanism} title={`${coveredBy.join(', ')}`} style={{ fontSize: 7, padding: '2px 5px', borderRadius: 4, background: 'rgba(34,197,94,0.08)', color: '#22c55e' }}>
-                  {MECHANISM_LABELS[mechanism as keyof typeof MECHANISM_LABELS] || mechanism.replace(/_/g, ' ').slice(0, 25)}
+                  {TZ_MECH_LABELS[mechanism as keyof typeof TZ_MECH_LABELS] || mechanism.replace(/_/g, ' ').slice(0, 25)}
                 </span>
               ))}
             </div>

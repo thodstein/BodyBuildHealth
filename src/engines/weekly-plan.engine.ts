@@ -35,7 +35,7 @@ const ORGAN_LABELS: Record<string, string> = {
   gut: 'ЖКТ', lungs: 'Лёгкие', skin: 'Кожа', eyes: 'Глаза',
 };
 
-import { MECHANISM_LABELS } from '../data/support-database';
+import { TZ_MECH_LABELS } from '../data/support-db';
 
 export interface SupplementPlanEntry {
   substanceId: string;
@@ -272,7 +272,7 @@ export function generateWeeklyPlan(
       substanceId: id,
       name: info.name,
       mechanism: primaryMech,
-      mechanismRu: MECHANISM_LABELS[primaryMech] || primaryMech.replace(/_/g, ' '),
+      mechanismRu: TZ_MECH_LABELS[primaryMech] || primaryMech.replace(/_/g, ' '),
       organs,
       organLabels: organs.map(o => ORGAN_LABELS[o] || o),
       systems,
@@ -322,7 +322,7 @@ export function generateWeeklyPlan(
   const allMechs = [...new Set(entries.flatMap(e => e.mechanism ? [e.mechanism] : []))];
   const keyMechanisms = allMechs.slice(0, 12).map(m => ({
     name: m,
-    label: MECHANISM_LABELS[m] || m.replace(/_/g, ' '),
+    label: TZ_MECH_LABELS[m] || m.replace(/_/g, ' '),
     substances: entries.filter(e => e.mechanism === m).map(e => e.substanceId),
   }));
 

@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { type BioStackProfile, type GoalType } from '../../engines/biostack-ai.engine';
 import { buildStack, explainStack, type StackExplanation, findReplacement, findSingleReplacementForStack, type ReplacementResult } from '../../engines/supplement-finder.engine';
-import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS, ALL_STACKS, type SupportStack, getStackSubstanceLabel, MECHANISM_LABELS } from '../../data/support-database';
+import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS, ALL_STACKS, type SupportStack, getStackSubstanceLabel } from '../../data/support-database';
+import { TZ_MECH_LABELS } from '../../data/support-db';
 import { ORGAN_LABELS, SYSTEM_LABELS_CATALOG } from '../../data/support-database';
 import { LAB_MARKER_MAP, type LabMarkerMap } from '../../data/lab-marker-map';
 import { STACK_TEMPLATES, type BioStackTemplate } from '../../engines/biostack-templates';

@@ -362,5 +362,14 @@ export function getQualifyingTotal(fed: string, meet: string, weightClass: numbe
   return f.qualifyingTotals[meet]?.[String(w)] || 0;
 }
 export function getVolumeReferences(): VolumeReference[] { return VOLUME_REFERENCES; }
-export function getVolumeByMuscle(muscle: string): VolumeReference | undefined { return VOLUME_REFERENCES.find(v => v.muscle.toLowerCase().includes(muscle.toLowerCase())); }
+// Маппинг английских групповых имён (ex.group: chest/back/...) на русские названия VOLUME_REFERENCES.
+const MUSCLE_GROUP_RU: Record<string, string> = {
+  chest: 'Грудь', back: 'Спина', legs: 'Квадрицепсы', shoulders: 'Плечи', arms: 'Бицепс', core: 'Пресс / Кор',
+  hamstrings: 'Бицепс бедра', glutes: 'Ягодичные', calves: 'Икры', triceps: 'Трицепс', biceps: 'Бицепс', quads: 'Квадрицепсы',
+};
+export function getVolumeByMuscle(muscle: string): VolumeReference | undefined {
+  const m = (MUSCLE_GROUP_RU[muscle.toLowerCase()] || muscle).toLowerCase();
+  return VOLUME_REFERENCES.find(v => v.muscle.toLowerCase() === m)
+    || VOLUME_REFERENCES.find(v => v.muscle.toLowerCase().includes(m) || m.includes(v.muscle.toLowerCase()));
+}
 export function getSplitVisuals(): SplitVisual[] { return SPLIT_VISUALS; }

@@ -8,6 +8,7 @@ import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../en
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { LabsScoreCard } from '../components/LabsScoreCard';
+import { LabsTzRiskTab } from './LabsScreen_parts/LabsTzRiskTab';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
 import { db } from '../../core/db';
@@ -142,9 +143,10 @@ const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
   { id: 'schedule', label: 'График сдачи', icon: '📅' },
   { id: 'reports', label: 'Отчёты', icon: '📄' },
   { id: 'extended', label: 'Все маркеры', icon: '🔬' },
+  { id: 'tz_risks', label: 'Риски (ТЗ)', icon: '🧮' },
 ];
 
-type LabSubTab = 'hero' | 'overview' | 'current' | 'archive' | 'catalog' | 'chart' | 'schedule' | 'reports' | 'extended';
+type LabSubTab = 'hero' | 'overview' | 'current' | 'archive' | 'catalog' | 'chart' | 'schedule' | 'reports' | 'extended' | 'tz_risks';
 
 export const LabsScreen: React.FC = () => {
   const linked = useDataLink();
@@ -1242,6 +1244,11 @@ export const LabsScreen: React.FC = () => {
           onPhaseChange={handlePhaseChange}
           tick={tick}
         />
+      )}
+
+      {/* ≡≡≡ TZ RISKS TAB ≡≡≡ */}
+      {mainTab === 'lab' && subTab === 'tz_risks' && (
+        <LabsTzRiskTab />
       )}
 
       {/* ≡≡≡ INVESTIGATIONS TAB ≡≡≡ */}

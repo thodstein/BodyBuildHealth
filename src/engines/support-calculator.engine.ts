@@ -5,6 +5,7 @@ import {
   type PowerLevel, type LabSlice,
   SYNERGY_ID_SUBSTANCES, TITRATION_RULES, SYNERGY_ID_LABELS,
 } from './support-calculator.types';
+import { evaluateRecommendations } from './recommendation-engine';
 
 const SYS_META: Record<RiskSystemId, { label: string; icon: string }> = {
   cardio: { label: 'Сердечно-сосудистая', icon: '❤️' },
@@ -482,14 +483,92 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   const blacklist = getBlacklist(state);
   const synergyIds = selectSynergyGroups(state);
   const substances = getSubstancesFromSynergies(synergyIds, state.powerLevel, blacklist);
+  const used = new Set(substances);
+
+  // 1. Обязательные на ВСЕХ уровнях
+  if (state.pharma.aas.length > 0) {
+    if (!state.pharma.hasHCG && !used.has('hcg')) { substances.push('hcg'); used.add('hcg'); }
+    const hasArom = state.pharma.aas.some((a: any) => (a.id||'').toLowerCase().includes('test') || (a.id||'').toLowerCase().includes('meth'));
+    if (hasArom && !state.pharma.hasAI && !used.has('anastrozole') && !used.has('tamoxifen')) { substances.push('anastrozole'); used.add('anastrozole'); }
+    if (state.pharma.aas.some((a: any) => ['tren','nandrolone','deca','npp','trest'].some(x => (a.id||'').toLowerCase().includes(x)))) {
+      if (!state.pharma.hasCaber && !used.has('cabergoline')) { substances.push('cabergoline'); used.add('cabergoline'); }
+    }
+  }
+
+  // 2. Рекомендации по анализам (тоже обязательные)
+  const resultPre: any = { selectedSubstances: substances, schedule: [], synergyIdsUsed: synergyIds, overallRiskBefore: 0, overallRiskAfter: 0 };
+  const recommendations = evaluateRecommendations(state, resultPre);
+  for (const rec of recommendations)
+    for (const id of rec.ids)
+      if (!used.has(id)) { substances.push(id); used.add(id); }
+
+  // 3. ТZ-подбор: breadth + targeted без ограничений
+  interface DBEntry { organId: string; mechId: string; k: number; q: string; }
+  const allDb: Record<string, DBEntry[]> = {};
+  try {
+    const supp = require('../data/support-db/supplements') as any;
+    const pharm = require('../data/support-db/pharmacy-db') as any;
+    Object.assign(allDb, supp.SUPPLEMENTS_DB || {}, pharm.PHARMACY_DB || {});
+  } catch {}
+
+  const riskSystems = ['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal'];
+  const levelThresholds: Record<string, number> = { basic: 65, mid: 45, max: 30 };
+
+  if (Object.keys(allDb).length > 0) {
+    const scores = calcAllRisks(state);
+    const threshold = levelThresholds[state.powerLevel] ?? 25;
+
+    // Breadth: все препараты, покрывающие активные системы риска (risk score > threshold)
+    const activeSystems = riskSystems.filter(sys => (scores[sys] || 0) > threshold);
+    const scored: [string, number, number][] = [];
+    for (const [id, entries] of Object.entries(allDb)) {
+      if (used.has(id) || !entries.length) continue;
+      let matchCount = 0; let totalK = 0;
+      for (const e of entries) {
+        if (activeSystems.includes(e.organId)) { matchCount++; totalK += e.k; }
+      }
+      if (matchCount > 0) scored.push([id, matchCount, totalK]);
+    }
+    // Сортируем: max охват систем → max суммарный k → безлимитно
+    scored.sort((a, b) => b[1] - a[1] || b[2] - a[2]);
+    for (const [id] of scored) {
+      if (used.has(id)) continue;
+      substances.push(id); used.add(id);
+    }
+
+    // Targeted: для КАЖДОЙ системы с риском > threshold добавляем лучший препарат
+    // Если риск >50% даже после coverage — добавляем второй препарат для этого механизма
+    for (const sys of activeSystems) {
+      let best: [string, number] | null = null;
+      for (const [id, entries] of Object.entries(allDb)) {
+        if (used.has(id)) continue;
+        for (const e of entries)
+          if (e.organId === sys && e.k > 0 && (!best || e.k > best[1])) best = [id, e.k];
+      }
+      if (best) { substances.push(best[0]); used.add(best[0]); }
+      // Если риск >50% — добавляем ещё 1 препарат для этого механизма
+      if ((scores[sys] || 0) > 50) {
+        let second: [string, number] | null = null;
+        for (const [id, entries] of Object.entries(allDb)) {
+          if (used.has(id)) continue;
+          for (const e of entries)
+            if (e.organId === sys && e.k > 0 && (!second || e.k > second[1])) second = [id, e.k];
+        }
+        if (second) { substances.push(second[0]); used.add(second[0]); }
+      }
+    }
+  }
+
   const titration = applyTitration(substances, state);
   const scores = calcAllRisks(state);
   const labDeltas = calcLabDeltas(state);
   const overallRaw = Math.round(Math.max(...Object.values(scores)));
   const cw = state.courseWeek ?? 1;
-  const weekProtectionBonus = Math.min(0.15, cw * 0.015); // +1.5% protection per week up to 15%
-  const protection = Math.min(0.7, 0.3 + (synergyIds.length * 0.02) + weekProtectionBonus);
-  const overallAfterSupport = Math.round(Math.max(...Object.values(scores))) - Math.round(Math.max(...Object.values(scores)) * Math.min(protection, 0.7));
+  const weekProtectionBonus = Math.min(0.15, cw * 0.015);
+  const protBase = 0.3 + (synergyIds.length * 0.02) + weekProtectionBonus;
+  const levelMult = state.powerLevel === 'max' ? 0.65 : state.powerLevel === 'mid' ? 0.50 : 0.35;
+  const protection = Math.min(0.85, protBase + levelMult);
+  const overallAfterSupport = Math.round(Math.max(5, overallRaw - Math.round(overallRaw * protection)));
   const schedule = generateSchedule(substances, synergyIds, titration);
   const result: CalculatorResult = {
     risk: { systems: [], overallRaw, overallAfterSupport, timestamp: new Date().toISOString() },
@@ -500,7 +579,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     contraindicationAlerts: getContraindicationAlerts(state),
     negativeBlocks: blacklist,
     comparisonBeforeAfter: (Object.keys(SYS_META) as RiskSystemId[]).map(id => ({
-      system: id, before: scores[id], after: Math.max(0, scores[id] - Math.round(scores[id] * Math.min(protection, 0.7))),
+      system: id, before: scores[id], after: Math.max(0, scores[id] - Math.round(scores[id] * protection)),
     })),
     timestamp: new Date().toISOString(),
   };

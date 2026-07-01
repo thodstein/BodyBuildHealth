@@ -19,6 +19,7 @@ import { RiskInfo } from './RiskScreen_parts/RiskInfo';
 import { runMDSS, type MDSSInput, type MDSSOutput, type BiomarkerInput } from '../../engines/mdss-engine';
 const Risk3DModel = React.lazy(() => import('./RiskScreen_parts/Risk3DModel').then(m => ({ default: m.Risk3DModel })));
 import { TZRiskMatrix } from './RiskScreen_parts/TZRiskMatrix';
+import { RiskSpecMethod } from './RiskScreen_parts/RiskSpecMethod';
 import { HysteresisChart } from './RiskScreen_parts/HysteresisChart';
 import { PredictiveAnalytics } from './RiskScreen_parts/PredictiveAnalytics';
 import { calculateWeeklyRiskDynamics, type WeeklyRiskDynamics } from '../../engines/weekly-risk-dynamics.engine';
@@ -50,21 +51,22 @@ const TAB_LABELS: Record<string, string> = {
   compliance: '✅ Комплаенс',
   clinical: '🩺 Клиника',
   info: 'ℹ️ Инфо',
+  tz_spec: '🧬 Механизм-ориентированная',
 };
 
 export const RiskScreen: React.FC = () => {
   const linked = useDataLink();
   const labAnalysis = linked.labAnalysis;
   const readinessData = linked.readiness;
-  const [mainTab, setMainTab] = useState<'hero' | 'calculations' | 'clinical' | 'info'>('hero');
+  const [mainTab, setMainTab] = useState<'hero' | 'calculations' | 'clinical' | 'info' | 'tz_spec'>('hero');
   const [subTab, setSubTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'model' | 'info' | 'reports' | 'mdss' | 'compliance' | 'clinical' | 'labs_risks'>('overview');
 
   // Force subTab when mainTab changes
   useEffect(() => {
     if (mainTab === 'info') setSubTab('info');
-    else if (mainTab === 'clinical') setSubTab('model');
+    else if (mainTab === 'clinical' || (mainTab === 'calculations' && calcPage === 'clinical')) setSubTab('model');
   }, [mainTab]);
-  const [calcPage, setCalcPage] = useState<'hero' | 'basic' | 'montecarlo' | 'mdss'>('hero');
+  const [calcPage, setCalcPage] = useState<'hero' | 'basic' | 'montecarlo' | 'mdss' | 'clinical'>('hero');
   const [basicPage, setBasicPage] = useState<'main' | 'dynamics' | 'mechanisms' | 'key_risks' | 'history'>('main');
   const [mcPage, setMcPage] = useState<'main' | 'organs' | 'dynamics' | 'sensitivity' | 'pk'>('main');
   const [tick, setTick] = useState(0);
@@ -908,8 +910,8 @@ export const RiskScreen: React.FC = () => {
     return <V7RiskDisplay result={v7Result} organWeek={organWeek} onWeekChange={setOrganWeek} mcEnabled={mcEnabled} onToggleMC={toggleMC} forcedTab={tabForPage[mcPage] || ''} />;
   };
 
-  const mainTabLabel = mainTab === 'calculations' ? 'Комплексные расчеты' :
-    mainTab === 'clinical' ? 'Клиника' : mainTab === 'info' ? 'Общая информация' : '';
+  const mainTabLabel = mainTab === 'calculations' ? 'Другие методы расчета' :
+    mainTab === 'clinical' ? 'Клиника (уст.)' : mainTab === 'info' ? 'Общая информация' : mainTab === 'tz_spec' ? 'Механизм-ориентированная модель' : '';
 
   return (
     <div className="screen risk" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: 0 }}>
@@ -921,15 +923,15 @@ export const RiskScreen: React.FC = () => {
           <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
             <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Оценка рисков</h1>
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', margin: '0 0 16px', lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
-              Комплексный анализ — расчёты, клинические модели и справочная информация
+              Механизм-ориентированная модель, вероятностные методы, клинические модели и справочная информация
             </p>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
-                { id: 'calculations', icon: '🧮', title: 'Комплексные расчеты', desc: 'Базовый расчёт, Монте Карло (V7), MDSS — все аналитические модели рисков.', color: '#22c55e' },
-                { id: 'clinical', icon: '🏥', title: 'Клиника', desc: '3D модель, комплаенс, клинические риски и анализы.', color: '#3b82f6' },
+                { id: 'tz_spec', icon: '🧬', title: 'Механизм-ориентированная модель', desc: 'Интегральный индекс риска по 6 системам · 28 механизмов · Полуколичественная шкала (ТЗ).', color: '#8b5cf6' },
+                { id: 'calculations', icon: '🧮', title: 'Другие методы расчета', desc: 'Вероятностная модель, Монте Карло (V7), MDSS, Клиника — все аналитические модели.', color: '#22c55e' },
                 { id: 'info', icon: 'ℹ️', title: 'Общая информация', desc: 'Формулы, механизмы, пороги препаратов и справочные данные.', color: '#a855f7' },
               ].map(card => (
-                <button key={card.id} onClick={() => { setMainTab(card.id as any); setSubTab(card.id === 'info' ? 'info' : card.id === 'clinical' ? 'model' : 'overview'); }} style={{
+                <button key={card.id} onClick={() => { setMainTab(card.id as any); setSubTab(card.id === 'info' ? 'info' : card.id === 'tz_spec' ? 'overview' : 'overview'); }} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
                   background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', color: 'var(--text)',
                   transition: 'all 0.2s',
@@ -976,7 +978,7 @@ export const RiskScreen: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {[
-                    { label: 'Базовый', icon: '📋', net: Math.round(riskResult?.overallNet ?? 0), raw: Math.round(riskResult?.overallRaw ?? 0), color: '#22c55e' },
+                    { label: 'Вероятностная', icon: '📋', net: Math.round(riskResult?.overallNet ?? 0), raw: Math.round(riskResult?.overallRaw ?? 0), color: '#22c55e' },
                     { label: 'Монте-Карло', icon: '🎲', net: v7Result ? Math.round(v7Result.globalRiskNet) : null, raw: v7Result ? Math.round(v7Result.globalRiskRaw) : null, color: '#8b5cf6' },
                     { label: 'MDSS', icon: '🏥', net: mdssResult ? Math.round(mdssResult.overallMaxRisk) : null, raw: null, color: '#f97316' },
                   ].map((item, i) => (
@@ -996,17 +998,19 @@ export const RiskScreen: React.FC = () => {
                 </div>
               </div>
 
-              {/* 3 Nav cards */}
+              {/* 4 Nav cards */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
                 {[
-                  { id: 'basic', icon: '📋', title: 'Базовый расчёт', desc: 'Обзор, динамика и механизмы рисков по системам организма.', color: '#22c55e', subs: 'Обзор • Динамика • Механизмы' },
+                  { id: 'basic', icon: '📋', title: 'Вероятностная модель', desc: 'Мультипликативная вероятностная модель риска. Обзор, динамика, механизмы.', color: '#22c55e', subs: 'Обзор • Динамика • Механизмы' },
                   { id: 'montecarlo', icon: '🎲', title: 'Монте Карло (V7)', desc: 'Органы, матрица рисков, временной ряд, чувствительность, фармакокинетика.', color: '#8b5cf6', subs: '5 подвкладок' },
                   { id: 'mdss', icon: '🏥', title: 'MDSS', desc: 'Medical Decision Support System — Hill+MC+Sigmoid модель прогнозирования.', color: '#f97316', subs: '' },
+                  { id: 'clinical', icon: '🩺', title: 'Клиника', desc: '3D модель, комплаенс, клинические риски и анализы.', color: '#3b82f6', subs: '3D • Комплаенс • Патологии • Анализы' },
                 ].map(card => (
                   <button key={card.id} onClick={() => {
                     setCalcPage(card.id as any);
                     if (card.id === 'basic') { setBasicPage('main'); setSubTab('overview'); }
                     else if (card.id === 'montecarlo') { setMcPage('main'); setSubTab('v7'); }
+                    else if (card.id === 'clinical') { setSubTab('model'); }
                     else setSubTab('mdss');
                   }} style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '14px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
@@ -1038,6 +1042,7 @@ export const RiskScreen: React.FC = () => {
                   <button onClick={() => {
                     if (basicPage !== 'main') { setBasicPage('main'); return; }
                     if (mcPage !== 'main') { setMcPage('main'); return; }
+                    if (calcPage === 'clinical') { setCalcPage('hero'); setSubTab('overview'); return; }
                     setCalcPage('hero'); setSubTab('overview');
                   }} style={{
                     padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', flexShrink: 0,
@@ -1049,8 +1054,10 @@ export const RiskScreen: React.FC = () => {
               ? (basicPage === 'main' ? ['main'] as const : [basicPage] as const)
               : calcPage === 'montecarlo'
               ? (mcPage === 'main' ? ['main'] as const : [mcPage] as const)
+              : calcPage === 'clinical' ? CLINICAL_SUBTABS as readonly string[]
               : calcPage === 'mdss' ? ['mdss'] as const
               : ['overview'] as const)
+            : mainTab === 'tz_spec' ? ['overview'] as const
             : mainTab === 'clinical' ? CLINICAL_SUBTABS as readonly string[]
             : ['info', 'reports'] as readonly string[]
           ).map(t => (
@@ -1083,8 +1090,12 @@ export const RiskScreen: React.FC = () => {
               {mainTab === 'calculations' && calcPage === 'montecarlo' && (mcPage === 'main' || mcPage === 'pk') && <HysteresisChart />}
               {/* Predictive Analytics — ARIMA + Holt-Winters */}
               {mainTab === 'calculations' && calcPage === 'montecarlo' && (mcPage === 'main') && <PredictiveAnalytics />}
+              {/* CLINICAL — внутри Другие методы расчета */}
+              {mainTab === 'calculations' && calcPage === 'clinical' && renderContent()}
+              {/* TZ SPEC METHOD — новая вкладка */}
+              {mainTab === 'tz_spec' && <RiskSpecMethod />}
               {/* All other content */}
-              {!((mainTab === 'calculations' && calcPage === 'basic') || (mainTab === 'calculations' && calcPage === 'montecarlo')) && renderContent()}
+              {!((mainTab === 'calculations' && (calcPage === 'basic' || calcPage === 'montecarlo' || calcPage === 'clinical')) || mainTab === 'tz_spec') && renderContent()}
             </>
           )}
       </div>

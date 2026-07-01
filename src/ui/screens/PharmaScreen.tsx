@@ -12,6 +12,7 @@ import { SYRINGE_SPECS, DRUG_THRESHOLDS } from '../../core/constants';
 import { SYNERGY_PAIRS, type SynergyPair } from '../../engines/support.engine';
 import { ALL_INTERACTIONS, findInteractionsForSubstance, type SupportInteraction } from '../../data/support-database';
 import { decodeGarbled } from '../../utils/text-sanitizer';
+import { getDrugTzMechanisms, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../data/support-db';
 import {
   PEPTIDE_DB, PEPTIDE_LIST, PEPTIDE_SYNERGY, PEPTIDE_CONFLICTS, PEPTIDE_GOAL_PROFILES,
   computeDilution, computeEffectiveDose, computePK, computePeptideRisks,
@@ -879,6 +880,40 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
           <span style={{ color: '#ff5252' }}>{riskLabels.join(' · ')}</span>
         </div>
       )}
+
+      {/* ── ТЗ механизмы ── */}
+      {(() => {
+        const tzMechs = getDrugTzMechanisms(sub.id);
+        if (!tzMechs.length) return null;
+        const grouped: Record<string, { mechId: string; label: string; weight: number }[]> = {};
+        for (const m of tzMechs) {
+          if (!grouped[m.organId]) grouped[m.organId] = [];
+          grouped[m.organId].push({ mechId: m.mechId, label: TZ_MECH_LABELS[m.mechId] || m.mechId, weight: m.weight });
+        }
+        return (
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#00e68a', marginBottom: 6 }}>🧬 Механизм-ориентированная модель (ТЗ)</div>
+            {Object.entries(grouped).map(([organId, mechs]) => (
+              <details key={organId} style={{ marginBottom: 4 }}>
+                <summary style={{ cursor:'pointer', padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', fontSize:10, fontWeight:600, listStyle:'none', display:'flex', alignItems:'center', gap:4 }}>
+                  {TZ_SYSTEM_ICONS[organId] || '•'} {TZ_SYSTEM_LABELS[organId] || organId}
+                  <span style={{ marginLeft:'auto', fontSize:8, color:'rgba(255,255,255,0.4)' }}>{mechs.length} мех.</span>
+                </summary>
+                <div style={{ padding:'4px 0 0 8px', display:'flex', flexDirection:'column', gap:2 }}>
+                  {mechs.map(m => (
+                    <div key={m.mechId} style={{ display:'flex', justifyContent:'space-between', padding:'2px 6px', borderRadius:4, fontSize:9, background:'rgba(255,255,255,0.02)' }}>
+                      <span style={{ color:'rgba(255,255,255,0.8)', flex:1 }}>{m.label}</span>
+                      <span style={{ fontWeight:700, color:m.weight >= 4 ? '#ef4444' : m.weight >= 3 ? '#f97316' : m.weight >= 2 ? '#eab308' : '#22c55e' }}>
+                        w={m.weight}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ))}
+          </div>
+        );
+      })()}
 
       {(sub.description || (detail?.description)) && (
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
