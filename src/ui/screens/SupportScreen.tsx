@@ -38,7 +38,7 @@ import { getSubstanceName, type StackResult as OptimizerStackResult } from '../.
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
 import type { CourseEntry } from '../../core/types';
 import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.engine';
-import { AutoCalculator } from './SupportScreen_parts/AutoCalculator';
+import { SupportCalculator } from './SupportScreen_parts/SupportCalculator';
 import { calculateSupportTZ, hydrateState } from '../../engines/support-calculator.engine';
 import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engines/support-calculator.types';
 import { calculateTZRisk, toCompatibleResult, type TZRiskResult } from '../../engines/risk-engine-tz';
@@ -5237,8 +5237,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
             <div style={{ flex:1, overflowY:'auto', paddingRight:4, display:'flex', flexDirection:'column', gap:8 }}>
 
-            {/* ===== ВВОДНЫЕ КАРТОЧКИ КАЛЬКУЛЯТОРА ===== */}
-            <AutoCalculator embedded
+            {/* ===== КАЛЬКУЛЯТОР ПОДДЕРЖКИ (Собрать данные + расчёт) ===== */}
+            <SupportCalculator embedded
               onApply={(applied: { level: string; subs: string[]; result: any }) => {
                 setAutoCalcResult(applied);
                 setManualLevelSelected(true);
