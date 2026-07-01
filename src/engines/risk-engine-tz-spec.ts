@@ -67,6 +67,8 @@ const SYSTEMS: SysDef[] = [
 export interface DrugInput {
   drugClass: 'aas'|'gh'|'insulin'; drugName: string;
   dose: number; form: 'inject'|'oral';
+  startWeek?: number;  // неделя начала (по умолчанию 1)
+  endWeek?: number;    // неделя окончания (по умолчанию = duration)
 }
 export interface TzSpecInput {
   drugClass: 'aas'|'gh'|'insulin'; drugName: string;
@@ -126,26 +128,360 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
   const raw = baseDefaults[mechId] ?? 0;
   const defaults = Math.min(3, Math.round(raw * mult));
 
-  const ldl=labValues['LDL'];const hct=labValues['HCT'];const alt=labValues['ALT'];const ast=labValues['AST'];const ggt=labValues['GGT'];
-  const k=labValues['K'];const egfr=labValues['eGFR'];const creat=labValues['CREAT'];const uacr=labValues['UACR'];
-  const lh=labValues['LH'];const tt=labValues['TT'];const e2=labValues['E2'];const glu=labValues['GLU'];const homa=labValues['HOMA'];
+  // Все доступные лабораторные маркеры
+  const ldl=labValues['LDL'];const hdl=labValues['HDL'];const tg=labValues['TG'];const tc=labValues['TC'];
+  const hct=labValues['HCT'];const hgb=labValues['HGB'];const plt=labValues['PLT'];
+  const alt=labValues['ALT'];const ast=labValues['AST'];const ggt=labValues['GGT'];const bil=labValues['BIL'];
+  const k=labValues['K'];const na=labValues['NA'];const egfr=labValues['eGFR'];const creat=labValues['CREAT'];const uacr=labValues['UACR'];
+  const lh=labValues['LH'];const fsh=labValues['FSH'];const tt=labValues['TT'];const e2=labValues['E2'];const prl=labValues['PRL'];const shbg=labValues['SHBG'];
+  const glu=labValues['GLU'];const homa=labValues['HOMA'];const crp=labValues['CRP'];const homoc=labValues['HOMOCYSTEINE'];
+  const tsh=labValues['TSH'];const bnp=labValues['BNP'];const dDimer=labValues['D_DIMER'];const fib=labValues['FIBRINOGEN'];
+  const psa=labValues['PSA'];
+
+  // Хелпер: лабораторный m_i → max(default, labValue)
+  const labMi = (val:number|undefined, thresholds:[number,number,number]):number|undefined => {
+    if (val === undefined) return undefined;
+    if (val < thresholds[0]) return 0;
+    if (val < thresholds[1]) return 1;
+    if (val < thresholds[2]) return 2;
+    return 3;
+  };
+  // Для обратных маркеров (ниже нормы = хуже)
+  const labMiInv = (val:number|undefined, thresholds:[number,number,number]):number|undefined => {
+    if (val === undefined) return undefined;
+    if (val > thresholds[0]) return 0;
+    if (val > thresholds[1]) return 1;
+    if (val > thresholds[2]) return 2;
+    return 3;
+  };
+
+  let labResult: number | undefined;
+
   switch(mechId){
-    case'cv2':if(ldl!==undefined){if(ldl<2.6)return 0;if(ldl<3.4)return 1;if(ldl<4.9)return 2;return 3}break;
-    case'cv4':if(hct!==undefined){if(hct<48)return 0;if(hct<51)return 1;if(hct<54)return 2;return 3}break;
-    case'cv5':if(k!==undefined){if(k>=3.5)return 0;if(k>=3.0)return 1;if(k>=2.5)return 2;return 3}break;
-    case'liv1':if(alt!==undefined){if(alt<40)return 0;if(alt<80)return 1;if(alt<200)return 2;return 3}break;
-    case'liv2':if(ggt!==undefined){if(ggt<55)return 0;if(ggt<110)return 1;if(ggt<220)return 2;return 3}break;
-    case'ren1':case'ren2':if(egfr!==undefined){if(egfr>=90)return 0;if(egfr>=60)return 1;if(egfr>=30)return 2;return 3}if(creat!==undefined){if(creat<90)return 0;if(creat<130)return 1;if(creat<200)return 2;return 3}break;
-    case'ren3':if(uacr!==undefined){if(uacr<30)return 0;if(uacr<300)return 1;if(uacr<1000)return 2;return 3}break;
-    case'rep1':if(lh!==undefined){if(lh>=2.0)return 0;if(lh>=1.0)return 1;if(lh>=0.5)return 2;return 3}break;
-    case'rep2':if(tt!==undefined){if(tt>12)return 0;if(tt>8)return 1;if(tt>4)return 2;return 3}break;
-    case'rep4':if(e2!==undefined){if(e2<160)return 0;if(e2<200)return 1;if(e2<300)return 2;return 3}break;
-    case'cns5':case'hem3':if(glu!==undefined){if(glu>=3.9)return 0;if(glu>=3.3)return 1;if(glu>=2.8)return 2;return 3}break;
-    case'hem2':if(glu!==undefined&&glu>=7.0)return 2;if(glu!==undefined&&glu>=5.6)return 1;if(homa!==undefined){if(homa<2.0)return 0;if(homa<3.0)return 1;if(homa<5.0)return 2;return 3}break;
+    // ── ССС ──
+    case'cv1': { // ремоделирование: NT-proBNP, BP
+      const bnpMi = labMiInv(bnp,[125,300,900]);
+      if (bnpMi !== undefined) labResult = bnpMi;
+      break;
+    }
+    case'cv2': { // дислипидемия: LDL, HDL(inv), TG, TC
+      const ldlMi = labMi(ldl,[2.6,3.4,4.9]);
+      const hdlMi = labMiInv(hdl,[1.5,1.0,0.8]);
+      const tgMi = labMi(tg,[1.7,2.3,5.6]);
+      // Берём худший
+      const vals = [ldlMi,hdlMi,tgMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
+      break;
+    }
+    case'cv3': { // задержка Na/H₂O: натрий
+      const naMi = labMi(na,[145,148,155]);
+      if (naMi !== undefined) labResult = naMi;
+      break;
+    }
+    case'cv4': { // протромботический: HCT, D-dimer, Fibrinogen, Platelets
+      const hctMi = labMi(hct,[48,51,54]);
+      const dMi = labMi(dDimer,[0.5,1.0,2.0]);
+      const fibMi = labMi(fib,[4.0,5.0,6.0]);
+      const pltMi = labMi(plt,[400,500,600]);
+      const vals = [hctMi,dMi,fibMi,pltMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
+      break;
+    }
+    case'cv5': { // аритмогенный: K
+      const kMi = labMiInv(k,[3.5,3.0,2.5]);
+      if (kMi !== undefined) labResult = kMi;
+      break;
+    }
+    // ── Печень ──
+    case'liv1': { // гепатоцеллюлярная: ALT, AST
+      const altMi = labMi(alt,[40,80,200]);
+      const astMi = labMi(ast,[40,80,200]);
+      const vals = [altMi,astMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
+      break;
+    }
+    case'liv2': { // холестаз: GGT, Bilirubin
+      const ggtMi = labMi(ggt,[55,110,220]);
+      const bilMi = labMi(bil,[21,50,100]);
+      const vals = [ggtMi,bilMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
+      break;
+    }
+    case'liv3': { // пренеопластический: AST/ALT ratio, GGT>2×ULN
+      if (alt !== undefined && ast !== undefined) {
+        const ratio = ast / alt;
+        if (ratio > 2) labResult = 3;
+        else if (ratio > 1.5) labResult = 2;
+        else if (ratio > 1) labResult = 1;
+        else labResult = 0;
+      }
+      break;
+    }
+    // ── Почки ──
+    case'ren1': { // гемодинамическое: eGFR, creatinine
+      const egfrMi = labMiInv(egfr,[90,60,30]);
+      const crMi = labMi(creat,[90,130,200]);
+      const vals = [egfrMi,crMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
+      break;
+    }
+    case'ren2': { // гиперфильтрация: eGFR > 120 (early hyperfiltration)
+      if (egfr !== undefined) {
+        if (egfr > 130) labResult = 2;
+        else if (egfr > 120) labResult = 1;
+        else labResult = 0;
+      }
+      break;
+    }
+    case'ren3': { // протеинурия: UACR / proteinuria
+      const uacrMi = labMi(uacr,[30,300,1000]);
+      if (uacrMi !== undefined) labResult = uacrMi;
+      break;
+    }
+    case'ren4': { // водно-электролитный: K, Na
+      const kMi = labMiInv(k,[3.5,3.0,2.5]);
+      const naMi = labMiInv(na,[135,130,125]);
+      const vals = [kMi,naMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
+      break;
+    }
+    // ── ЦНС ──
+    case'cns1': { // нейромедиаторная: Prolactin (↑ = дофамин ↓)
+      const prlMi = labMi(prl,[15,25,50]);
+      if (prlMi !== undefined) labResult = prlMi;
+      break;
+    }
+    case'cns2': { // окислительный стресс: CRP, Homocysteine
+      const crpMi = labMi(crp,[5,10,20]);
+      const homocMi = labMi(homoc,[15,20,30]);
+      const vals = [crpMi,homocMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
+      break;
+    }
+    case'cns3': { // апоптоз: нет прямого маркера, используем Homocysteine как суррогат
+      const homocMi = labMi(homoc,[15,20,30]);
+      if (homocMi !== undefined) labResult = homocMi;
+      break;
+    }
+    case'cns4': { // нейроэндокринная: TSH, Cortisol
+      const tshMi = labMiInv(tsh,[4.0,6.0,10.0]);
+      if (tshMi !== undefined) labResult = tshMi;
+      break;
+    }
+    case'cns5': { // нейроглюкопения: Glucose
+      const gluMi = labMiInv(glu,[3.9,3.3,2.8]);
+      if (gluMi !== undefined) labResult = gluMi;
+      break;
+    }
+    case'cns6': { // внутричерепная гипертензия: нет прямого маркера
+      break;
+    }
+    // ── Репродуктивная ──
+    case'rep1': { // супрессия GnRH/LH/FSH: LH, FSH
+      const lhMi = labMiInv(lh,[2.0,1.0,0.5]);
+      const fshMi = labMiInv(fsh,[2.0,1.0,0.5]);
+      const vals = [lhMi,fshMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
+      break;
+    }
+    case'rep2': { // ↓ интратестикулярного T: TT (низкий = плохо)
+      const ttMi = labMiInv(tt,[12,8,4]);
+      if (ttMi !== undefined) labResult = ttMi;
+      break;
+    }
+    case'rep3': { // сперматогенез: FSH (low=suppressed), Inhibin B (не измеряем)
+      const fshMi = labMiInv(fsh,[2.0,1.0,0.5]);
+      if (fshMi !== undefined) labResult = fshMi;
+      break;
+    }
+    case'rep4': { // эстрогенный сдвиг: E2
+      const e2Mi = labMi(e2,[160,200,300]);
+      if (e2Mi !== undefined) labResult = e2Mi;
+      break;
+    }
+    case'rep5': { // постцикловая супрессия: LH+TT combined
+      const lhMi = labMiInv(lh,[2.0,1.0,0.5]);
+      const ttMi = labMiInv(tt,[12,8,4]);
+      const vals = [lhMi,ttMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
+      break;
+    }
+    // ── Гематолого-метаболический ──
+    case'hem1': { // эритроцитоз: HCT, Hemoglobin
+      const hctMi = labMi(hct,[48,51,54]);
+      const hgbMi = labMi(hgb,[170,180,190]);
+      const vals = [hctMi,hgbMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
+      break;
+    }
+    case'hem2': { // инсулинорезистентность: Glucose, HOMA
+      const gluMi = labMi(glu,[5.6,6.1,7.0]);
+      const homaMi = labMi(homa,[2.0,3.0,5.0]);
+      const vals = [gluMi,homaMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
+      break;
+    }
+    case'hem3': { // гипогликемия: Glucose (low = bad)
+      const gluMi = labMiInv(glu,[3.9,3.3,2.8]);
+      if (gluMi !== undefined) labResult = gluMi;
+      break;
+    }
+    case'hem4': { // гипокалиемия: K (low = bad)
+      const kMi = labMiInv(k,[3.5,3.0,2.5]);
+      if (kMi !== undefined) labResult = kMi;
+      break;
+    }
+    case'hem5': { // водно-электролитный сдвиг: K, Na
+      const kMi = labMiInv(k,[3.5,3.0,2.5]);
+      const naMi = labMiInv(na,[135,130,125]);
+      const vals = [kMi,naMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
+      break;
+    }
   }
+
+  // Лабораторное значение имеет приоритет, но не ниже минимума от doseFactor
+  if (labResult !== undefined) {
+    return Math.max(labResult, defaults > 0 ? 1 : 0);
+  }
+
   // Если механизм целевой для препарата (weight>0) — минимум m_i=1
   const result = Math.max(defaults, (mechWeight && mechWeight > 0) ? 1 : 0);
   return Math.min(3, result);
+}
+
+// ── PK-модель: накопление и распад препарата ──
+// halfLifeWeeks — период полувыведения в неделях (из DRUG_DB или эвристика)
+// Накопление: A(t) = 1 - e^(-k_acc × t) — стационар за ~5半life
+// Распад:     A(t) = e^(-k_dec × (t - endWeek)) — затухание после отмены
+// k = ln(2) / halfLife  ≈ 0.693 / halfLife
+function getHalfLifeWeeks(drugName: string, form: string): number {
+  const entry = DRUG_DB[drugName.toLowerCase()] || DRUG_DB[drugName];
+  if (entry?.pk?.halfLifeHours) {
+    return Math.max(0.5, entry.pk.halfLifeHours / 168); // 168ч = 1 неделя
+  }
+  // Эвристика по форме/классу
+  if (form === 'oral') return 0.5;   // оралы — быстрые
+  if (entry?.class === 'gh') return 1.0;
+  if (entry?.class === 'insulin') return 0.3;
+  // Инъекционные ААС: по эфиру
+  const n = drugName.toLowerCase();
+  if (n.includes('prop') || n.includes('acet')) return 1.0;
+  if (n.includes('phen')) return 1.5;
+  if (n.includes('enan') || n.includes('cyp')) return 2.0;
+  if (n.includes('deca') || n.includes('nand')) return 2.5;
+  if (n.includes('undec')) return 3.0;
+  return 2.0; // дефолт для инъекций
+}
+
+// Концентрация препарата на неделе W (0..1)
+// startWeek, endWeek — 1-indexed недели действия
+// weeksAfter — сколько недель прошло после endWeek (для распада)
+function getDrugConcentration(week: number, startWeek: number, endWeek: number, halfLifeWeeks: number): number {
+  if (week < startWeek) return 0;          // ещё не начал
+  if (week <= endWeek) {
+    // Накопление: A = 1 - e^(-k×(week-startWeek+1))
+    const k = 0.693 / halfLifeWeeks;
+    return 1 - Math.exp(-k * (week - startWeek + 1));
+  }
+  // Распад: A = e^(-k×(week-endWeek))
+  const k = 0.693 / halfLifeWeeks;
+  return Math.exp(-k * (week - endWeek));
+}
+
+// ── Понедельная динамика риска ──
+export interface TimelineWeekResult {
+  week: number;
+  activeDrugs: string[];     // имена активных препаратов
+  drugConcentrations: Record<string, number>; // имя → 0..1
+  organPercents: Record<string, number>;      // sysId → rawPercent
+  organAfterPercents: Record<string, number>; // sysId → afterPercent
+  overallRaw: number;
+  overallAfter: number;
+}
+
+export function calculateTzSpecRiskTimeline(input: TzSpecInput, totalWeeks?: number): TimelineWeekResult[] {
+  const drugEntries = input.drugs && input.drugs.length > 0 ? input.drugs
+    : [{ drugClass: input.drugClass, drugName: input.drugName, dose: input.dose, form: input.form }];
+
+  // Определяем общую длительность курса
+  let maxEnd = input.duration || 12;
+  for (const d of drugEntries) {
+    const sw = d.startWeek || 1;
+    const ew = d.endWeek || input.duration || 12;
+    // Добавляем 3 полувыведения для распада (до ~12% остатка)
+    const hl = getHalfLifeWeeks(d.drugName, d.form);
+    const decayWeeks = Math.ceil(hl * 3);
+    maxEnd = Math.max(maxEnd, ew + decayWeeks);
+  }
+  if (totalWeeks) maxEnd = Math.max(maxEnd, totalWeeks);
+
+  const results: TimelineWeekResult[] = [];
+  for (let w = 1; w <= maxEnd; w++) {
+    // Фильтруем активные препараты (концентрация > 0.02)
+    const activeDrugs: DrugInput[] = [];
+    const concentrations: Record<string, number> = {};
+    for (const d of drugEntries) {
+      const sw = d.startWeek || 1;
+      const ew = d.endWeek || input.duration || 12;
+      const hl = getHalfLifeWeeks(d.drugName, d.form);
+      const conc = getDrugConcentration(w, sw, ew, hl);
+      if (conc > 0.02) {
+        activeDrugs.push(d);
+        concentrations[d.drugName] = Math.round(conc * 100) / 100;
+      }
+    }
+
+    // Считаем риск для этой недели с активными препаратами
+    if (activeDrugs.length === 0) {
+      results.push({
+        week: w, activeDrugs: [], drugConcentrations: {},
+        organPercents: {}, organAfterPercents: {},
+        overallRaw: 0, overallAfter: 0,
+      });
+      continue;
+    }
+
+    // Длительность для этой недели = сколько недель препарат уже принимается
+    const effectiveDuration = Math.min(input.duration, w);
+    const weekInput: TzSpecInput = {
+      ...input,
+      duration: effectiveDuration,
+      combinations: Math.max(1, activeDrugs.length),
+      drugs: activeDrugs,
+    };
+
+    const weekResult = calculateTzSpecRisk(weekInput);
+
+    // Масштабируем raw по концентрации (если препарат на стадии распада, риск ниже)
+    const organPercents: Record<string, number> = {};
+    const organAfterPercents: Record<string, number> = {};
+    for (const o of weekResult.organs) {
+      // Средневзвешенная концентрация активных препаратов
+      let avgConc = 0;
+      for (const d of activeDrugs) avgConc += concentrations[d.drugName] || 1;
+      avgConc /= activeDrugs.length;
+      // Если концентрация ниже 1 (распад), снижаем риск
+      const scaledRaw = Math.round(o.rawPercent * avgConc);
+      const scaledAfter = Math.round(o.afterPercent * avgConc);
+      organPercents[o.id] = scaledRaw;
+      organAfterPercents[o.id] = scaledAfter;
+    }
+
+    const overallRaw = Math.round(Object.values(organPercents).reduce((a, b) => a + b, 0) / (Object.keys(organPercents).length || 1));
+    const overallAfter = Math.round(Object.values(organAfterPercents).reduce((a, b) => a + b, 0) / (Object.keys(organAfterPercents).length || 1));
+
+    results.push({
+      week: w,
+      activeDrugs: activeDrugs.map(d => d.drugName),
+      drugConcentrations: concentrations,
+      organPercents,
+      organAfterPercents,
+      overallRaw,
+      overallAfter,
+    });
+  }
+  return results;
 }
 
 // ── ГЛАВНАЯ ФУНКЦИЯ РАСЧЁТА ──

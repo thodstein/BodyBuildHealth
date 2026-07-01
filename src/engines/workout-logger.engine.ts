@@ -267,6 +267,79 @@ export function exportToCSV(): WorkoutCSV {
   return { headers, rows };
 }
 
+/**
+ * importSessionsFromCSV — импорт тренировок из CSV (формат exportToCSV:
+ * Date,Exercise,Set,Weight,Reps,RPE[,RIR][,...]). Группирует по дате → сессии,
+ * по упражнению → упражнения, пересчитывает тоталы/1RM/avgRPE, добавляет в he_workout_log_v2.
+ * Строки с ошибками пропускаются и возвращаются в errors.
+ */
+export function importSessionsFromCSV(text: string): { importedSessions: number; importedSets: number; errors: string[] } {
+  const errors: string[] = [];
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return { importedSessions: 0, importedSets: 0, errors: ['Пустой ввод.'] };
+
+  // пропустить заголовок
+  let start = 0;
+  if (/^date/i.test(lines[0]) || /^"date"/i.test(lines[0])) start = 1;
+
+  const byDate: Record<string, { exName: string; setNumber: number; weight: number; reps: number; rpe: number; rir: number }[]> = {};
+  let lineNo = 0;
+  for (let i = start; i < lines.length; i++) {
+    lineNo = i + 1;
+    const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+    if (cols.length < 5) { errors.push(`Строка ${lineNo}: мало колонок (нужно ≥5: date,exercise,set,weight,reps).`); continue; }
+    const [date, exercise, setStr, weightStr, repsStr, rpeStr, rirStr] = cols;
+    if (!/^\d{4}-\d{2}-\d{2}/.test(date)) { errors.push(`Строка ${lineNo}: дата не YYYY-MM-DD («${date}»).`); continue; }
+    const set = parseInt(setStr) || 1;
+    const weight = parseFloat(weightStr);
+    const reps = parseInt(repsStr);
+    if (isNaN(weight) || isNaN(reps)) { errors.push(`Строка ${lineNo}: вес/повт не число.`); continue; }
+    const rpe = rpeStr ? parseFloat(rpeStr) || 0 : 0;
+    const rir = rirStr ? parseFloat(rirStr) : 2;
+    if (!byDate[date]) byDate[date] = [];
+    byDate[date].push({ exName: exercise || 'Упражнение', setNumber: set, weight, reps, rpe, rir: isNaN(rir as number) ? 2 : rir });
+  }
+
+  const newSessions: WorkoutSession[] = [];
+  let importedSets = 0;
+  Object.keys(byDate).sort().forEach(date => {
+    const rows = byDate[date];
+    const byEx: Record<string, typeof rows> = {};
+    rows.forEach(r => { if (!byEx[r.exName]) byEx[r.exName] = []; byEx[r.exName].push(r); });
+    const exercises: WorkoutExercise[] = Object.keys(byEx).map((exName, oi) => {
+      const exRows = byEx[exName].sort((a, b) => a.setNumber - b.setNumber);
+      const sets: WorkoutSet[] = exRows.map((r, si) => ({
+        setNumber: si + 1, weightKg: r.weight, reps: r.reps, rpe: r.rpe, rir: r.rir,
+        isPR: false, notes: '',
+      }));
+      const totalVolume = sets.reduce((s, x) => s + x.weightKg * x.reps, 0);
+      const best1RM = Math.max(0, ...sets.map(s => s.reps > 0 ? Math.round(s.weightKg * (1 + s.reps / 30)) : s.weightKg));
+      const rpes = sets.map(s => s.rpe).filter(r => r > 0);
+      const avgRPE = rpes.length > 0 ? rpes.reduce((a: number, b: number) => a + b, 0) / rpes.length : 0;
+      return { exerciseId: exName, exerciseName: exName, pattern: '', muscleGroup: '', order: oi, sets, totalVolume, best1RM, avgRPE };
+    });
+    const totalVolume = exercises.reduce((s, e) => s + e.totalVolume, 0);
+    const totalSets = exercises.reduce((s, e) => s + e.sets.length, 0);
+    const totalReps = exercises.reduce((s, e) => s + e.sets.reduce((ss: number, x: WorkoutSet) => ss + x.reps, 0), 0);
+    importedSets += totalSets;
+    newSessions.push({
+      sessionId: 'imp_' + date + '_' + Math.random().toString(36).slice(2, 8),
+      date, startTime: '00:00', endTime: '00:00', durationMin: 0,
+      focus: 'Импорт CSV', exercises, totalVolume, totalSets, totalReps,
+      avgIntensity: 0, prCount: 0, notes: 'Импортировано из CSV', weekNumber: 0, mesocycleWeek: 0,
+    });
+  });
+
+  if (newSessions.length > 0) {
+    const existing = loadSessions();
+    // дедуп по date+focus (не дублируем уже импортированные)
+    const haveKeys = new Set(existing.filter(s => s.focus === 'Импорт CSV').map(s => s.date));
+    const toAdd = newSessions.filter(s => !haveKeys.has(s.date));
+    saveSessions([...toAdd, ...existing]);
+    return { importedSessions: toAdd.length, importedSets, errors };
+  }
+  return { importedSessions: 0, importedSets: 0, errors: errors.length ? errors : ['Нет валидных строк.'] };
+}
 export function getLastSession(): WorkoutSession | null {
   const sessions = loadSessions();
   return sessions.length > 0 ? sessions[0] : null;

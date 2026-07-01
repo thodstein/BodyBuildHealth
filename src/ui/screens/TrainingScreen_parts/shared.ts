@@ -42,7 +42,7 @@ export type TrainingTab =
   | 'plan' | 'runtime' | 'exercises' | 'excalc' | 'calculators' | 'diary' | 'cycles' | 'history'
   | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress' | 'mytraining'
   | 'programcalc' | 'reports' | 'srcbb' | 'volume' | 'library' | 'powerlifting' | 'bodybuilding'
-  | 'calc_substitute' | 'calc_quality' | 'calc_1rm';
+  | 'calc_substitute' | 'calc_quality' | 'calc_1rm' | 'import_data';
 export type TrainingPage = 'hero' | 'tabs';
 // Главная — ровно 3 раздела: Тренировка (вести), Планирование (планировать), Инфо (смотреть).
 export type TrainingGroup = 'training' | 'planning' | 'info' | null;
@@ -50,7 +50,7 @@ export type TrainingGroup = 'training' | 'planning' | 'info' | null;
 export const TAB_GROUPS: Record<string, { title: string; icon: string; tabs: TrainingTab[]; color: string }> = {
   training: { title: '🏋️ Тренировка', icon: '🏋️', tabs: ['runtime', 'timers', 'diary'], color: 'var(--accent)' },
   planning: { title: '📐 Планирование', icon: '📐', tabs: ['srcbb', 'plan', 'cycles', 'mytraining', 'programcalc', 'volume', 'powerlifting', 'bodybuilding', 'excalc', 'calc_substitute', 'calc_quality', 'calc_1rm', 'calculators'], color: '#3b82f6' },
-  info: { title: '📊 Инфо', icon: '📊', tabs: ['analytics', 'visual', 'progress', 'history', 'reports', 'exercises', 'methods', 'programs', 'library'], color: '#a855f7' },
+  info: { title: '📊 Инфо', icon: '📊', tabs: ['analytics', 'visual', 'progress', 'history', 'reports', 'exercises', 'methods', 'programs', 'library', 'import_data'], color: '#a855f7' },
 };
 
 export const TAB_LABELS: Record<TrainingTab, string> = {
@@ -66,6 +66,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   calc_substitute: '🔄 Замена упражнения',
   calc_quality: '🎯 Качество программы',
   calc_1rm: '🎯 Калькулятор 1RM',
+  import_data: '📥 Импорт CSV',
 };
 
 // ══ Этап R/U: 3 плоские трассы планировщика (ПЛ / ББ / Ручной сбор), одна вкладка — один клик.

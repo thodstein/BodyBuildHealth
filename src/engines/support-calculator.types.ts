@@ -214,7 +214,19 @@ export interface CalculatorResult {
   contraindicationAlerts: string[];
   negativeBlocks: string[];
   comparisonBeforeAfter: { system: string; before: number; after: number }[];
+  timeline?: TimelineWeekData[];
+  peakWeek?: number;
   timestamp: string;
+}
+
+export interface TimelineWeekData {
+  week: number;
+  activeDrugs: string[];
+  drugConcentrations: Record<string, number>;
+  organPercents: Record<string, number>;
+  organAfterPercents: Record<string, number>;
+  overallRaw: number;
+  overallAfter: number;
 }
 
 // ─── Schedule ───

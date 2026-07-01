@@ -11,6 +11,7 @@ export interface TzDrugEntry {
   organMechanisms: Record<string, string[]>;
   mechanismWeights: Record<string, number>;
   doseModifier: number;
+  pk?: { halfLifeHours?: number };
 }
 
 export interface TzSupportEntry {

@@ -2,12 +2,13 @@ import {
   type CalculatorState, type CalculatorResult, type RiskSystemId,
   type SystemRisk, type MechanismDetail, type LabDelta,
   type ScheduleItem, type TimeBlock, type SynergyId,
-  type PowerLevel, type LabSlice,
+  type PowerLevel, type LabSlice, type TimelineWeekData,
   SYNERGY_ID_SUBSTANCES, TITRATION_RULES, SYNERGY_ID_LABELS,
 } from './support-calculator.types';
 import { evaluateRecommendations } from './recommendation-engine';
-import { calculateTzSpecRisk, type TzSpecInput, type DrugInput, type TzSpecResult, type TzSpecMechanismResult } from './risk-engine-tz-spec';
+import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, type DrugInput, type TzSpecResult, type TzSpecMechanismResult } from './risk-engine-tz-spec';
 import { DRUG_DB } from '../data/support-db';
+import { normalizeLabValue } from '../core/constants';
 
 const SYS_META: Record<RiskSystemId, { label: string; icon: string }> = {
   cardio: { label: 'Сердечно-сосудистая', icon: '❤️' },
@@ -485,23 +486,85 @@ function getContraindicationAlerts(state: CalculatorState): string[] {
 function extractLabValues(labs: CalculatorState['labs']): Record<string, number> {
   const v: Record<string, number> = {};
   const fp = labs?.fullPanel || labs?.midCourse || labs?.preCourse;
-  if (fp) {
-    const b = (fp.panelBiochem || {}) as Record<string, any>;
-    if (b.ALT) v['ALT'] = Number(b.ALT);
-    if (b.AST) v['AST'] = Number(b.AST);
-    if (b.GGT) v['GGT'] = Number(b.GGT);
-    if (b.LDL) v['LDL'] = Number(b.LDL);
-    if (b.HDL) v['HDL'] = Number(b.HDL);
-    if (b.CREAT) v['CREAT'] = Number(b.CREAT);
-    if (b.GLUC) v['GLU'] = Number(b.GLUC);
-    if (b.K) v['K'] = Number(b.K);
-    const h = (fp.panelHematology || {}) as Record<string, any>;
-    if (h.HCT) v['HCT'] = Number(h.HCT);
-    const s = (fp.panelSex || {}) as Record<string, any>;
-    if (s.LH) v['LH'] = Number(s.LH);
-    if (s.TT) v['TT'] = Number(s.TT);
-    if (s.E2) v['E2'] = Number(s.E2);
+  if (!fp) return v;
+
+  const num = (val: any): number | undefined => {
+    if (val === undefined || val === null || val === '') return undefined;
+    const n = typeof val === 'string' ? parseFloat(val.replace(',', '.')) : Number(val);
+    return isNaN(n) ? undefined : n;
+  };
+
+  // panelBiochem: ALT, AST, GGT, Bilirubin, Glucose, Creatinine, Urea, Uric acid, CRP, Homocysteine
+  const b = (fp.panelBiochem || {}) as Record<string, any>;
+  if (num(b.ALT) !== undefined) v['ALT'] = num(b.ALT)!;
+  if (num(b.AST) !== undefined) v['AST'] = num(b.AST)!;
+  if (num(b.GGT) !== undefined) v['GGT'] = num(b.GGT)!;
+  if (num(b.Bilirubin) !== undefined) v['BIL'] = num(b.Bilirubin)!;
+  if (num(b.Glucose) !== undefined) v['GLU'] = num(b.Glucose)!;
+  if (num(b.Creatinine) !== undefined) v['CREAT'] = num(b.Creatinine)!;
+  if (num(b.CRP) !== undefined) v['CRP'] = num(b.CRP)!;
+  if (num(b.Homocysteine) !== undefined) v['HOMOCYSTEINE'] = num(b.Homocysteine)!;
+
+  // panelLipid: Total Cholesterol, LDL, HDL, Triglycerides, VLDL, ApoB, ApoA1, Lp(a)
+  const lip = (fp.panelLipid || {}) as Record<string, any>;
+  if (num(lip.LDL) !== undefined) v['LDL'] = num(lip.LDL)!;
+  if (num(lip.HDL) !== undefined) v['HDL'] = num(lip.HDL)!;
+  if (num(lip.Triglycerides) !== undefined) v['TG'] = num(lip.Triglycerides)!;
+  if (num(lip['Total Cholesterol']) !== undefined) v['TC'] = num(lip['Total Cholesterol'])!;
+
+  // panelHematology: HCT, Hemoglobin, RBC, WBC, Platelets
+  const h = (fp.panelHematology || {}) as Record<string, any>;
+  if (num(h.HCT) !== undefined) v['HCT'] = num(h.HCT)!;
+  if (num(h.Hemoglobin) !== undefined) v['HGB'] = num(h.Hemoglobin)!;
+  if (num(h.Platelets) !== undefined) v['PLT'] = num(h.Platelets)!;
+
+  // panelSex: LH, FSH, Total T, Free T, E2, Prolactin, SHBG, DHT, Progesterone, Cortisol
+  const s = (fp.panelSex || {}) as Record<string, any>;
+  if (num(s.LH) !== undefined) v['LH'] = num(s.LH)!;
+  if (num(s.FSH) !== undefined) v['FSH'] = num(s.FSH)!;
+  if (num(s['Total T']) !== undefined) v['TT'] = normalizeLabValue('Total T', num(s['Total T'])!);
+  if (num(s.E2) !== undefined) v['E2'] = normalizeLabValue('E2', num(s.E2)!);
+  if (num(s.Prolactin) !== undefined) v['PRL'] = normalizeLabValue('Prolactin', num(s.Prolactin)!);
+  if (num(s.SHBG) !== undefined) v['SHBG'] = num(s.SHBG)!;
+  if (num(s.Cortisol) !== undefined) v['CORTISOL'] = normalizeLabValue('Cortisol', num(s.Cortisol)!);
+
+  // panelThyroid: TSH, T3 free, T4 free
+  const th = (fp.panelThyroid || {}) as Record<string, any>;
+  if (num(th.TSH) !== undefined) v['TSH'] = num(th.TSH)!;
+
+  // panelMineral: Calcium, Phosphorus, Magnesium, Sodium, Potassium, Chloride
+  const min = (fp.panelMineral || {}) as Record<string, any>;
+  if (num(min.Potassium) !== undefined) v['K'] = num(min.Potassium)!;
+  if (num(min.Sodium) !== undefined) v['NA'] = num(min.Sodium)!;
+
+  // panelCoagulation: D-dimer, Fibrinogen, PT, APTT, INR
+  const coag = (fp.panelCoagulation || {}) as Record<string, any>;
+  if (num(coag['D-dimer']) !== undefined) v['D_DIMER'] = num(coag['D-dimer'])!;
+  if (num(coag.Fibrinogen) !== undefined) v['FIBRINOGEN'] = num(coag.Fibrinogen)!;
+
+  // panelCardiac: CK, CK-MB, Troponin I, NT-proBNP
+  const card = (fp.panelCardiac || {}) as Record<string, any>;
+  if (num(card['NT-proBNP']) !== undefined) v['BNP'] = num(card['NT-proBNP'])!;
+
+  // panelInflammatory: IL-6, TNF-alpha, hsCRP
+  const infl = (fp.panelInflammatory || {}) as Record<string, any>;
+  if (num(infl.hsCRP) !== undefined && v['CRP'] === undefined) v['CRP'] = num(infl.hsCRP)!;
+
+  // panelTumor: PSA total
+  const tum = (fp.panelTumor || {}) as Record<string, any>;
+  if (num(tum['PSA total']) !== undefined) v['PSA'] = num(tum['PSA total'])!;
+
+  // panelUrinalysis: Protein
+  const ua = (fp.panelUrinalysis || {}) as Record<string, any>;
+  if (num(ua.Protein) !== undefined) v['UACR'] = num(ua.Protein)!;
+
+  // eGFR calculated from creatinine (MDRD simplified)
+  if (v['CREAT'] !== undefined) {
+    const cr = v['CREAT']; // μmol/L
+    const egfr = Math.round(175 * Math.pow(cr / 88.4, -1.154));
+    v['eGFR'] = Math.min(120, Math.max(15, egfr));
   }
+
   return v;
 }
 
@@ -515,7 +578,7 @@ function buildTzInput(state: CalculatorState, supportSubs: string[]): TzSpecInpu
     const form = dbEntry?.form === 'oral' ? 'oral' as const : 'inject' as const;
     const dbClass = dbEntry?.class || 'aas';
     const drugClass: 'aas' | 'gh' | 'insulin' = dbClass === 'gh' ? 'gh' : dbClass === 'insulin' ? 'insulin' : 'aas';
-    drugs.push({ drugClass, drugName: a.id, dose: a.doseMgWeek || 0, form });
+    drugs.push({ drugClass, drugName: a.id, dose: a.doseMgWeek || 0, form, startWeek: a.startWeek, endWeek: a.endWeek });
   }
 
   if (state.pharma.hasGH && !drugs.some(d => d.drugName === 'mk677' || d.drugName === 'cjc1295')) {
@@ -542,7 +605,7 @@ function buildTzInput(state: CalculatorState, supportSubs: string[]): TzSpecInpu
     dose: firstDrug.dose, duration,
     form: firstDrug.form,
     combinations: Math.max(1, drugs.length),
-    labCoverage: Object.keys(labValues).length > 0 ? 0.7 : 0.3,
+    labCoverage: Math.min(1.0, 0.3 + Object.keys(labValues).length * 0.04),
     labValues, supportSubstances: supportSubs, drugs,
   };
 }
@@ -615,6 +678,17 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     for (const sub of rec.substances)
       if (!used.has(sub.id)) { substances.push(sub.id); used.add(sub.id); }
 
+  // 2a. Отмечаем какие системы уже покрыты рекомендациями (чтобы TZ не дублировал)
+  const recCoveredSystems = new Set<string>();
+  for (const rec of recommendations) {
+    if (rec.system) recCoveredSystems.add(rec.system);
+    // Также отмечаем endocrine для гормональных рекомендаций
+    if (rec.id === 'estradiol' || rec.id === 'prolactin' || rec.id === 'hcg' || rec.id === 'always_hcg') recCoveredSystems.add('reproductive');
+    if (rec.id === 'hepatic') recCoveredSystems.add('hepatic');
+    if (rec.id === 'hct') recCoveredSystems.add('hematologic');
+    if (rec.id === 'lipid' || rec.id === 'bp') recCoveredSystems.add('cardio');
+    if (rec.id === 'neuro') recCoveredSystems.add('neuro');
+  }
   // 3. ТZ-подбор: breadth + targeted без ограничений
   interface DBEntry { organId: string; mechId: string; k: number; q: string; }
   const allDb: Record<string, DBEntry[]> = {};
@@ -623,6 +697,17 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     const pharm = require('../data/support-db/pharmacy-db') as any;
     Object.assign(allDb, supp.SUPPLEMENTS_DB || {}, pharm.PHARMACY_DB || {});
   } catch {}
+
+  // Считаем сколько веществ уже покрывают каждую систему
+  const sysCoverageCount: Record<string, number> = {};
+  for (const subId of substances) {
+    const entries = allDb[subId];
+    if (entries) {
+      for (const e of entries) {
+        sysCoverageCount[e.organId] = (sysCoverageCount[e.organId] || 0) + 1;
+      }
+    }
+  }
 
   const riskSystems: RiskSystemId[] = ['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal'];
   const levelThresholds: Record<string, number> = { basic: 65, mid: 45, max: 30 };
@@ -636,43 +721,69 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   if (Object.keys(allDb).length > 0) {
     const threshold = levelThresholds[state.powerLevel] ?? 25;
 
-    // Breadth: все препараты, покрывающие активные системы риска (risk score > threshold)
-    const activeSystems = riskSystems.filter(sys => (scoresPre[sys] || 0) > threshold);
-    const scored: [string, number, number][] = [];
-    for (const [id, entries] of Object.entries(allDb)) {
-      if (used.has(id) || !entries.length) continue;
-      let matchCount = 0; let totalK = 0;
-      for (const e of entries) {
-        if (activeSystems.includes(e.organId as RiskSystemId)) { matchCount++; totalK += e.k; }
+    // Активные системы = риск > threshold, НО ещё не покрытые рекомендациями
+    const activeSystems = riskSystems.filter(sys => {
+      const score = scoresPre[sys] || 0;
+      if (score <= threshold) return false;
+      // Пропускаем если рекомендации уже дали 2+ вещества для этой системы
+      const tzSys = sys === 'neuro' ? 'cns' : sys;
+      const covered = sysCoverageCount[tzSys] || sysCoverageCount[sys] || 0;
+      return covered < 2;
+    });
+
+    // Breadth: добавляем ТОЛЬКО вещества для систем без покрытия
+    // Не более 1-2 на систему (а не все подряд)
+    const systemsNeedingCoverage = activeSystems.filter(sys => {
+      const tzSys = sys === 'neuro' ? 'cns' : sys;
+      return (sysCoverageCount[tzSys] || sysCoverageCount[sys] || 0) === 0;
+    });
+
+    if (systemsNeedingCoverage.length > 0) {
+      const scored: [string, number, number][] = [];
+      for (const [id, entries] of Object.entries(allDb)) {
+        if (used.has(id) || !entries.length) continue;
+        let matchCount = 0; let totalK = 0;
+        for (const e of entries) {
+          if (systemsNeedingCoverage.includes(e.organId as RiskSystemId)) { matchCount++; totalK += e.k; }
+        }
+        if (matchCount > 0) scored.push([id, matchCount, totalK]);
       }
-      if (matchCount > 0) scored.push([id, matchCount, totalK]);
-    }
-    // Сортируем: max охват систем → max суммарный k → безлимитно
-    scored.sort((a, b) => b[1] - a[1] || b[2] - a[2]);
-    for (const [id] of scored) {
-      if (used.has(id)) continue;
-      substances.push(id); used.add(id);
+      scored.sort((a, b) => b[1] - a[1] || b[2] - a[2]);
+      // Только топ-2 широких препарата (не весь каталог)
+      for (const [id] of scored.slice(0, 2)) {
+        if (used.has(id)) continue;
+        substances.push(id); used.add(id);
+      }
     }
 
-    // Targeted: для КАЖДОЙ системы с риском > threshold добавляем лучший препарат
-    // Если риск >50% даже после coverage — добавляем второй препарат для этого механизма
+    // Targeted: для КАЖДОЙ системы с риском > threshold без покрытия — 1 препарат
     for (const sys of activeSystems) {
+      const tzSys = sys === 'neuro' ? 'cns' : sys;
+      const currentCount = sysCoverageCount[tzSys] || sysCoverageCount[sys] || 0;
+      if (currentCount >= 2) continue; // Уже 2+ вещества — достаточно
+
       let best: [string, number] | null = null;
       for (const [id, entries] of Object.entries(allDb)) {
         if (used.has(id)) continue;
         for (const e of entries)
-          if (e.organId === sys && e.k > 0 && (!best || e.k > best[1])) best = [id, e.k];
+          if ((e.organId === tzSys || e.organId === sys) && e.k > 0 && (!best || e.k > best[1])) best = [id, e.k];
       }
-      if (best) { substances.push(best[0]); used.add(best[0]); }
-      // Если риск >50% — добавляем ещё 1 препарат для этого механизма
-      if ((scoresPre[sys] || 0) > 50) {
+      if (best) {
+        substances.push(best[0]); used.add(best[0]);
+        sysCoverageCount[tzSys] = (sysCoverageCount[tzSys] || 0) + 1;
+      }
+      // Если риск >50% и меньше 2 веществ — добавляем ещё 1
+      if ((scoresPre[sys] || 0) > 50 && (sysCoverageCount[tzSys] || 0) < 2) {
         let second: [string, number] | null = null;
         for (const [id, entries] of Object.entries(allDb)) {
           if (used.has(id)) continue;
           for (const e of entries)
-            if (e.organId === sys && e.k > 0 && (!second || e.k > second[1])) second = [id, e.k];
+            if ((e.organId === tzSys || e.organId === sys) && e.k > 0 && (!second || e.k > second[1])) second = [id, e.k];
         }
-        if (second) { substances.push(second[0]); used.add(second[0]); }
+        if (second) {
+          substances.push(second[0]); used.add(second[0]);
+          sysCoverageCount[tzSys] = (sysCoverageCount[tzSys] || 0) + 1;
+        }
       }
     }
   }
@@ -686,6 +797,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   let overallAfterSupport: number;
   let finalScores: Record<RiskSystemId, number>;
   let tzResultFinal: TzSpecResult | null = null;
+  let peakWeek = 0;
 
   const tzInputFinal = buildTzInput(state, substances);
   if (tzInputFinal) {
@@ -705,6 +817,45 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     overallAfterSupport = Math.round(Math.max(5, overallRaw - Math.round(overallRaw * protection)));
   }
 
+  // ── Понедельная динамика риска (timeline) ──
+  let timelineData: TimelineWeekData[] | undefined;
+  if (tzInputFinal) {
+    try {
+      const timelineInput: TzSpecInput = {
+        ...tzInputFinal,
+        supportSubstances: substances,
+      };
+      const tlRaw = calculateTzSpecRiskTimeline(timelineInput);
+      timelineData = tlRaw.map(t => ({
+        week: t.week,
+        activeDrugs: t.activeDrugs,
+        drugConcentrations: t.drugConcentrations,
+        organPercents: t.organPercents,
+        organAfterPercents: t.organAfterPercents,
+        overallRaw: t.overallRaw,
+        overallAfter: t.overallAfter,
+      }));
+
+      // ── Главный риск карточки = пиковая неделя ──
+      // Support должен покрывать худший момент курса
+      if (timelineData.length > 0) {
+        let peak = timelineData[0];
+        for (const t of timelineData) {
+          if (t.overallRaw > peak.overallRaw) peak = t;
+        }
+        peakWeek = peak.week;
+        overallRaw = peak.overallRaw;
+        overallAfterSupport = peak.overallAfter;
+        // Обновляем finalScores для system bars — используем органные % пиковой недели
+        for (const sys of Object.keys(finalScores)) {
+          const tzSys = sys === 'neuro' ? 'cns' : sys;
+          const peakVal = peak.organPercents[tzSys];
+          if (peakVal !== undefined) finalScores[sys as RiskSystemId] = peakVal;
+        }
+      }
+    } catch {}
+  }
+
   const result: CalculatorResult = {
     risk: { systems: [], overallRaw, overallAfterSupport, timestamp: new Date().toISOString() },
     schedule, selectedSubstances: substances,
@@ -720,6 +871,8 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
         ? (tzResultFinal.organs.find(o => o.id === (id === 'neuro' ? 'cns' : id))?.afterPercent ?? 0)
         : Math.max(0, (finalScores[id] || 0) - Math.round((finalScores[id] || 0) * 0.4)),
     })),
+    timeline: timelineData,
+    peakWeek,
     timestamp: new Date().toISOString(),
   };
   result.risk.systems = tzResultFinal

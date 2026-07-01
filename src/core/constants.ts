@@ -556,3 +556,67 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'OSMOLALITY': { prefUnit: 'mOsm/kg', coeff: 1, uln: 295, lln: 275, name: 'Осмоляльность' },
   'ANION_GAP': { prefUnit: 'mmol/L', coeff: 1, uln: 16, lln: 8, name: 'Анионный провал' },
 } as const;
+
+// ── Нормализация лабораторных значений к единицам РФ (Гемотест, Инвитро, Хеликс, КДЛ) ──
+// Российские лаборатории используют специфичные единицы для ряда гормонов.
+// Функция определяет единицу по величине значения и приводит к стандарту, используемому в UCUM_MAP.
+//
+// Целевые единицы (после нормализации):
+//   E2 (Эстрадиол) → pg/mL (РФ-лаборатории: pmol/L, 1 pg/mL = 3.67 pmol/L)
+//   Prolactin → ng/mL (РФ-лаборатории: mIU/L, 1 ng/mL = 21.2 mIU/L)
+//   Total T → nmol/L (РФ-лаборатории: nmol/L или ng/dL, 1 nmol/L = 28.8 ng/dL)
+//   Free T → pg/mL (РФ-лаборатории: pg/mL)
+//   Cortisol → nmol/L (РФ-лаборатории: nmol/L)
+//   DHEA-S → μg/dL (РФ-лаборатории: μg/dL или μmol/L, 1 μg/dL = 0.0271 μmol/L)
+//
+// Эвристика: если значение > порога — считаем что оно в «нецелевой» единице и конвертируем.
+export function normalizeLabValue(marker: string, rawValue: number): number {
+  if (isNaN(rawValue)) return rawValue;
+  switch (marker) {
+    case 'E2':
+    case 'Эстрадиол':
+      // РФ: pmol/L (мужчины: 40-150). Цель: pg/mL (мужчины: 10-40).
+      // Если > 50 — точно pmol/L (pg/mL > 50 для мужчин = крайне редко)
+      // 1 pg/mL = 3.67 pmol/L → pmol/L ÷ 3.67 = pg/mL
+      if (rawValue > 50) return Math.round(rawValue / 3.67 * 10) / 10;
+      return rawValue;
+
+    case 'Prolactin':
+    case 'Пролактин':
+    case 'PRL':
+      // РФ: mIU/L (мужчины: 50-350). Цель: ng/mL (мужчины: 3-15).
+      // Если > 100 — точно mIU/L (ng/mL > 100 = нереально)
+      if (rawValue > 100) return Math.round(rawValue / 21.2 * 10) / 10;
+      return rawValue;
+
+    case 'Total T':
+    case 'TT':
+    case 'Тестостерон общий':
+      // РФ: nmol/L (мужчины: 12-33). Может быть ng/dL (300-1000).
+      // Если > 100 — точно ng/dL. Конвертируем в nmol/L.
+      if (rawValue > 100) return Math.round(rawValue * 0.0347 * 10) / 10;
+      return rawValue;
+
+    case 'Cortisol':
+    case 'Кортизол':
+      // РФ: nmol/L (мужчины: 100-550). Может быть μg/dL (5-25).
+      // Если < 50 — точно μg/dL. Конвертируем в nmol/L (×27.59).
+      if (rawValue < 50) return Math.round(rawValue * 27.59 * 10) / 10;
+      return rawValue;
+
+    case 'DHEA-S':
+    case 'ДГЭА-С':
+      // РФ: μg/dL (мужчины: 80-560). Может быть μmol/L (2-15).
+      // Если < 20 — точно μmol/L. Конвертируем в μg/dL (×36.9).
+      if (rawValue < 20) return Math.round(rawValue * 36.9 * 10) / 10;
+      return rawValue;
+
+    case 'SHBG':
+    case 'ГСПГ':
+      // РФ: nmol/L (мужчины: 15-60). Стандартная единица — nmol/L.
+      return rawValue;
+
+    default:
+      return rawValue;
+  }
+}

@@ -3676,7 +3676,7 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
         } catch { return <div style={{ padding:20, textAlign:'center', color:'rgba(255,255,255,0.3)', fontSize:11 }}>Ошибка загрузки истории</div>; }
       })()}</InfoErrorBoundary>}
       {/* ═══════════ ANALYTICS TAB ═══════════ */}
-      {tab === 'analytics' && <InfoErrorBoundary label="Аналитика"><><MuscleProgressCard sessions={historyWorkouts} level={level} /><VolumeTrendCard sessions={historyWorkouts} /><LiftHistoryCard sessions={historyWorkouts} /><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /></></InfoErrorBoundary>}
+      {tab === 'analytics' && <InfoErrorBoundary label="Аналитика"><><MuscleProgressCard sessions={historyWorkouts} level={level} /><VolumeTrendCard sessions={historyWorkouts} /><LoadRadarCard sessions={historyWorkouts} level={level} /><WeekCompareCard sessions={historyWorkouts} /><LiftHistoryCard sessions={historyWorkouts} /><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /></></InfoErrorBoundary>}
       {tab === 'library' && (
   <InfoErrorBoundary label="Каталог циклов">
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -3699,6 +3699,7 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
       {tab === 'progress' && <InfoErrorBoundary label="Прогресс"><ProgressTab historyWorkouts={historyWorkouts} /></InfoErrorBoundary>}
       {tab === 'excalc' && <InfoErrorBoundary label="Калькулятор упражнений"><ExerciseCalcTab /></InfoErrorBoundary>}
       {tab === 'calc_1rm' && <InfoErrorBoundary label="Калькулятор 1RM"><OneRmCalcTab /></InfoErrorBoundary>}
+      {tab === 'import_data' && <InfoErrorBoundary label="Импорт CSV"><CsvImportTab onDone={loadDiaryStats} /></InfoErrorBoundary>}
       {tab === 'volume' && <InfoErrorBoundary label="Расчёт объёма"><VolumeOptimizerTab /></InfoErrorBoundary>}
       {tab === 'calc_substitute' && <InfoErrorBoundary label="Замена упражнения"><CalcSubstituteTab /></InfoErrorBoundary>}
       {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} onBuildPlan={() => setTab('plan')} /></InfoErrorBoundary>}
@@ -3811,6 +3812,9 @@ import { TrainingRecommendationsCard } from './TrainingScreen_parts/TrainingReco
 import { OneRmCalcTab } from './TrainingScreen_parts/OneRmCalcTab';
 import { LiftHistoryCard } from './TrainingScreen_parts/LiftHistoryCard';
 import { VolumeTrendCard } from './TrainingScreen_parts/VolumeTrendCard';
+import { LoadRadarCard } from './TrainingScreen_parts/LoadRadarCard';
+import { WeekCompareCard } from './TrainingScreen_parts/WeekCompareCard';
+import { CsvImportTab } from './TrainingScreen_parts/CsvImportTab';
 import { usePlanGeneration } from '../hooks/usePlanGeneration';
 import { PowerliftingTab } from './TrainingScreen_parts/PowerliftingTab';
 import { BodybuildingTab } from './TrainingScreen_parts/BodybuildingTab';

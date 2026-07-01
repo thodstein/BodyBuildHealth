@@ -4,6 +4,7 @@ import { calculateSupportTZ, hydrateState } from '../../../engines/support-calcu
 import { SYNERGY_ID_LABELS } from '../../../engines/support-calculator.types';
 import { getDrugsToNormalizeMarker, getMarkerName } from '../../../data/support-lab-effects';
 import { UCUM_MAP } from '../../../core/constants';
+import { RiskTimelineChart } from './RiskTimelineChart';
 
 interface SupportCalculatorProps {
   onApply: (result: { level: string; subs: string[]; result: CalculatorResult }) => void;
@@ -241,18 +242,23 @@ export const SupportCalculator: React.FC<SupportCalculatorProps> = ({ onApply, e
             </button>
           </div>
 
-          {/* Risk summary */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          {/* Risk summary — peak week */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
             <div style={{ flex: 1, padding: '8px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', textAlign: 'center' }}>
-              <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Риск до</div>
+              <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Риск до (пик)</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: result.overallRiskBefore > 50 ? '#ef4444' : result.overallRiskBefore > 25 ? '#fbbf24' : '#22c55e' }}>{result.overallRiskBefore}%</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', fontSize: 16, color: 'var(--text-dim)' }}>→</div>
             <div style={{ flex: 1, padding: '8px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', textAlign: 'center' }}>
-              <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Риск после</div>
+              <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>После поддержки</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: result.overallRiskAfter > 50 ? '#ef4444' : result.overallRiskAfter > 25 ? '#fbbf24' : '#22c55e' }}>{result.overallRiskAfter}%</div>
             </div>
           </div>
+          {result.peakWeek ? (
+            <div style={{ fontSize: 8, color: 'var(--text-dim)', textAlign: 'center', marginBottom: 6 }}>
+              Пиковая неделя: <b style={{ color: 'var(--accent)' }}>{result.peakWeek}</b>{result.timeline ? ` из ${result.timeline.length}` : ''}
+            </div>
+          ) : null}
 
           {/* Systems risk bars */}
           <div style={{ marginBottom: 8 }}>
@@ -271,6 +277,11 @@ export const SupportCalculator: React.FC<SupportCalculatorProps> = ({ onApply, e
               );
             })}
           </div>
+
+          {/* Timeline dynamics chart */}
+          {result.timeline && result.timeline.length > 1 && (
+            <RiskTimelineChart timeline={result.timeline} />
+          )}
 
           {/* Substances count + synergies */}
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>

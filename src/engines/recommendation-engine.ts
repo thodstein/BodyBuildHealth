@@ -2,6 +2,7 @@ import type { CalculatorState, CalculatorResult, LabSlice } from './support-calc
 import { PHARMA_DB } from '../core/pharma-database';
 import { MECHANISM_TO_SUPPORT, ORGAN_TO_SUPPORT, SYSTEM_TO_SUPPORT, CATEGORY_TO_SUPPORT, DRUG_PD_EFFECT_TO_SUPPORT, getSupportEntry, findByMechanisms, findByLabMarker, findByCategoryAndMech, findByOrganAndMech, SUPPORT_CATALOG_DATA, ALL_SUPPORT_IDS, filterByCoverageLevel, getEntryTier, getSynergyScore, getConflictScore, scoreCombination, COVERAGE_TIER_MAP, getBoostSubstances } from '../data/support-index';
 import { getSupportByMechanism, getSupportBySystem, getFullChainSupport } from '../data/mechanism-support-bridge';
+import { normalizeLabValue } from '../core/constants';
 
 export type RecSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 export type RecStatus = 'active' | 'escalated' | 'blocked' | 'covered';
@@ -43,7 +44,12 @@ function getV(fp: LabSlice | null | undefined, panel: keyof LabSlice, key: strin
   const pv = fp[panel] as Record<string, string> | undefined;
   if (!pv) return null;
   const v = parseFloat(pv[key]);
-  return isNaN(v) ? null : v;
+  if (isNaN(v)) return null;
+  // Нормализация гормонов к единицам РФ
+  if (key === 'E2' || key === 'Prolactin' || key === 'Total T' || key === 'Cortisol' || key === 'DHEA-S') {
+    return normalizeLabValue(key, v);
+  }
+  return v;
 }
 
 // Get substance info from SUPPORT_CATALOG_DATA or fallback
