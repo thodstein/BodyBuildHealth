@@ -3,11 +3,116 @@ import { FOOD_DB, calcBBQualityScore } from '../../../core/nutrition-database';
 import { useDataLink } from '../../../core/data-link';
 import { scoreAllProducts, compareProducts, calcMealScore, CATEGORY_LABELS, GOAL_MAP_RU } from '../../../engines/product-usefulness.engine';
 import type { MealProduct, SavedMeal, MealScore } from '../../../engines/product-usefulness.engine';
-import { calculateOverallScore, scoreAllProductsV2, compareProductsV2, calcMealScoreV2, calcDIAAS, analyzeDailyDiet, getDefaultProfile, type UserDietProfile, type V2ScoreResult } from '../../../engines/product-usefulness-v2.engine';
+import { calculateOverallScore, scoreAllProductsV2, compareProductsV2, calcMealScoreV2, calcDIAAS, analyzeDailyDiet, getDefaultProfile, type UserDietProfile, type V2ScoreResult, type MealScoreV2 } from '../../../engines/product-usefulness-v2.engine';
 import { PopupBool, PopupNumber, PopupSelect } from '../../components/PopupXxx';
 
 type PlannerTab = 'dashboard' | 'settings' | 'catalog' | 'compare' | 'meal' | 'swap';
 type SortKey = 'score' | 'name' | 'protein' | 'kcal';
+type NormalizedMealScore = {
+  compositeScore: number;
+  maxPossible: number;
+  totalKcal: number;
+  totalProtein: number;
+  totalFat: number;
+  totalCarbs: number;
+  totalFiber: number;
+  totalWeight: number;
+  kcalPerGram: number;
+  pfcRatio: { proteinPct: number; fatPct: number; carbsPct: number };
+  productScores: { foodId: string; name: string; weight: number; score: number; contribution: number }[];
+  weakLink: { foodId: string; name: string; reason: string } | null;
+  weakLinks: string[];
+  microCoverage: { key: string; name: string; current: number; rda: number; percent: number }[];
+  label: string;
+  color: string;
+  timingNote?: string;
+};
+
+const normalizeAmount = (item: any): number => {
+  const raw = item?.weightGrams ?? item?.amount ?? item?.qty ?? item?.grams ?? 100;
+  const parsed = typeof raw === 'string' ? parseFloat(raw.replace(',', '.')) : Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
+};
+
+const findFoodByDiaryItem = (item: any) => {
+  const directId = item?.id || item?.foodId;
+  if (directId) {
+    const byId = FOOD_DB.find(f => f.id === directId);
+    if (byId) return byId;
+  }
+  const q = (item?.name || '').toLowerCase().trim();
+  if (!q) return null;
+  return FOOD_DB.find(f => f.name.toLowerCase() === q)
+    || FOOD_DB.find(f => f.name.toLowerCase().includes(q) || q.includes(f.name.toLowerCase()))
+    || null;
+};
+
+const getDiaryProductsForDate = (date: string): MealProduct[] => {
+  try {
+    const raw = localStorage.getItem('nutrition_diary');
+    if (!raw) return [];
+    const diary = JSON.parse(raw);
+    const sourceItems: any[] = [];
+    if (Array.isArray(diary)) {
+      sourceItems.push(...diary.filter((d: any) => (d.date || d.createdAt || '').startsWith(date)));
+    } else {
+      const dayData = diary?.[date]?.meals || {};
+      Object.values(dayData).forEach((meal: any) => {
+        if (Array.isArray(meal)) sourceItems.push(...meal);
+      });
+    }
+    return sourceItems.flatMap(item => {
+      const food = findFoodByDiaryItem(item);
+      return food ? [{ foodId: food.id, weightGrams: normalizeAmount(item) }] : [];
+    });
+  } catch {
+    return [];
+  }
+};
+
+const toV2Timing = (timing: 'any' | 'pre' | 'post') => (
+  timing === 'pre' ? 'pre_workout' : timing === 'post' ? 'post_workout' : undefined
+);
+
+const normalizeMealScore = (result: MealScore | MealScoreV2, timingNote?: string): NormalizedMealScore => {
+  if ('macros' in result) {
+    const totalWeight = result.productScores.reduce((s, p) => s + p.weightG, 0);
+    const totalKcal = result.macros.kcal || 0;
+    const pfcRatio = {
+      proteinPct: totalKcal > 0 ? Math.round(result.macros.protein * 4 / totalKcal * 100) : 0,
+      fatPct: totalKcal > 0 ? Math.round(result.macros.fat * 9 / totalKcal * 100) : 0,
+      carbsPct: totalKcal > 0 ? Math.round(result.macros.carbs * 4 / totalKcal * 100) : 0,
+    };
+    const weakName = result.weakLinks[0];
+    const weakProduct = weakName ? result.productScores.find(p => p.name === weakName) : undefined;
+    return {
+      compositeScore: result.compositeScore,
+      maxPossible: result.maxPossible,
+      totalKcal,
+      totalProtein: result.macros.protein,
+      totalFat: result.macros.fat,
+      totalCarbs: result.macros.carbs,
+      totalFiber: result.macros.fiber,
+      totalWeight,
+      kcalPerGram: totalWeight > 0 ? Math.round(totalKcal / totalWeight * 10) / 10 : 0,
+      pfcRatio,
+      productScores: result.productScores.map(p => ({
+        foodId: p.id,
+        name: p.name,
+        weight: p.weightG,
+        score: p.score,
+        contribution: totalWeight > 0 ? Math.round(p.weightG / totalWeight * 100) : 0,
+      })),
+      weakLink: weakProduct ? { foodId: weakProduct.id, name: weakProduct.name, reason: `Скор ${weakProduct.score}/10 ниже среднего по приёму` } : null,
+      weakLinks: result.weakLinks,
+      microCoverage: [],
+      label: result.label,
+      color: result.color,
+      timingNote,
+    };
+  }
+  return { ...result, weakLinks: result.weakLink ? [result.weakLink.name] : [], timingNote };
+};
 
 const PILL = (active: boolean, color = '#00e68a') => ({
   padding: '5px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: active ? 700 : 400,
@@ -82,7 +187,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
 
   const [mealProducts, setMealProducts] = useState<MealProduct[]>([]);
   const [mealSearch, setMealSearch] = useState('');
-  const [mealResult, setMealResult] = useState<MealScore | null>(null);
+  const [mealResult, setMealResult] = useState<NormalizedMealScore | null>(null);
   const [mealName, setMealName] = useState('');
   const [savedMeals, setSavedMeals] = useState<SavedMeal[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_saved_meals') || '[]'); }
@@ -190,9 +295,9 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         const fallback = JSON.parse(localStorage.getItem('he_quick_plan_items') || '[]');
         const list = raw.length > 0 ? raw : fallback;
         if (list.length === 0) { showToast('Нет сохранённого плана'); return; }
-        const items = list.map((i: any) => ({ foodId: i.id || i.foodId, weightGrams: i.amount || i.weightGrams || 100 }));
+        const items = list.map((i: any) => ({ foodId: i.id || i.foodId, weightGrams: normalizeAmount(i) }));
         setMealProducts(prev => [...prev, ...items]);
-        showToast(`✅ Добавлено ${items.length} продуктов иИз плана`);
+        showToast(`✅ Добавлено ${items.length} продуктов из плана`);
         return;
       }
       if (source === 'recipe') {
@@ -207,17 +312,8 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         return;
       }
       if (source === 'diary') {
-        const diary = JSON.parse(localStorage.getItem('nutrition_diary') || '{}');
         const today = new Date().toISOString().split('T')[0];
-        const dayData = diary[today]?.meals || {};
-        const entries: { foodId: string; weightGrams: number }[] = [];
-        Object.keys(dayData).forEach(mealName => {
-          (dayData[mealName] || []).forEach((item: any) => {
-            const q = (item.name || '').toLowerCase().trim();
-            const found = FOOD_DB.find(f => f.name.toLowerCase() === q) || FOOD_DB.find(f => f.name.toLowerCase().includes(q) || q.includes(f.name.toLowerCase()));
-            if (found) entries.push({ foodId: found.id, weightGrams: parseInt(item.qty) || 100 });
-          });
-        });
+        const entries = getDiaryProductsForDate(today);
         if (entries.length === 0) { showToast('Нет записей в дневнике за сегодня'); return; }
         setMealProducts(prev => [...prev, ...entries]);
         showToast(`✅ Добавлено ${entries.length} продуктов иИз дневника`);
@@ -993,14 +1089,17 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               {mealProducts.length > 0 && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                   <button onClick={() => {
-                    const result = useV2 ? calcMealScoreV2(mealProducts, v2Profile) : calcMealScore(mealProducts, opts);
-                    if (result && mealTiming !== 'any') {
+                    const result = useV2 ? calcMealScoreV2(mealProducts, v2Profile, toV2Timing(mealTiming)) : calcMealScore(mealProducts, opts);
+                    let timingNote: string | undefined;
+                    if (!useV2 && result && mealTiming !== 'any') {
                       const timingMod = mealTiming === 'pre' ? 1.05 : 1.08;
                       (result as any).compositeScore = Math.min(100, Math.round((result as any).compositeScore * timingMod));
                       (result as any).label = (result as any).compositeScore >= 85 ? '💎 Элитный' : (result as any).compositeScore >= 70 ? '⭐ Отличный' : (result as any).compositeScore >= 50 ? '👍 Хороший' : (result as any).compositeScore >= 30 ? '⚡ Базовый' : '⚠️ Слабый';
-                      (result as any).timingNote = mealTiming === 'pre' ? '🔥 Pre-workout: +5% за быстрые углеводы, кофеин' : '🍗 Post-workout: +8% за белок и восстановление';
+                      timingNote = mealTiming === 'pre' ? '🔥 Pre-workout: +5% за быстрые углеводы, кофеин' : '🍗 Post-workout: +8% за белок и восстановление';
+                    } else if (useV2 && mealTiming !== 'any') {
+                      timingNote = mealTiming === 'pre' ? '🔥 Pre-workout: учтён тайминг перед тренировкой' : '🍗 Post-workout: учтено окно восстановления';
                     }
-                    setMealResult(result as any);
+                    setMealResult(normalizeMealScore(result, timingNote));
                   }} style={{
                     padding: '7px 14px', borderRadius: 8, fontSize: 9, border: 'none',
                     background: 'linear-gradient(135deg, #f97316, #ef4444)', color: '#fff', cursor: 'pointer', fontWeight: 700,
@@ -1040,9 +1139,9 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                     </div>
                     <ScoreBadge score={mealResult.compositeScore} max={mealResult.maxPossible} color={mealResult.color} label={mealResult.label} />
                   </div>
-                  {(mealResult as any).timingNote && (
+                  {mealResult.timingNote && (
                     <div style={{ fontSize:7, color:'#f97316', marginBottom:8, padding:'4px 8px', borderRadius:6, background:'rgba(249,115,22,0.06)', border:'1px solid rgba(249,115,22,0.1)' }}>
-                      {(mealResult as any).timingNote}
+                      {mealResult.timingNote}
                     </div>
                   )}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 8 }}>
@@ -1078,8 +1177,8 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                   {mealResult.productScores.map(ps => (
                     <div key={ps.foodId} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0' }}>
                       <div style={{ width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 7, fontWeight: 800, border: `2px solid ${ps.score >= 55 ? '#22c55e' : ps.score >= 40 ? '#f59e0b' : '#ef4444'}`,
-                        color: ps.score >= 55 ? '#22c55e' : ps.score >= 40 ? '#f59e0b' : '#ef4444',
+                        fontSize: 7, fontWeight: 800, border: `2px solid ${ps.score >= (mealResult.maxPossible <= 10 ? 7 : 55) ? '#22c55e' : ps.score >= (mealResult.maxPossible <= 10 ? 4 : 40) ? '#f59e0b' : '#ef4444'}`,
+                        color: ps.score >= (mealResult.maxPossible <= 10 ? 7 : 55) ? '#22c55e' : ps.score >= (mealResult.maxPossible <= 10 ? 4 : 40) ? '#f59e0b' : '#ef4444',
                       }}>{ps.score}</div>
                       <span style={{ flex: 1, fontSize: 8, color: '#fff' }}>{ps.name}</span>
                       <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.9)' }}>{ps.weight}г</span>
@@ -1097,21 +1196,23 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                       <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>{mealResult.weakLink.reason}</div>
                     </div>
                   )}
-                  {mealResult.productScores.some((ps:any)=>ps.score<50) && (
+                  {mealResult.productScores.some(ps => ps.score < (mealResult.maxPossible <= 10 ? 5 : 50)) && (
                     <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
                       <div style={{ fontSize:9, fontWeight:700, color:'#00e68a', marginBottom:6 }}>🔄 Точечные замены (улучшение скора)</div>
-                      {mealResult.productScores.filter((ps:any)=>ps.score<50).slice(0,3).map((ps:any)=>{
-                        const food = FOOD_DB.find(f=>f.id===ps.foodId);
-                        if(!food) return null;
-                        const sameCat = scored.filter((p:any)=>p.food.category===food.category&&p.food.id!==food.id);
-                        const best = sameCat.sort((a,b)=>b.score.total-a.score.total)[0];
-                        if(!best||best.score.total<=ps.score) return null;
-                        const improvement = Math.round((best.score.total-ps.score)/ps.score*100);
+                       {mealResult.productScores.filter(ps => ps.score < (mealResult.maxPossible <= 10 ? 5 : 50)).slice(0,3).map(ps=>{
+                         const food = FOOD_DB.find(f=>f.id===ps.foodId);
+                         if(!food) return null;
+                         const sameCat = scored.filter((p:any)=>p.food.category===food.category&&p.food.id!==food.id);
+                         const best = sameCat.sort((a,b)=>b.score.total-a.score.total)[0];
+                         if(!best) return null;
+                         const bestScore = useV2 ? (v2Scored.get(best.food.id)?.total ?? best.score.total / 10) : best.score.total;
+                         if(bestScore<=ps.score) return null;
+                         const improvement = Math.round((bestScore-ps.score)/Math.max(1, ps.score)*100);
                         return (
                           <div key={ps.foodId} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 0',fontSize:8}}>
                             <span style={{color:'#ef4444',textDecoration:'line-through'}}>{ps.name} ({ps.score})</span>
                             <span style={{color:'rgba(255,255,255,0.3)'}}>→</span>
-                            <span style={{color:'#22c55e',fontWeight:600}}>{best.food.name} ({best.score.total})</span>
+                             <span style={{color:'#22c55e',fontWeight:600}}>{best.food.name} ({bestScore})</span>
                             <span style={{color:'#22c55e',fontWeight:700,marginLeft:'auto'}}>+{improvement}%</span>
                           </div>
                         );
@@ -1166,7 +1267,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                 if (!diets) return null;
                 const bars = [
                   { label:'🥩 mTOR-активация', value:diets.mtorDeficitMg>0?Math.max(0,100-Math.round(diets.mtorDeficitMg/30*100)):100, max:100, color:'#22c55e', ok:diets.mtorTriggered },
-                  { label:'🧬 Гликемическая нагрузка', value:Math.min(100,Math.round((1-diets.giLoad/100)*100)), max:100, color:diets.giLoadWarning?'#f59e0b':'#22c55e', hint:diets.giLoad.toFixed(0)+' GL' },
+                  { label:'🧬 Гликемическая нагрузка', value:Math.max(0, Math.min(100, Math.round(100 - diets.giLoad / 120 * 100))), max:100, color:diets.giLoadWarning?'#f59e0b':'#22c55e', hint:diets.giLoad.toFixed(0)+' GL' },
                   { label:'⚖️ PRAL (кислотность)', value:Math.max(0,Math.min(100,50-diets.pralTotal*2)), max:100, color:diets.pralWarning?'#ef4444':'#8b5cf6', hint:diets.pralTotal.toFixed(1) },
                   { label:'🩸 Аммиак-риск', value:100-diets.ammoniaScore, max:100, color:diets.ammoniaRisk?'#ef4444':'#22c55e' },
                   { label:'🐟 Омега-баланс', value:Math.min(100,Math.round((1/Math.max(0.1,diets.omegaRatio))*10)), max:100, color:diets.omegaWarning?'#ef4444':'#3b82f6', hint:diets.omegaRatio.toFixed(1)+':1' },
@@ -1299,7 +1400,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
                   <div style={{ flex:1,minWidth:0 }}>
                     <div style={{ fontSize:10,fontWeight:600,color:'#fff' }}>{food.name}</div>
                     <div style={{ fontSize:7,color:'rgba(255,255,255,0.9)' }}>
-                      Скор {score.total}/100 · {food.kcal}ккал · Б{food.protein} Ж{food.fat} У{food.carbs} · {CATEGORY_LABELS[food.category]||food.category}
+                      Скор {useV2 ? `${score.total}/10` : `${score.total}/100`} · {food.kcal}ккал · Б{food.protein} Ж{food.fat} У{food.carbs} · {CATEGORY_LABELS[food.category]||food.category}
                     </div>
                   </div>
                   <div style={{ fontSize:9,fontWeight:700,color:'#22c55e' }}>↑{improvement}%</div>
@@ -1333,4 +1434,3 @@ export const ProductUsefulnessPlanner: React.FC = () => {
     </div>
   );
 };
-

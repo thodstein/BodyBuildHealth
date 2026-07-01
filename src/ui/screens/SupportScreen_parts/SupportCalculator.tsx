@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import type { CalculatorState, CalculatorResult } from '../../../engines/support-calculator.types';
+import type { CalculatorState, CalculatorResult, LabSlice } from '../../../engines/support-calculator.types';
 import { calculateSupportTZ, hydrateState } from '../../../engines/support-calculator.engine';
 import { SYNERGY_ID_LABELS } from '../../../engines/support-calculator.types';
+import { getDrugsToNormalizeMarker, getMarkerName } from '../../../data/support-lab-effects';
+import { UCUM_MAP } from '../../../core/constants';
 
 interface SupportCalculatorProps {
   onApply: (result: { level: string; subs: string[]; result: CalculatorResult }) => void;
@@ -300,6 +302,72 @@ export const SupportCalculator: React.FC<SupportCalculatorProps> = ({ onApply, e
               );
             })}
           </div>
+
+          {/* Lab-based suggestions */}
+          {(() => {
+            if (!state?.labs?.fullPanel) return null;
+            const fp = state.labs.fullPanel;
+            const panelMap: Array<[keyof LabSlice, Record<string, string>]> = [
+              ['panelBiochem', fp.panelBiochem], ['panelHematology', fp.panelHematology],
+              ['panelLipid', fp.panelLipid], ['panelSex', fp.panelSex],
+              ['panelThyroid', fp.panelThyroid], ['panelMineral', fp.panelMineral],
+              ['panelCoagulation', fp.panelCoagulation], ['panelCardiac', fp.panelCardiac],
+            ];
+            const markerMap: Record<string, string> = {
+              ALT:'ALT', AST:'AST', GGT:'GGT', 'Bilirubin':'BIL', 'Glucose':'GLU', 'Creatinine':'CREATININE', 'CRP':'CRP', 'Homocysteine':'HOMOCYSTEINE',
+              HCT:'HCT', Hemoglobin:'HGB', Platelets:'PLT',
+              LDL:'LDL', HDL:'HDL', Triglycerides:'TG',
+              'Total T':'TT', E2:'E2', Prolactin:'PRL', LH:'LH', FSH:'FSH',
+              TSH:'TSH', 'T4 free':'FT4',
+              Potassium:'K', Sodium:'NA', Magnesium:'MG',
+              'D-dimer':'D_DIMER', Fibrinogen:'FIBRINOGEN',
+              'NT-proBNP':'NT_PROBNP',
+            };
+            const deviations: Array<{ marker: string; name: string; value: number; isHigh: boolean }> = [];
+            for (const [, panel] of panelMap) {
+              if (!panel) continue;
+              for (const [key, val] of Object.entries(panel)) {
+                const ucumKey = markerMap[key];
+                if (!ucumKey) continue;
+                const numVal = parseFloat(val);
+                if (isNaN(numVal)) continue;
+                const ref = UCUM_MAP[ucumKey];
+                if (!ref) continue;
+                const norm = numVal * (ref.coeff || 1);
+                if (norm > ref.uln) deviations.push({ marker: ucumKey, name: ref.name || key, value: norm, isHigh: true });
+                else if (norm < ref.lln) deviations.push({ marker: ucumKey, name: ref.name || key, value: norm, isHigh: false });
+              }
+            }
+            if (deviations.length === 0) return null;
+            const plannedIds = new Set(result.selectedSubstances.map((s: string) => s.toLowerCase()));
+            return (
+              <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.1)', marginBottom: 6 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>🩸 Лабораторные отклонения и рекомендации</div>
+                {deviations.slice(0, 6).map(d => {
+                  const drugs = getDrugsToNormalizeMarker(d.marker, d.isHigh).slice(0, 4);
+                  const inPlan = drugs.filter(d2 => plannedIds.has(d2.drugId.toLowerCase()));
+                  const notInPlan = drugs.filter(d2 => !plannedIds.has(d2.drugId.toLowerCase()));
+                  return (
+                    <div key={d.marker} style={{ marginBottom: 4, padding: '4px 6px', borderRadius: 6, background: 'rgba(0,0,0,0.1)' }}>
+                      <div style={{ fontSize: 8, fontWeight: 600, color: d.isHigh ? '#ef4444' : '#3b82f6' }}>
+                        {d.name} {d.isHigh ? '↑' : '↓'} {d.value}
+                      </div>
+                      {inPlan.length > 0 && (
+                        <div style={{ fontSize: 7, color: '#00e68a', marginTop: 2 }}>
+                          ✓ В плане: {inPlan.map(d2 => d2.drugId).join(', ')}
+                        </div>
+                      )}
+                      {notInPlan.length > 0 && (
+                        <div style={{ fontSize: 7, color: '#fbbf24', marginTop: 1 }}>
+                          💡 Доп.: {notInPlan.map(d2 => d2.drugId).join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Contraindications */}
           {result.contraindicationAlerts.length > 0 && (

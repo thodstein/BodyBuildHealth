@@ -568,7 +568,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (a === 'орехи') { if (n.includes('миндаль')||n.includes('грецк')||n.includes('кешью')||n.includes('фундук')||n.includes('пекан')||n.includes('макадам')||n.includes('фисташк')||n.includes('орех')||n.includes('nut')||n.includes('almond')||n.includes('walnut')||n.includes('cashew')||n.includes('hazeln')||n.includes('pecan')||n.includes('pistach')) return true; }
       if (a === 'арахис') { if (n.includes('арахис')||n.includes('peanut')||n.includes('groundnut')||n.includes('ахид')||n.includes('землян')) return true; }
       if (a === 'яйца') { if (n.includes('яйц')||n.includes('яич')||n.includes('яичн')||n.includes('белок')||n.includes('желтк')||n.includes('омлет')||n.includes('egg')||n.includes('egg_')||n.includes('майонез')) return true; }
-      if (a === 'соя') { if (n.includes('со')||n.includes('тофу')||n.includes('соев')||n.includes('edamame')||n.includes('soy')||n.includes('мисо')||n.includes('miso')||n.includes('темпе')||n.includes('tamari')) return true; }
+      if (a === 'соя') { if (n.includes('соя')||n.includes('соев')||n.includes('тофу')||n.includes('edamame')||n.includes('soy')||n.includes('мисо')||n.includes('miso')||n.includes('темпе')||n.includes('tamari')) return true; }
       if (a === 'рыба') { if (n.includes('рыб')||n.includes('лосос')||n.includes('тунец')||n.includes('треск')||n.includes('палтус')||n.includes('скумбр')||n.includes('форель')||n.includes('сардин')||n.includes('сельдь')||n.includes('anchov')||n.includes('fish')||n.includes('salmon')||n.includes('tuna')||n.includes('cod')||n.includes('halibut')) return true; }
       if (a === 'морепродукты') { if (n.includes('креветк')||n.includes('краб')||n.includes('лобстер')||n.includes('омар')||n.includes('мидии')||n.includes('кальмар')||n.includes('осьминог')||n.includes('shrimp')||n.includes('crab')||n.includes('lobster')||n.includes('mussel')||n.includes('squid')||n.includes('scallop')||n.includes('устриц')||n.includes('моллюск')||n.includes('ракушк')||n.includes('langoust')) return true; }
       if (a === 'кунжут') { if (n.includes('кунжут')||n.includes('сезам')||n.includes('тахини')||n.includes('sesame')||n.includes('tahini')) return true; }
@@ -580,6 +580,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     };
     const allergenIds = new Set<string>();
     allergens.forEach(a => { const vals = userAllergenToValues[a] || [a]; vals.forEach(v => allergenIds.add(v)); });
+    const allergenLabel = (code: string): string => ALLERGEN_LIST.find(a => a.id === code)?.label || code;
+    const matchesSelectedAllergen = (food: any, selectedCode: string): boolean => {
+      const tags = getFoodAllergens(food.id);
+      return tags.includes(selectedCode) || allergenTextMatches(selectedCode, food.name);
+    };
     // Wire diet preferences into allergen/exclusion system
     dietPrefs.forEach(dp => {
       if (dp === 'no_dairy' && !allergens.includes('молочные')) { ['dairy'].forEach(v => allergenIds.add(v)); }
@@ -732,9 +737,37 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         });
         totals = { kcal: meals.reduce((s: number, m: any) => s + m.totals.kcal, 0), p: meals.reduce((s: number, m: any) => s + m.totals.p, 0), f: meals.reduce((s: number, m: any) => s + m.totals.f, 0), c: meals.reduce((s: number, m: any) => s + m.totals.c, 0) };
       }
-      const allergenWarnings: string[] = [];
-      meals.forEach(m => { m.items.forEach((it: any) => { const food = FOOD_DB.find(f => f.id === it.id); if (food?.allergens) { const matched = food.allergens.filter(a => !allergens.includes(a)); if (matched.length > 0 && !excludedIds.has(food.id)) allergenWarnings.push(`${it.name}: содержит ${matched.join(', ')}`); } }); });
-      return { meals, totals, isTrainingDay, isWorkDay, allergenWarnings: [...new Set(allergenWarnings)] };
+      const addMacroTopUp = (macro: 'p' | 'f' | 'c', deficit: number) => {
+        if (deficit <= 0 || meals.length === 0) return;
+        const targetMeal = meals[meals.length - 1];
+        const candidateId = macro === 'p' ? 'whey_isolate' : macro === 'f' ? 'olive_oil' : 'rice_white';
+        const food = FOOD_DB.find(f => f.id === candidateId);
+        if (!food) return;
+        const per100 = macro === 'p' ? food.protein : macro === 'f' ? food.fat : food.carbs;
+        if (!per100) return;
+        const amount = Math.min(macro === 'f' ? 25 : 180, Math.max(macro === 'f' ? 5 : 30, Math.round(deficit / per100 * 100)));
+        const r = amount / 100;
+        const item = { name: food.name, id: food.id, amount, kcal: Math.round(food.kcal * r), p: Math.round(food.protein * r), f: Math.round(food.fat * r), c: Math.round(food.carbs * r) };
+        targetMeal.items.push(item);
+        targetMeal.totals = { kcal: targetMeal.items.reduce((s: number, i: any) => s + i.kcal, 0), p: targetMeal.items.reduce((s: number, i: any) => s + i.p, 0), f: targetMeal.items.reduce((s: number, i: any) => s + i.f, 0), c: targetMeal.items.reduce((s: number, i: any) => s + i.c, 0) };
+      };
+      addMacroTopUp('p', tP_ - totals.p);
+      addMacroTopUp('f', tF_ - totals.f);
+      addMacroTopUp('c', tC_ - totals.c);
+      totals = { kcal: meals.reduce((s: number, m: any) => s + m.totals.kcal, 0), p: meals.reduce((s: number, m: any) => s + m.totals.p, 0), f: meals.reduce((s: number, m: any) => s + m.totals.f, 0), c: meals.reduce((s: number, m: any) => s + m.totals.c, 0) };
+      const allergenWarnings: { food: string; allergens: string[] }[] = [];
+      meals.forEach(m => {
+        m.items.forEach((it: any) => {
+          const food = FOOD_DB.find(f => f.id === it.id);
+          if (!food || excludedIds.has(food.id) || allergenIds.size === 0) return;
+          const matched = [...allergenIds].filter(a => matchesSelectedAllergen(food, a));
+          if (matched.length > 0) allergenWarnings.push({ food: it.name, allergens: matched.map(allergenLabel) });
+        });
+      });
+      const uniqueAllergenWarnings = Array.from(
+        new Map(allergenWarnings.map(w => [`${w.food}:${w.allergens.join('|')}`, w])).values()
+      );
+      return { meals, totals, isTrainingDay, isWorkDay, allergenWarnings: uniqueAllergenWarnings };
     };
     const dayIdx = days === 1 ? selectedDayIndex : 0;
     const d1 = buildDay(dayIdx, trainingDays[dayIdx]);
@@ -856,7 +889,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const hasGLP = injections.some(i => i.type === 'семаглутид' || i.type === 'тирзепатид'); const hasAAS = injections.some(i => i.type === 'ААС');
       const totalInsulinDose = injections.filter(i => i.type === 'инсулин' && i.esterType !== 'long').reduce((s, i) => s + i.dose, 0);
       if (hasAAS) recs.push('💉 ААС: белок +0.3г/кг, вода 40мл/кг, NAC/расторопша.');
-      if (hasShortInsulin || hasInsulin) { recs.push(`💉 Инсулин: ${totalInsulinDose}ЕД × 10г = ${totalInsulinDose*10}г угл. Минимум 150г угл/день.`); recs.push('🍔 На инсулине — минимум жиров в окне действия.’);'); }
+      if (hasShortInsulin || hasInsulin) { recs.push(`💉 Инсулин: ${totalInsulinDose}ЕД × 10г = ${totalInsulinDose*10}г угл. Минимум 150г угл/день.`); recs.push('🍔 На инсулине — минимум жиров в окне действия.'); }
       if (hasGH) recs.push('🧬 ГР: избегать угл в окне 60мин до/после. Вода +0.5-1л.');
       if (hasIGF) recs.push('🧬 ИФР-1: натощак за 30-45мин до еды. Контроль глюкозы.');
       if (hasGLP) recs.push('💊 GLP-1: дробно 5-6р по 100-200г. Жиры <5г/приём.');
@@ -911,7 +944,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (daily.diaasWarning) recs.push(`💪 ${daily.diaasWarning}`);
 
       // GI load
-      if (daily.giLoadWarning) recs.push(`🫃 Высокая нагрузка на ЖКТ (${Math.round(daily.giLoad)}). Добавьте пищеварительные ферменты или уменьшите порции.`);
+      if (daily.giLoadWarning) recs.push(`🧬 Высокая гликемическая нагрузка (${Math.round(daily.giLoad)} GL). Разнесите углеводы по приёмам и замените часть быстрых углеводов на низко-GI источники.`);
 
       // Electrolytes
       if (daily.electrolyteRisk) recs.push(`💧 Риск электролитов: K ${Math.round(daily.potassiumMg)}мг, Mg ${Math.round(daily.magnesiumMg)}мг. Добавьте шпинат, авокадо, орехи.`);
@@ -1026,7 +1059,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             <div style={{height:'100%',width:`${Math.max(2,cKcalPct)}%`,background:'#f97316',minWidth:2,flex:1}}/>
           </div>
         </div>
-        {d.allergenWarnings?.length > 0 && <div style={{padding:'6px 10px',borderRadius:8,background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',fontSize:8,color:'#ef4444',marginBottom:8,display:'flex',alignItems:'center',gap:4}}><span style={{fontSize:10}}>⚠️</span><span>{d.allergenWarnings.join('; ')}</span></div>}
+        {d.allergenWarnings?.length > 0 && <div style={{padding:'6px 10px',borderRadius:8,background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',fontSize:8,color:'#ef4444',marginBottom:8,display:'flex',alignItems:'center',gap:4}}><span style={{fontSize:10}}>⚠️</span><span>{d.allergenWarnings.map((w: any) => typeof w === 'string' ? w : `${w.food}: ${w.allergens.join(', ')}`).join('; ')}</span></div>}
         {d.meals.map((m: any, mi: number) => {
           const mealKcal = Math.round(m.totals?.kcal || 0); const mealP = Math.round(m.totals?.p || 0); const mealF = Math.round(m.totals?.f || 0); const mealC = Math.round(m.totals?.c || 0);
           const mealDiaas = calcMealDIAAS((m.items || []).map((it: any) => ({ foodId: it.id || it.name, weightGrams: it.amount || 100 })));

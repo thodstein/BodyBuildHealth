@@ -151,7 +151,8 @@ export const TrainingScreen: React.FC = () => {
   const [manualWorkMax, setManualWorkMax] = useState<Record<string, number>>({ chest: 100, back: 110, legs: 140, shoulders: 60, arms: 50, core: 60 });
   const setManualWm = (k: string, v: number) => setManualWorkMax(p => ({ ...p, [k]: v }));
   const PCT_FOR_RIR_MAN: Record<number, number> = { 0: 1.0, 1: 0.96, 2: 0.92, 3: 0.88, 4: 0.84, 5: 0.80 };
-  const [manualResult, setManualResult] = useState<{ splitName: string; corrections: string[]; days: { day: number; groups: string[]; exercises: { name: string; sets: number; reps: string; rir: number; rest: number; group: string; weight: number }[] }[] } | null>(null);
+  const [manualResult, setManualResult] = useState<{ splitName: string; corrections: string[]; days: { day: number; groups: string[]; exercises: { name: string; sets: number; reps: string; rir: number; rest: number; group: string; weight: number }[] }[] } | null>(() => { try { return JSON.parse(localStorage.getItem('he_manual_session') || 'null'); } catch { return null; } });
+  useEffect(() => { try { localStorage.setItem('he_manual_session', JSON.stringify(manualResult)); } catch { /* ignore */ } }, [manualResult]);
   const [manualSavedPlans, setManualSavedPlans] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); } catch { return []; } });
   const loadManualPlan = (plan: any) => { if (plan?.cfg) setManualCfg(plan.cfg); if (plan?.days) setManualResult({ splitName: plan.name || 'Загруженный план', corrections: plan.corrections || [], days: plan.days }); };
   const refreshManualSaved = () => { try { setManualSavedPlans(JSON.parse(localStorage.getItem('myTrainingPlans') || '[]')); } catch { setManualSavedPlans([]); } };
@@ -309,7 +310,8 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
   const [historyExpanded, setHistoryExpanded] = useState<string | null>(null);
 
   // Runtime (live workout) state
-  const [runtimeDay, setRuntimeDay] = useState<number>(1);
+  const [runtimeDay, setRuntimeDay] = useState<number>(() => { try { const v = JSON.parse(localStorage.getItem('he_runtime_day') || '1'); return typeof v === 'number' ? v : 1; } catch { return 1; } });
+  useEffect(() => { try { localStorage.setItem('he_runtime_day', JSON.stringify(runtimeDay)); } catch { /* ignore */ } }, [runtimeDay]);
   const [runtimeExIdx, setRuntimeExIdx] = useState(0);
   const [runtimeLogs, setRuntimeLogs] = useState<Record<string, { sets: { weight: number; reps: number; rpe: number; rir: number }[]; completed: boolean }>>({});
   const [runtimeStarted, setRuntimeStarted] = useState(false);
@@ -1460,6 +1462,9 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
               {macrocycle && currentMicrocycle ? (
                 <>
                   <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+                    {(() => { const _td = currentMicrocycle.days.filter((d: any) => d.isTraining); const _todayIdx = (((new Date().getDay() + 6) % 7)) % Math.max(1, _td.length); return (
+                      <button onClick={() => setRuntimeDay(_todayIdx)} title="Сегодня (по дню недели)" style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: 'rgba(0,230,138,0.12)', color: 'var(--accent)', border: '1px solid rgba(0,230,138,0.4)' }}>📅 Сегодня</button>
+                    ); })()}
                     {currentMicrocycle.days.filter((d: any) => d.isTraining).map((day: any, di: number) => (
                       <button key={di} onClick={() => setRuntimeDay(di)} style={{
                         padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: runtimeDay === di ? 700 : 400, cursor: 'pointer',
@@ -3570,6 +3575,7 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
           </div>
         );
 return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            <TrainingRecommendationsCard historyWorkouts={historyWorkouts} level={level} weakPoints={tprofile.weakPoints} readinessHistory={loadReadinessHistory()} acwr={(() => { try { const _s = loadSRPESessions(); if (_s.length < 2) return undefined; return acuteChronicRatio(toDailyLoads(_s)).ratio; } catch { return undefined; } })()} />
           <div style={gCard}>
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, letterSpacing:'0.3px', textTransform:'uppercase', marginBottom:8 }}>📜 История тренировок</div>
             <div style={{ display:'flex', gap:6, marginBottom:8 }}>
@@ -3670,7 +3676,7 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
         } catch { return <div style={{ padding:20, textAlign:'center', color:'rgba(255,255,255,0.3)', fontSize:11 }}>Ошибка загрузки истории</div>; }
       })()}</InfoErrorBoundary>}
       {/* ═══════════ ANALYTICS TAB ═══════════ */}
-      {tab === 'analytics' && <InfoErrorBoundary label="Аналитика"><><MuscleProgressCard sessions={historyWorkouts} level={level} /><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /></></InfoErrorBoundary>}
+      {tab === 'analytics' && <InfoErrorBoundary label="Аналитика"><><MuscleProgressCard sessions={historyWorkouts} level={level} /><VolumeTrendCard sessions={historyWorkouts} /><LiftHistoryCard sessions={historyWorkouts} /><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /></></InfoErrorBoundary>}
       {tab === 'library' && (
   <InfoErrorBoundary label="Каталог циклов">
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -3692,6 +3698,7 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
       {tab === 'timers' && <InfoErrorBoundary label="Таймеры"><TimersTab /></InfoErrorBoundary>}
       {tab === 'progress' && <InfoErrorBoundary label="Прогресс"><ProgressTab historyWorkouts={historyWorkouts} /></InfoErrorBoundary>}
       {tab === 'excalc' && <InfoErrorBoundary label="Калькулятор упражнений"><ExerciseCalcTab /></InfoErrorBoundary>}
+      {tab === 'calc_1rm' && <InfoErrorBoundary label="Калькулятор 1RM"><OneRmCalcTab /></InfoErrorBoundary>}
       {tab === 'volume' && <InfoErrorBoundary label="Расчёт объёма"><VolumeOptimizerTab /></InfoErrorBoundary>}
       {tab === 'calc_substitute' && <InfoErrorBoundary label="Замена упражнения"><CalcSubstituteTab /></InfoErrorBoundary>}
       {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} onBuildPlan={() => setTab('plan')} /></InfoErrorBoundary>}
@@ -3800,6 +3807,10 @@ import { CalcSubstituteTab } from './TrainingScreen_parts/CalcSubstituteTab';
 import { CalcQualityTab } from './TrainingScreen_parts/CalcQualityTab';
 import { MuscleProgressCard } from './TrainingScreen_parts/MuscleProgressCard';
 import { MicrocyclePlannerCard } from './TrainingScreen_parts/MicrocyclePlannerCard';
+import { TrainingRecommendationsCard } from './TrainingScreen_parts/TrainingRecommendationsCard';
+import { OneRmCalcTab } from './TrainingScreen_parts/OneRmCalcTab';
+import { LiftHistoryCard } from './TrainingScreen_parts/LiftHistoryCard';
+import { VolumeTrendCard } from './TrainingScreen_parts/VolumeTrendCard';
 import { usePlanGeneration } from '../hooks/usePlanGeneration';
 import { PowerliftingTab } from './TrainingScreen_parts/PowerliftingTab';
 import { BodybuildingTab } from './TrainingScreen_parts/BodybuildingTab';

@@ -6,6 +6,8 @@ import {
   SYNERGY_ID_SUBSTANCES, TITRATION_RULES, SYNERGY_ID_LABELS,
 } from './support-calculator.types';
 import { evaluateRecommendations } from './recommendation-engine';
+import { calculateTzSpecRisk, type TzSpecInput, type DrugInput, type TzSpecResult, type TzSpecMechanismResult } from './risk-engine-tz-spec';
+import { DRUG_DB } from '../data/support-db';
 
 const SYS_META: Record<RiskSystemId, { label: string; icon: string }> = {
   cardio: { label: 'Сердечно-сосудистая', icon: '❤️' },
@@ -479,6 +481,117 @@ function getContraindicationAlerts(state: CalculatorState): string[] {
   return alerts;
 }
 
+// ── TZ Risk Engine helpers ──
+function extractLabValues(labs: CalculatorState['labs']): Record<string, number> {
+  const v: Record<string, number> = {};
+  const fp = labs?.fullPanel || labs?.midCourse || labs?.preCourse;
+  if (fp) {
+    const b = (fp.panelBiochem || {}) as Record<string, any>;
+    if (b.ALT) v['ALT'] = Number(b.ALT);
+    if (b.AST) v['AST'] = Number(b.AST);
+    if (b.GGT) v['GGT'] = Number(b.GGT);
+    if (b.LDL) v['LDL'] = Number(b.LDL);
+    if (b.HDL) v['HDL'] = Number(b.HDL);
+    if (b.CREAT) v['CREAT'] = Number(b.CREAT);
+    if (b.GLUC) v['GLU'] = Number(b.GLUC);
+    if (b.K) v['K'] = Number(b.K);
+    const h = (fp.panelHematology || {}) as Record<string, any>;
+    if (h.HCT) v['HCT'] = Number(h.HCT);
+    const s = (fp.panelSex || {}) as Record<string, any>;
+    if (s.LH) v['LH'] = Number(s.LH);
+    if (s.TT) v['TT'] = Number(s.TT);
+    if (s.E2) v['E2'] = Number(s.E2);
+  }
+  return v;
+}
+
+function buildTzInput(state: CalculatorState, supportSubs: string[]): TzSpecInput | null {
+  const drugs: DrugInput[] = [];
+  const aasList = state.pharma.aas;
+
+  for (const a of aasList) {
+    const id = (a.id || '').toLowerCase();
+    const dbEntry = DRUG_DB[id] || DRUG_DB[a.id];
+    const form = dbEntry?.form === 'oral' ? 'oral' as const : 'inject' as const;
+    const dbClass = dbEntry?.class || 'aas';
+    const drugClass: 'aas' | 'gh' | 'insulin' = dbClass === 'gh' ? 'gh' : dbClass === 'insulin' ? 'insulin' : 'aas';
+    drugs.push({ drugClass, drugName: a.id, dose: a.doseMgWeek || 0, form });
+  }
+
+  if (state.pharma.hasGH && !drugs.some(d => d.drugName === 'mk677' || d.drugName === 'cjc1295')) {
+    drugs.push({ drugClass: 'gh', drugName: 'cjc1295', dose: 300, form: 'inject' });
+  }
+  if (state.pharma.hasIGF && !drugs.some(d => d.drugName === 'igf1_lr3')) {
+    drugs.push({ drugClass: 'gh', drugName: 'igf1_lr3', dose: 100, form: 'inject' });
+  }
+  if (state.pharma.hasInsulin && !drugs.some(d => d.drugClass === 'insulin')) {
+    drugs.push({ drugClass: 'insulin', drugName: 'ins_short', dose: 10, form: 'inject' });
+  }
+  if (state.pharma.hasGLP1 && !drugs.some(d => d.drugName === 'semaglutide' || d.drugName === 'tirzepatide')) {
+    drugs.push({ drugClass: 'insulin', drugName: 'semaglutide', dose: 5, form: 'inject' });
+  }
+
+  if (drugs.length === 0) return null;
+
+  const allAasWeeks = aasList.map(a => a.weeks || 12);
+  const duration = Math.max(...allAasWeeks, 12);
+  const labValues = extractLabValues(state.labs);
+  const firstDrug = drugs[0];
+  return {
+    drugClass: firstDrug.drugClass, drugName: firstDrug.drugName,
+    dose: firstDrug.dose, duration,
+    form: firstDrug.form,
+    combinations: Math.max(1, drugs.length),
+    labCoverage: Object.keys(labValues).length > 0 ? 0.7 : 0.3,
+    labValues, supportSubstances: supportSubs, drugs,
+  };
+}
+
+function tzToScores(tzResult: TzSpecResult, oldScores: Record<RiskSystemId, number>): Record<RiskSystemId, number> {
+  const scores: Record<string, number> = {
+    cardio: 0, hepatic: 0, renal: 0, neuro: 0,
+    endocrine: 0, hematologic: 0, reproductive: 0, musculoskeletal: 0,
+  };
+  for (const organ of tzResult.organs) {
+    const mappedId = organ.id === 'cns' ? 'neuro' : organ.id;
+    scores[mappedId] = organ.rawPercent;
+  }
+  scores['endocrine'] = oldScores['endocrine'] || 0;
+  scores['musculoskeletal'] = oldScores['musculoskeletal'] || 0;
+  return scores as Record<RiskSystemId, number>;
+}
+
+function toSystemRisksFromTz(
+  tzResult: TzSpecResult,
+  oldScores: Record<RiskSystemId, number>,
+  synergyCount: number,
+): SystemRisk[] {
+  const tzMechMap = new Map<string, TzSpecMechanismResult[]>();
+  const tzAfterMap = new Map<string, number>();
+  for (const organ of tzResult.organs) {
+    tzMechMap.set(organ.id, organ.mechanisms);
+    tzAfterMap.set(organ.id, organ.afterPercent);
+  }
+  return (Object.keys(SYS_META) as RiskSystemId[]).map(id => {
+    const tzId = id === 'neuro' ? 'cns' : id;
+    const tzMechs = tzMechMap.get(tzId) || [];
+    const raw = oldScores[id] || 0;
+    const afterSupport = tzAfterMap.get(tzId) ?? Math.max(0, raw - Math.round(raw * Math.min(0.7, 0.3 + synergyCount * 0.02)));
+    const mechs: MechanismDetail[] = tzMechs.length > 0
+      ? tzMechs.map((m, i) => ({
+          id: i + 1, name: m.name,
+          contribution: Math.round(m.raw),
+          active: m.raw > 5, triggers: [],
+        }))
+      : MECH_NAMES[id].slice(0, 7).map((name, i) => ({
+          id: i + 1, name,
+          contribution: raw > 0 ? Math.round(raw / 7 * (i + 1)) : 0,
+          active: false, triggers: [],
+        }));
+    return { id, label: SYS_META[id].label, icon: SYS_META[id].icon, rawScore: raw, afterSupport, mechanisms: mechs };
+  });
+}
+
 export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   const blacklist = getBlacklist(state);
   const synergyIds = selectSynergyGroups(state);
@@ -499,8 +612,8 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   const resultPre: any = { selectedSubstances: substances, schedule: [], synergyIdsUsed: synergyIds, overallRiskBefore: 0, overallRiskAfter: 0 };
   const recommendations = evaluateRecommendations(state, resultPre);
   for (const rec of recommendations)
-    for (const id of rec.ids)
-      if (!used.has(id)) { substances.push(id); used.add(id); }
+    for (const sub of rec.substances)
+      if (!used.has(sub.id)) { substances.push(sub.id); used.add(sub.id); }
 
   // 3. ТZ-подбор: breadth + targeted без ограничений
   interface DBEntry { organId: string; mechId: string; k: number; q: string; }
@@ -511,21 +624,26 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     Object.assign(allDb, supp.SUPPLEMENTS_DB || {}, pharm.PHARMACY_DB || {});
   } catch {}
 
-  const riskSystems = ['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal'];
+  const riskSystems: RiskSystemId[] = ['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal'];
   const levelThresholds: Record<string, number> = { basic: 65, mid: 45, max: 30 };
 
+  // ── TZ Risk: рассчитываем риск БЕЗ поддержки для отбора веществ ──
+  const oldScores = calcAllRisks(state);
+  const tzInputPre = buildTzInput(state, []);
+  const tzResultPre = tzInputPre ? calculateTzSpecRisk(tzInputPre) : null;
+  const scoresPre = tzResultPre ? tzToScores(tzResultPre, oldScores) : oldScores;
+
   if (Object.keys(allDb).length > 0) {
-    const scores = calcAllRisks(state);
     const threshold = levelThresholds[state.powerLevel] ?? 25;
 
     // Breadth: все препараты, покрывающие активные системы риска (risk score > threshold)
-    const activeSystems = riskSystems.filter(sys => (scores[sys] || 0) > threshold);
+    const activeSystems = riskSystems.filter(sys => (scoresPre[sys] || 0) > threshold);
     const scored: [string, number, number][] = [];
     for (const [id, entries] of Object.entries(allDb)) {
       if (used.has(id) || !entries.length) continue;
       let matchCount = 0; let totalK = 0;
       for (const e of entries) {
-        if (activeSystems.includes(e.organId)) { matchCount++; totalK += e.k; }
+        if (activeSystems.includes(e.organId as RiskSystemId)) { matchCount++; totalK += e.k; }
       }
       if (matchCount > 0) scored.push([id, matchCount, totalK]);
     }
@@ -547,7 +665,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       }
       if (best) { substances.push(best[0]); used.add(best[0]); }
       // Если риск >50% — добавляем ещё 1 препарат для этого механизма
-      if ((scores[sys] || 0) > 50) {
+      if ((scoresPre[sys] || 0) > 50) {
         let second: [string, number] | null = null;
         for (const [id, entries] of Object.entries(allDb)) {
           if (used.has(id)) continue;
@@ -559,17 +677,34 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     }
   }
 
+  // ── Финальный расчёт риска С поддержкой (TZ engine) ──
   const titration = applyTitration(substances, state);
-  const scores = calcAllRisks(state);
   const labDeltas = calcLabDeltas(state);
-  const overallRaw = Math.round(Math.max(...Object.values(scores)));
-  const cw = state.courseWeek ?? 1;
-  const weekProtectionBonus = Math.min(0.15, cw * 0.015);
-  const protBase = 0.3 + (synergyIds.length * 0.02) + weekProtectionBonus;
-  const levelMult = state.powerLevel === 'max' ? 0.65 : state.powerLevel === 'mid' ? 0.50 : 0.35;
-  const protection = Math.min(0.85, protBase + levelMult);
-  const overallAfterSupport = Math.round(Math.max(5, overallRaw - Math.round(overallRaw * protection)));
   const schedule = generateSchedule(substances, synergyIds, titration);
+
+  let overallRaw: number;
+  let overallAfterSupport: number;
+  let finalScores: Record<RiskSystemId, number>;
+  let tzResultFinal: TzSpecResult | null = null;
+
+  const tzInputFinal = buildTzInput(state, substances);
+  if (tzInputFinal) {
+    tzResultFinal = calculateTzSpecRisk(tzInputFinal);
+    finalScores = tzToScores(tzResultFinal, oldScores);
+    overallRaw = tzResultFinal.overallRaw;
+    overallAfterSupport = tzResultFinal.overallAfter;
+  } else {
+    // Нет ААС — старая эвристика
+    finalScores = oldScores;
+    overallRaw = Math.round(Math.max(...Object.values(oldScores)));
+    const cw = state.courseWeek ?? 1;
+    const weekProtectionBonus = Math.min(0.15, cw * 0.015);
+    const protBase = 0.3 + (synergyIds.length * 0.02) + weekProtectionBonus;
+    const levelMult = state.powerLevel === 'max' ? 0.65 : state.powerLevel === 'mid' ? 0.50 : 0.35;
+    const protection = Math.min(0.85, protBase + levelMult);
+    overallAfterSupport = Math.round(Math.max(5, overallRaw - Math.round(overallRaw * protection)));
+  }
+
   const result: CalculatorResult = {
     risk: { systems: [], overallRaw, overallAfterSupport, timestamp: new Date().toISOString() },
     schedule, selectedSubstances: substances,
@@ -579,11 +714,17 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     contraindicationAlerts: getContraindicationAlerts(state),
     negativeBlocks: blacklist,
     comparisonBeforeAfter: (Object.keys(SYS_META) as RiskSystemId[]).map(id => ({
-      system: id, before: scores[id], after: Math.max(0, scores[id] - Math.round(scores[id] * protection)),
+      system: id,
+      before: finalScores[id] || 0,
+      after: tzResultFinal
+        ? (tzResultFinal.organs.find(o => o.id === (id === 'neuro' ? 'cns' : id))?.afterPercent ?? 0)
+        : Math.max(0, (finalScores[id] || 0) - Math.round((finalScores[id] || 0) * 0.4)),
     })),
     timestamp: new Date().toISOString(),
   };
-  result.risk.systems = toSystemRisks(scores, result);
+  result.risk.systems = tzResultFinal
+    ? toSystemRisksFromTz(tzResultFinal, finalScores, synergyIds.length)
+    : toSystemRisks(finalScores, result);
   return result;
 }
 

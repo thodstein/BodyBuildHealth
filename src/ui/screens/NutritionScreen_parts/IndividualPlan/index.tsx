@@ -375,9 +375,9 @@ const ReportTab: React.FC = () => {
         {/* Allergen warnings */}
         {r.allergenWarnings && r.allergenWarnings.length > 0 && <div style={card}>
           <div style={{ fontSize:9, fontWeight:600, color:'#ef4444', marginBottom:4 }}>⚠️ Аллергены</div>
-          {r.allergenWarnings.map((w: { food: string; allergens: string[] }, i: number) => (
+          {r.allergenWarnings.map((w: { food: string; allergens: string[] } | string, i: number) => (
             <div key={i} style={{ fontSize:7, color:'rgba(255,255,255,0.7)', marginBottom:2 }}>
-              {w.food}: {w.allergens.join(', ')}
+              {typeof w === 'string' ? w : `${w.food}: ${w.allergens.join(', ')}`}
             </div>
           ))}
         </div>}

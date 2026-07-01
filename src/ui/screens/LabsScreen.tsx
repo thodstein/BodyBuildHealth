@@ -6,6 +6,7 @@ import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine'
 import { computeLabIndexDetails, type LabIndexDetail } from '../../engines/labs-indices.engine';
 import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
+import { getDrugsToNormalizeMarker, getMarkerName } from '../../data/support-lab-effects';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { LabsScoreCard } from '../components/LabsScoreCard';
 import { LabsTzRiskTab } from './LabsScreen_parts/LabsTzRiskTab';
@@ -179,7 +180,7 @@ export const LabsScreen: React.FC = () => {
   const [catalogDetail, setCatalogDetail] = useState<{ code: string; name: string; unit: string; uln: number; lln: number; system: string; description: string } | null>(null);
   const [catFilterSys, setCatFilterSys] = useState('all');
   const [riskSections, setRiskSections] = useState<Record<string, boolean>>({
-    pharma: true, indices: true, systems: true, markers: true, requiredLabs: false,
+    pharma: true, indices: true, systems: true, markers: true, requiredLabs: false, normalizeDrugs: false,
   });
   const [addError, setAddError] = useState('');
   const [labReportGenerated, setLabReportGenerated] = useState(false);
@@ -1454,6 +1455,42 @@ export const LabsScreen: React.FC = () => {
                 </div>
               )}
               </div>)}</div>
+
+            {/* Drugs to Normalize */}
+            {deviationCount > 0 && labRisks && (
+              <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 8 }}>
+                <button onClick={() => setRiskSections(s => ({ ...s, normalizeDrugs: !s.normalizeDrugs }))} style={{
+                  display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
+                  background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 12, fontWeight: 700,
+                }}>
+                  <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: riskSections.normalizeDrugs ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+                  💊 Препараты для нормализации маркеров
+                </button>
+                {riskSections.normalizeDrugs && (<div style={{ padding: '0 12px 12px' }}>
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    {labRisks.markerDeviations.slice(0, 8).map(m => {
+                      const isHigh = m.deviation > 0;
+                      const drugs = getDrugsToNormalizeMarker(m.code, isHigh).slice(0, 5);
+                      if (!drugs.length) return null;
+                      return (
+                        <div key={m.code} style={{ padding: '6px 8px', borderRadius: 8, background: isHigh ? 'rgba(239,68,68,0.04)' : 'rgba(59,130,246,0.04)', border: `1px solid ${isHigh ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)'}` }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 4, color: isHigh ? '#ef4444' : '#3b82f6' }}>
+                            {m.name} {isHigh ? '↑' : '↓'} {Math.abs(m.deviation)}% → нормализация
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                            {drugs.map((d, i) => (
+                              <span key={i} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontWeight: 600, border: '1px solid rgba(0,230,138,0.15)' }}>
+                                {d.drugId} ({(d.effect.strength * 100).toFixed(0)}%)
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>)}
+              </div>
+            )}
 
             {/* Penalty */}
             {anyNoLabs && (

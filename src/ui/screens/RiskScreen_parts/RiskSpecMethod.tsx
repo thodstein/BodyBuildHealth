@@ -296,29 +296,37 @@ export const RiskSpecMethod: React.FC = () => {
             const weeks = Math.max(course.reduce((m, c) => Math.max(m, (c.endWeek || 12)), 0) + 4, 8);
             const weekly: { week: number; risk: number }[] = [];
             for (let w = 0; w <= weeks; w++) {
-              let effectiveDose = 0;
-              let drugCount = 0;
-              for (const c of course) {
+              // Строим массив препаратов с учётом накопления/распада каждого
+              const weeklyDrugs = course.map(c => {
                 const sw = c.startWeek || 0;
                 const ew = c.endWeek || 12;
                 const hl = (PHARMA_DB as any)?.[(c.substanceId || '').toLowerCase()]?.pk?.halfLifeHours ?? 168;
                 const hlWeeks = hl / 168;
+                let effDose = 0;
                 if (w >= sw && w <= ew) {
                   const weeksOn = w - sw + 1;
                   const accum = 1 - Math.pow(0.5, weeksOn / Math.max(hlWeeks, 0.1));
-                  effectiveDose += (c.doseValue || 0) * accum;
-                  drugCount++;
+                  effDose = (c.doseValue || 0) * accum;
                 } else if (w > ew) {
                   const weeksOff = w - ew;
                   const lastDose = (c.doseValue || 0) * (1 - Math.pow(0.5, Math.max(1, ew - sw + 1) / Math.max(hlWeeks, 0.1)));
-                  effectiveDose += lastDose * Math.pow(0.5, weeksOff / Math.max(hlWeeks, 0.1));
+                  effDose = lastDose * Math.pow(0.5, weeksOff / Math.max(hlWeeks, 0.1));
                 }
-              }
+                const id = (c.substanceId || '').toLowerCase();
+                const isAAS = !id.includes('gh') && !id.includes('growth') && !id.includes('insulin') && !id.includes('igf');
+                return {
+                  drugClass: isAAS ? 'aas' as const : id.includes('insulin') ? 'insulin' as const : 'gh' as const,
+                  drugName: id || 'unknown',
+                  dose: Math.max(0, Math.round(effDose)),
+                  form: (id.includes('oxand') || id.includes('stan') || id.includes('meth') ? 'oral' : 'inject') as 'inject' | 'oral',
+                };
+              }).filter(d => d.dose > 0);
               const weeklyInput: TzSpecInput = {
-                drugClass: courseSummary?.drugClass || 'aas', drugName: 'weekly', dose: Math.round(effectiveDose) || 1,
+                drugClass: courseSummary?.drugClass || 'aas', drugName: 'weekly', dose: 1,
                 duration: Math.max(w, 1), form: courseSummary?.form || 'inject',
                 combinations: courseSummary?.combos || 1,
                 labCoverage: dCov, labValues: forceNoLabs ? {} : labMap, supportSubstances: supportIds,
+                drugs: weeklyDrugs.length > 0 ? weeklyDrugs : undefined,
               };
               const r = calculateTzSpecRisk(weeklyInput);
               weekly.push({ week: w, risk: r.overallAfter });

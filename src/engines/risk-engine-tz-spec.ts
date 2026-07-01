@@ -7,59 +7,60 @@ import { PHARMACY_DB } from '../data/support-db/pharmacy-db';
 const Q_MAP: Record<string, number> = { A: 1.0, B: 0.7, C: 0.4 };
 
 // ── 6 систем с механизмами и maxRaw ──
-interface MechDef { id: string; weight: number; defaultM: number; requiresF: boolean; requiresC: boolean; }
+// ТЗ п.10: каждый механизм имеет свою формулу с D/T/F/C
+// rep5 — особый: только T (без D) — ТЗ п.10.5
+interface MechDef { id: string; weight: number; defaultM: number; requiresD: boolean; requiresF: boolean; requiresC: boolean; }
 interface SysDef { id: string; name: string; icon: string; mechanisms: MechDef[]; maxRaw: number; }
-// maxRaw рассчитаны для сценария «тяжёлый курс»: D=1.5, T=1.4, m=2 (умеренная выраженность)
-// Это даёт реалистичные проценты риска вместо астрономических maxRaw
-// Формула расчета: Σ(w × m(2) × D(1.5) × T(1.4) × [F=1.0] × [C=1.0])
-// Для механизмов с requiresF or requiresC множитель 1.0 (инъекция, одна комбинация)
+// maxRaw recalculated for extreme 2-drug course: test 1000 + tren 500, 16wk, 2 drugs, no labs
+// Formula: Σ(mech.weight × (drugMechWeight/4) × m_i × D × T × [F] × [C]) × U for each drug, summed
+// drugMechWeight/4 scales: weight=4 → 1.0 (full), weight=2 → 0.5 (half), weight=1 → 0.25 (weak)
 const SYSTEMS: SysDef[] = [
   { id:'cardio', name:'Сердечно-сосудистая', icon:'❤️',
     mechanisms:[
-      { id:'cv1', weight:4, defaultM:1, requiresF:false, requiresC:true },
-      { id:'cv2', weight:4, defaultM:1, requiresF:true, requiresC:false },
-      { id:'cv3', weight:2, defaultM:1, requiresF:false, requiresC:false },
-      { id:'cv4', weight:2, defaultM:1, requiresF:false, requiresC:false },
-      { id:'cv5', weight:4, defaultM:1, requiresF:false, requiresC:true },
-    ], maxRaw: 67.2 },  // Σ(4+4+2+2+4)×2×1.5×1.4
+      { id:'cv1', weight:4, defaultM:1, requiresD:true, requiresF:false, requiresC:true },
+      { id:'cv2', weight:4, defaultM:1, requiresD:true, requiresF:true, requiresC:false },
+      { id:'cv3', weight:2, defaultM:1, requiresD:true, requiresF:false, requiresC:false },
+      { id:'cv4', weight:2, defaultM:1, requiresD:true, requiresF:false, requiresC:false },
+      { id:'cv5', weight:4, defaultM:1, requiresD:true, requiresF:false, requiresC:true },
+    ], maxRaw: 200 },
   { id:'hepatic', name:'Печень', icon:'🫁',
     mechanisms:[
-      { id:'liv1', weight:4, defaultM:1, requiresF:true, requiresC:false },
-      { id:'liv2', weight:2, defaultM:1, requiresF:true, requiresC:false },
-      { id:'liv3', weight:2, defaultM:0, requiresF:false, requiresC:false },
-    ], maxRaw: 33.6 },  // (4+2+2)×2×1.5×1.4
+      { id:'liv1', weight:4, defaultM:1, requiresD:true, requiresF:true, requiresC:false },
+      { id:'liv2', weight:2, defaultM:1, requiresD:true, requiresF:true, requiresC:false },
+      { id:'liv3', weight:2, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
+    ], maxRaw: 60 },
   { id:'renal', name:'Почки', icon:'🫘',
     mechanisms:[
-      { id:'ren1', weight:2, defaultM:0, requiresF:false, requiresC:false },
-      { id:'ren2', weight:2, defaultM:0, requiresF:false, requiresC:true },
-      { id:'ren3', weight:3, defaultM:0, requiresF:false, requiresC:false },
-      { id:'ren4', weight:2, defaultM:0, requiresF:false, requiresC:false },
-    ], maxRaw: 37.8 },  // (2+2+3+2)×2×1.5×1.4 = 9×4.2
+      { id:'ren1', weight:2, defaultM:1, requiresD:true, requiresF:false, requiresC:false },
+      { id:'ren2', weight:2, defaultM:1, requiresD:true, requiresF:false, requiresC:true },
+      { id:'ren3', weight:3, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
+      { id:'ren4', weight:2, defaultM:1, requiresD:true, requiresF:false, requiresC:false },
+    ], maxRaw: 25 },
   { id:'cns', name:'ЦНС', icon:'🧠',
     mechanisms:[
-      { id:'cns1', weight:3, defaultM:1, requiresF:false, requiresC:true },
-      { id:'cns2', weight:3, defaultM:1, requiresF:false, requiresC:false },
-      { id:'cns3', weight:2, defaultM:0, requiresF:false, requiresC:false },
-      { id:'cns4', weight:2, defaultM:1, requiresF:false, requiresC:false },
-      { id:'cns5', weight:2, defaultM:0, requiresF:false, requiresC:false },
-      { id:'cns6', weight:2, defaultM:0, requiresF:false, requiresC:false },
-    ], maxRaw: 58.8 },  // (3+3+2+2+2+2)×2×1.5×1.4 = 14×4.2
+      { id:'cns1', weight:3, defaultM:1, requiresD:true, requiresF:false, requiresC:true },
+      { id:'cns2', weight:3, defaultM:1, requiresD:true, requiresF:false, requiresC:false },
+      { id:'cns3', weight:2, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
+      { id:'cns4', weight:2, defaultM:1, requiresD:true, requiresF:false, requiresC:false },
+      { id:'cns5', weight:2, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
+      { id:'cns6', weight:2, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
+    ], maxRaw: 100 },
   { id:'reproductive', name:'Репродуктивная / HPG-ось', icon:'🧬',
     mechanisms:[
-      { id:'rep1', weight:4, defaultM:2, requiresF:false, requiresC:false },
-      { id:'rep2', weight:4, defaultM:2, requiresF:false, requiresC:false },
-      { id:'rep3', weight:2, defaultM:1, requiresF:false, requiresC:false },
-      { id:'rep4', weight:2, defaultM:1, requiresF:true, requiresC:false },
-      { id:'rep5', weight:2, defaultM:1, requiresF:false, requiresC:false },
-    ], maxRaw: 56.0 },  // (4+4+2+2)×2×1.5×1.4 + 2×2×1.4 = 50.4 + 5.6
+      { id:'rep1', weight:4, defaultM:2, requiresD:true, requiresF:false, requiresC:false },
+      { id:'rep2', weight:4, defaultM:2, requiresD:true, requiresF:false, requiresC:false },
+      { id:'rep3', weight:2, defaultM:1, requiresD:true, requiresF:false, requiresC:false },
+      { id:'rep4', weight:2, defaultM:1, requiresD:true, requiresF:true, requiresC:false },
+      { id:'rep5', weight:2, defaultM:1, requiresD:false, requiresF:false, requiresC:false },
+    ], maxRaw: 165 },
   { id:'hematologic', name:'Гематолого-метаболический', icon:'🩸',
     mechanisms:[
-      { id:'hem1', weight:3, defaultM:1, requiresF:false, requiresC:false },
-      { id:'hem2', weight:2, defaultM:0, requiresF:false, requiresC:false },
-      { id:'hem3', weight:3, defaultM:0, requiresF:false, requiresC:false },
-      { id:'hem4', weight:2, defaultM:0, requiresF:false, requiresC:false },
-      { id:'hem5', weight:2, defaultM:0, requiresF:false, requiresC:false },
-    ], maxRaw: 50.4 },  // (3+2+3+2+2)×2×1.5×1.4 = 12×4.2
+      { id:'hem1', weight:3, defaultM:1, requiresD:true, requiresF:false, requiresC:false },
+      { id:'hem2', weight:2, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
+      { id:'hem3', weight:3, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
+      { id:'hem4', weight:2, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
+      { id:'hem5', weight:2, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
+    ], maxRaw: 45 },
 ];
 
 // ── Типы ──
@@ -119,13 +120,15 @@ function getPenaltyFactor(d_cov:number):number{return 1+0.25*(1-d_cov)}
 // ── m_i из лабораторных значений (таблица T4) + коррекция по дозе ──
 function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:number,mechWeight?:number):number{
   // Базовые defaults с учётом guaranteed эффектов ААС
-  const baseDefaults:Record<string,number>={cv1:1,cv2:2,cv3:1,cv4:2,cv5:1,liv1:2,liv2:1,liv3:0,ren1:0,ren2:0,ren3:0,ren4:0,cns1:2,cns2:2,cns3:0,cns4:1,cns5:0,cns6:0,rep1:3,rep2:3,rep3:2,rep4:1,rep5:2,hem1:2,hem2:0,hem3:0,hem4:0,hem5:0};
+  const baseDefaults:Record<string,number>={cv1:1,cv2:2,cv3:1,cv4:2,cv5:1,liv1:2,liv2:1,liv3:0,ren1:1,ren2:1,ren3:0,ren4:1,cns1:2,cns2:2,cns3:0,cns4:1,cns5:0,cns6:0,rep1:3,rep2:3,rep3:2,rep4:1,rep5:2,hem1:2,hem2:0,hem3:0,hem4:0,hem5:0};
   // Масштабируем по дозе: doseFactor 1.0-2.0 → умножаем m_i
   const mult = doseFactor && doseFactor > 1.0 ? Math.min(1.5, doseFactor) : 1.0;
   const raw = baseDefaults[mechId] ?? 0;
   const defaults = Math.min(3, Math.round(raw * mult));
 
   const ldl=labValues['LDL'];const hct=labValues['HCT'];const alt=labValues['ALT'];const ast=labValues['AST'];const ggt=labValues['GGT'];
+  const k=labValues['K'];const egfr=labValues['eGFR'];const creat=labValues['CREAT'];const uacr=labValues['UACR'];
+  const lh=labValues['LH'];const tt=labValues['TT'];const e2=labValues['E2'];const glu=labValues['GLU'];const homa=labValues['HOMA'];
   switch(mechId){
     case'cv2':if(ldl!==undefined){if(ldl<2.6)return 0;if(ldl<3.4)return 1;if(ldl<4.9)return 2;return 3}break;
     case'cv4':if(hct!==undefined){if(hct<48)return 0;if(hct<51)return 1;if(hct<54)return 2;return 3}break;
@@ -174,14 +177,18 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
 
       // Суммируем вклад КАЖДОГО препарата в этот механизм
       for(const drug of drugEntries){
-        const D_i=getDoseFactor(drug.dose,drug.drugClass);
         const drugEntry=DRUG_DB[drug.drugName.toLowerCase()]||DRUG_DB[drug.drugName];
         const mechWeight=drugEntry?.mechanismWeights?.[mech.id]||0;
+        if(mechWeight===0) continue; // Drug doesn't target this mechanism — skip
+        const D_i=getDoseFactor(drug.dose,drug.drugClass)*(drugEntry?.doseModifier||1.0);
         const m_i=getMiFromLab(mech.id,labValues,D_i,mechWeight);
         const F_mech=mech.requiresF?getFormFactor(drug.form,sys.id):1.0;
         const C_mech=mech.requiresC?C_i:1.0;
-        const E_i=D_i*T_i*F_mech*C_mech;
-        mechRaw+=mech.weight*m_i*E_i;
+        // ТЗ п.10.5: rep5 = w × m × T (без D)
+        const D_eff=mech.requiresD?D_i:1.0;
+        const E_i=D_eff*T_i*F_mech*C_mech;
+        // mechWeight/4 scales drug contribution: weight=4→1.0, weight=2→0.5, weight=1→0.25
+        mechRaw+=mech.weight*(mechWeight/4)*m_i*E_i;
       }
 
       // Штраф за отсутствие анализов

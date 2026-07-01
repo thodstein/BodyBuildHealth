@@ -47,7 +47,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [done, setDone] = useState<WorkoutSession | null>(null);
   // фактический ввод текущего подхода: [exerciseIndex][setIndex] -> {weight,reps}
-  const [actual, setActual] = useState<Record<string, { weight: number; reps: number }>>({});
+  const [actual, setActual] = useState<Record<string, { weight: number; reps: number; rpe: number }>>({});
   const [exDone, setExDone] = useState<Record<string, boolean>>({});
   // P11: VBT-ввод скорости штанги (м/с) на сет + авторегуляция по потере скорости
   const [vel, setVel] = useState<Record<string, number>>({});
@@ -77,8 +77,8 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     if (!session || !day) return;
     hapticImpact('light');
     const t = day.exercises[ei].targetSets[si];
-    const a = actual[keyFor(ei, si)] || { weight: t.weight, reps: t.reps };
-    let s = logSet(session, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: 0, rir: t.rir, notes: '' });
+    const a = actual[keyFor(ei, si)] || { weight: t.weight, reps: t.reps, rpe: 0 };
+    let s = logSet(session, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: a.rpe || 0, rir: t.rir, notes: '' });
     setSession(s);
     setActual(prev => ({ ...prev, [keyFor(ei, si)]: a }));
     // пометить следующий подход/упражнение активным — UI сам покажет статус
@@ -109,6 +109,39 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     session.exercises.forEach(ex => ex.sets.forEach(s => { v += s.weightKg * s.reps; n++; }));
     return { volume: Math.round(v), sets: n };
   }, [session]);
+
+  // 1.4: оценка e1RM (Epley) по лучшему сету сессии
+  const topE1RM = useMemo(() => {
+    const src = done || session;
+    if (!src) return { e1rm: 0, exercise: '', weight: 0, reps: 0 };
+    let best = { e1rm: 0, exercise: '', weight: 0, reps: 0 };
+    src.exercises.forEach(ex => ex.sets.forEach(s => { if (s.weightKg > 0 && s.reps > 0) { const e = Math.round(s.weightKg * (1 + s.reps / 30)); if (e > best.e1rm) best = { e1rm: e, exercise: ex.exerciseName, weight: s.weightKg, reps: s.reps }; } }));
+    return best;
+  }, [done, session]);
+
+  // 2.1/2.2: двойная прогрессия + рекомендация делода по завершённой сессии
+  const nextSuggestions = useMemo(() => {
+    if (!done || !day) return [];
+    return day.exercises.map((ex, ei) => {
+      const sesEx = done.exercises[ei];
+      if (!sesEx || sesEx.sets.length === 0) return null;
+      const target = ex.targetSets[0];
+      if (!target) return null;
+      const sets = sesEx.sets;
+      const avgReps = sets.reduce((s: number, x: any) => s + x.reps, 0) / sets.length;
+      const maxRPE = Math.max(0, ...sets.map((x: any) => x.rpe || 0));
+      const inc = target.weight >= 40 ? 2.5 : 1;
+      const hitTarget = avgReps >= target.reps;
+      let nextWeight = target.weight, nextReps = target.reps, note = '', deload = false;
+      if (hitTarget) { nextWeight = target.weight + inc; note = `Прогрессия: +${inc}кг (цель ${target.reps}повт достигнута${maxRPE <= 8 ? ' при RPE≤8' : ''})`; }
+      else if (avgReps < target.reps - 1) { note = `Удержать ${target.weight}кг — добрать повторы до ${target.reps}`; }
+      else { note = 'Почти в цель — повторить вес, добавить 1 повтор'; nextReps = target.reps; }
+      if (maxRPE >= 9 && sets.length >= 3) { deload = true; note = note + ' · высокий RPE — рассмотреть делод (−15-20% объём)'; }
+      return { name: ex.name, nextWeight, nextReps, note, deload };
+    }).filter(Boolean) as { name: string; nextWeight: number; nextReps: number; note: string; deload: boolean }[];
+  }, [done, day]);
+
+  const anyDeload = nextSuggestions.some(s => s.deload);
 
   // D1: LMS-метрики фактической сессии (Тоннаж/КПШ/Инт.отн/УОИ/Инт.Ф+Б) — считаются для done-состояния
   const lms = useMemo(() => computeSessionMetrics(done, day), [done, day]);
@@ -146,18 +179,36 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
               <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>{ex.name} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>({ex.muscleGroup})</span></div>
               {ex.targetSets.map((t, si) => {
                 const k = keyFor(ei, si);
-                const a = actual[k] || { weight: t.weight, reps: t.reps };
+                const a = actual[k] || { weight: t.weight, reps: t.reps, rpe: 0 };
                 const logged = !!actual[k];
+                const targetRPE = 10 - t.rir;
+                const dW = a.weight - t.weight;
+                const dR = a.reps - t.reps;
+                const rpeDelta = a.rpe > 0 ? a.rpe - targetRPE : 0;
+                const nextW = a.rpe > 0 ? (rpeDelta > 0 ? Math.max(0, a.weight - 2.5) : rpeDelta < -1 ? a.weight + 2.5 : a.weight) : a.weight;
+                const nextR = a.rpe > 0 ? (rpeDelta > 1 ? Math.max(1, a.reps - 1) : a.reps) : a.reps;
                 return (
                   <div key={si} style={{ ...ROW, flexWrap: 'wrap', gap: 6 }}>
                     <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, width: 52 }}>Сет {si + 1}</span>
                     <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, width: 90 }}>цель {t.weight}кг×{t.reps}@RIR{t.rir}</span>
                     <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                      <input style={{ ...IN, width: 64 }} type="number" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { weight: +e.target.value, reps: a.reps } }))} aria-label="вес" />
-                      <input style={{ ...IN, width: 52 }} type="number" value={a.reps} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: +e.target.value } }))} aria-label="повт" />
+                      <input style={{ ...IN, width: 60 }} type="number" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { weight: +e.target.value, reps: a.reps, rpe: a.rpe } }))} aria-label="вес" />
+                      <input style={{ ...IN, width: 48 }} type="number" value={a.reps} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: +e.target.value, rpe: a.rpe } }))} aria-label="повт" />
+                      <input style={{ ...IN, width: 44 }} type="number" min={0} max={10} placeholder="RPE" value={a.rpe || ""} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: a.reps, rpe: +e.target.value } }))} aria-label="RPE" />
                       <input style={{ ...IN, width: 48 }} type="number" step="0.01" placeholder="v" value={vel[k] ?? ""} onChange={e => setVel(p => ({ ...p, [k]: +e.target.value }))} aria-label="скорость м/с" />
                       <button style={logged ? BTN_GHOST : BTN} onClick={() => logOne(ei, si)}>{logged ? '✓' : 'OK'}</button>
                     </div>
+                    {logged && (
+                      <div style={{ width: '100%', fontSize: 10, color: 'rgba(255,255,255,0.55)', paddingLeft: 56, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span>факт <b style={{ color: '#fff' }}>{a.weight}кг×{a.reps}</b>{a.rpe > 0 ? `@RPE${a.rpe}` : ''}</span>
+                        <span style={{ color: dW === 0 ? 'var(--text-dim)' : dW > 0 ? '#22c55e' : '#f59e0b' }}>Δвес {dW > 0 ? '+' : ''}{dW}</span>
+                        <span style={{ color: dR === 0 ? 'var(--text-dim)' : dR > 0 ? '#22c55e' : '#f59e0b' }}>Δповт {dR > 0 ? '+' : ''}{dR}</span>
+                        {a.rpe > 0 && <span style={{ color: rpeDelta > 0 ? '#ef4444' : rpeDelta < -1 ? '#22c55e' : 'var(--text-dim)' }}>RPE vs цели({targetRPE}): {rpeDelta > 0 ? '+' : ''}{rpeDelta}</span>}
+                        {a.rpe > 0 && (rpeDelta > 0 || rpeDelta < -1) && (
+                          <span style={{ color: ACCENT, fontWeight: 700 }}>→ след. сет: {nextW}кг×{nextR}{rpeDelta > 0 ? ' (легче)' : ' (тяжелее)'}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -193,6 +244,24 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
           <div style={ROW}><span>Объём факт vs план:</span><span style={{ color: ACCENT }}>{factVol.volume} / {planned.volume} кг·пов</span></div>
           <div style={ROW}><span>Сеты факт vs план:</span><span style={{ color: ACCENT }}>{factVol.sets} / {planned.sets}</span></div>
           <div style={{ ...SMALL, marginTop: 8 }}>Реализация объёма: {planned.volume > 0 ? Math.round(factVol.volume / planned.volume * 100) : 0}%</div>
+          {topE1RM.e1rm > 0 && (
+            <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa' }}>🎯 Оценка 1RM (Epley) по лучшему сету</div>
+              <div style={{ ...SMALL, marginTop: 4 }}><b style={{ color: '#fff' }}>{topE1RM.exercise}</b>: {topE1RM.weight}кг×{topE1RM.reps} → e1RM ≈ <b style={{ color: '#60a5fa' }}>{topE1RM.e1rm} кг</b></div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>Обновите workMax для этой группы в профиле, если e1RM выше текущего — веса в плане пересчитаются.</div>
+            </div>
+          )}
+          {nextSuggestions.length > 0 && (
+            <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: anyDeload ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.05)', border: '1px solid ' + (anyDeload ? 'rgba(239,68,68,0.25)' : 'rgba(0,230,138,0.18)') }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: anyDeload ? '#ef4444' : ACCENT, marginBottom: 6 }}>{anyDeload ? '⚠ Прогрессия + сигнал делода' : '📈 Прогрессия к следующей сессии (double progression)'}</div>
+              {anyDeload && <div style={{ fontSize: 10, color: '#fca5a5', marginBottom: 6 }}>Высокий RPE на нескольких сетах — рассмотрите делод-неделю (−15-20% объём, удержание интенсивности) перед следующей прогрессией.</div>}
+              {nextSuggestions.map((s, i) => (
+                <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginBottom: 4, paddingLeft: 4, borderLeft: '2px solid ' + (s.deload ? '#ef4444' : 'rgba(0,230,138,0.4)') }}>
+                  <b style={{ color: '#fff' }}>{s.name}</b> → след. {s.nextWeight}кг×{s.nextReps}. <span style={{ color: 'var(--text-dim)' }}>{s.note}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {lms && (
             <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)' }}>
               <div style={{ ...LABEL, color: ACCENT }}>📊 LMS-метрики сессии ({lms.exerciseCount} упр.)</div>

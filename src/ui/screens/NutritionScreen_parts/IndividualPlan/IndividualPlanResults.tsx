@@ -11,6 +11,31 @@ import { DailyDietDashboard } from "../DailyDietDashboard";
 import { NutritionQualityCard } from '../../../components/NutritionQualityCard';
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type MealTiming, type DailyDietReport, type MealScoreV2 } from '../../../../engines/product-usefulness-v2.engine';
 
+const getDiaryEntriesForDate = (date: string): any[] => {
+  try {
+    const diaryRaw = localStorage.getItem('nutrition_diary');
+    if (!diaryRaw) return [];
+    const diary = JSON.parse(diaryRaw);
+    if (Array.isArray(diary)) return diary.filter((d: any) => (d.date || d.createdAt || '').startsWith(date));
+    const meals = diary?.[date]?.meals || {};
+    return Object.values(meals).flatMap((meal: any) => Array.isArray(meal) ? meal : []);
+  } catch {
+    return [];
+  }
+};
+
+const getDiaryLoggedDayCount = (): number => {
+  try {
+    const diaryRaw = localStorage.getItem('nutrition_diary');
+    if (!diaryRaw) return 0;
+    const diary = JSON.parse(diaryRaw);
+    if (!Array.isArray(diary)) return Object.keys(diary).length;
+    return new Set(diary.map((d: any) => (d.date || d.createdAt || '').slice(0, 10)).filter(Boolean)).size;
+  } catch {
+    return 0;
+  }
+};
+
 export const IndividualPlanResults: React.FC = () => {
   const {
     generatePlan, planDays, setPlanDays, selectedDayIndex, setSelectedDayIndex,
@@ -391,12 +416,8 @@ export const IndividualPlanResults: React.FC = () => {
 
         {(() => {
           try {
-            const diaryRaw = localStorage.getItem('nutrition_diary');
-            if (!diaryRaw) return null;
-            const diary: any[] = JSON.parse(diaryRaw);
-            if (!Array.isArray(diary) || diary.length === 0) return null;
             const today = new Date().toISOString().split('T')[0];
-            const todayEntries = diary.filter((d: any) => (d.date || d.createdAt || '').startsWith(today));
+            const todayEntries = getDiaryEntriesForDate(today);
             if (todayEntries.length === 0) return null;
             const factKcal = Math.round(todayEntries.reduce((s: number, d: any) => s + (d.kcal || 0), 0));
             const factP = Math.round(todayEntries.reduce((s: number, d: any) => s + (d.p || d.protein || 0), 0));
@@ -703,9 +724,7 @@ export const IndividualPlanResults: React.FC = () => {
           {(() => {
             const ach: { label: string; earned: boolean; icon: string }[] = [];
             try {
-              const diaryRaw = localStorage.getItem('nutrition_diary');
-              const diary = diaryRaw ? JSON.parse(diaryRaw) : {};
-              const daysLogged = Object.keys(diary).length;
+              const daysLogged = getDiaryLoggedDayCount();
               if (daysLogged >= 1) ach.push({ label: 'Первый день в дневнике', earned: true, icon: '📝' });
               if (daysLogged >= 7) ach.push({ label: 'Неделя дневника', earned: true, icon: '📆' });
               if (daysLogged >= 30) ach.push({ label: 'Месяц дневника', earned: true, icon: '📅' });
@@ -1124,9 +1143,23 @@ export const IndividualPlanResults: React.FC = () => {
             <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.12)' }}>
               <div style={{ fontSize: 9, fontWeight: 700, color: '#3b82f6', marginBottom: 3 }}>🍬 Гликемическая нагрузка</div>
               {(() => {
+                const items = (dayPlan.meals || []).flatMap((m: any) => m.items || []);
+                const gl = Math.round(items.reduce((sum: number, it: any) => {
+                  const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+                  if (!food?.gi) return sum;
+                  const amountRatio = (it.amount || 100) / 100;
+                  const availableCarbs = Math.max(0, (food.carbs || 0) - (food.fiber || 0)) * amountRatio;
+                  return sum + availableCarbs * food.gi / 100;
+                }, 0));
+                const carbItems = items.filter((it: any) => {
+                  const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+                  return food?.gi && (food.carbs || 0) > 0;
+                });
+                const avgGI = carbItems.length > 0 ? Math.round(carbItems.reduce((sum: number, it: any) => {
+                  const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+                  return sum + (food?.gi || 0);
+                }, 0) / carbItems.length) : 0;
                 const totalCarbs = dayPlan.totals?.c || 0;
-                const avgGI = planType === 'keto' ? 30 : planType === 'highcarb' ? 65 : 55;
-                const gl = Math.round(totalCarbs * avgGI / 100);
                 const glPerMeal = dayPlan.meals?.length > 0 ? Math.round(gl / dayPlan.meals.length) : 0;
                 const glLabel = gl <= 80 ? 'Низкая' : gl <= 120 ? 'Средняя' : 'Высокая';
                 const glColor = gl <= 80 ? '#22c55e' : gl <= 120 ? '#f59e0b' : '#ef4444';
@@ -1137,7 +1170,7 @@ export const IndividualPlanResults: React.FC = () => {
                       <span style={{ fontSize: 11, fontWeight: 700, color: glColor }}>{gl} <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.9)' }}>({glLabel})</span></span>
                     </div>
                     <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.9)' }}>
-                      Средний ГИ рациона: ~{avgGI} · ГН на приём: ~{glPerMeal} · Углеводы: {Math.round(totalCarbs)}г
+                      Средний ГИ рациона: ~{avgGI} · ГН на приём: ~{glPerMeal} · Углеводы: {Math.round(dayPlan.totals?.c || 0)}г
                     </div>
                     {gl > 120 && <div style={{ fontSize: 8, color: '#f59e0b', marginTop: 2 }}>💡 Высокая нагрузка — рекомендуется увеличить долю низко-ГИ продуктов (бобовые, цельнозерновые, овощи)</div>}
                   </div>
@@ -1861,7 +1894,7 @@ export const IndividualPlanResults: React.FC = () => {
                         🧬 mTOR: {calcDailyReport.mtorTriggered ? '✅ Запущен' : `❌ Дефицит ${calcDailyReport.mtorDeficitMg}мг лейцина`}
                       </div>
                       <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.giLoadWarning ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.giLoadWarning ? '#ef4444' : '#22c55e' }}>
-                        🫃 Нагр. ЖКТ: {calcDailyReport.giLoad.toFixed(0)} {calcDailyReport.giLoadWarning ? '⚠️' : '✅'}
+                        🧬 GL: {calcDailyReport.giLoad.toFixed(0)} {calcDailyReport.giLoadWarning ? '⚠️' : '✅'}
                       </div>
                       <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.pralWarning ? 'rgba(245,158,11,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.pralWarning ? '#f59e0b' : '#22c55e' }}>
                         🧂 PRAL: {calcDailyReport.pralTotal.toFixed(0)} {calcDailyReport.pralWarning || '✅'}
@@ -1969,7 +2002,7 @@ export const IndividualPlanResults: React.FC = () => {
                     {(() => {
                       const recs: string[] = [];
                       if (!calcDailyReport.mtorTriggered) recs.push('🥩 Увеличьте лейцин (красное мясо, яйца, сывороточный протеин)');
-                      if (calcDailyReport.giLoadWarning) recs.push('🍚 Замените быстрые углеводы на медленные (овсянка, гречка, бурый рис)');
+                      if (calcDailyReport.giLoadWarning) recs.push('🍚 Снизьте гликемическую нагрузку: часть быстрых углеводов замените на овсянку, гречку, бобовые или овощи');
                       if (calcDailyReport.omegaWarning) recs.push('🐟 Добавьте Омега-3 (лосось, скумбрия, льняное масло)');
                       if (calcDailyReport.electrolyteRisk) recs.push('🥑 Увеличьте калий (авокадо, шпинат, бананы) и магний (орехи, семена)');
                       if (calcDailyReport.microDeficits.length > 0) recs.push('💊 Обратите внимание на дефициты: ' + calcDailyReport.microDeficits.slice(0,3).join(', '));
@@ -2088,4 +2121,3 @@ export const IndividualPlanResults: React.FC = () => {
     </>
   );
 };
-

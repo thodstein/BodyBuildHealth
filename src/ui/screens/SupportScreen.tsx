@@ -43,6 +43,7 @@ import { calculateSupportTZ, hydrateState } from '../../engines/support-calculat
 import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engines/support-calculator.types';
 import { calculateTZRisk, toCompatibleResult, type TZRiskResult } from '../../engines/risk-engine-tz';
 import { getDrugTzMechanisms, getSupportTzDisplay, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../data/support-db';
+import { getLabEffectsForDrug, getMarkerName } from '../../data/support-lab-effects';
 import { calculateSupportPlan, applyJointToPlan, applyBoostToPlan, type PlanResult, type PlanSubstance } from '../../engines/support-plan-engine';
 import { buildPreApplyCard, evaluateRecommendations, computeCoverageRisk } from '../../engines/recommendation-engine';
 import { calculateMixScore, type TrainingMixScore, type MixSubstance, type MixProfile, MIX_MECHANISMS, MIX_SYNERGY, MIX_TEMPLATES, type MixTemplate, buildBestRecipe, type MixRecipe, type MixRecipeItem, groupRecipeItemsByTiming } from '../../engines/training-mix-scoring.engine';
@@ -683,6 +684,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [planView, setPlanView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [planSaved, setPlanSaved] = useState<string | boolean>(false);
   const [reportGenerated, setReportGenerated] = useState(false);
+  useEffect(() => { try { const saved = localStorage.getItem('he_support_report_current'); if (saved) { setReportGenerated(true); setSupportReportCurrent(JSON.parse(saved)); } } catch {} }, []);
   const [planSubTab, setPlanSubTab] = useState<'active' | 'archive' | 'myplans'>('active');
   const [favSearch, setFavSearch] = useState('');
   const [archivedPlans, setArchivedPlans] = useState<any[]>(() => {
@@ -1960,6 +1962,29 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   ))}
                 </div>
               </details>
+            ))}
+          </div>
+        );
+      })()}
+
+      {(() => {
+        const subIdLc = subId.toLowerCase();
+        const labInfo = getLabEffectsForDrug(subIdLc);
+        if (!labInfo.effects.length) return null;
+        const dirColor: Record<string, string> = { up: '#ef4444', down: '#00e68a', normalize: '#60a5fa' };
+        const dirArrow: Record<string, string> = { up: '↑', down: '↓', normalize: '↕' };
+        return (
+          <div style={{ marginTop: 3, padding: '6px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.03)', border: '1px solid rgba(239,68,68,0.1)' }}>
+            <div style={{ fontSize: 7, color: '#ef4444', fontWeight: 700, marginBottom: 3 }}>🩸 Влияние на анализы</div>
+            {labInfo.effects.map((eff, i) => (
+              <div key={i} style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 2, lineHeight: 1.4 }}>
+                <span style={{ color: dirColor[eff.direction], fontWeight: 700 }}>{dirArrow[eff.direction]}</span>{' '}
+                <b>{getMarkerName(eff.marker)}</b>
+                <span style={{ color: 'rgba(255,255,255,0.4)', marginLeft: 3 }}>
+                  {eff.strength >= 0.4 ? 'значимо' : eff.strength >= 0.2 ? 'умеренно' : 'слабо'} ({(eff.strength * 100).toFixed(0)}%)
+                </span>
+                <br/><span style={{ color: 'rgba(255,255,255,0.45)' }}>{eff.reason}</span>
+              </div>
             ))}
           </div>
         );

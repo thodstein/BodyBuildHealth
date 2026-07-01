@@ -13,6 +13,7 @@ import { SYNERGY_PAIRS, type SynergyPair } from '../../engines/support.engine';
 import { ALL_INTERACTIONS, findInteractionsForSubstance, type SupportInteraction } from '../../data/support-database';
 import { decodeGarbled } from '../../utils/text-sanitizer';
 import { getDrugTzMechanisms, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../data/support-db';
+import { getLabEffectsForDrug, getMarkerName } from '../../data/support-lab-effects';
 import {
   PEPTIDE_DB, PEPTIDE_LIST, PEPTIDE_SYNERGY, PEPTIDE_CONFLICTS, PEPTIDE_GOAL_PROFILES,
   computeDilution, computeEffectiveDose, computePK, computePeptideRisks,
@@ -911,6 +912,34 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
                 </div>
               </details>
             ))}
+          </div>
+        );
+      })()}
+
+      {(() => {
+        const labInfo = getLabEffectsForDrug(sub.id);
+        if (!labInfo.effects.length) return null;
+        const dirColor: Record<string, string> = { up: '#ef4444', down: '#00e68a', normalize: '#60a5fa' };
+        const dirArrow: Record<string, string> = { up: '↑', down: '↓', normalize: '↕' };
+        return (
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>🩸 Влияние на анализы</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {labInfo.effects.map((eff, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
+                  <span style={{ color: dirColor[eff.direction], fontWeight: 700, fontSize: 14, lineHeight: 1 }}>{dirArrow[eff.direction]}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>
+                      {getMarkerName(eff.marker)}
+                      <span style={{ marginLeft: 6, fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>
+                        {eff.strength >= 0.4 ? 'значимо' : eff.strength >= 0.2 ? 'умеренно' : 'слабо'} ({(eff.strength * 100).toFixed(0)}%)
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>{eff.reason}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         );
       })()}

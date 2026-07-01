@@ -66,6 +66,7 @@ export interface FactorDetail {
 
 export interface MealScoreV2 {
   compositeScore: number;
+  maxPossible: number;
   productScores: { id: string; name: string; score: number; weightG: number; contribution: number }[];
   weakLinks: string[];
   macros: { kcal: number; protein: number; fat: number; carbs: number; fiber: number };
@@ -79,6 +80,7 @@ export interface DailyDietReport {
   totalKcal: number;
   mtorTriggered: boolean;
   mtorDeficitMg: number;
+  /** Real daily glycemic load: sum(available carbs * GI / 100). */
   giLoad: number;
   giLoadWarning: boolean;
   cortisolRisk: boolean;
@@ -481,7 +483,7 @@ export function calcMealScoreV2(
     .filter((e): e is NonNullable<typeof e> => e !== null);
 
   if (entries.length === 0) {
-    return { compositeScore: 0, productScores: [], weakLinks: [], macros: { kcal: 0, protein: 0, fat: 0, carbs: 0, fiber: 0 }, modifiers: [], label: 'Нет данных', color: '#666' };
+    return { compositeScore: 0, maxPossible: 10, productScores: [], weakLinks: [], macros: { kcal: 0, protein: 0, fat: 0, carbs: 0, fiber: 0 }, modifiers: [], label: 'Нет данных', color: '#666' };
   }
 
   const totalW = entries.reduce((s, e) => s + e.weightG, 0);
@@ -529,10 +531,13 @@ export function calcMealScoreV2(
   }));
 
   const avgScore = productScores.reduce((s, p) => s + p.score, 0) / productScores.length;
-  const weakLinks = productScores.filter(p => p.score < avgScore - 10).map(p => p.name);
+  const weakLinks = productScores
+    .filter(p => p.score <= Math.max(3, avgScore - 1.2))
+    .map(p => p.name);
 
   return {
     compositeScore: R,
+    maxPossible: 10,
     productScores,
     weakLinks,
     macros: {
@@ -660,10 +665,15 @@ export function analyzeDailyDiet(
   const mtorTriggered = totalLeucine >= 3000;
   const mtorDeficitMg = Math.max(0, 3000 - totalLeucine);
 
-  // GI Load
-  const giLoad = sumF(f => f.gastro_tags?.enzyme_demand_score ?? 3);
-  const enzymeThreshold = profile.pharma.DIGESTIVE_ENZYMES ? 80 : 60;
-  const giLoadWarning = giLoad > enzymeThreshold;
+  // Glycemic load: available carbs multiplied by GI. Products without GI do not add GL.
+  const giLoad = sumF(f => {
+    const gi = f.gi || 0;
+    if (gi <= 0) return 0;
+    const availableCarbs = Math.max(0, (f.carbs || 0) - (f.fiber || 0));
+    return availableCarbs * gi / 100;
+  });
+  const giLoadThreshold = (profile.pharma.HGH || profile.pharma.INSULIN_USE || (profile.labs.homa_ir ?? 0) > 2.5) ? 80 : 120;
+  const giLoadWarning = giLoad > giLoadThreshold;
 
   // Cortisol
   const postMeal = meals.find(m => m.timing === 'post_workout');
