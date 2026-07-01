@@ -89,8 +89,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [manualLevelSelected, setManualLevelSelected] = useState(false);
   const [boostEnabled, setBoostEnabled] = useState(false);
   const [jointMode, setJointMode] = useState(false);
-  const [jointNotification, setJointNotification] = useState(false);
-  const [boostNotification, setBoostNotification] = useState(false);
   const stateRef = useRef<CalculatorState | null>(null);
   const [myPlansRefresh, setMyPlansRefresh] = useState(0);
   const [weekChangeMsg, setWeekChangeMsg] = useState('');
@@ -4232,14 +4230,14 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           <div style={{ display:'flex', flexDirection:'column', gap:10, fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.6 }}>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>1. Сбор данных — 21 карточка + профиль + курс + анализы</h3>
-              <p style={{ margin:'0 0 6px' }}>Калькулятор собирает данные из 4 источников:</p>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>1. Сбор данных — Профиль → Данные калькулятора</h3>
+              <p style={{ margin:'0 0 6px' }}>Калькулятор собирает данные из 3 источников автоматически:</p>
               <ul style={{ paddingLeft:16, margin:'4px 0' }}>
-                <li><b>AutoCalculator (21 карточка):</b> профиль, неврология, фарма-стек, цели, гепатобилиарная, мочевыделительная, ССС, ОДА, питание, противопоказания, токсическая нагрузка, стоматология, генетика (MTHFR, CYP19A1, SRD5A2, AR), ЖКТ, психология, инъекции, эпикриз, журнал, лаборатория</li>
-                <li><b>Профиль пользователя:</b> вес, возраст, пол, тренировки, сон, стресс — из he_user_profile</li>
-                <li><b>Курс ААС:</b> препараты, дозы, длительность — из PHARMA_DB с linkedRisks, cvProfile, pd</li>
+                <li><b>Профиль → Данные калькулятора:</b> профиль, неврология, фарма-стек, цели, гепатобилиарная, мочевыделительная, ССС, ОДА, питание, противопоказания, токсическая нагрузка, стоматология, генетика (MTHFR, CYP19A1, SRD5A2, AR), ЖКТ, психология, инъекции, эпикриз, журнал — заполняется один раз</li>
+                <li><b>Фарма → Курс:</b> препараты, дозы, длительность — из PHARMA_DB с linkedRisks, cvProfile, pd</li>
                 <li><b>Анализы (80+ маркеров):</b> АЛТ, АСТ, ЛПНП, гематокрит, эстрадиол и др. — из linked.labs + LAB_MARKER_MAP</li>
               </ul>
+              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>Нажмите «📥 Собрать данные» — калькулятор автоматически подтянет все заполненные данные и покажет чеклист готовности.</p>
             </div>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
@@ -4272,15 +4270,14 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
               <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>4. Уровни покрытия</h3>
               <table style={{ width:'100%', fontSize:9, borderCollapse:'collapse', margin:'4px 0' }}>
-                <thead><tr style={{ background:'rgba(0,0,0,0.2)' }}><th style={{ padding:'4px 6px', textAlign:'left' }}>Уровень</th><th style={{ padding:'4px 6px' }}>Порог</th><th style={{ padding:'4px 6px' }}>Вещ/мех</th><th style={{ padding:'4px 6px' }}>Базовая защита</th><th style={{ padding:'4px 6px' }}>Макс. защита</th></tr></thead>
+                <thead><tr style={{ background:'rgba(0,0,0,0.2)' }}><th style={{ padding:'4px 6px', textAlign:'left' }}>Уровень</th><th style={{ padding:'4px 6px' }}>Порог риска</th><th style={{ padding:'4px 6px' }}>Защита</th></tr></thead>
                 <tbody>
-                  <tr><td style={{ padding:'4px 6px' }}>🟢 База</td><td style={{ padding:'4px 6px', textAlign:'center' }}>15%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>1</td><td style={{ padding:'4px 6px', textAlign:'center' }}>30%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>45%</td></tr>
-                  <tr><td style={{ padding:'4px 6px' }}>🟡 Средний</td><td style={{ padding:'4px 6px', textAlign:'center' }}>10%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>1</td><td style={{ padding:'4px 6px', textAlign:'center' }}>45%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>60%</td></tr>
-                  <tr><td style={{ padding:'4px 6px' }}>🔴 Максимум</td><td style={{ padding:'4px 6px', textAlign:'center' }}>6%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>2</td><td style={{ padding:'4px 6px', textAlign:'center' }}>60%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>75%</td></tr>
-                  <tr><td style={{ padding:'4px 6px' }}>💎 Буст</td><td style={{ padding:'4px 6px', textAlign:'center' }}>4%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>3</td><td style={{ padding:'4px 6px', textAlign:'center' }}>70%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>85%</td></tr>
+                  <tr><td style={{ padding:'4px 6px' }}>🟢 Базовый</td><td style={{ padding:'4px 6px', textAlign:'center' }}>65%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>35%</td></tr>
+                  <tr><td style={{ padding:'4px 6px' }}>🟡 Средний</td><td style={{ padding:'4px 6px', textAlign:'center' }}>45%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>50%</td></tr>
+                  <tr><td style={{ padding:'4px 6px' }}>🔴 Максимум</td><td style={{ padding:'4px 6px', textAlign:'center' }}>30%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>65%</td></tr>
                 </tbody>
               </table>
-              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>Защита = базовая + покрытие механизмов × бонус. Потолок 85%.</p>
+              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>При риске {'>'}50% на механизм добавляется 2-й препарат. ХГЧ, АИ, каберголин — на всех уровнях при наличии ААС.</p>
             </div>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
@@ -5334,7 +5331,19 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 🧮 Рассчитать поддержку
               </button>
 
-              {/* Joint/Boost moved to Intel popup (SupportModals) */}
+              {/* Active mode banners */}
+              {boostEnabled && (
+                <div style={{ marginBottom:6, padding:'8px 12px', borderRadius:8, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', fontSize:9, color:'#ef4444', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span>🔥 Усиление стека активно — добавлены буст-препараты</span>
+                  <button onClick={() => { setBoostEnabled(false); calcSupport(); }} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer', fontSize:10, fontWeight:700 }}>✕</button>
+                </div>
+              )}
+              {jointMode && (
+                <div style={{ marginBottom:6, padding:'8px 12px', borderRadius:8, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', fontSize:9, color:'#8b5cf6', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span>🦴 Режим суставов активен — добавлены хондропротекторы</span>
+                  <button onClick={() => { setJointMode(false); calcSupport(); }} style={{ background:'none', border:'none', color:'#8b5cf6', cursor:'pointer', fontSize:10, fontWeight:700 }}>✕</button>
+                </div>
+              )}
               
                {/* Save calc result + Save Plan to Мои планы */}
               {calcDone && calcResult && (
