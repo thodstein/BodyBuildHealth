@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { EXERCISE_CATALOG, getExerciseById, getSubstitutes, canReplace } from '../../../core/exercise-catalog';
 import { calcExercisePrescription } from '../../../engines/training.engine';
 import { getVolumeByMuscle } from '../../../engines/training-methodology.engine';
@@ -12,13 +12,13 @@ const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border:
 
 const GROUPS = ['all', 'chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as const;
 const GROUP_RU: Record<string, string> = {
-  all: 'Р’СЃРµ РіСЂСѓРїРїС‹',
-  chest: 'Р“СЂСѓРґСЊ',
-  back: 'РЎРїРёРЅР°',
-  legs: 'РќРѕРіРё',
-  shoulders: 'РџР»РµС‡Рё',
-  arms: 'Р СѓРєРё',
-  core: 'РљРѕСЂ',
+  all: 'Все группы',
+  chest: 'Грудь',
+  back: 'Спина',
+  legs: 'Ноги',
+  shoulders: 'Плечи',
+  arms: 'Руки',
+  core: 'Кор',
 };
 
 export const ExerciseCalcTab: React.FC = () => {
@@ -116,21 +116,24 @@ export const ExerciseCalcTab: React.FC = () => {
   const getSubstitutesFor = (exerciseId: string) => {
     const ex = getExerciseById(exerciseId);
     if (!ex) return [];
-    // Filter by equipment if we had user equipment data; for now, we return all
-    return getSubstitutes(exerciseId).filter(sub => canReplace(exerciseId, sub.id));
+    const sub = getSubstitutes(exerciseId);
+    if (!sub) return [];
+    return sub.substitutes
+      .filter(s => canReplace(exerciseId, s.id))
+      .map(s => ({ id: s.id, name: getExerciseById(s.id)?.name ?? s.id, reason: s.reason }));
   };
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>
-        рџ“¦ Калькулятор упражнений v2
+        📦 Калькулятор упражнений v2
       </div>
 
       {/* Controls */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 12 }}>
         <div>
-          <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Группа мышц</label>
           <PopupSelect
+            label="Группа мышц"
             value={group}
             options={GROUPS.map(g => ({ id: g, label: GROUP_RU[g], desc: '' }))}
             hint="Выберите группу"
@@ -138,8 +141,8 @@ export const ExerciseCalcTab: React.FC = () => {
           />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Упражнение</label>
           <PopupSelect
+            label="Упражнение"
             value={exId}
             options={exList.map(e => ({ id: e.id, label: e.name, desc: `${e.group} · ${e.type === 'compound' ? 'Базовое' : 'Изолированное'}`}))}
             hint="Начните вводить для поиска"
@@ -147,8 +150,8 @@ export const ExerciseCalcTab: React.FC = () => {
           />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Цель</label>
           <PopupSelect
+            label="Цель"
             value={goal}
             options={[
               { id: 'strength', label: 'Сила' },
@@ -157,12 +160,12 @@ export const ExerciseCalcTab: React.FC = () => {
               { id: 'power', label: 'Взрывная сила' },
             ]}
             hint="Выберите цель"
-            onChange={v => setV(v)}
+            onChange={v => setGoal(v)}
           />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Неделя</label>
           <PopupNumber
+            label="Неделя"
             value={week}
             min={1}
             max={52}
@@ -171,8 +174,8 @@ export const ExerciseCalcTab: React.FC = () => {
           />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Всего недель</label>
           <PopupNumber
+            label="Всего недель"
             value={totalWeeks}
             min={1}
             max={52}
@@ -181,8 +184,8 @@ export const ExerciseCalcTab: React.FC = () => {
           />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>1RM (кг)</label>
           <PopupNumber
+            label="1RM (кг)"
             value={oneRM}
             min={0}
             max={500}
@@ -193,31 +196,31 @@ export const ExerciseCalcTab: React.FC = () => {
       </div>
 
       {!ex ? (
-        <div style={{ ...SMALL, textAlign: 'center', padding: 20 }}>Р’С‹Р±РµСЂРёС‚Рµ СѓРїСЂР°Р¶РЅРµРЅРёРµ РІС‹С€Рµ.</div>
+        <div style={{ ...SMALL, textAlign: 'center', padding: 20 }}>Выберите упражнение выше.</div>
       ) : (
         <>
-          <MetricCard title="Предопределённый вес" icon="рџ”ё" accent={ACCENT}>
+          <MetricCard title="Предопределённый вес" icon="🔸" accent={ACCENT}>
             <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{workWeight}</div>
             <div style={{ ...SMALL }}>кг</div>
           </MetricCard>
-          <MetricCard title="Повторения" icon="рџ”ё" accent={ACCENT}>
+          <MetricCard title="Повторения" icon="🔸" accent={ACCENT}>
             <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{presc?.reps ?? '-'}</div>
             <div style={{ ...SMALL }}>повт</div>
           </MetricCard>
-          <MetricCard title="Подходы" icon="рџ”љ" accent={ACCENT}>
+          <MetricCard title="Подходы" icon="🔚" accent={ACCENT}>
             <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{presc?.sets ?? '-'}</div>
             <div style={{ ...SMALL }}>подходов</div>
           </MetricCard>
-          <MetricCard title="RIR" icon="рџ”ё" accent={ACCENT}>
+          <MetricCard title="RIR" icon="🔸" accent={ACCENT}>
             <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{presc?.rir ?? '-'}</div>
             <div style={{ ...SMALL }}>пунктов</div>
           </MetricCard>
-          <MetricCard title="Отдых" icon="рџ”ё" accent={ACCENT}>
+          <MetricCard title="Отдых" icon="🔸" accent={ACCENT}>
             <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{presc?.rest ?? '-'}</div>
             <div style={{ ...SMALL }}>сек</div>
           </MetricCard>
-          {presc.dropSet && <div style={{ ...SMALL, marginTop: 8 }}>рџ”» Р”СЂРѕРї-СЃРµС‚: {presc.dropSetReps}</div>}
-          {presc.backoffSet && <div style={{ ...SMALL }}>в†©пёЏ Р’РєР»СЋС‡РёС‚СЊ backoff‑СЃРµС‚ (РѕР±СЉС‘РјРЅС‹Р№ РґРѕР±РѕСЂРЅС‹Р№ РїРѕРґС…РѕРґ).</div>}
+          {presc?.dropSet && <div style={{ ...SMALL, marginTop: 8 }}>🔻 Дроп-сет: {presc?.dropSetReps}</div>}
+          {presc?.backoffSet && <div style={{ ...SMALL }}>↩️ Включить backoff‑сет (объёмный доборный подход).</div>}
 
           {/* Блок рекомендаций по замене */}
           <div style={{ marginTop: 16 }}>

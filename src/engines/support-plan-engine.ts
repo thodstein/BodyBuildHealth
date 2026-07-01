@@ -401,7 +401,7 @@ function getSubDose(id: string): { mg: number; timing: string; name: string } {
     potassium: { mg: 200, timing: 'с едой', name: 'Калий' },
     boron: { mg: 6, timing: 'с едой', name: 'Бор' },
     chromium: { mg: 200, timing: 'с едой', name: 'Хром (пиколинат)' },
-    hcg: { mg: 500, timing: '2x/нед', name: 'ХГЧ' },
+    hcg: { mg: 500, timing: '2x/нед, схема 3/1 (3 нед приема → 1 нед отдых)', name: 'ХГЧ' },
     theanine: { mg: 200, timing: 'вечер', name: 'L-Теанин' },
     glycine: { mg: 3000, timing: 'на ночь', name: 'Глицин' },
     tyrosine: { mg: 500, timing: 'утро, натощак', name: 'L-Тирозин' },
@@ -701,6 +701,17 @@ export function calculateSupportPlan(
   externalLabs?: any[],
 ): PlanResult {
   const scores = calcAllRisks(state);
+  const sysVals = Object.values(scores) as number[];
+  const maxRisk = sysVals.length > 0 ? Math.max(...sysVals) : 30;
+  const avgRisk = sysVals.length > 0 ? Math.round(sysVals.reduce((a, b) => a + b, 0) / sysVals.length) : 15;
+  const overallRiskBefore = Math.round(maxRisk * 0.6 + avgRisk * 0.4);
+
+  // ─── Proportional risk targets per level (as fraction of overallRiskBefore) ───
+  const riskRatios: Record<string, number> = { basic: 0.65, mid: 0.50, max: 0.30, boost: 0.17 };
+  const riskTarget = overallRiskBefore * (riskRatios[level] || 0.65);
+  // Boost button: additional reduction (base→0.75, mid/max→0.60, boost→0.50)
+  const boostRatio: Record<string, number> = { basic: 0.75, mid: 0.60, max: 0.60, boost: 0.50 };
+  // will be checked later if boostEnabled is true from state
 
   // ─── RISK BREAKDOWN: explain sources of each system's risk ───
   const riskBreakdown: Record<string, string[]> = {};
@@ -804,8 +815,6 @@ export function calculateSupportPlan(
     if ((state.oda?.injuries || []).length > 0) brd('musculoskeletal', `${state.oda.injuries.length} травм в истории (+${state.oda.injuries.length * 5}%)`);
   }
   const excludedSubs = new Set(state.journal?.negative?.map((n: any) => normalizeId(n.substanceId)) || []);
-  // Protection levels: base % + coverage bonus (up to 85%)
-  const levelBaseProtection: Record<string, number> = { basic: 0.30, mid: 0.45, max: 0.60, boost: 0.70 };
 
   // ─── CONTRAINDICATION FILTER: exclude substances that conflict with user health data ───
   const userCI = new Set<string>();
@@ -855,7 +864,6 @@ export function calculateSupportPlan(
   };
   const threshold = levelThresholds[level] || 15;
   const includeAllSystems = level === 'boost';
-  const tierOrder = ['core', 'standard', 'advanced', 'specialty'];
 
   // ─── Select substances via mechanism bridge (breadth-of-coverage) ───
   const selectedIds = new Set<string>(existingSubs?.map(s => normalizeId(s)) || []);
@@ -874,22 +882,19 @@ export function calculateSupportPlan(
   // ─── Phase 1: Collect activated mechanisms & their candidates ───
   type Activation = { sysKey: string; sysScore: number; mechKey: string; candidates: string[] };
   const activations: Activation[] = [];
-  // Tier allowlist per level
-  const maxTierIdx: Record<string, number> = { basic: 1, mid: 2, max: 2, boost: 3 }; // 0=core,1=std,2=adv,3=spec
-  const maxTier = maxTierIdx[level] ?? 2;
   for (const [sysKey, sysScore] of Object.entries(scores)) {
     const mechKeys = SYS_TO_MECH_KEYS[sysKey] || [];
     if (sysScore >= threshold || (includeAllSystems && sysScore >= 2)) {
       for (const mechKey of mechKeys) {
         const { curated, autoIndexed } = findBestSubstancesForBridgeMech(mechKey);
-        // Try curated first-line substances; fall back to auto-indexed if none survive filtering
+        const useCuratedOnly = level === 'basic' || level === 'mid';
         let subs = curated
           .map(normalizeId)
-          .filter(id => !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id) && (tierOrder.indexOf(getCatalogEntry(id)?.tier || 'standard') <= maxTier));
-        if (subs.length === 0) {
+          .filter(id => !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id));
+        if (subs.length === 0 && !useCuratedOnly) {
           subs = autoIndexed
             .map(normalizeId)
-            .filter(id => !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id) && (tierOrder.indexOf(getCatalogEntry(id)?.tier || 'standard') <= maxTier));
+            .filter(id => !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id));
         }
         if (subs.length === 0) {
           uncoveredMechanisms.push({ mechKey, mechLabel: MECH_LABELS[mechKey] || mechKey, systemLabel: SYS_LABELS[sysKey] || sysKey, risk: sysScore });
@@ -922,10 +927,10 @@ export function calculateSupportPlan(
   // ─── Phase 2: Score EVERY candidate by synergy + new coverage ───
   // score = synergyWeight × 50 (main driver: substances that work together)
   //       + newCovScore × 8  (how many NEW activated mechs this substance adds)
-  //       + tierScore + bestFormScore
+  //       + bestFormScore (preferred forms get +8)
   // Synergy is weighted 6× higher than breadth — the engine PREFERS synergistic pairs.
   const candidateMeta = new Map<string, {
-    newCoverage: number; synergyWeight: number; tierScore: number; bestFormScore: number;
+    newCoverage: number; synergyWeight: number; bestFormScore: number;
     coveredMechs: string[]; coveredSys: string[];
   }>();
 
@@ -936,20 +941,39 @@ export function calculateSupportPlan(
       const coveredMechs = bridgeKeys.filter(bk => activatedMechSet.has(bk));
       const coveredSys = [...new Set(activations.filter(a => coveredMechs.includes(a.mechKey)).map(a => a.sysKey))];
       const entry = getCatalogEntry(id);
-      const tier = entry?.tier || 'standard';
-      const tierIdx = tierOrder.indexOf(tier);
-      const tierMult: Record<string, number> = { basic: 30, mid: 20, max: 15, boost: 12 };
-      const tierScore = Math.max(0, 3 - tierIdx) * (tierMult[level] || 12);
       const bestFormScore = entry?.bestForCourse ? 8 : 0;
       const synergyWeight = calcSynergyWeight(id);
       // How many of the covered mechanisms are NOT yet covered by selected set
       const newCoverage = coveredMechs.filter(mk => !coveredMechsSet.has(mk)).length;
       candidateMeta.set(id, {
-        newCoverage, synergyWeight, tierScore, bestFormScore,
+        newCoverage, synergyWeight, bestFormScore,
         coveredMechs, coveredSys,
       });
     }
   }
+
+  // ─── Proportional risk target — determines when to stop adding ───
+  const riskRatio = riskRatios[level] || 0.65;
+  function isRiskMet(): boolean {
+    if (selectedIds.size === 0) return false;
+    // Compute exact same formula as final overallAfter
+    let wSum = 0, aSys = 0;
+    for (const [sys, score] of Object.entries(scores) as [string, number][]) {
+      if (score > 0) {
+        const mechKeys = SYS_TO_MECH_KEYS[sys] || [];
+        const coverCount = [...selectedIds].filter(id => getBridgeKeys(id).some((bk: string) => mechKeys.includes(bk))).length;
+        const factor = Math.pow(0.85, coverCount);
+        const net = Math.round(score * factor);
+        const ep = Math.min(0.85, (score - net) / score);
+        wSum += ep;
+        aSys++;
+      }
+    }
+    const avgP = aSys > 0 ? wSum / aSys : 0;
+    const estimatedAfter = Math.round(overallRiskBefore * (1 - Math.min(1, avgP)));
+    return estimatedAfter <= riskTarget;
+  }
+  const canAdd = () => !isRiskMet();
 
   // ─── Phase 3: Iterative selection — re-score after each pick ───
   // Each iteration: pick the candidate with highest total score,
@@ -963,22 +987,14 @@ export function calculateSupportPlan(
     // Recalc new coverage every time (coveredMechsSet changed)
     const nc = m.coveredMechs.filter(mk => !coveredMechsSet.has(mk)).length;
     m.newCoverage = nc;
-    // Tier penalty: substances above level's tier get massive penalty
-    const entry = getCatalogEntry(id);
-    const tierIdx = tierOrder.indexOf(entry?.tier || 'standard');
-    const tierPenalty = tierIdx > maxTier ? -10000 : 0;
-    return sw * 50 + nc * 8 + m.tierScore + m.bestFormScore + tierPenalty;
+    return sw * 50 + nc * 8 + m.bestFormScore;
   }
 
-  // Max iterations: prevent infinite loops
-  const MAX_PICKS = 50;
-  // Coverage stop-target per level — stop adding once enough mechanisms covered
-  const coverageTargets: Record<string, number> = { basic: 0.50, mid: 0.65, max: 0.80, boost: 0.95 };
-  const coverageTarget = coverageTargets[level] || 0.65;
-  const totalMechs = activatedMechSet.size;
+  // Prevent infinite loops
+  const MAX_PICKS = 80;
   for (let iter = 0; iter < MAX_PICKS; iter++) {
-    // Check if coverage is sufficient for this level
-    if (totalMechs > 0 && coveredMechsSet.size / totalMechs >= coverageTarget) break;
+    // Stop when risk target is met for this level
+    if (isRiskMet()) break;
     let bestId = '';
     let bestScore = -1;
     for (const id of candidateMeta.keys()) {
@@ -1004,11 +1020,6 @@ export function calculateSupportPlan(
     }
   }
 
-  // ─── Soft substance caps per level (±30% flexibility) ───
-  const maxSubstances: Record<string, number> = { basic: 14, mid: 22, max: 32, boost: 44 };
-  const maxSub = maxSubstances[level] || 24;
-  const canAdd = () => selectedIds.size < maxSub;
-
   // ─── Phase 3b: Synergy-only picks ───
   // with already-selected set even if all mechs covered (synergy stack boost)
   for (let iter = 0; iter < 6; iter++) {
@@ -1016,9 +1027,6 @@ export function calculateSupportPlan(
     let bestScore = 0;
     for (const id of candidateMeta.keys()) {
       if (selectedIds.has(id)) continue;
-      const entry = getCatalogEntry(id);
-      const tierIdx = tierOrder.indexOf(entry?.tier || 'standard');
-      if (tierIdx > maxTier) continue; // skip if above level's tier
       const sw = calcSynergyWeight(id);
       if (sw > bestScore) { bestScore = sw; bestId = id; }
     }
@@ -1036,14 +1044,12 @@ export function calculateSupportPlan(
   for (const act of sortedUncovered) {
     if (gapFillCount >= gapFillMax) break;
     if (!canAdd()) break;
-    const alreadyCovered = [...selectedIds].some(id => getBridgeKeys(id).includes(act.mechKey));
-    // Pick the highest-tier candidate for this mechanism (within level's tier limit)
     const best = act.candidates
-      .filter(id => !selectedIds.has(id) && !excludedSubs.has(id) && (tierOrder.indexOf(getCatalogEntry(id)?.tier || 'standard') <= maxTier))
+      .filter(id => !selectedIds.has(id) && !excludedSubs.has(id))
       .sort((a, b) => {
-        const ta = tierOrder.indexOf(getCatalogEntry(a)?.tier || 'standard');
-        const tb = tierOrder.indexOf(getCatalogEntry(b)?.tier || 'standard');
-        return ta - tb;
+        const ea = getCatalogEntry(a);
+        const eb = getCatalogEntry(b);
+        return (eb?.bestForCourse ? 1 : 0) - (ea?.bestForCourse ? 1 : 0);
       });
     if (best.length === 0) continue;
     const pick = best[0];
@@ -1090,14 +1096,140 @@ export function calculateSupportPlan(
     }
   }
 
-  // ─── Add essential base substances for all levels ───
-  const alwaysInclude = ['magnesium', 'vitamin_d3', 'zinc', 'omega3', 'coq10'];
-  for (const id of alwaysInclude) {
-    if (false) break;
-    if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id)) {
-      selectedIds.add(id);
-      if (!substanceReasons[id]) substanceReasons[id] = [];
-      substanceReasons[id].push({ mechInfo: 'Базовая поддержка (обязательно)', system: 'general' });
+  // ─── Mandatory course vitamins: D3 + C + E + taurine (always) ───
+  const hasAAS = (state.pharma?.aas || []).length > 0;
+  if (hasAAS) {
+    for (const vid of ['vitamin_d3', 'vitamin_c', 'vitamin_e']) {
+      if (!selectedIds.has(vid) && !isContraindicated(vid) && catalogExists(vid)) {
+        selectedIds.add(vid);
+        if (!substanceReasons[vid]) substanceReasons[vid] = [];
+        const label: Record<string, string> = { vitamin_d3: 'D3 5000 МЕ — иммунитет, кальций, тестостерон', vitamin_c: 'C 1000 мг — антиоксидант, коллаген, иммунитет', vitamin_e: 'E 400 МЕ — мембраны, антиоксидант, простата' };
+        substanceReasons[vid].push({ mechInfo: 'Курс: обязательно — ' + (label[vid] || vid), system: 'general' });
+      }
+    }
+  }
+
+  // ─── Cognitive support on course: alpha GPC/citicoline + NAC + nootropic (fasoracetam or lions_mane) ───
+  if (hasAAS) {
+    // Pick alpha GPC or citicoline (whichever not already selected)
+    const cholinergic = ['alpha_gpc', 'citicoline'].find(id => !selectedIds.has(id) && !isContraindicated(id) && catalogExists(id) && canAdd());
+    if (cholinergic) {
+      selectedIds.add(cholinergic);
+      if (!substanceReasons[cholinergic]) substanceReasons[cholinergic] = [];
+      substanceReasons[cholinergic].push({ mechInfo: 'Когнитив: на курсе → ' + (cholinergic === 'alpha_gpc' ? 'альфа-ГФХ 300 мг — ацетилхолин, память' : 'цитиколин 500 мг — нейрометаболизм'), system: 'neuro' });
+    }
+    // Pick fasoracetam or lions_mane (whichever not already selected)
+    const nootropic = ['fasoracetam', 'lions_mane'].find(id => !selectedIds.has(id) && !isContraindicated(id) && catalogExists(id) && canAdd());
+    if (nootropic) {
+      selectedIds.add(nootropic);
+      if (!substanceReasons[nootropic]) substanceReasons[nootropic] = [];
+      substanceReasons[nootropic].push({ mechInfo: 'Когнитив: на курсе → ' + (nootropic === 'fasoracetam' ? 'фасорацетам 50 мг — ГАМК-ергик, фокус' : 'ежовик 500 мг — BDNF, нейрогенез'), system: 'neuro' });
+    }
+  }
+
+  // ─── Bromantane on cut (calorie deficit) ───
+  const isCutting = (state.nutrition?.calories || 2500) < 2200;
+  if (isCutting && !selectedIds.has('bromantane') && !isContraindicated('bromantane') && catalogExists('bromantane') && canAdd()) {
+    selectedIds.add('bromantane');
+    if (!substanceReasons['bromantane']) substanceReasons['bromantane'] = [];
+    substanceReasons['bromantane'].push({ mechInfo: 'Сушка: бромантан 100 мг — адаптоген, энергия, жиросжигание', system: 'neuro' });
+  }
+
+  // ─── Taurine always in basic + course (morning) ───
+  if (hasAAS && !selectedIds.has('taurine') && !isContraindicated('taurine') && catalogExists('taurine')) {
+    selectedIds.add('taurine');
+    if (!substanceReasons['taurine']) substanceReasons['taurine'] = [];
+    substanceReasons['taurine'].push({ mechInfo: 'Сердце: таурин 1000 мг утром — кардиопротекция, электролиты', system: 'cardio' });
+  }
+
+  // ─── MSM + Boswellia — joint pair ───
+  const hasJointIssues = (state.oda?.jointPain || 'none') !== 'none' || state.oda?.ligamentIssues || state.oda?.backPain;
+  if (hasJointIssues || level === 'boost') {
+    for (const jid of ['msm', 'boswellia']) {
+      if (!selectedIds.has(jid) && !isContraindicated(jid) && catalogExists(jid) && canAdd()) {
+        selectedIds.add(jid);
+        if (!substanceReasons[jid]) substanceReasons[jid] = [];
+        substanceReasons[jid].push({ mechInfo: 'Суставы: ' + (jid === 'msm' ? 'МСМ 1500 мг — сера для соединительной ткани' : 'босвеллия 500 мг — 5-LOX, противовоспалительное'), system: 'musculoskeletal' });
+      }
+    }
+  }
+
+  // ─── Goal-based support ───
+  const goal = state.goals?.trainingCycle || 'maintenance';
+  if (goal === 'mass') {
+    for (const mid of ['creatine', 'glutamine', 'eaa']) {
+      if (!selectedIds.has(mid) && !isContraindicated(mid) && catalogExists(mid) && canAdd()) {
+        selectedIds.add(mid);
+        if (!substanceReasons[mid]) substanceReasons[mid] = [];
+        const note: Record<string, string> = { creatine: 'креатин 5 г — сила, объём, регенерация АТФ', glutamine: 'глютамин 5 г 2x/д — иммунитет, ЖКТ, азотный баланс', eaa: 'EAA 10 г — полный аминокислотный профиль' };
+        substanceReasons[mid].push({ mechInfo: 'Масса: ' + (note[mid] || mid), system: 'musculoskeletal' });
+      }
+    }
+  }
+  if (goal === 'cut') {
+    for (const cid of ['cla', 'l_carnitine']) {
+      if (!selectedIds.has(cid) && !isContraindicated(cid) && catalogExists(cid) && canAdd()) {
+        selectedIds.add(cid);
+        if (!substanceReasons[cid]) substanceReasons[cid] = [];
+        const note: Record<string, string> = { cla: 'CLA 3 г — жиросжигание, катаболизм', l_carnitine: 'L-карнитин 2 г — транспорт ЖК в митохондрии' };
+        substanceReasons[cid].push({ mechInfo: 'Сушка: ' + (note[cid] || cid), system: 'metabolic' });
+      }
+    }
+  }
+  if (goal === 'endurance') {
+    for (const eid of ['beta_alanine', 'citrulline', 'cordyceps']) {
+      if (!selectedIds.has(eid) && !isContraindicated(eid) && catalogExists(eid) && canAdd()) {
+        selectedIds.add(eid);
+        if (!substanceReasons[eid]) substanceReasons[eid] = [];
+        const note: Record<string, string> = { beta_alanine: 'бета-аланин 3.2 г — буфер усталости', citrulline: 'цитруллин 6 г — NO, кровоток', cordyceps: 'кордицепс 500 мг — аэробная мощность' };
+        substanceReasons[eid].push({ mechInfo: 'Выносливость: ' + (note[eid] || eid), system: 'musculoskeletal' });
+      }
+    }
+  }
+  if (goal === 'maintenance') {
+    for (const rid of ['glycine', 'gaba', 'melatonin', 'magnesium']) {
+      if (!selectedIds.has(rid) && !isContraindicated(rid) && catalogExists(rid) && canAdd()) {
+        selectedIds.add(rid);
+        if (!substanceReasons[rid]) substanceReasons[rid] = [];
+        const note: Record<string, string> = { glycine: 'глицин 3 г — ГАМК-ергик, сон', gaba: 'ГАМК 500 мг — расслабление', melatonin: 'мелатонин 3 мг — циркадный ритм', magnesium: 'магний 400 мг — нервно-мышечная' };
+        substanceReasons[rid].push({ mechInfo: 'Восстановление: ' + (note[rid] || rid), system: 'neuro' });
+      }
+    }
+  }
+
+  // ─── Condition-based extras ───
+  // Masteron/Primobolan → collagen + MSM (dry joints)
+  const hasMasteronLike = (state.pharma?.aas || []).some((a: any) =>
+    ['masteron','drostanolone','primobolan','methenolone'].some(n => a.id?.toLowerCase().includes(n))
+  );
+  if (hasMasteronLike) {
+    for (const mid of ['collagen', 'msm']) {
+      if (!selectedIds.has(mid) && !isContraindicated(mid) && catalogExists(mid) && canAdd()) {
+        selectedIds.add(mid);
+        if (!substanceReasons[mid]) substanceReasons[mid] = [];
+        substanceReasons[mid].push({ mechInfo: 'Суставы: маст/примо → ' + (mid === 'collagen' ? 'коллаген 10 г — связки' : 'МСМ 1500 мг — сера'), system: 'musculoskeletal' });
+      }
+    }
+  }
+  // Frequent injections → quercetin + zinc + astragalus (healing)
+  const hasFrequentInj = (state.injection?.glutes === 'pain' || state.injection?.quads === 'pain' || state.injection?.delts === 'pain' || (state.pharma?.aas || []).length > 2);
+  if (hasFrequentInj) {
+    for (const fid of ['quercetin', 'zinc']) {
+      if (!selectedIds.has(fid) && !isContraindicated(fid) && catalogExists(fid) && canAdd()) {
+        selectedIds.add(fid);
+        if (!substanceReasons[fid]) substanceReasons[fid] = [];
+        substanceReasons[fid].push({ mechInfo: 'Инъекции: ' + (fid === 'quercetin' ? 'кверцетин 500 мг — заживление, антигистамин' : 'цинк 30 мг — регенерация'), system: 'general' });
+      }
+    }
+  }
+  // GH in stack → TMG + folate + B12 (homocysteine protection)
+  if (state.pharma?.hasGH) {
+    for (const gid of ['betaine', 'folate', 'vitamin_b12']) {
+      if (!selectedIds.has(gid) && !isContraindicated(gid) && catalogExists(gid) && canAdd()) {
+        selectedIds.add(gid);
+        if (!substanceReasons[gid]) substanceReasons[gid] = [];
+        substanceReasons[gid].push({ mechInfo: 'GH: гормон роста → ' + (gid === 'betaine' ? 'TMG 3 г — метилирование' : gid === 'folate' ? '5-MTHF 800 мкг' : 'B12 1000 мкг'), system: 'hepatic' });
+      }
     }
   }
 
@@ -1119,25 +1251,36 @@ export function calculateSupportPlan(
     substanceReasons['milk_thistle'].push({ mechInfo: 'Печень: стабилизация мембран гепатоцитов', system: 'hepatic' });
   }
 
-  // ─── Add cardio protection ───
-  const cardioScore = scores.cardio || 0;
-  if (cardioScore >= 20 && !selectedIds.has('telmisartan') && !isContraindicated('telmisartan') && canAdd()) {
+  // ─── Add cardio protection (BP-based dosing) ───
+  const bpSystolic = state.cardio?.bpStage === 'hypertension1' ? 135 : state.cardio?.bpStage === 'prehypertension' ? 128 : state.cardio?.bpStage === 'normal' ? 118 : 125;
+  const hr = state.cardio?.heartRate || 72;
+  // Check for nandrolone (adds nebivolol at lower BP)
+  const hasNandrolone = (state.pharma?.aas || []).some((a: any) => a.id?.toLowerCase().includes('nandrolone') || a.id?.toLowerCase().includes('deca'));
+  if (bpSystolic >= 123 && !selectedIds.has('telmisartan') && !isContraindicated('telmisartan') && canAdd()) {
     selectedIds.add('telmisartan');
     if (!substanceReasons['telmisartan']) substanceReasons['telmisartan'] = [];
-    substanceReasons['telmisartan'].push({ mechInfo: 'ССС: контроль АД, ARB-защита', system: 'cardio' });
+    const dose = bpSystolic >= 128 ? '80 мг' : '40 мг';
+    substanceReasons['telmisartan'].push({ mechInfo: `ССС: АД ${bpSystolic} → телмисартан ${dose}`, system: 'cardio' });
   }
-  if (cardioScore >= 20 && !selectedIds.has('nebivolol') && !isContraindicated('nebivolol') && canAdd() && (level === 'max' || level === 'boost')) {
+  // Nebivolol: BP ≥129 OR nandrolone in stack OR (elevated HR and BP≥123)
+  const needNebivolol = bpSystolic >= 129 || hasNandrolone || (hr >= 80 && bpSystolic >= 123);
+  if (needNebivolol && !selectedIds.has('nebivolol') && !isContraindicated('nebivolol') && canAdd()) {
     selectedIds.add('nebivolol');
     if (!substanceReasons['nebivolol']) substanceReasons['nebivolol'] = [];
-    substanceReasons['nebivolol'].push({ mechInfo: 'ССС: контроль ЧСС, NO-модуляция', system: 'cardio' });
+    substanceReasons['nebivolol'].push({ mechInfo: `ССС: ${hasNandrolone ? 'нандролон в стеке → ' : ''}небиволол 2.5 мг под контролем ЧСС и АД`, system: 'cardio' });
+  }
+  // Nandrolone → always agmatine (NO-boost + BP)
+  if (hasNandrolone && !selectedIds.has('agmatine') && !isContraindicated('agmatine') && catalogExists('agmatine') && canAdd()) {
+    selectedIds.add('agmatine');
+    if (!substanceReasons['agmatine']) substanceReasons['agmatine'] = [];
+    substanceReasons['agmatine'].push({ mechInfo: 'ССС: нандролон → агматин 1 г 2x/д — NO-буст, контроль АД, инсулин', system: 'cardio' });
   }
 
   // ─── Add neuroprotection for levels mid+ ───
   const neuroScore = scores.neuro || 0;
-  if ((level === 'max' || level === 'boost') && neuroScore >= 10) {
+  if ((level === 'max' || level === 'boost') && neuroScore >= 10 && canAdd()) {
     const neuroExtras = ['lions_mane', 'phosphatidylserine', 'theanine', 'glycine'];
     for (const id of neuroExtras) {
-      if (false) break;
       if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id)) {
         selectedIds.add(id);
         if (!substanceReasons[id]) substanceReasons[id] = [];
@@ -1145,10 +1288,9 @@ export function calculateSupportPlan(
       }
     }
   }
-  if (level === 'boost' && neuroScore >= 5) {
+  if (level === 'boost' && neuroScore >= 5 && canAdd()) {
     const boostNeuro = ['ashwagandha', 'melatonin', 'vitamin_b6'];
     for (const id of boostNeuro) {
-      if (false) break;
       if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id)) {
         selectedIds.add(id);
         if (!substanceReasons[id]) substanceReasons[id] = [];
@@ -1159,7 +1301,6 @@ export function calculateSupportPlan(
 
   // ─── Add joint support if user reports joint pain ───
   const hasJointPain = (state.oda?.jointPain || 'none') !== 'none' && (state.oda?.jointPain || 'none') !== '';
-  const isBoostEnabled = level === 'boost';
   if (hasJointPain) {
     const jointSubs = [
       { id: 'collagen', reason: 'Коллаген UC-II: восстановление хрящевой ткани, сухожилий и связок' },
@@ -1175,8 +1316,7 @@ export function calculateSupportPlan(
     const odaPain = (state.oda?.jointPain || 'none');
     const isSymptomatic = odaPain === 'moderate' || odaPain === 'severe';
     for (const js of jointSubs) {
-      if (false) break;
-      if (!selectedIds.has(js.id) && !excludedSubs.has(js.id) && catalogExists(js.id)) {
+      if (!selectedIds.has(js.id) && !excludedSubs.has(js.id) && catalogExists(js.id) && canAdd()) {
         selectedIds.add(js.id);
         if (!substanceReasons[js.id]) substanceReasons[js.id] = [];
         const note = js.id === 'bcp157' || js.id === 'tb500'
@@ -1185,35 +1325,229 @@ export function calculateSupportPlan(
         substanceReasons[js.id].push({ mechInfo: `Суставы: ${note}`, system: 'musculoskeletal' });
       }
     }
-    // Also ensure basic joint vitamins
-    for (const id of ['vitamin_d3', 'vitamin_k2', 'magnesium', 'calcium']) {
-      if (false) break;
-      if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id)) {
-        selectedIds.add(id);
-        if (!substanceReasons[id]) substanceReasons[id] = [];
-        substanceReasons[id].push({ mechInfo: 'Кости/суставы: минеральная поддержка', system: 'musculoskeletal' });
-      }
-    }
   }
 
   // ─── Boost mode: add extra protection ───
+  const isBoostEnabled = level === 'boost';
   if (isBoostEnabled) {
     const boostExtras = ['astragalus', 'melatonin', 'ginseng', 'egcg', 'l_carnitine', 'saw_palmetto', 'selenium', 'iron', 'copper', 'potassium'];
     for (const id of boostExtras) {
-      if (false) break;
-      if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id)) {
+      if (!selectedIds.has(id) && !excludedSubs.has(id) && catalogExists(id) && !isContraindicated(id) && canAdd()) {
         selectedIds.add(id);
         if (!substanceReasons[id]) substanceReasons[id] = [];
         substanceReasons[id].push({ mechInfo: 'Буст-защита: дополнительная поддержка всех систем', system: 'general' });
       }
     }
-    // Add hCG if AAS detected
-    const hasAAS = (state.pharma?.aas || []).length > 0;
-    if (hasAAS && !selectedIds.has('hcg') && !isContraindicated('hcg') && true) {
-      selectedIds.add('hcg');
-      if (!substanceReasons['hcg']) substanceReasons['hcg'] = [];
-      substanceReasons['hcg'].push({ mechInfo: 'ГГЯ: поддержка функции яичек на курсе ААС, 500 МЕ 2р/нед', system: 'endocrine' });
+  }
+
+  // ─── HCG: auto-assign when AAS detected (all levels) ───
+  if (hasAAS && !selectedIds.has('hcg') && !isContraindicated('hcg') && canAdd()) {
+    selectedIds.add('hcg');
+    if (!substanceReasons['hcg']) substanceReasons['hcg'] = [];
+    substanceReasons['hcg'].push({ mechInfo: 'ГГЯ: поддержка яичек на курсе ААС, 500 МЕ 2р/нед, схема 3/1 (3 нед приема → 1 нед отдых)', system: 'endocrine' });
+  }
+
+  // ─── Anastrozole: AI day-of-injection if aromatizable AAS or high E2 ───
+  const hasAromAAS = (state.pharma?.aas || []).some((a: any) =>
+    !['nandrolone','trenbolone','primobolan','drostanolone','masteron'].some(n => a.id?.toLowerCase().includes(n))
+  );
+  const preE2 = parseFloat(state.labs?.preCourse?.panelSex?.['E2'] || '0');
+  const midE2 = parseFloat(state.labs?.midCourse?.panelSex?.['E2'] || '0');
+  const e2High = preE2 > 150 || midE2 > 120;
+  if (hasAAS && hasAromAAS && !selectedIds.has('anastrozole') && !isContraindicated('anastrozole') && (level === 'max' || level === 'boost' || e2High)) {
+    selectedIds.add('anastrozole');
+    if (!substanceReasons['anastrozole']) substanceReasons['anastrozole'] = [];
+    substanceReasons['anastrozole'].push({ mechInfo: 'Эндокринная: контроль эстрадиола в день укола, 0.5-1 мг', system: 'endocrine' });
+  }
+
+  // ─── Cabergoline: under prolactin control, no fixed dose ───
+  const preProl = parseFloat(state.labs?.preCourse?.panelSex?.['Prolactin'] || '0');
+  const midProl = parseFloat(state.labs?.midCourse?.panelSex?.['Prolactin'] || '0');
+  const prolactinHigh = preProl > 30 || midProl > 25;
+  const hasTren = (state.pharma?.aas || []).some((a: any) => a.id?.toLowerCase().includes('tren'));
+  if ((hasTren || prolactinHigh) && !selectedIds.has('cabergoline') && !isContraindicated('cabergoline') && (level === 'max' || level === 'boost')) {
+    selectedIds.add('cabergoline');
+    if (!substanceReasons['cabergoline']) substanceReasons['cabergoline'] = [];
+    substanceReasons['cabergoline'].push({ mechInfo: 'Эндокринная: контроль пролактина (под анализы), без фикс. дозы', system: 'endocrine' });
+  }
+
+  // ─── Tren / Oral AAS → ALWAYS NAC + TUDCA ───
+  const hasOral = (state.pharma?.aas || []).some((a: any) =>
+    ['methandienone','oxandrolone','stanozolol','dianabol','anadrol','superdrol','turinabol','halodrol','oxymetholone'].some(n => a.id?.toLowerCase().includes(n))
+  );
+  const hasTrenOrOral = hasTren || hasOral;
+  if (hasTrenOrOral) {
+    if (!selectedIds.has('nac') && !isContraindicated('nac')) {
+      selectedIds.add('nac');
+      if (!substanceReasons['nac']) substanceReasons['nac'] = [];
+      substanceReasons['nac'].push({ mechInfo: 'Печень: обязательно при трен/оралках — глутатион, детоксикация', system: 'hepatic' });
     }
+    if (!selectedIds.has('tudca') && !isContraindicated('tudca') && canAdd()) {
+      selectedIds.add('tudca');
+      if (!substanceReasons['tudca']) substanceReasons['tudca'] = [];
+      substanceReasons['tudca'].push({ mechInfo: 'Печень: обязательно при трен/оралках — ER-стресс, желчеотток', system: 'hepatic' });
+    }
+  }
+
+  // ─── Tren / Lipid-damaging → BERGAMOT ───
+  const hasLipidDamaging = hasTren || (state.pharma?.aas || []).some((a: any) =>
+    ['methandienone','oxandrolone','stanozolol','winstrol','anadrol','superdrol'].some(n => a.id?.toLowerCase().includes(n))
+  );
+  if (hasLipidDamaging && !selectedIds.has('bergamot') && !isContraindicated('bergamot') && catalogExists('bergamot') && canAdd()) {
+    selectedIds.add('bergamot');
+    if (!substanceReasons['bergamot']) substanceReasons['bergamot'] = [];
+    substanceReasons['bergamot'].push({ mechInfo: 'Липиды: трен/оралки → бергамот 500 мг, защита ЛПВП', system: 'cardio' });
+  }
+
+  // ─── Kidney stress / Tren → ASTRAGALUS ───
+  const hasRenalRisk = hasTren || (state.urinary?.creatinineElevation !== 'none' && state.urinary?.creatinineElevation !== '') || (state.urinary?.proteinuria) || (state.contraindications?.hasKidneyDisease) || (state.cardio?.bpStage !== 'normal');
+  if (hasRenalRisk && !selectedIds.has('astragalus') && !isContraindicated('astragalus') && catalogExists('astragalus') && canAdd()) {
+    selectedIds.add('astragalus');
+    if (!substanceReasons['astragalus']) substanceReasons['astragalus'] = [];
+    substanceReasons['astragalus'].push({ mechInfo: 'Почки: ренопротекция — астрагал 500 мг 2x/д', system: 'renal' });
+  }
+
+  // ─── BP / Vascular → serrapeptase + nattokinase + bromelain + tadalafil 5mg ───
+  const bpSystolicVal = state.cardio?.bpStage === 'hypertension1' ? 135 : state.cardio?.bpStage === 'prehypertension' ? 128 : 0;
+  if (bpSystolicVal >= 125) {
+    if (!selectedIds.has('serrapeptase') && !isContraindicated('serrapeptase') && catalogExists('serrapeptase') && canAdd()) {
+      selectedIds.add('serrapeptase');
+      if (!substanceReasons['serrapeptase']) substanceReasons['serrapeptase'] = [];
+      substanceReasons['serrapeptase'].push({ mechInfo: 'Сосуды: АД ' + bpSystolicVal + ' → серрапептаза 120 000 ЕД, фибринолиз', system: 'cardio' });
+    }
+    if (!selectedIds.has('nattokinase') && !isContraindicated('nattokinase') && canAdd()) {
+      selectedIds.add('nattokinase');
+      if (!substanceReasons['nattokinase']) substanceReasons['nattokinase'] = [];
+      substanceReasons['nattokinase'].push({ mechInfo: 'Сосуды: АД ' + bpSystolicVal + ' → наттокиназа 2000 FU, реология', system: 'cardio' });
+    }
+    if (!selectedIds.has('bromelain') && !isContraindicated('bromelain') && canAdd()) {
+      selectedIds.add('bromelain');
+      if (!substanceReasons['bromelain']) substanceReasons['bromelain'] = [];
+      substanceReasons['bromelain'].push({ mechInfo: 'Сосуды: АД ' + bpSystolicVal + ' → бромелайн 500 мг, протеолиз', system: 'cardio' });
+    }
+    // Tadalafil 5 mg for vascular + BP + NO
+    if (!selectedIds.has('pharma_tadalafil') && !isContraindicated('pharma_tadalafil') && catalogExists('pharma_tadalafil') && canAdd()) {
+      selectedIds.add('pharma_tadalafil');
+      if (!substanceReasons['pharma_tadalafil']) substanceReasons['pharma_tadalafil'] = [];
+      substanceReasons['pharma_tadalafil'].push({ mechInfo: 'Сосуды: АД ' + bpSystolicVal + ' → тадалафил 5 мг, NO-модуляция + эндотелий', system: 'cardio' });
+    }
+  }
+
+  // ─── Homocysteine → TMG (betaine) + 5-MTHF (folate) ───
+  const hcyPre = parseFloat(state.labs?.preCourse?.panelBiochem?.['Homocysteine'] || '0');
+  const hcyMid = parseFloat(state.labs?.midCourse?.panelBiochem?.['Homocysteine'] || '0');
+  const hcyMax = Math.max(hcyPre, hcyMid);
+  if (hcyMax > 10) {
+    if (!selectedIds.has('folate') && !isContraindicated('folate') && canAdd()) {
+      selectedIds.add('folate');
+      if (!substanceReasons['folate']) substanceReasons['folate'] = [];
+      substanceReasons['folate'].push({ mechInfo: 'Метилирование: гомоцистеин ' + hcyMax + ' мкмоль/л → 5-MTHF 800 мкг', system: 'hepatic' });
+    }
+    if (hcyMax > 12 && !selectedIds.has('betaine') && !isContraindicated('betaine') && canAdd()) {
+      selectedIds.add('betaine');
+      if (!substanceReasons['betaine']) substanceReasons['betaine'] = [];
+      substanceReasons['betaine'].push({ mechInfo: 'Метилирование: гомоцистеин ' + hcyMax + ' → TMG (бетаин) 3 г', system: 'hepatic' });
+    }
+    if (hcyMax > 15 && !selectedIds.has('vitamin_b12') && !isContraindicated('vitamin_b12') && canAdd()) {
+      selectedIds.add('vitamin_b12');
+      if (!substanceReasons['vitamin_b12']) substanceReasons['vitamin_b12'] = [];
+      substanceReasons['vitamin_b12'].push({ mechInfo: 'Метилирование: гомоцистеин >15 → B12 1000 мкг', system: 'hepatic' });
+    }
+  }
+
+  // ─── Creatinine >115 → Cordyceps ───
+  const creatPre = parseFloat(state.labs?.preCourse?.panelBiochem?.['Creatinine'] || '0');
+  const creatMid = parseFloat(state.labs?.midCourse?.panelBiochem?.['Creatinine'] || '0');
+  const creatMax = Math.max(creatPre, creatMid);
+  if (creatMax > 115 && !selectedIds.has('cordyceps') && !isContraindicated('cordyceps') && catalogExists('cordyceps') && canAdd()) {
+    selectedIds.add('cordyceps');
+    if (!substanceReasons['cordyceps']) substanceReasons['cordyceps'] = [];
+    substanceReasons['cordyceps'].push({ mechInfo: 'Почки: креатинин ' + creatMax + ' → кордицепс 500 мг 2x/д', system: 'renal' });
+  }
+
+  // ─── Hematocrit >0.50 → serra + natto + bromelain + эритроцитаферез ───
+  const hctPre = parseFloat(state.labs?.preCourse?.panelHematology?.['HCT'] || '0');
+  const hctMid = parseFloat(state.labs?.midCourse?.panelHematology?.['HCT'] || '0');
+  const hctMax = Math.max(hctPre, hctMid);
+  if (hctMax > 0.50 || state.cardio?.hctElevation !== 'none') {
+    for (const hid of ['serrapeptase', 'nattokinase', 'bromelain']) {
+      if (!selectedIds.has(hid) && !isContraindicated(hid) && catalogExists(hid) && canAdd()) {
+        selectedIds.add(hid);
+        if (!substanceReasons[hid]) substanceReasons[hid] = [];
+        substanceReasons[hid].push({ mechInfo: 'Гематокрит: ' + (hctMax || '?') + '% → ' + (hid === 'serrapeptase' ? 'серрапептаза 120 000 ЕД' : hid === 'nattokinase' ? 'наттокиназа 2000 FU' : 'бромелайн 500 мг') + ' + рекомендован эритроцитаферез (донорство как альтернатива)', system: 'hematologic' });
+      }
+    }
+  }
+
+  // ─── Expanded lab panels → targeted substances ───
+  const gluPre = parseFloat(state.labs?.preCourse?.panelBiochem?.['Glucose'] || '0');
+  const gluMid = parseFloat(state.labs?.midCourse?.panelBiochem?.['Glucose'] || '0');
+  const gluMax = Math.max(gluPre, gluMid);
+  if (gluMax > 5.6) {
+    if (!selectedIds.has('berberine') && !isContraindicated('berberine') && canAdd()) selectedIds.add('berberine') && (substanceReasons['berberine'] = substanceReasons['berberine'] || []).push({ mechInfo: 'Метаболизм: глюкоза ' + gluMax + ' → берберин 500 мг 2x/д', system: 'endocrine' });
+    if (!selectedIds.has('chromium') && !isContraindicated('chromium') && canAdd()) selectedIds.add('chromium') && (substanceReasons['chromium'] = substanceReasons['chromium'] || []).push({ mechInfo: 'Метаболизм: глюкоза ' + gluMax + ' → хром 200 мкг', system: 'endocrine' });
+  }
+
+  const crpPre = parseFloat(state.labs?.preCourse?.panelBiochem?.['CRP'] || '0');
+  const crpMid = parseFloat(state.labs?.midCourse?.panelBiochem?.['CRP'] || '0');
+  const crpMax = Math.max(crpPre, crpMid);
+  if (crpMax > 5) {
+    if (!selectedIds.has('curcumin') && !isContraindicated('curcumin') && canAdd()) selectedIds.add('curcumin') && (substanceReasons['curcumin'] = substanceReasons['curcumin'] || []).push({ mechInfo: 'Воспаление: СРБ ' + crpMax + ' → куркумин 1000 мг', system: 'hepatic' });
+    if (!selectedIds.has('omega3') && !isContraindicated('omega3') && canAdd()) selectedIds.add('omega3') && (substanceReasons['omega3'] = substanceReasons['omega3'] || []).push({ mechInfo: 'Воспаление: СРБ ' + crpMax + ' → омега-3 2 г EPA+DHA', system: 'cardio' });
+  }
+
+  const ldlPre = parseFloat(state.labs?.preCourse?.panelLipid?.['LDL'] || '0');
+  const ldlMid = parseFloat(state.labs?.midCourse?.panelLipid?.['LDL'] || '0');
+  const ldlMax = Math.max(ldlPre, ldlMid);
+  if (ldlMax > 3.0) {
+    if (!selectedIds.has('omega3') && !isContraindicated('omega3') && canAdd()) selectedIds.add('omega3') && (substanceReasons['omega3'] = substanceReasons['omega3'] || []).push({ mechInfo: 'Липиды: ЛПНП ' + ldlMax + ' → омега-3 2 г', system: 'cardio' });
+    if (!selectedIds.has('bergamot') && !isContraindicated('bergamot') && catalogExists('bergamot') && canAdd()) selectedIds.add('bergamot') && (substanceReasons['bergamot'] = substanceReasons['bergamot'] || []).push({ mechInfo: 'Липиды: ЛПНП ' + ldlMax + ' → бергамот 500 мг', system: 'cardio' });
+  }
+
+  const tgPre = parseFloat(state.labs?.preCourse?.panelLipid?.['Triglycerides'] || '0');
+  const tgMid = parseFloat(state.labs?.midCourse?.panelLipid?.['Triglycerides'] || '0');
+  const tgMax = Math.max(tgPre, tgMid);
+  if (tgMax > 1.7) {
+    if (!selectedIds.has('omega3') && !isContraindicated('omega3') && canAdd()) selectedIds.add('omega3') && (substanceReasons['omega3'] = substanceReasons['omega3'] || []).push({ mechInfo: 'Липиды: ТГ ' + tgMax + ' → омега-3 4 г', system: 'cardio' });
+    if (!selectedIds.has('berberine') && !isContraindicated('berberine') && canAdd()) selectedIds.add('berberine') && (substanceReasons['berberine'] = substanceReasons['berberine'] || []).push({ mechInfo: 'Липиды: ТГ ' + tgMax + ' → берберин 500 мг', system: 'cardio' });
+  }
+
+  const fertPre = parseFloat(state.labs?.preCourse?.panelIron?.['Ferritin'] || '0');
+  const fertMid = parseFloat(state.labs?.midCourse?.panelIron?.['Ferritin'] || '0');
+  const fertMin = Math.min(fertPre || 999, fertMid || 999);
+  if (fertMin > 0 && fertMin < 30) {
+    if (!selectedIds.has('iron') && !isContraindicated('iron') && canAdd()) selectedIds.add('iron') && (substanceReasons['iron'] = substanceReasons['iron'] || []).push({ mechInfo: 'Кровь: ферритин ' + fertMin + ' → железо 18 мг + вит.C', system: 'hematologic' });
+    if (!selectedIds.has('vitamin_c') && !isContraindicated('vitamin_c') && canAdd()) selectedIds.add('vitamin_c') && (substanceReasons['vitamin_c'] = substanceReasons['vitamin_c'] || []).push({ mechInfo: 'Кровь: ферритин ↓ → вит.C 1000 мг для абсорбции железа', system: 'hematologic' });
+  }
+
+  const tshPre = parseFloat(state.labs?.preCourse?.panelThyroid?.['TSH'] || '0');
+  const tshMid = parseFloat(state.labs?.midCourse?.panelThyroid?.['TSH'] || '0');
+  if ((tshPre > 4.0 || tshMid > 4.0)) {
+    if (!selectedIds.has('selenium') && !isContraindicated('selenium') && canAdd()) selectedIds.add('selenium') && (substanceReasons['selenium'] = substanceReasons['selenium'] || []).push({ mechInfo: 'Щитовидная: ТТГ↑ → селен 200 мкг', system: 'endocrine' });
+    if (!selectedIds.has('zinc') && !isContraindicated('zinc') && canAdd()) selectedIds.add('zinc') && (substanceReasons['zinc'] = substanceReasons['zinc'] || []).push({ mechInfo: 'Щитовидная: ТТГ↑ → цинк 30 мг', system: 'endocrine' });
+  }
+
+  const kPre = parseFloat(state.labs?.preCourse?.panelBiochem?.['Potassium'] || '0');
+  const kMid = parseFloat(state.labs?.midCourse?.panelBiochem?.['Potassium'] || '0');
+  const kMin = Math.min(kPre || 5, kMid || 5);
+  if (kMin > 0 && kMin < 3.5) {
+    if (!selectedIds.has('potassium') && !isContraindicated('potassium') && canAdd()) selectedIds.add('potassium') && (substanceReasons['potassium'] = substanceReasons['potassium'] || []).push({ mechInfo: 'Электролиты: K ' + kMin + ' → калий цитрат 300 мг', system: 'cardio' });
+  }
+
+  const testoPre = parseFloat(state.labs?.preCourse?.panelSex?.['Total T'] || '0');
+  const testoMid = parseFloat(state.labs?.midCourse?.panelSex?.['Total T'] || '0');
+  const testoMin = Math.min(testoPre || 20, testoMid || 20);
+  if (testoMin > 0 && testoMin < 8) {
+    if (!selectedIds.has('zinc') && !isContraindicated('zinc') && canAdd()) selectedIds.add('zinc') && (substanceReasons['zinc'] = substanceReasons['zinc'] || []).push({ mechInfo: 'Гормоны: TT ' + testoMin + ' → цинк 30 мг', system: 'endocrine' });
+    if (!selectedIds.has('boron') && !isContraindicated('boron') && canAdd()) selectedIds.add('boron') && (substanceReasons['boron'] = substanceReasons['boron'] || []).push({ mechInfo: 'Гормоны: TT ↓ → бор 6 мг', system: 'endocrine' });
+    if (!selectedIds.has('vitamin_d3') && !isContraindicated('vitamin_d3') && canAdd()) selectedIds.add('vitamin_d3') && (substanceReasons['vitamin_d3'] = substanceReasons['vitamin_d3'] || []).push({ mechInfo: 'Гормоны: TT ↓ → D3 5000 МЕ', system: 'endocrine' });
+  }
+
+  const mgPre = parseFloat(state.labs?.preCourse?.panelBiochem?.['Magnesium'] || '0');
+  const mgMid = parseFloat(state.labs?.midCourse?.panelBiochem?.['Magnesium'] || '0');
+  const mgMin = Math.min(mgPre || 1, mgMid || 1);
+  if (mgMin > 0 && mgMin < 0.75) {
+    if (!selectedIds.has('magnesium') && !isContraindicated('magnesium') && canAdd()) selectedIds.add('magnesium') && (substanceReasons['magnesium'] = substanceReasons['magnesium'] || []).push({ mechInfo: 'Электролиты: Mg ' + mgMin + ' → магний 400 мг', system: 'cardio' });
   }
 
   // ─── SUBSTANCE CAP REMOVED — unlimited coverage ───
@@ -1221,11 +1555,11 @@ export function calculateSupportPlan(
   // B5: Auto-apply high-scoring stacks (score >70, covers ≥3 systems, synergy > 80)
   const autoStacks = recommendStacks(scores, selectedIds, level);
   for (const rec of autoStacks) {
-    if (rec.score >= 70 && rec.coveredSystems.length >= 3 && rec.stack.synergyScore >= 80) {
+    if (rec.score >= 70 && rec.coveredSystems.length >= 3 && rec.stack.synergyScore >= 85) {
       for (const sub of rec.stack.substances) {
         if (!canAdd()) break;
         const normId = normalizeId(sub.id);
-        if (!selectedIds.has(normId) && !excludedSubs.has(normId) && catalogExists(normId) && !isContraindicated(normId) && !rec.wasteSubstances.includes(sub.id) && (tierOrder.indexOf(getCatalogEntry(normId)?.tier || 'standard') <= maxTier)) {
+        if (!selectedIds.has(normId) && !excludedSubs.has(normId) && catalogExists(normId) && !isContraindicated(normId) && !rec.wasteSubstances.includes(sub.id)) {
           selectedIds.add(normId);
           if (!substanceReasons[normId]) substanceReasons[normId] = [];
           substanceReasons[normId].push({ mechInfo: `Стек «${rec.stack.name}»: ${sub.mechanism || 'синергия стека'}`, system: rec.stack.system });
@@ -1259,11 +1593,111 @@ export function calculateSupportPlan(
     if (!selectedIds.has('saw_palmetto') && !isContraindicated('saw_palmetto')) { selectedIds.add('saw_palmetto'); if (!substanceReasons['saw_palmetto']) substanceReasons['saw_palmetto'] = []; substanceReasons['saw_palmetto'].push({ mechInfo: 'Генетика SRD5A2 ↑: контроль ДГТ', system: 'reproductive' }); }
   }
   if (state.genetics?.arSensitivity === 'high') {
-    // Higher androgen receptor sensitivity = higher risk of polycythemia, BP issues
     if (!selectedIds.has('omega3') && !isContraindicated('omega3')) { selectedIds.add('omega3'); if (!substanceReasons['omega3']) substanceReasons['omega3'] = []; substanceReasons['omega3'].push({ mechInfo: 'Генетика AR ↑: кардиопротекция при высокой чувствительности', system: 'cardio' }); }
   }
   if (state.genetics?.arSensitivity === 'low') {
     if (!selectedIds.has('zinc') && !isContraindicated('zinc')) { selectedIds.add('zinc'); if (!substanceReasons['zinc']) substanceReasons['zinc'] = []; substanceReasons['zinc'].push({ mechInfo: 'Генетика AR ↓: повышение чувствительности рецепторов', system: 'endocrine' }); }
+  }
+
+  // ─── Expanded lab-to-substance mapping (remaining markers) ───
+  const _l = state.labs;
+  // HDL <1.0 → omega3 + bergamot
+  const hdlPre = parseFloat(_l?.preCourse?.panelLipid?.['HDL'] || '0');
+  const hdlMid = parseFloat(_l?.midCourse?.panelLipid?.['HDL'] || '0');
+  if ((hdlPre > 0 && hdlPre < 1.0) || (hdlMid > 0 && hdlMid < 1.0)) {
+    if (!selectedIds.has('omega3') && !isContraindicated('omega3') && canAdd()) selectedIds.add('omega3') && (substanceReasons['omega3'] = substanceReasons['omega3'] || []).push({ mechInfo: 'Липиды: ЛПВП↓ → омега-3 4 г', system: 'cardio' });
+  }
+  // Uric acid >420 → tart cherry + quercetin
+  const uaPre = parseFloat(_l?.preCourse?.panelBiochem?.['Uric acid'] || '0');
+  const uaMid = parseFloat(_l?.midCourse?.panelBiochem?.['Uric acid'] || '0');
+  const uaMax = Math.max(uaPre, uaMid);
+  if (uaMax > 420) {
+    if (!selectedIds.has('quercetin') && !isContraindicated('quercetin') && catalogExists('quercetin') && canAdd()) selectedIds.add('quercetin') && (substanceReasons['quercetin'] = substanceReasons['quercetin'] || []).push({ mechInfo: 'Мочевая кислота: ' + uaMax + ' → кверцетин 500 мг', system: 'renal' });
+    if (!selectedIds.has('vitamin_c') && !isContraindicated('vitamin_c') && canAdd()) selectedIds.add('vitamin_c') && (substanceReasons['vitamin_c'] = substanceReasons['vitamin_c'] || []).push({ mechInfo: 'Мочевая кислота: ↑ → вит.C 1000 мг', system: 'renal' });
+  }
+  // Cortisol >25 → ashwagandha + phosphatidylserine
+  const cortPre = parseFloat(_l?.preCourse?.panelSex?.['Cortisol'] || '0');
+  const cortMid = parseFloat(_l?.midCourse?.panelSex?.['Cortisol'] || '0');
+  const cortMax = Math.max(cortPre, cortMid);
+  if (cortMax > 25) {
+    if (!selectedIds.has('ashwagandha') && !isContraindicated('ashwagandha') && canAdd()) selectedIds.add('ashwagandha') && (substanceReasons['ashwagandha'] = substanceReasons['ashwagandha'] || []).push({ mechInfo: 'Стресс: кортизол ' + cortMax + ' → ашваганда KSM-66 600 мг', system: 'neuro' });
+    if (!selectedIds.has('phosphatidylserine') && !isContraindicated('phosphatidylserine') && canAdd()) selectedIds.add('phosphatidylserine') && (substanceReasons['phosphatidylserine'] = substanceReasons['phosphatidylserine'] || []).push({ mechInfo: 'Стресс: кортизол ↑ → фосфатидилсерин 300 мг', system: 'neuro' });
+  }
+  // SHBG >50 → boron + nettle
+  const shbgPre = parseFloat(_l?.preCourse?.panelSex?.['SHBG'] || '0');
+  const shbgMid = parseFloat(_l?.midCourse?.panelSex?.['SHBG'] || '0');
+  if ((shbgPre > 50 || shbgMid > 50)) {
+    if (!selectedIds.has('boron') && !isContraindicated('boron') && canAdd()) selectedIds.add('boron') && (substanceReasons['boron'] = substanceReasons['boron'] || []).push({ mechInfo: 'Гормоны: SHBG ' + (Math.max(shbgPre, shbgMid)) + ' → бор 6 мг', system: 'endocrine' });
+  }
+  // CK >200 → CoQ10 + magnesium
+  const ckPre = parseFloat(_l?.preCourse?.panelCardiac?.['CK'] || '0');
+  const ckMid = parseFloat(_l?.midCourse?.panelCardiac?.['CK'] || '0');
+  const ckMax = Math.max(ckPre, ckMid);
+  if (ckMax > 200) {
+    if (!selectedIds.has('coq10') && !isContraindicated('coq10') && canAdd()) selectedIds.add('coq10') && (substanceReasons['coq10'] = substanceReasons['coq10'] || []).push({ mechInfo: 'Мышцы: КФК ' + ckMax + ' → CoQ10 200 мг', system: 'musculoskeletal' });
+    if (!selectedIds.has('magnesium') && !isContraindicated('magnesium') && canAdd()) selectedIds.add('magnesium') && (substanceReasons['magnesium'] = substanceReasons['magnesium'] || []).push({ mechInfo: 'Мышцы: КФК ↑ → магний 400 мг', system: 'musculoskeletal' });
+  }
+  // HbA1c >5.7% → berberine + chromium + cinnamon
+  const hba1cPre = parseFloat(_l?.preCourse?.panelBiochem?.['HbA1c'] || '0');
+  const hba1cMid = parseFloat(_l?.midCourse?.panelBiochem?.['HbA1c'] || '0');
+  if ((hba1cPre > 5.7 || hba1cMid > 5.7)) {
+    if (!selectedIds.has('cinnamon') && !isContraindicated('cinnamon') && catalogExists('cinnamon') && canAdd()) selectedIds.add('cinnamon') && (substanceReasons['cinnamon'] = substanceReasons['cinnamon'] || []).push({ mechInfo: 'Метаболизм: HbA1c↑ → корица 500 мг', system: 'endocrine' });
+  }
+  // Hemoglobin >170 → hydration + nattokinase
+  const hbPre = parseFloat(_l?.preCourse?.panelHematology?.['Hemoglobin'] || '0');
+  const hbMid = parseFloat(_l?.midCourse?.panelHematology?.['Hemoglobin'] || '0');
+  if ((hbPre > 170 || hbMid > 170)) {
+    if (!selectedIds.has('nattokinase') && !isContraindicated('nattokinase') && canAdd()) selectedIds.add('nattokinase') && (substanceReasons['nattokinase'] = substanceReasons['nattokinase'] || []).push({ mechInfo: 'Кровь: Hb ' + (Math.max(hbPre, hbMid)) + ' → наттокиназа + рекомендована гидратация', system: 'hematologic' });
+  }
+  // WBC <4 → zinc + D3
+  const wbcPre = parseFloat(_l?.preCourse?.panelHematology?.['WBC'] || '0');
+  const wbcMid = parseFloat(_l?.midCourse?.panelHematology?.['WBC'] || '0');
+  if ((wbcPre > 0 && wbcPre < 4) || (wbcMid > 0 && wbcMid < 4)) {
+    if (!selectedIds.has('zinc') && !isContraindicated('zinc') && canAdd()) selectedIds.add('zinc') && (substanceReasons['zinc'] = substanceReasons['zinc'] || []).push({ mechInfo: 'Иммунитет: лейкоциты↓ → цинк 30 мг', system: 'hematologic' });
+  }
+  // GGT >55 → TUDCA + milk_thistle
+  const ggtPre = parseFloat(_l?.preCourse?.panelBiochem?.['GGT'] || '0');
+  const ggtMid = parseFloat(_l?.midCourse?.panelBiochem?.['GGT'] || '0');
+  if ((ggtPre > 55 || ggtMid > 55)) {
+    if (!selectedIds.has('tudca') && !isContraindicated('tudca') && canAdd()) selectedIds.add('tudca') && (substanceReasons['tudca'] = substanceReasons['tudca'] || []).push({ mechInfo: 'Печень: ГГТ↑ → TUDCA 500 мг — ER-стресс + желчеотток', system: 'hepatic' });
+    if (!selectedIds.has('milk_thistle') && !isContraindicated('milk_thistle') && canAdd()) selectedIds.add('milk_thistle') && (substanceReasons['milk_thistle'] = substanceReasons['milk_thistle'] || []).push({ mechInfo: 'Печень: ГГТ↑ → расторопша 600 мг', system: 'hepatic' });
+  }
+  // DHEA-S <200 → DHEA + pregnenolone
+  const dheaPre = parseFloat(_l?.preCourse?.panelSex?.['DHEA_S'] || '0');
+  const dheaMid = parseFloat(_l?.midCourse?.panelSex?.['DHEA_S'] || '0');
+  if ((dheaPre > 0 && dheaPre < 200) || (dheaMid > 0 && dheaMid < 200)) {
+    if (!selectedIds.has('dhea') && !isContraindicated('dhea') && catalogExists('dhea') && canAdd()) selectedIds.add('dhea') && (substanceReasons['dhea'] = substanceReasons['dhea'] || []).push({ mechInfo: 'Гормоны: DHEA-S↓ → DHEA 25 мг', system: 'endocrine' });
+    if (!selectedIds.has('pregnenolone') && !isContraindicated('pregnenolone') && catalogExists('pregnenolone') && canAdd()) selectedIds.add('pregnenolone') && (substanceReasons['pregnenolone'] = substanceReasons['pregnenolone'] || []).push({ mechInfo: 'Гормоны: DHEA-S↓ → прегненолон 50 мг', system: 'endocrine' });
+  }
+  // PSA >4 → saw palmetto + zinc
+  const psaPre = parseFloat(_l?.preCourse?.panelSex?.['PSA'] || '0');
+  const psaMid = parseFloat(_l?.midCourse?.panelSex?.['PSA'] || '0');
+  if ((psaPre > 4 || psaMid > 4)) {
+    if (!selectedIds.has('saw_palmetto') && !isContraindicated('saw_palmetto') && canAdd()) selectedIds.add('saw_palmetto') && (substanceReasons['saw_palmetto'] = substanceReasons['saw_palmetto'] || []).push({ mechInfo: 'Простата: ПСА↑ → пальметто 640 мг', system: 'reproductive' });
+  }
+  // IGF-1 <150 → arginine + ornithine + zinc
+  const igfPre = parseFloat(_l?.preCourse?.panelSex?.['IGF-1'] || '0');
+  const igfMid = parseFloat(_l?.midCourse?.panelSex?.['IGF-1'] || '0');
+  if ((igfPre > 0 && igfPre < 150) || (igfMid > 0 && igfMid < 150)) {
+    if (!selectedIds.has('zinc') && !isContraindicated('zinc') && canAdd()) selectedIds.add('zinc') && (substanceReasons['zinc'] = substanceReasons['zinc'] || []).push({ mechInfo: 'GH-ось: IGF-1↓ → цинк 30 мг', system: 'endocrine' });
+  }
+  // Lp(a) >75 → omega3 + niacin
+  const lpaPre = parseFloat(_l?.preCourse?.panelLipid?.['Lp(a)'] || '0');
+  const lpaMid = parseFloat(_l?.midCourse?.panelLipid?.['Lp(a)'] || '0');
+  if ((lpaPre > 75 || lpaMid > 75)) {
+    if (!selectedIds.has('vitamin_b3') && !isContraindicated('vitamin_b3') && catalogExists('vitamin_b3') && canAdd()) selectedIds.add('vitamin_b3') && (substanceReasons['vitamin_b3'] = substanceReasons['vitamin_b3'] || []).push({ mechInfo: 'Липиды: ЛП(а)↑ → ниацин B3 500 мг', system: 'cardio' });
+  }
+  // Free T <12 → boron + magnesium + zinc
+  const freeTPre = parseFloat(_l?.preCourse?.panelSex?.['Free T'] || '0');
+  const freeTMid = parseFloat(_l?.midCourse?.panelSex?.['Free T'] || '0');
+  if ((freeTPre > 0 && freeTPre < 12) || (freeTMid > 0 && freeTMid < 12)) {
+    if (!selectedIds.has('boron') && !isContraindicated('boron') && canAdd()) selectedIds.add('boron') && (substanceReasons['boron'] = substanceReasons['boron'] || []).push({ mechInfo: 'Гормоны: freeT↓ → бор 6 мг', system: 'endocrine' });
+  }
+  // Lymphocytes <1.0 → D3 + zinc + astragalus
+  const lymphPre = parseFloat(_l?.preCourse?.panelHematology?.['Lymphocytes'] || '0');
+  const lymphMid = parseFloat(_l?.midCourse?.panelHematology?.['Lymphocytes'] || '0');
+  if ((lymphPre > 0 && lymphPre < 1.0) || (lymphMid > 0 && lymphMid < 1.0)) {
+    if (!selectedIds.has('astragalus') && !isContraindicated('astragalus') && catalogExists('astragalus') && canAdd()) selectedIds.add('astragalus') && (substanceReasons['astragalus'] = substanceReasons['astragalus'] || []).push({ mechInfo: 'Иммунитет: лимфоциты↓ → астрагал 500 мг', system: 'hematologic' });
   }
 
   // ─── Build PlanSubstance list ───
@@ -1343,41 +1777,37 @@ export function calculateSupportPlan(
     dosages[s.id] = { mg: s.doseMg, timing: s.timing };
   }
 
-  // ─── Build systems map with weighted mechanism coverage ───
+  // ─── Build systems map — multiplicative risk reduction (no baseline) ───
   const systemsResult: Record<string, { raw: number; net: number; mechanisms: string[] }> = {};
   for (const [sys, score] of Object.entries(scores)) {
     const mechs = systemMechanisms[sys] || [];
-    const totalMechs = (SYS_TO_MECH_KEYS[sys] || []).length || 1;
-    let totalCoverage = 0;
+    // Count unique substances covering this system's mechanisms
+    const coveringSubs = new Set<string>();
     for (const mechKey of mechs) {
-      const mechData = allMechanisms.find(m => m.mechKey === mechKey);
-      const subCount = mechData?.substances?.length || 0;
-      totalCoverage += Math.min(0.85, subCount * 0.15);
+      for (const s of substances) {
+        if (getBridgeKeys(s.id).includes(mechKey)) coveringSubs.add(s.id);
+      }
     }
-    const avgCoverage = Math.min(0.75, totalCoverage / totalMechs);
-    const levelBase = levelBaseProtection[level] || 0.30;
-    const effectiveProtection = Math.min(0.85, levelBase + avgCoverage * 0.25);
+    // Each substance on a system: ×0.85 multiplicative
+    const factor = Math.pow(0.85, coveringSubs.size);
     systemsResult[sys] = {
       raw: score,
-      net: Math.max(0, Math.round(score * (1 - effectiveProtection))),
+      net: Math.max(0, Math.round(score * factor)),
       mechanisms: mechs,
     };
   }
 
   // ─── Risk dynamics with substance-aware coverage ───
   const riskDynamics = Object.entries(scores).map(([sys, raw]) => {
-    const sysMechs = allMechanisms.filter(m => SYS_TO_MECH_KEYS[sys]?.includes(m.mechKey));
-    const totalMechs = (SYS_TO_MECH_KEYS[sys] || []).length || 1;
-    let totalCoverage = 0;
-    for (const mechKey of (systemMechanisms[sys] || [])) {
-      const mechData = sysMechs.find(m => m.mechKey === mechKey);
-      const subCount = mechData?.substances?.length || 0;
-      totalCoverage += Math.min(0.85, subCount * 0.15);
+    const mechs = systemMechanisms[sys] || [];
+    const coveringSubs = new Set<string>();
+    for (const mechKey of mechs) {
+      for (const s of substances) {
+        if (getBridgeKeys(s.id).includes(mechKey)) coveringSubs.add(s.id);
+      }
     }
-    const avgCoverage = Math.min(0.75, totalCoverage / totalMechs);
-    const levelBase = levelBaseProtection[level] || 0.30;
-    const effectiveProtection = Math.min(0.85, levelBase + avgCoverage * 0.25);
-    return { system: sys, before: raw, after: Math.max(0, Math.round(raw * (1 - effectiveProtection))), mechanisms: sysMechs };
+    const factor = Math.pow(0.85, coveringSubs.size);
+    return { system: sys, before: raw, after: Math.max(0, Math.round(raw * factor)), mechanisms: allMechanisms.filter(m => SYS_TO_MECH_KEYS[sys]?.includes(m.mechKey)) };
   });
 
   // ─── Coverage percent ───
@@ -1394,23 +1824,23 @@ export function calculateSupportPlan(
   const specialInstructions = buildSpecialInstructions(substances);
 
   const systemScores = Object.values(scores);
-  const maxRisk = systemScores.length > 0 ? Math.max(...systemScores) : 0;
-  const avgRisk = systemScores.length > 0 ? Math.round(systemScores.reduce((a, b) => a + b, 0) / systemScores.length) : 0;
-  // Weighted: max risk dominates (60%), average supports (40%) — so hepatic 65% with cardio 20% = 65*0.6 + 21*0.4 = 47%
-  const overallRaw = Math.round(maxRisk * 0.6 + avgRisk * 0.4);
+  // Use same weighted formula as overallRiskBefore
+  const brMax = systemScores.length > 0 ? Math.max(...systemScores) : 0;
+  const brAvg = systemScores.length > 0 ? Math.round(systemScores.reduce((a: number, b: number) => a + b, 0) / systemScores.length) : 0;
+  const overallRaw = Math.round(brMax * 0.6 + brAvg * 0.4);
 
   let weightedProtectionSum = 0;
   let activeSystems = 0;
   for (const [sys, score] of Object.entries(scores)) {
     if (score > 0) {
       const sysResult = systemsResult[sys];
-      const ep = Math.max(0, Math.min(0.85, score > 0 ? (score - (sysResult?.net || score)) / score : 0));
+      const ep = Math.max(0, Math.min(0.85, score > 0 ? (score - (sysResult?.net ?? score)) / score : 0));
       weightedProtectionSum += ep;
       activeSystems++;
     }
   }
   const avgProtection = activeSystems > 0 ? weightedProtectionSum / activeSystems : 0.3;
-  const overallAfter = Math.round(overallRaw * (1 - Math.min(0.8, avgProtection)));
+  const overallAfter = Math.round(overallRaw * (1 - Math.min(1, avgProtection)));
 
   // ─── Coverage gaps (systems where support reduced risk by <40%) ───
   const coverageGaps: PlanResult['coverageGaps'] = [];
@@ -1418,7 +1848,7 @@ export function calculateSupportPlan(
     if (score > 0) {
       const sysLabel = SYS_LABELS[sys] || sys;
       const sysResult = systemsResult[sys];
-      const net = sysResult?.net || score;
+      const net = sysResult?.net ?? score;
       const reductionPercent = Math.round(((score - net) / Math.max(1, score)) * 100);
       // Show as gap when coverage is insufficient (reduction < 40%)
       if (reductionPercent < 40 && net > 20) {
@@ -1476,10 +1906,23 @@ export function calculateSupportPlan(
 }
 
 // ─── Apply joint/boost substances on top of existing plan ───
-export function applyJointToPlan(plan: PlanResult): PlanResult {
+export function applyJointToPlan(plan: PlanResult, userCI?: Set<string>): PlanResult {
   const existing = new Set(plan.substances.map(s => s.id));
   const added: PlanSubstance[] = [];
   const seen = new Set<string>();
+
+  function isCId(id: string): boolean {
+    if (!userCI || userCI.size === 0) return false;
+    const entry = getCatalogEntry(id);
+    if (!entry?.contraindications) return false;
+    for (const contra of entry.contraindications) {
+      const low = contra.toLowerCase();
+      for (const term of userCI) {
+        if (low.includes(term)) return true;
+      }
+    }
+    return false;
+  }
 
   // Find substances targeting musculoskeletal mechanisms
   const muscKeys = Object.keys(BRIDGE_MECH_TO_CATALOG).filter(k => k.startsWith('musculoskeletal_'));
@@ -1490,7 +1933,7 @@ export function applyJointToPlan(plan: PlanResult): PlanResult {
       if (existing.has(id) || seen.has(id)) continue;
       seen.add(id);
       const entry = getCatalogEntry(id);
-      if (!entry) continue;
+      if (!entry || isCId(id)) continue;
       // Only add joint-relevant substances (collagen, glucosamine, chondroitin, msm, vitamin_c, etc.)
       if (!id.includes('collagen') && !id.includes('glucosamine') && !id.includes('chondroitin')
         && !id.includes('msm') && !id.includes('hyaluronic') && !id.includes('boswellia')
@@ -1513,27 +1956,38 @@ export function applyJointToPlan(plan: PlanResult): PlanResult {
   return { ...plan, substances: [...plan.substances, ...added] };
 }
 
-export function applyBoostToPlan(plan: PlanResult): PlanResult {
+export function applyBoostToPlan(plan: PlanResult, userCI?: Set<string>): PlanResult {
   const existing = new Set(plan.substances.map(s => s.id));
   const added: PlanSubstance[] = [];
   const candidates: Array<{ id: string; score: number }> = [];
 
+  function isCId(id: string): boolean {
+    if (!userCI || userCI.size === 0) return false;
+    const entry = getCatalogEntry(id);
+    if (!entry?.contraindications) return false;
+    for (const contra of entry.contraindications) {
+      const low = contra.toLowerCase();
+      for (const term of userCI) {
+        if (low.includes(term)) return true;
+      }
+    }
+    return false;
+  }
+
   // Scan ALL bridge mechanisms, find high-priority candidates NOT in plan
-  for (const [bridgeKey, codes] of Object.entries(BRIDGE_MECH_TO_CATALOG)) {
+  for (const [bridgeKey] of Object.entries(BRIDGE_MECH_TO_CATALOG)) {
     const { curated, autoIndexed } = findBestSubstancesForBridgeMech(bridgeKey);
     for (const rawId of [...curated, ...autoIndexed]) {
       const id = normalizeId(rawId);
-      if (existing.has(id) || added.some(a => a.id === id)) continue;
+      if (existing.has(id) || added.some(a => a.id === id) || isCId(id)) continue;
       const entry = getCatalogEntry(id);
       if (!entry) continue;
-      // Score: tier + synergy weight with existing plan
-      const tierIdx = ['core', 'standard', 'advanced', 'specialty'].indexOf(entry.tier || 'standard');
-      const tierScore = Math.max(0, 3 - tierIdx) * 10;
+      // Score: synergy weight + best form bonus
       let synScore = 0;
       for (const sub of plan.substances) {
         if (entry.synergies?.some((syn: any) => syn.with.toLowerCase() === sub.id)) synScore += 15;
       }
-      candidates.push({ id, score: tierScore + synScore + (entry.bestForCourse ? 5 : 0) });
+      candidates.push({ id, score: synScore + (entry.bestForCourse ? 5 : 0) });
     }
   }
 

@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { EXERCISE_CATALOG, getExerciseById, getSubstitutes, canReplace } from '../../../core/exercise-catalog';
 import { getVolumeReferences, getVolumeByMuscle } from '../../../engines/training-methodology.engine';
 import { PopupSelect, PopupNumber, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
@@ -30,7 +30,7 @@ interface Suggestion {
 
 export const VolumeOptimizerTab: React.FC = () => {
   const { profile } = useDataLink();
-  const level = (profile?.settings.trainingLevel as 'beginner' | 'intermediate' | 'advanced' | 'enhanced') ?? 'intermediate';
+  const [level, setLevel] = useState<'beginner' | 'intermediate' | 'advanced' | 'enhanced'>((profile?.settings.trainingLevel as 'beginner' | 'intermediate' | 'advanced' | 'enhanced') ?? 'intermediate');
   // We'll map 'enhanced' to 'advanced' for volume references, as the engine might not have enhanced.
   const volumeLevel = level === 'enhanced' ? 'advanced' : level;
   const [oneRMGlobal, setOneRMGlobal] = useState<number>(100);
@@ -81,7 +81,7 @@ export const VolumeOptimizerTab: React.FC = () => {
       if (!map[muscle]) {
         const volRef = getVolumeByMuscle(muscle);
         if (!volRef) return;
-        const levelData = volRef[volumeLevel as keyof typeof volRef];
+        const levelData = volRef[volumeLevel as 'beginner' | 'intermediate' | 'advanced'];
         if (!levelData) return;
         map[muscle] = {
           sets: 0,
@@ -154,8 +154,8 @@ export const VolumeOptimizerTab: React.FC = () => {
         // Need to add volume
         const deficit = mev - sets;
         let exerciseId: string | undefined;
-        let reason: string;
-        let detail: string;
+        let reason: string = '';
+        let detail: string = '';
 
         // Prefer to add sets to the existing exercise with the most sets for this muscle
         if (muscleExercises.length > 0) {
@@ -168,8 +168,8 @@ export const VolumeOptimizerTab: React.FC = () => {
           // No existing exercise for this muscle, add a new one
           // Choose a basic exercise for the muscle from volume references
           const volRef = getVolumeByMuscle(muscle);
-          if (volRef && volRef[volumeLevel as keyof typeof volRef].bestExercises.length > 0) {
-            exerciseId = volRef[volumeLevel as keyof typeof volRef].bestExercises[0];
+          if (volRef && volRef.bestExercises.length > 0) {
+            exerciseId = volRef.bestExercises[0];
           } else {
             // Fallback to first exercise in catalog for this muscle
             const fallback = EXERCISE_CATALOG.find(e => e.group === muscle);
@@ -235,8 +235,9 @@ export const VolumeOptimizerTab: React.FC = () => {
   const getSubstitutesFor = (exerciseId: string) => {
     const ex = getExercise(exerciseId);
     if (!ex) return [];
-    // Filter by equipment if we had user equipment data; for now, we return all
-    return getSubstitutes(exerciseId).filter(sub => canReplace(exerciseId, sub.id));
+    const sub = getSubstitutes(exerciseId);
+    if (!sub) return [];
+    return sub.substitutes.map(s => ({ id: s.id, name: getExerciseById(s.id)?.name ?? s.id, reason: s.reason }));
   };
 
   // Apply improvements from suggestions
@@ -314,7 +315,7 @@ export const VolumeOptimizerTab: React.FC = () => {
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>
-        рџ“¦ Объём и оптимизация v2
+        📦 Объём и оптимизация v2
       </div>
 
       {/* Level and global oneRM inputs */}
@@ -323,7 +324,7 @@ export const VolumeOptimizerTab: React.FC = () => {
           <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Уровень подготовки</label>
           <select
             value={level}
-            onChange={e => setLevel(e.target.value as any)}
+            onChange={e => setLevel(e.target.value as 'beginner' | 'intermediate' | 'advanced' | 'enhanced')}
             style={IN}
           >
             <option value="beginner">Начальный</option>
@@ -350,8 +351,8 @@ export const VolumeOptimizerTab: React.FC = () => {
         {rows.map(row => (
           <div key={row.id} style={{ display: 'flex', gap: 12, alignItems: 'start', marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
             <div style={{ flex: 2, minWidth: 180 }}>
-              <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Упражнение</label>
               <PopupSelect
+                label="Упражнение"
                 value={row.exerciseId}
                 options={EXERCISE_CATALOG.map(e => ({ id: e.id, label: e.name, desc: `${e.group} · ${e.type === 'compound' ? 'Базовое' : 'Изолированное'}`}))}
                 hint="Начните вводить для поиска"
@@ -433,15 +434,15 @@ export const VolumeOptimizerTab: React.FC = () => {
 
       {/* Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
-        <MetricCard title="Объём (сетов)" icon="рџ”љ" accent={ACCENT}>
+        <MetricCard title="Объём (сетов)" icon="🔚" accent={ACCENT}>
           <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{totalSets}</div>
           <div style={{ ...SMALL }}>подходов</div>
         </MetricCard>
-        <MetricCard title="Тоннаж" icon="рџ“¦" accent={ACCENT}>
+        <MetricCard title="Тоннаж" icon="📦" accent={ACCENT}>
           <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{totalTonnage.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
           <div style={{ ...SMALL }}>кг·повт</div>
         </MetricCard>
-        <MetricCard title="КПШ" icon="рџ”§" accent={ACCENT}>
+        <MetricCard title="КПШ" icon="📧" accent={ACCENT}>
           <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{totalKpSh.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
           <div style={{ ...SMALL }}>единица</div>
         </MetricCard>
@@ -450,7 +451,7 @@ export const VolumeOptimizerTab: React.FC = () => {
       {/* Tonnage and KPSh by muscle */}
       {Object.keys(tonnageByMuscle.tonnageByMuscle).length > 0 && (
         <>
-          <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>рџ”§ Тоннаж по мышцам</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>📧 Тоннаж по мышцам</div>
           <div style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
             {Object.entries(tonnageByMuscle.tonnageByMuscle).map(([muscle, tonnage]) => (
               <div key={muscle} style={{ background: 'rgba(24,24,27,0.4)', borderRadius: 8, padding: 10 }}>

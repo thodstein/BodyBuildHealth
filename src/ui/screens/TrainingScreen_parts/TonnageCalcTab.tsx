@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { EXERCISE_CATALOG, getExerciseById } from '../../../core/exercise-catalog';
 import { PopupSelect, PopupNumber, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 
@@ -145,7 +145,7 @@ export const TonnageCalcTab: React.FC = () => {
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>
-        рџ“¦ Тоннаж калькулятор v2
+        📦 Тоннаж калькулятор v2
       </div>
 
       {/* Таблица упражнений */}
@@ -153,14 +153,14 @@ export const TonnageCalcTab: React.FC = () => {
         <button
           onClick={addRow}
           style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 700, fontSize: 11 }}>
-          пј‹ Добавить упражнение
+          ＋ Добавить упражнение
         </button>
       </div>
       {rows.map(row => (
         <div key={row.id} style={{ display: 'flex', gap: 12, alignItems: 'start', marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <div style={{ flex: 2, minWidth: 180 }}>
-            <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Упражнение</label>
             <PopupSelect
+              label="Упражнение"
               value={row.exerciseId}
               options={EXERCISE_CATALOG.map(e => ({ id: e.id, label: e.name, desc: `${e.group} · ${e.type === 'compound' ? 'Базовое' : 'Изолированное'}`}))}
               hint="Начните вводить для поиска"
@@ -220,7 +220,7 @@ export const TonnageCalcTab: React.FC = () => {
               onClick={() => delRow(row.id)}
               style={{ marginTop: 4, padding: '4px 8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}
             >
-              вњ•
+              ✕
             </button>
           </div>
         </div>
@@ -228,19 +228,19 @@ export const TonnageCalcTab: React.FC = () => {
 
       {/* Общие показатели */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
-        <MetricCard title="РњР°Р»СЊРєСѓСЏС‚РѕСЂ" icon="рџ“¦" accent={ACCENT}>
+        <MetricCard title="Тоннаж" icon="📦" accent={ACCENT}>
           <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{totalTonnage.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
           <div style={{ ...SMALL }}>кг·повт</div>
         </MetricCard>
-        <MetricCard title="Средний вес" icon="рџ”ё" accent={ACCENT}>
+        <MetricCard title="Средний вес" icon="🔸" accent={ACCENT}>
           <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{(totalTonnage / Math.max(totalReps, 1)).toFixed(1)}</div>
           <div style={{ ...SMALL }}>кг</div>
         </MetricCard>
-        <MetricCard title="Общее количество подходов" icon="рџ”љ" accent={ACCENT}>
+        <MetricCard title="Общее количество подходов" icon="🔚" accent={ACCENT}>
           <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{totalSets}</div>
           <div style={{ ...SMALL }}>подходов</div>
         </MetricCard>
-        <MetricCard title="КПШ (общ)" icon="рџ”§" accent={ACCENT}>
+        <MetricCard title="КПШ (общ)" icon="📧" accent={ACCENT}>
           <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{totalKpSh.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
           <div style={{ ...SMALL }}>единица</div>
         </MetricCard>
@@ -249,7 +249,7 @@ export const TonnageCalcTab: React.FC = () => {
       {/* По мышцам */}
       {Object.keys(tonnageByMuscle).length > 0 && (
         <>
-          <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>рџ”§ Тоннаж по мышцам</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>📧 Тоннаж по мышцам</div>
           <div style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
             {Object.entries(tonnageByMuscle).map(([muscle, tonnage]) => (
               <div key={muscle} style={{ background: 'rgba(24,24,27,0.4)', borderRadius: 8, padding: 10 }}>
@@ -260,7 +260,7 @@ export const TonnageCalcTab: React.FC = () => {
               </div>
             ))}
           </div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>рџ”§ КПШ по мышцам</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>📧 КПШ по мышцам</div>
           <div style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
             {Object.entries(kpShByMuscle).map(([muscle, kpSh]) => (
               <div key={muscle} style={{ background: 'rgba(24,24,27,0.4)', borderRadius: 8, padding: 10 }}>
@@ -275,7 +275,7 @@ export const TonnageCalcTab: React.FC = () => {
       )}
 
       {/* По зонам интенсивности */}
-      <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>рџ”§ Тоннаж по зонам интенсивности (%1РџРњ)</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>📧 Тоннаж по зонам интенсивности (%1ПМ)</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
         {[['light', 'Легкая (<60%)', '#22c55e'], ['medium', 'Средняя (60-80%)', '#f59e0b'], ['heavy', 'Тяжёлая (>80%)', '#ef4444']].map(([key, label, color]) => (
           <div key={key} style={{ background: `${color}0f`, border: `1px solid ${color}33`, borderRadius: 8, padding: 10 }}>
@@ -307,7 +307,7 @@ export const TonnageCalcTab: React.FC = () => {
             transition: 'all 0.2s' 
           }}
         >
-          {saved ? 'вњ“ Сохранено' : 'Сохранить в план тренировки'}
+          {saved ? '✓ Сохранено' : 'Сохранить в план тренировки'}
         </button>
         <button
           onClick={handleCalcSave}
@@ -329,7 +329,7 @@ export const TonnageCalcTab: React.FC = () => {
             transition: 'all 0.2s' 
           }}
         >
-          {calcSaved ? 'вњ“ Расчёт сохранён' : 'Сохранить расчёт'}
+          {calcSaved ? '✓ Расчёт сохранён' : 'Сохранить расчёт'}
         </button>
         <button
           onClick={handleCalcLoad}

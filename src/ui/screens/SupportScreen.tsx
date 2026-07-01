@@ -445,8 +445,20 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       courseWeek: courseWeekState,
     };
     let result = calculateSupportPlan(state, supportLevel as PowerLevel, enhancedSubs, linked.labs);
-    if (jointMode) result = applyJointToPlan(result);
-    if (boostEnabled) result = applyBoostToPlan(result);
+    // Build userCI for boost/joint contraindication checks
+    const ci = state.contraindications || {};
+    const userCI = new Set<string>();
+    if (ci.hasCVD) userCI.add('сердечно-сосудистые').add('ССЗ').add('гипертония').add('CVD');
+    if (ci.hasThrombophilia) userCI.add('тромбофилия').add('тромбоз').add('коагуляция');
+    if (ci.hasLiverDisease) userCI.add('печен').add('гепатит').add('цирроз').add('печёночная');
+    if (ci.hasKidneyDisease) userCI.add('почк').add('почечная').add('нефро').add('ХБП');
+    if (ci.hasDiabetes) userCI.add('диабет').add('инсулин').add('гликемия');
+    if (ci.hasEpilepsy) userCI.add('эпилепсия').add('судорог');
+    if (ci.hasMentalIllness) userCI.add('психи').add('шизофрения').add('биполяр');
+    if (ci.hasGI) userCI.add('язва').add('гастрит').add('ЖКТ');
+    if (ci.allergies) userCI.add(ci.allergies.toLowerCase());
+    if (jointMode) result = applyJointToPlan(result, userCI);
+    if (boostEnabled) result = applyBoostToPlan(result, userCI);
     setPlanResult(result);
     // Map to a backwards-compatible effectiveLevel format
     const subs = result.substances.map(s => s.id);
@@ -5257,41 +5269,63 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   </button>
                 </div>
               )}
-              {calcDone && calcResult && (
+              {calcDone && (calcResult || planResult) && (
                 <div style={{ marginTop:10, padding:'12px', borderRadius:10, background:'rgba(0,230,138,0.03)', border:'1px solid rgba(0,230,138,0.1)' }}>
+                  {(() => {
+                    const r = planResult || calcResult || {} as any;
+                    const riskBefore = r.overallRiskBefore ?? r.riskBeforeSupport ?? 0;
+                    const riskAfter = r.overallRiskAfter ?? r.riskAfterSupport ?? 0;
+                    const score = r.coveragePercent ?? r.supportScore ?? 0;
+                    const isOptimal = score > 50;
+                    const isMid = score > 25;
+                    return (<>
                   <div style={{ fontSize:11, fontWeight:700, color:'var(--text-light)', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
                     📊 Результат расчёта
-                    {calcResult.supportScore > 50 ? <span style={{ fontSize:9, padding:'1px 6px', borderRadius:4, background:'rgba(34,197,94,0.12)', color:'#22c55e' }}>Оптимально</span> : calcResult.supportScore > 25 ? <span style={{ fontSize:9, padding:'1px 6px', borderRadius:4, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>Средне</span> : <span style={{ fontSize:9, padding:'1px 6px', borderRadius:4, background:'rgba(239,68,68,0.12)', color:'#ef4444' }}>Недостаточно</span>}
+                    {isOptimal ? <span style={{ fontSize:9, padding:'1px 6px', borderRadius:4, background:'rgba(34,197,94,0.12)', color:'#22c55e' }}>Оптимально</span> : isMid ? <span style={{ fontSize:9, padding:'1px 6px', borderRadius:4, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>Средне</span> : <span style={{ fontSize:9, padding:'1px 6px', borderRadius:4, background:'rgba(239,68,68,0.12)', color:'#ef4444' }}>Недостаточно</span>}
                   </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,0,0,0.08)', border:'1px solid var(--border)' }}>
+                  {(() => {
+                    // Show week scale info
+                    if (!planResult) return null;
+                    const ws = planResult.weekScale || 1;
+                    return <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center',marginBottom:6}}>
+                      <span style={{fontSize:7,color:'var(--text-dim)'}}>Нед.{courseWeekState}</span>
+                      {ws < 1 && <span style={{fontSize:7,padding:'1px 5px',borderRadius:3,background:'rgba(245,158,11,0.08)',color:'#f59e0b'}}>Дозы ×{ws.toFixed(1)} (адаптация)</span>}
+                      {planResult.coverageGaps?.length > 0 && <span style={{fontSize:7,padding:'1px 5px',borderRadius:3,background:'rgba(239,68,68,0.08)',color:'#ef4444'}}>{planResult.coverageGaps.length} пробелов</span>}
+                    </div>;
+                  })()}
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,padding:'8px 10px',borderRadius:8,background:'rgba(0,0,0,0.08)',border:'1px solid var(--border)'}}>
                     <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                       <span style={{ fontSize:9, color:'var(--text-dim)' }}>Без</span>
-                      <span style={{ fontSize:13, fontWeight:800, color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}%</span>
+                      <span style={{ fontSize:13, fontWeight:800, color:'#ef4444' }}>{Math.round(riskBefore)}%</span>
                     </div>
                     <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                       <span style={{ fontSize:10, color:'var(--accent)', fontWeight:700 }}>/</span>
                     </div>
                     <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                       <span style={{ fontSize:9, color:'var(--text-dim)' }}>С</span>
-                      <span style={{ fontSize:13, fontWeight:800, color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}%</span>
+                      <span style={{ fontSize:13, fontWeight:800, color:'#22c55e' }}>{Math.round(riskAfter)}%</span>
                     </div>
                     <div style={{ padding:'2px 8px', borderRadius:6, background:'rgba(34,197,94,0.1)' }}>
-                      <span style={{ fontSize:10, fontWeight:700, color:'#22c55e' }}>{Math.round(calcResult.riskBeforeSupport)}/{Math.round(calcResult.riskAfterSupport)}</span>
+                      <span style={{ fontSize:10, fontWeight:700, color:'#22c55e' }}>{Math.round(riskBefore)}/{Math.round(riskAfter)}</span>
                     </div>
                   </div>
                   <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.1)' }}>
                     <span style={{ fontSize:9, color:'var(--text-dim)', minWidth:90 }}>Оценка поддержки</span>
                     <div style={{ flex:1, height:6, borderRadius:3, background:'var(--bg-secondary)', overflow:'hidden', border:'1px solid var(--border)' }}>
-                      <div style={{ height:'100%', width:`${Math.min(100, calcResult.supportScore)}%`, borderRadius:3, background: calcResult.supportScore > 50 ? 'linear-gradient(90deg,#22c55e,#4ade80)' : calcResult.supportScore > 25 ? 'linear-gradient(90deg,#eab308,#f59e0b)' : 'linear-gradient(90deg,#ef4444,#f97316)', transition:'width 0.6s' }} />
+                      <div style={{ height:'100%', width:`${Math.min(100, score)}%`, borderRadius:3, background: isOptimal ? 'linear-gradient(90deg,#22c55e,#4ade80)' : isMid ? 'linear-gradient(90deg,#eab308,#f59e0b)' : 'linear-gradient(90deg,#ef4444,#f97316)', transition:'width 0.6s' }} />
                     </div>
-                    <span style={{ fontSize:12, fontWeight:800, color:'#8b5cf6', minWidth:40, textAlign:'right' }}>{Math.round(calcResult.supportScore)}/100</span>
-                  </div>
-                  {calcResult.systemSupport && Object.keys(calcResult.systemSupport).length > 0 && (
+                    <span style={{ fontSize:12, fontWeight:800, color:'#8b5cf6', minWidth:40, textAlign:'right' }}>{Math.round(score)}/100</span>
+                  </div></>);})()}
+                  {(() => {
+                    const sysData = planResult?.systems || (calcResult?.systemSupport ? Object.fromEntries(Object.entries(calcResult.systemSupport).map(([k,v]) => [k, { raw: (v as number), net: (v as number), mechanisms: [] }])) : null);
+                    if (!sysData) return null;
+                    return (
                     <div style={{ marginBottom:8 }}>
                       <div style={{ fontSize:9, fontWeight:600, color:'var(--text-dim)', marginBottom:4 }}>📈 Покрытие по системам:</div>
                       <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-                        {SYSTEM_ORDER.filter(k => (calcResult.systemSupport || {})[k] !== undefined).map(sysKey => {
-                          const cov = (calcResult.systemSupport || {})[sysKey] || 0;
+                        {SYSTEM_ORDER.filter(k => sysData[k] !== undefined).map(sysKey => {
+                          const sys = sysData[sysKey] || { raw: 0, net: 0 };
+                          const cov = Math.round(100 - sys.net);
                           const sysInfo = SYSTEM_LABELS_RU[sysKey] || { name: sysKey, emoji: '📌' };
                           const barColor = cov > 60 ? '#22c55e' : cov > 30 ? '#f59e0b' : '#ef4444';
                           return (
@@ -5300,13 +5334,14 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                               <div style={{ flex:1, height:4, borderRadius:2, background:'var(--bg-secondary)', overflow:'hidden' }}>
                                 <div style={{ height:'100%', width:`${Math.min(100, cov)}%`, borderRadius:2, background: barColor, transition:'width 0.5s' }} />
                               </div>
-                              <span style={{ fontSize:9, fontWeight:600, color: barColor, minWidth:28, textAlign:'right' }}>{Math.round(cov)}%</span>
+                              <span style={{ fontSize:9, fontWeight:600, color: barColor, minWidth:28, textAlign:'right' }}>{cov}%</span>
                             </div>
                           );
                         })}
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
                   {/* Recommendations based on low coverage */}
                   {calcResult && (calcResult.systemSupport || {}).cardio !== undefined && (
                     <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, background:'rgba(0,0,0,0.12)', border:'1px solid var(--border)' }}>
@@ -5471,27 +5506,16 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                 <tr style={{ background:'rgba(0,0,0,0.06)' }}>
                                   <th style={{ padding:'4px 6px', textAlign:'left', color:'var(--text-dim)', fontWeight:600 }}>Препарат</th>
                                   <th style={{ padding:'4px 6px', textAlign:'left', color:'var(--text-dim)', fontWeight:600 }}>Доза</th>
-                                  <th style={{ padding:'4px 6px', textAlign:'left', color:'var(--text-dim)', fontWeight:600 }}>Тир</th>
                                   <th style={{ padding:'4px 6px', textAlign:'left', color:'var(--text-dim)', fontWeight:600 }}>Указание</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {block.substances.map((s: any, si: number) => {
-                                  const planInfo = planResult?.substances?.find((ps: PlanSubstance) => ps.id === s.id);
-                                  const tierColors: Record<string, string> = { core:'#22c55e', standard:'#f59e0b', advanced:'#f97316', specialty:'#ef4444' };
-                                  const tierLabels: Record<string, string> = { core:'ядро', standard:'станд.', advanced:'продв.', specialty:'спец.' };
                                   return (
                                     <tr key={si} style={{ borderBottom:'1px solid var(--border)', cursor:'pointer' }}
                                       onClick={() => setExpandedCategories(p => ({ ...p, [s.id]: !p[s.id] }))}>
                                       <td style={{ padding:'4px 6px', fontWeight:600, color:'var(--text-light)' }}>{s.name}</td>
                                       <td style={{ padding:'4px 6px', color:'#00e68a', fontWeight:600 }}>{s.dose}</td>
-                                      <td style={{ padding:'4px 6px' }}>
-                                        <span style={{ padding:'1px 5px', borderRadius:4, fontSize:7, fontWeight:700,
-                                          background:`${tierColors[planInfo?.tier||'standard']}20`,
-                                          color:tierColors[planInfo?.tier||'standard'] }}>
-                                          {tierLabels[planInfo?.tier||'standard']}
-                                        </span>
-                                      </td>
                                       <td style={{ padding:'4px 6px', color:'var(--text-dim)', fontSize:7 }}>{s.instructions}</td>
                                     </tr>
                                   );
@@ -5520,14 +5544,24 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   </div>
 
                   {/* ===== SUBSTANCE DETAIL LIST (D3: click to expand) ===== */}
-                  <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'40vh', overflowY:'auto', marginBottom:8 }}>
-                    {(effectiveLevel?.subs || []).map((id: string) => {
+                  {(() => {
+                    // Sort subs by time of day (morning → afternoon → evening → other)
+                    const sortOrder: Record<string, number> = { утро: 0, 'утро,': 0, натощак: 0, день: 1, обед: 1, вечер: 2, 'на ночь': 2, ночь: 2 };
+                    const timedSubs = [...(effectiveLevel?.subs || [])].sort((a, b) => {
+                      const ta = effectiveLevel?.dosages?.[a]?.timing?.toLowerCase() || '';
+                      const tb = effectiveLevel?.dosages?.[b]?.timing?.toLowerCase() || '';
+                      const sa = Object.entries(sortOrder).find(([k]) => ta.includes(k))?.[1] ?? 3;
+                      const sb = Object.entries(sortOrder).find(([k]) => tb.includes(k))?.[1] ?? 3;
+                      return sa - sb;
+                    });
+                    return (
+                    <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'40vh', overflowY:'auto', marginBottom:8 }}>
+                      {timedSubs.map((id: string) => {
                       const sub = allSupport.find((s: any) => s.id === id);
                       const d = effectiveLevel?.dosages?.[id];
                       const planInfo = planResult?.substances?.find((s: PlanSubstance) => s.id === id);
                       const catalogEntry = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
                       const isExpanded = expandedCategories[id];
-                      const tierColors: Record<string, string> = { core:'#22c55e', standard:'#f59e0b', advanced:'#f97316', specialty:'#ef4444' };
                       return sub ? (
                         <div key={id} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)', fontSize:9, cursor:'pointer' }}
                           onClick={() => setExpandedCategories(p => ({ ...p, [id]: !p[id] }))}>
@@ -5535,12 +5569,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                             <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                               <span style={{ fontSize:10, transform: isExpanded ? 'rotate(90deg)':'none', transition:'0.2s' }}>▶</span>
                               <span style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</span>
-                              {planInfo?.tier && (
-                                <span style={{ padding:'1px 4px', borderRadius:3, fontSize:6, fontWeight:700,
-                                  background:`${tierColors[planInfo.tier]}18`, color:tierColors[planInfo.tier] }}>
-                                  {planInfo.tier}
-                                </span>
-                              )}
                             </div>
                             <div style={{ display:'flex', gap:2, alignItems:'center' }}>
                               {d && <span style={{ color:'#00e68a', fontSize:8, fontWeight:600 }}>{d.mg >= 5000 ? `${(d.mg/1000).toFixed(1)} г` : `${d.mg} мг`} — {d.timing}</span>}
@@ -5593,6 +5621,33 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                   <span style={{ color:'var(--text-dim)' }}>{planInfo.comment}</span>
                                 </div>
                               )}
+                              {/* Why this substance — tie breaker info */}
+                              <div style={{ marginBottom:4, display:'flex', flexWrap:'wrap', gap:3 }}>
+                                {(() => {
+                                  const mechCount = planResult?.mechanisms?.filter((m: any) => (m.substances || []).includes(id)).length || 0;
+                                  if (!mechCount) return null;
+                                  return <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(96,165,250,0.08)', color:'#60a5fa' }}>
+                                    {mechCount} механизмов
+                                  </span>;
+                                })()}
+                                {planInfo?.fromJoint && <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.08)', color:'#8b5cf6' }}>Суставы 🦴</span>}
+                                {planInfo?.fromBoost && <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(239,68,68,0.08)', color:'#ef4444' }}>Усиление 🔥</span>}
+                                {/* Count synergy partners in current plan */}
+                                {(() => {
+                                  if (!catalogEntry?.synergies) return null;
+                                  const planIds = new Set(effectiveLevel?.subs || []);
+                                  const partners = catalogEntry.synergies.filter((s: any) => planIds.has(s.with));
+                                  if (!partners.length) return null;
+                                  return <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(34,197,94,0.08)', color:'#22c55e' }}>
+                                    ⊕ {partners.length} синергий в плане
+                                  </span>;
+                                })()}
+                                {catalogEntry?.analog?.length ? (
+                                  <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(129,140,248,0.08)', color:'#818cf8' }}>
+                                    {catalogEntry.analog.length} аналогов
+                                  </span>
+                                ) : null}
+                              </div>
                               {catalogEntry?.mechanismOfAction && (
                                 <div style={{ marginBottom:4 }}>
                                   <span style={{ fontWeight:600, color:'#8b5cf6' }}>Механизм: </span>
@@ -5608,7 +5663,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
                                       {mechsForSub.map((m: any, i: number) => (
                                         <span key={i} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(96,165,250,0.08)', color:'#60a5fa' }}>
-                                          {m.mechLabel || m.mechKey}
+                                          {m.systemLabel ? `${m.systemLabel}: ` : ''}{m.mechLabel || m.mechKey}
                                         </span>
                                       ))}
                                     </div>
@@ -5686,6 +5741,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       ) : null;
                     })}
                   </div>
+                    );
+                  })()}
 
                   {/* ===== SYNERGY COMMENT CARD ===== */}
                   {planResult?.synergyComment && (

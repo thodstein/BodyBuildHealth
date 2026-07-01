@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
 import { calcTraining, calcExercisePrescription, EXERCISE_DB, TRAINING_SPLITS, TRAINING_LEVEL_CONFIGS, LEVEL_VOLUMES } from '../../engines/training.engine';
 import { generateMacrocycle, generateBlockPlan, getCurrentWeekPlan, BLOCK_SEQUENCES, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../engines/training-periodization.engine';
@@ -329,6 +329,27 @@ export const TrainingScreen: React.FC = () => {
   useEffect(() => { loadDiaryStats(); }, []);
   useEffect(() => { if (prevDays.current !== daysPerWeek) { prevDays.current = daysPerWeek; generatePlan(); } }, [daysPerWeek]);
   useEffect(() => { localStorage.setItem('myTrainingExercises', JSON.stringify(customExercises)); }, [customExercises]);
+
+  // Sync tab/planningTrack with 'storage' events (cross-tab + child-tab navigation via localStorage)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'he_training_planning_track') {
+        const val = localStorage.getItem('he_training_planning_track');
+        const parsed = val === 'manual' || val === 'bb' ? val : 'pl';
+        setPlanningTrack(parsed);
+        setPlanningTrackState(parsed);
+      }
+      if (e.key === 'he_training_tab') {
+        const val = localStorage.getItem('he_training_tab');
+        const validTabs: TrainingTab[] = ['plan', 'cycles', 'programs', 'mytraining', 'programcalc', 'volume', 'library', 'analytics', 'visual', 'progress', 'excalc', 'methods', 'timers', 'history', 'reports', 'srcbb'];
+        if (val && validTabs.includes(val as TrainingTab)) {
+          setTab(val as TrainingTab);
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   useEffect(() => {
     if (macrocycle && selectedWeek > 0) {
@@ -3328,26 +3349,6 @@ export const TrainingScreen: React.FC = () => {
             </div>
           </div>
         );
-          useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (e.key === 'he_training_planning_track') {
-        const val = localStorage.getItem('he_training_planning_track');
-        const parsed = val === 'manual' || val === 'bb' ? val : 'pl';
-        setPlanningTrack(parsed);
-        setPlanningTrackState(parsed);
-      }
-      if (e.key === 'he_training_tab') {
-        const val = localStorage.getItem('he_training_tab');
-        // Validate tab
-        const validTabs = ['plan', 'cycles', 'programs', 'mytraining', 'programcalc', 'volume', 'library', 'analytics', 'visual', 'progress', 'excalc', 'volume', 'methods', 'timers', 'history', 'reports', 'srcbb'];
-        if (validTabs.includes(val)) {
-          setTab(val);
-        }
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
 return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
           <div style={gCard}>
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, letterSpacing:'0.3px', textTransform:'uppercase', marginBottom:8 }}>рџ“њ РСЃС‚РѕСЂРёСЏ С‚СЂРµРЅРёСЂРѕРІРѕРє</div>

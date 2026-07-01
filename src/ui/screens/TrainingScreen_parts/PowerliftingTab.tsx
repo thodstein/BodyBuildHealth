@@ -1,6 +1,6 @@
-﻿import React from "react";
+import React from "react";
 import { SRCBBScreen } from "../SRCBBScreen";
-import { POWERLIFTING_PROGRAMS } from "../../lib/training/data/programs";
+import { POWERLIFTING_PROGRAMS } from "../../../lib/training/data/programs";
 
 export const PowerliftingTab: React.FC = () => {
   const program = POWERLIFTING_PROGRAMS[0]; // Use first program for simplicity
@@ -62,7 +62,7 @@ export const PowerliftingTab: React.FC = () => {
                 <div key={ex.id} style={{ marginBottom: "8px", display: "flex", justifyContent: "space-between" }}>
                   <span>
                     <strong>{ex.name}</strong>: {ex.sets} подходов × {ex.reps} 
-                    {ex.weight > 0 && ` @ ${ex.weight} кг`}
+                    {(ex.weight ?? 0) > 0 && ` @ ${ex.weight} кг`}
                     {ex.rir > 0 && ` (RIR ${ex.rir})`}
                   </span>
                   {ex.notes && <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.6)" }}>{ex.notes}</span>}
