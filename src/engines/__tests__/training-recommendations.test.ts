@@ -102,4 +102,15 @@ describe('generateTrainingRecommendations', () => {
     expect(recs.some(r => r.id.startsWith('pharma-'))).toBe(false);
   });
 
+
+  it('support: low hepatic coverage + onCourse -> warn', () => {
+    const recs = generateTrainingRecommendations({ historyWorkouts: [], level: 'intermediate', weakPoints: [], onCourse: true, supportCoverage: { hepatic: 0.1, cardio: 0.8, neuro: 0.8, renal: 0.8 } });
+    expect(recs.some(r => r.id === 'supp-hepatic')).toBe(true);
+  });
+
+  it('support: adequate coverage -> no supp rec', () => {
+    const recs = generateTrainingRecommendations({ historyWorkouts: [], level: 'intermediate', weakPoints: [], onCourse: true, supportCoverage: { hepatic: 0.8, cardio: 0.8, neuro: 0.8, renal: 0.8 } });
+    expect(recs.some(r => r.id.startsWith('supp-'))).toBe(false);
+  });
+
 });

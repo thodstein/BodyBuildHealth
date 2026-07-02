@@ -504,8 +504,17 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       subs.push('hcg');
       dosages['hcg'] = DEFAULT_DOSAGES['hcg'] || { mg: 500, timing: '2x/нед, схема 3/1 (МЕ)' };
     }
+    // Merge TZ engine substances (from calcSupport) with old engine
+    if (calcResult?.selectedSubstances) {
+      for (const tzId of calcResult.selectedSubstances) {
+        if (!subs.includes(tzId)) {
+          subs.push(tzId);
+          dosages[tzId] = dosages[tzId] || DEFAULT_DOSAGES[tzId] || { mg: 500, timing: 'с едой' };
+        }
+      }
+    }
     return { subs, dosages, planResult: result };
-  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, linked.course, linked.profile, courseWeekState]);
+  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, linked.course, linked.profile, courseWeekState, boostEnabled, jointMode, calcResult]);
 
   // C4: Track plan changes in history
   useEffect(() => {

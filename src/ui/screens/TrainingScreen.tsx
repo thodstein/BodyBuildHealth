@@ -101,6 +101,7 @@ export const TrainingScreen: React.FC = () => {
   const [exType, setExType] = useState('all');
   const [exEquipment, setExEquipment] = useState('all');
   const [exDifficulty, setExDifficulty] = useState('all');
+  const [exVisible, setExVisible] = useState(80);
   const [selectedEx, setSelectedEx] = useState<Exercise | null>(null);
 
   // Calculator state
@@ -454,6 +455,7 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
     if (exDifficulty !== 'all') list = list.filter(e => e.difficulty === exDifficulty);
     return list;
   }, [exSearch, exGroup, exType, exEquipment, exDifficulty]);
+  useEffect(() => { setExVisible(80); }, [exSearch, exGroup, exType, exEquipment, exDifficulty]);
 
   const calcResults = useMemo(() => {
     const epley1RM = calcWeight * (1 + calcReps / 30);
@@ -1805,7 +1807,7 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
 
           {/* Exercise list */}
           <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:'50vh', overflowY:'auto', paddingRight:2 }}>
-            {filteredExercises.slice(0, 80).map(ex => {
+            {filteredExercises.slice(0, exVisible).map(ex => {
               const isSelected = selectedEx?.id === ex.id;
               const typeIcon = ex.type === 'compound' ? '🔩' : '🎯';
               const equipIcon = { barbell:'🏋️', dumbbell:'💪', machine:'⚙️', cable:'🔗', bodyweight:'🧘' }[ex.equipment] || '📦';
@@ -1873,6 +1875,9 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
               );
             })}
             {filteredExercises.length === 0 && <div style={{ textAlign:'center', padding:20, color:'var(--text-dim)', fontSize:11 }}>Упражнения не найдены</div>}
+            {filteredExercises.length > exVisible && (
+              <button onClick={() => setExVisible(v => v + 80)} style={{ width:'100%', padding:10, borderRadius:8, border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.04)', color:'var(--accent)', cursor:'pointer', fontSize:11, fontWeight:600, marginTop:4 }}>▼ Показать ещё ({filteredExercises.length - exVisible} из {filteredExercises.length})</button>
+            )}
           </div>
         </div>
         </InfoErrorBoundary>
@@ -3575,7 +3580,7 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
           </div>
         );
 return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-            <TrainingRecommendationsCard historyWorkouts={historyWorkouts} level={level} weakPoints={tprofile.weakPoints} readinessHistory={loadReadinessHistory()} acwr={(() => { try { const _s = loadSRPESessions(); if (_s.length < 2) return undefined; return acuteChronicRatio(toDailyLoads(_s)).ratio; } catch { return undefined; } })()} nutrition={{ kcal: linked.avgWeeklyKcal, protein: linked.avgWeeklyProtein, fat: linked.avgWeeklyFat, carbs: linked.avgWeeklyCarbs }} bodyWeight={tprofile.bodyWeight} labAnalysis={linked.labAnalysis ? { liverStress: linked.labAnalysis.liverStress, cardioRisk: linked.labAnalysis.cardioRisk, inflammation: linked.labAnalysis.inflammation, kidneyStress: linked.labAnalysis.kidneyStress, hormoneScore: linked.labAnalysis.hormoneScore, homaIR: linked.labAnalysis.homaIR } : undefined} onCourse={tprofile.onCourse} courseIntensity={tprofile.courseIntensity} />
+            <TrainingRecommendationsCard historyWorkouts={historyWorkouts} level={level} weakPoints={tprofile.weakPoints} readinessHistory={loadReadinessHistory()} acwr={(() => { try { const _s = loadSRPESessions(); if (_s.length < 2) return undefined; return acuteChronicRatio(toDailyLoads(_s)).ratio; } catch { return undefined; } })()} nutrition={{ kcal: linked.avgWeeklyKcal, protein: linked.avgWeeklyProtein, fat: linked.avgWeeklyFat, carbs: linked.avgWeeklyCarbs }} bodyWeight={tprofile.bodyWeight} labAnalysis={linked.labAnalysis ? { liverStress: linked.labAnalysis.liverStress, cardioRisk: linked.labAnalysis.cardioRisk, inflammation: linked.labAnalysis.inflammation, kidneyStress: linked.labAnalysis.kidneyStress, hormoneScore: linked.labAnalysis.hormoneScore, homaIR: linked.labAnalysis.homaIR } : undefined} onCourse={tprofile.onCourse} courseIntensity={tprofile.courseIntensity} supportCoverage={linked.supportCoverage} />
           <div style={gCard}>
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, letterSpacing:'0.3px', textTransform:'uppercase', marginBottom:8 }}>📜 История тренировок</div>
             <div style={{ display:'flex', gap:6, marginBottom:8 }}>
