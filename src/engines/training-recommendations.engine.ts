@@ -14,6 +14,11 @@ export interface RecommendationInput {
   weakPoints: string[];
   readinessHistory?: { date: string; recovery: number }[];
   acwr?: number;
+  bodyWeight?: number;
+  nutrition?: { kcal: number; protein: number; fat: number; carbs: number };
+  labAnalysis?: { liverStress: number; cardioRisk: number; inflammation: number; kidneyStress: number; hormoneScore: number; homaIR: number | null };
+  onCourse?: boolean;
+  courseIntensity?: string;
 }
 
 const GRP_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры', triceps: 'Трицепс', biceps: 'Бицепс', quads: 'Квадрицепсы' };
@@ -111,6 +116,36 @@ export function generateTrainingRecommendations(input: RecommendationInput): Tra
     Object.entries(jointByGroup).forEach(([g, score]) => { if (score >= 30) recs.push({ id: `joint-${g}`, severity: 'warn', text: `Высокая суставная нагрузка на «${ru(g)}» за неделю — добавьте предаб-упражнения и mobility в разминку, рассмите изолирующие замены базовых.` }); });
   }
 
-  if (recs.length === 0) recs.push({ id: 'ok', severity: 'info', text: 'Сбалансировано: объём в пределах MEV-MAV, готовность в норме, рисков перетрена не обнаружено.' });
+  // 6.1/Nutrition→Training: питание учитывается в тренировочных рекомендациях
+  if (input.nutrition && input.bodyWeight && input.bodyWeight > 0) {
+    const bw = input.bodyWeight;
+    const carbG = input.nutrition.carbs / bw;
+    const protG = input.nutrition.protein / bw;
+    const kcalG = input.nutrition.kcal / bw;
+    if (carbG > 0 && carbG < 3) recs.push({ id: 'nutr-carbs-low', severity: 'warn', text: `Низкое потребление углеводов (${carbG.toFixed(1)} г/кг) — снизить тренировочный объём на 10-15%, риск низкой работоспособности и гликогена.` });
+    if (protG > 0 && protG < 1.6) recs.push({ id: 'nutr-protein-low', severity: 'warn', text: `Недостаток белка (${protG.toFixed(1)} г/кг <1.6) — риск восстановления/синтеза, повысьте до 1.6-2.2 г/кг.` });
+    if (kcalG > 0 && kcalG < 25) recs.push({ id: 'nutr-kcal-low', severity: 'info', text: `Дефицит калорий (${kcalG.toFixed(0)} ккал/кг) — работоспособность может снижаться; учтите при прогрессии нагрузки (фаза жиросжигания).` });
+  }
+
+  // 6.3: Labs → Training: лабораторные показатели влияют на рекомендации
+  if (input.labAnalysis) {
+    const la = input.labAnalysis;
+    if (la.liverStress >= 7) recs.push({ id: 'lab-liver', severity: 'warn', text: `Высокий стресс печени (${la.liverStress}/10) — снизить объём на 10%, избегать жимовых перегрузок и стимуляторов.` });
+    if (la.cardioRisk >= 7) recs.push({ id: 'lab-cardio', severity: 'warn', text: `Высокий кардиориск (${la.cardioRisk}/10) — ограничить тяжёлые сеты с задержкой дыхания, добавить кардио 150 мин/нед.` });
+    if (la.inflammation >= 7) recs.push({ id: 'lab-inflam', severity: 'warn', text: `Высокое воспаление (${la.inflammation}/10) — увеличить отдых между сессиями, рассмотреть делод.` });
+    if (la.kidneyStress >= 7) recs.push({ id: 'lab-kidney', severity: 'warn', text: `Стресс почек (${la.kidneyStress}/10) — контролировать гидратацию (≥35 мл/кг), избегать экстремального объёма.` });
+    if (la.hormoneScore <= 3) recs.push({ id: 'lab-hormone', severity: 'warn', text: `Низкий гормональный профиль (${la.hormoneScore}/10) — восстановление хуже, снизить частоту на 1 сессию или объём на 15%.` });
+    if (la.homaIR !== null && la.homaIR >= 2.5) recs.push({ id: 'lab-insulin', severity: 'info', text: `Инсулинорезистентность (HOMA-IR ${la.homaIR.toFixed(1)}) — углеводы вокруг тренировки, добавить кардио.` });
+  }
+
+  // 6.4: Pharma → Training: AAS-курс влияет на рекомендации
+  if (input.onCourse) {
+    const intensity = input.courseIntensity || 'moderate';
+    if (intensity === 'heavy') recs.push({ id: 'pharma-heavy', severity: 'info', text: 'Тяжёлый курс — объём повышен (MRV ×1.3), но следите за суставами, ЦНС и восстановлением. Делод каждые 4-5 нед.' });
+    else if (intensity === 'mild') recs.push({ id: 'pharma-mild', severity: 'info', text: 'Лёгкий курс — объём повышен умеренно (MRV ×1.15). Стандартная прогрессия, делод по самочувствию.' });
+    else recs.push({ id: 'pharma-moderate', severity: 'info', text: 'Курс — объём повышен (MRV ×1.2). Усиленное восстановление: сон 8+, белок 2+ г/кг.' });
+  }
+
+  if (recs.length === 0) recs.push({ id: 'ok', severity: 'info', text: 'Сбалансировано: объём, готовность, питание и лаборатория в норме, рисков перетрена не обнаружено.' });
   return recs;
 }

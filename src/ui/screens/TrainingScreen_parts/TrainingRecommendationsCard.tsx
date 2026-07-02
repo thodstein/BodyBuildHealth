@@ -15,10 +15,15 @@ export const TrainingRecommendationsCard: React.FC<{
   weakPoints: string[];
   readinessHistory?: { date: string; recovery: number }[];
   acwr?: number;
-}> = ({ historyWorkouts, level, weakPoints, readinessHistory, acwr }) => {
+  nutrition?: { kcal: number; protein: number; fat: number; carbs: number };
+  bodyWeight?: number;
+  labAnalysis?: { liverStress: number; cardioRisk: number; inflammation: number; kidneyStress: number; hormoneScore: number; homaIR: number | null };
+  onCourse?: boolean;
+  courseIntensity?: string;
+}> = ({ historyWorkouts, level, weakPoints, readinessHistory, acwr, nutrition, bodyWeight, labAnalysis, onCourse, courseIntensity }) => {
   const recs: TrainingRecommendation[] = useMemo(
-    () => generateTrainingRecommendations({ historyWorkouts, level, weakPoints, readinessHistory, acwr }),
-    [historyWorkouts, level, weakPoints, readinessHistory, acwr]
+    () => generateTrainingRecommendations({ historyWorkouts, level, weakPoints, readinessHistory, acwr, nutrition, bodyWeight, labAnalysis, onCourse, courseIntensity }),
+    [historyWorkouts, level, weakPoints, readinessHistory, acwr, nutrition, bodyWeight, labAnalysis, onCourse, courseIntensity]
   );
   const hasAlert = recs.some(r => r.severity !== 'info');
 

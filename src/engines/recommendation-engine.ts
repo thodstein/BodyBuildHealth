@@ -205,19 +205,19 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
 
   // ── Aromatization → E2 control ──
   const e2Val = getV(fp, 'panelSex', 'E2');
-  if (maxAro > 0 || state.epicrisis.pastGyno || (e2Val !== null && e2Val > 150)) {
+  if (maxAro > 0 || state.epicrisis.pastGyno || (e2Val !== null && e2Val > 40)) {
     let ids: string[] = findSupportByMechanisms(['AROMATASE_INHIBITION', 'ESTROGEN_MODULATION']);
     if (ids.length === 0) ids = ['dim', 'indinol'];
     const reasoning: Record<string, string> = {};
     ids.forEach(id => { reasoning[id] = 'Модуляция эстрогеновых рецепторов'; });
-    if (maxAro >= 0.5 || (e2Val !== null && e2Val > 200)) {
+    if (maxAro >= 0.5 || (e2Val !== null && e2Val > 55)) {
       ids.push('anastrozole');
       reasoning['anastrozole'] = 'Ингибитор ароматазы — доза по E2';
     }
-    addRec('estradiol', (e2Val !== null && e2Val > 200) ? 'critical' : 'high', 'endocrine', 'Гормоны',
-      `Ароматизация${e2Val !== null ? ' (E2: ' + e2Val + ')' : ''} от ${drugNames.join(', ')}${state.epicrisis.pastGyno ? ' · гинекомастия в анамнезе' : ''}`,
+    addRec('estradiol', (e2Val !== null && e2Val > 55) ? 'critical' : 'high', 'endocrine', 'Гормоны',
+      `Ароматизация${e2Val !== null ? ' (E2: ' + e2Val + ' pg/mL)' : ''} от ${drugNames.join(', ')}${state.epicrisis.pastGyno ? ' · гинекомастия в анамнезе' : ''}`,
       ids, reasoning,
-      'E2 > 200: +Анастрозол 1 мг 2×/нед, доза по E2. Контроль E2 каждые 4 нед.',
+      'E2 > 55 pg/mL: +Анастрозол 1 мг 2×/нед, доза по E2. Контроль E2 каждые 4 нед.',
       'E2, пролактин, ЛГ, ФСГ каждые 4 нед');
   }
 
@@ -308,7 +308,7 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
     addRec('always_hcg', 'info', 'reproductive', 'HPTA',
       'ХГЧ на курсе: 500 МЕ 2×/нед, 3/1',
       ['hcg'], { hcg: 'Имитация ЛГ, поддержка стероидогенеза, профилактика атрофии яичек. Схема 3/1.' },
-      'При E2 > 200: снизить до 250 МЕ. При пропуске >2 нед: возобновить с 250 МЕ.',
+      'При E2 > 55 pg/mL: снизить до 250 МЕ. При пропуске >2 нед: возобновить с 250 МЕ.',
       'E2, ЛГ, ФСГ, размер яичек каждые 4 нед');
   }
 
@@ -335,7 +335,7 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
     { marker:'Vitamin D (25-OH)', panels:['panelVitamin'], threshold:{ higherIsWorse:false, value:30 }, system:'endocrine', label:'Витамины' },
     { marker:'B12', panels:['panelVitamin'], threshold:{ higherIsWorse:false, value:210 }, system:'', label:'Витамины' },
     { marker:'TSH', panels:['panelThyroid'], threshold:{ higherIsWorse:true, value:4.5 }, system:'endocrine', label:'Щитовидная' },
-    { marker:'E2', panels:['panelSex'], threshold:{ higherIsWorse:true, value:150 }, system:'endocrine', label:'Гормоны' },
+    { marker:'E2', panels:['panelSex'], threshold:{ higherIsWorse:true, value:40 }, system:'endocrine', label:'Гормоны' },
     { marker:'Prolactin', panels:['panelSex'], threshold:{ higherIsWorse:true, value:25 }, system:'endocrine', label:'Гормоны' },
     { marker:'PSA total', panels:['panelTumor'], threshold:{ higherIsWorse:true, value:4 }, system:'', label:'Простата' },
     { marker:'DHEA-S', panels:['panelAdrenal'], threshold:{ higherIsWorse:false, value:100 }, system:'endocrine', label:'Надпочечники' },
@@ -461,7 +461,7 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
     // ── Genetics ──
     { condition: state.genetics.mthfr === 'c677t', id:'genetics_mthfr', severity:'medium', system:'', label:'Генетика', title:'MTHFR C677T: нарушение метилирования', mechanisms:['METHYLATION', 'HOMOCYSTEINE_LOWERING'], categories:['methylation'], fallback:['methylfolate','methylcobalamin','tmg'], reasoning:'Поддержка метилирования', escalation:'Гомоцистеин > 15: +ТМГ 1 г', monitoring:'Гомоцистеин, B12, фолат каждые 4 нед' },
     { condition: state.genetics.srd5a2 === 'hypersensitive', id:'genetics_srd5a2', severity:'medium', system:'', label:'Генетика', title:'SRD5A2 гиперчувствительность', mechanisms:['5AR_INHIBITION'], fallback:['saw_palmetto','zinc_sup'], reasoning:'Ингибиция 5AR', escalation:'+Дутастерид (под контролем)', monitoring:'ДГТ, PSA, 3a-ADG, волосы/кожа' },
-    { condition: state.genetics.cyp19a1 === 'high', id:'genetics_cyp19', severity:'medium', system:'endocrine', label:'Генетика', title:'CYP19A1 высокая активность: риск ↑ E2', mechanisms:['AROMATASE_INHIBITION'], categories:['hormonal'], fallback:['dim','indinol','zinc_sup'], reasoning:'Контроль ароматазы', escalation:'+Анастрозол 1 мг 2×/нед при E2 > 150', monitoring:'E2, пролактин каждые 4 нед' },
+    { condition: state.genetics.cyp19a1 === 'high', id:'genetics_cyp19', severity:'medium', system:'endocrine', label:'Генетика', title:'CYP19A1 высокая активность: риск ↑ E2', mechanisms:['AROMATASE_INHIBITION'], categories:['hormonal'], fallback:['dim','indinol','zinc_sup'], reasoning:'Контроль ароматазы',       escalation:'+Анастрозол 1 мг 2×/нед при E2 > 40 pg/mL', monitoring:'E2, пролактин каждые 4 нед' },
 
     // ── Psych ──
     { condition: state.psych.mirrorObsession >= 4 || state.psych.fearOfLoss >= 4 || state.psych.apathyOffCycle >= 4, id:'psych', severity:'medium', system:'neuro', label:'Психология', title:`${state.psych.mirrorObsession>=4?'· зеркало ':''}${state.psych.fearOfLoss>=4?'· страх ':''}${state.psych.apathyOffCycle>=4?'· апатия':''}`, categories:['anxiolytic','antidepressant'], mechanisms:['SEROTONIN_PRECURSOR','DOPAMINE_PRECURSOR'], fallback:['l_tryptophan','ashwagandha','l_tyrosine'], reasoning:'Психологическая поддержка', escalation:'Нет эффекта 4 нед → психотерапевт', monitoring:'PHQ-9, GAD-7 каждые 2 нед' },

@@ -71,4 +71,35 @@ describe('generateTrainingRecommendations', () => {
     expect(recs.some(r => r.text.includes('суставная нагрузка'))).toBe(true);
   });
 
+
+  it('учёт питания в тренировках: низкие углеводы → warn', () => {
+    const recs = generateTrainingRecommendations({ historyWorkouts: [], level: 'intermediate', weakPoints: [], bodyWeight: 80, nutrition: { kcal: 2000, protein: 160, fat: 70, carbs: 160 } });
+    expect(recs.some(r => r.text.includes('углеводов') && r.severity === 'warn')).toBe(true);
+  });
+
+  it('недостаток белка → warn', () => {
+    const recs = generateTrainingRecommendations({ historyWorkouts: [], level: 'intermediate', weakPoints: [], bodyWeight: 80, nutrition: { kcal: 2000, protein: 100, fat: 70, carbs: 400 } });
+    expect(recs.some(r => r.text.includes('белка') && r.severity === 'warn')).toBe(true);
+  });
+
+  it('адекватное питание — нет nutrition-warn', () => {
+    const recs = generateTrainingRecommendations({ historyWorkouts: [], level: 'intermediate', weakPoints: [], bodyWeight: 80, nutrition: { kcal: 2800, protein: 160, fat: 80, carbs: 400 } });
+    expect(recs.some(r => r.id.startsWith('nutr-'))).toBe(false);
+  });
+
+  it('lab: high liver stress -> warn', () => {
+    const recs = generateTrainingRecommendations({ historyWorkouts: [], level: 'intermediate', weakPoints: [], labAnalysis: { liverStress: 8, cardioRisk: 3, inflammation: 3, kidneyStress: 3, hormoneScore: 5, homaIR: null } });
+    expect(recs.some(r => r.id === 'lab-liver' && r.severity === 'warn')).toBe(true);
+  });
+
+  it('pharma: heavy course -> info', () => {
+    const recs = generateTrainingRecommendations({ historyWorkouts: [], level: 'intermediate', weakPoints: [], onCourse: true, courseIntensity: 'heavy' });
+    expect(recs.some(r => r.id === 'pharma-heavy')).toBe(true);
+  });
+
+  it('pharma: no course -> no pharma rec', () => {
+    const recs = generateTrainingRecommendations({ historyWorkouts: [], level: 'intermediate', weakPoints: [], onCourse: false });
+    expect(recs.some(r => r.id.startsWith('pharma-'))).toBe(false);
+  });
+
 });

@@ -64,20 +64,20 @@ export const PHARMACY_DB: Record<string, TzSupportEntry[]> = {
   clonazepam: [ { organId:'cns', mechId:'cns1', k:0.20, q:'B', source:'БДР-агонист' } ],
   buspirone: [ { organId:'cns', mechId:'cns1', k:0.10, q:'B', source:'5-HT1A-агонист' } ],
   // ═══ НПВС ═══
-  ibuprofen: [ { organId:'cardio', mechId:'cv4', k:0.10, q:'C', source:'↓ агрегации, ↑ АД' } ],
-  naproxen: [ { organId:'cardio', mechId:'cv4', k:0.10, q:'C', source:'↓ агрегации' } ],
-  celecoxib: [ { organId:'cardio', mechId:'cv4', k:0.05, q:'C', source:'КОКС-2' } ],
-  diclofenac: [ { organId:'cardio', mechId:'cv4', k:0.10, q:'C', source:'НПВС' } ],
+  ibuprofen: [],
+  naproxen: [],
+  celecoxib: [],
+  diclofenac: [],
   // ═══ КОРТИКОСТЕРОИДЫ ═══
-  prednisone: [ { organId:'hematologic', mechId:'hem2', k:0.30, q:'B', source:'ГКС, ↑ глюкозы' } ],
-  dexamethasone: [ { organId:'hematologic', mechId:'hem2', k:0.30, q:'B', source:'ГКС, ↑ глюкозы' } ],
-  hydrocortisone: [ { organId:'hematologic', mechId:'hem2', k:0.20, q:'B', source:'ГКС, ↑ глюкозы' } ],
-  methylprednisolone: [ { organId:'hematologic', mechId:'hem2', k:0.30, q:'B', source:'ГКС, ↑ глюкозы' } ],
+  prednisone: [],
+  dexamethasone: [],
+  hydrocortisone: [],
+  methylprednisolone: [],
   // ═══ ПРОТИВОСУДОРОЖНЫЕ ═══
   valproate: [ { organId:'cns', mechId:'cns1', k:0.10, q:'B', source:'↑ GABA' } ],
   lamotrigine: [ { organId:'cns', mechId:'cns1', k:0.10, q:'B', source:'Стабилизатор мембран' } ],
-  carbamazepine: [ { organId:'hepatic', mechId:'liv1', k:0.10, q:'C', source:'Индуктор CYP450' } ],
-  phenytoin: [ { organId:'hepatic', mechId:'liv1', k:0.10, q:'C', source:'Индуктор CYP450' } ],
+  carbamazepine: [],
+  phenytoin: [],
   // ═══ ТИРЕОИДНЫЕ ПРЕПАРАТЫ ═══
   levothyroxine: [ { organId:'hematologic', mechId:'hem2', k:0.05, q:'C', source:'T4, ↑ метаболизма' } ],
   liothyronine: [ { organId:'hematologic', mechId:'hem2', k:0.10, q:'C', source:'T3, ↑ метаболизма' } ],
@@ -88,8 +88,8 @@ export const PHARMACY_DB: Record<string, TzSupportEntry[]> = {
   pioglitazone: [ { organId:'hematologic', mechId:'hem2', k:0.35, q:'A', source:'Тиазолидиндион, PPAR-γ' }, { organId:'hematologic', mechId:'hem3', k:0.15, q:'C', source:'Стабилизация гликемии' } ],
   acarbose: [ { organId:'hematologic', mechId:'hem2', k:0.20, q:'B', source:'↓ постпрандиальной глюкозы (α-глюкозидаза)' }, { organId:'hematologic', mechId:'hem3', k:0.20, q:'B', source:'Предотвращение постпрандиальной гипогликемии (замедление всасывания)' } ],
   // ═══ ИММУНОСУПРЕССАНТЫ ═══
-  tacrolimus: [ { organId:'renal', mechId:'ren1', k:0.10, q:'B', source:'Кальциневриновый ингибитор' } ],
-  cyclosporine: [ { organId:'renal', mechId:'ren1', k:0.15, q:'B', source:'Кальциневриновый ингибитор' } ],
-  mycophenolate: [ { organId:'hematologic', mechId:'hem1', k:0.05, q:'C', source:'Иммуносупрессор (экспертно)' } ],
-  azathioprine: [ { organId:'hepatic', mechId:'liv1', k:0.10, q:'B', source:'Гепатотоксичность' } ],
+  tacrolimus: [],
+  cyclosporine: [],
+  mycophenolate: [],
+  azathioprine: [],
 };

@@ -69,6 +69,8 @@ export interface DrugInput {
   dose: number; form: 'inject'|'oral';
   startWeek?: number;  // неделя начала (по умолчанию 1)
   endWeek?: number;    // неделя окончания (по умолчанию = duration)
+  concFactor?: number; // 0..1 — масштабирование вклада препарата (для timeline: распад ↓)
+  effDuration?: number; // эффективная длительность для этого препарата (для timeline)
 }
 export interface TzSpecInput {
   drugClass: 'aas'|'gh'|'insulin'; drugName: string;
@@ -137,6 +139,7 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
   const glu=labValues['GLU'];const homa=labValues['HOMA'];const crp=labValues['CRP'];const homoc=labValues['HOMOCYSTEINE'];
   const tsh=labValues['TSH'];const bnp=labValues['BNP'];const dDimer=labValues['D_DIMER'];const fib=labValues['FIBRINOGEN'];
   const psa=labValues['PSA'];
+  const cortisol=labValues['CORTISOL'];
 
   // Хелпер: лабораторный m_i → max(default, labValue)
   const labMi = (val:number|undefined, thresholds:[number,number,number]):number|undefined => {
@@ -159,8 +162,8 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
 
   switch(mechId){
     // ── ССС ──
-    case'cv1': { // ремоделирование: NT-proBNP, BP
-      const bnpMi = labMiInv(bnp,[125,300,900]);
+    case'cv1': { // ремоделирование: NT-proBNP (high = worse), BP
+      const bnpMi = labMi(bnp,[125,300,900]);
       if (bnpMi !== undefined) labResult = bnpMi;
       break;
     }
@@ -168,8 +171,9 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       const ldlMi = labMi(ldl,[2.6,3.4,4.9]);
       const hdlMi = labMiInv(hdl,[1.5,1.0,0.8]);
       const tgMi = labMi(tg,[1.7,2.3,5.6]);
+      const tcMi = labMi(tc,[5.0,6.2,7.5]);
       // Берём худший
-      const vals = [ldlMi,hdlMi,tgMi].filter(v=>v!==undefined) as number[];
+      const vals = [ldlMi,hdlMi,tgMi,tcMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
@@ -187,9 +191,11 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
-    case'cv5': { // аритмогенный: K
+    case'cv5': { // аритмогенный: K (low), HCT (high = hyperviscosity)
       const kMi = labMiInv(k,[3.5,3.0,2.5]);
-      if (kMi !== undefined) labResult = kMi;
+      const hctMi = labMi(hct,[50,54,58]);
+      const vals = [kMi,hctMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
     // ── Печень ──
@@ -263,9 +269,11 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       if (homocMi !== undefined) labResult = homocMi;
       break;
     }
-    case'cns4': { // нейроэндокринная: TSH, Cortisol
-      const tshMi = labMiInv(tsh,[4.0,6.0,10.0]);
-      if (tshMi !== undefined) labResult = tshMi;
+    case'cns4': { // нейроэндокринная: TSH (high = hypothyroid), Cortisol (high = stress)
+      const tshMi = labMi(tsh,[4.0,6.0,10.0]);
+      const cortMi = labMi(cortisol,[690,900,1380]);
+      const vals = [tshMi,cortMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
     case'cns5': { // нейроглюкопения: Glucose
@@ -284,9 +292,11 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
-    case'rep2': { // ↓ интратестикулярного T: TT (низкий = плохо)
+    case'rep2': { // ↓ интратестикулярного T: TT (низкий = плохо), SHBG (высокий = ↓ free T)
       const ttMi = labMiInv(tt,[12,8,4]);
-      if (ttMi !== undefined) labResult = ttMi;
+      const shbgMi = labMi(shbg,[60,80,100]);
+      const vals = [ttMi,shbgMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
     case'rep3': { // сперматогенез: FSH (low=suppressed), Inhibin B (не измеряем)
@@ -294,8 +304,8 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       if (fshMi !== undefined) labResult = fshMi;
       break;
     }
-    case'rep4': { // эстрогенный сдвиг: E2
-      const e2Mi = labMi(e2,[160,200,300]);
+    case'rep4': { // эстрогенный сдвиг: E2 (нормализовано в pg/mL)
+      const e2Mi = labMi(e2,[40,55,80]);
       if (e2Mi !== undefined) labResult = e2Mi;
       break;
     }
@@ -444,28 +454,28 @@ export function calculateTzSpecRiskTimeline(input: TzSpecInput, totalWeeks?: num
 
     // Длительность для этой недели = сколько недель препарат уже принимается
     const effectiveDuration = Math.min(input.duration, w);
+    // Комбинация: только препараты с conc > 0.5 (полноценные партнёры)
+    const fullComboCount = activeDrugs.filter(d => (concentrations[d.drugName] || 1) > 0.5).length;
+    // Передаём concFactor и effDuration per-drug
     const weekInput: TzSpecInput = {
       ...input,
       duration: effectiveDuration,
-      combinations: Math.max(1, activeDrugs.length),
-      drugs: activeDrugs,
+      combinations: Math.max(1, fullComboCount),
+      drugs: activeDrugs.map(d => ({
+        ...d,
+        concFactor: concentrations[d.drugName] || 1,
+        effDuration: Math.max(1, w - (d.startWeek || 1) + 1),
+      })),
     };
 
     const weekResult = calculateTzSpecRisk(weekInput);
 
-    // Масштабируем raw по концентрации (если препарат на стадии распада, риск ниже)
+    // Риск уже отмасштабирован per-drug через concFactor — не усредняем
     const organPercents: Record<string, number> = {};
     const organAfterPercents: Record<string, number> = {};
     for (const o of weekResult.organs) {
-      // Средневзвешенная концентрация активных препаратов
-      let avgConc = 0;
-      for (const d of activeDrugs) avgConc += concentrations[d.drugName] || 1;
-      avgConc /= activeDrugs.length;
-      // Если концентрация ниже 1 (распад), снижаем риск
-      const scaledRaw = Math.round(o.rawPercent * avgConc);
-      const scaledAfter = Math.round(o.afterPercent * avgConc);
-      organPercents[o.id] = scaledRaw;
-      organAfterPercents[o.id] = scaledAfter;
+      organPercents[o.id] = o.rawPercent;
+      organAfterPercents[o.id] = o.afterPercent;
     }
 
     const overallRaw = Math.round(Object.values(organPercents).reduce((a, b) => a + b, 0) / (Object.keys(organPercents).length || 1));
@@ -510,6 +520,7 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
 
     for(const mech of sys.mechanisms){
       let mechRaw=0,mechAfter=0;let bestQ='';
+      const C_mech=mech.requiresC?C_i:1.0;
 
       // Суммируем вклад КАЖДОГО препарата в этот механизм
       for(const drug of drugEntries){
@@ -517,20 +528,25 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
         const mechWeight=drugEntry?.mechanismWeights?.[mech.id]||0;
         if(mechWeight===0) continue; // Drug doesn't target this mechanism — skip
         const D_i=getDoseFactor(drug.dose,drug.drugClass)*(drugEntry?.doseModifier||1.0);
+        // Per-drug duration (timeline: drug B started week 6, now week 8 → 2 weeks, not 8)
+        const drugDuration = drug.effDuration ?? duration;
+        const T_drug=getDurationFactor(drugDuration);
         const m_i=getMiFromLab(mech.id,labValues,D_i,mechWeight);
         const F_mech=mech.requiresF?getFormFactor(drug.form,sys.id):1.0;
-        const C_mech=mech.requiresC?C_i:1.0;
         // ТЗ п.10.5: rep5 = w × m × T (без D)
         const D_eff=mech.requiresD?D_i:1.0;
-        const E_i=D_eff*T_i*F_mech*C_mech;
+        const E_i=D_eff*T_drug*F_mech*C_mech;
         // mechWeight/4 scales drug contribution: weight=4→1.0, weight=2→0.5, weight=1→0.25
-        mechRaw+=mech.weight*(mechWeight/4)*m_i*E_i;
+        // concFactor scales per-drug contribution (timeline: drug decaying → lower risk)
+        const concMult = drug.concFactor ?? 1.0;
+        mechRaw += mech.weight*(mechWeight/4)*m_i*E_i*concMult;
       }
 
       // Штраф за отсутствие анализов
       mechRaw*=U_i;
 
       // Π(1 - k*_ij) — поддержка применяется к сумме
+      // Кап: минимум 0.30 (не более 70% снижения риска) — ТЗ правило
       let productK=1.0;let maxK=0;
       for(const[,entries]of supportLookup){
         for(const entry of entries){
@@ -541,13 +557,14 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
           }
         }
       }
+      productK=Math.max(0.30,productK);
       mechAfter=mechRaw*productK;
 
       totalBefore+=mechRaw;totalAfter+=mechAfter;
       const mechId=mech.id;
       mechResults.push({
         id:mechId,name:TZ_MECH_LABELS[mechId]||mechId,weight:mech.weight,
-        m_i:Math.round(mechRaw/(mech.weight*U_i*T_i*C_i||1)), // обратная прикидка среднего m
+        m_i:Math.round(mechRaw/(mech.weight*U_i*(C_mech||1)||1)),
         E_i:Math.round(T_i*100)/100,raw:Math.round(mechRaw*10)/10,
         afterSupport:Math.round(mechAfter*10)/10,
         k_used:Math.round((1-productK)*100),q_label:bestQ,

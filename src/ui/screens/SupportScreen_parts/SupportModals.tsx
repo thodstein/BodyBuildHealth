@@ -84,10 +84,10 @@ export const SupportModals: React.FC<SupportModalsProps> = ({
           <p style={{ fontSize:8, color:'var(--text-dim)', marginBottom:8 }}>После выбора уровня можно добавить усиление и суставы</p>
           <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
             {[
-              { v:'basic', l:'🟢 База', c:'#22c55e', d:'Только активные риски (порог 15%)' },
-              { v:'mid', l:'🟡 Средний', c:'#eab308', d:'Стандартное покрытие (порог 10%)' },
-              { v:'max', l:'🟠 Максимум', c:'#f97316', d:'Глубокое покрытие всех систем (порог 6%)' },
-              { v:'boost', l:'🔴 Усиление', c:'#ef4444', d:'Максимальная защита (порог 4%)' },
+              { v:'basic', l:'🟢 База', c:'#22c55e', d:'Нет высокого риска (≤50%)' },
+              { v:'mid', l:'🟡 Средний', c:'#eab308', d:'Нет выраженного риска (≤35%)' },
+              { v:'max', l:'🟠 Максимум', c:'#f97316', d:'Нижний умеренный (≤25%)' },
+              { v:'boost', l:'🔴 Буст', c:'#ef4444', d:'Слабый риск (≤15%)' },
             ].map(btn => (
               <button key={btn.v} onClick={() => setModalLevel(btn.v)} style={{
                 padding:'12px 14px', borderRadius:10, cursor:'pointer', textAlign:'left',
@@ -121,14 +121,14 @@ export const SupportModals: React.FC<SupportModalsProps> = ({
               background: modalWantBoost ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)',
               color: modalWantBoost ? '#fca5a5' : 'var(--text-dim)',
             }}>
-              🔥 {modalWantBoost ? '✅ Буст (в плане)' : '➕ Буст'}
+              🔥 {modalWantBoost ? '✅ Усиление (в плане)' : '➕ Усиление'}
             </button>
           </div>
 
           <button onClick={handleApply} style={{
             width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer',
             background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:12, marginBottom:6,
-          }}>✅ Применить уровень{modalWantJoint ? ' + суставы' : ''}{modalWantBoost ? ' + буст' : ''}</button>
+          }          }>✅ Применить уровень{modalWantJoint ? ' + суставы' : ''}{modalWantBoost ? ' + усиление' : ''}</button>
           <button onClick={() => setModalLevel(null)} style={{ width:'100%', padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10 }}>Назад</button>
         </>
       )}

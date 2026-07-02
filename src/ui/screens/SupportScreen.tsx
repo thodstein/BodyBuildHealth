@@ -367,10 +367,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   ], [neuroScore]);
 
   const SUPPORT_LEVELS: Record<string, { label: string; desc: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }> }> = {
-    basic: { label: '🟢 База', desc: 'Только активные риски (порог 15%)', subs: [], dosages: {} },
-    mid: { label: '🟡 Средний', desc: 'Стандартное покрытие (порог 10%)', subs: [], dosages: {} },
-    max: { label: '🟠 Максимум', desc: 'Глубокое покрытие (порог 6%)', subs: [], dosages: {} },
-    boost: { label: '🔴 Усиление', desc: 'Максимальная защита (порог 4%)', subs: [], dosages: {} },
+    basic: { label: '🟢 База', desc: 'Нет высокого риска (≤50%)', subs: [], dosages: {} },
+    mid: { label: '🟡 Средний', desc: 'Нет выраженного риска (≤35%)', subs: [], dosages: {} },
+    max: { label: '🟠 Максимум', desc: 'Нижний умеренный (≤25%)', subs: [], dosages: {} },
+    boost: { label: '🔴 Буст', desc: 'Слабый риск (≤15%)', subs: [], dosages: {} },
   };
 
   useEffect(() => {
@@ -421,7 +421,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const aasList = (linked.course || []).filter((c: any) => {
       const ph = PHARMA_DB[c.substanceId];
       return ph?.class && ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm'].includes(ph.class);
-    }).map((c: any) => ({ id: c.substanceId || '', doseMgWeek: (c.doseValue || 0) * (c.frequency || 1), weeks: (c.endWeek || 12) - (c.startWeek || 0) }));
+    }).map((c: any) => ({ id: c.substanceId || '', doseMgWeek: (c.doseValue || 0) * (c.frequency || 1), weeks: (c.endWeek || 12) - (c.startWeek || 0), startWeek: c.startWeek || 1, endWeek: c.endWeek || 12 }));
     const h = hydrateState();
     const state: CalculatorState = {
       profile: h.profile || { weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male' | 'female', workoutsPerWeek: s?.workoutsPerWeek ?? 3, avgWorkoutMinutes: s?.avgWorkoutMinutes ?? 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
@@ -445,6 +445,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       injection: h.injection || { glutes: 'ok', quads: 'ok', delts: 'ok', localAreas: '' },
       powerLevel: (supportLevel as PowerLevel),
       courseWeek: courseWeekState,
+      boostEnabled: boostEnabled,
+      jointMode: jointMode,
     };
     let result = calculateSupportPlan(state, supportLevel as PowerLevel, enhancedSubs, linked.labs);
     // Build userCI for boost/joint contraindication checks
@@ -461,8 +463,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (ci.allergies) userCI.add(ci.allergies.toLowerCase());
     if (jointMode) result = applyJointToPlan(result, userCI);
     if (boostEnabled) result = applyBoostToPlan(result, userCI);
-    setPlanResult(result);
-    // Map to a backwards-compatible effectiveLevel format
+    setPlanResult(result);    // Map to a backwards-compatible effectiveLevel format
     const subs = result.substances.map(s => s.id);
     const dosages: Record<string, { mg: number; timing: string }> = {};
     for (const s of result.substances) {
@@ -534,7 +535,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const aasList = (linked.course || []).filter(c => {
       const ph = PHARMA_DB[c.substanceId] as any;
       return ph?.class && ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm'].includes(ph.class);
-    }).map(c => ({ id: c.substanceId, doseMgWeek: (c.doseValue || 0) * ((typeof c.frequency === 'number' ? c.frequency : parseFloat(String(c.frequency)) || 0) > 0 ? (typeof c.frequency === 'number' ? c.frequency : parseFloat(String(c.frequency)) || 0) : 1), weeks: (c.endWeek || 12) - (c.startWeek || 0) }));
+    }).map(c => ({ id: c.substanceId, doseMgWeek: (c.doseValue || 0) * ((typeof c.frequency === 'number' ? c.frequency : parseFloat(String(c.frequency)) || 0) > 0 ? (typeof c.frequency === 'number' ? c.frequency : parseFloat(String(c.frequency)) || 0) : 1), weeks: (c.endWeek || 12) - (c.startWeek || 0), startWeek: c.startWeek || 1, endWeek: c.endWeek || 12 }));
     const defaults: Partial<CalculatorState> = {
       profile: { weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male' | 'female', workoutsPerWeek: s?.workoutsPerWeek ?? 3, avgWorkoutMinutes: s?.avgWorkoutMinutes ?? 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
       pharma: { phase: 'course', aas: aasList, hasGH: false, hasIGF: false, hasInsulin: false, hasHCG: !!linked.course?.find((c: any) => c.substanceId === 'hcg'), hasAI: false, hasCaber: false, hasSERM: false, hasSARMs: aasList.some(a => a.id.includes('ostarine') || a.id.includes('lgd')), hasMGF: false, hasGLP1: false },
@@ -553,6 +554,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       },
       powerLevel: level,
       courseWeek: courseWeekState,
+      boostEnabled: boostEnabled,
+      jointMode: jointMode,
     } as CalculatorState;
     stateRef.current = state;
     const tzResult: CalculatorResult = calculateSupportTZ(state);
@@ -594,6 +597,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       schedule: tzResult.schedule,
       synergyIdsUsed: tzResult.synergyIdsUsed,
       selectedSubstances: tzResult.selectedSubstances,
+      jointSubs: tzResult.jointSubs || [],
       contraindicationAlerts: tzResult.contraindicationAlerts,
       negativeBlocks: tzResult.negativeBlocks,
     };
@@ -996,10 +1000,26 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const validInteractionIds = interactionIds.filter(Boolean);
   
   // Group catalogSubstances by primary category for catalog
+  const CATALOG_BLACKLIST = new Set([
+    'testosterone','insulin','vasopressin','follistatin','endocannabinoid',
+    'igf1','mgf','glutamate','histidine','pharma',
+    'corticosteroid_drugs','antibiotic_drugs','nsaid_drugs','immunosuppressant_drugs',
+    'ppi_drugs','antipsychotic_drugs','antithyroid_drugs',
+  ]);
   const catalogSubstances = useMemo(() => {
     const allSubsMap = new Map<string, SupportSubstance>();
     for (const s of ALL_SUBSTANCES) allSubsMap.set(s.id.toLowerCase(), s);
-    return Object.values(SUPPORT_CATALOG_DATA).map(entry => {
+    return Object.values(SUPPORT_CATALOG_DATA)
+      .filter(entry => {
+        const eid = entry.id || '';
+        if (CATALOG_BLACKLIST.has(eid)) return false;
+        const cats = entry.category || [];
+        if (cats.includes('marker')) return false;
+        if (eid.endsWith('_drugs')) return false;
+        if (entry.dosage && entry.dosage.mg === 0 && cats.includes('hormonal')) return false;
+        return true;
+      })
+      .map(entry => {
       const allSub = allSubsMap.get((entry.id||'').toLowerCase());
       return {
         id: entry.id,
@@ -4295,14 +4315,15 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
               <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>4. Уровни покрытия</h3>
               <table style={{ width:'100%', fontSize:9, borderCollapse:'collapse', margin:'4px 0' }}>
-                <thead><tr style={{ background:'rgba(0,0,0,0.2)' }}><th style={{ padding:'4px 6px', textAlign:'left' }}>Уровень</th><th style={{ padding:'4px 6px' }}>Порог риска</th><th style={{ padding:'4px 6px' }}>Защита</th></tr></thead>
+                <thead><tr style={{ background:'rgba(0,0,0,0.2)' }}><th style={{ padding:'4px 6px', textAlign:'left' }}>Уровень</th><th style={{ padding:'4px 6px' }}>Целевой риск</th><th style={{ padding:'4px 6px' }}>Max/систему</th></tr></thead>
                 <tbody>
-                  <tr><td style={{ padding:'4px 6px' }}>🟢 Базовый</td><td style={{ padding:'4px 6px', textAlign:'center' }}>65%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>35%</td></tr>
-                  <tr><td style={{ padding:'4px 6px' }}>🟡 Средний</td><td style={{ padding:'4px 6px', textAlign:'center' }}>45%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>50%</td></tr>
-                  <tr><td style={{ padding:'4px 6px' }}>🔴 Максимум</td><td style={{ padding:'4px 6px', textAlign:'center' }}>30%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>65%</td></tr>
+                  <tr><td style={{ padding:'4px 6px' }}>🟢 База</td><td style={{ padding:'4px 6px', textAlign:'center' }}>≤50%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>2</td></tr>
+                  <tr><td style={{ padding:'4px 6px' }}>🟡 Средний</td><td style={{ padding:'4px 6px', textAlign:'center' }}>≤35%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>3</td></tr>
+                  <tr><td style={{ padding:'4px 6px' }}>🟠 Максимум</td><td style={{ padding:'4px 6px', textAlign:'center' }}>≤25%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>4</td></tr>
+                  <tr><td style={{ padding:'4px 6px' }}>🔴 Буст</td><td style={{ padding:'4px 6px', textAlign:'center' }}>≤15%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>5</td></tr>
                 </tbody>
               </table>
-              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>При риске {'>'}50% на механизм добавляется 2-й препарат. ХГЧ, АИ, каберголин — на всех уровнях при наличии ААС.</p>
+              <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>🔥 Усиление: снижает целевой риск на 5% (буст→10%, макс→20%). 🦴 Суставы: отдельный стек, не в основном плане.</p>
             </div>
 
             <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
@@ -5359,13 +5380,13 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               {/* Active mode banners */}
               {boostEnabled && (
                 <div style={{ marginBottom:6, padding:'8px 12px', borderRadius:8, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', fontSize:9, color:'#ef4444', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <span>🔥 Усиление стека активно — добавлены буст-препараты</span>
+                  <span>🔥 Усиление активно — целевой риск снижен на 5%</span>
                   <button onClick={() => { setBoostEnabled(false); calcSupport(); }} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer', fontSize:10, fontWeight:700 }}>✕</button>
                 </div>
               )}
               {jointMode && (
                 <div style={{ marginBottom:6, padding:'8px 12px', borderRadius:8, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', fontSize:9, color:'#8b5cf6', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <span>🦴 Режим суставов активен — добавлены хондропротекторы</span>
+                  <span>🦴 Режим суставов — отдельные препараты (не в основном стеке)</span>
                   <button onClick={() => { setJointMode(false); calcSupport(); }} style={{ background:'none', border:'none', color:'#8b5cf6', cursor:'pointer', fontSize:10, fontWeight:700 }}>✕</button>
                 </div>
               )}
@@ -6232,7 +6253,7 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
                           const aasList = (linked.course || []).filter((c: any) => {
                             const ph = PHARMA_DB[c.substanceId];
                             return ph?.class && ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm'].includes(ph.class);
-                          }).map((c: any) => ({ id: c.substanceId || '', doseMgWeek: (c.doseValue || 0) * (c.frequency || 1), weeks: (c.endWeek || 12) - (c.startWeek || 0) }));
+                          }).map((c: any) => ({ id: c.substanceId || '', doseMgWeek: (c.doseValue || 0) * (c.frequency || 1), weeks: (c.endWeek || 12) - (c.startWeek || 0), startWeek: c.startWeek || 1, endWeek: c.endWeek || 12 }));
                           const baseState: CalculatorState = {
                             profile: { weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male'|'female', workoutsPerWeek: s?.workoutsPerWeek ?? 3, avgWorkoutMinutes: s?.avgWorkoutMinutes ?? 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
                             neuro: h.neuro || { dopamineScore:0, serotoninScore:0, gabaBalance:'balance', memoryIssues:false, focusIssues:false, slowThinking:false, coordinationIssues:false, aggressionScore:0, headaches:false, weatherDependent:false, sleepQuality:'good' },
@@ -6334,6 +6355,28 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
                               ⊕ {sub.name} + {allSupport.find((x: any) => x.id === (s.substanceA === id ? s.substanceB : s.substanceA))?.name || ''}: {s.effect?.slice(0, 60)}
                             </div>
                           )) : null;
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== JOINT SUBS (separate, not in main stack) ===== */}
+                  {calcResult?.jointSubs && calcResult.jointSubs.length > 0 && (
+                    <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.2)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#8b5cf6', marginBottom:6, display:'flex', alignItems:'center', gap:6 }}>
+                        🦴 Суставы и связки ({calcResult.jointSubs.length})
+                      </div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>Отдельные препараты — не входят в основной стек поддержки</div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                        {calcResult.jointSubs.map((jid: string) => {
+                          const entry = SUPPORT_CATALOG_DATA[jid] || SUPPORT_CATALOG_DATA[jid.toUpperCase()];
+                          const name = entry?.nameRu || entry?.name || jid;
+                          const dose = entry?.dosage?.mg ? (entry.dosage.mg >= 1000 ? `${(entry.dosage.mg/1000).toFixed(1)} г` : `${entry.dosage.mg} мг`) : '—';
+                          return (
+                            <span key={jid} style={{ fontSize:8, padding:'3px 8px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.15)', color:'#c4b5fd' }}>
+                              {name} <span style={{ color:'var(--text-dim)' }}>{dose}</span>
+                            </span>
+                          );
                         })}
                       </div>
                     </div>

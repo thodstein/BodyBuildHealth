@@ -8,6 +8,8 @@ import {
 import { evaluateRecommendations } from './recommendation-engine';
 import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, type DrugInput, type TzSpecResult, type TzSpecMechanismResult } from './risk-engine-tz-spec';
 import { DRUG_DB } from '../data/support-db';
+import { SUPPLEMENTS_DB } from '../data/support-db/supplements';
+import { PHARMACY_DB } from '../data/support-db/pharmacy-db';
 import { normalizeLabValue } from '../core/constants';
 
 const SYS_META: Record<RiskSystemId, { label: string; icon: string }> = {
@@ -504,6 +506,16 @@ function extractLabValues(labs: CalculatorState['labs']): Record<string, number>
   if (num(b.Creatinine) !== undefined) v['CREAT'] = num(b.Creatinine)!;
   if (num(b.CRP) !== undefined) v['CRP'] = num(b.CRP)!;
   if (num(b.Homocysteine) !== undefined) v['HOMOCYSTEINE'] = num(b.Homocysteine)!;
+  // Insulin (may be in panelBiochem or panelSex depending on lab)
+  const sForIns = (fp.panelSex || {}) as Record<string, any>;
+  const insVal = num(b.Insulin) ?? num(sForIns.Insulin);
+  if (insVal !== undefined) {
+    // HOMA-IR = (glucose mmol/L × insulin μU/mL) / 22.5
+    const glu = v['GLU'];
+    if (glu !== undefined) {
+      v['HOMA'] = Math.round((glu * insVal) / 22.5 * 100) / 100;
+    }
+  }
 
   // panelLipid: Total Cholesterol, LDL, HDL, Triglycerides, VLDL, ApoB, ApoA1, Lp(a)
   const lip = (fp.panelLipid || {}) as Record<string, any>;
@@ -692,11 +704,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   // 3. ТZ-подбор: breadth + targeted без ограничений
   interface DBEntry { organId: string; mechId: string; k: number; q: string; }
   const allDb: Record<string, DBEntry[]> = {};
-  try {
-    const supp = require('../data/support-db/supplements') as any;
-    const pharm = require('../data/support-db/pharmacy-db') as any;
-    Object.assign(allDb, supp.SUPPLEMENTS_DB || {}, pharm.PHARMACY_DB || {});
-  } catch {}
+  Object.assign(allDb, SUPPLEMENTS_DB || {}, PHARMACY_DB || {});
 
   // Считаем сколько веществ уже покрывают каждую систему
   const sysCoverageCount: Record<string, number> = {};
@@ -710,7 +718,10 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   }
 
   const riskSystems: RiskSystemId[] = ['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal'];
-  const levelThresholds: Record<string, number> = { basic: 65, mid: 45, max: 30 };
+  // ── Целевые уровни риска (после поддержки) ──
+  // База: нет высокого (≤50%), Средний: нет выраженного (≤35%), Максимум: нижний умеренный (≤25%), Буст: слабый (≤15%)
+  const levelTargets: Record<string, number> = { basic: 50, mid: 35, max: 25, boost: 15 };
+  const maxPerSystem: Record<string, number> = { basic: 2, mid: 3, max: 4, boost: 5 };
 
   // ── TZ Risk: рассчитываем риск БЕЗ поддержки для отбора веществ ──
   const oldScores = calcAllRisks(state);
@@ -719,20 +730,21 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   const scoresPre = tzResultPre ? tzToScores(tzResultPre, oldScores) : oldScores;
 
   if (Object.keys(allDb).length > 0) {
-    const threshold = levelThresholds[state.powerLevel] ?? 25;
+    // Целевой риск после поддержки (Усиление = -5)
+    const baseTarget = levelTargets[state.powerLevel] ?? 50;
+    const target = Math.max(5, baseTarget - (state.boostEnabled ? 5 : 0));
+    const maxPerSys = (maxPerSystem[state.powerLevel] ?? 2) + (state.boostEnabled ? 1 : 0);
 
-    // Активные системы = риск > threshold, НО ещё не покрытые рекомендациями
+    // Активные системы = риск > target
     const activeSystems = riskSystems.filter(sys => {
       const score = scoresPre[sys] || 0;
-      if (score <= threshold) return false;
-      // Пропускаем если рекомендации уже дали 2+ вещества для этой системы
+      if (score <= target) return false;
       const tzSys = sys === 'neuro' ? 'cns' : sys;
       const covered = sysCoverageCount[tzSys] || sysCoverageCount[sys] || 0;
-      return covered < 2;
+      return covered < maxPerSys;
     });
 
-    // Breadth: добавляем ТОЛЬКО вещества для систем без покрытия
-    // Не более 1-2 на систему (а не все подряд)
+    // Breadth: broad-spectrum для систем без покрытия (NAC, магний, D3, омега-3)
     const systemsNeedingCoverage = activeSystems.filter(sys => {
       const tzSys = sys === 'neuro' ? 'cns' : sys;
       return (sysCoverageCount[tzSys] || sysCoverageCount[sys] || 0) === 0;
@@ -749,41 +761,37 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
         if (matchCount > 0) scored.push([id, matchCount, totalK]);
       }
       scored.sort((a, b) => b[1] - a[1] || b[2] - a[2]);
-      // Только топ-2 широких препарата (не весь каталог)
-      for (const [id] of scored.slice(0, 2)) {
+      for (const [id] of scored.slice(0, 3)) {
         if (used.has(id)) continue;
         substances.push(id); used.add(id);
       }
     }
 
-    // Targeted: для КАЖДОЙ системы с риском > threshold без покрытия — 1 препарат
+    // Targeted + итеративный gap-filling: добавляем вещества пока риск > target или maxPerSys не достигнут
     for (const sys of activeSystems) {
       const tzSys = sys === 'neuro' ? 'cns' : sys;
-      const currentCount = sysCoverageCount[tzSys] || sysCoverageCount[sys] || 0;
-      if (currentCount >= 2) continue; // Уже 2+ вещества — достаточно
+      let currentCount = sysCoverageCount[tzSys] || sysCoverageCount[sys] || 0;
 
-      let best: [string, number] | null = null;
-      for (const [id, entries] of Object.entries(allDb)) {
-        if (used.has(id)) continue;
-        for (const e of entries)
-          if ((e.organId === tzSys || e.organId === sys) && e.k > 0 && (!best || e.k > best[1])) best = [id, e.k];
-      }
-      if (best) {
-        substances.push(best[0]); used.add(best[0]);
-        sysCoverageCount[tzSys] = (sysCoverageCount[tzSys] || 0) + 1;
-      }
-      // Если риск >50% и меньше 2 веществ — добавляем ещё 1
-      if ((scoresPre[sys] || 0) > 50 && (sysCoverageCount[tzSys] || 0) < 2) {
-        let second: [string, number] | null = null;
+      while (currentCount < maxPerSys) {
+        // Найти лучшее вещество для этой системы
+        let best: [string, number] | null = null;
         for (const [id, entries] of Object.entries(allDb)) {
           if (used.has(id)) continue;
-          for (const e of entries)
-            if ((e.organId === tzSys || e.organId === sys) && e.k > 0 && (!second || e.k > second[1])) second = [id, e.k];
+          for (const e of entries) {
+            if ((e.organId === tzSys || e.organId === sys) && e.k > 0 && (!best || e.k > best[1])) {
+              best = [id, e.k];
+            }
+          }
         }
-        if (second) {
-          substances.push(second[0]); used.add(second[0]);
-          sysCoverageCount[tzSys] = (sysCoverageCount[tzSys] || 0) + 1;
-        }
+        if (!best) break;
+        substances.push(best[0]); used.add(best[0]);
+        currentCount++;
+        sysCoverageCount[tzSys] = currentCount;
+        // Проверяем — достаточно ли? Если риск был ~target и k>0.3, хватит 1-2
+        const score = scoresPre[sys] || 0;
+        // Эвристика: риск × (1-k)^currentCount ≤ target?
+        const estimatedRisk = score * Math.pow(1 - best[1], currentCount);
+        if (estimatedRisk <= target) break;
       }
     }
   }
@@ -856,9 +864,19 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     } catch {}
   }
 
+  // ── Суставы: отдельный массив, НЕ в основном стеке ──
+  const jointSubs: string[] = [];
+  if (state.jointMode) {
+    const jointIds = ['collagen','glucosamine','msm','boswellia','chondroitin_sulfate','hyaluronic_acid','bpc157','tb500','vitamin_c','curcumin','omega3'];
+    for (const jid of jointIds) {
+      if (!used.has(jid)) jointSubs.push(jid);
+    }
+  }
+
   const result: CalculatorResult = {
     risk: { systems: [], overallRaw, overallAfterSupport, timestamp: new Date().toISOString() },
     schedule, selectedSubstances: substances,
+    jointSubs: jointSubs.length > 0 ? jointSubs : undefined,
     synergyIdsUsed: synergyIds,
     titrationApplied: titration,
     labDeltas, overallRiskBefore: overallRaw, overallRiskAfter: overallAfterSupport,

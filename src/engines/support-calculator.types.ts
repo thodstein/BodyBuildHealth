@@ -198,7 +198,9 @@ export interface CalculatorState {
   psych: PsychData;
   injection: InjectionData;
   powerLevel: PowerLevel;
-  courseWeek?: number; // 1+ — for per-week titration and risk scaling
+  courseWeek?: number;
+  boostEnabled?: boolean;
+  jointMode?: boolean;
 }
 
 // ─── Output ───
@@ -206,6 +208,7 @@ export interface CalculatorResult {
   risk: { systems: SystemRisk[]; overallRaw: number; overallAfterSupport: number; timestamp: string };
   schedule: ScheduleItem[];
   selectedSubstances: string[];
+  jointSubs?: string[];
   synergyIdsUsed: SynergyId[];
   titrationApplied: Record<string, number>;
   labDeltas: LabDelta[];

@@ -152,6 +152,23 @@ export const RiskScreen: React.FC = () => {
     return [];
   }, [tick]);
 
+  // Load TZ Spec risk data from support calculator (sync C18)
+  const supportTzRisk = useMemo<{ raw: number; net: number; systems: Record<string, number>; subs: number; ts: number } | null>(() => {
+    try {
+      const sr = JSON.parse(localStorage.getItem('he_support_risk') || 'null');
+      if (sr && typeof sr.riskBeforeSupport === 'number') {
+        return {
+          raw: Math.round(sr.riskBeforeSupport),
+          net: Math.round(sr.riskAfterSupport),
+          systems: sr.systemSupport || {},
+          subs: Array.isArray(sr.subs) ? sr.subs.length : 0,
+          ts: sr.timestamp || 0,
+        };
+      }
+    } catch {}
+    return null;
+  }, [tick]);
+
   // Compute pharma risk — using TZ engine (single source of truth)
   // WITH support substances applied → overallRaw = raw risk, overallNet = risk after support reduction
   const pharmaRisk = useMemo<RiskResult | null>(() => {
@@ -981,6 +998,7 @@ export const RiskScreen: React.FC = () => {
                     { label: 'Вероятностная', icon: '📋', net: Math.round(riskResult?.overallNet ?? 0), raw: Math.round(riskResult?.overallRaw ?? 0), color: '#22c55e' },
                     { label: 'Монте-Карло', icon: '🎲', net: v7Result ? Math.round(v7Result.globalRiskNet) : null, raw: v7Result ? Math.round(v7Result.globalRiskRaw) : null, color: '#8b5cf6' },
                     { label: 'MDSS', icon: '🏥', net: mdssResult ? Math.round(mdssResult.overallMaxRisk) : null, raw: null, color: '#f97316' },
+                    { label: 'ТЗ-калькулятор', icon: '🧬', net: supportTzRisk?.net ?? null, raw: supportTzRisk?.raw ?? null, color: '#06b6d4' },
                   ].map((item, i) => (
                     <div key={i} style={{
                       flex: '1 1 30%', minWidth: 100, textAlign: 'center', padding: '10px 4px', borderRadius: 12,
@@ -998,7 +1016,36 @@ export const RiskScreen: React.FC = () => {
                 </div>
               </div>
 
-              {/* 4 Nav cards */}
+              {/* Support calculator sync card (C18) */}
+              {supportTzRisk && (
+                <div style={{ marginTop:10, padding:12, borderRadius:14, background:'rgba(6,182,212,0.06)', border:'1px solid rgba(6,182,212,0.2)' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#06b6d4', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
+                    🧬 Синхронизация с калькулятором поддержки
+                  </div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:8 }}>
+                    <div style={{ flex:'1 1 45%', minWidth:120, padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.15)' }}>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Риск без поддержки</div>
+                      <div style={{ fontSize:20, fontWeight:800, color:getRiskColor(supportTzRisk.raw) }}>{supportTzRisk.raw}%</div>
+                    </div>
+                    <div style={{ flex:'1 1 45%', minWidth:120, padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.15)' }}>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Риск с поддержкой</div>
+                      <div style={{ fontSize:20, fontWeight:800, color:getRiskColor(supportTzRisk.net) }}>{supportTzRisk.net}%</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>
+                    Веществ в плане: {supportTzRisk.subs} · Снижение: {supportTzRisk.raw - supportTzRisk.net}% · {supportTzRisk.ts ? new Date(supportTzRisk.ts).toLocaleDateString('ru-RU') : ''}
+                  </div>
+                  {Object.keys(supportTzRisk.systems).length > 0 && (
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
+                      {Object.entries(supportTzRisk.systems).map(([sys, val]) => (
+                        <span key={sys} style={{ fontSize:8, padding:'2px 6px', borderRadius:6, background:getRiskColor(val as number)+'15', color:getRiskColor(val as number) }}>
+                          {sys}: {Math.round(val as number)}%
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
                 {[
                   { id: 'basic', icon: '📋', title: 'Вероятностная модель', desc: 'Мультипликативная вероятностная модель риска. Обзор, динамика, механизмы.', color: '#22c55e', subs: 'Обзор • Динамика • Механизмы' },

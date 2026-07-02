@@ -3575,7 +3575,7 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
           </div>
         );
 return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-            <TrainingRecommendationsCard historyWorkouts={historyWorkouts} level={level} weakPoints={tprofile.weakPoints} readinessHistory={loadReadinessHistory()} acwr={(() => { try { const _s = loadSRPESessions(); if (_s.length < 2) return undefined; return acuteChronicRatio(toDailyLoads(_s)).ratio; } catch { return undefined; } })()} />
+            <TrainingRecommendationsCard historyWorkouts={historyWorkouts} level={level} weakPoints={tprofile.weakPoints} readinessHistory={loadReadinessHistory()} acwr={(() => { try { const _s = loadSRPESessions(); if (_s.length < 2) return undefined; return acuteChronicRatio(toDailyLoads(_s)).ratio; } catch { return undefined; } })()} nutrition={{ kcal: linked.avgWeeklyKcal, protein: linked.avgWeeklyProtein, fat: linked.avgWeeklyFat, carbs: linked.avgWeeklyCarbs }} bodyWeight={tprofile.bodyWeight} labAnalysis={linked.labAnalysis ? { liverStress: linked.labAnalysis.liverStress, cardioRisk: linked.labAnalysis.cardioRisk, inflammation: linked.labAnalysis.inflammation, kidneyStress: linked.labAnalysis.kidneyStress, hormoneScore: linked.labAnalysis.hormoneScore, homaIR: linked.labAnalysis.homaIR } : undefined} onCourse={tprofile.onCourse} courseIntensity={tprofile.courseIntensity} />
           <div style={gCard}>
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, letterSpacing:'0.3px', textTransform:'uppercase', marginBottom:8 }}>📜 История тренировок</div>
             <div style={{ display:'flex', gap:6, marginBottom:8 }}>
@@ -3699,6 +3699,7 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
       {tab === 'progress' && <InfoErrorBoundary label="Прогресс"><ProgressTab historyWorkouts={historyWorkouts} /></InfoErrorBoundary>}
       {tab === 'excalc' && <InfoErrorBoundary label="Калькулятор упражнений"><ExerciseCalcTab /></InfoErrorBoundary>}
       {tab === 'calc_1rm' && <InfoErrorBoundary label="Калькулятор 1RM"><OneRmCalcTab /></InfoErrorBoundary>}
+      {tab === 'pl_norms' && <InfoErrorBoundary label="Нормативы ПЛ"><PlNormsCalcTab /></InfoErrorBoundary>}
       {tab === 'import_data' && <InfoErrorBoundary label="Импорт CSV"><CsvImportTab onDone={loadDiaryStats} /></InfoErrorBoundary>}
       {tab === 'volume' && <InfoErrorBoundary label="Расчёт объёма"><VolumeOptimizerTab /></InfoErrorBoundary>}
       {tab === 'calc_substitute' && <InfoErrorBoundary label="Замена упражнения"><CalcSubstituteTab /></InfoErrorBoundary>}
@@ -3810,6 +3811,7 @@ import { MuscleProgressCard } from './TrainingScreen_parts/MuscleProgressCard';
 import { MicrocyclePlannerCard } from './TrainingScreen_parts/MicrocyclePlannerCard';
 import { TrainingRecommendationsCard } from './TrainingScreen_parts/TrainingRecommendationsCard';
 import { OneRmCalcTab } from './TrainingScreen_parts/OneRmCalcTab';
+import { PlNormsCalcTab } from './TrainingScreen_parts/PlNormsCalcTab';
 import { LiftHistoryCard } from './TrainingScreen_parts/LiftHistoryCard';
 import { VolumeTrendCard } from './TrainingScreen_parts/VolumeTrendCard';
 import { LoadRadarCard } from './TrainingScreen_parts/LoadRadarCard';
