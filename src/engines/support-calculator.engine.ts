@@ -10,6 +10,7 @@ import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, typ
 import { DRUG_DB } from '../data/support-db';
 import { SUPPLEMENTS_DB } from '../data/support-db/supplements';
 import { PHARMACY_DB } from '../data/support-db/pharmacy-db';
+import { SUPPORT_CATALOG_DATA } from '../data/support-database';
 import { normalizeLabValue } from '../core/constants';
 
 const SYS_META: Record<RiskSystemId, { label: string; icon: string }> = {
@@ -395,15 +396,30 @@ const SUB_NAMES: Record<string, string> = {
   calcium:'Кальций', boron:'Бор', vitamin_k2:'K2',
   ashwagandha:'Ашваганда', selenium:'Селен', artichoke:'Артишок',
   bile_acids:'Жёлчные к-ты', berberine:'Берберин', anastrozole:'Анастрозол',
-  cabergoline:'Каберголин',
+  cabergoline:'Каберголин', hcg:'ХГЧ', tamoxifen:'Тамоксифен',
+  curcumin:'Куркумин', piperine:'Пиперин', reishi:'Рейши', maitake:'Майтаке',
+  shilajit:'Шиладжит', chaga:'Чага', cordyceps:'Кордицепс', lions_mane:'Ежовик',
+  saw_palmetto:'Пальма сереноа', pygeum:'Слива африканская',
+  taurine:'Таурин', inositol:'Инозитол', nac_acetyl:'N-ацетилтаурин',
+  dhea:'DHEA', pregnenolone:'Прегненолон',
+  collagen:'Коллаген', glucosamine:'Глюкозамин', msm:'МСМ',
+  boswellia:'Босвеллия', chondroitin_sulfate:'Хондроитин', hyaluronic_acid:'Гиалуроновая к-та',
+  bpc157:'BPC-157', tb500:'TB-500',
+  melatonin:'Мелатонин', '5htp':'5-HTP', stjohns_wort:'Зверобой',
+  grape_seed:'Экстракт косточек винограда', pine_bark:'Экстракт коры сосны',
+  DIM:'DIM', indole_3_carbinol:'I3C', calcium_d_glucarate:'Кальция D-глюкарат',
+  selenium_yeast:'Селен (дрожжи)', methylfolate:'5-МТГФ',
+  niacin:'Ниацин', pantethine:'Пантетин', red_yeast_rice:'Красный дрожжевой рис',
+  celadrin:'Целадрин', emu_oil:'Эму масло', cissus:'Циссус',
+  l_citrulline:'L-Цитруллин', beet_root:'Свёкла',
 };
 
 function generateSchedule(substances: string[], synergyIds: SynergyId[], doses: Record<string, number>): ScheduleItem[] {
   const schedule: ScheduleItem[] = [];
   const used = new Set<string>();
-  const morningGroup = ['vitamin_c','vitamin_d3','vitamin_e','coq10','alpha_lipoic','selenium','boron','zinc','telmisartan','nebivolol','ashwagandha','calcium','vitamin_k2','probiotics','anastrozole','cabergoline'];
-  const afternoonGroup = ['berberine','bromelain','nattokinase','betaine','folate','vitamin_b12','magnesium','potassium','artichoke','bile_acids','omega3'];
-  const eveningGroup = ['nac','tudca','milk_thistle','glycine','theanine','gaba','tyrosine','l_dopa','x5htp','vitamin_b6','astragalus','celery_extract','glutathione','bergamot','red_yeast','aspirin'];
+  const morningGroup = ['vitamin_c','vitamin_d3','vitamin_e','coq10','alpha_lipoic','selenium','boron','zinc','telmisartan','nebivolol','ashwagandha','calcium','vitamin_k2','probiotics','anastrozole','cabergoline','hcg','curcumin','dhea','pregnenolone','collagen','melatonin','l_citrulline','DIM','saw_palmetto'];
+  const afternoonGroup = ['berberine','bromelain','nattokinase','betaine','folate','vitamin_b12','magnesium','potassium','artichoke','bile_acids','omega3','glucosamine','msm','boswellia','chondroitin_sulfate','taurine','inositol','piperine','reishi','maitake','shilajit','chaga','cordyceps','lions_mane'];
+  const eveningGroup = ['nac','tudca','milk_thistle','glycine','theanine','gaba','tyrosine','l_dopa','x5htp','vitamin_b6','astragalus','celery_extract','glutathione','bergamot','red_yeast','aspirin','tamoxifen','5htp','hyaluronic_acid','bpc157','tb500'];
   const timeOf = (id: string): TimeBlock => morningGroup.includes(id) ? 'morning' : afternoonGroup.includes(id) ? 'afternoon' : 'evening';
   const doseStr = (id: string): string => {
     if (doses[id]) return doses[id] + ' мг';
@@ -421,14 +437,24 @@ function generateSchedule(substances: string[], synergyIds: SynergyId[], doses: 
       ashwagandha:'300 мг', selenium:'50 мкг', artichoke:'250 мг',
       bile_acids:'250 мг', bergamot:'500 мг', red_yeast:'600 мг',
       berberine:'500 мг', anastrozole:'0.5 мг', cabergoline:'0.25 мг',
+      hcg:'500 МЕ', tamoxifen:'10 мг', curcumin:'500 мг', piperine:'5 мг',
+      reishi:'500 мг', maitake:'500 мг', shilajit:'250 мг', chaga:'500 мг',
+      cordyceps:'500 мг', lions_mane:'500 мг', saw_palmetto:'320 мг',
+      taurine:'1000 мг', inositol:'1000 мг', dhea:'25 мг', pregnenolone:'50 мг',
+      collagen:'5000 мг', glucosamine:'1500 мг', msm:'1000 мг', boswellia:'300 мг',
+      chondroitin_sulfate:'1200 мг', hyaluronic_acid:'200 мг',
+      bpc157:'250 мкг', tb500:'5 мг', melatonin:'3 мг', '5htp':'100 мг',
+      DIM:'100 мг', l_citrulline:'3000 мг',
     };
     return defs[id] || 'по инструкции';
   };
-  for (const sub of substances) {
+    for (const sub of substances) {
     if (used.has(sub)) continue; used.add(sub);
     const block = timeOf(sub);
+    const catEntry = SUPPORT_CATALOG_DATA[sub] || SUPPORT_CATALOG_DATA[sub.toUpperCase()];
+    const name = SUB_NAMES[sub] || catEntry?.nameRu || catEntry?.name || sub;
     schedule.push({
-      substanceId: sub, name: SUB_NAMES[sub] || sub,
+      substanceId: sub, name,
       dose: doseStr(sub), timeBlock: block,
       instructions: block === 'morning' ? 'С завтраком' : block === 'afternoon' ? 'С обедом' : 'За 1-2 ч до сна',
       synergyGroup: synergyIds.find(sid => SYNERGY_ID_SUBSTANCES[sid]?.includes(sub)),
