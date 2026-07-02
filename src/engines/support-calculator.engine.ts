@@ -591,10 +591,61 @@ function extractLabValues(labs: CalculatorState['labs']): Record<string, number>
   // panelTumor: PSA total
   const tum = (fp.panelTumor || {}) as Record<string, any>;
   if (num(tum['PSA total']) !== undefined) v['PSA'] = num(tum['PSA total'])!;
+  if (num(tum['PSA free']) !== undefined) v['PSA_FREE'] = num(tum['PSA free'])!;
 
   // panelUrinalysis: Protein
   const ua = (fp.panelUrinalysis || {}) as Record<string, any>;
   if (num(ua.Protein) !== undefined) v['UACR'] = num(ua.Protein)!;
+
+  // panelIron: Ferritin, Iron, TIBC
+  const iron = (fp.panelIron || {}) as Record<string, any>;
+  if (num(iron.Ferritin) !== undefined) v['FERRITIN'] = num(iron.Ferritin)!;
+  if (num(iron.Iron) !== undefined) v['IRON'] = num(iron.Iron)!;
+  if (num(iron.TIBC) !== undefined) v['TIBC'] = num(iron.TIBC)!;
+
+  // panelVitamin: B12, Folate, Vitamin D (25-OH)
+  const vit = (fp.panelVitamin || {}) as Record<string, any>;
+  if (num(vit['Vitamin D (25-OH)']) !== undefined) v['VITD'] = num(vit['Vitamin D (25-OH)'])!;
+  if (num(vit.B12) !== undefined) v['B12'] = num(vit.B12)!;
+  if (num(vit.Folate) !== undefined) v['FOLATE'] = num(vit.Folate)!;
+
+  // panelAdrenal: DHEA-S, Aldosterone, PTH
+  const adr = (fp.panelAdrenal || {}) as Record<string, any>;
+  if (num(adr['DHEA-S']) !== undefined) v['DHEAS'] = num(adr['DHEA-S'])!;
+  if (num(adr.Aldosterone) !== undefined) v['ALDO'] = num(adr.Aldosterone)!;
+  if (num(adr.PTH) !== undefined) v['PTH'] = num(adr.PTH)!;
+
+  // panelMineral: Calcium, Magnesium, Phosphorus
+  if (num(min.Calcium) !== undefined) v['CA'] = num(min.Calcium)!;
+  if (num(min.Magnesium) !== undefined) v['MG'] = num(min.Magnesium)!;
+  if (num(min.Phosphorus) !== undefined) v['PHOS'] = num(min.Phosphorus)!;
+
+  // panelCardiac: CK, CK-MB, Troponin
+  if (num(card.CK) !== undefined) v['CK'] = num(card.CK)!;
+  if (num(card['CK-MB']) !== undefined) v['CKMB'] = num(card['CK-MB'])!;
+  if (num(card['Troponin I']) !== undefined) v['TROP'] = num(card['Troponin I'])!;
+
+  // panelInflammatory: IL-6, TNF-alpha
+  if (num(infl['IL-6']) !== undefined) v['IL6'] = num(infl['IL-6'])!;
+  if (num(infl['TNF-alpha']) !== undefined) v['TNFA'] = num(infl['TNF-alpha'])!;
+
+  // panelBiochem доп: Urea, Uric acid
+  if (num(b.Urea) !== undefined) v['UREA'] = num(b.Urea)!;
+  if (num(b['Uric acid']) !== undefined) v['URIC'] = num(b['Uric acid'])!;
+
+  // panelHematology доп: RBC, WBC
+  if (num(h.RBC) !== undefined) v['RBC'] = num(h.RBC)!;
+  if (num(h.WBC) !== undefined) v['WBC'] = num(h.WBC)!;
+
+  // panelSex доп: Free T, DHT, Progesterone
+  if (num(s['Free T']) !== undefined) v['FT'] = num(s['Free T'])!;
+  if (num(s.DHT) !== undefined) v['DHT'] = num(s.DHT)!;
+  if (num(s.Progesterone) !== undefined) v['PROG'] = num(s.Progesterone)!;
+
+  // panelThyroid доп: T3 free, T4 free, Anti-TPO
+  if (num(th['T3 free']) !== undefined) v['T3'] = num(th['T3 free'])!;
+  if (num(th['T4 free']) !== undefined) v['T4'] = num(th['T4 free'])!;
+  if (num(th['Anti-TPO']) !== undefined) v['ANTI_TPO'] = num(th['Anti-TPO'])!;
 
   // eGFR calculated from creatinine (MDRD simplified)
   if (v['CREAT'] !== undefined) {

@@ -397,18 +397,19 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       if (ORAL_17AA.includes(id)) hasOral = true;
     }
     let level: 'basic' | 'mid' | 'max' | 'boost' = 'basic';
-    if (hasHighRisk || (hasOral && count >= 2)) level = 'boost';
-    else if (hasOral || count >= 3) level = 'max';
-    else if (count >= 1) level = 'mid';
-    // 1c: Risk-based level adjustment
+    if (hasHighRisk || (hasOral && count >= 2)) level = 'max';
+    else if (hasOral || count >= 3) level = 'mid';
+    else if (count >= 1) level = 'basic';
+    // Risk-based: recommend level matching target (≤50=база, ≤35=средний, ≤25=макс, ≤15=буст)
     const riskNet = linked.risk?.overallNet ?? 0;
-    if (riskNet > 50) level = 'boost';
-    else if (riskNet > 30 && level !== 'boost') level = 'max';
-    // 1c: Lab abnormality count
+    if (riskNet > 25) level = 'max';
+    else if (riskNet > 35) level = 'boost';
+    // Lab abnormality count
     const abnormalCount = (linked.labAnalysis?.interpretations || []).filter(
       i => i.status === 'high' || i.status === 'critical_high'
     ).length;
-    if (abnormalCount > 2) level = 'boost';
+    if (abnormalCount > 3) level = 'boost';
+    else if (abnormalCount > 1 && level === 'basic') level = 'mid';
     setAutoLevel(level);
     if (!manualLevelSelected) setSupportLevel(level);
   }, [supportDrugs, linked.risk, linked.labAnalysis, manualLevelSelected]);
@@ -5226,6 +5227,15 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           text += `\n═══════════════════════════════\n`;
           if (calcDone && calcResult) {
             text += `\n📉 Риски: ${Math.round(calcResult.riskBeforeSupport)}% → ${Math.round(calcResult.riskAfterSupport)}%\n`;
+            if (calcResult.jointSubs && calcResult.jointSubs.length > 0) {
+              text += `\n🦴 Суставы и связки (отдельно):\n`;
+              calcResult.jointSubs.forEach((jid: string) => {
+                const e = SUPPORT_CATALOG_DATA[jid] || SUPPORT_CATALOG_DATA[jid.toUpperCase()];
+                const n = e?.nameRu || e?.name || jid;
+                const d = e?.dosage?.mg ? (e.dosage.mg >= 1000 ? `${(e.dosage.mg/1000).toFixed(1)} г` : `${e.dosage.mg} мг`) : '—';
+                text += `  • ${n} — ${d}\n`;
+              });
+            }
           }
           text += `\nСгенерировано: ${new Date().toLocaleDateString('ru-RU')}\n`;
           text += `body-build-health.vercel.app\n`;
@@ -5257,6 +5267,15 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               const sysInfo = SYSTEM_LABELS_RU[k] || { name: k };
               text += `  ${sysInfo.name}: покрытие ${v}%\n`;
             });
+            if (calcResult.jointSubs && calcResult.jointSubs.length > 0) {
+              text += `\n🦴 СУСТАВЫ И СВЯЗКИ (отдельный стек):\n`;
+              calcResult.jointSubs.forEach((jid: string) => {
+                const e = SUPPORT_CATALOG_DATA[jid] || SUPPORT_CATALOG_DATA[jid.toUpperCase()];
+                const n = e?.nameRu || e?.name || jid;
+                const d = e?.dosage?.mg ? (e.dosage.mg >= 1000 ? `${(e.dosage.mg/1000).toFixed(1)} г` : `${e.dosage.mg} мг`) : '—';
+                text += `  • ${n} — ${d}\n`;
+              });
+            }
           }
           text += `\n═══════════════════════════════════\n`;
           navigator.clipboard.writeText(text).catch(() => {});
@@ -5436,6 +5455,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       enhancedSubs: enhancedSubs,
                       boostEnabled: boostEnabled,
                       jointMode: jointMode,
+                      jointSubs: calcResult?.jointSubs || [],
                     };
                     myPlans.push(planData);
                     localStorage.setItem('he_my_plans', JSON.stringify(myPlans));
@@ -5580,6 +5600,36 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
                 {(expandedCategories.calc_plan ?? true) && (<>
 
+                  {/* ===== ПЕРЕЧЕНЬ ПРЕПАРАТОВ ===== */}
+                  <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:6, display:'flex', alignItems:'center', gap:6 }}>
+                      💊 Препараты плана ({effectiveLevel.subs.length})
+                      {boostEnabled && <span style={{ fontSize:8, padding:'1px 6px', borderRadius:4, background:'rgba(239,68,68,0.12)', color:'#ef4444' }}>🔥 Усиление</span>}
+                      {jointMode && <span style={{ fontSize:8, padding:'1px 6px', borderRadius:4, background:'rgba(139,92,246,0.12)', color:'#8b5cf6' }}>🦴 Суставы</span>}
+                    </div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      {effectiveLevel.subs.map((id: string) => {
+                        const entry = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
+                        const name = entry?.nameRu || entry?.name || id;
+                        const dose = effectiveLevel?.dosages?.[id];
+                        const doseStr = dose ? (dose.mg >= 1000 ? `${(dose.mg/1000).toFixed(1)} г` : `${dose.mg} мг`) : (entry?.dosage?.mg ? (entry.dosage.mg >= 1000 ? `${(entry.dosage.mg/1000).toFixed(1)} г` : `${entry.dosage.mg} мг`) : '');
+                        const cat = entry?.category?.[0] || '';
+                        const tierColors: Record<string,string> = { core:'#22c55e', standard:'#f59e0b', advanced:'#f97316', specialty:'#ef4444' };
+                        const tier = entry?.tier || 'standard';
+                        return (
+                          <span key={id} style={{ fontSize:8, padding:'3px 8px', borderRadius:6, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.1)', color:'var(--text-light)', display:'flex', alignItems:'center', gap:3 }}>
+                            <span style={{ width:5, height:5, borderRadius:'50%', background: tierColors[tier] || '#888', flexShrink:0 }} />
+                            {name}
+                            {doseStr && <span style={{ color:'var(--text-dim)' }}>{doseStr}</span>}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:4, display:'flex', gap:8 }}>
+                      <span>🟢 core</span><span>🟡 standard</span><span>🟠 advanced</span><span>🔴 specialty</span>
+                    </div>
+                  </div>
+
                   {(!linked.course || linked.course.length === 0) && (
                     <div style={{marginBottom:10,padding:'10px 12px',borderRadius:10,background:'rgba(245,158,11,0.06)',border:'1px solid rgba(245,158,11,0.2)'}}>
                       <div style={{fontSize:10,fontWeight:700,color:'#f59e0b',marginBottom:4}}>⚠️ Нет данных о курсе</div>
@@ -5668,6 +5718,42 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       {courseWeekState <= 6 && (<div style={{fontSize:7,color:'#f59e0b',marginTop:3,padding:'3px 6px',borderRadius:4,background:'rgba(245,158,11,0.06)'}}>⚠ Дозы снижены на {Math.round((1-planResult.weekScale)*100)}% — фаза адаптации (нед.{courseWeekState}). К неделе 7 — полные дозы.</div>)}
                     </div>
                   )}
+
+                  {/* ===== ОПИСАНИЕ МЕТОДОЛОГИИ ===== */}
+                  <details style={{ marginBottom:10 }}>
+                    <summary style={{ fontSize:10, fontWeight:700, color:'var(--accent)', cursor:'pointer', padding:'6px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
+                      📖 Как работает подбор поддержки
+                    </summary>
+                    <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.6, marginTop:6, padding:'10px 12px', borderRadius:8, background:'rgba(0,0,0,0.06)' }}>
+                      <div style={{ marginBottom:6 }}>
+                        <b style={{ color:'#00e68a' }}>1. Обязательные препараты:</b> ХГЧ (при ААС — поддержка HPTA), анастрозол (при ароматизирующихся — контроль E2), каберголин (при трен/нандролон — контроль пролактина). На всех уровнях.
+                      </div>
+                      <div style={{ marginBottom:6 }}>
+                        <b style={{ color:'#00e68a' }}>2. Рекомендации по анализам:</b> отклонения маркеров (АЛТ, ЛПНП, HCT, E2 и др.) → авто-добавление корректирующих веществ.
+                      </div>
+                      <div style={{ marginBottom:6 }}>
+                        <b style={{ color:'#00e68a' }}>3. Broad-spectrum (широкий спектр):</b> отбор веществ с максимальным покрытием механизмов (NAC, магний, D3, омега-3, CoQ10) — закрывают несколько систем одновременно.
+                      </div>
+                      <div style={{ marginBottom:6 }}>
+                        <b style={{ color:'#00e68a' }}>4. Targeted (точечное усиление):</b> для каждой системы с риском {'>'} целевого — 1-5 веществ (по уровню) с максимальным k (коэффициентом защиты).
+                      </div>
+                      <div style={{ marginBottom:6 }}>
+                        <b style={{ color:'#00e68a' }}>5. Gap-filling:</b> после отбора пересчитываем риск; если система всё ещё {'>'} целевого — добавляем ещё вещества (до maxPerSystem).
+                      </div>
+                      <div style={{ marginBottom:6, padding:'6px 8px', borderRadius:6, background:'rgba(0,0,0,0.1)' }}>
+                        <b>Уровни и целевой риск:</b><br/>
+                        🟢 База ≤50% (нет высокого) · 2/систему<br/>
+                        🟡 Средний ≤35% (нет выраженного) · 3/систему<br/>
+                        🟠 Максимум ≤25% (нижний умеренный) · 4/систему<br/>
+                        🔴 Буст ≤15% (слабый) · 5/систему<br/>
+                        🔥 Усиление: target -5%, max +1/систему<br/>
+                        🦴 Суставы: отдельный стек, не влияет на расчёт риска
+                      </div>
+                      <div>
+                        <b style={{ color:'#f59e0b' }}>Логика препаратов:</b> пероральные 17α-алкилированные → усиленная гепатопротекция (TUDCA + NAC + силимарин); тренболон → контроль пролактина + нейропротекция; тестостерон → контроль E2 + HCT; нандролон → контроль пролактина.
+                      </div>
+                    </div>
+                  </details>
 
                   {/* ===== TIME-BLOCK TABLE (D1) ===== */}
                   {(() => {

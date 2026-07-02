@@ -140,6 +140,13 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
   const tsh=labValues['TSH'];const bnp=labValues['BNP'];const dDimer=labValues['D_DIMER'];const fib=labValues['FIBRINOGEN'];
   const psa=labValues['PSA'];
   const cortisol=labValues['CORTISOL'];
+  const ferritin=labValues['FERRITIN'];const vitd=labValues['VITD'];const b12=labValues['B12'];const folate=labValues['FOLATE'];
+  const dheas=labValues['DHEAS'];const mg=labValues['MG'];const ca=labValues['CA'];const phos=labValues['PHOS'];
+  const ck=labValues['CK'];const il6=labValues['IL6'];const tnfa=labValues['TNFA'];
+  const urea=labValues['UREA'];const uric=labValues['URIC'];const wbc=labValues['WBC'];const rbcVal=labValues['RBC'];
+  const ft=labValues['FT'];const dht=labValues['DHT'];const prog=labValues['PROG'];
+  const t3=labValues['T3'];const t4=labValues['T4'];const antiTpo=labValues['ANTI_TPO'];
+  const psaFree=labValues['PSA_FREE'];const aldo=labValues['ALDO'];const pth=labValues['PTH'];
 
   // Хелпер: лабораторный m_i → max(default, labValue)
   const labMi = (val:number|undefined, thresholds:[number,number,number]):number|undefined => {
@@ -162,9 +169,11 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
 
   switch(mechId){
     // ── ССС ──
-    case'cv1': { // ремоделирование: NT-proBNP (high = worse), BP
+    case'cv1': { // ремоделирование: NT-proBNP (high = worse), CK (мышечное повреждение)
       const bnpMi = labMi(bnp,[125,300,900]);
-      if (bnpMi !== undefined) labResult = bnpMi;
+      const ckMi = labMi(ck,[200,500,1000]);
+      const vals = [bnpMi,ckMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
     case'cv2': { // дислипидемия: LDL, HDL(inv), TG, TC
@@ -224,10 +233,12 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       break;
     }
     // ── Почки ──
-    case'ren1': { // гемодинамическое: eGFR, creatinine
+    case'ren1': { // гемодинамическое: eGFR, creatinine, urea, uric acid
       const egfrMi = labMiInv(egfr,[90,60,30]);
       const crMi = labMi(creat,[90,130,200]);
-      const vals = [egfrMi,crMi].filter(v=>v!==undefined) as number[];
+      const ureaMi = labMi(urea,[8,12,20]);
+      const uricMi = labMi(uric,[420,480,540]);
+      const vals = [egfrMi,crMi,ureaMi,uricMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
@@ -244,10 +255,12 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       if (uacrMi !== undefined) labResult = uacrMi;
       break;
     }
-    case'ren4': { // водно-электролитный: K, Na
+    case'ren4': { // водно-электролитный: K, Na, Mg, Ca
       const kMi = labMiInv(k,[3.5,3.0,2.5]);
       const naMi = labMiInv(na,[135,130,125]);
-      const vals = [kMi,naMi].filter(v=>v!==undefined) as number[];
+      const mgMi = labMiInv(mg,[0.75,0.65,0.5]);
+      const caMi = labMiInv(ca,[2.2,2.0,1.75]);
+      const vals = [kMi,naMi,mgMi,caMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
@@ -257,10 +270,13 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       if (prlMi !== undefined) labResult = prlMi;
       break;
     }
-    case'cns2': { // окислительный стресс: CRP, Homocysteine
+    case'cns2': { // окислительный стресс: CRP, Homocysteine, IL-6, TNF-alpha, Ferritin
       const crpMi = labMi(crp,[5,10,20]);
       const homocMi = labMi(homoc,[15,20,30]);
-      const vals = [crpMi,homocMi].filter(v=>v!==undefined) as number[];
+      const il6Mi = labMi(il6,[2,5,10]);
+      const tnfaMi = labMi(tnfa,[3,5,10]);
+      const ferMi = labMi(ferritin,[300,400,500]);
+      const vals = [crpMi,homocMi,il6Mi,tnfaMi,ferMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
@@ -269,10 +285,13 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       if (homocMi !== undefined) labResult = homocMi;
       break;
     }
-    case'cns4': { // нейроэндокринная: TSH (high = hypothyroid), Cortisol (high = stress)
+    case'cns4': { // нейроэндокринная: TSH (high=hypothyroid), Cortisol (high=stress), T3(low), T4(low), DHEA-S(low)
       const tshMi = labMi(tsh,[4.0,6.0,10.0]);
       const cortMi = labMi(cortisol,[690,900,1380]);
-      const vals = [tshMi,cortMi].filter(v=>v!==undefined) as number[];
+      const t3Mi = labMiInv(t3,[4.5,3.5,2.5]);
+      const t4Mi = labMiInv(t4,[12,9,6]);
+      const dheasMi = labMiInv(dheas,[100,50,20]);
+      const vals = [tshMi,cortMi,t3Mi,t4Mi,dheasMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
@@ -292,10 +311,11 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
-    case'rep2': { // ↓ интратестикулярного T: TT (низкий = плохо), SHBG (высокий = ↓ free T)
+    case'rep2': { // ↓ интратестикулярного T: TT (низкий=плохо), FT (низкий=плохо), SHBG (высокий=↓free T)
       const ttMi = labMiInv(tt,[12,8,4]);
+      const ftMi = labMiInv(ft,[250,150,50]);
       const shbgMi = labMi(shbg,[60,80,100]);
-      const vals = [ttMi,shbgMi].filter(v=>v!==undefined) as number[];
+      const vals = [ttMi,ftMi,shbgMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
@@ -317,10 +337,12 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       break;
     }
     // ── Гематолого-метаболический ──
-    case'hem1': { // эритроцитоз: HCT, Hemoglobin
+    case'hem1': { // эритроцитоз: HCT, Hemoglobin, RBC, WBC
       const hctMi = labMi(hct,[48,51,54]);
       const hgbMi = labMi(hgb,[170,180,190]);
-      const vals = [hctMi,hgbMi].filter(v=>v!==undefined) as number[];
+      const rbcMi = labMi(rbcVal,[5.5,6.0,6.5]);
+      const wbcMi = labMi(wbc,[11,13,15]);
+      const vals = [hctMi,hgbMi,rbcMi,wbcMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
@@ -341,10 +363,12 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       if (kMi !== undefined) labResult = kMi;
       break;
     }
-    case'hem5': { // водно-электролитный сдвиг: K, Na
+    case'hem5': { // водно-электролитный сдвиг: K, Na, Mg, Ca
       const kMi = labMiInv(k,[3.5,3.0,2.5]);
       const naMi = labMiInv(na,[135,130,125]);
-      const vals = [kMi,naMi].filter(v=>v!==undefined) as number[];
+      const mgMi = labMiInv(mg,[0.75,0.65,0.5]);
+      const caMi = labMiInv(ca,[2.2,2.0,1.75]);
+      const vals = [kMi,naMi,mgMi,caMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
