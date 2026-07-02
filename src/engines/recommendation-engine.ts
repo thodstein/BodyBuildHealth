@@ -315,6 +315,73 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
   // ════════════════════════════════════════════════════════════════
   //  PHASE 3: Labs → query index for each marker
   // ════════════════════════════════════════════════════════════════
+
+  // ── Vitamin D deficiency → D3 + K2 + Mg ──
+  const vitDVal = getV(fp, 'panelVitamin', 'Vitamin D (25-OH)');
+  if (vitDVal !== null && vitDVal < 30) {
+    addRec('lab_vitd', 'medium', 'endocrine', 'Витамины',
+      `Витамин D: ${vitDVal} < 30 нг/мл — дефицит`,
+      ['vitamin_d3', 'vitamin_k2', 'magnesium'],
+      { vitamin_d3: 'Восполнение дефицита 2000-5000 МЕ/сут', vitamin_k2: 'Кофактор — направление Ca в кость, ↓кальцификации сосудов', magnesium: 'Кофактор активации витамина D' },
+      'Контроль 25-OH D через 8 нед. Цель: 40-60 нг/мл.',
+      '25-OH витамин D каждые 8 нед');
+  }
+
+  // ── B12 deficiency → methylcobalamin + folate ──
+  const b12Val = getV(fp, 'panelVitamin', 'B12');
+  if (b12Val !== null && b12Val < 210) {
+    addRec('lab_b12', 'medium', 'hematologic', 'Витамины',
+      `B12: ${b12Val} < 210 пг/мл — дефицит`,
+      ['vitamin_b12', 'folate', 'betaine'],
+      { vitamin_b12: 'Метилкобаламин 1000 мкг — восполнение дефицита', folate: '5-МТГФ 400 мкг — кофактор', betaine: 'TMG 1000 мг — поддержка метилирования' },
+      'Контроль B12, гомоцистеин через 4 нед.',
+      'B12, гомоцистеин, фолат каждые 4 нед');
+  }
+
+  // ── High Ferritin → iron chelation + antioxidant ──
+  const ferVal = getV(fp, 'panelIron', 'Ferritin');
+  if (ferVal !== null && ferVal > 300) {
+    addRec('lab_ferritin', 'medium', 'hematologic', 'Железо',
+      `Ферритин: ${ferVal} > 300 — избыток железа`,
+      ['milk_thistle', 'vitamin_c', 'nac'],
+      { milk_thistle: 'Силимарин — гепатопротекция при перегрузке железом', vitamin_c: 'Витамин C — хелатор железа при избытке', nac: 'NAC — связывание свободного железа' },
+      'Кровопускание при ферритине >500. Контроль ферритина, Fe, ТФК.',
+      'Ферритин, железо, ТФК, % насыщения трансферрина каждые 8 нед');
+  }
+
+  // ── Low DHEA-S → DHEA support ──
+  const dheaVal = getV(fp, 'panelAdrenal', 'DHEA-S');
+  if (dheaVal !== null && dheaVal < 100 && sex === 'male') {
+    addRec('lab_dheas', 'low', 'endocrine', 'Надпочечники',
+      `DHEA-S: ${dheaVal} < 100 мкг/дл — надпочечниковая недостаточность`,
+      ['ashwagandha', 'vitamin_c', 'pantethine'],
+      { ashwagandha: 'Адаптоген — поддержка надпочечников', vitamin_c: 'Кофактор стероидогенеза', pantethine: 'Предшественник CoA — синтез гормонов' },
+      'Контроль DHEA-S, кортизол через 8 нед.',
+      'DHEA-S, кортизол утром каждые 8 нед');
+  }
+
+  // ── High Homocysteine → methylation support ──
+  const hcyVal = getV(fp, 'panelBiochem', 'Homocysteine');
+  if (hcyVal !== null && hcyVal > 15) {
+    addRec('lab_hcy', 'medium', 'hematologic', 'Метилирование',
+      `Гомоцистеин: ${hcyVal} > 15 — нарушение метилирования`,
+      ['betaine', 'folate', 'vitamin_b12', 'vitamin_b6'],
+      { betaine: 'TMG 1000 мг — донор метильных групп', folate: '5-МТГФ 400 мкг — активная форма фолата', vitamin_b12: 'B12 1000 мкг — кофактор метилтрансферазы', vitamin_b6: 'B6 25 мг — кофактор цистатионин-β-синтазы' },
+      'Контроль гомоцистеина через 4 нед. Цель: <10.',
+      'Гомоцистеин, B12, фолат каждые 4 нед');
+  }
+
+  // ── High CRP → anti-inflammatory support ──
+  const crpVal = getV(fp, 'panelBiochem', 'CRP');
+  if (crpVal !== null && crpVal > 5) {
+    addRec('lab_crp', 'medium', '', 'Воспаление',
+      `СРБ: ${crpVal} > 5 — системное воспаление`,
+      ['omega3', 'curcumin', 'vitamin_c', 'coq10'],
+      { omega3: 'EPA+DHA — анти-воспалительный (↓IL-6, ↓TNF-α)', curcumin: 'Куркумин — ↓NF-κB, ↓COX-2', vitamin_c: 'Антиоксидант — ↓окислительного стресса', coq10: 'Mitochondrial protection — ↓воспаления' },
+      'Контроль СРБ, IL-6 через 4 нед.',
+      'СРБ, IL-6, ферритин каждые 4 нед');
+  }
+
   const labRules: { marker: string; panels: (keyof LabSlice)[]; threshold: { higherIsWorse: boolean; value: number }; system: string; label: string }[] = [
     { marker:'ALT', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:40 }, system:'hepatic', label:'Печень' },
     { marker:'AST', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:40 }, system:'hepatic', label:'Печень' },

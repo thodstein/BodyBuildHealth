@@ -77,7 +77,11 @@ export interface TzSpecInput {
   dose: number; duration: number; form: 'inject'|'oral';
   combinations: number; labCoverage: number;
   labValues: Record<string, number>; supportSubstances: string[];
-  drugs?: DrugInput[];  // множественный курс: переопределяет drugClass+dose+form
+  drugs?: DrugInput[];
+  genetics?: { cyp19a1?: string; srd5a2?: string; mthfr?: string; ar?: string; esr1?: string; comt?: string; agtr1?: string; nos3?: string; };
+  nutrition?: { proteinPerKg: number; fiberG: number; omega3G: number; sodiumG: number; potassiumG: number; waterL: number; calories: number; };
+  training?: { hasHIIT: boolean; weeklyMinutes: number; volumeTonnes: number; lissMinutesPerWeek: number; };
+  courseWeek?: number;
 }
 export interface TzSpecMechanismResult {
   id: string; name: string; weight: number; m_i: number;
@@ -523,6 +527,43 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
   const{duration,combinations,labCoverage,labValues,supportSubstances}=input;
   const T_i=getDurationFactor(duration);const C_i=getCombinationFactor(combinations);
   const U_i=getPenaltyFactor(labCoverage);
+  const genetics=input.genetics||{};
+  const nutrition=input.nutrition;
+  const training=input.training;
+
+  // Генетические множители: повышают m_i для конкретных механизмов
+  const geneticBoost: Record<string, number> = {};
+  if (genetics.mthfr === 'c677t') { geneticBoost['cns2'] = 1.3; geneticBoost['cns3'] = 1.2; } // гомоцистеин ↑ → окислительный стресс + апоптоз
+  if (genetics.cyp19a1 === 'high') { geneticBoost['rep4'] = 1.3; } // ароматиза ↑ → эстрогенный сдвиг
+  if (genetics.srd5a2 === 'hypersensitive') { geneticBoost['rep2'] = 1.15; } // 5α-редуктаза ↑ → DHT сдвиг (связан с репродуктивной)
+  if (genetics.ar === 'high') { geneticBoost['rep1'] = 1.2; } // AR чувствительность → супрессия HPTA
+  if (genetics.comt === 'slow') { geneticBoost['cns1'] = 1.2; } // COMT медленный → дофамин/катехоламины ↑
+  if (genetics.agtr1 === 'high') { geneticBoost['cv3'] = 1.2; } // AGTR1 → задержка Na/H₂O
+  if (genetics.nos3 === 'low') { geneticBoost['cv1'] = 1.2; geneticBoost['cv5'] = 1.15; } // NO ↓ → ремоделирование + аритмия
+  if (genetics.esr1 === 'high') { geneticBoost['rep4'] = (geneticBoost['rep4']||1)*1.15; } // ESR1 ↑ → эстрогенный
+
+  // Питание: плохое питание → выше риск (множитель 1.0-1.2)
+  const nutritionMult = nutrition ? (() => {
+    let m = 1.0;
+    if (nutrition.proteinPerKg < 1.5) m += 0.05; // мало белка
+    if (nutrition.fiberG < 20) m += 0.05;
+    if (nutrition.omega3G < 1.0) m += 0.05;
+    if (nutrition.sodiumG > 4) m += 0.03; // много соли → ССС
+    if (nutrition.potassiumG < 2.5) m += 0.03;
+    if (nutrition.waterL < 1.5) m += 0.04;
+    return Math.min(1.25, m);
+  })() : 1.0;
+
+  // Тренировки: высокий объём → выше риск (множитель 1.0-1.15)
+  const trainingMult = training ? (() => {
+    let m = 1.0;
+    const totalMin = training.weeklyMinutes || 0;
+    if (totalMin > 360) m += 0.05;
+    if (totalMin > 480) m += 0.05;
+    if (training.hasHIIT) m += 0.03;
+    if (training.volumeTonnes > 10000) m += 0.02;
+    return Math.min(1.20, m);
+  })() : 1.0;
 
   // Определяем список препаратов
   const drugEntries=input.drugs&&input.drugs.length>0?input.drugs
@@ -556,6 +597,9 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
         const drugDuration = drug.effDuration ?? duration;
         const T_drug=getDurationFactor(drugDuration);
         const m_i=getMiFromLab(mech.id,labValues,D_i,mechWeight);
+        // Генетический множитель для этого механизма
+        const gMult = geneticBoost[mech.id] || 1.0;
+        const m_i_adj = m_i * gMult * nutritionMult * trainingMult;
         const F_mech=mech.requiresF?getFormFactor(drug.form,sys.id):1.0;
         // ТЗ п.10.5: rep5 = w × m × T (без D)
         const D_eff=mech.requiresD?D_i:1.0;
@@ -563,7 +607,7 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
         // mechWeight/4 scales drug contribution: weight=4→1.0, weight=2→0.5, weight=1→0.25
         // concFactor scales per-drug contribution (timeline: drug decaying → lower risk)
         const concMult = drug.concFactor ?? 1.0;
-        mechRaw += mech.weight*(mechWeight/4)*m_i*E_i*concMult;
+        mechRaw += mech.weight*(mechWeight/4)*m_i_adj*E_i*concMult;
       }
 
       // Штраф за отсутствие анализов

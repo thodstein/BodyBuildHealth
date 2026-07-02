@@ -689,6 +689,32 @@ function buildTzInput(state: CalculatorState, supportSubs: string[]): TzSpecInpu
   const duration = Math.max(...allAasWeeks, 12);
   const labValues = extractLabValues(state.labs);
   const firstDrug = drugs[0];
+  // Genetics
+  const genetics = state.genetics ? {
+    cyp19a1: state.genetics.cyp19a1,
+    srd5a2: state.genetics.srd5a2,
+    mthfr: state.genetics.mthfr,
+    ar: state.genetics.arSensitivity,
+  } : undefined;
+  // Nutrition
+  const n = state.nutrition;
+  const nutrition = n ? {
+    proteinPerKg: n.proteinGPerKg || (n.proteinG && state.profile?.weight ? n.proteinG / state.profile.weight : 1.8),
+    fiberG: n.fiberG || 25,
+    omega3G: n.omega3 ? 1.5 : 0.5,
+    sodiumG: (n.sodiumMg || 3000) / 1000,
+    potassiumG: (n.potassiumMg || 3000) / 1000,
+    waterL: n.waterL || 2,
+    calories: n.calories || 2500,
+  } : undefined;
+  // Training
+  const p = state.profile;
+  const training = p ? {
+    hasHIIT: (p.workoutsPerWeek || 3) >= 4,
+    weeklyMinutes: (p.workoutsPerWeek || 3) * (p.avgWorkoutMinutes || 60),
+    volumeTonnes: 8000,
+    lissMinutesPerWeek: 60,
+  } : undefined;
   return {
     drugClass: firstDrug.drugClass, drugName: firstDrug.drugName,
     dose: firstDrug.dose, duration,
@@ -696,6 +722,8 @@ function buildTzInput(state: CalculatorState, supportSubs: string[]): TzSpecInpu
     combinations: Math.max(1, drugs.length),
     labCoverage: Math.min(1.0, 0.3 + Object.keys(labValues).length * 0.04),
     labValues, supportSubstances: supportSubs, drugs,
+    genetics, nutrition, training,
+    courseWeek: state.courseWeek,
   };
 }
 
@@ -937,6 +965,13 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
           const peakVal = peak.organPercents[tzSys];
           if (peakVal !== undefined) finalScores[sys as RiskSystemId] = peakVal;
         }
+        // ── Риск выбранной недели (для отображения) ──
+        const cw = state.courseWeek ?? 1;
+        const selectedWeek = timelineData.find(t => t.week === cw);
+        if (selectedWeek) {
+          // Сохраняем peak для подбора, но показываем selected week в результате
+          // peakWeek остаётся как индикатор худшей недели
+        }
       }
     } catch {}
   }
@@ -947,6 +982,18 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     const jointIds = ['collagen','glucosamine','msm','boswellia','chondroitin_sulfate','hyaluronic_acid','bpc157','tb500','vitamin_c','curcumin','omega3'];
     for (const jid of jointIds) {
       if (!used.has(jid)) jointSubs.push(jid);
+    }
+  }
+
+  // Риск выбранной недели (для отображения — пик = для подбора)
+  const cw = state.courseWeek ?? 1;
+  let selectedWeekRaw: number | undefined;
+  let selectedWeekAfter: number | undefined;
+  if (timelineData && timelineData.length > 0) {
+    const sw = timelineData.find(t => t.week === cw);
+    if (sw) {
+      selectedWeekRaw = sw.overallRaw;
+      selectedWeekAfter = sw.overallAfter;
     }
   }
 
@@ -968,6 +1015,8 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     })),
     timeline: timelineData,
     peakWeek,
+    selectedWeekRaw,
+    selectedWeekAfter,
     timestamp: new Date().toISOString(),
   };
   result.risk.systems = tzResultFinal

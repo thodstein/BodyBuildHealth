@@ -219,6 +219,8 @@ export interface CalculatorResult {
   comparisonBeforeAfter: { system: string; before: number; after: number }[];
   timeline?: TimelineWeekData[];
   peakWeek?: number;
+  selectedWeekRaw?: number;
+  selectedWeekAfter?: number;
   timestamp: string;
 }
 

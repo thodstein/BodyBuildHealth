@@ -16,6 +16,7 @@ type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet'
   | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'analytics' 
   | 'contacts' | 'bp_diary' | 'measurements' | 'diaries' | 'calculator_data' | 'nutrition_planner' | 'biostack_profile';
 type ProfilePage = 'hero' | 'tabs';
+type MainTab = 'info' | 'analytics' | 'contacts';
 
 const SPORT_TYPES = [
   { id: 'bodybuilding', label: 'Бодибилдинг' }, { id: 'powerlifting', label: 'Пауэрлифтинг' },
@@ -387,6 +388,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
   const [tab, setTab] = useState<ProfileTab>('overview');
   const [overTab, setOverTab] = useState('general');
   const [page, setPage] = useState<ProfilePage>('hero');
+  const [mainTab, setMainTab] = useState<MainTab>('info');
   const [labs, setLabs] = useState<LabPoint[]>([]);
   const [editInjury, setEditInjury] = useState<InjuryRecord | null>(null);
   const [weightLog, setWeightLog] = useState<WeightEntry[]>(getWeightLog);
@@ -604,15 +606,24 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
     save({ weakPoints: wp.includes(id) ? wp.filter(x => x !== id) : [...wp, id] });
   };
 
-  const tabs: { id: ProfileTab; label: string }[] = [
-    { id: 'overview', label: 'Обзор' }, { id: 'anthropometry', label: 'Тело' },
+  const tabs: { id: MainTab; label: string }[] = [
+    { id: 'info', label: '📋 Сведения' },
+    { id: 'analytics', label: '📊 Аналитика' },
+    { id: 'contacts', label: '📞 Контакты' },
+  ];
+
+  // Sub-tabs for 'info' mainTab
+  const infoSubTabs: { id: ProfileTab; label: string }[] = [
+    { id: 'overview', label: 'Обзор' },
+    { id: 'anthropometry', label: 'Тело' },
     { id: 'lifestyle', label: 'Образ жизни' },
-    { id: 'diet', label: 'Питание' }, { id: 'injuries', label: 'Травмы' },
-    { id: 'analytics', label: 'Аналитика' },
-    { id: 'diaries', label: 'Дневники' }, { id: 'contacts', label: 'Контакты' },
-    { id: 'calculator_data', label: '🧮 Калькулятор' },
-    { id: 'biostack_profile', label: '🧬 BioStack' },
-    { id: 'nutrition_planner', label: '🥗 Планировщик' },
+    { id: 'diet', label: 'Питание' },
+    { id: 'genetics', label: 'Генетика' },
+    { id: 'injuries', label: 'Травмы' },
+    { id: 'sleep', label: '🛌 Сон' },
+    { id: 'bp_diary', label: '❤️ Давление' },
+    { id: 'measurements', label: '📏 Замеры' },
+    { id: 'diaries', label: '📔 Дневники' },
   ];
 
   const initials = (profile.name || 'П').charAt(0).toUpperCase();
@@ -650,10 +661,8 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
-                { id: 'overview', icon: '📋', title: 'Сведения о пользователе', desc: 'Обзор, антропометрия, сон, образ жизни, питание, травмы', color: '#00e68a' },
-                { id: 'calculator_data', icon: '🧮', title: 'Данные для калькулятора поддержки', desc: 'Вес, анализы, фарма, цели — всё для точного расчёта поддержки', color: '#f59e0b' },
-                { id: 'nutrition_planner', icon: '🥗', title: 'Данные планировщика питания', desc: 'Параметры КБЖУ, аллергии, предпочтения для генерации плана', color: '#22c55e' },
-                { id: 'analytics', icon: '📊', title: 'Аналитика', desc: 'Отчёты для тренера/врача, дневник прогресса, дневники по категориям', color: '#3b82f6' },
+                { id: 'info', icon: '📋', title: 'Сведения о пользователе', desc: 'Персональные данные, образ жизни, питание, генетика, травмы, дневники (вес, давление, сон, замеры)', color: '#00e68a' },
+                { id: 'analytics', icon: '📊', title: 'Аналитика', desc: 'Отчёты по всем модулям, графики прогресса, архив отчётов', color: '#3b82f6' },
                 { id: 'contacts', icon: '📞', title: 'Контакты и друзья', desc: 'Список друзей, шаринг, поддержка и контакты', color: '#8b5cf6' },
               ].map(card => (
                 <button key={card.id} onClick={() => { setPage('tabs'); setTab(card.id as ProfileTab); }} style={{
@@ -683,18 +692,36 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
             }}>← На главную</button>
           </div>
 
-          <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none', marginBottom:10, paddingBottom:2 }}>
+          {/* Main tabs: 3 only */}
+          <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none', marginBottom:6, paddingBottom:2 }}>
             {tabs.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)} style={{
-                padding:'6px 14px', borderRadius:20, fontSize:11, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                background: tab === t.id ? apple.accentDim : apple.glassBg,
-                border: tab === t.id ? apple.accentBorder : apple.glassBorder,
-                color: tab === t.id ? apple.accent : apple.textSecondary,
+              <button key={t.id} onClick={() => { setMainTab(t.id); if (t.id === 'analytics') setTab('analytics'); if (t.id === 'contacts') setTab('contacts'); if (t.id === 'info' && mainTab !== 'info') setTab('overview'); }} style={{
+                padding:'8px 18px', borderRadius:22, fontSize:12, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                background: mainTab === t.id ? apple.accentDim : apple.glassBg,
+                border: mainTab === t.id ? apple.accentBorder : apple.glassBorder,
+                color: mainTab === t.id ? apple.accent : apple.textSecondary,
                 transition:'all 0.2s',
               }}>{t.label}</button>
             ))}
           </div>
 
+          {/* Sub-tabs for 'info' */}
+          {mainTab === 'info' && (
+            <div style={{ display:'flex', gap:3, overflowX:'auto', scrollbarWidth:'none', marginBottom:10, paddingBottom:2 }}>
+              {infoSubTabs.map(t => (
+                <button key={t.id} onClick={() => setTab(t.id)} style={{
+                  padding:'5px 12px', borderRadius:18, fontSize:10, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                  background: tab === t.id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                  border: tab === t.id ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                  color: tab === t.id ? '#00e68a' : 'rgba(255,255,255,0.6)',
+                  transition:'all 0.2s',
+                }}>{t.label}</button>
+              ))}
+            </div>
+          )}
+
+          {/* ═══ INFO TABS (mainTab === 'info') ═══ */}
+          {mainTab === 'info' && (<>
           {/* ═══ OVERVIEW TAB ═══ */}
           {tab === 'overview' && <>
             <InfoErrorBoundary label="Сведения о пользователе">
@@ -1567,8 +1594,11 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
             </div>
           </InfoErrorBoundary>
           )}
+          </>
+          )}
 
-          {/* ═══ ANALYTICS TAB ═══ */}
+          {/* ═══ ANALYTICS TAB (mainTab === 'analytics') ═══ */}
+          {mainTab === 'analytics' && <>
           {tab === 'analytics' && <InfoErrorBoundary label="Аналитика">{(() => {
             const bmiVal = settings.weight && settings.height ? (settings.weight / Math.pow(settings.height / 100, 2)).toFixed(1) : '—';
             const lbmVal = settings.weight && settings.bodyFat ? (settings.weight * (1 - settings.bodyFat / 100)).toFixed(1) : '—';
@@ -2354,8 +2384,10 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
               </div>
             </div></InfoErrorBoundary>
           )}
+          </>}
 
-          {/* ═══ CONTACTS TAB ═══ */}
+          {/* ═══ CONTACTS TAB (mainTab === 'contacts') ═══ */}
+          {mainTab === 'contacts' && <>
           {tab === 'contacts' && (
             <InfoErrorBoundary label="Контакты"><div>
               <div style={glassCard}>
@@ -2435,8 +2467,9 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
               </div>
             </div></InfoErrorBoundary>
           )}
+          </>}
 
-          {/* ═══ CALCULATOR DATA TAB ═══ */}
+          {/* ═══ REMOVED TABS (calculator_data, nutrition_planner, biostack_profile, nutrition_v7) — hidden, code kept for reference ═══ */}
           {tab === 'calculator_data' && (
             <InfoErrorBoundary label="Калькулятор"><div>
               <div style={{ marginBottom:12 }}>

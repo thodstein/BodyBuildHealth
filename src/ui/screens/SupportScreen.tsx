@@ -5507,6 +5507,13 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       <span style={{ fontSize:10, fontWeight:700, color:'#22c55e' }}>{Math.round(riskBefore)}/{Math.round(riskAfter)}</span>
                     </div>
                   </div>
+                  {/* Peak week vs selected week info */}
+                  {calcResult?.peakWeek && calcResult?.selectedWeekRaw !== undefined && (
+                    <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6, display:'flex', justifyContent:'space-between', padding:'4px 8px', borderRadius:6, background:'rgba(0,0,0,0.04)' }}>
+                      <span>📅 Нед. {courseWeekState}: <b style={{color:'#f59e0b'}}>{calcResult.selectedWeekRaw}%</b> → <b style={{color:'#22c55e'}}>{calcResult.selectedWeekAfter ?? 0}%</b></span>
+                      <span>📈 Пик нед. {calcResult.peakWeek}: <b style={{color:'#ef4444'}}>{Math.round(riskBefore)}%</b> → <b style={{color:'#22c55e'}}>{Math.round(riskAfter)}%</b></span>
+                    </div>
+                  )}
                   <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.1)' }}>
                     <span style={{ fontSize:9, color:'var(--text-dim)', minWidth:90 }}>Оценка поддержки</span>
                     <div style={{ flex:1, height:6, borderRadius:3, background:'var(--bg-secondary)', overflow:'hidden', border:'1px solid var(--border)' }}>
