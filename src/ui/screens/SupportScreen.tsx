@@ -5670,11 +5670,27 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   )}
 
                   {/* ===== TIME-BLOCK TABLE (D1) ===== */}
-                  {planResult?.schedule && planResult.schedule.length > 0 && (
+                  {(() => {
+                    const flatSched = calcResult?.schedule || planResult?.schedule || [];
+                    if (!flatSched || flatSched.length === 0) return null;
+                    // Group by timeBlock (support both flat ScheduleItem and grouped format)
+                    const grouped: { timeBlock: string; substances: any[] }[] = [];
+                    for (const item of flatSched) {
+                      if (item.substances) {
+                        // Already grouped format (old engine)
+                        grouped.push(item);
+                      } else if (item.substanceId) {
+                        // Flat format (TZ engine) → group
+                        let g = grouped.find(g => g.timeBlock === item.timeBlock);
+                        if (!g) { g = { timeBlock: item.timeBlock, substances: [] }; grouped.push(g); }
+                        g.substances.push(item);
+                      }
+                    }
+                    return (
                     <div style={{ marginBottom:10 }}>
-                      <div style={{ fontSize:10, fontWeight:700, color:'var(--text-light)', marginBottom:6 }}>📋 План по времени приёма</div>
+                      <div style={{ fontSize:10, fontWeight:700, color:'var(--text-light)', marginBottom:6 }}>📋 План по времени приёма ({flatSched.length} препар.)</div>
                       <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                        {planResult.schedule.map((block: any, bi: number) => (
+                        {grouped.map((block: any, bi: number) => (
                           <div key={bi} style={{ borderRadius:8, overflow:'hidden', border:'1px solid var(--border)' }}>
                             <div style={{ padding:'6px 10px', fontSize:9, fontWeight:700, background:'rgba(0,230,138,0.08)', color:'var(--accent)' }}>
                               {block.timeBlock}
@@ -5704,7 +5720,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         ))}
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
 
                   {/* ===== ADD SUBSTANCE SEARCH ===== */}
                   <div style={{marginBottom:10}}>
