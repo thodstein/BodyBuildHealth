@@ -23,12 +23,12 @@ const SPORT_TYPES = [
   { id: 'crossfit', label: 'Кроссфит' }, { id: 'fitness', label: 'Фитнес' }, { id: 'other', label: 'Другое' },
 ] as const;
 
-const CHRONIC_CONDITIONS = [
+const CHRONIC_CONDITIONS: {id:string;label:string}[] = [
   { id: 'hypertension', label: 'Гипертония' }, { id: 'diabetes', label: 'Диабет' },
   { id: 'asthma', label: 'Астма' }, { id: 'thyroid', label: 'Щитовидная железа' },
   { id: 'heart', label: 'Сердечно-сосудистые' }, { id: 'liver', label: 'Заболевания печени' },
   { id: 'kidney', label: 'Заболевания почек' }, { id: 'joints', label: 'Заболевания суставов' },
-] as const;
+];
 
 const BLOOD_TYPES = [
   { id: 'I+', label: 'I (Rh+)' }, { id: 'I-', label: 'I (Rh−)' },
@@ -78,13 +78,13 @@ const DIET_TYPES = [
   { id: 'mediterranean', label: 'Средиземноморское', icon: '' },
 ] as const;
 
-const ALLERGEN_OPTIONS = [
+const ALLERGEN_OPTIONS: {id:string;label:string}[] = [
   { id: 'dairy', label: 'Молочные' }, { id: 'gluten', label: 'Глютен' }, { id: 'soy', label: 'Соя' },
   { id: 'eggs', label: 'Яйца' }, { id: 'fish', label: 'Рыба' }, { id: 'shellfish', label: 'Морепродукты' },
   { id: 'tree_nuts', label: 'Орехи' }, { id: 'peanuts', label: 'Арахис' },
 ];
 
-const INTOLERANCE_OPTIONS = [
+const INTOLERANCE_OPTIONS: {id:string;label:string}[] = [
   { id: 'lactose', label: 'Лактоза' }, { id: 'fructose', label: 'Фруктоза' },
   { id: 'histamine', label: 'Гистамин' }, { id: 'sorbitol', label: 'Сорбитол' },
 ];
@@ -438,6 +438,11 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
   const [page, setPage] = useState<ProfilePage>('hero');
   const [mainTab, setMainTab] = useState<MainTab>('info');
   const [healthPopup, setHealthPopup] = useState<string | null>(null);
+  const [overPopup, setOverPopup] = useState<string | null>(null);
+  const [anthroPopup, setAnthroPopup] = useState<string | null>(null);
+  const [lifestylePopup, setLifestylePopup] = useState<string | null>(null);
+  const [dietPopup, setDietPopup] = useState<string | null>(null);
+  const [geneticsPopup, setGeneticsPopup] = useState<string | null>(null);
   const [labs, setLabs] = useState<LabPoint[]>([]);
   const [editInjury, setEditInjury] = useState<InjuryRecord | null>(null);
   const [weightLog, setWeightLog] = useState<WeightEntry[]>(getWeightLog);
@@ -864,42 +869,60 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                     ))}
                   </div>
                 </div>
-                <div style={glassCard}>
-                  <div style={sectionLabel}>Основная информация</div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                    <div><span style={sectionLabel}>Имя</span><input style={appleInput} value={profile.name} onChange={e => updateProfile({ name: e.target.value })} /></div>
-                    <div><span style={sectionLabel}>Email</span><input style={appleInput} value={settings.email ?? ''} disabled /></div>
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10 }}>
-                    <div><span style={sectionLabel}>Возраст</span><input style={appleInput} type="number" value={settings.age || ''} onChange={e => save({ age: parseFloat(e.target.value) || 0 })} placeholder="30" /></div>
-                    <div><span style={sectionLabel}>Пол</span><div style={{ display:'flex', gap:6 }}><button style={pillBtn(settings.sex === 'male')} onClick={() => save({ sex: 'male' })}>Муж</button><button style={pillBtn(settings.sex === 'female')} onClick={() => save({ sex: 'female' })}>Жен</button></div></div>
-                  </div>
-                </div>
-                <div style={glassCard}>
-                  <div style={sectionLabel}>Расширенная информация</div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                    <div><span style={sectionLabel}>Вид спорта</span><div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>{SPORT_TYPES.map(st => <button key={st.id} style={pillBtn((settings.sportType ?? 'bodybuilding') === st.id)} onClick={() => save({ sportType: st.id })}>{st.label}</button>)}</div></div>
-                    <div><span style={sectionLabel}>Стаж (лет)</span><input style={appleInput} type="number" value={(settings.trainingExperience ?? 0) || ''} onChange={e => save({ trainingExperience: parseFloat(e.target.value) || 0 })} /></div>
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10 }}>
-                    <div><span style={sectionLabel}>Группа крови</span><select style={appleInput} value={settings.bloodType ?? ''} onChange={e => save({ bloodType: e.target.value })}><option value="">—</option>{BLOOD_TYPES.map(bt => <option key={bt.id} value={bt.id}>{bt.label}</option>)}</select></div>
-                    <div><span style={sectionLabel}>Аллергии</span><input style={appleInput} value={settings.allergyNotes ?? ''} onChange={e => save({ allergyNotes: e.target.value })} /></div>
-                  </div>
-                  <div style={{ marginTop:10 }}>
-                    <span style={sectionLabel}>Хронические заболевания</span>
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:4 }}>{CHRONIC_CONDITIONS.map(c => { const a = (settings.chronicConditions ?? []).includes(c.id); return <button key={c.id} onClick={() => { const cur = settings.chronicConditions ?? []; save({ chronicConditions: a ? cur.filter(x => x !== c.id) : [...cur, c.id] }); }} style={pillBtn(a)}>{c.label}</button>; })}</div>
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10 }}>
-                    <div><span style={sectionLabel}>Экстренный контакт</span><input style={appleInput} value={settings.emergencyName ?? ''} onChange={e => save({ emergencyName: e.target.value })} placeholder="Имя" /></div>
-                    <div><span style={sectionLabel}>Экстренный телефон</span><input style={appleInput} value={settings.emergencyPhone ?? ''} onChange={e => save({ emergencyPhone: e.target.value })} placeholder="Телефон" /></div>
-                  </div>
-                </div>
-                <div style={glassCard}>
-                  <div style={sectionLabel}>Фаза курса</div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>{COURSE_PHASES.map(p => <button key={p.id} style={pillBtn((settings.phase ?? 'baseline') === p.id)} onClick={() => save({ phase: p.id })}>{p.label}</button>)}</div>
-                  {settings.courseStartDate && <div style={{ marginTop:10 }}><span style={sectionLabel}>Дата начала курса</span><input style={appleInput} type="date" value={settings.courseStartDate} onChange={e => save({ courseStartDate: e.target.value })} /></div>}
-                  {!settings.courseStartDate && settings.phase && settings.phase !== 'baseline' && <button style={{ ...pillBtn(false), marginTop:10 }} onClick={() => save({ courseStartDate: new Date().toISOString().slice(0, 10) })}>Указать дату начала</button>}
-                </div>
+                {(() => {
+                  const op = overPopup;
+                  const s = settings;
+                  const cards: { id:string; icon:string; title:string; color:string; summary:(s:any)=>string; fields:(s:any)=>React.ReactNode }[] = [
+                    { id:'basic', icon:'👤', title:'Основная информация', color:'#60a5fa',
+                      summary: s => `${s?.name||profile.name||'—'} • ${s?.age||'—'} лет • ${s?.sex==='male'?'Муж':s?.sex==='female'?'Жен':'—'}`,
+                      fields: s => <>
+                        <HealthNumber label="Возраст" value={s?.age||''} onChange={v => save({age:parseInt(v)||0})} placeholder="30" />
+                        <div style={{marginTop:6}}><HealthBool label="Мужской" active={s?.sex==='male'} onClick={() => save({sex:'male'})} /><span style={{display:'inline-block',width:6}}/><HealthBool label="Женский" active={s?.sex==='female'} onClick={() => save({sex:'female'})} /></div>
+                      </>
+                    },
+                    { id:'extended', icon:'📋', title:'Расширенная информация', color:'#34d399',
+                      summary: s => `${SPORT_TYPES.find(st=>st.id===(s?.sportType||'bodybuilding'))?.label||'—'} • Стаж ${s?.trainingExperience||'—'} лет${s?.bloodType ? ' • '+(BLOOD_TYPES.find(b=>b.id===s.bloodType)?.label||'') : ''}`,
+                      fields: s => <>
+                        <div style={{marginBottom:6}}><div style={{fontSize:9,color:'rgba(255,255,255,0.4)',marginBottom:3}}>Вид спорта</div>
+                          <div style={{display:'flex',flexWrap:'wrap',gap:3}}>{SPORT_TYPES.map(st => <HealthBool key={st.id} label={st.label} active={(s?.sportType||'bodybuilding')===st.id} onClick={() => save({sportType:st.id})} />)}</div></div>
+                        <HealthNumber label="Стаж (лет)" value={s?.trainingExperience||''} onChange={v => save({trainingExperience:parseInt(v)||0})} />
+                        <div style={{marginTop:6,display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                          <div><div style={{fontSize:9,color:'rgba(255,255,255,0.4)',marginBottom:3}}>Группа крови</div>
+                            <div style={{display:'flex',flexWrap:'wrap',gap:3}}>{BLOOD_TYPES.map(bt => <HealthBool key={bt.id} label={bt.label} active={s?.bloodType===bt.id} onClick={() => save({bloodType:bt.id})} />)}</div></div>
+                          <HealthNumber label="Аллергии (заметки)" value={s?.allergyNotes||''} onChange={v => save({allergyNotes:v})} />
+                        </div>
+                        <div style={{marginTop:6}}><div style={{fontSize:9,color:'rgba(255,255,255,0.4)',marginBottom:3}}>Хронические заболевания</div>
+                          <div style={{display:'flex',flexWrap:'wrap',gap:3}}>{CHRONIC_CONDITIONS.map(c => {const a=(s?.chronicConditions??[]).includes(c.id); return <HealthBool key={c.id} label={c.label} active={a} onClick={() => {const cur=s?.chronicConditions??[]; save({chronicConditions:a?cur.filter((x:string)=>x!==c.id):[...cur,c.id]})}} />})}</div></div>
+                        <div style={{marginTop:6,display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                          <HealthNumber label="Экстренный контакт" value={s?.emergencyName||''} onChange={v => save({emergencyName:v})} />
+                          <HealthNumber label="Экстренный телефон" value={s?.emergencyPhone||''} onChange={v => save({emergencyPhone:v})} />
+                        </div>
+                      </>
+                    },
+                    { id:'course', icon:'💉', title:'Фаза курса', color:'#f87171',
+                      summary: s => `${COURSE_PHASES.find(p=>p.id===(s?.phase||'baseline'))?.label||'—'}${s?.courseStartDate?' • с '+s.courseStartDate:''}`,
+                      fields: s => <>
+                        <div style={{marginBottom:6}}><div style={{fontSize:9,color:'rgba(255,255,255,0.4)',marginBottom:3}}>Фаза</div>
+                          <div style={{display:'flex',flexWrap:'wrap',gap:3}}>{COURSE_PHASES.map(p => <HealthBool key={p.id} label={p.label} active={(s?.phase||'baseline')===p.id} onClick={() => save({phase:p.id})} />)}</div></div>
+                        {s?.courseStartDate ? <HealthNumber label="Дата начала курса" value={s.courseStartDate} onChange={v => save({courseStartDate:v})} /> : s?.phase && s.phase!=='baseline' ? <button onClick={() => save({courseStartDate:new Date().toISOString().slice(0,10)})} style={{marginTop:4,padding:'6px 12px',borderRadius:8,border:'1px solid rgba(248,113,113,0.3)',background:'rgba(248,113,113,0.1)',color:'#fca5a5',cursor:'pointer',fontSize:10,fontWeight:600}}>📅 Указать дату начала</button> : null}
+                      </>
+                    },
+                  ];
+                  return <>{cards.map(c => {
+                    const open = op === c.id;
+                    return <div key={c.id} style={{...glassCard,cursor:'pointer',borderColor:open?c.color:undefined}} onClick={() => setOverPopup(open?null:c.id)}>
+                      <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <span style={{fontSize:18}}>{c.icon}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:12,fontWeight:700,color:'#fff'}}>{c.title}</div>
+                          <div style={{fontSize:9,color:'rgba(255,255,255,0.4)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.summary(s)}</div>
+                        </div>
+                        <span style={{fontSize:12,color:'rgba(255,255,255,0.3)',transition:'transform .2s',transform:open?'rotate(180deg)':'rotate(0deg)'}}>▾</span>
+                      </div>
+                      {open && <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid rgba(255,255,255,0.06)'}}>{c.fields(s)}</div>}
+                    </div>;
+                  })}</>;
+                })()}
               </>}
               {overTab === 'nutrition' && <>
                 <div style={glassCard}>
@@ -1023,48 +1046,45 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
               )}
             </div>
 
-            <div style={glassCard}>
-              <div style={sectionLabel}>Основные параметры</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                <div>
-                  <span style={sectionLabel}>Рост (см)</span>
-                  <input style={appleInput} type="number" value={settings.height || ''} onChange={e => save({ height: parseFloat(e.target.value) || 0 })} placeholder="175" />
-                </div>
-                <div>
-                  <span style={sectionLabel}>Вес (кг)</span>
-                  <input style={appleInput} type="number" step="0.1" value={settings.weight} onChange={e => save({ weight: parseFloat(e.target.value) || 0 })} placeholder="80" />
-                </div>
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10 }}>
-                <div>
-                  <span style={sectionLabel}>% жира (ручной)</span>
-                  <input style={appleInput} type="number" step="0.1" value={settings.bodyFat || ''} onChange={e => save({ bodyFat: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="15" />
-                </div>
-                <div>
-                  <span style={sectionLabel}>Пол</span>
-                  <div style={{ display:'flex', gap:6 }}>
-                    <button style={pillBtn(settings.sex === 'male')} onClick={() => save({ sex: 'male' })}>М</button>
-                    <button style={pillBtn(settings.sex === 'female')} onClick={() => save({ sex: 'female' })}>Ж</button>
+            {(() => {
+              const ap = anthroPopup;
+              const s = settings;
+              const cards: { id:string; icon:string; title:string; color:string; summary:(s:any)=>string; fields:(s:any)=>React.ReactNode }[] = [
+                { id:'body', icon:'⚖️', title:'Основные параметры', color:'#34d399',
+                  summary: s => `${s?.height||'—'} см • ${s?.weight||'—'} кг • ${s?.bodyFat?s.bodyFat+'% жира':''} • ${s?.sex==='male'?'Муж':s?.sex==='female'?'Жен':'—'}`,
+                  fields: s => <>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                      <HealthNumber label="Рост (см)" value={s?.height||''} onChange={v => save({height:parseInt(v)||0})} placeholder="175" />
+                      <HealthNumber label="Вес (кг)" value={s?.weight||''} onChange={v => save({weight:parseFloat(v)||0})} placeholder="80" />
+                      <HealthNumber label="% жира (ручной)" value={s?.bodyFat||''} onChange={v => save({bodyFat:v?parseFloat(v)||0:undefined})} placeholder="15" />
+                      <div><div style={{fontSize:9,color:'rgba(255,255,255,0.4)',marginBottom:3}}>Пол</div><div style={{display:'flex',gap:4}}><HealthBool label="М" active={s?.sex==='male'} onClick={()=>save({sex:'male'})} /><HealthBool label="Ж" active={s?.sex==='female'} onClick={()=>save({sex:'female'})} /></div></div>
+                    </div>
+                  </>
+                },
+                { id:'girth', icon:'📏', title:'Обхваты (см)', color:'#60a5fa',
+                  summary: s => {const items=[{k:'waistCm',l:'Талия'},{k:'neckCm',l:'Шея'},{k:'chestCm',l:'Грудь'},{k:'hipCm',l:'Бёдра'},{k:'forearmCm',l:'Предплечье'},{k:'bicepCm',l:'Бицепс'},{k:'thighCm',l:'Бедро'}].filter(x=>(s||{})[x.k]); return items.length?items.map(x=>x.l+': '+(s||{})[x.k]+'см').join(', '):'Не заполнены';},
+                  fields: s => <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
+                    {[{k:'waistCm',l:'Талия'},{k:'neckCm',l:'Шея'},{k:'chestCm',l:'Грудь'},{k:'hipCm',l:'Бёдра'},{k:'forearmCm',l:'Предплечье'},{k:'bicepCm',l:'Бицепс'},{k:'thighCm',l:'Бедро'}].map(c =>
+                      <HealthNumber key={c.k} label={c.l} value={(s||{})[c.k]??''} onChange={v => save({[c.k]:v?parseFloat(v)||0:undefined} as any)} />
+                    )}
                   </div>
-                </div>
-              </div>
-            </div>
-
-            <div style={glassCard}>
-              <div style={sectionLabel}>Обхваты (см)</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-                {[
-                  { k:'waistCm', l:'Талия' }, { k:'neckCm', l:'Шея' }, { k:'chestCm', l:'Грудь' },
-                  { k:'hipCm', l:'Бёдра' }, { k:'forearmCm', l:'Предплечье' }, { k:'bicepCm', l:'Бицепс' },
-                  { k:'thighCm', l:'Бедро' }
-                ].map(c => (
-                  <div key={c.k}>
-                    <span style={{ ...sectionLabel, fontSize:10 }}>{c.l}</span>
-                    <input style={{ ...appleInput, fontSize:13, padding:'8px 10px' }} type="number" step="0.5" value={(settings as any)[c.k] ?? ''} onChange={e => save({ [c.k]: e.target.value ? parseFloat(e.target.value) || 0 : undefined } as any)} />
+                },
+              ];
+              return <>{cards.map(c => {
+                const open = ap === c.id;
+                return <div key={c.id} style={{...glassCard,cursor:'pointer',borderColor:open?c.color:undefined}} onClick={() => setAnthroPopup(open?null:c.id)}>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{fontSize:18}}>{c.icon}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:700,color:'#fff'}}>{c.title}</div>
+                      <div style={{fontSize:9,color:'rgba(255,255,255,0.4)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.summary(s)}</div>
+                    </div>
+                    <span style={{fontSize:12,color:'rgba(255,255,255,0.3)',transition:'transform .2s',transform:open?'rotate(180deg)':'rotate(0deg)'}}>▾</span>
                   </div>
-                ))}
-              </div>
-            </div>
+                  {open && <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid rgba(255,255,255,0.06)'}}>{c.fields(s)}</div>}
+                </div>;
+              })}</>;
+            })()}
 
             {/* Weight history with gradient bars */}
             {weightLog.length > 1 && (
@@ -1104,126 +1124,120 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
           {/* ═══ LIFESTYLE TAB ═══ */}
           {tab === 'lifestyle' && (
             <InfoErrorBoundary label="Образ жизни">
-              <div style={glassCard}>
-                <div style={sectionLabel}>Стресс и усталость</div>
-                <div style={{ marginBottom:12 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                    <span style={{ fontSize:12, color: apple.textSecondary }}>Стресс</span>
-                    <span style={{ fontSize:14, fontWeight:700, color: (settings.baselineStressLevel ?? 3) <= 3 ? apple.accent : (settings.baselineStressLevel ?? 3) <= 6 ? '#f59e0b' : '#ef4444' }}>{settings.baselineStressLevel ?? 3}/10</span>
+            {(() => {
+              const lp = lifestylePopup;
+              const s = settings;
+              const cd = calcData||{};
+              const cards: { id:string; icon:string; title:string; color:string; summary:(s:any,cd:any)=>string; fields:(s:any,cd:any)=>React.ReactNode }[] = [
+                { id:'stress', icon:'😰', title:'Стресс и усталость', color:'#f87171',
+                  summary: (s) => `Стресс: ${s?.baselineStressLevel??3}/10 • Усталость: ${s?.fatigueLevel??3}/10`,
+                  fields: (s) => <>
+                    {['baselineStressLevel','fatigueLevel'].map(k => {
+                      const label = k==='baselineStressLevel'?'Стресс':'Усталость';
+                      const val = s?.[k]??3;
+                      return <div key={k} style={{marginBottom:6}}>
+                        <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
+                          <span style={{fontSize:10,color:'rgba(255,255,255,0.5)'}}>{label}</span>
+                          <span style={{fontSize:11,fontWeight:700,color:val<=3?'#00e68a':val<=6?'#f59e0b':'#ef4444'}}>{val}/10</span>
+                        </div>
+                        <input type="range" min={1} max={10} value={val} onChange={e => save({[k]:parseFloat(e.target.value)||0})} style={{width:'100%',accentColor:'#00e68a'}} />
+                      </div>;
+                    })}
+                  </>
+                },
+                { id:'activity', icon:'🏃', title:'Активность', color:'#34d399',
+                  summary: (s) => `Шаги: ${s?.dailySteps??6000} • Вода: ${s?.dailyWaterLiters??2}л • Тренировки: ${s?.workoutsPerWeek||'—'}/${s?.avgWorkoutMinutes||'—'}мин`,
+                  fields: (s) => <>
+                    {[{k:'dailySteps',l:'Шаги/день',max:30000,step:500},{k:'dailyWaterLiters',l:'Вода/день (л)',max:6,step:0.1}].map(({k,l,max,step}) => {
+                      const val = s?.[k]??(k==='dailySteps'?6000:2);
+                      return <div key={k} style={{marginBottom:6}}>
+                        <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
+                          <span style={{fontSize:10,color:'rgba(255,255,255,0.5)'}}>{l}</span>
+                          <span style={{fontSize:11,fontWeight:700,color:'#00e68a'}}>{val}</span>
+                        </div>
+                        <input type="range" min={0} max={max} step={step} value={val} onChange={e => save({[k]:parseFloat(e.target.value)||0})} style={{width:'100%',accentColor:'#00e68a'}} />
+                      </div>;
+                    })}
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                      <HealthNumber label="Тренировок/нед" value={s?.workoutsPerWeek||''} onChange={v => save({workoutsPerWeek:parseFloat(v)||0})} />
+                      <HealthNumber label="Мин/тренировку" value={s?.avgWorkoutMinutes||''} onChange={v => save({avgWorkoutMinutes:parseFloat(v)||0})} />
+                    </div>
+                  </>
+                },
+                { id:'levels', icon:'📊', title:'Уровни и опыт', color:'#8b5cf6',
+                  summary: (s) => `${TRAINING_LEVELS.find(l=>l.id===(s?.trainingLevel||'intermediate'))?.label||'—'} • ${PHARMA_EXPERIENCE.find(e=>e.id===(s?.pharmaExperience||'none'))?.label||'—'}`,
+                  fields: (s) => <>
+                    <div style={{marginBottom:6}}><div style={{fontSize:9,color:'rgba(255,255,255,0.4)',marginBottom:3}}>Тренировочный уровень</div>
+                      <div style={{display:'flex',flexWrap:'wrap',gap:3}}>{TRAINING_LEVELS.map(l => <HealthBool key={l.id} label={l.label} active={(s?.trainingLevel||'intermediate')===l.id} onClick={()=>save({trainingLevel:l.id as any})} />)}</div></div>
+                    <div><div style={{fontSize:9,color:'rgba(255,255,255,0.4)',marginBottom:3}}>Фармакологический опыт</div>
+                      <div style={{display:'flex',flexWrap:'wrap',gap:3}}>{PHARMA_EXPERIENCE.map(e => <HealthBool key={e.id} label={e.label} active={(s?.pharmaExperience||'none')===e.id} onClick={()=>save({pharmaExperience:e.id as any})} />)}</div></div>
+                  </>
+                },
+                { id:'goals', icon:'🎯', title:'Цель', color:'#fbbf24',
+                  summary: (s) => GOALS.find(g=>g.id===(s?.primaryGoal||s?.goal||''))?.label||'Не выбрана',
+                  fields: (s) => <div style={{display:'flex',flexWrap:'wrap',gap:3}}>{GOALS.map(g => <HealthBool key={g.id} label={g.label} active={(s?.primaryGoal||s?.goal||'')===g.id} onClick={()=>save({primaryGoal:g.id as any,goal:g.id})} />)}</div>
+                },
+                { id:'weakpoints', icon:'💪', title:'Отстающие группы', color:'#f97316',
+                  summary: (s) => {const wp=s?.weakPoints??[]; return wp.length?wp.map((id:string)=>MUSCLE_GROUPS_FULL.find(m=>m.id===id)?.label||id).join(', '):'Не указаны';},
+                  fields: (s) => <div style={{display:'flex',flexWrap:'wrap',gap:3}}>{MUSCLE_GROUPS_FULL.map(m => <HealthBool key={m.id} label={m.label} active={(s?.weakPoints??[]).includes(m.id)} onClick={()=>toggleWeakPoint(m.id)} />)}</div>
+                },
+                { id:'supps', icon:'💊', title:'Принимаю: БАДы', color:'#38bdf8',
+                  summary: (s) => {const sups=s?.currentSupplements??[]; return sups.length?sups.map((x:any)=>x.name||'?').join(', '):'Нет';},
+                  fields: (s) => <div>
+                    {(s?.currentSupplements??[]).map((sup:any,i:number) => <div key={sup.id} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                      <span style={{flex:1,fontSize:10,color:'rgba(255,255,255,0.7)'}}>{sup.name||'?'} — {sup.doseMg} {sup.doseUnit}</span>
+                      <button onClick={()=>save({currentSupplements:(s?.currentSupplements??[]).filter((_:any,j:number)=>j!==i)})} style={{padding:'2px 8px',borderRadius:6,border:'1px solid rgba(239,68,68,0.3)',background:'transparent',color:'#ef4444',fontSize:9,cursor:'pointer'}}>✕</button>
+                    </div>)}
+                    <button onClick={() => {const ns:SupplementEntry={id:crypto.randomUUID(),name:'',doseMg:0,doseUnit:'mg'}; save({currentSupplements:[...(s?.currentSupplements??[]),ns]});}} style={{marginTop:4,padding:'6px 12px',borderRadius:8,border:'1px solid rgba(56,189,248,0.3)',background:'rgba(56,189,248,0.1)',color:'#7dd3fc',cursor:'pointer',fontSize:10,fontWeight:600}}>+ Добавить БАД</button>
                   </div>
-                  <input style={appleSlider} type="range" min="1" max="10" value={settings.baselineStressLevel ?? 3} onChange={e => save({ baselineStressLevel: parseFloat(e.target.value) || 0 })} />
-                </div>
-                <div>
-                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                    <span style={{ fontSize:12, color: apple.textSecondary }}>Усталость</span>
-                    <span style={{ fontSize:14, fontWeight:700, color: (settings.fatigueLevel ?? 3) <= 3 ? apple.accent : (settings.fatigueLevel ?? 3) <= 6 ? '#f59e0b' : '#ef4444' }}>{settings.fatigueLevel ?? 3}/10</span>
+                },
+                { id:'meds', icon:'💉', title:'Принимаю: Аптека', color:'#a78bfa',
+                  summary: (s) => {const meds=s?.currentMedications??[]; return meds.length?meds.map((x:any)=>x.name||'?').join(', '):'Нет';},
+                  fields: (s) => <div>
+                    {(s?.currentMedications??[]).map((med:any,i:number) => <div key={med.id} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                      <span style={{flex:1,fontSize:10,color:'rgba(255,255,255,0.7)'}}>{med.name||'?'} — {med.doseMg} {med.doseUnit} ({med.frequency})</span>
+                      <button onClick={()=>save({currentMedications:(s?.currentMedications??[]).filter((_:any,j:number)=>j!==i)})} style={{padding:'2px 8px',borderRadius:6,border:'1px solid rgba(239,68,68,0.3)',background:'transparent',color:'#ef4444',fontSize:9,cursor:'pointer'}}>✕</button>
+                    </div>)}
+                    <button onClick={() => {const nm:MedicationEntry={id:crypto.randomUUID(),name:'',doseMg:0,doseUnit:'mg',frequency:'daily'}; save({currentMedications:[...(s?.currentMedications??[]),nm]});}} style={{marginTop:4,padding:'6px 12px',borderRadius:8,border:'1px solid rgba(167,139,250,0.3)',background:'rgba(167,139,250,0.1)',color:'#c4b5fd',cursor:'pointer',fontSize:10,fontWeight:600}}>+ Добавить препарат</button>
                   </div>
-                  <input style={appleSlider} type="range" min="1" max="10" value={settings.fatigueLevel ?? 3} onChange={e => save({ fatigueLevel: parseFloat(e.target.value) || 0 })} />
-                </div>
-              </div>
-
-              <div style={glassCard}>
-                <div style={sectionLabel}>Активность</div>
-                <div style={{ marginBottom:12 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                    <span style={{ fontSize:12, color: apple.textSecondary }}>Шаги/день</span>
-                    <span style={{ fontSize:14, fontWeight:700, color: apple.accent }}>{settings.dailySteps ?? 6000}</span>
+                },
+                { id:'neuropsych', icon:'🧠', title:'Нейро + Псих (калькулятор)', color:'#e879f9',
+                  summary: (cd) => `Дофамин: ${cd.neuro?.dopamineScore||1} • Серотонин: ${cd.neuro?.serotoninScore||1} • Страх потери: ${cd.psych?.fearOfLoss||1}`,
+                  fields: (cd) => <>
+                    {[
+                      {k:'neuro.dopamineScore',l:'Дофамин',g:'neuro',f:'dopamineScore'},
+                      {k:'neuro.serotoninScore',l:'Серотонин',g:'neuro',f:'serotoninScore'},
+                      {k:'neuro.aggressionScore',l:'Агрессия',g:'neuro',f:'aggressionScore'},
+                      {k:'psych.fearOfLoss',l:'Страх потери',g:'psych',f:'fearOfLoss'},
+                      {k:'psych.mirrorObsession',l:'Одержимость зеркалом',g:'psych',f:'mirrorObsession'},
+                      {k:'psych.apathyOffCycle',l:'Апатия вне курса',g:'psych',f:'apathyOffCycle'},
+                    ].map(f => {
+                      const val = cd[f.g]?.[f.f]||1;
+                      return <div key={f.k} style={{marginBottom:4}}>
+                        <div style={{fontSize:9,color:'rgba(255,255,255,0.4)',marginBottom:2}}>{f.l}</div>
+                        <div style={{display:'flex',gap:3}}>{[1,2,3,4,5].map(n => 
+                          <button key={n} onClick={() => upCalc(f.k,n)} style={{flex:1,padding:'5px 0',borderRadius:6,border:'none',cursor:'pointer',fontSize:10,fontWeight:700,background:val===n?'#00e68a':'rgba(255,255,255,0.06)',color:val===n?'#000':'rgba(255,255,255,0.4)'}}>{n}</button>
+                        )}</div>
+                      </div>;
+                    })}
+                  </>
+                },
+              ];
+              return <>{cards.map(c => {
+                const open = lp === c.id;
+                return <div key={c.id} style={{...glassCard,cursor:'pointer',borderColor:open?c.color:undefined}} onClick={() => setLifestylePopup(open?null:c.id)}>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{fontSize:18}}>{c.icon}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:700,color:'#fff'}}>{c.title}</div>
+                      <div style={{fontSize:9,color:'rgba(255,255,255,0.4)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.summary(s,cd)}</div>
+                    </div>
+                    <span style={{fontSize:12,color:'rgba(255,255,255,0.3)',transition:'transform .2s',transform:open?'rotate(180deg)':'rotate(0deg)'}}>▾</span>
                   </div>
-                  <input style={appleSlider} type="range" min="0" max="30000" step="500" value={settings.dailySteps ?? 6000} onChange={e => save({ dailySteps: parseFloat(e.target.value) || 0 })} />
-                </div>
-                <div style={{ marginBottom:12 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                    <span style={{ fontSize:12, color: apple.textSecondary }}>Вода/день (л)</span>
-                    <span style={{ fontSize:14, fontWeight:700, color: apple.accent }}>{settings.dailyWaterLiters ?? 2}</span>
-                  </div>
-                  <input style={appleSlider} type="range" min="0" max="6" step="0.1" value={settings.dailyWaterLiters ?? 2} onChange={e => save({ dailyWaterLiters: parseFloat(e.target.value) || 0 })} />
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                  <div><span style={sectionLabel}>Тренировок/нед</span><input style={appleInput} type="number" min="0" max="7" value={settings.workoutsPerWeek || ''} onChange={e => save({ workoutsPerWeek: parseFloat(e.target.value) || 0 })} /></div>
-                  <div><span style={sectionLabel}>Мин/тренировку</span><input style={appleInput} type="number" min="15" max="180" value={settings.avgWorkoutMinutes || ''} onChange={e => save({ avgWorkoutMinutes: parseFloat(e.target.value) || 0 })} /></div>
-                </div>
-              </div>
-
-              <div style={glassCard}>
-                <div style={sectionLabel}>Уровни и опыт</div>
-                <div style={{ marginBottom:10 }}>
-                  <span style={sectionLabel}>Тренировочный уровень</span>
-                  <div style={{ display:'flex', gap:5, marginTop:4 }}>
-                    {TRAINING_LEVELS.map(l => <button key={l.id} style={pillBtn((settings.trainingLevel ?? 'intermediate') === l.id)} onClick={() => save({ trainingLevel: l.id as any })}>{l.label}</button>)}
-                  </div>
-                </div>
-                <div>
-                  <span style={sectionLabel}>Фармакологический опыт</span>
-                  <div style={{ display:'flex', gap:5, marginTop:4 }}>
-                    {PHARMA_EXPERIENCE.map(e => <button key={e.id} style={pillBtn((settings.pharmaExperience ?? 'none') === e.id)} onClick={() => save({ pharmaExperience: e.id as any })}>{e.label}</button>)}
-                  </div>
-                </div>
-              </div>
-
-              <div style={glassCard}>
-                <div style={sectionLabel}>Цель</div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginTop:2 }}>
-                  {GOALS.map(g => <button key={g.id} style={pillBtn((settings.primaryGoal ?? settings.goal ?? '') === g.id)} onClick={() => save({ primaryGoal: g.id as any, goal: g.id })}>{g.label}</button>)}
-                </div>
-              </div>
-
-              <div style={glassCard}>
-                <div style={sectionLabel}>Отстающие группы</div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginTop:4 }}>
-                  {MUSCLE_GROUPS_FULL.map(m => (
-                    <button key={m.id} style={pillBtn((settings.weakPoints ?? []).includes(m.id))} onClick={() => toggleWeakPoint(m.id)}>{m.label}</button>
-                  ))}
-                </div>
-              </div>
-
-              <div style={glassCard}>
-                <div style={sectionLabel}>Принимаю: БАДы</div>
-                {(settings.currentSupplements ?? []).map((sup, i) => (
-                  <div key={sup.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 0', borderBottom: apple.glassBorder }}>
-                    <span style={{ flex:1, fontSize:12, color: apple.textSecondary }}>{sup.name} — {sup.doseMg} {sup.doseUnit}</span>
-                    <button style={{
-                      padding:'3px 8px', borderRadius:6, border:'1px solid rgba(239,68,68,0.3)', background:'transparent', color:'#ef4444', fontSize:10, cursor:'pointer',
-                    }} onClick={() => save({ currentSupplements: (settings.currentSupplements ?? []).filter((_, j) => j !== i) })}>Уд.</button>
-                  </div>
-                ))}
-                <button style={{ ...pillBtn(false), marginTop:8, width:'100%' }} onClick={() => {
-                  const ns: SupplementEntry = { id: crypto.randomUUID(), name: '', doseMg: 0, doseUnit: 'mg' };
-                  save({ currentSupplements: [...(settings.currentSupplements ?? []), ns] });
-                }}>+ Добавить БАД</button>
-              </div>
-
-              <div style={glassCard}>
-                <div style={sectionLabel}>Принимаю: Аптека</div>
-                {(settings.currentMedications ?? []).map((med, i) => (
-                  <div key={med.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 0', borderBottom: apple.glassBorder }}>
-                    <span style={{ flex:1, fontSize:12, color: apple.textSecondary }}>{med.name} — {med.doseMg} {med.doseUnit} ({med.frequency})</span>
-                    <button style={{
-                      padding:'3px 8px', borderRadius:6, border:'1px solid rgba(239,68,68,0.3)', background:'transparent', color:'#ef4444', fontSize:10, cursor:'pointer',
-                    }} onClick={() => save({ currentMedications: (settings.currentMedications ?? []).filter((_, j) => j !== i) })}>Уд.</button>
-                  </div>
-                ))}
-                <button style={{ ...pillBtn(false), marginTop:8, width:'100%' }} onClick={() => {
-                  const nm: MedicationEntry = { id: crypto.randomUUID(), name: '', doseMg: 0, doseUnit: 'mg', frequency: 'daily' };
-                  save({ currentMedications: [...(settings.currentMedications ?? []), nm] });
-                }}>+ Добавить препарат</button>
-              </div>
-
-              <div style={glassCard}>
-                <div style={sectionLabel}>🧠 Нейро + 🧘 Псих (калькулятор)</div>
-                {[
-                  {k:'neuro.dopamineScore',l:'Дофамин',v:calcData.neuro?.dopamineScore||1},
-                  {k:'neuro.serotoninScore',l:'Серотонин',v:calcData.neuro?.serotoninScore||1},
-                  {k:'neuro.aggressionScore',l:'Агрессия',v:calcData.neuro?.aggressionScore||1},
-                  {k:'psych.fearOfLoss',l:'Страх потери',v:calcData.psych?.fearOfLoss||1},
-                  {k:'psych.mirrorObsession',l:'Одержимость зеркалом',v:calcData.psych?.mirrorObsession||1},
-                  {k:'psych.apathyOffCycle',l:'Апатия вне курса',v:calcData.psych?.apathyOffCycle||1},
-                ].map(f=><div key={f.k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:3}}>
-                  <span style={{fontSize:9,color:'rgba(255,255,255,0.6)'}}>{f.l}</span>
-                  <div style={{display:'flex',gap:2}}>{[1,2,3,4,5].map(n=>
-                    <button key={n} onClick={()=>upCalc(f.k,n)} style={{width:22,height:22,borderRadius:11,border:'none',cursor:'pointer',fontSize:9,fontWeight:700,background:f.v===n?'#00e68a':'rgba(255,255,255,0.06)',color:f.v===n?'#000':'rgba(255,255,255,0.4)'}}>{n}</button>
-                  )}</div>
-                </div>)}
-              </div>
+                  {open && <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid rgba(255,255,255,0.06)'}}>{c.fields(s,cd)}</div>}
+                </div>;
+              })}</>;
+            })()}
             </InfoErrorBoundary>
           )}
 
@@ -1474,74 +1488,71 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
           {/* ═══ DIET TAB ═══ */}
           {tab === 'diet' && (
             <InfoErrorBoundary label="Питание"><div>
-              <div style={glassCard}>
-                <div style={sectionLabel}>Тип питания</div>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(110px, 1fr))', gap:6 }}>
-                  {DIET_TYPES.map(dt => (
-                    <button key={dt.id} onClick={() => save({ dietType: dt.id as any })} style={{
-                      padding:'10px 6px', borderRadius:12, cursor:'pointer', textAlign:'center',
-                      background: settings.dietType === dt.id ? apple.accentDim : apple.glassBg,
-                      border: settings.dietType === dt.id ? apple.accentBorder : apple.glassBorder,
-                    }}>
-                      <div style={{ fontSize:18 }}>{dt.icon}</div>
-                      <div style={{ fontSize:10, fontWeight:600, color: settings.dietType === dt.id ? apple.accent : apple.textSecondary, marginTop:2 }}>{dt.label}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div style={glassCard}>
-                <div style={sectionLabel}>Пищевые аллергии</div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginTop:4 }}>
-                  {ALLERGEN_OPTIONS.map(a => {
-                    const active = (settings.foodAllergies ?? []).includes(a.id);
-                    return (
-                      <button key={a.id} onClick={() => { const current = settings.foodAllergies ?? []; save({ foodAllergies: active ? current.filter(x => x !== a.id) : [...current, a.id] }); }} style={{
-                        ...pillBtn(active), borderColor: active ? '#ef4444' : undefined, color: active ? '#ef4444' : undefined, background: active ? 'rgba(239,68,68,0.15)' : undefined,
-                      }}>{a.label}</button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div style={glassCard}>
-                <div style={sectionLabel}>Непереносимости</div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginTop:4 }}>
-                  {INTOLERANCE_OPTIONS.map(it => {
-                    const active = (settings.foodIntolerances ?? []).includes(it.id);
-                    return (
-                      <button key={it.id} onClick={() => { const current = settings.foodIntolerances ?? []; save({ foodIntolerances: active ? current.filter(x => x !== it.id) : [...current, it.id] }); }} style={{
-                        ...pillBtn(active), borderColor: active ? '#f97316' : undefined, color: active ? '#f97316' : undefined, background: active ? 'rgba(249,115,22,0.15)' : undefined,
-                      }}>{it.label}</button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div style={glassCard}>
-                <div style={sectionLabel}>Навыки готовки</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginTop:4 }}>
-                  {COOKING_SKILLS.map(cs => (
-                    <button key={cs.id} onClick={() => save({ cookingSkill: cs.id as any })} style={{
-                      ...pillBtn(settings.cookingSkill === cs.id), width:'100%',
-                    }}>{cs.label}</button>
-                  ))}
-                </div>
-              </div>
-
-              <div style={glassCard}>
-                <div style={sectionLabel}>Приёмов пищи в день</div>
-                <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:4 }}>
-                  <input type="range" min={2} max={7} value={settings.mealsPerDay ?? 4} onChange={e => save({ mealsPerDay: parseFloat(e.target.value) || 0 })} style={{ flex:1, accentColor: apple.accent }} />
-                  <span style={{ fontSize:18, fontWeight:700, minWidth:24, textAlign:'center', color: apple.accent }}>{settings.mealsPerDay ?? 4}</span>
-                </div>
-              </div>
-
-              {((settings.foodAllergies ?? []).length + (settings.foodIntolerances ?? []).length > 0 || settings.dietType) && (
-                <div style={{ ...glassCard, borderColor: apple.accent + '44' }}>
-                  <div style={{ fontSize:11, color: apple.accent, fontWeight:600, marginBottom:6 }}>Активные ограничения</div>
+            {(() => {
+              const dp = dietPopup;
+              const s = settings;
+              const cards: { id:string; icon:string; title:string; color:string; summary:(s:any)=>string; fields:(s:any)=>React.ReactNode }[] = [
+                { id:'diettype', icon:'🥗', title:'Тип питания', color:'#34d399',
+                  summary: s => DIET_TYPES.find(d=>d.id===(s?.dietType||''))?.label||'Не выбран',
+                  fields: s => <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(100px,1fr))',gap:4}}>
+                    {DIET_TYPES.map(dt => {
+                      const active = s?.dietType===dt.id;
+                      return <button key={dt.id} onClick={()=>save({dietType:dt.id as any})} style={{padding:'8px 4px',borderRadius:10,cursor:'pointer',textAlign:'center',background:active?'rgba(52,211,153,0.2)':'rgba(255,255,255,0.04)',border:active?'1px solid #34d399':'1px solid rgba(255,255,255,0.06)',color:active?'#34d399':'rgba(255,255,255,0.6)',fontSize:10,fontWeight:active?700:400}}>
+                        <div style={{fontSize:16}}>{dt.icon}</div>
+                        <div style={{marginTop:1}}>{dt.label}</div>
+                      </button>;
+                    })}
+                  </div>
+                },
+                { id:'allergies', icon:'⚠️', title:'Пищевые аллергии', color:'#ef4444',
+                  summary: s => {const a=s?.foodAllergies??[]; return a.length?a.map((id:string)=>ALLERGEN_OPTIONS.find(o=>o.id===id)?.label||id).join(', '):'Нет';},
+                  fields: s => <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
+                    {ALLERGEN_OPTIONS.map(a => {const active=(s?.foodAllergies??[]).includes(a.id); return <HealthBool key={a.id} label={a.label} active={active} onClick={()=>{const cur=s?.foodAllergies??[];save({foodAllergies:active?cur.filter((x:string)=>x!==a.id):[...cur,a.id]});}} />})}
+                  </div>
+                },
+                { id:'intolerances', icon:'🤢', title:'Непереносимости', color:'#f97316',
+                  summary: s => {const a=s?.foodIntolerances??[]; return a.length?a.map((id:string)=>INTOLERANCE_OPTIONS.find(o=>o.id===id)?.label||id).join(', '):'Нет';},
+                  fields: s => <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
+                    {INTOLERANCE_OPTIONS.map(it => {const active=(s?.foodIntolerances??[]).includes(it.id); return <HealthBool key={it.id} label={it.label} active={active} onClick={()=>{const cur=s?.foodIntolerances??[];save({foodIntolerances:active?cur.filter((x:string)=>x!==it.id):[...cur,it.id]});}} />})}
+                  </div>
+                },
+                { id:'cooking', icon:'👨‍🍳', title:'Навыки готовки', color:'#fbbf24',
+                  summary: s => COOKING_SKILLS.find(cs=>cs.id===(s?.cookingSkill||''))?.label||'Не указан',
+                  fields: s => <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4}}>
+                    {COOKING_SKILLS.map(cs => <HealthBool key={cs.id} label={cs.label} active={s?.cookingSkill===cs.id} onClick={()=>save({cookingSkill:cs.id as any})} />)}
+                  </div>
+                },
+                { id:'meals', icon:'🍽️', title:'Приёмов пищи в день', color:'#60a5fa',
+                  summary: s => `${s?.mealsPerDay??4} раз/день`,
+                  fields: s => <div>
+                    <div style={{display:'flex',alignItems:'center',gap:10}}>
+                      <input type="range" min={2} max={7} value={s?.mealsPerDay??4} onChange={e=>save({mealsPerDay:parseFloat(e.target.value)||0})} style={{flex:1,accentColor:'#00e68a'}} />
+                      <span style={{fontSize:18,fontWeight:700,minWidth:24,textAlign:'center',color:'#00e68a'}}>{s?.mealsPerDay??4}</span>
+                    </div>
+                  </div>
+                },
+              ];
+              const totalRestr = (s?.foodAllergies??[]).length+(s?.foodIntolerances??[]).length;
+              return <>{cards.map(c => {
+                const open = dp === c.id;
+                return <div key={c.id} style={{...glassCard,cursor:'pointer',borderColor:open?c.color:undefined}} onClick={() => setDietPopup(open?null:c.id)}>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{fontSize:18}}>{c.icon}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:700,color:'#fff'}}>{c.title}</div>
+                      <div style={{fontSize:9,color:'rgba(255,255,255,0.4)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.summary(s)}</div>
+                    </div>
+                    <span style={{fontSize:12,color:'rgba(255,255,255,0.3)',transition:'transform .2s',transform:open?'rotate(180deg)':'rotate(0deg)'}}>▾</span>
+                  </div>
+                  {open && <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid rgba(255,255,255,0.06)'}}>{c.fields(s)}</div>}
+                </div>;
+              })}</>;
+            })()}
+              {(settings.foodAllergies ?? []).length + (settings.foodIntolerances ?? []).length > 0 || settings.dietType ? (
+                <div style={{ ...glassCard, borderColor: 'rgba(0,230,138,0.2)' }}>
+                  <div style={{ fontSize:11, color: '#00e68a', fontWeight:600, marginBottom:6 }}>Активные ограничения</div>
                   <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                    {settings.dietType && <span style={{ fontSize:10, padding:'3px 8px', borderRadius:12, background:apple.accentDim, color:apple.accent }}>
+                    {settings.dietType && <span style={{ fontSize:10, padding:'3px 8px', borderRadius:12, background:'rgba(0,230,138,0.1)', color:'#00e68a' }}>
                       {DIET_TYPES.find(d => d.id === settings.dietType)?.label}
                     </span>}
                     {(settings.foodAllergies ?? []).map(a => (
@@ -1556,7 +1567,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                     ))}
                   </div>
                 </div>
-              )}
+              ) : null}
             </div></InfoErrorBoundary>
           )}
 
@@ -1564,32 +1575,47 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
 
           {/* ═══ GENETICS TAB ═══ */}
           {tab === 'genetics' && (
-            <InfoErrorBoundary label="Генетика"><div style={glassCard}>
-              <div style={sectionLabel}>Генетические полиморфизмы</div>
-              <p style={{ fontSize:10, color: apple.textDim, margin:'4px 0 10px' }}>Укажите ваши генетические варианты, если известны. Они влияют на расчёт рисков в V7 движке.</p>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:8 }}>
-                {([
-                  { key:'COMT', label:'COMT', options:['Met/Met','Val/Met','Val/Val'] },
-                  { key:'MTHFR', label:'MTHFR', options:['C677T/C677T','C677T/A1298C','A1298C/A1298C','C677T/+','A1298C/+','+/+' ] },
-                  { key:'ESR1', label:'ESR1', options:['PvuII TT','PvuII TC','PvuII CC'] },
-                  { key:'AGTR1', label:'AGTR1', options:['1166CC','1166AC','1166AA'] },
-                  { key:'NOS3', label:'NOS3', options:['Glu298Glu','Glu298Asp','Asp298Asp'] },
-                  { key:'SRD5A2', label:'SRD5A2', desc:'5α-редуктаза', options:['V89L V/V','V89L V/L','V89L L/L'] },
-                  { key:'CYP3A4', label:'CYP3A4', options:['*1/*1 (WT)','*1/*22','*22/*22'] },
-                ] as const).map(gene => (
-                  <div key={gene.key} style={{ background:'rgba(255,255,255,0.02)', padding:10, borderRadius:10, border:apple.glassBorder }}>
-                    <div style={{ fontWeight:600, fontSize:12, color:apple.textPrimary, marginBottom:1 }}>{gene.label}</div>
-                    {(gene as any).desc && <div style={{ fontSize:9, color:apple.textDim, marginBottom:4 }}>{(gene as any).desc}</div>}
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                      <button onClick={() => { const g = {...(settings.genetics ?? {})}; delete g[gene.key]; save({ genetics: g }); }} style={pillBtn(!(settings.genetics ?? {})[gene.key])}>Не знаю</button>
-                      {gene.options.map(opt => (
-                        <button key={opt} onClick={() => { const g = {...(settings.genetics ?? {})}; g[gene.key] = opt; save({ genetics: g }); }} style={pillBtn((settings.genetics ?? {})[gene.key] === opt)}>{opt}</button>
-                      ))}
-                    </div>
+            <InfoErrorBoundary label="Генетика">
+            {(() => {
+              const gp = geneticsPopup;
+              const genes = [
+                { key:'COMT', label:'COMT', options:['Met/Met','Val/Met','Val/Val'] },
+                { key:'MTHFR', label:'MTHFR', options:['C677T/C677T','C677T/A1298C','A1298C/A1298C','C677T/+','A1298C/+','+/+' ] },
+                { key:'ESR1', label:'ESR1', options:['PvuII TT','PvuII TC','PvuII CC'] },
+                { key:'AGTR1', label:'AGTR1', options:['1166CC','1166AC','1166AA'] },
+                { key:'NOS3', label:'NOS3', options:['Glu298Glu','Glu298Asp','Asp298Asp'] },
+                { key:'SRD5A2', label:'SRD5A2', desc:'5α-редуктаза', options:['V89L V/V','V89L V/L','V89L L/L'] },
+                { key:'CYP3A4', label:'CYP3A4', options:['*1/*1 (WT)','*1/*22','*22/*22'] },
+              ];
+              const s = settings;
+              const cards = genes.map(gene => ({
+                id: gene.key, icon:'🧬', title: gene.label, color:'#c084fc',
+                desc: (gene as any).desc,
+                summary: (s:any) => (s?.genetics??{})[gene.key] || 'Не знаю',
+                fields: (s:any) => <>
+                  {(gene as any).desc && <div style={{fontSize:9,color:'rgba(255,255,255,0.4)',marginBottom:4}}>{(gene as any).desc}</div>}
+                  <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
+                    <HealthBool label="Не знаю" active={!(s?.genetics??{})[gene.key]} onClick={() => { const g={...(s?.genetics??{})}; delete g[gene.key]; save({genetics:g}); }} />
+                    {gene.options.map(opt => <HealthBool key={opt} label={opt} active={(s?.genetics??{})[gene.key]===opt} onClick={() => { const g={...(s?.genetics??{})}; g[gene.key]=opt; save({genetics:g}); }} />)}
                   </div>
-                ))}
-              </div>
-            </div></InfoErrorBoundary>
+                </>
+              }));
+              return <>{cards.map(c => {
+                const open = gp === c.id;
+                return <div key={c.id} style={{...glassCard,cursor:'pointer',borderColor:open?c.color:undefined}} onClick={() => setGeneticsPopup(open?null:c.id)}>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{fontSize:18}}>{c.icon}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:700,color:'#fff'}}>{c.title}</div>
+                      <div style={{fontSize:9,color:'rgba(255,255,255,0.4)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.summary(s)}{c.desc?' • '+c.desc:''}</div>
+                    </div>
+                    <span style={{fontSize:12,color:'rgba(255,255,255,0.3)',transition:'transform .2s',transform:open?'rotate(180deg)':'rotate(0deg)'}}>▾</span>
+                  </div>
+                  {open && <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid rgba(255,255,255,0.06)'}}>{c.fields(s)}</div>}
+                </div>;
+              })}</>;
+            })()}
+            </InfoErrorBoundary>
           )}
 
           {/* ═══ INJURIES TAB ═══ */}
