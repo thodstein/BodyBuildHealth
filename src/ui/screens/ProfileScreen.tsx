@@ -447,6 +447,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
   const [reportTab, setReportTab] = useState<'current' | 'archive'>('current');
   const [analyticsSubTab, setAnalyticsSubTab] = useState<'reports' | 'progress'>('reports');
+  const [diarySubTab, setDiarySubTab] = useState<'sleep' | 'measurements' | 'progress'>('sleep');
   const [selectedArchiveItem, setSelectedArchiveItem] = useState<any>(null);
   const [showCustomReport, setShowCustomReport] = useState(false);
   const [customReportBlocks, setCustomReportBlocks] = useState<Record<string, boolean>>({
