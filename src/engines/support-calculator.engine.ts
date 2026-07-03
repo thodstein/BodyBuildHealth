@@ -774,11 +774,17 @@ function toSystemRisksFromTz(
 
 export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   const blacklist = getBlacklist(state);
-  const synergyIds = selectSynergyGroups(state);
-  const substances = getSubstancesFromSynergies(synergyIds, state.powerLevel, blacklist);
-  const used = new Set(substances);
+  // BUG 8: убран выбор веществ через «ядро» (selectSynergyGroups + getSubstancesFromSynergies).
+  // Раньше SEVERAL broad-spectrum антиоксидантов назначались автоматически, затем дублировались
+  // рекомендациями по анализам → 3-4 одинаковых препарата в плане.
+  // Теперь стек строится ТОЛЬКО из: (1) обязательных hCG/AI/caber, (2) рекомендаций по анализам,
+  // (3) breadth/targeted отбора по TZ DB. synergyIds сохранены только как метаданные для риска.
+  const synergyIds: SynergyId[] = [];
+  const substances: string[] = [];
+  const used = new Set<string>();
+  for (const b of blacklist) used.add(b);
 
-  // 1. Обязательные на ВСЕХ уровнях
+  // 1. Обязательные препараты на курсе ААС (mandatory logic, BUG 7)
   if (state.pharma.aas.length > 0) {
     if (!state.pharma.hasHCG && !used.has('hcg')) { substances.push('hcg'); used.add('hcg'); }
     const hasArom = state.pharma.aas.some((a: any) => (a.id||'').toLowerCase().includes('test') || (a.id||'').toLowerCase().includes('meth'));
@@ -841,17 +847,31 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     const maxPerSys = (maxPerSystem[state.powerLevel] ?? 2) + (state.boostEnabled ? 1 : 0);
 
     // Активные системы = риск > target
-    // BUG 9: На фазе курса/моста НЕ покрываем репродуктивную (подавление HPTA — нормально на курсе)
+    // BUG 9: На фазе курса/моста НЕ покрываем репродуктивную (подавление HPTA — нормально на курсе,
+    // закрывается обязательным ХГЧ). Применение остальных репродуктивных БАД нецелесообразно.
+    // NEW: Опорно-двигательная (суставы/связки) НЕ входит в интеллектуальный расчёт риска —
+    // она закрывается отдельной кнопкой «Суставы» (jointMode) на усмотрение пользователя,
+    // чтобы избежать излишнего назначения из-за % непокрытия этой системы.
+    // Broad-spectrum препараты (D3, K2, Mg, Омега-3) всё равно могут попадать в отбор, если
+    // они покрывают ДРУГИЕ активные системы (cardio/hepatic/endocrine).
     const phase = state.pharma?.phase || 'course';
     const skipReproductive = phase === 'course' || phase === 'bridge';
+    const skipMusculoskeletal = !state.jointMode;
     const activeSystems = riskSystems.filter(sys => {
       if (skipReproductive && sys === 'reproductive') return false;
+      if (skipMusculoskeletal && sys === 'musculoskeletal') return false;
       const score = scoresPre[sys] || 0;
       if (score <= target) return false;
       const tzSys = sys === 'neuro' ? 'cns' : sys;
       const covered = sysCoverageCount[tzSys] || sysCoverageCount[sys] || 0;
       return covered < maxPerSys;
     });
+
+    // BUG 13: На фазе course/bridge исключаем трибулус (LH-бустер бесполезен при экзогенном T,
+    // подавление HPTA эндогенного теста не восстановить — нужна только фаза PCT/мост/фертильность).
+    const tBoosterBlacklist = (phase === 'course' || phase === 'bridge')
+      ? new Set<string>(['tribulus','tribulus_terrestris'])
+      : new Set<string>();
 
     // Breadth: broad-spectrum для систем без покрытия (NAC, магний, D3, омега-3)
     const systemsNeedingCoverage = activeSystems.filter(sys => {
@@ -863,6 +883,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       const scored: [string, number, number][] = [];
       for (const [id, entries] of Object.entries(allDb)) {
         if (used.has(id) || !entries.length) continue;
+        if (tBoosterBlacklist.has(id)) continue; // BUG 13: трибулус на курсе/мосте
         let matchCount = 0; let totalK = 0;
         for (const e of entries) {
           if (systemsNeedingCoverage.includes(e.organId as RiskSystemId)) { matchCount++; totalK += e.k; }
@@ -886,6 +907,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
         let best: [string, number] | null = null;
         for (const [id, entries] of Object.entries(allDb)) {
           if (used.has(id)) continue;
+          if (tBoosterBlacklist.has(id)) continue; // BUG 13
           for (const e of entries) {
             if ((e.organId === tzSys || e.organId === sys) && e.k > 0 && (!best || e.k > best[1])) {
               best = [id, e.k];

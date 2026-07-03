@@ -44,7 +44,8 @@ import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engine
 import { calculateTZRisk, toCompatibleResult, type TZRiskResult } from '../../engines/risk-engine-tz';
 import { getDrugTzMechanisms, getSupportTzDisplay, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../data/support-db';
 import { getLabEffectsForDrug, getMarkerName } from '../../data/support-lab-effects';
-import { calculateSupportPlan, applyJointToPlan, applyBoostToPlan, type PlanResult, type PlanSubstance } from '../../engines/support-plan-engine';
+import { runSupportUnified, runSupportForLevel } from '../../engines/support-plan';
+import type { PlanResult, PlanSubstance } from '../../engines/support-plan-engine';
 import { buildPreApplyCard, evaluateRecommendations, computeCoverageRisk } from '../../engines/recommendation-engine';
 import { calculateMixScore, type TrainingMixScore, type MixSubstance, type MixProfile, MIX_MECHANISMS, MIX_SYNERGY, MIX_TEMPLATES, type MixTemplate, buildBestRecipe, type MixRecipe, type MixRecipeItem, groupRecipeItemsByTiming } from '../../engines/training-mix-scoring.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
@@ -415,10 +416,15 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (!manualLevelSelected) setSupportLevel(level);
   }, [supportDrugs, linked.risk, linked.labAnalysis, manualLevelSelected]);
 
-  // Compute effective level using NEW plan engine (mapping-based)
+  // ── ЕДИНЫЙ ДВИЖОК (один вызов → PlanResult со всем: вещества + риски + display) ──
+  // BUG 8: Раньше здесь работали ДВА движка (calculateSupportPlan + calculateSupportTZ) с разной
+  // логикой → дубли (3-4 одинаковых), разные цифры риска, «непонятные препараты».
+  // Теперь ОДИН вызов `runSupportUnified(state)` из src/engines/support-plan/index.ts.
+  // Внутри: calculateSupportTZ (вещества + риск) + генерация display-данных из каталога.
+  // Кнопки БАЗОВЫЙ/СРЕДНИЙ/МАКСИМУМ/БУСТ → powerLevel → target риск % (65/55/45/30).
+  // Кнопки 🔥Усиление / 🦴Суставы / ♀Репродукт. → флаги boostEnabled/jointMode/reproMode.
   const [planResult, setPlanResult] = useState<PlanResult | null>(null);
   const effectiveLevel = useMemo(() => {
-    // Build CalculatorState from linked data for the new engine
     const s = linked.profile?.settings;
     const aasList = (linked.course || []).filter((c: any) => {
       const ph = PHARMA_DB[c.substanceId];
@@ -428,7 +434,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const state: CalculatorState = {
       profile: h.profile || { weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male' | 'female', workoutsPerWeek: s?.workoutsPerWeek ?? 3, avgWorkoutMinutes: s?.avgWorkoutMinutes ?? 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
       neuro: h.neuro || { dopamineScore: 0, serotoninScore: 0, gabaBalance: 'balance', memoryIssues: false, focusIssues: false, slowThinking: false, coordinationIssues: false, aggressionScore: 0, headaches: false, weatherDependent: false, sleepQuality: 'good' },
-      pharma: h.pharma || { phase: 'course', aas: aasList, hasGH: false, hasIGF: false, hasInsulin: false, hasHCG: false, hasAI: false, hasCaber: false, hasSERM: false, hasSARMs: false, hasMGF: false, hasGLP1: false },
+      pharma: h.pharma || { phase: (supportPhase === 'fertility' ? 'pct' : supportPhase) as any, aas: aasList, hasGH: false, hasIGF: false, hasInsulin: false, hasHCG: false, hasAI: false, hasCaber: false, hasSERM: false, hasSARMs: false, hasMGF: false, hasGLP1: false },
       goals: h.goals || { healthMaintenance: false, competitionPrep: false, sleepRecovery: false, lipidCorrection: false, bloodThinning: false, liverDetox: false, bpControl: false, trainingCycle: 'maintenance', cycleWeeks: 12, previousCycles: 0, timeSinceLastCycle: 'none' },
       hepatobiliary: h.hepatobiliary || { altAstElevation: 'none', ggtElevation: 'none', bilirubinElevation: 'none', fattyLiver: false, cholecystitis: false, alcoholHistory: 'none' },
       urinary: h.urinary || { creatinineElevation: 'none', ureaElevation: 'none', proteinuria: false, nephrotoxicDrugs: false, hypertension: false, diabetes: false, urinationPattern: 'normal' },
@@ -449,36 +455,16 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       courseWeek: courseWeekState,
       boostEnabled: boostEnabled,
       jointMode: jointMode,
+      reproMode: reproMode,
     };
-    let result = calculateSupportPlan(state, supportLevel as PowerLevel, enhancedSubs, linked.labs);
-    // Build userCI for boost/joint contraindication checks
-    const ci = state.contraindications || {};
-    const userCI = new Set<string>();
-    if (ci.hasCVD) userCI.add('сердечно-сосудистые').add('ССЗ').add('гипертония').add('CVD');
-    if (ci.hasThrombophilia) userCI.add('тромбофилия').add('тромбоз').add('коагуляция');
-    if (ci.hasLiverDisease) userCI.add('печен').add('гепатит').add('цирроз').add('печёночная');
-    if (ci.hasKidneyDisease) userCI.add('почк').add('почечная').add('нефро').add('ХБП');
-    if (ci.hasDiabetes) userCI.add('диабет').add('инсулин').add('гликемия');
-    if (ci.hasEpilepsy) userCI.add('эпилепсия').add('судорог');
-    if (ci.hasMentalIllness) userCI.add('психи').add('шизофрения').add('биполяр');
-    if (ci.hasGI) userCI.add('язва').add('гастрит').add('ЖКТ');
-    if (ci.allergies) userCI.add(ci.allergies.toLowerCase());
-    if (jointMode) result = applyJointToPlan(result, userCI);
-    if (boostEnabled) result = applyBoostToPlan(result, userCI);
-    setPlanResult(result);    // Map to a backwards-compatible effectiveLevel format
-    const subs = result.substances.map(s => s.id);
+    // ── ОДИН ВЫЗОВ ──
+    const planRes = runSupportUnified(state);
+    setPlanResult(planRes);
+    // subs + dosages из единого результата (с dedup)
+    const subs: string[] = [...new Set(planRes.substances.map(p => p.id))];
     const dosages: Record<string, { mg: number; timing: string }> = {};
-    for (const s of result.substances) {
-      dosages[s.id] = { mg: s.doseMg, timing: s.timing };
-    }
-    // Also ensure phase mods are applied for hCG and fertile-specific items
-    const phaseResult = getPhaseLevel(supportLevel, supportPhase, SUPPORT_LEVELS);
-    // Merge phase-specific adds
-    for (const addId of (phaseResult as any).subs || []) {
-      if (!subs.includes(addId)) {
-        subs.push(addId);
-        dosages[addId] = (phaseResult as any).dosages?.[addId] || dosages[addId] || DEFAULT_DOSAGES[addId] || { mg: 500, timing: 'с едой' };
-      }
+    for (const p of planRes.substances) {
+      dosages[p.id] = { mg: p.doseMg, timing: p.timing };
     }
     // Apply analog replacements
     for (const [originalId, analogId] of Object.entries(selectedAnalogs)) {
@@ -490,27 +476,16 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         dosages[analogId] = analogDosage;
       }
     }
-    // Add enhancedSubs (manual additions)
+    // Add enhancedSubs (manual additions) — с dedup
     for (const enhId of enhancedSubs) {
       if (!subs.includes(enhId)) {
         subs.push(enhId);
-        dosages[enhId] = dosages[enhId] || DEFAULT_DOSAGES[enhId] || { mg: 500, timing: 'с едой' };
+        const d = DEFAULT_DOSAGES[enhId];
+        dosages[enhId] = d ? { mg: d.mg, timing: d.timing } : { mg: 500, timing: 'с едой' };
       }
     }
-    // Auto-add hCG if AAS in course
-    const hasAAS = (linked.course || []).some((c: any) => {
-      const ph = PHARMA_DB[c.substanceId];
-      return ph?.class && ['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone','oral_17aa','sarm'].includes(ph.class);
-    });
-    if (hasAAS && !subs.includes('hcg')) {
-      subs.push('hcg');
-      dosages['hcg'] = DEFAULT_DOSAGES['hcg'] || { mg: 500, timing: '2x/нед, схема 3/1 (МЕ)' };
-    }
-    // BUG 8: Убрано добавление calcResult.selectedSubstances в effectiveLevel
-    // TZ-движок уже включает все вещества (обязательные + рекомендации + breadth + targeted)
-    // Дубли убраны — subs берётся только из старого движка + enhancedSubs + phase
-    return { subs, dosages, planResult: result };
-  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, linked.course, linked.profile, courseWeekState, boostEnabled, jointMode]);
+    return { subs, dosages };
+  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, linked.course, linked.profile, courseWeekState, boostEnabled, jointMode, reproMode]);
 
   // C4: Track plan changes in history
   useEffect(() => {
@@ -6275,7 +6250,7 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
                             powerLevel: 'basic', courseWeek: courseWeekState,
                           };
                           try {
-                            const baseResult = calculateSupportPlan(baseState, 'basic', enhancedSubs, linked.labs);
+                            const baseResult = runSupportForLevel(baseState, 'basic');
                             return (
                               <table style={{ width:'100%', fontSize:7, borderCollapse:'collapse' }}>
                                 <thead><tr style={{ borderBottom:'1px solid var(--border)' }}>
