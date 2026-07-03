@@ -8,10 +8,14 @@ import {
   startSession, addExerciseToSession, logSet, finishSession,
   getLastSession, getRecentPRs, type WorkoutSession,
 } from '../../../engines/workout-logger.engine';
+import { generateWarmup, type WarmupInput } from '../../../engines/warmup.engine';
+import { generateCooldown, type CooldownInput } from '../../../engines/cooldown.engine';
+import { type WarmupBlock, type CooldownBlock } from '../../../core/types';
 import { computeSessionMetrics } from './sessionMetrics';
 import { hapticImpact, hapticNotify } from '../../../core/telegram';
 import { velocityLoss, velocityLossZone, thresholdForIntent, type VBTIntent } from '../../../engines/pro/vbt.engine';
 import { saveSRPESession } from '../../../engines/pro/srpe-store';
+import { useTrainingProfile } from '../TrainingScreen_parts/training-profile';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -43,9 +47,12 @@ export interface SessionPlayerProps {
 }
 
 export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, focus }) => {
+  const [profile] = useTrainingProfile();
   const [dayIdx, setDayIdx] = useState(0);
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [done, setDone] = useState<WorkoutSession | null>(null);
+  const [warmupBlocks, setWarmupBlocks] = useState<WarmupBlock[]>([]);
+  const [cooldownBlocks, setCooldownBlocks] = useState<CooldownBlock[]>([]);
   // фактический ввод текущего подхода: [exerciseIndex][setIndex] -> {weight,reps}
   const [actual, setActual] = useState<Record<string, { weight: number; reps: number; rpe: number }>>({});
   const [exDone, setExDone] = useState<Record<string, boolean>>({});
@@ -61,6 +68,17 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
 
   const begin = () => {
     if (!day) return;
+    
+    const warmupInput: WarmupInput = {
+      sessionFocus: focus,
+      primaryExercises: day.exercises.map(ex => ex.name),
+      riskFlags: {}, // Need to get this from profile or somewhere? 
+      techniqueIssues: [], // Need to get this from profile or somewhere?
+      fatigueLevel: profile.fatigue / 10,
+      equipmentAvailable: profile.equipment,
+    };
+    setWarmupBlocks(generateWarmup(warmupInput));
+
     let s = startSession(focus || day.label, weekNumber);
     day.exercises.forEach(ex => {
       s = addExerciseToSession(s, { id: ex.name, name: ex.name, pattern: ex.muscleGroup, muscleGroup: ex.muscleGroup });
@@ -69,6 +87,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     setDone(null);
     setActual({});
     setExDone({});
+    setCooldownBlocks([]);
   };
 
   const keyFor = (ei: number, si: number) => `${ei}_${si}`;
@@ -88,6 +107,15 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     if (!session) return;
     hapticNotify('success');
     const finished = finishSession(session, `${focus} — ${day?.label}`);
+    
+    const cooldownInput: CooldownInput = {
+      muscleGroupsUsed: Array.from(new Set(day.exercises.map(ex => ex.muscleGroup))),
+      fatigueScore: profile.fatigue / 10,
+      riskFlags: {}, 
+      sessionDuration: (finished.durationMin || sessionDur) * 60,
+    };
+    setCooldownBlocks(generateCooldown(cooldownInput));
+
     // P12 wire: сохранить сессию с sRPE для мониторинга нагрузки (training-load.engine)
     try { saveSRPESession({ date: finished.date, sRPE: sessionRPE, durationMin: finished.durationMin || sessionDur }); } catch { /* ignore */ }
     setDone(finished);
@@ -156,9 +184,26 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
         ))}
       </div>
 
-      {!session && !done && (
-        <button style={{ ...BTN, width: '100%' }} onClick={begin}>▶ Начать тренировку — {day.label} (нед {weekNumber})</button>
+       {!session && !done && (
+        <div style={{ marginTop: 8 }}>
+          {warmupBlocks.length > 0 && (
+            <div style={{ ...CARD, marginBottom: 8 }}>
+              <div style={H}>🤸 Разминка перед: {day.label}</div>
+              {warmupBlocks.map((b: WarmupBlock, i: number) => (
+                <div key={i} style={{ marginBottom: 4 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT }}>{b.type.toUpperCase()}</div>
+                  <div style={SMALL}>{b.notes}</div>
+                  <ul style={{ paddingLeft: 16, margin: '2px 0' }}>
+                    {b.exercises.map((ex, j: number) => <li key={j} style={SMALL}>{ex.exerciseId}</li>)}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+          <button style={{ ...BTN, width: '100%' }} onClick={begin}>▶ Начать тренировку — {day.label} (нед {weekNumber})</button>
+        </div>
       )}
+
 
       {session && (
         <div style={CARD}>
@@ -276,7 +321,20 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
             </div>
           )}
           {prs.length > 0 && <div style={{ marginTop: 8 }}><div style={LABEL}>🏆 Последние PR:</div>{prs.map((p, i) => <div key={i} style={SMALL}>• {p.exercise}: {p.weight}кг×{p.reps} ({p.date})</div>)}</div>}
-          <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); }}>← Новая тренировка</button>
+          {cooldownBlocks.length > 0 && (
+            <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.1)' }}>
+              <div style={H}>🧘 Рекомендованная заминка</div>
+              {cooldownBlocks.map((b: CooldownBlock, i: number) => (
+                <div key={i} style={{ marginBottom: 4 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT }}>{b.type.toUpperCase()}</div>
+                  <ul style={{ paddingLeft: 16, margin: '2px 0' }}>
+                    {b.exercises.map((ex, j: number) => <li key={j} style={SMALL}>{ex.exerciseId}</li>)}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+          <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); }}>← Новая тренировка</button>
         </div>
       )}
 
