@@ -825,7 +825,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   const riskSystems: RiskSystemId[] = ['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal'];
   // ── Целевые уровни риска (после поддержки) ──
   // База: нет высокого (≤50%), Средний: нет выраженного (≤35%), Максимум: нижний умеренный (≤25%), Буст: слабый (≤15%)
-  const levelTargets: Record<string, number> = { basic: 50, mid: 35, max: 25, boost: 15 };
+  const levelTargets: Record<string, number> = { basic: 65, mid: 55, max: 45, boost: 30 };
   const maxPerSystem: Record<string, number> = { basic: 2, mid: 3, max: 4, boost: 5 };
 
   // ── TZ Risk: рассчитываем риск БЕЗ поддержки для отбора веществ ──
@@ -841,7 +841,11 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     const maxPerSys = (maxPerSystem[state.powerLevel] ?? 2) + (state.boostEnabled ? 1 : 0);
 
     // Активные системы = риск > target
+    // BUG 9: На фазе курса/моста НЕ покрываем репродуктивную (подавление HPTA — нормально на курсе)
+    const phase = state.pharma?.phase || 'course';
+    const skipReproductive = phase === 'course' || phase === 'bridge';
     const activeSystems = riskSystems.filter(sys => {
+      if (skipReproductive && sys === 'reproductive') return false;
       const score = scoresPre[sys] || 0;
       if (score <= target) return false;
       const tzSys = sys === 'neuro' ? 'cns' : sys;
@@ -985,6 +989,14 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     }
   }
 
+  // ── Репродуктивная система: ручная кнопка (добавляет HPTA/сперматогенез препараты) ──
+  if (state.reproMode) {
+    const reproIds = ['hcg','zinc','vitamin_d3','coq10','ashwagandha','saw_palmetto'];
+    for (const rid of reproIds) {
+      if (!used.has(rid)) { substances.push(rid); used.add(rid); }
+    }
+  }
+
   // Риск выбранной недели (для отображения — пик = для подбора)
   const cw = state.courseWeek ?? 1;
   let selectedWeekRaw: number | undefined;
@@ -1027,28 +1039,71 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
 
 export function hydrateState(): Partial<CalculatorState> {
   const result: Partial<CalculatorState> = {};
+  // 1. Read from autocalc state (calculator-specific fields: neuro, cardio, hepatobiliary, etc.)
   try {
-    const saved = localStorage.getItem('he_support_plan_current');
+    const saved = localStorage.getItem('he_autocalc_state');
     if (saved) {
-      const p = JSON.parse(saved);
-      if (p.state && p.state.profile) {
-        Object.assign(result, p.state);
+      const s = JSON.parse(saved);
+      if (s.neuro) result.neuro = s.neuro;
+      if (s.psych) result.psych = s.psych;
+      if (s.genetics) result.genetics = s.genetics;
+      if (s.hepatobiliary) result.hepatobiliary = s.hepatobiliary;
+      if (s.cardio) result.cardio = s.cardio;
+      if (s.urinary) result.urinary = s.urinary;
+      if (s.goals) result.goals = s.goals;
+      if (s.nutrition) result.nutrition = s.nutrition;
+      if (s.contraindications) result.contraindications = s.contraindications;
+      if (s.oda) result.oda = s.oda;
+      if (s.dental) result.dental = s.dental;
+      if (s.gi) result.gi = s.gi;
+      if (s.toxicLoad) result.toxicLoad = s.toxicLoad;
+      if (s.epicrisis) result.epicrisis = s.epicrisis;
+      if (s.injection) result.injection = s.injection;
+      if (s.journal) result.journal = s.journal;
+      if (s.labs) result.labs = s.labs;
+    }
+  } catch {}
+  // 2. Read profile from he_profile_v2 (single source of truth for personal data)
+  try {
+    const raw = localStorage.getItem('he_profile_v2');
+    if (raw) {
+      const p = JSON.parse(raw);
+      const s = p.settings || {};
+      result.profile = {
+        weight: s.weight || 80, age: s.age || 30, sex: (s.sex || 'male') as 'male' | 'female',
+        height: s.height, bodyfat: s.bodyFat,
+        workoutsPerWeek: s.workoutsPerWeek || 3, avgWorkoutMinutes: s.avgWorkoutMinutes || 60,
+        sleepHours: s.sleepHours || 7, stressLevel: s.stressLevel || 4,
+        smoker: s.smoker || false, alcohol: s.alcohol || 'rare', caffeineMg: s.caffeineMg || 100,
+      };
+      // Genetics from profile (single source)
+      if (s.genetics && !result.genetics) {
+        result.genetics = {
+          cyp19a1: s.genetics.CYP19A1 || s.genetics.cyp19a1 || 'unknown',
+          srd5a2: s.genetics.SRD5A2 || s.genetics.srd5a2 || 'unknown',
+          arSensitivity: s.genetics.AR || s.genetics.ar || 'unknown',
+          mthfr: s.genetics.MTHFR || s.genetics.mthfr || 'unknown',
+        };
+      }
+      // Contraindications from profile (single source)
+      if (!result.contraindications) {
+        const ci = s.chronicConditions || [];
+        result.contraindications = {
+          allergies: (s.foodAllergies || []).join(', '),
+          hasCVD: ci.includes('heart') || ci.includes('hypertension'),
+          hasThrombophilia: false,
+          hasGI: false,
+          hasProstateIssues: false,
+          hasDiabetes: ci.includes('diabetes'),
+          hasEpilepsy: false,
+          hasMentalIllness: false,
+          hasLiverDisease: ci.includes('liver'),
+          hasKidneyDisease: ci.includes('kidney'),
+        };
       }
     }
   } catch {}
-  try {
-    const raw = localStorage.getItem('he_user_profile');
-    if (raw) {
-      const p = JSON.parse(raw);
-      result.profile = {
-        weight: p.weight || 80, age: p.age || 30, sex: p.sex || 'male',
-        height: p.height, bodyfat: p.bodyfat,
-        workoutsPerWeek: p.workoutsPerWeek || 3, avgWorkoutMinutes: p.avgWorkoutMinutes || 60,
-        sleepHours: p.sleepHours || 7, stressLevel: p.stressLevel || 4,
-        smoker: p.smoker || false, alcohol: p.alcohol || 'rare', caffeineMg: p.caffeineMg || 100,
-      };
-    }
-  } catch {}
+  // 3. Course data — legacy he_course_data (SupportScreen passes course via linked.course directly)
   try {
     const raw = localStorage.getItem('he_course_data');
     if (raw) {
@@ -1057,38 +1112,18 @@ export function hydrateState(): Partial<CalculatorState> {
       result.pharma = { phase: c.phase || 'course', aas, hasGH: !!c.ghPeptides, hasIGF: !!c.igf1, hasInsulin: !!c.insulin, hasHCG: !!c.hcg, hasAI: !!c.ai, hasCaber: !!c.caber, hasSERM: !!c.serm, hasSARMs: !!c.sarm, hasMGF: false, hasGLP1: false };
     }
   } catch {}
-  try {
-    const raw = localStorage.getItem('he_labs_history');
-    if (raw) {
-      const arr = JSON.parse(raw); const l = Array.isArray(arr) ? arr : [];
-      const toSlice = (d: any): LabSlice => ({ date: d.date || '', panelSex: d.panelSex || d.values || {}, panelBiochem: d.panelBiochem || {}, panelHematology: d.panelHematology || {}, panelThyroid: d.panelThyroid || {}, panelLipid: d.panelLipid || {}, panelIron: d.panelIron || {}, panelVitamin: d.panelVitamin || {}, panelCardiac: d.panelCardiac || {}, panelCoagulation: d.panelCoagulation || {}, panelInflammatory: d.panelInflammatory || {}, panelAdrenal: d.panelAdrenal || {}, panelMineral: d.panelMineral || {}, panelTumor: d.panelTumor || {}, panelUrinalysis: d.panelUrinalysis || {} });
-      result.labs = { preCourse: l[0] ? toSlice(l[0]) : null, midCourse: l[1] ? toSlice(l[1]) : null, postPCT: l[2] ? toSlice(l[2]) : null, fullPanel: null };
-    }
-  } catch {}
-  // Also read extended profile data saved by the AutoCalculator itself
-  try {
-    const extState = localStorage.getItem('he_autocalc_state');
-    if (extState) {
-      const s = JSON.parse(extState);
-      if (s.neuro) result.neuro = { ...(result.neuro || {}), ...s.neuro };
-      if (s.psych) result.psych = { ...(result.psych || {}), ...s.psych };
-      if (s.genetics) result.genetics = { ...(result.genetics || {}), ...s.genetics };
-      if (s.hepatobiliary) result.hepatobiliary = { ...(result.hepatobiliary || {}), ...s.hepatobiliary };
-      if (s.cardio) result.cardio = { ...(result.cardio || {}), ...s.cardio };
-      if (s.urinary) result.urinary = { ...(result.urinary || {}), ...s.urinary };
-      if (s.goals) result.goals = { ...(result.goals || {}), ...s.goals };
-      if (s.nutrition) result.nutrition = { ...(result.nutrition || {}), ...s.nutrition };
-      if (s.contraindications) result.contraindications = { ...(result.contraindications || {}), ...s.contraindications };
-      if (s.oda) result.oda = { ...(result.oda || {}), ...s.oda };
-      if (s.dental) result.dental = { ...(result.dental || {}), ...s.dental };
-      if (s.gi) result.gi = { ...(result.gi || {}), ...s.gi };
-      if (s.toxicLoad) result.toxicLoad = { ...(result.toxicLoad || {}), ...s.toxicLoad };
-      if (s.epicrisis) result.epicrisis = { ...(result.epicrisis || {}), ...s.epicrisis };
-      if (s.injection) result.injection = { ...(result.injection || {}), ...s.injection };
-      if (s.journal) result.journal = { ...(result.journal || {}), ...s.journal };
-      if (s.labs) result.labs = { ...(result.labs || {}), ...s.labs };
-      if (s.profile) result.profile = { ...(result.profile || {}), ...s.profile };
-    }
-  } catch {}
+  // 4. Labs — read from he_labs_history (legacy) if not already set from autocalc
+  if (!result.labs) {
+    try {
+      const raw = localStorage.getItem('he_labs_history');
+      if (raw) {
+        const arr = JSON.parse(raw); const l = Array.isArray(arr) ? arr : [];
+        const toSlice = (d: any): LabSlice => ({ date: d.date || '', panelSex: d.panelSex || d.values || {}, panelBiochem: d.panelBiochem || {}, panelHematology: d.panelHematology || {}, panelThyroid: d.panelThyroid || {}, panelLipid: d.panelLipid || {}, panelIron: d.panelIron || {}, panelVitamin: d.panelVitamin || {}, panelCardiac: d.panelCardiac || {}, panelCoagulation: d.panelCoagulation || {}, panelInflammatory: d.panelInflammatory || {}, panelAdrenal: d.panelAdrenal || {}, panelMineral: d.panelMineral || {}, panelTumor: d.panelTumor || {}, panelUrinalysis: d.panelUrinalysis || {} });
+        result.labs = { preCourse: l[0] ? toSlice(l[0]) : null, midCourse: l[1] ? toSlice(l[1]) : null, postPCT: l[2] ? toSlice(l[2]) : null, fullPanel: null };
+      }
+    } catch {}
+  }
+  // Profile from he_profile_v2 is the single source of truth — autocalc_state profile is NOT used
+  // to prevent data drift. Calculator-specific fields (neuro, cardio, etc.) come from autocalc_state above.
   return result;
 }

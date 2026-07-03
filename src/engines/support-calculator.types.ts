@@ -201,6 +201,7 @@ export interface CalculatorState {
   courseWeek?: number;
   boostEnabled?: boolean;
   jointMode?: boolean;
+  reproMode?: boolean;
 }
 
 // ─── Output ───

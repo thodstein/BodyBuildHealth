@@ -89,7 +89,7 @@ export function loadSessions(): WorkoutSession[] {
 
 function saveSessions(sessions: WorkoutSession[]) {
   sessions.sort((a, b) => b.date.localeCompare(a.date));
-  localStorage.setItem(LOG_KEY, JSON.stringify(sessions.slice(-500)));
+  localStorage.setItem(LOG_KEY, JSON.stringify(sessions.slice(-2000)));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

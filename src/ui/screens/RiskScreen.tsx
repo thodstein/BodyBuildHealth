@@ -152,23 +152,6 @@ export const RiskScreen: React.FC = () => {
     return [];
   }, [tick]);
 
-  // Load TZ Spec risk data from support calculator (sync C18)
-  const supportTzRisk = useMemo<{ raw: number; net: number; systems: Record<string, number>; subs: number; ts: number } | null>(() => {
-    try {
-      const sr = JSON.parse(localStorage.getItem('he_support_risk') || 'null');
-      if (sr && typeof sr.riskBeforeSupport === 'number') {
-        return {
-          raw: Math.round(sr.riskBeforeSupport),
-          net: Math.round(sr.riskAfterSupport),
-          systems: sr.systemSupport || {},
-          subs: Array.isArray(sr.subs) ? sr.subs.length : 0,
-          ts: sr.timestamp || 0,
-        };
-      }
-    } catch {}
-    return null;
-  }, [tick]);
-
   // Compute pharma risk — using TZ engine (single source of truth)
   // WITH support substances applied → overallRaw = raw risk, overallNet = risk after support reduction
   const pharmaRisk = useMemo<RiskResult | null>(() => {
@@ -642,97 +625,8 @@ export const RiskScreen: React.FC = () => {
             )}
           </div>
 
-          {/* Источники рисков — система breakdown из единого TZ-движка */}
-          <div className="card" style={{ marginBottom:10, padding:12 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>📋 Риск по системам организма (TZ engine)</div>
-            {pharmaRisk?.systemBreakdown ? (
-              <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                {Object.entries(pharmaRisk.systemBreakdown)
-                  .filter(([,v]) => (v as any).net > 0)
-                  .sort(([,a],[,b]) => (b as any).net - (a as any).net)
-                  .slice(0, 7)
-                  .map(([sys, val]) => {
-                    const v = val as { raw: number; net: number };
-                    const sysLabel: Record<string,string> = { cardio:'ССС', hepatic:'Печень', renal:'Почки', neuro:'НС', endocrine:'Энд.', hematologic:'Кровь', reproductive:'Репродуктивная', musculoskeletal:'ОДА', metabolic:'Метаболизм' };
-                    return (
-                      <div key={sys} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 8px', borderRadius:6, background:'var(--bg-secondary)' }}>
-                        <span style={{ fontSize:9, fontWeight:600, minWidth:70, color:'var(--text)' }}>{sysLabel[sys]||sys}</span>
-                        <div style={{ flex:1, height:6, borderRadius:3, background:'rgba(255,255,255,0.06)', overflow:'hidden', position:'relative' }}>
-                          <div style={{ position:'absolute', top:0, left:0, height:'100%', width:`${Math.min(100,v.raw)}%`, background:getRiskColor(v.raw), borderRadius:3, opacity:0.3 }} />
-                          <div style={{ position:'absolute', top:0, left:0, height:'100%', width:`${Math.min(100,v.net)}%`, background:getRiskColor(v.net), borderRadius:3 }} />
-                        </div>
-                        <span style={{ fontSize:9, fontWeight:700, minWidth:55, textAlign:'right', color:getRiskColor(v.net) }}>{Math.round(v.raw)}→{Math.round(v.net)}%</span>
-                      </div>
-                    );
-                  })}
-              </div>
-            ) : (
-              <div style={{ fontSize:10, color:'var(--text-dim)', textAlign:'center', padding:8 }}>Нет данных для расчёта</div>
-            )}
-            {pharmaRiskRaw && pharmaRisk && (
-              <div style={{ marginTop:6, fontSize:8, color:'var(--text-dim)', textAlign:'center' }}>
-                Общий: {Math.round(pharmaRiskRaw.overallRaw)}% → {Math.round(pharmaRisk.overallNet)}% · {supportSubstanceIds.length} веществ поддержки
-              </div>
-            )}
-          </div>
-
-          {/* Поддержка — эффективность — из ЕДИНОГО TZ-движка (raw vs net) */}
-          {pharmaRiskRaw && pharmaRisk && (() => {
-            const before = pharmaRiskRaw.overallRaw;
-            const after = pharmaRisk.overallNet;
-            const reduction = before - after;
-            const reductionPct = before > 0 ? Math.round((reduction / before) * 100) : 0;
-            return (
-              <div className="card" style={{ marginBottom:10, padding:12 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>🧪 Эффективность поддержки (TZ engine)</div>
-                <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:4 }}>
-                  <div style={{ flex:1, textAlign:'center', padding:'6px', borderRadius:8, background:'var(--bg-secondary)' }}>
-                    <div style={{ fontSize:8, color:'var(--text-dim)' }}>Без поддержки</div>
-                    <div style={{ fontSize:18, fontWeight:800, color:'#ef4444' }}>{Math.round(before)}%</div>
-                  </div>
-                  <div style={{ fontSize:16, color:'var(--text-dim)' }}>→</div>
-                  <div style={{ flex:1, textAlign:'center', padding:'6px', borderRadius:8, background:'var(--bg-secondary)' }}>
-                    <div style={{ fontSize:8, color:'var(--text-dim)' }}>С поддержкой</div>
-                    <div style={{ fontSize:18, fontWeight:800, color:'#22c55e' }}>{Math.round(after)}%</div>
-                  </div>
-                  <div style={{ flex:1, textAlign:'center', padding:'6px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)' }}>
-                    <div style={{ fontSize:8, color:'var(--text-dim)' }}>Снижение</div>
-                    <div style={{ fontSize:18, fontWeight:800, color: reduction > 0 ? '#00e68a' : '#ef4444' }}>-{reductionPct}%</div>
-                  </div>
-                </div>
-                {pharmaRisk?.systemBreakdown && (() => {
-                  const sysCov: Record<string, number> = {};
-                  for (const [sys, val] of Object.entries(pharmaRisk.systemBreakdown)) {
-                    const rawVal = pharmaRiskRaw?.systemBreakdown?.[sys] as { raw: number } | undefined;
-                    const v = val as { raw: number; net: number };
-                    if (rawVal && rawVal.raw > 0) {
-                      sysCov[sys] = Math.round((1 - v.net / rawVal.raw) * 100);
-                    }
-                  }
-                  const topSys = Object.entries(sysCov).filter(([,c]) => c > 0).sort(([,a],[,b]) => b-a).slice(0, 5);
-                  if (topSys.length > 0) return (
-                    <div style={{ marginTop:6, display:'flex', flexDirection:'column', gap:2 }}>
-                      {topSys.map(([sys, cov]) => {
-                        const sysNames: Record<string,string> = { cardio:'ССС', hepatic:'Печень', renal:'Почки', neuro:'НС', endocrine:'Энд.', hematologic:'Кровь', reproductive:'Реп.', musculoskeletal:'ОДА' };
-                        const color = cov >= 70 ? '#22c55e' : cov >= 40 ? '#f59e0b' : '#ef4444';
-                        return (
-                          <div key={sys} style={{ display:'flex', alignItems:'center', gap:4 }}>
-                            <span style={{ width:30, fontSize:7, color:'var(--text-dim)', textAlign:'right' }}>{sysNames[sys]||sys}</span>
-                            <div style={{ flex:1, height:4, borderRadius:2, background:'rgba(255,255,255,0.05)', overflow:'hidden' }}>
-                              <div style={{ width:`${cov}%`, height:'100%', borderRadius:2, background:color }} />
-                            </div>
-                            <span style={{ fontSize:7, fontWeight:700, color, minWidth:30 }}>{cov}%</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                  return null;
-                })()}
-                <div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'center' }}>Единый TZ engine · {supportSubstanceIds.length} веществ поддержки</div>
-              </div>
-            );
-          })()}
+          {/* Риск по системам и Эффективность поддержки — удалены, относятся к вероятностной модели */}
+          {/* Синхронизация с калькулятором — удалена, не относится к методам расчёта риска */}
 
           {/* 4 nav cards */}
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -998,7 +892,6 @@ export const RiskScreen: React.FC = () => {
                     { label: 'Вероятностная', icon: '📋', net: Math.round(riskResult?.overallNet ?? 0), raw: Math.round(riskResult?.overallRaw ?? 0), color: '#22c55e' },
                     { label: 'Монте-Карло', icon: '🎲', net: v7Result ? Math.round(v7Result.globalRiskNet) : null, raw: v7Result ? Math.round(v7Result.globalRiskRaw) : null, color: '#8b5cf6' },
                     { label: 'MDSS', icon: '🏥', net: mdssResult ? Math.round(mdssResult.overallMaxRisk) : null, raw: null, color: '#f97316' },
-                    { label: 'ТЗ-калькулятор', icon: '🧬', net: supportTzRisk?.net ?? null, raw: supportTzRisk?.raw ?? null, color: '#06b6d4' },
                   ].map((item, i) => (
                     <div key={i} style={{
                       flex: '1 1 30%', minWidth: 100, textAlign: 'center', padding: '10px 4px', borderRadius: 12,
@@ -1016,36 +909,6 @@ export const RiskScreen: React.FC = () => {
                 </div>
               </div>
 
-              {/* Support calculator sync card (C18) */}
-              {supportTzRisk && (
-                <div style={{ marginTop:10, padding:12, borderRadius:14, background:'rgba(6,182,212,0.06)', border:'1px solid rgba(6,182,212,0.2)' }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:'#06b6d4', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
-                    🧬 Синхронизация с калькулятором поддержки
-                  </div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:8 }}>
-                    <div style={{ flex:'1 1 45%', minWidth:120, padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.15)' }}>
-                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Риск без поддержки</div>
-                      <div style={{ fontSize:20, fontWeight:800, color:getRiskColor(supportTzRisk.raw) }}>{supportTzRisk.raw}%</div>
-                    </div>
-                    <div style={{ flex:'1 1 45%', minWidth:120, padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.15)' }}>
-                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Риск с поддержкой</div>
-                      <div style={{ fontSize:20, fontWeight:800, color:getRiskColor(supportTzRisk.net) }}>{supportTzRisk.net}%</div>
-                    </div>
-                  </div>
-                  <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>
-                    Веществ в плане: {supportTzRisk.subs} · Снижение: {supportTzRisk.raw - supportTzRisk.net}% · {supportTzRisk.ts ? new Date(supportTzRisk.ts).toLocaleDateString('ru-RU') : ''}
-                  </div>
-                  {Object.keys(supportTzRisk.systems).length > 0 && (
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
-                      {Object.entries(supportTzRisk.systems).map(([sys, val]) => (
-                        <span key={sys} style={{ fontSize:8, padding:'2px 6px', borderRadius:6, background:getRiskColor(val as number)+'15', color:getRiskColor(val as number) }}>
-                          {sys}: {Math.round(val as number)}%
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
                 {[
                   { id: 'basic', icon: '📋', title: 'Вероятностная модель', desc: 'Мультипликативная вероятностная модель риска. Обзор, динамика, механизмы.', color: '#22c55e', subs: 'Обзор • Динамика • Механизмы' },

@@ -112,6 +112,27 @@ export class StrengthDiary {
   /**
    * Get workout logs by date range
    */
+  /**
+   * Archive localStorage sessions to IndexedDB for durability.
+   * Sessions that are already in IDB (by id) are skipped.
+   * Returns count of newly archived sessions.
+   */
+  async archiveSessionsToIDB(): Promise<number> {
+    const lsSessions = loadSessions();
+    if (lsSessions.length === 0) return 0;
+    const idbLogs = await db.getAll<WorkoutLog>('workout_log');
+    const idbIds = new Set(idbLogs.map(l => l.id));
+    let archived = 0;
+    for (const session of lsSessions) {
+      const log = sessionToWorkoutLog(session);
+      if (!idbIds.has(log.id)) {
+        await db.put('workout_log', log);
+        archived++;
+      }
+    }
+    return archived;
+  }
+
   async getWorkoutLogsByDate(start: string, end: string): Promise<WorkoutLog[]> {
     const logs = await db.getAll<WorkoutLog>('workout_log');
     return logs.filter(w => w.date >= start && w.date <= end).sort((a, b) => b.date.localeCompare(a.date));

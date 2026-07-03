@@ -90,6 +90,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [manualLevelSelected, setManualLevelSelected] = useState(false);
   const [boostEnabled, setBoostEnabled] = useState(false);
   const [jointMode, setJointMode] = useState(false);
+  const [reproMode, setReproMode] = useState(false);
   const stateRef = useRef<CalculatorState | null>(null);
   const [myPlansRefresh, setMyPlansRefresh] = useState(0);
   const [weekChangeMsg, setWeekChangeMsg] = useState('');
@@ -367,10 +368,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   ], [neuroScore]);
 
   const SUPPORT_LEVELS: Record<string, { label: string; desc: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }> }> = {
-    basic: { label: '🟢 База', desc: 'Нет высокого риска (≤50%)', subs: [], dosages: {} },
-    mid: { label: '🟡 Средний', desc: 'Нет выраженного риска (≤35%)', subs: [], dosages: {} },
-    max: { label: '🟠 Максимум', desc: 'Нижний умеренный (≤25%)', subs: [], dosages: {} },
-    boost: { label: '🔴 Буст', desc: 'Слабый риск (≤15%)', subs: [], dosages: {} },
+    basic: { label: '🟢 База', desc: 'Риск 55-65%', subs: [], dosages: {} },
+    mid: { label: '🟡 Средний', desc: 'Риск 45-55%', subs: [], dosages: {} },
+    max: { label: '🟠 Максимум', desc: 'Риск 30-45%', subs: [], dosages: {} },
+    boost: { label: '🔴 Буст', desc: 'Риск 15-30%', subs: [], dosages: {} },
   };
 
   useEffect(() => {
@@ -505,17 +506,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       subs.push('hcg');
       dosages['hcg'] = DEFAULT_DOSAGES['hcg'] || { mg: 500, timing: '2x/нед, схема 3/1 (МЕ)' };
     }
-    // Merge TZ engine substances (from calcSupport) with old engine
-    if (calcResult?.selectedSubstances) {
-      for (const tzId of calcResult.selectedSubstances) {
-        if (!subs.includes(tzId)) {
-          subs.push(tzId);
-          dosages[tzId] = dosages[tzId] || DEFAULT_DOSAGES[tzId] || { mg: 500, timing: 'с едой' };
-        }
-      }
-    }
+    // BUG 8: Убрано добавление calcResult.selectedSubstances в effectiveLevel
+    // TZ-движок уже включает все вещества (обязательные + рекомендации + breadth + targeted)
+    // Дубли убраны — subs берётся только из старого движка + enhancedSubs + phase
     return { subs, dosages, planResult: result };
-  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, linked.course, linked.profile, courseWeekState, boostEnabled, jointMode, calcResult]);
+  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, linked.course, linked.profile, courseWeekState, boostEnabled, jointMode]);
 
   // C4: Track plan changes in history
   useEffect(() => {
@@ -566,6 +561,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       courseWeek: courseWeekState,
       boostEnabled: boostEnabled,
       jointMode: jointMode,
+      reproMode: reproMode,
     } as CalculatorState;
     stateRef.current = state;
     const tzResult: CalculatorResult = calculateSupportTZ(state);
@@ -4327,10 +4323,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               <table style={{ width:'100%', fontSize:9, borderCollapse:'collapse', margin:'4px 0' }}>
                 <thead><tr style={{ background:'rgba(0,0,0,0.2)' }}><th style={{ padding:'4px 6px', textAlign:'left' }}>Уровень</th><th style={{ padding:'4px 6px' }}>Целевой риск</th><th style={{ padding:'4px 6px' }}>Max/систему</th></tr></thead>
                 <tbody>
-                  <tr><td style={{ padding:'4px 6px' }}>🟢 База</td><td style={{ padding:'4px 6px', textAlign:'center' }}>≤50%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>2</td></tr>
-                  <tr><td style={{ padding:'4px 6px' }}>🟡 Средний</td><td style={{ padding:'4px 6px', textAlign:'center' }}>≤35%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>3</td></tr>
-                  <tr><td style={{ padding:'4px 6px' }}>🟠 Максимум</td><td style={{ padding:'4px 6px', textAlign:'center' }}>≤25%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>4</td></tr>
-                  <tr><td style={{ padding:'4px 6px' }}>🔴 Буст</td><td style={{ padding:'4px 6px', textAlign:'center' }}>≤15%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>5</td></tr>
+                  <tr><td style={{ padding:'4px 6px' }}>🟢 База</td><td style={{ padding:'4px 6px', textAlign:'center' }}>55-65%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>2</td></tr>
+                  <tr><td style={{ padding:'4px 6px' }}>🟡 Средний</td><td style={{ padding:'4px 6px', textAlign:'center' }}>45-55%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>3</td></tr>
+                  <tr><td style={{ padding:'4px 6px' }}>🟠 Максимум</td><td style={{ padding:'4px 6px', textAlign:'center' }}>30-45%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>4</td></tr>
+                  <tr><td style={{ padding:'4px 6px' }}>🔴 Буст</td><td style={{ padding:'4px 6px', textAlign:'center' }}>15-30%</td><td style={{ padding:'4px 6px', textAlign:'center' }}>5</td></tr>
                 </tbody>
               </table>
               <p style={{ margin:'4px 0 0', fontSize:9, color:'var(--text-dim)' }}>🔥 Усиление: снижает целевой риск на 5% (буст→10%, макс→20%). 🦴 Суставы: отдельный стек, не в основном плане.</p>
@@ -4369,7 +4365,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 <li><b>🔬 Лаб-находки:</b> отклонения анализов с рекомендованными веществами</li>
                 <li><b>🧩 Стеки:</b> рекомендованные комбинации с рейтингом и кнопкой «+ В план»</li>
                 <li><b>📅 Таймлайн доз:</b> таблица дозировок по неделям 1→12</li>
-                <li><b>👨‍⚕️ Заключение:</b> структурированный отчёт для врача</li>
+                <li><b>📄 Отчёт:</b> структурированный отчёт по плану поддержки</li>
                 <li><b>💾 Сохранение:</b> в Мои планы с проверкой дубликатов, копирование заключения</li>
               </ul>
             </div>
@@ -5405,6 +5401,28 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 🧮 Рассчитать поддержку
               </button>
 
+              {/* Toggle buttons: available in BOTH intelligent and manual modes */}
+              <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+                <button onClick={() => { setBoostEnabled(!boostEnabled); setTimeout(() => calcSupport(), 50); }} style={{
+                  flex:1, padding:'8px 6px', borderRadius:10, fontSize:9, fontWeight:700, cursor:'pointer',
+                  background: boostEnabled ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)',
+                  border: boostEnabled ? '2px solid rgba(239,68,68,0.4)' : '1px solid rgba(255,255,255,0.06)',
+                  color: boostEnabled ? '#ef4444' : 'var(--text-dim)',
+                }}>🔥 Усиление</button>
+                <button onClick={() => { setJointMode(!jointMode); setTimeout(() => calcSupport(), 50); }} style={{
+                  flex:1, padding:'8px 6px', borderRadius:10, fontSize:9, fontWeight:700, cursor:'pointer',
+                  background: jointMode ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.03)',
+                  border: jointMode ? '2px solid rgba(139,92,246,0.4)' : '1px solid rgba(255,255,255,0.06)',
+                  color: jointMode ? '#8b5cf6' : 'var(--text-dim)',
+                }}>🦴 Суставы</button>
+                <button onClick={() => { setReproMode(!reproMode); setTimeout(() => calcSupport(), 50); }} style={{
+                  flex:1, padding:'8px 6px', borderRadius:10, fontSize:9, fontWeight:700, cursor:'pointer',
+                  background: reproMode ? 'rgba(236,72,153,0.12)' : 'rgba(255,255,255,0.03)',
+                  border: reproMode ? '2px solid rgba(236,72,153,0.4)' : '1px solid rgba(255,255,255,0.06)',
+                  color: reproMode ? '#ec4899' : 'var(--text-dim)',
+                }}>⚧ Репродукт.</button>
+              </div>
+
               {/* Active mode banners */}
               {boostEnabled && (
                 <div style={{ marginBottom:6, padding:'8px 12px', borderRadius:8, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', fontSize:9, color:'#ef4444', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -5416,6 +5434,12 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 <div style={{ marginBottom:6, padding:'8px 12px', borderRadius:8, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', fontSize:9, color:'#8b5cf6', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <span>🦴 Режим суставов — отдельные препараты (не в основном стеке)</span>
                   <button onClick={() => { setJointMode(false); calcSupport(); }} style={{ background:'none', border:'none', color:'#8b5cf6', cursor:'pointer', fontSize:10, fontWeight:700 }}>✕</button>
+                </div>
+              )}
+              {reproMode && (
+                <div style={{ marginBottom:6, padding:'8px 12px', borderRadius:8, background:'rgba(236,72,153,0.08)', border:'1px solid rgba(236,72,153,0.2)', fontSize:9, color:'#ec4899', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span>⚧ Репродуктивная система — добавлены препараты для HPTA/сперматогенеза</span>
+                  <button onClick={() => { setReproMode(false); calcSupport(); }} style={{ background:'none', border:'none', color:'#ec4899', cursor:'pointer', fontSize:10, fontWeight:700 }}>✕</button>
                 </div>
               )}
               
@@ -5749,10 +5773,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       </div>
                       <div style={{ marginBottom:6, padding:'6px 8px', borderRadius:6, background:'rgba(0,0,0,0.1)' }}>
                         <b>Уровни и целевой риск:</b><br/>
-                        🟢 База ≤50% (нет высокого) · 2/систему<br/>
-                        🟡 Средний ≤35% (нет выраженного) · 3/систему<br/>
-                        🟠 Максимум ≤25% (нижний умеренный) · 4/систему<br/>
-                        🔴 Буст ≤15% (слабый) · 5/систему<br/>
+                        🟢 База 55-65% · 2/систему<br/>
+                        🟡 Средний 45-55% · 3/систему<br/>
+                        🟠 Максимум 30-45% · 4/систему<br/>
+                        🔴 Буст 15-30% · 5/систему<br/>
                         🔥 Усиление: target -5%, max +1/систему<br/>
                         🦴 Суставы: отдельный стек, не влияет на расчёт риска
                       </div>
@@ -5761,60 +5785,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       </div>
                     </div>
                   </details>
-
-                  {/* ===== TIME-BLOCK TABLE (D1) ===== */}
-                  {(() => {
-                    const flatSched = calcResult?.schedule || planResult?.schedule || [];
-                    if (!flatSched || flatSched.length === 0) return null;
-                    // Group by timeBlock (support both flat ScheduleItem and grouped format)
-                    const grouped: { timeBlock: string; substances: any[] }[] = [];
-                    for (const item of flatSched) {
-                      if (item.substances) {
-                        // Already grouped format (old engine)
-                        grouped.push(item);
-                      } else if (item.substanceId) {
-                        // Flat format (TZ engine) → group
-                        let g = grouped.find(g => g.timeBlock === item.timeBlock);
-                        if (!g) { g = { timeBlock: item.timeBlock, substances: [] }; grouped.push(g); }
-                        g.substances.push(item);
-                      }
-                    }
-                    return (
-                    <div style={{ marginBottom:10 }}>
-                      <div style={{ fontSize:10, fontWeight:700, color:'var(--text-light)', marginBottom:6 }}>📋 План по времени приёма ({flatSched.length} препар.)</div>
-                      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                        {grouped.map((block: any, bi: number) => (
-                          <div key={bi} style={{ borderRadius:8, overflow:'hidden', border:'1px solid var(--border)' }}>
-                            <div style={{ padding:'6px 10px', fontSize:9, fontWeight:700, background:'rgba(0,230,138,0.08)', color:'var(--accent)' }}>
-                              {block.timeBlock}
-                            </div>
-                            <table style={{ width:'100%', fontSize:8, borderCollapse:'collapse' }}>
-                              <thead>
-                                <tr style={{ background:'rgba(0,0,0,0.06)' }}>
-                                  <th style={{ padding:'4px 6px', textAlign:'left', color:'var(--text-dim)', fontWeight:600 }}>Препарат</th>
-                                  <th style={{ padding:'4px 6px', textAlign:'left', color:'var(--text-dim)', fontWeight:600 }}>Доза</th>
-                                  <th style={{ padding:'4px 6px', textAlign:'left', color:'var(--text-dim)', fontWeight:600 }}>Указание</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {block.substances.map((s: any, si: number) => {
-                                  return (
-                                    <tr key={si} style={{ borderBottom:'1px solid var(--border)', cursor:'pointer' }}
-                                      onClick={() => setExpandedCategories(p => ({ ...p, [s.id]: !p[s.id] }))}>
-                                      <td style={{ padding:'4px 6px', fontWeight:600, color:'var(--text-light)' }}>{s.name}</td>
-                                      <td style={{ padding:'4px 6px', color:'#00e68a', fontWeight:600 }}>{s.dose}</td>
-                                      <td style={{ padding:'4px 6px', color:'var(--text-dim)', fontSize:7 }}>{s.instructions}</td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    );
-                  })()}
 
                   {/* ===== ADD SUBSTANCE SEARCH ===== */}
                   <div style={{marginBottom:10}}>
@@ -6214,67 +6184,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       </div>
                     </details>
                   )}
-                  {/* ===== C3: MECHANISM COVERAGE MATRIX ===== */}
-                  {planResult?.mechanisms && planResult.mechanisms.length > 0 && (
-                    <details style={{ marginBottom:10 }}>
-                      <summary style={{ fontSize:10, fontWeight:700, color:'#8b5cf6', cursor:'pointer', marginBottom:4 }}>🧬 Матрица покрытия механизмов</summary>
-                      <div style={{ padding:'6px', borderRadius:8, background:'rgba(139,92,246,0.03)', border:'1px solid rgba(139,92,246,0.12)', overflowX:'auto' }}>
-                        <div style={{ display:'grid', gridTemplateColumns:'auto repeat(8, 1fr)', gap:2, minWidth:600 }}>
-                          {(() => {
-                            const allSyss = ['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal'];
-                            const maxMechs = 8;
-                            const sysLabels: Record<string, string> = { cardio:'ССС', hepatic:'Печень', renal:'Почки', neuro:'НС', endocrine:'Энд.', hematologic:'Кровь', reproductive:'Реп.', musculoskeletal:'ОДА' };
-                            // Header row
-                            const header= [<div key="h" style={{ fontSize:7, color:'var(--text-dim)', padding:'2px', fontWeight:600 }}>Мех.</div>];
-                            for (const sys of allSyss) {
-                              header.push(<div key={sys} style={{ fontSize:7, color:'var(--text-light)', padding:'2px', fontWeight:600, textAlign:'center' }}>{sysLabels[sys]}</div>);
-                            }
-                            // Mechanism rows
-                            const rows = [];
-                            for (let m = 1; m <= maxMechs; m++) {
-                              const cells = [<div key={`m${m}`} style={{ fontSize:7, color:'var(--text-dim)', padding:'2px 4px' }}>M{m}</div>];
-                              for (const sys of allSyss) {
-                                const mechKey = `${sys}_${m}`;
-                                const mech = planResult.mechanisms.find((mc: any) => mc.mechKey === mechKey);
-                                const uncovered = planResult.uncoveredMechanisms?.some((um: any) => um.mechKey === mechKey);
-                                const risk = planResult.systems?.[sys]?.raw || 0;
-                                let color = 'rgba(255,255,255,0.03)';
-                                let text = '';
-                                let tooltip = '';
-                                if (mech && mech.substances.length > 0) {
-                                  color = '#22c55e';
-                                  text = mech.substances.length.toString();
-                                  tooltip = `${mech.mechLabel}: ${mech.substances.join(', ')}`;
-                                } else if (uncovered && risk > 0) {
-                                  color = '#ef4444';
-                                  text = '!';
-                                  tooltip = `${sysLabels[sys]} не покрыто`;
-                                } else if (risk > 0) {
-                                  color = 'rgba(239,68,68,0.2)';
-                                  text = '·';
-                                }
-                                cells.push(
-                                  <div key={`${sys}_${m}`} title={tooltip}
-                                    style={{ fontSize:7, fontWeight:600, color: text === '!' ? '#fff' : '#fff',
-                                      background: color, borderRadius:3, padding:'3px 1px', textAlign:'center',
-                                      minWidth:18, cursor:tooltip?'help':'default', opacity: color==='#22c55e' ? 0.9 : color.includes('239') ? 0.4 : 0.8 }}>
-                                    {text}
-                                  </div>
-                                );
-                              }
-                              rows.push(<React.Fragment key={`r${m}`}>{cells}</React.Fragment>);
-                            }
-                            return [...header, ...rows];
-                          })()}
-                        </div>
-                        <div style={{ display:'flex', gap:8, marginTop:6, fontSize:7, color:'var(--text-dim)' }}>
-                          <span><span style={{ display:'inline-block', width:10, height:10, borderRadius:2, background:'#22c55e', marginRight:2, verticalAlign:'middle' }} /> Покрыто (N веществ)</span>
-                          <span><span style={{ display:'inline-block', width:10, height:10, borderRadius:2, background:'#ef4444', marginRight:2, verticalAlign:'middle' }} /> Не покрыто</span>
-                          <span><span style={{ display:'inline-block', width:10, height:10, borderRadius:2, background:'rgba(239,68,68,0.2)', marginRight:2, verticalAlign:'middle' }} /> Низкий риск</span>
-                        </div>
-                      </div>
-                    </details>
-                  )}
 
                   {/* ===== MONITORING CARD ===== */}
                   {planResult?.monitoring && planResult.monitoring.length > 0 && (
@@ -6300,40 +6209,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     </details>
                   )}
 
-                  {/* ===== C4: CHANGE HISTORY ===== */}
-                  {planHistory.length > 1 && (
-                    <details style={{ marginBottom:10 }}>
-                      <summary style={{ fontSize:10, fontWeight:700, color:'#60a5fa', cursor:'pointer', marginBottom:4 }}>📜 История изменений плана ({planHistory.length})</summary>
-                      <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(96,165,250,0.03)', border:'1px solid rgba(96,165,250,0.1)', fontSize:7, color:'var(--text-dim)', maxHeight:'20vh', overflowY:'auto' }}>
-                        {planHistory.slice().reverse().map((h, i) => (
-                          <div key={i} style={{ marginBottom:3, padding:'3px 6px', borderRadius:4, background:'rgba(0,0,0,0.04)', display:'flex', justifyContent:'space-between' }}>
-                            <span>{h.date}</span>
-                            <span style={{ fontWeight:600, color:'var(--accent)' }}>{SUPPORT_LEVELS[h.level]?.label || h.level}</span>
-                            <span>{h.subs.length} вещ.</span>
-                            <span style={{ color: h.riskAfter < h.riskBefore ? '#22c55e' : '#ef4444' }}>{h.riskBefore}%→{h.riskAfter}%</span>
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-                  )}
-
-                  {/* ===== WEEKLY DOSE TIMELINE ===== */}
-                  {planResult?.substances && planResult.substances.length > 0 && (
-                    <details style={{marginBottom:10}}>
-                      <summary style={{fontSize:10,fontWeight:700,color:'#60a5fa',cursor:'pointer',marginBottom:4}}>📅 Динамика доз по неделям (1→12)</summary>
-                      <div style={{padding:'6px',borderRadius:8,background:'rgba(96,165,250,0.03)',border:'1px solid rgba(96,165,250,0.1)',overflowX:'auto'}}>
-                        <table style={{width:'100%',fontSize:7,borderCollapse:'collapse',minWidth:400}}>
-                          <thead><tr style={{borderBottom:'1px solid var(--border)'}}><th style={{padding:'2px 4px',textAlign:'left',color:'var(--text-dim)'}}>Вещество</th>{[1,2,4,6,8,12].map(w=><th key={w} style={{padding:'2px 4px',textAlign:'center',color:w===courseWeekState?'var(--accent)':'var(--text-dim)',fontWeight:w===courseWeekState?700:400}}>{w}н{w===courseWeekState?'✦':''}</th>)}</tr></thead>
-                          <tbody>{planResult.substances.slice(0,10).map((sub:PlanSubstance)=>{const bd=sub.doseMg/((sub.fromBoost||sub.fromJoint)?1.5:1);return <tr key={sub.id} style={{borderBottom:'1px solid var(--border)'}}><td style={{padding:'2px 4px',fontWeight:600,color:'var(--text-light)'}}>{sub.name}</td>{[1,2,4,6,8,12].map(w=>{const ws=w<=2?0.6:w<=4?0.8:w<=6?0.9:1;const wd=Math.round(bd*ws*(w>=8?1.3:w>=4?1.1:1));const ic=w===courseWeekState;return <td key={w} style={{padding:'2px 4px',textAlign:'center',fontWeight:ic?700:400,color:ic?'#00e68a':'var(--text-dim)',background:ic?'rgba(0,230,138,0.06)':'transparent'}}>{wd>=5000?(wd/1000).toFixed(1)+'г':wd+'мг'}</td>;})}</tr>;})}</tbody>
-                        </table>
-                        <div style={{fontSize:7,color:'var(--text-dim)',marginTop:4}}>✦ Текущая неделя · 1-2: старт (60%) · 3-4: разгон (80%) · 5-6: плато (90%) · 7+: полные дозы (100%)</div>
-                      </div>
-                    </details>
-                  )}
                   {/* ===== C5: DOCTOR'S CONCLUSION ===== */}
                   {planResult && (
                     <details style={{ marginBottom:10 }}>
-                      <summary style={{ fontSize:10, fontWeight:700, color:'#60a5fa', cursor:'pointer', marginBottom:4 }}>👨‍⚕️ Заключение для врача</summary>
+                      <summary style={{ fontSize:10, fontWeight:700, color:'#60a5fa', cursor:'pointer', marginBottom:4 }}>📄 Отчёт</summary>
                       <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(96,165,250,0.04)', border:'1px solid rgba(96,165,250,0.15)' }}>
                         <div style={{ fontSize:9, color:'var(--text-light)', lineHeight:1.5, whiteSpace:'pre-line' }}>
                           <div style={{ fontWeight:700, marginBottom:4 }}>📋 ОБОСНОВАНИЕ НАЗНАЧЕНИЙ</div>

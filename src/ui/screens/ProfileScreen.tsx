@@ -13,8 +13,8 @@ import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { BioStackAISettings } from '../components/BioStackAIProfile';
 
 type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' 
-  | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'analytics' 
-  | 'contacts' | 'bp_diary' | 'measurements' | 'diaries' | 'calculator_data' | 'nutrition_planner' | 'biostack_profile';
+  | 'genetics' | 'injuries' | 'progress' | 'analytics' 
+  | 'contacts' | 'bp_diary' | 'measurements' | 'health';
 type ProfilePage = 'hero' | 'tabs';
 type MainTab = 'info' | 'analytics' | 'contacts';
 
@@ -617,13 +617,13 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
     { id: 'overview', label: 'Обзор' },
     { id: 'anthropometry', label: 'Тело' },
     { id: 'lifestyle', label: 'Образ жизни' },
+    { id: 'health', label: '🏥 Здоровье' },
     { id: 'diet', label: 'Питание' },
     { id: 'genetics', label: 'Генетика' },
     { id: 'injuries', label: 'Травмы' },
     { id: 'sleep', label: '🛌 Сон' },
     { id: 'bp_diary', label: '❤️ Давление' },
     { id: 'measurements', label: '📏 Замеры' },
-    { id: 'diaries', label: '📔 Дневники' },
   ];
 
   const initials = (profile.name || 'П').charAt(0).toUpperCase();
@@ -1126,6 +1126,185 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
             </InfoErrorBoundary>
           )}
 
+          {/* ═══ HEALTH TAB (данные для калькуляторов) ═══ */}
+          {tab === 'health' && (
+            <InfoErrorBoundary label="Здоровье">
+            <div>
+              <div style={{ marginBottom:12 }}>
+                <h3 style={{ margin:'0 0 4px', fontSize:15, fontWeight:800, color:'#fff' }}>🏥 Данные здоровья</h3>
+                <p style={{ fontSize:10, color:'rgba(255,255,255,0.5)', margin:0 }}>Данные для калькулятора поддержки и риск-движка. Заполняется один раз.</p>
+              </div>
+              <div style={glassCard}>
+                <div style={sectionLabel}>🫁 Гепатобилиарная</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>АЛТ/АСТ</span>
+                    <select style={appleInput} value={calcData?.hepatobiliary?.altAstElevation || 'none'} onChange={e => upCalc('hepatobiliary', { ...calcData?.hepatobiliary, altAstElevation: e.target.value })}>
+                      <option value="none">Норма</option><option value="mild">Лёгкое ↑</option><option value="moderate">Умеренное ↑</option><option value="severe">Выраженное ↑</option>
+                    </select>
+                  </div>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>ГГТ</span>
+                    <select style={appleInput} value={calcData?.hepatobiliary?.ggtElevation || 'none'} onChange={e => upCalc('hepatobiliary', { ...calcData?.hepatobiliary, ggtElevation: e.target.value })}>
+                      <option value="none">Норма</option><option value="mild">Лёгкое ↑</option><option value="moderate">Умеренное ↑</option><option value="severe">Выраженное ↑</option>
+                    </select>
+                  </div>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>Билирубин</span>
+                    <select style={appleInput} value={calcData?.hepatobiliary?.bilirubinElevation || 'none'} onChange={e => upCalc('hepatobiliary', { ...calcData?.hepatobiliary, bilirubinElevation: e.target.value })}>
+                      <option value="none">Норма</option><option value="mild">Лёгкое ↑</option><option value="moderate">Умеренное ↑</option>
+                    </select>
+                  </div>
+                  <div style={{ display:'flex', gap:4 }}>
+                    <button onClick={() => upCalc('hepatobiliary', { ...calcData?.hepatobiliary, fattyLiver: !calcData?.hepatobiliary?.fattyLiver })} style={pillBtn(!!calcData?.hepatobiliary?.fattyLiver)}>Жировая печень</button>
+                    <button onClick={() => upCalc('hepatobiliary', { ...calcData?.hepatobiliary, cholecystitis: !calcData?.hepatobiliary?.cholecystitis })} style={pillBtn(!!calcData?.hepatobiliary?.cholecystitis)}>Холецистит</button>
+                  </div>
+                </div>
+              </div>
+              <div style={glassCard}>
+                <div style={sectionLabel}>💧 Мочевыделительная</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>Креатинин</span>
+                    <select style={appleInput} value={calcData?.urinary?.creatinineElevation || 'none'} onChange={e => upCalc('urinary', { ...calcData?.urinary, creatinineElevation: e.target.value })}>
+                      <option value="none">Норма</option><option value="mild">Лёгкое ↑</option><option value="moderate">Умеренное ↑</option>
+                    </select>
+                  </div>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>Мочевина</span>
+                    <select style={appleInput} value={calcData?.urinary?.ureaElevation || 'none'} onChange={e => upCalc('urinary', { ...calcData?.urinary, ureaElevation: e.target.value })}>
+                      <option value="none">Норма</option><option value="mild">Лёгкое ↑</option><option value="moderate">Умеренное ↑</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
+                  <button onClick={() => upCalc('urinary', { ...calcData?.urinary, proteinuria: !calcData?.urinary?.proteinuria })} style={pillBtn(!!calcData?.urinary?.proteinuria)}>Протеинурия</button>
+                  <button onClick={() => upCalc('urinary', { ...calcData?.urinary, hypertension: !calcData?.urinary?.hypertension })} style={pillBtn(!!calcData?.urinary?.hypertension)}>Гипертония</button>
+                  <button onClick={() => upCalc('urinary', { ...calcData?.urinary, diabetes: !calcData?.urinary?.diabetes })} style={pillBtn(!!calcData?.urinary?.diabetes)}>Диабет</button>
+                </div>
+              </div>
+              <div style={glassCard}>
+                <div style={sectionLabel}>❤️ ССС</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>АД</span>
+                    <select style={appleInput} value={calcData?.cardio?.bpStage || 'normal'} onChange={e => upCalc('cardio', { ...calcData?.cardio, bpStage: e.target.value })}>
+                      <option value="normal">Норма</option><option value="high_normal">Высокая норма</option><option value="hypertension1">Гипертензия 1</option><option value="hypertension2">Гипертензия 2</option>
+                    </select>
+                  </div>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>ЧСС</span>
+                    <input style={appleInput} type="number" value={calcData?.cardio?.heartRate || ''} onChange={e => upCalc('cardio', { ...calcData?.cardio, heartRate: parseInt(e.target.value) || 0 })} placeholder="70" />
+                  </div>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>ЛПНП</span>
+                    <select style={appleInput} value={calcData?.cardio?.ldlElevation || 'none'} onChange={e => upCalc('cardio', { ...calcData?.cardio, ldlElevation: e.target.value })}>
+                      <option value="none">Норма</option><option value="mild">Лёгкое ↑</option><option value="moderate">Умеренное ↑</option><option value="severe">Выраженное ↑</option>
+                    </select>
+                  </div>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>Гематокрит</span>
+                    <select style={appleInput} value={calcData?.cardio?.hctElevation || 'none'} onChange={e => upCalc('cardio', { ...calcData?.cardio, hctElevation: e.target.value })}>
+                      <option value="none">Норма</option><option value="mild">Лёгкое ↑</option><option value="moderate">Умеренное ↑</option><option value="severe">Выраженное ↑</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
+                  <button onClick={() => upCalc('cardio', { ...calcData?.cardio, previousCVD: !calcData?.cardio?.previousCVD })} style={pillBtn(!!calcData?.cardio?.previousCVD)}>ССЗ в анамнезе</button>
+                  <button onClick={() => upCalc('cardio', { ...calcData?.cardio, familyCVD: !calcData?.cardio?.familyCVD })} style={pillBtn(!!calcData?.cardio?.familyCVD)}>Наследственность</button>
+                </div>
+              </div>
+              <div style={glassCard}>
+                <div style={sectionLabel}>🧠 Неврология</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>Дофамин (1-5)</span><input style={appleInput} type="number" min="1" max="5" value={calcData?.neuro?.dopamineScore || ''} onChange={e => upCalc('neuro', { ...calcData?.neuro, dopamineScore: parseInt(e.target.value) || 0 })} /></div>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>Серотонин (1-5)</span><input style={appleInput} type="number" min="1" max="5" value={calcData?.neuro?.serotoninScore || ''} onChange={e => upCalc('neuro', { ...calcData?.neuro, serotoninScore: parseInt(e.target.value) || 0 })} /></div>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>Агрессия (1-5)</span><input style={appleInput} type="number" min="1" max="5" value={calcData?.neuro?.aggressionScore || ''} onChange={e => upCalc('neuro', { ...calcData?.neuro, aggressionScore: parseInt(e.target.value) || 0 })} /></div>
+                </div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
+                  <button onClick={() => upCalc('neuro', { ...calcData?.neuro, memoryIssues: !calcData?.neuro?.memoryIssues })} style={pillBtn(!!calcData?.neuro?.memoryIssues)}>Память</button>
+                  <button onClick={() => upCalc('neuro', { ...calcData?.neuro, focusIssues: !calcData?.neuro?.focusIssues })} style={pillBtn(!!calcData?.neuro?.focusIssues)}>Концентрация</button>
+                  <button onClick={() => upCalc('neuro', { ...calcData?.neuro, headaches: !calcData?.neuro?.headaches })} style={pillBtn(!!calcData?.neuro?.headaches)}>Головные боли</button>
+                </div>
+              </div>
+              <div style={glassCard}>
+                <div style={sectionLabel}>🫀 ЖКТ</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                  <button onClick={() => upCalc('gi', { ...calcData?.gi, bloating: !calcData?.gi?.bloating })} style={pillBtn(!!calcData?.gi?.bloating)}>Вздутие</button>
+                  <button onClick={() => upCalc('gi', { ...calcData?.gi, heartburn: !calcData?.gi?.heartburn })} style={pillBtn(!!calcData?.gi?.heartburn)}>Изжога</button>
+                  <button onClick={() => upCalc('gi', { ...calcData?.gi, diarrhea: !calcData?.gi?.diarrhea })} style={pillBtn(!!calcData?.gi?.diarrhea)}>Диарея</button>
+                  <button onClick={() => upCalc('gi', { ...calcData?.gi, constipation: !calcData?.gi?.constipation })} style={pillBtn(!!calcData?.gi?.constipation)}>Запор</button>
+                  <button onClick={() => upCalc('gi', { ...calcData?.gi, diagnosedIBS: !calcData?.gi?.diagnosedIBS })} style={pillBtn(!!calcData?.gi?.diagnosedIBS)}>СРК</button>
+                </div>
+              </div>
+              <div style={glassCard}>
+                <div style={sectionLabel}>🦴 ОДА</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                  <button onClick={() => upCalc('oda', { ...calcData?.oda, jointPain: calcData?.oda?.jointPain === 'mild' ? 'none' : 'mild' })} style={pillBtn(calcData?.oda?.jointPain === 'mild')}>Боль в суставах</button>
+                  <button onClick={() => upCalc('oda', { ...calcData?.oda, ligamentIssues: !calcData?.oda?.ligamentIssues })} style={pillBtn(!!calcData?.oda?.ligamentIssues)}>Связки</button>
+                  <button onClick={() => upCalc('oda', { ...calcData?.oda, backPain: !calcData?.oda?.backPain })} style={pillBtn(!!calcData?.oda?.backPain)}>Боль в спине</button>
+                </div>
+              </div>
+              <div style={glassCard}>
+                <div style={sectionLabel}>📋 Эпикриз</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                  <button onClick={() => upCalc('epicrisis', { ...calcData?.epicrisis, pastGyno: !calcData?.epicrisis?.pastGyno })} style={pillBtn(!!calcData?.epicrisis?.pastGyno)}>Гинекомастия</button>
+                  <button onClick={() => upCalc('epicrisis', { ...calcData?.epicrisis, pastLibidoDrop: !calcData?.epicrisis?.pastLibidoDrop })} style={pillBtn(!!calcData?.epicrisis?.pastLibidoDrop)}>↓ Либидо</button>
+                  <button onClick={() => upCalc('epicrisis', { ...calcData?.epicrisis, pastHctSpike: !calcData?.epicrisis?.pastHctSpike })} style={pillBtn(!!calcData?.epicrisis?.pastHctSpike)}>↑ HCT</button>
+                  <button onClick={() => upCalc('epicrisis', { ...calcData?.epicrisis, pastLiverIssues: !calcData?.epicrisis?.pastLiverIssues })} style={pillBtn(!!calcData?.epicrisis?.pastLiverIssues)}>Печень</button>
+                  <button onClick={() => upCalc('epicrisis', { ...calcData?.epicrisis, pastKidneyIssues: !calcData?.epicrisis?.pastKidneyIssues })} style={pillBtn(!!calcData?.epicrisis?.pastKidneyIssues)}>Почки</button>
+                </div>
+              </div>
+              <div style={glassCard}>
+                <div style={sectionLabel}>🎯 Цели курса</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                  <button onClick={() => upCalc('goals', { ...calcData?.goals, healthMaintenance: !calcData?.goals?.healthMaintenance })} style={pillBtn(!!calcData?.goals?.healthMaintenance)}>Здоровье</button>
+                  <button onClick={() => upCalc('goals', { ...calcData?.goals, competitionPrep: !calcData?.goals?.competitionPrep })} style={pillBtn(!!calcData?.goals?.competitionPrep)}>Соревнования</button>
+                  <button onClick={() => upCalc('goals', { ...calcData?.goals, lipidCorrection: !calcData?.goals?.lipidCorrection })} style={pillBtn(!!calcData?.goals?.lipidCorrection)}>Липиды</button>
+                  <button onClick={() => upCalc('goals', { ...calcData?.goals, bloodThinning: !calcData?.goals?.bloodThinning })} style={pillBtn(!!calcData?.goals?.bloodThinning)}>Кровь</button>
+                  <button onClick={() => upCalc('goals', { ...calcData?.goals, liverDetox: !calcData?.goals?.liverDetox })} style={pillBtn(!!calcData?.goals?.liverDetox)}>Печень</button>
+                  <button onClick={() => upCalc('goals', { ...calcData?.goals, bpControl: !calcData?.goals?.bpControl })} style={pillBtn(!!calcData?.goals?.bpControl)}>АД</button>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:6 }}>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>Длина цикла (нед)</span>
+                    <input style={appleInput} type="number" value={calcData?.goals?.cycleWeeks || ''} onChange={e => upCalc('goals', { ...calcData?.goals, cycleWeeks: parseInt(e.target.value) || 12 })} />
+                  </div>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>Предыдущих курсов</span>
+                    <input style={appleInput} type="number" value={calcData?.goals?.previousCycles || ''} onChange={e => upCalc('goals', { ...calcData?.goals, previousCycles: parseInt(e.target.value) || 0 })} />
+                  </div>
+                </div>
+              </div>
+              <div style={glassCard}>
+                <div style={sectionLabel}>🧘 Психология</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>Страх потери (1-5)</span><input style={appleInput} type="number" min="1" max="5" value={calcData?.psych?.fearOfLoss || ''} onChange={e => upCalc('psych', { ...calcData?.psych, fearOfLoss: parseInt(e.target.value) || 1 })} /></div>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>Зеркало (1-5)</span><input style={appleInput} type="number" min="1" max="5" value={calcData?.psych?.mirrorObsession || ''} onChange={e => upCalc('psych', { ...calcData?.psych, mirrorObsession: parseInt(e.target.value) || 1 })} /></div>
+                  <div><span style={{ fontSize:10, color: apple.textDim }}>Апатия (1-5)</span><input style={appleInput} type="number" min="1" max="5" value={calcData?.psych?.apathyOffCycle || ''} onChange={e => upCalc('psych', { ...calcData?.psych, apathyOffCycle: parseInt(e.target.value) || 1 })} /></div>
+                </div>
+              </div>
+              <div style={glassCard}>
+                <div style={sectionLabel}>☣️ Токсическая нагрузка</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                  <button onClick={() => upCalc('toxicLoad', { ...calcData?.toxicLoad, hazardousWork: !calcData?.toxicLoad?.hazardousWork })} style={pillBtn(!!calcData?.toxicLoad?.hazardousWork)}>Вредное производство</button>
+                  <button onClick={() => upCalc('toxicLoad', { ...calcData?.toxicLoad, regularNSAIDs: !calcData?.toxicLoad?.regularNSAIDs })} style={pillBtn(!!calcData?.toxicLoad?.regularNSAIDs)}>НПВС регулярно</button>
+                </div>
+              </div>
+              <div style={glassCard}>
+                <div style={sectionLabel}>🦷 Стоматология</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                  <button onClick={() => upCalc('dental', { ...calcData?.dental, bleedingGums: !calcData?.dental?.bleedingGums })} style={pillBtn(!!calcData?.dental?.bleedingGums)}>Кровоточивость</button>
+                  <button onClick={() => upCalc('dental', { ...calcData?.dental, looseTeeth: !calcData?.dental?.looseTeeth })} style={pillBtn(!!calcData?.dental?.looseTeeth)}>Подвижность зубов</button>
+                  <button onClick={() => upCalc('dental', { ...calcData?.dental, cramps: !calcData?.dental?.cramps })} style={pillBtn(!!calcData?.dental?.cramps)}>Судороги</button>
+                </div>
+              </div>
+              <div style={glassCard}>
+                <div style={sectionLabel}>💉 Инъекции</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                  {['glutes','quads','delts'].map(zone => (
+                    <div key={zone}>
+                      <span style={{ fontSize:10, color: apple.textDim }}>{zone === 'glutes' ? 'Ягодицы' : zone === 'quads' ? 'Бёдра' : 'Дельты'}</span>
+                      <select style={appleInput} value={(calcData?.injection as any)?.[zone] || 'ok'} onChange={e => upCalc('injection', { ...calcData?.injection, [zone]: e.target.value })}>
+                        <option value="ok">Норма</option><option value="painful">Болезненно</option><option value="lumps">Уплотнения</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            </InfoErrorBoundary>
+          )}
+
           {/* ═══ DIET TAB ═══ */}
           {tab === 'diet' && (
             <InfoErrorBoundary label="Питание"><div>
@@ -1216,66 +1395,6 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
           )}
 
           {/* ═══ NUTRITION V7 TAB ═══ */}
-          {tab === 'nutrition_v7' && (
-            <InfoErrorBoundary label="Нутрициология v7"><div>
-              <div style={glassCard}>
-                <div style={sectionLabel}>Параметры питания V7</div>
-                <p style={{ fontSize:10, color: apple.textDim, margin:'4px 0 10px' }}>Эти параметры используются V7 риск-движком для расчёта рисков.</p>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                  {[
-                    { label:'Белок, г/кг', key:'proteinPerKg', hint:'1.6-2.2 г/кг' },
-                    { label:'Клетчатка, г/д', key:'fiberG', hint:'25-35 г/день' },
-                    { label:'Омега-3, г/д', key:'omega3G', hint:'1.5-3 г' },
-                    { label:'Натрий, г/д', key:'sodiumG', hint:'2.3-4 г' },
-                    { label:'Калий, г/д', key:'potassiumG', hint:'2.6-3.4 г' },
-                  ].map(f => (
-                    <div key={f.key}>
-                      <span style={{ fontSize:10, color: apple.textDim }}>{f.label}</span>
-                      <input style={appleInput} type="number" step="0.1" value={(settings as any)[f.key] || ''} onChange={e => save({ [f.key]: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder={f.hint} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div style={glassCard}>
-                <div style={sectionLabel}>Образ жизни (V7)</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                  {[
-                    { label:'Алкоголь, доз/нед', key:'alcoholPerWeek' },
-                    { label:'Уровень стресса', key:'stressLevel' },
-                    { label:'Уровень активности', key:'activityLevel' },
-                    { label:'Сон, ч/ночь', key:'sleepHours' },
-                  ].map(f => (
-                    <div key={f.key}>
-                      <span style={{ fontSize:10, color: apple.textDim }}>{f.label}</span>
-                      <input style={appleInput} type="number" step="1" value={(settings as any)[f.key] || ''} onChange={e => save({ [f.key]: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} />
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display:'flex', gap:8, alignItems:'center', marginTop:10 }}>
-                  <span style={{ fontSize:11, color: apple.textDim }}>Курение</span>
-                  <button onClick={() => save({ smoke: !settings.smoke })} style={{
-                    ...pillBtn(false),
-                    background: settings.smoke ? 'rgba(239,68,68,0.15)' : apple.accentDim,
-                    borderColor: settings.smoke ? '#ef4444' : apple.accent,
-                    color: settings.smoke ? '#ef4444' : apple.accent,
-                  }}>{settings.smoke ? 'Курю' : 'Не курю'}</button>
-                </div>
-              </div>
-
-              <div style={glassCard}>
-                <div style={sectionLabel}>Тренировочные параметры (V7)</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>HIIT</span>
-                    <button onClick={() => save({ hasHIIT: !settings.hasHIIT })} style={{ ...pillBtn(!!settings.hasHIIT), marginTop:4 }}>{settings.hasHIIT ? 'Да' : 'Нет'}</button>
-                  </div>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>Объём, т/нед</span><input style={appleInput} type="number" value={settings.volumeTonnes || ''} onChange={e => save({ volumeTonnes: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} /></div>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>LISS, мин/нед</span><input style={appleInput} type="number" value={settings.lissMinutesPerWeek || ''} onChange={e => save({ lissMinutesPerWeek: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} /></div>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>Курсов ААС</span><input style={appleInput} type="number" value={settings.totalCycles || ''} onChange={e => save({ totalCycles: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} /></div>
-                </div>
-              </div>
-            </div></InfoErrorBoundary>
-          )}
 
           {/* ═══ GENETICS TAB ═══ */}
           {tab === 'genetics' && (
@@ -2263,127 +2382,6 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
           {/* ═══ MEASUREMENTS TAB ═══ */}
           {tab === 'measurements' && <InfoErrorBoundary label="Измерения"><ProfileMeasurementsTab /></InfoErrorBoundary>}
 
-          {/* ═══ DIARIES TAB ═══ */}
-          {tab === 'diaries' && (
-            <InfoErrorBoundary label="Дневники"><div>
-              <div style={{ marginBottom:12 }}>
-                <h3 style={{ margin:'0 0 4px', fontSize:15, fontWeight:800, color:'#fff' }}>📔 Дневники</h3>
-                <p style={{ fontSize:10, color:'rgba(255,255,255,0.7)', margin:0 }}>Все дневники приложения для отслеживания прогресса</p>
-              </div>
-
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {[
-                  { icon:'🏋️', title:'Тренировок', desc:'Упражнения, подходы, веса, объём, RPE. История тренировок, прогресс по упражнениям, сплиты.', color:'#3b82f6', tab:'progress' },
-                  { icon:'🥗', title:'Питания', desc:'Продукты, калории, белки/жиры/углеводы. OCR сканирование, штрихкоды, рецепты.', color:'#22c55e', tab:'diet' },
-                  { icon:'🍽', title:'Приёмов пищи', desc:'Завтрак, обед, ужин, перекусы. Дневное/недельное меню, корзина продуктов.', color:'#f59e0b', tab:'diet', navScreen:'nutrition' },
-                  { icon:'📏', title:'Замеров тела', desc:'Вес, обхваты (талия, грудь, бицепс, бедро), % жира. Фото прогресса.', color:'#a855f7', tab:'diaries' },
-                  { icon:'🩸', title:'Анализов', desc:'Результаты анализов, референсные диапазоны, отклонения, динамика по датам.', color:'#ef4444', tab:'analytics', navScreen:'labs' },
-                  { icon:'💊', title:'Курса', desc:'Препараты, дозировки, фазы. Календарь приёма, корзина покупок.', color:'#ec4899', tab:'overview', navScreen:'pharma' },
-                  { icon:'🧪', title:'Поддержки', desc:'БАДы, протоколы, стеки, синергии. Недельный план приёма.', color:'#06b6d4', tab:'overview', navScreen:'support' },
-                  { icon:'❤️', title:'Давления', desc:'Систолическое/диастолическое давление, пульс. График динамики.', color:'#f43f5e', tab:'diaries' },
-                  { icon:'🛌', title:'Сна', desc:'Продолжительность, качество, пробуждения. Корреляция с тренировками.', color:'#8b5cf6', tab:'diaries' },
-                  { icon:'📊', title:'Отчётов', desc:'Полные отчёты по всем блокам: тренировки, анализы, риски, курс. Архив.', color:'#84cc16', tab:'analytics' },
-                  { icon:'⚠️', title:'Рисков', desc:'Оценка рисков по системам, Монте-Карло, клинические модели, MDSS.', color:'#f97316', tab:'analytics', navScreen:'risks' },
-                  { icon:'🩺', title:'Травм', desc:'Журнал травм, реабилитация, ограничения движений, восстановление.', color:'#14b8a6', tab:'injuries' },
-                ].map((d, i) => (
-                  <div key={i} onClick={() => { try { if ((d as any).navScreen && onNavigate) onNavigate((d as any).navScreen); else if (d.tab) setTab(d.tab as ProfileTab); } catch(e) { console.warn('[Diary] nav:', e); } }} style={{
-                    display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, cursor:'pointer',
-                    background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)',
-                  }}>
-                    <div style={{ width:40, height:40, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:d.color+'18', fontSize:18 }}>{d.icon}</div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:12, fontWeight:700, color:d.color, marginBottom:1, letterSpacing:-0.2 }}>{d.title}</div>
-                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)', lineHeight:1.3 }}>{d.desc}</div>
-                    </div>
-                    <span style={{ color:d.color, fontSize:14, opacity:0.5 }}>→</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Встроенные дневники: Сон, Давление, Замеры */}
-              <div style={{ marginTop: 14, display:'flex', flexDirection:'column', gap:10 }}>
-                <div style={glassCard}>
-                  <div style={{ fontSize:13, fontWeight:700, color:'#8b5cf6', marginBottom:8 }}>🛌 Дневник сна</div>
-                  <SleepDiary settings={settings} save={save} />
-                </div>
-                <div style={glassCard}>
-                  <div style={{ fontSize:13, fontWeight:700, color:'#f43f5e', marginBottom:8 }}>❤️ Давление и пульс</div>
-                  {(() => {
-                    const [bpSystolic, setBpSystolic] = React.useState('120');
-                    const [bpDiastolic, setBpDiastolic] = React.useState('80');
-                    const [bpHr, setBpHR] = React.useState('72');
-                    const [showBpForm, setShowBpForm] = React.useState(false);
-                    const [bpPeriod, setBpPeriod] = React.useState<'day'|'week'|'month'|'all'>('week');
-                    const [bpEntries, setBpEntries] = React.useState<BPEntry[]>(() => { try { return JSON.parse(localStorage.getItem('he_bp_diary') || '[]'); } catch { return []; } });
-                    const addBp = () => {
-                      const s = Math.round(Number(bpSystolic)); const d = Math.round(Number(bpDiastolic)); const h = Math.round(Number(bpHr));
-                      if (!s || !d || !h || isNaN(s) || isNaN(d) || isNaN(h) || s<50||s>250||d<30||d>160||h<30||h>250) return;
-                      const entry: BPEntry = { date: new Date().toISOString().slice(0,10), systolic: s, diastolic: d, hr: h };
-                      const updated = [...bpEntries, entry]; setBpEntries(updated); saveBPDiary(updated);
-                      setBpSystolic(''); setBpDiastolic(''); setBpHr(''); setShowBpForm(false);
-                    };
-                    const now = new Date(); const cutoff = new Date(now);
-                    if (bpPeriod === 'day') cutoff.setDate(cutoff.getDate()-1);
-                    else if (bpPeriod === 'week') cutoff.setDate(cutoff.getDate()-7);
-                    else if (bpPeriod === 'month') cutoff.setMonth(cutoff.getMonth()-1);
-                    else cutoff.setFullYear(cutoff.getFullYear()-10);
-                    const filtered = bpEntries.filter((e:BPEntry) => new Date(e.date) >= cutoff).sort((a:BPEntry,b:BPEntry) => b.date.localeCompare(a.date));
-                    const avgS = filtered.length ? Math.round(filtered.reduce((s:number,e:BPEntry)=>s+e.systolic,0)/filtered.length) : 0;
-                    const avgD = filtered.length ? Math.round(filtered.reduce((s:number,e:BPEntry)=>s+e.diastolic,0)/filtered.length) : 0;
-                    const avgH = filtered.length ? Math.round(filtered.reduce((s:number,e:BPEntry)=>s+e.hr,0)/filtered.length) : 0;
-                    return <div>
-                      <div style={{ display:'flex', gap:4, marginBottom:8 }}>
-                        <button onClick={() => setShowBpForm(!showBpForm)} style={{ padding:'6px 14px', borderRadius:20, fontSize:10, fontWeight:700, cursor:'pointer', background:'#f43f5e', border:'none', color:'#fff' }}>{showBpForm ? '✕' : '+ Записать'}</button>
-                        {(['day','week','month','all'] as const).map(p => <button key={p} onClick={()=>setBpPeriod(p)} style={{ flex:1, padding:'6px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', background: bpPeriod===p?'rgba(244,63,94,0.15)':'rgba(255,255,255,0.03)', border: bpPeriod===p?'1px solid rgba(244,63,94,0.3)':'1px solid rgba(255,255,255,0.06)', color: bpPeriod===p?'#f43f5e':'rgba(255,255,255,0.5)' }}>{p==='day'?'День':p==='week'?'Нед':p==='month'?'Мес':'Всё'}</button>)}
-                        <button onClick={()=>{if(confirm('Очистить?')){setBpEntries([]);localStorage.removeItem('he_bp_diary')}}} style={{ padding:'6px 10px', borderRadius:10, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444' }}>🗑</button>
-                      </div>
-                      {showBpForm && <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:8 }}>
-                        <div><div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:2 }}>Систолическое</div><input type="number" value={bpSystolic} onChange={e=>setBpSystolic(e.target.value)} placeholder="120" style={{ width:'100%', padding:'6px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:12, textAlign:'center' }} /></div>
-                        <div><div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:2 }}>Диастолическое</div><input type="number" value={bpDiastolic} onChange={e=>setBpDiastolic(e.target.value)} placeholder="80" style={{ width:'100%', padding:'6px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:12, textAlign:'center' }} /></div>
-                        <div><div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:2 }}>Пульс</div><input type="number" value={bpHr} onChange={e=>setBpHR(e.target.value)} placeholder="70" style={{ width:'100%', padding:'6px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:12, textAlign:'center' }} /></div>
-                        <div style={{ gridColumn:'1/-1' }}><button onClick={addBp} style={{ width:'100%', padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#f43f5e,#e11d48)', color:'#fff', fontWeight:700, fontSize:11 }}>Сохранить</button></div>
-                      </div>}
-                      {filtered.length > 0 && <>
-                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:8 }}>
-                          <div style={{ textAlign:'center', padding:10, borderRadius:8, background:'rgba(244,63,94,0.06)', border:'1px solid rgba(244,63,94,0.1)' }}>
-                            <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:2 }}>Среднее сист.</div>
-                            <div style={{ fontSize:20, fontWeight:800, color: avgS>140?'#ef4444':avgS>130?'#f59e0b':'#22c55e' }}>{avgS||'—'}</div>
-                          </div>
-                          <div style={{ textAlign:'center', padding:10, borderRadius:8, background:'rgba(244,63,94,0.06)', border:'1px solid rgba(244,63,94,0.1)' }}>
-                            <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:2 }}>Среднее диаст.</div>
-                            <div style={{ fontSize:20, fontWeight:800, color: avgD>90?'#ef4444':avgD>80?'#f59e0b':'#22c55e' }}>{avgD||'—'}</div>
-                          </div>
-                          <div style={{ textAlign:'center', padding:10, borderRadius:8, background:'rgba(244,63,94,0.06)', border:'1px solid rgba(244,63,94,0.1)' }}>
-                            <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:2 }}>Средний пульс</div>
-                            <div style={{ fontSize:20, fontWeight:800, color: avgH>100?'#ef4444':avgH>85?'#f59e0b':'#22c55e' }}>{avgH||'—'}</div>
-                          </div>
-                        </div>
-                        {filtered.length >= 2 && <div style={{ marginBottom:8, padding:'10px 8px', borderRadius:8, background:'rgba(255,255,255,0.02)' }}>
-                          <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:4 }}>📈 Динамика ({filtered.length} зап.)</div>
-                          <div style={{ display:'flex', alignItems:'flex-end', gap:2, height:60 }}>
-                            {filtered.slice().reverse().map((e:BPEntry,i:number) => { const maxV=200; const hS=Math.min(100,(e.systolic/maxV)*100); const hD=Math.min(100,(e.diastolic/maxV)*100); return <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:1 }}><div style={{ width:'60%', height:`${hS}%`, borderRadius:'3px 3px 0 0', background:'#ef4444', opacity:0.8 }} /><div style={{ width:'60%', height:`${hD}%`, borderRadius:'3px 3px 0 0', background:'#f59e0b', opacity:0.8 }} /></div>; })}
-                          </div>
-                          <div style={{ display:'flex', gap:8, fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:4, justifyContent:'center' }}>
-                            <span><span style={{ display:'inline-block', width:6, height:6, borderRadius:1, background:'#ef4444', marginRight:3 }} />Сист.</span>
-                            <span><span style={{ display:'inline-block', width:6, height:6, borderRadius:1, background:'#f59e0b', marginRight:3 }} />Диаст.</span>
-                            <span>Ø {avgS}/{avgD}</span>
-                          </div>
-                        </div>}
-                        <div style={{ maxHeight:120, overflowY:'auto' }}>
-                          {filtered.slice(0,20).map((e:BPEntry,i:number) => <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'3px 0', fontSize:9, color:'rgba(255,255,255,0.7)', borderBottom:'1px solid rgba(255,255,255,0.03)' }}><span>{e.date}</span><span style={{ fontWeight:700 }}>{e.systolic}/{e.diastolic} · {e.hr} уд/мин</span></div>)}
-                        </div>
-                      </>}
-                      {filtered.length === 0 && <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.4)', fontSize:10 }}>Нет записей. Добавьте первое измерение.</div>}
-                    </div>;
-                  })()}
-                </div>
-                <div style={glassCard}>
-                  <div style={{ fontSize:13, fontWeight:700, color:'#a855f7', marginBottom:8 }}>📏 Замеры тела</div>
-                  <ProfileMeasurementsTab />
-                </div>
-              </div>
-            </div></InfoErrorBoundary>
-          )}
           </>}
 
           {/* ═══ CONTACTS TAB (mainTab === 'contacts') ═══ */}
@@ -2470,33 +2468,10 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
           </>}
 
           {/* ═══ REMOVED TABS (calculator_data, nutrition_planner, biostack_profile, nutrition_v7) — hidden, code kept for reference ═══ */}
-          {tab === 'calculator_data' && (
-            <InfoErrorBoundary label="Калькулятор"><div>
-              <div style={{ marginBottom:12 }}>
-                <h3 style={{ margin:'0 0 4px', fontSize:15, fontWeight:800, color:'#fff' }}>🧮 Данные калькулятора</h3>
-                <p style={{ fontSize:10, color:'rgba(255,255,255,0.5)', margin:0 }}>Заполните один раз — данные автоматически передаются в калькулятор поддержки. Сохраняются в вашем профиле.</p>
-              </div>
-              <ProfileCalcData />
-            </div></InfoErrorBoundary>
-          )}
 
           {/* ═══ NUTRITION PLANNER DATA TAB ═══ */}
-          {tab === 'nutrition_planner' && (
-            <InfoErrorBoundary label="Планировщик"><div>
-              <div style={{ marginBottom:12 }}>
-                <h3 style={{ margin:'0 0 4px', fontSize:15, fontWeight:800, color:'#fff' }}>🥗 Данные планировщика питания</h3>
-                <p style={{ fontSize:10, color:'rgba(255,255,255,0.5)', margin:0 }}>Ваши параметры для генерации плана питания. Сохраняются и используются планировщиком автоматически.</p>
-              </div>
-              <PlannerProfileData />
-            </div></InfoErrorBoundary>
-          )}
 
           {/* ═══ BIOSTACK PROFILE TAB ═══ */}
-          {tab === 'biostack_profile' && (
-            <InfoErrorBoundary label="BioStack"><div>
-              <BioStackAISettings />
-            </div></InfoErrorBoundary>
-          )}
           </div>
         </div>
       )}

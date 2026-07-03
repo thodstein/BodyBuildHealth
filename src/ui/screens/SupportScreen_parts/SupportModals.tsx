@@ -84,10 +84,10 @@ export const SupportModals: React.FC<SupportModalsProps> = ({
           <p style={{ fontSize:8, color:'var(--text-dim)', marginBottom:8 }}>После выбора уровня можно добавить усиление и суставы</p>
           <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
             {[
-              { v:'basic', l:'🟢 База', c:'#22c55e', d:'Нет высокого риска (≤50%)' },
-              { v:'mid', l:'🟡 Средний', c:'#eab308', d:'Нет выраженного риска (≤35%)' },
-              { v:'max', l:'🟠 Максимум', c:'#f97316', d:'Нижний умеренный (≤25%)' },
-              { v:'boost', l:'🔴 Буст', c:'#ef4444', d:'Слабый риск (≤15%)' },
+              { v:'basic', l:'🟢 База', c:'#22c55e', d:'Риск 55-65%' },
+              { v:'mid', l:'🟡 Средний', c:'#eab308', d:'Риск 45-55%' },
+              { v:'max', l:'🟠 Максимум', c:'#f97316', d:'Риск 30-45%' },
+              { v:'boost', l:'🔴 Буст', c:'#ef4444', d:'Риск 15-30%' },
             ].map(btn => (
               <button key={btn.v} onClick={() => setModalLevel(btn.v)} style={{
                 padding:'12px 14px', borderRadius:10, cursor:'pointer', textAlign:'left',

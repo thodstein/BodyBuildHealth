@@ -42,7 +42,7 @@ export type TrainingTab =
   | 'plan' | 'runtime' | 'exercises' | 'excalc' | 'calculators' | 'diary' | 'cycles' | 'history'
   | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress' | 'mytraining'
   | 'programcalc' | 'reports' | 'srcbb' | 'volume' | 'library' | 'powerlifting' | 'bodybuilding'
-  | 'calc_substitute' | 'calc_quality' | 'calc_1rm' | 'import_data' | 'pl_norms';
+  | 'calc_substitute' | 'calc_quality' | 'calc_1rm' | 'import_data' | 'pl_norms' | 'pl_pro';
 export type TrainingPage = 'hero' | 'tabs';
 // Главная — ровно 3 раздела: Тренировка (вести), Планирование (планировать), Инфо (смотреть).
 export type TrainingGroup = 'training' | 'planning' | 'info' | null;
@@ -68,6 +68,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   calc_1rm: '🎯 Калькулятор 1RM',
   import_data: '📥 Импорт CSV',
   pl_norms: '🏆 Нормативы ПЛ',
+  pl_pro: '🏋️ Pro ПЛ-инструменты',
 };
 
 // ══ Этап R/U: 3 плоские трассы планировщика (ПЛ / ББ / Ручной сбор), одна вкладка — один клик.
@@ -86,7 +87,7 @@ export const PL_PLANNING_TABS: TrainingTab[] = ['srcbb', 'volume', 'powerlifting
 export const BB_PLANNING_TABS: TrainingTab[] = ['srcbb', 'volume', 'bodybuilding'];
 export const MANUAL_PLANNING_TABS: TrainingTab[] = ['plan', 'cycles', 'mytraining', 'programcalc', 'volume'];
 // Калькуляторы доступны в любой трассе планировщика (подбор / замена / качество / нагрузка)
-const CALC_TABS: TrainingTab[] = ['excalc', 'calc_substitute', 'calc_quality', 'calc_1rm', 'pl_norms', 'calculators'];
+const CALC_TABS: TrainingTab[] = ['excalc', 'calc_substitute', 'calc_quality', 'calc_1rm', 'pl_norms', 'pl_pro', 'calculators'];
 export function planningTabsFor(track: PlanningTrack): TrainingTab[] {
   const base = track === 'manual' ? MANUAL_PLANNING_TABS : track === 'bb' ? BB_PLANNING_TABS : PL_PLANNING_TABS;
   return [...base, ...CALC_TABS];
