@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import type { CalculatorState, CalculatorResult, LabSlice } from '../../../engines/support-calculator.types';
-import { calculateSupportTZ, hydrateState } from '../../../engines/support-calculator.engine';
-import { SYNERGY_ID_LABELS } from '../../../engines/support-calculator.types';
+import type { CalculatorState, CalculatorResult, LabSlice } from '../../../engines/support-plan';
+import { calculateSupportTZ, hydrateState } from '../../../engines/support-plan';
+import { SYNERGY_ID_LABELS } from '../../../engines/support-plan';
 import { getDrugsToNormalizeMarker, getMarkerName } from '../../../data/support-lab-effects';
 import { UCUM_MAP } from '../../../core/constants';
 import { RiskTimelineChart } from './RiskTimelineChart';

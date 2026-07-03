@@ -16,7 +16,7 @@
  *   - stacks.ts     — recommendStacksLight
  *   - index.ts      — главный вызов runSupportUnified (этот файл)
  *
- *  Источник правды для веществ и риска: `calculateSupportTZ` (support-calculator.engine).
+ *  Источник правды для веществ и риска: `calculateSupportTZ` (engine.ts в этой папке).
  *  Display-данные генерируются из каталога + ALL_INTERACTIONS + evaluateRecommendations.
  *
  *  Кнопки БАЗОВЫЙ/СРЕДНИЙ/МАКСИМУМ/БУСТ → powerLevel → target риск % (65/55/45/30).
@@ -24,9 +24,8 @@
  * ──────────────────────────────────────────────────────────────────────────
  */
 
-import { calculateSupportTZ } from '../support-calculator.engine';
-import type { CalculatorState } from '../support-calculator.types';
-import type { PlanResult } from '../support-plan-engine';
+import { calculateSupportTZ, hydrateState } from './engine';
+import type { CalculatorState, PlanResult } from './types';
 import { clamp } from './types';
 import { buildSubstances, buildSchedule, computeWeekScale } from './substances';
 import {
@@ -139,3 +138,8 @@ export function runSupportForLevel(
 ): PlanResult {
   return runSupportUnified({ ...state, powerLevel: level });
 }
+
+// Re-export для обратной совместимости
+export { calculateSupportTZ, hydrateState } from './engine';
+export { SYNERGY_ID_LABELS, SYNERGY_ID_SUBSTANCES, TITRATION_RULES, SYSTEM_LABELS_RU, SYS_ORDER, clamp, sysName, sysEmoji, catalogEntry, defaultDosage } from './types';
+export type { CalculatorState, CalculatorResult, PlanResult, PlanSubstance, PlanMechanism, StackRecommendation, RiskSystemId, PowerLevel, SynergyId, SystemRisk, MechanismDetail, LabDelta, ScheduleItem, TimeBlock, LabSlice, TimelineWeekData, LabPanelData, UserProfileData, NeuroStatusData, PharmaStackData, AASEntry, GoalsData, HepatobiliaryData, UrinaryData, CardiovascularData, ODAData, NutritionData, ContraindicationsData, ExperienceJournal, EpicrisisData, ToxicLoadData, DentalData, GeneticData, GIData, PsychData, InjectionData, Sex, CoursePhase } from './types';

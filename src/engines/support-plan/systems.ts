@@ -5,8 +5,7 @@
 
 import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
-import type { CalculatorResult } from '../support-calculator.types';
-import type { PlanMechanism } from '../support-plan-engine';
+import type { CalculatorResult, PlanMechanism } from './types';
 import { SYS_ORDER, sysName, sysEmoji } from './types';
 
 /** Системы организма с их raw/net риском и списком механизмов. */

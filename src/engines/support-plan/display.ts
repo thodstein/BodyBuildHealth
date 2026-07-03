@@ -5,7 +5,7 @@
 
 import { ALL_INTERACTIONS, SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { evaluateRecommendations } from '../recommendation-engine';
-import type { CalculatorState, CalculatorResult } from '../support-calculator.types';
+import type { CalculatorState, CalculatorResult } from './types';
 import { catalogEntry } from './types';
 
 /**

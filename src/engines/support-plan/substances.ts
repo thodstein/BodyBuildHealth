@@ -3,8 +3,7 @@
  */
 
 import { DEFAULT_DOSAGES } from '../../data/support-database';
-import type { CalculatorResult } from '../support-calculator.types';
-import type { PlanSubstance } from '../support-plan-engine';
+import type { CalculatorResult, PlanSubstance } from './types';
 import { catalogEntry } from './types';
 
 /**

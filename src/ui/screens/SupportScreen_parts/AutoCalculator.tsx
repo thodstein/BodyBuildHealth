@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import type { CalculatorState, CalculatorResult, LabDelta, SystemRisk, ScheduleItem, PowerLevel, SynergyId, Sex, LabSlice } from '../../../engines/support-calculator.types';
-import { calculateSupportTZ, hydrateState } from '../../../engines/support-calculator.engine';
-import { SYNERGY_ID_LABELS } from '../../../engines/support-calculator.types';
+import type { CalculatorState, CalculatorResult, LabDelta, SystemRisk, ScheduleItem, PowerLevel, SynergyId, Sex, LabSlice } from '../../../engines/support-plan';
+import { calculateSupportTZ, hydrateState } from '../../../engines/support-plan';
+import { SYNERGY_ID_LABELS } from '../../../engines/support-plan';
 import { PHARMA_DB, PHARMA_CLASSES } from '../../../core/pharma-database';
 import { SUPPORT_COVERAGE_MAP } from '../../../data/support-coverage-map';
 import { evaluateRecommendations, applyCoverageLevel, computeCoverageRisk, buildPreApplyCard } from '../../../engines/recommendation-engine';

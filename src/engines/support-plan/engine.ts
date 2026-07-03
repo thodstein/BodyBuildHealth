@@ -4,14 +4,14 @@ import {
   type ScheduleItem, type TimeBlock, type SynergyId,
   type PowerLevel, type LabSlice, type TimelineWeekData,
   SYNERGY_ID_SUBSTANCES, TITRATION_RULES, SYNERGY_ID_LABELS,
-} from './support-calculator.types';
-import { evaluateRecommendations } from './recommendation-engine';
-import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, type DrugInput, type TzSpecResult, type TzSpecMechanismResult } from './risk-engine-tz-spec';
-import { DRUG_DB } from '../data/support-db';
-import { SUPPLEMENTS_DB } from '../data/support-db/supplements';
-import { PHARMACY_DB } from '../data/support-db/pharmacy-db';
-import { SUPPORT_CATALOG_DATA } from '../data/support-database';
-import { normalizeLabValue } from '../core/constants';
+} from './types';
+import { evaluateRecommendations } from '../recommendation-engine';
+import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, type DrugInput, type TzSpecResult, type TzSpecMechanismResult } from '../risk-engine-tz-spec';
+import { DRUG_DB } from '../../data/support-db';
+import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
+import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
+import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
+import { normalizeLabValue } from '../../core/constants';
 
 const SYS_META: Record<RiskSystemId, { label: string; icon: string }> = {
   cardio: { label: 'Сердечно-сосудистая', icon: '❤️' },

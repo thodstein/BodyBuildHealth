@@ -39,13 +39,12 @@ import { checkDrugInteractions } from '../../engines/pharma-interactions.engine'
 import type { CourseEntry } from '../../core/types';
 import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.engine';
 import { SupportCalculator } from './SupportScreen_parts/SupportCalculator';
-import { calculateSupportTZ, hydrateState } from '../../engines/support-calculator.engine';
-import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engines/support-calculator.types';
-import { calculateTZRisk, toCompatibleResult, type TZRiskResult } from '../../engines/risk-engine-tz';
+import { calculateSupportTZ, hydrateState } from '../../engines/support-plan';
+import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engines/support-plan';
 import { getDrugTzMechanisms, getSupportTzDisplay, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../data/support-db';
 import { getLabEffectsForDrug, getMarkerName } from '../../data/support-lab-effects';
 import { runSupportUnified, runSupportForLevel } from '../../engines/support-plan';
-import type { PlanResult, PlanSubstance } from '../../engines/support-plan-engine';
+import type { PlanResult, PlanSubstance } from '../../engines/support-plan';
 import { buildPreApplyCard, evaluateRecommendations, computeCoverageRisk } from '../../engines/recommendation-engine';
 import { calculateMixScore, type TrainingMixScore, type MixSubstance, type MixProfile, MIX_MECHANISMS, MIX_SYNERGY, MIX_TEMPLATES, type MixTemplate, buildBestRecipe, type MixRecipe, type MixRecipeItem, groupRecipeItemsByTiming } from '../../engines/training-mix-scoring.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
@@ -540,40 +539,31 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     } as CalculatorState;
     stateRef.current = state;
     const tzResult: CalculatorResult = calculateSupportTZ(state);
-    // ── TZ Risk Engine: probabilistic 49-cell model ──
-    const tzRiskInput = {
-      course: linked.course || [],
-      labs: linked.labs || [],
-      genetics: {} as any,
-      nutrition: {
-        proteinPerKg: (s?.weight ?? 80) > 0 ? ((s?.nutritionFactor ?? 0.8) * 160) / (s?.weight ?? 80) : 1.8,
-        fiberG: 25, omega3G: 1.5, sodiumG: 3, potassiumG: 3, waterL: 2,
-        calories: 2500,
-      },
-      training: {
-        hasHIIT: (s?.workoutsPerWeek ?? 3) >= 4,
-        weeklyMinutes: (s?.workoutsPerWeek ?? 3) * (s?.avgWorkoutMinutes ?? 60),
-        volumeTonnes: 8000, lissMinutesPerWeek: 60,
-      },
-      weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male' | 'female',
-      supportSubstances: tzResult.selectedSubstances || [],
-      courseWeek: courseWeekState,
-    };
-    const tzRiskResult: TZRiskResult = calculateTZRisk(tzRiskInput);
-    const tzCompat = toCompatibleResult(tzRiskResult);
+    // ── ЕДИНЫЙ ДВИЖОК РИСКА: calculateTzSpecRisk (механизм-ориентированная модель) ──
+    // calculateSupportTZ уже использует calculateTzSpecRisk внутри.
+    // Никаких вторых движков (calculateTZRisk удалён — был рассинхрон).
+    const systemBreakdown: Record<string, { raw: number; net: number }> = {};
+    for (const cmp of (tzResult.comparisonBeforeAfter || [])) {
+      systemBreakdown[cmp.system] = { raw: cmp.before, net: cmp.after };
+    }
     const calcResultData: Record<string, any> = {
-      riskBeforeSupport: tzRiskResult.overallRaw,
-      riskAfterSupport: tzRiskResult.overallNet,
-      supportScore: Math.round(100 - tzRiskResult.overallNet),
-      systemSupport: Object.fromEntries(Object.entries(tzCompat.systemBreakdown).map(([k, v]) => [k, 100 - v.net])),
-      // coverageMap: per-system risk reduction fraction (for RiskOverview display)
-      coverageMap: Object.fromEntries(Object.entries(tzCompat.systemBreakdown).map(([k, v]) => [k, Math.max(0, Math.min(1, (v.raw - v.net) / Math.max(1, v.raw)))])),
+      riskBeforeSupport: tzResult.overallRiskBefore,
+      riskAfterSupport: tzResult.overallRiskAfter,
+      supportScore: Math.round(100 - tzResult.overallRiskAfter),
+      systemSupport: Object.fromEntries(
+        Object.entries(systemBreakdown).map(([k, v]) => [k, 100 - v.net])
+      ),
+      coverageMap: Object.fromEntries(
+        Object.entries(systemBreakdown).map(([k, v]) => [k, Math.max(0, Math.min(1, (v.raw - v.net) / Math.max(1, v.raw)))])
+      ),
       riskAssessment: {
-        systemBreakdown: Object.fromEntries(Object.entries(tzCompat.systemBreakdown).map(([k, v]) => [k, { raw: v.raw, net: v.net }])),
-        mechanismBreakdown: tzCompat.mechanismBreakdown,
-        mechanismDetail: tzCompat.mechanismDetail,
+        systemBreakdown,
+        mechanismBreakdown: {},
+        mechanismDetail: (tzResult.risk?.systems || []).flatMap((sys: any) =>
+          (sys.mechanisms || []).map((m: any) => ({ system: sys.id, ...m }))
+        ),
       },
-      tzRiskResult,
+      tzRiskResult: tzResult,
       timestamp: tzResult.timestamp ?? new Date().toISOString(),
       schedule: tzResult.schedule,
       synergyIdsUsed: tzResult.synergyIdsUsed,

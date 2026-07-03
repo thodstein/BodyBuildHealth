@@ -93,6 +93,74 @@
     - Стеки: `mechanismCodes` в anatomicalMapping — только ТЗ-коды.
     - Все чипсы/метки механизмов — из `TZ_MECH_LABELS`, не из старых `MECHANISM_LABELS` / `BRIDGE_MECH_TO_CATALOG`.
 
+## Session Summary (Jul 03) — ЕДИНЫЙ ДВИЖОК: support-plan/ (ONE engine, no duplicates)
+
+### Сделано
+**СИНХРОНИЗАЦИЯ: один движок механизм-ориентированной модели (calculateTzSpecRisk)**
+
+Проблема: в SupportScreen.tsx `calcSupport` использовал ДВА разных движка:
+- `calculateSupportTZ` (движок А) — выбирал вещества на основе `calculateTzSpecRisk` (механизм-ориентированная модель)
+- `calculateTZRisk` (движок Б, из `risk-engine-tz.ts`) — ПЕРЕЗАПИСЫВАЛ риск-числа в UI другим движком
+
+Результат: вещества подбирались по одному движку, а цифры риска показывались из другого → рассинхрон.
+
+**Решение:**
+- `calculateTZRisk` / `toCompatibleResult` / `TZRiskResult` — ПОЛНОСТЬЮ УБРАНЫ из SupportScreen.tsx
+- Риск теперь берётся из `tzResult` (= `calculateSupportTZ`), который внутри использует `calculateTzSpecRisk`
+- `calcResultData.riskBeforeSupport` = `tzResult.overallRiskBefore`
+- `calcResultData.riskAfterSupport` = `tzResult.overallRiskAfter`
+- `systemBreakdown` строится из `tzResult.comparisonBeforeAfter`
+- `mechanismDetail` — из `tzResult.risk.systems[].mechanisms`
+
+**Консолидация файлов в `src/engines/support-plan/`:**
+
+| Старый файл | → Куда перенесён | Строк |
+|---|---|---|
+| `support-calculator.types.ts` (278 строк) | → `support-plan/types.ts` | 340 |
+| `support-calculator.engine.ts` (1152 строк) | → `support-plan/engine.ts` | 1152 |
+| `support-plan-engine.ts` (2199 строк) | → только 4 типа (PlanSubstance, PlanMechanism, PlanResult, StackRecommendation) в `support-plan/types.ts` | — |
+
+**Структура `src/engines/support-plan/`:**
+- `types.ts` (340) — ВСЕ типы: CalculatorState, CalculatorResult, PlanResult, PlanSubstance, PlanMechanism, StackRecommendation + константы (SYNERGY_ID_*, TITRATION_RULES, SYSTEM_LABELS_RU) + утилиты (clamp, sysName, catalogEntry)
+- `engine.ts` (1152) — `calculateSupportTZ` + `hydrateState` + все helper-функции (rProfile, rNeuro, rPharma, calcAllRisks, buildTzInput, tzToScores, toSystemRisksFromTz, extractLabValues, generateSchedule, applyTitration, и т.д.)
+- `index.ts` (150) — `runSupportUnified(state)` → PlanResult + `runSupportForLevel()` + re-export
+- `substances.ts` (108) — buildSubstances, buildSchedule, computeWeekScale
+- `systems.ts` (144) — buildSystems, buildMechanisms, buildCoverageGaps, buildUncoveredMechanisms, buildRiskDynamics, buildRiskBreakdown
+- `display.ts` (122) — buildSynergyComment, buildMonitoring, buildSpecialInstructions, buildConflicts, buildLabFindings
+- `stacks.ts` (79) — recommendStacksLight
+
+**Удалено 3 файла:**
+- `src/engines/support-calculator.engine.ts` — УДАЛЁН
+- `src/engines/support-calculator.types.ts` — УДАЛЁН
+- `src/engines/support-plan-engine.ts` — УДАЛЁН (2199 строк мёртвого кода)
+
+**Обновлены импорты в 8 файлах:**
+- `recommendation-engine.ts` — `./support-calculator.types` → `./support-plan/types`
+- `SupportScreen.tsx` — `support-calculator.engine` + `risk-engine-tz` → `support-plan` (единственный импорт)
+- `SupportScreen_parts/AutoCalculator.tsx` — `support-calculator.*` → `support-plan`
+- `SupportScreen_parts/SupportCalculator.tsx` — `support-calculator.*` → `support-plan`
+- `SupportScreen_parts/RiskTimelineChart.tsx` — `support-calculator.types` → `support-plan`
+- `support-plan/substances.ts`, `systems.ts`, `display.ts`, `stacks.ts` — `../support-calculator.types` → `./types`
+
+✅ `tsc --noEmit` — 0 ошибок
+✅ `vite build` — OK (21.79s)
+✅ UTF-8 noBOM — все 7 файлов OK
+
+### Скорректированный ПЛАН (оставшиеся задачи)
+
+| № | Задача | Статус | Описание |
+|---|--------|--------|----------|
+| BUG 11 | убрать «план по времени» из UI | ❌ | timedPlan/generateTimedPlan — удалить из рендера |
+| BUG 20 | переименовать «Заключение для врача» → «Отчёт» | ❌ | В SupportScreen.tsx |
+| BUG 17 | убрать матрицу покрытия | ❌ | coverageMatrix — удалить из UI |
+| BUG 19 | удалить историю и динамику доз | ❌ | planHistory/riskDynamics — убрать из UI |
+| BUG 12 | расписать синергию стека | ❌ | synergyComment — наполнить реальным текстом |
+| BUG 15-16 | починить дублирование карточек рисков + несоответствие по системам | ❌ | Проверить что riskCard показывает те же цифры что effectiveLevel |
+| BUG 21 | починить зависание фарма каталога | ❌ | PharmaScreen/catalog — investigate hang |
+| BUG 2 | проверить описания стеков | ❌ | support-synergy-stacks.ts |
+| BUG 22-23 | визуальная проверка всех изменений | ❌ | Глазами в dev |
+| Manual | recommended stacks на уровни 100/100 и ниже | ❌ | В ручном режиме |
+
 ## Session Summary (Jun 27 — Part 4) — ONE calculator tab + RISK ENGINE TZ
 ### Done
 

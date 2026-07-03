@@ -6,8 +6,7 @@
 import { ALL_STACKS } from '../../data/support-database';
 import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
-import type { CalculatorState, CalculatorResult } from '../support-calculator.types';
-import type { StackRecommendation } from '../support-plan-engine';
+import type { CalculatorState, CalculatorResult, StackRecommendation } from './types';
 import { SYS_ORDER, clamp, sysName } from './types';
 import { buildSystems } from './systems';
 

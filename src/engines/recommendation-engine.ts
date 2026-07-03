@@ -1,4 +1,4 @@
-import type { CalculatorState, CalculatorResult, LabSlice } from './support-calculator.types';
+import type { CalculatorState, CalculatorResult, LabSlice } from './support-plan/types';
 import { PHARMA_DB } from '../core/pharma-database';
 import { MECHANISM_TO_SUPPORT, ORGAN_TO_SUPPORT, SYSTEM_TO_SUPPORT, CATEGORY_TO_SUPPORT, DRUG_PD_EFFECT_TO_SUPPORT, getSupportEntry, findByMechanisms, findByLabMarker, findByCategoryAndMech, findByOrganAndMech, SUPPORT_CATALOG_DATA, ALL_SUPPORT_IDS, filterByCoverageLevel, getEntryTier, getSynergyScore, getConflictScore, scoreCombination, COVERAGE_TIER_MAP, getBoostSubstances } from '../data/support-index';
 import { getSupportByMechanism, getSupportBySystem, getFullChainSupport } from '../data/mechanism-support-bridge';

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { TimelineWeekData } from '../../../engines/support-calculator.types';
+import type { TimelineWeekData } from '../../../engines/support-plan';
 
 interface RiskTimelineChartProps {
   timeline: TimelineWeekData[];
