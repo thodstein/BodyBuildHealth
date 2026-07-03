@@ -38,6 +38,8 @@ import { ProMetricsPanel } from './SRCBBScreen_parts/ProMetricsPanel';
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard, SaveButton } from './SRCBBScreen_parts/TrainingPopups';
 import { TrainingScoreCard } from '../components/TrainingScoreCard';
 import { ReadinessForecastCard } from './TrainingScreen_parts/ReadinessForecastCard';
+import { lmsPlanToSessions, bbPlanToSessions, autoregPlan as autoregPlanBridge, progressFromSessions, planVsFact } from '../../engines/training-integration.engine';
+import type { BridgeSession, ReadinessInput, ProgressSnapshot } from '../../engines/training-integration.engine';
 type Mode = 'pl' | 'bb' | 'manual';
 
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: '12px', margin: '6px 0' };
@@ -55,8 +57,8 @@ const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: '#00e68a'
 export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
-    pl: [['plan', '📋 План цикла'], ['plates', '🧮 Калькулятор блинов'], ['autoreg', '🧠 Авторегуляция'], ['peak', '🏁 Пиковая фаза'], ['recovery', '🔋 Восстановление'], ['safety', '🛡 Безопасность'], ['demo', '🎬 Демонстрация']].map(([k, l]) => ({ key: k, label: l })),
-    bb: [['plan', '📋 План сплита'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
+    pl: [['plan', '📋 План цикла'], ['bridge', '🔗 Мост план→сессия'], ['plates', '🧮 Калькулятор блинов'], ['autoreg', '🧠 Авторегуляция'], ['peak', '🏁 Пиковая фаза'], ['recovery', '🔋 Восстановление'], ['safety', '🛡 Безопасность'], ['demo', '🎬 Демонстрация']].map(([k, l]) => ({ key: k, label: l })),
+    bb: [['plan', '📋 План сплита'], ['bridge', '🔗 Мост план→сессия'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
     manual: [],
   };
   const [subView, setSubView] = useState<string>('plan');
@@ -123,6 +125,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (!tpl) return;
     const plan = buildLMSPlan({ template: tpl, pmMap: { 'Присед': pmSquat, 'Жим лежа': pmBench, 'Становая тяга': pmDead }, fallbackPm: 80, mode: 'natural', weeksOverride: cycleWeeks });
     setBuiltSrc(plan); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setSrcAdditions({}); setPickerDay(null);
+    // TRAINING INTEGRATION: конвертировать PL план в сессии
+    try { const sessions = lmsPlanToSessions(plan); saveBridgeSessions(sessions); } catch { /* ignore */ }
   };
 
   // ── BB ──
@@ -162,6 +166,47 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [historyWorkouts, setHistoryWorkouts] = useState<WorkoutLog[]>([]);
   useEffect(() => { (async () => { try { const w = await diary.getWorkoutLogs(); setHistoryWorkouts(w.reverse()); } catch { /* ignore */ } })(); }, [diary]);
 
+  // ── TRAINING INTEGRATION: мост план→сессия ──
+  const [bridgeSessions, setBridgeSessions] = useState<BridgeSession[]>([]);
+  const [progressSnap, setProgressSnap] = useState<ProgressSnapshot[]>([]);
+  // сохраняем bridge-сессии при построении плана
+  const saveBridgeSessions = (sessions: BridgeSession[]) => {
+    setBridgeSessions(sessions);
+    try { localStorage.setItem('he_bridge_sessions', JSON.stringify(sessions)); } catch { /* ignore */ }
+    // рассчитываем прогресс
+    const snap = progressFromSessions(sessions);
+    setProgressSnap(snap);
+    try { localStorage.setItem('he_bridge_progress', JSON.stringify(snap)); } catch { /* ignore */ }
+  };
+  // восстанавливаем при монтировании
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('he_bridge_sessions');
+      if (saved) setBridgeSessions(JSON.parse(saved));
+      const savedProgress = localStorage.getItem('he_bridge_progress');
+      if (savedProgress) setProgressSnap(JSON.parse(savedProgress));
+    } catch { /* ignore */ }
+  }, []);
+
+  // autoregPlan через training-integration (параллельно существующему autoreg)
+  const bridgeAutoreg = useMemo(() => {
+    if (!builtSrc && !builtBb) return null;
+    const rec = linked.readiness?.recovery ?? 80;
+    const fat = linked.readiness?.fatigue ?? 30;
+    const r: ReadinessInput = {
+      priScore: rec / 100,
+      fatigueScore: fat / 100,
+      recoveryScore: rec / 100,
+      riskLevel: level === 'novice' ? 'high' : level === 'intermediate' ? 'medium' : 'low',
+      goal: mainTab === 'pl' ? goal : bbGoal,
+      plannedIntensity: mainTab === 'pl' ? 85 : 75,
+      plannedSets: mainTab === 'pl' ? 15 : 20,
+      plannedReps: mainTab === 'pl' ? 5 : 10,
+      plannedFrequency: mainTab === 'pl' ? days : bbDays,
+    };
+    return autoregPlanBridge(r);
+  }, [builtSrc, builtBb, linked.readiness, mainTab, goal, bbGoal, level, days, bbDays]);
+
   const bbRanked = useMemo(() => rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays }), [bbLevel, bbGoal, bbDays]);
   const bbBest = bbRanked[0];
 
@@ -169,6 +214,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (!bbBest) return;
     const plan = buildBBPlan({ patternId: bbBest.pattern.id, level: bbLevel, goal: bbGoal as any, weeks: bbWeeks, workMax: bbWorkMax, weakPoints });
     setBuiltBb(plan); setBbWeekSel(1);
+    // TRAINING INTEGRATION: конвертировать BB план в сессии
+    try { const sessions = bbPlanToSessions(plan); saveBridgeSessions(sessions); } catch { /* ignore */ }
   };
   const baseMrv = useMemo(() => Object.fromEntries(Object.entries(getAllVolumeLandmarks(bbLevel)).map(([k, v]) => [k, v.mrv])), [bbLevel]);
   const pedAdapt = useMemo(() => adaptForPEDs(peds, baseMrv), [peds, baseMrv]);
@@ -671,7 +718,48 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
         </div>;
       })()}
 
-      {subView === 'plates' && <PlateCalculator initialWeight={workingWeight} />}
+      {subView === 'bridge' && (
+        <div style={CARD}>
+          <div style={H}>🔗 Мост план→сессия (training-integration)</div>
+          {bridgeSessions.length === 0 ? (
+            <div style={{ ...SMALL, padding: 12, textAlign: 'center' }}>Постройте план (ПЛ или ББ) — сессии появятся здесь.</div>
+          ) : (
+            <>
+              <div style={{ ...SMALL, marginBottom: 8 }}>Сгенерировано {bridgeSessions.length} сессий.</div>
+              {bridgeSessions.slice(0, 5).map((s, i) => (
+                <ExpandableCard key={i} title={`${s.focus} (${s.exercises.length} упр.)`} icon={s.source === 'SRC' ? '🏋️' : '💪'} short={`${s.totalSets} сет · ${Math.round(s.totalVolume)} кг·пов`} full={
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+                    {s.exercises.map((e, ei) => (
+                      <div key={ei} style={{ marginBottom: 4 }}>
+                        <b>{e.exerciseName}</b> ({e.muscleGroup}): {e.sets.length} подходов · объём {e.totalVolume.toFixed(0)} кг·пов
+                      </div>
+                    ))}
+                  </div>
+                } />
+              ))}
+              {bridgeSessions.length > 5 && <div style={{ ...SMALL, marginTop: 4 }}>… ещё {bridgeSessions.length - 5} сессий</div>}
+              {bridgeAutoreg && (
+                <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>🧠 Авторегуляция (мост)</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                    {bridgeAutoreg.summary}
+                    {bridgeAutoreg.sessionDowngraded && ' · ⬇ понижение нагрузки'}
+                    {bridgeAutoreg.sessionCancelled && ' · ⛔ отмена сессии'}
+                  </div>
+                </div>
+              )}
+              {progressSnap.length > 0 && (
+                <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.2)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>📈 Прогресс (лучшие подходы)</div>
+                  {progressSnap.slice(0, 5).map((p, i) => (
+                    <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 2 }}>{p.exercise}: {p.lastWeight}кг×{p.lastReps} → e1RM {p.estimated1RM.toFixed(1)}кг</div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {subView === 'autoreg' && <AutoregPanel />}
       {subView === 'peak' && <PeakingPanel />}

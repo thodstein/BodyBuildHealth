@@ -688,7 +688,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const isPreWorkout = mt.label === 'Предтрен'; const isPostWorkout = mt.label === 'Пост-трен'; const isPeriWorkout = isPreWorkout || isPostWorkout;
         const highQuality = budget === 'max' || budget === 'enhanced'; const lowQuality = budget === 'low';
         const effectiveTierFilter = lazyDayMode ? (f: any) => f.tier === 'basic' : (f: any) => f.tier === 'basic' || f.tier === 'mid' || f.tier === 'max';
-        const fastCarbs = qualityRange(FOOD_DB.filter(f => f.gi && f.gi >= 80)); const slowCarbs = qualityRange(FOOD_DB.filter(f => f.category === 'carb' || f.category === 'grain')); const proteinFoods = qualityRange(FOOD_DB.filter(f => f.category === 'protein' && effectiveTierFilter(f))); const allProtein = applyFoodPrefs(proteinFoods, 'protein'); const topProtein = highQuality ? qualitySort(allProtein, true).slice(0, 8) : lowQuality ? qualitySort(allProtein, false).slice(0, 5) : allProtein.filter(f => f.protein > 15).sort(() => Math.random() - 0.5).slice(0, 5);
+        const fastCarbs = qualityRange(FOOD_DB.filter(f => f.gi && f.gi >= 80)); const slowCarbs = qualityRange(FOOD_DB.filter(f => f.category === 'carb' || f.category === 'grain')); const proteinFoods = qualityRange(FOOD_DB.filter(f => f.category === 'protein' && effectiveTierFilter(f))); const allProtein = applyFoodPrefs(proteinFoods, 'protein');         const topProtein = highQuality ? qualitySort(allProtein, true).slice(0, 8) : qualitySort(allProtein, true).slice(0, 6);
         const pickItem = (foodPool: any[], targetG: number, seed: number, maxItems = 2): any[] => { const result: any[] = []; let pool = applyFoodPrefs(foodPool, 'any'); if (pool.length === 0) return result; const highQ = budget === 'max' || budget === 'enhanced'; const lowQ = budget === 'low'; if (highQ) pool = qualitySort(pool, true); else if (lowQ) pool = qualitySort(pool, false); const preferPool = preferredSet.size > 0 ? pool.filter(f => preferredSet.has(f.id)) : []; let mainPool = preferPool.length > 0 ? preferPool : pool; if (lazyDayMode) { mainPool = mainPool.filter(f => f.tier === 'basic'); } // N4: lazyDayMode — only basic foods
         if (highQ && usedFoodIds.size > 0) { const unused = mainPool.filter(f => !usedFoodIds.has(f.id)); if (unused.length > 0) mainPool = unused; }
         const lm = lazyDayMode ? 1 : maxItems; // N4: lazyDayMode — 1 item max per meal
@@ -710,7 +710,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
               remainingC -= (treat.carbs || 0) * 0.3;
             }
           }
-          const protItems = pickItem(topProtein, remainingP, sSeed); protItems.forEach(i => { items.push(i); remainingP -= i.p || 0; remainingF -= i.f || 0; remainingC -= i.c || 0; });
+          const protItems = pickItem(topProtein, remainingP, sSeed, 1); protItems.forEach(i => { items.push(i); remainingP -= i.p || 0; remainingF -= i.f || 0; remainingC -= i.c || 0; });
           const carbPool = applyFoodPrefs(slowCarbs, 'carb'); if (carbPool.length > 0 && remainingC > 10) { const cPool = highQuality ? qualitySort(carbPool, true) : carbPool; const cIdx = highQuality ? 0 : Math.floor(seedRand(sSeed + 3) * cPool.length); const cF = cPool[cIdx % cPool.length]; usedFoodIds.add(cF.id); const cPortion = Math.min(1, remainingC / Math.max(1, cF.carbs || 1)); items.push({ name: cF.name, id: cF.id, amount: Math.round(cPortion * (parseInt(cF.servingSize) || 100)), kcal: Math.round(cF.kcal * cPortion), p: Math.round(cF.protein * cPortion), f: Math.round(cF.fat * cPortion), c: Math.round(cF.carbs * cPortion) }); }
           const vegPool = limitPool(applyFoodPrefs(qualityRange(FOOD_DB.filter(f => f.category === 'veg_fruit')), 'veg'), foodSeed + 4); if (vegPool.length > 0) { const vIdx = highQuality ? 0 : Math.floor(seedRand(foodSeed + 4) * vegPool.length); const v = vegPool[vIdx % vegPool.length]; usedFoodIds.add(v.id); items.push({ name: v.name, id: v.id, amount: 80, kcal: Math.round(v.kcal * 0.8), p: Math.round(v.protein * 0.8), f: Math.round(v.fat * 0.8), c: Math.round(v.carbs * 0.8) }); }
         }
@@ -718,25 +718,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         return { ...mt, items, totals: tot, idx };
       });
       let totals = { kcal: meals.reduce((s,m) => s + m.totals.kcal, 0), p: meals.reduce((s,m) => s + m.totals.p, 0), f: meals.reduce((s,m) => s + m.totals.f, 0), c: meals.reduce((s,m) => s + m.totals.c, 0) };
-      // KBJU correction: scale all items uniformly to meet targets within 2%
+      // KBJU correction: iterative per-macro refinement, tolerance ≤2%
       const tK = tKcalAdj || 1; const tP_ = tP || 1; const tF_ = tF || 1; const tC_ = tCAdj || 1;
-      const devK = Math.abs(totals.kcal - tK) / tK; const devP = Math.abs(totals.p - tP_) / tP_;
-      const devF = Math.abs(totals.f - tF_) / tF_; const devC = Math.abs(totals.c - tC_) / tC_;
-      if (devK > 0.02 || devP > 0.02 || devF > 0.02 || devC > 0.02) {
-        const scales = [tK / Math.max(1, totals.kcal), tP_ / Math.max(1, totals.p), tF_ / Math.max(1, totals.f), tC_ / Math.max(1, totals.c)];
-        const effScale = Math.min(1.3, Math.max(0.7, scales.reduce((s, v) => s + v, 0) / scales.length));
-        meals.forEach((m: any) => {
-          m.items.forEach((it: any) => {
-            it.amount = Math.round(it.amount * effScale);
-            it.kcal = Math.round(it.kcal * effScale);
-            it.p = Math.round(it.p * effScale);
-            it.f = Math.round(it.f * effScale);
-            it.c = Math.round(it.c * effScale);
-          });
-          m.totals = { kcal: m.items.reduce((s: number, i: any) => s + i.kcal, 0), p: m.items.reduce((s: number, i: any) => s + i.p, 0), f: m.items.reduce((s: number, i: any) => s + i.f, 0), c: m.items.reduce((s: number, i: any) => s + i.c, 0) };
-        });
-        totals = { kcal: meals.reduce((s: number, m: any) => s + m.totals.kcal, 0), p: meals.reduce((s: number, m: any) => s + m.totals.p, 0), f: meals.reduce((s: number, m: any) => s + m.totals.f, 0), c: meals.reduce((s: number, m: any) => s + m.totals.c, 0) };
-      }
+      const TOL = 0.02;
       const addMacroTopUp = (macro: 'p' | 'f' | 'c', deficit: number) => {
         if (deficit <= 0 || meals.length === 0) return;
         const targetMeal = meals[meals.length - 1];
@@ -745,16 +729,40 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         if (!food) return;
         const per100 = macro === 'p' ? food.protein : macro === 'f' ? food.fat : food.carbs;
         if (!per100) return;
-        const amount = Math.min(macro === 'f' ? 25 : 180, Math.max(macro === 'f' ? 5 : 30, Math.round(deficit / per100 * 100)));
+        const amount = Math.min(macro === 'f' ? 25 : 120, Math.max(macro === 'f' ? 5 : 20, Math.round(deficit / per100 * 100)));
         const r = amount / 100;
         const item = { name: food.name, id: food.id, amount, kcal: Math.round(food.kcal * r), p: Math.round(food.protein * r), f: Math.round(food.fat * r), c: Math.round(food.carbs * r) };
         targetMeal.items.push(item);
         targetMeal.totals = { kcal: targetMeal.items.reduce((s: number, i: any) => s + i.kcal, 0), p: targetMeal.items.reduce((s: number, i: any) => s + i.p, 0), f: targetMeal.items.reduce((s: number, i: any) => s + i.f, 0), c: targetMeal.items.reduce((s: number, i: any) => s + i.c, 0) };
       };
-      addMacroTopUp('p', tP_ - totals.p);
-      addMacroTopUp('f', tF_ - totals.f);
-      addMacroTopUp('c', tC_ - totals.c);
-      totals = { kcal: meals.reduce((s: number, m: any) => s + m.totals.kcal, 0), p: meals.reduce((s: number, m: any) => s + m.totals.p, 0), f: meals.reduce((s: number, m: any) => s + m.totals.f, 0), c: meals.reduce((s: number, m: any) => s + m.totals.c, 0) };
+      for (let iter = 0; iter < 3; iter++) {
+        const devK = Math.abs(totals.kcal - tK) / tK; const devP = Math.abs(totals.p - tP_) / tP_;
+        const devF = Math.abs(totals.f - tF_) / tF_; const devC = Math.abs(totals.c - tC_) / tC_;
+        if (devK <= TOL && devP <= TOL && devF <= TOL && devC <= TOL) break;
+        if (iter === 0) {
+          const scales = [tK / Math.max(1, totals.kcal), tP_ / Math.max(1, totals.p), tF_ / Math.max(1, totals.f), tC_ / Math.max(1, totals.c)];
+          const effScale = Math.min(1.3, Math.max(0.7, scales.reduce((s, v) => s + v, 0) / scales.length));
+          meals.forEach((m: any) => {
+            m.items.forEach((it: any) => {
+              it.amount = Math.round(it.amount * effScale);
+              it.kcal = Math.round(it.kcal * effScale);
+              it.p = Math.round(it.p * effScale);
+              it.f = Math.round(it.f * effScale);
+              it.c = Math.round(it.c * effScale);
+            });
+            m.totals = { kcal: m.items.reduce((s: number, i: any) => s + i.kcal, 0), p: m.items.reduce((s: number, i: any) => s + i.p, 0), f: m.items.reduce((s: number, i: any) => s + i.f, 0), c: m.items.reduce((s: number, i: any) => s + i.c, 0) };
+          });
+          totals = { kcal: meals.reduce((s: number, m: any) => s + m.totals.kcal, 0), p: meals.reduce((s: number, m: any) => s + m.totals.p, 0), f: meals.reduce((s: number, m: any) => s + m.totals.f, 0), c: meals.reduce((s: number, m: any) => s + m.totals.c, 0) };
+        }
+        if (iter < 2) {
+          const thresholds = { p: Math.max(3, tP_ * TOL), f: Math.max(3, tF_ * TOL), c: Math.max(5, tC_ * TOL) };
+          const pDeficit = tP_ - totals.p; const fDeficit = tF_ - totals.f; const cDeficit = tC_ - totals.c;
+          if (pDeficit > thresholds.p) addMacroTopUp('p', pDeficit);
+          if (fDeficit > thresholds.f) addMacroTopUp('f', fDeficit);
+          if (cDeficit > thresholds.c) addMacroTopUp('c', cDeficit);
+          totals = { kcal: meals.reduce((s: number, m: any) => s + m.totals.kcal, 0), p: meals.reduce((s: number, m: any) => s + m.totals.p, 0), f: meals.reduce((s: number, m: any) => s + m.totals.f, 0), c: meals.reduce((s: number, m: any) => s + m.totals.c, 0) };
+        }
+      }
       const allergenWarnings: { food: string; allergens: string[] }[] = [];
       meals.forEach(m => {
         m.items.forEach((it: any) => {
@@ -1021,7 +1029,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [riskReport, setRiskReport] = useState<any>(null);
   const [drugCompatReport, setDrugCompatReport] = useState<any>(null);
   const [nutritionReport, setNutritionReport] = useState<any>(null);
-  useEffect(() => { try { const saved = localStorage.getItem('he_nutrition_report_current'); if (saved) { setNutritionReport(JSON.parse(saved)); setActiveReports(prev => prev.includes('nutrition') ? prev : [...prev, 'nutrition']); } } catch {} }, []);
 
   const generateAllergenReport = () => { if (!dayPlan) return; const conflicts: any[] = []; dayPlan.meals.flatMap((m: any) => m.items).forEach((it: any) => { const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name); if (food?.allergens) { const matched = food.allergens.filter((a: string) => allergens.includes(a)); if (matched.length > 0) conflicts.push({ food: it.name, allergens: matched }); } }); const riskLevel = conflicts.length === 0 ? 'low' : conflicts.length <= 3 ? 'medium' : 'high'; setAllergenReport({ conflicts, riskLevel, summary: conflicts.length === 0 ? '✅ Нет совпадений' : `⚠ ${conflicts.length} совпадений` }); setActiveReports(prev => prev.includes('allergen') ? prev : [...prev, 'allergen']); };
   const generateNutrientReport = () => { if (!dayPlan) return; const micros: Record<string, number> = {}; dayPlan.meals.flatMap((m: any) => m.items).forEach((it: any) => { const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name); if (food?.micros) Object.entries(food.micros).forEach(([k, v]) => { if (v) micros[k] = (micros[k] || 0) + (v as number) * (it.amount / 100); }); }); const targets: Record<string, number> = { Ca:1000,Fe:18,Mg:400,Zn:15,K:3500,Se:55,VitC:100,VitD:15,VitB12:2.4,Omega3:1.6 }; const results: Record<string, any> = {}; const gaps: string[] = []; Object.entries(targets).forEach(([k, t]) => { const actual = Math.round((micros[k]||0)*10)/10; const pct = Math.round(actual/t*100); results[k] = { actual, target: t, pct, status: pct>=80?'ok':pct>=50?'low':'critical' }; if (pct < 80) gaps.push(`${k}: ${actual} из ${t} (${pct}%)`); }); setNutrientReport({ micros: results, gaps: gaps.length === 0 ? ['✅ Все в норме'] : gaps }); setActiveReports(prev => prev.includes('nutrient') ? prev : [...prev, 'nutrient']); };

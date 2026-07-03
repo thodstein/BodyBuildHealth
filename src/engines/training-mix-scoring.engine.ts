@@ -30,7 +30,7 @@ export interface TrainingMixScore {
 }
 
 export interface MixProfile {
-  goal: 'pump' | 'endurance' | 'strength' | 'recovery' | 'focus' | 'powerlifting' | 'competition' | 'crossfit' | 'post_comp' | 'hiit' | 'mma' | 'sprint';
+  goal: 'pump' | 'endurance' | 'strength' | 'recovery' | 'focus' | 'powerlifting' | 'competition' | 'crossfit' | 'post_comp' | 'hiit' | 'mma' | 'sprint' | 'fat_loss' | 'joint' | 'gut' | 'sleep' | 'hydration';
   timing: 'pre' | 'intra' | 'post';
   weightKg: number;
   isOnCycle: boolean;
@@ -190,98 +190,436 @@ export const MIX_SYNERGY: Record<string, string> = {
   sprint: 'Быстрая АТФ-регенерация (креатин 8 г + кордицепс), NO-пампинг (цитруллин + глицерол), CNS-стимуляция (кофеин), H⁺-буфер (β-аланин), нейромышечная передача (магний + таурин).',
 };
 
+export interface MixTemplateItem {
+  id: string;
+  name?: string;
+  dose: string;
+  unit: string;
+  note?: string;
+}
+
 export interface MixTemplate {
   id: string;
   name: string;
   description: string;
   goal: MixProfile['goal'];
   tags: string[];
-  pre: { id: string; dose: string; unit: string; }[];
-  intra: { id: string; dose: string; unit: string; }[];
-  post: { id: string; dose: string; unit: string; }[];
+  pre: MixTemplateItem[];
+  intra: MixTemplateItem[];
+  post: MixTemplateItem[];
+}
+
+export interface MixRenderItem {
+  name: string;
+  id: string;
+  dose: string;
+  unit: string;
+  note: string;
+  mg: number;
+}
+
+/** Build the default comprehensive stack for a goal+timing (without multiplier — apply at render). */
+export function buildDefaultStack(
+  goal: string,
+  timing: 'pre' | 'intra' | 'post',
+  bw: number,
+  multiplier: number,
+  durHrs: number,
+  isCompetition: boolean,
+): MixRenderItem[] {
+  const mixUnit = (v: number): string => v >= 1000 ? `${(v/1000).toFixed(1)}` : `${v}`;
+  const mixSuffix = (v: number): string => v >= 1000 ? 'г' : 'мг';
+  const isPL = goal === 'powerlifting' || goal === 'competition';
+  const isStrengthGoal = goal === 'strength';
+  const isPumpGoal = goal === 'pump';
+  const isFocusGoal = goal === 'focus';
+  const isEnduranceGoal = goal === 'endurance';
+  const isRecoveryGoal = goal === 'recovery';
+  const isHIIT = goal === 'hiit';
+  const isMMA = goal === 'mma';
+  const isSprint = goal === 'sprint';
+  const isPostComp = goal === 'post_comp';
+  const isCF = goal === 'crossfit';
+  const nil: MixRenderItem[] = [];
+
+  // ── PRE ──
+  if (timing === 'pre') {
+    if (isPL) return [
+      { name:'Креатин (загрузка)', id:'creatine', dose:mixUnit(8000*multiplier), unit:'г', note:'За 45 мин до. АТФ для максимальных усилий', mg:Math.round(8000*multiplier) },
+      { name:'Кофеин', id:'caffeine', dose:`${isCompetition?400:300}`, unit:'мг', note:'За 30 мин до. CNS-активация', mg:isCompetition?400:300 },
+      { name:'Бета-аланин', id:'beta_alanine', dose:'4', unit:'г', note:'За 30 мин до. Буфер H⁺ ионов', mg:4000 },
+      { name:'L-тирозин', id:'tyrosine', dose:mixUnit(3000*multiplier), unit:mixSuffix(3000*multiplier), note:'За 30 мин до. Фокус, дофамин', mg:Math.round(3000*multiplier) },
+      { name:'OKG (орнитин)', id:'glutamine', dose:'5', unit:'г', note:'За 30 мин до. Аммиак-буфер для ЦНС', mg:5000 },
+      { name:'Цитруллин', id:'citrulline', dose:mixUnit(6000*multiplier), unit:'г', note:'За 45 мин. NO для кровотока', mg:Math.round(6000*multiplier) },
+      { name:'Таурин', id:'taurine', dose:mixUnit(2000*multiplier), unit:mixSuffix(2000*multiplier), note:'За 30 мин до. Осморегуляция, пампинг', mg:Math.round(2000*multiplier) },
+      { name:'Кордицепс', id:'cordyceps', dose:'3', unit:'г', note:'За 45 мин до. VO₂max, митохондриальный биогенез', mg:3000 },
+      { name:'Глицерол', id:'glycerol', dose:`${(3*multiplier).toFixed(1)}`, unit:'г', note:'За 60 мин до. Гипергидратация, венозный пампинг', mg:Math.round(3000*multiplier) },
+      { name:'Агматин', id:'agmatine', dose:'1', unit:'г', note:'За 30 мин до. NO-модуляция, нейромодулятор', mg:1000 },
+      { name:'Экдистерон', id:'ecdysterone', dose:'500', unit:'мг', note:'За 30 мин до. mTOR, синтез белка', mg:500 },
+    ];
+    if (isStrengthGoal) return [
+      { name:'Креатин', id:'creatine', dose:mixUnit(5000*multiplier), unit:mixSuffix(5000*multiplier), note:'За 45 мин до. АТФ, фосфокреатин', mg:Math.round(5000*multiplier) },
+      { name:'Кофеин', id:'caffeine', dose:'300', unit:'мг', note:'За 30 мин до. CNS-активация', mg:300 },
+      { name:'Бета-аланин', id:'beta_alanine', dose:'3.2', unit:'г', note:'За 30 мин до. Буфер H⁺', mg:3200 },
+      { name:'Экдистерон', id:'ecdysterone', dose:'500', unit:'мг', note:'За 45 мин до. mTOR, синтез белка', mg:500 },
+      { name:'Таурин', id:'taurine', dose:`${(2*multiplier).toFixed(1)}`, unit:'г', note:'За 30 мин до. Ca²⁺-модуляция', mg:Math.round(2000*multiplier) },
+      { name:'Цитруллин', id:'citrulline', dose:'6', unit:'г', note:'За 45 мин до. NO для рабочего кровотока', mg:6000 },
+      { name:'АЦЛ-карнитин', id:'alcar', dose:'1.5', unit:'г', note:'За 30 мин до. Ацетилхолин, нейромышечная передача', mg:1500 },
+      { name:'Родиола розовая', id:'rhodiola', dose:'500', unit:'мг', note:'За 30 мин до. ↓ утомления ЦНС', mg:500 },
+    ];
+    if (isFocusGoal) return [
+      { name:'L-тирозин', id:'tyrosine', dose:`${(3*multiplier).toFixed(1)}`, unit:'г', note:'За 30 мин до. Дофамин/норадреналин', mg:Math.round(3000*multiplier) },
+      { name:'АЦЛ-карнитин', id:'alcar', dose:'1.5', unit:'г', note:'За 30 мин до. Ацетилхолин', mg:1500 },
+      { name:'Кордицепс', id:'cordyceps', dose:'2', unit:'г', note:'За 45 мин до. ATP для мозга', mg:2000 },
+      { name:'Родиола розовая', id:'rhodiola', dose:'500', unit:'мг', note:'За 30 мин до. ↓ утомления, ↑ стрессоустойчивость', mg:500 },
+      { name:'Кофеин', id:'caffeine', dose:'200', unit:'мг', note:'За 30 мин до. CNS-стимуляция', mg:200 },
+      { name:'Цитруллин', id:'citrulline', dose:'4', unit:'г', note:'За 30 мин до. NO для мозгового кровотока', mg:4000 },
+      { name:'Таурин', id:'taurine', dose:'2', unit:'г', note:'За 30 мин до. GABA-модуляция, фокус', mg:2000 },
+    ];
+    if (isEnduranceGoal) return [
+      { name:'Кордицепс', id:'cordyceps', dose:'3', unit:'г', note:'За 45 мин до. VO₂max, митохондрии', mg:3000 },
+      { name:'Бета-аланин', id:'beta_alanine', dose:'4', unit:'г', note:'За 30 мин до. Карнозин, буфер H⁺', mg:4000 },
+      { name:'Родиола розовая', id:'rhodiola', dose:'500', unit:'мг', note:'За 30 мин до. ↓ утомления, ↑ выносливость', mg:500 },
+      { name:'Цитруллин', id:'citrulline', dose:'6', unit:'г', note:'За 45 мин до. NO, кровоток', mg:6000 },
+      { name:'Таурин', id:'taurine', dose:`${(2*multiplier).toFixed(1)}`, unit:'г', note:'За 30 мин до. Осморегуляция, буфер', mg:Math.round(2000*multiplier) },
+      { name:'L-карнитин', id:'l_carnitine', dose:'1.5', unit:'г', note:'За 45 мин до. Транспорт жирных кислот', mg:1500 },
+      { name:'Глицерол', id:'glycerol', dose:`${(4*multiplier).toFixed(1)}`, unit:'г', note:'За 60 мин до. Гипергидратация', mg:Math.round(4000*multiplier) },
+    ];
+    if (isRecoveryGoal) return [
+      { name:'Креатин', id:'creatine', dose:'5', unit:'г', note:'За 30 мин до. Восстановление АТФ', mg:5000 },
+      { name:'Цитруллин', id:'citrulline', dose:'4', unit:'г', note:'За 30 мин до. NO, кровоток к мышцам', mg:4000 },
+      { name:'Родиола розовая', id:'rhodiola', dose:'500', unit:'мг', note:'За 30 мин до. Адаптоген', mg:500 },
+      { name:'Таурин', id:'taurine', dose:'2', unit:'г', note:'За 30 мин до. Осморегуляция', mg:2000 },
+      { name:'Ашваганда', id:'ashwagandha', dose:'600', unit:'мг', note:'За 45 мин до. ↓ кортизол', mg:600 },
+    ];
+    if (isHIIT) return [
+      { name:'Кофеин', id:'caffeine', dose:'200', unit:'мг', note:'За 30 мин до. CNS-активация для взрывных усилий', mg:200 },
+      { name:'Бета-аланин', id:'beta_alanine', dose:'4', unit:'г', note:'За 30 мин до. Буфер H⁺ для анаэробной работы', mg:4000 },
+      { name:'Креатин', id:'creatine', dose:'5', unit:'г', note:'За 30 мин до. АТФ для интервалов', mg:5000 },
+      { name:'Цитруллин', id:'citrulline', dose:'6', unit:'г', note:'За 45 мин до. NO для кровотока', mg:6000 },
+      { name:'Таурин', id:'taurine', dose:'2', unit:'г', note:'За 30 мин до. Осморегуляция, Ca²⁺-модуляция', mg:2000 },
+    ];
+    if (isMMA) return [
+      { name:'Креатин', id:'creatine', dose:'5', unit:'г', note:'За 30 мин до. Взрывная сила', mg:5000 },
+      { name:'Кофеин', id:'caffeine', dose:'200', unit:'мг', note:'За 30 мин до. CNS-ready без перестимуляции', mg:200 },
+      { name:'Бета-аланин', id:'beta_alanine', dose:'4', unit:'г', note:'За 30 мин до. Буфер H⁺', mg:4000 },
+      { name:'L-тирозин', id:'tyrosine', dose:'2', unit:'г', note:'За 30 мин до. CNS-фокус, дофамин', mg:2000 },
+      { name:'Цитруллин', id:'citrulline', dose:'6', unit:'г', note:'За 45 мин до. NO для кровотока', mg:6000 },
+      { name:'АЦЛ-карнитин', id:'alcar', dose:'1.5', unit:'г', note:'За 30 мин до. Ацетилхолин, защита мозга', mg:1500 },
+      { name:'Таурин', id:'taurine', dose:'2', unit:'г', note:'За 30 мин до. Нейромодуляция, GABA', mg:2000 },
+      { name:'Родиола розовая', id:'rhodiola', dose:'500', unit:'мг', note:'За 30 мин до. Адаптоген, ↓ утомления ЦНС', mg:500 },
+    ];
+    if (isSprint) return [
+      { name:'Креатин', id:'creatine', dose:'8', unit:'г', note:'За 45 мин до. Максимум фосфокреатина', mg:8000 },
+      { name:'Кофеин', id:'caffeine', dose:'250', unit:'мг', note:'За 30 мин до. CNS-активация', mg:250 },
+      { name:'Бета-аланин', id:'beta_alanine', dose:'4', unit:'г', note:'За 30 мин до. Буфер H⁺', mg:4000 },
+      { name:'Цитруллин', id:'citrulline', dose:'8', unit:'г', note:'За 45 мин до. NO для кровотока', mg:8000 },
+      { name:'Кордицепс', id:'cordyceps', dose:'3', unit:'г', note:'За 45 мин до. ATP-регенерация', mg:3000 },
+      { name:'Таурин', id:'taurine', dose:'2', unit:'г', note:'За 30 мин до. Ca²⁺-модуляция, осморегуляция', mg:2000 },
+      { name:'Магний', id:'magnesium', dose:'400', unit:'мг', note:'За 45 мин до. Нейромышечная передача', mg:400 },
+    ];
+    if (isPostComp) return [
+      { name:'Ашваганда KSM-66', id:'ashwagandha', dose:'600', unit:'мг', note:'За 45 мин до. ↓ кортизол, адаптоген', mg:600 },
+      { name:'Магний', id:'magnesium', dose:'400', unit:'мг', note:'За 30 мин до. ↓ кортизол, сон', mg:400 },
+      { name:'Родиола розовая', id:'rhodiola', dose:'500', unit:'мг', note:'За 30 мин до. ↓ утомления ЦНС', mg:500 },
+    ];
+    // pump / crossfit / fallback → pump default
+    return [
+      { name:'Цитруллин (малат)', id:'citrulline', dose:mixUnit(Math.min(8000,6000*multiplier)), unit:'г', note:'За 30-45 мин до. NO-бустер, пампинг', mg:Math.round(Math.min(8000,6000*multiplier)) },
+      { name:'Бета-аланин', id:'beta_alanine', dose:'3.2', unit:'г', note:'За 30 мин до. Буфер молочной кислоты', mg:3200 },
+      { name:'L-тирозин', id:'tyrosine', dose:mixUnit(2000*multiplier), unit:mixSuffix(2000*multiplier), note:'За 30 мин до. Фокус, дофамин', mg:Math.round(2000*multiplier) },
+      { name:'Креатин', id:'creatine', dose:mixUnit(5000*multiplier), unit:mixSuffix(5000*multiplier), note:'За 30 мин до. АТФ, взрывная сила', mg:Math.round(5000*multiplier) },
+      { name:'Таурин', id:'taurine', dose:mixUnit(2000*multiplier), unit:mixSuffix(2000*multiplier), note:'За 30 мин до. Осморегуляция, пампинг', mg:Math.round(2000*multiplier) },
+      { name:'АЦЛ-карнитин', id:'alcar', dose:'1.5', unit:'г', note:'За 30 мин до. Ацетилхолин, митохондрии', mg:1500 },
+      { name:'Глицерол', id:'glycerol', dose:`${(3*multiplier).toFixed(1)}`, unit:'г', note:'За 60 мин до. Гипергидратация, венозный пампинг', mg:Math.round(3000*multiplier) },
+      { name:'Родиола розовая', id:'rhodiola', dose:'500', unit:'мг', note:'За 30 мин до. Адаптоген, снижение утомления', mg:500 },
+      { name:'Кордицепс', id:'cordyceps', dose:'2', unit:'г', note:'За 45 мин до. ATP, выносливость', mg:2000 },
+      { name:'Тонгкат Али 200:1', id:'tongkat_ali', dose:'400', unit:'мг', note:'За 30 мин до. Тестостерон, энергия', mg:400 },
+    ];
+  }
+
+  // ── INTRA ──
+  if (timing === 'intra') {
+    if (isPL || isStrengthGoal) return [
+      { name:'HBCD', id:'hbcd', dose:`${Math.round(30*durHrs)}`, unit:'г', note:'Каждые 20 мин. Быстрый углевод для мощности', mg:Math.round(30000*durHrs) },
+      { name:'EAA (2:1:1)', id:'eaa', dose:mixUnit(10000*multiplier), unit:'г', note:'Каждые 30 мин. Анти-катаболизм', mg:Math.round(10000*multiplier) },
+      { name:'L-глютамин', id:'glutamine', dose:'5', unit:'г', note:'Каждые 30 мин. ЖКТ, иммунитет', mg:5000 },
+      { name:'Электролиты (Na/K/Mg)', id:'electrolyte', dose:'1.5', unit:'г/л', note:'Каждые 15-20 мин. Гидратация', mg:Math.round(1500*durHrs) },
+      { name:'Таурин', id:'taurine', dose:'2', unit:'г', note:'Каждые 30 мин. Осморегуляция', mg:2000 },
+      { name:'Креатин', id:'creatine', dose:'3', unit:'г', note:'Приём. Поддержка АТФ', mg:3000 },
+      { name:'Кордицепс', id:'cordyceps', dose:'2', unit:'г', note:'Однократно. Выносливость для многоповторов', mg:2000 },
+    ];
+    if (isEnduranceGoal || isCF) return [
+      { name:'HBCD', id:'hbcd', dose:`${Math.round(50*durHrs)}`, unit:'г', note:'Каждые 15 мин. Много углеводов для длительной работы', mg:Math.round(50000*durHrs) },
+      { name:'EAA (2:1:1)', id:'eaa', dose:`${(15*multiplier).toFixed(0)}`, unit:'г', note:'Каждые 30 мин. Максимальный анти-катаболизм', mg:Math.round(15000*multiplier) },
+      { name:'L-глютамин', id:'glutamine', dose:'5', unit:'г', note:'Каждые 30 мин. ЖКТ, иммунитет', mg:5000 },
+      { name:'Электролиты (Na/K/Mg)', id:'electrolyte', dose:'2', unit:'г/л', note:'Каждые 15 мин. Гидратация + соль', mg:Math.round(2000*durHrs) },
+      { name:'L-карнитин', id:'l_carnitine', dose:'1', unit:'г', note:'Каждые 30 мин. Транспорт жирных кислот', mg:1000 },
+      { name:'Таурин', id:'taurine', dose:'2', unit:'г', note:'Каждые 30 мин. Осморегуляция', mg:2000 },
+      { name:'Кордицепс', id:'cordyceps', dose:'3', unit:'г', note:'Однократно. VO₂max', mg:3000 },
+      { name:'Глицерол', id:'glycerol', dose:'3', unit:'г', note:'В изотоник. Гипергидратация', mg:3000 },
+    ];
+    if (isPumpGoal) return [
+      { name:'Глицерол', id:'glycerol', dose:'5', unit:'г', note:'В изотоник. Венозный пампинг', mg:5000 },
+      { name:'Цитруллин', id:'citrulline', dose:'3', unit:'г', note:'Каждые 30 мин. NO для пампа', mg:3000 },
+      { name:'Таурин', id:'taurine', dose:'2', unit:'г', note:'Каждые 30 мин. Осморегуляция', mg:2000 },
+      { name:'Электролиты (Na/K/Mg)', id:'electrolyte', dose:'1.5', unit:'г/л', note:'Каждые 15-20 мин. Гидратация', mg:Math.round(1500*durHrs) },
+      { name:'EAA (2:1:1)', id:'eaa', dose:'10', unit:'г', note:'Каждые 30 мин. Анти-катаболизм', mg:10000 },
+      { name:'L-глютамин', id:'glutamine', dose:'5', unit:'г', note:'Каждые 30 мин. ЖКТ', mg:5000 },
+      { name:'Креатин', id:'creatine', dose:'3', unit:'г', note:'Приём. Поддержка АТФ', mg:3000 },
+    ];
+    if (isHIIT) return [
+      { name:'HBCD', id:'hbcd', dose:`${Math.round(30*durHrs)}`, unit:'г', note:'Между спринтами — быстрый углевод', mg:Math.round(30000*durHrs) },
+      { name:'Электролиты (Na/K/Mg)', id:'electrolyte', dose:'1.5', unit:'г/л', note:'Каждые 15 мин. Гидратация', mg:Math.round(1500*durHrs) },
+      { name:'Глицерол', id:'glycerol', dose:'3', unit:'г', note:'В изотоник. Гипергидратация', mg:3000 },
+    ];
+    if (isMMA) return [
+      { name:'HBCD', id:'hbcd', dose:`${Math.round(40*durHrs)}`, unit:'г', note:'Углеводы между раундами', mg:Math.round(40000*durHrs) },
+      { name:'EAA (2:1:1)', id:'eaa', dose:'10', unit:'г', note:'Каждые 30 мин. Анти-катаболизм', mg:10000 },
+      { name:'Электролиты (Na/K/Mg)', id:'electrolyte', dose:'2', unit:'г/л', note:'Каждые 15 мин. Гидратация', mg:Math.round(2000*durHrs) },
+      { name:'Глицерол', id:'glycerol', dose:'3', unit:'г', note:'В изотоник. Гипергидратация', mg:3000 },
+    ];
+    if (isSprint) return [
+      { name:'Электролиты (Na/K/Mg)', id:'electrolyte', dose:'1', unit:'г/л', note:'Каждые 15 мин. Лёгкая гидратация', mg:Math.round(1000*durHrs) },
+      { name:'Глицерол', id:'glycerol', dose:'3', unit:'г', note:'В изотоник. Гипергидратация', mg:3000 },
+    ];
+    // recovery / focus / post_comp / fallback
+    return [
+      { name:'HBCD', id:'hbcd', dose:`${Math.round(20*durHrs)}`, unit:'г', note:'Каждые 20 мин. Лёгкий углевод', mg:Math.round(20000*durHrs) },
+      { name:'EAA (2:1:1)', id:'eaa', dose:'8', unit:'г', note:'Каждые 30 мин. Анти-катаболизм', mg:8000 },
+      { name:'L-глютамин', id:'glutamine', dose:'5', unit:'г', note:'Каждые 30 мин. ЖКТ', mg:5000 },
+      { name:'Электролиты (Na/K/Mg)', id:'electrolyte', dose:'1', unit:'г/л', note:'Каждые 20 мин. Гидратация', mg:1000 },
+      { name:'Таурин', id:'taurine', dose:'2', unit:'г', note:'Каждые 30 мин. Осморегуляция', mg:2000 },
+    ];
+  }
+
+  // ── POST ──
+  if (timing === 'post') {
+    if (isRecoveryGoal || isPostComp) return [
+      { name:'Сывороточный протеин', id:'protein', dose:`${(0.35*bw).toFixed(0)}`, unit:'г', note:'Сразу после. Быстрое усвоение', mg:Math.round(0.35*bw*1000) },
+      { name:'Креатин моногидрат', id:'creatine', dose:'5', unit:'г', note:'Сразу после. Креатин-фосфат', mg:5000 },
+      { name:'L-глютамин', id:'glutamine', dose:`${(5*multiplier).toFixed(0)}`, unit:'г', note:'Сразу после. Восстановление', mg:Math.round(5000*multiplier) },
+      { name:'NAC', id:'nac', dose:'1.2', unit:'г', note:'Сразу после. Глутатион, детоксикация', mg:1200 },
+      { name:'Ашваганда KSM-66', id:'ashwagandha', dose:'600', unit:'мг', note:'Сразу после. ↓ кортизол', mg:600 },
+      { name:'Куркумин (с пиперином)', id:'curcumin', dose:'800', unit:'мг', note:'Сразу после. ↓ воспаление', mg:800 },
+      { name:'Омега-3', id:'omega3', dose:'2', unit:'г', note:'Сразу после. Противовоспалительное', mg:2000 },
+      { name:'Цинк + Магний (ZMA)', id:'zinc', dose:'30+450', unit:'мг', note:'Перед сном. Сон, тестостерон', mg:480 },
+      { name:'Витамин C', id:'vitamin_c', dose:'1000', unit:'мг', note:'Сразу после. Антиоксидант, кортизол', mg:1000 },
+    ];
+    if (isStrengthGoal) return [
+      { name:'Сывороточный протеин', id:'protein', dose:`${(0.45*bw).toFixed(0)}`, unit:'г', note:'Сразу после. MPS, синтез белка', mg:Math.round(0.45*bw*1000) },
+      { name:'Креатин моногидрат', id:'creatine', dose:'5', unit:'г', note:'Сразу после. Креатин-фосфат', mg:5000 },
+      { name:'L-глютамин', id:'glutamine', dose:`${(5*multiplier).toFixed(0)}`, unit:'г', note:'Сразу после. Восстановление', mg:Math.round(5000*multiplier) },
+      { name:'Экдистерон', id:'ecdysterone', dose:'500', unit:'мг', note:'Сразу после. mTOR, синтез белка', mg:500 },
+      { name:'Ашваганда KSM-66', id:'ashwagandha', dose:'600', unit:'мг', note:'Сразу после. ↑ IGF-1', mg:600 },
+      { name:'NAC', id:'nac', dose:'1.2', unit:'г', note:'Сразу после. Глутатион', mg:1200 },
+      { name:'Омега-3', id:'omega3', dose:'2', unit:'г', note:'Сразу после. Противовоспалительное', mg:2000 },
+      { name:'Цинк + Магний (ZMA)', id:'zinc', dose:'30+450', unit:'мг', note:'Перед сном. Тестостерон, сон', mg:480 },
+    ];
+    if (isMMA) return [
+      { name:'Сывороточный протеин', id:'protein', dose:`${(0.4*bw).toFixed(0)}`, unit:'г', note:'Сразу после. MPS', mg:Math.round(0.4*bw*1000) },
+      { name:'L-глютамин', id:'glutamine', dose:'10', unit:'г', note:'GABA, восстановление, ЖКТ', mg:10000 },
+      { name:'Креатин моногидрат', id:'creatine', dose:'5', unit:'г', note:'Сразу после. Восстановление АТФ', mg:5000 },
+      { name:'Омега-3', id:'omega3', dose:'3', unit:'г', note:'Защита мозга, противовоспалительное', mg:3000 },
+      { name:'Ашваганда KSM-66', id:'ashwagandha', dose:'600', unit:'мг', note:'↓ кортизол, адаптоген', mg:600 },
+      { name:'Куркумин (с пиперином)', id:'curcumin', dose:'800', unit:'мг', note:'NF-kB, системное воспаление', mg:800 },
+    ];
+    if (isHIIT) return [
+      { name:'Сывороточный протеин', id:'protein', dose:`${(0.35*bw).toFixed(0)}`, unit:'г', note:'Сразу после. Быстрое усвоение', mg:Math.round(0.35*bw*1000) },
+      { name:'Креатин моногидрат', id:'creatine', dose:'5', unit:'г', note:'Сразу после. Креатин-фосфат', mg:5000 },
+      { name:'Омега-3', id:'omega3', dose:'2', unit:'г', note:'Противовоспалительное', mg:2000 },
+      { name:'Кордицепс', id:'cordyceps', dose:'2', unit:'г', note:'Восстановление митохондрий', mg:2000 },
+    ];
+    if (isSprint) return [
+      { name:'Сывороточный протеин', id:'protein', dose:`${(0.3*bw).toFixed(0)}`, unit:'г', note:'Сразу после. Быстрое усвоение', mg:Math.round(0.3*bw*1000) },
+      { name:'Креатин моногидрат', id:'creatine', dose:'5', unit:'г', note:'Сразу после. Дозагрузка креатина', mg:5000 },
+      { name:'HMB', id:'hmb', dose:'3', unit:'г', note:'Анти-катаболизм, ↓ MuRF1', mg:3000 },
+      { name:'L-карнитин', id:'l_carnitine', dose:'1', unit:'г', note:'Окисление ЖК, восстановление', mg:1000 },
+    ];
+    // pump / endurance / focus / crossfit / PL / fallback
+    return [
+      { name:'Сывороточный протеин', id:'protein', dose:`${(0.4*bw).toFixed(0)}`, unit:'г', note:'Сразу после. Быстрое усвоение', mg:Math.round(0.4*bw*1000) },
+      { name:'Креатин моногидрат', id:'creatine', dose:'5', unit:'г', note:'Сразу после. Креатин-фосфат', mg:5000 },
+      { name:'L-глютамин', id:'glutamine', dose:mixUnit(5000*multiplier), unit:mixSuffix(5000*multiplier), note:'Сразу после. Восстановление', mg:Math.round(5000*multiplier) },
+      { name:'Цинк + Магний (ZMA)', id:'zinc', dose:'30+450', unit:'мг', note:'Перед сном. Тестостерон, сон', mg:480 },
+      { name:'Витамин C', id:'vitamin_c', dose:'500', unit:'мг', note:'Сразу после. Антиоксидант', mg:500 },
+      { name:'Ашваганда KSM-66', id:'ashwagandha', dose:'600', unit:'мг', note:'Сразу после. Кортизол, анаболизм', mg:600 },
+      { name:'Омега-3', id:'omega3', dose:'2', unit:'г', note:'Сразу после. Противовоспалительное', mg:2000 },
+      { name:'NAC', id:'nac', dose:'1.2', unit:'г', note:'Сразу после. Глутатион, детоксикация', mg:1200 },
+      { name:'Куркумин (с пиперином)', id:'curcumin', dose:'800', unit:'мг', note:'Сразу после. NF-kB, воспаление', mg:800 },
+      { name:'Альфа-липоевая кислота', id:'alpha_lipoic', dose:'300', unit:'мг', note:'Сразу после. Nrf2, антиоксидант', mg:300 },
+      { name:'L-карнитин', id:'l_carnitine', dose:'1', unit:'г', note:'Сразу после. Восстановление мышц', mg:1000 },
+    ];
+  }
+
+  return nil;
+}
+
+/** Convert a MixTemplate's timing items to MixRenderItem[] with names, notes, and mg. */
+export function resolveTemplateItems(items: MixTemplateItem[], multiplier: number, bw: number): MixRenderItem[] {
+  return items.map(item => {
+    const doseNum = parseFloat(item.dose);
+    let mg = doseNum;
+    if (item.unit === 'г' || item.unit === 'г/л') mg = doseNum * 1000;
+    else if (item.unit === 'мг') mg = doseNum;
+    else if (item.unit === 'г/кг') mg = doseNum * bw * 1000;
+    mg = Math.round(mg * multiplier);
+    const isPerKg = item.unit === 'г/кг';
+    let displayDose = item.dose;
+    let displayUnit = item.unit;
+    if (isPerKg && !item.unit.includes('/')) { /* keep as-is */ }
+    // Auto-generate name from id if not provided
+    const displayName = item.name || item.id.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    const displayNote = item.note || `Из шаблона. Доза: ${item.dose}${item.unit}`;
+    return { name: displayName, id: item.id, dose: displayDose, unit: displayUnit, note: displayNote, mg };
+  });
+}
+
+/** Find the default template for a goal (the first template matching the goal). */
+export function getDefaultTemplate(goal: string): MixTemplate | undefined {
+  return MIX_TEMPLATES.find(t => t.goal === goal);
 }
 
 export const MIX_TEMPLATES: MixTemplate[] = [
   {
-    id: 'c4_original', name: 'C4 Original (аналог)', description: 'Классический предтреник: кофеин + креатин + β-аланин + аргинин. Энергия и памп без перегруза.',
-    goal: 'pump', tags: ['pre', 'энергия', 'памп', 'классика'],
-    pre: [{ id:'caffeine', dose:'200', unit:'мг' }, { id:'creatine', dose:'5', unit:'г' }, { id:'beta_alanine', dose:'3.2', unit:'г' }, { id:'citrulline', dose:'6', unit:'г' }, { id:'tyrosine', dose:'2', unit:'г' }],
-    intra: [], post: [],
+    id: 'fat_loss', name: '🔥 Жиросжигание (LISS/кардио)', description: 'Сжигание жира с сохранением мышц. Минимум углеводов, акцент на липолиз и энергию из жиров.',
+    goal: 'fat_loss', tags: ['Жиросжигание','Кардио'],
+    pre: [
+      { id:'l_carnitine', dose:'2', unit:'г', note:'За 30 мин. Транспорт ЖК в митохондрии' },
+      { id:'caffeine', dose:'250', unit:'мг', note:'За 20 мин. Липолиз + CNS' },
+      { id:'cordyceps', dose:'2', unit:'г', note:'За 30 мин. VO₂max, ATP' },
+      { id:'green_tea', dose:'500', unit:'мг', note:'За 20 мин. EGCG, термогенез' },
+      { id:'tyrosine', dose:'2', unit:'г', note:'За 30 мин. Фокус, дофамин' },
+    ],
+    intra: [
+      { id:'eaa', dose:'10', unit:'г', note:'Каждые 30 мин. Анти-катаболизм' },
+      { id:'electrolyte', dose:'1.5', unit:'г/л', note:'Гидратация без калорий' },
+    ],
+    post: [
+      { id:'protein', dose:'0.4', unit:'г/кг', note:'Сразу после. Сохранение мышц' },
+      { id:'l_carnitine', dose:'1', unit:'г', note:'Липолиз' },
+      { id:'omega3', dose:'2', unit:'г', note:'Противовоспалительное' },
+      { id:'cla', dose:'2', unit:'г', note:'Липолиз, анти-катаболизм' },
+    ],
   },
   {
-    id: 'pump_formula', name: 'Pump-формула MAX', description: 'Максимальный NO: цитруллин + глицерол + агматин. Венозный пампинг и гипергидратация.',
-    goal: 'pump', tags: ['pre', 'памп', 'NO', 'max'],
-    pre: [{ id:'citrulline', dose:'8', unit:'г' }, { id:'glycerol', dose:'5', unit:'г' }, { id:'agmatine', dose:'1', unit:'г' }, { id:'taurine', dose:'2', unit:'г' }, { id:'creatine', dose:'5', unit:'г' }],
-    intra: [{ id:'glycerol', dose:'3', unit:'г' }, { id:'citrulline', dose:'3', unit:'г' }, { id:'electrolyte', dose:'1.5', unit:'г/л' }],
-    post: [],
+    id: 'joint', name: '🦵 Суставы и связки', description: 'Защита хряща, регенерация соединительной ткани. Для профилактики травм на объёмных циклах.',
+    goal: 'joint', tags: ['Суставы','Связки','Травмы'],
+    pre: [
+      { id:'collagen', dose:'15', unit:'г', note:'За 30 мин. Синтез коллагена' },
+      { id:'glucosamine', dose:'1500', unit:'мг', note:'За 30 мин. Матрикс хряща' },
+      { id:'msm', dose:'3', unit:'г', note:'За 30 мин. Сера для хряща' },
+      { id:'vitamin_c', dose:'1000', unit:'мг', note:'За 30 мин. Кофактор коллагена' },
+    ],
+    intra: [
+      { id:'hbcd', dose:'20', unit:'г', note:'Лёгкий углевод для гидратации тканей' },
+      { id:'electrolyte', dose:'1.5', unit:'г/л', note:'Гидратация суставной жидкости' },
+    ],
+    post: [
+      { id:'collagen', dose:'15', unit:'г', note:'Сразу после. Матрикс хряща' },
+      { id:'vitamin_c', dose:'1', unit:'г', note:'Кофактор коллагена' },
+      { id:'curcumin', dose:'800', unit:'мг', note:'NF-kB, воспаление суставов' },
+      { id:'omega3', dose:'3', unit:'г', note:'Противовоспалительное для суставов' },
+    ],
   },
   {
-    id: 'superhuman_clone', name: 'SuperHuman (аналог)', description: 'Тяжёлый предтрен: двойной стимулятор + ноотропы. Максимум CNS-активации.',
-    goal: 'powerlifting', tags: ['pre', 'сила', 'CNS', 'тяжёлый'],
-    pre: [{ id:'caffeine', dose:'400', unit:'мг' }, { id:'tyrosine', dose:'3', unit:'г' }, { id:'alcar', dose:'1.5', unit:'г' }, { id:'beta_alanine', dose:'4', unit:'г' }, { id:'citrulline', dose:'6', unit:'г' }, { id:'agmatine', dose:'1', unit:'г' }, { id:'taurine', dose:'2', unit:'г' }],
-    intra: [], post: [],
+    id: 'gut', name: '🫀 Здоровье ЖКТ', description: 'Восстановление слизистой, микробиом, детоксикация. Для курсов с пероральными ААС и НПВС.',
+    goal: 'gut', tags: ['ЖКТ','Микробиом','Слизистая'],
+    pre: [
+      { id:'glutamine', dose:'5', unit:'г', note:'За 20 мин. Энергия для энтероцитов' },
+      { id:'zinc', dose:'25', unit:'мг', note:'За 20 мин. Восстановление слизистой' },
+      { id:'probiotic', dose:'1', unit:'капс', note:'За 20 мин. L. rhamnosus, B. lactis' },
+    ],
+    intra: [
+      { id:'glutamine', dose:'5', unit:'г', note:'Энергия энтероцитов' },
+      { id:'electrolyte', dose:'1', unit:'г/л', note:'Лёгкий изотоник без сахара' },
+    ],
+    post: [
+      { id:'glutamine', dose:'10', unit:'г', note:'Восстановление ворсинок' },
+      { id:'zinc', dose:'25', unit:'мг', note:'Репарация слизистой' },
+      { id:'betaine_hcl', dose:'1', unit:'капс', note:'Поддержка кислотности' },
+      { id:'vitamin_c', dose:'1', unit:'г', note:'Антиоксидант, иммунитет ЖКТ' },
+      { id:'bone_broth', dose:'200', unit:'мл', note:'Коллаген, глицин для слизистой' },
+    ],
   },
   {
-    id: 'endurance_pro', name: 'Endurance Pro', description: 'Для длительных кардио-сессий: кордицепс + родиола + карнитин + электролиты.',
-    goal: 'endurance', tags: ['pre', 'intra', 'выносливость', 'кардио'],
-    pre: [{ id:'cordyceps', dose:'3', unit:'г' }, { id:'rhodiola', dose:'500', unit:'мг' }, { id:'beta_alanine', dose:'4', unit:'г' }, { id:'l_carnitine', dose:'1.5', unit:'г' }],
-    intra: [{ id:'hbcd', dose:'50', unit:'г' }, { id:'electrolyte', dose:'2', unit:'г/л' }, { id:'glycerol', dose:'3', unit:'г' }],
-    post: [{ id:'protein', dose:'0.35', unit:'г/кг' }, { id:'glutamine', dose:'5', unit:'г' }, { id:'omega3', dose:'2', unit:'г' }],
-  },
-  {
-    id: 'strength_basic', name: 'Strength Basic', description: 'База для силовой тренировки: креатин + кофеин + β-аланин. Минимум компонентов, максимум силы.',
-    goal: 'strength', tags: ['pre', 'сила', 'база'],
-    pre: [{ id:'creatine', dose:'5', unit:'г' }, { id:'caffeine', dose:'300', unit:'мг' }, { id:'beta_alanine', dose:'3.2', unit:'г' }, { id:'citrulline', dose:'6', unit:'г' }, { id:'taurine', dose:'2', unit:'г' }],
-    intra: [], post: [],
-  },
-  {
-    id: 'full_recovery', name: 'Full Recovery Kit', description: 'Полный пост-тренировочный комплект: MPS + антиоксиданты + гормональная стабилизация.',
-    goal: 'recovery', tags: ['post', 'восстановление', 'MPS', 'антиоксидант'],
-    pre: [],
+    id: 'sleep', name: '💤 Сон и восстановление', description: 'Глубокий сон, кортизол ↓, GH ↑, GABA-эргическая поддержка. Вечерний приём за 30-60 мин до сна.',
+    goal: 'sleep', tags: ['Сон','Восстановление','Кортизол'],
+    pre: [
+      { id:'magnesium', dose:'400', unit:'мг', note:'Глицинат Mg за 30 мин. GABA, сон' },
+      { id:'glycine', dose:'3', unit:'г', note:'За 30 мин. Нейромедиатор, ↓ темп. тела' },
+      { id:'l_theanine', dose:'200', unit:'мг', note:'За 30 мин. Альфа-волны, релакс' },
+      { id:'melatonin', dose:'3', unit:'мг', note:'За 20 мин. Циркадный ритм' },
+      { id:'gaba', dose:'500', unit:'мг', note:'За 20 мин. GABA-рецепторы' },
+    ],
     intra: [],
-    post: [{ id:'protein', dose:'0.4', unit:'г/кг' }, { id:'creatine', dose:'5', unit:'г' }, { id:'glutamine', dose:'5', unit:'г' }, { id:'nac', dose:'1.2', unit:'г' }, { id:'ashwagandha', dose:'600', unit:'мг' }, { id:'omega3', dose:'2', unit:'г' }, { id:'vitamin_c', dose:'1000', unit:'мг' }, { id:'zinc', dose:'30+450', unit:'мг' }],
+    post: [
+      { id:'magnesium', dose:'400', unit:'мг', note:'Глицинат Mg — сон' },
+      { id:'glycine', dose:'3', unit:'г', note:'Глицин — качество сна' },
+      { id:'ashwagandha', dose:'600', unit:'мг', note:'↓ кортизол, ↑ GH' },
+      { id:'zma', dose:'1', unit:'порц', note:'Цинк + Mg + B6 — тестостерон + сон' },
+      { id:'melatonin', dose:'3', unit:'мг', note:'Циркадный ритм' },
+    ],
   },
   {
-    id: 'focus_nootropic', name: 'Focus Nootropic Stack', description: 'Для максимальной концентрации: тирозин + АЦЛ-карнитин + родиола. Без перестимуляции.',
-    goal: 'focus', tags: ['pre', 'фокус', 'ноотроп'],
-    pre: [{ id:'tyrosine', dose:'3', unit:'г' }, { id:'alcar', dose:'1.5', unit:'г' }, { id:'rhodiola', dose:'500', unit:'мг' }, { id:'caffeine', dose:'200', unit:'мг' }, { id:'citrulline', dose:'4', unit:'г' }],
-    intra: [{ id:'eaa', dose:'8', unit:'г' }, { id:'electrolyte', dose:'1', unit:'г/л' }],
-    post: [],
+    id: 'hydration', name: '💧 Гипергидратация', description: 'Максимальная гидратация для венозного пампинга, терморегуляции и профилактики судорог.',
+    goal: 'hydration', tags: ['Гидратация','Электролиты','Памп'],
+    pre: [
+      { id:'glycerol', dose:'5', unit:'г', note:'За 60 мин. Гипергидратация' },
+      { id:'electrolyte', dose:'1.5', unit:'г/л', note:'За 60 мин. Na/K/Mg' },
+      { id:'taurine', dose:'2', unit:'г', note:'За 30 мин. Осморегуляция' },
+      { id:'citrulline', dose:'6', unit:'г', note:'За 45 мин. NO + гидратация сосудов' },
+    ],
+    intra: [
+      { id:'electrolyte', dose:'2', unit:'г/л', note:'Каждые 15 мин. Макс гидратация' },
+      { id:'glycerol', dose:'3', unit:'г', note:'В изотоник. Удержание воды' },
+      { id:'hbcd', dose:'20', unit:'г', note:'Лёгкий углевод для удержания воды' },
+    ],
+    post: [
+      { id:'glycerol', dose:'5', unit:'г', note:'Догидратация' },
+      { id:'electrolyte', dose:'2', unit:'г/л', note:'Восполнение солей' },
+      { id:'taurine', dose:'2', unit:'г', note:'Осморегуляция' },
+    ],
   },
   {
-    id: 'crossfit_wod', name: 'CF WOD Stack', description: 'Для CrossFit: энергия + гидратация + восстановление между WODами.',
-    goal: 'crossfit', tags: ['pre', 'intra', 'post', 'CF', 'WOD'],
-    pre: [{ id:'caffeine', dose:'300', unit:'мг' }, { id:'beta_alanine', dose:'4', unit:'г' }, { id:'cordyceps', dose:'3', unit:'г' }, { id:'citrulline', dose:'6', unit:'г' }],
-    intra: [{ id:'hbcd', dose:'60', unit:'г' }, { id:'eaa', dose:'15', unit:'г' }, { id:'electrolyte', dose:'2', unit:'г/л' }, { id:'glycerol', dose:'3', unit:'г' }],
-    post: [{ id:'protein', dose:'0.35', unit:'г/кг' }, { id:'creatine', dose:'5', unit:'г' }, { id:'omega3', dose:'2', unit:'г' }, { id:'curcumin', dose:'800', unit:'мг' }],
+    id: 'antiinflammatory', name: '🧪 Противовоспалительный', description: 'Системное ↓ воспаления. Для восстановления после травм, при хроническом воспалении на курсе.',
+    goal: 'recovery', tags: ['Воспаление','Иммунитет','Восстановление'],
+    pre: [
+      { id:'curcumin', dose:'800', unit:'мг', note:'С пиперином. NF-kB, ↓ IL-6' },
+      { id:'omega3', dose:'3', unit:'г', note:'Высокая доза. Resolvin E1' },
+      { id:'bromelain', dose:'500', unit:'мг', note:'Протеаза, ↓ отёк' },
+      { id:'vitamin_c', dose:'1', unit:'г', note:'Антиоксидант' },
+    ],
+    intra: [
+      { id:'electrolyte', dose:'1.5', unit:'г/л', note:'Гидратация' },
+      { id:'hbcd', dose:'20', unit:'г', note:'Лёгкий углевод' },
+    ],
+    post: [
+      { id:'curcumin', dose:'800', unit:'мг', note:'NF-kB, ↓ воспаление' },
+      { id:'omega3', dose:'3', unit:'г', note:'Resolvin E1, ↓ IL-6' },
+      { id:'bromelain', dose:'500', unit:'мг', note:'Протеаза, ↓ фибрин' },
+      { id:'vitamin_c', dose:'1', unit:'г', note:'Антиоксидант' },
+    ],
   },
   {
-    id: 'post_comp_recovery', name: 'Пост-соревновательное восстановление', description: 'Гормональный откат + кортизол + сон. ZMA, ашваганда, витамин C, родиола.',
-    goal: 'post_comp', tags: ['post', 'recovery', 'гормоны', 'кортизол'],
-    pre: [{ id:'ashwagandha', dose:'600', unit:'мг' }, { id:'rhodiola', dose:'500', unit:'мг' }, { id:'magnesium', dose:'400', unit:'мг' }],
-    intra: [{ id:'electrolyte', dose:'1', unit:'г/л' }, { id:'eaa', dose:'5', unit:'г' }],
-    post: [{ id:'protein', dose:'0.4', unit:'г/кг' }, { id:'zinc', dose:'30', unit:'мг' }, { id:'magnesium', dose:'450', unit:'мг' }, { id:'vitamin_c', dose:'1000', unit:'мг' }, { id:'ashwagandha', dose:'600', unit:'мг' }, { id:'omega3', dose:'2', unit:'г' }, { id:'melatonin', dose:'3', unit:'мг' }, { id:'gaba', dose:'750', unit:'мг' }],
-  },
-  {
-    id: 'hiit_stack', name: 'HIIT: анаэробная ёмкость', description: 'β-аланин + креатин + глицерол + кофеин. Для спринтов и интервалов.',
-    goal: 'hiit', tags: ['pre', 'intra', 'post', 'HIIT', 'анаэробика'],
-    pre: [{ id:'caffeine', dose:'200', unit:'мг' }, { id:'beta_alanine', dose:'4', unit:'г' }, { id:'creatine', dose:'5', unit:'г' }, { id:'citrulline', dose:'6', unit:'г' }, { id:'taurine', dose:'2', unit:'г' }],
-    intra: [{ id:'hbcd', dose:'30', unit:'г' }, { id:'electrolyte', dose:'1.5', unit:'г/л' }, { id:'glycerol', dose:'3', unit:'г' }],
-    post: [{ id:'protein', dose:'0.35', unit:'г/кг' }, { id:'creatine', dose:'5', unit:'г' }, { id:'omega3', dose:'2', unit:'г' }, { id:'cordyceps', dose:'2', unit:'г' }],
-  },
-  {
-    id: 'mma_stack', name: 'MMA: взрыв + защита мозга', description: 'Креатин + β-аланин + глицерол + родиола + АЦЛ-карнитин.',
-    goal: 'mma', tags: ['pre', 'intra', 'post', 'MMA', 'единоборства'],
-    pre: [{ id:'creatine', dose:'5', unit:'г' }, { id:'caffeine', dose:'200', unit:'мг' }, { id:'beta_alanine', dose:'4', unit:'г' }, { id:'citrulline', dose:'6', unit:'г' }, { id:'tyrosine', dose:'2', unit:'г' }, { id:'alcar', dose:'1.5', unit:'г' }, { id:'taurine', dose:'2', unit:'г' }, { id:'rhodiola', dose:'500', unit:'мг' }],
-    intra: [{ id:'hbcd', dose:'40', unit:'г' }, { id:'eaa', dose:'10', unit:'г' }, { id:'electrolyte', dose:'2', unit:'г/л' }, { id:'glycerol', dose:'3', unit:'г' }],
-    post: [{ id:'protein', dose:'0.4', unit:'г/кг' }, { id:'glutamine', dose:'10', unit:'г' }, { id:'creatine', dose:'5', unit:'г' }, { id:'omega3', dose:'3', unit:'г' }, { id:'ashwagandha', dose:'600', unit:'мг' }, { id:'curcumin', dose:'800', unit:'мг' }],
-  },
-  {
-    id: 'sprint_stack', name: 'Спринт: АТФ-регенерация', description: 'Креатин 8 г + кордицепс + цитруллин. Для бега на 100-400м.',
-    goal: 'sprint', tags: ['pre', 'post', 'спринт', 'скорость'],
-    pre: [{ id:'creatine', dose:'8', unit:'г' }, { id:'caffeine', dose:'250', unit:'мг' }, { id:'beta_alanine', dose:'4', unit:'г' }, { id:'citrulline', dose:'8', unit:'г' }, { id:'cordyceps', dose:'3', unit:'г' }, { id:'taurine', dose:'2', unit:'г' }, { id:'magnesium', dose:'400', unit:'мг' }],
-    intra: [{ id:'electrolyte', dose:'1', unit:'г/л' }, { id:'glycerol', dose:'3', unit:'г' }],
-    post: [{ id:'protein', dose:'0.3', unit:'г/кг' }, { id:'creatine', dose:'5', unit:'г' }, { id:'hmb', dose:'3', unit:'г' }, { id:'l_carnitine', dose:'1', unit:'г' }],
+    id: 'immunity', name: '🛡️ Иммунитет', description: 'Поддержка иммунной системы на курсе. NK-клетки, антиоксиданты, адаптогены.',
+    goal: 'recovery', tags: ['Иммунитет','Адаптогены','Антиоксиданты'],
+    pre: [
+      { id:'vitamin_c', dose:'2', unit:'г', note:'Высокая доза за 30 мин' },
+      { id:'zinc', dose:'25', unit:'мг', note:'Кофактор иммунитета' },
+      { id:'astragalus', dose:'500', unit:'мг', note:'Адаптоген, NK-клетки' },
+      { id:'echinacea', dose:'400', unit:'мг', note:'За 30 мин. Иммуномодулятор' },
+    ],
+    intra: [
+      { id:'electrolyte', dose:'1.5', unit:'г/л', note:'Гидратация' },
+      { id:'glutamine', dose:'5', unit:'г', note:'Иммунитет ЖКТ' },
+    ],
+    post: [
+      { id:'vitamin_c', dose:'2', unit:'г', note:'Антиоксидант' },
+      { id:'zinc', dose:'25', unit:'мг', note:'Иммунитет' },
+      { id:'vitamin_d3', dose:'2000', unit:'МЕ', note:'Иммуномодулятор' },
+      { id:'probiotic', dose:'1', unit:'капс', note:'Микробиом → иммунитет' },
+    ],
   },
 ];
 
@@ -548,13 +886,33 @@ export function calculateMixScore(substances: MixSubstance[], profile: MixProfil
   const bw = profile.weightKg;
   const durHrs = profile.workoutDurationMin / 60;
 
-  // Score accumulators
-  let pump = 0, energy = 0, focus = 0, strength = 0;
-  let hydration = 0, endurance = 0, anticatabolic = 0;
-  let recovery = 0, protein = 0, glycogen = 0;
+  // Score accumulators — аддитивные (больше веществ → выше скор)
+  let pump = 0, pumpBest = 0, pumpCount = 0;
+  let energy = 0, energyBest = 0, energyCount = 0;
+  let focus = 0, focusBest = 0, focusCount = 0;
+  let strength = 0, strengthBest = 0, strengthCount = 0;
+  let hydration = 0, hydrationBest = 0, hydrationCount = 0;
+  let endurance = 0, enduranceBest = 0, enduranceCount = 0;
+  let anticatabolic = 0, anticatabolicBest = 0, anticatabolicCount = 0;
+  let recovery = 0, recoveryBest = 0, recoveryCount = 0;
+  let protein = 0, proteinBest = 0, proteinCount = 0;
+  let glycogen = 0, glycogenBest = 0, glycogenCount = 0;
   let noScore = 0;
   const catLabel: Record<string, string> = { pump:'🩸 Памп', energy:'⚡ Энергия', focus:'🧠 Фокус', strength:'🏋️ Сила', hydration:'💧 Гидратация', endurance:'🏃 Выносливость', anticatabolic:'🛡️ Анти-катаболизм', recovery:'🔄 Восстановление', protein:'🥩 Белок', glycogen:'🍚 Гликоген' };
   const substanceBreakdown: SubstanceScoreBreakdown[] = [];
+  const acc = (cat: string, sc: number) => {
+    if (cat === 'pump') { pump = Math.max(pump, sc); pumpBest = Math.max(pumpBest, sc); pumpCount++; }
+    if (cat === 'energy') { energy = Math.max(energy, sc); energyBest = Math.max(energyBest, sc); energyCount++; }
+    if (cat === 'focus') { focus = Math.max(focus, sc); focusBest = Math.max(focusBest, sc); focusCount++; }
+    if (cat === 'strength') { strength = Math.max(strength, sc); strengthBest = Math.max(strengthBest, sc); strengthCount++; }
+    if (cat === 'hydration') { hydration = Math.max(hydration, sc); hydrationBest = Math.max(hydrationBest, sc); hydrationCount++; }
+    if (cat === 'endurance') { endurance = Math.max(endurance, sc); enduranceBest = Math.max(enduranceBest, sc); enduranceCount++; }
+    if (cat === 'anticatabolic') { anticatabolic = Math.max(anticatabolic, sc); anticatabolicBest = Math.max(anticatabolicBest, sc); anticatabolicCount++; }
+    if (cat === 'recovery') { recovery = Math.max(recovery, sc); recoveryBest = Math.max(recoveryBest, sc); recoveryCount++; }
+    if (cat === 'protein') { protein = Math.max(protein, sc); proteinBest = Math.max(proteinBest, sc); proteinCount++; }
+    if (cat === 'glycogen') { glycogen = Math.max(glycogen, sc); glycogenBest = Math.max(glycogenBest, sc); glycogenCount++; }
+  };
+  const addBonus = (best: number, count: number) => Math.min(100, Math.round(best + (count - 1) * 5));
 
   for (const sub of substances) {
     const db = getSubstanceScore(sub.id) || SUBSTANCE_DB[sub.id] || SUBSTANCE_DB[sub.id.toLowerCase()];
@@ -562,19 +920,22 @@ export function calculateMixScore(substances: MixSubstance[], profile: MixProfil
     const score = db.baseScore * multiplier;
     const cats: { key: string; label: string; score: number }[] = [];
     for (const cat of db.categories) {
-      if (cat === 'pump') { pump = Math.max(pump, score); cats.push({ key: cat, label: catLabel[cat] || cat, score: Math.round(score) }); }
-      if (cat === 'energy') { energy = Math.max(energy, score); cats.push({ key: cat, label: catLabel[cat] || cat, score: Math.round(score) }); }
-      if (cat === 'focus') { focus = Math.max(focus, score); cats.push({ key: cat, label: catLabel[cat] || cat, score: Math.round(score) }); }
-      if (cat === 'strength') { strength = Math.max(strength, score); cats.push({ key: cat, label: catLabel[cat] || cat, score: Math.round(score) }); }
-      if (cat === 'hydration') { hydration = Math.max(hydration, score); cats.push({ key: cat, label: catLabel[cat] || cat, score: Math.round(score) }); }
-      if (cat === 'endurance') { endurance = Math.max(endurance, score); cats.push({ key: cat, label: catLabel[cat] || cat, score: Math.round(score) }); }
-      if (cat === 'anticatabolic') { anticatabolic = Math.max(anticatabolic, score); cats.push({ key: cat, label: catLabel[cat] || cat, score: Math.round(score) }); }
-      if (cat === 'recovery') { recovery = Math.max(recovery, score); cats.push({ key: cat, label: catLabel[cat] || cat, score: Math.round(score) }); }
-      if (cat === 'protein') { protein = Math.max(protein, score); cats.push({ key: cat, label: catLabel[cat] || cat, score: Math.round(score) }); }
-      if (cat === 'glycogen') { glycogen = Math.max(glycogen, score); cats.push({ key: cat, label: catLabel[cat] || cat, score: Math.round(score) }); }
+      acc(cat, score);
+      cats.push({ key: cat, label: catLabel[cat] || cat, score: Math.round(score) });
     }
     substanceBreakdown.push({ id: sub.id, name: sub.name, doseMg: sub.doseMg, baseScore: Math.round(score), categories: cats });
   }
+  // Apply additive bonus (best + 5 per extra substance in same category)
+  pump = addBonus(pumpBest, pumpCount);
+  energy = addBonus(energyBest, energyCount);
+  focus = addBonus(focusBest, focusCount);
+  strength = addBonus(strengthBest, strengthCount);
+  hydration = addBonus(hydrationBest, hydrationCount);
+  endurance = addBonus(enduranceBest, enduranceCount);
+  anticatabolic = addBonus(anticatabolicBest, anticatabolicCount);
+  recovery = addBonus(recoveryBest, recoveryCount);
+  protein = addBonus(proteinBest, proteinCount);
+  glycogen = addBonus(glycogenBest, glycogenCount);
 
   // NO score = pump + endurance weighted, minus nandrolone penalty
   noScore = Math.round(pump * 0.5 + endurance * 0.3 + hydration * 0.2);
@@ -695,11 +1056,17 @@ export function calculateMixScore(substances: MixSubstance[], profile: MixProfil
   const isHIIT = profile.goal === 'hiit';
   const isMMA = profile.goal === 'mma';
   const isSprint = profile.goal === 'sprint';
+  const isFatLoss = profile.goal === 'fat_loss';
+  const isJoint = profile.goal === 'joint';
+  const isGut = profile.goal === 'gut';
+  const isSleep = profile.goal === 'sleep';
+  const isHydration = profile.goal === 'hydration';
+  const isFn = (v: boolean, def: number, map: Record<string, number>) => v ? (map[profile.timing] ?? def) : undefined;
   const weights = profile.timing === 'pre'
-    ? { pump: isPump ? 0.35 : isStrength ? 0.10 : isEndurance ? 0.10 : isFocus ? 0.05 : isCF ? 0.15 : isHIIT ? 0.08 : isMMA ? 0.05 : isSprint ? 0.05 : 0.15, energy: isPump ? 0.15 : isStrength ? 0.20 : isEndurance ? 0.30 : isFocus ? 0.20 : isCF ? 0.30 : isHIIT ? 0.35 : isMMA ? 0.25 : isSprint ? 0.30 : 0.25, focus: isPump ? 0.05 : isStrength ? 0.10 : isEndurance ? 0.10 : isFocus ? 0.40 : isCF ? 0.25 : isHIIT ? 0.05 : isMMA ? 0.20 : isSprint ? 0.05 : 0.25, strength: isPump ? 0.10 : isStrength ? 0.40 : isEndurance ? 0.10 : isFocus ? 0.10 : isPL ? 0.25 : isHIIT ? 0.20 : isMMA ? 0.25 : isSprint ? 0.40 : 0.25, endurance: isPump ? 0.10 : isStrength ? 0.05 : isEndurance ? 0.35 : isFocus ? 0.05 : isCF ? 0.15 : isHIIT ? 0.25 : isMMA ? 0.15 : isSprint ? 0.10 : 0.05 }
+    ? { pump: (isPump ? 0.35 : isFatLoss ? 0.05 : isHydration ? 0.20 : isStrength ? 0.10 : isEndurance ? 0.10 : isFocus ? 0.05 : isCF ? 0.15 : isHIIT ? 0.08 : isMMA ? 0.05 : isSprint ? 0.05 : 0.15), energy: (isPump ? 0.15 : isFatLoss ? 0.30 : isStrength ? 0.20 : isEndurance ? 0.30 : isFocus ? 0.20 : isCF ? 0.30 : isHIIT ? 0.35 : isMMA ? 0.25 : isSprint ? 0.30 : 0.25), focus: (isPump ? 0.05 : isFatLoss ? 0.20 : isStrength ? 0.10 : isEndurance ? 0.10 : isFocus ? 0.40 : isCF ? 0.25 : isHIIT ? 0.05 : isMMA ? 0.20 : isSprint ? 0.05 : 0.25), strength: (isPump ? 0.10 : isFatLoss ? 0.05 : isStrength ? 0.40 : isEndurance ? 0.10 : isFocus ? 0.10 : isPL ? 0.25 : isHIIT ? 0.20 : isMMA ? 0.25 : isSprint ? 0.40 : 0.25), endurance: (isPump ? 0.10 : isFatLoss ? 0.30 : isStrength ? 0.05 : isEndurance ? 0.35 : isFocus ? 0.05 : isCF ? 0.15 : isHIIT ? 0.25 : isMMA ? 0.15 : isSprint ? 0.10 : 0.05) }
     : profile.timing === 'intra'
-    ? { pump: isPump ? 0.20 : isStrength ? 0.10 : isHIIT ? 0.08 : isMMA ? 0.10 : isSprint ? 0.20 : 0.10, energy: isEndurance ? 0.20 : isCF ? 0.10 : 0.10, focus: 0.05, strength: isStrength ? 0.15 : isSprint ? 0.05 : isHIIT ? 0.05 : 0.05, hydration: isCF ? 0.35 : isEndurance ? 0.35 : isHIIT ? 0.40 : isMMA ? 0.35 : isSprint ? 0.40 : 0.30, endurance: isEndurance ? 0.25 : isCF ? 0.20 : isHIIT ? 0.30 : isMMA ? 0.25 : isSprint ? 0.20 : 0.20, anticatabolic: isMMA ? 0.20 : isHIIT ? 0.15 : isSprint ? 0.10 : 0.15 }
-    : { pump: 0.05, energy: 0.05, focus: 0.05, strength: isStrength ? 0.20 : isPL ? 0.15 : isSprint ? 0.15 : 0.1, hydration: 0.05, recovery: isRecovery ? 0.50 : isPostComp ? 0.45 : isPL ? 0.40 : isHIIT ? 0.40 : isMMA ? 0.35 : isSprint ? 0.30 : 0.35, protein: isRecovery ? 0.20 : isStrength ? 0.30 : isPostComp ? 0.25 : isMMA ? 0.30 : isSprint ? 0.30 : 0.25, glycogen: isPostComp ? 0.10 : isPL ? 0.05 : isHIIT ? 0.15 : isMMA ? 0.10 : isSprint ? 0.10 : 0.10, antiinflammatory: isRecovery ? 0.10 : isPostComp ? 0.10 : isMMA ? 0.05 : isSprint ? 0.05 : 0 };
+    ? { pump: (isPump ? 0.20 : isFatLoss ? 0.05 : isHydration ? 0.15 : isStrength ? 0.10 : isHIIT ? 0.08 : isMMA ? 0.10 : isSprint ? 0.20 : 0.10), energy: (isEndurance ? 0.20 : isCF ? 0.10 : isFatLoss ? 0.15 : 0.10), focus: (isFatLoss ? 0.10 : 0.05), strength: (isStrength ? 0.15 : isSprint ? 0.05 : isHIIT ? 0.05 : 0.05), hydration: (isCF ? 0.35 : isEndurance ? 0.35 : isHIIT ? 0.40 : isMMA ? 0.35 : isSprint ? 0.40 : isFatLoss ? 0.20 : isHydration ? 0.40 : 0.30), endurance: (isEndurance ? 0.25 : isCF ? 0.20 : isHIIT ? 0.30 : isMMA ? 0.25 : isSprint ? 0.20 : isFatLoss ? 0.25 : 0.20), anticatabolic: (isMMA ? 0.20 : isHIIT ? 0.15 : isSprint ? 0.10 : isFatLoss ? 0.15 : 0.15) }
+    : { pump: (isPump ? 0.05 : isHydration ? 0.10 : 0.05), energy: 0.05, focus: 0.05, strength: (isStrength ? 0.20 : isPL ? 0.15 : isSprint ? 0.15 : 0.1), hydration: (isHydration ? 0.25 : 0.05), recovery: (isRecovery ? 0.50 : isPostComp ? 0.45 : isPL ? 0.40 : isHIIT ? 0.40 : isMMA ? 0.35 : isSprint ? 0.30 : isFatLoss ? 0.25 : isJoint ? 0.55 : isSleep ? 0.50 : isGut ? 0.30 : 0.35), protein: (isRecovery ? 0.20 : isStrength ? 0.30 : isPostComp ? 0.25 : isMMA ? 0.30 : isSprint ? 0.30 : isFatLoss ? 0.30 : isJoint ? 0.15 : isSleep ? 0.10 : isGut ? 0.15 : 0.25), glycogen: (isPostComp ? 0.10 : isPL ? 0.05 : isHIIT ? 0.15 : isMMA ? 0.10 : isSprint ? 0.10 : isFatLoss ? 0.10 : 0.10), antiinflammatory: (isRecovery ? 0.10 : isPostComp ? 0.10 : isMMA ? 0.05 : isSprint ? 0.05 : isJoint ? 0.20 : isSleep ? 0.20 : isGut ? 0.20 : 0) };
 
   for (const [key, w] of Object.entries(weights)) {
     const val = key === 'pump' ? pump : key === 'energy' ? energy : key === 'focus' ? focus : key === 'strength' ? strength : key === 'hydration' ? hydration : key === 'endurance' ? endurance : key === 'anticatabolic' ? anticatabolic : key === 'recovery' ? recovery : key === 'protein' ? protein : glycogen;
@@ -751,6 +1118,30 @@ export function calculateMixScore(substances: MixSubstance[], profile: MixProfil
   if (profile.goal === 'post_comp') {
     suggestions.push('🔄 Пост-соревнования: гормональный откат — ZMA, ашваганда 600 мг, витамин C 1 г, родиола 500 мг (кортизол + восстановление)');
     suggestions.push('💤 Сон 9+ часов, холодные ванны для воспаления, минимум стимуляторов 3-5 дней');
+  }
+  if (profile.goal === 'fat_loss') {
+    if (profile.timing === 'pre') suggestions.push('🔥 Жиросжигание: L-карнитин 2 г, кофеин 200-300 мг, кордицепс 2-3 г, экстракт зелёного чая 500 мг, йохимбин 5 мг');
+    if (profile.timing === 'intra') suggestions.push('🔥 Жиросжигание intra: HBCD 15-20 г (минимум), EAA 10 г, электролиты — калорий минимум');
+    if (profile.timing === 'post') suggestions.push('🔥 Жиросжигание post: протеин 0.4 г/кг, L-карнитин 1 г, CLA 2 г, омега-3 2 г (сохранение мышц + липолиз)');
+  }
+  if (profile.goal === 'joint') {
+    if (profile.timing === 'pre') suggestions.push('🦵 Суставы: коллаген 15 г за 30 мин, глюкозамин 1500 мг, MSM 3 г, гиалуроновая к-та 100 мг');
+    if (profile.timing === 'intra') suggestions.push('🦵 Суставы intra: HBCD 20 г + электролиты + глицерол 3 г — влажная среда для хрящей');
+    if (profile.timing === 'post') suggestions.push('🦵 Суставы post: коллаген 15 г + витамин C 1 г + куркумин 800 мг + омега-3 3 г (матрикс хряща)');
+  }
+  if (profile.goal === 'gut') {
+    if (profile.timing === 'pre') suggestions.push('🫀 ЖКТ: глутамин 5 г за 30 мин, пробиотики (L. rhamnosus), L-карнитин 1 г для тонуса ЖКТ');
+    if (profile.timing === 'intra') suggestions.push('🫀 ЖКТ intra: только глутамин 5 г + простые электролиты — исключить сахара и HBCD при чувствительности');
+    if (profile.timing === 'post') suggestions.push('🫀 ЖКТ post: глутамин 10 г, костный бульон, бетаин HCl, цинк 25 мг + витамин C 1 г (восстановление слизистой)');
+  }
+  if (profile.goal === 'sleep') {
+    if (profile.timing === 'pre') suggestions.push('💤 Сон: глицин 3 г за 30 мин, магний 400 мг глицинат, L-теанин 200 мг, мелатонин 1-3 мг, GABA 500 мг');
+    if (profile.timing === 'post') suggestions.push('💤 Сон post: магний 400 мг глицинат, глицин 3 г, ашваганда 600 мг (кортизол ↓), мелатонин 1-3 мг, ZMA');
+  }
+  if (profile.goal === 'hydration') {
+    if (profile.timing === 'pre') suggestions.push('💧 Гидратация: глицерол 3-5 г + электролиты (Na 500 мг, K 200 мг) за 60 мин');
+    if (profile.timing === 'intra') suggestions.push('💧 Гидратация intra: электролиты 2 г/л + глицерол 3 г + HBCD 20-30 г — максимум жидкости');
+    if (profile.timing === 'post') suggestions.push('💧 Гидратация post: 1.5× потерянного веса воды + электролиты + глицерол 5 г');
   }
 
   return {

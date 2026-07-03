@@ -734,6 +734,7 @@ export interface ReadinessInput {
   nutrition?: number;
   support?: number;
   fatigue?: number;
+  mixQualityScore?: number;
 }
 
 export interface ReadinessScores {

@@ -34,7 +34,13 @@ export function calcReadiness(i: ReadinessInput): ReadinessScores {
   const tl = Math.min(1, Math.max(0, i.trainingLoadRatio));
   const sf = Math.min(1, Math.max(0, i.subjFatigue / 10));
   const hr = Math.min(1, Math.max(0, i.hrIncrease));
-  const fat = Math.max(0, Math.min(100, (tl * 0.5 + sf * 0.3 + hr * 0.2) * 100));
+  let fat = Math.max(0, Math.min(100, (tl * 0.5 + sf * 0.3 + hr * 0.2) * 100));
+
+  // Mix quality modifier: хороший микс → +восстановление, −усталость
+  if (i.mixQualityScore !== undefined) {
+    if (i.mixQualityScore > 80) { rec = Math.min(100, rec + 3); fat = Math.max(0, fat - 3); }
+    else if (i.mixQualityScore > 0 && i.mixQualityScore < 40) { rec = Math.max(0, rec - 3); fat = Math.min(100, fat + 3); }
+  }
 
   let cons = false, reason = '';
   if (rec < 40) { cons = true; reason = 'Восстановление < 40'; }

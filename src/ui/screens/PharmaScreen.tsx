@@ -6,11 +6,11 @@ import { simulateCourse, steadyStatePeak, steadyStateTrough, eliminationConstant
 import { PharmaScoreCard } from '../components/PharmaScoreCard';
 import { calculateMultiSubstancePKPD } from '../../engines/pkpd-superposition.engine';
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
-import { PHARMA_DETAILS, type PharmaDetail } from '../../data/support-database';
+import { PHARMA_DETAILS, type PharmaDetail } from '../../data/support-category-data';
 import type { PharmaSubstance, CourseEntry, PD } from '../../core/types';
 import { SYRINGE_SPECS, DRUG_THRESHOLDS } from '../../core/constants';
 import { SYNERGY_PAIRS, type SynergyPair } from '../../engines/support.engine';
-import { ALL_INTERACTIONS, findInteractionsForSubstance, type SupportInteraction } from '../../data/support-database';
+import { ALL_INTERACTIONS, findInteractionsForSubstance, type SupportInteraction } from '../../data/support-substances';
 import { decodeGarbled } from '../../utils/text-sanitizer';
 import { getDrugTzMechanisms, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../data/support-db';
 import { getLabEffectsForDrug, getMarkerName } from '../../data/support-lab-effects';
@@ -209,6 +209,11 @@ export const PharmaScreen: React.FC = () => {
     );
   }, []);
 
+  const scoreCourse = useMemo(() =>
+    (linked.course || []).map((c: any) => ({ substanceId: c.substanceId || '', dose: c.doseValue || 0, unit: c.doseUnit || 'мг', weeks: (c.endWeek || 12) - (c.startWeek || 0) })),
+    [linked.course]
+  );
+
   if (page === 'main') {
     const cards = [
       { key:'course' as const, icon:'📋', title:'Курс', desc:'Управление курсом, маппинг препаратов, диагностика', color:'#8b5cf6' },
@@ -281,7 +286,7 @@ export const PharmaScreen: React.FC = () => {
             </div>
           )}
           <PharmaScoreCard
-            course={(linked.course || []).map((c: any) => ({ substanceId: c.substanceId || '', dose: c.doseValue || 0, unit: c.doseUnit || 'мг', weeks: (c.endWeek || 12) - (c.startWeek || 0) }))}
+            course={scoreCourse}
             weight={linked.profile?.settings?.weight || 80}
             age={linked.profile?.settings?.age || 30}
             sex={linked.profile?.settings?.sex || 'male'}

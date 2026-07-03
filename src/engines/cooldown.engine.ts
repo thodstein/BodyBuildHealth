@@ -1,4 +1,5 @@
 import type { CooldownBlock } from '../core/types';
+export type { CooldownBlock };
 
 export interface CooldownInput {
   muscleGroupsUsed: string[];

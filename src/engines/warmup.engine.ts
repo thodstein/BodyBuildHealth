@@ -1,4 +1,5 @@
 import type { WarmupBlock } from '../core/types';
+export type { WarmupBlock };
 
 export interface WarmupInput {
   sessionFocus: string;

@@ -12,6 +12,116 @@ import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { normalizeLabValue } from '../../core/constants';
+import { SYNERGY_NETWORK } from '../../data/support-synergy-network';
+
+// ── Synergy helpers ──
+// Ищет все синергии кандидата с уже выбранными веществами
+function synergyScoreWithPlan(candidateId: string, planIds: string[]): number {
+  let total = 0;
+  for (const entry of SYNERGY_NETWORK) {
+    if (entry.type !== 'synergy') continue;
+    const partners = [entry.a, entry.b, entry.c, entry.d, entry.e, entry.f, entry.g, ...(entry.substances || [])].filter(Boolean) as string[];
+    if (!partners.includes(candidateId)) continue;
+    for (const pid of planIds) {
+      if (partners.includes(pid)) {
+        total += entry.score;
+      }
+    }
+  }
+  return total;
+}
+
+// Ищет все конфликты кандидата с выбранными веществами
+function conflictScoreWithPlan(candidateId: string, planIds: string[]): number {
+  let total = 0;
+  for (const entry of SYNERGY_NETWORK) {
+    if (entry.type !== 'conflict' && entry.type !== 'caution') continue;
+    const partners = [entry.a, entry.b, entry.c, entry.d, entry.e, entry.f, entry.g, ...(entry.substances || [])].filter(Boolean) as string[];
+    if (!partners.includes(candidateId)) continue;
+    for (const pid of planIds) {
+      if (partners.includes(pid)) {
+        total += entry.score;
+      }
+    }
+  }
+  return total;
+}
+
+// Генерирует what-if рекомендации синергии для уже выбранного плана
+export interface SynergyRecommendation {
+  candidateId: string;
+  candidateName: string;
+  synergiesWith: string[];       // ID веществ в плане, с которыми есть синергия
+  synergyScore: number;          // Суммарный score синергии
+  newSystemCoverage: number;     // Сколько НОВЫХ систем покроет
+  totalSystemCoverage: number;   // Всего систем после добавления
+  reason: string;                // Текстовое описание пользы
+  effect: string;                // Эффект синергии
+  severity: string;              // HIGH / MEDIUM / LOW
+}
+
+export function generateSynergyRecommendations(
+  planIds: string[],
+  activeSystems: string[],
+  allDb: Record<string, any[]>,
+  planSystemCoverage: Set<string>,
+): SynergyRecommendation[] {
+  const recommendations: SynergyRecommendation[] = [];
+  const used = new Set(planIds);
+  for (const [id, entries] of Object.entries(allDb)) {
+    if (used.has(id) || !entries || entries.length === 0) continue;
+    // Синергия с веществами в плане
+    const synScore = synergyScoreWithPlan(id, planIds);
+    const confScore = conflictScoreWithPlan(id, planIds);
+    if (synScore <= 0 || confScore > 0) continue; // нет синергии или есть конфликт
+    // Какие системы покроет новое вещество
+    const newSystems = new Set<string>();
+    for (const e of entries) {
+      const sys = e.organId === 'cns' ? 'neuro' : e.organId;
+      if (!planSystemCoverage.has(sys) && activeSystems.includes(sys)) {
+        newSystems.add(sys);
+      }
+    }
+    // Хотя бы 1 синергия с планом ИЛИ покрывает новую активную систему
+    if (synScore < 4 && newSystems.size === 0) continue;
+    // Имена синергистов в плане
+    const synergiesWith: string[] = [];
+    let bestEffect = '';
+    let bestSeverity = 'MEDIUM';
+    for (const entry of SYNERGY_NETWORK) {
+      if (entry.type !== 'synergy') continue;
+      const partners = [entry.a, entry.b, entry.c, entry.d, entry.e, entry.f, entry.g, ...(entry.substances || [])].filter(Boolean) as string[];
+      if (!partners.includes(id)) continue;
+      for (const pid of planIds) {
+        if (partners.includes(pid) && !synergiesWith.includes(pid)) {
+          synergiesWith.push(pid);
+          if (entry.severity === 'HIGH' || bestSeverity !== 'HIGH') {
+            bestEffect = entry.effect;
+            bestSeverity = entry.severity;
+          }
+        }
+      }
+    }
+    const catalogEntry = SUPPORT_CATALOG_DATA[id];
+    const candidateName = catalogEntry?.name || id;
+    const totalSys = new Set([...planSystemCoverage, ...[...entries].map(e => e.organId === 'cns' ? 'neuro' : e.organId)]).size;
+    recommendations.push({
+      candidateId: id,
+      candidateName,
+      synergiesWith,
+      synergyScore: synScore,
+      newSystemCoverage: newSystems.size,
+      totalSystemCoverage: totalSys,
+      reason: newSystems.size > 0
+        ? `Покрывает ${newSystems.size} новых систем + синергия со ${synergiesWith.length} веществами плана`
+        : `Синергия со ${synergiesWith.length} веществами плана (score ${synScore})`,
+      effect: bestEffect,
+      severity: bestSeverity,
+    });
+  }
+  recommendations.sort((a, b) => (b.newSystemCoverage - a.newSystemCoverage) || (b.synergyScore - a.synergyScore));
+  return recommendations.slice(0, 5);
+}
 
 const SYS_META: Record<RiskSystemId, { label: string; icon: string }> = {
   cardio: { label: 'Сердечно-сосудистая', icon: '❤️' },
@@ -833,6 +943,8 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   // База: нет высокого (≤50%), Средний: нет выраженного (≤35%), Максимум: нижний умеренный (≤25%), Буст: слабый (≤15%)
   const levelTargets: Record<string, number> = { basic: 65, mid: 55, max: 45, boost: 30 };
   const maxPerSystem: Record<string, number> = { basic: 2, mid: 3, max: 4, boost: 5 };
+  // Объявляем boostAdded ВНЕ if-блока — доступно для результата
+  const boostAdded: string[] = [];
 
   // ── TZ Risk: рассчитываем риск БЕЗ поддержки для отбора веществ ──
   const oldScores = calcAllRisks(state);
@@ -880,17 +992,22 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     });
 
     if (systemsNeedingCoverage.length > 0) {
-      const scored: [string, number, number][] = [];
+      // [id, matchCount, totalK, synergyBonus]
+      const scored: [string, number, number, number][] = [];
       for (const [id, entries] of Object.entries(allDb)) {
         if (used.has(id) || !entries.length) continue;
-        if (tBoosterBlacklist.has(id)) continue; // BUG 13: трибулус на курсе/мосте
+        if (tBoosterBlacklist.has(id)) continue;
         let matchCount = 0; let totalK = 0;
         for (const e of entries) {
           if (systemsNeedingCoverage.includes(e.organId as RiskSystemId)) { matchCount++; totalK += e.k; }
         }
-        if (matchCount > 0) scored.push([id, matchCount, totalK]);
+        if (matchCount > 0) {
+          const synBonus = synergyScoreWithPlan(id, substances);
+          scored.push([id, matchCount, totalK, synBonus]);
+        }
       }
-      scored.sort((a, b) => b[1] - a[1] || b[2] - a[2]);
+      // Синергия даёт бонус к скорингу: matchCount×20 + totalK + synergyBonus×3
+      scored.sort((a, b) => (b[1] * 20 + b[2] + b[3] * 3) - (a[1] * 20 + a[2] + a[3] * 3));
       for (const [id] of scored.slice(0, 3)) {
         if (used.has(id)) continue;
         substances.push(id); used.add(id);
@@ -898,19 +1015,26 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     }
 
     // Targeted + итеративный gap-filling: добавляем вещества пока риск > target или maxPerSys не достигнут
+    // Синергия учитывается: candidate score = k + synergyBonus×0.3
     for (const sys of activeSystems) {
       const tzSys = sys === 'neuro' ? 'cns' : sys;
       let currentCount = sysCoverageCount[tzSys] || sysCoverageCount[sys] || 0;
 
       while (currentCount < maxPerSys) {
-        // Найти лучшее вещество для этой системы
-        let best: [string, number] | null = null;
+        // Найти лучшее вещество для этой системы (k + синергия с уже выбранными)
+        let best: [string, number, number] | null = null; // [id, k, synergyBonus]
         for (const [id, entries] of Object.entries(allDb)) {
           if (used.has(id)) continue;
-          if (tBoosterBlacklist.has(id)) continue; // BUG 13
+          if (tBoosterBlacklist.has(id)) continue;
+          // Проверка конфликтов
+          if (conflictScoreWithPlan(id, substances) > 0) continue;
           for (const e of entries) {
-            if ((e.organId === tzSys || e.organId === sys) && e.k > 0 && (!best || e.k > best[1])) {
-              best = [id, e.k];
+            if ((e.organId === tzSys || e.organId === sys) && e.k > 0) {
+              const synBonus = synergyScoreWithPlan(id, substances);
+              const compositeScore = e.k + synBonus * 0.3;
+              if (!best || compositeScore > (best[1] + best[2] * 0.3)) {
+                best = [id, e.k, synBonus];
+              }
             }
           }
         }
@@ -918,11 +1042,53 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
         substances.push(best[0]); used.add(best[0]);
         currentCount++;
         sysCoverageCount[tzSys] = currentCount;
-        // Проверяем — достаточно ли? Если риск был ~target и k>0.3, хватит 1-2
+        // Проверяем — достаточно ли?
         const score = scoresPre[sys] || 0;
-        // Эвристика: риск × (1-k)^currentCount ≤ target?
         const estimatedRisk = score * Math.pow(1 - best[1], currentCount);
         if (estimatedRisk <= target) break;
+      }
+    }
+
+    // ── УСИЛЕНИЕ (boost): добавляем препарат с максимальной синергией к плану ──
+    // Не просто снижаем target — ищем ВЕЩЕСТВО, которое сыграет в синергии с остальными
+    // и покроет систему с наибольшим остаточным риском
+    if (state.boostEnabled) {
+      // Системы с наибольшим остаточным риском (после основного подбора)
+      const sortedByRisk = riskSystems
+        .filter(sys => {
+          if (skipReproductive && sys === 'reproductive') return false;
+          if (skipMusculoskeletal && sys === 'musculoskeletal') return false;
+          return true;
+        })
+        .map(sys => ({ sys, risk: scoresPre[sys] || 0 }))
+        .sort((a, b) => b.risk - a.risk);
+
+      for (const { sys, risk } of sortedByRisk) {
+        if (risk <= target) continue; // уже покрыта
+        if (boostAdded.length >= 2) break; // макс 2 усилителя
+        const tzSys = sys === 'neuro' ? 'cns' : sys;
+        const currentCount = sysCoverageCount[tzSys] || sysCoverageCount[sys] || 0;
+        if (currentCount >= maxPerSys + 1) continue; // уже максимум
+        // Ищем вещество с максимальной синергией к плану, покрывающее эту систему
+        let bestBoost: [string, number, number] | null = null; // [id, synScore, k]
+        for (const [id, entries] of Object.entries(allDb)) {
+          if (used.has(id)) continue;
+          if (tBoosterBlacklist.has(id)) continue;
+          if (conflictScoreWithPlan(id, substances) > 0) continue;
+          const hasSys = entries.some(e => e.organId === tzSys || e.organId === sys);
+          if (!hasSys) continue;
+          const synScore = synergyScoreWithPlan(id, substances);
+          if (synScore < 4) continue; // только реальные синергисты
+          const bestK = Math.max(...entries.filter(e => e.organId === tzSys || e.organId === sys).map(e => e.k));
+          if (!bestBoost || synScore > bestBoost[1] || (synScore === bestBoost[1] && bestK > bestBoost[2])) {
+            bestBoost = [id, synScore, bestK];
+          }
+        }
+        if (bestBoost) {
+          substances.push(bestBoost[0]); used.add(bestBoost[0]);
+          boostAdded.push(bestBoost[0]);
+          sysCoverageCount[tzSys] = (sysCoverageCount[tzSys] || 0) + 1;
+        }
       }
     }
   }
@@ -1031,6 +1197,23 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     }
   }
 
+  // ── Synergy recommendations: what-if карточка ──
+  const planSystemCoverage = new Set<string>();
+  for (const subId of substances) {
+    const entries = allDb[subId];
+    if (entries) for (const e of entries) planSystemCoverage.add(e.organId === 'cns' ? 'neuro' : e.organId);
+  }
+  const _phase = state.pharma?.phase || 'course';
+  const _skipRepro = _phase === 'course' || _phase === 'bridge';
+  const _skipMusculo = !state.jointMode;
+  const _target = Math.max(5, (levelTargets[state.powerLevel] ?? 50) - (state.boostEnabled ? 5 : 0));
+  const activeSystemsList = riskSystems.filter(sys => {
+    if (_skipRepro && sys === 'reproductive') return false;
+    if (_skipMusculo && sys === 'musculoskeletal') return false;
+    return (scoresPre[sys] || 0) > _target;
+  });
+  const synergyRecs = generateSynergyRecommendations(substances.slice(), activeSystemsList, allDb, planSystemCoverage);
+
   const result: CalculatorResult = {
     risk: { systems: [], overallRaw, overallAfterSupport, timestamp: new Date().toISOString() },
     schedule, selectedSubstances: substances,
@@ -1051,6 +1234,8 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     peakWeek,
     selectedWeekRaw,
     selectedWeekAfter,
+    synergyRecommendations: synergyRecs.length > 0 ? synergyRecs : undefined,
+    boostAdded: boostAdded.length > 0 ? boostAdded : undefined,
     timestamp: new Date().toISOString(),
   };
   result.risk.systems = tzResultFinal

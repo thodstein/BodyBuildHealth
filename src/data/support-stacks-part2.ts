@@ -1453,6 +1453,7 @@ export const STACKS_PART_2: SupportStack[] = [
       organMechanisms: 'Холинергическая нейротрансмиссия, церебральный кровоток, целостность мембран нейронов',
       drugMechanisms: [
         'Alpha-GPC — ↑ холин через ГЭБ, ↑ ACh, ↑ PC, ↑ GH через GHRH',
+        'Холина битартрат — ↑ общий пул холина, ↑ ACh, ↑ PC, ↑ метилирование через бетаин',
         'Гинкго — ↑ PAF ингибитор, ↑ NO, ↑ церебральный кровоток на 20-30%, ↑ α7-nAChR',
       ],
       mechanismCodes: ['CHOLINERGIC', 'CEREBRAL_BLOOD_FLOW', 'NO_UP', 'NEUROPROTECTION', 'MEMBRANE_PHOSPHOLIPID'],

@@ -1,7 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { EXERCISE_CATALOG, getExerciseById, getSubstitutes, canReplace } from '../../../core/exercise-catalog';
+import { EXERCISE_CATALOG, getExerciseById, getExercisesByGroup, getSubstitutes, canReplace } from '../../../core/exercise-catalog';
 import { calcExercisePrescription } from '../../../engines/training.engine';
 import { getVolumeByMuscle } from '../../../engines/training-methodology.engine';
+import { prescribeExercises, forceVector, lengthenedPartials } from '../../../engines/pro/exercise-prescription.engine';
+import { generateRepTempo } from '../../../engines/rep-tempo-engine';
 import { PopupSelect, PopupNumber, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { useDataLink } from '../../../core/data-link';
 import type { Exercise } from '../../../core/types';
@@ -263,6 +265,63 @@ const [savedCalcs, setSavedCalcs] = useState<Array<{ id: number; name: string; g
             <div style={{ marginTop: 16, padding: 12, background: 'rgba(255,255,255,0.05)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT }}>Слабый пункт</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>{weakPointAdvice}</div>
+            </div>
+          )}
+
+          {/* PRO: биомеханическая прескрипция */}
+          {ex && (
+            <div style={{ marginTop: 16, padding: 12, background: 'rgba(168,85,247,0.06)', borderRadius: 8, border: '1px solid rgba(168,85,247,0.2)' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>🔬 PRO: Биомеханическая прескрипция</div>
+              <div style={{ display: 'grid', gap: 6 }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                  <b>Force-вектор:</b> {forceVector(ex.group, ex.type, ex.name)}
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                  <b>Joint-stress:</b> {ex.jointStress}
+                  <span style={{ marginLeft: 8, color: ex.jointStress === 'high' ? '#ef4444' : ex.jointStress === 'med' ? '#f59e0b' : '#22c55e' }}>
+                    {ex.jointStress === 'high' ? ' ⚠ высокий' : ex.jointStress === 'med' ? ' ● средний' : ' ● низкий'}
+                  </span>
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                  <b>Региональная гипертрофия:</b> {(() => { const lp = lengthenedPartials(ex.group); return lp.length > 0 ? lp.slice(0, 3).map(l => l.name).join(', ') : 'нет данных'; })()}
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                  <b>PRO-рейтинг:</b> {(() => { const ranked = prescribeExercises({ muscle: ex.group, goal: goal as any, limit: 10 }); const found = ranked.findIndex(r => r.id === ex.id); if (found >= 0) return `${found + 1}-е место из ${ranked.length} (score: ${ranked[found].score})`; return 'не в топ-10'; })()}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* PRO: реп-темпо */}
+          {ex && (
+            <div style={{ marginTop: 16, padding: 12, background: 'rgba(96,165,250,0.06)', borderRadius: 8, border: '1px solid rgba(96,165,250,0.2)' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>⏱ PRO: Реп-темпо прескрипция</div>
+              {(() => {
+                const riskLevel = level === 'beginner' ? 'high' as const : level === 'advanced' ? 'low' as const : 'medium' as const;
+                const tempoRes = generateRepTempo({
+                  goal: goal as any,
+                  riskLevel,
+                  difficultyLevel: level === 'beginner' ? 'low' as const : level === 'advanced' ? 'high' as const : 'medium' as const,
+                  techniqueIssues: [],
+                  isMainLift: ex.type === 'compound',
+                });
+                return (
+                  <div style={{ display: 'grid', gap: 4 }}>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                      <b>Паттерн:</b> {tempoRes.pattern}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                      <b>Темп:</b> {tempoRes.tempo.toString}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                      <b>Целевой RPE/RIR:</b> {tempoRes.targetRPE} / {tempoRes.targetRIR}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', fontStyle: 'italic' }}>
+                      {tempoRes.rationale}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
           {savedCalcs.length > 0 && (

@@ -6,10 +6,9 @@ import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
 import { generatePCTPlan } from '../../engines/pct-planner.engine';
 import { PHARMA_DB } from '../../core/pharma-database';
+import { UnifiedLabPanel } from '../components/UnifiedLabPanel';
 
 type FertTab = 'overview' | 'pct-plan' | 'hrt' | 'analyses';
-type AnalysesSubTab = 'before' | 'during' | 'after' | 'spermogram' | 'instrumental' | 'structure';
-
 const addToPlan = async (substanceId: string, doseValue: number, doseUnit: string, freq: string, startWeek: number, endWeek: number) => {
   try {
     await db.put('course_log', {
@@ -53,8 +52,6 @@ const VARICOCELE = [
 export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode?: 'pct' | 'hrt' | 'fertility' }> = ({ initialTab, restrictToMode }) => {
   const [tab, setTab] = useState<FertTab>(initialTab || 'overview');
   useEffect(() => { setTab(initialTab || 'overview'); }, [initialTab]);
-
-  const [analysesSTab, setAnalysesSTab] = useState<AnalysesSubTab>('before');
 
   // Filter tabs based on mode
   const fertTabsAll: { id: FertTab; label: string }[] = [
@@ -684,411 +681,32 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
 
       {tab === 'analyses' && (
         <div>
-          {/* Analyses sub-tabs */}
-          <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
-            {(restrictToMode === 'pct' ? [
-              { id:'before' as AnalysesSubTab, label:'До ПКТ' },
-              { id:'during' as AnalysesSubTab, label:'Во время' },
-              { id:'after' as AnalysesSubTab, label:'После ПКТ' },
-              { id:'instrumental' as AnalysesSubTab, label:'Инструментальные' },
-            ] : restrictToMode === 'hrt' ? [
-              { id:'before' as AnalysesSubTab, label:'До старта' },
-              { id:'during' as AnalysesSubTab, label:'Контроль (6-8 нед)' },
-              { id:'after' as AnalysesSubTab, label:'Ежегодно' },
-              { id:'instrumental' as AnalysesSubTab, label:'Инструментальные' },
-            ] : []).map(st =>
-              <button key={st.id} onClick={() => setAnalysesSTab(st.id)} style={{
-                padding:'5px 10px', borderRadius:16, fontSize:9, cursor:'pointer', whiteSpace:'nowrap',
-                background: analysesSTab===st.id ? 'var(--accent-green)' : 'var(--bg-secondary)',
-                color: analysesSTab===st.id ? '#000' : 'var(--text-dim)', border:'none', fontWeight: analysesSTab===st.id ? 700 : 400,
-              }}>{st.label}</button>
-            )}
-          </div>
-          {(() => {
-            const renderChecklist = (title: string, subtitle: string, items: {code:string;name:string;range:string}[], borderColor: string) => {
-              const has = items.filter(i => allLabs[i.code]);
-              const total = items.length;
-              return (
-                <div style={{ ...s.card, borderLeft: `3px solid ${borderColor}` }}>
-                  <h4 style={{ margin:'0 0 2px', fontSize:13, color:borderColor }}>{title}</h4>
-                  <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8 }}>{subtitle} · {has.length}/{total} сдано</div>
-                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                    {items.map(item => {
-                      const hasData = !!allLabs[item.code];
-                      const val = allLabs[item.code];
-                      return (
-                        <div key={item.code} style={{
-                          display:'flex', alignItems:'center', gap:8, padding:'6px 8px',
-                          borderRadius:8, background: hasData ? 'rgba(0,230,138,0.06)' : 'var(--bg-secondary)',
-                          border: `1px solid ${hasData ? 'rgba(0,230,138,0.2)' : 'var(--border)'}`,
-                          flexWrap:'wrap',
-                        }}>
-                          <div style={{
-                            width:20, height:20, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center',
-                            background: hasData ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)',
-                            fontSize:12, flexShrink:0,
-                          }}>{hasData ? '✓' : '○'}</div>
-                          <div style={{ flex:1, minWidth: 0 }}>
-                            <div style={{ fontSize:11, fontWeight: hasData ? 600 : 400, color: hasData ? 'var(--text-light)' : 'var(--text-dim)', wordBreak:'break-word' }}>
-                              {item.name}
-                            </div>
-                            <div style={{ fontSize:8, color:'var(--text-dim)' }}>
-                              {hasData ? (val && val !== 'true' ? `Значение: ${val}` : 'Есть данные') : `Норма: ${item.range}`}
-                            </div>
-                          </div>
-                          {hasData && <div style={{ fontSize:9, color:'#00e68a', fontWeight:600 }}>✓</div>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            };
-
-            if (restrictToMode === 'pct') {
-              const PCT_BEFORE = [
-                { code:'LH', name:'Лютеинизирующий гормон', range:'1.7-8.6 mIU/mL' },
-                { code:'FSH', name:'Фолликулостимулирующий гормон', range:'1.5-12.4 mIU/mL' },
-                { code:'TT', name:'Тестостерон общий', range:'300-1000 ng/dL' },
-                { code:'FT', name:'Тестостерон свободный', range:'5.0-21.0 pg/mL' },
-                { code:'E2', name:'Эстрадиол E2', range:'11-44 pg/mL' },
-                { code:'PRL', name:'Пролактин', range:'4.0-15.2 ng/mL' },
-                { code:'SHBG', name:'SHBG (ГСПГ)', range:'18-54 nmol/L' },
-                { code:'TSH', name:'Тиреотропный гормон', range:'0.4-4.0 mIU/L' },
-                { code:'FT4', name:'Свободный T4', range:'0.8-1.8 ng/dL' },
-                { code:'CORT', name:'Кортизол (утро)', range:'6.2-19.4 mkg/dL' },
-                { code:'CBC', name:'Гематокрит (Hct)', range:'<50%' },
-                { code:'ALT', name:'АЛТ/AST (печень)', range:'<45/<40 U/L' },
-                { code:'LIPID', name:'Липидный профиль', range:'ЛПНП<100, ЛПВП>40' },
-                { code:'PSA', name:'ПСА общий', range:'<4.0 ng/mL' },
-              ];
-              const PCT_AFTER = [
-                { code:'LH', name:'LH (контроль)', range:'1.7-8.6 mIU/mL' },
-                { code:'FSH', name:'FSH (контроль)', range:'1.5-12.4 mIU/mL' },
-                { code:'TT', name:'Тестостерон общий (контроль)', range:'300-1000 ng/dL' },
-                { code:'FT', name:'Тестостерон свободный (контроль)', range:'5.0-21.0 pg/mL' },
-                { code:'E2', name:'Эстрадиол E2 (контроль)', range:'11-44 pg/mL' },
-                { code:'PRL', name:'Пролактин (контроль)', range:'4.0-15.2 ng/mL' },
-                { code:'SHBG', name:'SHBG (контроль)', range:'18-54 nmol/L' },
-                { code:'CBC', name:'Гематокрит (контроль)', range:'<50%' },
-                { code:'ALT', name:'АЛТ/AST (контроль)', range:'<45/<40 U/L' },
-                { code:'LIPID', name:'Липидный профиль (контроль)', range:'ЛПНП<100, ЛПВП>40' },
-                { code:'SPERM', name:'Спермограмма', range:'Объём≥1.5мл, PR≥32%' },
-              ];
-              const PCT_INSTR = [
-                { name:'УЗИ мошонки/яичек', purpose:'Оценка объёма яичек, исключение варикоцеле' },
-                { name:'УЗИ простаты (трансректальное)', purpose:'Исключение простатита/аденомы' },
-                { name:'ЭКГ', purpose:'Скрининг нарушений ритма, гипертрофии ЛЖ' },
-              ];
-              const PCTTimeline = () => (
-                <div style={s.card}>
-                  <h4 style={{ margin:'0 0 10px', fontSize:13, color:'#f59e0b', fontWeight:700 }}>⏱ Таймлайн анализов ПКТ</h4>
-                  <div style={{ position:'relative', paddingLeft:20 }}>
-                    <div style={{ position:'absolute', left:8, top:4, bottom:4, width:2, background:'linear-gradient(180deg, #f59e0b, #22c55e)', borderRadius:1 }} />
-                    {[
-                      { period:'За 7-14 дней до последней инъекции', label:'До ПКТ', color:'#f59e0b', items:'Полный гормональный профиль + CBC + биохимия + ПСА' },
-                      { period:'Недели 1-2', label:'Старт ПКТ', color:'#ec4899', items:'LH, FSH, TT — контроль базы' },
-                      { period:'Недели 3-4', label:'Первичный контроль', color:'#a855f7', items:'LH, FSH, TT, E2, PRL — каждые 2 нед' },
-                      { period:'Недели 5-8', label:'Коррекция', color:'#3b82f6', items:'LH, FSH, TT, E2, Hct, ALT — каждые 2 нед' },
-                      { period:'Через 4-6 нед после ПКТ', label:'Финальный контроль', color:'#22c55e', items:'Все маркеры + спермограмма + DFI + ингибин B' },
-                    ].map((item, i) => (
-                      <div key={i} style={{ position:'relative', marginBottom:10, paddingLeft:12, borderLeft:`2px solid ${item.color}` }}>
-                        <div style={{ position:'absolute', left:-17, top:2, width:10, height:10, borderRadius:'50%', background:item.color }} />
-                        <div style={{ fontSize:8, color:item.color, fontWeight:700, letterSpacing:'0.5px' }}>{item.label}</div>
-                        <div style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{item.period}</div>
-                        <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{item.items}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-              const PCT_DURING = [
-                { code:'LH', name:'LH (контроль каждые 2 нед)', range:'1.7-8.6 mIU/mL' },
-                { code:'FSH', name:'FSH (контроль каждые 2 нед)', range:'1.5-12.4 mIU/mL' },
-                { code:'TT', name:'Тестостерон общий', range:'300-1000 ng/dL' },
-                { code:'FT', name:'Тестостерон свободный', range:'5.0-21.0 pg/mL' },
-                { code:'E2', name:'Эстрадиол E2', range:'11-44 pg/mL' },
-                { code:'PRL', name:'Пролактин', range:'4.0-15.2 ng/mL' },
-                { code:'CBC', name:'Гематокрит (Hct)', range:'<50%' },
-                { code:'ALT', name:'АЛТ/AST (печень)', range:'<45/<40 U/L' },
-              ];
-              return (
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  {analysesSTab === 'before' && renderChecklist('До ПКТ', 'Обязательный минимум перед стартом', PCT_BEFORE, '#f59e0b')}
-                  {analysesSTab === 'during' && renderChecklist('Во время ПКТ', 'Контроль каждые 2 нед', PCT_DURING, '#a855f7')}
-                  {analysesSTab === 'after' && renderChecklist('После ПКТ (4-6 нед)', 'Контроль восстановления', PCT_AFTER, '#22c55e')}
-                  {analysesSTab === 'instrumental' && (
-                    <div style={{ ...s.card, borderLeft:'3px solid #a855f7' }}>
-                      <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#a855f7' }}>🔬 Инструментальные исследования ПКТ</h4>
-                      {PCT_INSTR.map((e,i) => (
-                        <div key={i} style={{ padding:'4px 0', fontSize:10, color:'var(--text-dim)' }}><b>{e.name}</b> — {e.purpose}</div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
-            if (restrictToMode === 'hrt') {
-              const HRT_BASELINE = [
-                { code:'TT', name:'Тестостерон общий', range:'300-1000 ng/dL' },
-                { code:'FT', name:'Тестостерон свободный', range:'5.0-21.0 pg/mL' },
-                { code:'E2', name:'Эстрадиол E2', range:'11-44 pg/mL' },
-                { code:'SHBG', name:'SHBG (ГСПГ)', range:'18-54 nmol/L' },
-                { code:'LH', name:'Лютеинизирующий гормон', range:'1.7-8.6 mIU/mL' },
-                { code:'FSH', name:'Фолликулостимулирующий гормон', range:'1.5-12.4 mIU/mL' },
-                { code:'PRL', name:'Пролактин', range:'4.0-15.2 ng/mL' },
-                { code:'CBC', name:'Гематокрит (Hct)', range:'<50%' },
-                { code:'TSH', name:'Тиреотропный гормон', range:'0.4-4.0 mIU/L' },
-                { code:'LIPID', name:'Липидный профиль', range:'ЛПНП<100, ЛПВП>40' },
-                { code:'PSA', name:'ПСА общий', range:'<4.0 ng/mL' },
-                { code:'INHB', name:'Ингибин B', range:'>80 pg/mL' },
-                { code:'VITD', name:'25-OH Витамин D', range:'30-100 ng/mL' },
-              ];
-              const HRT_DURING = [
-                { code:'TT', name:'Тестостерон общий (пик/надир)', range:'500-900 ng/dL' },
-                { code:'FT', name:'Тестостерон свободный', range:'15-25 pg/mL' },
-                { code:'E2', name:'Эстрадиол E2', range:'20-40 pg/mL' },
-                { code:'CBC', name:'Гематокрит', range:'<50%' },
-                { code:'PSA', name:'ПСА', range:'<4.0 ng/mL' },
-                { code:'LIPID', name:'Липиды', range:'ЛПНП<100, ЛПВП>40' },
-              ];
-              const HRT_FOLLOWUP = [
-                { code:'TT', name:'Тестостерон (плато)', range:'500-900 ng/dL' },
-                { code:'FT', name:'Свободный тестостерон', range:'15-25 pg/mL' },
-                { code:'E2', name:'Эстрадиол', range:'20-40 pg/mL' },
-                { code:'CBC', name:'Гематокрит', range:'<50%' },
-                { code:'PSA', name:'ПСА', range:'<4.0 ng/mL' },
-                { code:'LIPID', name:'Липидный профиль', range:'ЛПНП<100, ЛПВП>40' },
-                { code:'DEXA', name:'Денситометрия (DEXA)', range:'Z-score > -1.5' },
-              ];
-              const HRT_INSTR = [
-                { name:'УЗИ простаты (трансректальное)', purpose:'Оценка объёма, исключение узлов/РПЖ (базово + ежегодно)' },
-                { name:'Денситометрия DEXA', purpose:'МПК при длительной ГЗТ >2 лет (каждые 1-2 года)' },
-                { name:'Эхокардиография', purpose:'Скрининг гипертрофии ЛЖ (базово, затем по показаниям)' },
-                { name:'УЗИ мошонки', purpose:'Исключение варикоцеле, оценка яичек (базово)' },
-              ];
-              const HRTTimeline = () => (
-                <div style={s.card}>
-                  <h4 style={{ margin:'0 0 10px', fontSize:13, color:'#8b5cf6', fontWeight:700 }}>⏱ Таймлайн анализов ГЗТ</h4>
-                  <div style={{ position:'relative', paddingLeft:20 }}>
-                    <div style={{ position:'absolute', left:8, top:4, bottom:4, width:2, background:'linear-gradient(180deg, #8b5cf6, #22c55e)', borderRadius:1 }} />
-                    {[
-                      { period:'До старта (за 1-2 нед)', label:'Базовый', color:'#8b5cf6', items:'TT, FT, SHBG, ЛГ, ФСГ, E2, PRL, ПСА, Hct, липиды, HOMA-IR, DEXA' },
-                      { period:'Через 6-8 нед', label:'Коррекция дозы', color:'#60a5fa', items:'TT/FT/E2 на пике и надире, Hct, ПСА' },
-                      { period:'Каждые 3-6 мес', label:'Плановый', color:'#06b6d4', items:'TT, FT, E2, Hct, ПСА, липиды, HOMA-IR' },
-                      { period:'Ежегодно', label:'Полный чек-ап', color:'#22c55e', items:'Гормоны + DEXA + УЗИ простаты + ЭхоКГ' },
-                    ].map((item, i) => (
-                      <div key={i} style={{ position:'relative', marginBottom:10, paddingLeft:12, borderLeft:`2px solid ${item.color}` }}>
-                        <div style={{ position:'absolute', left:-17, top:2, width:10, height:10, borderRadius:'50%', background:item.color }} />
-                        <div style={{ fontSize:8, color:item.color, fontWeight:700, letterSpacing:'0.5px' }}>{item.label}</div>
-                        <div style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{item.period}</div>
-                        <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{item.items}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-              return (
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  {analysesSTab === 'before' && renderChecklist('Базовые анализы (до старта ГЗТ)', 'Исходный профиль', HRT_BASELINE, '#8b5cf6')}
-                  {analysesSTab === 'during' && renderChecklist('Контроль на терапии (6-8 нед)', 'Пик/надир + Hct', HRT_DURING, '#60a5fa')}
-                  {analysesSTab === 'after' && renderChecklist('Ежегодный мониторинг', 'Плато + скрининг', HRT_FOLLOWUP, '#22c55e')}
-                  {analysesSTab === 'instrumental' && (
-                    <div style={{ ...s.card, borderLeft:'3px solid #a855f7' }}>
-                      <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#a855f7' }}>🔬 Инструментальные исследования ГЗТ</h4>
-                      {HRT_INSTR.map((e,i) => (
-                        <div key={i} style={{ padding:'4px 0', fontSize:10, color:'var(--text-dim)' }}><b>{e.name}</b> — {e.purpose}</div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
-            if (restrictToMode === 'fertility' || !restrictToMode) {
-              const FERT_LABS = [
-                { code:'INHB', name:'Ингибин B', range:'>80 pg/mL' },
-                { code:'AMH', name:'АМГ (анти-Мюллеров гормон)', range:'>2.0 ng/mL' },
-                { code:'LH', name:'Лютеинизирующий гормон', range:'1.7-8.6 mIU/mL' },
-                { code:'FSH', name:'Фолликулостимулирующий гормон', range:'1.5-12.4 mIU/mL' },
-                { code:'TT', name:'Тестостерон общий', range:'300-1000 ng/dL' },
-                { code:'FT', name:'Тестостерон свободный', range:'5.0-21.0 pg/mL' },
-                { code:'E2', name:'Эстрадиол E2', range:'11-44 pg/mL' },
-                { code:'PRL', name:'Пролактин', range:'4.0-15.2 ng/mL' },
-                { code:'SHBG', name:'SHBG (ГСПГ)', range:'18-54 nmol/L' },
-              ];
-              const FERT_SPERM = [
-                { code:'SPERM_VOL', name:'Объём эякулята', range:'≥1.5 мл' },
-                { code:'SPERM_CONC', name:'Концентрация сперматозоидов', range:'≥15 млн/мл' },
-                { code:'SPERM_PR', name:'Прогрессивно-подвижные (PR)', range:'≥32%' },
-                { code:'SPERM_NP', name:'Непрогрессивно-подвижные (NP)', range:'—' },
-                { code:'SPERM_MORPH', name:'Морфология (строгие критерии Крюгера)', range:'≥4%' },
-                { code:'SPERM_MAR', name:'MAR-тест (антиспермальные антитела)', range:'<50%' },
-                { code:'SPERM_DFI', name:'DFI (фрагментация ДНК)', range:'<15%' },
-                { code:'SPERM_VIT', name:'Жизнеспособность', range:'≥58%' },
-              ];
-              const FERT_PERIODS = [
-                { name:'Ингибин B + АМГ', period:'базово + каждые 3-6 мес восстановления', note:'Ключевые маркеры сперматогенеза и овариального резерва' },
-                { name:'Гормональный профиль', period:'базово + каждые 4-6 нед на фоне терапии', note:'LH, FSH, TT, FT, E2, PRL, SHBG' },
-                { name:'Спермограмма', period:'базово, затем через 3 и 6 мес восстановления', note:'Полный анализ + MAR + DFI' },
-              ];
-              const FertTimeline = () => (
-                <div style={s.card}>
-                  <h4 style={{ margin:'0 0 10px', fontSize:13, color:'#3b82f6', fontWeight:700 }}>⏱ Таймлайн анализов фертильности</h4>
-                  <div style={{ position:'relative', paddingLeft:20 }}>
-                    <div style={{ position:'absolute', left:8, top:4, bottom:4, width:2, background:'linear-gradient(180deg, #3b82f6, #22c55e)', borderRadius:1 }} />
-                    {[
-                      { period:'До старта терапии (базово)', label:'Базовые маркеры', color:'#3b82f6', items:'Ингибин B, АМГ, LH, FSH, TT, FT, E2, PRL, SHBG' },
-                      { period:'Каждые 4-6 нед на фоне терапии', label:'Контроль динамики', color:'#60a5fa', items:'LH, FSH, TT, FT, E2, PRL, SHBG' },
-                      { period:'Базово + через 3 и 6 мес', label:'Спермограмма', color:'#06b6d4', items:'Полный анализ + MAR-тест + DFI + жизнеспособность' },
-                      { period:'Каждые 3-6 мес восстановления', label:'Ингибин B + АМГ', color:'#22c55e', items:'Оценка сперматогенеза и овариального резерва' },
-                    ].map((item, i) => (
-                      <div key={i} style={{ position:'relative', marginBottom:10, paddingLeft:12, borderLeft:`2px solid ${item.color}` }}>
-                        <div style={{ position:'absolute', left:-17, top:2, width:10, height:10, borderRadius:'50%', background:item.color }} />
-                        <div style={{ fontSize:8, color:item.color, fontWeight:700, letterSpacing:'0.5px' }}>{item.label}</div>
-                        <div style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{item.period}</div>
-                        <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{item.items}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-              return (
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  {/* 1. Гормоны */}
-                  <div style={{ borderRadius:14, overflow:'hidden', border:'1px solid rgba(59,130,246,0.2)' }}>
-                    <div style={{ padding:'8px 12px', background:'linear-gradient(135deg,rgba(59,130,246,0.12),rgba(99,102,241,0.06))', borderBottom:'1px solid rgba(59,130,246,0.1)' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                        <span style={{ fontSize:16 }}>🧬</span>
-                        <span style={{ fontSize:12, fontWeight:700, color:'#3b82f6' }}>Гормоны крови</span>
-                        <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginLeft:'auto' }}>10 маркеров</span>
-                      </div>
-                    </div>
-                    <div style={{ padding:12, background:'rgba(24,24,27,0.12)' }}>
-                      <p style={{ fontSize:9, color:'rgba(255,255,255,0.5)', margin:'0 0 8px' }}>Автозаполнение из LabsScreen</p>
-                      <div style={s.row}>
-                        <div>{field('LH (mIU/mL)', lh, setLh, '5')}</div>
-                        <div>{field('FSH (mIU/mL)', fsh, setFsh, '4')}</div>
-                      </div>
-                      <div style={s.row}>
-                        <div>{field('TT общ. (ng/dL)', tt, setTt, '500')}</div>
-                        <div>{field('FT своб. (pg/mL)', ft, setFt, '15')}</div>
-                      </div>
-                      <div style={s.row}>
-                        <div>{field('E2 (pg/mL)', e2, setE2, '25')}</div>
-                        <div>{field('Пролактин (ng/mL)', prl, setPrl, '8')}</div>
-                      </div>
-                      <div style={s.row}>
-                        <div>{field('SHBG (nmol/L)', shbg, setShbg, '30')}</div>
-                        <div>{field('Ингибин B (pg/mL)', inhb, setInhb, '150')}</div>
-                      </div>
-                      <div style={s.row}>
-                        <div>{field('AMH (ng/mL)', amh, setAmh, '4')}</div>
-                        <div></div>
-                      </div>
-                    </div>
-                  </div>
-                  {renderChecklist('Гормональные маркеры фертильности', 'Базовые и контрольные', FERT_LABS, '#3b82f6')}
-
-                  {/* 2. Спермограмма — display-only */}
-                  <div style={{ borderRadius:14, overflow:'hidden', border:'1px solid rgba(34,197,94,0.2)' }}>
-                    <div style={{ padding:'8px 12px', background:'linear-gradient(135deg,rgba(34,197,94,0.12),rgba(22,163,74,0.06))', borderBottom:'1px solid rgba(34,197,94,0.1)' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                        <span style={{ fontSize:16 }}>🔬</span>
-                        <span style={{ fontSize:12, fontWeight:700, color:'#22c55e' }}>Спермограмма</span>
-                        <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginLeft:'auto' }}>ВОЗ 2021</span>
-                      </div>
-                    </div>
-                    <div style={{ padding:12, background:'rgba(24,24,27,0.12)' }}>
-                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                        {[
-                          { label:'📦 Объём', val:volume, norm:'≥1.5 мл', good:(v:any)=>parseFloat(v||'0')>=1.5 },
-                          { label:'🔬 Концентрация', val:concentration, norm:'≥16 млн/мл', good:(v:any)=>parseFloat(v||'0')>=16 },
-                          { label:'📊 Общее кол-во', val:totalCount, norm:'≥39 млн', good:(v:any)=>parseFloat(v||'0')>=39 },
-                          { label:'🏃 PR подвижность', val:pr, norm:'≥30%', good:(v:any)=>parseFloat(v||'0')>=30 },
-                          { label:'🚶 NP подвижность', val:np, norm:'—', good:()=>true },
-                          { label:'🛑 Неподвижные', val:immotile, norm:'—', good:()=>true },
-                          { label:'🧬 Морфология', val:morphology, norm:'≥4%', good:(v:any)=>parseFloat(v||'0')>=4 },
-                          { label:'💪 Жизнеспособность', val:viability, norm:'≥58%', good:(v:any)=>parseFloat(v||'0')>=58 },
-                          { label:'🧪 pH', val:ph, norm:'7.2–8.0', good:(v:any)=>{const n=parseFloat(v||'7.4'); return n>=7.2&&n<=8.0} },
-                          { label:'🍬 Фруктоза', val:fructose, norm:'≥13 ммоль/л', good:()=>true },
-                          { label:'⚡ Цинк', val:zincMmol, norm:'≥2 ммоль/л', good:()=>true },
-                          { label:'🛡 MAR-тест', val:mar, norm:'<50%', good:(v:any)=>parseFloat(v||'0')<50 },
-                          { label:'🔴 Лейкоциты', val:leukocytes, norm:'<1 млн/мл', good:(v:any)=>parseFloat(v||'0')<1 },
-                        ].map((item, i) => {
-                          const isGood = item.good(item.val||'0');
-                          return (
-                            <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:6, background:i%2===0?'rgba(34,197,94,0.04)':'transparent' }}>
-                              <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{item.label}</span>
-                              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                                <span style={{ fontSize:9, color:item.val?(isGood?'#22c55e':'#ef4444'):'var(--text-dim)', fontWeight:item.val?700:400 }}>
-                                  {item.val || '—'}
-                                </span>
-                                <span style={{ fontSize:8, color:'var(--text-dim)' }}>{item.norm}</span>
-                                {item.val && <span style={{ fontSize:10 }}>{isGood ? '✅' : '❌'}</span>}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div style={{ display:'flex', gap:12, padding:'5px 8px', fontSize:9, color:'var(--text-dim)' }}>
-                        <span>Вязкость: {viscosity ? '⚠ Повышена' : '✅ Норма'}</span>
-                        <span>Агглютинация: {agglutination ? '❌ Есть' : '✅ Нет'}</span>
-                      </div>
-                    </div>
-                  </div>
-                  {renderChecklist('Спермограмма + MAR + DFI', 'Полная оценка сперматогенеза', FERT_SPERM, '#22c55e')}
-
-                  {/* 3. DFI/Структура */}
-                  <div style={{ borderRadius:14, overflow:'hidden', border:'1px solid rgba(168,85,247,0.2)' }}>
-                    <div style={{ padding:'8px 12px', background:'linear-gradient(135deg,rgba(168,85,247,0.12),rgba(139,92,246,0.06))', borderBottom:'1px solid rgba(168,85,247,0.1)' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                        <span style={{ fontSize:16 }}>🧬</span>
-                        <span style={{ fontSize:12, fontWeight:700, color:'#a855f7' }}>DFI и структурные факторы</span>
-                        <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginLeft:'auto' }}>Фрагментация ДНК</span>
-                      </div>
-                    </div>
-                    <div style={{ padding:12, background:'rgba(24,24,27,0.12)' }}>
-                      <div style={s.row}>
-                        <div>{field('DFI (%) <=15 норма', dfi, setDfi, '0')}</div>
-                        <div>
-                          <span style={s.label}>Варикоцеле</span>
-                          <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                            {VARICOCELE.map(v => <button key={v.id} style={varicocele === v.id ? s.btnActive : s.btn} onClick={() => setVaricocele(v.id)}>{v.label}</button>)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 4. Периоды сдачи */}
-                  <FertTimeline />
-
-                  {/* 5. Инструментальные */}
-                  <div style={s.card}>
-                    <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#a855f7' }}>🔬 Инструментальные исследования фертильности</h4>
-                    <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                      {[
-                        { name:'УЗИ мошонки с допплером', purpose:'Кровоток яичек, варикоцеле, объём яичек' },
-                        { name:'Спермограмма + MAR-тест', purpose:'Количество, подвижность, морфология, антиспермальные антитела' },
-                        { name:'Фрагментация ДНК (SCD/Halosperm)', purpose:'Целостность хроматина, DFI < 15%' },
-                        { name:'УЗИ простаты (трансректальное)', purpose:'Исключение инфекции/воспаления' },
-                        { name:'Гормональный профиль (кровь)', purpose:'ЛГ, ФСГ, ТТ, E2, Пролактин, Ингибин В, АМГ' },
-                      ].map((e, i) => (
-                        <div key={i} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.08)' }}>
-                          <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{e.name}</span>
-                          <span style={{ fontSize:9, color:'var(--text-dim)', marginLeft:4 }}>— {e.purpose}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            return null;
-          })()}
+          <UnifiedLabPanel
+            showFertilityPhase={true}
+            onValuesChange={(vals) => {
+              if (vals['LH'] !== undefined && vals['LH'] !== lh) setLh(vals['LH']);
+              if (vals['FSH'] !== undefined && vals['FSH'] !== fsh) setFsh(vals['FSH']);
+              if (vals['TT'] !== undefined && vals['TT'] !== tt) setTt(vals['TT']);
+              if (vals['FT'] !== undefined && vals['FT'] !== ft) setFt(vals['FT']);
+              if (vals['E2'] !== undefined && vals['E2'] !== e2) setE2(vals['E2']);
+              if (vals['PRL'] !== undefined && vals['PRL'] !== prl) setPrl(vals['PRL']);
+              if (vals['SHBG'] !== undefined && vals['SHBG'] !== shbg) setShbg(vals['SHBG']);
+              if (vals['INHB'] !== undefined && vals['INHB'] !== inhb) setInhb(vals['INHB']);
+              if (vals['AMH'] !== undefined && vals['AMH'] !== amh) setAmh(vals['AMH']);
+              if (vals['SPERM_VOL'] !== undefined && vals['SPERM_VOL'] !== volume) setVolume(vals['SPERM_VOL']);
+              if (vals['SPERM_CONC'] !== undefined && vals['SPERM_CONC'] !== concentration) setConcentration(vals['SPERM_CONC']);
+              if (vals['SPERM_PR'] !== undefined && vals['SPERM_PR'] !== pr) setPr(vals['SPERM_PR']);
+              if (vals['SPERM_NP'] !== undefined && vals['SPERM_NP'] !== np) setNp(vals['SPERM_NP']);
+              if (vals['SPERM_MORPH'] !== undefined && vals['SPERM_MORPH'] !== morphology) setMorphology(vals['SPERM_MORPH']);
+              if (vals['SPERM_VIT'] !== undefined && vals['SPERM_VIT'] !== viability) setViability(vals['SPERM_VIT']);
+              if (vals['SPERM_PH'] !== undefined && vals['SPERM_PH'] !== ph) setPh(vals['SPERM_PH']);
+              if (vals['SPERM_MAR'] !== undefined && vals['SPERM_MAR'] !== mar) setMar(vals['SPERM_MAR']);
+              if (vals['SPERM_LEUK'] !== undefined && vals['SPERM_LEUK'] !== leukocytes) setLeukocytes(vals['SPERM_LEUK']);
+              if (vals['SPERM_DFI'] !== undefined && vals['SPERM_DFI'] !== dfi) setDfi(vals['SPERM_DFI']);
+              if (vals['SPERM_FRUCT'] !== undefined && vals['SPERM_FRUCT'] !== fructose) setFructose(vals['SPERM_FRUCT']);
+              if (vals['SPERM_ZINC'] !== undefined && vals['SPERM_ZINC'] !== zincMmol) setZincMmol(vals['SPERM_ZINC']);
+            }}
+          />
         </div>
       )}
 

@@ -177,6 +177,15 @@ export function useDataLink(): LinkedData {
       ? (() => { const n = hgbVal * (hgbUcum?.coeff || 1); return n >= (hgbUcum?.lln || 130) && n <= (hgbUcum?.uln || 170) ? 0.8 : 0.4; })()
       : 0.7;
 
+    // Mix quality: последняя сохранённая оценка тренировочного микса → readiness
+    const lastMix: { score?: number } | null = (() => {
+      try {
+        const arr: { score: number }[] = JSON.parse(localStorage.getItem('he_training_mixes') || '[]');
+        const last = arr[arr.length - 1];
+        return last?.score ? { score: last.score } : null;
+      } catch { return null; }
+    })();
+
     return calcReadiness({
       sleepHours: s.baselineSleepHours ?? 7,
       sleepQuality: s.baselineSleepQuality ?? 5,
@@ -193,6 +202,7 @@ export function useDataLink(): LinkedData {
       trainingLoadRatio: Math.max(0.2, Math.min(1.5, trainingLoad + sRpeLoadAdj)),
       subjFatigue: Math.min(10, (s.fatigueLevel ?? 3) + sRpeFatigueAdj),
       hrIncrease: crpNorm > 0.6 ? 0.3 : 0.1,
+      mixQualityScore: lastMix?.score ?? undefined,
     });
   })();
 

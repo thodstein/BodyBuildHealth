@@ -852,6 +852,12 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
   const [archiveReports, setArchiveReports] = React.useState<NutritionReport[]>(() => { try { return JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]'); } catch { return []; } });
   const [reportEditMode, setReportEditMode] = React.useState(false);
   const [reportEditText, setReportEditText] = React.useState('');
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem('he_nutrition_report_current');
+      if (saved) { const p = JSON.parse(saved); if (p.overallGrade && p.overallGrade !== '—') { setFullReport(p); setReportEditText(JSON.stringify(p, null, 2)); setReportSubTab('full'); } }
+    } catch {}
+  }, []);
   const raw = React.useMemo(() => { try { return JSON.parse(localStorage.getItem('nutrition_diary') || '{}'); } catch { return {}; } }, [foodEntries]);
   const dayData = raw[reportDate];
   const weekStart = React.useMemo(() => { const d = new Date(reportDate); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().split('T')[0]; }, [reportDate]);
@@ -1226,7 +1232,6 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
       <button onClick={() => {
         try {
           const report = { id: Date.now().toString(), date: new Date().toISOString().slice(0,10), kcal: Math.round(totals.kcal), protein: Math.round(totals.p), fat: Math.round(totals.f), carbs: Math.round(totals.c), items: data.length, timestamp: Date.now(), overallGrade: '—', kbjuPct: { kcal: Math.round(totals.kcal), protein: Math.round(totals.p), fat: Math.round(totals.f), carbs: Math.round(totals.c) }, mealCount: data.length, dietQuality: { score: 0, label: '—' }, risks: [], recommendations: [], plan: { days: [] } };
-          localStorage.setItem('he_nutrition_report_current', JSON.stringify(report));
           const archive = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]');
           archive.unshift(report);
           localStorage.setItem('he_nutrition_report_archive', JSON.stringify(archive.slice(0, 20)));

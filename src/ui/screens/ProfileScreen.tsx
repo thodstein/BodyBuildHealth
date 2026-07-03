@@ -11,6 +11,7 @@ import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../co
 import { useDataLink } from '../../core/data-link';
 import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { BioStackAISettings } from '../components/BioStackAIProfile';
+import { BPDiaryTab } from '../components/BPDiaryTab';
 
 type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' 
   | 'genetics' | 'injuries' | 'progress' | 'analytics' 
@@ -59,13 +60,9 @@ function getMeasurementsLog(): MeasurementEntry[] {
   try { return JSON.parse(localStorage.getItem(MEASUREMENTS_LOG_KEY) || '[]'); } catch { return []; }
 }
 
-const BP_DIARY_KEY = 'he_bp_diary';
 interface BPEntry { date: string; systolic: number; diastolic: number; hr: number; }
 function getBPDiary(): BPEntry[] {
-  try { return JSON.parse(localStorage.getItem(BP_DIARY_KEY) || '[]'); } catch { return []; }
-}
-function saveBPDiary(log: BPEntry[]) {
-  localStorage.setItem(BP_DIARY_KEY, JSON.stringify(log));
+  try { return JSON.parse(localStorage.getItem('he_bp_diary') || '[]'); } catch { return []; }
 }
 
 const DIET_TYPES = [
@@ -443,17 +440,11 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
   const [lifestylePopup, setLifestylePopup] = useState<string | null>(null);
   const [dietPopup, setDietPopup] = useState<string | null>(null);
   const [geneticsPopup, setGeneticsPopup] = useState<string | null>(null);
+  const [progressPopup, setProgressPopup] = useState<string | null>(null);
   const [labs, setLabs] = useState<LabPoint[]>([]);
   const [editInjury, setEditInjury] = useState<InjuryRecord | null>(null);
   const [weightLog, setWeightLog] = useState<WeightEntry[]>(getWeightLog);
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
-  const [bpEntries, setBpEntries] = useState<BPEntry[]>(getBPDiary);
-  const [bpPeriod, setBpPeriod] = useState<'day' | 'week' | 'month' | 'all'>('week');
-  const [showBpForm, setShowBpForm] = useState(false);
-  const [diarySubTab, setDiarySubTab] = useState<'sleep' | 'bp' | 'measurements' | 'progress'>('sleep');
-  const [bpSystolic, setBpSystolic] = useState('');
-  const [bpDiastolic, setBpDiastolic] = useState('');
-  const [bpHr, setBpHr] = useState('');
   const [reportTab, setReportTab] = useState<'current' | 'archive'>('current');
   const [analyticsSubTab, setAnalyticsSubTab] = useState<'reports' | 'progress'>('reports');
   const [selectedArchiveItem, setSelectedArchiveItem] = useState<any>(null);
@@ -733,6 +724,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
     { id: 'genetics', label: 'Генетика' },
     { id: 'injuries', label: 'Травмы' },
     { id: 'diaries', label: '📓 Дневники' },
+    { id: 'bp_diary', label: '🫀 Давление' },
   ];
 
   const initials = (profile.name || 'П').charAt(0).toUpperCase();
@@ -1695,35 +1687,96 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
           {/* ═══ PROGRESS TAB ═══ */}
           {tab === 'progress' && (
           <InfoErrorBoundary label="Прогресс">
-            {/* Weight goal + line chart */}
-            <div style={glassCard}>
-              <div style={sectionLabel}>Прогресс веса</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
-                <div>
-                  <span style={{ fontSize:10, color: apple.textDim }}>Текущий вес</span>
-                  <div style={{ fontSize:24, fontWeight:800, color: apple.accent }}>{settings.weight} <span style={{ fontSize:12, fontWeight:400, color: apple.textDim }}>кг</span></div>
-                </div>
-                <div>
-                  <span style={{ fontSize:10, color: apple.textDim }}>Целевой вес</span>
-                  <input style={appleInput} type="number" value={settings.targetWeight || ''} onChange={e => save({ targetWeight: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="75" />
-                </div>
-              </div>
-              {settings.targetWeight && settings.weight && (
-                <div>
-                  <div style={{ height:6, borderRadius:3, background:'rgba(255,255,255,0.06)', overflow:'hidden', marginBottom:6 }}>
-                    <div style={{
-                      height:'100%', borderRadius:3,
-                      background: apple.gradientGreen,
-                      width:`${Math.min(100, Math.max(0, Math.round((1 - Math.abs(settings.weight - settings.targetWeight) / Math.max(1, Math.abs(settings.targetWeight))) * 100)))}%`,
-                      transition: 'width 0.5s',
-                    }} />
+            {(() => {
+              const pp = progressPopup;
+              const weightCard = {
+                id:'weight', icon:'⚖️', title:'Вес и цель', color:'#00e68a',
+                summary: () => `${settings.weight || '—'} кг → цель ${settings.targetWeight || '—'} кг`,
+                fields: () => <>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+                    <HealthNumber label="Текущий вес (кг)" value={String(settings.weight||'')} onChange={v => save({weight:parseFloat(v)||0})} />
+                    <HealthNumber label="Целевой вес (кг)" value={String(settings.targetWeight||'')} onChange={v => save({targetWeight:v?parseFloat(v):undefined})} />
                   </div>
-                  <div style={{ fontSize:11, color: apple.textSecondary, textAlign:'center' }}>
-                    {Math.round((1 - Math.abs(settings.weight - settings.targetWeight) / Math.max(1, Math.abs(settings.targetWeight))) * 100)}% к цели
+                  {settings.targetWeight && settings.weight ? <div style={{marginBottom:8}}>
+                    <div style={{height:4,borderRadius:2,background:'rgba(255,255,255,0.06)',overflow:'hidden',marginBottom:4}}>
+                      <div style={{height:'100%',borderRadius:2,background:apple.gradientGreen,width:`${Math.min(100,Math.max(0,Math.round((1-Math.abs(settings.weight-settings.targetWeight)/Math.max(1,Math.abs(settings.targetWeight)))*100)))}%`,transition:'width .5s'}} />
+                    </div>
+                    <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',textAlign:'center'}}>{Math.round((1-Math.abs(settings.weight-settings.targetWeight)/Math.max(1,Math.abs(settings.targetWeight)))*100)}% к цели</div>
+                  </div> : null}
+                  <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',marginBottom:4}}>➕ Новая запись веса</div>
+                  <div style={{display:'flex',gap:6}}>
+                    <input style={{...appleInput,flex:1}} type="date" id="progressWeightDate" defaultValue={new Date().toISOString().split('T')[0]} />
+                    <input style={{...appleInput,width:80}} type="number" step="0.1" id="progressWeightVal" placeholder="кг" />
+                    <button onClick={()=>{
+                      const d=(document.getElementById('progressWeightDate') as HTMLInputElement)?.value;
+                      const w=parseFloat((document.getElementById('progressWeightVal') as HTMLInputElement)?.value||'0');
+                      if(d&&w){const log=weightLog;log.push({date:d,weight:w});localStorage.setItem(WEIGHT_LOG_KEY,JSON.stringify(log.slice(-180)));setWeightLog([...log]);alert('✓ Записано')}
+                    }} style={{padding:'6px 12px',borderRadius:8,background:apple.gradientGreen,border:'none',color:'#000',fontWeight:700,cursor:'pointer',fontSize:11}}>➕</button>
                   </div>
-                </div>
-              )}
-            </div>
+                </>
+              };
+              const compCard = {
+                id:'composition', icon:'💪', title:'Композиция тела', color:'#8b5cf6',
+                summary: () => {
+                  const bf = settings.bodyFat ? `${settings.bodyFat}%` : '—';
+                  const tbf = settings.targetBodyFat ? `→ ${settings.targetBodyFat}%` : '—';
+                  return `${bf} жир ${tbf}${ffmi ? ` • FFMI ${ffmi}` : ''}`;
+                },
+                fields: () => <>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+                    <HealthNumber label="% жира" value={String(settings.bodyFat||'')} onChange={v => save({bodyFat:parseFloat(v)||0})} />
+                    <HealthNumber label="Целевой % жира" value={String(settings.targetBodyFat||'')} onChange={v => save({targetBodyFat:v?parseFloat(v):undefined})} />
+                  </div>
+                  {ffmi ? <div style={{background:'rgba(139,92,246,0.1)',borderRadius:8,padding:8}}>
+                    <div style={{fontSize:10,color:'rgba(255,255,255,0.5)',marginBottom:2}}>FFMI {ffmi} — {ffmiCategory}</div>
+                    <div style={{height:3,borderRadius:2,background:'rgba(255,255,255,0.06)',overflow:'hidden',position:'relative'}}>
+                      {[{pos:0},{pos:25},{pos:50},{pos:75},{pos:95}].map(s=><div key={s.pos} style={{position:'absolute',left:`${s.pos}%`,top:0,width:2,height:3,borderRadius:1,background:s.pos<50?'#f97316':s.pos<75?'#f59e0b':'#00e68a'}} />)}
+                      {parseFloat(ffmi||'0')>0 && <div style={{position:'absolute',left:`${Math.min(98,Math.max(2,((parseFloat(ffmi)-15)/15)*100))}%`,top:-2,width:8,height:8,borderRadius:'50%',background:apple.gradientGreen,border:'2px solid rgba(0,0,0,0.3)'}} />}
+                    </div>
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:7,color:'rgba(255,255,255,0.3)',marginTop:1}}><span>15</span><span>18</span><span>20</span><span>22</span><span>25</span><span>30</span></div>
+                  </div> : null}
+                  {lbm ? <div style={{fontSize:10,color:'rgba(255,255,255,0.5)',marginTop:4}}>LBM: {lbm} кг</div> : null}
+                </>
+              };
+              const measCard = {
+                id:'measurements', icon:'📏', title:'Обхваты', color:'#3b82f6',
+                summary: () => {
+                  const parts:string[]=[];
+                  if(settings.waistCm)parts.push(`Тал:${settings.waistCm}`);
+                  if(settings.chestCm)parts.push(`Гр:${settings.chestCm}`);
+                  if(settings.bicepCm)parts.push(`Биц:${settings.bicepCm}`);
+                  if(settings.thighCm)parts.push(`Бед:${settings.thighCm}`);
+                  return parts.length?parts.join(' | '):'нет данных';
+                },
+                fields: () => <>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:8}}>
+                    {[
+                      {k:'waistCm',l:'Талия'},{k:'chestCm',l:'Грудь'},{k:'bicepCm',l:'Бицепс'},
+                      {k:'thighCm',l:'Бедро'},{k:'hipCm',l:'Бёдра'},{k:'neckCm',l:'Шея'},
+                    ].map(m => <HealthNumber key={m.k} label={m.l} value={String((settings as any)[m.k]||'')} onChange={v => save({[m.k]:parseFloat(v)||0})} />)}
+                  </div>
+                  <button onClick={()=>{
+                    const entry:MeasurementEntry={date:new Date().toISOString().split('T')[0],waistCm:settings.waistCm||0,chestCm:settings.chestCm||0,hipCm:settings.hipCm||0,bicepCm:settings.bicepCm||0,thighCm:settings.thighCm||0,neckCm:settings.neckCm||0,forearmCm:settings.forearmCm||0,bodyFat:settings.bodyFat||0};
+                    const log=getMeasurementsLog();log.push(entry);localStorage.setItem(MEASUREMENTS_LOG_KEY,JSON.stringify(log.slice(-30)));alert('✓ Замеры сохранены');
+                  }} style={{...pillBtn(false),width:'100%',fontSize:11}}>💾 Сохранить замеры в историю</button>
+                </>
+              };
+              const cards = [weightCard, compCard, measCard];
+              return <>{cards.map(c => {
+                const open = pp === c.id;
+                return <div key={c.id} style={{...glassCard,cursor:'pointer',borderColor:open?c.color:undefined}} onClick={() => setProgressPopup(open?null:c.id)}>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{fontSize:18}}>{c.icon}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:700,color:'#fff'}}>{c.title}</div>
+                      <div style={{fontSize:9,color:'rgba(255,255,255,0.4)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.summary()}</div>
+                    </div>
+                    <span style={{fontSize:12,color:'rgba(255,255,255,0.3)',transition:'transform .2s',transform:open?'rotate(180deg)':'rotate(0deg)'}}>▾</span>
+                  </div>
+                  {open && <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid rgba(255,255,255,0.06)'}}>{c.fields()}</div>}
+                </div>;
+              })}</>;
+            })()}
 
             {/* Weight trend line chart (SVG) */}
             {weightLog.length > 2 && (
@@ -1756,7 +1809,6 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   <span style={{ color: apple.accent, fontWeight:600 }}>Тек: {weightLog[weightLog.length-1]?.weight?.toFixed(1)} кг</span>
                   <span>Макс: {Math.max(...weightLog.map(w => w.weight)).toFixed(1)} кг</span>
                 </div>
-                {/* Trend indicator */}
                 {(() => {
                   const firstW = weightLog[0]?.weight;
                   const lastW = weightLog[weightLog.length-1]?.weight;
@@ -1771,135 +1823,46 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
               </div>
             )}
 
-            {/* Body measurements cards */}
-            <div style={glassCard}>
-              <div style={sectionLabel}>Обхваты</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-                {[
-                  { k:'waistCm', l:'Талия', unit:'см' },
-                  { k:'chestCm', l:'Грудь', unit:'см' },
-                  { k:'bicepCm', l:'Бицепс', unit:'см' },
-                  { k:'thighCm', l:'Бедро', unit:'см' },
-                  { k:'hipCm', l:'Бёдра', unit:'см' },
-                  { k:'neckCm', l:'Шея', unit:'см' },
-                ].map(m => {
-                  const val = (settings as any)[m.k];
-                  return (
-                    <div key={m.k} style={{ background:'rgba(255,255,255,0.03)', borderRadius:10, padding:'10px 8px', textAlign:'center', border: apple.glassBorder }}>
-                      <div style={{ fontSize:9, color: apple.textDim, marginBottom:2 }}>{m.l}</div>
-                      <div style={{ fontSize:16, fontWeight:700, color: val ? apple.textPrimary : apple.textSecondary }}>{val ? `${val}` : '—'}<span style={{ fontSize:9, fontWeight:400, marginLeft:2, color: apple.textDim }}>{val ? m.unit : ''}</span></div>
-                    </div>
-                  );
+            {/* Lab indices + Weak organs + Genetic polymorphisms */}
+            {labIndices && labIndexText && (
+              <div style={glassCard}>
+                <div style={sectionLabel}>Индексы лабораторий</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  {(['inflammation','metabolism','thyroid','lipids'] as const).map(k => {
+                    const val = labIndices[k];
+                    const neededCodes: Record<string, string[]> = { inflammation:['CRP','FERRITIN'], metabolism:['GLU','GLUCOSE','HbA1c','HBA1C'], thyroid:['TSH','FT4','FT3'], lipids:['LDL','HDL','TG'] };
+                    const hasData = val > 0 || (neededCodes[k] || []).some(c => labs.some(l => l.code.toUpperCase() === c));
+                    const emojis: Record<string, string> = { inflammation:'Воспаление', metabolism:'Метаболизм', thyroid:'Щитовидная', lipids:'Липиды' };
+                    return (
+                      <div key={k} style={{ background:'rgba(255,255,255,0.03)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
+                        <div style={{ fontSize:9, color: apple.textDim }}>{emojis[k]}</div>
+                        <div style={{ fontSize:15, fontWeight:700 }}>{hasData ? `${(val * 100).toFixed(0)}%` : '—'}</div>
+                        <div style={{ fontSize:9, color: apple.textDim }}>{hasData ? labIndexText[k] : 'Нет данных'}</div>
+                      </div>
+                    );
                 })}
               </div>
-              {/* Save measurements button */}
-              <button onClick={() => {
-                const entry: MeasurementEntry = {
-                  date: new Date().toISOString().split('T')[0],
-                  waistCm: settings.waistCm || 0, chestCm: settings.chestCm || 0,
-                  hipCm: settings.hipCm || 0, bicepCm: settings.bicepCm || 0,
-                  thighCm: settings.thighCm || 0, neckCm: settings.neckCm || 0,
-                  forearmCm: settings.forearmCm || 0, bodyFat: settings.bodyFat || 0,
-                };
-                const log = getMeasurementsLog();
-                log.push(entry);
-                localStorage.setItem(MEASUREMENTS_LOG_KEY, JSON.stringify(log.slice(-30)));
-                alert('Замеры сохранены');
-              }} style={{ ...pillBtn(false), marginTop:10, width:'100%' }}>Сохранить текущие замеры</button>
             </div>
-
-            {/* FFMI trend */}
-            {ffmi && (
-              <div style={glassCard}>
-                <div style={sectionLabel}>FFMI анализ</div>
-                <div style={{ display:'flex', gap:10, alignItems:'center' }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:10, color: apple.textDim, marginBottom:2 }}>Текущий FFMI</div>
-                    <div style={{ fontSize:22, fontWeight:800, color: '#8b5cf6' }}>{ffmi}</div>
-                    <div style={{ fontSize:10, color: apple.textSecondary, marginTop:2 }}>{ffmiCategory}</div>
-                  </div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:10, color: apple.textDim, marginBottom:2 }}>LBM</div>
-                    <div style={{ fontSize:22, fontWeight:800, color: '#3b82f6' }}>{lbm || '—'}<span style={{ fontSize:11, fontWeight:400 }}> кг</span></div>
-                    <div style={{ fontSize:10, color: apple.textSecondary, marginTop:2 }}>Сухая масса</div>
-                  </div>
-                </div>
-                {/* FFMI gauge */}
-                <div style={{ marginTop:10, background:'rgba(255,255,255,0.03)', borderRadius:8, padding:'8px 10px' }}>
-                  <div style={{ fontSize:10, color: apple.textDim, marginBottom:4 }}>Шкала FFMI</div>
-                  <div style={{ height:4, borderRadius:2, background:'rgba(255,255,255,0.06)', position:'relative', overflow:'visible' }}>
-                    {[
-                      { pos:0, color:'#f97316', label:'<18' },
-                      { pos:25, color:'#f59e0b', label:'18-20' },
-                      { pos:50, color:'#3b82f6', label:'20-22' },
-                      { pos:75, color:'#00e68a', label:'22-25' },
-                      { pos:95, color:'#ef4444', label:'25+' },
-                    ].map(s => (
-                      <div key={s.pos} style={{ position:'absolute', left:`${s.pos}%`, top:-0, width:3, height:4, borderRadius:1, background:s.color }} />
-                    ))}
-                    {ffmi && parseFloat(ffmi) > 0 && (
-                      <div style={{
-                        position:'absolute',
-                        left:`${Math.min(98, Math.max(2, ((parseFloat(ffmi) - 15) / 15) * 100))}%`,
-                        top:-5, width:12, height:12, borderRadius:'50%',
-                        background: apple.gradientGreen, border:'2px solid rgba(0,0,0,0.3)',
-                        boxShadow: '0 0 8px rgba(0,230,138,0.4)',
-                      }} />
-                    )}
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:8, color: apple.textDim, marginTop:2 }}>
-                    <span>15</span><span>18</span><span>20</span><span>22</span><span>25</span><span>30</span>
-                  </div>
-                </div>
-              </div>
             )}
 
-            {/* Target body fat */}
             <div style={glassCard}>
-              <div style={{ marginTop:0 }}>
-                <span style={sectionLabel}>Целевой % жира</span>
-                <input style={appleInput} type="number" step="0.1" value={settings.targetBodyFat || ''} onChange={e => save({ targetBodyFat: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="12" />
-              </div>
-              {labIndices && labIndexText && (
-                <div style={{ marginTop:12 }}>
-                  <div style={sectionLabel}>Индексы лабораторий</div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    {(['inflammation','metabolism','thyroid','lipids'] as const).map(k => {
-                      const val = labIndices[k];
-                      const neededCodes: Record<string, string[]> = { inflammation:['CRP','FERRITIN'], metabolism:['GLU','GLUCOSE','HbA1c','HBA1C'], thyroid:['TSH','FT4','FT3'], lipids:['LDL','HDL','TG'] };
-                      const hasData = val > 0 || (neededCodes[k] || []).some(c => labs.some(l => l.code.toUpperCase() === c));
-                      const emojis: Record<string, string> = { inflammation:'Воспаление', metabolism:'Метаболизм', thyroid:'Щитовидная', lipids:'Липиды' };
-                      return (
-                        <div key={k} style={{ background:'rgba(255,255,255,0.03)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
-                          <div style={{ fontSize:9, color: apple.textDim }}>{emojis[k]}</div>
-                          <div style={{ fontSize:15, fontWeight:700 }}>{hasData ? `${(val * 100).toFixed(0)}%` : '—'}</div>
-                          <div style={{ fontSize:9, color: apple.textDim }}>{hasData ? labIndexText[k] : 'Нет данных'}</div>
-                        </div>
-                      );
-                  })}
-                </div>
-              </div>
-            )}
-            </div>
-
-            <div style={{ ...glassCard, marginTop:10 }}>
               <div style={sectionLabel}>Слабые органы</div>
               <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:4 }}>
                 {ORGAN_WEAKNESSES.map(o => {
                   const ci = getContraindications();
                   const active = (ci.organWeaknesses ?? []).includes(o.id);
-                  return <button key={o.id} onClick={() => { const cur = ci.organWeaknesses ?? []; const upd = active ? cur.filter(x => x !== o.id) : [...cur, o.id]; saveContraindications({ organWeaknesses: upd }); }} style={pillBtn(active)}>{o.label}</button>;
+                  return <button key={o.id} onClick={() => { const cur = ci.organWeaknesses ?? []; const upd = active ? cur.filter((x:string) => x !== o.id) : [...cur, o.id]; saveContraindications({ organWeaknesses: upd }); }} style={pillBtn(active)}>{o.label}</button>;
                 })}
               </div>
             </div>
 
-            <div style={{ ...glassCard, marginTop:10 }}>
+            <div style={glassCard}>
               <div style={sectionLabel}>Генетические полиморфизмы</div>
               <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:4 }}>
                 {GENETIC_POLYMORPHISMS.map(g => {
                   const ci = getContraindications();
                   const active = (ci.geneticPolymorphisms ?? []).includes(g.id);
-                  return <button key={g.id} onClick={() => { const cur = ci.geneticPolymorphisms ?? []; const upd = active ? cur.filter(x => x !== g.id) : [...cur, g.id]; saveContraindications({ geneticPolymorphisms: upd }); }} style={pillBtn(active)}>{g.label}</button>;
+                  return <button key={g.id} onClick={() => { const cur = ci.geneticPolymorphisms ?? []; const upd = active ? cur.filter((x:string) => x !== g.id) : [...cur, g.id]; saveContraindications({ geneticPolymorphisms: upd }); }} style={pillBtn(active)}>{g.label}</button>;
                 })}
               </div>
             </div>
@@ -2234,8 +2197,8 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                               if (customReportBlocks.risk) sections.push(`⚠️ Риски:\n  Общий: ${riskData?.overallNet || '—'}% · Без поддержки: ${riskData?.overallRaw || '—'}%`);
                               if (customReportBlocks.support) sections.push(`🧪 Поддержка:\n  ${suppsList || 'нет'}`);
                               if (customReportBlocks.bp) {
-                                const lastBp = bpEntries[0];
-                                sections.push(`❤️ Давление:\n  ${lastBp ? `${lastBp.systolic}/${lastBp.diastolic} · Пульс: ${lastBp.hr} · ${lastBp.date}` : 'нет записей'} (всего: ${bpEntries.length} зап.)`);
+                                const bpd = getBPDiary(); const lastBp = bpd[0];
+                                sections.push(`❤️ Давление:\n  ${lastBp ? `${lastBp.systolic}/${lastBp.diastolic} · Пульс: ${lastBp.hr} · ${lastBp.date}` : 'нет записей'} (всего: ${bpd.length} зап.)`);
                               }
                               if (customReportBlocks.sleep) {
                                 const sleepDiary = (() => { try { return JSON.parse(localStorage.getItem('he_sleep_diary') || '[]'); } catch { return []; } })();
@@ -2448,7 +2411,6 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                 <div style={{ display:'flex', gap:3, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }}>
                   {[
                     { id:'sleep', label:'🛌 Сон' },
-                    { id:'bp', label:'❤️ Давление' },
                     { id:'measurements', label:'📏 Замеры' },
                     { id:'progress', label:'📈 Прогресс' },
                   ].map(d => (
@@ -2463,153 +2425,6 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
 
                 {/* ═══ SLEEP DIARY ═══ */}
                 {diarySubTab === 'sleep' && <SleepDiary settings={settings} save={save} />}
-
-                {/* ═══ BP/HR DIARY ═══ */}
-                {diarySubTab === 'bp' && (
-                  <div>
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-                      <h3 style={{ margin:0, fontSize:15, fontWeight:700, color: apple.textPrimary }}>🫀 Давление и пульс</h3>
-                      <button onClick={() => setShowBpForm(!showBpForm)} style={{
-                        padding:'6px 14px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer',
-                        background: apple.accentDim, border: apple.accentBorder, color: apple.accent,
-                      }}>{showBpForm ? '✕ Отмена' : '+ Добавить'}</button>
-                    </div>
-                    {showBpForm && (
-                      <div style={{ ...glassCard, marginBottom:10 }}>
-                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:10 }}>
-                          <div>
-                            <div style={{ fontSize:9, color: apple.textDim, marginBottom:3 }}>Систолическое</div>
-                            <input type="number" value={bpSystolic} onChange={e => setBpSystolic(e.target.value)} placeholder="120" style={appleInput} />
-                          </div>
-                          <div>
-                            <div style={{ fontSize:9, color: apple.textDim, marginBottom:3 }}>Диастолическое</div>
-                            <input type="number" value={bpDiastolic} onChange={e => setBpDiastolic(e.target.value)} placeholder="80" style={appleInput} />
-                          </div>
-                          <div>
-                            <div style={{ fontSize:9, color: apple.textDim, marginBottom:3 }}>Пульс</div>
-                            <input type="number" value={bpHr} onChange={e => setBpHr(e.target.value)} placeholder="70" style={appleInput} />
-                          </div>
-                        </div>
-                        <button onClick={() => {
-                          const s = Math.round(Number(bpSystolic)); const d = Math.round(Number(bpDiastolic)); const h = Math.round(Number(bpHr));
-                          if (!s || !d || !h || isNaN(s) || isNaN(d) || isNaN(h) || s < 50 || s > 250 || d < 30 || d > 160 || h < 30 || h > 250) return;
-                          const entry: BPEntry = { date: new Date().toISOString().slice(0,10), systolic: s, diastolic: d, hr: h };
-                          const updated = [...bpEntries, entry];
-                          setBpEntries(updated); saveBPDiary(updated);
-                          setBpSystolic(''); setBpDiastolic(''); setBpHr(''); setShowBpForm(false);
-                        }} style={{
-                          width:'100%', padding:'10px', borderRadius:10, border:'none', cursor:'pointer',
-                          background: apple.gradientGreen, color:'#000', fontWeight:700, fontSize:12,
-                        }}>Сохранить</button>
-                      </div>
-                    )}
-                    <div style={{ display:'flex', gap:4, marginBottom:10 }}>
-                      {(['day','week','month','all'] as const).map(p => (
-                        <button key={p} onClick={() => setBpPeriod(p)} style={{
-                          flex:1, padding:'8px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer',
-                          background: bpPeriod === p ? apple.accentDim : apple.glassBg,
-                          border: bpPeriod === p ? apple.accentBorder : apple.glassBorder,
-                          color: bpPeriod === p ? apple.accent : apple.textSecondary,
-                        }}>{p === 'day' ? 'День' : p === 'week' ? 'Неделя' : p === 'month' ? 'Месяц' : 'Всё'}</button>
-                      ))}
-                      <button onClick={() => {
-                        if (confirm('Очистить все записи давления?')) {
-                          setBpEntries([]); localStorage.removeItem('he_bp_diary');
-                        }
-                      }} style={{
-                        padding:'8px 10px', borderRadius:10, fontSize:10, fontWeight:600, cursor:'pointer',
-                        background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444',
-                      }}>🗑</button>
-                    </div>
-                    {(() => {
-                      const now = new Date();
-                      const cutoff = new Date(now);
-                      if (bpPeriod === 'day') cutoff.setDate(cutoff.getDate() - 1);
-                      else if (bpPeriod === 'week') cutoff.setDate(cutoff.getDate() - 7);
-                      else if (bpPeriod === 'month') cutoff.setMonth(cutoff.getMonth() - 1);
-                      else cutoff.setFullYear(cutoff.getFullYear() - 10);
-                      const filtered = bpEntries.filter(e => new Date(e.date) >= cutoff).sort((a, b) => b.date.localeCompare(a.date));
-                      const avgSystolic = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.systolic, 0) / filtered.length) : 0;
-                      const avgDiastolic = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.diastolic, 0) / filtered.length) : 0;
-                      const avgHr = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.hr, 0) / filtered.length) : 0;
-                      return (
-                        <>
-                          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:10 }}>
-                            <div style={{ ...glassCard, textAlign:'center', padding:12 }}>
-                              <div style={{ fontSize:9, color: apple.textDim, marginBottom:4 }}>Среднее сист.</div>
-                              <div style={{ fontSize:24, fontWeight:800, color: avgSystolic > 140 ? '#ef4444' : avgSystolic > 130 ? '#f59e0b' : apple.accent }}>{avgSystolic || '—'}</div>
-                              <div style={{ fontSize:8, color: apple.textDim }}>мм рт. ст.</div>
-                            </div>
-                            <div style={{ ...glassCard, textAlign:'center', padding:12 }}>
-                              <div style={{ fontSize:9, color: apple.textDim, marginBottom:4 }}>Среднее диаст.</div>
-                              <div style={{ fontSize:24, fontWeight:800, color: avgDiastolic > 90 ? '#ef4444' : avgDiastolic > 80 ? '#f59e0b' : apple.accent }}>{avgDiastolic || '—'}</div>
-                              <div style={{ fontSize:8, color: apple.textDim }}>мм рт. ст.</div>
-                            </div>
-                            <div style={{ ...glassCard, textAlign:'center', padding:12 }}>
-                              <div style={{ fontSize:9, color: apple.textDim, marginBottom:4 }}>Средний пульс</div>
-                              <div style={{ fontSize:24, fontWeight:800, color: avgHr > 100 ? '#ef4444' : avgHr > 85 ? '#f59e0b' : apple.accent }}>{avgHr || '—'}</div>
-                              <div style={{ fontSize:8, color: apple.textDim }}>уд/мин</div>
-                            </div>
-                          </div>
-                          {filtered.length >= 2 && (
-                            <div style={{ ...glassCard, marginBottom:10, padding:'12px 10px', overflow:'hidden' }}>
-                              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-                                <span style={{ fontSize:10, color: apple.textDim, fontWeight:600 }}>📈 Динамика</span>
-                                <span style={{ fontSize:8, color: apple.textDim }}>{filtered.length} записей</span>
-                              </div>
-                              <div style={{ display:'flex', alignItems:'flex-end', gap:2, height:80 }}>
-                                {filtered.slice().reverse().map((e, i) => {
-                                  const maxVal = 200;
-                                  const hS = Math.min(100, (e.systolic / maxVal) * 100);
-                                  const hD = Math.min(100, (e.diastolic / maxVal) * 100);
-                                  return (
-                                    <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:1, position:'relative' }}>
-                                      <div style={{ width:'70%', height:`${hS}%`, borderRadius:'4px 4px 0 0', background:'linear-gradient(180deg, #ef4444, #dc2626)', opacity:0.8 }} />
-                                      <div style={{ width:'70%', height:`${hD}%`, borderRadius:'4px 4px 0 0', background:'linear-gradient(180deg, #f59e0b, #d97706)', opacity:0.8 }} />
-                                      {filtered.length <= 31 && (
-                                        <span style={{ fontSize:6, color: apple.textDim, marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'100%', textAlign:'center' }}>
-                                          {e.date.slice(5)}
-                                        </span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              <div style={{ display:'flex', gap:10, fontSize:8, color: apple.textDim, marginTop:6 }}>
-                                <span><span style={{ display:'inline-block', width:8, height:8, borderRadius:2, background:'#ef4444', marginRight:3 }} /> Систолическое</span>
-                                <span><span style={{ display:'inline-block', width:8, height:8, borderRadius:2, background:'#f59e0b', marginRight:3 }} /> Диастолическое</span>
-                              </div>
-                            </div>
-                          )}
-                          <div style={{ fontSize:10, color: apple.textDim, fontWeight:600, marginBottom:6 }}>Записи ({filtered.length})</div>
-                          {filtered.length === 0 ? (
-                            <div style={{ ...glassCard, textAlign:'center', padding:20 }}>
-                              <div style={{ fontSize:24, marginBottom:4 }}>🫀</div>
-                              <div style={{ fontSize:10, color: apple.textDim }}>Нет записей за выбранный период</div>
-                            </div>
-                          ) : (
-                            filtered.map((e, i) => {
-                              const bpColor = e.systolic > 140 || e.diastolic > 90 ? '#ef4444' : e.systolic > 130 || e.diastolic > 80 ? '#f59e0b' : apple.accent;
-                              return (
-                                <div key={i} style={{ ...glassCard, display:'flex', alignItems:'center', gap:10, padding:'10px 12px' }}>
-                                  <div style={{ width:36, height:36, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.1)', fontSize:16 }}>🫀</div>
-                                  <div style={{ flex:1 }}>
-                                    <div style={{ fontSize:13, fontWeight:700, color: apple.textPrimary }}>{e.systolic}/{e.diastolic}</div>
-                                    <div style={{ fontSize:9, color: apple.textDim }}>Пульс: {e.hr} уд/мин</div>
-                                  </div>
-                                  <div style={{ textAlign:'right' }}>
-                                    <div style={{ fontSize:11, color: bpColor, fontWeight:600 }}>{e.systolic > 140 || e.diastolic > 90 ? '⚠ Повышено' : e.systolic > 130 || e.diastolic > 80 ? '⚡ Граница' : '✅ Норма'}</div>
-                                    <div style={{ fontSize:8, color: apple.textDim }}>{e.date}</div>
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
 
                 {/* ═══ MEASUREMENTS DIARY ═══ */}
                 {diarySubTab === 'measurements' && <ProfileMeasurementsTab />}
@@ -2774,6 +2589,13 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   </div>
                 )}
               </div>
+            </InfoErrorBoundary>
+          )}
+
+          {/* ═══ BP DIARY TAB ═══ */}
+          {tab === 'bp_diary' && (
+            <InfoErrorBoundary label="Давление">
+              <BPDiaryTab />
             </InfoErrorBoundary>
           )}
 

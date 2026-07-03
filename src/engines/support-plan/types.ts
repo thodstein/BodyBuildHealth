@@ -218,6 +218,18 @@ export interface CalculatorState {
 //  OUTPUT: CalculatorResult (результат движка)
 // ═══════════════════════════════════════════════════════════════
 
+export interface SynergyRecommendation {
+  candidateId: string;
+  candidateName: string;
+  synergiesWith: string[];
+  synergyScore: number;
+  newSystemCoverage: number;
+  totalSystemCoverage: number;
+  reason: string;
+  effect: string;
+  severity: string;
+}
+
 export interface CalculatorResult {
   risk: { systems: SystemRisk[]; overallRaw: number; overallAfterSupport: number; timestamp: string };
   schedule: ScheduleItem[];
@@ -235,6 +247,8 @@ export interface CalculatorResult {
   peakWeek?: number;
   selectedWeekRaw?: number;
   selectedWeekAfter?: number;
+  synergyRecommendations?: SynergyRecommendation[];
+  boostAdded?: string[];
   timestamp: string;
 }
 

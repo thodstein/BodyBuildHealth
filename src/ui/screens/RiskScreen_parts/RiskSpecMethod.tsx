@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { calculateTzSpecRisk, DRUG_CLASSES, getCategoryLabel, type TzSpecInput, type TzSpecResult, type TzSpecOrganResult, type TzSpecMechanismResult } from '../../../engines/risk-engine-tz-spec';
 import { useDataLink } from '../../../core/data-link';
 import { PHARMA_DB } from '../../../core/pharma-database';
-const Risk3DModel = React.lazy(() => import('./Risk3DModel').then(m => ({ default: m.Risk3DModel })));
+import { TZRisk3DModel } from './TZRisk3DModel';
 
 const ACCENT = '#00e68a';
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 16, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 10 };
@@ -360,21 +360,19 @@ export const RiskSpecMethod: React.FC = () => {
             );
           })()}
 
-          {/* ── 3D модель ── */}
+          {/* ── 3D модель (на данных TZ) ── */}
           <div style={CARD}>
             <button onClick={() => setShow3D(!show3D)} style={{
               width: '100%', padding: 8, borderRadius: 8, cursor: 'pointer', textAlign: 'center',
-              background: show3D ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.03)',
-              border: `1px solid ${show3D ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.06)'}`,
-              color: show3D ? '#8b5cf6' : 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 600,
+              background: show3D ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${show3D ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`,
+              color: show3D ? '#00e68a' : 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 600,
             }}>
-              {show3D ? '▲ Скрыть 3D модель' : '🧊 Показать 3D модель рисков'}
+              {show3D ? '▲ Скрыть 3D модель' : '🧊 3D модель рисков (ТЗ)'}
             </button>
             {show3D && (
               <div style={{ marginTop: 8, minHeight: 300 }}>
-                <React.Suspense fallback={<div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка 3D модели...</div>}>
-                  <Risk3DModel result={null as any} mcEnabled={false} onToggleMC={() => {}} organWeek={0} onWeekChange={() => {}} />
-                </React.Suspense>
+                <TZRisk3DModel tzResult={result} />
               </div>
             )}
           </div>

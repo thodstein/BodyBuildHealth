@@ -17,8 +17,6 @@ import { V7RiskDisplay } from './RiskScreen_parts/V7RiskDisplay';
 import { WeeklyRiskChart } from './RiskScreen_parts/WeeklyRiskChart';
 import { RiskInfo } from './RiskScreen_parts/RiskInfo';
 import { runMDSS, type MDSSInput, type MDSSOutput, type BiomarkerInput } from '../../engines/mdss-engine';
-const Risk3DModel = React.lazy(() => import('./RiskScreen_parts/Risk3DModel').then(m => ({ default: m.Risk3DModel })));
-import { TZRiskMatrix } from './RiskScreen_parts/TZRiskMatrix';
 import { RiskSpecMethod } from './RiskScreen_parts/RiskSpecMethod';
 import { HysteresisChart } from './RiskScreen_parts/HysteresisChart';
 import { PredictiveAnalytics } from './RiskScreen_parts/PredictiveAnalytics';
@@ -46,7 +44,6 @@ const TAB_LABELS: Record<string, string> = {
   dynamics: '📈 Динамика',
   mechanisms: '⚙️ Механизмы',
   v7: '🧬 V7',
-  model: '🧮 Модель',
   mdss: '🏥 MDSS',
   compliance: '✅ Комплаенс',
   clinical: '🩺 Клиника',
@@ -59,12 +56,12 @@ export const RiskScreen: React.FC = () => {
   const labAnalysis = linked.labAnalysis;
   const readinessData = linked.readiness;
   const [mainTab, setMainTab] = useState<'hero' | 'calculations' | 'clinical' | 'info' | 'tz_spec'>('hero');
-  const [subTab, setSubTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'model' | 'info' | 'reports' | 'mdss' | 'compliance' | 'clinical' | 'labs_risks'>('overview');
+  const [subTab, setSubTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'info' | 'reports' | 'mdss' | 'compliance' | 'clinical' | 'labs_risks'>('overview');
 
   // Force subTab when mainTab changes
   useEffect(() => {
     if (mainTab === 'info') setSubTab('info');
-    else if (mainTab === 'clinical' || (mainTab === 'calculations' && calcPage === 'clinical')) setSubTab('model');
+    else if (mainTab === 'clinical' || (mainTab === 'calculations' && calcPage === 'clinical')) setSubTab('clinical');
   }, [mainTab]);
   const [calcPage, setCalcPage] = useState<'hero' | 'basic' | 'montecarlo' | 'mdss' | 'clinical'>('hero');
   const [basicPage, setBasicPage] = useState<'main' | 'dynamics' | 'mechanisms' | 'key_risks' | 'history'>('main');
@@ -536,9 +533,7 @@ export const RiskScreen: React.FC = () => {
       case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics} />;
       case 'mechanisms': return <RiskDetails riskResult={riskResult} labRiskContributions={effectiveLabContrib} isSyntheticLab={isSyntheticLab} />;
       case 'v7': return v7Result ? <V7RiskDisplay result={v7Result} organWeek={organWeek} onWeekChange={setOrganWeek} mcEnabled={mcEnabled} onToggleMC={toggleMC} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>;
-      case 'model': return <React.Suspense fallback={<div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка 3D модели...</div>}>
-        {v7Result ? <Risk3DModel result={v7Result} mcEnabled={mcEnabled} onToggleMC={toggleMC} organWeek={organWeek} onWeekChange={setOrganWeek} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>}
-      </React.Suspense>;
+
       case 'dynamics': return weeklyDynamics ? <WeeklyRiskChart dynamics={weeklyDynamics} selectedWeek={selectedWeek} onWeekSelect={setSelectedWeek} mode={weekMode} onModeChange={setWeekMode} /> : <div style={{ textAlign:'center', padding:40, color:'var(--text-dim)' }}>Нет данных для динамики</div>;
       case 'info': return <RiskInfo />;
       case 'reports': return renderRiskReports();
@@ -551,11 +546,11 @@ export const RiskScreen: React.FC = () => {
   };
 
   const CALC_SUBTABS = ['overview','dynamics','mechanisms','v7','mdss'] as const;
-  const CLINICAL_SUBTABS = ['model','compliance','clinical','labs_risks'] as const;
+  const CLINICAL_SUBTABS = ['compliance','clinical','labs_risks'] as const;
 
   const SUBTAB_LABELS: Record<string, string> = {
     overview: '📊 Обзор', dynamics: '📈 Динамика', mechanisms: '⚙️ Механизмы',
-    v7: '🧬 Монте Карло', model: '🧮 3D Модель', mdss: '🏥 MDSS',
+    v7: '🧬 Монте Карло', mdss: '🏥 MDSS',
     compliance: '✅ Комплаенс', clinical: '🩺 Клиника', info: 'ℹ️ Инфо',
     labs_risks: '🩸 Анализы', reports: '📄 Отчёты',
     main: '📋 Главная',
@@ -920,7 +915,7 @@ export const RiskScreen: React.FC = () => {
                     setCalcPage(card.id as any);
                     if (card.id === 'basic') { setBasicPage('main'); setSubTab('overview'); }
                     else if (card.id === 'montecarlo') { setMcPage('main'); setSubTab('v7'); }
-                    else if (card.id === 'clinical') { setSubTab('model'); }
+                    else if (card.id === 'clinical') { setSubTab('clinical'); }
                     else setSubTab('mdss');
                   }} style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '14px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
@@ -992,8 +987,6 @@ export const RiskScreen: React.FC = () => {
               </div>
               {/* BASIC CALC — multi-page */}
               {mainTab === 'calculations' && calcPage === 'basic' && riskResult && renderBasicCalc()}
-              {/* TZ Risk Matrix — вероятностная модель в базовом расчёте */}
-              {mainTab === 'calculations' && calcPage === 'basic' && basicPage === 'main' && linked.profile && <TZRiskMatrix />}
               {/* MONTE CARLO — multi-page */}
               {mainTab === 'calculations' && calcPage === 'montecarlo' && renderMonteCarlo()}
               {/* Hysteresis — PK/PD simulation visible in Monte Carlo */}

@@ -3,7 +3,7 @@
  * REUSE workout-logger.engine: startSession → addExerciseToSession → logSet → finishSession.
  * Mobile-first, dark theme. Принимает нормализованный план (дни → упражнения → целевые сеты).
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import {
   startSession, addExerciseToSession, logSet, finishSession,
   getLastSession, getRecentPRs, type WorkoutSession,
@@ -32,6 +32,7 @@ export interface PlayerExercise {
   name: string;
   muscleGroup: string;
   targetSets: PlayerSet[];
+  restSec?: number; // целевой отдых между подходами (сек), из presc
   // LMS-поля для метрик (Этап D1). Передаются из плана; иначе — эвристика.
   pm?: number;       // предельный максимум упражнения (кг)
   coef?: number;     // Коэф. тяжести (1.2 / 1.0 / 0.3)
@@ -61,10 +62,45 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   const [vbtIntent, setVbtIntent] = useState<VBTIntent>('strength');
   const [sessionRPE, setSessionRPE] = useState<number>(7);
   const [sessionDur, setSessionDur] = useState<number>(60);
+  // авто-таймер отдыха
+  const [timerSec, setTimerSec] = useState<number>(0);
+  const [timerRunning, setTimerRunning] = useState<boolean>(false);
+  const [timerExIdx, setTimerExIdx] = useState<number>(-1);
+  const timerRef = useRef<number | null>(null);
 
   const day = days[dayIdx] || days[0];
   const last = useMemo(() => getLastSession(), [done]);
   const prs = useMemo(() => getRecentPRs(3), [done]);
+
+  // авто-таймер: обратный отсчёт
+  useEffect(() => {
+    if (!timerRunning || timerSec <= 0) return;
+    timerRef.current = window.setTimeout(() => {
+      setTimerSec(prev => {
+        if (prev <= 1) { setTimerRunning(false); hapticNotify('success'); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => { if (timerRef.current !== null) { window.clearTimeout(timerRef.current); timerRef.current = null; } };
+  }, [timerRunning, timerSec]);
+
+  const startRestTimer = useCallback((ei: number) => {
+    const rest = day?.exercises[ei]?.restSec || 90;
+    setTimerExIdx(ei);
+    setTimerSec(rest);
+    setTimerRunning(true);
+  }, [day]);
+
+  const skipRestTimer = useCallback(() => {
+    setTimerRunning(false);
+    setTimerSec(0);
+    setTimerExIdx(-1);
+    if (timerRef.current !== null) { window.clearTimeout(timerRef.current); timerRef.current = null; }
+  }, []);
+
+  const timerPct = timerRunning && timerSec > 0
+    ? ((day?.exercises[timerExIdx]?.restSec || 90) - timerSec) / (day?.exercises[timerExIdx]?.restSec || 90) * 100
+    : 0;
 
   const begin = () => {
     if (!day) return;
@@ -100,7 +136,8 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     let s = logSet(session, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: a.rpe || 0, rir: t.rir, notes: '' });
     setSession(s);
     setActual(prev => ({ ...prev, [keyFor(ei, si)]: a }));
-    // пометить следующий подход/упражнение активным — UI сам покажет статус
+    // авто-старт таймера отдыха после подхода
+    startRestTimer(ei);
   };
 
   const finish = () => {
@@ -276,6 +313,22 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
                   <button key={it} onClick={() => setVbtIntent(it)} style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: vbtIntent===it?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: vbtIntent===it?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.02)', color: vbtIntent===it?'#00e68a':'var(--text-dim)' }}>{it}</button>
                 ))}
               </div>
+              {/* таймер отдыха для этого упражнения */}
+              {timerRunning && timerExIdx === ei && (
+                <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>⏱ Отдых</span>
+                    <span style={{ fontSize: 20, fontWeight: 700, color: timerSec <= 10 ? '#f59e0b' : ACCENT }}>
+                      {String(Math.floor(timerSec / 60)).padStart(2, '0')}:{String(timerSec % 60).padStart(2, '0')}
+                    </span>
+                    <button onClick={skipRestTimer} style={{ fontSize: 10, padding: '2px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', minHeight: 28 }}>Пропустить</button>
+                  </div>
+                  <div style={{ marginTop: 4, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.min(100, timerPct)}%`, borderRadius: 2, background: timerSec <= 10 ? '#f59e0b' : ACCENT, transition: 'width 1s linear' }} />
+                  </div>
+                  {timerSec === 0 && <div style={{ marginTop: 4, fontSize: 10, color: ACCENT, fontWeight: 600 }}>✅ Отдых завершён — можно приступать к следующему подходу</div>}
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -10,6 +10,7 @@ import { usePlanCtx } from "./IndividualPlanContext";
 import { DailyDietDashboard } from "../DailyDietDashboard";
 import { NutritionQualityCard } from '../../../components/NutritionQualityCard';
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type MealTiming, type DailyDietReport, type MealScoreV2 } from '../../../../engines/product-usefulness-v2.engine';
+import { MealQuickControls } from "./MealQuickControls";
 
 const getDiaryEntriesForDate = (date: string): any[] => {
   try {
@@ -295,7 +296,8 @@ export const IndividualPlanResults: React.FC = () => {
       </button>
 
       <div ref={resultsRef as any} />
-      {generated && (
+      {generated && (<>
+        <MealQuickControls />
         <GlassCard title="Выбор дней" icon="📅" color="#00e68a">
           <div style={{ color:'rgba(255,255,255,0.8)', fontSize:7, marginBottom:4, textAlign:'center' }}>Нажмите на день для плана на 1 день</div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:3, marginBottom:8 }}>
@@ -362,7 +364,7 @@ export const IndividualPlanResults: React.FC = () => {
             }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:7, fontWeight:600 }}>📥 Импорт</button>
           </div>
         </GlassCard>
-      )}
+      </>)}
       {generated && dayPlan && <DailyDietDashboard />}
       {generated && dayPlan && (
         <NutritionQualityCard

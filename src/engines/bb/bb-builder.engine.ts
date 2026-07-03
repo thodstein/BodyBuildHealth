@@ -14,6 +14,7 @@
 import { SPLIT_PATTERNS, getPattern, sessionsOf, type SplitPattern, type ScheduleDay } from './bb-split-patterns';
 import { FORCE_HEAVY_GROUPS, getPair, resolveCharacter, type DayCharacter, type MuscleSlot } from './bb-day-types';
 import { getAllVolumeLandmarks, landmarksForRotation, normLevel, type TrainingLevel } from '../volume-landmarks.engine';
+import { tempoFor, REST_BY_CHARACTER, type TempoSpec } from './bb-tempo-rest';
 
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
 
@@ -32,6 +33,8 @@ export interface BBSet {
   rir: number;
   weight: number;   // кг
   technique?: string;
+  tempo?: string;       // PRO: нотация темпа (напр. "2-1-1-0")
+  restSeconds?: number; // PRO: отдых между подходами
 }
 
 export interface BBExercise {
@@ -43,6 +46,8 @@ export interface BBExercise {
   rir: number;
   workSets: BBSet[];
   exerciseName?: string;
+  tempoSpec?: string;       // PRO: нотация темпа из bb-tempo-rest
+  restSeconds?: number;     // PRO: отдых между подходами
 }
 
 export interface BBSession {
@@ -128,10 +133,19 @@ function buildSession(
     const pct = PCT_FOR_RIR[rir] ?? 0.9;
     const reps = Math.round((rmin + rmax) / 2);
     const weight = Math.round(wm * pct * 10) / 10;
-    const workSets: BBSet[] = Array.from({ length: sets }, () => ({ reps, rir, weight }));
+    // PRO: bb-tempo-rest — темп и отдых по характеру дня
+    const tempoSpec = tempoFor(resolved);
+    const restSeconds = REST_BY_CHARACTER[resolved];
+    const workSets: BBSet[] = Array.from({ length: sets }, () => ({
+      reps, rir, weight,
+      tempo: tempoSpec.notation,
+      restSeconds,
+    }));
     exercises.push({
       muscle, role, character: resolved, sets, repsRange: [rmin, rmax], rir, workSets,
       exerciseName: undefined,
+      tempoSpec: tempoSpec.notation,
+      restSeconds,
     });
   }
   return { day: dayInRotation, weekOffset: 0, character, sessionTag: sched.sessionTag, exercises };
