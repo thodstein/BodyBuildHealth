@@ -14,7 +14,7 @@ import { BioStackAISettings } from '../components/BioStackAIProfile';
 
 type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' 
   | 'genetics' | 'injuries' | 'progress' | 'analytics' 
-  | 'contacts' | 'bp_diary' | 'measurements' | 'health';
+  | 'contacts' | 'bp_diary' | 'measurements' | 'health' | 'diaries';
 type ProfilePage = 'hero' | 'tabs';
 type MainTab = 'info' | 'analytics' | 'contacts';
 
@@ -197,6 +197,24 @@ const sectionLabel: React.CSSProperties = {
   letterSpacing: '0.5px',
   color: apple.textDim,
   marginBottom: 4,
+};
+
+// ── Diary Hub card styles ──
+const diaryCardBase: React.CSSProperties = {
+  display:'flex', flexDirection:'column', alignItems:'center', gap:4,
+  padding:'12px 8px', borderRadius:12, cursor:'pointer', textAlign:'center',
+  transition:'all 0.15s', border:'none', color:'inherit',
+};
+const diaryIconWrap: React.CSSProperties = {
+  width:36, height:36, borderRadius:10,
+  display:'flex', alignItems:'center', justifyContent:'center',
+  fontSize:18, marginBottom:2,
+};
+const diaryCardTitle: React.CSSProperties = {
+  fontSize:11, fontWeight:700, color: apple.textPrimary, lineHeight:1.2,
+};
+const diaryCardDesc: React.CSSProperties = {
+  fontSize:9, color: apple.textDim, lineHeight:1.2,
 };
 
 const SLEEP_DIARY_KEY = 'he_sleep_diary';
@@ -383,12 +401,43 @@ const SleepDiary: React.FC<{ settings: any; save: (data: any) => void }> = ({ se
   );
 };
 
+/* ── helper components for health tab cards ── */
+const HealthSelect: React.FC<{ label:string; value:string; opts:[string,string][]; onChange:(v:string)=>void }> = ({label,value,opts,onChange}) => (
+  <div>
+    <div style={{fontSize:9,color:'rgba(255,255,255,0.4)',marginBottom:2}}>{label}</div>
+    <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
+      {opts.map(([val,lab]) => (
+        <button key={val} onClick={()=>onChange(val)} style={{
+          flex:1, padding:'5px 4px', borderRadius:6, border:'none', cursor:'pointer', fontSize:9, fontWeight:600,
+          background: value===val ? '#3b82f6' : 'rgba(255,255,255,0.06)',
+          color: value===val ? '#fff' : 'rgba(255,255,255,0.5)',
+        }}>{lab}</button>
+      ))}
+    </div>
+  </div>
+);
+const HealthBool: React.FC<{ label:string; active:boolean; onClick:()=>void }> = ({label,active,onClick}) => (
+  <button onClick={onClick} style={{
+    padding:'5px 10px', borderRadius:8, border:'none', cursor:'pointer', fontSize:10, fontWeight:600,
+    background: active ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)',
+    color: active ? '#fca5a5' : 'rgba(255,255,255,0.5)',
+  }}>{active ? '✓ ' : ''}{label}</button>
+);
+const HealthNumber: React.FC<{ label:string; value:string|number; onChange:(v:string)=>void; placeholder?:string; min?:number; max?:number }> = ({label,value,onChange,placeholder,min,max}) => (
+  <div>
+    <div style={{fontSize:9,color:'rgba(255,255,255,0.4)',marginBottom:2}}>{label}</div>
+    <input style={{width:'100%',padding:'6px 8px',borderRadius:8,border:'1px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.06)',color:'#fff',fontSize:11,outline:'none',boxSizing:'border-box'}}
+      type="number" min={min} max={max} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} />
+  </div>
+);
+
 export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> = ({ onNavigate }) => {
   const profile = useProfileRefresh();
   const [tab, setTab] = useState<ProfileTab>('overview');
   const [overTab, setOverTab] = useState('general');
   const [page, setPage] = useState<ProfilePage>('hero');
   const [mainTab, setMainTab] = useState<MainTab>('info');
+  const [healthPopup, setHealthPopup] = useState<string | null>(null);
   const [labs, setLabs] = useState<LabPoint[]>([]);
   const [editInjury, setEditInjury] = useState<InjuryRecord | null>(null);
   const [weightLog, setWeightLog] = useState<WeightEntry[]>(getWeightLog);
@@ -396,6 +445,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
   const [bpEntries, setBpEntries] = useState<BPEntry[]>(getBPDiary);
   const [bpPeriod, setBpPeriod] = useState<'day' | 'week' | 'month' | 'all'>('week');
   const [showBpForm, setShowBpForm] = useState(false);
+  const [diarySubTab, setDiarySubTab] = useState<'sleep' | 'bp' | 'measurements' | 'progress'>('sleep');
   const [bpSystolic, setBpSystolic] = useState('');
   const [bpDiastolic, setBpDiastolic] = useState('');
   const [bpHr, setBpHr] = useState('');
@@ -408,6 +458,50 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
     pharma: true, risk: true, support: true, bp: true, sleep: true,
   });
 
+  // Contacts state
+  const [showFriendForm, setShowFriendForm] = useState(false);
+  const [friendName, setFriendName] = useState('');
+  const [friendUsername, setFriendUsername] = useState('');
+  const [friendVerifyStatus, setFriendVerifyStatus] = useState<'idle'|'checking'|'found'|'not_found'>('idle');
+  const [friendVerifiedName, setFriendVerifiedName] = useState('');
+  const [showTrainingForm, setShowTrainingForm] = useState(false);
+  const [trainingUsername, setTrainingUsername] = useState('');
+  const [notification, setNotification] = useState<{text:string;type:'success'|'error'} | null>(null);
+  const showNotif = (text:string,type:'success'|'error'='success') => { setNotification({text,type}); setTimeout(()=>setNotification(null),2500); };
+
+  const verifyUsername = async () => {
+    const u = friendUsername.trim().replace(/^@/, '');
+    if (!u) return;
+    setFriendVerifyStatus('checking');
+    try {
+      const res = await fetch('/api/verify-telegram-user', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: u }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setFriendVerifyStatus('found');
+        setFriendVerifiedName(data.name || u);
+        if (!friendName.trim()) setFriendName(data.name || u);
+      } else {
+        setFriendVerifyStatus('not_found');
+      }
+    } catch {
+      setFriendVerifyStatus('not_found');
+    }
+  };
+
+  // Debounced verify on username change
+  const verifyTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const onFriendUsernameChange = (val: string) => {
+    setFriendUsername(val);
+    setFriendVerifyStatus('idle');
+    if (verifyTimerRef.current) clearTimeout(verifyTimerRef.current);
+    if (val.trim().length >= 3) {
+      verifyTimerRef.current = setTimeout(verifyUsername, 600);
+    }
+  };
+
   // Food diary data for reports
   const [foodDiaryAvg, setFoodDiaryAvg] = useState<{avgKcal:number;avgProtein:number;avgFat:number;avgCarbs:number} | null>(null);
 
@@ -417,70 +511,82 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
   const [friends, setFriends] = useState<TelegramFriend[]>(getFriends);
   const saveFriends = (f: TelegramFriend[]) => { localStorage.setItem(TELEGRAM_FRIENDS_KEY, JSON.stringify(f)); setFriends(f); };
 
-  const addFriend = () => {
+  const removeFriend = (id: string) => { saveFriends(friends.filter(f => f.id !== id)); showNotif('Друг удалён'); };
+
+  const doAddFriend = () => {
+    if (!friendName.trim()) return;
+    const newFriend: TelegramFriend = {
+      id: crypto.randomUUID(), name: friendName.trim(),
+      username: friendUsername.trim().replace(/^@/, '') || 'user',
+      addedAt: new Date().toISOString().split('T')[0],
+    };
+    saveFriends([...friends, newFriend]);
+    setFriendName(''); setFriendUsername(''); setFriendVerifyStatus('idle'); setShowFriendForm(false);
+    const status = friendVerifyStatus === 'found' ? ' (подтверждён через Telegram)' : '';
+    showNotif(`✅ ${newFriend.name} добавлен${status}`);
+
     const tg = (window as any).Telegram?.WebApp;
     if (tg?.switchInlineQuery) {
-      tg.switchInlineQuery('bodybuildhealth_friend_add', ['users', 'groups']);
+      setTimeout(() => {
+        try { tg.switchInlineQuery(`friend_${newFriend.id}`, ['users']); } catch {}
+      }, 500);
     }
-    try {
-      const name = prompt('Имя друга (если не через Telegram)');
-      if (!name || !name.trim()) return;
-      const username = prompt('Username (без @)') || 'user';
-      const newFriend: TelegramFriend = {
-        id: crypto.randomUUID(), name: name.trim(), username,
-        addedAt: new Date().toISOString().split('T')[0],
-      };
-      saveFriends([...friends, newFriend]);
-    } catch {}
   };
 
-  const removeFriend = (id: string) => { saveFriends(friends.filter(f => f.id !== id)); };
-
-  const shareReport = () => {
+  const doInviteFriend = () => {
+    const inviteLink = `https://t.me/BodyBuildHealthBot?start=ref_${crypto.randomUUID().slice(0,8)}`;
     const tg = (window as any).Telegram?.WebApp;
-  const settings = profile?.settings ?? {};
-    const bmiVal = settings.weight && settings.height ? (settings.weight / Math.pow(settings.height / 100, 2)).toFixed(1) : '—';
-    const ffmiVal = (() => {
-      if (!settings.weight || !settings.height || !settings.bodyFat) return '—';
-      const lbm = settings.weight * (1 - settings.bodyFat / 100);
-      return (lbm / Math.pow(settings.height / 100, 2) + 6.1 * (1.8 - settings.height / 100)).toFixed(1);
-    })();
-    const riskRaw = localStorage.getItem('he_last_risk');
-    const riskPct = riskRaw ? JSON.parse(riskRaw).overallNet || '—' : '—';
-    const supps = (settings.currentSupplements || []).slice(0, 3).map((x: any) => x.name).join(', ') || 'нет';
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(inviteLink);
+      showNotif('🔗 Приглашение отправлено');
+    } else {
+      navigator.clipboard?.writeText(inviteLink).then(() => showNotif('📋 Ссылка-приглашение скопирована'));
+    }
+  };
 
+  const doShareReport = () => {
+    const tg = (window as any).Telegram?.WebApp;
+    const s = profile?.settings ?? {};
+    const bmiVal = s.weight && s.height ? (s.weight / Math.pow(s.height / 100, 2)).toFixed(1) : '—';
+    const lbm = s.weight && s.bodyFat ? s.weight * (1 - s.bodyFat / 100) : 0;
+    const ffmiVal = lbm && s.height ? (lbm / Math.pow(s.height / 100, 2) + 6.1 * (1.8 - s.height / 100)).toFixed(1) : '—';
+    const riskRaw = (() => { try { return JSON.parse(localStorage.getItem('he_last_risk') || 'null'); } catch { return null; } })();
+    const riskPct = riskRaw?.overallNet || '—';
+    const supps = (s.currentSupplements || []).slice(0, 3).map((x: any) => x.name).join(', ') || 'нет';
     const report = [
       `📊 *Отчёт BodyBuildHealth*`,
       `👤 ${profile.name || 'Пользователь'}`,
-      `⚖️ Вес: ${settings.weight || '—'} кг | Рост: ${settings.height || '—'} см`,
+      `⚖️ Вес: ${s.weight || '—'} кг | Рост: ${s.height || '—'} см`,
       `📐 BMI: ${bmiVal} | FFMI: ${ffmiVal}`,
-      `🔥 Текущий риск: ${riskPct}%`,
+      `🔥 Риск: ${riskPct}%`,
       `💊 Поддержка: ${supps}`,
       `📅 ${new Date().toLocaleDateString('ru')}`,
     ].join('\n');
 
     if (tg?.sendData) {
       tg.sendData(JSON.stringify({ type: 'share_report', report }));
+      showNotif('📤 Отчёт отправлен через Telegram');
     } else if (tg?.openTelegramLink) {
       tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent('https://body-build-health.vercel.app')}&text=${encodeURIComponent(report)}`);
+      showNotif('🔗 Telegram открыт');
     } else {
-      navigator.clipboard?.writeText(report).then(() => alert('Отчёт скопирован в буфер обмена'));
+      navigator.clipboard?.writeText(report).then(() => showNotif('📋 Отчёт скопирован в буфер'));
     }
   };
 
-  const openTrainingForFriend = () => {
+  const doShareTraining = () => {
+    if (!trainingUsername.trim()) return;
     const tg = (window as any).Telegram?.WebApp;
-    const username = prompt('Username друга (без @)') || '';
-    if (!username.trim()) return;
-    const deepLink = `https://t.me/BodyBuildHealthBot?start=training_view_${username.trim()}`;
-    localStorage.setItem('he_shared_training_for', username.trim());
+    const deepLink = `https://t.me/BodyBuildHealthBot?start=training_view_${trainingUsername.trim()}`;
+    localStorage.setItem('he_shared_training_for', trainingUsername.trim());
     if (tg?.openTelegramLink) {
       tg.openTelegramLink(deepLink);
     } else if (tg?.openLink) {
       tg.openLink(deepLink);
     } else {
-      navigator.clipboard?.writeText(deepLink).then(() => alert('Ссылка скопирована в буфер'));
+      navigator.clipboard?.writeText(deepLink).then(() => showNotif('📋 Ссылка скопирована'));
     }
+    setTrainingUsername(''); setShowTrainingForm(false);
   };
 
   const settings = profile.settings;
@@ -621,9 +727,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
     { id: 'diet', label: 'Питание' },
     { id: 'genetics', label: 'Генетика' },
     { id: 'injuries', label: 'Травмы' },
-    { id: 'sleep', label: '🛌 Сон' },
-    { id: 'bp_diary', label: '❤️ Давление' },
-    { id: 'measurements', label: '📏 Замеры' },
+    { id: 'diaries', label: '📓 Дневники' },
   ];
 
   const initials = (profile.name || 'П').charAt(0).toUpperCase();
@@ -997,9 +1101,6 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
             </InfoErrorBoundary>
           )}
 
-          {/* ═══ SLEEP TAB — ДНЕВНИК СНА ═══ */}
-          {tab === 'sleep' && <InfoErrorBoundary label="Сон"><SleepDiary settings={settings} save={save} /></InfoErrorBoundary>}
-
           {/* ═══ LIFESTYLE TAB ═══ */}
           {tab === 'lifestyle' && (
             <InfoErrorBoundary label="Образ жизни">
@@ -1134,173 +1235,238 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                 <h3 style={{ margin:'0 0 4px', fontSize:15, fontWeight:800, color:'#fff' }}>🏥 Данные здоровья</h3>
                 <p style={{ fontSize:10, color:'rgba(255,255,255,0.5)', margin:0 }}>Данные для калькулятора поддержки и риск-движка. Заполняется один раз.</p>
               </div>
-              <div style={glassCard}>
-                <div style={sectionLabel}>🫁 Гепатобилиарная</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>АЛТ/АСТ</span>
-                    <select style={appleInput} value={calcData?.hepatobiliary?.altAstElevation || 'none'} onChange={e => upCalc('hepatobiliary', { ...calcData?.hepatobiliary, altAstElevation: e.target.value })}>
-                      <option value="none">Норма</option><option value="mild">Лёгкое ↑</option><option value="moderate">Умеренное ↑</option><option value="severe">Выраженное ↑</option>
-                    </select>
-                  </div>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>ГГТ</span>
-                    <select style={appleInput} value={calcData?.hepatobiliary?.ggtElevation || 'none'} onChange={e => upCalc('hepatobiliary', { ...calcData?.hepatobiliary, ggtElevation: e.target.value })}>
-                      <option value="none">Норма</option><option value="mild">Лёгкое ↑</option><option value="moderate">Умеренное ↑</option><option value="severe">Выраженное ↑</option>
-                    </select>
-                  </div>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>Билирубин</span>
-                    <select style={appleInput} value={calcData?.hepatobiliary?.bilirubinElevation || 'none'} onChange={e => upCalc('hepatobiliary', { ...calcData?.hepatobiliary, bilirubinElevation: e.target.value })}>
-                      <option value="none">Норма</option><option value="mild">Лёгкое ↑</option><option value="moderate">Умеренное ↑</option>
-                    </select>
-                  </div>
-                  <div style={{ display:'flex', gap:4 }}>
-                    <button onClick={() => upCalc('hepatobiliary', { ...calcData?.hepatobiliary, fattyLiver: !calcData?.hepatobiliary?.fattyLiver })} style={pillBtn(!!calcData?.hepatobiliary?.fattyLiver)}>Жировая печень</button>
-                    <button onClick={() => upCalc('hepatobiliary', { ...calcData?.hepatobiliary, cholecystitis: !calcData?.hepatobiliary?.cholecystitis })} style={pillBtn(!!calcData?.hepatobiliary?.cholecystitis)}>Холецистит</button>
+              {/* Labs + health data hub */}
+              <div style={{ ...glassCard, marginBottom:8, border:'1px solid rgba(59,130,246,0.25)', background:'linear-gradient(135deg,rgba(59,130,246,0.10),rgba(99,102,241,0.05))' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                  <span style={{ fontSize:20, flexShrink:0 }}>📊</span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'#60a5fa' }}>Источники данных для расчётов</div>
+                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginTop:1 }}>Лабораторные маркеры (Labs) + карточки здоровья ниже → все модули</div>
                   </div>
                 </div>
-              </div>
-              <div style={glassCard}>
-                <div style={sectionLabel}>💧 Мочевыделительная</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>Креатинин</span>
-                    <select style={appleInput} value={calcData?.urinary?.creatinineElevation || 'none'} onChange={e => upCalc('urinary', { ...calcData?.urinary, creatinineElevation: e.target.value })}>
-                      <option value="none">Норма</option><option value="mild">Лёгкое ↑</option><option value="moderate">Умеренное ↑</option>
-                    </select>
-                  </div>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>Мочевина</span>
-                    <select style={appleInput} value={calcData?.urinary?.ureaElevation || 'none'} onChange={e => upCalc('urinary', { ...calcData?.urinary, ureaElevation: e.target.value })}>
-                      <option value="none">Норма</option><option value="mild">Лёгкое ↑</option><option value="moderate">Умеренное ↑</option>
-                    </select>
-                  </div>
-                </div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
-                  <button onClick={() => upCalc('urinary', { ...calcData?.urinary, proteinuria: !calcData?.urinary?.proteinuria })} style={pillBtn(!!calcData?.urinary?.proteinuria)}>Протеинурия</button>
-                  <button onClick={() => upCalc('urinary', { ...calcData?.urinary, hypertension: !calcData?.urinary?.hypertension })} style={pillBtn(!!calcData?.urinary?.hypertension)}>Гипертония</button>
-                  <button onClick={() => upCalc('urinary', { ...calcData?.urinary, diabetes: !calcData?.urinary?.diabetes })} style={pillBtn(!!calcData?.urinary?.diabetes)}>Диабет</button>
-                </div>
-              </div>
-              <div style={glassCard}>
-                <div style={sectionLabel}>❤️ ССС</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>АД</span>
-                    <select style={appleInput} value={calcData?.cardio?.bpStage || 'normal'} onChange={e => upCalc('cardio', { ...calcData?.cardio, bpStage: e.target.value })}>
-                      <option value="normal">Норма</option><option value="high_normal">Высокая норма</option><option value="hypertension1">Гипертензия 1</option><option value="hypertension2">Гипертензия 2</option>
-                    </select>
-                  </div>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>ЧСС</span>
-                    <input style={appleInput} type="number" value={calcData?.cardio?.heartRate || ''} onChange={e => upCalc('cardio', { ...calcData?.cardio, heartRate: parseInt(e.target.value) || 0 })} placeholder="70" />
-                  </div>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>ЛПНП</span>
-                    <select style={appleInput} value={calcData?.cardio?.ldlElevation || 'none'} onChange={e => upCalc('cardio', { ...calcData?.cardio, ldlElevation: e.target.value })}>
-                      <option value="none">Норма</option><option value="mild">Лёгкое ↑</option><option value="moderate">Умеренное ↑</option><option value="severe">Выраженное ↑</option>
-                    </select>
-                  </div>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>Гематокрит</span>
-                    <select style={appleInput} value={calcData?.cardio?.hctElevation || 'none'} onChange={e => upCalc('cardio', { ...calcData?.cardio, hctElevation: e.target.value })}>
-                      <option value="none">Норма</option><option value="mild">Лёгкое ↑</option><option value="moderate">Умеренное ↑</option><option value="severe">Выраженное ↑</option>
-                    </select>
-                  </div>
-                </div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
-                  <button onClick={() => upCalc('cardio', { ...calcData?.cardio, previousCVD: !calcData?.cardio?.previousCVD })} style={pillBtn(!!calcData?.cardio?.previousCVD)}>ССЗ в анамнезе</button>
-                  <button onClick={() => upCalc('cardio', { ...calcData?.cardio, familyCVD: !calcData?.cardio?.familyCVD })} style={pillBtn(!!calcData?.cardio?.familyCVD)}>Наследственность</button>
-                </div>
-              </div>
-              <div style={glassCard}>
-                <div style={sectionLabel}>🧠 Неврология</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>Дофамин (1-5)</span><input style={appleInput} type="number" min="1" max="5" value={calcData?.neuro?.dopamineScore || ''} onChange={e => upCalc('neuro', { ...calcData?.neuro, dopamineScore: parseInt(e.target.value) || 0 })} /></div>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>Серотонин (1-5)</span><input style={appleInput} type="number" min="1" max="5" value={calcData?.neuro?.serotoninScore || ''} onChange={e => upCalc('neuro', { ...calcData?.neuro, serotoninScore: parseInt(e.target.value) || 0 })} /></div>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>Агрессия (1-5)</span><input style={appleInput} type="number" min="1" max="5" value={calcData?.neuro?.aggressionScore || ''} onChange={e => upCalc('neuro', { ...calcData?.neuro, aggressionScore: parseInt(e.target.value) || 0 })} /></div>
-                </div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
-                  <button onClick={() => upCalc('neuro', { ...calcData?.neuro, memoryIssues: !calcData?.neuro?.memoryIssues })} style={pillBtn(!!calcData?.neuro?.memoryIssues)}>Память</button>
-                  <button onClick={() => upCalc('neuro', { ...calcData?.neuro, focusIssues: !calcData?.neuro?.focusIssues })} style={pillBtn(!!calcData?.neuro?.focusIssues)}>Концентрация</button>
-                  <button onClick={() => upCalc('neuro', { ...calcData?.neuro, headaches: !calcData?.neuro?.headaches })} style={pillBtn(!!calcData?.neuro?.headaches)}>Головные боли</button>
-                </div>
-              </div>
-              <div style={glassCard}>
-                <div style={sectionLabel}>🫀 ЖКТ</div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                  <button onClick={() => upCalc('gi', { ...calcData?.gi, bloating: !calcData?.gi?.bloating })} style={pillBtn(!!calcData?.gi?.bloating)}>Вздутие</button>
-                  <button onClick={() => upCalc('gi', { ...calcData?.gi, heartburn: !calcData?.gi?.heartburn })} style={pillBtn(!!calcData?.gi?.heartburn)}>Изжога</button>
-                  <button onClick={() => upCalc('gi', { ...calcData?.gi, diarrhea: !calcData?.gi?.diarrhea })} style={pillBtn(!!calcData?.gi?.diarrhea)}>Диарея</button>
-                  <button onClick={() => upCalc('gi', { ...calcData?.gi, constipation: !calcData?.gi?.constipation })} style={pillBtn(!!calcData?.gi?.constipation)}>Запор</button>
-                  <button onClick={() => upCalc('gi', { ...calcData?.gi, diagnosedIBS: !calcData?.gi?.diagnosedIBS })} style={pillBtn(!!calcData?.gi?.diagnosedIBS)}>СРК</button>
-                </div>
-              </div>
-              <div style={glassCard}>
-                <div style={sectionLabel}>🦴 ОДА</div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                  <button onClick={() => upCalc('oda', { ...calcData?.oda, jointPain: calcData?.oda?.jointPain === 'mild' ? 'none' : 'mild' })} style={pillBtn(calcData?.oda?.jointPain === 'mild')}>Боль в суставах</button>
-                  <button onClick={() => upCalc('oda', { ...calcData?.oda, ligamentIssues: !calcData?.oda?.ligamentIssues })} style={pillBtn(!!calcData?.oda?.ligamentIssues)}>Связки</button>
-                  <button onClick={() => upCalc('oda', { ...calcData?.oda, backPain: !calcData?.oda?.backPain })} style={pillBtn(!!calcData?.oda?.backPain)}>Боль в спине</button>
-                </div>
-              </div>
-              <div style={glassCard}>
-                <div style={sectionLabel}>📋 Эпикриз</div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                  <button onClick={() => upCalc('epicrisis', { ...calcData?.epicrisis, pastGyno: !calcData?.epicrisis?.pastGyno })} style={pillBtn(!!calcData?.epicrisis?.pastGyno)}>Гинекомастия</button>
-                  <button onClick={() => upCalc('epicrisis', { ...calcData?.epicrisis, pastLibidoDrop: !calcData?.epicrisis?.pastLibidoDrop })} style={pillBtn(!!calcData?.epicrisis?.pastLibidoDrop)}>↓ Либидо</button>
-                  <button onClick={() => upCalc('epicrisis', { ...calcData?.epicrisis, pastHctSpike: !calcData?.epicrisis?.pastHctSpike })} style={pillBtn(!!calcData?.epicrisis?.pastHctSpike)}>↑ HCT</button>
-                  <button onClick={() => upCalc('epicrisis', { ...calcData?.epicrisis, pastLiverIssues: !calcData?.epicrisis?.pastLiverIssues })} style={pillBtn(!!calcData?.epicrisis?.pastLiverIssues)}>Печень</button>
-                  <button onClick={() => upCalc('epicrisis', { ...calcData?.epicrisis, pastKidneyIssues: !calcData?.epicrisis?.pastKidneyIssues })} style={pillBtn(!!calcData?.epicrisis?.pastKidneyIssues)}>Почки</button>
-                </div>
-              </div>
-              <div style={glassCard}>
-                <div style={sectionLabel}>🎯 Цели курса</div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                  <button onClick={() => upCalc('goals', { ...calcData?.goals, healthMaintenance: !calcData?.goals?.healthMaintenance })} style={pillBtn(!!calcData?.goals?.healthMaintenance)}>Здоровье</button>
-                  <button onClick={() => upCalc('goals', { ...calcData?.goals, competitionPrep: !calcData?.goals?.competitionPrep })} style={pillBtn(!!calcData?.goals?.competitionPrep)}>Соревнования</button>
-                  <button onClick={() => upCalc('goals', { ...calcData?.goals, lipidCorrection: !calcData?.goals?.lipidCorrection })} style={pillBtn(!!calcData?.goals?.lipidCorrection)}>Липиды</button>
-                  <button onClick={() => upCalc('goals', { ...calcData?.goals, bloodThinning: !calcData?.goals?.bloodThinning })} style={pillBtn(!!calcData?.goals?.bloodThinning)}>Кровь</button>
-                  <button onClick={() => upCalc('goals', { ...calcData?.goals, liverDetox: !calcData?.goals?.liverDetox })} style={pillBtn(!!calcData?.goals?.liverDetox)}>Печень</button>
-                  <button onClick={() => upCalc('goals', { ...calcData?.goals, bpControl: !calcData?.goals?.bpControl })} style={pillBtn(!!calcData?.goals?.bpControl)}>АД</button>
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:6 }}>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>Длина цикла (нед)</span>
-                    <input style={appleInput} type="number" value={calcData?.goals?.cycleWeeks || ''} onChange={e => upCalc('goals', { ...calcData?.goals, cycleWeeks: parseInt(e.target.value) || 12 })} />
-                  </div>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>Предыдущих курсов</span>
-                    <input style={appleInput} type="number" value={calcData?.goals?.previousCycles || ''} onChange={e => upCalc('goals', { ...calcData?.goals, previousCycles: parseInt(e.target.value) || 0 })} />
-                  </div>
-                </div>
-              </div>
-              <div style={glassCard}>
-                <div style={sectionLabel}>🧘 Психология</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>Страх потери (1-5)</span><input style={appleInput} type="number" min="1" max="5" value={calcData?.psych?.fearOfLoss || ''} onChange={e => upCalc('psych', { ...calcData?.psych, fearOfLoss: parseInt(e.target.value) || 1 })} /></div>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>Зеркало (1-5)</span><input style={appleInput} type="number" min="1" max="5" value={calcData?.psych?.mirrorObsession || ''} onChange={e => upCalc('psych', { ...calcData?.psych, mirrorObsession: parseInt(e.target.value) || 1 })} /></div>
-                  <div><span style={{ fontSize:10, color: apple.textDim }}>Апатия (1-5)</span><input style={appleInput} type="number" min="1" max="5" value={calcData?.psych?.apathyOffCycle || ''} onChange={e => upCalc('psych', { ...calcData?.psych, apathyOffCycle: parseInt(e.target.value) || 1 })} /></div>
-                </div>
-              </div>
-              <div style={glassCard}>
-                <div style={sectionLabel}>☣️ Токсическая нагрузка</div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                  <button onClick={() => upCalc('toxicLoad', { ...calcData?.toxicLoad, hazardousWork: !calcData?.toxicLoad?.hazardousWork })} style={pillBtn(!!calcData?.toxicLoad?.hazardousWork)}>Вредное производство</button>
-                  <button onClick={() => upCalc('toxicLoad', { ...calcData?.toxicLoad, regularNSAIDs: !calcData?.toxicLoad?.regularNSAIDs })} style={pillBtn(!!calcData?.toxicLoad?.regularNSAIDs)}>НПВС регулярно</button>
-                </div>
-              </div>
-              <div style={glassCard}>
-                <div style={sectionLabel}>🦷 Стоматология</div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                  <button onClick={() => upCalc('dental', { ...calcData?.dental, bleedingGums: !calcData?.dental?.bleedingGums })} style={pillBtn(!!calcData?.dental?.bleedingGums)}>Кровоточивость</button>
-                  <button onClick={() => upCalc('dental', { ...calcData?.dental, looseTeeth: !calcData?.dental?.looseTeeth })} style={pillBtn(!!calcData?.dental?.looseTeeth)}>Подвижность зубов</button>
-                  <button onClick={() => upCalc('dental', { ...calcData?.dental, cramps: !calcData?.dental?.cramps })} style={pillBtn(!!calcData?.dental?.cramps)}>Судороги</button>
-                </div>
-              </div>
-              <div style={glassCard}>
-                <div style={sectionLabel}>💉 Инъекции</div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                  {['glutes','quads','delts'].map(zone => (
-                    <div key={zone}>
-                      <span style={{ fontSize:10, color: apple.textDim }}>{zone === 'glutes' ? 'Ягодицы' : zone === 'quads' ? 'Бёдра' : 'Дельты'}</span>
-                      <select style={appleInput} value={(calcData?.injection as any)?.[zone] || 'ok'} onChange={e => upCalc('injection', { ...calcData?.injection, [zone]: e.target.value })}>
-                        <option value="ok">Норма</option><option value="painful">Болезненно</option><option value="lumps">Уплотнения</option>
-                      </select>
+                {/* Usage rows */}
+                <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:7 }}>
+                  {[
+                    { icon:'⚠️', label:'Расчёт рисков (TZ)', info:'38 маркеров + здоровье', nav:'risks' as const, color:'#f87171' },
+                    { icon:'🧩', label:'Калькулятор поддержки', info:'50+ маркеров + здоровье', nav:'support' as const, color:'#34d399' },
+                    { icon:'🏋️', label:'Тренировки (объём/коррекция)', info:'композиты + здоровье', nav:'training' as const, color:'#60a5fa' },
+                    { icon:'🧬', label:'Фертильность', info:'18 параметров', nav:'support' as const, color:'#c084fc' },
+                    { icon:'📊', label:'Readiness / прогнозы', info:'4 маркера + стресс/сон', nav:'home' as const, color:'#fbbf24' },
+                  ].map(m => (
+                    <div key={m.nav+m.label} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.03)', cursor:'pointer' }}
+                      onClick={() => onNavigate?.(m.nav)}>
+                      <span style={{ fontSize:12 }}>{m.icon}</span>
+                      <span style={{ fontSize:10, color:'rgba(255,255,255,0.7)', flex:1 }}>{m.label}</span>
+                      <span style={{ fontSize:9, color:m.color, fontWeight:600 }}>{m.info}</span>
+                      <span style={{ fontSize:10, color:'rgba(255,255,255,0.25)' }}>→</span>
                     </div>
                   ))}
                 </div>
+                {/* Action buttons */}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5 }}>
+                  <button onClick={() => onNavigate?.('labs')} style={{
+                    padding:'7px 0', borderRadius:8, border:'none', cursor:'pointer',
+                    background:'rgba(59,130,246,0.25)', color:'#93c5fd', fontSize:10, fontWeight:700,
+                  }}>🧪 Labs</button>
+                  <button onClick={() => onNavigate?.('risks')} style={{
+                    padding:'7px 0', borderRadius:8, border:'none', cursor:'pointer',
+                    background:'rgba(248,113,113,0.2)', color:'#fca5a5', fontSize:10, fontWeight:700,
+                  }}>⚠ Риски</button>
+                  <button onClick={() => onNavigate?.('support')} style={{
+                    padding:'7px 0', borderRadius:8, border:'none', cursor:'pointer',
+                    background:'rgba(52,211,153,0.2)', color:'#6ee7b7', fontSize:10, fontWeight:700,
+                  }}>🧩 Поддержка</button>
+                </div>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.25)', marginTop:6, textAlign:'center' }}>
+                  Лабораторные цифры (Labs) + карточки «🫁 Гепатобилиарная», «❤️ ССС», «💧 Мочевыделительная» и т.д. ниже — все данные склеиваются в общий профиль здоровья
+                </div>
               </div>
+              {(() => {
+                const hp = healthPopup;
+                const systems: {
+                  id: string; icon: string; title: string; color: string;
+                  summary: (d: any) => string;
+                  fields: (d: any, u: Function) => React.ReactNode;
+                }[] = [
+                  { id:'hepatobiliary', icon:'🫁', title:'Гепатобилиарная', color:'#34d399',
+                    summary: d => {
+                      const alt = d?.altAstElevation || 'none'; const ggt = d?.ggtElevation || 'none';
+                      const bil = d?.bilirubinElevation || 'none';
+                      const flags = [d?.fattyLiver ? 'Жир.печень' : '', d?.cholecystitis ? 'Холецистит' : ''].filter(Boolean).join(', ');
+                      return `АЛТ/АСТ: ${alt==='none'?'Норма':alt==='mild'?'↑':alt==='moderate'?'↑↑':'↑↑↑'} | ГГТ: ${ggt==='none'?'Норма':ggt==='mild'?'↑':ggt==='moderate'?'↑↑':'↑↑↑'}${flags ? ' | '+flags : ''}`;
+                    },
+                    fields: (d, u) => <>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                        <HealthSelect label="АЛТ/АСТ" value={d?.altAstElevation||'none'} opts={[['none','Норма'],['mild','Лёгкое ↑'],['moderate','Умеренное ↑'],['severe','Выраженное ↑']]} onChange={v => u('hepatobiliary',{...d,altAstElevation:v})} />
+                        <HealthSelect label="ГГТ" value={d?.ggtElevation||'none'} opts={[['none','Норма'],['mild','Лёгкое ↑'],['moderate','Умеренное ↑'],['severe','Выраженное ↑']]} onChange={v => u('hepatobiliary',{...d,ggtElevation:v})} />
+                        <HealthSelect label="Билирубин" value={d?.bilirubinElevation||'none'} opts={[['none','Норма'],['mild','Лёгкое ↑'],['moderate','Умеренное ↑']]} onChange={v => u('hepatobiliary',{...d,bilirubinElevation:v})} />
+                        <div style={{ display:'flex', gap:4, alignItems:'end', paddingBottom:4 }}>
+                          <HealthBool label="Жир.печень" active={!!d?.fattyLiver} onClick={() => u('hepatobiliary',{...d,fattyLiver:!d?.fattyLiver})} />
+                          <HealthBool label="Холецистит" active={!!d?.cholecystitis} onClick={() => u('hepatobiliary',{...d,cholecystitis:!d?.cholecystitis})} />
+                        </div>
+                      </div>
+                    </>
+                  },
+                  { id:'urinary', icon:'💧', title:'Мочевыделительная', color:'#60a5fa',
+                    summary: d => {
+                      const cr = d?.creatinineElevation||'none'; const ur = d?.ureaElevation||'none';
+                      const flags = [d?.proteinuria?'Протеинурия':'',d?.hypertension?'Гипертония':'',d?.diabetes?'Диабет':''].filter(Boolean).join(', ');
+                      return `Креатинин: ${cr==='none'?'Норма':cr==='mild'?'↑':'↑↑'} | Мочевина: ${ur==='none'?'Норма':ur==='mild'?'↑':'↑↑'}${flags ? ' | '+flags : ''}`;
+                    },
+                    fields: (d, u) => <>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                        <HealthSelect label="Креатинин" value={d?.creatinineElevation||'none'} opts={[['none','Норма'],['mild','Лёгкое ↑'],['moderate','Умеренное ↑']]} onChange={v => u('urinary',{...d,creatinineElevation:v})} />
+                        <HealthSelect label="Мочевина" value={d?.ureaElevation||'none'} opts={[['none','Норма'],['mild','Лёгкое ↑'],['moderate','Умеренное ↑']]} onChange={v => u('urinary',{...d,ureaElevation:v})} />
+                      </div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
+                        <HealthBool label="Протеинурия" active={!!d?.proteinuria} onClick={() => u('urinary',{...d,proteinuria:!d?.proteinuria})} />
+                        <HealthBool label="Гипертония" active={!!d?.hypertension} onClick={() => u('urinary',{...d,hypertension:!d?.hypertension})} />
+                        <HealthBool label="Диабет" active={!!d?.diabetes} onClick={() => u('urinary',{...d,diabetes:!d?.diabetes})} />
+                      </div>
+                    </>
+                  },
+                  { id:'cardio', icon:'❤️', title:'ССС', color:'#f87171',
+                    summary: d => {
+                      const bp = d?.bpStage||'normal'; const hr = d?.heartRate||'';
+                      const ldl = d?.ldlElevation||'none'; const hct = d?.hctElevation||'none';
+                      const f = [d?.previousCVD?'ССЗ':'',d?.familyCVD?'Наслед.':''].filter(Boolean).join(',');
+                      return `АД: ${bp==='normal'?'Норма':bp==='high_normal'?'↑':bp==='hypertension1'?'I ст.':'II ст.'}${hr?' | ЧСС: '+hr:''}${f?' | '+f:''}`;
+                    },
+                    fields: (d, u) => <>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                        <HealthSelect label="АД" value={d?.bpStage||'normal'} opts={[['normal','Норма'],['high_normal','Высокая норма'],['hypertension1','Гипертензия 1'],['hypertension2','Гипертензия 2']]} onChange={v => u('cardio',{...d,bpStage:v})} />
+                        <HealthNumber label="ЧСС" value={d?.heartRate||''} onChange={v => u('cardio',{...d,heartRate:v ? parseInt(v)||0 : 0})} placeholder="70" />
+                        <HealthSelect label="ЛПНП" value={d?.ldlElevation||'none'} opts={[['none','Норма'],['mild','Лёгкое ↑'],['moderate','Умеренное ↑'],['severe','Выраженное ↑']]} onChange={v => u('cardio',{...d,ldlElevation:v})} />
+                        <HealthSelect label="Гематокрит" value={d?.hctElevation||'none'} opts={[['none','Норма'],['mild','Лёгкое ↑'],['moderate','Умеренное ↑'],['severe','Выраженное ↑']]} onChange={v => u('cardio',{...d,hctElevation:v})} />
+                      </div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
+                        <HealthBool label="ССЗ в анамнезе" active={!!d?.previousCVD} onClick={() => u('cardio',{...d,previousCVD:!d?.previousCVD})} />
+                        <HealthBool label="Наследственность" active={!!d?.familyCVD} onClick={() => u('cardio',{...d,familyCVD:!d?.familyCVD})} />
+                      </div>
+                    </>
+                  },
+                  { id:'neuro', icon:'🧠', title:'Неврология', color:'#a78bfa',
+                    summary: d => `Дофамин: ${d?.dopamineScore||'—'} | Серотонин: ${d?.serotoninScore||'—'} | Агрессия: ${d?.aggressionScore||'—'}${[d?.memoryIssues?'Память':'',d?.focusIssues?'Конц.':'',d?.headaches?'Боли':''].filter(Boolean).length ? ' | '+[d?.memoryIssues?'Память':'',d?.focusIssues?'Конц.':'',d?.headaches?'Боли':''].filter(Boolean).join(',') : ''}`,
+                    fields: (d, u) => <>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+                        <HealthNumber label="Дофамин (1-5)" value={d?.dopamineScore||1} min={1} max={5} onChange={v => u('neuro',{...d,dopamineScore:parseInt(v)||1})} />
+                        <HealthNumber label="Серотонин (1-5)" value={d?.serotoninScore||1} min={1} max={5} onChange={v => u('neuro',{...d,serotoninScore:parseInt(v)||1})} />
+                        <HealthNumber label="Агрессия (1-5)" value={d?.aggressionScore||1} min={1} max={5} onChange={v => u('neuro',{...d,aggressionScore:parseInt(v)||1})} />
+                      </div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
+                        <HealthBool label="Память" active={!!d?.memoryIssues} onClick={() => u('neuro',{...d,memoryIssues:!d?.memoryIssues})} />
+                        <HealthBool label="Концентрация" active={!!d?.focusIssues} onClick={() => u('neuro',{...d,focusIssues:!d?.focusIssues})} />
+                        <HealthBool label="Головные боли" active={!!d?.headaches} onClick={() => u('neuro',{...d,headaches:!d?.headaches})} />
+                      </div>
+                    </>
+                  },
+                  { id:'gi', icon:'🫀', title:'ЖКТ', color:'#fbbf24',
+                    summary: d => { const a = [d?.bloating?'Вздутие':'',d?.heartburn?'Изжога':'',d?.diarrhea?'Диарея':'',d?.constipation?'Запор':'',d?.diagnosedIBS?'СРК':''].filter(Boolean); return a.length ? a.join(', ') : 'Нет жалоб'; },
+                    fields: (d, u) => <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      <HealthBool label="Вздутие" active={!!d?.bloating} onClick={() => u('gi',{...d,bloating:!d?.bloating})} />
+                      <HealthBool label="Изжога" active={!!d?.heartburn} onClick={() => u('gi',{...d,heartburn:!d?.heartburn})} />
+                      <HealthBool label="Диарея" active={!!d?.diarrhea} onClick={() => u('gi',{...d,diarrhea:!d?.diarrhea})} />
+                      <HealthBool label="Запор" active={!!d?.constipation} onClick={() => u('gi',{...d,constipation:!d?.constipation})} />
+                      <HealthBool label="СРК" active={!!d?.diagnosedIBS} onClick={() => u('gi',{...d,diagnosedIBS:!d?.diagnosedIBS})} />
+                    </div>
+                  },
+                  { id:'oda', icon:'🦴', title:'ОДА', color:'#f97316',
+                    summary: d => { const a = [d?.jointPain==='mild'?'Боль в суставах':'',d?.ligamentIssues?'Связки':'',d?.backPain?'Боль в спине':'']; return a.filter(Boolean).length ? a.filter(Boolean).join(', ') : 'Нет жалоб'; },
+                    fields: (d, u) => <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      <HealthBool label="Боль в суставах" active={d?.jointPain==='mild'} onClick={() => u('oda',{...d,jointPain:d?.jointPain==='mild'?'none':'mild'})} />
+                      <HealthBool label="Связки (слабые)" active={!!d?.ligamentIssues} onClick={() => u('oda',{...d,ligamentIssues:!d?.ligamentIssues})} />
+                      <HealthBool label="Боль в спине" active={!!d?.backPain} onClick={() => u('oda',{...d,backPain:!d?.backPain})} />
+                    </div>
+                  },
+                  { id:'epicrisis', icon:'📋', title:'Эпикриз (история)', color:'#c084fc',
+                    summary: d => { const a = [d?.pastGyno?'Гинекомастия':'',d?.pastLibidoDrop?'↓ Либидо':'',d?.pastHctSpike?'↑ HCT':'',d?.pastLiverIssues?'Печень':'',d?.pastKidneyIssues?'Почки':'']; return a.filter(Boolean).length ? a.filter(Boolean).join(', ') : 'Нет отмеченных'; },
+                    fields: (d, u) => <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      <HealthBool label="Гинекомастия" active={!!d?.pastGyno} onClick={() => u('epicrisis',{...d,pastGyno:!d?.pastGyno})} />
+                      <HealthBool label="↓ Либидо" active={!!d?.pastLibidoDrop} onClick={() => u('epicrisis',{...d,pastLibidoDrop:!d?.pastLibidoDrop})} />
+                      <HealthBool label="↑ HCT" active={!!d?.pastHctSpike} onClick={() => u('epicrisis',{...d,pastHctSpike:!d?.pastHctSpike})} />
+                      <HealthBool label="Печень" active={!!d?.pastLiverIssues} onClick={() => u('epicrisis',{...d,pastLiverIssues:!d?.pastLiverIssues})} />
+                      <HealthBool label="Почки" active={!!d?.pastKidneyIssues} onClick={() => u('epicrisis',{...d,pastKidneyIssues:!d?.pastKidneyIssues})} />
+                    </div>
+                  },
+                  { id:'goals', icon:'🎯', title:'Цели курса', color:'#fb923c',
+                    summary: d => { const a = [d?.healthMaintenance?'Здоровье':'',d?.competitionPrep?'Соревн.':'',d?.lipidCorrection?'Липиды':'',d?.bloodThinning?'Кровь':'',d?.liverDetox?'Печень':'',d?.bpControl?'АД':'']; const s = a.filter(Boolean).join(', '); return (s||'—')+(d?.cycleWeeks?` | ${d.cycleWeeks} нед`:''); },
+                    fields: (d, u) => <>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                        <HealthBool label="Здоровье" active={!!d?.healthMaintenance} onClick={() => u('goals',{...d,healthMaintenance:!d?.healthMaintenance})} />
+                        <HealthBool label="Соревнования" active={!!d?.competitionPrep} onClick={() => u('goals',{...d,competitionPrep:!d?.competitionPrep})} />
+                        <HealthBool label="Липиды" active={!!d?.lipidCorrection} onClick={() => u('goals',{...d,lipidCorrection:!d?.lipidCorrection})} />
+                        <HealthBool label="Кровь" active={!!d?.bloodThinning} onClick={() => u('goals',{...d,bloodThinning:!d?.bloodThinning})} />
+                        <HealthBool label="Печень" active={!!d?.liverDetox} onClick={() => u('goals',{...d,liverDetox:!d?.liverDetox})} />
+                        <HealthBool label="АД" active={!!d?.bpControl} onClick={() => u('goals',{...d,bpControl:!d?.bpControl})} />
+                      </div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginTop:6 }}>
+                        <HealthNumber label="Длина цикла (нед)" value={d?.cycleWeeks||12} onChange={v => u('goals',{...d,cycleWeeks:parseInt(v)||12})} />
+                        <HealthNumber label="Предыдущих курсов" value={d?.previousCycles||0} onChange={v => u('goals',{...d,previousCycles:parseInt(v)||0})} />
+                      </div>
+                    </>
+                  },
+                  { id:'psych', icon:'🧘', title:'Психология', color:'#e879f9',
+                    summary: d => `Страх: ${d?.fearOfLoss||1} | Зеркало: ${d?.mirrorObsession||1} | Апатия: ${d?.apathyOffCycle||1}`,
+                    fields: (d, u) => <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+                      <HealthNumber label="Страх потери (1-5)" value={d?.fearOfLoss||1} min={1} max={5} onChange={v => u('psych',{...d,fearOfLoss:parseInt(v)||1})} />
+                      <HealthNumber label="Зеркало (1-5)" value={d?.mirrorObsession||1} min={1} max={5} onChange={v => u('psych',{...d,mirrorObsession:parseInt(v)||1})} />
+                      <HealthNumber label="Апатия (1-5)" value={d?.apathyOffCycle||1} min={1} max={5} onChange={v => u('psych',{...d,apathyOffCycle:parseInt(v)||1})} />
+                    </div>
+                  },
+                  { id:'toxicLoad', icon:'☣️', title:'Токсическая нагрузка', color:'#ef4444',
+                    summary: d => [d?.hazardousWork?'Вредное производство':'',d?.regularNSAIDs?'НПВС регулярно':''].filter(Boolean).join(', ') || 'Нет',
+                    fields: (d, u) => <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      <HealthBool label="Вредное производство" active={!!d?.hazardousWork} onClick={() => u('toxicLoad',{...d,hazardousWork:!d?.hazardousWork})} />
+                      <HealthBool label="НПВС регулярно" active={!!d?.regularNSAIDs} onClick={() => u('toxicLoad',{...d,regularNSAIDs:!d?.regularNSAIDs})} />
+                    </div>
+                  },
+                  { id:'dental', icon:'🦷', title:'Стоматология', color:'#94a3b8',
+                    summary: d => { const a = [d?.bleedingGums?'Кровоточивость':'',d?.looseTeeth?'Подв.зубов':'',d?.cramps?'Судороги':'']; return a.filter(Boolean).length ? a.filter(Boolean).join(', ') : 'Нет жалоб'; },
+                    fields: (d, u) => <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      <HealthBool label="Кровоточивость" active={!!d?.bleedingGums} onClick={() => u('dental',{...d,bleedingGums:!d?.bleedingGums})} />
+                      <HealthBool label="Подвижность зубов" active={!!d?.looseTeeth} onClick={() => u('dental',{...d,looseTeeth:!d?.looseTeeth})} />
+                      <HealthBool label="Судороги" active={!!d?.cramps} onClick={() => u('dental',{...d,cramps:!d?.cramps})} />
+                    </div>
+                  },
+                  { id:'injection', icon:'💉', title:'Инъекции', color:'#38bdf8',
+                    summary: d => { const z = ['glutes','quads','delts'].map(zn => { const v = (d||{})[zn]; return v && v!=='ok' ? (zn==='glutes'?'Ягодицы':zn==='quads'?'Бёдра':'Дельты')+': '+(v==='painful'?'больно':'уплотн.') : ''; }).filter(Boolean); return z.length ? z.join(', ') : 'Норма'; },
+                    fields: (d, u) => <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                      {['glutes','quads','delts'].map(zone => (
+                        <div key={zone} style={{ flex:1, minWidth:100 }}>
+                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', marginBottom:2 }}>{zone==='glutes'?'Ягодицы':zone==='quads'?'Бёдра':'Дельты'}</div>
+                          {(['ok','painful','lumps'] as const).map(opt => {
+                            const cur = (d||{})[zone]||'ok';
+                            return <button key={opt} onClick={() => u('injection',{...d,[zone]:opt})} style={{
+                              display:'block', width:'100%', padding:'6px 8px', marginBottom:2, borderRadius:6, border:'none', cursor:'pointer', fontSize:10, fontWeight:600,
+                              background: cur===opt ? '#38bdf8' : 'rgba(255,255,255,0.06)', color: cur===opt ? '#000' : 'rgba(255,255,255,0.5)',
+                            }}>{opt==='ok'?'Норма':opt==='painful'?'Болезненно':'Уплотнения'}</button>;
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  },
+                ];
+
+                return <>{systems.map(sys => {
+                  const d = (calcData||{})[sys.id];
+                  return <React.Fragment key={sys.id}>
+                    <div style={{ ...glassCard, cursor:'pointer', borderColor: hp===sys.id ? sys.color : undefined }}
+                      onClick={() => setHealthPopup(hp===sys.id ? null : sys.id)}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <span style={{ fontSize:18 }}>{sys.icon}</span>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{sys.title}</div>
+                          <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{sys.summary(d)}</div>
+                        </div>
+                        <span style={{ fontSize:12, color:'rgba(255,255,255,0.3)', transition:'transform .2s', transform:hp===sys.id?'rotate(180deg)':'rotate(0deg)' }}>▾</span>
+                      </div>
+                      {hp === sys.id && <div style={{ marginTop:8, paddingTop:8, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+                        {sys.fields(d, upCalc)}
+                      </div>}
+                    </div>
+                  </React.Fragment>;
+                })}</>;
+              })()}
             </div>
             </InfoErrorBoundary>
           )}
@@ -2212,175 +2378,378 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
           </div>);
           })()}</InfoErrorBoundary>}
           
-          {/* ═══ BP/HR DIARY ═══ */}
-          {tab === 'bp_diary' && (
-            <InfoErrorBoundary label="Давление"><div>
-              {/* Header + Add button */}
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-                <h3 style={{ margin:0, fontSize:15, fontWeight:700, color: apple.textPrimary }}>🫀 Давление и пульс</h3>
-                <button onClick={() => setShowBpForm(!showBpForm)} style={{
-                  padding:'6px 14px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer',
-                  background: apple.accentDim, border: apple.accentBorder, color: apple.accent,
-                }}>{showBpForm ? '✕ Отмена' : '+ Добавить'}</button>
-              </div>
-
-              {/* Entry form */}
-              {showBpForm && (
-                <div style={{ ...glassCard, marginBottom:10 }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:10 }}>
-                    <div>
-                      <div style={{ fontSize:9, color: apple.textDim, marginBottom:3 }}>Систолическое</div>
-                      <input type="number" value={bpSystolic} onChange={e => setBpSystolic(e.target.value)} placeholder="120" style={appleInput} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize:9, color: apple.textDim, marginBottom:3 }}>Диастолическое</div>
-                      <input type="number" value={bpDiastolic} onChange={e => setBpDiastolic(e.target.value)} placeholder="80" style={appleInput} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize:9, color: apple.textDim, marginBottom:3 }}>Пульс</div>
-                      <input type="number" value={bpHr} onChange={e => setBpHr(e.target.value)} placeholder="70" style={appleInput} />
-                    </div>
-                  </div>
-                  <button onClick={() => {
-                    const s = Math.round(Number(bpSystolic)); const d = Math.round(Number(bpDiastolic)); const h = Math.round(Number(bpHr));
-                    if (!s || !d || !h || isNaN(s) || isNaN(d) || isNaN(h) || s < 50 || s > 250 || d < 30 || d > 160 || h < 30 || h > 250) return;
-                    const entry: BPEntry = { date: new Date().toISOString().slice(0,10), systolic: s, diastolic: d, hr: h };
-                    const updated = [...bpEntries, entry];
-                    setBpEntries(updated); saveBPDiary(updated);
-                    setBpSystolic(''); setBpDiastolic(''); setBpHr(''); setShowBpForm(false);
-                  }} style={{
-                    width:'100%', padding:'10px', borderRadius:10, border:'none', cursor:'pointer',
-                    background: apple.gradientGreen, color:'#000', fontWeight:700, fontSize:12,
-                  }}>Сохранить</button>
+          {/* ═══ DIARIES HUB TAB ═══ */}
+          {tab === 'diaries' && (
+            <InfoErrorBoundary label="Дневники">
+              <div>
+                <div style={glassCard}>
+                  <div style={sectionLabel}>📓 Дневники</div>
+                  <p style={{ fontSize:10, color: apple.textDim, margin:'4px 0 10px' }}>
+                    Все дневники приложения в одном месте. Выберите тип дневника ниже, чтобы добавить или просмотреть записи.
+                  </p>
                 </div>
-              )}
 
-              {/* Period toggle + archive */}
-              <div style={{ display:'flex', gap:4, marginBottom:10 }}>
-                {(['day','week','month','all'] as const).map(p => (
-                  <button key={p} onClick={() => setBpPeriod(p)} style={{
-                    flex:1, padding:'8px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer',
-                    background: bpPeriod === p ? apple.accentDim : apple.glassBg,
-                    border: bpPeriod === p ? apple.accentBorder : apple.glassBorder,
-                    color: bpPeriod === p ? apple.accent : apple.textSecondary,
-                  }}>{p === 'day' ? 'День' : p === 'week' ? 'Неделя' : p === 'month' ? 'Месяц' : 'Всё'}</button>
-                ))}
-                <button onClick={() => {
-                  if (confirm('Очистить все записи давления?')) {
-                    setBpEntries([]); localStorage.removeItem('he_bp_diary');
-                  }
-                }} style={{
-                  padding:'8px 10px', borderRadius:10, fontSize:10, fontWeight:600, cursor:'pointer',
-                  background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444',
-                }}>🗑</button>
-              </div>
+                {/* External diaries (переход на другие экраны) */}
+                <div style={glassCard}>
+                  <div style={{ fontSize:10, fontWeight:700, color: apple.textDim, marginBottom:8 }}>
+                    🧭 Перейти к дневнику
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                    <button onClick={() => onNavigate?.('nutrition')} style={{ ...diaryCardBase, background:'rgba(16,185,129,0.08)', border:'1px solid rgba(16,185,129,0.15)' }}>
+                      <div style={diaryIconWrap}>🍽️</div>
+                      <div style={diaryCardTitle}>Питание</div>
+                    </button>
+                    <button onClick={() => onNavigate?.('training')} style={{ ...diaryCardBase, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)' }}>
+                      <div style={diaryIconWrap}>🏋️</div>
+                      <div style={diaryCardTitle}>Тренировки</div>
+                    </button>
+                    {(settings.phase === 'course' || settings.phase === 'course-bridge-course') && (
+                      <button onClick={() => onNavigate?.('pharma')} style={{ ...diaryCardBase, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.15)' }}>
+                        <div style={diaryIconWrap}>💉</div>
+                        <div style={diaryCardTitle}>Фарма</div>
+                      </button>
+                    )}
+                    {(localStorage.getItem('he_autocalc_state') || localStorage.getItem('he_support_substances')) && (
+                      <button onClick={() => onNavigate?.('support')} style={{ ...diaryCardBase, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.15)' }}>
+                        <div style={diaryIconWrap}>🧪</div>
+                        <div style={diaryCardTitle}>Поддержка</div>
+                      </button>
+                    )}
+                  </div>
+                </div>
 
-              {/* Filtered entries */}
-              {(() => {
-                const now = new Date();
-                const cutoff = new Date(now);
-                if (bpPeriod === 'day') cutoff.setDate(cutoff.getDate() - 1);
-                else if (bpPeriod === 'week') cutoff.setDate(cutoff.getDate() - 7);
-                else if (bpPeriod === 'month') cutoff.setMonth(cutoff.getMonth() - 1);
-                else cutoff.setFullYear(cutoff.getFullYear() - 10); // all
-                const filtered = bpEntries.filter(e => new Date(e.date) >= cutoff).sort((a, b) => b.date.localeCompare(a.date));
-                const avgSystolic = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.systolic, 0) / filtered.length) : 0;
-                const avgDiastolic = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.diastolic, 0) / filtered.length) : 0;
-                const avgHr = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.hr, 0) / filtered.length) : 0;
+                {/* Internal diary sub-tabs */}
+                <div style={{ display:'flex', gap:3, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }}>
+                  {[
+                    { id:'sleep', label:'🛌 Сон' },
+                    { id:'bp', label:'❤️ Давление' },
+                    { id:'measurements', label:'📏 Замеры' },
+                    { id:'progress', label:'📈 Прогресс' },
+                  ].map(d => (
+                    <button key={d.id} onClick={() => setDiarySubTab(d.id as any)} style={{
+                      padding:'6px 14px', borderRadius:18, fontSize:10, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0,
+                      background: diarySubTab === d.id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                      border: diarySubTab === d.id ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                      color: diarySubTab === d.id ? '#00e68a' : 'rgba(255,255,255,0.6)',
+                    }}>{d.label}</button>
+                  ))}
+                </div>
 
-                return (
-                  <>
-                    {/* Average cards */}
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:10 }}>
-                      <div style={{ ...glassCard, textAlign:'center', padding:12 }}>
-                        <div style={{ fontSize:9, color: apple.textDim, marginBottom:4 }}>Среднее сист.</div>
-                        <div style={{ fontSize:24, fontWeight:800, color: avgSystolic > 140 ? '#ef4444' : avgSystolic > 130 ? '#f59e0b' : apple.accent }}>{avgSystolic || '—'}</div>
-                        <div style={{ fontSize:8, color: apple.textDim }}>мм рт. ст.</div>
-                      </div>
-                      <div style={{ ...glassCard, textAlign:'center', padding:12 }}>
-                        <div style={{ fontSize:9, color: apple.textDim, marginBottom:4 }}>Среднее диаст.</div>
-                        <div style={{ fontSize:24, fontWeight:800, color: avgDiastolic > 90 ? '#ef4444' : avgDiastolic > 80 ? '#f59e0b' : apple.accent }}>{avgDiastolic || '—'}</div>
-                        <div style={{ fontSize:8, color: apple.textDim }}>мм рт. ст.</div>
-                      </div>
-                      <div style={{ ...glassCard, textAlign:'center', padding:12 }}>
-                        <div style={{ fontSize:9, color: apple.textDim, marginBottom:4 }}>Средний пульс</div>
-                        <div style={{ fontSize:24, fontWeight:800, color: avgHr > 100 ? '#ef4444' : avgHr > 85 ? '#f59e0b' : apple.accent }}>{avgHr || '—'}</div>
-                        <div style={{ fontSize:8, color: apple.textDim }}>уд/мин</div>
-                      </div>
+                {/* ═══ SLEEP DIARY ═══ */}
+                {diarySubTab === 'sleep' && <SleepDiary settings={settings} save={save} />}
+
+                {/* ═══ BP/HR DIARY ═══ */}
+                {diarySubTab === 'bp' && (
+                  <div>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                      <h3 style={{ margin:0, fontSize:15, fontWeight:700, color: apple.textPrimary }}>🫀 Давление и пульс</h3>
+                      <button onClick={() => setShowBpForm(!showBpForm)} style={{
+                        padding:'6px 14px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer',
+                        background: apple.accentDim, border: apple.accentBorder, color: apple.accent,
+                      }}>{showBpForm ? '✕ Отмена' : '+ Добавить'}</button>
                     </div>
-
-                    {/* Chart */}
-                    {filtered.length >= 2 && (
-                      <div style={{ ...glassCard, marginBottom:10, padding:'12px 10px', overflow:'hidden' }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-                          <span style={{ fontSize:10, color: apple.textDim, fontWeight:600 }}>📈 Динамика</span>
-                          <span style={{ fontSize:8, color: apple.textDim }}>{filtered.length} записей</span>
-                        </div>
-                        <div style={{ display:'flex', alignItems:'flex-end', gap:2, height:80 }}>
-                          {filtered.slice().reverse().map((e, i) => {
-                            const maxVal = 200;
-                            const hS = Math.min(100, (e.systolic / maxVal) * 100);
-                            const hD = Math.min(100, (e.diastolic / maxVal) * 100);
-                            return (
-                              <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:1, position:'relative' }}>
-                                <div style={{ width:'70%', height:`${hS}%`, borderRadius:'4px 4px 0 0', background:'linear-gradient(180deg, #ef4444, #dc2626)', opacity:0.8 }} />
-                                <div style={{ width:'70%', height:`${hD}%`, borderRadius:'4px 4px 0 0', background:'linear-gradient(180deg, #f59e0b, #d97706)', opacity:0.8 }} />
-                                {filtered.length <= 31 && (
-                                  <span style={{ fontSize:6, color: apple.textDim, marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'100%', textAlign:'center' }}>
-                                    {e.date.slice(5)}
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div style={{ display:'flex', gap:10, fontSize:8, color: apple.textDim, marginTop:6 }}>
-                          <span><span style={{ display:'inline-block', width:8, height:8, borderRadius:2, background:'#ef4444', marginRight:3 }} /> Систолическое</span>
-                          <span><span style={{ display:'inline-block', width:8, height:8, borderRadius:2, background:'#f59e0b', marginRight:3 }} /> Диастолическое</span>
-                          <span style={{ marginLeft:'auto', color: avgSystolic <= 120 && avgDiastolic <= 80 ? '#22c55e' : avgSystolic <= 130 && avgDiastolic <= 85 ? '#f59e0b' : '#ef4444', fontWeight:700 }}>
-                            Ø {avgSystolic}/{avgDiastolic}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Entry list */}
-                    <div style={{ fontSize:10, color: apple.textDim, fontWeight:600, marginBottom:6 }}>Записи ({filtered.length})</div>
-                    {filtered.length === 0 ? (
-                      <div style={{ ...glassCard, textAlign:'center', padding:20 }}>
-                        <div style={{ fontSize:24, marginBottom:4 }}>🫀</div>
-                        <div style={{ fontSize:10, color: apple.textDim }}>Нет записей за выбранный период</div>
-                      </div>
-                    ) : (
-                      filtered.map((e, i) => {
-                        const bpColor = e.systolic > 140 || e.diastolic > 90 ? '#ef4444' : e.systolic > 130 || e.diastolic > 80 ? '#f59e0b' : apple.accent;
-                        return (
-                          <div key={i} style={{ ...glassCard, display:'flex', alignItems:'center', gap:10, padding:'10px 12px' }}>
-                            <div style={{ width:36, height:36, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.1)', fontSize:16 }}>🫀</div>
-                            <div style={{ flex:1 }}>
-                              <div style={{ fontSize:13, fontWeight:700, color: apple.textPrimary }}>{e.systolic}/{e.diastolic}</div>
-                              <div style={{ fontSize:9, color: apple.textDim }}>Пульс: {e.hr} уд/мин</div>
-                            </div>
-                            <div style={{ textAlign:'right' }}>
-                              <div style={{ fontSize:11, color: bpColor, fontWeight:600 }}>{e.systolic > 140 || e.diastolic > 90 ? '⚠ Повышено' : e.systolic > 130 || e.diastolic > 80 ? '⚡ Граница' : '✅ Норма'}</div>
-                              <div style={{ fontSize:8, color: apple.textDim }}>{e.date}</div>
-                            </div>
-                            <button onClick={() => {
-                              const updated = bpEntries.filter((_, idx) => idx !== bpEntries.indexOf(e));
-                              setBpEntries(updated); saveBPDiary(updated);
-                            }} style={{ padding:'4px 8px', borderRadius:6, border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontSize:9 }}>✕</button>
+                    {showBpForm && (
+                      <div style={{ ...glassCard, marginBottom:10 }}>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:10 }}>
+                          <div>
+                            <div style={{ fontSize:9, color: apple.textDim, marginBottom:3 }}>Систолическое</div>
+                            <input type="number" value={bpSystolic} onChange={e => setBpSystolic(e.target.value)} placeholder="120" style={appleInput} />
                           </div>
-                        );
-                      })
+                          <div>
+                            <div style={{ fontSize:9, color: apple.textDim, marginBottom:3 }}>Диастолическое</div>
+                            <input type="number" value={bpDiastolic} onChange={e => setBpDiastolic(e.target.value)} placeholder="80" style={appleInput} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize:9, color: apple.textDim, marginBottom:3 }}>Пульс</div>
+                            <input type="number" value={bpHr} onChange={e => setBpHr(e.target.value)} placeholder="70" style={appleInput} />
+                          </div>
+                        </div>
+                        <button onClick={() => {
+                          const s = Math.round(Number(bpSystolic)); const d = Math.round(Number(bpDiastolic)); const h = Math.round(Number(bpHr));
+                          if (!s || !d || !h || isNaN(s) || isNaN(d) || isNaN(h) || s < 50 || s > 250 || d < 30 || d > 160 || h < 30 || h > 250) return;
+                          const entry: BPEntry = { date: new Date().toISOString().slice(0,10), systolic: s, diastolic: d, hr: h };
+                          const updated = [...bpEntries, entry];
+                          setBpEntries(updated); saveBPDiary(updated);
+                          setBpSystolic(''); setBpDiastolic(''); setBpHr(''); setShowBpForm(false);
+                        }} style={{
+                          width:'100%', padding:'10px', borderRadius:10, border:'none', cursor:'pointer',
+                          background: apple.gradientGreen, color:'#000', fontWeight:700, fontSize:12,
+                        }}>Сохранить</button>
+                      </div>
                     )}
-                  </>
-                );
-              })()}
-            </div></InfoErrorBoundary>
-          )}
+                    <div style={{ display:'flex', gap:4, marginBottom:10 }}>
+                      {(['day','week','month','all'] as const).map(p => (
+                        <button key={p} onClick={() => setBpPeriod(p)} style={{
+                          flex:1, padding:'8px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer',
+                          background: bpPeriod === p ? apple.accentDim : apple.glassBg,
+                          border: bpPeriod === p ? apple.accentBorder : apple.glassBorder,
+                          color: bpPeriod === p ? apple.accent : apple.textSecondary,
+                        }}>{p === 'day' ? 'День' : p === 'week' ? 'Неделя' : p === 'month' ? 'Месяц' : 'Всё'}</button>
+                      ))}
+                      <button onClick={() => {
+                        if (confirm('Очистить все записи давления?')) {
+                          setBpEntries([]); localStorage.removeItem('he_bp_diary');
+                        }
+                      }} style={{
+                        padding:'8px 10px', borderRadius:10, fontSize:10, fontWeight:600, cursor:'pointer',
+                        background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444',
+                      }}>🗑</button>
+                    </div>
+                    {(() => {
+                      const now = new Date();
+                      const cutoff = new Date(now);
+                      if (bpPeriod === 'day') cutoff.setDate(cutoff.getDate() - 1);
+                      else if (bpPeriod === 'week') cutoff.setDate(cutoff.getDate() - 7);
+                      else if (bpPeriod === 'month') cutoff.setMonth(cutoff.getMonth() - 1);
+                      else cutoff.setFullYear(cutoff.getFullYear() - 10);
+                      const filtered = bpEntries.filter(e => new Date(e.date) >= cutoff).sort((a, b) => b.date.localeCompare(a.date));
+                      const avgSystolic = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.systolic, 0) / filtered.length) : 0;
+                      const avgDiastolic = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.diastolic, 0) / filtered.length) : 0;
+                      const avgHr = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.hr, 0) / filtered.length) : 0;
+                      return (
+                        <>
+                          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:10 }}>
+                            <div style={{ ...glassCard, textAlign:'center', padding:12 }}>
+                              <div style={{ fontSize:9, color: apple.textDim, marginBottom:4 }}>Среднее сист.</div>
+                              <div style={{ fontSize:24, fontWeight:800, color: avgSystolic > 140 ? '#ef4444' : avgSystolic > 130 ? '#f59e0b' : apple.accent }}>{avgSystolic || '—'}</div>
+                              <div style={{ fontSize:8, color: apple.textDim }}>мм рт. ст.</div>
+                            </div>
+                            <div style={{ ...glassCard, textAlign:'center', padding:12 }}>
+                              <div style={{ fontSize:9, color: apple.textDim, marginBottom:4 }}>Среднее диаст.</div>
+                              <div style={{ fontSize:24, fontWeight:800, color: avgDiastolic > 90 ? '#ef4444' : avgDiastolic > 80 ? '#f59e0b' : apple.accent }}>{avgDiastolic || '—'}</div>
+                              <div style={{ fontSize:8, color: apple.textDim }}>мм рт. ст.</div>
+                            </div>
+                            <div style={{ ...glassCard, textAlign:'center', padding:12 }}>
+                              <div style={{ fontSize:9, color: apple.textDim, marginBottom:4 }}>Средний пульс</div>
+                              <div style={{ fontSize:24, fontWeight:800, color: avgHr > 100 ? '#ef4444' : avgHr > 85 ? '#f59e0b' : apple.accent }}>{avgHr || '—'}</div>
+                              <div style={{ fontSize:8, color: apple.textDim }}>уд/мин</div>
+                            </div>
+                          </div>
+                          {filtered.length >= 2 && (
+                            <div style={{ ...glassCard, marginBottom:10, padding:'12px 10px', overflow:'hidden' }}>
+                              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                                <span style={{ fontSize:10, color: apple.textDim, fontWeight:600 }}>📈 Динамика</span>
+                                <span style={{ fontSize:8, color: apple.textDim }}>{filtered.length} записей</span>
+                              </div>
+                              <div style={{ display:'flex', alignItems:'flex-end', gap:2, height:80 }}>
+                                {filtered.slice().reverse().map((e, i) => {
+                                  const maxVal = 200;
+                                  const hS = Math.min(100, (e.systolic / maxVal) * 100);
+                                  const hD = Math.min(100, (e.diastolic / maxVal) * 100);
+                                  return (
+                                    <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:1, position:'relative' }}>
+                                      <div style={{ width:'70%', height:`${hS}%`, borderRadius:'4px 4px 0 0', background:'linear-gradient(180deg, #ef4444, #dc2626)', opacity:0.8 }} />
+                                      <div style={{ width:'70%', height:`${hD}%`, borderRadius:'4px 4px 0 0', background:'linear-gradient(180deg, #f59e0b, #d97706)', opacity:0.8 }} />
+                                      {filtered.length <= 31 && (
+                                        <span style={{ fontSize:6, color: apple.textDim, marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'100%', textAlign:'center' }}>
+                                          {e.date.slice(5)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              <div style={{ display:'flex', gap:10, fontSize:8, color: apple.textDim, marginTop:6 }}>
+                                <span><span style={{ display:'inline-block', width:8, height:8, borderRadius:2, background:'#ef4444', marginRight:3 }} /> Систолическое</span>
+                                <span><span style={{ display:'inline-block', width:8, height:8, borderRadius:2, background:'#f59e0b', marginRight:3 }} /> Диастолическое</span>
+                              </div>
+                            </div>
+                          )}
+                          <div style={{ fontSize:10, color: apple.textDim, fontWeight:600, marginBottom:6 }}>Записи ({filtered.length})</div>
+                          {filtered.length === 0 ? (
+                            <div style={{ ...glassCard, textAlign:'center', padding:20 }}>
+                              <div style={{ fontSize:24, marginBottom:4 }}>🫀</div>
+                              <div style={{ fontSize:10, color: apple.textDim }}>Нет записей за выбранный период</div>
+                            </div>
+                          ) : (
+                            filtered.map((e, i) => {
+                              const bpColor = e.systolic > 140 || e.diastolic > 90 ? '#ef4444' : e.systolic > 130 || e.diastolic > 80 ? '#f59e0b' : apple.accent;
+                              return (
+                                <div key={i} style={{ ...glassCard, display:'flex', alignItems:'center', gap:10, padding:'10px 12px' }}>
+                                  <div style={{ width:36, height:36, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.1)', fontSize:16 }}>🫀</div>
+                                  <div style={{ flex:1 }}>
+                                    <div style={{ fontSize:13, fontWeight:700, color: apple.textPrimary }}>{e.systolic}/{e.diastolic}</div>
+                                    <div style={{ fontSize:9, color: apple.textDim }}>Пульс: {e.hr} уд/мин</div>
+                                  </div>
+                                  <div style={{ textAlign:'right' }}>
+                                    <div style={{ fontSize:11, color: bpColor, fontWeight:600 }}>{e.systolic > 140 || e.diastolic > 90 ? '⚠ Повышено' : e.systolic > 130 || e.diastolic > 80 ? '⚡ Граница' : '✅ Норма'}</div>
+                                    <div style={{ fontSize:8, color: apple.textDim }}>{e.date}</div>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
 
-          {/* ═══ MEASUREMENTS TAB ═══ */}
-          {tab === 'measurements' && <InfoErrorBoundary label="Измерения"><ProfileMeasurementsTab /></InfoErrorBoundary>}
+                {/* ═══ MEASUREMENTS DIARY ═══ */}
+                {diarySubTab === 'measurements' && <ProfileMeasurementsTab />}
+
+                {/* ═══ PROGRESS DIARY ═══ */}
+                {diarySubTab === 'progress' && (
+                  <div>
+                    <div style={glassCard}>
+                      <div style={sectionLabel}>Прогресс веса</div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
+                        <div>
+                          <span style={{ fontSize:10, color: apple.textDim }}>Текущий вес</span>
+                          <div style={{ fontSize:24, fontWeight:800, color: apple.accent }}>{settings.weight} <span style={{ fontSize:12, fontWeight:400, color: apple.textDim }}>кг</span></div>
+                        </div>
+                        <div>
+                          <span style={{ fontSize:10, color: apple.textDim }}>Целевой вес</span>
+                          <input style={appleInput} type="number" value={settings.targetWeight || ''} onChange={e => save({ targetWeight: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="75" />
+                        </div>
+                      </div>
+                      {settings.targetWeight && settings.weight && (
+                        <div>
+                          <div style={{ height:6, borderRadius:3, background:'rgba(255,255,255,0.06)', overflow:'hidden', marginBottom:6 }}>
+                            <div style={{
+                              height:'100%', borderRadius:3,
+                              background: apple.gradientGreen,
+                              width:`${Math.min(100, Math.max(0, Math.round((1 - Math.abs(settings.weight - settings.targetWeight) / Math.max(1, Math.abs(settings.targetWeight))) * 100)))}%`,
+                              transition: 'width 0.5s',
+                            }} />
+                          </div>
+                          <div style={{ fontSize:11, color: apple.textSecondary, textAlign:'center' }}>
+                            {Math.round((1 - Math.abs(settings.weight - settings.targetWeight) / Math.max(1, Math.abs(settings.targetWeight))) * 100)}% к цели
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {weightLog.length > 2 && (
+                      <div style={glassCard}>
+                        <div style={sectionLabel}>График веса</div>
+                        <div style={{ position:'relative', height:120, marginTop:8 }}>
+                          <svg width="100%" height="100%" viewBox={`0 0 ${weightLog.length - 1} 100`} preserveAspectRatio="none" style={{ position:'absolute', inset:0 }}>
+                            <defs>
+                              <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#00e68a" stopOpacity="0.3" />
+                                <stop offset="100%" stopColor="#00e68a" stopOpacity="0.02" />
+                              </linearGradient>
+                            </defs>
+                            {(() => {
+                              const minW = Math.min(...weightLog.map(w => w.weight)) - 1;
+                              const maxW = Math.max(...weightLog.map(w => w.weight)) + 1;
+                              const range = maxW - minW || 1;
+                              const pts = weightLog.map((e, i) => `${i * (100/(weightLog.length-1))},${100 - ((e.weight - minW) / range) * 100}`).join(' ');
+                              const areaPts = `0,100 ${pts} ${weightLog.length-1},100`;
+                              return <><polygon points={areaPts} fill="url(#weightGrad)" /><polyline points={pts} fill="none" stroke="#00e68a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></>;
+                            })()}
+                          </svg>
+                          <div style={{ display:'flex', justifyContent:'space-between', position:'absolute', bottom:0, width:'100%', fontSize:8, color: apple.textDim, paddingTop:4 }}>
+                            <span>{weightLog[0]?.date?.slice(5)}</span>
+                            <span>{weightLog[weightLog.length-1]?.date?.slice(5)}</span>
+                          </div>
+                        </div>
+                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color: apple.textDim, marginTop:4 }}>
+                          <span>Мин: {Math.min(...weightLog.map(w => w.weight)).toFixed(1)} кг</span>
+                          <span style={{ color: apple.accent, fontWeight:600 }}>Тек: {weightLog[weightLog.length-1]?.weight?.toFixed(1)} кг</span>
+                          <span>Макс: {Math.max(...weightLog.map(w => w.weight)).toFixed(1)} кг</span>
+                        </div>
+                        {(() => {
+                          const firstW = weightLog[0]?.weight;
+                          const lastW = weightLog[weightLog.length-1]?.weight;
+                          if (firstW && lastW && weightLog.length >= 7) {
+                            const diff = lastW - firstW;
+                            const color = diff > 0.5 ? '#f59e0b' : diff < -0.5 ? '#00e68a' : '#3b82f6';
+                            const arrow = diff > 0.5 ? '↑' : diff < -0.5 ? '↓' : '→';
+                            return <div style={{ marginTop:4, fontSize:10, color, fontWeight:600, textAlign:'center' }}>{arrow} {diff > 0 ? '+' : ''}{diff.toFixed(1)} кг за период</div>;
+                          }
+                          return null;
+                        })()}
+                      </div>
+                    )}
+                    <div style={glassCard}>
+                      <div style={sectionLabel}>Обхваты</div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                        {[
+                          { k:'waistCm', l:'Талия', unit:'см' },
+                          { k:'chestCm', l:'Грудь', unit:'см' },
+                          { k:'bicepCm', l:'Бицепс', unit:'см' },
+                          { k:'thighCm', l:'Бедро', unit:'см' },
+                          { k:'hipCm', l:'Бёдра', unit:'см' },
+                          { k:'neckCm', l:'Шея', unit:'см' },
+                        ].map(m => {
+                          const val = (settings as any)[m.k];
+                          return (
+                            <div key={m.k} style={{ background:'rgba(255,255,255,0.03)', borderRadius:10, padding:'10px 8px', textAlign:'center', border: apple.glassBorder }}>
+                              <div style={{ fontSize:9, color: apple.textDim, marginBottom:2 }}>{m.l}</div>
+                              <div style={{ fontSize:16, fontWeight:700, color: val ? apple.textPrimary : apple.textSecondary }}>{val ? `${val}` : '—'}<span style={{ fontSize:9, fontWeight:400, marginLeft:2, color: apple.textDim }}>{val ? m.unit : ''}</span></div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <button onClick={() => {
+                        const entry: MeasurementEntry = {
+                          date: new Date().toISOString().split('T')[0],
+                          waistCm: settings.waistCm || 0, chestCm: settings.chestCm || 0,
+                          hipCm: settings.hipCm || 0, bicepCm: settings.bicepCm || 0,
+                          thighCm: settings.thighCm || 0, neckCm: settings.neckCm || 0,
+                          forearmCm: settings.forearmCm || 0, bodyFat: settings.bodyFat || 0,
+                        };
+                        const log = getMeasurementsLog();
+                        log.push(entry);
+                        localStorage.setItem(MEASUREMENTS_LOG_KEY, JSON.stringify(log.slice(-30)));
+                        alert('Замеры сохранены');
+                      }} style={{ ...pillBtn(false), marginTop:10, width:'100%' }}>Сохранить текущие замеры</button>
+                    </div>
+                    {(() => {
+                      const lbmVal = settings.weight && settings.bodyFat ? (settings.weight * (1 - settings.bodyFat / 100)).toFixed(1) : null;
+                      const ffmiVal = lbmVal && settings.height ? (parseFloat(lbmVal) / Math.pow(settings.height / 100, 2) + 6.1 * (1.8 - settings.height / 100)).toFixed(1) : null;
+                      const ffmiCategory = ffmiVal ? (parseFloat(ffmiVal) < 18 ? 'Ниже среднего' : parseFloat(ffmiVal) < 20 ? 'Средний' : parseFloat(ffmiVal) < 22 ? 'Хорошо' : parseFloat(ffmiVal) < 25 ? 'Отлично' : parseFloat(ffmiVal) < 28 ? 'Исключительно' : 'Подозрение') : '';
+                      if (!ffmiVal) return null;
+                      return (
+                        <div style={glassCard}>
+                          <div style={sectionLabel}>FFMI анализ</div>
+                          <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+                            <div style={{ flex:1 }}>
+                              <div style={{ fontSize:10, color: apple.textDim, marginBottom:2 }}>Текущий FFMI</div>
+                              <div style={{ fontSize:22, fontWeight:800, color: '#8b5cf6' }}>{ffmiVal}</div>
+                              <div style={{ fontSize:10, color: apple.textSecondary, marginTop:2 }}>{ffmiCategory}</div>
+                            </div>
+                            <div style={{ flex:1 }}>
+                              <div style={{ fontSize:10, color: apple.textDim, marginBottom:2 }}>LBM</div>
+                              <div style={{ fontSize:22, fontWeight:800, color: '#3b82f6' }}>{lbmVal || '—'}<span style={{ fontSize:11, fontWeight:400 }}> кг</span></div>
+                              <div style={{ fontSize:10, color: apple.textSecondary, marginTop:2 }}>Сухая масса</div>
+                            </div>
+                          </div>
+                          <div style={{ marginTop:10, background:'rgba(255,255,255,0.03)', borderRadius:8, padding:'8px 10px' }}>
+                            <div style={{ fontSize:10, color: apple.textDim, marginBottom:4 }}>Шкала FFMI</div>
+                            <div style={{ height:4, borderRadius:2, background:'rgba(255,255,255,0.06)', position:'relative', overflow:'visible' }}>
+                              {[
+                                { pos:0, color:'#f97316', label:'<18' },
+                                { pos:25, color:'#f59e0b', label:'18-20' },
+                                { pos:50, color:'#3b82f6', label:'20-22' },
+                                { pos:75, color:'#00e68a', label:'22-25' },
+                                { pos:95, color:'#ef4444', label:'25+' },
+                              ].map(s => (
+                                <div key={s.pos} style={{ position:'absolute', left:`${s.pos}%`, top:-0, width:3, height:4, borderRadius:1, background:s.color }} />
+                              ))}
+                              {ffmiVal && parseFloat(ffmiVal) > 0 && (
+                                <div style={{
+                                  position:'absolute',
+                                  left:`${Math.min(98, Math.max(2, ((parseFloat(ffmiVal) - 15) / 15) * 100))}%`,
+                                  top:-5, width:12, height:12, borderRadius:'50%',
+                                  background: apple.gradientGreen, border:'2px solid rgba(0,0,0,0.3)',
+                                  boxShadow: '0 0 8px rgba(0,230,138,0.4)',
+                                }} />
+                              )}
+                            </div>
+                            <div style={{ display:'flex', justifyContent:'space-between', fontSize:8, color: apple.textDim, marginTop:2 }}>
+                              <span>15</span><span>18</span><span>20</span><span>22</span><span>25</span><span>30</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            </InfoErrorBoundary>
+          )}
 
           </>}
 
@@ -2391,78 +2760,164 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
               <div style={glassCard}>
                 <div style={sectionLabel}>Контакты и друзья</div>
                 <p style={{ fontSize:10, color: apple.textDim, margin:'4px 0 10px' }}>
-                  Управление списком друзей, обмен отчётами и доступ к тренировкам через Telegram WebApp.
+                  Управление списком друзей, обмен отчётами и доступ к тренировкам.
                 </p>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
-                  <button onClick={addFriend} style={{
+                  <button onClick={() => setShowFriendForm(true)} style={{
                     padding:'10px 8px', borderRadius:14, cursor:'pointer', border:'none', color:'#fff', fontWeight:700, fontSize:12,
                     background: apple.gradientBlue,
-                  }}>Добавить друга</button>
-                  <button onClick={shareReport} style={{
+                  }}>➕ Добавить друга</button>
+                  <button onClick={doShareReport} style={{
                     padding:'10px 8px', borderRadius:14, cursor:'pointer', border:'none', color:'#000', fontWeight:700, fontSize:12,
                     background: apple.gradientOrange,
-                  }}>Поделиться отчётом</button>
+                  }}>📤 Поделиться отчётом</button>
                 </div>
-                <button onClick={openTrainingForFriend} style={{
+                <button onClick={() => setShowTrainingForm(true)} style={{
                   width:'100%', padding:'10px 8px', borderRadius:14, cursor:'pointer', marginBottom:10,
                   background: apple.gradientPurple, border:'none', color:'#fff', fontWeight:700, fontSize:12,
-                }}>Открыть тренировку другу</button>
+                }}>🏋️ Открыть тренировку другу</button>
                 <button onClick={() => {
                   const tg = (window as any).Telegram?.WebApp;
                   if (tg?.openTelegramLink) tg.openTelegramLink('https://t.me/BodyBuildHealthBot');
                   else if (tg?.openLink) tg.openLink('https://t.me/BodyBuildHealthBot');
                   else window.open('https://t.me/BodyBuildHealthBot', '_blank');
+                  showNotif('🔗 Открываю Telegram...');
                 }} style={{
                   width:'100%', padding:'10px 8px', borderRadius:14, cursor:'pointer', marginBottom:10,
                   background: apple.gradientGreen, border:'none', color:'#000', fontWeight:700, fontSize:12,
-                }}>Связаться с поддержкой</button>
+                }}>💬 Связаться с поддержкой</button>
+              </div>
 
-                {friends.length > 0 && (
-                  <div>
-                    <div style={{ fontSize:11, fontWeight:700, color: apple.accent, marginBottom:8 }}>
-                      Список друзей ({friends.length})
+              {/* ═══ Add Friend Form (inline modal) ═══ */}
+              {showFriendForm && (
+                <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.6)', padding:20 }} onClick={() => setShowFriendForm(false)}>
+                  <div style={{ background:'#18181b', borderRadius:16, padding:20, maxWidth:340, width:'100%', border:'1px solid rgba(255,255,255,0.06)' }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ margin:'0 0 4px', fontSize:14, fontWeight:700, color:'#fff' }}>➕ Добавить друга</h3>
+                    <p style={{ fontSize:9, color:'rgba(255,255,255,0.6)', margin:'0 0 12px' }}>
+                      Добавьте друга в локальный список. После сохранения через Telegram откроется выбор чата — отправьте другу приглашение.
+                    </p>
+                    <div style={{ marginBottom:10 }}>
+                      <div style={{ fontSize:9, color: apple.textDim, marginBottom:3 }}>Имя *</div>
+                      <input type="text" value={friendName} onChange={e => setFriendName(e.target.value)} placeholder="Алексей" style={appleInput} />
                     </div>
-                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                      {friends.map(f => (
-                        <div key={f.id} style={{
-                          display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:14,
-                          background: apple.glassBg, border: apple.glassBorder,
-                        }}>
-                          <div style={{
-                            width:36, height:36, borderRadius:'50%', flexShrink:0,
-                            background: apple.gradientBlue,
-                            display:'flex', alignItems:'center', justifyContent:'center',
-                            fontSize:14, color:'#fff', fontWeight:700,
-                          }}>
-                            {f.name.charAt(0).toUpperCase()}
-                          </div>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:12, fontWeight:600, color: apple.textPrimary }}>{f.name}</div>
-                            <div style={{ fontSize:9, color: apple.textDim }}>@{f.username} · {f.addedAt}</div>
-                          </div>
-                          <button onClick={() => removeFriend(f.id)} style={{
-                            padding:'4px 10px', borderRadius:8, fontSize:10, cursor:'pointer',
-                            background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontWeight:600,
-                          }}>Удалить</button>
-                        </div>
-                      ))}
+                    <div style={{ marginBottom:14 }}>
+                      <div style={{ fontSize:9, color: apple.textDim, marginBottom:3 }}>Username Telegram (без @)</div>
+                      <div style={{ position:'relative' }}>
+                        <input type="text" value={friendUsername} onChange={e => onFriendUsernameChange(e.target.value)} placeholder="alex_fit" style={appleInput} />
+                        {friendVerifyStatus === 'checking' && <span style={{ position:'absolute', right:10, top:10, fontSize:10, color:'#f59e0b' }}>⏳</span>}
+                      </div>
+                      {friendVerifyStatus === 'found' && (
+                        <div style={{ fontSize:8, color:'#22c55e', marginTop:3 }}>✅ Найден: {friendVerifiedName}</div>
+                      )}
+                      {friendVerifyStatus === 'not_found' && (
+                        <div style={{ fontSize:8, color:'#ef4444', marginTop:3 }}>❌ Пользователь не найден. Проверьте username и убедитесь, что бот был добавлен в контакты.</div>
+                      )}
+                      {friendVerifyStatus === 'idle' && (
+                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:3 }}>Введите 3+ символа — username проверится через Telegram автоматически.</div>
+                      )}
+                    </div>
+                    <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+                      <button onClick={doAddFriend} style={{
+                        flex:1, padding:'10px', borderRadius:10, border:'none', cursor:'pointer',
+                        background: friendName.trim() ? apple.gradientGreen : 'rgba(255,255,255,0.06)',
+                        color: friendName.trim() ? '#000' : 'rgba(255,255,255,0.4)',
+                        fontWeight:700, fontSize:12,
+                      }}>💾 Сохранить</button>
+                      <button onClick={doInviteFriend} style={{
+                        padding:'10px 12px', borderRadius:10, cursor:'pointer',
+                        background:'rgba(59,130,246,0.1)', border:'1px solid rgba(59,130,246,0.3)', color:'#60a5fa', fontWeight:600, fontSize:12, whiteSpace:'nowrap',
+                      }}>🔗 Пригласить</button>
+                      <button onClick={() => setShowFriendForm(false)} style={{
+                        padding:'10px 16px', borderRadius:10, cursor:'pointer',
+                        background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.8)', fontWeight:600, fontSize:12,
+                      }}>Отмена</button>
                     </div>
                   </div>
-                )}
-                {friends.length === 0 && (
-                  <div style={{ textAlign:'center', padding:'20px 0', color: apple.textDim, fontSize:10 }}>
-                    Нет добавленных друзей. Нажмите «Добавить друга» чтобы начать.
-                  </div>
-                )}
-              </div>
-              <div style={glassCard}>
-                <div style={{ fontSize:11, color: apple.textDim, fontWeight:600, marginBottom:4 }}>Быстрые действия</div>
-                <div style={{ fontSize:9, color: apple.textDim, lineHeight:1.8 }}>
-                  <div>• <b>Добавить друга</b> — открывает Telegram UserPicker</div>
-                  <div>• <b>Поделиться отчётом</b> — отправляет сводку профиля в чат</div>
-                  <div>• <b>Открыть тренировку</b> — deep-link для доступа друга к программе</div>
                 </div>
+              )}
+
+              {/* ═══ Share Training Form (inline modal) ═══ */}
+              {showTrainingForm && (
+                <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.6)', padding:20 }} onClick={() => setShowTrainingForm(false)}>
+                  <div style={{ background:'#18181b', borderRadius:16, padding:20, maxWidth:340, width:'100%', border:'1px solid rgba(255,255,255,0.06)' }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ margin:'0 0 4px', fontSize:14, fontWeight:700, color:'#fff' }}>🏋️ Открыть тренировку другу</h3>
+                    <p style={{ fontSize:9, color:'rgba(255,255,255,0.6)', margin:'0 0 12px' }}>
+                      Создайте ссылку-приглашение, чтобы друг мог просмотреть вашу текущую программу тренировок.
+                    </p>
+                    <div style={{ marginBottom:14 }}>
+                      <div style={{ fontSize:9, color: apple.textDim, marginBottom:3 }}>Username друга (без @)</div>
+                      <input type="text" value={trainingUsername} onChange={e => setTrainingUsername(e.target.value)} placeholder="alex_fit" style={appleInput} />
+                      <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:3 }}>Бот создаст ссылку и откроет Telegram для отправки другу. Username не проверяется — убедитесь, что он правильный.</div>
+                    </div>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button onClick={doShareTraining} style={{
+                        flex:1, padding:'10px', borderRadius:10, border:'none', cursor:'pointer',
+                        background: trainingUsername.trim() ? apple.gradientPurple : 'rgba(255,255,255,0.06)',
+                        color: trainingUsername.trim() ? '#fff' : 'rgba(255,255,255,0.4)',
+                        fontWeight:700, fontSize:12,
+                      }}>🔗 Открыть доступ</button>
+                      <button onClick={() => setShowTrainingForm(false)} style={{
+                        padding:'10px 16px', borderRadius:10, cursor:'pointer',
+                        background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.8)', fontWeight:600, fontSize:12,
+                      }}>Отмена</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Friends list */}
+              <div style={glassCard}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                  <div style={sectionLabel}>👥 Друзья ({friends.length})</div>
+                </div>
+                {friends.length > 0 ? (
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                    {friends.map(f => (
+                      <div key={f.id} style={{
+                        display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:14,
+                        background: apple.glassBg, border: apple.glassBorder,
+                      }}>
+                        <div style={{
+                          width:36, height:36, borderRadius:'50%', flexShrink:0,
+                          background: apple.gradientBlue,
+                          display:'flex', alignItems:'center', justifyContent:'center',
+                          fontSize:14, color:'#fff', fontWeight:700,
+                        }}>
+                          {f.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:12, fontWeight:600, color: apple.textPrimary }}>{f.name}</div>
+                          <div style={{ fontSize:9, color: apple.textDim }}>@{f.username} · {f.addedAt}</div>
+                        </div>
+                        <button onClick={() => removeFriend(f.id)} style={{
+                          padding:'4px 10px', borderRadius:8, fontSize:10, cursor:'pointer',
+                          background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontWeight:600,
+                        }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign:'center', padding:'14px 0', color: apple.textDim, fontSize:10 }}>
+                    Нет добавленных друзей. Нажмите «➕ Добавить друга» чтобы начать.
+                  </div>
+                )}
               </div>
+
+              {/* Toast notification */}
+              {notification && (
+                <div style={{
+                  position:'fixed', bottom:30, left:'50%', transform:'translateX(-50%)', zIndex:2000,
+                  padding:'10px 20px', borderRadius:12,
+                  background: notification.type === 'success' ? 'rgba(0,230,138,0.15)' : 'rgba(239,68,68,0.15)',
+                  border: notification.type === 'success' ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(239,68,68,0.3)',
+                  color: notification.type === 'success' ? '#00e68a' : '#ef4444',
+                  fontSize:12, fontWeight:600, textAlign:'center',
+                  backdropFilter:'blur(12px)',
+                  boxShadow:'0 4px 24px rgba(0,0,0,0.4)',
+                }}>
+                  {notification.text}
+                </div>
+              )}
             </div></InfoErrorBoundary>
           )}
           </>}
