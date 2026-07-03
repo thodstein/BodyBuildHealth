@@ -250,6 +250,16 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
       metrics.warnings.forEach(w => lines.push(`  • ${w}`));
     }
     lines.push('');
+    const titrationIds = ['ashwagandha', 'rhodiola', 'shilajit', 'berberine', 'tongkat_ali', 'fadogia', 'ashwa', 'probiotics', 'bromelain', 'serrapeptase', 'nattokinase'];
+    const needTitration = stackIds.filter(id => titrationIds.some(t => id.toLowerCase().includes(t)));
+    if (needTitration.length > 0) {
+      lines.push('📈 ВЕЩЕСТВА, ТРЕБУЮЩИЕ ТИТРОВАНИЯ:');
+      needTitration.forEach(id => {
+        const cat = catData[id];
+        lines.push(`  • ${cat?.nameRu || cat?.name || id}: Начать с ½ дозы, увеличивать каждые 3-4 дня на 25%.`);
+      });
+    }
+    lines.push('');
     lines.push('🔬 МЕХАНИЗМЫ ПО ГРУППАМ:');
     if (metrics.organMechs) {
       metrics.organMechs.forEach((mechs, group) => {
@@ -315,6 +325,27 @@ export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; st
               <StatBox label="Совместимость" value={`${metrics.compatScore}`} sub="из 100" color={metrics.compatScore >= 70 ? '#00e68a' : metrics.compatScore >= 40 ? '#f59e0b' : '#ef4444'} />
               <StatBox label="Синергии" value={`${metrics.synergyDensity}%`} sub={`${metrics.synergyPairs}/${metrics.totalPairs} пар`} color={metrics.synergyDensity >= 60 ? '#60a5fa' : '#f59e0b'} />
               <StatBox label="Тиры" value={`${metrics.tiers.core}/${metrics.tiers.standard}/${metrics.tiers.advanced}`} sub="core/std/adv" color="#a78bfa" />
+            </div>
+            {/* Cost breakdown bar */}
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', marginBottom: 3 }}>💰 Оценка стоимости/мес</div>
+              <div style={{ display: 'flex', gap: 2 }}>
+                {(() => {
+                  const costTiers = [
+                    { key: 'low', label: '~200 ₽', color: '#22c55e', count: metrics.tiers.core },
+                    { key: 'medium', label: '~800 ₽', color: '#f59e0b', count: metrics.tiers.standard },
+                    { key: 'high', label: '~2500 ₽', color: '#ef4444', count: metrics.tiers.advanced + metrics.tiers.specialty },
+                  ];
+                  const max = Math.max(1, ...costTiers.map(t => t.count));
+                  return costTiers.map(t => (
+                    <div key={t.key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                      <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)' }}>{t.label}</span>
+                      <div style={{ width: '100%', height: Math.max(2, (t.count / max) * 24), borderRadius: '2px 2px 0 0', background: t.color }} />
+                      <span style={{ fontSize: 7, fontWeight: 600, color: t.color }}>{t.count}</span>
+                    </div>
+                  ));
+                })()}
+              </div>
             </div>
           </>
         )}

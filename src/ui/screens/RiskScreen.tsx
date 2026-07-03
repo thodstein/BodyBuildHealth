@@ -49,6 +49,7 @@ const TAB_LABELS: Record<string, string> = {
   clinical: '🩺 Клиника',
   info: 'ℹ️ Инфо',
   tz_spec: '🧬 Механизм-ориентированная',
+  tz_3d: '🧊 3D модель',
 };
 
 export const RiskScreen: React.FC = () => {
@@ -559,6 +560,7 @@ export const RiskScreen: React.FC = () => {
     pk: '💊 Фармакокинетика',
     key_risks: '🔑 Ключевые',
     history: '📜 История и пороги',
+    tz_3d: '🧊 3D модель',
   };
 
   const SYSTEM_ICONS_V2: Record<string, string> = {
@@ -962,7 +964,7 @@ export const RiskScreen: React.FC = () => {
               : calcPage === 'clinical' ? CLINICAL_SUBTABS as readonly string[]
               : calcPage === 'mdss' ? ['mdss'] as const
               : ['overview'] as const)
-            : mainTab === 'tz_spec' ? ['overview'] as const
+            : mainTab === 'tz_spec' ? ['overview', 'tz_3d'] as const
             : mainTab === 'clinical' ? CLINICAL_SUBTABS as readonly string[]
             : ['info', 'reports'] as readonly string[]
           ).map(t => (
@@ -996,7 +998,7 @@ export const RiskScreen: React.FC = () => {
               {/* CLINICAL — внутри Другие методы расчета */}
               {mainTab === 'calculations' && calcPage === 'clinical' && renderContent()}
               {/* TZ SPEC METHOD — новая вкладка */}
-              {mainTab === 'tz_spec' && <RiskSpecMethod />}
+              {mainTab === 'tz_spec' && <RiskSpecMethod subTab={subTab} />}
               {/* All other content */}
               {!((mainTab === 'calculations' && (calcPage === 'basic' || calcPage === 'montecarlo' || calcPage === 'clinical')) || mainTab === 'tz_spec') && renderContent()}
             </>

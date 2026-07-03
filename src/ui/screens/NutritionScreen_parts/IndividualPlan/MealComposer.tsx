@@ -2,6 +2,7 @@ import React from "react";
 import { usePlanCtx } from "./IndividualPlanContext";
 import { FOOD_DB } from "../../../../core/nutrition-database";
 import { getRecipesByMeal } from "../../../../engines/nutrition-periodization.engine";
+import { MealQuickControls } from "./MealQuickControls";
 
 export const MealComposer: React.FC = () => {
   const {
@@ -37,6 +38,8 @@ export const MealComposer: React.FC = () => {
 
       {generated && (
         <>
+          <MealQuickControls />
+
           <div style={{ display:'flex', gap:4, justifyContent:'center', flexWrap:'wrap' }}>
             {DAY_LABELS.map((label: string, idx: number) => (
               <button key={idx} onClick={() => { setPlanDays(1); setSelectedDayIndex(idx); generatePlan(1, undefined, idx); }} style={{

@@ -3,9 +3,12 @@
  * SupportMixCalc.tsx — извлечено из SupportScreen.tsx
  * Секция: section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'mixcalc'
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { PopupBool, PopupNumber, PopupSelect } from '../../components/PopupXxx';
 import { calculateMixScore, type TrainingMixScore, type MixSubstance, type MixProfile, MIX_MECHANISMS, MIX_SYNERGY, MIX_TEMPLATES, type MixTemplate, buildBestRecipe, type MixRecipe, type MixRecipeItem, groupRecipeItemsByTiming, buildDefaultStack, resolveTemplateItems } from '../../../engines/training-mix-scoring.engine';
+import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
+import { loadSRPESessions } from '../../../engines/pro/srpe-store';
+import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportMixCalc: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -46,8 +49,28 @@ export const SupportMixCalc: React.FC<{ s: Record<string, any> }> = ({ s }) => {
     setCustomMixItems,
     mixHistory,
     setMixHistory,
+    mixExperience,
+    setMixExperience,
+    mixDayType,
+    setMixDayType,
+    planSaved,
+    setPlanSaved,
+    enhancedSubs,
+    setEnhancedSubs,
+    calcSupport,
+    supportLevel,
+    mixSavedPlans,
+    setMixSavedPlans,
+    customMixSubstance,
+    setCustomMixSubstance,
+    customMixDoseMg,
+    setCustomMixDoseMg,
     linked
   } = s;
+
+  const mixGoal = mixGoals[0] || 'pump';
+  const customMixSubstances = SUPPORT_CATALOG_DATA ? Object.entries(SUPPORT_CATALOG_DATA).map(([id, e]) => ({ id, name: ((e as any).name || (e as any).ru || id) as string })).sort((a, b) => a.name.localeCompare(b.name)) : [];
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
 
   return (
         <div style={{ padding:'0 12px 80px', maxWidth:600, margin:'0 auto' }}>
@@ -74,6 +97,10 @@ export const SupportMixCalc: React.FC<{ s: Record<string, any> }> = ({ s }) => {
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
               <PopupSelect label="🏋️ Тип тренировки" value={mixWorkoutType} options={[{id:'heavy',label:'🏋️ Тяжёлая (присед/тяга)'},{id:'moderate',label:'🏃 Средняя (подсобка)'},{id:'light',label:'🩸 Лёгкая (пампинг)'}]} onChange={v=>setMixWorkoutType(v as any)} />
               <PopupSelect label="🌅 Время суток" value={mixTimeOfDay} options={[{id:'morning',label:'🌅 Утро (6-12)'},{id:'afternoon',label:'☀️ День (12-18)'},{id:'evening',label:'🌙 Вечер (18-24)'}]} onChange={v=>setMixTimeOfDay(v as any)} />
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
+              <PopupSelect label="🎓 Опыт" value={mixExperience || 'intermediate'} options={[{id:'novice',label:'🌱 Новичок'},{id:'intermediate',label:'📈 Средний'},{id:'advanced',label:'🏆 Опытный'}]} onChange={v=>setMixExperience(v as any)} />
+              <PopupSelect label="📆 Тип дня" value={mixDayType || 'fullbody'} options={[{id:'push',label:'💪 Push (жимы)'},{id:'pull',label:'🔙 Pull (тяги)'},{id:'legs',label:'🦵 Ноги'},{id:'upper',label:'🔼 Верх'},{id:'lower',label:'🔽 Низ'},{id:'fullbody',label:'🔄 Full Body'}]} onChange={v=>setMixDayType(v as any)} />
             </div>
             <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>💉 Фармакология (влияет на скор)</div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:6 }}>
@@ -251,7 +278,8 @@ export const SupportMixCalc: React.FC<{ s: Record<string, any> }> = ({ s }) => {
               const mixSubstances: MixSubstance[] = dedupedStack.filter((s: any) =>s.mg>0).map((s: any) =>({ id:s.id, name:s.name, doseMg:s.mg }));
               // Multi-goal score calculation
               const scoresByGoal = mixGoals.map((g: any) => {
-                const p: MixProfile = { goal: g as any, timing: mixTiming as any, weightKg: bw, isOnCycle, drugs: { insulin: mixInsulin>0, igf: mixDrugIGF>0, gh: mixDrugGH>0, mgf: mixDrugMGF>0, glp1: mixDrugGLP1, insulinDose: mixInsulin, insulinTiming: mixInsulinTiming, igfDose: mixDrugIGF, igfTiming: mixDrugIGFTiming, ghDose: mixDrugGH, ghTiming: mixDrugGHTiming, mgfDose: mixDrugMGF, mgfTiming: mixDrugMGFTiming }, hasNandrolone, userElectrolytes: { sodiumMmolL: na, potassiumMmolL: k, chlorideMmolL: cl }, workoutType: mixWorkoutType, timeOfDay: mixTimeOfDay, workoutDurationMin: Math.round(durHrs*60) };
+                const aasIds = (linked.course || []).map((c:any) => (c.substanceId||'').toLowerCase()).filter(Boolean);
+                const p: MixProfile = { goal: g as any, timing: mixTiming as any, weightKg: bw, isOnCycle, drugs: { insulin: mixInsulin>0, igf: mixDrugIGF>0, gh: mixDrugGH>0, mgf: mixDrugMGF>0, glp1: mixDrugGLP1, insulinDose: mixInsulin, insulinTiming: mixInsulinTiming, igfDose: mixDrugIGF, igfTiming: mixDrugIGFTiming, ghDose: mixDrugGH, ghTiming: mixDrugGHTiming, mgfDose: mixDrugMGF, mgfTiming: mixDrugMGFTiming }, hasNandrolone, userElectrolytes: { sodiumMmolL: na, potassiumMmolL: k, chlorideMmolL: cl }, workoutType: mixWorkoutType, timeOfDay: mixTimeOfDay, workoutDurationMin: Math.round(durHrs*60), experience: (mixExperience as any) || 'intermediate', dayType: (mixDayType as any) || 'fullbody', aas: aasIds };
                 return { goal: g, score: calculateMixScore(mixSubstances, p) };
               });
               // Average scores across goals
@@ -279,7 +307,7 @@ export const SupportMixCalc: React.FC<{ s: Record<string, any> }> = ({ s }) => {
               };
               // Build comparison score for opposite timing
               const compareTiming = mixTiming === 'pre' ? 'intra' : mixTiming === 'intra' ? 'pre' : 'pre';
-              const compareProfile: MixProfile = { goal: mixGoal as any, timing: compareTiming as MixProfile['timing'], weightKg: bw, isOnCycle, drugs: score.drugModifiers as any, hasNandrolone, userElectrolytes: { sodiumMmolL: na, potassiumMmolL: k, chlorideMmolL: cl }, workoutType: mixWorkoutType, timeOfDay: mixTimeOfDay, workoutDurationMin: Math.round(durHrs*60) };
+              const compareProfile: MixProfile = { goal: mixGoal as any, timing: compareTiming as MixProfile['timing'], weightKg: bw, isOnCycle, drugs: score.drugModifiers as any, hasNandrolone, userElectrolytes: { sodiumMmolL: na, potassiumMmolL: k, chlorideMmolL: cl }, workoutType: mixWorkoutType, timeOfDay: mixTimeOfDay, workoutDurationMin: Math.round(durHrs*60), experience: (mixExperience as any) || 'intermediate', dayType: (mixDayType as any) || 'fullbody', aas: aasIds };
               const compareScore = calculateMixScore(mixSubstances, compareProfile);
 
               const ScoreRow = ({ l, v, c }: { l: string; v: number; c: string }) => (

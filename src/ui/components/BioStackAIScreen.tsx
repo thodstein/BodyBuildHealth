@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
-import { loadBioStackProfile } from '../../engines/biostack-ai.engine';
+import { loadBioStackProfile, autoFillFromMainProfile } from '../../engines/biostack-ai.engine';
 import { SUB_TABS, BIO_ANIM_CSS, type BSTab, initBioToast, SkeletonLoader, showToast } from './BioStackAIConstants';
 import { ProfileTab } from './BioStackAIProfile';
 import { SearchTab } from './BioStackAISearch';
@@ -17,14 +17,48 @@ export const BioStackAIScreen: React.FC = () => {
   const [tab, setTab] = useState<BSTab>(() => {
     try { const saved = localStorage.getItem(BIO_TAB_KEY); return saved && SUB_TABS.find(t => t.id === saved) ? (saved as BSTab) : 'profile'; } catch { return 'profile'; }
   });
-  const [profile, setProfile] = useState<BioStackProfile>(() => loadBioStackProfile());
-  const [loading, setLoading] = useState(true);
-  const [stackIds, setStackIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('he_biostack_active');
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
+  const [profile, setProfile] = useState<BioStackProfile>(() => {
+    const saved = loadBioStackProfile();
+    if (Object.keys(saved).length <= 5) {
+      const filled = autoFillFromMainProfile();
+      return { ...saved, ...filled };
+    }
+    return saved;
   });
+  const [loading, setLoading] = useState(true);
+  /* ── Multi-stack ── */
+  const STACKS_KEY = 'he_biostack_stacks';
+  const IDX_KEY = 'he_biostack_active_idx';
+  const [allStacks, setAllStacks] = useState<string[][]>(() => {
+    try {
+      const raw = localStorage.getItem(STACKS_KEY);
+      if (raw) return JSON.parse(raw);
+      const old = localStorage.getItem('he_biostack_active');
+      if (old) { const p = JSON.parse(old); return Array.isArray(p[0]) ? p : [p]; }
+    } catch {}
+    return [[]];
+  });
+  const [activeStackIdx, setActiveStackIdxRaw] = useState<number>(() => {
+    try { return Math.min(+(localStorage.getItem(IDX_KEY) || '0'), allStacks.length - 1); } catch { return 0; }
+  });
+  const saveStacks = (stks: string[][], idx: number) => {
+    setAllStacks(stks);
+    localStorage.setItem(STACKS_KEY, JSON.stringify(stks));
+    localStorage.setItem(IDX_KEY, String(idx));
+    localStorage.setItem('he_biostack_active', JSON.stringify(stks[idx] || []));
+  };
+  const setActiveStackIdx = (idx: number) => {
+    const i = Math.max(0, Math.min(idx, allStacks.length - 1));
+    setActiveStackIdxRaw(i);
+    localStorage.setItem(IDX_KEY, String(i));
+    localStorage.setItem('he_biostack_active', JSON.stringify(allStacks[i] || []));
+  };
+  const stackIds = allStacks[activeStackIdx] || [];
+  const setStackIds = (ids: string[]) => {
+    const updated = allStacks.map((s, i) => i === activeStackIdx ? ids : s);
+    saveStacks(updated, activeStackIdx);
+  };
+  const setStackIdsAndSync = (ids: string[]) => setStackIds(ids);
 
   useEffect(() => { initBioToast(); setLoading(false); }, []);
 
@@ -36,17 +70,27 @@ export const BioStackAIScreen: React.FC = () => {
     }
   }, [loading]);
 
-  // auto-save active stack for other screens to read
-  const setStackIdsAndSync = (ids: string[]) => {
-    setStackIds(ids);
-    localStorage.setItem('he_biostack_active', JSON.stringify(ids));
-  };
-
   const tabContent: Record<BSTab, React.ReactNode> = {
     profile: <ProfileTab profile={profile} setProfile={setProfile} setStackIds={setStackIdsAndSync} />,
     search: <SearchTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
     build: <BuildTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
-    stack: <StackTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
+    stack: <StackTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync}
+      allStacks={allStacks} activeStackIdx={activeStackIdx}
+      setActiveStackIdx={setActiveStackIdx}
+      createStack={() => {
+        const n = [...allStacks, []];
+        saveStacks(n, n.length - 1);
+      }}
+      deleteStack={(i: number) => {
+        const n = allStacks.filter((_, j) => j !== i);
+        if (n.length === 0) n.push([]);
+        saveStacks(n, Math.min(activeStackIdx, n.length - 1));
+      }}
+      renameStack={(i: number, name: string) => {
+        const keys = `he_biostack_name_${i}`;
+        localStorage.setItem(keys, name);
+      }}
+    />,
     risks: <RisksTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
     compare: <CompareTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
     reports: <ReportsTab profile={profile} stackIds={stackIds} />,

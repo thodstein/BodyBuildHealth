@@ -45,7 +45,6 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
               }}
             />
 
-
             {/* ===== ЕДИНАЯ КАРТОЧКА РАСЧЁТА ПОДДЕРЖКИ ===== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:16, border:'2px solid rgba(0,230,138,0.25)', position:'relative' }}>
               <div style={{ position:'absolute', top:0, left:0, right:0, bottom:0, background:'linear-gradient(135deg, rgba(0,230,138,0.02), rgba(0,198,83,0.02))', pointerEvents:'none' }} />

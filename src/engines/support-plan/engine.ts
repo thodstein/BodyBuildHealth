@@ -883,6 +883,7 @@ function toSystemRisksFromTz(
 }
 
 export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
+  try {
   const blacklist = getBlacklist(state);
   // BUG 8: убран выбор веществ через «ядро» (selectSynergyGroups + getSubstancesFromSynergies).
   // Раньше SEVERAL broad-spectrum антиоксидантов назначались автоматически, затем дублировались
@@ -1242,6 +1243,20 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     ? toSystemRisksFromTz(tzResultFinal, finalScores, synergyIds.length)
     : toSystemRisks(finalScores, result);
   return result;
+  } catch (err: any) {
+    console.error('calculateSupportTZ error:', err);
+    const fallback: CalculatorResult = {
+      risk: { systems: [], overallRaw: 50, overallAfterSupport: 35, timestamp: new Date().toISOString() },
+      schedule: [], selectedSubstances: [],
+      synergyIdsUsed: [], titrationApplied: {}, labDeltas: [],
+      overallRiskBefore: 50, overallRiskAfter: 35,
+      contraindicationAlerts: [`Ошибка движка: ${err?.message || 'Неизвестная'}`],
+      negativeBlocks: [],
+      comparisonBeforeAfter: [],
+      timestamp: new Date().toISOString(),
+    };
+    return fallback;
+  }
 }
 
 export function hydrateState(): Partial<CalculatorState> {

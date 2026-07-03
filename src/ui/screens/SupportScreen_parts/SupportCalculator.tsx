@@ -190,47 +190,13 @@ export const SupportCalculator: React.FC<SupportCalculatorProps> = ({ onApply, e
             <button onClick={doCollect} style={{ width: '100%', padding: '6px', borderRadius: 8, fontSize: 8, fontWeight: 600, cursor: 'pointer', background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.12)', color: '#60a5fa' }}>
               🔄 Обновить данные
             </button>
+
+            <button onClick={doCalculate} style={{ width: '100%', padding: '10px', marginTop: 6, borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,198,83,0.05))', border: '2px solid rgba(0,230,138,0.3)', color: '#00e68a' }}>
+              🧮 Рассчитать
+            </button>
           </div>
         )}
       </div>
-
-      {/* ═══ ШАГ 2: УРОВЕНЬ + РАСЧЁТ ═══ */}
-      {collected && (
-        <div style={{ ...GLASS, marginBottom: 8, padding: 14, border: '2px solid rgba(0,230,138,0.25)' }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-            🧮 Шаг 2: Расчёт поддержки
-          </div>
-
-          {/* Level selector */}
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>📊 Уровень поддержки:</div>
-            <div style={{ display: 'flex', gap: 4 }}>
-              {([
-                { id: 'basic', label: 'Базовый', desc: '65% порог', color: '#22c55e' },
-                { id: 'mid', label: 'Средний', desc: '45% порог', color: '#fbbf24' },
-                { id: 'max', label: 'Максимум', desc: '30% порог', color: '#ef4444' },
-              ] as const).map(l => (
-                <button key={l.id} onClick={() => setLevel(l.id)} style={{
-                  flex: 1, padding: '10px 6px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
-                  background: level === l.id ? `rgba(${l.id === 'basic' ? '34,197,94' : l.id === 'mid' ? '251,191,36' : '239,68,68'},0.12)` : 'rgba(255,255,255,0.03)',
-                  border: level === l.id ? `1px solid ${l.color}` : '1px solid rgba(255,255,255,0.06)',
-                }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: level === l.id ? l.color : 'var(--text-dim)' }}>{l.label}</div>
-                  <div style={{ fontSize: 7, color: 'var(--text-dim)' }}>{l.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Calculate button */}
-          <button onClick={doCalculate} style={{
-            width: '100%', padding: '14px', borderRadius: 12, border: '2px solid var(--accent)', cursor: 'pointer',
-            background: 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,198,83,0.05))', color: '#00e68a', fontWeight: 800, fontSize: 13, marginBottom: 6,
-          }}>
-            🧮 Рассчитать поддержку
-          </button>
-        </div>
-      )}
 
       {/* ═══ РЕЗУЛЬТАТ ═══ */}
       {result && (

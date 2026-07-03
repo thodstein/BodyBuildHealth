@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
-import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
-import { getStackInteractions, getStackCoverageStats, RISK_SYSTEM_LABELS } from '../../engines/biostack-bridge';
+import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS } from '../../data/support-database';
+import { getStackInteractions, getStackCoverageStats, RISK_SYSTEM_LABELS, getStackTzMechanismCoverage, type TzCoverageResult } from '../../engines/biostack-bridge';
 import { GlassCard } from './BioStackAIConstants';
 
 type SubRisk = {
@@ -16,6 +16,7 @@ export function RisksTab({ profile, stackIds, setStackIds }: { profile: BioStack
     if (stackIds.length < 2) return null;
     const { pairs, critical, moderate, safe } = getStackInteractions(stackIds);
     const coverageStats = getStackCoverageStats();
+    const tzCoverage = syncWithEngine ? getStackTzMechanismCoverage(stackIds) : null;
 
     // Profile compatibility checks (kept as data mapping, not calculation)
     const subRisk: Record<string, SubRisk> = {};
@@ -68,8 +69,8 @@ export function RisksTab({ profile, stackIds, setStackIds }: { profile: BioStack
     const riskyIds = new Set(critical.map(p => [p.a, p.b]).flat());
     const moderateIds = new Set(moderate.map(p => [p.a, p.b]).flat());
 
-    return { pairs, critical, moderate, safe, total: pairs.length, sortedSubs, coverageStats, riskyIds, moderateIds };
-  }, [stackIds, profile]);
+    return { pairs, critical, moderate, safe, total: pairs.length, sortedSubs, coverageStats, riskyIds, moderateIds, tzCoverage };
+  }, [stackIds, profile, syncWithEngine]);
 
   const [expandedPair, setExpandedPair] = useState<Record<string, boolean>>({});
   const [graphTab, setGraphTab] = useState<'graph' | 'list'>('list');
@@ -135,9 +136,88 @@ export function RisksTab({ profile, stackIds, setStackIds }: { profile: BioStack
           </div>
         </div>
 
-        {syncWithEngine && (
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8 }}>
-            🔄 Покрытие систем рассчитано на основе каталога поддержки. Риски рассчитываются в основном риск-движке на вкладке Риски.
+        {syncWithEngine && analysis.tzCoverage && (
+          <div style={{ marginTop: 8 }}>
+            {/* TZ coverage gauge */}
+            <div style={{
+              padding: '8px 10px', borderRadius: 10, marginBottom: 8,
+              background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ position: 'relative', width: 44, height: 44, flexShrink: 0 }}>
+                  <svg viewBox="0 0 36 36" style={{ width: 44, height: 44, transform: 'rotate(-90deg)' }}>
+                    <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="3" />
+                    <circle cx="18" cy="18" r="15.5" fill="none" stroke="#a78bfa" strokeWidth="3"
+                      strokeDasharray={`${analysis.tzCoverage.overallCoveragePct} ${100 - analysis.tzCoverage.overallCoveragePct}`} strokeLinecap="round"
+                      strokeDashoffset="0" opacity="0.8" />
+                  </svg>
+                  <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#a78bfa' }}>{analysis.tzCoverage.overallCoveragePct}%</span>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', marginBottom: 2 }}>🧬 Покрытие 28 механизмов ТЗ</div>
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>{analysis.tzCoverage.totalCovered}/{analysis.tzCoverage.totalMechs} механизмов покрыто</div>
+                </div>
+              </div>
+            </div>
+
+            {/* System coverage bars */}
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>🎯 Покрытие по системам ТЗ</div>
+              {Object.entries(analysis.tzCoverage.systems).map(([sysId, sys]) => (
+                <div key={sysId} style={{ marginBottom: 3 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7, marginBottom: 1 }}>
+                    <span style={{ color: 'rgba(255,255,255,0.6)' }}>{sys.label}</span>
+                    <span style={{ color: sys.coveragePct >= 100 ? '#4ade80' : sys.coveragePct >= 50 ? '#f59e0b' : '#ef4444', fontWeight: 600 }}>
+                      {sys.coveredMechs}/{sys.totalMechs}
+                    </span>
+                  </div>
+                  <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.05)' }}>
+                    <div style={{ width: sys.coveragePct + '%', height: '100%', borderRadius: 2, background: sys.coveragePct >= 100 ? '#4ade80' : sys.coveragePct >= 50 ? '#f59e0b' : '#ef4444', transition: 'width 0.3s' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Gap suggestions */}
+            {analysis.tzCoverage.gapMechs.length > 0 && (
+              <div>
+                <div style={{ fontSize: 8, fontWeight: 600, color: '#ef4444', marginBottom: 4 }}>⚠ Непокрытые механизмы ({analysis.tzCoverage.gapMechs.length})</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {analysis.tzCoverage.gapMechs.slice(0, 6).map(gap => (
+                    <div key={gap.mechId} style={{
+                      padding: '6px 8px', borderRadius: 8,
+                      background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.1)',
+                    }}>
+                      <div style={{ fontSize: 8, color: '#fff', fontWeight: 600, marginBottom: 2 }}>
+                        {gap.systemLabel}: {gap.mechLabel}
+                      </div>
+                      <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                        {gap.suggestions.slice(0, 3).map(s => (
+                          <span key={s.id} title={`k=${s.k} q=${s.q}`} style={{
+                            fontSize: 6, padding: '1px 5px', borderRadius: 4,
+                            background: 'rgba(34,197,94,0.06)', color: '#4ade80', cursor: 'pointer',
+                            border: '1px solid rgba(34,197,94,0.12)',
+                          }}>+{s.name}</span>
+                        ))}
+                        {gap.suggestions.length > 3 && (
+                          <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)' }}>+{gap.suggestions.length - 3} ещё</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {analysis.tzCoverage.gapMechs.length > 6 && (
+                    <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 2 }}>
+                      ...и ещё {analysis.tzCoverage.gapMechs.length - 6} непокрытых механизмов
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {analysis.tzCoverage.gapMechs.length === 0 && (
+              <div style={{ fontSize: 8, color: '#4ade80', padding: '4px 8px', borderRadius: 6, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.08)' }}>
+                ✅ Все 28 механизмов ТЗ покрыты стеком
+              </div>
+            )}
           </div>
         )}
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -291,6 +371,51 @@ export function RisksTab({ profile, stackIds, setStackIds }: { profile: BioStack
           </div>
         </GlassCard>
       )}
+
+      {/* AAS course compatibility */}
+      {(() => {
+        try {
+          const courseRaw = localStorage.getItem('he_course_data');
+          if (!courseRaw) return null;
+          const course = JSON.parse(courseRaw);
+          const activeAAS: string[] = (course.aas || []).filter((a: any) => a.active !== false).map((a: any) => a.id?.toLowerCase?.() || a.id || '').filter(Boolean);
+          if (activeAAS.length === 0) return null;
+          const aasConflicts: Array<{ aasName: string; subName: string; effect: string; severity: string }> = [];
+          for (const aasId of activeAAS) {
+            for (const subId of stackIds) {
+              const inx = ALL_INTERACTIONS.find((i: any) =>
+                (i.substanceA?.toLowerCase?.() === aasId && i.substanceB?.toLowerCase?.() === subId) ||
+                (i.substanceB?.toLowerCase?.() === aasId && i.substanceA?.toLowerCase?.() === subId));
+              if (inx && (inx.severity === 'HIGH' || inx.severity === 'MEDIUM') && (inx.type === 'conflict' || inx.type === 'caution')) {
+                const aasName = SUPPORT_CATALOG_DATA[activeAAS.find(x => x === aasId) || '']?.nameRu || aasId;
+                const subName = SUPPORT_CATALOG_DATA[subId]?.nameRu || SUPPORT_CATALOG_DATA[subId]?.name || subId;
+                aasConflicts.push({ aasName, subName, effect: inx.effect || 'Взаимодействие', severity: inx.severity });
+              }
+            }
+          }
+          if (aasConflicts.length === 0) return null;
+          return (
+            <GlassCard title={`💉 Совместимость с курсом (${activeAAS.length} AAS)`} icon="💉" color="#ef4444">
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>
+                Обнаружены взаимодействия с активными препаратами курса ({activeAAS.map((a: string) => SUPPORT_CATALOG_DATA[a]?.nameRu || a).join(', ')}):
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {aasConflicts.map((c, i) => (
+                  <div key={i} style={{
+                    padding: '6px 8px', borderRadius: 8,
+                    background: c.severity === 'HIGH' ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.04)',
+                    border: c.severity === 'HIGH' ? '1px solid rgba(239,68,68,0.12)' : '1px solid rgba(245,158,11,0.1)',
+                  }}>
+                    <span style={{ fontSize: 8, color: c.severity === 'HIGH' ? '#ef4444' : '#f59e0b' }}>
+                      {c.severity === 'HIGH' ? '🔴' : '🟡'} <strong>{c.aasName}</strong> + <strong>{c.subName}</strong>: {c.effect}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </GlassCard>
+          );
+        } catch { return null; }
+      })()}
 
       {/* Auto-fix button */}
       {analysis.critical.length > 0 && setStackIds && (

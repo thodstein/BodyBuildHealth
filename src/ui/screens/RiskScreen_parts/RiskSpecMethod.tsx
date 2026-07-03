@@ -16,7 +16,7 @@ const catColor = (pct: number) => {
   return '#ef4444';
 };
 
-export const RiskSpecMethod: React.FC = () => {
+export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
   const linked = useDataLink();
   const course = linked.course || [];
   const labs = linked.labs || [];
@@ -112,7 +112,30 @@ export const RiskSpecMethod: React.FC = () => {
   const [result, setResult] = useState<TzSpecResult | null>(null);
   const [expandedMech, setExpandedMech] = useState<string | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
-  const [show3D, setShow3D] = useState(false);
+
+  // If showing 3D sub-tab, render the 3D model directly
+  if (subTab === 'tz_3d') {
+    if (!showResult || !result) {
+      return (
+        <div style={{ textAlign: 'center', padding: 40, color: 'rgba(255,255,255,0.5)' }}>
+          Сначала выполните расчёт рисков во вкладке «Обзор»
+        </div>
+      );
+    }
+    return (
+      <div>
+        <div style={CARD}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🧬 3D модель рисков (ТЗ)</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>
+            Визуализация риска по 6 системам на анатомической модели · Цвет = уровень риска системы
+          </div>
+        </div>
+        <div style={{ minHeight: 400 }}>
+          <TZRisk3DModel tzResult={result} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -360,28 +383,12 @@ export const RiskSpecMethod: React.FC = () => {
             );
           })()}
 
-          {/* ── 3D модель (на данных TZ) ── */}
-          <div style={CARD}>
-            <button onClick={() => setShow3D(!show3D)} style={{
-              width: '100%', padding: 8, borderRadius: 8, cursor: 'pointer', textAlign: 'center',
-              background: show3D ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
-              border: `1px solid ${show3D ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`,
-              color: show3D ? '#00e68a' : 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 600,
-            }}>
-              {show3D ? '▲ Скрыть 3D модель' : '🧊 3D модель рисков (ТЗ)'}
-            </button>
-            {show3D && (
-              <div style={{ marginTop: 8, minHeight: 300 }}>
-                <TZRisk3DModel tzResult={result} />
-              </div>
-            )}
-          </div>
-
           <div style={{ ...CARD, fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
             <b style={{ color: ACCENT }}>📐 Методология:</b><br />
             R = Σ(w × m × E × U × Π(1−k*))<br />
             w (1-4) — вес механизма · m (0-3) — выраженность · E = D×T×F×C — экспозиция · U — штраф · k* — скорр. защита<br />
-            Категории: 0-24% низкий · 25-49% умеренный · 50-74% высокий · 75-100% очень высокий
+            Категории: 0-24% низкий · 25-49% умеренный · 50-74% высокий · 75-100% очень высокий<br />
+            <span style={{ color: 'rgba(255,255,255,0.35)', marginTop: 4, display: 'inline-block' }}>3D модель — во вкладке «🧊 3D модель»</span>
           </div>
         </>
       )}

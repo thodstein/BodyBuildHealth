@@ -40,6 +40,9 @@ export interface MixProfile {
   workoutType: 'heavy' | 'moderate' | 'light';
   timeOfDay: 'morning' | 'afternoon' | 'evening';
   workoutDurationMin: number;
+  experience?: 'novice' | 'intermediate' | 'advanced';
+  dayType?: 'push' | 'pull' | 'legs' | 'upper' | 'lower' | 'fullbody';
+  aas?: string[];
 }
 
 // Dynamic substance scoring — lookup by SUPPORT_CATALOG_DATA categories
@@ -989,6 +992,78 @@ export function calculateMixScore(substances: MixSubstance[], profile: MixProfil
   }
   if (profile.drugs.glp1) { drugModifiers.push({ drug: 'ГПП-1', effect: '↓ гликемия — следить за гипогликемией', bonus: -5 }); }
 
+  // ── EXPERIENCE MODIFIERS ──
+  if (profile.experience === 'novice') {
+    energy = Math.round(energy * 0.9);
+    focus = Math.round(focus * 0.9);
+    strength = Math.round(strength * 0.85);
+  } else if (profile.experience === 'advanced') {
+    energy = Math.round(energy * 1.1);
+    pump = Math.round(pump * 1.1);
+    strength = Math.round(strength * 1.1);
+    glycogen = Math.round(glycogen * 1.15);
+  }
+
+  // ── DAY TYPE MODIFIERS ──
+  if (profile.dayType === 'push') {
+    pump = Math.round(pump * 1.15);
+    focus = Math.round(focus * 1.10);
+  } else if (profile.dayType === 'pull') {
+    glycogen = Math.round(glycogen * 1.10);
+    energy = Math.round(energy * 1.10);
+  } else if (profile.dayType === 'legs') {
+    hydration = Math.round(hydration * 1.15);
+    strength = Math.round(strength * 1.15);
+  } else if (profile.dayType === 'upper') {
+    focus = Math.round(focus * 1.15);
+    pump = Math.round(pump * 1.05);
+  } else if (profile.dayType === 'lower') {
+    strength = Math.round(strength * 1.15);
+    hydration = Math.round(hydration * 1.10);
+  }
+
+  // ── AAS MODIFIERS ──
+  if (profile.aas && profile.aas.length > 0) {
+    const aasLower = profile.aas.map(a => a.toLowerCase());
+    if (aasLower.some(a => a.includes('tren'))) {
+      pump = Math.round(pump * 0.8);
+      anticatabolic = Math.round(anticatabolic * 1.15);
+      glycogen = Math.round(glycogen * 1.1);
+      drugModifiers.push({ drug: 'Тренболон', effect: '↓ NO (вазоконстрикция) — памп ослаблен, ↑ анти-катаболизм', bonus: -20 });
+    }
+    if (aasLower.some(a => a.includes('diana') || a.includes('methandro') || a.includes('anadrol') || a.includes('oxymeth'))) {
+      pump = Math.round(pump * 1.1);
+      hydration = Math.round(hydration * 1.05);
+      glycogen = Math.round(glycogen * 1.1);
+      drugModifiers.push({ drug: 'Метан/Анадрол', effect: '↑ гликоген + вода — усиленный памп и гидратация', bonus: +10 });
+    }
+    if (aasLower.some(a => a.includes('winstrol') || a.includes('stanozolol'))) {
+      strength = Math.round(strength * 1.15);
+      hydration = Math.round(hydration * 0.95);
+      recovery = Math.round(recovery * 0.95);
+      drugModifiers.push({ drug: 'Станозолол', effect: '↑ сила, ↓ вода/восстановление (сухость суставов)', bonus: +5 });
+    }
+    if (aasLower.some(a => a.includes('equipoise') || a.includes('boldenone') || a.includes('eq_'))) {
+      endurance = Math.round(endurance * 1.1);
+      pump = Math.round(pump * 1.05);
+      drugModifiers.push({ drug: 'Болденон (EQ)', effect: '↑ RBC → выносливость + памп', bonus: +10 });
+    }
+    if (aasLower.some(a => a.includes('masteron') || a.includes('drostanolone'))) {
+      strength = Math.round(strength * 1.1);
+      pump = Math.round(pump * 0.95);
+      drugModifiers.push({ drug: 'Мастерон', effect: '↑ сила, ↓ вода (сушка)', bonus: +5 });
+    }
+    if (aasLower.some(a => a.includes('primobolan') || a.includes('methenolone'))) {
+      recovery = Math.round(recovery * 1.05);
+      drugModifiers.push({ drug: 'Примоболан', effect: '↑ коллаген → мягкое восстановление', bonus: +5 });
+    }
+    if (aasLower.some(a => a.includes('anavar') || a.includes('oxandrolone'))) {
+      strength = Math.round(strength * 1.05);
+      recovery = Math.round(recovery * 1.05);
+      drugModifiers.push({ drug: 'Оксандролон', effect: '↑ сила + коллаген → восстановление', bonus: +8 });
+    }
+  }
+
   // Carb calculation based on goal and drugs
   let recCarbs = 0;
   if (profile.timing === 'pre') recCarbs = bw * (profile.goal === 'endurance' ? 1.2 : profile.goal === 'crossfit' ? 1.0 : profile.goal === 'powerlifting' || profile.goal === 'competition' ? 1.0 : profile.goal === 'post_comp' ? 0.6 : profile.goal === 'strength' ? 0.8 : profile.goal === 'hiit' ? 0.7 : profile.goal === 'mma' ? 0.7 : profile.goal === 'sprint' ? 0.6 : 0.6) * multiplier;
@@ -1012,6 +1087,15 @@ export function calculateMixScore(substances: MixSubstance[], profile: MixProfil
   let recWater = bw * 35 + durHrs * 500;
   if (profile.drugs.insulin) recWater *= 1.15;
   if (profile.drugs.gh) recWater *= 1.1;
+
+  // ── EXPERIENCE/DAY TYPE DOSE MODIFIERS (after recCarbs/recEAA/recWater init) ──
+  if (profile.experience === 'novice') {
+    recCarbs = Math.round(recCarbs * 0.8);
+    recEAA = Math.round(recEAA * 0.85);
+  }
+  if (profile.dayType === 'legs') {
+    recWater = Math.round(recWater * 1.15);
+  }
 
   // Time-of-day adjustments
   if (profile.timeOfDay === 'morning') { energy = Math.round(energy * 1.1); }

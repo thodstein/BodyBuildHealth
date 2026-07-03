@@ -7,7 +7,24 @@ import { TZ_MECH_LABELS } from '../../data/support-db';
 import { decodeGarbled } from '../../utils/text-sanitizer';
 import { GlassCard, StatBox, ORGANS, toFinderProfile, ConfirmModal, showToast, PRICE_RUB } from './BioStackAIConstants';
 
-export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void }) {
+function getTitration(id: string, cat: any): string | null {
+  const needy = ['ashwagandha', 'rhodiola', 'shilajit', 'berberine', 'tongkat_ali', 'fadogia', 'ashwa', 'probiotics', 'bromelain', 'serrapeptase', 'nattokinase'];
+  const lc = id.toLowerCase();
+  const catNames = (cat?.category || []).map((c: string) => c.toLowerCase());
+  if (needy.some(n => lc.includes(n))) {
+    return 'Начать с ½ дозы, увеличивать каждые 3-4 дня на 25% до полной. Контроль ЖКТ.';
+  }
+  if (catNames.includes('adaptogen') || catNames.includes('hormonal') || catNames.includes('thyroid')) {
+    return 'Рекомендуется начать с ½ дозы, титровать в течение 5-7 дней.';
+  }
+  return null;
+}
+
+export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStackIdx, setActiveStackIdx, createStack, deleteStack, renameStack }: {
+  profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void;
+  allStacks: string[][]; activeStackIdx: number; setActiveStackIdx: (i: number) => void;
+  createStack: () => void; deleteStack: (i: number) => void; renameStack: (i: number, name: string) => void;
+}) {
   const explanation = useMemo(() => {
     if (stackIds.length === 0) return null;
     const fp = toFinderProfile(profile);
@@ -171,7 +188,6 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
   const [savedStacks, setSavedStacks] = useState<string[][]>(() => {
     try { return JSON.parse(localStorage.getItem('he_finder_saved_stacks') || '[]'); } catch { return []; }
   });
-  const [confirmAddPlan, setConfirmAddPlan] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
 
   const handleRemove = useCallback((id: string) => {
@@ -194,27 +210,7 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
     setStackIds([]);
   }, [setStackIds]);
 
-  const handleAddToPlan = useCallback(() => {
-    try {
-      let arr: any[] = JSON.parse(localStorage.getItem('he_my_stacks') || '[]');
-      if (!arr.find((x: any) => x.id === 'biostack_' + stackIds.join('_'))) {
-        const subNames = stackIds.slice(0,3).map((id: string) => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id).join(', ');
-        arr.push({
-          id: 'biostack_' + stackIds.join('_'),
-          name: 'BioStack AI: ' + subNames + (stackIds.length > 3 ? ' и ещё ' + (stackIds.length-3) : ''),
-          description: synergyExplanation?.cascadeDesc || 'Собран в BioStack AI',
-          system: (stackSystems || []).join(', ') || 'Мультисистемная',
-          subs: stackIds, dosages: {}, timingSummary: '',
-          monitoring: '', specialInstructions: '', contraindications: '', warnings: '',
-          synergyScore: explanation?.totalSynergyScore ?? 0,
-          source: 'BioStack AI', date: new Date().toISOString(),
-        });
-        localStorage.setItem('he_my_stacks', JSON.stringify(arr));
-      }
-      setConfirmAddPlan(false);
-      showToast('✅ Стек сохранён в Мои стеки', 'success');
-    } catch { setConfirmAddPlan(false); }
-  }, [stackIds, synergyExplanation, stackSystems, explanation]);
+
 
   /* ── Drag & Drop ── */
   const handleDragStart = useCallback((e: React.DragEvent, idx: number) => {
@@ -471,11 +467,62 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
     musculo: '💪 Опорно-двиг.', metabolic: '⚡ Метаболизм', gi: '🫃 ЖКТ',
     покровная: '🧴 Кожа', гепатобилиарная: '🫁 Печень+Жёлчь', иммунная: '🛡️ Иммунная',
   };
+  /* ── Helpers for stack names ── */
+  const stackName = (ids: string[], idx: number): string => {
+    const stored = localStorage.getItem(`he_biostack_name_${idx}`);
+    if (stored) return stored;
+    const top = ids.slice(0, 3).map(id => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id).filter(Boolean);
+    if (top.length === 0) return `Стек ${idx + 1}`;
+    return top.join(', ') + (ids.length > 3 ? ` +${ids.length - 3}` : '');
+  };
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editName, setEditName] = useState('');
+
   if (stackIds.length === 0) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 60, color: 'rgba(255,255,255,0.3)' }}>
-        <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Стек пуст</div>
+      <div style={{ paddingBottom: 80 }}>
+        {/* ── Multi-stack header ── */}
+        <div style={{ display: 'flex', gap: 3, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}>
+          {allStacks.map((stk, idx) => (
+            <div key={idx} onClick={() => { setActiveStackIdx(idx); setEditingIdx(null); }}
+              onContextMenu={e => { e.preventDefault(); setEditingIdx(idx); setEditName(stackName(stk, idx)); }}
+              style={{
+                flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3, padding: '5px 8px', borderRadius: 12,
+                cursor: 'pointer', fontSize: 8, fontWeight: 600, whiteSpace: 'nowrap', maxWidth: 160,
+                background: activeStackIdx === idx ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                border: activeStackIdx === idx ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.04)',
+                color: activeStackIdx === idx ? '#00e68a' : 'rgba(255,255,255,0.5)',
+              }}>
+              <span>{stk.length > 0 ? '📋' : '📭'}</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{stackName(stk, idx)}</span>
+              {allStacks.length > 1 && (
+                <span onClick={e => { e.stopPropagation(); deleteStack(idx); }}
+                  style={{ marginLeft: 2, fontSize: 7, color: '#ef4444', cursor: 'pointer' }}>✕</span>
+              )}
+            </div>
+          ))}
+          <button onClick={createStack} style={{
+            flexShrink: 0, padding: '5px 10px', borderRadius: 12, fontSize: 8, fontWeight: 600, cursor: 'pointer',
+            background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', color: '#a78bfa',
+          }}>+</button>
+        </div>
+
+        {/* ── Edit name popup ── */}
+        {editingIdx !== null && (
+          <div style={{ padding: '4px 0', marginBottom: 8, display: 'flex', gap: 4 }}>
+            <input value={editName} onChange={e => setEditName(e.target.value)}
+              style={{ flex: 1, padding: '4px 8px', borderRadius: 6, fontSize: 8, background: '#202023', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', outline: 'none' }}
+              placeholder="Название стека" autoFocus />
+            <button onClick={() => { renameStack(editingIdx, editName); setEditingIdx(null); }}
+              style={{ padding: '4px 8px', borderRadius: 6, fontSize: 8, fontWeight: 600, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a' }}>✓</button>
+            <button onClick={() => setEditingIdx(null)}
+              style={{ padding: '4px 8px', borderRadius: 6, fontSize: 8, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}>✕</button>
+          </div>
+        )}
+
+        <div style={{ textAlign: 'center', paddingTop: 30, color: 'rgba(255,255,255,0.3)' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Стек пуст</div>
         <div style={{ fontSize: 10, maxWidth: 280, margin: '0 auto', lineHeight: 1.5, marginBottom: 16 }}>
           Добавьте препараты через 🔍 Поиск или 🧩 Сборка
         </div>
@@ -509,11 +556,50 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
 
 
       </div>
+      </div>
     );
   }
 
   return (
     <div style={{ paddingBottom: 80 }}>
+      {/* ── Multi-stack header ── */}
+      <div style={{ display: 'flex', gap: 3, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}>
+        {allStacks.map((stk, idx) => (
+          <div key={idx} onClick={() => { setActiveStackIdx(idx); setEditingIdx(null); }}
+            onContextMenu={e => { e.preventDefault(); setEditingIdx(idx); setEditName(stackName(stk, idx)); }}
+            style={{
+              flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3, padding: '5px 8px', borderRadius: 12,
+              cursor: 'pointer', fontSize: 8, fontWeight: 600, whiteSpace: 'nowrap', maxWidth: 160,
+              background: activeStackIdx === idx ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+              border: activeStackIdx === idx ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.04)',
+              color: activeStackIdx === idx ? '#00e68a' : 'rgba(255,255,255,0.5)',
+            }}>
+            <span>{stk.length > 0 ? '📋' : '📭'}</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{stackName(stk, idx)}</span>
+            {allStacks.length > 1 && (
+              <span onClick={e => { e.stopPropagation(); deleteStack(idx); }}
+                style={{ marginLeft: 2, fontSize: 7, color: '#ef4444', cursor: 'pointer' }}>✕</span>
+            )}
+          </div>
+        ))}
+        <button onClick={createStack} style={{
+          flexShrink: 0, padding: '5px 10px', borderRadius: 12, fontSize: 8, fontWeight: 600, cursor: 'pointer',
+          background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', color: '#a78bfa',
+        }}>+</button>
+      </div>
+
+      {editingIdx !== null && (
+        <div style={{ padding: '4px 0', marginBottom: 8, display: 'flex', gap: 4 }}>
+          <input value={editName} onChange={e => setEditName(e.target.value)}
+            style={{ flex: 1, padding: '4px 8px', borderRadius: 6, fontSize: 8, background: '#202023', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', outline: 'none' }}
+            placeholder="Название стека" autoFocus />
+          <button onClick={() => { renameStack(editingIdx, editName); setEditingIdx(null); }}
+            style={{ padding: '4px 8px', borderRadius: 6, fontSize: 8, fontWeight: 600, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a' }}>✓</button>
+          <button onClick={() => setEditingIdx(null)}
+            style={{ padding: '4px 8px', borderRadius: 6, fontSize: 8, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}>✕</button>
+        </div>
+      )}
+
       <GlassCard title={`📋 Стек • ${stackIds.length} компонентов`} icon="📊" color="#00e68a">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 8 }}>
           <StatBox label="Компонентов" value={stackIds.length} color="#00e68a" />
@@ -521,15 +607,54 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
           <StatBox label="Покрытие" value={`${explanation?.completeness ?? 0}%`} color="#60a5fa" />
           <StatBox label="С дозой" value={`${explanation?.totalDoseCount ?? 0}/${stackIds.length}`} color="#f59e0b" />
         </div>
+        {stackIds.length > (profile.maxStackSize || 8) && (
+          <div style={{ fontSize: 8, color: '#f59e0b', padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.1)', marginBottom: 6 }}>
+            ⚠ Превышен лимит ({profile.maxStackSize || 8}) — рекомендуется сократить стек
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 4 }}>
           <button onClick={handleSaveStack} style={{
             flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
             background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a',
           }}>💾 Сохранить стек</button>
-          <button onClick={() => setConfirmAddPlan(true)} style={{
-            flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
-            background: 'rgba(0,230,138,0.15)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a',
-          }}>📋 В план поддержки</button>
+        </div>
+        <div style={{ display: 'flex', gap: 2, marginTop: 4, justifyContent: 'flex-end' }}>
+          <button onClick={() => {
+            const data = JSON.stringify({ stackIds, date: new Date().toISOString(), profile: { goals: profile.goals, aasStatus: profile.aasStatus } });
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `biostack_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('📤 Стек экспортирован', 'success');
+          }} style={{
+            padding: '3px 8px', borderRadius: 6, fontSize: 7, fontWeight: 600, cursor: 'pointer',
+            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)',
+          }}>📤</button>
+          <button onClick={() => {
+            const input = document.createElement('input');
+            input.type = 'file'; input.accept = '.json';
+            input.onchange = (e: any) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = () => {
+                try {
+                  const data = JSON.parse(reader.result as string);
+                  if (data.stackIds && Array.isArray(data.stackIds)) {
+                    setStackIds(data.stackIds);
+                    showToast('📥 Стек импортирован', 'success');
+                  }
+                } catch { showToast('❌ Ошибка импорта', 'error'); }
+              };
+              reader.readAsText(file);
+            };
+            input.click();
+          }} style={{
+            padding: '3px 8px', borderRadius: 6, fontSize: 7, fontWeight: 600, cursor: 'pointer',
+            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)',
+          }}>📥</button>
         </div>
         <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
           <button onClick={() => {
@@ -556,24 +681,39 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
             flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
             background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: '#818cf8',
           }}>📦 В мои стеки</button>
+          <button onClick={() => {
+            const lines: string[] = [];
+            lines.push(`🧬 BioStack AI — Стек (${stackIds.length} веществ)`);
+            lines.push('');
+            for (const id of stackIds) {
+              const cat = SUPPORT_CATALOG_DATA[id];
+              const name = cat?.nameRu || cat?.name || id;
+              const dose = cat?.dosage?.mg ? `${cat.dosage.mg} мг` : '—';
+              const timing = (cat as any)?.timingDosage || cat?.dosage?.timing || '—';
+              const tier = cat?.tier || '';
+              lines.push(`• ${name} [${tier}] — ${dose} × ${timing}`);
+            }
+            if (synergyExplanation) {
+              lines.push('');
+              lines.push(`🧬 ${synergyExplanation.cascadeDesc}`);
+            }
+            if (explanation) {
+              lines.push(`🎯 Синергия: ${explanation.totalSynergyScore} • Покрытие: ${explanation.completeness}%`);
+            }
+            const cost = stackIds.reduce((s, id) => s + (PRICE_RUB[id] || 0), 0);
+            lines.push(`💰 ~${cost.toLocaleString()} ₽/мес`);
+            navigator.clipboard.writeText(lines.join('\n'));
+            showToast('📋 Стек скопирован в буфер обмена', 'success');
+          }} style={{
+            padding: '8px 10px', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+            background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.15)', color: '#a855f7',
+          }}>📋</button>
           <button onClick={() => setConfirmClear(true)} style={{
             flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
             background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444',
           }}>🗑 Очистить</button>
         </div>
       </GlassCard>
-
-      {confirmAddPlan && (
-        <ConfirmModal
-          title="📋 Добавить в план поддержки?"
-          text={`Стек из ${stackIds.length} препаратов будет сохранён в «Мои стеки» и добавлен в текущий план поддержки. Вы сможете изменить дозировки и состав в плане.`}
-          confirmLabel="✅ Добавить в план"
-          cancelLabel="Отмена"
-          onConfirm={handleAddToPlan}
-          onCancel={() => setConfirmAddPlan(false)}
-          confirmColor="#00e68a"
-        />
-      )}
 
       {confirmClear && (
         <ConfirmModal
@@ -681,7 +821,64 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
         <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>
           Нажмите на препарат, чтобы отметить как принятый
         </div>
+
+        {/* Compliance 7-day history chart */}
+        {stackIds.length > 0 && (
+          <div style={{ marginTop: 8, padding: '8px 0 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ fontSize: 7, fontWeight: 600, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>📈 Последние 7 дней</div>
+            <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 40 }}>
+              {(() => {
+                const days: Array<{ key: string; label: string; taken: number; total: number }> = [];
+                const d = new Date();
+                for (let i = 6; i >= 0; i--) {
+                  const k = d.toISOString().slice(0, 10);
+                  const t = compliance[k]?.length || 0;
+                  days.push({ key: k, label: d.toLocaleDateString('ru', { weekday: 'short' }).slice(0, 2), taken: t, total: stackIds.length });
+                  d.setDate(d.getDate() - 1);
+                }
+                const maxH = 36;
+                return days.map(day => {
+                  const h = day.total > 0 ? Math.max(2, (day.taken / day.total) * maxH) : 2;
+                  const color = day.taken === 0 ? 'rgba(255,255,255,0.08)' : day.taken >= day.total ? '#22c55e' : day.taken >= day.total * 0.5 ? '#f59e0b' : '#ef4444';
+                  return (
+                    <div key={day.key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                      <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)' }}>{day.taken}</span>
+                      <div style={{ width: '70%', height: h, borderRadius: '2px 2px 0 0', background: color, transition: 'height 0.3s' }} title={`${day.taken}/${day.total}`} />
+                      <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.25)' }}>{day.label}</span>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        )}
       </GlassCard>
+
+      {/* ⏰ Timing overload warning */}
+      {(() => {
+        const timingCounts: Record<string, number> = {};
+        for (const id of stackIds) {
+          const cat = SUPPORT_CATALOG_DATA[id];
+          if (!cat) continue;
+          const t = (cat as any)?.timingDosage || cat?.dosage?.timing || '';
+          if (t && t !== '—') {
+            timingCounts[t] = (timingCounts[t] || 0) + 1;
+          }
+        }
+        const overloaded = Object.entries(timingCounts).filter(([, n]) => n >= 3);
+        if (overloaded.length > 0) {
+          return (
+            <GlassCard title="⏰ Перегрузка по времени приёма" icon="⏰" color="#f59e0b" style={{ marginBottom: 10 }}>
+              {overloaded.map(([timing, count]) => (
+                <div key={timing} style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.1)', marginBottom: 4, fontSize: 8, color: '#fbbf24' }}>
+                  ⚠ {count} препаратов в одно время ({timing}). Рекомендуется разнести приём.
+                </div>
+              ))}
+            </GlassCard>
+          );
+        }
+        return null;
+      })()}
 
       {/* 🚀 Действия со стеком — компактная кнопка-попап */}
       {(() => {
@@ -875,6 +1072,10 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
                   ))}
                   <span style={{ color: '#60a5fa', fontSize: 7 }}>{cat.bestForm || (cat.forms?.find(f => f.best)?.nameRu || cat.forms?.[0]?.nameRu || '')}</span>
                 </div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
+                  💊 {cat.dosage?.mg ? `${cat.dosage.mg} мг` : '—'} · {cat.dosage?.timing || (cat as any)?.timingDosage || '—'}
+                  {cat.dosage?.mg && <span style={{ marginLeft: 4, color: '#f59e0b' }}>~{(PRICE_RUB[entry.id] || '?')} ₽/мес</span>}
+                </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{isExpanded ? '▲' : '▼'}</span>
@@ -887,6 +1088,15 @@ export function StackTab({ profile, stackIds, setStackIds }: { profile: BioStack
                   🧬 <strong style={{ color: '#a78bfa' }}>Механизм:</strong> {entry.mechanism}
                 </div>
 
+                {(() => {
+                  const t = getTitration(entry.id, cat);
+                  if (!t) return null;
+                  return (
+                    <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.1)', marginBottom: 6, fontSize: 8, color: '#fbbf24', lineHeight: 1.3 }}>
+                      📈 Титрование: {t}
+                    </div>
+                  );
+                })()}
                 {cat.description && (
                   <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, marginBottom: 6 }}>
                     📝 {decodeGarbled(cat.description)}

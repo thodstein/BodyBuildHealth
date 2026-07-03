@@ -14,6 +14,7 @@ import { type WarmupBlock, type CooldownBlock } from '../../../core/types';
 import { computeSessionMetrics } from './sessionMetrics';
 import { hapticImpact, hapticNotify } from '../../../core/telegram';
 import { velocityLoss, velocityLossZone, thresholdForIntent, type VBTIntent } from '../../../engines/pro/vbt.engine';
+import { calculatePlates } from '../../../engines/gym-competition.engine';
 import { saveSRPESession } from '../../../engines/pro/srpe-store';
 import { useTrainingProfile } from '../TrainingScreen_parts/training-profile';
 
@@ -211,6 +212,24 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   // D1: LMS-метрики фактической сессии (Тоннаж/КПШ/Инт.отн/УОИ/Инт.Ф+Б) — считаются для done-состояния
   const lms = useMemo(() => computeSessionMetrics(done, day), [done, day]);
 
+  // раскладка блинов для каждого упражнения (по целевому весу первого подхода)
+  const plateBreakdowns = useMemo(() => {
+    if (!day) return {};
+    const map: Record<number, string> = {};
+    day.exercises.forEach((ex, ei) => {
+      const targetW = ex.targetSets[0]?.weight || 0;
+      if (targetW > 0) {
+        const r = calculatePlates(targetW);
+        if (r.platesPerSide.length > 0) {
+          map[ei] = r.platesPerSide.map(p => `${p.count * 2}×${p.plate}`).join(' + ') + ` на гриф ${r.barWeight} кг`;
+        } else {
+          map[ei] = `гриф ${r.barWeight} кг`;
+        }
+      }
+    });
+    return map;
+  }, [day]);
+
   if (days.length === 0) return <div style={SMALL}>Нет дней в плане.</div>;
 
   return (
@@ -259,6 +278,11 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
           {day.exercises.map((ex, ei) => (
             <div key={ei} style={{ marginTop: 8, padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>{ex.name} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>({ex.muscleGroup})</span></div>
+              {plateBreakdowns[ei] && (
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginBottom: 4, padding: '2px 0' }}>
+                  🏋️ {plateBreakdowns[ei]}
+                </div>
+              )}
               {ex.targetSets.map((t, si) => {
                 const k = keyFor(ei, si);
                 const a = actual[k] || { weight: t.weight, reps: t.reps, rpe: 0 };

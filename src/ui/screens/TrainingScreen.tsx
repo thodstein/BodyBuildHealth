@@ -3291,6 +3291,13 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
         </InfoErrorBoundary>
       )}
 
+      {/* ═══════════ TRAINING MIXES TAB ═══════════ */}
+      {tab === 'mixes' && (
+        <InfoErrorBoundary label="Тренировочные миксы">
+          <TrainingMixTab />
+        </InfoErrorBoundary>
+      )}
+
       {/* ═══════════ CYCLES TAB ═══════════ */}
       {tab === 'cycles' && (
         <InfoErrorBoundary label="Циклы">
@@ -3709,6 +3716,7 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
       {tab === 'volume' && <InfoErrorBoundary label="Расчёт объёма"><VolumeOptimizerTab /></InfoErrorBoundary>}
       {tab === 'calc_substitute' && <InfoErrorBoundary label="Замена упражнения"><CalcSubstituteTab /></InfoErrorBoundary>}
       {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} onBuildPlan={() => setTab('plan')} /></InfoErrorBoundary>}
+      {tab === 'pl_pro' && <InfoErrorBoundary label="Pro ПЛ-инструменты"><ProPlToolsTab /></InfoErrorBoundary>}
 
       {/* ═══════════ MY TRAINING TAB ═══════════ */}
       {tab === 'mytraining' && (
@@ -3851,6 +3859,8 @@ import { ProgressTab } from './TrainingScreen_parts/ProgressTab';
 import { StrengthLevelCard } from './TrainingScreen_parts/StrengthLevelCard';
 import { StructuredAnalyticsCard } from './TrainingScreen_parts/StructuredAnalyticsCard';
 import { ExerciseGeneratorContent } from './TrainingScreen_parts/ExerciseGenerator';
+import { TrainingMixTab } from './TrainingScreen_parts/TrainingMixTab';
+import { ProPlToolsTab } from './TrainingScreen_parts/ProPlToolsTab';
 
 
 

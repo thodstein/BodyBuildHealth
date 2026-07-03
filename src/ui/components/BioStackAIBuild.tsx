@@ -278,7 +278,7 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
   const [selTargets, setSelTargets] = useState<GoalType[]>([]);
   const [targetSize, setTargetSize] = useState(() => profile.stackComplexity === 'minimal' ? 5 : profile.stackComplexity === 'balanced' ? 10 : 18);
   const [lmState, setLmState] = useState<LMState>({});
-  const [result, setResult] = useState<{ stack: string[]; explanation: StackExplanation } | null>(null);
+  const [result, setResult] = useState<{ stack: string[]; explanation: StackExplanation; budgetNote?: string } | null>(null);
   const [multiResult, setMultiResult] = useState<{ variant: BuildVariant; stack: string[]; estCost: number; synergyScore: number; coverage: string; substanceCount: number }[] | null>(null);
   const [avoidConflicts, setAvoidConflicts] = useState(true);
   const [stkQuery, setStkQuery] = useState('');
@@ -361,8 +361,22 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
       autoFill: true, profile: fp,
       avoidIds: conflictFilter ? stackIds.filter(id => !conflictFilter(id)) : undefined,
     });
-    const exp = explainStack(built.stack, fp);
-    setResult({ stack: built.stack, explanation: exp });
+    // Budget filter: economy → only core/standard
+    let filteredStack = built.stack;
+    let budgetNote = '';
+    if (profile.budget === 'economy') {
+      const tierEd = filteredStack.filter(id => {
+        const c = SUPPORT_CATALOG_DATA[id];
+        return c && (c.tier === 'core' || c.tier === 'standard');
+      });
+      const removed = filteredStack.length - tierEd.length;
+      if (removed > 0) {
+        budgetNote = `💰 Бюджетный режим: убрано ${removed} препаратов тира advanced/specialty`;
+        filteredStack = tierEd;
+      }
+    }
+    const exp = explainStack(filteredStack, fp);
+    setResult({ stack: filteredStack, explanation: exp, budgetNote });
   }, [goals, selTargets, selOrgans, selSystems, targetSize, lmState, stackIds, profile, avoidConflicts]);
 
   const handleSaveStack = useCallback(() => {
@@ -513,6 +527,11 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
       {/* ─── Result ─── */}
       {result && (
         <GlassCard title="📋 Результат сборки" icon="📋" color="#00e68a">
+          {result.budgetNote && (
+            <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.12)', marginBottom: 6, fontSize: 8, color: '#22c55e' }}>
+              {result.budgetNote}
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 8 }}>
             <StatBox label="Синергия" value={result.explanation.totalSynergyScore} color="#8b5cf6" />
             <StatBox label="Покрытие" value={`${result.explanation.completeness}%`} color="#8b5cf6" />

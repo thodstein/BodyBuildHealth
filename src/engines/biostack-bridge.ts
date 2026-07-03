@@ -1,5 +1,7 @@
 import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS } from '../data/support-database';
 import type { SupportCatalogEntry } from '../data/support-catalog-data';
+import { SUPPLEMENTS_DB } from '../data/support-db/supplements';
+import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from '../data/support-db';
 
 const BIO_STACK_KEY = 'he_biostack_active';
 const BIO_FAV_KEY = 'he_biostack_favorites';
@@ -127,4 +129,87 @@ export function getStackNutritional(): SupportCatalogEntry[] {
     const cats = (s as any).categories || (s as any).category || [];
     return cats.some((c: string) => ['vitamin', 'mineral', 'amino', 'fatty_acid', 'electrolyte', 'vitamin_like', 'omega', 'antioxidant'].includes(c));
   });
+}
+
+// ── TZ 28-механизмов: покрытие стека ──
+const TZ_SYS_MECHS: Record<string, string[]> = {
+  cardio: ['cv1','cv2','cv3','cv4','cv5'],
+  hepatic: ['liv1','liv2','liv3'],
+  renal: ['ren1','ren2','ren3','ren4'],
+  cns: ['cns1','cns2','cns3','cns4','cns5','cns6'],
+  reproductive: ['rep1','rep2','rep3','rep4','rep5'],
+  hematologic: ['hem1','hem2','hem3','hem4','hem5'],
+};
+
+export interface TzCoverageResult {
+  systems: Record<string, {
+    label: string;
+    totalMechs: number;
+    coveredMechs: number;
+    coveragePct: number;
+    mechs: Array<{ mechId: string; label: string; covered: boolean; bestK: number; bestSub: string }>;
+  }>;
+  overallCoveragePct: number;
+  totalCovered: number;
+  totalMechs: number;
+  gapMechs: Array<{ system: string; systemLabel: string; mechId: string; mechLabel: string; suggestions: Array<{ id: string; name: string; k: number; q: string }> }>;
+}
+
+export function getStackTzMechanismCoverage(stackIds: string[]): TzCoverageResult {
+  const coveredMechs = new Map<string, { k: number; sub: string }>();
+  for (const id of stackIds) {
+    const entries = SUPPLEMENTS_DB[id];
+    if (!entries) continue;
+    for (const e of entries) {
+      const key = `${e.organId}:${e.mechId}`;
+      const existing = coveredMechs.get(key);
+      if (!existing || e.k > existing.k) {
+        coveredMechs.set(key, { k: e.k, sub: id });
+      }
+    }
+  }
+
+  const systems: TzCoverageResult['systems'] = {};
+  let totalCovered = 0;
+  let totalMechs = 0;
+  const gapMechs: TzCoverageResult['gapMechs'] = [];
+
+  for (const [sysId, mechIds] of Object.entries(TZ_SYS_MECHS)) {
+    const sysLabel = TZ_SYSTEM_LABELS[sysId] || sysId;
+    const mechs: TzCoverageResult['systems']['0']['mechs'] = [];
+    let covered = 0;
+    for (const mechId of mechIds) {
+      const key = `${sysId}:${mechId}`;
+      const c = coveredMechs.get(key);
+      const isCovered = !!c;
+      if (isCovered) covered++;
+      mechs.push({ mechId, label: TZ_MECH_LABELS[mechId] || mechId, covered: isCovered, bestK: c?.k || 0, bestSub: c?.sub || '' });
+
+      if (!isCovered) {
+        const suggestions: TzCoverageResult['gapMechs'][0]['suggestions'] = [];
+        for (const [subId, entries] of Object.entries(SUPPLEMENTS_DB) as [string, { organId: string; mechId: string; k: number; q: string; source: string }[]][]) {
+          for (const e of entries) {
+            if (e.organId === sysId && e.mechId === mechId) {
+              const name = SUPPORT_CATALOG_DATA[subId]?.nameRu || SUPPORT_CATALOG_DATA[subId]?.name || subId;
+              suggestions.push({ id: subId, name, k: e.k, q: e.q });
+              break;
+            }
+          }
+        }
+        suggestions.sort((a, b) => b.k - a.k);
+        gapMechs.push({ system: sysId, systemLabel: sysLabel, mechId, mechLabel: TZ_MECH_LABELS[mechId] || mechId, suggestions: suggestions.slice(0, 5) });
+      }
+    }
+    systems[sysId] = { label: sysLabel, totalMechs: mechIds.length, coveredMechs: covered, coveragePct: Math.round(covered / mechIds.length * 100), mechs };
+    totalCovered += covered;
+    totalMechs += mechIds.length;
+  }
+
+  return {
+    systems,
+    overallCoveragePct: totalMechs > 0 ? Math.round(totalCovered / totalMechs * 100) : 0,
+    totalCovered,
+    totalMechs,
+    gapMechs,
+  };
 }

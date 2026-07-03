@@ -57,13 +57,12 @@ import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load
 
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
-type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'plan' | 'reports' | 'mixcalc';
+type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'plan' | 'reports';
 type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'research' | 'favorites' | 'protocols' | 'biostack';
 
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { PopupBool, PopupNumber, PopupSelect } from '../components/PopupXxx';
 import { BioStackAIScreen } from '../components/BioStackAIScreen';
-import { SupportMixCalc } from './SupportScreen_parts/SupportMixCalc';
 import { SupportPeptideCalc } from './SupportScreen_parts/SupportPeptideCalc';
 import { SupportResearch } from './SupportScreen_parts/SupportResearch';
 import { SupportGeneratorInfo } from './SupportScreen_parts/SupportGeneratorInfo';
@@ -195,7 +194,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (calcView !== 'main') {
       if (section === 'generator') { setSection('home'); resetMain(); } 
       else if (calcView === 'peptides') { setCalcView('info'); setInfoView('catalog'); setInfoTab('catalog'); setSection('home'); }
-      else if (calcView === 'mixcalc') { setCalcView('info'); setInfoView('catalog'); setInfoTab('catalog'); setSection('home'); }
       else if (calcView === 'info') { goHome(); } 
       else { setCalcView('main'); }
       return;
@@ -496,6 +494,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, linked.course, linked.profile, courseWeekState, boostEnabled, jointMode, reproMode]);
 
   const calcSupport = (overrideLevel?: 'basic' | 'mid' | 'max' | 'boost', overrideSubs?: string[]) => {
+    try {
     const s = linked.profile?.settings;
     const level = (overrideLevel || supportLevel) as PowerLevel;
     // Build TZ state from linked data
@@ -618,6 +617,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         timestamp: Date.now(),
       }));
     } catch (e2) { /* ignore profile save errors */ }
+    } catch (err: any) {
+      console.error('calcSupport error:', err);
+      showToast(`Ошибка расчёта: ${err?.message || 'Неизвестная ошибка'}`, 'error');
+      setCalcDone(false);
+    }
   };
 
   // Removed auto-calc useEffect. User clicks "Рассчитать поддержку" manually.
@@ -740,7 +744,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const CATALOG_IDS = useMemo(() => new Set(Object.keys(SUPPORT_CATALOG_DATA).map(k => k.toLowerCase())), []);
 
   // Neurotoxicity tab state (lifted from IIFE to component level)
-  const [neuroTab, setNeuroTab] = useState<'calc' | 'mechanisms' | 'support'>('mechanisms');
+  const [neuroTab, setNeuroTab] = useState<string>('mechanisms');
 
   // Catalog sub-tab
   const [catalogSubTab, setCatalogSubTab] = useState<'type' | 'organ' | 'tier' | 'stack'>('type');
@@ -2467,7 +2471,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     SupportGeneratorInfo,
     SupportHomeView,
     SupportInteractionsView,
-    SupportMixCalc,
     SupportModals,
     SupportPeptideCalc,
     SupportProtocols,
@@ -2950,7 +2953,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'protocols' ? '40px' : section === 'generator' ? '85px' : (section === 'info' || calcView === 'info' || calcView === 'peptides' || calcView === 'mixcalc') ? '120px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'protocols' ? '40px' : section === 'generator' ? '85px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '120px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (with back/home) ===== */}
       {section === 'generator' && (
@@ -2987,16 +2990,15 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
       )}
 
       {/* ===== INFO HEADER (back/home + pills) ===== */}
-      {(section === 'info' || calcView === 'info' || calcView === 'peptides' || calcView === 'mixcalc') && (
+      {(section === 'info' || calcView === 'info' || calcView === 'peptides') && (
         <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
           <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center', overflowX:'auto' }}>
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['mixcalc','💪 Тренировочные миксы'],['biostack','🧬 BioStack AI'],['interactions','⚠ Взаимодействия'],['research','Исследования'],['favorites','Избранное']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['interactions','⚠ Взаимодействия'],['research','Исследования'],['favorites','Избранное']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 if (id === 'peptides') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); }
-                else if (id === 'mixcalc') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); }
                 else { setTab('main'); setSupportView('calc'); setCalcView('info'); setSection('home'); setInfoView(id as InfoView); }
               }} style={{
                 padding:'5px 12px', borderRadius:16, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
@@ -3243,11 +3245,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
       {/* ===== SUPPORT CALCULATOR RESULT ===== */}
       {section === 'generator' && genTab === 'calculator' && ((tab === 'main' && supportView === 'calc' && calcView === 'calculator') || tab === 'calculator') && (
         <SupportCalcResult s={s} />
-      )}
-
-      {/* ===== TRAINING MIX CALCULATOR ===== */}
-      {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'mixcalc' && (
-        <SupportMixCalc s={s} />
       )}
 
       {/* ===== PEPTIDE CALCULATOR ===== */}

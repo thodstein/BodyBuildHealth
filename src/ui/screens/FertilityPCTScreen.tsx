@@ -8,7 +8,7 @@ import { generatePCTPlan } from '../../engines/pct-planner.engine';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { UnifiedLabPanel } from '../components/UnifiedLabPanel';
 
-type FertTab = 'overview' | 'pct-plan' | 'hrt' | 'analyses';
+type FertTab = 'overview' | 'pct-plan' | 'hrt';
 const addToPlan = async (substanceId: string, doseValue: number, doseUnit: string, freq: string, startWeek: number, endWeek: number) => {
   try {
     await db.put('course_log', {
@@ -58,13 +58,12 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
     { id: 'overview', label: '📋 Ориентировочные протоколы' },
     { id: 'pct-plan', label: 'ПКТ базовый протокол' },
     { id: 'hrt', label: '⚕️ Ориентировочные протоколы ГЗТ' },
-    { id: 'analyses', label: '🧪 Анализы' },
   ];
   const fertTabs = fertTabsAll.filter(t => {
     if (!restrictToMode) return true;
-    if (restrictToMode === 'pct') return ['pct-plan', 'analyses'].includes(t.id);
-    if (restrictToMode === 'hrt') return ['hrt', 'analyses'].includes(t.id);
-    if (restrictToMode === 'fertility') return ['overview', 'analyses'].includes(t.id);
+    if (restrictToMode === 'pct') return ['pct-plan'].includes(t.id);
+    if (restrictToMode === 'hrt') return ['hrt'].includes(t.id);
+    if (restrictToMode === 'fertility') return ['overview'].includes(t.id);
     return true;
   });
 
@@ -361,7 +360,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
               <span style={{ color: '#00e68a', fontSize: 14 }}>→</span>
             </button>
 
-            <button onClick={() => setTab('analyses')} style={{
+            <button onClick={() => setTab('overview')} style={{
               width: '100%', padding: 12, borderRadius: 14, cursor: 'pointer', textAlign: 'left' as const,
               background: 'var(--glass-bg)', border: '1px solid rgba(245,158,11,0.2)',
               color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10,
@@ -676,37 +675,6 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
               ))}
             </div>
           </div>
-        </div>
-      )}
-
-      {tab === 'analyses' && (
-        <div>
-          <UnifiedLabPanel
-            showFertilityPhase={true}
-            onValuesChange={(vals) => {
-              if (vals['LH'] !== undefined && vals['LH'] !== lh) setLh(vals['LH']);
-              if (vals['FSH'] !== undefined && vals['FSH'] !== fsh) setFsh(vals['FSH']);
-              if (vals['TT'] !== undefined && vals['TT'] !== tt) setTt(vals['TT']);
-              if (vals['FT'] !== undefined && vals['FT'] !== ft) setFt(vals['FT']);
-              if (vals['E2'] !== undefined && vals['E2'] !== e2) setE2(vals['E2']);
-              if (vals['PRL'] !== undefined && vals['PRL'] !== prl) setPrl(vals['PRL']);
-              if (vals['SHBG'] !== undefined && vals['SHBG'] !== shbg) setShbg(vals['SHBG']);
-              if (vals['INHB'] !== undefined && vals['INHB'] !== inhb) setInhb(vals['INHB']);
-              if (vals['AMH'] !== undefined && vals['AMH'] !== amh) setAmh(vals['AMH']);
-              if (vals['SPERM_VOL'] !== undefined && vals['SPERM_VOL'] !== volume) setVolume(vals['SPERM_VOL']);
-              if (vals['SPERM_CONC'] !== undefined && vals['SPERM_CONC'] !== concentration) setConcentration(vals['SPERM_CONC']);
-              if (vals['SPERM_PR'] !== undefined && vals['SPERM_PR'] !== pr) setPr(vals['SPERM_PR']);
-              if (vals['SPERM_NP'] !== undefined && vals['SPERM_NP'] !== np) setNp(vals['SPERM_NP']);
-              if (vals['SPERM_MORPH'] !== undefined && vals['SPERM_MORPH'] !== morphology) setMorphology(vals['SPERM_MORPH']);
-              if (vals['SPERM_VIT'] !== undefined && vals['SPERM_VIT'] !== viability) setViability(vals['SPERM_VIT']);
-              if (vals['SPERM_PH'] !== undefined && vals['SPERM_PH'] !== ph) setPh(vals['SPERM_PH']);
-              if (vals['SPERM_MAR'] !== undefined && vals['SPERM_MAR'] !== mar) setMar(vals['SPERM_MAR']);
-              if (vals['SPERM_LEUK'] !== undefined && vals['SPERM_LEUK'] !== leukocytes) setLeukocytes(vals['SPERM_LEUK']);
-              if (vals['SPERM_DFI'] !== undefined && vals['SPERM_DFI'] !== dfi) setDfi(vals['SPERM_DFI']);
-              if (vals['SPERM_FRUCT'] !== undefined && vals['SPERM_FRUCT'] !== fructose) setFructose(vals['SPERM_FRUCT']);
-              if (vals['SPERM_ZINC'] !== undefined && vals['SPERM_ZINC'] !== zincMmol) setZincMmol(vals['SPERM_ZINC']);
-            }}
-          />
         </div>
       )}
 
