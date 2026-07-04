@@ -28,6 +28,14 @@ export interface WeekProgression {
   rationale: string;
 }
 
+export interface InterMesoStep {
+  mesoIndex: number;
+  startVolumeSets: number;
+  startIntensityPct: number;
+  startRIR: number;
+  growthRationale: string;
+}
+
 const r1 = (v: number) => Math.round(v * 10) / 10;
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -88,6 +96,43 @@ export function generateMesocycleProgression(config: MesocycleConfig): WeekProgr
     });
   }
   return out;
+}
+
+/** Сгенерировать прогрессию МЕЖДУ мезоциклами (Трек Мезо 1→2→3). */
+export function generateInterMesocycleProgression(config: MesocycleConfig, mesoCount: number = 3): InterMesoStep[] {
+  const { startVolumeSets, startIntensityPct, startRIR, goal } = config;
+  const steps: InterMesoStep[] = [];
+  
+  let curVol = startVolumeSets;
+  let curInt = startIntensityPct;
+  let curRir = startRIR;
+
+  // Коэффициенты роста между мезоциклами
+  const growth = {
+    hypertrophy: { vol: 1.08, int: 0.02, rir: 0 },
+    strength: { vol: 1.05, int: 0.03, rir: -0.2 },
+    power: { vol: 1.02, int: 0.04, rir: 0 },
+  }[goal];
+
+  for (let i = 1; i <= mesoCount; i++) {
+    if (i > 1) {
+      curVol = Math.round(curVol * growth.vol);
+      curInt = r2(clamp(curInt + growth.int, 0.5, 1));
+      curRir = r1(clamp(curRir + growth.rir, 0, 5));
+    }
+    
+    steps.push({
+      mesoIndex: i,
+      startVolumeSets: curVol,
+      startIntensityPct: curInt,
+      startRIR: curRir,
+      growthRationale: i === 1 
+        ? "Стартовые параметры первого мезоцикла" 
+        : `Прогрессия от Мезо ${i-1}: объём +${Math.round((growth.vol-1)*100)}%, интенсивность +${Math.round(growth.int*100)}%`,
+    });
+  }
+  
+  return steps;
 }
 
 function phaseLine(phase: MesocyclePhase, goal: MesoGoal, vm: number, ip: number, rir: number, fa: boolean): string {

@@ -28,8 +28,8 @@ export const LABS_PHASES = [
 export const PHASE_REQUIRED_PANELS: Record<string, string[]> = {
   baseline: ['cbc', 'liver_extended', 'kidney', 'electrolytes', 'lipids', 'thyroid', 'glucose', 'iron_studies', 'hormones_androgens', 'adrenal'],
   on_cycle: ['cbc', 'liver_extended', 'kidney', 'electrolytes', 'lipids', 'hormones_androgens', 'glucose', 'iron_studies', 'prostate', 'bone_markers'],
-  pct: ['cbc', 'liver', 'kidney', 'lipids', 'hormones_axis', 'prolactin', 'thyroid', 'adrenal'],
-  bridge: ['cbc', 'liver', 'kidney', 'lipids', 'thyroid', 'bone_markers'],
+  pct: ['cbc', 'liver', 'kidney', 'lipids', 'hormones_axis', 'prolactin', 'thyroid', 'adrenal', 'iron_studies'],
+  bridge: ['cbc', 'liver', 'kidney', 'lipids', 'thyroid', 'bone_markers', 'iron_studies'],
   fertility: ['cbc', 'hormones_fertility', 'semen', 'thyroid', 'iron_studies', 'electrolytes', 'prostate']
 };
 
@@ -64,12 +64,13 @@ export const LAB_PANELS: Record<string, LabPanel> = {
   },
   lipids: {
     id: 'lipids',
-    label: 'Липиды',
+    label: 'Липиды + гомоцистеин',
     weight: 1,
     markers: [
       { id: 'ldl', label: 'ЛПНП', unit: 'mmol/L', ref: [0, 3], importance: 'critical', ucumCode: 'LDL' },
       { id: 'hdl', label: 'ЛПВП', unit: 'mmol/L', ref: [1, 2.5], importance: 'important', ucumCode: 'HDL' },
-      { id: 'tg', label: 'Триглицериды', unit: 'mmol/L', ref: [0.4, 1.7], importance: 'important', ucumCode: 'TG' }
+      { id: 'tg', label: 'Триглицериды', unit: 'mmol/L', ref: [0.4, 1.7], importance: 'important', ucumCode: 'TG' },
+      { id: 'homocysteine', label: 'Гомоцистеин', unit: 'umol/L', ref: [5, 15], importance: 'important', ucumCode: 'HOMOCYSTEINE' }
     ]
   },
   thyroid: {
@@ -92,11 +93,12 @@ export const LAB_PANELS: Record<string, LabPanel> = {
   },
   hormones_androgens: {
     id: 'hormones_androgens',
-    label: 'Андрогены',
+    label: 'Андрогены + ИФР-1',
     weight: 1,
     markers: [
       { id: 'tt', label: 'Тестостерон', unit: 'ng/dL', ref: [300, 1000], importance: 'important', ucumCode: 'TT' },
-      { id: 'e2', label: 'Эстрадиол', unit: 'pg/mL', ref: [10, 40], importance: 'important', ucumCode: 'E2' }
+      { id: 'e2', label: 'Эстрадиол', unit: 'pg/mL', ref: [10, 40], importance: 'important', ucumCode: 'E2' },
+      { id: 'igf1', label: 'ИФР-1', unit: 'ng/mL', ref: [100, 250], importance: 'important', ucumCode: 'IGF1' }
     ]
   },
   hormones_axis: {
@@ -165,11 +167,14 @@ export const LAB_PANELS: Record<string, LabPanel> = {
   },
   iron_studies: {
     id: 'iron_studies',
-    label: 'Железо',
+    label: 'Железо + транспорт',
     weight: 0.9,
     markers: [
       { id: 'ferritin', label: 'Ферритин', unit: 'ug/L', ref: [30, 300], importance: 'critical', ucumCode: 'FERRITIN' },
+      { id: 'iron', label: 'Железо сыв.', unit: 'umol/L', ref: [10, 30], importance: 'important', ucumCode: 'IRON' },
       { id: 'tibc', label: 'ОЖСС', unit: 'umol/L', ref: [45, 70], importance: 'important', ucumCode: 'TIBC' },
+      { id: 'uibc', label: 'Лат. ЖСС', unit: 'umol/L', ref: [20, 45], importance: 'important', ucumCode: 'UIBC' },
+      { id: 'transferrin', label: 'Трансферрин', unit: 'g/L', ref: [2.0, 3.8], importance: 'important', ucumCode: 'TRANSFERRIN' },
       { id: 'hgb', label: 'Гемоглобин', unit: 'g/L', ref: [130, 170], importance: 'important', ucumCode: 'HGB' }
     ]
   },

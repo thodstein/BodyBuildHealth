@@ -1,3 +1,5 @@
+import { FOOD_DB_SUPPLEMENT } from './nutrition-database-supplement';
+
 export interface FoodItem {
   id: string;
   name: string;
@@ -184,6 +186,30 @@ export function enrichFoodItemV2(f: FoodItem): FoodItem {
   const isNut = ['almond', 'walnut', 'nut', 'seed', 'peanut', 'cashew', 'pistachio', 'hazelnut'].some(k => f.id.includes(k));
   const isLegume = ['lentil', 'chickpea', 'bean', 'peas', 'soy', 'tofu', 'tempeh'].some(k => f.id.includes(k));
   const isEgg_sup = f.id.includes('egg');
+  // ─── Supplement-specific classifiers ───
+  const isSuppAnimal = isSupplement && (['whey','casein','collagen','milk','beef','egg'].some(k => f.id.includes(k)) || f.name.includes('сывор') || f.name.includes('казеин'));
+  const isSuppPlant = isSupplement && (['soy','pea','rice','hemp','pumpkin','sunflower','almond','walnut'].some(k => f.id.includes(k)));
+  const isSuppCreatine = isSupplement && f.id.includes('creatine');
+  const isSuppBCAA = isSupplement && (f.id.includes('bcaa') || f.id.includes('eaa') || f.id.includes('amino'));
+  const isSuppFishOil = isSupplement && (f.id.includes('fish_oil') || f.id.includes('omega') || f.id.includes('epa') || f.id.includes('dha'));
+  const hasCaffeine = m.Caffeine ? true : f.id.includes('caffeine') || f.id.includes('pre_workout');
+  const hasAshwagandha = f.id.includes('ashwagandha') || f.id.includes('withania');
+  const hasCordyceps = f.id.includes('cordyceps');
+  const hasReishi = f.id.includes('reishi');
+  const hasRhodiola = f.id.includes('rhodiola');
+  const hasMilkThistle = f.id.includes('milk_thistle') || f.id.includes('silymarin');
+  const hasCollagen = f.id.includes('collagen') || f.id.includes('gelatin');
+  const hasProbiotics = f.id.includes('probiotic') || f.id.includes('digestive');
+  const hasBetaine = f.id.includes('betaine') || f.id.includes('tmg');
+  const hasHMB = f.id.includes('hmb');
+  const hasCLA = f.id.includes('cla');
+  const hasCarnitine = f.id.includes('carnitine');
+  const hasCitrulline = f.id.includes('citrulline');
+  const hasTaurine = f.id.includes('taurine');
+  const hasCarnosine = f.id.includes('carnosine') || f.id.includes('beta_alanine');
+  // Merge supplement type into isAnimal/isPlant for correct macro assignment
+  const effectiveAnimal = isAnimal || isSuppAnimal || (isSupplement && f.protein > 15 && !isSuppPlant);
+  const effectivePlant = isPlant || isSuppPlant || (isSupplement && f.id.includes('soy'));
 
   // saturated fat ratio by food type
   let satRatio = 0.35;
@@ -198,21 +224,21 @@ export function enrichFoodItemV2(f: FoodItem): FoodItem {
   const polyRatio = 0.25;
 
   f.macro_100g = {
-    proteins_animal: isAnimal ? f.protein : 0,
-    proteins_plant: isPlant ? f.protein : 0,
+    proteins_animal: effectiveAnimal ? f.protein : 0,
+    proteins_plant: effectivePlant ? f.protein : 0,
     fats_saturated: Math.round(f.fat * satRatio * 10) / 10,
     fats_monounsaturated: Math.round(f.fat * monoRatio * 10) / 10,
     fats_polyunsaturated: Math.round(f.fat * polyRatio * 10) / 10,
-    omega_3_mg: m.Omega3 ?? (isFish ? Math.round(f.fat * 180) : isNut ? Math.round(f.fat * 50) : 0),
+    omega_3_mg: m.Omega3 ?? (isFish || isSuppFishOil ? Math.round(f.fat * 180) : isNut ? Math.round(f.fat * 50) : hasCarnitine ? 100 : 0),
     omega_6_mg: isNut ? Math.round(f.fat * 200) : isGrain || isLegume ? Math.round(f.fat * 80) : isRedMeat ? Math.round(f.fat * 30) : 0,
-    mct_oil_g: f.id.includes('coconut') || f.id.includes('mct') ? f.fat * 0.6 : 0,
-    cholesterol_mg: m.Cholesterol ?? (isAnimal && !isFish ? Math.round(f.fat * 5) : isFish ? Math.round(f.fat * 4) : 0),
-    carbs_sugar: f.id.includes('sugar') || f.id.includes('syrup') || f.id.includes('honey') ? f.carbs * 0.9 : Math.round(f.carbs * (isFruit ? 0.5 : 0.08) * 10) / 10,
-    insulin_index: Math.min(120, f.gi + (isDairy ? 60 : isGrain ? 5 : 10)),
+    mct_oil_g: f.id.includes('coconut') || f.id.includes('mct') ? f.fat * (isSupplement ? 0.9 : 0.6) : 0,
+    cholesterol_mg: m.Cholesterol ?? (effectiveAnimal && !isFish ? Math.round(f.fat * 5) : isFish ? Math.round(f.fat * 4) : isSuppFishOil ? Math.round(f.fat * 4) : 0),
+    carbs_sugar: f.id.includes('sugar') || f.id.includes('syrup') || f.id.includes('honey') || f.id.includes('dextrose') || f.id.includes('maltodextrin') ? f.carbs * 0.9 : Math.round(f.carbs * (isFruit ? 0.5 : 0.08) * 10) / 10,
+    insulin_index: Math.min(120, f.gi + (isDairy ? 60 : isGrain ? 5 : isSupplement ? 5 : 10)),
   };
 
   // Amino acid ratios: animal vs plant
-  const aaFactor = isLegume ? 0.65 : isGrain ? 0.55 : isAnimal || isFish ? 1.0 : 0.75;
+  const aaFactor = isLegume ? 0.65 : isGrain ? 0.55 : effectiveAnimal || isFish ? 1.0 : isSuppBCAA ? 1.5 : hasCollagen ? 0.6 : 0.75;
   f.amino_acid_profile_100g = {
     leucine_mg: m.Leucine ?? Math.round(f.protein * 42 * aaFactor),
     isoleucine_mg: m.Isoleucine ?? Math.round(f.protein * 25 * aaFactor),
@@ -265,46 +291,46 @@ export function enrichFoodItemV2(f: FoodItem): FoodItem {
   };
 
   f.bioactive_compounds_100g = {
-    creatine_mg: isRedMeat ? Math.round(f.protein * 10) : isFish ? Math.round(f.protein * 5) : 0,
-    beta_alanine_mg: m.BetaAlanine ?? (isRedMeat ? Math.round(f.protein * 3) : 0),
-    taurine_mg: isFish ? Math.round(f.protein * 2) : isRedMeat ? Math.round(f.protein * 1.5) : 0,
+    creatine_mg: isSuppCreatine ? 1000 : isRedMeat ? Math.round(f.protein * 10) : isFish ? Math.round(f.protein * 5) : 0,
+    beta_alanine_mg: m.BetaAlanine ?? (hasCarnosine ? 1000 : isRedMeat ? Math.round(f.protein * 3) : 0),
+    taurine_mg: hasTaurine ? 1000 : isFish ? Math.round(f.protein * 2) : isRedMeat ? Math.round(f.protein * 1.5) : 0,
     lignan_mg: f.id.includes('flax') || f.id.includes('linseed') ? 300 : f.id.includes('sesame') ? 50 : f.id.includes('bread') ? 20 : 0,
     indol_3_carbinol_mg: f.id.includes('broccoli') || f.id.includes('cabbage') || f.id.includes('cauliflower') ? 45 : f.id.includes('kale') ? 35 : 0,
   };
 
   f.gastro_tags = {
-    fodmap_group: (f.fiber > 3 && !isGrain) || isDairy || f.id.includes('apple') ? 'LOW' : 'HIGH',
-    enzyme_demand_score: isRedMeat && f.protein > 20 ? 7 : isNut ? 5 : isGrain ? 3 : isLegume ? 5 : isDairy ? 3 : isFish ? 3 : isVegetable ? 2 : 3,
-    gastric_emptying_speed: f.fiber > 6 ? 'SLOW' : f.fat > 20 ? 'SLOW' : isGrain || isLegume ? 'SLOW' : isFish ? 'FAST' : 'MEDIUM',
+    fodmap_group: isSupplement ? 'LOW' : (f.fiber > 3 && !isGrain) || isDairy || f.id.includes('apple') ? 'LOW' : 'HIGH',
+    enzyme_demand_score: isSupplement ? 1 : isRedMeat && f.protein > 20 ? 7 : isNut ? 5 : isGrain ? 3 : isLegume ? 5 : isDairy ? 3 : isFish ? 3 : isVegetable ? 2 : 3,
+    gastric_emptying_speed: isSupplement ? 'FAST' : f.fiber > 6 ? 'SLOW' : f.fat > 20 ? 'SLOW' : isGrain || isLegume ? 'SLOW' : isFish ? 'FAST' : 'MEDIUM',
     allergen_flags: f.allergens,
-    gut_irritant_potential: isDairy || isLegume && f.fiber > 5 ? 'HIGH' : f.gi > 70 ? 'HIGH' : 'LOW',
+    gut_irritant_potential: isDairy && !isSupplement || isLegume && f.fiber > 5 ? 'HIGH' : f.gi > 70 ? 'HIGH' : isSupplement ? 'LOW' : 'LOW',
   };
 
   f.metabolic_flags = {
     atherogenic_potential: (f.macro_100g?.fats_saturated ?? 0) > 8 ? 'HIGH' : 'LOW',
-    glycation_potential: f.gi > 70 || (f.macro_100g?.carbs_sugar ?? 0) > 10 ? 'HIGH' : f.gi > 50 ? 'HIGH' : 'LOW',
-    ammonia_source_level: isRedMeat && f.protein > 22 ? 'HIGH' : isAnimal ? 'MEDIUM' : isLegume ? 'MEDIUM' : 'LOW',
-    heavy_metal_risk: f.id.includes('tuna') || f.id.includes('mackerel') || f.id.includes('herring') || f.id.includes('shark') || f.id.includes('swordfish') ? 'MEDIUM' : 'LOW',
-    cns_impact: m.Caffeine ? 'STIMULANT' : (f.amino_acid_profile_100g?.tryptophan_mg ?? 0) > 200 ? 'SEDATIVE' : 'NEUTRAL',
+    glycation_potential: f.gi > 70 || (f.macro_100g?.carbs_sugar ?? 0) > 10 ? 'HIGH' : f.gi > 50 ? 'HIGH' : isSupplement ? 'LOW' : 'LOW',
+    ammonia_source_level: isRedMeat && f.protein > 22 ? 'HIGH' : effectiveAnimal ? 'MEDIUM' : isLegume ? 'MEDIUM' : 'LOW',
+    heavy_metal_risk: isSuppFishOil && !f.id.includes('mcg') ? 'MEDIUM' : f.id.includes('tuna') || f.id.includes('mackerel') || f.id.includes('herring') || f.id.includes('shark') || f.id.includes('swordfish') ? 'MEDIUM' : 'LOW',
+    cns_impact: hasCaffeine ? 'STIMULANT' : hasAshwagandha || hasRhodiola ? 'SEDATIVE' : hasCordyceps ? 'STIMULANT' : (f.amino_acid_profile_100g?.tryptophan_mg ?? 0) > 200 ? 'SEDATIVE' : 'NEUTRAL',
     goitrogenic_potential: f.id.includes('broccoli') || f.id.includes('cabbage') || f.id.includes('cauliflower') || f.id.includes('kale') ? 'HIGH' : 'LOW',
-    hepatoprotective: f.id.includes('broccoli') || f.id.includes('artichoke') || f.id.includes('curcumin') || f.id.includes('milk_thistle') || f.id.includes('liver') ? true : false,
-    anabolic_potential: isAnimal && f.protein > 22 ? 'HIGH' : isAnimal && f.protein > 15 ? 'MEDIUM' : isLegume && f.protein > 10 ? 'MEDIUM' : 'LOW',
-    detox_support_level: isVegetable && f.fiber > 3 ? 'MEDIUM' : f.id.includes('broccoli') || f.id.includes('cabbage') || isVegetable ? 'LOW' : 'LOW',
+    hepatoprotective: hasMilkThistle || hasAshwagandha || hasCordyceps || hasReishi || f.id.includes('broccoli') || f.id.includes('artichoke') || f.id.includes('curcumin') || f.id.includes('liver') ? true : false,
+    anabolic_potential: isSuppCreatine || hasHMB ? 'MEDIUM' : effectiveAnimal && f.protein > 22 ? 'HIGH' : effectiveAnimal && f.protein > 15 ? 'MEDIUM' : isLegume && f.protein > 10 ? 'MEDIUM' : 'LOW',
+    detox_support_level: hasMilkThistle || hasAshwagandha || hasCordyceps || hasReishi || hasBetaine ? 'HIGH' : isVegetable && f.fiber > 3 ? 'MEDIUM' : 'LOW',
     histamine_level: isFish ? 'MEDIUM' : isDairy || isRedMeat ? 'MEDIUM' : 'LOW',
-    insulin_sensitivity_impact: f.fiber > 5 ? 'POSITIVE' : f.gi > 70 ? 'NEGATIVE' : isNut ? 'POSITIVE' : 'NEUTRAL',
-    thyroid_support_level: isFish && (f.trace_elements_100g?.iodine_mcg ?? 0) > 30 ? 'MEDIUM' : 'LOW',
+    insulin_sensitivity_impact: hasCLA || f.fiber > 5 ? 'POSITIVE' : f.gi > 70 ? 'NEGATIVE' : isNut ? 'POSITIVE' : 'NEUTRAL',
+    thyroid_support_level: f.id.includes('thyroid') || (isFish && (f.trace_elements_100g?.iodine_mcg ?? 0) > 30) ? 'MEDIUM' : 'LOW',
   };
 
   f.specific_compounds_100g = {
-    polyphenols_mg: isFruit ? 100 : isVegetable ? 60 : isNut ? 200 : isLegume ? 80 : isGrain ? 15 : (isBeverage && (f.id.includes('coffee') || f.id.includes('tea'))) ? 200 : 0,
-    flavonoids_mg: isFruit ? 40 : isVegetable ? 20 : isLegume ? 25 : isNut ? 10 : 0,
+    polyphenols_mg: hasAshwagandha ? 300 : hasCordyceps ? 200 : isFruit ? 100 : isVegetable ? 60 : isNut ? 200 : isLegume ? 80 : isGrain ? 15 : (isBeverage && (f.id.includes('coffee') || f.id.includes('tea'))) ? 200 : 0,
+    flavonoids_mg: isFruit ? 40 : isVegetable ? 20 : isLegume ? 25 : isNut ? 10 : hasMilkThistle ? 500 : 0,
     curcumin_mg: f.id.includes('turmeric') || f.id.includes('curcuma') ? 100 : 0,
     sulforaphane_mg: f.id.includes('broccoli') || f.id.includes('cauliflower') || f.id.includes('cabbage') ? 45 : 0,
     resveratrol_mg: f.id.includes('grape') || f.id.includes('blueberry') || f.id.includes('peanut') || f.id.includes('pistachio') ? 5 : f.id.includes('cocoa') || f.id.includes('chocolate') ? 3 : 0,
     lectins_mg: isLegume ? 150 : isGrain ? 30 : isNut ? 10 : 0,
     oxalates_mg: f.id.includes('spinach') ? 750 : f.id.includes('beetroot') ? 600 : f.id.includes('rhubarb') ? 500 : f.id.includes('kale') ? 20 : f.id.includes('almond') ? 120 : isNut ? 30 : isLegume ? 20 : isVegetable ? 10 : 0,
     phytoestrogens_mg: f.id.includes('soy') || f.id.includes('tofu') || f.id.includes('tempeh') ? 50 : f.id.includes('flax') || f.id.includes('linseed') ? 200 : isLegume ? 5 : 0,
-    alpha_lipoic_acid_mg: isRedMeat ? 3 : f.id.includes('broccoli') ? 3 : f.id.includes('spinach') ? 2 : isFish ? 1 : isEgg_sup ? 0.5 : isVegetable ? 1 : 0,
+    alpha_lipoic_acid_mg: isRedMeat ? 3 : f.id.includes('broccoli') ? 3 : f.id.includes('spinach') ? 2 : isFish ? 1 : isEgg_sup ? 0.5 : isVegetable ? 1 : hasCarnitine ? 100 : 0,
     coenzyme_q10_mg: isRedMeat ? 3 : isFish ? 4 : isNut ? 1 : isEgg_sup ? 2 : f.id.includes('chicken') ? 1.5 : f.id.includes('broccoli') ? 0.9 : isVegetable ? 0.5 : 0,
     berberine_mg: f.id.includes('barberry') || f.id.includes('goldenseal') || f.id.includes('oregon_grape') ? 50 : 0,
   };
@@ -1355,6 +1381,9 @@ export const FOOD_DB: FoodItem[] = [
   {id:"int_quesadilla_cheese",name:"Кесадилья с сыром",category:"other",kcal:330,protein:14,fat:18,carbs:28,fiber:2,gi:60,servingSize:"200 г",micros:{Ca:250,Fe:1,Zn:1.5,P:150}}
 ];
 
+// ─── Merge supplement (510 products) into FOOD_DB ───
+(FOOD_DB as FoodItem[]).push(...FOOD_DB_SUPPLEMENT);
+
 export const FOOD_ALLERGEN_DIET: Record<string, { allergens: string[]; isVegetarian: boolean; isVegan: boolean; isGlutenFree: boolean; isDairyFree: boolean; dietTags: string[] }> = {
   chicken_breast: { allergens: [], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
   turkey_breast: { allergens: [], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
@@ -1486,11 +1515,81 @@ const RATION_TIERS: Record<string, { basic: string[]; mid: string[]; max: string
     max: [],
   },
   supplement: {
-    basic: ['creatine', 'fish_oil', 'vitamin_complex'],
-    mid: ['bcaa', 'glutamine', 'casein', 'marmalade', 'corn_flakes', 'dates'],
-    max: ['amylopectin', 'dextrose'],
+    basic: ['creatine', 'fish_oil', 'vitamin_complex', 'supp_whey_hydro', 'supp_eaas', 'supp_collagen'],
+    mid: ['bcaa', 'glutamine', 'casein', 'marmalade', 'corn_flakes', 'dates', 'supp_hmb', 'supp_cla', 'supp_zma', 'supp_beta_alanine'],
+    max: ['amylopectin', 'dextrose', 'supp_mass_gainer', 'supp_citrulline', 'supp_cordyceps'],
   },
 };
+
+// ─── Extend RATION_TIERS with supplement products ───
+(function extendRationTiers() {
+  const extendedProtein = RATION_TIERS.protein;
+  extendedProtein.basic.push(
+    'poultry_duck_breast','poultry_turkey_drumstick','poultry_turkey_ground_lean',
+    'fish_salmon_wild','fish_trout_rainbow','fish_tuna_steak',
+    'meat_beef_ground_93','meat_beef_skirt','meat_beef_flank',
+    'meat_game_venison','meat_game_rabbit',
+    'seafood_shrimp_tiger','seafood_tuna_canned_water'
+  );
+  extendedProtein.mid.push(
+    'poultry_duck_leg','poultry_turkey_wing','poultry_pheasant',
+    'fish_halibut','fish_sea_bass','fish_cod_liver',
+    'meat_lamb_leg_roast','meat_lamb_chop',
+    'meat_beef_sirloin','meat_beef_ribeye_fresh',
+    'meat_pork_tenderloin_raw','seafood_crab','seafood_scallops'
+  );
+  extendedProtein.max.push(
+    'fish_salmon_atlantic','fish_eel','fish_red_snapper',
+    'meat_beef_tenderloin_fresh','meat_beef_wagyu',
+    'seafood_lobster','seafood_oysters',
+    'egg_quail','egg_omega3'
+  );
+  RATION_TIERS.carb.basic.push('grain_barley','grain_couscous','grain_bulgur','grain_millet','grain_semolina','grain_wheat_germ');
+  RATION_TIERS.carb.mid.push('grain_amaranth','grain_spelt','grain_wild_rice','grain_black_rice','grain_red_rice','grain_teff','bread_rye_crispbread','pasta_soba');
+  RATION_TIERS.carb.max.push('grain_quinoa_red','grain_kamut','grain_einkorn','grain_teff_whole');
+  RATION_TIERS.fat.basic.push('oil_grapeseed_cold','oil_coconut_extra','oil_flaxseed_cold');
+  RATION_TIERS.fat.mid.push('oil_avocado_cold','oil_walnut_pressed','oil_sesame_toasted','oil_hemp_organic','nut_macadamia','nut_pecan','nut_brazil','seed_hemp','seed_poppy','seed_pumpkin');
+  RATION_TIERS.fat.max.push('nut_pine','seed_chia','oil_macadamia','oil_perilla');
+  RATION_TIERS.dairy.basic.push('dairy_mozzarella','dairy_ricotta','dairy_quark','dairy_skyr','dairy_kefir_0');
+  RATION_TIERS.dairy.mid.push('cheese_parmesan','cheese_gouda','cheese_feta','cheese_halloumi','cheese_goat_soft','dairy_ayran','dairy_buttermilk','dairy_cream_10');
+  RATION_TIERS.dairy.max.push('cheese_brie','cheese_camembert','cheese_blue','cheese_manchego','cheese_pecorino');
+  RATION_TIERS.veg_fruit.basic.push(
+    'veg_cauliflower','veg_kale','veg_zucchini_green','veg_arugula','veg_romaine','veg_celery_stalks',
+    'fruit_apple_green','fruit_blueberry','fruit_strawberry','fruit_grapefruit',
+    'mush_shiitake','mush_cremini','mush_portobello'
+  );
+  RATION_TIERS.veg_fruit.mid.push(
+    'veg_brussels_sprouts','veg_asparagus_green','veg_bell_pepper_red','veg_cabbage_red','veg_daikon',
+    'fruit_raspberry','fruit_blackberry','fruit_cherry','fruit_pomegranate_fresh',
+    'mush_porcini','mush_maitake','mush_enoki',
+    'herb_fresh_basil','herb_fresh_cilantro','herb_fresh_parsley'
+  );
+  RATION_TIERS.veg_fruit.max.push(
+    'veg_artichoke_globe','veg_bok_choy','veg_collard_greens','veg_fennel',
+    'fruit_goji_berry','fruit_acai','fruit_papaya',
+    'mush_truffle','mush_chanterelle','mush_morel',
+    'herb_fresh_mint','herb_fresh_rosemary','herb_fresh_thyme'
+  );
+  // ─── Extend supplement tier with new products ───
+  RATION_TIERS.supplement.basic.push(
+    'supp_whey_hydro','supp_eaas','supp_collagen','supp_peptopro',
+    'supp_beef_isolate','supp_egg_protein','supp_soy_isolate','supp_pea_protein',
+    'supp_probiotics'
+  );
+  RATION_TIERS.supplement.mid.push(
+    'supp_beta_alanine','supp_citrulline','supp_carnitine','supp_taurine',
+    'supp_zma','supp_melatonin','supp_5htp','supp_gaba',
+    'supp_hmb','supp_cla',
+    'supp_arginine','supp_ornithine','supp_ashwagandha','supp_rhodiola',
+    'supp_cordyceps','supp_reishi',
+    'supp_tyrosine','supp_betaine','supp_digestive_enzymes'
+  );
+  RATION_TIERS.supplement.max.push(
+    'supp_mass_gainer','supp_pre_workout','supp_creatine_hcl',
+    'supp_creatine_ethyl','supp_mct_oil','supp_carnosine',
+    'supp_colostrum'
+  );
+})();
 
 export interface FoodFilter {
   dietType?: 'omnivore' | 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'paleo' | 'mediterranean';
@@ -1560,6 +1659,19 @@ export function getTopByFat(limit: number, filter?: FoodFilter): FoodItem[] {
     .filter(f => f.fat > 5 && f.category !== 'supplement' && matchesFilter(f, filter))
     .sort((a, b) => (b.fat / Math.max(b.kcal, 1)) - (a.fat / Math.max(a.kcal, 1)))
     .slice(0, limit));
+}
+
+export function getTopSupplements(limit: number, purpose?: 'protein' | 'pre_workout' | 'recovery' | 'general', filter?: FoodFilter): FoodItem[] {
+  let filtered = [...FOOD_DB].filter(f => f.category === 'supplement' && matchesFilter(f, filter));
+  if (purpose === 'protein') {
+    filtered = filtered.filter(f => f.protein > 50);
+  } else if (purpose === 'pre_workout') {
+    filtered = filtered.filter(f => (f.micros?.Caffeine ?? 0) > 0 || f.id.includes('creatine') || f.id.includes('citrulline') || f.id.includes('beta_alanine'));
+  } else if (purpose === 'recovery') {
+    filtered = filtered.filter(f => f.id.includes('casein') || f.id.includes('collagen') || f.id.includes('zma') || f.id.includes('glutamine') || f.id.includes('bcaa'));
+  }
+  filtered.sort((a, b) => (b.bb_quality_score ?? 5) - (a.bb_quality_score ?? 5));
+  return applyDietTags(filtered.slice(0, limit));
 }
 
 export { RATION_TIERS };
@@ -1772,9 +1884,159 @@ export { RATION_TIERS };
       specific_compounds_100g: { polyphenols_mg:0,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0,berberine_mg:0 },
       bb_quality_score: 9.0,
     },
+    // ─── Supplement overrides (key sports nutrition products) ───
+    casein: {
+      amino_acid_profile_100g: { leucine_mg:1900,isoleucine_mg:1100,valine_mg:1200,lysine_mg:1700,methionine_mg:520,arginine_mg:700,glutamine_mg:2600,tryptophan_mg:240,phenylalanine_mg:1050,threonine_mg:950,histidine_mg:580,cysteine_mg:120 },
+      specific_compounds_100g: { polyphenols_mg:0,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0,berberine_mg:0 },
+      bb_quality_score: 8.5,
+    },
+    creatine: {
+      macro_100g: { proteins_animal:0,proteins_plant:0, fats_saturated:0,fats_monounsaturated:0,fats_polyunsaturated:0, omega_3_mg:0,omega_6_mg:0, mct_oil_g:0,cholesterol_mg:0, carbs_sugar:0,insulin_index:10 },
+      amino_acid_profile_100g: { leucine_mg:0,isoleucine_mg:0,valine_mg:0,lysine_mg:0,methionine_mg:0,arginine_mg:0,glutamine_mg:0,tryptophan_mg:0,phenylalanine_mg:0,threonine_mg:0,histidine_mg:0,cysteine_mg:0 },
+      bioactive_compounds_100g: { creatine_mg:1000,beta_alanine_mg:0,taurine_mg:0,lignan_mg:0,indol_3_carbinol_mg:0 },
+      metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'LOW',ammonia_source_level:'LOW',heavy_metal_risk:'LOW',cns_impact:'NEUTRAL',goitrogenic_potential:'LOW',hepatoprotective:false,anabolic_potential:'MEDIUM',detox_support_level:'LOW',histamine_level:'LOW',insulin_sensitivity_impact:'POSITIVE',thyroid_support_level:'LOW' },
+      bb_quality_score: 8.5,
+    },
+    fish_oil: {
+      macro_100g: { proteins_animal:0,proteins_plant:0, fats_saturated:3,fats_monounsaturated:2.5,fats_polyunsaturated:35, omega_3_mg:30000,omega_6_mg:2000, mct_oil_g:0,cholesterol_mg:0, carbs_sugar:0,insulin_index:5 },
+      specific_compounds_100g: { polyphenols_mg:0,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0,berberine_mg:0 },
+      metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'LOW',ammonia_source_level:'LOW',heavy_metal_risk:'MEDIUM',cns_impact:'NEUTRAL',goitrogenic_potential:'LOW',hepatoprotective:true,anabolic_potential:'LOW',detox_support_level:'MEDIUM',histamine_level:'LOW',insulin_sensitivity_impact:'POSITIVE',thyroid_support_level:'LOW' },
+      bb_quality_score: 9.0,
+    },
+    bcaa: {
+      amino_acid_profile_100g: { leucine_mg:5000,isoleucine_mg:2500,valine_mg:2500,lysine_mg:0,methionine_mg:0,arginine_mg:0,glutamine_mg:0,tryptophan_mg:0,phenylalanine_mg:0,threonine_mg:0,histidine_mg:0,cysteine_mg:0 },
+      specific_compounds_100g: { polyphenols_mg:0,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0,berberine_mg:0 },
+      bb_quality_score: 7.5,
+    },
+    glutamine: {
+      amino_acid_profile_100g: { leucine_mg:0,isoleucine_mg:0,valine_mg:0,lysine_mg:0,methionine_mg:0,arginine_mg:0,glutamine_mg:10000,tryptophan_mg:0,phenylalanine_mg:0,threonine_mg:0,histidine_mg:0,cysteine_mg:0 },
+      bb_quality_score: 7.0,
+    },
+    whey_isolate: {
+      amino_acid_profile_100g: { leucine_mg:3100,isoleucine_mg:1800,valine_mg:1900,lysine_mg:2900,methionine_mg:850,arginine_mg:1100,glutamine_mg:4200,tryptophan_mg:400,phenylalanine_mg:1500,threonine_mg:1600,histidine_mg:900,cysteine_mg:500 },
+      bb_quality_score: 9.5,
+    },
+    // ─── Supplement file additions (supp_* prefix) ───
+    supp_whey_hydro: {
+      amino_acid_profile_100g: { leucine_mg:3500,isoleucine_mg:2000,valine_mg:2100,lysine_mg:3100,methionine_mg:900,arginine_mg:1200,glutamine_mg:4500,tryptophan_mg:420,phenylalanine_mg:1600,threonine_mg:1700,histidine_mg:950,cysteine_mg:550 },
+      bb_quality_score: 9.5,
+    },
+    supp_eaas: {
+      amino_acid_profile_100g: { leucine_mg:4500,isoleucine_mg:2200,valine_mg:2200,lysine_mg:3500,methionine_mg:1000,arginine_mg:500,glutamine_mg:1000,tryptophan_mg:500,phenylalanine_mg:1500,threonine_mg:2000,histidine_mg:1000,cysteine_mg:500 },
+      bb_quality_score: 8.0,
+    },
+    supp_collagen: {
+      amino_acid_profile_100g: { leucine_mg:800,isoleucine_mg:600,valine_mg:700,lysine_mg:900,methionine_mg:200,arginine_mg:2000,glutamine_mg:2500,tryptophan_mg:0,phenylalanine_mg:600,threonine_mg:600,histidine_mg:350,cysteine_mg:50 },
+      macro_100g: { proteins_animal:90,proteins_plant:0, fats_saturated:0,fats_monounsaturated:0,fats_polyunsaturated:0, omega_3_mg:0,omega_6_mg:0, mct_oil_g:0,cholesterol_mg:0, carbs_sugar:0,insulin_index:20 },
+      metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'LOW',ammonia_source_level:'LOW',heavy_metal_risk:'LOW',cns_impact:'NEUTRAL',goitrogenic_potential:'LOW',hepatoprotective:false,anabolic_potential:'LOW',detox_support_level:'LOW',histamine_level:'LOW',insulin_sensitivity_impact:'NEUTRAL',thyroid_support_level:'LOW' },
+      bb_quality_score: 6.5,
+    },
+    supp_beta_alanine: {
+      specific_compounds_100g: { polyphenols_mg:0,flavonoids_mg:0,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0,berberine_mg:0 },
+      bb_quality_score: 7.0,
+    },
+    supp_citrulline: {
+      amino_acid_profile_100g: { leucine_mg:0,isoleucine_mg:0,valine_mg:0,lysine_mg:0,methionine_mg:0,arginine_mg:8500,glutamine_mg:0,tryptophan_mg:0,phenylalanine_mg:0,threonine_mg:0,histidine_mg:0,cysteine_mg:0 },
+      bb_quality_score: 7.5,
+    },
+    supp_zma: {
+      trace_elements_100g: { iron_total_mg:0,iron_heme_mg:0,zinc_mg:30,selenium_mcg:0,copper_mg:0,manganese_mg:0,iodine_mcg:0,chromium_mcg:0 },
+      electrolytes_100g: { sodium_mg:0,potassium_mg:0,magnesium_mg:450,calcium_mg:0,phosphorus_mg:0,pral_index:0 },
+      vitamins_100g: { vitamin_a_mcg:0,vitamin_c_mg:0,vitamin_d_mcg:0,vitamin_e_mg:0,vitamin_k_mcg:0,vitamin_b1_mg:0,vitamin_b2_mg:0,vitamin_b3_mg:0,vitamin_b5_mg:0,vitamin_b6_mg:35,vitamin_b7_mcg:0,vitamin_b9_mcg:0,vitamin_b12_mcg:0 },
+      bb_quality_score: 8.0,
+    },
+    supp_mass_gainer: {
+      macro_100g: { proteins_animal:15,proteins_plant:5, fats_saturated:1,fats_monounsaturated:1,fats_polyunsaturated:0.5, omega_3_mg:20,omega_6_mg:150, mct_oil_g:0,cholesterol_mg:5, carbs_sugar:20,insulin_index:75 },
+      bb_quality_score: 5.5,
+    },
+    supp_hmb: {
+      macro_100g: { proteins_animal:0,proteins_plant:0, fats_saturated:0,fats_monounsaturated:0,fats_polyunsaturated:0, omega_3_mg:0,omega_6_mg:0, mct_oil_g:0,cholesterol_mg:0, carbs_sugar:0,insulin_index:5 },
+      bb_quality_score: 7.5,
+    },
+    supp_cla: {
+      macro_100g: { proteins_animal:0,proteins_plant:0, fats_saturated:1,fats_monounsaturated:2,fats_polyunsaturated:80, omega_3_mg:0,omega_6_mg:75000, mct_oil_g:0,cholesterol_mg:0, carbs_sugar:0,insulin_index:5 },
+      bb_quality_score: 6.0,
+    },
+    supp_cordyceps: {
+      specific_compounds_100g: { polyphenols_mg:500,flavonoids_mg:200,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0,berberine_mg:0 },
+      bb_quality_score: 7.5,
+    },
+    supp_ashwagandha: {
+      specific_compounds_100g: { polyphenols_mg:800,flavonoids_mg:300,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:0,lectins_mg:0,oxalates_mg:0,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0,berberine_mg:0 },
+      bb_quality_score: 7.5,
+    },
+    // ─── Key produce overrides ───
+    veg_kale: {
+      specific_compounds_100g: { polyphenols_mg:200,flavonoids_mg:120,curcumin_mg:0,sulforaphane_mg:35,resveratrol_mg:0,lectins_mg:0,oxalates_mg:20,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0.5,berberine_mg:0 },
+      bb_quality_score: 9.0,
+    },
+    veg_cauliflower: {
+      specific_compounds_100g: { polyphenols_mg:50,flavonoids_mg:20,curcumin_mg:0,sulforaphane_mg:30,resveratrol_mg:0,lectins_mg:0,oxalates_mg:5,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0.5,berberine_mg:0 },
+      bb_quality_score: 8.0,
+    },
+    fruit_blueberry: {
+      specific_compounds_100g: { polyphenols_mg:500,flavonoids_mg:150,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:5,lectins_mg:0,oxalates_mg:5,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0.5,berberine_mg:0 },
+      bb_quality_score: 8.5,
+    },
+    fruit_strawberry: {
+      specific_compounds_100g: { polyphenols_mg:300,flavonoids_mg:100,curcumin_mg:0,sulforaphane_mg:0,resveratrol_mg:2,lectins_mg:0,oxalates_mg:5,phytoestrogens_mg:0,alpha_lipoic_acid_mg:0,coenzyme_q10_mg:0.3,berberine_mg:0 },
+      bb_quality_score: 8.0,
+    },
+    seed_chia: {
+      macro_100g: { proteins_animal:0,proteins_plant:16, fats_saturated:3.3,fats_monounsaturated:2.3,fats_polyunsaturated:24, omega_3_mg:18000,omega_6_mg:5800, mct_oil_g:0,cholesterol_mg:0, carbs_sugar:0,insulin_index:10 },
+      bb_quality_score: 9.0,
+    },
+    nut_brazil: {
+      trace_elements_100g: { iron_total_mg:2.4,iron_heme_mg:0,zinc_mg:4,selenium_mcg:1917,copper_mg:1.7,manganese_mg:1.2,iodine_mcg:2,chromium_mcg:5 },
+      bb_quality_score: 8.5,
+    },
   };
   for (const [id, override] of Object.entries(overrides)) {
     const idx = FOOD_DB.findIndex(f => f.id === id);
     if (idx >= 0) Object.assign(FOOD_DB[idx], override);
+  }
+})();
+
+// ─── Auto-generate FOOD_ALLERGEN_DIET entries for new products ───
+(function autoGenAllergenDiet() {
+  for (let i = 0; i < FOOD_DB.length; i++) {
+    const f = FOOD_DB[i];
+    if (FOOD_ALLERGEN_DIET[f.id]) continue;
+    const cat = f.category;
+    const isMeatOrFish = cat === 'protein' && !f.name.includes('тофу') && !f.name.includes('темпе') && !f.name.includes('протеин');
+    const isDairy = cat === 'dairy';
+    const isVegVegan = cat === 'veg_fruit' || cat === 'grain' || cat === 'carb';
+    const isFat = cat === 'fat';
+    const isSupp = cat === 'supplement';
+    const isOther = cat === 'other' || cat === 'fast_food';
+    const hasGluten = ['grain', 'carb'].includes(cat) || f.id.includes('bread') || f.id.includes('pasta') || f.id.includes('noodle') || f.id.includes('flour') || f.id.includes('cereal');
+    const hasDairy = isDairy || f.id.includes('milk') || f.id.includes('cheese') || f.id.includes('cream') || f.id.includes('yogurt') || f.id.includes('kefir');
+    const hasFish = f.id.includes('fish') || f.id.includes('salmon') || f.id.includes('tuna') || f.id.includes('cod') || f.id.includes('herring') || f.id.includes('mackerel') || f.id.includes('sardine') || f.id.includes('trout');
+    const hasShellfish = f.id.includes('shrimp') || f.id.includes('crab') || f.id.includes('lobster') || f.id.includes('mussel') || f.id.includes('clam') || f.id.includes('oyster') || f.id.includes('scallop') || f.id.includes('octopus') || f.id.includes('squid');
+    const hasEggs = f.id.includes('egg');
+    const hasNuts = f.id.includes('almond') || f.id.includes('walnut') || f.id.includes('cashew') || f.id.includes('pistachio') || f.id.includes('hazelnut') || f.id.includes('pecan') || f.id.includes('macadamia') || f.id.includes('nut') || f.id.includes('peanut');
+    const hasSoy = f.id.includes('soy') || f.id.includes('tofu') || f.id.includes('tempeh') || f.id.includes('edamame');
+    const allergens: string[] = [];
+    if (hasFish) allergens.push('fish');
+    if (hasShellfish) allergens.push('shellfish');
+    if (hasDairy) allergens.push('dairy');
+    if (hasEggs) allergens.push('eggs');
+    if (hasNuts) allergens.push('tree_nuts');
+    if (hasSoy) allergens.push('soy');
+    if (hasGluten) allergens.push('gluten');
+    const isVegetarian = !isMeatOrFish && !f.id.includes('beef') && !f.id.includes('pork') && !f.id.includes('lamb') && !f.id.includes('chicken') && !f.id.includes('turkey') && !f.id.includes('duck') && !f.id.includes('goose') && !f.id.includes('rabbit') && !f.id.includes('venison') && !f.id.includes('bison') && !f.id.includes('elk') && !f.id.includes('boar') && !f.id.includes('game');
+    const isVegan = isVegetarian && !hasDairy && !hasEggs && !f.id.includes('honey');
+    const dietTags: string[] = [];
+    if (['protein', 'fat', 'veg_fruit'].includes(cat) || f.carbs < 10) dietTags.push('keto');
+    if (!hasGluten && !['grain', 'carb'].includes(cat)) dietTags.push('paleo');
+    if (!isMeatOrFish || hasFish) dietTags.push('mediterranean');
+    FOOD_ALLERGEN_DIET[f.id] = {
+      allergens,
+      isVegetarian,
+      isVegan,
+      isGlutenFree: !hasGluten,
+      isDairyFree: !hasDairy,
+      dietTags,
+    };
   }
 })();

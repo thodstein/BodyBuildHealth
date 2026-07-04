@@ -40,6 +40,23 @@ import { TrainingScoreCard } from '../components/TrainingScoreCard';
 import { ReadinessForecastCard } from './TrainingScreen_parts/ReadinessForecastCard';
 import { lmsPlanToSessions, bbPlanToSessions, autoregPlan as autoregPlanBridge, progressFromSessions, planVsFact } from '../../engines/training-integration.engine';
 import type { BridgeSession, ReadinessInput, ProgressSnapshot } from '../../engines/training-integration.engine';
+import { generateRepTempo, type RepTempoOutput } from '../../engines/rep-tempo-engine';
+import { MesocycleProgressionCard } from './TrainingScreen_parts/MesocycleProgressionCard';
+
+const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepTempoOutput => {
+  const isCompound = !exerciseName.toLowerCase().includes('сгибан') &&
+    !exerciseName.toLowerCase().includes('разгибан') &&
+    !exerciseName.toLowerCase().includes('подъём') &&
+    !exerciseName.toLowerCase().includes('махи');
+  return generateRepTempo({
+    goal: goal === 'strength' ? 'strength' : goal === 'mass' || goal === 'bulk' ? 'hypertrophy' : 'hypertrophy',
+    riskLevel: 'low',
+    difficultyLevel: 'medium',
+    techniqueIssues: [],
+    isMainLift,
+  });
+};
+
 type Mode = 'pl' | 'bb' | 'manual';
 
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: '12px', margin: '6px 0' };
@@ -82,7 +99,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), pmSquat, pmBench, pmDead, bodyWeight: bw }); } catch { /* ignore */ } }, [pmSquat, pmBench, pmDead, bw]);
   // U4: ручная правка поверх сгенерированного плана (оверлей правок по позиции сета)
   const [editMode, setEditMode] = useState<boolean>(false);
-  const [srcEdits, setSrcEdits] = useState<Record<string, { weight?: number; reps?: number; sets?: number }>>({});
+  const [srcEdits, setSrcEdits] = useState<Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string }>>({});
   const setKey = (w: number, di: number, ei: number, si: number) => `${w}_${di}_${ei}_${si}`;
   const effSet = (w: number, di: number, ei: number, si: number, ws: { sets: number; reps: number; weight: number; pct: number }) => {
     const ed = srcEdits[setKey(w, di, ei, si)];
@@ -476,16 +493,25 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   </div>
                   {!editMode && (
                     <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:8, overflow:'hidden', border:'1px solid rgba(255,255,255,0.06)' }}>
-                      <div style={{ display:'grid', gridTemplateColumns:'2.2fr 0.5fr 1.3fr', gap:2, padding:'5px 8px', fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', background:'rgba(0,230,138,0.05)' }}>
-                        <span>Упражнение</span><span>Нагр.</span><span>Подходы</span>
+                      <div style={{ display:'grid', gridTemplateColumns:'2fr 0.5fr 1.1fr 0.7fr', gap:2, padding:'5px 8px', fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', background:'rgba(0,230,138,0.05)' }}>
+                        <span>Упражнение</span><span>Нагр.</span><span>Подходы</span><span>Темп</span>
                       </div>
-                      {d.exercises.map((e, ei) => (
-                        <div key={ei} style={{ display:'grid', gridTemplateColumns:'2.2fr 0.5fr 1.3fr', gap:2, padding:'5px 8px', fontSize:10, color:'rgba(255,255,255,0.9)', borderTop:'1px solid rgba(255,255,255,0.04)', alignItems:'center' }}>
-                          <span style={{ fontWeight:600 }}>{e.name}</span>
-                          <span style={{ fontSize:9, fontWeight:700, color:e.load === 'main' ? '#00e68a' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.4)' }}>{e.load === 'main' ? 'ОСН' : e.load === 'additional' ? 'ДОП' : 'АКС'}</span>
-                          <span style={{ color:'rgba(255,255,255,0.85)' }}>{e.workSets.map((ws, si) => setStr(effSet(wk.week, di, ei, si, ws))).join('  ·  ')}</span>
-                        </div>
-                      ))}
+                       {d.exercises.map((e, ei) => {
+                         const tmpo = getTempo(e.name, goal, e.load === 'main');
+                         const currentT = e.workSets.map((ws, si) => {
+                           const k = setKey(wk.week, di, ei, si);
+                           return srcEdits[k]?.tempo || tmpo.tempo.toString;
+                         });
+                         return (
+                         <div key={ei} style={{ display:'grid', gridTemplateColumns:'2fr 0.5fr 1.1fr 0.7fr', gap:2, padding:'5px 8px', fontSize:10, color:'rgba(255,255,255,0.9)', borderTop:'1px solid rgba(255,255,255,0.04)', alignItems:'center' }}>
+                           <span style={{ fontWeight:600 }}>{e.name}</span>
+                           <span style={{ fontSize:9, fontWeight:700, color:e.load === 'main' ? '#00e68a' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.4)' }}>{e.load === 'main' ? 'ОСН' : e.load === 'additional' ? 'ДОП' : 'АКС'}</span>
+                           <span style={{ color:'rgba(255,255,255,0.85)' }}>{e.workSets.map((ws, si) => setStr(effSet(wk.week, di, ei, si, ws))).join('  ·  ')}</span>
+                           <span style={{ fontSize:8, color:'#a855f7', fontWeight:700, background:'rgba(168,85,247,0.1)', padding:'2px 6px', borderRadius:4, textAlign:'center' }}>{currentT[0]}</span>
+                         </div>
+                         );
+                       })}
+
                     </div>
                   )}
                   {editMode && d.exercises.map((e, ei) => (
@@ -500,14 +526,16 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                         {editMode ? (
                           <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
                             {e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); const es = effSet(wk.week, di, ei, si, ws); const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'2px 4px', fontSize:9, textAlign:'center' }; return (
-                              <div key={si} style={{ display:'flex', gap:3, alignItems:'center' }}>
-                                <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>С{si+1}</span>
-                                <input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], weight: +ev.target.value } }))} style={{ ...INM, width:44 }} />
-                                <span style={{ fontSize:7 }}>×</span>
-                                <input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, width:32 }} />
-                                <span style={{ fontSize:7 }}>×</span>
-                                <input type='number' value={es.sets} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], sets: +ev.target.value } }))} style={{ ...INM, width:28 }} />
-                              </div>
+                               <div key={si} style={{ display:'flex', gap:3, alignItems:'center' }}>
+                                 <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>С{si+1}</span>
+                                 <input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], weight: +ev.target.value } }))} style={{ ...INM, width:44 }} />
+                                 <span style={{ fontSize:7 }}>×</span>
+                                 <input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, width:32 }} />
+                                 <span style={{ fontSize:7 }}>×</span>
+                                 <input type='number' value={es.sets} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], sets: +ev.target.value } }))} style={{ ...INM, width:28 }} />
+                                 <input type='text' value={srcEdits[k]?.tempo || ''} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], tempo: ev.target.value } }))} style={{ ...INM, width:56, textAlign:'center', color:'#a855f7', fontWeight:700 }} placeholder='3-1-1-0' />
+                               </div>
+
                             ); })}
                           </div>
                         ) : e.workSets.map((ws, si) => (
@@ -541,6 +569,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>УОИ: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.uoi.toFixed(3)}</b></div>
                 </div>
               </MetricCard>
+              <MesocycleProgressionCard weeks={totalW} startVolumeSets={Math.round(W.reduce((s, w) => s + w.days.reduce((ss, d) => ss + d.exercises.reduce((sss, e) => sss + e.workSets.reduce((a, ws) => a + ws.sets, 0), 0), 0), 0) / totalW / (days || 3))} startIntensityPct={0.72} startRIR={3} goal="strength" title="Прогрессия мезоцикла (ПЛ)" />
               {weakPoints.length > 0 && (() => { const eq = loadTrainingProfile().equipment; const eqOk = (e: any) => eq.length === 0 || eq.includes(e.equipment); const GRP_RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' }; const dk0 = dayKey(wk.week, 0); return <MetricCard title='🎯 Рекомендации для слабых групп (добавить аксессуары)' icon='🎯' accent='#ff9100'>
                 {weakPoints.map(g => { const pool = getExercisesByGroup(g).filter(eqOk).filter(e => e.type === 'isolation').slice(0, 3); if (pool.length === 0) return null; return <div key={g} style={{ marginBottom: 6 }}><div style={{ fontSize: 10, fontWeight: 700, color: '#ff9100' }}>{GRP_RU[g] || g}</div>{pool.map(ex => <button key={ex.id} onClick={() => addAccessory(dk0, ex.name, g)} style={{ marginRight: 4, marginBottom: 3, padding: '4px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: '1px solid rgba(255,145,0,0.3)', background: 'rgba(255,145,0,0.08)', color: '#ff9100' }}>＋ {ex.name}</button>)}</div>; })}
                 <div style={{ ...SMALL, color: 'rgba(255,255,255,0.5)' }}>Добавляется в день 1 текущей недели (3×10, вес ~70% от workMax). Можно отредактировать в режиме правки.</div>
@@ -646,20 +675,22 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                       <span style={{ fontSize:9, color:ACCENT, fontWeight:700 }}>{s.sessionTag}</span>
                     </div>
                     <div style={{ padding: '4px 0' }}>
-                      <div style={{ display:'grid', gridTemplateColumns:'1.6fr 0.8fr 0.7fr 0.7fr 0.8fr', gap:2, padding:'4px 10px', fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase' }}>
-                        <span>Мышца</span><span>Характер</span><span>Сеты×повт</span><span>RIR</span><span>Вес</span>
+                      <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr', gap:2, padding:'4px 10px', fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase' }}>
+                        <span>Мышца</span><span>Характер</span><span>Сеты×повт</span><span>RIR</span><span>Вес</span><span>Темп</span>
                       </div>
                       {s.exercises.map((e, ei) => {
                         const rawW = e.workSets[0].weight;
                         const adjW = autoRegOn && autoRegResult ? Math.round(rawW * autoRegResult.topSetPctMultiplier * 10) / 10 : rawW;
                         const adjSets = autoRegOn && autoRegResult ? Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier)) : e.sets;
+                        const tmpo = getTempo(e.muscle, bbGoal, e.character === 'тяж');
                         return (
-                        <div key={ei} style={{ display:'grid', gridTemplateColumns:'1.6fr 0.8fr 0.7fr 0.7fr 0.8fr', gap:2, padding:'5px 10px', fontSize:10, color:'rgba(255,255,255,0.85)', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
+                        <div key={ei} style={{ display:'grid', gridTemplateColumns:'1.4fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr', gap:2, padding:'5px 10px', fontSize:10, color:'rgba(255,255,255,0.85)', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
                           <span style={{ fontWeight:600 }}>{e.muscle}</span>
                           <span style={{ color:'rgba(255,255,255,0.6)' }}>{e.character}</span>
                           <span>{adjSets}×{e.workSets[0].reps}</span>
                           <span style={{ color:'#f59e0b' }}>{e.rir}{autoRegOn && autoRegResult?.rirShift ? `+${autoRegResult.rirShift}` : ''}</span>
                           <span style={{ color: adjW !== rawW ? '#f59e0b' : ACCENT, fontWeight:700 }}>{adjW} кг{adjW !== rawW ? ' ⚡' : ''}</span>
+                          <span style={{ fontSize:8, color:'#a855f7', fontWeight:700, background:'rgba(168,85,247,0.1)', padding:'2px 6px', borderRadius:4, textAlign:'center' }}>{tmpo.tempo.toString}</span>
                         </div>
                         );
                       })}
@@ -692,6 +723,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 ); })}
               </MetricCard>
               {(() => { const wkStats = W.map(w => { const exs = w.sessions.flatMap(s => s.exercises); const sets = exs.reduce((s, e) => s + e.sets, 0); const rir = sets > 0 ? exs.reduce((s, e) => s + e.rir * e.sets, 0) / sets : 0; return { week: w.week, sets, rir }; }); const maxS = Math.max(1, ...wkStats.map(x => x.sets)); const px = (i: number) => 24 + (i / Math.max(1, W.length - 1)) * 280; const py = (v: number) => 60 - (v / 5) * 44; return <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.15)' }}><div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>📈 Прогрессия объёма и RIR по неделям</div><svg width='100%' viewBox='0 0 320 70' style={{ maxWidth: 360, margin: '0 auto', display: 'block' }}>{wkStats.map(x => <rect key={'b'+x.week} x={px(x.week-1)-8} y={60 - (x.sets / maxS) * 44} width={16} height={(x.sets / maxS) * 44} rx={3} fill='rgba(0,230,138,0.4)' />)}<polyline points={wkStats.map(x => px(x.week-1) + ',' + py(x.rir)).join(' ')} fill='none' stroke='#a855f7' strokeWidth={1.6} />{wkStats.map(x => <circle key={'r'+x.week} cx={px(x.week-1)} cy={py(x.rir)} r={2} fill='#a855f7' />)}</svg><div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 4 }}><span style={{ fontSize: 9, color: 'rgba(0,230,138,0.8)' }}>▮ Сеты/нед</span><span style={{ fontSize: 9, color: '#a855f7' }}>● RIR</span></div></div>; })()}
+              <MesocycleProgressionCard weeks={W.length} startVolumeSets={Math.round(W.reduce((s, w) => s + w.sessions.reduce((ss, sess) => ss + sess.exercises.reduce((sss, e) => sss + e.sets, 0), 0), 0) / W.length)} startIntensityPct={0.7} startRIR={2} goal="hypertrophy" title="Прогрессия мезоцикла (ББ)" />
               <div style={{ ...SMALL, marginTop: 8, padding: 8, background:'rgba(96,165,250,0.06)', borderRadius:8, border:'1px solid rgba(96,165,250,0.15)' }}>{explainBBMetrics(m)}</div>
             </div>;
           })()}

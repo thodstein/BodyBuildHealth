@@ -147,9 +147,18 @@ export function getMachineByName(name: string): GymMachine | undefined { return 
 // 2. Plate Math Calculator
 // ═══════════════════════════════════════════════════════════════════════════
 
-const STANDARD_PLATES = [25, 20, 15, 10, 5, 2.5, 1.25];
+export type WeightUnit = 'kg' | 'lbs';
 
-export function calculatePlates(targetWeight: number, barWeight: number = 20, availablePlates: number[] = STANDARD_PLATES): PlateMathResult {
+const METRIC_PLATES = [25, 20, 15, 10, 5, 2.5, 1.25];
+const IMPERIAL_PLATES = [45, 35, 25, 10, 5, 2.5];
+
+export function calculatePlates(
+  targetWeight: number, 
+  barWeight: number = 20, 
+  unit: WeightUnit = 'kg',
+  availablePlates?: number[]
+): PlateMathResult {
+  const platesSet = availablePlates || (unit === 'kg' ? METRIC_PLATES : IMPERIAL_PLATES);
   const weightPerSide = (targetWeight - barWeight) / 2;
 
   if (weightPerSide < 0) {
@@ -162,7 +171,7 @@ export function calculatePlates(targetWeight: number, barWeight: number = 20, av
   const platesPerSide: PlateMathResult['platesPerSide'] = [];
   let remaining = weightPerSide;
 
-  for (const plate of availablePlates.sort((a, b) => b - a)) {
+  for (const plate of platesSet.sort((a, b) => b - a)) {
     if (remaining >= plate) {
       const count = Math.floor(remaining / plate);
       platesPerSide.push({ plate, count });

@@ -21,8 +21,36 @@
  */
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Types
+// Utilities
 // ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Validates if a string is a valid tempo notation (e.g. "3-1-1-0" or "2-0-X-0")
+ */
+export function isValidTempo(tempo: string): boolean {
+  const parts = tempo.split('-');
+  if (parts.length !== 4) return false;
+  return parts.every(p => p === 'X' || (!isNaN(Number(p)) && Number(p) >= 0));
+}
+
+/**
+ * Parses a tempo string into a Tempo object
+ */
+export function parseTempo(tempoStr: string): Tempo | null {
+  if (!isValidTempo(tempoStr)) return null;
+  const parts = tempoStr.split('-');
+  const ecc = Number(parts[0]);
+  const bot = Number(parts[1]);
+  const conc = parts[2] === 'X' ? 0 : Number(parts[2]);
+  const top = Number(parts[3]);
+  return {
+    eccentric: ecc,
+    pauseBottom: bot,
+    concentric: conc,
+    pauseTop: top,
+    toString: tempoStr,
+  };
+}
 
 export type RepPattern = 'normal' | 'pause' | 'tempo' | 'explosive' | 'cluster' | 'rest_pause' | 'partial' | 'slow';
 

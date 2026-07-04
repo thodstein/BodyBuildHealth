@@ -1,6 +1,7 @@
 import { resolveCanonicalId } from './support-meta';
 import { INTERACTIONS_DB } from './support-interactions-db';
 import { SYNERGY_NETWORK } from './support-synergy-network';
+import { SUPPORT_CATALOG_DATA } from './support-catalog-data';
 
 export interface SupportSubstance {
   id: string;
@@ -512,4 +513,69 @@ export function findConflicts(id: string): SupportInteraction[] {
 }
 export function getSubstance(id: string): SupportSubstance | undefined {
   return SUPPORT_SUBSTANCE_MAP[id];
+}
+
+// ── AUTO-POPULATION: synergies / conflicts / cautions from ALL_INTERACTIONS ──
+// Для каждой записи в SUPPORT_CATALOG_DATA автоматически заполняем synergies[],
+// conflicts[] и cautions[] из ALL_INTERACTIONS, если они пустые или неполные.
+// Существующие вручную записанные данные НЕ перезаписываются — только дополняются.
+const _catData = SUPPORT_CATALOG_DATA as Record<string, any>;
+const _norm = (s: string) => (s || '').toLowerCase().replace(/[_\-\s]/g, '');
+for (const _cid of Object.keys(_catData)) {
+  const _entry = _catData[_cid];
+  if (!_entry || typeof _entry !== 'object') continue;
+  const _normId = _norm(_cid);
+  const _existingSyn = new Set((_entry.synergies || []).map((s: any) => _norm(s.with || s.id || '')));
+  const _existingConf = new Set((_entry.conflicts || []).map((c: any) => _norm(c.with || c.id || '')));
+  const _existingCaut = new Set((_entry.cautions || []).map((c: any) => _norm(c.with || c.id || '')));
+
+  const _synToAdd: any[] = [];
+  const _confToAdd: any[] = [];
+  const _cautToAdd: any[] = [];
+
+  for (const _inter of ALL_INTERACTIONS) {
+    if (!_inter || !_inter.substanceA || !_inter.substanceB) continue;
+    const _aNorm = _norm(_inter.substanceA);
+    const _bNorm = _norm(_inter.substanceB);
+    let _partnerId = '';
+    let _partnerName = '';
+    if (_aNorm === _normId || _aNorm.includes(_normId) || _normId.includes(_aNorm)) {
+      _partnerId = _inter.substanceB;
+      _partnerName = _catData[_inter.substanceB]?.nameRu || _catData[_inter.substanceB]?.name || _inter.substanceB;
+    } else if (_bNorm === _normId || _bNorm.includes(_normId) || _normId.includes(_bNorm)) {
+      _partnerId = _inter.substanceA;
+      _partnerName = _catData[_inter.substanceA]?.nameRu || _catData[_inter.substanceA]?.name || _inter.substanceA;
+    } else {
+      continue;
+    }
+
+    const _partnerNorm = _norm(_partnerId);
+    const _effect = _inter.effect || '';
+    const _mechanism = (_inter.mechanisms || []).join('; ') || _inter.notes || '';
+    const _severity = _inter.severity || 'MEDIUM';
+
+    if (_inter.type === 'synergy') {
+      if (!_existingSyn.has(_partnerNorm) && !_synToAdd.find(x => _norm(x.with) === _partnerNorm)) {
+        _synToAdd.push({ with: _partnerId, effect: _effect, mechanism: _mechanism, severity: _severity });
+      }
+    } else if (_inter.type === 'conflict') {
+      if (!_existingConf.has(_partnerNorm) && !_confToAdd.find(x => _norm(x.with) === _partnerNorm)) {
+        _confToAdd.push({ with: _partnerId, effect: _effect, mechanism: _mechanism, severity: _severity });
+      }
+    } else if (_inter.type === 'caution') {
+      if (!_existingCaut.has(_partnerNorm) && !_cautToAdd.find(x => _norm(x.with) === _partnerNorm)) {
+        _cautToAdd.push({ with: _partnerId, effect: _effect, mechanism: _mechanism, severity: _severity });
+      }
+    }
+  }
+
+  if (_synToAdd.length > 0) {
+    _entry.synergies = [...(_entry.synergies || []), ..._synToAdd.slice(0, 15)];
+  }
+  if (_confToAdd.length > 0) {
+    _entry.conflicts = [...(_entry.conflicts || []), ..._confToAdd.slice(0, 10)];
+  }
+  if (_cautToAdd.length > 0) {
+    _entry.cautions = [...(_entry.cautions || []), ..._cautToAdd.slice(0, 10)];
+  }
 }

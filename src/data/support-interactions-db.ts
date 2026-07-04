@@ -102,6 +102,67 @@ export const INTERACTIONS_DB: Interaction[] = [
   { id:'INT_LIONS_MANE_PHOSPHATIDYLSERINE', substanceA:'LIONS_MANE', substanceB:'PHOSPHATIDYLSERINE', type:'synergy', effect:'Синергия для памяти и когнитивной функции', mechanisms:['COGNITIVE_ENHANCEMENT','NEUROPROTECTION'], severity:'MEDIUM', notes:'PS — строительный блок мембран, львиная грива — фактор роста нейронов' },
   { id:'INT_LIONS_MANE_GINKGO', substanceA:'LIONS_MANE', substanceB:'GINKGO', type:'synergy', effect:'Улучшение церебрального кровотока и нейропластичности', mechanisms:['NO_UP','NEUROPROTECTION'], severity:'LOW', notes:'Гинкго улучшает мозговой кровоток, львиная грива — NGF' },
   { id:'INT_LIONS_MANE_CURCUMIN', substanceA:'LIONS_MANE', substanceB:'CURCUMIN', type:'synergy', effect:'Противовоспалительная и нейропротекторная синергия', mechanisms:['ANTIINFLAMMATORY','NEUROPROTECTION'], severity:'MEDIUM', notes:'Куркумин снижает нейровоспаление, львиная грива стимулирует NGF' },
+
+  // ── NEW: Melatonin interactions ──
+  { id:'INT_MELATONIN_MAGNESIUM', substanceA:'MELATONIN', substanceB:'MAGNESIUM', type:'synergy', effect:'SLEEP_QUALITY_UP', mechanisms:['Магний — кофактор синтеза мелатонина через активацию N-ацетилтрансферазы в эпифизе. Также Mg блокирует NMDA-рецепторы (возбуждающие), дополняя тормозный эффект мелатонина на MT1/MT2.'], severity:'LOW', notes:'Магний — кофактор синтеза мелатонина + блокада NMDA → двойной эффект для сна' },
+  { id:'INT_MELATONIN_ZINC', substanceA:'MELATONIN', substanceB:'ZINC', type:'synergy', effect:'SLEEP_IMMUNE_UP', mechanisms:['Цинк — кофактор синтеза мелатонина через шишковидную железу. Zn + мелатонин усиливают иммунный ответ (NK-клетки, цитотоксические T-лимфоциты).'], severity:'LOW', notes:'Цинк — кофактор синтеза мелатонина; синергия сна и иммунитета' },
+  { id:'INT_MELATONIN_5HTP', substanceA:'MELATONIN', substanceB:'5HTP', type:'synergy', effect:'SLEEP_ONSET_UP', mechanisms:['5-HTP — предшественник серотонина → N-ацетилсеротонин → мелатонин. Экзогенный мелатонин + 5-HTP обеспечивают полный путь синтеза.'], severity:'MEDIUM', notes:'5-HTP — предшественник мелатонина; комбинация ускоряет засыпание' },
+  { id:'INT_MELATONIN_CORTISOL', substanceA:'MELATONIN', substanceB:'ASHWAGANDHA', type:'synergy', effect:'CIRCADIAN_CORTISOL', mechanisms:['Мелатонин синхронизирует циркадный ритм, ашваганда снижает вечерний кортизол через HPA-ось. Нормализация ритма кортизола + 昼 melatonin.'], severity:'LOW', notes:'Мелатонин + ашваганда: нормализация циркадного ритма кортизола' },
+
+  // ── NEW: Selenium interactions ──
+  { id:'INT_SELENIUM_VITAMIN_E', substanceA:'SELENIUM', substanceB:'VITAMIN_E', type:'synergy', effect:'ANTIOXIDANT_NETWORK', mechanisms:['Селен — кофактор глутатионпероксидазы (GPx), восстанавливающей липидные гидроперекиси. Витамин E (α-токоферол) перехватывает пероксильные радикалы в мембранах. GPx регенерирует окисленный витамин E. Классический синергизм антиоксидантной сети.'], severity:'LOW', notes:'Селен (GPx) регенерирует витамин E → синергия антиоксидантной сети' },
+  { id:'INT_SELENIUM_IODINE', substanceA:'SELENIUM', substanceB:'IODINE', type:'synergy', effect:'THYROID_SUPPORT', mechanisms:['Селен — кофактор дейодиназ (DIO1, DIO2, DIO3), конвертирующих T4→T3. Без Se дейодиназа неактивна → функциональный гипотиреоз даже при достаточном йоде. Синергия: йод — субстрат, Se — активация.'], severity:'MEDIUM', notes:'Селен — кофактор дейодиназ T4→T3; без Se йод неэффективен' },
+  { id:'INT_SELENIUM_MERCURY', substanceA:'SELENIUM', substanceB:'OMEGA3', type:'caution', effect:'HEAVY_METAL_BINDING', mechanisms:['Селен имеет высокое сродство к ртути (Hg-Se комплекс). Омега-3 из крупных рыб может содержать метилртуть. Se связывает Hg, но истощает собственный пул Se → риск дефицита. Выбирать очищенный омега-3.'], severity:'LOW', notes:'Селен связывает ртуть из рыбьего жира; выбирайте очищенный омега-3' },
+
+  // ── NEW: Chromium interactions ──
+  { id:'INT_CHROMIUM_CINNAMON', substanceA:'CHROMIUM', substanceB:'CINNAMON', type:'synergy', effect:'GLUCOSE_DOWN', mechanisms:['Хром — кофактор рецептора инсулина (усиление тирозинкиназы). Корица (проантоцианидины типа A) активирует инсулиновые рецепторы и GLUT4. Аддитивный эффект на гликемию.'], severity:'LOW', notes:'Хром + корица: двойное усиление инсулиновой чувствительности' },
+  { id:'INT_CHROMIUM_ZINC', substanceA:'CHROMIUM', substanceB:'ZINC', type:'synergy', effect:'METABOLIC_SYNERGY', mechanisms:['Хром — кофактор рецептора инсулина, Zn — кофактор синтеза инсулина в β-клетках. Комбинация поддерживает полный цикл: синтез + чувствительность.'], severity:'LOW', notes:'Хром (чувствительность) + Zn (синтез инсулина) → полный цикл' },
+
+  // ── NEW: Copper interactions ──
+  { id:'INT_COPPER_IRON', substanceA:'COPPER', substanceB:'IRON', type:'synergy', effect:'HEMOGLOBIN_UP', mechanisms:['Медь — кофактор церулоплазмина, окисляющего Fe2+→Fe3+ для связывания с трансферрином. Без Cu железо не может быть мобилизовано из запасов → функциональная анемия при нормальном Fe.'], severity:'MEDIUM', notes:'Медь (церулоплазмин) необходима для мобилизации железа → гемоглобин' },
+  { id:'INT_COPPER_VITAMIN_C', substanceA:'COPPER', substanceB:'VITAMIN_C', type:'caution', effect:'OXIDATIVE_STRESS', mechanisms:['Высокие дозы витамина C (>1000 мг) восстанавливают Cu2+→Cu+ -> прооксидант в присутствии ионов. Риск окислительного стресса. Не превышать 500 мг витамина C при приёме меди.'], severity:'LOW', notes:'Витамин C >1000 мг может делать медь прооксидантом — осторожно' },
+
+  // ── NEW: Calcium interactions ──
+  { id:'INT_CALCIUM_IRON', substanceA:'CALCIUM', substanceB:'IRON', type:'conflict', effect:'IRON_ABSORB_DOWN', mechanisms:['Ca блокирует DMT1-транспортёр Fe в энтероцитах. Интервал ≥2 ч между приёмом.'], severity:'MEDIUM', notes:'Кальций блокирует всасывание железа — интервал ≥2 ч' },
+  { id:'INT_CALCIUM_VITAMIN_K2', substanceA:'CALCIUM', substanceB:'VITAMIN_K2', type:'synergy', effect:'BONE_TARGETING', mechanisms:['Витамин K2 активирует остеокальцин (Gla-белок), направляющий кальций в костный матрикс. Без K2 кальций может осаждаться в сосудах. Синергия D3+K2+Ca = тройка для костей.'], severity:'LOW', notes:'K2 направляет кальций в кости, предотвращая кальцификацию сосудов' },
+
+  // ── NEW: Iron interactions (additional) ──
+  { id:'INT_IRON_VITAMIN_A', substanceA:'IRON', substanceB:'VITAMIN_A', type:'synergy', effect:'HEMOGLOBIN_UP', mechanisms:['Витамин A необходим для созревания эритробластов в костном мозге. Также ретинол мобилизует железо из печени (ферритина) в костный мозг.'], severity:'MEDIUM', notes:'Витамин A + Fe: совместная борьба с анемией (мобилизация + эритропоэз)' },
+  { id:'INT_IRON_VITAMIN_B12', substanceA:'IRON', substanceB:'VITAMIN_B12', type:'synergy', effect:'ERYTHROPOIESIS', mechanisms:['B12 + фолиевая кислота — кофакторы синтеза ДНК в эритробластах. Fe — субстрат синтеза гемоглобина. Тройная синергия: B12 + Fe + фолат — лечение мегалобластной/микроцитарной анемии.'], severity:'MEDIUM', notes:'B12 + Fe: синергия для эритропоэза и лечения анемии' },
+
+  // ── NEW: Iodine interactions (additional) ──
+  { id:'INT_IODINE_SELENIUM', substanceA:'IODINE', substanceB:'SELENIUM', type:'synergy', effect:'THYROID_HORMONE_UP', mechanisms:['Йод — субстрат синтеза T3/T4, селен — кофактор дейодиназ (T4→T3). Без Se избыток йода может привести к болезни Хашимото (аутоиммунный тиреоидит).'], severity:'MEDIUM', notes:'Йод + Se: синергия синтеза и активации тиреоидных гормонов' },
+  { id:'INT_IODINE_IRON', substanceA:'IODINE', substanceB:'IRON', type:'synergy', effect:'THYROID_METABOLISM', mechanisms:['T3 повышает синтез гемоглобина через стимуляцию эритропоэтина. Без Fe T3 не может обеспечить эритропоэз. Также TfR-экспрессия регулируется T3.'], severity:'LOW', notes:'T3 стимулирует эритропоэз; железо — субстрат → синергия' },
+
+  // ── NEW: Vitamin B1 (Thiamine) interactions ──
+  { id:'INT_VITAMIN_B1_MAGNESIUM', substanceA:'VITAMIN_B1', substanceB:'MAGNESIUM', type:'synergy', effect:'ENERGY_METABOLISM', mechanisms:['Тиамин (B1) — кофактор пируватдегидрогеназы (PDH) и α-кетоглутаратдегидрогеназы (KGDH). Mg — кофактор всех киназ, использующих АТФ (Mg-АТФ). Тандем B1+Mg для энергетического метаболизма.'], severity:'LOW', notes:'B1 (PDH) + Mg (АТФ) → синергия энергетического метаболизма' },
+  { id:'INT_VITAMIN_B1_B6_B12', substanceA:'VITAMIN_B1', substanceB:'VITAMIN_B6', type:'synergy', effect:'NEURO_SUPPORT', mechanisms:['B1 — миелинизация и энергетика нейронов, B6 — синтез нейромедиателей (GABA, серотонин, дофамин). Тандем поддерживает ЦНС.'], severity:'LOW', notes:'B1 + B6: синергия для нервной системы (миелин + нейромедиаторы)' },
+  { id:'INT_VITAMIN_B1_ALCOHOL', substanceA:'VITAMIN_B1', substanceB:'ALCOHOL', type:'conflict', effect:'THIAMINE_DEPLETION', mechanisms:['Алкоголь снижает всасывание тиамина в кишечнике и истощает запасы B1 в печени. Риск синдрома Вернике-Корсакова. Дополнительный B1 обязателен при алкоголизме.'], severity:'HIGH', notes:'Алкоголь истощает B1 — риск энцефалопатии Вернике' },
+
+  // ── NEW: Vitamin A interactions ──
+  { id:'INT_VITAMIN_A_IRON', substanceA:'VITAMIN_A', substanceB:'IRON', type:'synergy', effect:'ANEMIA_PREVENT', mechanisms:['Витамин A мобилизует железо из печени в костный мозг и поддерживает дифференцировку эритробластов. Ретинол+Fe = лечение анемии у детей.'], severity:'MEDIUM', notes:'Витамин A + Fe: синергия для лечения анемии' },
+  { id:'INT_VITAMIN_A_VITAMIN_D_K2', substanceA:'VITAMIN_A', substanceB:'VITAMIN_K2', type:'synergy', effect:'BONE_HEALTH', mechanisms:['Витамин A (ретиноевая кислота, RAR) и K2 (MK-7, остеокальцин) совместно регулируют ремоделирование кости. A стимулирует остеобласты, K2 направляет кальций.'], severity:'LOW', notes:'A + K2: синергия для костного ремоделирования' },
+
+  // ── NEW: Supplement ↔ Pharma interactions ──
+  { id:'INT_NAC_ANASTROZOLE', substanceA:'NAC', substanceB:'PHARMA_ANASTROZOLE', type:'caution', effect:'DRUG_METABOLISM_MOD', mechanisms:['NAC обладает антиоксидантным действием и может влиять на CYP-зависимый метаболизм. Анастрозол метаболизируется CYP3A4. Высокие дозы NAC (>1200 мг) могут теоретически модулировать CYP3A4. Контроль эстрадиола каждые 4 нед.'], severity:'LOW', notes:'NAC может влиять на метаболизм анастрозола (CYP3A4) — контроль E2' },
+  { id:'INT_TUDCA_TAMOXIFEN', substanceA:'TUDCA', substanceB:'PHARMA_TAMOXIFEN', type:'synergy', effect:'LIVER_PROTECT_ON_PCT', mechanisms:['Тамоксифен метаболизируется CYP2D6/CYP3A4 и может вызывать жировую инфильтрацию печени (НАСГ). TUDCA снижает ER-стресс и улучшает желчеотток, защищая печень при ПКТ.'], severity:'MEDIUM', notes:'TUDCA защищает печень при тамоксифене (ER-стресс + желчеотток)' },
+  { id:'INT_NAC_TAMOXIFEN', substanceA:'NAC', substanceB:'PHARMA_TAMOXIFEN', type:'synergy', effect:'LIVER_GSH_SUPPORT', mechanisms:['NAC повышает внутриклеточный глутатион, защищая гепатоциты при детоксикации тамоксифена. Также NAC может потенцировать антиэстрогенный эффект через снижение окислительного стресса.'], severity:'LOW', notes:'NAC + тамоксифен: глутатионовая защита печени при ПКТ' },
+  { id:'INT_ZINC_ANASTROZOLE', substanceA:'ZINC', substanceB:'PHARMA_ANASTROZOLE', type:'synergy', effect:'AROMATASE_SUPPORT', mechanisms:['Цинк — кофактор 5α-редуктазы и модулятор эстрогеновых рецепторов. Анастрозол снижает эстрадиол, Zn поддерживает эндогенный тестостерон. Синергия в контроле эстрогена.'], severity:'LOW', notes:'Zn + анастрозол: поддержка тестостерона при снижении эстрадиола' },
+  { id:'INT_ASHWAGANDHA_CABERGOLINE', substanceA:'ASHWAGANDHA', substanceB:'PHARMA_CABERGOLINE', type:'caution', effect:'PROLACTIN_OVERSUPPRESS', mechanisms:['Ашваганда может снижать пролактин через HPA-ось. Каберголин (D2-агонист) также снижает пролактин. Комбинация может привести к избыточному подавлению пролактина (<3 нг/мл). Контроль пролактина каждые 4 нед.'], severity:'MEDIUM', notes:'Ашваганда + каберголин: риск избыточного снижения пролактина — контроль' },
+  { id:'INT_VITAMIN_B6_CABERGOLINE', substanceA:'VITAMIN_B6', substanceB:'PHARMA_CABERGOLINE', type:'caution', effect:'PROLACTIN_DOUBLE_LOW', mechanisms:['B6 (пиридоксин) в высоких дозах (>300 мг) снижает пролактин через допаминергический путь. Каберголин — мощный D2-агонист. Аддитивный эффект. Риск гипопролактинемии.'], severity:'LOW', notes:'B6 + каберголин: аддитивное снижение пролактина — осторожно' },
+  { id:'INT_OMEGA3_STATINS', substanceA:'OMEGA3', substanceB:'PHARMA_STATINS', type:'synergy', effect:'LIPID_DUAL', mechanisms:['Омега-3 (EPA/DHA) снижает триглицериды через ↓ VLDL-синтез. Статины снижают холестерин через ингибирование HMG-CoA редуктазы. Ортогональные механизмы: TG + LDL-C.'], severity:'LOW', notes:'Омега-3 + статины: ортогональное снижение TG и LDL-C' },
+  { id:'INT_COQ10_STATINS', substanceA:'COQ10', substanceB:'PHARMA_STATINS', type:'synergy', effect:'MITOCHONDRIAL_RESTORE', mechanisms:['Статины ингибируют mevalonat-путь → ↓ синтез CoQ10 в печени. Depletion CoQ10 → миалгия, слабость. Дополнение CoQ10 (100-200 мг) восстанавливает пул и снижает миопатию на 50%.'], severity:'MEDIUM', notes:'Статины истощают CoQ10 → дополнение обязательно (миалгия)' },
+  { id:'INT_VITAMIN_D3_TESTOSTERONE', substanceA:'VITAMIN_D', substanceB:'PHARMA_TESTOSTERONE', type:'synergy', effect:'HORMONE_BALANCE', mechanisms:['Витамин D — прогормон, VDR-рецепторы в клетках Лейдига. Уровень D коррелирует с тестостероном (r=0.3). Дополнение D3 на курсе поддерживает эндогенный синтез при экзогенном подавлении.'], severity:'LOW', notes:'Витамин D + тестостерон: поддержка эндогенного синтеза на курсе' },
+  { id:'INT_ASHWAGANDHA_TESTOSTERONE', substanceA:'ASHWAGANDHA', substanceB:'PHARMA_TESTOSTERONE', type:'caution', effect:'HPTA_MOD', mechanisms:['Ашваганда может повышать эндогенный тестостерон на 15-25% (через HPA-ось и LH). На экзогенном тестостероне этот эффект подавлен. Однако ашваганда может снизить конверсию T→DHT через 5α-редуктазу.'], severity:'LOW', notes:'Ашваганда + экзогенный T: эффект может быть избыточным, мониторинг' },
+  { id:'INT_TADALAFIL_NITRATE', substanceA:'PHARMA_TADALAFIL', substanceB:'NITRATE', type:'conflict', effect:'BP_DROP', mechanisms:['Тадалафил (ФДЭ-5 ингибитор) повышает цГМФ → вазодилатация. Нитраты (нитроглицерин)捐аторы NO → ↑ цГМФ. Риск тяжёлой гипотензии. Абсолютно противопоказано.'], severity:'HIGH', notes:'Тадалафил + нитраты: критическая гипотензия — противопоказано!' },
+  { id:'INT_NAC_METFORMIN', substanceA:'NAC', substanceB:'METFORMIN', type:'synergy', effect:'METABOLIC_PROTECT', mechanisms:['NAC повышает глутатион, защищая печень при метформине. Также NAC может потенцировать AMPK-активацию метформина и снижать инсулинорезистентность.'], severity:'LOW', notes:'NAC + метформин: глутатионовая защита + синергия AMPK' },
+  { id:'INT_MILK_THISTLE_TAMOXIFEN', substanceA:'MILK_THISTLE', substanceB:'PHARMA_TAMOXIFEN', type:'caution', effect:'CYP_INTERFERE', mechanisms:['Силимарин (молочный чертополох) ингибирует CYP2D6, метаболизирующий тамоксифен в активный метаболит эндоксифен. Высокие дозы силимарина могут снизить эффективность тамоксифена. Интервал ≥3 ч.'], severity:'MEDIUM', notes:'Силимарин ингибирует CYP2D6 → может снизить тамоксифен. Интервал ≥3 ч' },
+  { id:'INT_GRAPEFRUIT_STATINS', substanceA:'GRAPEFRUIT', substanceB:'PHARMA_STATINS', type:'conflict', effect:'DRUG_LEVEL_UP', mechanisms:['Грейпфрут (нарангинин, бергамоттин) ингибирует CYP3A4 в кишечнике → AUC статинов возрастает на 200-300%. Высокий риск рабдомиолиза. Избегать грейпфрута при аторвастатине/симвастатине.'], severity:'HIGH', notes:'Грейпфрут + статины: критический риск рабдомиолиза через CYP3A4' },
+  { id:'INT_VITAMIN_K_WARFARIN', substanceA:'VITAMIN_K2', substanceB:'WARFARIN', type:'conflict', effect:'ANTICOAG_DOWN', mechanisms:['Варфарин — антагонист витамина K (ингибитор VKORC1). Приём K2 напрямую противоположен механизму действия варфарина. Исключить K2 при приёме варфарина.'], severity:'HIGH', notes:'Витамин K2 + варфарин: прямое антагонистическое взаимодействие — исключить' },
+  { id:'INT_GARLIC_WARFARIN', substanceA:'GARLIC', substanceB:'WARFARIN', type:'caution', effect:'BLEED_RISK', mechanisms:['Чеснок (аллиин/аллицин) ингибирует агрегацию тромбоцитов. Варфарин — антикоагулянт. Аддитивный эффект → риск кровотечения. Контроль МНО.'], severity:'MEDIUM', notes:'Чеснок + варфарин: аддитивный антикоагулянтный эффект — контроль МНО' },
+  { id:'INT_GINKGO_WARFARIN', substanceA:'GINKGO', substanceB:'WARFARIN', type:'caution', effect:'BLEED_RISK', mechanisms:['Гинкго билоба (гинкголиды) ингибируют фактор активации тромбоцитов (PAF). Варфарин — антагонист K. Комбинация → риск кровотечения. Контроль МНО каждые 2 нед.'], severity:'MEDIUM', notes:'Гинкго + варфарин: риск кровотечения через PAF-ингибирование' },
+  { id:'INT_CURCUMIN_ANASTROZOLE', substanceA:'CURCUMIN', substanceB:'PHARMA_ANASTROZOLE', type:'caution', effect:'CYP_MOD', mechanisms:['Куркумин ингибирует CYP1A2 и может модулировать CYP3A4. Анастрозол метаболизируется CYP3A4. Высокие дозы куркумина (>1000 мг) могут влиять на фармакокинетику анастрозола.'], severity:'LOW', notes:'Куркумин может влиять на метаболизм анастрозола — контроль E2' },
+  { id:'INT_RESVERATROL_ANASTROZOLE', substanceA:'RESVERATROL', substanceB:'PHARMA_ANASTROZOLE', type:'caution', effect:'AROMATASE_MOD', mechanisms:['Ресвератрол является слабым ингибитором ароматазы in vitro. Анастрозол — мощный ингибитор. Аддитивный эффект может привести к избыточному снижению эстрадиола (<10 пг/мл). Контроль E2.'], severity:'LOW', notes:'Ресвератрол + анастрозол: риск гипоэстрадиолемии — контроль E2' },
 ];
 // ── FROM: interaction-links.ts ──
 export interface InteractionLink {
@@ -306,4 +367,106 @@ export const INTERACTION_LINKS_DB: InteractionLink[] = [
   { id: "LINK_LIONS_MANE_GINKGO_B", interactionId: "INT_LIONS_MANE_GINKGO", substance: "GINKGO", role: "B" },
   { id: "LINK_LIONS_MANE_CURCUMIN_A", interactionId: "INT_LIONS_MANE_CURCUMIN", substance: "LIONS_MANE", role: "A" },
   { id: "LINK_LIONS_MANE_CURCUMIN_B", interactionId: "INT_LIONS_MANE_CURCUMIN", substance: "CURCUMIN", role: "B" },
+
+  // ── NEW: Melatonin links ──
+  { id: "LINK_MELATONIN_MAGNESIUM_A", interactionId: "INT_MELATONIN_MAGNESIUM", substance: "MELATONIN", role: "A" },
+  { id: "LINK_MELATONIN_MAGNESIUM_B", interactionId: "INT_MELATONIN_MAGNESIUM", substance: "MAGNESIUM", role: "B" },
+  { id: "LINK_MELATONIN_ZINC_A", interactionId: "INT_MELATONIN_ZINC", substance: "MELATONIN", role: "A" },
+  { id: "LINK_MELATONIN_ZINC_B", interactionId: "INT_MELATONIN_ZINC", substance: "ZINC", role: "B" },
+  { id: "LINK_MELATONIN_5HTP_A", interactionId: "INT_MELATONIN_5HTP", substance: "MELATONIN", role: "A" },
+  { id: "LINK_MELATONIN_5HTP_B", interactionId: "INT_MELATONIN_5HTP", substance: "5HTP", role: "B" },
+  { id: "LINK_MELATONIN_ASHWAGANDHA_A", interactionId: "INT_MELATONIN_CORTISOL", substance: "MELATONIN", role: "A" },
+  { id: "LINK_MELATONIN_ASHWAGANDHA_B", interactionId: "INT_MELATONIN_CORTISOL", substance: "ASHWAGANDHA", role: "B" },
+
+  // ── NEW: Selenium links ──
+  { id: "LINK_SELENIUM_VITAMIN_E_A", interactionId: "INT_SELENIUM_VITAMIN_E", substance: "SELENIUM", role: "A" },
+  { id: "LINK_SELENIUM_VITAMIN_E_B", interactionId: "INT_SELENIUM_VITAMIN_E", substance: "VITAMIN_E", role: "B" },
+  { id: "LINK_SELENIUM_IODINE_A", interactionId: "INT_SELENIUM_IODINE", substance: "SELENIUM", role: "A" },
+  { id: "LINK_SELENIUM_IODINE_B", interactionId: "INT_SELENIUM_IODINE", substance: "IODINE", role: "B" },
+  { id: "LINK_SELENIUM_OMEGA3_A", interactionId: "INT_SELENIUM_MERCURY", substance: "SELENIUM", role: "A" },
+  { id: "LINK_SELENIUM_OMEGA3_B", interactionId: "INT_SELENIUM_MERCURY", substance: "OMEGA3", role: "B" },
+
+  // ── NEW: Chromium links ──
+  { id: "LINK_CHROMIUM_CINNAMON_A", interactionId: "INT_CHROMIUM_CINNAMON", substance: "CHROMIUM", role: "A" },
+  { id: "LINK_CHROMIUM_CINNAMON_B", interactionId: "INT_CHROMIUM_CINNAMON", substance: "CINNAMON", role: "B" },
+  { id: "LINK_CHROMIUM_ZINC_A", interactionId: "INT_CHROMIUM_ZINC", substance: "CHROMIUM", role: "A" },
+  { id: "LINK_CHROMIUM_ZINC_B", interactionId: "INT_CHROMIUM_ZINC", substance: "ZINC", role: "B" },
+
+  // ── NEW: Copper links ──
+  { id: "LINK_COPPER_IRON_A", interactionId: "INT_COPPER_IRON", substance: "COPPER", role: "A" },
+  { id: "LINK_COPPER_IRON_B", interactionId: "INT_COPPER_IRON", substance: "IRON", role: "B" },
+  { id: "LINK_COPPER_VITAMIN_C_A", interactionId: "INT_COPPER_VITAMIN_C", substance: "COPPER", role: "A" },
+  { id: "LINK_COPPER_VITAMIN_C_B", interactionId: "INT_COPPER_VITAMIN_C", substance: "VITAMIN_C", role: "B" },
+
+  // ── NEW: Calcium links ──
+  { id: "LINK_CALCIUM_IRON_A", interactionId: "INT_CALCIUM_IRON", substance: "CALCIUM", role: "A" },
+  { id: "LINK_CALCIUM_IRON_B", interactionId: "INT_CALCIUM_IRON", substance: "IRON", role: "B" },
+  { id: "LINK_CALCIUM_K2_A", interactionId: "INT_CALCIUM_VITAMIN_K2", substance: "CALCIUM", role: "A" },
+  { id: "LINK_CALCIUM_K2_B", interactionId: "INT_CALCIUM_VITAMIN_K2", substance: "VITAMIN_K2", role: "B" },
+
+  // ── NEW: Iron links ──
+  { id: "LINK_IRON_VITAMIN_A_A", interactionId: "INT_IRON_VITAMIN_A", substance: "IRON", role: "A" },
+  { id: "LINK_IRON_VITAMIN_A_B", interactionId: "INT_IRON_VITAMIN_A", substance: "VITAMIN_A", role: "B" },
+  { id: "LINK_IRON_VITAMIN_B12_A", interactionId: "INT_IRON_VITAMIN_B12", substance: "IRON", role: "A" },
+  { id: "LINK_IRON_VITAMIN_B12_B", interactionId: "INT_IRON_VITAMIN_B12", substance: "VITAMIN_B12", role: "B" },
+
+  // ── NEW: Iodine links ──
+  { id: "LINK_IODINE_SELENIUM_A", interactionId: "INT_IODINE_SELENIUM", substance: "IODINE", role: "A" },
+  { id: "LINK_IODINE_SELENIUM_B", interactionId: "INT_IODINE_SELENIUM", substance: "SELENIUM", role: "B" },
+  { id: "LINK_IODINE_IRON_A", interactionId: "INT_IODINE_IRON", substance: "IODINE", role: "A" },
+  { id: "LINK_IODINE_IRON_B", interactionId: "INT_IODINE_IRON", substance: "IRON", role: "B" },
+
+  // ── NEW: Vitamin B1 links ──
+  { id: "LINK_B1_MAGNESIUM_A", interactionId: "INT_VITAMIN_B1_MAGNESIUM", substance: "VITAMIN_B1", role: "A" },
+  { id: "LINK_B1_MAGNESIUM_B", interactionId: "INT_VITAMIN_B1_MAGNESIUM", substance: "MAGNESIUM", role: "B" },
+  { id: "LINK_B1_B6_A", interactionId: "INT_VITAMIN_B1_B6_B12", substance: "VITAMIN_B1", role: "A" },
+  { id: "LINK_B1_B6_B", interactionId: "INT_VITAMIN_B1_B6_B12", substance: "VITAMIN_B6", role: "B" },
+  { id: "LINK_B1_ALCOHOL_A", interactionId: "INT_VITAMIN_B1_ALCOHOL", substance: "VITAMIN_B1", role: "A" },
+  { id: "LINK_B1_ALCOHOL_B", interactionId: "INT_VITAMIN_B1_ALCOHOL", substance: "ALCOHOL", role: "B" },
+
+  // ── NEW: Vitamin A links ──
+  { id: "LINK_VA_IRON_A", interactionId: "INT_VITAMIN_A_IRON", substance: "VITAMIN_A", role: "A" },
+  { id: "LINK_VA_IRON_B", interactionId: "INT_VITAMIN_A_IRON", substance: "IRON", role: "B" },
+  { id: "LINK_VA_K2_A", interactionId: "INT_VITAMIN_A_VITAMIN_D_K2", substance: "VITAMIN_A", role: "A" },
+  { id: "LINK_VA_K2_B", interactionId: "INT_VITAMIN_A_VITAMIN_D_K2", substance: "VITAMIN_K2", role: "B" },
+
+  // ── NEW: Supplement ↔ Pharma links ──
+  { id: "LINK_NAC_ANASTROZOLE_A", interactionId: "INT_NAC_ANASTROZOLE", substance: "NAC", role: "A" },
+  { id: "LINK_NAC_ANASTROZOLE_B", interactionId: "INT_NAC_ANASTROZOLE", substance: "PHARMA_ANASTROZOLE", role: "B" },
+  { id: "LINK_TUDCA_TAMOXIFEN_A", interactionId: "INT_TUDCA_TAMOXIFEN", substance: "TUDCA", role: "A" },
+  { id: "LINK_TUDCA_TAMOXIFEN_B", interactionId: "INT_TUDCA_TAMOXIFEN", substance: "PHARMA_TAMOXIFEN", role: "B" },
+  { id: "LINK_NAC_TAMOXIFEN_A", interactionId: "INT_NAC_TAMOXIFEN", substance: "NAC", role: "A" },
+  { id: "LINK_NAC_TAMOXIFEN_B", interactionId: "INT_NAC_TAMOXIFEN", substance: "PHARMA_TAMOXIFEN", role: "B" },
+  { id: "LINK_ZINC_ANASTROZOLE_A", interactionId: "INT_ZINC_ANASTROZOLE", substance: "ZINC", role: "A" },
+  { id: "LINK_ZINC_ANASTROZOLE_B", interactionId: "INT_ZINC_ANASTROZOLE", substance: "PHARMA_ANASTROZOLE", role: "B" },
+  { id: "LINK_ASHWAGANDHA_CABERGOLINE_A", interactionId: "INT_ASHWAGANDHA_CABERGOLINE", substance: "ASHWAGANDHA", role: "A" },
+  { id: "LINK_ASHWAGANDHA_CABERGOLINE_B", interactionId: "INT_ASHWAGANDHA_CABERGOLINE", substance: "PHARMA_CABERGOLINE", role: "B" },
+  { id: "LINK_B6_CABERGOLINE_A", interactionId: "INT_VITAMIN_B6_CABERGOLINE", substance: "VITAMIN_B6", role: "A" },
+  { id: "LINK_B6_CABERGOLINE_B", interactionId: "INT_VITAMIN_B6_CABERGOLINE", substance: "PHARMA_CABERGOLINE", role: "B" },
+  { id: "LINK_OMEGA3_STATINS_A", interactionId: "INT_OMEGA3_STATINS", substance: "OMEGA3", role: "A" },
+  { id: "LINK_OMEGA3_STATINS_B", interactionId: "INT_OMEGA3_STATINS", substance: "PHARMA_STATINS", role: "B" },
+  { id: "LINK_COQ10_STATINS_A", interactionId: "INT_COQ10_STATINS", substance: "COQ10", role: "A" },
+  { id: "LINK_COQ10_STATINS_B", interactionId: "INT_COQ10_STATINS", substance: "PHARMA_STATINS", role: "B" },
+  { id: "LINK_VITD_TESTOSTERONE_A", interactionId: "INT_VITAMIN_D3_TESTOSTERONE", substance: "VITAMIN_D", role: "A" },
+  { id: "LINK_VITD_TESTOSTERONE_B", interactionId: "INT_VITAMIN_D3_TESTOSTERONE", substance: "PHARMA_TESTOSTERONE", role: "B" },
+  { id: "LINK_ASHWAGANDHA_TESTOSTERONE_A", interactionId: "INT_ASHWAGANDHA_TESTOSTERONE", substance: "ASHWAGANDHA", role: "A" },
+  { id: "LINK_ASHWAGANDHA_TESTOSTERONE_B", interactionId: "INT_ASHWAGANDHA_TESTOSTERONE", substance: "PHARMA_TESTOSTERONE", role: "B" },
+  { id: "LINK_TADALAFIL_NITRATE_A", interactionId: "INT_TADALAFIL_NITRATE", substance: "PHARMA_TADALAFIL", role: "A" },
+  { id: "LINK_TADALAFIL_NITRATE_B", interactionId: "INT_TADALAFIL_NITRATE", substance: "NITRATE", role: "B" },
+  { id: "LINK_NAC_METFORMIN_A", interactionId: "INT_NAC_METFORMIN", substance: "NAC", role: "A" },
+  { id: "LINK_NAC_METFORMIN_B", interactionId: "INT_NAC_METFORMIN", substance: "METFORMIN", role: "B" },
+  { id: "LINK_MILK_THISTLE_TAMOXIFEN_A", interactionId: "INT_MILK_THISTLE_TAMOXIFEN", substance: "MILK_THISTLE", role: "A" },
+  { id: "LINK_MILK_THISTLE_TAMOXIFEN_B", interactionId: "INT_MILK_THISTLE_TAMOXIFEN", substance: "PHARMA_TAMOXIFEN", role: "B" },
+  { id: "LINK_GRAPEFRUIT_STATINS_A", interactionId: "INT_GRAPEFRUIT_STATINS", substance: "GRAPEFRUIT", role: "A" },
+  { id: "LINK_GRAPEFRUIT_STATINS_B", interactionId: "INT_GRAPEFRUIT_STATINS", substance: "PHARMA_STATINS", role: "B" },
+  { id: "LINK_VITAMIN_K_WARFARIN_A", interactionId: "INT_VITAMIN_K_WARFARIN", substance: "VITAMIN_K2", role: "A" },
+  { id: "LINK_VITAMIN_K_WARFARIN_B", interactionId: "INT_VITAMIN_K_WARFARIN", substance: "WARFARIN", role: "B" },
+  { id: "LINK_GARLIC_WARFARIN_A", interactionId: "INT_GARLIC_WARFARIN", substance: "GARLIC", role: "A" },
+  { id: "LINK_GARLIC_WARFARIN_B", interactionId: "INT_GARLIC_WARFARIN", substance: "WARFARIN", role: "B" },
+  { id: "LINK_GINKGO_WARFARIN_A", interactionId: "INT_GINKGO_WARFARIN", substance: "GINKGO", role: "A" },
+  { id: "LINK_GINKGO_WARFARIN_B", interactionId: "INT_GINKGO_WARFARIN", substance: "WARFARIN", role: "B" },
+  { id: "LINK_CURCUMIN_ANASTROZOLE_A", interactionId: "INT_CURCUMIN_ANASTROZOLE", substance: "CURCUMIN", role: "A" },
+  { id: "LINK_CURCUMIN_ANASTROZOLE_B", interactionId: "INT_CURCUMIN_ANASTROZOLE", substance: "PHARMA_ANASTROZOLE", role: "B" },
+  { id: "LINK_RESVERATROL_ANASTROZOLE_A", interactionId: "INT_RESVERATROL_ANASTROZOLE", substance: "RESVERATROL", role: "A" },
+  { id: "LINK_RESVERATROL_ANASTROZOLE_B", interactionId: "INT_RESVERATROL_ANASTROZOLE", substance: "PHARMA_ANASTROZOLE", role: "B" },
 ];

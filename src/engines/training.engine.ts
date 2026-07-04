@@ -1,6 +1,7 @@
 import { TrainingInput, TrainingOutput, Exercise } from '../core/types';
 import { EXERCISE_CATALOG, getExercisesByGroup, canReplace, getSubstitutes, getExerciseById } from '../core/exercise-catalog';
 import { RIR_MATRIX, MesocyclePhase, mesocyclePhaseForWeek, calculateWeeklyProgression, generateWeeklyPlan, getProgressionRationale } from './rir-matrix.engine';
+import { recommendTempo, formatTempo, TEMPO_PRESETS } from './rep-tempo.engine';
 
 export { EXERCISE_CATALOG as EXERCISE_DB, getExercisesByGroup as selectExercises, canReplace, getSubstitutes, getExerciseById };
 
@@ -62,7 +63,7 @@ export function calcExercisePrescription(
   volumeMultiplier: number,
   weekNumber: number = 1,
   totalWeeks: number = 12
-): { sets: number; reps: string; rir: number; dropSet: boolean; dropSetReps: string; backoffSet: boolean; rest: number; progressionNote: string } {
+): { sets: number; reps: string; rir: number; dropSet: boolean; dropSetReps: string; backoffSet: boolean; rest: number; progressionNote: string; tempo: string } {
   // AUD-FIX-6: пропорциональные границы фаз (фикс коротких циклов 4-6 нед)
   const phase: MesocyclePhase = mesocyclePhaseForWeek(weekNumber, totalWeeks);
   // AUD-FIX-7: согласованный deload — phase==='deload' (нед %4 в base) и параметр isDeload
@@ -74,7 +75,7 @@ export function calcExercisePrescription(
   const baseSets = level === 'beginner' ? 3 : level === 'intermediate' ? 3 : 4;
   let sets = Math.max(2, Math.round(baseSets * volumeMultiplier * (isWeakGroup ? 1.2 : 1.0)));
   if (effectiveDeload) sets = Math.max(2, Math.round(sets * 0.6));
-
+  
   const repRanges: Record<string, [number, number]> = {
     strength: [3, 6], hypertrophy: [8, 12], bulk: [6, 10], cut: [10, 15],
     maintenance: [8, 12], endurance: [12, 20], rehab: [12, 20], recomp: [6, 10],
@@ -82,22 +83,26 @@ export function calcExercisePrescription(
   const range = repRanges[goal] || [8, 12];
   if (exercise.type === 'compound') { range[0] = Math.max(3, range[0] - 2); range[1] = Math.max(6, range[1] - 2); }
   const reps = `${range[0]}-${range[1]}`;
-
+  
   let rir = effectiveDeload ? 4 : goalRir;
   if (isWeakGroup && !effectiveDeload) rir = Math.max(0, rir - 1);
-
+  
   const dropSet = !effectiveDeload && exercise.type === 'isolation' && (goal === 'hypertrophy' || goal === 'bulk');
   const dropSetReps = dropSet ? `${Math.max(4, range[0] - 2)}-${range[1]}` : '';
   const backoffSet = !effectiveDeload && exercise.type === 'compound' && (goal === 'strength' || goal === 'hypertrophy');
-
+  
   const rest = exercise.type === 'compound'
     ? (goal === 'strength' ? 180 : 120)
     : (goal === 'cut' ? 45 : 60);
-
+  
   const progressionNote = !effectiveDeload ? ` | Нед ${weekNumber}: +2.5-5% весов или +1 сет на группу` : '';
-
-  return { sets, reps, rir, dropSet, dropSetReps: dropSet ? `${Math.max(4, range[0] - 2)}-${range[1]}` : '', backoffSet, rest, progressionNote };
+  
+  const tempoId = recommendTempo(goal, exercise.type === 'compound' ? 'compound' : 'isolation');
+  const tempo = formatTempo(TEMPO_PRESETS[tempoId].tempo);
+  
+  return { sets, reps, rir, dropSet, dropSetReps: dropSet ? `${Math.max(4, range[0] - 2)}-${range[1]}` : '', backoffSet, rest, progressionNote, tempo };
 }
+
 
 export function assignIntensityTechnique(
   exercise: Exercise,

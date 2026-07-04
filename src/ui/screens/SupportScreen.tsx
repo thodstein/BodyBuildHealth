@@ -56,7 +56,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'plan' | 'reports';
-type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'research' | 'favorites' | 'protocols' | 'biostack';
+type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'research' | 'favorites' | 'protocols' | 'biostack' | 'diary' | 'bioavailability' | 'symptoms';
 
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { PopupBool, PopupNumber, PopupSelect } from '../components/PopupXxx';
@@ -68,9 +68,13 @@ import { SupportHomeView } from './SupportScreen_parts/SupportHomeView';
 import { SupportCatalogView } from './SupportScreen_parts/SupportCatalogView';
 import { SupportInteractionsView } from './SupportScreen_parts/SupportInteractionsView';
 import { SupportFavoritesView } from './SupportScreen_parts/SupportFavoritesView';
+import { SupportDiaryView } from './SupportScreen_parts/SupportDiaryView';
 import { SupportStacksView } from './SupportScreen_parts/SupportStacksView';
 import { SupportCalcResult } from './SupportScreen_parts/SupportCalcResult';
+import { DosageDatabaseView } from '../components/DosageCalculator';
 import { SupportProtocols } from './SupportScreen_parts/SupportProtocols';
+import { SupportBioavailability } from './SupportScreen_parts/SupportBioavailability';
+import { SymptomSolverTab } from './SupportScreen_parts/SymptomSolverTab';
 export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTab }) => {
   const linked = useDataLink();
   const [tab, setTab] = useState<SupportTab>(initialTab || 'main');
@@ -78,8 +82,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [calcView, setCalcView] = useState<CalcView>('main');
   const [infoView, setInfoView] = useState<InfoView>('main');
   const [section, setSection] = useState<'home'|'generator'|'protocols'|'info'>('home');
-  const [genTab, setGenTab] = useState<'calculator'|'info'>('calculator');
-  const [protocolTab, setProtocolTab] = useState<'pct'|'fertility'|'hrt'|'neuro'|'joints'|'acne'>('pct');
+  const [genTab, setGenTab] = useState<'calculator'|'info'|'dosages'>('calculator');
+  const [protocolTab, setProtocolTab] = useState<'pct'|'fertility'|'hrt'|'neuro'|'joints'|'acne'|'injections'>('pct');
   const [infoTab, setInfoTab] = useState<string>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
   const [catalogOrgans, setCatalogOrgans] = useState<string[]>([]);
@@ -1494,8 +1498,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       .map(i => ({ ...i, source: 'db' as const }));
     seen.clear();
     for (const item of fromDB) {
-      seen.add(item.interactionId);
-      seen.add(`${item.substanceA}|${item.substanceB}`);
+      seen.add(item.interactionId.toLowerCase());
+      seen.add(`${item.substanceA.toLowerCase()}|${item.substanceB.toLowerCase()}`);
+      seen.add([item.substanceA.toLowerCase(), item.substanceB.toLowerCase()].sort().join('||'));
     }
     const fromEngine = SYNERGY_PAIRS
       .filter(p => catalogOk(p.substanceA) && catalogOk(p.substanceB))
@@ -1510,7 +1515,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       notes: p.clinicalNote || '',
       source: 'engine' as const,
     }));
-    const dedupedEngine = fromEngine.filter(e => !seen.has(`${e.substanceA}|${e.substanceB}`) && !seen.has(e.interactionId));
+    const dedupedEngine = fromEngine.filter(e => {
+      const pk1 = `${e.substanceA.toLowerCase()}|${e.substanceB.toLowerCase()}`;
+      const pk2 = [e.substanceA.toLowerCase(), e.substanceB.toLowerCase()].sort().join('||');
+      return !seen.has(pk1) && !seen.has(pk2) && !seen.has(e.interactionId.toLowerCase());
+    });
     // Pharma synergy pairs (AAS + peptides + insulin)
     const PHARMA_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin']);
     const pharmaFromEngine = SYNERGY_PAIRS
@@ -1519,7 +1528,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         const b = PHARMA_DB[p.substanceB];
         return a && b && PHARMA_CLASSES.has(a.class) && PHARMA_CLASSES.has(b.class) && !catalogOk(p.substanceA) && !catalogOk(p.substanceB);
       })
-      .filter(p => !seen.has(`${p.substanceA}|${p.substanceB}`))
+      .filter(p => {
+        const pk1 = `${p.substanceA.toLowerCase()}|${p.substanceB.toLowerCase()}`;
+        const pk2 = [p.substanceA.toLowerCase(), p.substanceB.toLowerCase()].sort().join('||');
+        return !seen.has(pk1) && !seen.has(pk2);
+      })
       .map((p, idx) => ({
       interactionId: `pharma_synergy_${idx}`,
       substanceA: p.substanceA,
@@ -1566,9 +1579,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   }, [interactionIds, allSupport, mergedInteractions]);
 
   const hasSupportInteractions = supportInteractions && supportInteractions.length > 0;
-  const supportSynergiesList = supportInteractions?.filter(i => i.type === 'synergy') ?? [];
-  const supportConflicts = supportInteractions?.filter(i => i.type === 'conflict') ?? [];
-  const supportCautions = supportInteractions?.filter(i => i.type === 'caution') ?? [];
+  const _sevRank: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+  const supportSynergiesList = (supportInteractions?.filter(i => i.type === 'synergy') ?? []).sort((a: any, b: any) => (_sevRank[b.severity] || 0) - (_sevRank[a.severity] || 0));
+  const supportConflicts = (supportInteractions?.filter(i => i.type === 'conflict') ?? []).sort((a: any, b: any) => (_sevRank[b.severity] || 0) - (_sevRank[a.severity] || 0));
+  const supportCautions = (supportInteractions?.filter(i => i.type === 'caution') ?? []).sort((a: any, b: any) => (_sevRank[b.severity] || 0) - (_sevRank[a.severity] || 0));
 
   // Replacement calculator state
   const [replaceSearch, setReplaceSearch] = useState('');
@@ -2954,10 +2968,11 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['calculator','🧮 Калькулятор'],['info','📖 О подборе']].map(([id,label]) => (
+            {[['calculator','🧮 Калькулятор'],['dosages','📋 Дозировки'],['info','📖 О подборе']].map(([id,label]) => (
               <button key={id} onClick={() => { setGenTab(id as any); 
               const a: Record<string,()=>void> = {
                 calculator: ()=>{ setTab('calculator'); setSupportView('calc'); },
+                dosages: ()=>{ setTab('main'); setSupportView('calc'); },
                 info: ()=>{},
               };
               a[id]?.();
@@ -2988,7 +3003,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['interactions','⚠ Взаимодействия'],['research','Исследования'],['favorites','Избранное']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['interactions','⚠ Взаимодействия'],['research','Исследования'],['favorites','Избранное'],['diary','📓 Дневник'],['bioavailability','🧬 Биодоступность'],['symptoms','🩺 Симптомы']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 if (id === 'peptides') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); }
                 else { setTab('main'); setSupportView('calc'); setCalcView('info'); setSection('home'); setInfoView(id as InfoView); }
@@ -3034,6 +3049,21 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             {renderView(infoView, 'biostack', () =>
               <div style={{ padding: '0 4px' }}>
                 <BioStackAIScreen />
+              </div>
+            )}
+            {renderView(infoView, 'diary', () =>
+              <div style={{ padding: '0 4px' }}>
+                <SupportDiaryView s={s} />
+              </div>
+            )}
+            {renderView(infoView, 'bioavailability', () =>
+              <div style={{ padding: '0 4px' }}>
+                <SupportBioavailability s={s} />
+              </div>
+            )}
+            {renderView(infoView, 'symptoms', () =>
+              <div style={{ padding: '0 4px' }}>
+                <SymptomSolverTab s={s} />
               </div>
             )}
 
@@ -3237,6 +3267,11 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
       {/* ===== SUPPORT CALCULATOR RESULT ===== */}
       {section === 'generator' && genTab === 'calculator' && ((tab === 'main' && supportView === 'calc' && calcView === 'calculator') || tab === 'calculator') && (
         <SupportCalcResult s={s} />
+      )}
+
+      {/* ===== DOSAGE DATABASE VIEW ===== */}
+      {section === 'generator' && genTab === 'dosages' && (
+        <DosageDatabaseView />
       )}
 
       {/* ===== PEPTIDE CALCULATOR ===== */}

@@ -59,31 +59,81 @@ export const PopupNumber: React.FC<{
 };
 
 export const PopupSelect: React.FC<{
-  label: string; value: string; options: { id: string; label: string; desc?: string }[];
-  hint?: string; onChange: (v: string) => void;
+  label: string;
+  value: string;
+  options: { id: string; label: string; desc?: string }[];
+  hint?: string;
+  onChange: (v: string) => void;
 }> = ({ label, value, options, hint, onChange }) => {
   const [open, setOpen] = useState(false);
   const sel = options.find(o => o.id === value);
+  return (
+    <>
+      <button onClick={() => setOpen(true)} style={cardBtnStyle(!!value)}>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+        <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{sel ? sel.label : 'Выбрать…'}</div>
+      </button>
+      {open && (
+        <div style={overlay} onClick={() => setOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={sheet(420)}>
+            <div style={topBar} />
+            <div style={sheetBody}>
+              <div style={titleStyle}>{label}</div>
+              {hint && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8, lineHeight: 1.4 }}>{hint}</div>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {options.map(o => (
+                  <button 
+                    key={o.id} 
+                    onClick={() => { onChange(o.id); setOpen(false); }}
+                    style={{ 
+                      display: 'block', width: '100%', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                      fontSize: 11, fontWeight: value === o.id ? 700 : 400,
+                      background: value === o.id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                      border: value === o.id ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                      color: value === o.id ? ACCENT : 'rgba(255,255,255,0.85)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>{o.label}</span>
+                      {value === o.id && <span style={{ fontSize: 10 }}>✓</span>}
+                    </div>
+                    {o.desc && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setOpen(false)} style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Закрыть</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+export const PopupText: React.FC<{
+  label: string; value: string; placeholder?: string;
+  hint?: string; onChange: (v: string) => void;
+}> = ({ label, value, placeholder, hint, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const [edit, setEdit] = useState(value);
   return <>
-    <button onClick={() => setOpen(true)} style={cardBtnStyle(!!value)}>
+    <button onClick={() => { setEdit(value); setOpen(true); }} style={cardBtnStyle(!!value)}>
       <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{sel ? sel.label : 'Выбрать…'}</div>
+      <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{value || 'Введите...'}</div>
     </button>
     {open && <div style={overlay} onClick={() => setOpen(false)}>
-      <div onClick={e => e.stopPropagation()} style={sheet(420)}>
+      <div onClick={e => e.stopPropagation()} style={sheet()}>
         <div style={topBar} />
         <div style={sheetBody}>
           <div style={titleStyle}>{label}</div>
           {hint && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8, lineHeight: 1.4 }}>{hint}</div>}
-          {options.map(o => <button key={o.id} onClick={() => { onChange(o.id); setOpen(false); }}
-            style={{ display: 'block', width: '100%', padding: '10px 12px', marginBottom: 4, borderRadius: 10, cursor: 'pointer', textAlign: 'left' as const,
-              fontSize: 11, fontWeight: value === o.id ? 700 : 400,
-              background: value === o.id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
-              border: value === o.id ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-              color: value === o.id ? ACCENT : 'rgba(255,255,255,0.85)' }}>
-            <div>{o.label}{value === o.id ? ' ✓' : ''}</div>
-            {o.desc && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>}
-          </button>)}
+          <input type="text" value={edit} placeholder={placeholder}
+            onChange={e => setEdit(e.target.value)} autoFocus
+            style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 16, boxSizing: 'border-box', textAlign: 'center', marginBottom: 12 }} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setOpen(false)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Отмена</button>
+            <button onClick={() => { onChange(edit); setOpen(false); }} style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 700, fontSize: 12 }}>OK</button>
+          </div>
         </div>
       </div>
     </div>}
@@ -129,4 +179,4 @@ export const SaveButton: React.FC<{
   </button>;
 };
 
-export default { PopupNumber, PopupSelect, ExpandableCard, MetricCard, SaveButton };
+export default { PopupNumber, PopupSelect, PopupText, ExpandableCard, MetricCard, SaveButton };

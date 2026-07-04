@@ -13,6 +13,7 @@ const CAT: { id: string; label: string; icon: string }[] = [
   { id: 'technique', label: 'Техника', icon: '🎯' },
   { id: 'volume', label: 'Объём', icon: '📦' },
   { id: 'frequency', label: 'Частота', icon: '🔁' },
+  { id: 'specialization', label: 'Специализация', icon: '🎯' },
 ];
 
 const EV_COLOR: Record<string, string> = { A: '#22c55e', B: '#eab308', C: '#f97316' };

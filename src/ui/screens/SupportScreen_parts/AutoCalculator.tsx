@@ -331,6 +331,187 @@ function LabDeltaView({ deltas }: { deltas: LabDelta[] }) {
   </div>;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// АВТО-ВЫВОД СОСТОЯНИЯ КАРТОЧЕК ИЗ ЦИФР АНАЛИЗОВ
+// Слова (АЛТ↑, ГГТ↑, ЛПНП↑, гематокрит↑, креатинин↑) → цифры калькулятора
+// ═══════════════════════════════════════════════════════════════════
+
+function deriveStateFromLabs(fp: LabSlice): {
+  hepatobiliary: Partial<CalculatorState['hepatobiliary']>;
+  cardio: Partial<CalculatorState['cardio']>;
+  urinary: Partial<CalculatorState['urinary']>;
+  goals: Partial<CalculatorState['goals']>;
+  contraindications: Partial<CalculatorState['contraindications']>;
+  derivedFields: string[];
+} {
+  const getV = (panel: keyof LabSlice, key: string): number | null => {
+    const pv = fp[panel] as Record<string, string> | undefined;
+    if (!pv) return null;
+    const v = parseFloat(pv[key]);
+    return isNaN(v) ? null : v;
+  };
+  const getS = (panel: keyof LabSlice, key: string): string => {
+    const pv = fp[panel] as Record<string, string> | undefined;
+    return pv?.[key] || '';
+  };
+
+  const derived: string[] = [];
+  const hep: Partial<CalculatorState['hepatobiliary']> = {};
+  const card: Partial<CalculatorState['cardio']> = {};
+  const urin: Partial<CalculatorState['urinary']> = {};
+  const goals: Partial<CalculatorState['goals']> = {};
+  const contr: Partial<CalculatorState['contraindications']> = {};
+
+  // ── ГЕПАТОБИЛИАРНАЯ ──
+  const alt = getV('panelBiochem', 'ALT');
+  const ast = getV('panelBiochem', 'AST');
+  const ggt = getV('panelBiochem', 'GGT');
+  const bilirubin = getV('panelBiochem', 'Bilirubin');
+
+  if (alt !== null || ast !== null) {
+    const maxTransam = Math.max(alt ?? 0, ast ?? 0);
+    if (maxTransam < 40) hep.altAstElevation = 'none';
+    else if (maxTransam < 80) hep.altAstElevation = 'mild';
+    else if (maxTransam < 120) hep.altAstElevation = 'moderate';
+    else hep.altAstElevation = 'severe';
+    derived.push('hepatobiliary.altAstElevation');
+  }
+
+  if (ggt !== null) {
+    if (ggt < 55) hep.ggtElevation = 'none';
+    else if (ggt < 100) hep.ggtElevation = 'mild';
+    else if (ggt < 200) hep.ggtElevation = 'moderate';
+    else hep.ggtElevation = 'severe';
+    derived.push('hepatobiliary.ggtElevation');
+  }
+
+  if (bilirubin !== null) {
+    if (bilirubin < 21) hep.bilirubinElevation = 'none';
+    else if (bilirubin < 40) hep.bilirubinElevation = 'mild';
+    else if (bilirubin < 60) hep.bilirubinElevation = 'moderate';
+    else hep.bilirubinElevation = 'severe';
+    derived.push('hepatobiliary.bilirubinElevation');
+  }
+
+  if (alt !== null && ast !== null && ggt !== null) {
+    if (alt / Math.max(1, ast) > 1.5 && ggt > 60) {
+      hep.fattyLiver = true;
+      derived.push('hepatobiliary.fattyLiver');
+    } else if (alt !== null && ast !== null && ggt !== null) {
+      hep.fattyLiver = false;
+      derived.push('hepatobiliary.fattyLiver');
+    }
+  }
+
+  // ── ССС ──
+  const ldl = getV('panelLipid', 'LDL');
+  const hdl = getV('panelLipid', 'HDL');
+  const tg = getV('panelLipid', 'Triglycerides');
+  const hct = getV('panelHematology', 'HCT');
+  const hb = getV('panelHematology', 'Hemoglobin');
+
+  if (ldl !== null) {
+    if (ldl < 3.0) card.ldlElevation = 'none';
+    else if (ldl < 4.0) card.ldlElevation = 'mild';
+    else if (ldl < 5.0) card.ldlElevation = 'moderate';
+    else card.ldlElevation = 'severe';
+    derived.push('cardio.ldlElevation');
+  }
+
+  if (hdl !== null) {
+    card.hdlLow = hdl < 1.0;
+    derived.push('cardio.hdlLow');
+  }
+
+  if (tg !== null) {
+    if (tg < 1.7) card.triglycerides = 'normal';
+    else if (tg < 2.3) card.triglycerides = 'mild';
+    else card.triglycerides = 'high';
+    derived.push('cardio.triglycerides');
+  }
+
+  if (hct !== null) {
+    if (hct < 52) card.hctElevation = 'none';
+    else if (hct < 56) card.hctElevation = 'mild';
+    else if (hct < 60) card.hctElevation = 'moderate';
+    else card.hctElevation = 'severe';
+    derived.push('cardio.hctElevation');
+  }
+
+  // Общий холестерин (если LDL нет, но Total есть)
+  if (ldl === null) {
+    const tc = getV('panelLipid', 'Total Cholesterol');
+    if (tc !== null) {
+      if (tc < 5.0) card.ldlElevation = 'none';
+      else if (tc < 6.0) card.ldlElevation = 'mild';
+      else if (tc < 7.0) card.ldlElevation = 'moderate';
+      else card.ldlElevation = 'severe';
+      derived.push('cardio.ldlElevation');
+    }
+  }
+
+  // ── МОЧЕВЫДЕЛИТЕЛЬНАЯ ──
+  const creatinine = getV('panelBiochem', 'Creatinine');
+  const urea = getV('panelBiochem', 'Urea');
+  const protein = getS('panelUrinalysis', 'Protein');
+
+  if (creatinine !== null) {
+    if (creatinine < 110) urin.creatinineElevation = 'none';
+    else if (creatinine < 130) urin.creatinineElevation = 'mild';
+    else if (creatinine < 150) urin.creatinineElevation = 'moderate';
+    else urin.creatinineElevation = 'severe';
+    derived.push('urinary.creatinineElevation');
+  }
+
+  if (urea !== null) {
+    if (urea < 8.3) urin.ureaElevation = 'none';
+    else if (urea < 12) urin.ureaElevation = 'mild';
+    else if (urea < 20) urin.ureaElevation = 'moderate';
+    else urin.ureaElevation = 'severe';
+    derived.push('urinary.ureaElevation');
+  }
+
+  if (protein) {
+    const pLower = protein.toLowerCase().trim();
+    if (pLower.includes('нет') || pLower.includes('norm') || pLower === '-' || pLower === '0' || pLower === 'neg' || pLower === 'trace') {
+      urin.proteinuria = false;
+    } else {
+      urin.proteinuria = true;
+    }
+    derived.push('urinary.proteinuria');
+  }
+
+  // ── ЦЕЛИ (авто-активация при отклонениях) ──
+  if (hep.altAstElevation && hep.altAstElevation !== 'none') {
+    goals.liverDetox = true;
+    derived.push('goals.liverDetox');
+  }
+  if ((card.ldlElevation && card.ldlElevation !== 'none') || card.hdlLow === true || (card.triglycerides && card.triglycerides !== 'normal')) {
+    goals.lipidCorrection = true;
+    derived.push('goals.lipidCorrection');
+  }
+  if (card.hctElevation && card.hctElevation !== 'none') {
+    goals.bloodThinning = true;
+    derived.push('goals.bloodThinning');
+  }
+
+  // ── ПРОТИВОПОКАЗАНИЯ (тяжёлые отклонения) ──
+  if (hep.altAstElevation === 'severe' || hep.bilirubinElevation === 'severe') {
+    contr.hasLiverDisease = true;
+    derived.push('contraindications.hasLiverDisease');
+  }
+  if (urin.creatinineElevation === 'severe') {
+    contr.hasKidneyDisease = true;
+    derived.push('contraindications.hasKidneyDisease');
+  }
+  if (card.hctElevation === 'severe' || (hb !== null && hb > 180)) {
+    contr.hasThrombophilia = true;
+    derived.push('contraindications.hasThrombophilia');
+  }
+
+  return { hepatobiliary: hep, cardio: card, urinary: urin, goals, contraindications: contr, derivedFields: derived };
+}
+
 export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek }) => {
   const [state, setState] = useState<CalculatorState>(() => {
     const h = hydrateState();
@@ -346,6 +527,10 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
   const [coverageLevel, setCoverageLevel] = useState<'basic' | 'mid' | 'max' | 'boost'>('mid');
   const [boostOverride, setBoostOverride] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
+  const [autoFromLabs, setAutoFromLabs] = useState(true);
+  const [labDerivedFields, setLabDerivedFields] = useState<string[]>([]);
+  const [labSyncFlash, setLabSyncFlash] = useState(false);
+  const lastFullPanelRef = React.useRef<string>('');
 
 
   const effectiveWeek = propWeek || Math.min(state.goals.cycleWeeks || 12, Math.max(1, ...state.pharma.aas.map(a => a.weeks || 12), 6));
@@ -410,6 +595,28 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
     } catch {}
   }, [state]);
 
+  // ═══ АВТО-ВЫВОД КАРТОЧЕК ИЗ АНАЛИЗОВ ═══
+  React.useEffect(() => {
+    const fp = state.labs.fullPanel;
+    if (!fp || !autoFromLabs) { setLabDerivedFields([]); return; }
+    const fpStr = JSON.stringify(fp);
+    if (fpStr === lastFullPanelRef.current) return;
+    lastFullPanelRef.current = fpStr;
+    const derived = deriveStateFromLabs(fp);
+    if (derived.derivedFields.length === 0) { setLabDerivedFields([]); return; }
+    setState(s => ({
+      ...s,
+      hepatobiliary: { ...s.hepatobiliary, ...derived.hepatobiliary },
+      cardio: { ...s.cardio, ...derived.cardio },
+      urinary: { ...s.urinary, ...derived.urinary },
+      goals: { ...s.goals, ...derived.goals },
+      contraindications: { ...s.contraindications, ...derived.contraindications },
+    }));
+    setLabDerivedFields(derived.derivedFields);
+    setLabSyncFlash(true);
+    setTimeout(() => setLabSyncFlash(false), 1800);
+  }, [state.labs.fullPanel, autoFromLabs]);
+
   const update = <K extends keyof CalculatorState>(key: K, val: CalculatorState[K]) => setState(s => ({ ...s, [key]: val }));
   const uProf = (v: Partial<CalculatorState['profile']>) => setState(s => ({ ...s, profile: { ...s.profile, ...v } }));
   const uPharm = (v: Partial<CalculatorState['pharma']>) => setState(s => ({ ...s, pharma: { ...s.pharma, ...v } }));
@@ -466,6 +673,24 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       </div>}
 
       {tab === 'cards' && <div>
+
+        {/* ── Авто-вывод из анализов ── */}
+        <div style={{ ...GLASS, padding: '8px 12px', marginBottom: 8, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+          <button onClick={() => setAutoFromLabs(!autoFromLabs)}
+            style={{ padding:'4px 10px', borderRadius:16, fontSize:9, fontWeight:700, cursor:'pointer',
+              background: autoFromLabs ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${autoFromLabs ? 'rgba(0,230,138,0.4)' : 'rgba(255,255,255,0.08)'}`,
+              color: autoFromLabs ? '#00e68a' : 'var(--text-dim)' }}>
+            🤖 Авто из анализов: {autoFromLabs ? 'ВКЛ' : 'ВЫКЛ'}
+          </button>
+          {labDerivedFields.length > 0 && <span style={{ fontSize:8, color:'var(--text-dim)' }}>
+            Синхронизировано: {labDerivedFields.length} полей
+          </span>}
+          {labSyncFlash && <span style={{ fontSize:8, color:'#00e68a', fontWeight:700 }}>✓ Данные анализов применены</span>}
+          {autoFromLabs && !state.labs.fullPanel && <span style={{ fontSize:8, color:'var(--text-dim)' }}>
+            Введите анализы на вкладке «🧪 Анализы» — поля печень/ССС/почки заполнятся автоматически
+          </span>}
+        </div>
 
         <Card icon="👤" title="Профиль" defaultOpen cols={3}>
           <PopupNumber label="Вес" value={state.profile.weight} min={30} max={250} suffix="кг" onChange={v => uProf({ weight: v })} />
@@ -560,6 +785,8 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         </Card>
 
         <Card icon="🫁" title="Гепатобилиарная" cols={2}>
+          {labDerivedFields.some(f => f.startsWith('hepatobiliary.')) && autoFromLabs &&
+            <div style={{ gridColumn:'1 / -1', marginBottom:4 }}><span style={BADGE('rgba(0,230,138,0.2)')}>🤖 Авто из анализов</span></div>}
           <SevSelect label="АЛТ/АСТ" value={state.hepatobiliary.altAstElevation} onChange={v => uHep({ altAstElevation: v as any })} />
           <SevSelect label="ГГТ" value={state.hepatobiliary.ggtElevation} onChange={v => uHep({ ggtElevation: v as any })} />
           <SevSelect label="Билирубин" value={state.hepatobiliary.bilirubinElevation} onChange={v => uHep({ bilirubinElevation: v as any })} />
@@ -569,6 +796,8 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         </Card>
 
         <Card icon="💧" title="Мочевыделительная" cols={2}>
+          {labDerivedFields.some(f => f.startsWith('urinary.')) && autoFromLabs &&
+            <div style={{ gridColumn:'1 / -1', marginBottom:4 }}><span style={BADGE('rgba(0,230,138,0.2)')}>🤖 Авто из анализов</span></div>}
           <SevSelect label="Креатинин" value={state.urinary.creatinineElevation} onChange={v => uUrin({ creatinineElevation: v as any })} />
           <SevSelect label="Мочевина" value={state.urinary.ureaElevation} onChange={v => uUrin({ ureaElevation: v as any })} />
           <PopupBool label="Протеинурия" value={state.urinary.proteinuria} onChange={v => uUrin({ proteinuria: v })} />
@@ -581,6 +810,8 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         </Card>
 
         <Card icon="❤️" title="Сердечно-сосудистая" cols={2}>
+          {labDerivedFields.some(f => f.startsWith('cardio.')) && autoFromLabs &&
+            <div style={{ gridColumn:'1 / -1', marginBottom:4 }}><span style={BADGE('rgba(0,230,138,0.2)')}>🤖 Авто из анализов</span></div>}
           <PopupSelect label="АД стадия" value={state.cardio.bpStage} options={[{id:'normal',label:'Норма'},{id:'prehypertension',label:'Прегипертензия'},{id:'hypertension1',label:'Гипертензия 1'},{id:'hypertension2',label:'Гипертензия 2'}]} onChange={v => uCard({ bpStage: v as any })} />
           <PopupNumber label="ЧСС" value={state.cardio.heartRate} min={40} max={120} suffix="уд/мин" onChange={v => uCard({ heartRate: v })} />
           <SevSelect label="ЛПНП" value={state.cardio.ldlElevation} onChange={v => uCard({ ldlElevation: v as any })} />

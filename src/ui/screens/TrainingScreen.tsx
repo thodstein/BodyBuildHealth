@@ -11,6 +11,7 @@ import { generateWarmup } from '../../engines/warmup.engine';
 import { generateCooldown } from '../../engines/cooldown.engine';
 import { selectSetScheme } from '../../engines/set-scheme.engine';
 import { selectTempo, formatTempo } from '../../engines/tempo.engine';
+import { generateRepTempo } from '../../engines/rep-tempo-engine';
 import { useDataLink } from '../../core/data-link';
 import type { TrainingInput, TrainingOutput, Exercise, MovementPattern } from '../../core/types';
 import { computeAnalytics, type AnalyticsSnapshot, type WeeklyBreakdown } from '../../engines/analytics-engine';
@@ -25,6 +26,9 @@ import { getStrengthLevel, getNextLevelTarget } from '../../engines/performance-
 import { computeStructuredAnalytics } from '../../engines/structured-analytics.engine';
 import { SRCBBScreen } from './SRCBBScreen';
 import { DiaryAndAnalyticsTab } from './TrainingScreen_parts/DiaryAndAnalyticsTab';
+import { VBTCalculator } from './SRCBBScreen_parts/VBTCalculator';
+import { MRVEstimator } from './SRCBBScreen_parts/MRVEstimator';
+import { PlateCalculator } from './SRCBBScreen_parts/PlateCalculator';
 
 import {
   WARMUP_LABELS, GOALS, LEVELS, MUSCLE_GROUPS, GROUP_LABELS, EQUIP_LABELS, JOINT_LABELS,
@@ -159,6 +163,10 @@ export const TrainingScreen: React.FC = () => {
   const loadManualPlan = (plan: any) => { if (plan?.cfg) setManualCfg(plan.cfg); if (plan?.days) setManualResult({ splitName: plan.name || 'Загруженный план', corrections: plan.corrections || [], days: plan.days }); };
   const refreshManualSaved = () => { try { setManualSavedPlans(JSON.parse(localStorage.getItem('myTrainingPlans') || '[]')); } catch { setManualSavedPlans([]); } };
 const [subModal, setSubModal] = useState<{ dayIdx: number; exIdx: number; options: { id: string; name: string; reason: string }[] } | null>(null);
+  const [inlineEdit, setInlineEdit] = useState<{ dayIdx: number; exIdx: number; field: string; value: string } | null>(null);
+  const [dragFrom, setDragFrom] = useState<{ dayIdx: number; exIdx: number } | null>(null);
+  const [showMacroPreview, setShowMacroPreview] = useState(false);
+  const inlineRef = useRef<HTMLInputElement | null>(null);
   const openSubstitute = (dayIdx: number, exIdx: number) => {
     if (!manualResult) return;
     const e = manualResult.days[dayIdx]?.exercises[exIdx];
@@ -263,6 +271,74 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
   const exportManualPlanText = () => { if (!manualResult) return; const lines: string[] = []; lines.push('Тренировочный план: ' + manualResult.splitName); lines.push('Параметры: ' + Object.entries(manualCfg).filter(([,v]) => v).map(([k,v]) => k + '=' + v).join(', ')); lines.push('Уровень: ' + level + ' · Цель: ' + goal + ' · Дней/нед: ' + daysPerWeek + ' · Длина: ' + mesoLength + ' нед'); lines.push(''); if (manualResult.corrections && manualResult.corrections.length) { lines.push('Комментарии к плану:'); manualResult.corrections.forEach(corr => lines.push('  • ' + corr)); lines.push(''); } manualResult.days.forEach(d => { lines.push('День ' + d.day + ' (' + d.groups.join(', ') + ')'); d.exercises.forEach(e => lines.push('  ' + e.name + ' — ' + e.sets + 'x' + e.reps + ' @ RIR' + e.rir + ' · ' + e.weight + ' кг · отдых ' + e.rest + 'с (' + e.group + ')')); lines.push(''); }); const txt = lines.join(String.fromCharCode(10)); try { navigator.clipboard?.writeText(txt); } catch {} setPlanCopied(true); setTimeout(() => setPlanCopied(false), 1800); };
   const detectGroup = (name: string): string => { const n = name.toLowerCase(); if (/squat|присед|leg|quad|ножн|выпад|lunge/.test(n)) return 'legs'; if (/bench|жим|chest|груд|press|плеч|shoulder|delt/.test(n)) return n.includes('shoulder')||/delt|плеч/.test(n) ? 'shoulders' : 'chest'; if (/deadlift|станов|тяга|row|pull|спин|back|chin|lat/.test(n)) return 'back'; if (/curl|бицеп|bicep/.test(n)) return 'arms'; if (/tricep|трицеп|extension|пресс|ab|core/.test(n)) return /пресс|ab|core/.test(n) ? 'core' : 'arms'; return 'full'; };
   const loadProgramToConstructor = (programId: string) => { const lib: FullProgram[] = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS]; const prog = lib.find(p => p.id === programId); if (!prog || !prog.weeks?.length) return; const wk = prog.weeks[0]; const days = wk.days.map((d: ProgramDay, di: number) => ({ day: di + 1, groups: Array.from(new Set((d.exercises || []).map((e: ProgramDay['exercises'][number]) => detectGroup(e.name)))), exercises: (d.exercises || []).map((e: ProgramDay['exercises'][number]) => { const g = detectGroup(e.name); const rir = e.rir ?? (e.rpe ? Math.max(0, 10 - e.rpe) : 2); const pct = PCT_FOR_RIR_MAN[Math.max(0, Math.min(5, rir))] ?? 0.9; const reps = parseInt(e.reps) || (parseInt(String(e.reps).replace(/[^0-9]/g,'')) || 8); const weight = Math.round((tprofile.workMax[g] || 80) * pct); return { name: e.name, sets: e.sets, reps: String(e.reps), rir, rest: e.restSec || 120, group: g, weight }; }) })); const corrections: string[] = []; corrections.push('Загружена готовая программа «' + prog.name + '» (' + (prog.author || '') + ', ' + prog.goal + ', ' + prog.level + ') — неделя 1, ' + days.length + ' дн.'); corrections.push('Программа доступна для редактирования, применения методик и выполнения. Веса рассчитаны из workMax×%1RM(RIR); отредактируйте при необходимости.'); if (prog.warnings?.length) corrections.push('Предупреждения программы: ' + prog.warnings.join('; ')); setManualResult({ splitName: prog.name + ' (неделя 1)', corrections, days }); };
+  const GRP_RU_M: Record<string, string> = { chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор', full: 'Общее' };
+  const SET_TEMPLATES: Record<string, { sets: number; reps: string; rir: number; rest: number }> = {
+    '5×5': { sets: 5, reps: '5', rir: 1, rest: 180 }, '3×8': { sets: 3, reps: '8', rir: 2, rest: 90 },
+    '4×10': { sets: 4, reps: '10', rir: 2, rest: 90 }, '3×12': { sets: 3, reps: '12', rir: 2, rest: 75 },
+    'AMRAP': { sets: 1, reps: 'AMRAP', rir: 0, rest: 180 }, 'Myo-rep': { sets: 1, reps: '15 + 5×3', rir: 0, rest: 120 },
+    '10×10 GVT': { sets: 10, reps: '10', rir: 3, rest: 60 }, '5/3/1': { sets: 3, reps: '5/3/1+', rir: 1, rest: 180 },
+  };
+  const startInline = (di: number, ei: number, field: string, val: string | number) => { setInlineEdit({ dayIdx: di, exIdx: ei, field, value: String(val) }); setTimeout(() => inlineRef.current?.focus(), 10); };
+  const commitInline = () => {
+    if (!inlineEdit || !manualResult) { setInlineEdit(null); return; }
+    const { dayIdx, exIdx, field, value } = inlineEdit;
+    const old = manualResult.days[dayIdx]?.exercises[exIdx];
+    if (!old) { setInlineEdit(null); return; }
+    const days = manualResult.days.map((d, di) => di === dayIdx ? { ...d, exercises: d.exercises.map((ex, ei) => {
+      if (ei !== exIdx) return ex; const ne = { ...ex };
+      if (field === 'sets') ne.sets = parseInt(value) || ex.sets;
+      else if (field === 'reps') ne.reps = value;
+      else if (field === 'rir') { const v = parseInt(value); if (!isNaN(v)) ne.rir = v; }
+      else if (field === 'weight') { const v = parseInt(value); if (!isNaN(v)) ne.weight = v; }
+      else if (field === 'rest') { const v = parseInt(value); if (!isNaN(v)) ne.rest = v; }
+      return ne;
+    }) } : d);
+    setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, `✏️ ${old.name}: ${field}=${value}`] });
+    setInlineEdit(null);
+  };
+  const dragStart = (e: React.DragEvent, di: number, ei: number) => { setDragFrom({ dayIdx: di, exIdx: ei }); e.dataTransfer.effectAllowed = 'move'; };
+  const dragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
+  const dropEx = (e: React.DragEvent, tDay: number, tEx: number) => {
+    e.preventDefault(); if (!dragFrom || !manualResult) return;
+    const { dayIdx: fDay, exIdx: fEx } = dragFrom;
+    if (fDay === tDay && fEx === tEx) { setDragFrom(null); return; }
+    const days = manualResult.days.map(d => ({ ...d, exercises: [...d.exercises.map(ee => ({ ...ee }))] }));
+    const moved = days[fDay].exercises.splice(fEx, 1)[0];
+    if (!moved) { setDragFrom(null); return; }
+    const insertAt = fDay === tDay && tEx > fEx ? tEx - 1 : tEx;
+    days[tDay].exercises.splice(insertAt, 0, moved);
+    const msg = fDay === tDay ? `↕️ «${moved.name}» перемещён в Дне ${days[fDay].day}.` : `↕️ «${moved.name}» из Дня ${days[fDay].day} → День ${days[tDay].day}.`;
+    setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, msg] });
+    setDragFrom(null);
+  };
+  const copyDay = (di: number) => {
+    if (!manualResult) return;
+    const src = manualResult.days[di];
+    const newNum = Math.max(...manualResult.days.map(d => d.day)) + 1;
+    const days = [...manualResult.days, { ...src, day: newNum, exercises: src.exercises.map(e => ({ ...e })) }];
+    setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, `📋 День ${src.day} скопирован → День ${newNum}.`] });
+  };
+  const massEditWeight = (pct: number) => {
+    if (!manualResult) return;
+    const sgn = pct > 0 ? '+' : '';
+    const days = manualResult.days.map(d => ({ ...d, exercises: d.exercises.map(e => ({ ...e, weight: Math.round(e.weight * (1 + pct / 100)) })) }));
+    setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, `⚡ Масс-правка: все веса ${sgn}${pct}%.`] });
+  };
+  const massEditVolume = (pct: number) => {
+    if (!manualResult) return;
+    const sgn = pct > 0 ? '+' : '';
+    const days = manualResult.days.map(d => ({ ...d, exercises: d.exercises.map(e => ({ ...e, sets: Math.max(1, Math.round(e.sets * (1 + pct / 100))) })) }));
+    setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, `⚡ Масс-правка: объём ${sgn}${pct}%.`] });
+  };
+  const applySetTemplate = (di: number, ei: number, key: string) => {
+    if (!manualResult) return;
+    const t = SET_TEMPLATES[key]; if (!t) return;
+    const e = manualResult.days[di].exercises[ei];
+    const pct = PCT_FOR_RIR_MAN[Math.max(0, Math.min(5, t.rir))] ?? 0.9;
+    const wm = tprofile.workMax[e.group] || manualWorkMax[e.group] || 80;
+    const days = manualResult.days.map((d, di2) => di2 === di ? { ...d, exercises: d.exercises.map((ex, ei2) => ei2 === ei ? { ...ex, sets: t.sets, reps: t.reps, rir: t.rir, rest: t.rest, weight: Math.round(wm * pct) } : ex) } : d);
+    setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, `⚡ Шаблон «${key}» → «${e.name}»: ${t.sets}×${t.reps}, RIR ${t.rir}.`] });
+  };
   const buildPlan = usePlanGeneration({ goal, level, mesoLength, weakPoints, equipment: tprofile.equipment, workMax: tprofile.workMax, manualWorkMax, injuries: tprofile.injuries || [], pctForRir: PCT_FOR_RIR_MAN });
   const generateManualPlan = () => {
     const corrections: string[] = [];
@@ -2270,27 +2346,52 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
                     {manualResult.corrections.map((corr, i) => <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginBottom: 3, paddingLeft: 4, borderLeft: '2px solid rgba(59,130,246,0.4)' }}>{corr}</div>)}
                   </div>
                 )}
+                {/* Mass editing + macro preview */}
+                <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', alignSelf: 'center' }}>⚡ Масс-правка:</span>
+                  <button onClick={() => massEditWeight(5)} style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.06)', color: 'var(--accent)', cursor: 'pointer', fontSize: 9, fontWeight: 600 }}>+5% вес</button>
+                  <button onClick={() => massEditWeight(-5)} style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.06)', color: 'var(--accent)', cursor: 'pointer', fontSize: 9, fontWeight: 600 }}>−5% вес</button>
+                  <button onClick={() => massEditVolume(-20)} style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)', color: '#ef4444', cursor: 'pointer', fontSize: 9, fontWeight: 600 }}>−20% объём</button>
+                  <button onClick={() => massEditVolume(10)} style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.06)', color: 'var(--accent)', cursor: 'pointer', fontSize: 9, fontWeight: 600 }}>+10% объём</button>
+                  <button onClick={() => setShowMacroPreview(v => !v)} style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', fontSize: 9, fontWeight: 600 }}>{showMacroPreview ? '▲ Скрыть макроцикл' : '📅 Макроцикл'}</button>
+                </div>
+                {showMacroPreview && <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.15)' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>📅 Предпросмотр макроцикла: {mesoLength} нед × {manualResult.days.length} дн</div>
+                  <div style={{ overflowX: 'auto' }}><div style={{ display: 'flex', gap: 4, minWidth: 'max-content' }}>
+                    {[...Array(Math.ceil(mesoLength))].map((_, wi) => { const heat = Math.min(1, (wi < mesoLength/2 ? 65 + wi : 85 - (wi - mesoLength/2)) / 100); return <div key={wi} style={{ padding: '4px 6px', borderRadius: 8, background: `rgba(168,85,247,${0.04 + heat * 0.1})`, border: `1px solid rgba(168,85,247,${0.1 + heat * 0.2})`, minWidth: 72 }}><div style={{ fontSize: 8, fontWeight: 700, color: '#a855f7', textAlign: 'center', marginBottom: 3 }}>Нед {wi + 1}</div><div style={{ display: 'grid', gridTemplateColumns: `repeat(${manualResult.days.length}, 1fr)`, gap: 2 }}>{manualResult.days.map((_, di2) => <div key={di2} style={{ height: 18, borderRadius: 3, background: `rgba(0,230,138,${0.15 + heat * 0.35})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>Д{di2 + 1}</span></div>)}</div><div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', marginTop: 2, overflow: 'hidden' }}><div style={{ height: '100%', width: Math.round(heat * 100) + '%', borderRadius: 2, background: heat > 0.75 ? '#f59e0b' : '#00e68a' }} /></div><div style={{ fontSize: 6, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>{Math.round(65 + heat * 35)}% инт.</div></div>; })}
+                  </div></div>
+                </div>}
                 <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {manualResult.days.map((d, di) => (
                     <div key={d.day} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'rgba(0,230,138,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                         <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>🏋️ День {d.day}</span>
-                        <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 700 }}>{d.groups.join(' · ')}</span>
+                        <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                          <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 700 }}>{d.groups.join(' · ')}</span>
+                          <button onClick={() => copyDay(di)} title="Копировать день" style={{ padding: '1px 6px', borderRadius: 4, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', fontSize: 9, fontWeight: 700 }}>📋</button>
+                        </span>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 0.7fr 0.7fr 0.5fr 0.5fr 0.5fr 0.6fr', gap: 2, padding: '4px 10px', fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
-                        <span>Упражнение</span><span>Сеты×повт</span><span>RIR</span><span>Вес</span><span>Группа</span><span>Отдых</span><span>Действия</span>
+                      <div style={{ display: 'grid', gridTemplateColumns: '14px 1.8fr 0.7fr 0.7fr 0.5fr 0.5fr 0.5fr 0.7fr', gap: 2, padding: '4px 10px', fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
+                        <span></span><span>Упражнение</span><span>Сеты×повт</span><span>RIR</span><span>Вес</span><span>Группа</span><span>Отдых</span><span>Действия</span>
                       </div>
-                      {d.exercises.map((e, ei) => (
-                        <div key={ei} style={{ display: 'grid', gridTemplateColumns: '2fr 0.7fr 0.7fr 0.5fr 0.5fr 0.5fr 0.6fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                          <span style={{ fontWeight: 600 }}>{e.name}</span>
-                          <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{e.sets}×{e.reps}</span>
-                          <span style={{ color: '#f59e0b' }}>{e.rir}</span>
-                          <span style={{ color: '#60a5fa', fontWeight: 700 }}>{e.weight} кг</span>
-                          <span style={{ color: 'rgba(255,255,255,0.6)' }}>{e.group}</span>
-                          <span style={{ color: 'rgba(255,255,255,0.6)' }}>{e.rest}с</span>
-                          <button onClick={() => openSubstitute(di, ei)} title="Подобрать замену" style={{ padding: '2px 6px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>🔄</button>
+                      {d.exercises.map((e, ei) => {
+                        const tmpo = generateRepTempo({ goal: goal === 'strength' ? 'strength' : 'hypertrophy', riskLevel: 'low', difficultyLevel: 'medium', techniqueIssues: [], isMainLift: ei === 0 });
+                        return (
+                        <div key={ei} draggable onDragStart={ev => dragStart(ev, di, ei)} onDragOver={dragOver} onDrop={ev => dropEx(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'grid', gridTemplateColumns: '14px 1.8fr 0.7fr 0.7fr 0.5fr 0.5fr 0.5fr 0.7fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab', alignItems: 'center' }}>
+                          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', cursor: 'grab', userSelect: 'none' }}>⠿</span>
+                          <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>{e.name}<span style={{ fontSize: 7, color: '#a855f7', fontWeight: 700, background: 'rgba(168,85,247,0.1)', padding: '1px 5px', borderRadius: 4, whiteSpace: 'nowrap' }}>{tmpo.tempo.toString}</span></span>
+                          <span onClick={() => startInline(di, ei, 'sets', e.sets)} style={{ cursor: 'text', color: 'var(--accent)', fontWeight: 700 }}>{e.sets}×{e.reps}</span>
+                          <span onClick={() => startInline(di, ei, 'rir', e.rir)} style={{ cursor: 'text', color: '#f59e0b' }}>{e.rir}</span>
+                          <span onClick={() => startInline(di, ei, 'weight', e.weight)} style={{ cursor: 'text', color: '#60a5fa', fontWeight: 700 }}>{e.weight} кг</span>
+                          <span style={{ color: 'rgba(255,255,255,0.6)' }}>{GRP_RU_M[e.group] || e.group}</span>
+                          <span onClick={() => startInline(di, ei, 'rest', e.rest)} style={{ cursor: 'text', color: 'rgba(255,255,255,0.6)' }}>{e.rest}с</span>
+                          <span style={{ display: 'flex', gap: 2 }}>
+                            <button onClick={(ev) => { ev.stopPropagation(); openSubstitute(di, ei); }} title="Замена" style={{ padding: '2px 5px', borderRadius: 4, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: 'var(--accent)', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>🔄</button>
+                            <button onClick={(e2) => { e2.stopPropagation(); const k = window.prompt('Шаблон (5×5, 3×8, 4×10, 3×12, AMRAP, Myo-rep, 10×10 GVT, 5/3/1):', '5×5'); if (k && SET_TEMPLATES[k]) applySetTemplate(di, ei, k); }} title="Шаблон" style={{ padding: '2px 5px', borderRadius: 4, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>⚡</button>
+                          </span>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ))}
                 </div>
@@ -2325,6 +2426,27 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button onClick={() => setImproveModal(null)} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer', fontWeight: 700, fontSize: 11 }}>Отмена</button>
                         <button onClick={improveModal.apply} style={{ flex: 1, padding: 10, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', cursor: 'pointer', fontWeight: 800, fontSize: 11 }}>Применить</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {inlineEdit && (
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }} onClick={() => setInlineEdit(null)}>
+                    <div onClick={ev => ev.stopPropagation()} style={{ background: '#18181b', border: '1px solid rgba(0,230,138,0.3)', borderRadius: 14, padding: 16, minWidth: 220 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>
+                        ✏️ Изменить {inlineEdit.field} — {manualResult.days[inlineEdit.dayIdx]?.exercises[inlineEdit.exIdx]?.name}
+                      </div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>
+                        {inlineEdit.field === 'sets' ? 'Например: 4' : inlineEdit.field === 'reps' ? 'Например: 8-12 или AMRAP' : inlineEdit.field === 'rir' ? '0-5 (0 = отказ)' : inlineEdit.field === 'weight' ? 'кг' : 'секунд'}
+                      </div>
+                      <input ref={inlineRef} type={inlineEdit.field === 'reps' ? 'text' : 'number'} value={inlineEdit.value}
+                        onChange={e2 => setInlineEdit({ ...inlineEdit, value: e2.target.value })}
+                        onKeyDown={e2 => { if (e2.key === 'Enter') commitInline(); if (e2.key === 'Escape') setInlineEdit(null); }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: 8, borderRadius: 8, border: '1px solid rgba(0,230,138,0.3)', background: '#222', color: '#fff', fontSize: 13, outline: 'none' }}
+                      />
+                      <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                        <button onClick={() => setInlineEdit(null)} style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 11 }}>Отмена</button>
+                        <button onClick={commitInline} style={{ flex: 1, padding: 8, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', cursor: 'pointer', fontWeight: 700, fontSize: 11 }}>✓ Сохранить</button>
                       </div>
                     </div>
                   </div>
@@ -3548,7 +3670,11 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
       {tab === 'programs' && <InfoErrorBoundary label="Программы"><ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} onAddToMyTraining={(exs) => setCustomExercises(prev => [...prev, ...exs])} /></InfoErrorBoundary>}
       {tab === 'timers' && <InfoErrorBoundary label="Таймеры"><TimersTab /></InfoErrorBoundary>}
       {tab === 'progress' && <InfoErrorBoundary label="Прогресс"><ProgressTab historyWorkouts={historyWorkouts} /></InfoErrorBoundary>}
-      {tab === 'excalc' && <InfoErrorBoundary label="Калькулятор упражнений"><ExerciseCalcTab /></InfoErrorBoundary>}
+       {tab === 'excalc' && <InfoErrorBoundary label="Калькулятор упражнений"><ExerciseCalcTab /></InfoErrorBoundary>}
+       {tab === 'calc_plates' && <InfoErrorBoundary label="Калькулятор блинов"><PlateCalculator /></InfoErrorBoundary>}
+       {tab === 'calc_vbt' && <InfoErrorBoundary label="VBT-калькулятор"><VBTCalculator /></InfoErrorBoundary>}
+       {tab === 'calc_mrv' && <InfoErrorBoundary label="Оценщик MRV"><MRVEstimator /></InfoErrorBoundary>}
+
       {tab === 'calc_1rm' && <InfoErrorBoundary label="Калькулятор 1RM"><OneRmCalcTab /></InfoErrorBoundary>}
       {tab === 'pl_norms' && <InfoErrorBoundary label="Нормативы ПЛ"><PlNormsCalcTab /></InfoErrorBoundary>}
       {tab === 'import_data' && <InfoErrorBoundary label="Импорт CSV"><CsvImportTab onDone={loadDiaryStats} /></InfoErrorBoundary>}
@@ -3556,6 +3682,18 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
       {tab === 'calc_substitute' && <InfoErrorBoundary label="Замена упражнения"><CalcSubstituteTab /></InfoErrorBoundary>}
       {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} onBuildPlan={() => setTab('plan')} /></InfoErrorBoundary>}
       {tab === 'pl_pro' && <InfoErrorBoundary label="Pro ПЛ-инструменты"><ProPlToolsTab /></InfoErrorBoundary>}
+      {tab === 'rel_strength' && <InfoErrorBoundary label="Относительная сила"><RelativeStrengthCalcTab /></InfoErrorBoundary>}
+      {tab === 'calendar' && <InfoErrorBoundary label="Календарь тренировок"><TrainingCalendarTab /></InfoErrorBoundary>}
+      {tab === 'periodization_designer' && <InfoErrorBoundary label="Дизайнер периодизации"><PeriodizationDesignerTab /></InfoErrorBoundary>}
+      {tab === 'tech_calc' && <InfoErrorBoundary label="Техника упражнений"><TechniqueCalcTab /></InfoErrorBoundary>}
+      {tab === 'target_muscle' && <InfoErrorBoundary label="Целевая мышца"><TargetMuscleCalcTab /></InfoErrorBoundary>}
+      {tab === 'deload_scheduler' && <InfoErrorBoundary label="Планировщик делода"><DeloadSchedulerTab /></InfoErrorBoundary>}
+      {tab === 'meso_progression' && <InfoErrorBoundary label="Прогрессия мезо"><div style={{ maxWidth: 720, margin: '0 auto', padding: 12 }}><MesocycleProgressionCard weeks={mesoLength} goal={goal === 'strength' ? 'strength' : goal === 'bulk' ? 'hypertrophy' : 'hypertrophy'} /></div></InfoErrorBoundary>}
+      {tab === 'calc_taper' && <InfoErrorBoundary label="Тапер-планер"><TaperPlannerTab /></InfoErrorBoundary>}
+      {tab === 'calc_plates' && <InfoErrorBoundary label="Калькулятор блинов"><PlateCalcTab /></InfoErrorBoundary>}
+      {tab === 'calc_vbt' && <InfoErrorBoundary label="VBT / скорость"><VBTCalcTab /></InfoErrorBoundary>}
+      {tab === 'calc_fatigue' && <InfoErrorBoundary label="Индекс усталости"><FatigueIndexTab /></InfoErrorBoundary>}
+      {tab === 'calc_mrv' && <InfoErrorBoundary label="Оценщик MRV"><MRVEstimatorTab /></InfoErrorBoundary>}
 
       {/* ═══════════ MY TRAINING TAB ═══════════ */}
       {tab === 'mytraining' && (
@@ -3700,6 +3838,16 @@ import { StructuredAnalyticsCard } from './TrainingScreen_parts/StructuredAnalyt
 import { ExerciseGeneratorContent } from './TrainingScreen_parts/ExerciseGenerator';
 import { TrainingMixTab } from './TrainingScreen_parts/TrainingMixTab';
 import { ProPlToolsTab } from './TrainingScreen_parts/ProPlToolsTab';
-
-
+import { RelativeStrengthCalcTab } from './TrainingScreen_parts/RelativeStrengthCalcTab';
+import { TrainingCalendarTab } from './TrainingScreen_parts/TrainingCalendarTab';
+import { PeriodizationDesignerTab } from './TrainingScreen_parts/PeriodizationDesignerTab';
+import { TechniqueCalcTab } from './TrainingScreen_parts/TechniqueCalcTab';
+import { DeloadSchedulerTab } from './TrainingScreen_parts/DeloadSchedulerTab';
+import { MesocycleProgressionCard } from './TrainingScreen_parts/MesocycleProgressionCard';
+import { TargetMuscleCalcTab } from './TrainingScreen_parts/TargetMuscleCalcTab';
+import { TaperPlannerTab } from './TrainingScreen_parts/TaperPlannerTab';
+import { PlateCalcTab } from './TrainingScreen_parts/PlateCalcTab';
+import { VBTCalcTab } from './TrainingScreen_parts/VBTCalcTab';
+import { FatigueIndexTab } from './TrainingScreen_parts/FatigueIndexTab';
+import { MRVEstimatorTab } from './TrainingScreen_parts/MRVEstimatorTab';
 

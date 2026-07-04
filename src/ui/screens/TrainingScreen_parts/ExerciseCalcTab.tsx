@@ -1,10 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { EXERCISE_CATALOG, getExerciseById, getExercisesByGroup, getSubstitutes, canReplace } from '../../../core/exercise-catalog';
 import { calcExercisePrescription } from '../../../engines/training.engine';
+import { forceVector, lengthenedPartials, prescribeExercises } from '../../../engines/pro/exercise-prescription.engine';
 import { getVolumeByMuscle } from '../../../engines/training-methodology.engine';
-import { prescribeExercises, forceVector, lengthenedPartials } from '../../../engines/pro/exercise-prescription.engine';
-import { generateRepTempo } from '../../../engines/rep-tempo-engine';
-import { PopupSelect, PopupNumber, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
+import { formatTempo, TEMPO_PRESETS } from '../../../engines/rep-tempo.engine';
+import { PopupSelect, PopupNumber, PopupText, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { useDataLink } from '../../../core/data-link';
 import type { Exercise } from '../../../core/types';
 
@@ -32,6 +32,7 @@ export const ExerciseCalcTab: React.FC = () => {
   const [level, setLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
   const [week, setWeek] = useState<number>(1);
   const [totalWeeks, setTotalWeeks] = useState<number>(12);
+  const [manualTempo, setManualTempo] = useState<string>('');
 
   // Состояние для отображения списка замен
   const [showSubstitutes, setShowSubstitutes] = useState(false);
@@ -40,7 +41,7 @@ const [savedCalcs, setSavedCalcs] = useState<Array<{ id: number; name: string; g
   const saveCalc = () => {
     if (!ex || !presc) return;
     try {
-      const item = { id: Date.now(), name: ex.name, goal, level, week, oneRM, reps: presc.reps, sets: presc.sets, rir: presc.rir, rest: presc.rest, weight: workWeight, date: new Date().toISOString().slice(0, 10) };
+      const item = { id: Date.now(), name: ex.name, goal, level, week, oneRM, reps: presc.reps, sets: presc.sets, rir: presc.rir, rest: presc.rest, weight: workWeight, tempo: manualTempo || presc.tempo, date: new Date().toISOString().slice(0, 10) };
       const arr = JSON.parse(localStorage.getItem('he_excalc_saved') || '[]');
       arr.unshift(item);
       localStorage.setItem('he_excalc_saved', JSON.stringify(arr.slice(0, 30)));
@@ -197,16 +198,27 @@ const [savedCalcs, setSavedCalcs] = useState<Array<{ id: number; name: string; g
             onChange={v => setTotalWeeks(v)}
           />
         </div>
-        <div>
-          <PopupNumber
-            label="1RM (кг)"
-            value={oneRM}
-            min={0}
-            max={500}
-            step={0.5}
-            onChange={v => setOneRM(v)}
-          />
-        </div>
+         <div>
+           <PopupNumber
+             label="1RM (кг)"
+             value={oneRM}
+             min={0}
+             max={500}
+             step={0.5}
+             onChange={v => setOneRM(v)}
+           />
+         </div>
+         <div>
+           <PopupText
+             label="Темп (опц.)"
+             value={manualTempo}
+             placeholder="напр. 3-1-1-0"
+             hint="ECC-BOT-CON-TOP"
+             onChange={(v: string) => setManualTempo(v)}
+           />
+
+         </div>
+
       </div>
 
       {!ex ? (
@@ -283,47 +295,33 @@ const [savedCalcs, setSavedCalcs] = useState<Array<{ id: number; name: string; g
                   </span>
                 </div>
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
-                  <b>Региональная гипертрофия:</b> {(() => { const lp = lengthenedPartials(ex.group); return lp.length > 0 ? lp.slice(0, 3).map(l => l.name).join(', ') : 'нет данных'; })()}
+                  <b>Региональная гипертрофия:</b> {(() => { const lp = lengthenedPartials(ex.group); return lp.length > 0 ? lp.slice(0, 3).map((l: { name: string }) => l.name).join(', ') : 'нет данных'; })()}
                 </div>
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
-                  <b>PRO-рейтинг:</b> {(() => { const ranked = prescribeExercises({ muscle: ex.group, goal: goal as any, limit: 10 }); const found = ranked.findIndex(r => r.id === ex.id); if (found >= 0) return `${found + 1}-е место из ${ranked.length} (score: ${ranked[found].score})`; return 'не в топ-10'; })()}
+                  <b>PRO-рейтинг:</b> {(() => { const ranked = prescribeExercises({ muscle: ex.group, goal: goal as any, limit: 10 }); const found = ranked.findIndex((r: { id: string; score: number }) => r.id === ex.id); if (found >= 0) return `${found + 1}-е место из ${ranked.length} (score: ${ranked[found].score})`; return 'не в топ-10'; })()}
                 </div>
               </div>
             </div>
           )}
 
-          {/* PRO: реп-темпо */}
-          {ex && (
-            <div style={{ marginTop: 16, padding: 12, background: 'rgba(96,165,250,0.06)', borderRadius: 8, border: '1px solid rgba(96,165,250,0.2)' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>⏱ PRO: Реп-темпо прескрипция</div>
-              {(() => {
-                const riskLevel = level === 'beginner' ? 'high' as const : level === 'advanced' ? 'low' as const : 'medium' as const;
-                const tempoRes = generateRepTempo({
-                  goal: goal as any,
-                  riskLevel,
-                  difficultyLevel: level === 'beginner' ? 'low' as const : level === 'advanced' ? 'high' as const : 'medium' as const,
-                  techniqueIssues: [],
-                  isMainLift: ex.type === 'compound',
-                });
-                return (
-                  <div style={{ display: 'grid', gap: 4 }}>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
-                      <b>Паттерн:</b> {tempoRes.pattern}
-                    </div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
-                      <b>Темп:</b> {tempoRes.tempo.toString}
-                    </div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
-                      <b>Целевой RPE/RIR:</b> {tempoRes.targetRPE} / {tempoRes.targetRIR}
-                    </div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', fontStyle: 'italic' }}>
-                      {tempoRes.rationale}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
+           {/* PRO: реп-темпо */}
+           {ex && (
+             <div style={{ marginTop: 16, padding: 12, background: 'rgba(96,165,250,0.06)', borderRadius: 8, border: '1px solid rgba(96,165,250,0.2)' }}>
+               <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>⏱ PRO: Реп-темпо прескрипция</div>
+               <div style={{ display: 'grid', gap: 4 }}>
+                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                   <b>Паттерн:</b> {manualTempo ? 'Ручной' : (presc?.tempo ? 'Рекомендованный' : '—')}
+                 </div>
+                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                   <b>Темп:</b> {manualTempo || presc?.tempo || '—'}
+                 </div>
+                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', fontStyle: 'italic' }}>
+                   {manualTempo ? 'Используется пользовательский темп' : (presc?.tempo ? 'Темп рассчитан на основе цели и типа упражнения' : 'Не определено')}
+                 </div>
+               </div>
+             </div>
+           )}
+
           {savedCalcs.length > 0 && (
             <div style={{ marginTop: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>💾 Сохранённые расчёты ({savedCalcs.length})</div>

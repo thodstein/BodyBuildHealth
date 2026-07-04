@@ -95,6 +95,47 @@ export interface CustomFoodEntry {
   fiber: number;
   category: FoodItem['category'];
   servingSize: string;
+  potassium_mg?: number;
+  magnesium_mg?: number;
+  calcium_mg?: number;
+  sodium_mg?: number;
+  phosphorus_mg?: number;
+  zinc_mg?: number;
+  iron_mg?: number;
+  selenium_mcg?: number;
+  copper_mg?: number;
+  manganese_mg?: number;
+  iodine_mcg?: number;
+  chromium_mcg?: number;
+  omega3_mg?: number;
+  vitamin_a_mcg?: number;
+  vitamin_c_mg?: number;
+  vitamin_d_mcg?: number;
+  vitamin_e_mg?: number;
+  vitamin_k_mcg?: number;
+  vitamin_b1_mg?: number;
+  vitamin_b2_mg?: number;
+  vitamin_b3_mg?: number;
+  vitamin_b5_mg?: number;
+  vitamin_b6_mg?: number;
+  vitamin_b7_mcg?: number;
+  vitamin_b9_mcg?: number;
+  vitamin_b12_mcg?: number;
+  leucine_mg?: number;
+  isoleucine_mg?: number;
+  valine_mg?: number;
+  lysine_mg?: number;
+  methionine_mg?: number;
+  arginine_mg?: number;
+  glutamine_mg?: number;
+  tryptophan_mg?: number;
+  threonine_mg?: number;
+  cysteine_mg?: number;
+  creatine_mg?: number;
+  taurine_mg?: number;
+  coenzyme_q10_mg?: number;
+  polyphenols_mg?: number;
+  flavonoids_mg?: number;
 }
 
 const TIER_CONFIG: Record<MealTier, { proteinPerKg: number; fatPerKg: number; kcalMultiplier: number; label: string; description: string }> = {

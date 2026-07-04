@@ -5,6 +5,8 @@ import { PHARMA_DB } from '../../../core/pharma-database';
 import { hydrateState, runSupportForLevel } from '../../../engines/support-plan';
 import type { CalculatorState, PlanSubstance, PowerLevel } from '../../../engines/support-plan';
 import { evaluateRecommendations, computeCoverageRisk, buildPreApplyCard } from '../../../engines/recommendation-engine';
+import { calcStackSynergyScore, buildCautions } from '../../../engines/support-plan/display';
+import { DosageCalculator, DosageCalculatorView } from '../../components/DosageCalculator';
 
 /**
  * Карточка расчёта поддержки (представление).
@@ -643,7 +645,31 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                               {catalogEntry?.sideEffects && catalogEntry.sideEffects.length>0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#ef4444',fontSize:7}}>Побочные: </span><span style={{color:'#ef4444',fontSize:6}}>{catalogEntry.sideEffects.slice(0,4).join('; ')}</span></div>)}
                               {catalogEntry?.monitoring && catalogEntry.monitoring.length>0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#60a5fa',fontSize:7}}>Мониторинг: </span><div style={{display:'flex',flexDirection:'column',gap:1,marginTop:2}}>{catalogEntry.monitoring.map((m:any,i:number)=><div key={i} style={{fontSize:7,padding:'2px 6px',borderRadius:4,background:'rgba(96,165,250,0.04)',display:'flex',gap:4}}><span style={{color:'#60a5fa',fontWeight:600}}>{m.what}</span><span style={{color:'var(--text-dim)'}}>— {m.when}</span>{m.targetRange&&<span style={{color:'#f59e0b'}}>→ {m.targetRange}</span>}</div>)}</div></div>)}
                               {catalogEntry?.dosage && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'var(--accent)',fontSize:7}}>Дозировка: </span><span style={{fontSize:6,color:'var(--text-dim)'}}>{catalogEntry.dosage.mg}мг — {catalogEntry.dosage.timing}{catalogEntry.dosage.form?' ('+catalogEntry.dosage.form+')':''}</span></div>)}
-                              {catalogEntry?.specialInstructions && catalogEntry.specialInstructions.length>0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#f59e0b',fontSize:7}}>Особые указания: </span><div style={{display:'flex',flexDirection:'column',gap:1,marginTop:2}}>{catalogEntry.specialInstructions.map((si: string, i: number) => <div key={i} style={{fontSize:7,padding:'2px 6px',borderRadius:4,background:'rgba(245,158,11,0.04)',color:'var(--text-dim)'}}>• {si}</div>)}</div></div>)}
+                              {/* Evidence-based dosage calculator for this substance */}
+                              {(() => {
+                                const evDosageKey = `ev_${id}`;
+                                const isDosageOpen = expandedCategories[evDosageKey];
+                                return (
+                                  <div style={{marginBottom:4}}>
+                                    <button onClick={(e) => { e.stopPropagation(); setExpandedCategories(p => ({...p, [evDosageKey]: !p[evDosageKey]})); }} style={{
+                                      width:'100', padding:'4px 8px', borderRadius:6, cursor:'pointer',
+                                      background: isDosageOpen ? 'rgba(0,230,138,0.08)' : 'rgba(96,165,250,0.04)',
+                                      border: '1px solid ' + (isDosageOpen ? 'rgba(0,230,138,0.2)' : 'rgba(96,165,250,0.1)'),
+                                      color: isDosageOpen ? 'var(--accent)' : '#60a5fa',
+                                      fontWeight:600, fontSize:7, display:'flex', alignItems:'center', gap:4, justifyContent:'center',
+                                    }}>
+                                      <span>{isDosageOpen ? '📋' : '📋'}</span>
+                                      {isDosageOpen ? 'Дозировка (источники) ▲' : 'Клинически обоснованная дозировка 📋'}
+                                    </button>
+                                    {isDosageOpen && (
+                                      <div onClick={(e) => e.stopPropagation()}>
+                                        <DosageCalculator substanceId={id} substanceName={sub.name} phase={supportPhase} bodyWeight={linked.profile?.settings?.weight || undefined} />
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                              {catalogEntry?.specialInstructions && catalogEntry.specialInstructions.length > 0 && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#f59e0b',fontSize:7}}>Особые указания: </span><div style={{display:'flex',flexDirection:'column',gap:1,marginTop:2}}>{catalogEntry.specialInstructions.map((si: string, i: number) => <div key={i} style={{fontSize:7,padding:'2px 6px',borderRadius:4,background:'rgba(245,158,11,0.04)',color:'var(--text-dim)'}}>• {si}</div>)}</div></div>)}
                               {catalogEntry?.targetOrgan && (<div style={{marginBottom:4}}><span style={{fontWeight:600,color:'#8b5cf6',fontSize:7}}>Орган-мишень: </span><span style={{fontSize:6,color:'var(--text-dim)'}}>{catalogEntry.targetOrgan}</span></div>)}
                               {catalogEntry?.bestForm && (
                                 <div style={{ marginBottom:4 }}>
@@ -695,6 +721,20 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                                   </div>
                                 </div>
                               )}
+                              {catalogEntry?.cautions && catalogEntry.cautions.length > 0 && (
+                                <div style={{marginBottom:4}}>
+                                  <span style={{ fontWeight:600, color:'#f59e0b', fontSize:7 }}>Осторожности: </span>
+                                  <div style={{display:'flex',flexDirection:'column',gap:1,marginTop:2}}>
+                                    {catalogEntry.cautions.map((c: any, i: number) => (
+                                      <div key={i} style={{fontSize:7,padding:'2px 6px',borderRadius:4,background:'rgba(245,158,11,0.04)',display:'flex',gap:4}}>
+                                        <span style={{color:'#f59e0b',fontWeight:600,minWidth:50}}>⚠ {c.with}</span>
+                                        <span style={{color:'var(--text-dim)',flex:1}}>{c.effect}</span>
+                                        <span style={{color:c.severity==='HIGH'?'#f59e0b':c.severity==='MEDIUM'?'#eab308':'#6b7280',fontWeight:600,fontSize:6}}>{c.severity}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -704,13 +744,95 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                     );
                   })()}
 
-                  {/* ===== SYNERGY COMMENT CARD ===== */}
-                  {planResult?.synergyComment && (
-                    <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(0,230,138,0.03)', border:'1px solid rgba(0,230,138,0.12)' }}>
-                      <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>⚡ Принцип синергии стека</div>
-                      <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5, whiteSpace:'pre-line' }}>
-                        {planResult.synergyComment}
+                  {/* ===== STACK SYNERGY SCORE + STRUCTURED INTERACTIONS ===== */}
+                  {(() => {
+                    const planIds = (calcResult?.selectedSubstances || effectiveLevel?.subs || []) as string[];
+                    if (!planIds || planIds.length < 2) return null;
+                    const stackScore = calcStackSynergyScore(planIds);
+                    const planCautions = buildCautions(planIds);
+                    const planConflicts = (planResult?.conflicts || []);
+                    const levelColors: Record<string, string> = { excellent:'#22c55e', good:'#4ade80', moderate:'#f59e0b', poor:'#ef4444', risky:'#dc2626' };
+                    const levelLabels: Record<string, string> = { excellent:'Отлично', good:'Хорошо', moderate:'Умеренно', poor:'Плохо', risky:'Рискованно' };
+                    const syns = stackScore.matrix.filter((m: any) => m.type === 'synergy');
+                    const confs = stackScore.matrix.filter((m: any) => m.type === 'conflict');
+                    const cauts = stackScore.matrix.filter((m: any) => m.type === 'caution');
+                    const synList = syns.length > 0 ? syns : [];
+                    const confList = confs.length > 0 ? confs : (planConflicts || []);
+                    const cautList = cauts.length > 0 ? cauts : (planCautions || []);
+                    return (
+                      <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(0,230,138,0.03)', border:`2px solid ${levelColors[stackScore.level]}33` }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                          <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)' }}>⚡ Совместимость стека</div>
+                          <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                            <span style={{ fontSize:16, fontWeight:800, color:levelColors[stackScore.level] }}>{stackScore.score}</span>
+                            <span style={{ fontSize:7, color:'var(--text-dim)' }}>/ 100</span>
+                            <span style={{ fontSize:7, padding:'1px 6px', borderRadius:4, background:levelColors[stackScore.level]+'22', color:levelColors[stackScore.level], fontWeight:700 }}>{levelLabels[stackScore.level]}</span>
+                          </div>
+                        </div>
+                        <div style={{ height:4, borderRadius:2, background:'rgba(255,255,255,0.06)', overflow:'hidden', marginBottom:6 }}>
+                          <div style={{ width:stackScore.score+'%', height:'100%', background:levelColors[stackScore.level], borderRadius:2, transition:'width 0.3s' }} />
+                        </div>
+                        <div style={{ display:'flex', gap:6, fontSize:7, marginBottom:6, flexWrap:'wrap' }}>
+                          <span style={{ color:'#22c55e', fontWeight:600 }}>⊕ {stackScore.synergies} синергий</span>
+                          <span style={{ color:'#ef4444', fontWeight:600 }}>⊖ {stackScore.conflicts} конфликтов</span>
+                          <span style={{ color:'#f59e0b', fontWeight:600 }}>⚠ {stackScore.cautions} осторожностей</span>
+                          <span style={{ color:'var(--text-dim)' }}>??? {stackScore.unknownPairs} неизвестно</span>
+                        </div>
+                        {planResult?.synergyComment && (
+                          <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.5, whiteSpace:'pre-line', marginBottom:6, padding:'6px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)' }}>
+                            {planResult.synergyComment}
+                          </div>
+                        )}
+                        {synList.length > 0 && (() => {
+                          const sections = [
+                            { list: synList, label: 'Синергии', color: '#22c55e', emoji: '⊕' },
+                            { list: confList, label: 'Конфликты', color: '#ef4444', emoji: '⊖' },
+                            { list: cautList, label: 'Осторожности', color: '#f59e0b', emoji: '⚠' },
+                          ];
+                          return sections.filter(sec => sec.list.length > 0).map((sec, si) => (
+                            <div key={si} style={{ marginBottom:4 }}>
+                              <div style={{ fontSize:8, fontWeight:700, color:sec.color, marginBottom:2 }}>{sec.emoji} {sec.label} ({sec.list.length})</div>
+                              <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                                {(sec.list as any[]).slice(0, 8).map((item: any, ii: number) => (
+                                  <div key={ii} style={{ display:'flex', gap:4, fontSize:7, padding:'3px 6px', borderRadius:4, background:sec.color+'06', alignItems:'center' }}>
+                                    <span style={{ color:sec.color, fontWeight:600, minWidth:60 }}>{item.aName || item.a || '?'} + {item.bName || item.b || '?'}</span>
+                                    <span style={{ color:'var(--text-dim)', flex:1 }}>{item.effect || ''}</span>
+                                    {item.severity && <span style={{ fontSize:6, padding:'0 3px', borderRadius:2, background:sec.color+'15', color:sec.color, fontWeight:600 }}>{item.severity}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ));
+                        })()}
                       </div>
+                    );
+                  })()}
+
+                  {/* ===== DOSAGE CALCULATOR BUTTON ===== */}
+                  {calcDone && effectiveLevel?.subs && effectiveLevel.subs.length > 0 && (
+                    <div style={{ marginBottom: 10 }}>
+                      <button onClick={() => setExpandedCategories(p => ({ ...p, dosage_calc: !(p.dosage_calc ?? false) }))} style={{
+                        width: '100%', padding: '8px 12px', borderRadius: 10, cursor: 'pointer',
+                        background: expandedCategories.dosage_calc ? 'rgba(0,230,138,0.1)' : 'rgba(96,165,250,0.06)',
+                        border: expandedCategories.dosage_calc ? '2px solid rgba(0,230,138,0.3)' : '1px solid rgba(96,165,250,0.2)',
+                        color: expandedCategories.dosage_calc ? 'var(--accent)' : '#60a5fa',
+                        fontWeight: 700, fontSize: 10, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center',
+                      }}>
+                        <span>{expandedCategories.dosage_calc ? '📋' : '📋'}</span>
+                        {expandedCategories.dosage_calc ? 'Калькулятор дозировок ▲' : 'Калькулятор дозировок (NIH ODS, FDA, EMA, ESC/ESH)'}
+                      </button>
+                      {expandedCategories.dosage_calc && (
+                        <div style={{ maxHeight: '60vh', overflowY: 'auto', marginTop: 6 }}>
+                          <DosageCalculatorView
+                            subs={(effectiveLevel.subs || []).map((id: string) => {
+                              const entry = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
+                              return { id, name: entry?.nameRu || entry?.name || id };
+                            })}
+                            phase={supportPhase}
+                            bodyWeight={linked.profile?.settings?.weight || undefined}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
 

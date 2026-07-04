@@ -3,10 +3,11 @@ import React from 'react';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
 import { INTERACTION_ENRICHMENT } from '../../../data/support-interaction-enrichment';
-import { checkDrugInteractions } from '../../../engines/pharma-interactions.engine';
+import { checkDrugInteractions, getClassInstructions, getCourseRecommendations } from '../../../engines/pharma-interactions.engine';
 import type { CourseEntry } from '../../../core/types';
 import { PopupSelect } from '../../components/PopupXxx';
 import { MECH_TRANSLATIONS_RU, MECH_LABELS, EFFECT_LABELS } from './SupportScreenData';
+import { calcStackSynergyScore, suggestSynergyAdditions } from '../../../engines/support-plan/display';
 
 export const SupportInteractionsView: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const {
@@ -120,7 +121,99 @@ export const SupportInteractionsView: React.FC<{ s: Record<string, any> }> = ({ 
                 </div>
               </div>
               {validInteractionIds.length<2 && <div style={{ textAlign:'center', padding:'20px 12px', background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)' }}><div style={{ fontSize:20, marginBottom:4 }}>⚡</div><div style={{ fontSize:10, color:'var(--text-dim)' }}>Выберите минимум 2 препарата</div></div>}
-              {validInteractionIds.length>=2 && !hasSupportInteractions && <div style={{ textAlign:'center', padding:'10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)' }}><span style={{ fontSize:10, color:'#4caf50', fontWeight:600 }}>✓ Конфликтов не обнаружено</span></div>}
+              {validInteractionIds.length>=2 && (() => {
+                const stackScore = calcStackSynergyScore(validInteractionIds);
+                const suggestions = suggestSynergyAdditions(validInteractionIds, 5);
+                const levelColors: Record<string, string> = { excellent:'#22c55e', good:'#4ade80', moderate:'#f59e0b', poor:'#ef4444', risky:'#dc2626' };
+                const levelLabels: Record<string, string> = { excellent:'Отлично', good:'Хорошо', moderate:'Умеренно', poor:'Плохо', risky:'Рискованно' };
+                const cellColor = (type: string) => type === 'synergy' ? '#22c55e' : type === 'conflict' ? '#ef4444' : type === 'caution' ? '#f59e0b' : 'rgba(255,255,255,0.15)';
+                const cellEmoji = (type: string) => type === 'synergy' ? '⊕' : type === 'conflict' ? '⊖' : type === 'caution' ? '⚠' : '—';
+                const ids = validInteractionIds;
+                const pairCell = (a: string, b: string) => {
+                  if (a === b) return null;
+                  const pair = stackScore.matrix.find(m =>
+                    (m.a === a && m.b === b) || (m.a === b && m.b === a) ||
+                    (m.a.toLowerCase() === a.toLowerCase() && m.b.toLowerCase() === b.toLowerCase()) ||
+                    (m.a.toLowerCase() === b.toLowerCase() && m.b.toLowerCase() === a.toLowerCase())
+                  );
+                  return pair || null;
+                };
+                return (
+                  <div style={{ marginBottom:10 }}>
+                    <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:`2px solid ${levelColors[stackScore.level]}44`, marginBottom:8 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                        <div style={{ fontSize:12, fontWeight:700, color:levelColors[stackScore.level] }}>📊 Совместимость стека</div>
+                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                          <span style={{ fontSize:20, fontWeight:800, color:levelColors[stackScore.level] }}>{stackScore.score}</span>
+                          <span style={{ fontSize:8, color:'var(--text-dim)' }}>/ 100</span>
+                          <span style={{ fontSize:8, padding:'2px 8px', borderRadius:6, background:levelColors[stackScore.level]+'22', color:levelColors[stackScore.level], fontWeight:700 }}>{levelLabels[stackScore.level]}</span>
+                        </div>
+                      </div>
+                      <div style={{ height:6, borderRadius:3, background:'rgba(255,255,255,0.06)', overflow:'hidden', marginBottom:6 }}>
+                        <div style={{ width:stackScore.score+'%', height:'100%', background:levelColors[stackScore.level], borderRadius:3, transition:'width 0.3s' }} />
+                      </div>
+                      <div style={{ display:'flex', gap:8, fontSize:8, color:'var(--text-dim)', flexWrap:'wrap' }}>
+                        <span style={{ color:'#22c55e' }}>⊕ {stackScore.synergies} синергий</span>
+                        <span style={{ color:'#ef4444' }}>⊖ {stackScore.conflicts} конфликтов</span>
+                        <span style={{ color:'#f59e0b' }}>⚠ {stackScore.cautions} осторожностей</span>
+                        <span style={{ color:'var(--text-dim)' }}>??? {stackScore.unknownPairs} неизвестно</span>
+                      </div>
+                    </div>
+                    {ids.length >= 2 && ids.length <= 8 && (() => {
+                      const names = ids.map((id: string) => resolveSubName(id) || id);
+                      const shortNames = names.map((n: string) => n.length > 8 ? n.substring(0,7)+'…' : n);
+                      const cellSize = Math.max(28, Math.min(48, Math.floor(280 / ids.length)));
+                      return (
+                        <div style={{ marginBottom:8, overflowX:'auto' }}>
+                          <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}>🔬 Матрица совместимости {ids.length}×{ids.length}</div>
+                          <div style={{ display:'inline-block', border:'1px solid var(--border)', borderRadius:8, overflow:'hidden' }}>
+                            <div style={{ display:'grid', gridTemplateColumns:`${cellSize+4}px repeat(${ids.length}, ${cellSize}px)`, gap:0 }}>
+                              <div style={{ padding:'2px', background:'rgba(0,0,0,0.2)' }} />
+                              {shortNames.map((n: string, ci: number) => (
+                                <div key={ci} style={{ padding:'2px', background:'rgba(0,0,0,0.2)', fontSize:5, color:'var(--text-dim)', textAlign:'center', writingMode:ids.length > 5 ? 'vertical-rl' : 'horizontal-tb', transform: ids.length > 5 ? 'rotate(180deg)' : 'none', lineHeight:1.1 }}>{n}</div>
+                              ))}
+                              {ids.map((rowId: string, ri: number) => (
+                                <React.Fragment key={ri}>
+                                  <div style={{ padding:'2px 4px', background:'rgba(0,0,0,0.2)', fontSize:5, color:'var(--text-dim)', display:'flex', alignItems:'center', justifyContent:'flex-end', whiteSpace:'nowrap', overflow:'hidden' }}>{shortNames[ri]}</div>
+                                  {ids.map((colId: string, ci: number) => {
+                                    const cell = pairCell(rowId, colId);
+                                    return (
+                                      <div key={ci} style={{ width:cellSize, height:cellSize, display:'flex', alignItems:'center', justifyContent:'center', background:cell ? cellColor(cell.type)+'15' : 'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.04)', fontSize:cellSize > 32 ? 10 : 7, color:cell ? cellColor(cell.type) : 'rgba(255,255,255,0.2)', fontWeight:700, cursor:'default' }} title={cell ? `${cell.aName} + ${cell.bName}: ${cell.effect}` : ''}>
+                                        {cell ? cellEmoji(cell.type) : '·'}
+                                      </div>
+                                    );
+                                  })}
+                                </React.Fragment>
+                              ))}
+                            </div>
+                          </div>
+                          <div style={{ display:'flex', gap:6, marginTop:4, fontSize:6, color:'var(--text-dim)' }}>
+                            <span><span style={{ color:'#22c55e', fontWeight:700 }}>⊕</span> синергия</span>
+                            <span><span style={{ color:'#ef4444', fontWeight:700 }}>⊖</span> конфликт</span>
+                            <span><span style={{ color:'#f59e0b', fontWeight:700 }}>⚠</span> осторожность</span>
+                            <span><span style={{ color:'rgba(255,255,255,0.3)' }}>·</span> неизвестно</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    {suggestions.length > 0 && (
+                      <div style={{ marginBottom:8 }}>
+                        <div style={{ fontSize:9, fontWeight:700, color:'#a855f7', marginBottom:4 }}>🔮 Рекомендации для усиления синергии</div>
+                        <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                          {suggestions.map((sug, si) => (
+                            <div key={si} style={{ display:'flex', alignItems:'center', gap:4, padding:'5px 8px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
+                              <button onClick={() => { if (!interactionIds.includes(sug.id) && interactionIds.length < 10) { updateInteraction(interactionIds.findIndex(x => !x), sug.id); } }} style={{ padding:'2px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(168,85,247,0.15)', border:'1px solid rgba(168,85,247,0.3)', color:'#a855f7', fontWeight:700 }}>+ Добавить</button>
+                              <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)', minWidth:50 }}>{sug.name}</span>
+                              <span style={{ fontSize:7, color:'var(--text-dim)', flex:1 }}>⊕{sug.synergiesWith.length} синергий: {sug.synergiesWith.map(x => resolveSubName(x) || x).slice(0,3).join(', ')}</span>
+                              <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(168,85,247,0.15)', color:'#a855f7', fontWeight:700 }}>{sug.score}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               {hasSupportInteractions && (
                 <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                   {[
@@ -268,6 +361,15 @@ export const SupportInteractionsView: React.FC<{ s: Record<string, any> }> = ({ 
                               ))}
                             </div>
                           )}
+                          {/* Caution chips */}
+                          {entry.cautions && entry.cautions.length > 0 && (
+                            <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:2 }}>
+                              <span style={{ fontSize:7, color:'#f59e0b', fontWeight:600 }}>🟡 Осторожности: </span>
+                              {entry.cautions.map((c:any, i:number) => (
+                                <span key={i} style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background: c.severity === 'HIGH' ? 'rgba(245,158,11,0.12)' : 'rgba(245,158,11,0.08)', color: '#f59e0b' }}>{c.with}: {c.effect}</span>
+                              ))}
+                            </div>
+                          )}
                           {/* Special instructions */}
                           {entry.specialInstructions && entry.specialInstructions.length > 0 && (
                             <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', lineHeight:1.2, marginTop:2, borderTop:'1px solid rgba(255,255,255,0.04)', paddingTop:3 }}>
@@ -369,6 +471,80 @@ export const SupportInteractionsView: React.FC<{ s: Record<string, any> }> = ({ 
                 } catch (e) {
                   return <div style={{ textAlign:'center', padding:'10px', borderRadius:8, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)' }}><span style={{ fontSize:9, color:'#ef4444' }}>Ошибка: {String(e)}</span></div>;
                 }
+              })()}
+
+              {/* ── CLASS INSTRUCTIONS (pharma) ── */}
+              {(() => {
+                const validPharmaIds = pharmaInteractIds.filter(Boolean);
+                if (validPharmaIds.length < 1) return null;
+                try {
+                  const course: CourseEntry[] = validPharmaIds.map((id:string,ix:number) => ({ id: 'interact_'+ix, substanceId: id, doseValue: 100, doseUnit: 'mg', frequency: 7, startWeek: 1, endWeek: 12 }));
+                  const clsInstr = getClassInstructions(course);
+                  const courseRecs = getCourseRecommendations(course);
+                  if (clsInstr.length === 0 && courseRecs.length === 0) return null;
+                  return (
+                    <div style={{ marginTop: 10 }}>
+                      {/* Course recommendations */}
+                      {courseRecs.length > 0 && (
+                        <div style={{ marginBottom: 8 }}>
+                          <h4 style={{ margin: '0 0 6px 0', fontSize: 10, color: '#3b82f6' }}>📋 Рекомендации для курса</h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {courseRecs.map((rec, ri) => {
+                              const tc = rec.type === 'critical' ? '#ef4444' : rec.type === 'warning' ? '#f59e0b' : '#3b82f6';
+                              return (
+                                <div key={ri} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid '+tc+'22' }}>
+                                  <div style={{ fontSize: 9, fontWeight: 700, color: tc, marginBottom: 4 }}>{rec.title}</div>
+                                  {rec.items.map((item, ij) => (
+                                    <div key={ij} style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', lineHeight: 1.35, padding: '2px 0 2px 10px', position: 'relative' }}>
+                                      <span style={{ position: 'absolute', left: 0, color: tc }}>•</span> {item}
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {/* Class instructions */}
+                      {clsInstr.length > 0 && (
+                        <div>
+                          <h4 style={{ margin: '0 0 6px 0', fontSize: 10, color: '#f59e0b' }}>📋 Особые указания по классам</h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {clsInstr.map((cls, ci) => (
+                              <div key={ci} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'9px 11px', border:'1px solid rgba(245,158,11,0.15)' }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>💊 {cls.className}</div>
+                                <div style={{ marginBottom: 6 }}>
+                                  <div style={{ fontSize: 8, fontWeight: 700, color: '#00e68a', marginBottom: 3 }}>Инструкции</div>
+                                  {cls.instructions.map((inst, ii) => (
+                                    <div key={ii} style={{ fontSize: 8, color: 'rgba(255,255,255,0.72)', lineHeight: 1.3, padding: '2px 0 2px 10px', position: 'relative' }}>
+                                      <span style={{ position: 'absolute', left: 0, color: '#00e68a' }}>•</span> {inst}
+                                    </div>
+                                  ))}
+                                </div>
+                                <div style={{ marginBottom: 4 }}>
+                                  <div style={{ fontSize: 7, fontWeight: 700, color: '#ff9800', marginBottom: 2 }}>🩸 Мониторинг</div>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                                    {cls.monitoring.map((m, mi) => (
+                                      <span key={mi} style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,152,0,0.1)', color: '#ff9800' }}>{m}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: 7, fontWeight: 700, color: '#ef4444', marginBottom: 2 }}>⚠ Предупреждения</div>
+                                  {cls.warnings.map((w, wi) => (
+                                    <div key={wi} style={{ fontSize: 8, color: 'rgba(255,255,255,0.72)', lineHeight: 1.3, padding: '2px 0 2px 10px', position: 'relative', borderLeft: '2px solid rgba(239,68,68,0.25)', marginBottom: 2 }}>
+                                      {w}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                } catch (e) { return null; }
               })()}
 
               {/* Per-entry data for pharma substances */}

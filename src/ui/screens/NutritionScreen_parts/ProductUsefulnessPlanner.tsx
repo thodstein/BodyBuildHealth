@@ -5,8 +5,9 @@ import { scoreAllProducts, compareProducts, calcMealScore, CATEGORY_LABELS, GOAL
 import type { MealProduct, SavedMeal, MealScore } from '../../../engines/product-usefulness.engine';
 import { calculateOverallScore, scoreAllProductsV2, compareProductsV2, calcMealScoreV2, calcDIAAS, analyzeDailyDiet, getDefaultProfile, type UserDietProfile, type V2ScoreResult, type MealScoreV2 } from '../../../engines/product-usefulness-v2.engine';
 import { PopupBool, PopupNumber, PopupSelect } from '../../components/PopupXxx';
+import { analyzeNutrientGaps, NUTRIENT_CATEGORIES, findBestCombo, type NutrientGap, type NutrientGapResult, type NutrientCombo } from '../../../engines/nutrient-gap-filler.engine';
 
-type PlannerTab = 'dashboard' | 'settings' | 'catalog' | 'compare' | 'meal' | 'swap';
+type PlannerTab = 'dashboard' | 'settings' | 'catalog' | 'compare' | 'meal' | 'swap' | 'targeting';
 type SortKey = 'score' | 'name' | 'protein' | 'kcal';
 type NormalizedMealScore = {
   compositeScore: number;
@@ -203,6 +204,62 @@ export const ProductUsefulnessPlanner: React.FC = () => {
     try { return JSON.parse(localStorage.getItem('he_usefulness_history') || '[]'); } catch { return []; }
   });
 
+  // Targeting tab hooks
+  const [targetExpanded, setTargetExpanded] = useState<string | null>(null);
+  const [targetFilter, setTargetFilter] = useState<'all' | 'deficit' | 'marginal' | 'ok'>('deficit');
+  const [targetCatExpanded, setTargetCatExpanded] = useState<string | null>('electrolytes');
+  const [showAllMap, setShowAllMap] = useState<Record<string, boolean>>({});
+  const [showCombos, setShowCombos] = useState(false);
+
+  // Targeting helpers
+  const getCatGaps = (catKey: string, gaps: NutrientGap[]) => {
+    const cat = NUTRIENT_CATEGORIES[catKey];
+    if (!cat) return [];
+    return gaps.filter(g => cat.nutrients.includes(g.nutrient));
+  };
+
+  const getCatDeficitCount = (catKey: string, gaps: NutrientGap[]) => {
+    return getCatGaps(catKey, gaps).filter(g => g.percentCovered < 50).length;
+  };
+
+  const getCatMarginalCount = (catKey: string, gaps: NutrientGap[]) => {
+    return getCatGaps(catKey, gaps).filter(g => g.percentCovered >= 50 && g.percentCovered < 80).length;
+  };
+
+  const addFillerToMeal = (foodId: string, grams: number) => {
+    const existing = mealProducts.find(p => p.foodId === foodId);
+    if (existing) {
+      setMealProducts(mealProducts.map(p => p.foodId === foodId ? { ...p, weightGrams: p.weightGrams + grams } : p));
+    } else {
+      setMealProducts([...mealProducts, { foodId, weightGrams: grams }]);
+    }
+    showToast(`✅ Добавлено в приём`);
+  };
+
+  const gapResult: NutrientGapResult = useMemo(() => {
+    if (mealProducts.length === 0) {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const diaryProds = getDiaryProductsForDate(today);
+        if (diaryProds.length > 0) return analyzeNutrientGaps(diaryProds);
+      } catch {}
+      return { gaps: [], suggestions: {}, summary: { totalNutrients: 0, deficits: 0, marginal: 0, ok: 0 } };
+    }
+    return analyzeNutrientGaps(mealProducts);
+  }, [mealProducts]);
+
+  const combos = useMemo(() => {
+    if (mealProducts.length === 0) return [];
+    return findBestCombo(mealProducts, 3);
+  }, [mealProducts]);
+
+  const filteredGaps = useMemo(() => {
+    if (targetFilter === 'all') return gapResult.gaps;
+    if (targetFilter === 'deficit') return gapResult.gaps.filter(g => g.percentCovered < 50);
+    if (targetFilter === 'marginal') return gapResult.gaps.filter(g => g.percentCovered >= 50 && g.percentCovered < 80);
+    return gapResult.gaps.filter(g => g.percentCovered >= 80);
+  }, [gapResult.gaps, targetFilter]);
+
   const [useV2, setUseV2] = useState(true);
   const [v2Profile, setV2Profile] = useState<UserDietProfile>(getDefaultProfile());
 
@@ -372,6 +429,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         <button onClick={() => setPlannerTab('compare')} style={PILL(plannerTab === 'compare', '#8b5cf6')}>⚖️ {compareIds.length > 0 && `(${compareIds.length})`}</button>
         <button onClick={() => setPlannerTab('meal')} style={PILL(plannerTab === 'meal', '#f97316')}>🍽️ Приём</button>
         <button onClick={() => setPlannerTab('swap')} style={PILL(plannerTab === 'swap', '#ec4899')}>🔄 Замена</button>
+        <button onClick={() => setPlannerTab('targeting')} style={PILL(plannerTab === 'targeting', '#06b6d4')}>🎯 Таргетинг</button>
       </div>
 
       {plannerTab === 'dashboard' && (() => {
@@ -1447,6 +1505,245 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
           )}
         </div>
       )}
+
+      {plannerTab === 'targeting' && (gapResult.summary.totalNutrients === 0 ? (
+        <div style={{ borderRadius: 12, padding: 16, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', textAlign: 'center' }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>🎯</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#06b6d4', marginBottom: 6 }}>Таргетинг нутриентов</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 6, lineHeight: 1.5 }}>
+            Соберите приём пищи на вкладке «🍽️ Приём» или добавьте записи в дневник —<br/>
+            алгоритм покажет дефициты и предложит продукты для их закрытия.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8 }}>
+            <button onClick={() => { setPlannerTab('meal'); setMealTab('compose'); }} style={{
+              padding: '8px', borderRadius: 10, cursor: 'pointer', fontSize: 9, fontWeight: 600,
+              background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.2)', color: '#f97316',
+            }}>🍽️ Собрать приём</button>
+            <button onClick={() => setPlannerTab('catalog')} style={{
+              padding: '8px', borderRadius: 10, cursor: 'pointer', fontSize: 9, fontWeight: 600,
+              background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.2)', color: '#3b82f6',
+            }}>📦 Каталог продуктов</button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ borderRadius: 12, padding: 10, background: 'rgba(6,182,212,0.05)', border: '1px solid rgba(6,182,212,0.1)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#06b6d4' }}>📊 Охват нутриентов</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>
+                {mealProducts.length > 0 ? `Приём: ${mealProducts.length} продуктов · ${mealProducts.reduce((s,mp)=>s+mp.weightGrams,0)}г` : 'Из дневника (сегодня)'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, fontSize: 8 }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontWeight: 800, color: '#ef4444', fontSize: 14 }}>{gapResult.summary.deficits}</div>
+                <div style={{ color: 'rgba(255,255,255,0.7)' }}>дефицит</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontWeight: 800, color: '#f59e0b', fontSize: 14 }}>{gapResult.summary.marginal}</div>
+                <div style={{ color: 'rgba(255,255,255,0.7)' }}>мало</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontWeight: 800, color: '#22c55e', fontSize: 14 }}>{gapResult.summary.ok}</div>
+                <div style={{ color: 'rgba(255,255,255,0.7)' }}>норма</div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            {[
+              { key: 'deficit' as const, label: '🔴 Дефицит (<50%)', color: '#ef4444' },
+              { key: 'marginal' as const, label: '🟡 Недостаточно (50-80%)', color: '#f59e0b' },
+              { key: 'ok' as const, label: '🟢 Норма (≥80%)', color: '#22c55e' },
+              { key: 'all' as const, label: '📋 Все', color: '#06b6d4' },
+            ].map(f => (
+              <button key={f.key} onClick={() => setTargetFilter(f.key)} style={PILL(targetFilter === f.key, f.color)}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {combos.length > 0 && (
+            <div style={{ borderRadius: 12, padding: 10, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.12)' }}>
+              <div onClick={() => setShowCombos(!showCombos)} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#00e68a' }}>🧩 Умный подбор комбинаций</span>
+                <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 4, background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontWeight: 600 }}>{combos.length} вариантов</span>
+                <span style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.5)', fontSize: 10 }}>{showCombos ? '▴' : '▾'}</span>
+              </div>
+              {showCombos && (
+                <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>
+                    Комбинации 1-3 продуктов, закрывающие максимум дефицитов за минимум калорий:
+                  </div>
+                  {combos.slice(0, 5).map((combo, ci) => (
+                    <div key={ci} style={{
+                      display: 'flex', flexDirection: 'column', gap: 4, padding: '6px 8px',
+                      borderRadius: 8, background: ci === 0 ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.01)',
+                      border: ci === 0 ? '1px solid rgba(0,230,138,0.15)' : '1px solid rgba(255,255,255,0.03)',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 8 }}>
+                        <span style={{ fontWeight: 700, color: '#00e68a' }}>#{ci + 1}</span>
+                        <span style={{ color: 'rgba(255,255,255,0.7)' }}>Покрывает {combo.coveredNutrients.length} дефицитов</span>
+                        <span style={{ color: '#f59e0b' }}>🔥 {combo.totalKcal}ккал</span>
+                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>⚖️ {combo.totalGrams}г</span>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                        {combo.items.map((item, ii) => (
+                          <span key={ii} style={{
+                            padding: '2px 6px', borderRadius: 4, fontSize: 7, fontWeight: 600,
+                            background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a',
+                          }}>
+                            {item.name} {item.grams}г
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {combo.items.map(item =>
+                          <button key={item.foodId} onClick={(e) => { e.stopPropagation(); addFillerToMeal(item.foodId, Math.max(10, Math.round(item.grams / 2))); }} style={{
+                            padding: '2px 6px', borderRadius: 4, fontSize: 6, fontWeight: 600, cursor: 'pointer',
+                            background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a',
+                          }}>＋ {item.name}</button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {mealProducts.length === 0 && gapResult.summary.totalNutrients > 0 && (
+            <div style={{ fontSize: 7, color: '#06b6d4', padding: '6px 8px', borderRadius: 6, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.12)' }}>
+              📓 Данные из дневника за сегодня. Добавьте продукты в «🍽️ Приём» для точного таргетинга.
+            </div>
+          )}
+
+          {Object.entries(NUTRIENT_CATEGORIES).map(([catKey, cat]) => {
+            const catGaps = getCatGaps(catKey, gapResult.gaps);
+            const filteredCatGaps = catGaps.filter(g => {
+              if (targetFilter === 'deficit') return g.percentCovered < 50;
+              if (targetFilter === 'marginal') return g.percentCovered >= 50 && g.percentCovered < 80;
+              if (targetFilter === 'ok') return g.percentCovered >= 80;
+              return true;
+            });
+            if (filteredCatGaps.length === 0) return null;
+            const deficitCount = getCatDeficitCount(catKey, gapResult.gaps);
+            const marginalCount = getCatMarginalCount(catKey, gapResult.gaps);
+            const isExpanded = targetCatExpanded === catKey;
+
+            return (
+              <div key={catKey} style={{ borderRadius: 12, padding: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div onClick={() => setTargetCatExpanded(isExpanded ? null : catKey)} style={{
+                  display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+                  padding: '2px 0', marginBottom: isExpanded ? 6 : 0,
+                }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{cat.label}</span>
+                  {deficitCount > 0 && <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 4, background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontWeight: 600 }}>{deficitCount} дефицит</span>}
+                  {marginalCount > 0 && <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 4, background: 'rgba(245,158,11,0.12)', color: '#f59e0b', fontWeight: 600 }}>{marginalCount} мало</span>}
+                  <span style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.5)', fontSize: 10 }}>{isExpanded ? '▴' : '▾'}</span>
+                </div>
+
+                {isExpanded && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {filteredCatGaps.map(gap => {
+                      const barColor = gap.percentCovered < 50 ? '#ef4444' : gap.percentCovered < 80 ? '#f59e0b' : '#22c55e';
+                      const isGapExpanded = targetExpanded === gap.nutrient;
+                      const fillers = gapResult.suggestions[gap.nutrient] || [];
+
+                      return (
+                        <div key={gap.nutrient}>
+                          <div onClick={() => setTargetExpanded(isGapExpanded ? null : gap.nutrient)} style={{
+                            cursor: 'pointer', padding: '4px 6px', borderRadius: 8,
+                            background: isGapExpanded ? `${barColor}08` : 'transparent',
+                            border: isGapExpanded ? `1px solid ${barColor}20` : '1px solid transparent',
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 8, color: '#fff', minWidth: 70, fontWeight: 600 }}>{gap.label}</span>
+                              <div style={{ flex: 1, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                                <div style={{ width: `${gap.percentCovered}%`, height: '100%', background: barColor, borderRadius: 3, transition: 'width 0.3s' }} />
+                              </div>
+                              <span style={{ fontSize: 8, fontWeight: 700, color: barColor, minWidth: 28, textAlign: 'right' }}>{gap.percentCovered}%</span>
+                              <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', minWidth: 90, textAlign: 'right' }}>
+                                {gap.current}/{gap.target}{gap.unit}
+                              </span>
+                            </div>
+                            {gap.deficit > 0 && (
+                              <div style={{ fontSize: 6, color: '#ef4444', marginTop: 2, paddingLeft: 2 }}>
+                                Не хватает {gap.deficit}{gap.unit}
+                              </div>
+                            )}
+                          </div>
+
+                          {isGapExpanded && gap.deficit > 0 && fillers.length > 0 && (
+                            <div style={{ marginTop: 4, marginLeft: 8, borderLeft: `1px solid ${barColor}25`, paddingLeft: 8 }}>
+                              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>
+                                Топ-10 продуктов для {gap.label.toLowerCase()} (по эффективности на ккал):
+                              </div>
+                              {(showAllMap[gap.nutrient] ? fillers : fillers.slice(0, 10)).map((f, idx) => (
+                                <div key={f.foodId} style={{
+                                  display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px',
+                                  borderRadius: 6, marginBottom: 2, fontSize: 8,
+                                  background: idx === 0 ? 'rgba(6,182,212,0.06)' : 'rgba(255,255,255,0.015)',
+                                  border: idx === 0 ? '1px solid rgba(6,182,212,0.12)' : '1px solid rgba(255,255,255,0.03)',
+                                }}>
+                                  <span style={{
+                                    width: 18, height: 18, borderRadius: '50%', display: 'flex', alignItems: 'center',
+                                    justifyContent: 'center', fontSize: 7, fontWeight: 800, flexShrink: 0,
+                                    background: idx < 2 ? 'rgba(6,182,212,0.12)' : 'rgba(255,255,255,0.04)',
+                                    color: idx < 2 ? '#06b6d4' : 'rgba(255,255,255,0.6)',
+                                  }}>{idx + 1}</span>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ color: '#fff', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {f.name}
+                                    </div>
+                                    <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', marginTop: 1, display: 'flex', gap: 6 }}>
+                                      <span>📦 {f.nutrientPer100g}{gap.unit}/100г</span>
+                                      <span>⚖️ {f.gramsToFill}г закроет</span>
+                                      <span>🔥 {f.kcalCost}ккал</span>
+                                    </div>
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                                    <span style={{ fontSize: 7, color: '#06b6d4', fontWeight: 700 }}>эфф. {f.efficiencyScore}</span>
+                                    <button onClick={(e) => { e.stopPropagation(); addFillerToMeal(f.foodId, Math.max(10, Math.round(f.gramsToFill / 2))); }} style={{
+                                      padding: '2px 6px', borderRadius: 4, fontSize: 6, fontWeight: 600, cursor: 'pointer',
+                                      background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a',
+                                      whiteSpace: 'nowrap',
+                                    }}>＋ В приём</button>
+                                  </div>
+                                </div>
+                              ))}
+                              {fillers.length > 10 && (
+                                <button onClick={() => setShowAllMap(m => ({ ...m, [gap.nutrient]: !m[gap.nutrient] }))} style={{
+                                  padding: '3px 8px', borderRadius: 6, fontSize: 7, fontWeight: 600, cursor: 'pointer',
+                                  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)',
+                                  marginTop: 2,
+                                }}>
+                                  {showAllMap[gap.nutrient] ? '🔼 Скрыть' : `📋 Показать все (${fillers.length})`}
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          {isGapExpanded && gap.deficit > 0 && fillers.length === 0 && (
+                            <div style={{ marginTop: 4, marginLeft: 8, padding: '4px 8px', borderRadius: 6, fontSize: 7, color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.01)' }}>
+                              Нет продуктов в базе, богатых этим нутриентом на 100ккал. Рассмотрите БАДы.
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '4px 0' }}>
+            🎯 Продукты отсортированы по эффективности: нутриент (на 100г) / ккал.
+            Кликните «＋ В приём» чтобы добавить продукт в расчёт на вкладке «🍽️ Приём».
+          </div>
+        </div>
+      ))}
     </div>
   );
 };

@@ -1,7 +1,7 @@
 /**
- * Periodization Designer + Goal Tracker + Habit Builder
+ * Periodization Designer + Visual Macrocycle Builder
  *
- * Periodization Designer: interactive mesocycle builder with drag-drop weeks
+ * Visual designer: drag-drop phase blocks onto a timeline canvas (1-52 weeks)
  * Goal Tracker: SMART goals with milestones, progress tracking, streak counting
  * Habit Builder: daily habit tracking with streaks and completion rates
  *
@@ -9,7 +9,74 @@
  */
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Types
+// Types — Visual Designer
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type PhaseKey =
+  | 'accumulation_hypertrophy' | 'accumulation_strength'
+  | 'intensification' | 'peaking' | 'deload' | 'technique'
+  | 'conditioning' | 'power' | 'gpp' | 'transition';
+
+export const PHASE_COLORS: Record<PhaseKey, string> = {
+  accumulation_hypertrophy: '#3b82f6',
+  accumulation_strength: '#2563eb',
+  intensification: '#ef4444',
+  peaking: '#f59e0b',
+  deload: '#00e68a',
+  technique: '#a855f7',
+  conditioning: '#ec4899',
+  power: '#f97316',
+  gpp: '#6366f1',
+  transition: '#6b7280',
+};
+
+export const PHASE_ICONS: Record<PhaseKey, string> = {
+  accumulation_hypertrophy: '💪',
+  accumulation_strength: '🏋️',
+  intensification: '🔥',
+  peaking: '⚡',
+  deload: '🧘',
+  technique: '🎯',
+  conditioning: '🏃',
+  power: '💥',
+  gpp: '🔄',
+  transition: '⏸',
+};
+
+export const PHASE_LABELS_RU: Record<PhaseKey, string> = {
+  accumulation_hypertrophy: 'Накопление (гипертрофия)',
+  accumulation_strength: 'Накопление (сила)',
+  intensification: 'Интенсификация',
+  peaking: 'Пик',
+  deload: 'Разгрузка',
+  technique: 'Технический блок',
+  conditioning: 'Кондиционный блок',
+  power: 'Мощностной блок',
+  gpp: 'GPP (общая подготовка)',
+  transition: 'Переходный период',
+};
+
+export interface DesignerPhaseBlock {
+  id: string;
+  phaseKey: PhaseKey;
+  startWeek: number;  // 1-based
+  endWeek: number;    // inclusive
+  notes: string;
+}
+
+export interface MacrocycleDesign {
+  id: string;
+  name: string;
+  totalWeeks: number;
+  blocks: DesignerPhaseBlock[];
+  sport: 'powerlifting' | 'bodybuilding' | 'general' | 'weightlifting' | 'crossfit';
+  goal: 'strength' | 'hypertrophy' | 'peaking' | 'conditioning';
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Existing types (unchanged)
 // ═══════════════════════════════════════════════════════════════════════════
 
 export interface PeriodizationBlock {
@@ -69,8 +136,136 @@ export interface HabitStats {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 1. Periodization Designer
+// 1. Visual Designer — timeline functions
 // ═══════════════════════════════════════════════════════════════════════════
+
+const STORAGE_KEY = 'he_macrocycle_designs';
+
+export function createEmptyDesign(name?: string): MacrocycleDesign {
+  return {
+    id: 'design_' + Date.now(),
+    name: name || 'Новый макроцикл',
+    totalWeeks: 52,
+    blocks: [],
+    sport: 'general',
+    goal: 'strength',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function loadDesigns(): MacrocycleDesign[] {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+}
+
+export function saveDesign(design: MacrocycleDesign): MacrocycleDesign[] {
+  const list = loadDesigns();
+  const idx = list.findIndex(d => d.id === design.id);
+  design.updatedAt = new Date().toISOString();
+  if (idx >= 0) list[idx] = design; else list.push(design);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  return list;
+}
+
+export function deleteDesign(id: string): MacrocycleDesign[] {
+  const list = loadDesigns().filter(d => d.id !== id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  return list;
+}
+
+export function addBlockToDesign(design: MacrocycleDesign, phaseKey: PhaseKey, startWeek: number): MacrocycleDesign {
+  const block = getPhaseTemplate(phaseKey);
+  if (!block) return design;
+  const endWeek = Math.min(startWeek + block.weeks - 1, design.totalWeeks);
+  const newBlock: DesignerPhaseBlock = {
+    id: 'blk_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    phaseKey, startWeek, endWeek, notes: '',
+  };
+  return { ...design, blocks: [...design.blocks, newBlock].sort((a, b) => a.startWeek - b.startWeek), updatedAt: new Date().toISOString() };
+}
+
+export function removeBlockFromDesign(design: MacrocycleDesign, blockId: string): MacrocycleDesign {
+  return { ...design, blocks: design.blocks.filter(b => b.id !== blockId), updatedAt: new Date().toISOString() };
+}
+
+export function moveBlockInDesign(design: MacrocycleDesign, blockId: string, newStart: number): MacrocycleDesign {
+  const idx = design.blocks.findIndex(b => b.id === blockId);
+  if (idx < 0) return design;
+  const block = design.blocks[idx];
+  const dur = block.endWeek - block.startWeek + 1;
+  const endWeek = Math.min(newStart + dur - 1, design.totalWeeks);
+  const updated: DesignerPhaseBlock = { ...block, startWeek: Math.max(1, newStart), endWeek };
+  const blocks = [...design.blocks];
+  blocks[idx] = updated;
+  return { ...design, blocks: blocks.sort((a, b) => a.startWeek - b.startWeek), updatedAt: new Date().toISOString() };
+}
+
+export function resizeBlockInDesign(design: MacrocycleDesign, blockId: string, newEndWeek: number): MacrocycleDesign {
+  const idx = design.blocks.findIndex(b => b.id === blockId);
+  if (idx < 0) return design;
+  const block = design.blocks[idx];
+  const endWeek = Math.max(block.startWeek, Math.min(newEndWeek, design.totalWeeks));
+  const updated: DesignerPhaseBlock = { ...block, endWeek };
+  const blocks = [...design.blocks];
+  blocks[idx] = updated;
+  return { ...design, blocks: blocks.sort((a, b) => a.startWeek - b.startWeek), updatedAt: new Date().toISOString() };
+}
+
+export function updateBlockNotes(design: MacrocycleDesign, blockId: string, notes: string): MacrocycleDesign {
+  const idx = design.blocks.findIndex(b => b.id === blockId);
+  if (idx < 0) return design;
+  const blocks = [...design.blocks];
+  blocks[idx] = { ...blocks[idx], notes };
+  return { ...design, blocks, updatedAt: new Date().toISOString() };
+}
+
+export function getDesignStats(design: MacrocycleDesign) {
+  const totalWeeks = design.totalWeeks;
+  const usedWeeks = design.blocks.reduce((s, b) => s + (b.endWeek - b.startWeek + 1), 0);
+  const freeWeeks = totalWeeks - usedWeeks;
+  const phaseCount: Record<string, number> = {};
+  for (const b of design.blocks) {
+    phaseCount[b.phaseKey] = (phaseCount[b.phaseKey] || 0) + 1;
+  }
+  return { totalWeeks, usedWeeks, freeWeeks, blockCount: design.blocks.length, phaseCount };
+}
+
+export function getDefaultPresetDesigns(): MacrocycleDesign[] {
+  return [
+    createFromPhases('Классический 12-нед (сила)', 12, ['accumulation_strength', 'accumulation_strength', 'deload', 'intensification', 'intensification', 'deload', 'peaking', 'deload'], 'powerlifting', 'strength'),
+    createFromPhases('Классический 16-нед (гипертрофия)', 16, ['accumulation_hypertrophy', 'accumulation_hypertrophy', 'deload', 'accumulation_hypertrophy', 'intensification', 'deload', 'accumulation_hypertrophy', 'intensification', 'deload', 'peaking', 'deload'], 'bodybuilding', 'hypertrophy'),
+    createFromPhases('52-нед годовой план', 52, ['gpp', 'gpp', 'accumulation_strength', 'accumulation_strength', 'deload', 'intensification', 'intensification', 'deload', 'peaking', 'deload', 'transition', 'gpp', 'accumulation_hypertrophy', 'accumulation_hypertrophy', 'deload', 'intensification', 'intensification', 'deload', 'peaking', 'deload', 'transition'], 'general', 'strength'),
+    createFromPhases('Блочная 8-нед (Issurin)', 8, ['accumulation_hypertrophy', 'intensification', 'peaking'], 'powerlifting', 'peaking'),
+  ];
+}
+
+function createFromPhases(name: string, totalWeeks: number, phaseKeys: PhaseKey[], sport: MacrocycleDesign['sport'], goal: MacrocycleDesign['goal']): MacrocycleDesign {
+  const design = createEmptyDesign(name);
+  design.totalWeeks = totalWeeks;
+  design.sport = sport;
+  design.goal = goal;
+  let cursor = 1;
+  for (const pk of phaseKeys) {
+    const tmpl = getPhaseTemplate(pk);
+    if (!tmpl) continue;
+    const end = cursor + tmpl.weeks - 1;
+    if (end > totalWeeks) break;
+    design.blocks.push({
+      id: 'blk_' + pk + '_' + cursor,
+      phaseKey: pk, startWeek: cursor, endWeek: end, notes: '',
+    });
+    cursor = end + 1;
+  }
+  return design;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 2. Block Templates + Models (unchanged from original)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export function getPhaseTemplate(key: PhaseKey): PeriodizationBlock | undefined {
+  return BLOCK_TEMPLATES[key];
+}
 
 const BLOCK_TEMPLATES: Record<string, PeriodizationBlock> = {
   accumulation_hypertrophy: {

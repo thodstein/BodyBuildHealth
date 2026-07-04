@@ -162,11 +162,11 @@ export const ALL_RISK_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocri
 export const BASE_RISK = 0.30;
 
 export const REQUIRED_LABS_PER_PHASE: Record<string, string[]> = {
-  baseline:              ['ALT','AST','GGT','ALP','BIL','DBIL','HCT','HGB','PLT','WBC','TT','FT3','FT4','TSH','E2','PRL','LH','FSH','SHBG','CRP','HbA1c','FERRITIN','VITD','LDL','HDL','TG','GLU','INS','HOMA','CREATININE','UA','B12','FOLATE','ALB','TP','K','NA','CA','P','MG','CORTISOL','DHT','PSA','INHB','AMH','EGFR','UACR'],
-  on_cycle:              ['ALT','AST','GGT','ALP','HCT','HGB','PLT','WBC','TT','E2','PRL','LH','FSH','LDL','HDL','TG','GLU','INS','HOMA','CRP','CREATININE','UA','CORTISOL','IGF1','BIL','DBIL','K','NA','D_DIMER','FIBRINOGEN','TROPONIN','BNP','EGFR','UACR','HbA1c'],
-  bridge:                ['TT','FT3','FT4','TSH','E2','LH','FSH','HCT','ALT','AST','CRP','SHBG','IGF1','GLU','INS','HOMA','CREATININE','LDL','HDL','TG','GGT','ALP','BIL','HGB','K','NA','HbA1c','EGFR','UACR','PRL'],
-  pct:                   ['TT','LH','FSH','E2','PRL','SHBG','IGF1','FT3','FT4','TSH','ALT','AST','GGT','HCT','HGB','CRP','LDL','HDL','CORTISOL','TG','ALP','BIL','CREATININE','K','NA','GLU','HbA1c','EGFR','UACR'],
-  post_pct:              ['TT','LH','FSH','HCT','ALT','AST','GGT','E2','SHBG','IGF1','TSH','FT3','FT4','CRP','HbA1c','LDL','HDL','TG','GLU','INS','CREATININE','FERRITIN','VITD','PSA','ALP','BIL','HGB','K','NA','PRL','EGFR','UACR'],
+  baseline:              ['ALT','AST','GGT','ALP','BIL','DBIL','HCT','HGB','PLT','WBC','TT','FT3','FT4','TSH','E2','PRL','LH','FSH','SHBG','CRP','HbA1c','FERRITIN','VITD','LDL','HDL','TG','GLU','INS','HOMA','CREATININE','UA','B12','FOLATE','ALB','TP','K','NA','CA','P','MG','CORTISOL','DHT','PSA','INHB','AMH','EGFR','UACR','IRON','TRANSFERRIN','UIBC','IGF1','HOMOCYSTEINE'],
+  on_cycle:              ['ALT','AST','GGT','ALP','HCT','HGB','PLT','WBC','TT','E2','PRL','LH','FSH','LDL','HDL','TG','GLU','INS','HOMA','CRP','CREATININE','UA','CORTISOL','IGF1','BIL','DBIL','K','NA','D_DIMER','FIBRINOGEN','TROPONIN','BNP','EGFR','UACR','HbA1c','IRON','TRANSFERRIN','UIBC','FERRITIN','HOMOCYSTEINE'],
+  bridge:                ['TT','FT3','FT4','TSH','E2','LH','FSH','HCT','ALT','AST','CRP','SHBG','IGF1','GLU','INS','HOMA','CREATININE','LDL','HDL','TG','GGT','ALP','BIL','HGB','K','NA','HbA1c','EGFR','UACR','PRL','IRON','TRANSFERRIN','UIBC','FERRITIN','HOMOCYSTEINE'],
+  pct:                   ['TT','LH','FSH','E2','PRL','SHBG','IGF1','FT3','FT4','TSH','ALT','AST','GGT','HCT','HGB','CRP','LDL','HDL','CORTISOL','TG','ALP','BIL','CREATININE','K','NA','GLU','HbA1c','EGFR','UACR','IRON','TRANSFERRIN','UIBC','FERRITIN','HOMOCYSTEINE'],
+  post_pct:              ['TT','LH','FSH','HCT','ALT','AST','GGT','E2','SHBG','IGF1','TSH','FT3','FT4','CRP','HbA1c','LDL','HDL','TG','GLU','INS','CREATININE','FERRITIN','VITD','PSA','ALP','BIL','HGB','K','NA','PRL','EGFR','UACR','IRON','TRANSFERRIN','UIBC','HOMOCYSTEINE'],
 } as const;
 
 
@@ -505,6 +505,7 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'LP_A': { prefUnit: 'mg/dL', coeff: 1, uln: 30, lln: 0, name: 'Липопротеин(a)' },
   'TRANSFERRIN': { prefUnit: 'g/L', coeff: 1, uln: 3.8, lln: 2.0, name: 'Трансферрин' },
   'IRON': { prefUnit: '?mol/L', coeff: 1, uln: 30, lln: 10, name: 'Железо' },
+  'UIBC': { prefUnit: '?mol/L', coeff: 1, uln: 45, lln: 20, name: 'Лат. ЖСС' },
   'RETICULOCYTES': { prefUnit: '%', coeff: 1, uln: 2.5, lln: 0.5, name: 'Ретикулоциты' },
   'ERYTHROPOIETIN': { prefUnit: 'mIU/mL', coeff: 1, uln: 25, lln: 5, name: 'Эритропоэтин' },
   'HAPTOGLOBIN': { prefUnit: 'g/L', coeff: 1, uln: 3.0, lln: 0.5, name: 'Гаптоглобин' },

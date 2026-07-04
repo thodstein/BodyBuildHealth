@@ -96,45 +96,68 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
         </div>
       )}
 
-      {/* linked substances chips */}
+      {/* linked substances — expanded */}
       {sub.linkedSubstances && sub.linkedSubstances.length > 0 && (
         <div style={{ marginBottom: 6 }}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Связанные вещества</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+          <div style={{ fontSize: 10, color: '#22c55e', fontWeight: 700, marginBottom: 4 }}>🔗 Связанные вещества</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {sub.linkedSubstances.map((ls, i) => {
               const linked = PHARMA_DB[ls.id];
-              const clr = ls.type === 'synergy' ? '#00e68a' : '#ff1744';
+              const isSynergy = ls.type === 'synergy';
+              const clr = isSynergy ? '#00e68a' : '#ff1744';
+              const bg = isSynergy ? 'rgba(0,230,138,0.06)' : 'rgba(255,23,68,0.06)';
+              const border = isSynergy ? 'rgba(0,230,138,0.15)' : 'rgba(255,23,68,0.15)';
               return (
-                <span key={i} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: `${clr}18`, color: clr, fontWeight: 500 }}>
-                  {ls.type === 'synergy' ? '⊕' : '⊖'} {linked?.name || ls.id} ({ls.mechanism})
-                </span>
+                <div key={i} style={{ padding: '5px 8px', borderRadius: 6, background: bg, border: `1px solid ${border}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: clr }}>{isSynergy ? '⊕' : '⊖'} {linked?.name || ls.id}</span>
+                    <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: `${clr}20`, color: clr, fontWeight: 600 }}>
+                      {isSynergy ? 'СИНЕРГИЯ' : 'АНТАГОНИЗМ'} {Math.round(ls.strength * 100)}%
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', lineHeight: 1.3 }}>{ls.mechanism}</div>
+                </div>
               );
             })}
           </div>
         </div>
       )}
 
-      {/* conflicts */}
+      {/* conflicts — expanded */}
       {sub.conflicts && sub.conflicts.length > 0 && (
         <div style={{ marginBottom: 6 }}>
-          <div style={{ fontSize: 9, color: '#ef4444', fontWeight: 600, marginBottom: 3 }}>🔴 Конфликты</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-            {sub.conflicts.map((c, i) => (
-              <span key={i} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: c.severity === 'HIGH' ? 'rgba(239,68,68,0.12)' : 'rgba(234,179,8,0.12)', color: c.severity === 'HIGH' ? '#ef4444' : '#eab308', fontWeight: 500, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {c.with}: {c.effect}
-              </span>
-            ))}
+          <div style={{ fontSize: 10, color: '#ef4444', fontWeight: 700, marginBottom: 4 }}>🔴 Конфликты и несовместимости</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {sub.conflicts.map((c, i) => {
+              const sevBg = c.severity === 'HIGH' ? 'rgba(239,68,68,0.08)' : c.severity === 'MEDIUM' ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.02)';
+              const sevBorder = c.severity === 'HIGH' ? 'rgba(239,68,68,0.2)' : c.severity === 'MEDIUM' ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.06)';
+              const sevColor = c.severity === 'HIGH' ? '#ef4444' : c.severity === 'MEDIUM' ? '#f59e0b' : '#9e9e9e';
+              return (
+                <div key={i} style={{ padding: '6px 8px', borderRadius: 6, background: sevBg, border: `1px solid ${sevBorder}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: sevColor }}>{c.with}</span>
+                    <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: `${sevColor}18`, color: sevColor, fontWeight: 600 }}>
+                      {c.severity}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', lineHeight: 1.35 }}>{c.effect}</div>
+                  {c.mechanism && (
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>{c.mechanism}</div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* special instructions */}
+      {/* special instructions — expanded */}
       {sub.specialInstructions && sub.specialInstructions.length > 0 && (
-        <div style={{ marginBottom: 6, padding: '4px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
-          <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600, marginBottom: 2 }}>📋 Особые указания</div>
+        <div style={{ marginBottom: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)' }}>
+          <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, marginBottom: 4 }}>📋 Особые указания</div>
           {sub.specialInstructions.map((si, i) => (
-            <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', lineHeight: 1.4, paddingLeft: 8, position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 0, color: '#f59e0b' }}>•</span>
+            <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45, padding: '3px 0 3px 10px', position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 0, color: '#f59e0b', fontWeight: 700 }}>•</span>
               {si}
             </div>
           ))}
@@ -302,18 +325,26 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
       )}
       {(detail?.synergies && detail.synergies.length > 0) && (
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Синергия и комбинации</div>
-          {(() => { try { return detail!.synergies.map((s: any, i: number) => {
-            const linkedName = (typeof s.with === 'string' && PHARMA_DB[s.with]) ? PHARMA_DB[s.with].name : s.with || '—';
-            return (
-              <div key={i} style={{ marginBottom: 4, padding: '4px 8px', borderRadius: 4, background: s.type === 'synergistic' ? 'rgba(0,230,138,0.08)' : s.type === 'antagonistic' ? 'rgba(255,23,68,0.08)' : 'rgba(41,121,255,0.08)' }}>
-                <span style={{ fontWeight: 600, color: s.type === 'synergistic' ? '#00e68a' : s.type === 'antagonistic' ? '#ff1744' : '#2979ff' }}>
-                  {s.type === 'synergistic' ? '⊕' : s.type === 'antagonistic' ? '⊖' : '→'} {linkedName}
-                </span>
-                <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>{s.desc || ''}</span>
-              </div>
-            );
-          }); } catch { return null; }})()}
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#00e68a', marginBottom: 6 }}>💥 Синергии и комбинации</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {(() => { try { return detail!.synergies.map((s: any, i: number) => {
+              const linkedName = (typeof s.with === 'string' && PHARMA_DB[s.with]) ? PHARMA_DB[s.with].name : s.with || '—';
+              const isSyn = s.type === 'synergistic';
+              const isAnt = s.type === 'antagonistic';
+              const clr = isSyn ? '#00e68a' : isAnt ? '#ff1744' : '#2979ff';
+              const bg = isSyn ? 'rgba(0,230,138,0.06)' : isAnt ? 'rgba(255,23,68,0.06)' : 'rgba(41,121,255,0.06)';
+              const lbl = isSyn ? '⊕ Синергия' : isAnt ? '⊖ Антагонизм' : '→ Комплемент';
+              return (
+                <div key={i} style={{ padding: '6px 10px', borderRadius: 8, background: bg, border: `1px solid ${clr}20` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    <span style={{ fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: `${clr}20`, color: clr }}>{lbl}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: clr }}>{linkedName}</span>
+                  </div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4 }}>{s.desc || ''}</div>
+                </div>
+              );
+            }); } catch { return null; }})()}
+          </div>
         </div>
       )}
       {((detail?.sideEffects && detail.sideEffects.length > 0) || (sub.sideEffects && sub.sideEffects.length > 0)) && (

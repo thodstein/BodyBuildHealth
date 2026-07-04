@@ -1773,3 +1773,40 @@ interface AdvancedProductCard {
 
 ### Финал
 Тренировочный блок полностью реализован и проверен (части 1–29). Все заявленные направления выполнены: единый профиль, реальные программы/СРЦ, применение методик, guardrails/качество/лаб-коррекция, sRPE→готовность→прогноз, единое выполнение, дневник, прогресс, сравнение, экспорт/PDF-отчёт, энциклопедия методик (47), калькуляторы, библиотека.
+
+---
+
+## Session Summary (Jul 04) — Training Calendar improvements
+
+### Done
+- **Bugfix (engine)**: `generateTrainingCalendar` hardcoded `plannedVolume: 0` and `actualVolume: 0` — fixed to read from `planned?.volume || 0` and `actual?.volume || 0`. `generateCalendarMonth` already patched in earlier session.
+- **Кнопка «Сегодня»** в шапке календаря — переключает на текущий месяц и возвращает на месяц-вью.
+- **Недельные метки (Н1-Н5)** слева от сетки месяца (колонка 32px).
+- **Compliance gauge bar** — отдельная карточка с прогресс-баром compliance за месяц.
+- **Имена упражнений** в недельной детализации — чипсы с названиями упражнений из actualMap.
+- **Ручная отметка дня** — кнопка «☐ Отм.» в карточке дня (для прошедших дат) позволяет отметить день как выполненный вручную; данные сохраняются в `he_cal_manual` localStorage; виртуальный лог добавляется в historyWorkouts, триггеря пересчёт календаря.
+- **Мезоцикл-вью** использует `getMesocycleOverview()` — показывает фазы (phaseDistribution) с compliance по фазам, тренд (improving/declining/stable).
+- **Вывод на экран**: вкладка `calendar` зарегистрирована в shared.ts (TrainingTab) и рендерится в TrainingScreen.tsx при `tab === 'calendar'`.
+- `tsc --noEmit`: 0 ошибок в изменённых файлах. 4 предсуществующие ошибки в SupportProtocols.tsx (параллельный агент).
+- `vite build`: падает только на SupportProtocols.tsx (не мой файл).
+- UTF-8 noBOM: оба файла OK.
+
+## Session Summary (Jul 04 — Part 2) — Visual Periodization Designer
+
+### Done
+- **`periodization-designer.engine.ts`** — расширен:
+  - Новые типы: `PhaseKey` (10 значений: accumulation_hypertrophy, accumulation_strength, intensification, peaking, deload, technique, conditioning, power, gpp, transition), `DesignerPhaseBlock` (id, phaseKey, startWeek, endWeek, notes), `MacrocycleDesign` (блоки на timeline).
+  - Константы: `PHASE_COLORS`, `PHASE_ICONS`, `PHASE_LABELS_RU` (10 фаз с русскими именами и цветами).
+  - Функции timeline: `createEmptyDesign()`, `loadDesigns()`, `saveDesign()`, `deleteDesign()`, `addBlockToDesign()`, `removeBlockFromDesign()`, `moveBlockInDesign()`, `resizeBlockInDesign()`, `updateBlockNotes()`, `getDesignStats()`, `getPhaseTemplate()`, `getDefaultPresetDesigns()` (3 пресета: классический 12-нед сила, 16-нед гипертрофия, 52-нед годовой план, 8-нед блочная).
+- **`PeriodizationDesignerTab.tsx`** (визуальный дизайнер):
+  - **Палитра блоков**: 10 draggable карточек фаз (HTML5 DnD) с цветами/иконками.
+  - **Таймлайн-канвас**: сетка недель (поквартально по 13 нед, ◀▶ навигация), drop-зоны для каждой недели.
+  - **Размещённые блоки**: цветные полоски с названием фазы и длительностью, drag → размещение.
+  - **Редактирование**: клик → панель свойств (длительность slider, кнопки сдвига ±1/2/4 нед, заметки textarea, удаление ✕).
+  - **График распределения фаз**: прогресс-бары % времени по каждой фазе.
+  - **Пресеты**: ➕ Создать пустой / загрузить шаблон из `getDefaultPresetDesigns()`.
+  - **Сохранение/загрузка**: localStorage `he_macrocycle_designs`, выбор дизайна из списка, дублирование, удаление, переименование.
+- **Регистрация**: `shared.ts` (TrainingTab + TAB_LABELS), в группе планирования. `TrainingScreen.tsx` (import + render).
+- `tsc --noEmit`: 0 ошибок в изменённых файлах (3 предсуществующие в ManualPlanEditor.tsx).
+- `vite build`: падает только на CsvImportTab.tsx (не мой файл).
+- UTF-8 noBOM: 5 файлов OK.

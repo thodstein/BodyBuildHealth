@@ -20,6 +20,37 @@ import { useTrainingProfile } from '../TrainingScreen_parts/training-profile';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
+
+const WARMUP_LABELS: Record<string, string> = {
+  light_cardio: 'Лёгкое кардио (ходьба/вело)', jumping_jack: 'Прыжки ноги вместе-врозь',
+  arm_circles: 'Круги руками', leg_swings: 'Махи ногами',
+  hip_circle: 'Круги тазом', ankle_mobility: 'Мобильность голеностопа',
+  shoulder_circle: 'Круги плечами', thoracic_rotation: 'Грудная ротация',
+  cat_camel: 'Кошка-верблюд', worlds_greatest: 'Растяжка мирового уровня',
+  banded_clam: 'Ракушка с резиной', external_rotation: 'Наружная ротация плеча',
+  bird_dog: 'Птица-собака', dead_bug: 'Мёртвый жук',
+  squat: 'Разминочные подходы — присед', bench: 'Разминочные подходы — жим',
+  deadlift: 'Разминочные подходы — тяга',
+};
+const COOLDOWN_LABELS: Record<string, string> = {
+  deep_breathing: 'Глубокое дыхание (диафрагмальное)', box_breathing: 'Квадратное дыхание (4-4-4-4)',
+  chest_stretch: 'Растяжка груди', shoulder_stretch: 'Растяжка плеч',
+  lat_stretch: 'Растяжка широчайших', hamstring_stretch: 'Растяжка задней поверхности бедра',
+  quad_stretch: 'Растяжка квадрицепса', glute_stretch: 'Растяжка ягодиц',
+  child_pose: 'Поза ребёнка', cat_camel: 'Кошка-верблюд',
+  nerve_flossing: 'Нейро-мобилизация',
+};
+function wLabel(exId: string) { return WARMUP_LABELS[exId] || exId; }
+function cLabel(exId: string) { return COOLDOWN_LABELS[exId] || exId; }
+
+function formatPlates(targetW: number): string {
+  if (targetW <= 0) return '';
+  const r = calculatePlates(targetW);
+  if (r.platesPerSide.length > 0) {
+    return r.platesPerSide.map(p => `${p.count * 2}x${p.plate}`).join(' + ') + ` на гриф ${r.barWeight} кг`;
+  }
+  return `гриф ${r.barWeight} кг`;
+}
 const BTN: React.CSSProperties = { background: ACCENT, color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 14, minHeight: 44 };
 const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: ACCENT, border: `1px solid ${ACCENT}` };
 const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const };
@@ -106,11 +137,24 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   const begin = () => {
     if (!day) return;
     
+    const riskFlags: Record<string, string> = {};
+    if (profile.injuries?.length) {
+      profile.injuries.forEach(inj => {
+        const m = inj.muscle?.toLowerCase() || '';
+        if (m.includes('колен') || m.includes('knee')) riskFlags['knee'] = 'high';
+        if (m.includes('плеч') || m.includes('shoulder')) riskFlags['shoulder'] = 'high';
+        if (m.includes('спин') || m.includes('поясн') || m.includes('back') || m.includes('lumbar')) riskFlags['back'] = 'high';
+      });
+    }
+    const techniqueIssues: string[] = profile.weakPoints?.length
+      ? profile.weakPoints.map(w => w === 'back' || w === 'core' ? 'rounding_back' : w === 'knees' ? 'knee_valgus' : '')
+        .filter(Boolean)
+      : [];
     const warmupInput: WarmupInput = {
       sessionFocus: focus,
       primaryExercises: day.exercises.map(ex => ex.name),
-      riskFlags: {}, // Need to get this from profile or somewhere? 
-      techniqueIssues: [], // Need to get this from profile or somewhere?
+      riskFlags,
+      techniqueIssues,
       fatigueLevel: profile.fatigue / 10,
       equipmentAvailable: profile.equipment,
     };
@@ -146,10 +190,18 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     hapticNotify('success');
     const finished = finishSession(session, `${focus} — ${day?.label}`);
     
+    const finishRiskFlags: Record<string, string> = {};
+    if (profile.injuries?.length) {
+      profile.injuries.forEach(inj => {
+        const m = inj.muscle?.toLowerCase() || '';
+        if (m.includes('колен') || m.includes('knee')) finishRiskFlags['knee'] = 'high';
+        if (m.includes('плеч') || m.includes('shoulder')) finishRiskFlags['shoulder'] = 'high';
+      });
+    }
     const cooldownInput: CooldownInput = {
       muscleGroupsUsed: Array.from(new Set(day.exercises.map(ex => ex.muscleGroup))),
       fatigueScore: profile.fatigue / 10,
-      riskFlags: {}, 
+      riskFlags: finishRiskFlags,
       sessionDuration: (finished.durationMin || sessionDur) * 60,
     };
     setCooldownBlocks(generateCooldown(cooldownInput));
@@ -212,24 +264,6 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   // D1: LMS-метрики фактической сессии (Тоннаж/КПШ/Инт.отн/УОИ/Инт.Ф+Б) — считаются для done-состояния
   const lms = useMemo(() => computeSessionMetrics(done, day), [done, day]);
 
-  // раскладка блинов для каждого упражнения (по целевому весу первого подхода)
-  const plateBreakdowns = useMemo(() => {
-    if (!day) return {};
-    const map: Record<number, string> = {};
-    day.exercises.forEach((ex, ei) => {
-      const targetW = ex.targetSets[0]?.weight || 0;
-      if (targetW > 0) {
-        const r = calculatePlates(targetW);
-        if (r.platesPerSide.length > 0) {
-          map[ei] = r.platesPerSide.map(p => `${p.count * 2}×${p.plate}`).join(' + ') + ` на гриф ${r.barWeight} кг`;
-        } else {
-          map[ei] = `гриф ${r.barWeight} кг`;
-        }
-      }
-    });
-    return map;
-  }, [day]);
-
   if (days.length === 0) return <div style={SMALL}>Нет дней в плане.</div>;
 
   return (
@@ -247,10 +281,18 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
               <div style={H}>🤸 Разминка перед: {day.label}</div>
               {warmupBlocks.map((b: WarmupBlock, i: number) => (
                 <div key={i} style={{ marginBottom: 4 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT }}>{b.type.toUpperCase()}</div>
-                  <div style={SMALL}>{b.notes}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT }}>
+                    {b.type === 'general' ? 'Кардио' : b.type === 'mobility' ? 'Суставная разминка' : b.type === 'activation' ? 'Активация мышц' : 'Специальная'}
+                    <span style={{ fontWeight: 400, fontSize: 10, color: 'rgba(255,255,255,0.5)', marginLeft: 6 }}>{b.durationSec}с</span>
+                  </div>
+                  {b.notes && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{b.notes}</div>}
                   <ul style={{ paddingLeft: 16, margin: '2px 0' }}>
-                    {b.exercises.map((ex, j: number) => <li key={j} style={SMALL}>{ex.exerciseId}</li>)}
+                    {b.exercises.map((ex, j: number) => (
+                      <li key={j} style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>
+                        {wLabel(ex.exerciseId)}
+                        {'intensityPct' in ex && ex.intensityPct ? ` · ${ex.intensityPct}% x ${ex.sets}x${ex.reps}` : ` · ${ex.sets}x${ex.reps}`}
+                      </li>
+                    ))}
                   </ul>
                 </div>
               ))}
@@ -278,11 +320,6 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
           {day.exercises.map((ex, ei) => (
             <div key={ei} style={{ marginTop: 8, padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>{ex.name} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>({ex.muscleGroup})</span></div>
-              {plateBreakdowns[ei] && (
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginBottom: 4, padding: '2px 0' }}>
-                  🏋️ {plateBreakdowns[ei]}
-                </div>
-              )}
               {ex.targetSets.map((t, si) => {
                 const k = keyFor(ei, si);
                 const a = actual[k] || { weight: t.weight, reps: t.reps, rpe: 0 };
@@ -297,6 +334,11 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
                   <div key={si} style={{ ...ROW, flexWrap: 'wrap', gap: 6 }}>
                     <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, width: 52 }}>Сет {si + 1}</span>
                     <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, width: 90 }}>цель {t.weight}кг×{t.reps}@RIR{t.rir}</span>
+                    {t.weight > 0 && (
+                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', width: '100%', paddingLeft: 52 }}>
+                        🏋️ {formatPlates(t.weight)}
+                      </span>
+                    )}
                     <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                       <input style={{ ...IN, width: 60 }} type="number" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { weight: +e.target.value, reps: a.reps, rpe: a.rpe } }))} aria-label="вес" />
                       <input style={{ ...IN, width: 48 }} type="number" value={a.reps} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: +e.target.value, rpe: a.rpe } }))} aria-label="повт" />
@@ -402,10 +444,18 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
             <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.1)' }}>
               <div style={H}>🧘 Рекомендованная заминка</div>
               {cooldownBlocks.map((b: CooldownBlock, i: number) => (
-                <div key={i} style={{ marginBottom: 4 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT }}>{b.type.toUpperCase()}</div>
+                <div key={i} style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT }}>
+                    {b.type === 'stretch' ? 'Стретчинг' : b.type === 'breathing' ? 'Дыхание' : 'Восстановление'}
+                    <span style={{ fontWeight: 400, fontSize: 10, color: 'rgba(255,255,255,0.5)', marginLeft: 6 }}>{b.durationSec}с</span>
+                  </div>
                   <ul style={{ paddingLeft: 16, margin: '2px 0' }}>
-                    {b.exercises.map((ex, j: number) => <li key={j} style={SMALL}>{ex.exerciseId}</li>)}
+                    {b.exercises.map((ex, j: number) => (
+                      <li key={j} style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>
+                        {cLabel(ex.exerciseId)}
+                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}> · {ex.durationSec}с</span>
+                      </li>
+                    ))}
                   </ul>
                 </div>
               ))}

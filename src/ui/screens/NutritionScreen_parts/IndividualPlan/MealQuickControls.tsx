@@ -2,6 +2,11 @@ import React, { useState } from "react";
 import { usePlanCtx } from "./IndividualPlanContext";
 import { FOOD_DB } from "../../../../core/nutrition-database";
 import { getRecipesByMeal } from "../../../../engines/nutrition-periodization.engine";
+import {
+  scoreFoodsForKBJU, getMealKBJUTarget, getMealCurrentKBJU,
+  type KbjuMatchResult, type AdvancedFilter,
+} from "../../../../engines/kbju-food-match.engine";
+import type { ComposerMode } from "./MealComposerMode";
 
 const btnCard: React.CSSProperties = {
   flex: 1, minWidth: 0,
@@ -25,7 +30,7 @@ const popupSheet: React.CSSProperties = {
   padding: '14px 20px 28px', borderRadius: '20px 20px 0 0',
   background: '#18181b', boxShadow: '0 -4px 30px rgba(0,0,0,0.4)',
   border: '1px solid rgba(255,255,255,0.06)', borderBottom: 'none',
-  maxHeight: '70vh', overflowY: 'auto', boxSizing: 'border-box',
+  maxHeight: '75vh', overflowY: 'auto', boxSizing: 'border-box',
 };
 
 const handle: React.CSSProperties = {
@@ -45,7 +50,18 @@ const productBtn: React.CSSProperties = {
   ...mealBtn, fontSize: 8, fontWeight: 400,
 };
 
-export const MealQuickControls: React.FC = () => {
+const CATEGORY_LABELS: Record<string, string> = {
+  protein: '🥩 Мясо/Рыба', dairy: '🥛 Молочка', grain: '🌾 Крупы',
+  carb: '🥔 Овощи', veg_fruit: '🥦 Овощи/Фрукты', fat: '🥑 Жиры/Орехи',
+  supplement: '💊 Спортпит', other: '📦 Прочее',
+};
+
+interface Props {
+  mode?: ComposerMode;
+  advancedFilter?: AdvancedFilter;
+}
+
+export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFilter = {} }) => {
   const ctx = usePlanCtx();
   const {
     dayPlan, generated,
@@ -60,6 +76,7 @@ export const MealQuickControls: React.FC = () => {
     selectedItemIdx?: number;
     searchQuery?: string;
     searchResults?: any[];
+    scoredResults?: KbjuMatchResult[];
     editWeight?: number;
   } | null>(null);
 
@@ -118,7 +135,9 @@ export const MealQuickControls: React.FC = () => {
       return;
     }
     if (p.mode === 'add_product') {
-      setPopup({ ...p, step: 'search_product', searchQuery: '', searchResults: [] });
+      const mealTarget = getMealKBJUTarget(dayPlan, idx);
+      const mealCurrent = getMealCurrentKBJU(dayPlan, idx);
+      setPopup({ ...p, step: 'search_product', searchQuery: '', searchResults: [], scoredResults: [] });
       return;
     }
     closePopup();
@@ -154,7 +173,7 @@ export const MealQuickControls: React.FC = () => {
         if (mi !== popup.selectedMealIdx) return m;
         const items = m.items.map((it: any, ii: number) => {
           if (ii !== popup.selectedItemIdx) return it;
-          return { ...it, name: food.name, id: food.id, kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs };
+          return { ...it, name: food.name || food.foodName, id: food.id || food.foodId, kcal: food.kcal, p: food.protein ?? food.p, f: food.fat ?? food.f, c: food.carbs ?? food.c };
         });
         const totals = { kcal: items.reduce((s: number, x: any) => s + x.kcal, 0), p: items.reduce((s: number, x: any) => s + x.p, 0), f: items.reduce((s: number, x: any) => s + x.f, 0), c: items.reduce((s: number, x: any) => s + x.c, 0) };
         return { ...m, items, totals };
@@ -187,41 +206,42 @@ export const MealQuickControls: React.FC = () => {
     closePopup();
   };
 
-  const doAddProduct = (food: any) => {
+  const doAddProduct = (result: KbjuMatchResult) => {
     if (!popup || popup.selectedMealIdx === undefined) return;
     saveUndo();
+    const food = FOOD_DB.find(f => f.id === result.foodId);
+    const amount = Math.round(food?.servingSize ? parseInt(food.servingSize) : 100);
     setDayPlan((prev: any) => {
       if (!prev) return prev;
       const meals2 = prev.meals.map((m: any, mi: number) => {
         if (mi !== popup.selectedMealIdx) return m;
-        const items = [...m.items, { name: food.name, id: food.id, amount: 100, kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs }];
+        const items = [...m.items, { name: result.foodName, id: result.foodId, amount, kcal: Math.round(result.kcal * amount / 100), p: Math.round(result.protein * amount / 100 * 10) / 10, f: Math.round(result.fat * amount / 100 * 10) / 10, c: Math.round(result.carbs * amount / 100 * 10) / 10 }];
         const totals = { kcal: items.reduce((s: number, x: any) => s + x.kcal, 0), p: items.reduce((s: number, x: any) => s + x.p, 0), f: items.reduce((s: number, x: any) => s + x.f, 0), c: items.reduce((s: number, x: any) => s + x.c, 0) };
         return { ...m, items, totals };
       });
       const totals = { kcal: meals2.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals2.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals2.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals2.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0) };
       return { ...prev, meals: meals2, totals };
     });
-    setPopup({ ...popup, step: 'search_product', searchQuery: '', searchResults: [] });
+    setPopup({ ...popup, step: 'search_product', searchQuery: '', searchResults: [], scoredResults: [] });
   };
 
   const handleSearch = (q: string) => {
-    if (!popup) return;
-    const results = q.trim().length > 0
-      ? FOOD_DB.filter((f: any) => (f.name || '').toLowerCase().includes(q.toLowerCase())).slice(0, 15)
-      : [];
-    setPopup({ ...popup, searchQuery: q, searchResults: results });
+    if (!popup || popup.selectedMealIdx === undefined) return;
+    setPopup({ ...popup, searchQuery: q, scoredResults: [] });
+    if (q.trim().length > 0) {
+      const raw = FOOD_DB.filter((f: any) => (f.name || '').toLowerCase().includes(q.toLowerCase()));
+      const mealTarget = getMealKBJUTarget(dayPlan, popup.selectedMealIdx);
+      const mealCur = getMealCurrentKBJU(dayPlan, popup.selectedMealIdx);
+      const defaultTarget = mealTarget || { kcal: 600, protein: 40, fat: 20, carbs: 60 };
+      const scored = scoreFoodsForKBJU(raw, defaultTarget, mealCur || undefined, mode === 'advanced' ? advancedFilter : undefined, 20);
+      setPopup({ ...popup, searchQuery: q, searchResults: raw.slice(0, 20), scoredResults: scored });
+    }
   };
 
   const undoLast = () => {
     if (undoStack.length === 0) return;
     setDayPlan(undoStack[0]);
     setUndoStack(undoStack.slice(1));
-  };
-
-  const CATEGORY_LABELS: Record<string, string> = {
-    protein: '🥩 Мясо/Рыба', dairy: '🥛 Молочка', grain: '🌾 Крупы',
-    carb: '🥔 Овощи', veg_fruit: '🥦 Овощи/Фрукты', fat: '🥑 Жиры/Орехи',
-    supplement: '💊 Спортпит', other: '📦 Прочее',
   };
 
   return (
@@ -431,12 +451,15 @@ export const MealQuickControls: React.FC = () => {
         </div>
       )}
 
-      {/* POPUP: search and add product */}
+      {/* POPUP: search and add product — WITH KBJU MATCH + ADVANCED MODE */}
       {popup && (popup.step === 'search_product') && (
         <div style={popupOverlay} onClick={closePopup}>
           <div onClick={e => e.stopPropagation()} style={popupSheet}>
             <div style={handle} />
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 }}>➕ Добавить продукт</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
+              ➕ Добавить продукт
+              {mode === 'advanced' && <span style={{ fontSize: 9, marginLeft: 6, color: '#a78bfa', fontWeight: 500 }}>Продвинутый режим</span>}
+            </div>
             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
               {popup.selectedMealIdx !== undefined
                 ? `В приём: ${meals[popup.selectedMealIdx]?.label}`
@@ -467,26 +490,93 @@ export const MealQuickControls: React.FC = () => {
                     color: '#fff', fontSize: 13, outline: 'none', boxSizing: 'border-box',
                     marginBottom: 8,
                   }} />
-                <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {popup.searchResults && popup.searchResults.length > 0 ? popup.searchResults.map((food: any) => (
-                    <button key={food.id} onClick={() => doAddProduct(food)}
-                      style={productBtn}
+                {/* KBJU remaining info for the selected meal */}
+                {popup.selectedMealIdx !== undefined && (() => {
+                  const target = getMealKBJUTarget(dayPlan, popup.selectedMealIdx);
+                  const cur = getMealCurrentKBJU(dayPlan, popup.selectedMealIdx);
+                  if (!target) return null;
+                  const remP = Math.max(0, target.protein - (cur?.protein || 0));
+                  const remF = Math.max(0, target.fat - (cur?.fat || 0));
+                  const remC = Math.max(0, target.carbs - (cur?.carbs || 0));
+                  return (
+                    <div style={{ marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.08)', fontSize: 8 }}>
+                      <div style={{ color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>Осталось добрать в приём:</div>
+                      <div style={{ display: 'flex', gap: 12 }}>
+                        <span style={{ color: '#60a5fa' }}>Б: <b>{remP}г</b></span>
+                        <span style={{ color: '#f59e0b' }}>Ж: <b>{remF}г</b></span>
+                        <span style={{ color: '#f97316' }}>У: <b>{remC}г</b></span>
+                      </div>
+                    </div>
+                  );
+                })()}
+                <div style={{ maxHeight: 350, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {popup.scoredResults && popup.scoredResults.length > 0 ? popup.scoredResults.map((result) => (
+                    <button key={result.foodId} onClick={() => doAddProduct(result)}
+                      style={{ ...productBtn, padding: mode === 'advanced' ? '8px 10px' : '10px 12px' }}
                       onMouseEnter={e => (e.target as HTMLElement).style.borderColor = 'rgba(0,230,138,0.3)'}
                       onMouseLeave={e => (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <span style={{ fontWeight: 700 }}>{food.name}</span>
-                          <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginLeft: 4 }}>
-                            {CATEGORY_LABELS[food.category] || food.category || ''}
-                          </span>
+                      {/* Row 1: name + match badge + KBJU */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ fontWeight: 700, fontSize: 9 }}>{result.foodName}</span>
+                            <span style={{
+                              fontSize: 7, padding: '1px 5px', borderRadius: 4,
+                              background: `${result.color}18`, color: result.color, fontWeight: 600,
+                              whiteSpace: 'nowrap',
+                            }}>
+                              {result.matchScore}% {result.label}
+                            </span>
+                            <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', marginLeft: 2 }}>
+                              {CATEGORY_LABELS[result.category]?.split(' ')[0] || result.category}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                            {Math.round(result.kcal)} ккал/100г · Б{result.protein} Ж{result.fat} У{result.carbs}
+                            {result.fiber > 0 && <span style={{ color: '#22c55e' }}> · клетч.{result.fiber}г</span>}
+                          </div>
                         </div>
-                        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 8, whiteSpace: 'nowrap' }}>
-                          {Math.round(food.kcal)} ккал/100г
-                        </span>
+                        {/* Match score mini bar */}
+                        <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', flexShrink: 0, marginTop: 4 }}>
+                          <div style={{ width: `${result.matchScore}%`, height: '100%', borderRadius: 2, background: result.color }} />
+                        </div>
                       </div>
-                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-                        Б{food.protein} · Ж{food.fat} · У{food.carbs}
-                      </div>
+                      {/* Row 2: advanced mode details */}
+                      {mode === 'advanced' && (
+                        <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', fontSize: 7 }}>
+                          {result.diaas !== undefined && result.diaas > 0 && (
+                            <span style={{ color: result.diaas >= 1 ? '#00e68a' : result.diaas >= 0.75 ? '#f59e0b' : '#ef4444' }}>
+                              🧬 DIAAS {result.diaas}
+                            </span>
+                          )}
+                          {result.gi > 0 && (
+                            <span style={{ color: result.gi <= 55 ? '#22c55e' : result.gi <= 70 ? '#f59e0b' : '#ef4444' }}>
+                              🍬 ГИ {result.gi}
+                            </span>
+                          )}
+                          {result.pral !== undefined && (
+                            <span style={{ color: (result.pral ?? 0) < 0 ? '#22c55e' : (result.pral ?? 0) <= 5 ? '#f59e0b' : '#ef4444' }}>
+                              ⚡ PRAL {(result.pral ?? 0).toFixed(1)}
+                            </span>
+                          )}
+                          {result.bbQuality !== undefined && (
+                            <span style={{ color: (result.bbQuality ?? 5) >= 7 ? '#00e68a' : (result.bbQuality ?? 5) >= 5 ? '#f59e0b' : '#ef4444' }}>
+                              ⭐ {result.bbQuality?.toFixed(1)}
+                            </span>
+                          )}
+                          {result.aminoScore !== undefined && result.aminoScore > 0 && (
+                            <span style={{ color: '#60a5fa' }}>💪 Амино {result.aminoScore}/8</span>
+                          )}
+                          {result.processingLevel && (
+                            <span style={{ color: result.processingLevel === 'минимальная' ? '#22c55e' : '#f59e0b' }}>
+                              🏭 {result.processingLevel}
+                            </span>
+                          )}
+                          {result.omega3mg !== undefined && result.omega3mg > 100 && (
+                            <span style={{ color: '#60a5fa' }}>🐟 Ω3 {result.omega3mg}мг</span>
+                          )}
+                        </div>
+                      )}
                     </button>
                   )) : popup.searchQuery && popup.searchQuery.trim().length > 0 ? (
                     <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', textAlign: 'center', padding: 12 }}>
@@ -494,7 +584,9 @@ export const MealQuickControls: React.FC = () => {
                     </div>
                   ) : (
                     <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: 12 }}>
-                      Начните вводить название продукта
+                      {mode === 'basic'
+                        ? 'Начните вводить название продукта. Будет показан скор КБЖУ-соответствия.'
+                        : 'Начните вводить название. Продукты будут отфильтрованы по заданным параметрам полезности.'}
                     </div>
                   )}
                 </div>

@@ -163,25 +163,5 @@ export function calcSuggestedWeight(
   };
 }
 
-export function getDeloadRecommendation(
-  logs: StrengthLogEntry[],
-  currentRPE: number,
-  weeksSinceDeload: number,
-  recoveryScore: number
-): { shouldDeload: boolean; reason: string } {
-  if (recoveryScore < 40) return { shouldDeload: true, reason: `Восстановление ${recoveryScore}% < 40 — рекомендуется делоад` };
-  if (weeksSinceDeload >= 8) return { shouldDeload: true, reason: `${weeksSinceDeload} недель без делаода — плановый делоад` };
-  if (currentRPE >= 9.5) return { shouldDeload: true, reason: `RPE ${currentRPE} ≥ 9.5 на последних тренировках — делоад` };
-
-  // AUD-FIX-4: сравнение plateau в хронологическом порядке (было — в порядке вставки).
-  const chrono = [...logs].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  const plateauExercises = chrono.filter((l, i, arr) => {
-    if (i === 0) return false;
-    const cur = l.estimated1RM ?? 0;
-    const prev = arr[i - 1].estimated1RM ?? 0;
-    return Math.abs(cur - prev) < 0.5;
-  });
-  if (plateauExercises.length >= 3) return { shouldDeload: true, reason: `Плато по ${plateauExercises.length} упражнениям — делоад для суперкомпенсации` };
-
-  return { shouldDeload: false, reason: '' };
-}
+// Реэкспорт из единого deload-engine
+export { getDeloadRecommendation } from './deload-engine';

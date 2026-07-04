@@ -50,6 +50,7 @@ export interface SupportCatalogEntry {
   description: string;
   synergies: SynergyInfo[];
   conflicts: ConflictInfo[];
+  cautions?: ConflictInfo[];
   monitoring: MonitoringItem[];
   contraindications: string[];
   sideEffects: string[];

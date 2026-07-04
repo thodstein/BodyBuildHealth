@@ -12,6 +12,7 @@ import { LabsScoreCard } from '../components/LabsScoreCard';
 // import { LabsTzRiskTab } from './LabsScreen_parts/LabsTzRiskTab'; // удалено — T4 маркеры интегрированы в фазы
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
+import { calculateTzSpecRisk, type TzSpecResult, type TzSpecOrganResult } from '../../engines/risk-engine-tz-spec';
 import { db } from '../../core/db';
 import { LabsResults } from './LabsScreen_parts/LabsResults';
 import { LabsSchedule } from './LabsScreen_parts/LabsSchedule';
@@ -178,7 +179,7 @@ export const LabsScreen: React.FC = () => {
   const [catalogDetail, setCatalogDetail] = useState<{ code: string; name: string; unit: string; uln: number; lln: number; system: string; description: string } | null>(null);
   const [catFilterSys, setCatFilterSys] = useState('all');
   const [riskSections, setRiskSections] = useState<Record<string, boolean>>({
-    pharma: true, indices: true, systems: true, markers: true, requiredLabs: false, normalizeDrugs: false,
+    pharma: true, indices: true, systems: true, markers: true, tz: true, requiredLabs: false, normalizeDrugs: false,
   });
   const [addError, setAddError] = useState('');
   const [labReportGenerated, setLabReportGenerated] = useState(false);
@@ -423,6 +424,40 @@ export const LabsScreen: React.FC = () => {
   const labPharmaAlerts = useMemo(() => {
     if (!hasLabs || linked.course.length === 0) return [];
     return analyzeLabDrugCorrelation(currentLabs, linked.course, linked.profile?.settings?.phase || 'on_cycle');
+  }, [hasLabs, currentLabs, linked.course]);
+
+  // ── Механизм-ориентированная модель (ТЗ) — данные из фазы ──
+  const tzSpecResult = useMemo<TzSpecResult | null>(() => {
+    if (!hasLabs) return null;
+    // лаб. значения: code → number
+    const m: Record<string, number> = {};
+    for (const l of currentLabs) {
+      const c = l.code?.toUpperCase();
+      if (c && typeof l.value === 'number' && isFinite(l.value)) m[c] = l.value;
+    }
+    // алиасы для движка
+    if (m['EGFR'] !== undefined) m['eGFR'] = m['EGFR'];
+    if (m['CREATININE'] !== undefined) m['CREAT'] = m['CREATININE'];
+    if (m['BILIRUBIN'] !== undefined) m['BIL'] = m['BILIRUBIN'];
+    // покрытие T4
+    const t4 = ['LDL','HDL','TG','HCT','HGB','ALT','AST','GGT','ALP','BIL','BILIRUBIN','EGFR','UACR','K','NA','GLU','HBA1C','LH','FSH','TT','E2','PRL'];
+    const p = t4.filter(c => m[c] !== undefined || m[c.toUpperCase()] !== undefined).length;
+    const cov = t4.length > 0 ? p / t4.length : 0.1;
+    // курс
+    const course = linked.course || [];
+    const fd = course[0];
+    let dc: 'aas'|'gh'|'insulin' = 'aas';
+    if (fd) {
+      const s = (fd.substanceId||'').toLowerCase();
+      if (s.includes('gh')||s.includes('somatr')||s.includes('hgh')) dc = 'gh';
+      else if (s.includes('insulin')||s.includes('ins_')) dc = 'insulin';
+    }
+    const totalDose = course.length ? course.reduce((s:number,c:any)=>s+(typeof c.doseValue==='number'?c.doseValue:parseFloat(c.doseValue)||0)*(typeof c.frequency==='number'?c.frequency:parseFloat(String(c.frequency))||7),0) : 500;
+    const dur = course.length ? Math.max(4,...course.map((c:any)=>Math.max(0,(c.endWeek??12)-(c.startWeek??0))+1)) : 12;
+    const oral = course.some((c:any)=>{const s=(c.substanceId||'').toLowerCase();return s.includes('oral')||s.includes('oxy')||s.includes('dbol')||s.includes('anadrol')||s.includes('winstrol')||s.includes('stanozo')||s.includes('turinabol');});
+    let sup: string[] = [];
+    try { const sr = JSON.parse(localStorage.getItem('he_support_risk')||'null'); if(sr?.subs) sup = sr.subs.map((id:string)=>id.toLowerCase()); } catch {}
+    return calculateTzSpecRisk({ drugClass:dc, drugName:fd?.substanceId||'custom', dose:Math.max(50,Math.round(totalDose)), duration:dur, form:oral?'oral':'inject', combinations:Math.max(1,course.length), labCoverage:cov, labValues:m, supportSubstances:sup });
   }, [hasLabs, currentLabs, linked.course]);
 
   const toggleGlobalNoLabs = useCallback(() => {
@@ -1575,6 +1610,64 @@ export const LabsScreen: React.FC = () => {
                 </div>)}
               </div>
             )}
+
+            {/* ── Механизм-ориентированная модель (ТЗ) ── */}
+            <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 8 }}>
+              <button onClick={() => setRiskSections(s => ({ ...s, tz: !s.tz }))} style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
+                background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 12, fontWeight: 700,
+              }}>
+                <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: riskSections.tz ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+                🧮 Риски (механизм-ориентированная модель ТЗ)
+              </button>
+              {riskSections.tz && (<div style={{ padding: '0 12px 12px' }}>
+                {tzSpecResult ? (
+                  <>
+                    <div style={{ textAlign: 'center', padding: '8px 0', borderRadius: 10, marginBottom: 6,
+                      background: 'linear-gradient(135deg, rgba(0,230,138,0.06) 0%, rgba(0,230,138,0.02) 100%)',
+                      border: '1px solid rgba(0,230,138,0.15)' }}>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Общий риск</div>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: 10, alignItems: 'center' }}>
+                        <span style={{ fontSize: 20, fontWeight: 800, color: tzSpecResult.overallRaw < 25 ? '#22c55e' : tzSpecResult.overallRaw < 50 ? '#eab308' : '#f97316' }}>{tzSpecResult.overallRaw}%</span>
+                        <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)' }}>→</span>
+                        <span style={{ fontSize: 20, fontWeight: 800, color: tzSpecResult.overallAfter < 25 ? '#22c55e' : tzSpecResult.overallAfter < 50 ? '#eab308' : '#f97316' }}>{tzSpecResult.overallAfter}%</span>
+                      </div>
+                      <div style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>
+                        {tzSpecResult.overallCategory} · K_protect {tzSpecResult.k_protect_overall}%
+                      </div>
+                      <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, margin: '4px 10px 0', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${Math.min(100, tzSpecResult.overallAfter)}%`, borderRadius: 2,
+                          background: tzSpecResult.overallAfter < 25 ? '#22c55e' : tzSpecResult.overallAfter < 50 ? '#eab308' : '#f97316' }} />
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gap: 2 }}>
+                      {tzSpecResult.organs.map((organ: TzSpecOrganResult) => {
+                        const cc = (v: number) => v < 25 ? '#22c55e' : v < 50 ? '#eab308' : v < 75 ? '#f97316' : '#ef4444';
+                        return (
+                          <div key={organ.id} style={{ padding: '4px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.02)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: 9, fontWeight: 600 }}>{organ.icon} {organ.name}</span>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: cc(organ.afterPercent) }}>
+                                {organ.rawPercent}% → {organ.afterPercent}%
+                              </span>
+                            </div>
+                            <div style={{ height: 2, background: 'rgba(255,255,255,0.05)', borderRadius: 1, marginTop: 1, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${Math.min(100, organ.afterPercent)}%`, background: cc(organ.afterPercent), borderRadius: 1 }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 4 }}>
+                      Из фазы «{PHASE_LABELS[selectedPhase]}» · покрытие {Math.round(tzSpecResult.d_cov * 100)}%
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', textAlign: 'center', padding: '10px 0' }}>
+                    {hasLabs ? 'Недостаточно данных' : 'Введите анализы в текущей фазе'}
+                  </div>
+                )}
+              </div>)}</div>
 
             {/* Penalty */}
             {anyNoLabs && (
