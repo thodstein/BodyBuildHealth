@@ -7,7 +7,6 @@ const PHASE_LABELS: Record<string, string> = {
   bridge: 'Мост',
   pct: 'ПКТ',
   post_pct: 'После ПКТ',
-  course_bridge_course: 'Курс+Мост',
 };
 
 const PHASE_DESCRIPTIONS: Record<string, string> = {
@@ -16,7 +15,6 @@ const PHASE_DESCRIPTIONS: Record<string, string> = {
   bridge: 'Контроль восстановления между курсами',
   pct: 'Мониторинг восстановления оси HPTA',
   post_pct: 'Финальная проверка после завершения ПКТ',
-  course_bridge_course: 'Затяжной курс с перемычкой',
 };
 
 const LAB_DESCRIPTIONS: Record<string, string> = {

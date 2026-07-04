@@ -9,6 +9,7 @@ import { trainingLoadReport, toDailyLoads, acuteChronicRatio } from '../../../en
 import { autoRegulate } from '../../../engines/pro/autoregulation-pro.engine';
 import { listSchemes, generateProgression } from '../../../engines/pro/progression-pro.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
+import { PL_NORM_TABLES, classifyTotal, findCategory, getNormTable, RANK_ORDER, RANK_LABELS, type ClassificationResult, type NormTable, type Federation, type Discipline } from '../../../engines/pl-norms.engine';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -53,10 +54,45 @@ const FFChart: React.FC<{ series: { date: string; fitness: number; fatigue: numb
 
 export const ProMetricsPanel: React.FC = () => {
   // ── Относительная сила ──
-  const [total, setTotal] = useState<number>(600);
+  const [squat, setSquat] = useState<number>(200);
+  const [bench, setBench] = useState<number>(140);
+  const [deadlift, setDeadlift] = useState<number>(260);
   const [bw, setBw] = useState<number>(90);
   const [sex, setSex] = useState<'male' | 'female'>('male');
+  const total = squat + bench + deadlift;
   const rs = useMemo(() => relativeStrengthReport(total, bw, sex), [total, bw, sex]);
+
+  // ── Нормативы по весовой категории ──
+  const [federation, setFederation] = useState<Federation>('wrpf_untested');
+  const [discipline, setDiscipline] = useState<Discipline>('total');
+  const disciplineOptions = useMemo(() => {
+    const all = PL_NORM_TABLES.filter(t => t.federation === federation);
+    const labels: Record<Discipline, string> = { total: 'Троеборье', bench: 'Жим лёжа', deadlift: 'Становая тяга', squat: 'Присед' };
+    return all.map(t => ({ value: t.discipline, label: labels[t.discipline] || t.discipline }));
+  }, [federation]);
+  const normTable = useMemo(() => getNormTable(federation, discipline) || PL_NORM_TABLES[0], [federation, discipline]);
+  const liftValue = discipline === 'bench' ? bench : discipline === 'deadlift' ? deadlift : discipline === 'squat' ? squat : total;
+  const classif = useMemo(() => classifyTotal(normTable, bw, liftValue), [normTable, bw, liftValue]);
+
+  // Per-lift relative strength
+  const liftRel = useMemo(() => ({
+    squat: bw > 0 ? +(squat / bw).toFixed(2) : 0,
+    bench: bw > 0 ? +(bench / bw).toFixed(2) : 0,
+    deadlift: bw > 0 ? +(deadlift / bw).toFixed(2) : 0,
+  }), [squat, bench, deadlift, bw]);
+
+  // Per-lift classification (WRPF only)
+  const liftClassifs = useMemo(() => {
+    const lifts: { key: Discipline; value: number; label: string }[] = [
+      { key: 'squat', value: squat, label: 'Присед' },
+      { key: 'bench', value: bench, label: 'Жим' },
+      { key: 'deadlift', value: deadlift, label: 'Тяга' },
+    ];
+    return lifts.map(l => {
+      const t = getNormTable(federation, l.key);
+      return t ? { ...l, classif: classifyTotal(t, bw, l.value) } : null;
+    }).filter(Boolean) as { key: Discipline; value: number; label: string; classif: ClassificationResult }[];
+  }, [federation, bw, squat, bench, deadlift]);
 
   // ── Монитор нагрузки (sRPE × длительность) ──
   // P12 wire: реальные sRPE-сессии из дневника (srpe-store); демо-массив как fallback, если <2 реальных.
@@ -80,13 +116,15 @@ export const ProMetricsPanel: React.FC = () => {
   // ── Проф-авторегуляция ──
   const [readiness, setReadiness] = useState<number>(75);
   const [fatigue, setFatigue] = useState<number>(40);
+  const [hrvRatio, setHrvRatio] = useState<number>(1.0);
+  const [sleepScore, setSleepScore] = useState<number>(70);
   const [lastRPE, setLastRPE] = useState<number>(8);
   const [vlPct, setVlPct] = useState<number>(15);
   const ar = useMemo(() => autoRegulate({
     readiness, acwr: { ratio: tlReport.acwr.ratio, zone: tlReport.acwr.zone },
-    fatigue, lastSessionRPE: lastRPE, lastVelocityLossPct: vlPct,
+    fatigue, hrvRatio, sleepScore, lastSessionRPE: lastRPE, lastVelocityLossPct: vlPct,
     plannedTopSetPct: 0.85, plannedRIR: 2, plannedVolumeMult: 1,
-  }), [readiness, fatigue, lastRPE, vlPct, tlReport.acwr]);
+  }), [readiness, fatigue, hrvRatio, sleepScore, lastRPE, vlPct, tlReport.acwr]);
 
   // ── Прогрессии (список схем) ──
   const schemes = useMemo(() => listSchemes(), []);
@@ -100,17 +138,133 @@ export const ProMetricsPanel: React.FC = () => {
 
       {/* Относительная сила */}
       <div style={CARD}>
-        <div style={{ ...SEC, borderLeftColor: '#a855f7' }}>🏋️ Относительная сила</div>
+        <div style={{ ...SEC, borderLeftColor: '#a855f7' }}>🏋️ Калькулятор «сила / масса»</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-          <div><div style={LABEL}>Тотал, кг</div><input style={IN} type="number" value={total} onChange={e => setTotal(+e.target.value)} /></div>
-          <div><div style={LABEL}>Вес тела, кг</div><input style={IN} type="number" value={bw} onChange={e => setBw(+e.target.value)} /></div>
-          <div><div style={LABEL}>Пол</div><select style={IN} value={sex} onChange={e => setSex(e.target.value as any)}><option value="male">М</option><option value="female">Ж</option></select></div>
+          <div><div style={LABEL}>Присед, кг</div><input style={IN} type="number" value={squat} onChange={e => setSquat(+e.target.value || 0)} /></div>
+          <div><div style={LABEL}>Жим лёжа, кг</div><input style={IN} type="number" value={bench} onChange={e => setBench(+e.target.value || 0)} /></div>
+          <div><div style={LABEL}>Тяга, кг</div><input style={IN} type="number" value={deadlift} onChange={e => setDeadlift(+e.target.value || 0)} /></div>
         </div>
-        <div style={ROW}><span>Wilks</span><b style={{ color: '#fff' }}>{rs.wilks}</b></div>
-        <div style={ROW}><span>DOTS</span><b style={{ color: ACCENT }}>{rs.dots} — {rs.classification.label}</b></div>
-        <div style={ROW}><span>IPF GLI</span><b style={{ color: '#fff' }}>{rs.ipfGL}</b></div>
-        <div style={ROW}><span>Allometric (×bw^⅔)</span><b style={{ color: '#fff' }}>{rs.allometric}</b></div>
-        <div style={ROW}><span>Относит. (тотал/вес)</span><b style={{ color: '#fff' }}>{rs.relative}×</b></div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 8 }}>
+          <div><div style={LABEL}>Вес тела, кг</div><input style={IN} type="number" value={bw} onChange={e => setBw(+e.target.value || 1)} /></div>
+          <div><div style={LABEL}>Пол</div><select style={IN} value={sex} onChange={e => setSex(e.target.value as any)}><option value="male">М</option><option value="female">Ж</option></select></div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={LABEL}>Тотал</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: ACCENT, lineHeight: '38px' }}>{total} <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>кг</span></div>
+          </div>
+        </div>
+
+        {/* Per-lift relative strength bars */}
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Относительная сила по движениям (× веса тела)</div>
+          {[
+            { label: 'Присед', value: liftRel.squat, color: '#ef4444' },
+            { label: 'Жим', value: liftRel.bench, color: '#3b82f6' },
+            { label: 'Тяга', value: liftRel.deadlift, color: '#f59e0b' },
+          ].map(l => {
+            const pct = Math.min(100, (l.value / 4) * 100);
+            const level = l.value >= 2.5 ? 'Элита' : l.value >= 2.0 ? 'Опытный' : l.value >= 1.5 ? 'Средний' : 'Новичок';
+            const lvlColor = l.value >= 2.5 ? ACCENT : l.value >= 2.0 ? '#60a5fa' : l.value >= 1.5 ? '#f59e0b' : 'rgba(255,255,255,0.4)';
+            return (
+              <div key={l.label} style={{ marginBottom: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 1 }}>
+                  <span>{l.label}</span>
+                  <span>{l.value}× <span style={{ color: lvlColor }}>({level})</span></span>
+                </div>
+                <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
+                  <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: l.color, opacity: 0.7 }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>Коэффициенты (тотал)</div>
+          <div style={ROW}><span>Wilks</span><b style={{ color: '#fff' }}>{rs.wilks}</b></div>
+          <div style={ROW}><span>DOTS</span><b style={{ color: ACCENT }}>{rs.dots} — {rs.classification.label}</b></div>
+          <div style={ROW}><span>IPF GLI</span><b style={{ color: '#fff' }}>{rs.ipfGL}</b></div>
+          <div style={ROW}><span>Allometric (×bw<sup>⅔</sup>)</span><b style={{ color: '#fff' }}>{rs.allometric}</b></div>
+          <div style={ROW}><span>Относит. (тотал/вес)</span><b style={{ color: '#fff' }}>{rs.relative}×</b></div>
+        </div>
+      </div>
+
+      {/* ── Нормативы по весовой категории ── */}
+      <div style={CARD}>
+        <div style={{ ...SEC, borderLeftColor: '#f59e0b' }}>📋 Разрядные нормативы (весовая категория)</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+          <div>
+            <div style={LABEL}>Федерация</div>
+            <select style={IN} value={federation} onChange={e => { setFederation(e.target.value as Federation); setDiscipline('total'); }}>
+              {(['fpr_ipf', 'wrpf_untested', 'wrpf_tested'] as Federation[]).map(f => {
+                const t = PL_NORM_TABLES.find(x => x.federation === f);
+                return <option key={f} value={f}>{t?.federationLabel || f}</option>;
+              })}
+            </select>
+          </div>
+          <div>
+            <div style={LABEL}>Дисциплина</div>
+            <select style={IN} value={discipline} onChange={e => setDiscipline(e.target.value as Discipline)}>
+              {disciplineOptions.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <div style={LABEL}>Категория</div>
+            <div style={{ ...IN, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: ACCENT, fontSize: 12 }}>{classif.category.label}</div>
+          </div>
+        </div>
+        <div style={ROW}>
+          <span>{discipline === 'total' ? 'Тотал' : disciplineOptions.find(d => d.value === discipline)?.label || discipline}</span>
+          <b style={{ color: ACCENT }}>{liftValue} кг</b>
+        </div>
+        <div style={ROW}><span>Достигнут разряд</span><b style={{ color: classif.achievedRank ? ACCENT : 'rgba(255,255,255,0.4)' }}>{classif.achievedLabel}</b></div>
+        {classif.kgToNext > 0 && classif.nextRank && (
+          <div style={{ marginTop: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>До {classif.nextLabel}: <b style={{ color: '#f59e0b' }}>+{classif.kgToNext} кг</b></span>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{liftValue} / {classif.allRanks.find(r => r.key === classif.nextRank)?.threshold || '?'} кг</span>
+            </div>
+            <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+              {(() => {
+                const prevThr = classif.allRanks.find(r => r.key === classif.achievedRank)?.threshold || 0;
+                const nextThr = classif.allRanks.find(r => r.key === classif.nextRank)?.threshold || 300;
+                const pct = Math.min(100, Math.max(0, ((liftValue - prevThr) / (nextThr - prevThr)) * 100));
+                return <div style={{ height: '100%', width: `${pct}%`, borderRadius: 3, background: 'linear-gradient(90deg, #f59e0b, #22c55e)' }} />;
+              })()}
+            </div>
+          </div>
+        )}
+        <div style={{ marginTop: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: classif.allRanks.length <= 4 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: 4 }}>
+            {classif.allRanks.map(r => (
+              <div key={r.key} style={{ padding: '4px 6px', borderRadius: 6, textAlign: 'center', fontSize: 9, fontWeight: 700, background: r.achieved ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)', border: r.achieved ? '1px solid rgba(0,230,138,0.4)' : '1px solid rgba(255,255,255,0.05)', color: r.achieved ? ACCENT : 'rgba(255,255,255,0.5)' }}>
+                <div style={{ fontSize: 11 }}>{r.achieved ? '✓' : ''} {r.label}</div>
+                <div style={{ fontSize: 9, marginTop: 2 }}>{r.threshold} кг</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Per-lift mini cards (when total is selected and WRPF has individual norms) */}
+        {discipline === 'total' && liftClassifs.length > 0 && (
+          <div style={{ marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>По движениям ({federation === 'wrpf_untested' ? 'WRPF без ДК' : federation === 'wrpf_tested' ? 'WRPF с ДК' : 'ФПР/IPF'}):</div>
+            {liftClassifs.map(lc => (
+              <div key={lc.key} style={{ marginBottom: 6, padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{lc.label}</span>
+                  <span style={{ fontSize: 10, color: ACCENT }}>{lc.value} кг</span>
+                </div>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {lc.classif.allRanks.map(r => (
+                    <span key={r.key} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, fontWeight: 700, background: r.achieved ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)', color: r.achieved ? ACCENT : 'rgba(255,255,255,0.4)', border: r.achieved ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.04)' }}>
+                      {r.achieved ? '✓' : ''} {r.label} {r.threshold}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Монитор нагрузки */}
@@ -128,14 +282,19 @@ export const ProMetricsPanel: React.FC = () => {
 
       {/* Проф-авторегуляция */}
       <div style={CARD}>
-        <div style={{ ...SEC, borderLeftColor: ACCENT }}>🧠 Проф-авторегуляция плана</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+        <div style={{ ...SEC, borderLeftColor: ACCENT }}>🧠 Проф-авторегуляция (HRV + готовность → веса)</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
           <div><div style={LABEL}>Готовность</div><input style={IN} type="number" value={readiness} onChange={e => setReadiness(+e.target.value)} /></div>
           <div><div style={LABEL}>Усталость</div><input style={IN} type="number" value={fatigue} onChange={e => setFatigue(+e.target.value)} /></div>
+          <div><div style={LABEL}>HRV-ratio</div><input style={IN} type="number" step="0.01" min="0.5" max="1.5" value={hrvRatio} onChange={e => setHrvRatio(+e.target.value)} /></div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
+          <div><div style={LABEL}>Сон (0-100)</div><input style={IN} type="number" value={sleepScore} onChange={e => setSleepScore(+e.target.value)} /></div>
           <div><div style={LABEL}>Посл. RPE</div><input style={IN} type="number" step="0.5" value={lastRPE} onChange={e => setLastRPE(+e.target.value)} /></div>
           <div><div style={LABEL}>VLoss %</div><input style={IN} type="number" value={vlPct} onChange={e => setVlPct(+e.target.value)} /></div>
         </div>
-        <div style={{ ...SMALL, marginTop: 6 }}>На входе ACWR = {tlReport.acwr.ratio} ({tlReport.acwr.zone}). Рекомендация:</div>
+        <div style={{ ...SMALL, marginTop: 6 }}>На входе: готовность {readiness}, ACWR {tlReport.acwr.ratio} ({tlReport.acwr.zone}), HRV ×{hrvRatio.toFixed(2)}</div>
+        {ar.intensityNote && <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: ar.intensityNote === 'силовая' ? 'rgba(239,68,68,0.12)' : ar.intensityNote === 'восстановительная' ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)', color: ar.intensityNote === 'силовая' ? '#ef4444' : ar.intensityNote === 'восстановительная' ? '#22c55e' : '#f59e0b', border: '1px solid rgba(255,255,255,0.06)' }}>🎯 Рекомендация: {ar.intensityNote === 'силовая' ? 'Силовая сессия (пуш)' : ar.intensityNote === 'восстановительная' ? 'Восстановительная сессия' : ar.intensityNote === 'лёгкая' ? 'Лёгкая сессия' : ar.intensityNote}</div>}
         <div style={ROW}><span>Топ-сет множитель</span><b style={{ color: ar.topSetPctMultiplier >= 1 ? ACCENT : '#f59e0b' }}>×{ar.topSetPctMultiplier}</b></div>
         <div style={ROW}><span>Объём множитель</span><b style={{ color: ar.volumeMultiplier >= 1 ? ACCENT : '#f59e0b' }}>×{ar.volumeMultiplier}</b></div>
         <div style={ROW}><span>RIR-сдвиг</span><b style={{ color: '#fff' }}>+{ar.rirShift}</b></div>

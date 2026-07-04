@@ -9,9 +9,8 @@ import { updateProfile, getProfile } from '../../core/profile-manager';
 import { SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { ALL_SUBSTANCES, ALL_INTERACTIONS, type SupportSubstance, type SupportInteraction } from '../../data/support-database';
 import { INTERACTION_ENRICHMENT } from '../../data/support-interaction-enrichment';
-import { getSubstanceTier, TIER_LABELS } from '../../data/support-database';
 import { getBpRiskLevel } from '../../core/bp-hr-data';
-import { SUPPORT_CATALOG_DATA, CATALOG_ENRICHMENT, ORGAN_LABELS as CATALOG_ORGAN_LABELS, SYSTEM_LABELS_CATALOG, CATEGORY_LABELS as CATALOG_CATEGORY_LABELS, TIER_LABELS_CATALOG, type SupportCatalogEntry } from '../../data/support-database';
+import { SUPPORT_CATALOG_DATA, CATALOG_ENRICHMENT, ORGAN_LABELS as CATALOG_ORGAN_LABELS, SYSTEM_LABELS_CATALOG, CATEGORY_LABELS as CATALOG_CATEGORY_LABELS, type SupportCatalogEntry } from '../../data/support-database';
 
 import { CANONICAL_ID_MAP } from '../../data/support-database';
 import { SUBSTANCE_ANALOGS, PHASE_MODS, DEFAULT_DOSAGES, getPhaseLevel, type SupportPhase } from '../../data/support-database';
@@ -38,7 +37,6 @@ import { getSubstanceName, type StackResult as OptimizerStackResult } from '../.
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
 import type { CourseEntry } from '../../core/types';
 import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.engine';
-import { SupportCalculator } from './SupportScreen_parts/SupportCalculator';
 import { calculateSupportTZ, hydrateState } from '../../engines/support-plan';
 import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engines/support-plan';
 import { getDrugTzMechanisms, getSupportTzDisplay, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../data/support-db';
@@ -101,6 +99,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [boostEnabled, setBoostEnabled] = useState(false);
   const [jointMode, setJointMode] = useState(false);
   const [reproMode, setReproMode] = useState(false);
+  const [neuroMode, setNeuroMode] = useState(false);
   const stateRef = useRef<CalculatorState | null>(null);
   const [myPlansRefresh, setMyPlansRefresh] = useState(0);
   const [weekChangeMsg, setWeekChangeMsg] = useState('');
@@ -374,11 +373,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     { name:'DHEA', dose: Math.round(neuroScore * 0.8 * 10) / 10, unit:'мг', timing:'Утро' },
   ], [neuroScore]);
 
-  const SUPPORT_LEVELS: Record<string, { label: string; desc: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }> }> = {
-    basic: { label: '🟢 База', desc: 'Риск 55-65%', subs: [], dosages: {} },
-    mid: { label: '🟡 Средний', desc: 'Риск 45-55%', subs: [], dosages: {} },
-    max: { label: '🟠 Максимум', desc: 'Риск 30-45%', subs: [], dosages: {} },
-    boost: { label: '🔴 Буст', desc: 'Риск 15-30%', subs: [], dosages: {} },
+  const SUPPORT_LEVELS: Record<string, { label: string; desc: string; range: [number, number]; subs: string[]; dosages: Record<string, { mg: number; timing: string }> }> = {
+    basic: { label: '🟢 База', desc: 'Риск 55–65%', range: [55, 65], subs: [], dosages: {} },
+    mid: { label: '🟡 Средний', desc: 'Риск 45–55%', range: [45, 55], subs: [], dosages: {} },
+    max: { label: '🟠 Максимум', desc: 'Риск 30–45%', range: [30, 45], subs: [], dosages: {} },
+    boost: { label: '🔴 Буст', desc: 'Риск 15–30%', range: [15, 30], subs: [], dosages: {} },
   };
 
   useEffect(() => {
@@ -462,6 +461,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       boostEnabled: boostEnabled,
       jointMode: jointMode,
       reproMode: reproMode,
+      neuroMode: neuroMode,
     };
     // ── ОДИН ВЫЗОВ ──
     const planRes = runSupportUnified(state);
@@ -491,7 +491,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       }
     }
     return { subs, dosages };
-  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, linked.course, linked.profile, courseWeekState, boostEnabled, jointMode, reproMode]);
+  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, linked.course, linked.profile, courseWeekState, boostEnabled, jointMode, reproMode, neuroMode]);
 
   const calcSupport = (overrideLevel?: 'basic' | 'mid' | 'max' | 'boost', overrideSubs?: string[]) => {
     try {
@@ -524,6 +524,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       boostEnabled: boostEnabled,
       jointMode: jointMode,
       reproMode: reproMode,
+      neuroMode: neuroMode,
     } as CalculatorState;
     stateRef.current = state;
     const tzResult: CalculatorResult = calculateSupportTZ(state);
@@ -1057,7 +1058,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const groupedSubstances = useMemo(() => {
     let filtered = catalogSubstances;
     if (supportTierFilter !== 'all') {
-      filtered = filtered.filter(s => getSubstanceTier(s.id) === supportTierFilter);
+      // tier filter removed — no longer filtering by tier
     }
     if (categoryFilter !== 'all') {
       filtered = filtered.filter(s => (s.categories||[]).some(c => c === categoryFilter));
@@ -1614,7 +1615,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         const cons: string[] = [];
         if (sub.mechanisms && sub.mechanisms.length > 0) pros.push(`${sub.mechanisms.length} механизмов`);
         if (!sub.mechanisms || sub.mechanisms.length === 0) cons.push('нет механизмов');
-        results.push({ id: sub.id, score, reason: `действует на ${target}`, pros, cons, organs: sub.organs || [], tier: getSubstanceTier(sub.id) });
+        results.push({ id: sub.id, score, reason: `действует на ${target}`, pros, cons, organs: sub.organs || [] });
       }
       return results.sort((a,b) => b.score - a.score);
     }
@@ -1631,7 +1632,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         const cons: string[] = [];
         if (sub.organs && sub.organs.length > 0) pros.push(`действует на ${sub.organs.length} органов`);
         if (!sub.organs || sub.organs.length === 0) cons.push('нет данных по органам');
-        results.push({ id: sub.id, score, reason: `механизм: ${target}`, pros, cons, organs: sub.organs || [], tier: getSubstanceTier(sub.id) });
+        results.push({ id: sub.id, score, reason: `механизм: ${target}`, pros, cons, organs: sub.organs || [] });
       }
       return results.sort((a,b) => b.score - a.score);
     }
@@ -1651,7 +1652,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         const tgtName = (sub.name||'').toLowerCase();
         if (!tgtName.includes(srcName) && !srcName.includes(tgtName)) continue;
         const score = srcName.length > 0 ? Math.round((tgtName.split(' ').filter(w => srcName.includes(w)).length / Math.max(1, srcName.split(' ').length)) * 50) : 0;
-        results.push({ id: sub.id, score, reason: 'совпадение названия', pros: [], cons: [], organs: sub.organs || [], tier: getSubstanceTier(sub.id) });
+        results.push({ id: sub.id, score, reason: 'совпадение названия', pros: [], cons: [], organs: sub.organs || [] });
         continue;
       }
       let mechOverlap = 0, orgOverlap = 0, catOverlap = 0;
@@ -1679,7 +1680,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           if (targetMechArr.includes(sm)) mechComparison.push(`✓ ${sm}`);
           else mechComparison.push(`✗ ${sm}`);
         }
-        results.push({ id: sub.id, score: Math.round(totalScore), reason: reasonParts.join('; ') || 'частичное совпадение', pros, cons, mechComparison: mechComparison.length > 0 ? mechComparison : undefined, organs: sub.organs || [], tier: getSubstanceTier(sub.id) });
+        results.push({ id: sub.id, score: Math.round(totalScore), reason: reasonParts.join('; ') || 'частичное совпадение', pros, cons, mechComparison: mechComparison.length > 0 ? mechComparison : undefined, organs: sub.organs || [] });
       }
     }
     return results.sort((a,b) => b.score - a.score);
@@ -1693,11 +1694,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     for (const sub of catalogSubstances) {
       // Category filter
       if (category && !(sub.categories||[]).some((c:string) => c.toLowerCase() === category.toLowerCase())) continue;
-      // Tier filter
-      if (tier) {
-        const subTier = getSubstanceTier(sub.id);
-        if (subTier !== tier) continue;
-      }
+      // Tier filter — removed (tier system deprecated)
       let score = 0;
       const reasons: string[] = [];
       // Check organ match
@@ -1828,12 +1825,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   if (!entry) return null;
   return (
     <div style={{ marginTop: 4 }}>
-      {entry.tier && (
+{entry.bestForCourse && (
         <div style={{ marginBottom: 3 }}>
-          <span style={{ fontSize: 8, padding: '1px 6px', borderRadius: 3, fontWeight: 700, color: TIER_LABELS_CATALOG[entry.tier]?.color || 'var(--text-dim)', background: (TIER_LABELS_CATALOG[entry.tier]?.color || 'var(--text-dim)') + '18', border: '1px solid ' + (TIER_LABELS_CATALOG[entry.tier]?.color || 'var(--text-dim)') + '40' }}>
-            {TIER_LABELS_CATALOG[entry.tier]?.emoji || ''} {TIER_LABELS_CATALOG[entry.tier]?.label || entry.tier}
-          </span>
-          {entry.bestForCourse && <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, marginLeft: 4, background: 'rgba(0,230,138,0.1)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.2)' }}>✓ На курсе</span>}
+          <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: 'rgba(0,230,138,0.1)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.2)' }}>✅ на курс</span>
         </div>
       )}
       {entry.dosage && (
@@ -2465,7 +2459,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     SYSTEM_INFO_ALL,
     SYSTEM_LABELS_CATALOG,
     SupportCalcResult,
-    SupportCalculator,
     SupportCatalogView,
     SupportFavoritesView,
     SupportGeneratorInfo,
@@ -2476,8 +2469,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     SupportProtocols,
     SupportResearch,
     SupportStacksView,
-    TIER_LABELS,
-    TIER_LABELS_CATALOG,
     TYPE_LABELS_RU,
     TZ_MECH_LABELS,
     TZ_SYSTEM_ICONS,
@@ -2576,7 +2567,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     getProfile,
     getStackDisplayName,
     getSubstanceName,
-    getSubstanceTier,
     getSupportTzDisplay,
     goBack,
     goHome,
@@ -2686,6 +2676,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     replaceTargetOrgan,
     reportGenerated,
     reproMode,
+    neuroMode,
     researchSource,
     resetMain,
     resolveProtoId,
@@ -2842,6 +2833,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     setReplaceTargetOrgan,
     setReportGenerated,
     setReproMode,
+    setNeuroMode,
     setResearchSource,
     setRiskCalcMethod,
     setRiskModel,
@@ -3147,7 +3139,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
                         <div key={sub.id}>
                           <div onClick={() => setSelectedSub(selectedSub === sub.id ? null : sub.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '7px 12px 7px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}>
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', lineHeight: 1.3 }}>{sub.name||(sub.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}{' '}<span style={{fontSize:8,padding:'0 3px',borderRadius:3,fontWeight:700,color:TIER_LABELS[getSubstanceTier(sub.id)]?.color||'var(--text-dim)',background:(TIER_LABELS[getSubstanceTier(sub.id)]?.color||'var(--text-dim)')+'18'}}>{TIER_LABELS[getSubstanceTier(sub.id)]?.label||'Стд'}</span></div>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', lineHeight: 1.3 }}>{sub.name||(sub.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
                               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 2 }}>
                                 {(sub.categories||[]).slice(0, 3).map(c => (
                                   <span key={c} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{c}</span>

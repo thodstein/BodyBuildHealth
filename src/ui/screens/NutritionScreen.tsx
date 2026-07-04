@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { FOOD_DB } from '../../core/nutrition-database';
 import { useDataLink, derivePAL } from '../../core/data-link';
-import { getRecipes } from '../../engines/nutrition-periodization.engine';
+import { getRecipes, calculateUserRecipeUsefulness } from '../../engines/nutrition-periodization.engine';
 import { calcNutrition } from '../../engines/nutrition.engine';
 import { calcNutritionV2 } from '../../engines/nutrition-v2.engine';
 import { checkMetabolicAdaptation, suggestNextPhase } from '../../engines/nutrition-periodization-v2.engine';
@@ -606,13 +606,14 @@ const RecipesTab: React.FC = () => {
                   padding:'6px 8px', borderRadius:6, marginBottom:3, position:'relative',
                   background:'rgba(167,139,250,0.03)', border:'1px solid rgba(167,139,250,0.08)',
                 }}>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                    <div>
-                      <span style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{r.name}</span>
-                      <span style={{ fontSize:8, color:'rgba(255,255,255,0.75)', marginLeft:4 }}>
-                        {r.kcal} ккал · Б{r.protein} Ж{r.fat} У{r.carbs}
-                      </span>
-                    </div>
+                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                     <div>
+                       <span style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{r.name}</span>
+                       <span style={{ fontSize:8, color:'rgba(255,255,255,0.75)', marginLeft:4 }}>
+                         {r.kcal} ккал · Б{r.protein} Ж{r.fat} У{r.carbs}
+                       </span>
+                       {(() => { const us = calculateUserRecipeUsefulness(r); const uc = us >= 7.5 ? '#22c55e' : us >= 5 ? '#f59e0b' : '#ef4444'; return <span style={{ fontSize:7, fontWeight:700, padding:'1px 4px', borderRadius:4, background:uc+'20', color:uc, border:'1px solid '+uc+'30', marginLeft:4 }} title={`Полезность: ${us}/10`}>💚{us}</span>; })()}
+                     </div>
                     <button onClick={() => deleteMyRecipe(r.id)} style={{
                       padding:'2px 6px', borderRadius:4, cursor:'pointer', fontSize:8,
                       background:'rgba(239,68,68,0.08)', border:'none', color:'#ef4444',
@@ -698,7 +699,7 @@ const RecipesTab: React.FC = () => {
                   <span style={{ color:'#60a5fa' }}>Б{r.protein}</span>
                   <span style={{ color:'#fbbf24' }}>Ж{r.fat}</span>
                   <span style={{ color:'#fb923c' }}>У{r.carbs}</span>
-                  {(() => { const qs = r.kcal > 0 ? Math.min(10, Math.round((r.protein * 4 / r.kcal) * 25)) : 0; const qc = qs >= 8 ? '#22c55e' : qs >= 5 ? '#f59e0b' : '#ef4444'; return <span style={{ fontSize:8, fontWeight:700, padding:'1px 5px', borderRadius:4, background:qc+'20', color:qc, border:'1px solid '+qc+'30' }}>⭐{qs}/10</span>; })()}
+                  {(() => { const qs = r.kcal > 0 ? Math.min(10, Math.round((r.protein * 4 / r.kcal) * 25)) : 0; const qc = qs >= 8 ? '#22c55e' : qs >= 5 ? '#f59e0b' : '#ef4444'; const us = r.usefulness ?? 0; const uc = us >= 7.5 ? '#22c55e' : us >= 5 ? '#f59e0b' : '#ef4444'; return <><span style={{ fontSize:8, fontWeight:700, padding:'1px 5px', borderRadius:4, background:qc+'20', color:qc, border:'1px solid '+qc+'30' }}>⭐{qs}/10</span><span style={{ fontSize:8, fontWeight:700, padding:'1px 5px', borderRadius:4, background:uc+'20', color:uc, border:'1px solid '+uc+'30' }} title={`Полезность: ${us}/10`}>💚{us}/10</span></>; })()}
                 </div>
               </div>
               <button onClick={() => setRecExpanded(prev => ({...prev, [i]: !prev[i]}))} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', border:'1px solid rgba(255,255,255,0.06)', background:'#18181b', color:'rgba(255,255,255,0.7)' }}>{isExpanded ? '▲' : '▼'}</button>

@@ -940,9 +940,11 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   }
 
   const riskSystems: RiskSystemId[] = ['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal'];
-  // ── Целевые уровни риска (после поддержки) ──
-  // База: нет высокого (≤50%), Средний: нет выраженного (≤35%), Максимум: нижний умеренный (≤25%), Буст: слабый (≤15%)
-  const levelTargets: Record<string, number> = { basic: 65, mid: 55, max: 45, boost: 30 };
+  // ── Целевые уровни риска (после поддержки) — плавающие пороги ──
+  // [min, max]: система активна если риск > max; цель — снизить до min
+  const levelTargets: Record<string, [number, number]> = {
+    basic: [55, 65], mid: [45, 55], max: [30, 45], boost: [15, 30],
+  };
   const maxPerSystem: Record<string, number> = { basic: 2, mid: 3, max: 4, boost: 5 };
   // Объявляем boostAdded ВНЕ if-блока — доступно для результата
   const boostAdded: string[] = [];
@@ -954,9 +956,11 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   const scoresPre = tzResultPre ? tzToScores(tzResultPre, oldScores) : oldScores;
 
   if (Object.keys(allDb).length > 0) {
-    // Целевой риск после поддержки (Усиление = -5)
-    const baseTarget = levelTargets[state.powerLevel] ?? 50;
-    const target = Math.max(5, baseTarget - (state.boostEnabled ? 5 : 0));
+    // Целевой риск после поддержки — плавающий порог [min, max]
+    const baseRange = levelTargets[state.powerLevel] ?? [40, 50];
+    const targetMax = Math.max(5, baseRange[1] - (state.boostEnabled ? 5 : 0));
+    const targetMin = Math.max(5, baseRange[0] - (state.boostEnabled ? 5 : 0));
+    const target = targetMin;
     const maxPerSys = (maxPerSystem[state.powerLevel] ?? 2) + (state.boostEnabled ? 1 : 0);
 
     // Активные системы = риск > target
@@ -970,11 +974,13 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     const phase = state.pharma?.phase || 'course';
     const skipReproductive = phase === 'course' || phase === 'bridge';
     const skipMusculoskeletal = !state.jointMode;
+    const skipNeuro = !state.neuroMode;
     const activeSystems = riskSystems.filter(sys => {
       if (skipReproductive && sys === 'reproductive') return false;
       if (skipMusculoskeletal && sys === 'musculoskeletal') return false;
+      if (skipNeuro && sys === 'neuro') return false;
       const score = scoresPre[sys] || 0;
-      if (score <= target) return false;
+      if (score <= targetMax) return false;
       const tzSys = sys === 'neuro' ? 'cns' : sys;
       const covered = sysCoverageCount[tzSys] || sysCoverageCount[sys] || 0;
       return covered < maxPerSys;
@@ -1186,6 +1192,15 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     }
   }
 
+  // ── Нейропротекция: ручная кнопка (добавляет ноотропы/нейропротекторы) ──
+  const neuroSubs: string[] = [];
+  if (state.neuroMode) {
+    const neuroIds = ['nac','alpha_lipoic','omega3','coq10','magnesium','lions_mane','theanine','tyrosine','vitamin_b6','vitamin_b12','folate','ashwagandha','bromantan','fasoracetam','lions_mane','huperzine','semax','cerebrolysin'];
+    for (const nid of neuroIds) {
+      if (!used.has(nid)) { neuroSubs.push(nid); used.add(nid); }
+    }
+  }
+
   // Риск выбранной недели (для отображения — пик = для подбора)
   const cw = state.courseWeek ?? 1;
   let selectedWeekRaw: number | undefined;
@@ -1206,19 +1221,23 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   }
   const _phase = state.pharma?.phase || 'course';
   const _skipRepro = _phase === 'course' || _phase === 'bridge';
-  const _skipMusculo = !state.jointMode;
-  const _target = Math.max(5, (levelTargets[state.powerLevel] ?? 50) - (state.boostEnabled ? 5 : 0));
-  const activeSystemsList = riskSystems.filter(sys => {
-    if (_skipRepro && sys === 'reproductive') return false;
-    if (_skipMusculo && sys === 'musculoskeletal') return false;
-    return (scoresPre[sys] || 0) > _target;
-  });
+const _skipMusculo = !state.jointMode;
+    const _skipNeuro = !state.neuroMode;
+    const _range = levelTargets[state.powerLevel] ?? [40, 50];
+    const _targetMax = Math.max(5, _range[1] - (state.boostEnabled ? 5 : 0));
+    const activeSystemsList = riskSystems.filter(sys => {
+      if (_skipRepro && sys === 'reproductive') return false;
+      if (_skipMusculo && sys === 'musculoskeletal') return false;
+      if (_skipNeuro && sys === 'neuro') return false;
+      return (scoresPre[sys] || 0) > _targetMax;
+    });
   const synergyRecs = generateSynergyRecommendations(substances.slice(), activeSystemsList, allDb, planSystemCoverage);
 
   const result: CalculatorResult = {
     risk: { systems: [], overallRaw, overallAfterSupport, timestamp: new Date().toISOString() },
     schedule, selectedSubstances: substances,
     jointSubs: jointSubs.length > 0 ? jointSubs : undefined,
+    neuroSubs: neuroSubs.length > 0 ? neuroSubs : undefined,
     synergyIdsUsed: synergyIds,
     titrationApplied: titration,
     labDeltas, overallRiskBefore: overallRaw, overallRiskAfter: overallAfterSupport,

@@ -212,6 +212,7 @@ export interface CalculatorState {
   boostEnabled?: boolean;
   jointMode?: boolean;
   reproMode?: boolean;
+  neuroMode?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -235,6 +236,7 @@ export interface CalculatorResult {
   schedule: ScheduleItem[];
   selectedSubstances: string[];
   jointSubs?: string[];
+  neuroSubs?: string[];
   synergyIdsUsed: SynergyId[];
   titrationApplied: Record<string, number>;
   labDeltas: LabDelta[];

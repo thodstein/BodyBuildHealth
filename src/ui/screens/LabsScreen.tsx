@@ -9,7 +9,7 @@ import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-
 import { getDrugsToNormalizeMarker, getMarkerName } from '../../data/support-lab-effects';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { LabsScoreCard } from '../components/LabsScoreCard';
-import { LabsTzRiskTab } from './LabsScreen_parts/LabsTzRiskTab';
+// import { LabsTzRiskTab } from './LabsScreen_parts/LabsTzRiskTab'; // удалено — T4 маркеры интегрированы в фазы
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
 import { db } from '../../core/db';
@@ -20,6 +20,7 @@ import { LabsOverview } from './LabsScreen_parts/LabsOverview';
 import ExtendedLabsTab from './LabsScreen_parts/ExtendedLabsTab';
 import { processUploadedFile, saveParsedLabs, type ParsedLabValue, type OCRResult } from '../../core/ocr-engine';
 import { getProfile, updateProfile } from '../../core/profile-manager';
+import { PopupNumber, PopupBool, PopupSelect } from '../components/PopupXxx';
 
 const NO_LABS_KEY = 'he_force_no_labs';
 const NO_LABS_SYSTEMS_KEY = 'he_no_labs_systems';
@@ -43,13 +44,11 @@ const PHASE_LABELS: Record<string, string> = {
   bridge: 'Мост',
   pct: 'ПКТ',
   post_pct: 'После ПКТ',
-  course_bridge_course: 'Курс+Мост',
 };
 
 const PROFILE_PHASE_TO_LABS_PHASE: Record<string, string> = {
   baseline: 'baseline',
   course: 'on_cycle',
-  'course-bridge-course': 'course_bridge_course',
   bridge: 'bridge',
   pct: 'pct',
   post_pct: 'post_pct',
@@ -144,10 +143,9 @@ const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
   { id: 'schedule', label: 'График сдачи', icon: '📅' },
   { id: 'reports', label: 'Отчёты', icon: '📄' },
   { id: 'extended', label: 'Все маркеры', icon: '🔬' },
-  { id: 'tz_risks', label: 'Риски (ТЗ)', icon: '🧮' },
 ];
 
-type LabSubTab = 'hero' | 'overview' | 'current' | 'archive' | 'catalog' | 'chart' | 'schedule' | 'reports' | 'extended' | 'tz_risks';
+type LabSubTab = 'hero' | 'overview' | 'current' | 'archive' | 'catalog' | 'chart' | 'schedule' | 'reports' | 'extended';
 
 export const LabsScreen: React.FC = () => {
   const linked = useDataLink();
@@ -190,6 +188,30 @@ export const LabsScreen: React.FC = () => {
     try { return JSON.parse(localStorage.getItem('he_lab_reports') || '[]'); } catch { return []; }
   });
 
+  const [fertSperm, setFertSperm] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('he_fert_sperm_' + selectedPhase) || '{}'); } catch { return {}; }
+  });
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('he_fert_sperm_' + selectedPhase);
+      if (saved) setFertSperm(JSON.parse(saved));
+    } catch {}
+  }, [selectedPhase]);
+  const updateFert = useCallback((key: string, value: string) => {
+    setFertSperm(prev => {
+      const next = { ...prev, [key]: value };
+      localStorage.setItem('he_fert_sperm_' + selectedPhase, JSON.stringify(next));
+      return next;
+    });
+  }, [selectedPhase]);
+  const updateFertBool = useCallback((key: string, value: boolean) => {
+    setFertSperm(prev => {
+      const next = { ...prev, [key]: value ? '1' : '0' };
+      localStorage.setItem('he_fert_sperm_' + selectedPhase, JSON.stringify(next));
+      return next;
+    });
+  }, [selectedPhase]);
+
   const uid = () => { try { return crypto.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`; } catch { return `${Date.now()}_${Math.random().toString(36).slice(2)}`; } };
 
   const labs: LabPoint[] = linked.labs || [];
@@ -201,7 +223,7 @@ export const LabsScreen: React.FC = () => {
     setSelectedPhase(phase);
     try {
       const p = getProfile();
-      p.settings.phase = phase === 'on_cycle' ? 'course' : phase === 'course_bridge_course' ? 'course-bridge-course' : phase;
+      p.settings.phase = phase === 'on_cycle' ? 'course' : phase;
       updateProfile(p);
       notifyDataChange();
     } catch {}
@@ -767,6 +789,73 @@ export const LabsScreen: React.FC = () => {
             </div>
           )}
 
+          {/* ─── Расширенная спермограмма (ПКТ / после ПКТ / базовый) ─── */}
+          {['baseline','pct','post_pct'].includes(selectedPhase) && (
+            <div style={{ marginTop: 10 }}>
+              <div className="card" style={{ marginBottom: 10, padding: 10 }}>
+                <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#ec4899' }}>🧬 Фертильность — расширенная спермограмма</h4>
+                <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:6 }}>
+                  Фаза: <b>{PHASE_LABELS[selectedPhase] || selectedPhase}</b>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                  <PopupNumber label="Объём (мл)" value={parseFloat(fertSperm.vol||'')||0} min={0} max={15} step={0.1} suffix="мл" onChange={v => updateFert('vol', String(v))} />
+                  <PopupNumber label="Концентрация (млн/мл)" value={parseFloat(fertSperm.conc||'')||0} min={0} max={500} step={0.1} suffix="млн/мл" onChange={v => updateFert('conc', String(v))} />
+                  <PopupNumber label="Общее кол-во (млн)" value={parseFloat(fertSperm.total||'')||0} min={0} max={1500} step={1} suffix="млн" onChange={v => updateFert('total', String(v))} />
+                  <PopupNumber label="PR (активно-подв.) %" value={parseFloat(fertSperm.pr||'')||0} min={0} max={100} step={1} suffix="%" onChange={v => updateFert('pr', String(v))} />
+                  <PopupNumber label="NP (непрогрессивно) %" value={parseFloat(fertSperm.np||'')||0} min={0} max={100} step={1} suffix="%" onChange={v => updateFert('np', String(v))} />
+                  <PopupNumber label="Неподвижные %" value={parseFloat(fertSperm.imm||'')||0} min={0} max={100} step={1} suffix="%" onChange={v => updateFert('imm', String(v))} />
+                  <PopupNumber label="Морфология (норма) %" value={parseFloat(fertSperm.morph||'')||0} min={0} max={100} step={1} suffix="%" onChange={v => updateFert('morph', String(v))} />
+                  <PopupNumber label="Жизнеспособность %" value={parseFloat(fertSperm.viab||'')||0} min={0} max={100} step={1} suffix="%" onChange={v => updateFert('viab', String(v))} />
+                  <PopupNumber label="pH" value={parseFloat(fertSperm.ph||'7.4')} min={6} max={9} step={0.1} onChange={v => updateFert('ph', String(v))} />
+                  <PopupNumber label="MAR-тест (% MAR+)" value={parseFloat(fertSperm.mar||'')||0} min={0} max={100} step={1} suffix="%" onChange={v => updateFert('mar', String(v))} />
+                  <PopupNumber label="Лейкоциты (млн/мл)" value={parseFloat(fertSperm.leuk||'')||0} min={0} max={20} step={0.1} suffix="млн/мл" onChange={v => updateFert('leuk', String(v))} />
+                  <PopupNumber label="Фруктоза (мкмоль/эяк)" value={parseFloat(fertSperm.fruc||'')||0} min={0} max={100} step={1} suffix="мкмоль" onChange={v => updateFert('fruc', String(v))} />
+                  <PopupNumber label="Цинк (ммоль/эяк)" value={parseFloat(fertSperm.zinc||'')||0} min={0} max={20} step={0.1} suffix="ммоль" onChange={v => updateFert('zinc', String(v))} />
+                  <PopupNumber label="DFI (фрагм. ДНК) %" value={parseFloat(fertSperm.dfi||'')||0} min={0} max={100} step={1} suffix="%" onChange={v => updateFert('dfi', String(v))} />
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginTop:8 }}>
+                  <PopupBool label={fertSperm.visc==='1'?'Вязкость: повышена':'Вязкость: норма'} value={fertSperm.visc==='1'} onChange={v => updateFertBool('visc', v)} />
+                  <PopupBool label={fertSperm.aggl==='1'?'Агглютинация: есть':'Агглютинация: нет'} value={fertSperm.aggl==='1'} onChange={v => updateFertBool('aggl', v)} />
+                  <PopupSelect label="Варикоцеле" value={fertSperm.var||'none'} options={[
+                    { id:'none', label:'Нет' }, { id:'grade1', label:'1 степень' },
+                    { id:'grade2', label:'2 степень' }, { id:'grade3', label:'3 степень' },
+                  ]} onChange={v => updateFert('var', v)} />
+                </div>
+              </div>
+
+              <div className="card" style={{ marginBottom: 10, padding: 10 }}>
+                <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#8b5cf6' }}>🧬 Ингибин B и гормональный профиль</h4>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                  <PopupNumber label="Ингибин B (pg/mL)" value={parseFloat(fertSperm.inhb||'')||0} min={0} max={500} step={1} suffix="pg/mL" onChange={v => updateFert('inhb', String(v))} />
+                  <PopupNumber label="АМГ (ng/mL)" value={parseFloat(fertSperm.amh||'')||0} min={0} max={20} step={0.1} suffix="ng/mL" onChange={v => updateFert('amh', String(v))} />
+                  <PopupNumber label="ЛГ (mIU/mL)" value={parseFloat(fertSperm.lh||'')||0} min={0} max={50} step={0.1} suffix="mIU/mL" onChange={v => updateFert('lh', String(v))} />
+                  <PopupNumber label="ФСГ (mIU/mL)" value={parseFloat(fertSperm.fsh||'')||0} min={0} max={50} step={0.1} suffix="mIU/mL" onChange={v => updateFert('fsh', String(v))} />
+                  <PopupNumber label="ТТ (ng/dL)" value={parseFloat(fertSperm.tt||'')||0} min={0} max={2000} step={1} suffix="ng/dL" onChange={v => updateFert('tt', String(v))} />
+                  <PopupNumber label="FT (pg/mL)" value={parseFloat(fertSperm.ft||'')||0} min={0} max={100} step={0.1} suffix="pg/mL" onChange={v => updateFert('ft', String(v))} />
+                  <PopupNumber label="E2 (pg/mL)" value={parseFloat(fertSperm.e2||'')||0} min={0} max={200} step={1} suffix="pg/mL" onChange={v => updateFert('e2', String(v))} />
+                  <PopupNumber label="Пролактин (ng/mL)" value={parseFloat(fertSperm.prl||'')||0} min={0} max={100} step={0.1} suffix="ng/mL" onChange={v => updateFert('prl', String(v))} />
+                  <PopupNumber label="SHBG (nmol/L)" value={parseFloat(fertSperm.shbg||'')||0} min={0} max={100} step={1} suffix="nmol/L" onChange={v => updateFert('shbg', String(v))} />
+                </div>
+              </div>
+
+              <div className="card" style={{ marginBottom: 10, padding: 10 }}>
+                <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#22c55e' }}>📋 Нормы ВОЗ 2021</h4>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'3px 12px', fontSize:9, color:'var(--text-dim)' }}>
+                  <span>Объём эякулята</span><span style={{ fontWeight:600, color:'#22c55e' }}>≥1.4 мл</span>
+                  <span>Концентрация</span><span style={{ fontWeight:600, color:'#22c55e' }}>≥16 млн/мл</span>
+                  <span>Подвижность (PR+NP)</span><span style={{ fontWeight:600, color:'#22c55e' }}>≥42%</span>
+                  <span>Прогрессивная (PR)</span><span style={{ fontWeight:600, color:'#22c55e' }}>≥30%</span>
+                  <span>Морфология (Крюгер)</span><span style={{ fontWeight:600, color:'#22c55e' }}>≥4%</span>
+                  <span>MAR-тест</span><span style={{ fontWeight:600, color:'#f59e0b' }}>{'<'}50% (норма), {'<'}10% (идеал)</span>
+                  <span>Лейкоциты</span><span style={{ fontWeight:600, color:'#22c55e' }}>{'<'}1 млн/мл</span>
+                  <span>DFI</span><span style={{ fontWeight:600, color:'#f59e0b' }}>{'<'}30% (идеал {'<'}15%)</span>
+                  <span>Ингибин B</span><span style={{ fontWeight:600, color:'#22c55e' }}>{'>'}80 pg/mL</span>
+                  <span>pH</span><span style={{ fontWeight:600, color:'#22c55e' }}>7.2-8.0</span>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 
@@ -1128,12 +1217,11 @@ export const LabsScreen: React.FC = () => {
             <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8, lineHeight:1.5 }}>
               {(() => {
                 const phases: Record<string,string> = {
-                  baseline:'Перед началом курса — полный базовый скрининг (45 маркеров)',
-                  on_cycle:'Каждые 4 недели на курсе — контроль печени, липидов, гормонов (32 маркера)',
-                  bridge:'Между курсами — восстановительный мониторинг (17 маркеров)',
-                  pct:'Послекурсовая терапия — контроль восстановления оси HPG (19 маркеров)',
-                  post_pct:'Через 4-6 недель после ПКТ — финальная проверка (24 маркера)',
-                  course_bridge_course:'Между курсами — расширенный контроль (20 маркеров)',
+                  baseline:'Перед началом курса — полный базовый скрининг (49 маркеров)',
+                  on_cycle:'Каждые 4 недели на курсе — контроль печени, липидов, гормонов (35 маркеров)',
+                  bridge:'Между курсами — восстановительный мониторинг (30 маркеров)',
+                  pct:'Послекурсовая терапия — контроль восстановления оси HPG (29 маркеров)',
+                  post_pct:'Через 4-6 недель после ПКТ — финальная проверка (32 маркера)',
                 };
                 return phases[selectedPhase] || 'Следуйте рекомендованному графику';
               })()}
@@ -1247,10 +1335,6 @@ export const LabsScreen: React.FC = () => {
         />
       )}
 
-      {/* ≡≡≡ TZ RISKS TAB ≡≡≡ */}
-      {mainTab === 'lab' && subTab === 'tz_risks' && (
-        <LabsTzRiskTab />
-      )}
 
       {/* ≡≡≡ INVESTIGATIONS TAB ≡≡≡ */}
       {mainTab === 'investigations' && (

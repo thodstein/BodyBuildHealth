@@ -146,21 +146,6 @@
 ✅ `vite build` — OK (21.79s)
 ✅ UTF-8 noBOM — все 7 файлов OK
 
-### Скорректированный ПЛАН (оставшиеся задачи)
-
-| № | Задача | Статус | Описание |
-|---|--------|--------|----------|
-| BUG 11 | убрать «план по времени» из UI | ❌ | timedPlan/generateTimedPlan — удалить из рендера |
-| BUG 20 | переименовать «Заключение для врача» → «Отчёт» | ❌ | В SupportScreen.tsx |
-| BUG 17 | убрать матрицу покрытия | ❌ | coverageMatrix — удалить из UI |
-| BUG 19 | удалить историю и динамику доз | ❌ | planHistory/riskDynamics — убрать из UI |
-| BUG 12 | расписать синергию стека | ❌ | synergyComment — наполнить реальным текстом |
-| BUG 15-16 | починить дублирование карточек рисков + несоответствие по системам | ❌ | Проверить что riskCard показывает те же цифры что effectiveLevel |
-| BUG 21 | починить зависание фарма каталога | ❌ | PharmaScreen/catalog — investigate hang |
-| BUG 2 | проверить описания стеков | ❌ | support-synergy-stacks.ts |
-| BUG 22-23 | визуальная проверка всех изменений | ❌ | Глазами в dev |
-| Manual | recommended stacks на уровни 100/100 и ниже | ❌ | В ручном режиме |
-
 ## Session Summary (Jun 27 — Part 4) — ONE calculator tab + RISK ENGINE TZ
 ### Done
 

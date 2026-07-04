@@ -11,6 +11,7 @@ import {
 import { GlassCard, PillBtn, inputStyle, selectStyle, greenBtn } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
 import { PopupNumber, PopupSelect, PopupText } from '../../../components/PopupXxx';
+import { getRecipes, type Recipe } from '../../../../engines/nutrition-periodization.engine';
 
 export const IndividualPlanSettings: React.FC = () => {
   const {
@@ -75,6 +76,7 @@ export const IndividualPlanSettings: React.FC = () => {
     v2Phase, setV2Phase, v2Labs, setV2Labs, v2Pharma, setV2Pharma,
     histamineSensitive, setHistamineSensitive,
     dietPrefs, setDietPrefs,
+    userRecipes,
   } = usePlanCtx();
 
   const [showSpecialMealModal, setShowSpecialMealModal] = useState(false);
@@ -1133,15 +1135,25 @@ export const IndividualPlanSettings: React.FC = () => {
             }}>+ Редактировать</button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-            {preferredFoods.slice(0, 10).map((pf) => {
-              const food = FOOD_DB.find(f => f.id === pf);
-              return food ? (
-                <span key={pf} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a', display: 'flex', alignItems: 'center', gap: 3 }}>
-                  {food.name}
-                  <span onClick={() => { const upd = preferredFoods.filter(p => p !== pf); setPreferredFoods(upd); localStorage.setItem('he_preferred_foods', JSON.stringify(upd)); }} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: 7 }}>✕</span>
-                </span>
-              ) : null;
-            })}
+            {(() => {
+              const allRecipes = [...getRecipes(), ...(userRecipes||[])] as Recipe[];
+              const findName = (id: string): string | null => {
+                const food = FOOD_DB.find(f => f.id === id);
+                if (food) return food.name;
+                if (id.startsWith('__recipe__')) { const r = allRecipes.find(r => '__recipe__' + r.name === id); if (r) return '🍳 ' + r.name; }
+                if (id.startsWith('__user_recipe__')) { const r = allRecipes.find(r => '__user_recipe__' + r.name === id); if (r) return '👨‍🍳 ' + r.name; }
+                return null;
+              };
+              return preferredFoods.slice(0, 10).map(pf => {
+                const name = findName(pf);
+                return name ? (
+                  <span key={pf} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a', display: 'flex', alignItems: 'center', gap: 3 }}>
+                    {name}
+                    <span onClick={() => { const upd = preferredFoods.filter(p => p !== pf); setPreferredFoods(upd); localStorage.setItem('he_preferred_foods', JSON.stringify(upd)); }} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: 7 }}>✕</span>
+                  </span>
+                ) : null;
+              });
+            })()}
             {preferredFoods.length === 0 && <span style={{ fontSize:7, color:'rgba(255,255,255,0.75)' }}>Не выбраны</span>}
           </div>
         </div>
@@ -1154,15 +1166,25 @@ export const IndividualPlanSettings: React.FC = () => {
             }}>+ Редактировать</button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-            {excludedFoods.map((ef) => {
-              const food = FOOD_DB.find(f => f.id === ef);
-              return food ? (
-                <span key={ef} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3 }}>
-                  {food.name}
-                  <span onClick={() => { const upd = excludedFoods.filter(p => p !== ef); setExcludedFoods(upd); localStorage.setItem('he_excluded_foods', JSON.stringify(upd)); }} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: 7 }}>✕</span>
-                </span>
-              ) : null;
-            })}
+            {(() => {
+              const allRecipes = [...getRecipes(), ...(userRecipes||[])] as Recipe[];
+              const findName = (id: string): string | null => {
+                const food = FOOD_DB.find(f => f.id === id);
+                if (food) return food.name;
+                if (id.startsWith('__recipe__')) { const r = allRecipes.find(r => '__recipe__' + r.name === id); if (r) return '🍳 ' + r.name; }
+                if (id.startsWith('__user_recipe__')) { const r = allRecipes.find(r => '__user_recipe__' + r.name === id); if (r) return '👨‍🍳 ' + r.name; }
+                return null;
+              };
+              return excludedFoods.map(ef => {
+                const name = findName(ef);
+                return name ? (
+                  <span key={ef} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3 }}>
+                    {name}
+                    <span onClick={() => { const upd = excludedFoods.filter(p => p !== ef); setExcludedFoods(upd); localStorage.setItem('he_excluded_foods', JSON.stringify(upd)); }} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: 7 }}>✕</span>
+                  </span>
+                ) : null;
+              });
+            })()}
             {excludedFoods.length === 0 && <span style={{ fontSize:7, color:'rgba(255,255,255,0.75)' }}>Не выбраны</span>}
           </div>
           {dietPrefs.length > 0 && (
@@ -1205,15 +1227,41 @@ export const IndividualPlanSettings: React.FC = () => {
         <PopupText label="📝 Заметки по питанию" value={customNotes} onChange={v => { setCustomNotes(v); localStorage.setItem('he_nutrition_notes', v); }} placeholder="Например: не ем после 20:00, аллергия на пенициллин, проблемы с ЖКТ..." />
       </GlassCard>
 
+      {(() => {
+        const allRecipes = [...getRecipes(), ...(userRecipes||[])] as Recipe[];
+        const prefRecipeRows = (setFn: (v: string[]) => void, current: string[], lsKey: string, search: string) =>
+          allRecipes.filter(r => !search || r.name.toLowerCase().includes(search.toLowerCase())).map(r => {
+            const rid = '__recipe__' + r.name;
+            const urid = '__user_recipe__' + r.name;
+            const sel = current.includes(rid) || current.includes(urid);
+            return (
+              <div key={rid} onClick={() => {
+                const id = r.name.startsWith('user_') ? urid : rid;
+                const upd = sel ? current.filter(x => x !== id) : [...current, id];
+                setFn(upd); localStorage.setItem(lsKey, JSON.stringify(upd));
+              }} style={{
+                padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9,
+                background: sel ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.02)',
+                border: sel ? '1px solid rgba(139,92,246,0.3)' : '1px solid transparent',
+                color: sel ? '#a78bfa' : 'rgba(255,255,255,0.7)',
+                display:'flex', alignItems:'center', gap:6,
+              }}>
+                <span style={{ fontSize:8, minWidth:12 }}>{sel ? '✓' : '○'}</span>
+                <span>🍳 {r.name}</span>
+                <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)', marginLeft:'auto' }}>{r.kcal} ккал</span>
+              </div>
+            );
+          });
+        return <>
       {/* Preferred foods modal */}
       {showPrefFoodModal && (
         <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
           onClick={() => setShowPrefFoodModal(false)}>
           <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:400, maxHeight:'85vh', padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(0,230,138,0.12)', overflowY:'auto' }}>
-            <div style={{ fontSize:14, fontWeight:700, color:'#00e68a', marginBottom:8, textAlign:'center' }}>🌟 Любимые продукты</div>
-            <input value={prefSearch} onChange={e => setPrefSearch(e.target.value)} placeholder="Поиск продуктов..." style={{ ...inputStyle, marginBottom:8, fontSize:11, padding:'8px 10px', boxSizing:'border-box', width:'100%' }} />
+            <div style={{ fontSize:14, fontWeight:700, color:'#00e68a', marginBottom:8, textAlign:'center' }}>🌟 Любимые продукты и рецепты</div>
+            <input value={prefSearch} onChange={e => setPrefSearch(e.target.value)} placeholder="Поиск продуктов и рецептов..." style={{ ...inputStyle, marginBottom:8, fontSize:11, padding:'8px 10px', boxSizing:'border-box', width:'100%' }} />
             <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'50vh', overflowY:'auto' }}>
-              {FOOD_DB.filter(f => !prefSearch || (f.name||'').toLowerCase().includes(prefSearch.toLowerCase()) || (f.id||'').toLowerCase().includes(prefSearch.toLowerCase())).slice(0,100).map(f => {
+              {FOOD_DB.filter(f => !prefSearch || (f.name||'').toLowerCase().includes(prefSearch.toLowerCase()) || (f.id||'').toLowerCase().includes(prefSearch.toLowerCase())).slice(0,60).map(f => {
                 const sel = preferredFoods.includes(f.id);
                 return (
                   <div key={f.id} onClick={() => {
@@ -1231,6 +1279,8 @@ export const IndividualPlanSettings: React.FC = () => {
                   </div>
                 );
               })}
+              {allRecipes.length > 0 && !prefSearch && <div style={{ fontSize:10, fontWeight:700, color:'#a78bfa', padding:'6px 0 2px', borderTop:'1px solid rgba(139,92,246,0.15)', marginTop:4 }}>🍳 Рецепты</div>}
+              {prefRecipeRows(setPreferredFoods, preferredFoods, 'he_preferred_foods', prefSearch)}
             </div>
             <button onClick={() => setShowPrefFoodModal(false)} style={{ width:'100%', marginTop:8, padding:'8px', borderRadius:8, border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:600 }}>✓ Готово ({preferredFoods.length})</button>
           </div>
@@ -1242,10 +1292,10 @@ export const IndividualPlanSettings: React.FC = () => {
         <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
           onClick={() => setShowExclFoodModal(false)}>
           <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:400, maxHeight:'85vh', padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(239,68,68,0.12)', overflowY:'auto' }}>
-            <div style={{ fontSize:14, fontWeight:700, color:'#ef4444', marginBottom:8, textAlign:'center' }}>🚫 Исключённые продукты</div>
-            <input value={exclSearch} onChange={e => setExclSearch(e.target.value)} placeholder="Поиск продуктов..." style={{ ...inputStyle, marginBottom:8, fontSize:11, padding:'8px 10px', boxSizing:'border-box', width:'100%' }} />
+            <div style={{ fontSize:14, fontWeight:700, color:'#ef4444', marginBottom:8, textAlign:'center' }}>🚫 Исключённые продукты и рецепты</div>
+            <input value={exclSearch} onChange={e => setExclSearch(e.target.value)} placeholder="Поиск продуктов и рецептов..." style={{ ...inputStyle, marginBottom:8, fontSize:11, padding:'8px 10px', boxSizing:'border-box', width:'100%' }} />
             <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'50vh', overflowY:'auto' }}>
-              {FOOD_DB.filter(f => !exclSearch || (f.name||'').toLowerCase().includes(exclSearch.toLowerCase()) || (f.id||'').toLowerCase().includes(exclSearch.toLowerCase())).slice(0,100).map(f => {
+              {FOOD_DB.filter(f => !exclSearch || (f.name||'').toLowerCase().includes(exclSearch.toLowerCase()) || (f.id||'').toLowerCase().includes(exclSearch.toLowerCase())).slice(0,60).map(f => {
                 const sel = excludedFoods.includes(f.id);
                 return (
                   <div key={f.id} onClick={() => {
@@ -1263,11 +1313,15 @@ export const IndividualPlanSettings: React.FC = () => {
                   </div>
                 );
               })}
+              {allRecipes.length > 0 && !exclSearch && <div style={{ fontSize:10, fontWeight:700, color:'#a78bfa', padding:'6px 0 2px', borderTop:'1px solid rgba(139,92,246,0.15)', marginTop:4 }}>🍳 Рецепты</div>}
+              {prefRecipeRows(setExcludedFoods, excludedFoods, 'he_excluded_foods', exclSearch)}
             </div>
             <button onClick={() => setShowExclFoodModal(false)} style={{ width:'100%', marginTop:8, padding:'8px', borderRadius:8, border:'1px solid rgba(239,68,68,0.2)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontSize:10, fontWeight:600 }}>✓ Готово ({excludedFoods.length})</button>
           </div>
         </div>
       )}
+      </>;
+      })()}
 
       <GlassCard title="Циклирование" icon="🔄" color="#3b82f6">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>

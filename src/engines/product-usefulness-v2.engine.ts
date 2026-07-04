@@ -160,9 +160,11 @@ function applyPhaseModifiers(score: number, f: FoodItem, p: UserDietProfile): { 
   const potassium = f.electrolytes_100g?.potassium_mg ?? 200;
   const cholesterol = f.macro_100g?.cholesterol_mg ?? 0;
 
+  const totalProtein = animalP + plantP;
+
   switch (p.phase) {
     case 'EXTREME_CUT':
-      score -= cals / 40 + insulinIdx / 25;
+      score -= Math.max(0, (totalProtein > 0 ? cals / totalProtein - 8 : 15) / 3) + insulinIdx / 30;
       if (fodmap === 'HIGH') { score -= 2.5; ff.push({ text: 'HIGH FODMAP на сушке', impact: -2.5, icon: '⚠️' }); }
       if (fiber > 4) { score += 1.5; ff.push({ text: 'Клетчатка >4г на сушке', impact: 1.5, icon: '✅' }); }
       if (sugar > 5) { score -= 3.0; ff.push({ text: 'Сахар >5г на сушке', impact: -3.0, icon: '🚨' }); }
@@ -170,8 +172,8 @@ function applyPhaseModifiers(score: number, f: FoodItem, p: UserDietProfile): { 
       if (f.metabolic_flags?.insulin_sensitivity_impact === 'NEGATIVE') { score -= 2.0; ff.push({ text: 'Инсулин-сенс NEG на сушке', impact: -2.0, icon: '⚠️' }); }
       break;
     case 'PEAK_WEEK':
-      if (f.category === 'veg_fruit') { score = 1.5; ff.push({ text: 'Овощи/фрукты запрещены на пике', impact: -8.5, icon: '🚨' }); }
-      else if (f.category === 'grain' && fodmap === 'LOW') { score = 9.5; ff.push({ text: 'Крупы LOW FODMAP — идеал загрузки', impact: 4.5, icon: '✅' }); }
+      if (f.category === 'veg_fruit') { score -= 5.0; ff.push({ text: 'Овощи/фрукты ограничены на пике', impact: -5.0, icon: '🚨' }); }
+      else if (f.category === 'grain' && fodmap === 'LOW') { score += 2.0; ff.push({ text: 'Крупы LOW FODMAP — идеал загрузки', impact: 2.0, icon: '✅' }); }
       if (sodium > 120 && p.pharma.DIURETICS) { score -= 5.0; ff.push({ text: 'Na >120мг + диуретики', impact: -5.0, icon: '🚨' }); }
       if (potassium < 100) { score -= 2.0; ff.push({ text: 'K <100мг на пике', impact: -2.0, icon: '⚠️' }); }
       if ((f.trace_elements_100g?.iodine_mcg ?? 0) > 50 || f.metabolic_flags?.thyroid_support_level === 'HIGH') { score += 0.5; ff.push({ text: 'Поддержка щитовидки', impact: 0.5, icon: '✅' }); }
@@ -185,7 +187,7 @@ function applyPhaseModifiers(score: number, f: FoodItem, p: UserDietProfile): { 
       break;
     case 'POST_CYCLE':
     case 'MOST':
-      score = 7.0 + (animalP > 15 ? 1.0 : 0);
+      score += (animalP > 15 ? 1.0 : -1.0);
       if (cholesterol >= 50 && cholesterol <= 150) { score += 2.0; ff.push({ text: 'Холестерин 50-150 — субстрат тестостерона', impact: 2.0, icon: '✅' }); }
       if (f.metabolic_flags?.detox_support_level === 'HIGH') { score += 1.0; ff.push({ text: 'Детокс-поддержка', impact: 1.0, icon: '✅' }); }
       if (f.metabolic_flags?.cns_impact === 'STIMULANT') { score -= 1.0; ff.push({ text: 'Стимуляция ЦНС на ПКТ', impact: -1.0, icon: '⚠️' }); }

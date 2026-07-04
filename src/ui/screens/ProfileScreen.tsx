@@ -105,7 +105,7 @@ const CHRONOTYPES = [
 
 const COURSE_PHASES = [
   { id: 'baseline', label: 'База' }, { id: 'course', label: 'Курс' },
-  { id: 'course-bridge-course', label: 'Курс+Бридж' }, { id: 'bridge', label: 'Бридж' },
+  { id: 'bridge', label: 'Бридж' },
   { id: 'pct', label: 'ПКТ' }, { id: 'post_pct', label: 'После ПКТ' }, { id: 'fertility', label: 'Фертильность' },
 ] as const;
 
@@ -1893,7 +1893,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                       <div style={diaryIconWrap}>🏋️</div>
                       <div style={diaryCardTitle}>Тренировки</div>
                     </button>
-                    {(settings.phase === 'course' || settings.phase === 'course-bridge-course') && (
+                    {settings.phase === 'course' && (
                       <button onClick={() => onNavigate?.('pharma')} style={{ ...diaryCardBase, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.15)' }}>
                         <div style={diaryIconWrap}>💉</div>
                         <div style={diaryCardTitle}>Фарма</div>

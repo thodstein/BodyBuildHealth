@@ -103,7 +103,8 @@ export interface FoodItem {
 /** Вычисляет BB Quality Score из макросов продукта (без привязки к профилю) */
 export function calcBBQualityScore(f: FoodItem): number {
   let score = 5.0;
-  if (f.protein > 20) score += 1.0;
+  const totalProtein = (f.macro_100g?.proteins_animal ?? 0) + (f.macro_100g?.proteins_plant ?? 0);
+  if (totalProtein > 20) score += 1.0;
   const o3 = f.macro_100g?.omega_3_mg ?? f.micros?.Omega3 ?? 0;
   if (o3 > 300) score += 1.0;
   const satFat = f.macro_100g?.fats_saturated ?? 0;
@@ -868,6 +869,7 @@ export const FOOD_DB: FoodItem[] = [
   {"id":"cornmeal","name":"Кукурузная каша (мамалыга)","category":"grain","kcal":96,"protein":2,"fat":1,"carbs":20,"fiber":2.5,"gi":68,"servingSize":"150 г","micros":{"Fe":0.5,"Mg":15,"P":30,"K":80,"VitB3":1}},
   {"id":"pancakes","name":"Блины (2 шт)","category":"grain","kcal":230,"protein":8,"fat":7,"carbs":34,"fiber":1,"gi":65,"servingSize":"100 г","micros":{"Ca":80,"Fe":0.8,"P":100,"VitB1":0.1}},
   {"id":"rice_cakes","name":"Рисовые хлебцы","category":"grain","kcal":375,"protein":7,"fat":3,"carbs":80,"fiber":2,"gi":82,"servingSize":"2 шт (20 г)","micros":{"Fe":0.5,"Mg":12,"P":40}},
+  {"id":"rice_cream","name":"Рисовый крем (сухой завтрак)","category":"grain","kcal":362,"protein":7,"fat":1.5,"carbs":80,"fiber":0.5,"gi":82,"servingSize":"50 г (сух)","micros":{"Ca":10,"Fe":0.3,"Mg":8,"P":30,"VitB1":0.1,"VitB3":1.5}},
   {"id":"potato_mashed","name":"Картофельное пюре","category":"carb","kcal":88,"protein":2,"fat":3,"carbs":15,"fiber":1.5,"gi":74,"servingSize":"150 г","micros":{"K":380,"VitC":7,"Mg":15,"P":40}},
   {"id":"potato_baked","name":"Картофель запечённый","category":"carb","kcal":93,"protein":2.5,"fat":0.1,"carbs":21,"fiber":2.2,"gi":85,"servingSize":"200 г","micros":{"K":550,"VitC":15,"Mg":25,"P":60,"Fe":0.8}},
   {"id":"french_fries","name":"Картофель фри","category":"fast_food","kcal":312,"protein":3.4,"fat":15,"carbs":41,"fiber":3.8,"gi":75,"servingSize":"150 г","micros":{"K":580,"Na":250,"VitC":4}},
@@ -1373,6 +1375,7 @@ export const FOOD_ALLERGEN_DIET: Record<string, { allergens: string[]; isVegetar
   tempeh: { allergens: ['soy'], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['mediterranean'] },
   seitan: { allergens: ['gluten'], isVegetarian: true, isVegan: true, isGlutenFree: false, isDairyFree: true, dietTags: [] },
   rice_white: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  rice_cream: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [] },
   rice_brown: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['mediterranean'] },
   oats: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['mediterranean'] },
   buckwheat: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['mediterranean'] },
@@ -1773,10 +1776,5 @@ export { RATION_TIERS };
   for (const [id, override] of Object.entries(overrides)) {
     const idx = FOOD_DB.findIndex(f => f.id === id);
     if (idx >= 0) Object.assign(FOOD_DB[idx], override);
-  }
-  // recalculate bb_quality_score for overridden products
-  for (const id of Object.keys(overrides)) {
-    const idx = FOOD_DB.findIndex(f => f.id === id);
-    if (idx >= 0) FOOD_DB[idx].bb_quality_score = calcBBQualityScore(FOOD_DB[idx]);
   }
 })();

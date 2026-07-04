@@ -1,12 +1,10 @@
-// @ts-nocheck
 /**
  * SupportPeptideCalc.tsx — извлечено из SupportScreen.tsx
  * Секция: protocols
  */
 import React from 'react';
-import { PopupBool, PopupNumber, PopupSelect } from '../../components/PopupXxx';
-import { PEPTIDE_LIST, PEPTIDE_DB, computeDilution, computeEffectiveDose, computePK, generatePeptideProtocol, ROUTE_LABELS, SYRINGE_TYPES } from '../../../engines/peptide-calculator.engine';
-import { InfoErrorBoundary } from './SupportScreenData';
+import { PopupNumber, PopupSelect } from '../../components/PopupXxx';
+import { PEPTIDE_LIST, ROUTE_LABELS, SYRINGE_TYPES } from '../../../engines/peptide-calculator.engine';
 
 export const SupportPeptideCalc: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const {
@@ -16,20 +14,16 @@ export const SupportPeptideCalc: React.FC<{ s: Record<string, any> }> = ({ s }) 
     setPepAmount,
     pepDose,
     setPepDose,
-    pepVial,
-    setPepVial,
+    pepDilution,
+    setPepDilution,
     pepSyringe,
     setPepSyringe,
-    pepConcentration,
-    setPepConcentration,
     pepProtocol,
     setPepProtocol,
-    pepShowSchedule,
-    setPepShowSchedule,
-    pepShowReconstitution,
-    setPepShowReconstitution,
-    pepShowDilution,
-    setPepShowDilution,
+    pepSchedule,
+    setPepSchedule,
+    pepTotalDays,
+    setPepTotalDays,
     goBack
   } = s;
 
@@ -183,50 +177,6 @@ export const SupportPeptideCalc: React.FC<{ s: Record<string, any> }> = ({ s }) 
               </div>
             </div>
           </div>
-
-      {/* ===== MODAL OVERLAY ===== */}
-      {showModal && <SupportModals
-        showModal={showModal} setShowModal={setShowModal}
-        modalLevel={modalLevel} setModalLevel={setModalLevel}
-        modalSearch={modalSearch} setModalSearch={setModalSearch}
-        modalSelected={modalSelected} setModalSelected={setModalSelected}
-        modalAddMode={modalAddMode} setModalAddMode={setModalAddMode}
-        showSavedPicker={showSavedPicker} setShowSavedPicker={setShowSavedPicker}
-        setEnhancedSubs={setEnhancedSubs}
-        setBoostEnabled={setBoostEnabled}
-        setSupportLevel={setSupportLevel}
-        setManualLevelSelected={setManualLevelSelected}
-        calcSupport={calcSupport}
-        catalogSupport={catalogSupport}
-        allSupport={allSupport}
-        catalogSubstances={catalogSubstances}
-        jointMode={jointMode}
-        setJointMode={setJointMode}
-        boostEnabled={boostEnabled}
-        getStackDisplayName={getStackDisplayName}
-        savedStacks={savedStacks}
-        MECH_TRANSLATIONS_RU={MECH_TRANSLATIONS_RU}
-        SUPPORT_LEVELS={SUPPORT_LEVELS}
-        courseWeekState={courseWeekState}
-        setCourseWeekState={setCourseWeekState}
-        maxCourseWeek={Math.max(2, ...((linked.course || []).map((c: any) => (c.endWeek || 12) - (c.startWeek || 0))), 12)}
-        onWeekChange={(newWeek: number) => {
-          if (calcDone && calcResult) {
-            calcSupport(supportLevel);
-            setWeekChangeMsg(`Неделя ${newWeek}: план пересчитан с учётом накопленного риска.`);
-            setTimeout(() => setWeekChangeMsg(''), 4000);
-          }
-        }}
-      />}
-
-      {/* ===== STACK BUILDER FLOATING BADGE ===== */}
-      {stackBuilder.length > 0 && (
-        <div style={{ position:'sticky', bottom:0, zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'8px 14px', borderRadius:16, background:'rgba(0,0,0,0.6)', border:'1px solid rgba(0,230,138,0.3)', boxShadow:'0 4px 20px rgba(0,0,0,0.5)' }}>
-          <span style={{ fontSize:10, fontWeight:700, color:'#00e68a' }}>🧮 Стек: {stackBuilder.length} веществ</span>
-          <button onClick={() => setStackBuilder([])} style={{ padding:'4px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#f87171', fontWeight:600 }}>Очистить</button>
-          <button onClick={saveBuilderStack} style={{ padding:'4px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', border:'none', color:'#000', fontWeight:700 }}>Сохранить</button>
         </div>
-      )}
-    </div>
   );
 };

@@ -206,13 +206,23 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
   // ── Aromatization → E2 control ──
   const e2Val = getV(fp, 'panelSex', 'E2');
   if (maxAro > 0 || state.epicrisis.pastGyno || (e2Val !== null && e2Val > 40)) {
-    let ids: string[] = findSupportByMechanisms(['AROMATASE_INHIBITION', 'ESTROGEN_MODULATION']);
+let ids: string[] = findSupportByMechanisms(['AROMATASE_INHIBITION', 'ESTROGEN_MODULATION']);
     if (ids.length === 0) ids = ['dim', 'indinol'];
     const reasoning: Record<string, string> = {};
-    ids.forEach(id => { reasoning[id] = 'Модуляция эстрогеновых рецепторов'; });
+    ids.forEach(id => { reasoning[id] = 'контроль ароматизации эстрогенов'; });
     if (maxAro >= 0.5 || (e2Val !== null && e2Val > 55)) {
-      ids.push('anastrozole');
-      reasoning['anastrozole'] = 'Ингибитор ароматазы — доза по E2';
+      if (!ids.includes('anastrozole') && !ids.some(id => id.toLowerCase() === 'pharma_anastrozole')) {
+        ids.push('anastrozole');
+        reasoning['anastrozole'] = 'Фарма-антиароматазин: контроль E2';
+      }
+    }
+    const hasAnastro = ids.includes('anastrozole') || ids.some(id => id.toLowerCase() === 'pharma_anastrozole');
+    if (hasAnastro) {
+      const newIds = ids.filter(id => {
+        const lc = id.toLowerCase();
+        return lc !== 'pharma_letrozole' && lc !== 'letrozole' && lc !== 'pharma_exemestane' && lc !== 'exemestane';
+      });
+      ids = newIds;
     }
     addRec('estradiol', (e2Val !== null && e2Val > 55) ? 'critical' : 'high', 'endocrine', 'Гормоны',
       `Ароматизация${e2Val !== null ? ' (E2: ' + e2Val + ' pg/mL)' : ''} от ${drugNames.join(', ')}${state.epicrisis.pastGyno ? ' · гинекомастия в анамнезе' : ''}`,

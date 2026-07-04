@@ -264,15 +264,19 @@ export const ProductUsefulnessPlanner: React.FC = () => {
 
   React.useEffect(() => {
     if (plannerTab === 'dashboard') {
-      const avgScore = scored.length > 0 ? Math.round(scored.reduce((s, x) => s + x.score.total, 0) / scored.length) : 0;
+      const items = useV2 ? scored.map(({ food }) => {
+        const v = v2Scored.get(food.id);
+        return { total: (v?.total ?? 5) * 10 };
+      }) : scored.map(x => ({ total: x.score.total }));
+      const avgScore = items.length > 0 ? Math.round(items.reduce((s, x) => s + x.total, 0) / items.length) : 0;
       if (avgScore > 0) {
         const today = new Date().toLocaleDateString('ru-RU');
-        const updated = [...scoreHistory.filter(h => h.date !== today), { date: today, avg: avgScore, count: scored.length }].slice(-30);
+        const updated = [...scoreHistory.filter(h => h.date !== today), { date: today, avg: avgScore, count: items.length }].slice(-30);
         setScoreHistory(updated);
         localStorage.setItem('he_usefulness_history', JSON.stringify(updated));
       }
     }
-  }, [plannerTab, scored]);
+  }, [plannerTab, scored, useV2, v2Scored]);
 
   const compareData = useMemo(() => {
     if (compareIds.length < 2) return [];
@@ -371,11 +375,15 @@ export const ProductUsefulnessPlanner: React.FC = () => {
       </div>
 
       {plannerTab === 'dashboard' && (() => {
-        const sorted = [...scored].sort((a, b) => b.score.total - a.score.total);
+        const scoredItems = useV2 ? scored.map(({ food }) => {
+          const v = v2Scored.get(food.id);
+          return { food, score: { total: (v?.total ?? 5) * 10, label: v?.label ?? '—', color: v?.color ?? '#888' } as any };
+        }) : scored;
+        const sorted = [...scoredItems].sort((a, b) => b.score.total - a.score.total);
         const top5 = sorted.slice(0, 5);
         const worst5 = sorted.slice(-5).reverse();
         const catAvg: Record<string, { total: number; count: number }> = {};
-        scored.forEach(({ food, score }) => {
+        scoredItems.forEach(({ food, score }) => {
           const cat = CATEGORY_LABELS[food.category] || food.category;
           if (!catAvg[cat]) catAvg[cat] = { total: 0, count: 0 };
           catAvg[cat].total += score.total; catAvg[cat].count++;
@@ -390,12 +398,12 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         };
         const goal = manualGoal || profileGoal || 'maintenance';
         const rec = phaseRecs[goal] || phaseRecs.maintenance;
-        const avgScore = scored.length > 0 ? Math.round(scored.reduce((s, x) => s + x.score.total, 0) / scored.length) : 0;
+const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) => s + x.score.total, 0) / scoredItems.length) : 0;
 
         return <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           <div style={{ borderRadius:12, padding:14, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.1)', textAlign:'center' }}>
             <div style={{ fontSize:28, fontWeight:800, color:'#00e68a' }}>{avgScore}</div>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)' }}>средний скор по {scored.length} продуктам</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)' }}>средний скор по {scoredItems.length} продуктам</div>
             <div style={{ marginTop:8, display:'flex', justifyContent:'center', gap:12 }}>
               <div style={{ textAlign:'center' }}><div style={{ fontSize:18, fontWeight:800, color:'#22c55e' }}>{top5.length}</div><div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>топ-5</div></div>
               <div style={{ textAlign:'center' }}><div style={{ fontSize:18, fontWeight:800, color:'#ef4444' }}>{worst5.length}</div><div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>худшие-5</div></div>
@@ -458,7 +466,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               <div key={cat} style={{ display:'flex',alignItems:'center',gap:6,marginBottom:4 }}>
                 <span style={{ fontSize:8,color:'rgba(255,255,255,0.8)',minWidth:80 }}>{cat}</span>
                 <div style={{ flex:1,height:5,borderRadius:3,background:'rgba(255,255,255,0.06)',overflow:'hidden' }}>
-                  <div style={{ width:`${Math.min(100,avg*10)}%`,height:'100%',borderRadius:3,background:avg>=7?'#22c55e':avg>=5?'#f59e0b':'#ef4444',transition:'width 0.3s' }}/>
+                  <div style={{ width:`${Math.min(100,avg)}%`,height:'100%',borderRadius:3,background:avg>=7?'#22c55e':avg>=5?'#f59e0b':'#ef4444',transition:'width 0.3s' }}/>
                 </div>
                 <span style={{ fontSize:8,fontWeight:700,color:avg>=7?'#22c55e':avg>=5?'#f59e0b':'#ef4444',minWidth:24,textAlign:'right' }}>{avg}</span>
                 <span style={{ fontSize:6,color:'rgba(255,255,255,0.4)',minWidth:16 }}>({count})</span>
@@ -909,11 +917,19 @@ export const ProductUsefulnessPlanner: React.FC = () => {
               {compareData.length >= 2 && (() => {
                 const catKeys = ['kcal','protein','fat','carbs','carbs_fiber','leucine_mg','isoleucine_mg','valine_mg','sodium_mg','potassium_mg','magnesium_mg'] as const;
                 const catLabels: Record<string,string> = {kcal:'🔥 Ккал', protein:'🥩 Белок', fat:'🧈 Жиры', carbs:'🍚 Углев.', carbs_fiber:'🌾 Клетч.', leucine_mg:'🧬 Лейцин', isoleucine_mg:'🧬 Илей', valine_mg:'🧬 Валин', sodium_mg:'⚡ Na', potassium_mg:'⚡ K', magnesium_mg:'⚡ Mg'};
+                const getVal = (ff: any, key: string): number | null => {
+                  if (!ff) return null;
+                  if (['kcal','protein','fat','carbs'].includes(key)) return ff[key] ?? null;
+                  if (key === 'carbs_fiber') return ff.fiber ?? ff.macro_100g?.carbs_fiber ?? null;
+                  if (['leucine_mg','isoleucine_mg','valine_mg'].includes(key)) return ff.amino_acid_profile_100g?.[key] ?? null;
+                  if (['sodium_mg','potassium_mg','magnesium_mg'].includes(key)) return ff.electrolytes_100g?.[key] ?? null;
+                  return null;
+                };
                 const rows = catKeys.map(key => {
-                  const vals = compareData.map((c:any) => { const ff = FOOD_DB.find((x:any) => x.id === c.food.id); return { id: c.food.id, v: ff ? (ff as any)[key] ?? null : null }; });
+                  const vals = compareData.map((c:any) => { const ff = FOOD_DB.find((x:any) => x.id === c.food.id); return { id: c.food.id, v: getVal(ff, key) }; });
                   const numeric = vals.filter(v => v.v !== null && typeof v.v === 'number');
                   if (numeric.length < 2) return null;
-                  const best = key === 'kcal' ? Math.min(...numeric.map(v=>v.v)) : Math.max(...numeric.map(v=>v.v));
+                  const best = key === 'kcal' ? Math.min(...numeric.map(v=>v.v as number)) : Math.max(...numeric.map(v=>v.v as number));
                   return { label: catLabels[key] || key, vals: vals.map(v => ({ id: v.id, v: v.v, win: v.v !== null && typeof v.v === 'number' && v.v === best })) };
                 }).filter(Boolean);
                 return (

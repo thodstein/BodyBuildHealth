@@ -8,7 +8,7 @@ function getBPDiary(): BPEntry[] {
   try { return JSON.parse(localStorage.getItem(BP_DIARY_KEY) || '[]'); } catch { return []; }
 }
 function saveBPDiary(log: BPEntry[]) {
-  localStorage.setItem(BP_DIARY_KEY, JSON.stringify(log));
+  try { localStorage.setItem(BP_DIARY_KEY, JSON.stringify(log)); } catch {}
 }
 
 const apple = {
@@ -25,36 +25,36 @@ const apple = {
 };
 const glassCard: React.CSSProperties = {
   background: 'rgba(24,24,27,0.15)', borderRadius: 12, padding: '12px 14px',
-  border: '1px solid rgba(255,255,255,0.04)', backdropFilter: 'blur(12px)',
+  border: '1px solid rgba(255,255,255,0.04)',
 };
 const appleInput: React.CSSProperties = {
   width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)',
   background: 'rgba(0,0,0,0.2)', color: '#fff', fontSize: 12, outline: 'none',
   boxSizing: 'border-box', fontFamily: 'inherit',
 };
-const pillBtn = (active: boolean): React.CSSProperties => ({
-  padding: '7px 12px', borderRadius: 18, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-  background: active ? apple.accentDim : 'rgba(255,255,255,0.03)',
-  border: active ? apple.accentBorder : '1px solid rgba(255,255,255,0.06)',
-  color: active ? apple.accent : 'rgba(255,255,255,0.6)', fontFamily: 'inherit',
-  transition: 'all 0.15s',
-});
 
 export const BPDiaryTab: React.FC = () => {
   const [entries, setEntries] = useState<BPEntry[]>(getBPDiary);
   const [systolic, setSystolic] = useState('');
   const [diastolic, setDiastolic] = useState('');
   const [hr, setHr] = useState('');
+  const [entryDate, setEntryDate] = useState(new Date().toISOString().slice(0, 10));
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [period, setPeriod] = useState<'day' | 'week' | 'month' | 'all'>('week');
+  const [savedMsg, setSavedMsg] = useState('');
+
+  const showSaved = (msg: string) => {
+    setSavedMsg(msg);
+    setTimeout(() => setSavedMsg(''), 2000);
+  };
 
   const saveEntry = () => {
     const s = Math.round(Number(systolic));
     const d = Math.round(Number(diastolic));
     const h = Math.round(Number(hr));
     if (!s || !d || !h || isNaN(s) || isNaN(d) || isNaN(h) || s < 50 || s > 250 || d < 30 || d > 160 || h < 30 || h > 250) return;
-    const entry: BPEntry = { date: new Date().toISOString().slice(0, 10), systolic: s, diastolic: d, hr: h };
+    const entry: BPEntry = { date: entryDate || new Date().toISOString().slice(0, 10), systolic: s, diastolic: d, hr: h };
     let updated: BPEntry[];
     if (editIdx !== null) {
       updated = [...entries];
@@ -62,13 +62,16 @@ export const BPDiaryTab: React.FC = () => {
     } else {
       updated = [...entries, entry];
     }
+    updated.sort((a, b) => a.date.localeCompare(b.date));
     setEntries(updated);
     saveBPDiary(updated);
     setSystolic('');
     setDiastolic('');
     setHr('');
+    setEntryDate(new Date().toISOString().slice(0, 10));
     setEditIdx(null);
     setShowForm(false);
+    showSaved(editIdx !== null ? '✓ Запись обновлена' : '✓ Запись сохранена');
   };
 
   const deleteEntry = (idx: number) => {
@@ -76,6 +79,7 @@ export const BPDiaryTab: React.FC = () => {
     setEntries(updated);
     saveBPDiary(updated);
     if (editIdx === idx) { setEditIdx(null); setShowForm(false); setSystolic(''); setDiastolic(''); setHr(''); }
+    showSaved('✓ Запись удалена');
   };
 
   const startEdit = (idx: number) => {
@@ -83,6 +87,7 @@ export const BPDiaryTab: React.FC = () => {
     setSystolic(String(e.systolic));
     setDiastolic(String(e.diastolic));
     setHr(String(e.hr));
+    setEntryDate(e.date);
     setEditIdx(idx);
     setShowForm(true);
   };
@@ -102,43 +107,63 @@ export const BPDiaryTab: React.FC = () => {
   const avgH = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.hr, 0) / filtered.length) : 0;
 
   // Line chart
-  const chartH = 120;
-  const chartW = 320;
-  const padL = 30;
-  const padR = 8;
-  const padT = 12;
-  const padB = 20;
+  const chartH = 140;
+  const chartW = 360;
+  const padL = 32;
+  const padR = 10;
+  const padT = 14;
+  const padB = 24;
   const innerW = chartW - padL - padR;
   const innerH = chartH - padT - padB;
   const yMin = 40;
-  const yMax = 200;
+  const yMax = 210;
   const yRange = yMax - yMin;
 
   const xScale = (i: number) => padL + (filtered.length > 1 ? (i / (filtered.length - 1)) * innerW : innerW / 2);
   const yScale = (v: number) => padT + innerH - ((v - yMin) / yRange) * innerH;
 
-  const sysLine = filtered.map((e, i) => `${i === 0 ? 'M' : 'L'}${xScale(i).toFixed(1)},${yScale(e.systolic).toFixed(1)}`).join(' ');
-  const diaLine = filtered.map((e, i) => `${i === 0 ? 'M' : 'L'}${xScale(i).toFixed(1)},${yScale(e.diastolic).toFixed(1)}`).join(' ');
+  const sysLine = filtered.length > 0
+    ? filtered.map((e, i) => `${i === 0 ? 'M' : 'L'}${xScale(i).toFixed(1)},${yScale(e.systolic).toFixed(1)}`).join(' ')
+    : '';
+  const diaLine = filtered.length > 0
+    ? filtered.map((e, i) => `${i === 0 ? 'M' : 'L'}${xScale(i).toFixed(1)},${yScale(e.diastolic).toFixed(1)}`).join(' ')
+    : '';
 
-  // Y-axis ticks
   const yTicks = [60, 80, 100, 120, 140, 160, 180, 200];
+
+  const bpStatus = (s: number, d: number) =>
+    s > 140 || d > 90 ? '⚠ Повышено' : s > 130 || d > 80 ? '⚡ Граница' : '✅ Норма';
+
+  const bpColor = (s: number, d: number) =>
+    s > 140 || d > 90 ? '#ef4444' : s > 130 || d > 80 ? '#f59e0b' : apple.accent;
 
   return (
     <div>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: apple.textPrimary }}>🫀 Давление и пульс</h3>
-        <button onClick={() => { if (!showForm) { setEditIdx(null); setSystolic(''); setDiastolic(''); setHr(''); } setShowForm(!showForm); }} style={{
+        <button onClick={() => { if (!showForm) { setEditIdx(null); setSystolic(''); setDiastolic(''); setHr(''); setEntryDate(new Date().toISOString().slice(0, 10)); } setShowForm(!showForm); }} style={{
           padding: '6px 14px', borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: 'pointer',
           background: apple.accentDim, border: apple.accentBorder, color: apple.accent, fontFamily: 'inherit',
         }}>{showForm ? '✕ Отмена' : '+ Добавить'}</button>
       </div>
 
+      {/* Save feedback */}
+      {savedMsg && (
+        <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', fontSize: 11, fontWeight: 600, marginBottom: 8, textAlign: 'center' }}>
+          {savedMsg}
+        </div>
+      )}
+
       {/* Form */}
       {showForm && (
         <div style={{ ...glassCard, marginBottom: 10 }}>
           {editIdx !== null && <div style={{ fontSize: 10, color: apple.accent, fontWeight: 600, marginBottom: 6 }}>✏️ Редактирование записи</div>}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+            <div>
+              <div style={{ fontSize: 9, color: apple.textDim, marginBottom: 3 }}>Дата</div>
+              <input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} style={appleInput} />
+            </div>
             <div>
               <div style={{ fontSize: 9, color: apple.textDim, marginBottom: 3 }}>Систолическое</div>
               <input type="number" value={systolic} onChange={e => setSystolic(e.target.value)} placeholder="120" style={appleInput} />
@@ -169,7 +194,7 @@ export const BPDiaryTab: React.FC = () => {
             color: period === p ? apple.accent : 'rgba(255,255,255,0.6)', fontFamily: 'inherit',
           }}>{p === 'day' ? 'День' : p === 'week' ? 'Неделя' : p === 'month' ? 'Месяц' : 'Всё'}</button>
         ))}
-        <button onClick={() => { if (confirm('Очистить все записи давления?')) { setEntries([]); localStorage.removeItem(BP_DIARY_KEY); } }} style={{
+        <button onClick={() => { if (window.confirm('Очистить все записи давления?')) { setEntries([]); localStorage.removeItem(BP_DIARY_KEY); showSaved('✓ Все записи удалены'); } }} style={{
           padding: '8px 10px', borderRadius: 10, fontSize: 10, fontWeight: 600, cursor: 'pointer',
           background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontFamily: 'inherit',
         }}>🗑</button>
@@ -192,7 +217,7 @@ export const BPDiaryTab: React.FC = () => {
         </div>
 
         {/* Line chart */}
-        {filtered.length >= 2 && (
+        {filtered.length >= 1 && (
           <div style={{ ...glassCard, marginBottom: 10, padding: '10px 8px', overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <span style={{ fontSize: 10, color: apple.textDim, fontWeight: 600 }}>📈 Динамика</span>
@@ -213,15 +238,28 @@ export const BPDiaryTab: React.FC = () => {
               <line x1={padL} y1={yScale(80)} x2={chartW - padR} y2={yScale(80)} stroke="rgba(0,230,138,0.25)" strokeWidth={1} strokeDasharray="4,3" />
               <text x={chartW - padR - 2} y={yScale(80) - 2} textAnchor="end" fill="rgba(0,230,138,0.25)" fontSize={6}>80</text>
               {/* Systolic area */}
-              <path d={`${sysLine} L${xScale(filtered.length - 1)},${yScale(yMin)} L${xScale(0)},${yScale(yMin)} Z`} fill="rgba(239,68,68,0.08)" />
-              {/* Systolic line */}
-              <path d={sysLine} fill="none" stroke="#ef4444" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-              {/* Diastolic line */}
-              <path d={diaLine} fill="none" stroke="#f59e0b" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              {filtered.length >= 2 && (
+                <path d={`${sysLine} L${xScale(filtered.length - 1)},${yScale(yMin)} L${xScale(0)},${yScale(yMin)} Z`} fill="rgba(239,68,68,0.08)" />
+              )}
+              {/* Systolic line / dot */}
+              {filtered.length >= 2 ? (
+                <path d={sysLine} fill="none" stroke="#ef4444" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              ) : (
+                <circle cx={xScale(0)} cy={yScale(filtered[0].systolic)} r={4} fill="#ef4444" />
+              )}
+              {/* Diastolic line / dot */}
+              {filtered.length >= 2 ? (
+                <path d={diaLine} fill="none" stroke="#f59e0b" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              ) : (
+                <circle cx={xScale(0)} cy={yScale(filtered[0].diastolic)} r={4} fill="#f59e0b" />
+              )}
               {/* X-axis labels */}
-              {filtered.length <= 14 && filtered.map((e, i) => (
+              {filtered.length <= 14 && filtered.length >= 2 && filtered.map((e, i) => (
                 <text key={i} x={xScale(i)} y={chartH - 2} textAnchor="middle" fill="rgba(255,255,255,0.25)" fontSize={6}>{e.date.slice(5)}</text>
               ))}
+              {filtered.length <= 14 && filtered.length === 1 && (
+                <text x={xScale(0)} y={chartH - 2} textAnchor="middle" fill="rgba(255,255,255,0.25)" fontSize={6}>{filtered[0].date.slice(5)}</text>
+              )}
               {filtered.length > 14 && (
                 <>
                   <text x={xScale(0)} y={chartH - 2} textAnchor="middle" fill="rgba(255,255,255,0.25)" fontSize={6}>{filtered[0].date.slice(5)}</text>
@@ -239,28 +277,25 @@ export const BPDiaryTab: React.FC = () => {
 
         {/* Entry list */}
         <div style={{ fontSize: 10, color: apple.textDim, fontWeight: 600, marginBottom: 6 }}>Записи ({reversed.length})</div>
-        {reversed.map((e, i) => {
-          const bpColor = e.systolic > 140 || e.diastolic > 90 ? '#ef4444' : e.systolic > 130 || e.diastolic > 80 ? '#f59e0b' : apple.accent;
-          return (
-            <div key={i} style={{ ...glassCard, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 6 }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,0.1)', fontSize: 16 }}>🫀</div>
-              <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => startEdit(entries.indexOf(e))} title="Редактировать">
-                <div style={{ fontSize: 13, fontWeight: 700, color: apple.textPrimary }}>{e.systolic}/{e.diastolic}</div>
-                <div style={{ fontSize: 9, color: apple.textDim }}>Пульс: {e.hr} уд/мин</div>
-              </div>
-              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-                <div style={{ fontSize: 11, color: bpColor, fontWeight: 600 }}>
-                  {e.systolic > 140 || e.diastolic > 90 ? '⚠ Повышено' : e.systolic > 130 || e.diastolic > 80 ? '⚡ Граница' : '✅ Норма'}
-                </div>
-                <div style={{ fontSize: 8, color: apple.textDim, whiteSpace: 'nowrap' }}>{e.date}</div>
-                <button onClick={(ev) => { ev.stopPropagation(); const idx = entries.indexOf(e); if (idx >= 0) deleteEntry(idx); }} style={{
-                  padding: '2px 6px', borderRadius: 6, fontSize: 8, cursor: 'pointer',
-                  border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.06)', color: '#ef4444', fontFamily: 'inherit',
-                }}>✕</button>
-              </div>
+        {reversed.map((e, i) => (
+          <div key={`${e.date}-${i}`} style={{ ...glassCard, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 6 }}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,0.1)', fontSize: 16 }}>🫀</div>
+            <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => startEdit(entries.indexOf(e))} title="Редактировать">
+              <div style={{ fontSize: 13, fontWeight: 700, color: apple.textPrimary }}>{e.systolic}/{e.diastolic}</div>
+              <div style={{ fontSize: 9, color: apple.textDim }}>Пульс: {e.hr} уд/мин</div>
             </div>
-          );
-        })}
+            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+              <div style={{ fontSize: 11, color: bpColor(e.systolic, e.diastolic), fontWeight: 600 }}>
+                {bpStatus(e.systolic, e.diastolic)}
+              </div>
+              <div style={{ fontSize: 8, color: apple.textDim, whiteSpace: 'nowrap' }}>{e.date}</div>
+              <button onClick={(ev) => { ev.stopPropagation(); const idx = entries.indexOf(e); if (idx >= 0) deleteEntry(idx); }} style={{
+                padding: '2px 6px', borderRadius: 6, fontSize: 8, cursor: 'pointer',
+                border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.06)', color: '#ef4444', fontFamily: 'inherit',
+              }}>✕</button>
+            </div>
+          </div>
+        ))}
       </> : (
         <div style={{ ...glassCard, textAlign: 'center', padding: 24 }}>
           <div style={{ fontSize: 28, marginBottom: 6 }}>🫀</div>

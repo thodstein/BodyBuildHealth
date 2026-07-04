@@ -225,7 +225,7 @@ export function generateLabSchedule(input: PhaseLabScheduleInput): LabScheduleIt
   const startDate = new Date(courseStartDate);
   const weeksSinceStart = Math.max(0, Math.floor((Date.now() - startDate.getTime()) / (7 * 86400000)));
 
-  if (phaseKey === 'on_cycle' || phaseKey === 'course_bridge_course') {
+  if (phaseKey === 'on_cycle') {
     schedule.push({
       week: 0,
       label: 'Базовые анализы (до курса)',
@@ -268,27 +268,6 @@ export function generateLabSchedule(input: PhaseLabScheduleInput): LabScheduleIt
       phaseSegment: 'end_course'
     });
 
-    if (phaseKey === 'course_bridge_course') {
-      const bridgeLabs = REQUIRED_LABS_PER_PHASE.bridge ?? [];
-      schedule.push({
-        week: 10,
-        label: 'Контроль моста',
-        labs: [...bridgeLabs, ...Array.from(drugExtraLabs).filter(l => !bridgeLabs.includes(l))],
-        diagnostics: REQUIRED_DIAGNOSTICS_PER_PHASE.bridge ?? [],
-        urgency: 'important',
-        reason: 'Мост — частичный контроль + специфичные триггеры.',
-        phaseSegment: 'bridge'
-      });
-      schedule.push({
-        week: 12,
-        label: 'Повторный базовый (2-й курс)',
-        labs: [...(REQUIRED_LABS_PER_PHASE.baseline ?? []), ...Array.from(drugExtraLabs)],
-        diagnostics: [...(REQUIRED_DIAGNOSTICS_PER_PHASE.baseline ?? [])],
-        urgency: 'critical',
-        reason: 'Новый базовый профиль перед 2-м курсом.',
-        phaseSegment: 'baseline'
-      });
-    }
   } else if (phaseKey === 'pct') {
     schedule.push({
       week: 0,
@@ -469,7 +448,6 @@ export function getDrugSpecificLabs(courseEntries: CourseEntry[]): { labs: strin
 function resolveSchedulePhaseKey(phase: string): string {
   const p = phase.toLowerCase();
   if (p.includes('fertility')) return 'fertility';
-  if (p.includes('course-bridge') || p.includes('course_bridge')) return 'course_bridge_course';
   if (p.includes('course') && !p.includes('bridge')) return 'on_cycle';
   if (p.includes('bridge')) return 'bridge';
   if (p.includes('post_pct') || p.includes('post-pct')) return 'post_pct';

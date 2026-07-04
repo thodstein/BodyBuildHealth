@@ -3,7 +3,7 @@ import { LMS_CYCLES, getCycleById } from '../../data/lms-cycles/lms-cycle-index'
 import { rankCycles, selectBestCycle, explainSelection, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
 import { buildLMSPlan, type LMSBuildOutput } from '../../engines/lms/lms-builder.engine';
 import { mesocyclePhaseForWeek } from '../../engines/rir-matrix.engine';
-import { autoRegulate, type AutoRegOutput } from '../../engines/pro/autoregulation-pro.engine';
+import { autoRegulate, shouldTrainToday, type AutoRegOutput } from '../../engines/pro/autoregulation-pro.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { SPLIT_PATTERNS } from '../../engines/bb/bb-split-patterns';
@@ -153,15 +153,17 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [appliedMethods, setAppliedMethods] = useState<Record<string, string>>({});
   const [methodNote, setMethodNote] = useState<string | null>(null);
   const linked = useDataLink();
-  // P12-wire #2: проф-авторегуляция плана (readiness + ACWR из sRPE-дневника)
+  // P12-wire #2: проф-авторегуляция плана (readiness + HRV + ACWR из sRPE-дневника)
   const [autoRegOn, setAutoRegOn] = useState<boolean>(false);
   const autoRegResult: AutoRegOutput = useMemo(() => {
     const rec = linked.readiness?.recovery ?? 80;
     const fat = linked.readiness?.fatigue ?? 30;
+    const sleep = linked.readiness?.sleep ?? 70;
+    const hrv = linked.profile?.settings?.baselineHrvRatio ?? 1.0;
     const srpe = loadSRPESessions();
     const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : { ratio: 1.0, zone: 'optimal' as const };
-    return autoRegulate({ readiness: rec, acwr: { ratio: acwr.ratio, zone: acwr.zone }, fatigue: fat, lastSessionRPE: 8, lastVelocityLossPct: 15, plannedTopSetPct: 0.85, plannedRIR: 2 });
-  }, [linked.readiness]);
+    return autoRegulate({ readiness: rec, acwr: { ratio: acwr.ratio, zone: acwr.zone }, fatigue: fat, hrvRatio: hrv, sleepScore: sleep, plannedTopSetPct: 0.85, plannedRIR: 2 });
+  }, [linked.readiness, linked.profile?.settings]);
   const diary = useMemo(() => new StrengthDiary(), []);
   const [historyWorkouts, setHistoryWorkouts] = useState<WorkoutLog[]>([]);
   useEffect(() => { (async () => { try { const w = await diary.getWorkoutLogs(); setHistoryWorkouts(w.reverse()); } catch { /* ignore */ } })(); }, [diary]);
@@ -246,12 +248,21 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     const wk = builtBb.weeks[0];
     return wk.sessions.map((sess, i) => ({
       label: `Д${i + 1} ${sess.character}`,
-      exercises: sess.exercises.map(e => ({
-        name: e.muscle, muscleGroup: e.muscle,
-        targetSets: e.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, rir: ws.rir })),
-      })),
+      exercises: sess.exercises.map(e => {
+        let w = e.workSets[0].weight;
+        let reps = e.workSets[0].reps;
+        let sets = e.sets;
+        if (autoRegOn && autoRegResult) {
+          w = Math.round(w * autoRegResult.topSetPctMultiplier * 10) / 10;
+          sets = Math.max(1, Math.round(sets * autoRegResult.volumeMultiplier));
+        }
+        return {
+          name: e.muscle, muscleGroup: e.muscle,
+          targetSets: Array.from({ length: sets }, () => ({ weight: w, reps, rir: e.rir })),
+        };
+      }),
     }));
-  }, [builtBb]);
+  }, [builtBb, autoRegOn, autoRegResult]);
 
   const playerDays: PlayerDay[] = mainTab === 'pl' ? srcDays : bbDaysArr;
   const workingWeight = useMemo(() => {
@@ -356,16 +367,27 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 {editMode && <span style={{ ...SMALL }}>правка недели 1 применяется к «Выполнение»</span>}
               </div>
               {/* P12-wire #2: проф-авторегуляция плана */}
-              <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: autoRegResult.deload ? 'rgba(239,68,68,0.08)' : 'rgba(96,165,250,0.06)', border: '1px solid ' + (autoRegResult.deload ? 'rgba(239,68,68,0.25)' : 'rgba(96,165,250,0.2)') }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <span style={{ fontSize:11, fontWeight:700, color: autoRegResult.deload ? '#ef4444' : '#60a5fa' }}>🧠 Авторегуляция плана {autoRegOn ? 'ВКЛ' : 'ВЫКЛ'}</span>
-                  <button onClick={() => setAutoRegOn(a => !a)} style={{ padding:'5px 10px', borderRadius:6, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegOn ? '#60a5fa' : 'rgba(255,255,255,0.1)', color: autoRegOn ? '#000' : 'var(--text-dim)' }}>{autoRegOn ? 'Отключить' : 'Применить'}</button>
-                </div>
-                {autoRegOn && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.7)' }}>
-                  <div>Топ-сет ×{autoRegResult.topSetPctMultiplier} · объём ×{autoRegResult.volumeMultiplier} · RIR +{autoRegResult.rirShift}{autoRegResult.deload ? ' · 🔴 DELOAD-триггер' : ''}</div>
-                  {autoRegResult.decisions.slice(0,3).map((d, i) => <div key={i} style={{ marginTop:2, color:'rgba(255,255,255,0.55)' }}>• {d}</div>)}
-                </div>}
-              </div>
+              {(() => {
+                const stt = shouldTrainToday({ readiness: linked.readiness?.recovery ?? 80, acwr: autoRegResult.deload ? { ratio: 1.8, zone: 'dangerous' } : { ratio: 1.0, zone: 'optimal' }, fatigue: linked.readiness?.fatigue ?? 30, hrvRatio: linked.profile?.settings?.baselineHrvRatio ?? 1.0 });
+                return (
+                  <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: autoRegResult.deload ? 'rgba(239,68,68,0.08)' : 'rgba(96,165,250,0.06)', border: '1px solid ' + (autoRegResult.deload ? 'rgba(239,68,68,0.25)' : 'rgba(96,165,250,0.2)') }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <div>
+                        <span style={{ fontSize:11, fontWeight:700, color: stt.train ? (autoRegResult.deload ? '#ef4444' : '#60a5fa') : '#ef4444' }}>
+                          {stt.train ? '✅' : '⚠️'} {stt.reason}
+                        </span>
+                        {autoRegResult.intensityNote && <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: autoRegResult.intensityNote === 'силовая' ? 'rgba(239,68,68,0.15)' : autoRegResult.intensityNote === 'восстановительная' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)', color: autoRegResult.intensityNote === 'силовая' ? '#ef4444' : autoRegResult.intensityNote === 'восстановительная' ? '#22c55e' : '#f59e0b' }}>{autoRegResult.intensityNote === 'силовая' ? 'СИЛОВАЯ' : autoRegResult.intensityNote === 'восстановительная' ? 'ВОССТАНОВИТ.' : autoRegResult.intensityNote === 'лёгкая' ? 'ЛЁГКАЯ' : ''}</span>}
+                      </div>
+                      <span style={{ marginRight: 8, fontSize: 10, fontWeight: 700, color: autoRegResult.deload ? '#ef4444' : '#60a5fa' }}>Авторегуляция {autoRegOn ? 'ВКЛ' : 'ВЫКЛ'}</span>
+                      <button onClick={() => setAutoRegOn(a => !a)} style={{ padding:'5px 10px', borderRadius:6, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegOn ? '#60a5fa' : 'rgba(255,255,255,0.1)', color: autoRegOn ? '#000' : 'var(--text-dim)' }}>{autoRegOn ? 'Отключить' : 'Применить'}</button>
+                    </div>
+                    {autoRegOn && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.7)' }}>
+                      <div>Топ-сет ×{autoRegResult.topSetPctMultiplier} · объём ×{autoRegResult.volumeMultiplier} · RIR +{autoRegResult.rirShift}{autoRegResult.deload ? ' · 🔴 DELOAD' : ''}</div>
+                      {autoRegResult.decisions.slice(0,3).map((d, i) => <div key={i} style={{ marginTop:2, color:'rgba(255,255,255,0.55)' }}>• {d}</div>)}
+                    </div>}
+                  </div>
+                );
+              })()}
               {/* Exercise picker popup */}
               {pickerDay && (
                 <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', background:'rgba(0,0,0,0.9)' }} onClick={() => setPickerDay(null)}>
@@ -567,6 +589,30 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 <div style={{ ...H, margin:0 }}>📋 План: {builtBb.pattern.name}</div>
                 <span style={{ fontSize:10, fontWeight:700, color: ACCENT, background:'rgba(0,230,138,0.12)', padding:'3px 8px', borderRadius:8 }}>{W.length} нед</span>
               </div>
+              {/* P12 auto-reg toggle + shouldTrainToday для BB */}
+              {(() => {
+                const stt = shouldTrainToday({ readiness: linked.readiness?.recovery ?? 80, acwr: autoRegResult.deload ? { ratio: 1.8, zone: 'dangerous' } : { ratio: 1.0, zone: 'optimal' }, fatigue: linked.readiness?.fatigue ?? 30, hrvRatio: linked.profile?.settings?.baselineHrvRatio ?? 1.0 });
+                return (
+                  <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: autoRegResult.deload ? 'rgba(239,68,68,0.08)' : 'rgba(96,165,250,0.06)', border: '1px solid ' + (autoRegResult.deload ? 'rgba(239,68,68,0.25)' : 'rgba(96,165,250,0.2)') }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: stt.train ? (autoRegResult.deload ? '#ef4444' : '#60a5fa') : '#ef4444' }}>
+                          {stt.train ? '✅' : '⚠️'} {stt.reason}
+                        </span>
+                      </div>
+                      <button onClick={() => setAutoRegOn(a => !a)} style={{ padding: '5px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: 'none', background: autoRegOn ? '#60a5fa' : 'rgba(255,255,255,0.1)', color: autoRegOn ? '#000' : 'var(--text-dim)' }}>
+                        {autoRegOn ? 'Авторег ON' : 'Включить авторег'}
+                      </button>
+                    </div>
+                    {autoRegOn && (
+                      <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                        <div>Топ-сет ×{autoRegResult.topSetPctMultiplier} · объём ×{autoRegResult.volumeMultiplier} · RIR +{autoRegResult.rirShift}{autoRegResult.deload ? ' · 🔴 DELOAD' : ''}</div>
+                        {autoRegResult.decisions.slice(0, 3).map((d, i) => <div key={i} style={{ marginTop: 2, color: 'rgba(255,255,255,0.55)' }}>• {d}</div>)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               {(() => { const srpe = loadSRPESessions(); if (srpe.length < 2) return null; const acwr = acuteChronicRatio(toDailyLoads(srpe)); if (acwr.ratio <= 1.5) return null; return <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', fontSize: 10, fontWeight: 600 }}>🚨 ACWR {acwr.ratio.toFixed(2)} — опасная зона. Рекомендуется разгрузочная неделя: объём −40%, RIR 4, без отказных подходов. Включите авторегуляцию или снизьте сеты по мышцам до MRV.</div>; })()}
               {builtBb.rationale.map((r, i) => <div key={i} style={{ ...SMALL, marginTop: 4 }}>{r}</div>)}
               {/* Выбор недели */}
@@ -603,15 +649,20 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                       <div style={{ display:'grid', gridTemplateColumns:'1.6fr 0.8fr 0.7fr 0.7fr 0.8fr', gap:2, padding:'4px 10px', fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase' }}>
                         <span>Мышца</span><span>Характер</span><span>Сеты×повт</span><span>RIR</span><span>Вес</span>
                       </div>
-                      {s.exercises.map((e, ei) => (
+                      {s.exercises.map((e, ei) => {
+                        const rawW = e.workSets[0].weight;
+                        const adjW = autoRegOn && autoRegResult ? Math.round(rawW * autoRegResult.topSetPctMultiplier * 10) / 10 : rawW;
+                        const adjSets = autoRegOn && autoRegResult ? Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier)) : e.sets;
+                        return (
                         <div key={ei} style={{ display:'grid', gridTemplateColumns:'1.6fr 0.8fr 0.7fr 0.7fr 0.8fr', gap:2, padding:'5px 10px', fontSize:10, color:'rgba(255,255,255,0.85)', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
                           <span style={{ fontWeight:600 }}>{e.muscle}</span>
                           <span style={{ color:'rgba(255,255,255,0.6)' }}>{e.character}</span>
-                          <span>{e.sets}×{e.workSets[0].reps}</span>
-                          <span style={{ color:'#f59e0b' }}>{e.rir}</span>
-                          <span style={{ color:ACCENT, fontWeight:700 }}>{e.workSets[0].weight} кг</span>
+                          <span>{adjSets}×{e.workSets[0].reps}</span>
+                          <span style={{ color:'#f59e0b' }}>{e.rir}{autoRegOn && autoRegResult?.rirShift ? `+${autoRegResult.rirShift}` : ''}</span>
+                          <span style={{ color: adjW !== rawW ? '#f59e0b' : ACCENT, fontWeight:700 }}>{adjW} кг{adjW !== rawW ? ' ⚡' : ''}</span>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ))}

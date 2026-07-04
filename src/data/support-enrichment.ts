@@ -1739,8 +1739,8 @@ export const CATALOG_ENRICHMENT: Record<string, CatalogEnrichment> = {
     labMarkers: ['Тестостерон', 'Е2', 'ЛГ', 'ФСГ', 'Пролактин'],
     restrictions: ['Контроль гормонов каждые 4-6 нед', 'Не превышать физиологические дозы'],
   },
-  anastrozole: {
-    targetSystems:['endocrine','reproductive'], targetMechanisms:['AROMATASE_INHIBITION','E2_SUPPRESSION','ESTROGEN_BLOCKADE'], linkedRisks:[{system:'endocrine',direction:'down',strength:0.4},{system:'cardio',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['letrozole','exemestane'],
+anastrozole: {
+targetSystems:['endocrine','reproductive'], targetMechanisms:['AROMATASE_INHIBITION','E2_SUPPRESSION','ESTROGEN_BLOCKADE'], linkedRisks:[{system:'endocrine',direction:'down',strength:0.4},{system:'cardio',direction:'up',strength:0.1}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'},
     maxUsageWeeks: 156,
     labMarkers: ['АД', 'ЧСС', 'ЭКГ', 'Креатинин', 'Калий'],
     restrictions: ['Только по назначению врача', 'Контроль АД и ЧСС', 'Не резко отменять'],

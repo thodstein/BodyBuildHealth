@@ -55,7 +55,7 @@ export const TAB_GROUPS: Record<string, { title: string; icon: string; tabs: Tra
 
 export const TAB_LABELS: Record<TrainingTab, string> = {
   plan: '📋 План тренировок', runtime: '▶️ Проведение тренировки', exercises: '🏋️ Упражнения', calculators: '⚖️ Нагрузка/тоннаж',
-  diary: '📝 Дневник тренировок', cycles: '🔄 Циклы', history: '📜 История', analytics: '📊 Аналитика',
+  diary: '📝 Дневник + аналитика', cycles: '🔄 Циклы', history: '📜 История', analytics: '📊 Аналитика',
   methods: '🧠 Методики', visual: '📈 Визуализация', programs: '📚 Программы', timers: '⏱️ Таймеры отдыха',
   progress: '📏 Прогресс', mytraining: '⭐ Мои тренировки', programcalc: '🛠️ Ручной конструктор', excalc: '🧮 Подбор упражнения', volume: '📐 Расчёт объёма',
   reports: '📄 Отчёты',

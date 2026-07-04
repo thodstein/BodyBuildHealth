@@ -24,6 +24,7 @@ import { getExerciseBio } from '../../data/exercise-biomechanics-db';
 import { getStrengthLevel, getNextLevelTarget } from '../../engines/performance-analytics.engine';
 import { computeStructuredAnalytics } from '../../engines/structured-analytics.engine';
 import { SRCBBScreen } from './SRCBBScreen';
+import { DiaryAndAnalyticsTab } from './TrainingScreen_parts/DiaryAndAnalyticsTab';
 
 import {
   WARMUP_LABELS, GOALS, LEVELS, MUSCLE_GROUPS, GROUP_LABELS, EQUIP_LABELS, JOINT_LABELS,
@@ -677,9 +678,9 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
             {[
               { label: 'Восст.', value: readiness.recovery, color: readiness.recovery >= 70 ? '#22c55e' : '#eab308' },
               { label: 'Питание', value: readiness.nutrition ?? 50, color: (readiness.nutrition ?? 50) >= 70 ? '#22c55e' : '#eab308' },
-              { label: 'Сон', value: (readiness.sleep ?? 0) * 10, color: (readiness.sleep ?? 5) >= 7 ? '#22c55e' : '#eab308' },
-              { label: 'Стресс', value: 100 - (readiness.stress ?? 50), color: (readiness.stress ?? 3) < 4 ? '#22c55e' : '#ef4444' },
-              { label: 'Усталость', value: 100 - (readiness.recovery ?? 70), color: (readiness.recovery ?? 70) >= 60 ? '#22c55e' : '#eab308' },
+              { label: 'Сон', value: readiness.sleep ?? 50, color: (readiness.sleep ?? 50) >= 70 ? '#22c55e' : '#eab308' },
+              { label: 'Поддержка', value: readiness.support ?? 50, color: (readiness.support ?? 50) >= 70 ? '#22c55e' : '#eab308' },
+              { label: 'Усталость', value: 100 - (readiness.fatigue ?? 50), color: (readiness.fatigue ?? 50) < 40 ? '#22c55e' : '#ef4444' },
             ].map(item => (
               <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 10, color: 'var(--text-dim)', minWidth: 44 }}>{item.label}</span>
@@ -3113,181 +3114,19 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
         </InfoErrorBoundary>
       )}
 
-      {/* ═══════════ DIARY TAB ═══════════ */}
+      {/* ═══════════ DIARY AND ANALYTICS TAB (объединённый дневник+аналитика) ═══════════ */}
       {tab === 'diary' && (
         <InfoErrorBoundary label="Дневник">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>📝 Записать подход</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Упражнение</label>
-                <select value={logExercise} onChange={e => setLogExercise(e.target.value)} style={{ width: '100%', padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }}>
-                  <option value="">— Выбрать —</option>
-                  {EXERCISE_CATALOG.filter(e => e.type === 'compound').slice(0, 20).map(e => (
-                    <option key={e.id} value={e.id}>{e.name.slice(0, 20)}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
-                <input type="number" value={logWeight} onChange={e => setLogWeight(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Повторения</label>
-                <input type="number" value={logReps} onChange={e => setLogReps(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>RIR</label>
-                <input type="number" min={0} max={5} value={logRIR} onChange={e => setLogRIR(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-            </div>
-            <button onClick={handleLogWorkout} style={{
-              width: '100%', padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 12,
-            }}>✓ Записать</button>
-          </div>
-
-          {diaryProgress.length > 0 && (
-            <>
-              <div className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
-                <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>🔥 Активность</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, fontSize: 10 }}>
-                  <div style={{ textAlign: 'center', background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: 6 }}>
-                    <div style={{ color: 'var(--text-dim)' }}>Недель</div>
-                    <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 16 }}>{diaryProgress.length}</div>
-                  </div>
-                  <div style={{ textAlign: 'center', background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: 6 }}>
-                    <div style={{ color: 'var(--text-dim)' }}>Тренировок</div>
-                    <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 16 }}>{diaryProgress.reduce((s, w) => s + w.workoutCount, 0)}</div>
-                  </div>
-                  <div style={{ textAlign: 'center', background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: 6 }}>
-                    <div style={{ color: 'var(--text-dim)' }}>Объём</div>
-                    <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 16 }}>{diaryProgress.length > 0 ? `${(diaryProgress[diaryProgress.length - 1]?.totalVolume / 1000).toFixed(1)}т` : '—'}</div>
-                  </div>
-                  <div style={{ textAlign: 'center', background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: 6 }}>
-                    <div style={{ color: 'var(--text-dim)' }}>План</div>
-                    {(() => {
-                      const planned = currentMicrocycle?.days?.filter((d: any) => d.isTraining).length || 0;
-                      const actual = diaryProgress.length > 0 ? (diaryProgress[diaryProgress.length - 1]?.workoutCount || 0) : 0;
-                      const compliance = planned > 0 ? Math.min(100, Math.round((actual / planned) * 100)) : 0;
-                      return (
-                        <>
-                          <div style={{ fontWeight: 700, color: compliance >= 80 ? '#22c55e' : compliance >= 50 ? '#ff9100' : '#ef4444', fontSize: 16 }}>{compliance}%</div>
-                          <div style={{ fontSize: 7, color: 'var(--text-dim)' }}>{actual}/{planned} дн</div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-              <div className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
-              <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>📈 Тоннаж по неделям</h4>
-              <div style={{ display: 'flex', gap: 2, height: 60, alignItems: 'flex-end' }}>
-                {diaryProgress.slice(-12).map((w, i) => {
-                  const maxVol = Math.max(...diaryProgress.map(w => w.totalVolume), 1);
-                  const h = Math.max(4, (w.totalVolume / maxVol) * 100);
-                  const isMax = w.totalVolume === maxVol;
-                  return (
-                    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}
-                      title={``}>
-                      <div style={{ width: '70%', height: `${h}%`, background: isMax ? 'var(--accent)' : 'rgba(0,230,138,0.3)', borderRadius: '2px 2px 0 0' }} />
-                      <span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{w.week}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
-                <span>Неделя</span>
-                <span>Пик: {Math.round(Math.max(...diaryProgress.map(w => w.totalVolume)))} кг</span>
-              </div>
-            </div>
-            </>
-          )}
-
-          {/* ═══ Training Insights: Deload Alerts & Progression ═══ */}
-          {(() => {
-            const insights: { icon: string; text: string; color: string }[] = [];
-            const totalWeeks = diaryProgress.length;
-            if (totalWeeks >= 4) {
-              const avgVol = diaryProgress.reduce((a: number, b: any) => a + b.totalVolume, 0) / Math.max(1, totalWeeks);
-              const lastVol = diaryProgress[diaryProgress.length - 1].totalVolume;
-              const isDeload = lastVol < avgVol * 0.6;
-              if (!isDeload) {
-                insights.push({ icon: '🧊', text: totalWeeks + ' нед. без разгрузки — рекомендация: deload-неделя', color: '#ff9100' });
-              }
-            }
-            if (diaryProgress.length >= 2) {
-              const lastWeek = diaryProgress[diaryProgress.length - 1];
-              const prevWeek = diaryProgress[diaryProgress.length - 2];
-              if (prevWeek.totalVolume > 0 && lastWeek.totalVolume > prevWeek.totalVolume * 1.2) {
-                insights.push({ icon: '⚠️', text: 'Скачок объёма +20% — риск перетренированности', color: '#ef4444' });
-              }
-            }
-            if (diaryStats.length >= 3) {
-              const stagnant = diaryStats.filter((s: any) => {
-                const p = s.weeklyProgress || [];
-                return p.length >= 3 && Math.abs((p[p.length-1]?.estimated1RM||0) - (p[p.length-3]?.estimated1RM||0)) < 2.5;
-              });
-              if (stagnant.length > 0) {
-                insights.push({ icon: '📊', text: 'Плато в ' + stagnant.length + ' упр. Смените схему прогрессии.', color: '#eab308' });
-              }
-            }
-            const rpe = (linked.readiness?.recovery ?? 7);
-            if ((10 - rpe) > 5) {
-              insights.push({ icon: '😴', text: 'Высокая усталость: приоритет — восстановление. Объём -15-25%.', color: '#8b5cf6' });
-            }
-            const freq = linked.profile?.settings?.workoutsPerWeek ?? 3;
-            const recFreq = level === 'beginner' ? '3-4' : level === 'intermediate' ? '4-5' : '4-6';
-            if (freq < parseInt(recFreq.split('-')[0]) || freq > parseInt(recFreq.split('-')[1])) {
-              insights.push({ icon: '📅', text: 'Оптимальная частота: ' + recFreq + ' дн/нед (сейчас: ' + freq + ')', color: '#3b82f6' });
-            }
-            const lastVol = diaryProgress.length > 0 ? diaryProgress[diaryProgress.length - 1].totalVolume : 0;
-            const bw = linked.profile?.settings?.weight || 80;
-            const volPerKg = lastVol / bw;
-            if (volPerKg > 0 && volPerKg < 30) {
-              insights.push({ icon: '📉', text: 'Объём ' + Math.round(volPerKg) + ' кг/кг — ниже MEV', color: '#ef4444' });
-            } else if (volPerKg > 80) {
-              insights.push({ icon: '📈', text: 'Объём ' + Math.round(volPerKg) + ' кг/кг — выше MRV', color: '#ef4444' });
-            } else if (volPerKg >= 30) {
-              insights.push({ icon: '✅', text: 'Объём ' + Math.round(volPerKg) + ' кг/кг — в оптимальном диапазоне', color: '#22c55e' });
-            }
-            if (insights.length === 0) return null;
-            return (
-              <div className="card" style={{ padding: '10px 12px', marginBottom: 8, background: 'rgba(0,230,138,0.03)', border: '1px solid rgba(0,230,138,0.15)' }}>
-                <h4 style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--accent)' }}>🧠 Анализ тренировок</h4>
-                {insights.map((t: any, i: number) => (
-                  <div key={i} style={{ fontSize: 10, color: t.color, padding: '3px 0', display: 'flex', gap: 4, alignItems: 'flex-start' }}>
-                    <span>{t.icon}</span>
-                    <span>{t.text}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-          {diaryStats.length > 0 && (
-            <div className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
-              <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>🏆 1RM по базовым</h4>
-              {diaryStats.map((s, i) => {
-                const pctMax = diaryStats.length > 0 ? Math.round((s.max1RM / Math.max(...diaryStats.map(d => d.max1RM))) * 100) : 0;
-                const prev = i < diaryStats.length - 1 ? diaryStats[i + 1] : null;
-                const trend = prev ? (s.max1RM > prev.max1RM * 1.02 ? '↑' : s.max1RM < prev.max1RM * 0.98 ? '↓' : '→') : '→';
-                const trendColor = trend === '↑' ? '#22c55e' : trend === '↓' ? '#ef4444' : '#6b7280';
-                return (
-                  <div key={s.exerciseId} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 10 }}>
-                    <span style={{ fontSize: 11, color: trendColor, minWidth: 12 }}>{trend}</span>
-                    <span style={{ flex: 1, fontWeight: 500 }}>{s.exerciseName}</span>
-                    <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 3, height: 6, overflow: 'hidden' }}>
-                      <div style={{ width: `${Math.max(5, pctMax)}%`, height: '100%', background: pctMax > 80 ? 'var(--accent)' : pctMax > 50 ? '#8b5cf6' : '#6b7280', borderRadius: 3 }} />
-                    </div>
-                    <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 55, textAlign: 'right' }}>{Math.round(s.max1RM)} кг</span>
-                    <span style={{ color: 'var(--text-dim)', minWidth: 45, textAlign: 'right' }}>{s.maxWeight}×{s.maxReps}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+          <DiaryAndAnalyticsTab
+            diary={diary}
+            diaryStats={diaryStats}
+            diaryProgress={diaryProgress}
+            historyWorkouts={historyWorkouts}
+            macrocycle={macrocycle}
+            selectedWeek={selectedWeek}
+            level={level}
+            onRefresh={loadDiaryStats}
+          />
         </InfoErrorBoundary>
       )}
 
@@ -3688,7 +3527,7 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
         } catch { return <div style={{ padding:20, textAlign:'center', color:'rgba(255,255,255,0.3)', fontSize:11 }}>Ошибка загрузки истории</div>; }
       })()}</InfoErrorBoundary>}
       {/* ═══════════ ANALYTICS TAB ═══════════ */}
-      {tab === 'analytics' && <InfoErrorBoundary label="Аналитика"><><MuscleProgressCard sessions={historyWorkouts} level={level} /><VolumeTrendCard sessions={historyWorkouts} /><LoadRadarCard sessions={historyWorkouts} level={level} /><WeekCompareCard sessions={historyWorkouts} /><LiftHistoryCard sessions={historyWorkouts} /><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /></></InfoErrorBoundary>}
+      {tab === 'analytics' && <InfoErrorBoundary label="Аналитика"><><div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', marginBottom: 8, fontSize: 10, color: 'var(--text-dim)' }}>💡 Аналитика также доступна во вкладке «Дневник тренировок» → режим «Аналитика»</div><MuscleProgressCard sessions={historyWorkouts} level={level} /><VolumeTrendCard sessions={historyWorkouts} /><LoadRadarCard sessions={historyWorkouts} level={level} /><WeekCompareCard sessions={historyWorkouts} /><LiftHistoryCard sessions={historyWorkouts} /><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /></></InfoErrorBoundary>}
       {tab === 'library' && (
   <InfoErrorBoundary label="Каталог циклов">
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>

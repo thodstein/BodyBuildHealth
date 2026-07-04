@@ -99,7 +99,7 @@ export const ArticlesScreen: React.FC = () => {
   const [listSection, setListSection] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [readingArticle, setReadingArticle] = useState<ArticleManifestEntry | null>(null);
   const [pdfViewer, setPdfViewer] = useState<string | null>(null);
 
   const articles = useMemo(() => {
@@ -116,8 +116,6 @@ export const ArticlesScreen: React.FC = () => {
     }
     return list;
   }, [category, search, listSection]);
-
-  const toggle = (id: string) => setExpandedId(expandedId === id ? null : id);
 
   const openPDF = (url: string) => {
     const tg = (window as any).Telegram?.WebApp;
@@ -245,6 +243,66 @@ export const ArticlesScreen: React.FC = () => {
         </div>
       )}
 
+      {/* Full-screen article reader */}
+      {readingArticle && (
+        <div style={{ position:'fixed', inset:0, zIndex:200, background:'#0a0a0f', display:'flex', flexDirection:'column' }}>
+          {/* Header */}
+          <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderBottom:'1px solid rgba(255,255,255,0.06)', flexShrink:0 }}>
+            <button onClick={() => setReadingArticle(null)} style={{
+              width:32, height:32, borderRadius:10, cursor:'pointer',
+              background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)',
+              color:'rgba(255,255,255,0.6)', fontSize:14, fontWeight:600,
+              display:'flex', alignItems:'center', justifyContent:'center',
+              transition:'all 0.2s', flexShrink:0,
+            }}>←</button>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{readingArticle.title}</div>
+              <div style={{ fontSize:9.5, color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', gap:6, marginTop:1 }}>
+                <span style={{ color: CATEGORIES.find(c => c.value === readingArticle.category)?.color || '#6b7280' }}>
+                  {CAT_ICON[readingArticle.category] || '📄'} {CATEGORIES.find(c => c.value === readingArticle.category)?.label || readingArticle.category}
+                </span>
+                <span>·</span>
+                <span>{estimateReadTime(readingArticle.content || '')} мин чтения</span>
+                <span>·</span>
+                <span>{readingArticle.date}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Scrollable content */}
+          <div style={{ flex:1, overflow:'auto', padding:'16px 14px 40px' }}>
+            {/* Title at top of content */}
+            <h1 style={{ fontSize:22, fontWeight:900, color:'#fff', margin:'0 0 8px', lineHeight:1.2, letterSpacing:'-0.03em' }}>
+              {readingArticle.title}
+            </h1>
+            <div style={{ fontSize:11, color:'rgba(255,255,255,0.35)', marginBottom:20, paddingBottom:16, borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8 }}>
+              <span>{readingArticle.authorName}</span>
+              <span>·</span>
+              <span>{readingArticle.date}</span>
+            </div>
+
+            <div dangerouslySetInnerHTML={{ __html: renderMarkdown(readingArticle.content || '') }} />
+
+            {/* Tags */}
+            {readingArticle.tags.length > 0 && (
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:24, paddingTop:14, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+                {readingArticle.tags.map(t => (
+                  <span key={t} style={{
+                    padding:'3px 10px', borderRadius:12, fontSize:9,
+                    background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.4)',
+                  }}>#{t}</span>
+                ))}
+              </div>
+            )}
+
+            {/* Footer */}
+            <div style={{ marginTop:24, paddingTop:14, borderTop:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9.5, color:'rgba(255,255,255,0.15)' }}>
+              Health Engine · {readingArticle.date}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Empty state */}
       {articles.length === 0 && (
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 20px', gap:10 }}>
@@ -257,19 +315,21 @@ export const ArticlesScreen: React.FC = () => {
       {/* Article cards — magazine grid */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
         {articles.map(article => {
-          const isExpanded = expandedId === article.id;
           const catColor = CATEGORIES.find(c => c.value === article.category)?.color || '#6b7280';
           const catIcon = CAT_ICON[article.category] || '📄';
           const readTime = article.content ? estimateReadTime(article.content) : 0;
           const isPDF = article.content_type === 'pdf';
 
           return (
-            <div key={article.id} style={{
+              <div key={article.id} onClick={() => {
+                if (isPDF) { setPdfViewer(article.file_url || ''); }
+                else { setReadingArticle(article); }
+              }} style={{
               borderRadius:12, overflow:'hidden',
               background:'rgba(255,255,255,0.03)',
               border:'1px solid rgba(255,255,255,0.06)',
               transition:'all 0.25s',
-              position:'relative',
+              position:'relative', cursor:'pointer',
             }}>
               {/* Color bar top */}
               <div style={{ height:3, background:catColor, width:'100%' }} />
@@ -288,21 +348,14 @@ export const ArticlesScreen: React.FC = () => {
                 </div>
 
                 {/* Title */}
-                <div style={{ fontWeight:700, fontSize:11.5, color:'#fff', marginBottom:3, lineHeight:1.3, letterSpacing:'-0.01em' }}
-                  onClick={() => {
-                    if (isPDF) { setPdfViewer(article.file_url || ''); }
-                    else { toggle(article.id); }
-                  }}
-                >
+                <div style={{ fontWeight:700, fontSize:11.5, color:'#fff', marginBottom:3, lineHeight:1.3, letterSpacing:'-0.01em' }}>
                   {article.title}
                 </div>
 
-                {/* Description visible only on expanded or as second line */}
-                {!isExpanded && (
-                  <div style={{ fontSize:9.5, color:'rgba(255,255,255,0.45)', lineHeight:1.3, marginBottom:4, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
-                    {article.description}
-                  </div>
-                )}
+                {/* Description */}
+                <div style={{ fontSize:9.5, color:'rgba(255,255,255,0.45)', lineHeight:1.3, marginBottom:4, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
+                  {article.description}
+                </div>
 
                 {/* Date + author */}
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:2 }}>
@@ -311,38 +364,8 @@ export const ArticlesScreen: React.FC = () => {
                 </div>
               </div>
 
-              {/* Expanded content */}
-              {isExpanded && article.content && (
-                <div style={{ borderTop:'1px solid rgba(255,255,255,0.06)', padding:'12px 12px 10px', background:'rgba(0,0,0,0.15)' }}>
-                  {/* Reading progress indicator */}
-                  <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:10, padding:'6px 10px', borderRadius:8, background:'rgba(0,230,138,0.06)' }}>
-                    <span style={{ fontSize:10, color:'var(--accent)', fontWeight:600 }}>📖 Чтение</span>
-                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)' }}>· {readTime} мин</span>
-                    <div style={{ flex:1 }} />
-                    <button onClick={() => setExpandedId(null)}
-                      style={{ fontSize:9, color:'rgba(255,255,255,0.3)', background:'transparent', border:'none', cursor:'pointer', padding:'2px 6px' }}>
-                      ✕ Свернуть
-                    </button>
-                  </div>
-
-                  <div dangerouslySetInnerHTML={{ __html: renderMarkdown(article.content) }} />
-
-                  {/* Tags */}
-                  {article.tags.length > 0 && (
-                    <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginTop:12, paddingTop:10, borderTop:'1px solid rgba(255,255,255,0.04)' }}>
-                      {article.tags.map(t => (
-                        <span key={t} style={{
-                          padding:'2px 8px', borderRadius:10, fontSize:9,
-                          background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.4)',
-                        }}>#{t}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* PDF click hint */}
-              {isPDF && !isExpanded && (
+              {isPDF && (
                 <div style={{ padding:'2px 10px 8px', display:'flex', alignItems:'center', gap:4 }}>
                   <span style={{ fontSize:8.5, color:'rgba(239,68,68,0.5)' }}>📂 Нажмите, чтобы открыть</span>
                 </div>

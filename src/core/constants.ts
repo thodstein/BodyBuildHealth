@@ -162,12 +162,11 @@ export const ALL_RISK_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocri
 export const BASE_RISK = 0.30;
 
 export const REQUIRED_LABS_PER_PHASE: Record<string, string[]> = {
-  baseline:              ['ALT','AST','GGT','ALP','BIL','DBIL','HCT','HGB','PLT','WBC','TT','FT3','FT4','TSH','E2','PRL','LH','FSH','SHBG','CRP','HbA1c','FERRITIN','VITD','LDL','HDL','TG','GLU','INS','HOMA','CREATININE','UA','B12','FOLATE','ALB','TP','K','NA','CA','P','MG','CORTISOL','DHT','PSA','INHB','AMH'],
-  on_cycle:              ['ALT','AST','GGT','ALP','HCT','HGB','PLT','WBC','TT','E2','PRL','LH','FSH','LDL','HDL','TG','GLU','INS','HOMA','CRP','CREATININE','UA','CORTISOL','IGF1','BIL','DBIL','K','NA','D_DIMER','FIBRINOGEN','TROPONIN','BNP'],
-  bridge:                ['TT','FT3','FT4','TSH','E2','LH','FSH','HCT','ALT','AST','CRP','SHBG','IGF1','GLU','INS','HOMA','CREATININE'],
-  pct:                   ['TT','LH','FSH','E2','PRL','SHBG','IGF1','FT3','FT4','TSH','ALT','AST','GGT','HCT','HGB','CRP','LDL','HDL','CORTISOL'],
-  post_pct:              ['TT','LH','FSH','HCT','ALT','AST','GGT','E2','SHBG','IGF1','TSH','FT3','FT4','CRP','HbA1c','LDL','HDL','TG','GLU','INS','CREATININE','FERRITIN','VITD','PSA'],
-  course_bridge_course:  ['TT','E2','LH','FSH','HCT','ALT','AST','GGT','CRP','HOMA','GLU','INS','CREATININE','TG','LDL','HDL','CORTISOL','IGF1','K','NA']
+  baseline:              ['ALT','AST','GGT','ALP','BIL','DBIL','HCT','HGB','PLT','WBC','TT','FT3','FT4','TSH','E2','PRL','LH','FSH','SHBG','CRP','HbA1c','FERRITIN','VITD','LDL','HDL','TG','GLU','INS','HOMA','CREATININE','UA','B12','FOLATE','ALB','TP','K','NA','CA','P','MG','CORTISOL','DHT','PSA','INHB','AMH','EGFR','UACR'],
+  on_cycle:              ['ALT','AST','GGT','ALP','HCT','HGB','PLT','WBC','TT','E2','PRL','LH','FSH','LDL','HDL','TG','GLU','INS','HOMA','CRP','CREATININE','UA','CORTISOL','IGF1','BIL','DBIL','K','NA','D_DIMER','FIBRINOGEN','TROPONIN','BNP','EGFR','UACR','HbA1c'],
+  bridge:                ['TT','FT3','FT4','TSH','E2','LH','FSH','HCT','ALT','AST','CRP','SHBG','IGF1','GLU','INS','HOMA','CREATININE','LDL','HDL','TG','GGT','ALP','BIL','HGB','K','NA','HbA1c','EGFR','UACR','PRL'],
+  pct:                   ['TT','LH','FSH','E2','PRL','SHBG','IGF1','FT3','FT4','TSH','ALT','AST','GGT','HCT','HGB','CRP','LDL','HDL','CORTISOL','TG','ALP','BIL','CREATININE','K','NA','GLU','HbA1c','EGFR','UACR'],
+  post_pct:              ['TT','LH','FSH','HCT','ALT','AST','GGT','E2','SHBG','IGF1','TSH','FT3','FT4','CRP','HbA1c','LDL','HDL','TG','GLU','INS','CREATININE','FERRITIN','VITD','PSA','ALP','BIL','HGB','K','NA','PRL','EGFR','UACR'],
 } as const;
 
 
@@ -178,7 +177,6 @@ export const REQUIRED_DIAGNOSTICS_PER_PHASE: Record<string, string[]> = {
   bridge:                ['joint_mri','echocg'],
   pct:                   ['usg_obp','usg_testes'],
   post_pct:              ['echocg','dexa','bp_monitor'],
-  course_bridge_course:  ['joint_usg','echocg','usg_testes']
 } as const;
 
 export const DIAGNOSTIC_TEMPLATES: Record<string, { name: string; keyMetrics: string[]; refRanges: Record<string, [number, number]> }> = {
@@ -372,14 +370,6 @@ export const PHASE_SCHEDULE_RULES: Record<string, { checkpoints: { type: string;
       { type: 'end_course', week: 12, markers: REQUIRED_LABS_PER_PHASE.on_cycle }
     ]
   },
-  'course-bridge-course': {
-    checkpoints: [
-      { type: 'baseline', week: 0, markers: REQUIRED_LABS_PER_PHASE.baseline },
-      { type: 'end_course', week: 8, markers: REQUIRED_LABS_PER_PHASE.on_cycle },
-      { type: 'bridge', week: 10, markers: REQUIRED_LABS_PER_PHASE.bridge },
-      { type: 'baseline', week: 12, markers: REQUIRED_LABS_PER_PHASE.baseline }
-    ]
-  },
   'course-pct': {
     checkpoints: [
       { type: 'baseline', week: 0, markers: REQUIRED_LABS_PER_PHASE.baseline },
@@ -486,6 +476,7 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'APTT': { prefUnit: 'sec', coeff: 1, uln: 40, lln: 25, name: 'АЧТВ' },
   'HOMAIR': { prefUnit: '', coeff: 1, uln: 2.7, lln: 1.0, name: 'HOMA-IR' },
   'EGFR': { prefUnit: 'mL/min', coeff: 1, uln: 120, lln: 60, name: 'СКФ' },
+  'UACR': { prefUnit: 'mg/g', coeff: 1, uln: 30, lln: 0, name: 'Альбумин/креатинин мочи' },
   'PROTEIN_URINE': { prefUnit: 'mg/L', coeff: 1, uln: 150, lln: 0, name: 'Протеинурия' },
   'MICROALB': { prefUnit: 'mg/L', coeff: 1, uln: 30, lln: 0, name: 'Микроальбумин' },
   'ECHO_LV_MASS': { prefUnit: 'g', coeff: 1, uln: 200, lln: 90, name: 'Масса ЛЖ' },

@@ -1,6 +1,5 @@
 // @ts-nocheck
 import React from 'react';
-import { SupportCalculator } from './SupportCalculator';
 import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS } from '../../../data/support-database';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { hydrateState, runSupportForLevel } from '../../../engines/support-plan';
@@ -18,10 +17,10 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
   const {
     setAutoCalcResult, setManualLevelSelected, setSupportLevel, setEnhancedSubs,
     showToast, calcSupport, setShowModal, setModalAddMode,
-    setBoostEnabled, setJointMode, setReproMode, setSupportPhase,
+    setBoostEnabled, setJointMode, setReproMode, setNeuroMode, setSupportPhase,
     setPlanSaved, setExpandedCategories, setSubSearch, setMyPlansRefresh,
     linked, supportLevel, autoLevel, manualLevelSelected,
-    boostEnabled, jointMode, reproMode, supportPhase, courseWeekState,
+    boostEnabled, jointMode, reproMode, neuroMode, supportPhase, courseWeekState,
     weekChangeMsg, calcDone, calcResult, planResult, effectiveLevel,
     planSaved, enhancedSubs, expandedCategories, subSearch, allSupport,
     SUPPORT_LEVELS,
@@ -32,18 +31,6 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
   return (
         <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
             <div style={{ flex:1, overflowY:'auto', paddingRight:4, display:'flex', flexDirection:'column', gap:8 }}>
-
-            {/* ===== КАЛЬКУЛЯТОР ПОДДЕРЖКИ (Собрать данные + расчёт) ===== */}
-            <SupportCalculator embedded
-              onApply={(applied: { level: string; subs: string[]; result: any }) => {
-                setAutoCalcResult(applied);
-                setManualLevelSelected(true);
-                setSupportLevel(applied.level as any);
-                setEnhancedSubs(applied.subs || []);
-                showToast(`✅ ${SUPPORT_LEVELS[applied.level]?.label || applied.level}`, 'success');
-                setTimeout(() => calcSupport(applied.level as any), 100);
-              }}
-            />
 
             {/* ===== ЕДИНАЯ КАРТОЧКА РАСЧЁТА ПОДДЕРЖКИ ===== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:16, border:'2px solid rgba(0,230,138,0.25)', position:'relative' }}>
@@ -149,6 +136,12 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                   border: reproMode ? '2px solid rgba(236,72,153,0.4)' : '1px solid rgba(255,255,255,0.06)',
                   color: reproMode ? '#ec4899' : 'var(--text-dim)',
                 }}>⚧ Репродукт.</button>
+                <button onClick={() => { setNeuroMode(!neuroMode); setTimeout(() => calcSupport(), 50); }} style={{
+                  flex:1, padding:'8px 6px', borderRadius:10, fontSize:9, fontWeight:700, cursor:'pointer',
+                  background: neuroMode ? 'rgba(20,184,166,0.12)' : 'rgba(255,255,255,0.03)',
+                  border: neuroMode ? '2px solid rgba(20,184,166,0.4)' : '1px solid rgba(255,255,255,0.06)',
+                  color: neuroMode ? '#14b8a6' : 'var(--text-dim)',
+                }}>🧠 Нейропрот.</button>
               </div>
 
               {/* Active mode banners */}
@@ -168,6 +161,12 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                 <div style={{ marginBottom:6, padding:'8px 12px', borderRadius:8, background:'rgba(236,72,153,0.08)', border:'1px solid rgba(236,72,153,0.2)', fontSize:9, color:'#ec4899', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <span>⚧ Репродуктивная система — добавлены препараты для HPTA/сперматогенеза</span>
                   <button onClick={() => { setReproMode(false); calcSupport(); }} style={{ background:'none', border:'none', color:'#ec4899', cursor:'pointer', fontSize:10, fontWeight:700 }}>✕</button>
+                </div>
+              )}
+              {neuroMode && (
+                <div style={{ marginBottom:6, padding:'8px 12px', borderRadius:8, background:'rgba(20,184,166,0.08)', border:'1px solid rgba(20,184,166,0.2)', fontSize:9, color:'#14b8a6', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span>🧠 Нейропротекция — добавлены ноотропы и нейропротекторы</span>
+                  <button onClick={() => { setNeuroMode(false); calcSupport(); }} style={{ background:'none', border:'none', color:'#14b8a6', cursor:'pointer', fontSize:10, fontWeight:700 }}>✕</button>
                 </div>
               )}
               
@@ -339,6 +338,7 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                       💊 Препараты плана ({effectiveLevel.subs.length})
                       {boostEnabled && <span style={{ fontSize:8, padding:'1px 6px', borderRadius:4, background:'rgba(239,68,68,0.12)', color:'#ef4444' }}>🔥 Усиление</span>}
                       {jointMode && <span style={{ fontSize:8, padding:'1px 6px', borderRadius:4, background:'rgba(139,92,246,0.12)', color:'#8b5cf6' }}>🦴 Суставы</span>}
+                      {neuroMode && <span style={{ fontSize:8, padding:'1px 6px', borderRadius:4, background:'rgba(20,184,166,0.12)', color:'#14b8a6' }}>🧠 Нейропрот.</span>}
                     </div>
                     <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
                       {effectiveLevel.subs.map((id: string) => {
@@ -479,7 +479,8 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                         🟠 Максимум 30-45% · 4/систему<br/>
                         🔴 Буст 15-30% · 5/систему<br/>
                         🔥 Усиление: target -5%, max +1/систему<br/>
-                        🦴 Суставы: отдельный стек, не влияет на расчёт риска
+                        🦴 Суставы: отдельный стек, не влияет на расчёт риска<br/>
+                        🧠 Нейропротекция: добавляет ноотропы/нейропротекторы
                       </div>
                       <div>
                         <b style={{ color:'#f59e0b' }}>Логика препаратов:</b> пероральные 17α-алкилированные → усиленная гепатопротекция (TUDCA + NAC + силимарин); тренболон → контроль пролактина + нейропротекция; тестостерон → контроль E2 + HCT; нандролон → контроль пролактина.
@@ -869,20 +870,129 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                     </details>
                   )}
 
-                  {/* ===== STACK RECOMMENDATIONS CARD ===== */}
+                  {/* ===== STACK RECOMMENDATIONS CARD (Expandable) ===== */}
                   {planResult?.stackRecommendations && planResult.stackRecommendations.length > 0 && (
                     <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.15)' }}>
-                      <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>🧩 Рекомендованные стеки</div>
-                      <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
-                        {planResult.stackRecommendations.slice(0, 3).map((sr: any, i: number) => (
-                          <div key={i} style={{ marginBottom:6, padding:'6px 8px', borderRadius:6, background:'rgba(0,0,0,0.06)', border:'1px solid var(--border)' }}>
-                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:3 }}>
-                              <span style={{ fontWeight:700, color:'var(--text-light)', fontSize:9 }}>{sr.stack.name}</span>
-                              <div style={{ display:'flex', gap:4 }}>
-                                <span style={{ fontSize:8, fontWeight:700, color: sr.score >= 70 ? '#22c55e' : sr.score >= 40 ? '#f59e0b' : 'var(--text-dim)' }}>
-                                  {sr.score}/100</span>{sr.score>=70&&sr.coveredSystems.length>=3&&<span style={{fontSize:7,color:'#22c55e'}}>Авто</span>}<button onClick={(e)=>{e.stopPropagation();const ns=sr.stack.substances.map((s:any)=>s.id).filter((id:string)=>!effectiveLevel?.subs?.includes(id));if(ns.length>0){setEnhancedSubs((p:string[])=>[...new Set([...p,...ns])]);showToast('+ Стек ('+ns.length+')','success');}else showToast('Уже в плане','warning');}} style={{marginLeft:'auto',padding:'2px 8px',borderRadius:6,fontSize:7,fontWeight:700,cursor:'pointer',background:'rgba(0,230,138,0.1)',border:'1px solid rgba(0,230,138,0.3)',color:'var(--accent)'}}>+ В план</button>
+                      <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>🧩 Рекомендованные стеки ({planResult.stackRecommendations.length})</div>
+                        {planResult.stackRecommendations.map((sr: any, i: number) => {
+                          const expandedKey = `stack_${i}`;
+                          const isExpanded = expandedCategories[expandedKey];
+                          const subsInPlan = (sr.stack.substances || []).filter((sub: any) => effectiveLevel?.subs?.includes(sub.id) || enhancedSubs?.includes(sub.id));
+                          const subsMissing = (sr.stack.substances || []).filter((sub: any) => !effectiveLevel?.subs?.includes(sub.id) && !enhancedSubs?.includes(sub.id));
+                          const missingIds = subsMissing.map((s: any) => s.id);
+                          return (
+                            <div key={i} style={{ marginBottom:6, borderRadius:8, background:'rgba(0,0,0,0.06)', border:'1px solid var(--border)', overflow:'hidden' }}>
+                              {/* Header row — click to expand/collapse */}
+                              <div
+                                onClick={() => setExpandedCategories((p: any) => ({ ...p, [expandedKey]: !p[expandedKey] }))}
+                                style={{ padding:'8px 10px', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center', gap:6 }}
+                              >
+                                <div style={{ flex:1, minWidth:0 }}>
+                                  <div style={{ fontWeight:700, color:'var(--text-light)', fontSize:9, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                                    {isExpanded ? '▾' : '▸'} {sr.stack.name}
+                                  </div>
+                                  <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>
+                                    {subsInPlan.length}/{sr.stack.substances.length} в плане · синергия {sr.synergyBonus}
+                                  </div>
+                                </div>
+                                <div style={{ display:'flex', gap:4, alignItems:'center', flexShrink:0 }}>
+                                  <span style={{ fontSize:8, fontWeight:700, color: sr.score >= 70 ? '#22c55e' : sr.score >= 40 ? '#f59e0b' : 'var(--text-dim)' }}>
+                                    {sr.score}</span>
+                                  {missingIds.length > 0 && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEnhancedSubs((p: string[]) => [...new Set([...p, ...missingIds])]);
+                                        showToast('+ ' + missingIds.length + ' вещ. из стека', 'success');
+                                      }}
+                                      style={{ padding:'2px 8px', borderRadius:6, fontSize:7, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'var(--accent)', whiteSpace:'nowrap' }}
+                                    >+ {missingIds.length} в план</button>
+                                  )}
+                                  {missingIds.length === 0 && (
+                                    <span style={{ fontSize:7, color:'#22c55e', fontWeight:700 }}>✓ всё в плане</span>
+                                  )}
+                                </div>
                               </div>
+
+                              {/* Expanded content */}
+                              {isExpanded && (
+                                <div style={{ padding:'8px 10px', borderTop:'1px solid var(--border)' }}>
+                                  {/* Description */}
+                                  {sr.stack.description && (
+                                    <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5, marginBottom:6 }}>
+                                      {sr.stack.description}
+                                    </div>
+                                  )}
+                                  {/* Synergy principle */}
+                                  {sr.stack.synergyPrinciple && (
+                                    <div style={{ fontSize:8, color:'#60a5fa', lineHeight:1.4, marginBottom:6, padding:'4px 8px', borderRadius:6, background:'rgba(96,165,250,0.04)', border:'1px solid rgba(96,165,250,0.1)' }}>
+                                      ⚡ {sr.stack.synergyPrinciple}
+                                    </div>
+                                  )}
+                                  {/* All substances with in-plan/missing markers */}
+                                  <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:6 }}>
+                                    {(sr.stack.substances || []).map((sub: any, j: number) => {
+                                      const inPlan = effectiveLevel?.subs?.includes(sub.id) || enhancedSubs?.includes(sub.id);
+                                      const catEntry = SUPPORT_CATALOG_DATA[sub.id] || SUPPORT_CATALOG_DATA[sub.id?.toUpperCase()] || SUPPORT_CATALOG_DATA[sub.id?.toLowerCase()];
+                                      const displayName = catEntry?.nameRu || catEntry?.name || sub.id;
+                                      return (
+                                        <div key={j} style={{
+                                          padding:'4px 8px', borderRadius:6,
+                                          background: inPlan ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.04)',
+                                          border: '1px solid ' + (inPlan ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.08)'),
+                                          display:'flex', alignItems:'flex-start', gap:6,
+                                        }}>
+                                          <span style={{ fontSize:9, flexShrink:0 }}>{inPlan ? '✅' : '⬜'}</span>
+                                          <div style={{ flex:1, minWidth:0 }}>
+                                            <div style={{ fontSize:8, fontWeight:700, color: inPlan ? '#22c55e' : 'var(--text-light)' }}>
+                                              {displayName} <span style={{ fontWeight:400, color:'var(--text-dim)' }}>— {sub.dose}</span>
+                                            </div>
+                                            {sub.mechanism && (
+                                              <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.3, marginTop:1 }}>{sub.mechanism}</div>
+                                            )}
+                                          </div>
+                                          {!inPlan && (
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEnhancedSubs((p: string[]) => [...new Set([...p, sub.id])]);
+                                                showToast('+ ' + (catEntry?.nameRu || sub.id), 'success');
+                                              }}
+                                              style={{ padding:'2px 6px', borderRadius:4, fontSize:7, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'var(--accent)', flexShrink:0, whiteSpace:'nowrap' }}
+                                            >+ доб.</button>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  {/* Monitoring */}
+                                  {sr.stack.monitoring && (
+                                    <div style={{ fontSize:7, color:'#f59e0b', lineHeight:1.4, marginBottom:4 }}>
+                                      📊 {sr.stack.monitoring}
+                                    </div>
+                                  )}
+                                  {/* Special instructions */}
+                                  {sr.stack.specialInstructions && (
+                                    <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.4, marginBottom:4 }}>
+                                      💊 {sr.stack.specialInstructions}
+                                    </div>
+                                  )}
+                                  {/* Contraindications */}
+                                  {sr.stack.contraindications && (
+                                    <div style={{ fontSize:7, color:'#ef4444', lineHeight:1.4 }}>
+                                      ⚠ {sr.stack.contraindications}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
+                          );
+                        })}
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:4 }}>
+                        💡 Нажмите на стек, чтобы развернуть. Зелёные ✅ — уже в плане, пустые ⬜ — добавить.
+                      </div>
+                    </div>
+                  )}
 
                   {/* ===== C2: WHAT-IF ANALYZER ===== */}
                   {calcDone && effectiveLevel?.subs && (
@@ -910,25 +1020,6 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                           </div>
                         ) : null;
                       })}
-                    </div>
-                  )}
-                            <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:2 }}>{sr.reason}</div>
-                            <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                              {sr.stack.substances.slice(0, 5).map((sub: any, j: number) => (
-                                <span key={j} style={{ padding:'1px 5px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'var(--accent)', fontSize:7 }}>{sub.id}</span>
-                              ))}
-                              {sr.stack.substances.length > 5 && <span style={{ fontSize:7, color:'var(--text-dim)' }}>+{sr.stack.substances.length - 5}</span>}
-                            </div>
-                            {sr.wasteSubstances && sr.wasteSubstances.length > 0 && (
-                              <div style={{ fontSize:6, color:'#ef4444', marginTop:2 }}>⚠ Избыточно: {sr.wasteSubstances.join(', ')}</div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:4 }}>
-                        💡 Стеки оцениваются по покрытию рисков, синергии и отсутствию избыточных веществ.
-                        Приоритет — стеки, которые закрывают максимум механизмов минимумом препаратов.
-                      </div>
                     </div>
                   )}
 

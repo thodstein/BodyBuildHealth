@@ -113,7 +113,6 @@ export function calculatePenaltyCoefficients(
 
 function resolvePhaseKey(phase: string): string {
   const p = phase.toLowerCase();
-  if (p.includes('course-bridge')) return 'course_bridge_course';
   if (p.includes('course') && !p.includes('bridge')) return 'on_cycle';
   if (p.includes('bridge')) return 'bridge';
   if (p.includes('pct') && p.includes('post')) return 'post_pct';
