@@ -82,10 +82,13 @@ export interface SessionPlayerProps {
 export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, focus }) => {
   const [profile] = useTrainingProfile();
   const [dayIdx, setDayIdx] = useState(0);
+  const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'done'>('ready');
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [done, setDone] = useState<WorkoutSession | null>(null);
   const [warmupBlocks, setWarmupBlocks] = useState<WarmupBlock[]>([]);
   const [cooldownBlocks, setCooldownBlocks] = useState<CooldownBlock[]>([]);
+  const [warmupDone, setWarmupDone] = useState<Record<string, boolean>>({});
+  const [cooldownDone, setCooldownDone] = useState<Record<string, boolean>>({});
   // фактический ввод текущего подхода: [exerciseIndex][setIndex] -> {weight,reps}
   const [actual, setActual] = useState<Record<string, { weight: number; reps: number; rpe: number }>>({});
   const [exDone, setExDone] = useState<Record<string, boolean>>({});
@@ -109,7 +112,14 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     if (!timerRunning || timerSec <= 0) return;
     timerRef.current = window.setTimeout(() => {
       setTimerSec(prev => {
-        if (prev <= 1) { setTimerRunning(false); hapticNotify('success'); return 0; }
+        if (prev <= 1) { 
+          setTimerRunning(false); 
+          hapticNotify('success');
+          try {
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+            audio.play().catch(() => {});
+          } catch { /* browser block */ }
+        }
         return prev - 1;
       });
     }, 1000);
@@ -159,30 +169,20 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
       equipmentAvailable: profile.equipment,
     };
     setWarmupBlocks(generateWarmup(warmupInput));
+    setPhase('warmup');
+    setWarmupDone({});
+  };
 
+  const startMain = () => {
+    if (!day) return;
     let s = startSession(focus || day.label, weekNumber);
     day.exercises.forEach(ex => {
       s = addExerciseToSession(s, { id: ex.name, name: ex.name, pattern: ex.muscleGroup, muscleGroup: ex.muscleGroup });
     });
     setSession(s);
-    setDone(null);
+    setPhase('main');
     setActual({});
     setExDone({});
-    setCooldownBlocks([]);
-  };
-
-  const keyFor = (ei: number, si: number) => `${ei}_${si}`;
-
-  const logOne = (ei: number, si: number) => {
-    if (!session || !day) return;
-    hapticImpact('light');
-    const t = day.exercises[ei].targetSets[si];
-    const a = actual[keyFor(ei, si)] || { weight: t.weight, reps: t.reps, rpe: 0 };
-    let s = logSet(session, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: a.rpe || 0, rir: t.rir, notes: '' });
-    setSession(s);
-    setActual(prev => ({ ...prev, [keyFor(ei, si)]: a }));
-    // авто-старт таймера отдыха после подхода
-    startRestTimer(ei);
   };
 
   const finish = () => {
@@ -205,11 +205,31 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
       sessionDuration: (finished.durationMin || sessionDur) * 60,
     };
     setCooldownBlocks(generateCooldown(cooldownInput));
+    setPhase('cooldown');
+    setCooldownDone({});
 
-    // P12 wire: сохранить сессию с sRPE для мониторинга нагрузки (training-load.engine)
     try { saveSRPESession({ date: finished.date, sRPE: sessionRPE, durationMin: finished.durationMin || sessionDur }); } catch { /* ignore */ }
     setDone(finished);
     setSession(null);
+  };
+
+  const exitSession = () => {
+    setPhase('done');
+  };
+
+
+  const keyFor = (ei: number, si: number) => `${ei}_${si}`;
+
+  const logOne = (ei: number, si: number) => {
+    if (!session || !day) return;
+    hapticImpact('light');
+    const t = day.exercises[ei].targetSets[si];
+    const a = actual[keyFor(ei, si)] || { weight: t.weight, reps: t.reps, rpe: 0 };
+    let s = logSet(session, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: a.rpe || 0, rir: t.rir, notes: '' });
+    setSession(s);
+    setActual(prev => ({ ...prev, [keyFor(ei, si)]: a }));
+    // авто-старт таймера отдыха после подхода
+    startRestTimer(ei);
   };
 
   // Плановые метрики дня
@@ -339,24 +359,26 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
                         🏋️ {formatPlates(t.weight)}
                       </span>
                     )}
-                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                      <input style={{ ...IN, width: 60 }} type="number" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { weight: +e.target.value, reps: a.reps, rpe: a.rpe } }))} aria-label="вес" />
-                      <input style={{ ...IN, width: 48 }} type="number" value={a.reps} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: +e.target.value, rpe: a.rpe } }))} aria-label="повт" />
-                      <input style={{ ...IN, width: 44 }} type="number" min={0} max={10} placeholder="RPE" value={a.rpe || ""} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: a.reps, rpe: +e.target.value } }))} aria-label="RPE" />
-                      <input style={{ ...IN, width: 48 }} type="number" step="0.01" placeholder="v" value={vel[k] ?? ""} onChange={e => setVel(p => ({ ...p, [k]: +e.target.value }))} aria-label="скорость м/с" />
-                      <button style={logged ? BTN_GHOST : BTN} onClick={() => logOne(ei, si)}>{logged ? '✓' : 'OK'}</button>
-                    </div>
-                    {logged && (
-                      <div style={{ width: '100%', fontSize: 10, color: 'rgba(255,255,255,0.55)', paddingLeft: 56, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                        <span>факт <b style={{ color: '#fff' }}>{a.weight}кг×{a.reps}</b>{a.rpe > 0 ? `@RPE${a.rpe}` : ''}</span>
-                        <span style={{ color: dW === 0 ? 'var(--text-dim)' : dW > 0 ? '#22c55e' : '#f59e0b' }}>Δвес {dW > 0 ? '+' : ''}{dW}</span>
-                        <span style={{ color: dR === 0 ? 'var(--text-dim)' : dR > 0 ? '#22c55e' : '#f59e0b' }}>Δповт {dR > 0 ? '+' : ''}{dR}</span>
-                        {a.rpe > 0 && <span style={{ color: rpeDelta > 0 ? '#ef4444' : rpeDelta < -1 ? '#22c55e' : 'var(--text-dim)' }}>RPE vs цели({targetRPE}): {rpeDelta > 0 ? '+' : ''}{rpeDelta}</span>}
-                        {a.rpe > 0 && (rpeDelta > 0 || rpeDelta < -1) && (
-                          <span style={{ color: ACCENT, fontWeight: 700 }}>→ след. сет: {nextW}кг×{nextR}{rpeDelta > 0 ? ' (легче)' : ' (тяжелее)'}</span>
-                        )}
-                      </div>
-                    )}
+                     <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                       <input style={{ ...IN, width: 60 }} type="number" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { weight: +e.target.value, reps: a.reps, rpe: a.rpe } }))} aria-label="вес" />
+                       <input style={{ ...IN, width: 48 }} type="number" value={a.reps} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: +e.target.value, rpe: a.rpe } }))} aria-label="повт" />
+                       <input style={{ ...IN, width: 44 }} type="number" min={0} max={10} placeholder="RPE" value={a.rpe || ""} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: a.reps, rpe: +e.target.value } }))} aria-label="RPE" />
+                       <input style={{ ...IN, width: 48 }} type="number" step="0.01" placeholder="v" value={vel[k] ?? ""} onChange={e => setVel(p => ({ ...p, [k]: +e.target.value }))} aria-label="скорость м/с" />
+                       <button style={logged ? BTN_GHOST : BTN} onClick={() => logOne(ei, si)}>{logged ? '✓' : 'OK'}</button>
+                     </div>
+                     {logged && (
+                       <div style={{ width: '100%', fontSize: 10, color: 'rgba(255,255,255,0.55)', paddingLeft: 56, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                         <span style={{ color: 'rgba(255,255,255,0.8)' }}>🏋️ {formatPlates(a.weight)}</span>
+                         <span>факт <b style={{ color: '#fff' }}>{a.weight}кг×{a.reps}</b>{a.rpe > 0 ? `@RPE${a.rpe}` : ''}</span>
+                         <span style={{ color: dW === 0 ? 'var(--text-dim)' : dW > 0 ? '#22c55e' : '#f59e0b' }}>Δвес {dW > 0 ? '+' : ''}{dW}</span>
+                         <span style={{ color: dR === 0 ? 'var(--text-dim)' : dR > 0 ? '#22c55e' : '#f59e0b' }}>Δповт {dR > 0 ? '+' : ''}{dR}</span>
+                         {a.rpe > 0 && <span style={{ color: rpeDelta > 0 ? '#ef4444' : rpeDelta < -1 ? '#22c55e' : 'var(--text-dim)' }}>RPE vs цели({targetRPE}): {rpeDelta > 0 ? '+' : ''}{rpeDelta}</span>}
+                         {a.rpe > 0 && (rpeDelta > 0 || rpeDelta < -1) && (
+                           <span style={{ color: ACCENT, fontWeight: 700 }}>→ след. сет: {nextW}кг×{nextR}{rpeDelta > 0 ? ' (легче)' : ' (тяжелее)'}</span>
+                         )}
+                       </div>
+                     )}
+
                   </div>
                 );
               })}

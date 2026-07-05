@@ -38,6 +38,15 @@ export const PlanTraining: React.FC<{
 
   const [clipboardDay, setClipboardDay] = useState<any>(null);
   const [localPlan, setLocalPlan] = useState<any[]>([]);
+  const [massScale, setMassScale] = useState({ weight: 0, volume: 0 });
+
+  const SET_PRESETS: Record<string, { sets: number, reps: number }> = {
+    '5x5': { sets: 5, reps: 5 },
+    '3x8': { sets: 3, reps: 8 },
+    '4x10': { sets: 4, reps: 10 },
+    'AMRAP': { sets: 1, reps: 0 },
+    'Myo-rep': { sets: 1, reps: 12 },
+  };
 
   useEffect(() => {
     if (trainingResult) {
@@ -51,6 +60,21 @@ export const PlanTraining: React.FC<{
       ...newPlan[dayIndex].exercises[exIndex],
       [field]: value
     };
+    setLocalPlan(newPlan);
+  };
+
+  const applyMassEdit = (type: 'weight' | 'volume') => {
+    const factor = 1 + (massScale[type] / 100);
+    const newPlan = localPlan.map(day => ({
+      ...day,
+      exercises: day.exercises.map((ex: Exercise) => {
+        if (type === 'weight') {
+          return { ...ex, weight: Math.round((ex.weight || 0) * factor) };
+        } else {
+          return { ...ex, sets: Math.round((ex.sets || 0) * factor) };
+        }
+      })
+    }));
     setLocalPlan(newPlan);
   };
   return (
@@ -119,6 +143,21 @@ export const PlanTraining: React.FC<{
             Рекомендация: {deloadRec.reason}
           </div>
         )}
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Массовое редактирование (%)</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 10 }}>Вес:</span>
+              <input type="number" value={massScale.weight} onChange={e => setMassScale({...massScale, weight: parseFloat(e.target.value)||0})} style={{ width: 40, fontSize: 10 }} />
+              <button onClick={() => applyMassEdit('weight')} style={{ fontSize: 10 }}>Применить</button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 10 }}>Объем:</span>
+              <input type="number" value={massScale.volume} onChange={e => setMassScale({...massScale, volume: parseFloat(e.target.value)||0})} style={{ width: 40, fontSize: 10 }} />
+              <button onClick={() => applyMassEdit('volume')} style={{ fontSize: 10 }}>Применить</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {splitOptions && splitOptions.length > 0 && (
@@ -227,7 +266,25 @@ export const PlanTraining: React.FC<{
                           {ex.targetMuscle && <div style={{ fontSize: 10 }}>{ex.targetMuscle}</div>}
                         </td>
                         <td>
-                          <input type="number" value={ex.sets || 0} onChange={(e) => updateExercise(dayIndex, i, 'sets', parseInt(e.target.value))} style={{width: 30}} />
+                          <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                            <input type="number" value={ex.sets || 0} onChange={(e) => updateExercise(dayIndex, i, 'sets', parseInt(e.target.value))} style={{width: 30}} />
+                            <select 
+                              style={{ fontSize: 9, width: 50 }} 
+                              onChange={(e) => {
+                                const preset = SET_PRESETS[e.target.value];
+                                if (preset) {
+                                  updateExercise(dayIndex, i, 'sets', preset.sets);
+                                  updateExercise(dayIndex, i, 'reps', preset.reps);
+                                }
+                              }}
+                              value=""
+                            >
+                              <option value="" disabled>Шаблон</option>
+                              {Object.entries(SET_PRESETS).map(([name, val]) => (
+                                <option key={name} value={name}>{name}</option>
+                              ))}
+                            </select>
+                          </div>
                         </td>
                         <td>
                           <input type="number" value={ex.reps || 0} onChange={(e) => updateExercise(dayIndex, i, 'reps', parseInt(e.target.value))} style={{width: 30}} />

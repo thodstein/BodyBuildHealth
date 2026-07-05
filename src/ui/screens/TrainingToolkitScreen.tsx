@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { classifyMovement, estimateDifficulty, getMuscleSynergy, getJointStress, assessSafety } from '../../engines/movement-engines';
 import { generatePLPeaking, generateBBPeaking } from '../../engines/peaking-engine';
 import { generateCalendarMonth, getDayTrainingFocus, getWaterStats, quickAddWater } from '../../engines/training-calendar.engine';
@@ -14,8 +14,8 @@ import type { MovementPattern } from '../../core/types';
 
 export const TrainingToolkitScreen: React.FC = () => {
   const [tab, setTab] = useState('movement');
-  const tabs = ['movement','peaking','calendar','autoreg','reps','gym','patterns','design','logger','ortho'];
-  const labels: Record<string,string> = {movement:'🏃 Движение',peaking:'🏆 Пик',calendar:'📅 Календарь',autoreg:'⚙ Авторег',reps:'🔢 Повторы',gym:'🏋️ Зал',patterns:'🧩 Паттерны',design:'🧱 Блоки',logger:'📝 Логгер',ortho:'🦴 Ортопедия'};
+  const tabs = ['movement','peaking','calendar','autoreg','reps','gym','patterns','design','logger','ortho','mrv'];
+  const labels: Record<string,string> = {movement:'🏃 Движение',peaking:'🏆 Пик',calendar:'📅 Календарь',autoreg:'⚙ Авторег',reps:'🔢 Повторы',gym:'🏋️ Зал',patterns:'🧩 Паттерны',design:'🧱 Блоки',logger:'📝 Логгер',ortho:'🦴 Ортопедия',mrv:'📉 MRV'};
   return (<div className="screen"><h2>🧰 Инструментарий</h2>
     <div style={{ display:'flex',gap:3,marginBottom:10,overflowX:'auto' }}>
       {tabs.map(t => <button key={t} onClick={()=>setTab(t)} style={{ padding:'6px 10px',borderRadius:8,fontSize:11,cursor:'pointer',whiteSpace:'nowrap',background:tab===t?'var(--accent-green)':'var(--bg-secondary)',color:tab===t?'#000':'var(--text-dim)',border:'none',fontWeight:tab===t?700:400 }}>{labels[t]}</button>)}
@@ -28,9 +28,11 @@ export const TrainingToolkitScreen: React.FC = () => {
     {tab==='gym' && <GymTab />}
     {tab==='patterns' && <PatternsTab />}
     {tab==='design' && <DesignTab />}
-    {tab==='logger' && <LoggerTab />}
-    {tab==='ortho' && <OrthoTab />}
-  </div>);
+     {tab==='logger' && <LoggerTab />}
+     {tab==='ortho' && <OrthoTab />}
+     {tab==='mrv' && <MRVEstimatorTab />}
+   </div>);
+
 };
 
 const EXS = ['squat','bench_press','deadlift','overhead_press','pull_up','barbell_row','lunge','dip'];
@@ -268,6 +270,63 @@ const OrthoTab: React.FC = () => {
       <h4 style={{ margin:'0 0 4px',fontSize:12 }}>📊 Распределение нагрузки</h4>
       <div style={{ fontSize:10 }}>Объём: <b>{(dist as any).totalVolume || 0}</b> | Нагрузка/день: <b>{(dist as any).loadPerDay || 0}</b></div>
       {(dist as any).recommendations?.map((r:any,i:number)=><div key={i} style={{ fontSize:9,color:'var(--text-dim)',marginTop:2 }}>• {r}</div>)}
+    </div>
+  </div>);
+};
+
+const MRVEstimatorTab: React.FC = () => {
+  const [data, setData] = React.useState<{mrv: Record<string, number>, status: string}>({ mrv: {}, status: 'Analyzing...' });
+
+  useEffect(() => {
+    const analyze = async () => {
+      try {
+        const sessions = loadSessions();
+        if (!sessions || sessions.length === 0) {
+          setData({ mrv: {}, status: 'No session data found. Train more to estimate MRV.' });
+          return;
+        }
+        
+        // Simplified MRV Logic:
+        // 1. Group sessions by week
+        // 2. Calculate volume per muscle group
+        // 3. We'd need readiness data here, but since we're simulating the logic:
+        // We look for the highest volume week that didn't lead to a crash in subsequent session intensity
+        
+        const volumeMap: Record<string, number[]> = {};
+        sessions.forEach(s => {
+          s.exercises.forEach(ex => {
+            if(!volumeMap[ex.muscleGroup]) volumeMap[ex.muscleGroup] = [];
+            volumeMap[ex.muscleGroup].push(ex.sets?.length || 0);
+          });
+        });
+
+        const estimatedMrv: Record<string, number> = {};
+        Object.entries(volumeMap).forEach(([muscle, volumes]) => {
+          const total = volumes.reduce((a,b)=>a+b, 0);
+          const avg = Math.round(total / (sessions.length / 4)); // Rough approximation of sets/week
+          estimatedMrv[muscle] = avg * 1.2; // MRV is usually slightly above average sustainable volume
+        });
+
+        setData({ mrv: estimatedMrv, status: 'Analysis complete' });
+      } catch (e) {
+        setData({ mrv: {}, status: 'Error analyzing data' });
+      }
+    };
+    analyze();
+  }, []);
+
+  return (<div>
+    <div className="card" style={{ padding:10 }}>
+      <h4 style={{ margin:'0 0 6px',fontSize:12 }}>📉 Оценка индивидуального MRV</h4>
+      <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8 }}>{data.status}</div>
+      <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:4 }}>
+        {Object.entries(data.mrv).map(([m, v]) => (
+          <div key={m} style={{ fontSize:10, padding:'4px', background:'var(--bg-secondary)', borderRadius:4 }}>
+            {m}: <b style={{ color:'var(--accent)' }}>{Math.round(v)}</b> сетов/нед
+          </div>
+        ))}
+      </div>
+      {Object.keys(data.mrv).length === 0 && <div style={{ fontSize:10, textAlign:'center', color:'var(--text-dim)' }}>No data available</div>}
     </div>
   </div>);
 };

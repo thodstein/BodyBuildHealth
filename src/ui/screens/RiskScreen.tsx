@@ -27,6 +27,7 @@ import { analyzeWithCompliance, type ComplianceReport, getComplianceStatus } fro
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
 import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { validateDiagnostics, getDiagnosticSummary } from '../../engines/diagnostics.engine';
+import { readRiskBridge, type RiskBridgeData } from '../../engines/risk-bridge';
 
 const RISK_HISTORY_KEY = 'risk_history';
 const MAX_HISTORY = 12;
@@ -335,6 +336,20 @@ export const RiskScreen: React.FC = () => {
     }
     if (shouldApplyPenalty) {
       result = applyPenaltyToResult(result);
+    }
+    // C18: Merge bridge data from SupportScreen (single source of truth for support-adjusted risk)
+    const bridge = readRiskBridge();
+    if (bridge && bridge.systemBreakdown) {
+      const bridgeBreakdown: Record<string, { raw: number; net: number }> = {};
+      for (const [sys, v] of Object.entries(bridge.systemBreakdown)) {
+        bridgeBreakdown[sys] = { raw: v.raw, net: v.net };
+      }
+      result = {
+        ...result,
+        overallRaw: bridge.riskBefore,
+        overallNet: bridge.riskAfter,
+        systemBreakdown: { ...result.systemBreakdown, ...bridgeBreakdown },
+      };
     }
     return result;
   }, [pharmaRisk, hasLabs, shouldApplyPenalty, noLabsSystems, trainingRisk, nutritionRisk]);

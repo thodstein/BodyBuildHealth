@@ -92,6 +92,9 @@ export const DeloadSchedulerTab: React.FC = () => {
       fatigueLevel: (linked.readiness?.fatigue ?? 30) / 100,
       recoveryLevel: (linked.readiness?.recovery ?? 80) / 100,
       overtrainingRisk: otResult.riskPercent,
+      acwr: acwr?.ratio ?? null,
+      monotony: monotonyResult?.monotony ?? null,
+      strain: monotonyResult?.strain ?? null,
     });
 
     const weeks = base.weeks.map(w => ({
@@ -104,7 +107,7 @@ export const DeloadSchedulerTab: React.FC = () => {
       weeks,
       deloadWeeks: weeks.filter(w => w.phase === 'deload' || w.phase === 'active_rest').map(w => w.week)
     };
-  }, [goal, level, weeksUntilGoal, currentWeek, linked.readiness, otResult.riskPercent, manualOverrides]);
+  }, [goal, level, weeksUntilGoal, currentWeek, linked.readiness, otResult.riskPercent, manualOverrides, acwr, monotonyResult]);
 
   const cyclePhase = (week: number) => {
     const phases: ScheduledWeek['phase'][] = ['accumulation', 'intensification', 'peaking', 'deload', 'active_rest'];

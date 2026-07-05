@@ -1,12 +1,12 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { usePlanCtx } from "./IndividualPlanContext";
 import { FOOD_DB } from "../../../../core/nutrition-database";
 import { getRecipesByMeal } from "../../../../engines/nutrition-periodization.engine";
 import { MealQuickControls } from "./MealQuickControls";
 import { MealComposerMode, type ComposerMode } from "./MealComposerMode";
 import type { AdvancedFilter } from "../../../../engines/kbju-food-match.engine";
-import { analyzeNutrientGaps } from "../../../../engines/nutrient-gap-filler.engine";
-import { getGapAwareComboResult, buildGapSummary, applyGapComboToPlan } from "../../../../engines/composer-targeting-integration";
+import { analyzeNutrientGaps, type NutrientGapResult } from "../../../../engines/nutrient-gap-filler.engine";
+import { getGapAwareComboResult, buildGapSummary, applyGapComboToPlan, type GapAwareScore } from "../../../../engines/composer-targeting-integration";
 
 const KbjuProgressBars: React.FC<{ dayPlan: any; targetKcal: number; targetP: number; targetF: number; targetC: number }> = ({
   dayPlan, targetKcal, targetP, targetF, targetC,
@@ -90,18 +90,29 @@ export const MealComposer: React.FC = () => {
 
   const currentDay = dayPlan || (threeDayPlan ? threeDayPlan[selectedDayIndex] : null);
   const dayProducts = useMemo(() => getProductsFromDayPlan(currentDay), [currentDay]);
+
+  const gapCacheRef = useRef<{ key: string; result: NutrientGapResult | null }>({ key: '', result: null });
   const gapResult = useMemo(() => {
     if (composerMode !== 'targeting' || dayProducts.length === 0) return null;
-    return analyzeNutrientGaps(dayProducts);
+    const key = JSON.stringify(dayProducts);
+    if (gapCacheRef.current.key === key) return gapCacheRef.current.result;
+    const result = analyzeNutrientGaps(dayProducts);
+    gapCacheRef.current = { key, result };
+    return result;
   }, [composerMode, dayProducts]);
   const gapSummary = useMemo(() => {
     if (!gapResult) return [];
     return buildGapSummary(gapResult);
   }, [gapResult]);
 
+  const comboCacheRef = useRef<{ key: string; result: { gaps: NutrientGapResult; suggestions: GapAwareScore[] } | null }>({ key: '', result: null });
   const comboResult = useMemo(() => {
     if (composerMode !== 'targeting' || dayProducts.length === 0) return null;
-    return getGapAwareComboResult(dayProducts, 5);
+    const key = JSON.stringify(dayProducts);
+    if (comboCacheRef.current.key === key) return comboCacheRef.current.result;
+    const result = getGapAwareComboResult(dayProducts, 5);
+    comboCacheRef.current = { key, result };
+    return result;
   }, [composerMode, dayProducts]);
 
   const handleApplyCombo = (foodId: string, weightGrams: number) => {
@@ -179,7 +190,7 @@ export const MealComposer: React.FC = () => {
                 </div>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {comboResult.suggestions.slice(0, 5).map(s => (
+                {comboResult.suggestions.slice(0, 5).map((s: GapAwareScore) => (
                   <div key={s.foodId} style={{
                     display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 8,
                     background: s.gapCoveragePct >= 50 ? 'rgba(0,230,138,0.04)' : 'rgba(245,158,11,0.04)',
@@ -192,7 +203,7 @@ export const MealComposer: React.FC = () => {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 8, fontWeight: 600, color: '#fff' }}>{s.foodName}</div>
                       <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>
-                        {s.gapNutrients.slice(0, 3).map(n => {
+                        {s.gapNutrients.slice(0, 3).map((n: string) => {
                           const gap = gapResult.gaps.find(g => g.nutrient === n);
                           return gap?.label || n;
                         }).join(', ')}

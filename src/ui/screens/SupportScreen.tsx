@@ -43,6 +43,7 @@ import { getDrugTzMechanisms, getSupportTzDisplay, TZ_MECH_LABELS, TZ_SYSTEM_LAB
 import { getLabEffectsForDrug, getMarkerName } from '../../data/support-lab-effects';
 import { runSupportUnified, runSupportForLevel } from '../../engines/support-plan';
 import type { PlanResult, PlanSubstance } from '../../engines/support-plan';
+import { writeRiskBridge } from '../../engines/risk-bridge';
 import { buildPreApplyCard, evaluateRecommendations, computeCoverageRisk } from '../../engines/recommendation-engine';
 import { calculateMixScore, type TrainingMixScore, type MixSubstance, type MixProfile, MIX_MECHANISMS, MIX_SYNERGY, MIX_TEMPLATES, type MixTemplate, buildBestRecipe, type MixRecipe, type MixRecipeItem, groupRecipeItemsByTiming } from '../../engines/training-mix-scoring.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
@@ -614,13 +615,23 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       updateProfile({ settings: { ...(getProfile().settings || {}), currentSupplements: supps } });
       notifyDataChange();
       // Sync support risk data for RiskScreen
+      const bridgeSubs = effectiveLevel?.subs || SUPPORT_LEVELS[level]?.subs || [];
       localStorage.setItem('he_support_risk', JSON.stringify({
         riskBeforeSupport: calcResultData.riskBeforeSupport,
         riskAfterSupport: calcResultData.riskAfterSupport,
         systemSupport: calcResultData.systemSupport,
-        subs: effectiveLevel?.subs || SUPPORT_LEVELS[level]?.subs || [],
+        subs: bridgeSubs,
         timestamp: Date.now(),
       }));
+      // Write unified risk bridge (C18: RiskScreen ↔ support engine sync)
+      writeRiskBridge({
+        riskBefore: calcResultData.riskBeforeSupport,
+        riskAfter: calcResultData.riskAfterSupport,
+        supportScore: calcResultData.supportScore,
+        systemBreakdown: calcResultData.riskAssessment?.systemBreakdown || {},
+        mechanismDetail: calcResultData.riskAssessment?.mechanismDetail || [],
+        subs: bridgeSubs,
+      });
     } catch (e2) { /* ignore profile save errors */ }
     } catch (err: any) {
       console.error('calcSupport error:', err);

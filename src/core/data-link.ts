@@ -9,6 +9,7 @@ import { acuteChronicRatio, toDailyLoads } from '../engines/pro/training-load.en
 import { calculateRisks } from '../engines/risk.engine';
 import { calculateSupport, type SupportInput } from '../engines/support.engine';
 import { interpretLabs, type LabCompositeResult } from '../engines/lab-analysis.engine';
+import { readRiskBridge } from '../engines/risk-bridge';
 import type { ReadinessScores, RiskCalculationResult } from './types';
 
 let globalTick = 0;
@@ -242,7 +243,22 @@ export function useDataLink(): LinkedData {
         activeDrugs,
         supportCoverage: coverage,
       });
-      return { ...riskResult, coverageMap: coverage } as RiskCalculationResult;
+      // C18: Merge bridge data from SupportScreen for consistent cross-screen risk
+      const bridge = readRiskBridge();
+      let finalRisk = { ...riskResult, coverageMap: coverage } as RiskCalculationResult;
+      if (bridge && bridge.systemBreakdown) {
+        const bd: Record<string, { raw: number; net: number }> = {};
+        for (const [sys, v] of Object.entries(bridge.systemBreakdown)) {
+          bd[sys] = { raw: v.raw, net: v.net };
+        }
+        finalRisk = {
+          ...finalRisk,
+          overallRaw: bridge.riskBefore,
+          overallNet: bridge.riskAfter,
+          systemBreakdown: { ...(finalRisk.systemBreakdown || {}), ...bd },
+        } as RiskCalculationResult;
+      }
+      return finalRisk;
     } catch (e) {
       console.warn('Risk calculation failed:', e);
       const fallbackCoverage: Record<string, number> = {};

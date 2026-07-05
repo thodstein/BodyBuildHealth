@@ -224,6 +224,9 @@ export function autoSchedule(input: AutoScheduleInput): AutoScheduleOutput {
 
   let w = input.currentWeek + 1;
   const totalWeeks = input.weeksUntilGoal;
+  const acwr = input.acwr ?? null;
+  const monotony = input.monotony ?? null;
+  const strain = input.strain ?? null;
 
   const pattern = input.goal === 'peaking'
     ? ['accumulation', 'accumulation', 'intensification', 'deload', 'intensification', 'peaking', 'peaking', 'deload']
@@ -231,14 +234,28 @@ export function autoSchedule(input: AutoScheduleInput): AutoScheduleOutput {
       ? ['accumulation', 'accumulation', 'accumulation', 'deload', 'intensification', 'intensification', 'intensification', 'deload']
       : ['accumulation', 'accumulation', 'accumulation', 'accumulation', 'deload', 'accumulation', 'accumulation', 'deload'];
 
-  const deloadFreq = input.level === 'beginner' ? 6 : input.level === 'intermediate' ? 5 : 4;
+  let deloadFreq = input.level === 'beginner' ? 6 : input.level === 'intermediate' ? 5 : 4;
+
+  if (acwr !== null && acwr > 1.5) {
+    deloadFreq = Math.max(3, deloadFreq - 2);
+    warnings.push(`ACWR ${acwr.toFixed(2)} > 1.5 — делоды учащены (каждые ${deloadFreq} нед вместо ${input.level === 'beginner' ? 6 : input.level === 'intermediate' ? 5 : 4})`);
+  } else if (acwr !== null && acwr > 1.3) {
+    deloadFreq = Math.max(3, deloadFreq - 1);
+    warnings.push(`ACWR ${acwr.toFixed(2)} > 1.3 — делоды учащены (каждые ${deloadFreq} нед)`);
+  }
+
+  if (input.overtrainingRisk > 50 && deloadFreq > 3) {
+    deloadFreq = Math.max(3, deloadFreq - 1);
+  }
 
   for (let i = 0; i < totalWeeks; i++) {
     let phase = pattern[i % pattern.length] as ScheduledWeek['phase'];
 
-    if (input.overtrainingRisk > 50 && i === 0) {
+    if ((input.overtrainingRisk > 50 || (acwr !== null && acwr > 1.5) || (strain !== null && strain > 1500)) && i === 0) {
       phase = 'deload';
-      warnings.push(`Неделя ${w}: принудительный deload (риск перетрена ${input.overtrainingRisk}%)`);
+      if (input.overtrainingRisk > 50) warnings.push(`Неделя ${w}: принудительный deload (риск перетрена ${input.overtrainingRisk}%)`);
+      if (acwr !== null && acwr > 1.5) warnings.push(`Неделя ${w}: принудительный deload (ACWR ${acwr.toFixed(2)} — опасная перегрузка)`);
+      if (strain !== null && strain > 1500) warnings.push(`Неделя ${w}: принудительный deload (strain ${Math.round(strain)} > 1500)`);
     }
 
     if (w % deloadFreq === 0 && phase !== 'deload') {
@@ -256,16 +273,25 @@ export function autoSchedule(input: AutoScheduleInput): AutoScheduleOutput {
     const p = params[phase];
 
     let volMod = 1.0;
-    if (input.fatigueLevel > 0.7) volMod = 0.8;
-    if (input.recoveryLevel < 0.3) volMod = 0.7;
+    if (input.fatigueLevel > 0.7) volMod = Math.min(volMod, 0.8);
+    if (input.recoveryLevel < 0.3) volMod = Math.min(volMod, 0.7);
+    if (acwr !== null && acwr > 1.5) volMod = Math.min(volMod, 0.6);
+    else if (acwr !== null && acwr > 1.3) volMod = Math.min(volMod, 0.8);
+    if (monotony !== null && monotony > 2) volMod = Math.min(volMod, 0.75);
+
+    let rpeMod = 1.0;
+    let rirMod = 1.0;
+    if (acwr !== null && acwr > 1.5) { rpeMod = 0.85; rirMod = 1.5; }
+    else if (acwr !== null && acwr > 1.3) { rpeMod = 0.9; rirMod = 1.3; }
+    if (monotony !== null && monotony > 2) { rpeMod = Math.min(rpeMod, 0.9); rirMod = Math.max(rirMod, 1.3); }
 
     weeks.push({
       week: w,
       phase,
       volumePercent: Math.round(p.vol * volMod),
-      intensityPercent: p.int,
-      rpeTarget: p.rpe,
-      rirTarget: p.rir,
+      intensityPercent: Math.round(p.int * rpeMod),
+      rpeTarget: Math.round(p.rpe * rpeMod * 10) / 10,
+      rirTarget: Math.round(p.rir * rirMod * 10) / 10,
       sessionsPerWeek: p.sesh,
       notes: p.note,
     });

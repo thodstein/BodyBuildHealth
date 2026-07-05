@@ -7,6 +7,7 @@ import type { CalculatorState, PlanSubstance, PowerLevel } from '../../../engine
 import { evaluateRecommendations, computeCoverageRisk, buildPreApplyCard } from '../../../engines/recommendation-engine';
 import { calcStackSynergyScore, buildCautions } from '../../../engines/support-plan/display';
 import { DosageCalculator, DosageCalculatorView } from '../../components/DosageCalculator';
+import { WeeklyPlanView } from './WeeklyPlanView';
 
 /**
  * Карточка расчёта поддержки (представление).
@@ -450,6 +451,12 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                         <span>покрытие систем</span>
                       </div>
                       {courseWeekState <= 6 && (<div style={{fontSize:7,color:'#f59e0b',marginTop:3,padding:'3px 6px',borderRadius:4,background:'rgba(245,158,11,0.06)'}}>⚠ Дозы снижены на {Math.round((1-planResult.weekScale)*100)}% — фаза адаптации (нед.{courseWeekState}). К неделе 7 — полные дозы.</div>)}
+                    </div>
+                  )}
+                  {/* ===== WEEKLY PLAN VIEW (S4) ===== */}
+                  {planResult && planResult.schedule && planResult.schedule.length > 0 && (
+                    <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.12)' }}>
+                      <WeeklyPlanView planResult={planResult} courseWeek={courseWeekState} />
                     </div>
                   )}
 
