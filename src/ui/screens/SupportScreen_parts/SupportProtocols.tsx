@@ -941,6 +941,18 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
                   </div>
                 </div>
               )}
+            {/* Cross-protocol warnings */}
+            <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🔗 Перекрёстные предупреждения</div>
+              <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                • ❤️ <b>Кардио:</b> Телмисартан + НПВС = {'\u2193'} эффекта + риск ОПП. НПВС — с осторожностью при АД {'>'}140/90<br/>
+                • 🫁 <b>Печень:</b> НПВС (диклофенак, ибупрофен) + 17α-алкилы = аддитивная гепатотоксичность. Парацетамол ≤2 г/день<br/>
+                • 💧 <b>Почки:</b> НПВС → {'\u2193'} простагландинов → {'\u2193'} почечного кровотока. Риск ОПП при дегидратации + НПВС<br/>
+                • 🫀 <b>ЖКТ:</b> НПВС + оральные ААС = гастропатия. Цинк-карнозин + DGL — гастропротекция<br/>
+                • 🩸 <b>Гематология:</b> НПВС + антикоагулянты/аспирин = риск ЖКТ-кровотечения. Контроль свёртываемости
+              </div>
+            </div>
+
             </div>
           </InfoErrorBoundary>)}
 
@@ -2579,6 +2591,676 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
                 </div>
               </div>
             </div>
+          {/* Cross-protocol warnings */}
+            <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🔗 Перекрёстные предупреждения</div>
+              <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                • ❤️ <b>Кардио:</b> Эритропоэтин + ААС = риск тромбоза (Hct {'>'}50%). Контроль Hct каждые 2 нед. Флеботомия при Hct {'>'}54%<br/>
+                • 🫁 <b>Печень:</b> Метформин + 17α-алкилы = риск лактат-ацидоза (редиайшие, но при нарушении функции печени). Контроль АЛТ/АСТ<br/>
+                • 💧 <b>Почки:</b> Растворение тромбов — аспирин + гидратация. Риск ОПП при дегидратации + НПВС<br/>
+                • 🦴 <b>Суставы:</b> Витамин C + коллаген — синергия. Витамин C улучшает абсорбцию негемового железа (осторожно при гемохроматозе)
+              </div>
+            </div>
+
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ ГЕМАТОЛОГИЯ ══════════ */}
+          {protocolTab === 'hemato' && (<InfoErrorBoundary label="Гематология">
+            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#ef4444', marginBottom:2 }}>🩸 Гематологическая поддержка на курсе ААС</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Контроль полицитемии, коагуляции и анемии. Профилактика тромбозов при высоком Hct.</p>
+              </div>
+
+              {/* Sub-tabs */}
+              <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
+                {[
+                  { id:'mechanisms', label:'🔬 Механизмы' },
+                  { id:'protocol', label:'💊 Фазы протокола' },
+                  { id:'timing', label:'⏰ Тайминг' },
+                  { id:'monitoring', label:'🧪 Мониторинг' },
+                  { id:'diary', label:'📓 Дневник' },
+                ].map((t: any) => (
+                  <button key={t.id} onClick={() => setHematoTab(t.id)}
+                    style={hematoTab === t.id ? pillActive('#ef4444') : pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+
+              {/* Mechanisms */}
+              {hematoTab === 'mechanisms' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🔬 Механизмы: почему кровь требует контроля на курсе</div>
+                  {[
+                    { m:'Эритроцитоз (Hct ↑)', e:'ААС стимулируют ЭПО-независимый эритропоэз (через ↑ HIF-1α + ↑ чувствительность предшественников к ЭПО). Hct растёт на 5-10% в первые 4-6 нед.', a:'Флеботомия при Hct {'>'}54%, аспирин 100 мг для ↓ вязкости' },
+                    { m:'Тромбоцитоз (PLT ↑)', e:'Андрогены ↑ TPO (тромбопоэтин) → ↑ продукция тромбоцитов на 20-40%', a:'Контроль числа тромбоцитов при Hct {'>'}50%' },
+                    { m:'Гиперкоагуляция (факторы свёртывания)', e:'ААС ↑ факторы II, VII, X, ↓ антитромбин III, ↑ ингибитор активатора плазминогена PAI-1', a:'D-димер, фибриноген, АЧТВ. Аспирин 100 мг как база' },
+                    { m:'Вязкость крови (гемореология)', e:'Hct ↑ + фибриноген ↑ + ↓ деформируемость эритроцитов = ↑ вязкости в 1.5-2× относительно нормы', a:'Гидратация 3+ л/день. Пентоксифиллин при симптомах' },
+                  ].map((x, i) => (
+                    <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#fca5a5', marginBottom:2 }}>{x.m}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:2 }}>{x.e}</div>
+                      <div style={{ fontSize:7, color:'#fca5a5', padding:'3px 5px', borderRadius:4, background:'rgba(239,68,68,0.06)' }}>🩺 Действие: {x.a}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Protocol phases */}
+              {hematoTab === 'protocol' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    { phase:'ФАЗА 1 · ПРОФИЛАКТИКА', label:'Базовый курс (Hct {'<'}48%)', color:'#22c55e', condition:'Hct {'<'}48%, PLT в норме', desc:'Профилактика гиперкоагуляции на любом курсе ААС',
+                      items:[
+                        { name:'Аспирин кардио 100 мг', dose:'100 мг', timing:'Утро после еды', note:'Антиагрегант. Необратимо ингибирует ЦОГ-1 → ↓ тромбоксан A2. Снижает риск тромбоза на 30-40%' },
+                        { name:'Гидратация', dose:'3+ л/день', timing:'Равномерно', note:'Снижение вязкости крови. Особенно важно при высоких дозах ААС и летом' },
+                        { name:'Омега-3 (EPA+DHA)', dose:'2-4 г/день', timing:'С едой', note:'↓ вязкости, ↓ фибриногена, ↑ NO. Двойная кардио+гемато защита' },
+                        { name:'Рыбий жир', dose:'EPA 1000 мг', timing:'С едой', note:'Дополнительный источник омега-3 при недостатке в пище' },
+                      ]},
+                    { phase:'ФАЗА 2 · РАННЯЯ КОРРЕКЦИЯ', label:'Hct 48-52%', color:'#f59e0b', condition:'Hct 48-52%, без симптомов', desc:'Усиление антикоагуляции',
+                      items:[
+                        { name:'Аспирин кардио 100 мг', dose:'100 мг', timing:'Утро после еды', note:'Продолжить. Обязательно с ИПП (омепразол 20 мг) для защиты ЖКТ' },
+                        { name:'Пентоксифиллин 400 мг', dose:'400 мг', timing:'2×/день с едой', note:'Улучшает деформируемость эритроцитов, ↓ вязкость. Курс 4-6 нед' },
+                        { name:'NAC 600-1200 мг', dose:'600 мг', timing:'2×/день', note:'Антиоксидант ↓ вязкости через ↑ глутатиона в эритроцитах. Защита от окислительного стресса' },
+                        { name:'Плазмаферез (опционально)', dose:'—', timing:'По показаниям', note:'При Hct {'>'}54% или симптомах гипервязкости. 1-2 сеанса до нормализации' },
+                      ]},
+                    { phase:'ФАЗА 3 · ТЕРАПИЯ', label:'Hct 52-54%', color:'#f97316', condition:'Hct 52-54% или симптомы', desc:'Медицинское вмешательство. Флеботомия при необходимости',
+                      items:[
+                        { name:'Флеботомия (кровопускание)', dose:'300-400 мл', timing:'1-2 раза/нед', note:'До Hct {'<'}48%. Восполнение жидкости — физраствор или вода 1 л после процедуры' },
+                        { name:'Аспирин 100 мг', dose:'100 мг', timing:'Утро', note:'Обязательно + ИПП. При высоком риске тромбоза — рассмотреть клопидогрель' },
+                        { name:'Дипиридамол 75 мг', dose:'75 мг', timing:'3×/день', note:'Антиагрегант + вазодилататор. Улучшает микроциркуляцию' },
+                        { name:'Гидратация', dose:'4+ л/день', timing:'Равномерно', note:'Принудительная гидратация для ↓ гематокрита' },
+                      ]},
+                    { phase:'ФАЗА 4 · УРГЕНТНАЯ', label:'Hct {'>'}54% / Hct {'>'}60%', color:'#ef4444', condition:'Hct {'>'}54% и/или симптомы гипервязкости', desc:'Неотложное вмешательство',
+                      items:[
+                        { name:'Флеботомия', dose:'400-500 мл', timing:'Ежедневно до Hct {'<'}48%', note:'Под контролем АД и пульса' },
+                        { name:'Низкомол. гепарин (НМГ)', dose:'По весу', timing:'П/к 1-2×/день', note:'Эноксапарин 40 мг 1×/день при D-димер {'>'}500. Переход на варфарин при тромбозе' },
+                        { name:'Консультация гематолога', dose:'—', timing:'Срочно', note:'Экстренная при симптомах ТЭЛА/ТГВ. Не откладывать' },
+                      ]},
+                  ].map((p: any, i: any) => (
+                    <div key={i} style={{ borderRadius:12, background:p.color+'08', border:'1px solid '+p.color+'22', padding:10 }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:p.color }}>{p.phase}</div>
+                      <div style={{ fontSize:8, fontWeight:600, color:p.color+'aa', marginBottom:2 }}>{p.label}</div>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:4 }}>{p.condition}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>{p.desc}</div>
+                      {p.items.map((x: any, xi: any) => (
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:6, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:700, color:'var(--text-light)' }}>{x.name}</span>
+                          <span style={{ fontSize:7, color:p.color, marginLeft:4 }}>{x.dose}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>· {x.timing}</span>
+                          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>💡 {x.note}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Timing */}
+              {hematoTab === 'timing' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>⏰ Суточный тайминг гематологической поддержки</div>
+                  <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Основной принцип: антиагреганты утром, гидратация в течение дня, контроль вечером.</p>
+                  {[
+                    { time:'🌅 Утро (06:00–09:00)', color:'#f59e0b', items:[
+                      { n:'Аспирин 100 мг + ИПП', why:'После еды. Защита ЖКТ + антиагрегантный эффект на весь день' },
+                      { n:'Омега-3 2-4 г с едой', why:'С завтраком. EPA/DHA снижают вязкость, ↑ NO' },
+                      { n:'Вода 500 мл', why:'После пробуждения. Компенсация ночной дегидратации' },
+                    ]},
+                    { time:'☀️ День (12:00–16:00)', color:'#f97316', items:[
+                      { n:'Пентоксифиллин 400 мг (если фаза 2+)', why:'С обедом. Улучшение реологии эритроцитов' },
+                      { n:'Гидратация 1-1.5 л', why:'Равномерно. Особенно при физ. нагрузке + дополнительно 500-1000 мл' },
+                    ]},
+                    { time:'🌙 Вечер (19:00–22:00)', color:'#6366f1', items:[
+                      { n:'NAC 600-1200 мг', why:'Антиоксидант. Лучше вс }}}}}}}}}}}}вечером перед сном для детоксикации' },
+                      { n:'Вода 500 мл', why:'Умеренная гидратация. Не перед сном' },
+                    ]},
+                  ].map((slot: any, si: any) =>(
+                    <div key={si} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:slot.color+'0a', border:'1px solid '+slot.color+'22' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:slot.color, marginBottom:4 }}>{slot.time}</div>
+                      {slot.items.map((x: any, xi: any) =>(
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{x.n}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:6 }}>— {x.why}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Monitoring */}
+              {hematoTab === 'monitoring' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={cardBg}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🧪 Лабораторный мониторинг крови</div>
+                    {[{ marker:'Гематокрит (Hct)', target:'42-50%', when:'Каждые 2-4 нед', action:'50-52% — фаза 2. 52-54% — фаза 3. {'>'}54% — фаза 4 (ургентная). {'>'}60% — риск спонтанного тромбоза' },
+                      { marker:'Гемоглобин (Hb)', target:'13.5-17.5 г/дл', when:'Каждые 2-4 нед', action:'Hb {'>'}17.5 — коррелирует с Hct. Hb {'<'}12.5 — возможна анемия при длительных курсах' },
+                      { marker:'Тромбоциты (PLT)', target:'150-350 ×10⁹/л', when:'Каждые 4 нед', action:'PLT {'>'}400 — риск тромбоза. Рассмотреть аспирин 100 мг' },
+                      { marker:'D-димер', target:'{'<'}500 нг/мл', when:'При симптомах', action:'{'>'}500 — активный тромбоз/фибринолиз. УЗИ вен + консультация гематолога' },
+                      { marker:'Фибриноген', target:'2-4 г/л', when:'Каждые 8 нед', action:'{'>'}4.5 — гиперкоагуляция. Коррекция гидратацией + омега-3' },
+                      { marker:'АЧТВ / ПВ / МНО', target:'АЧТВ 25-35 с, МНО 0.8-1.2', when:'При терапии антикоагулянтами', action:'МНО {'>'}1.5 — риск кровотечения при НМГ/варфарине' },
+                    ].map((m: any, i: any) =>(
+                      <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                          <span style={{ fontSize:9, fontWeight:700, color:'#fca5a5' }}>{m.marker}</span>
+                          <span style={{ fontSize:8, fontWeight:600, color:'#ef4444' }}>{m.when}</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}><b style={{color:'#fca5a5'}}>Цель: {m.target}</b></div>
+                        <div style={{ fontSize:7, color:'#fca5a5', lineHeight:1.3, padding:'4px 6px', borderRadius:4, background:'rgba(239,68,68,0.06)' }}>💡 {m.action}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Diary */}
+              {hematoTab === 'diary' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>📓 Дневник гематологических симптомов</div>
+                  {[{ s:'Головная боль (пульсирующая)', hint:'Маркёр гипервязкости. Проверить Hct + АД. Флеботомия при Hct {'>'}54%' },
+                    { s:'Покраснение лица/кожи', hint:'Плетора. При Hct {'>'}50%. Гидратация + аспирин' },
+                    { s:'Звон в ушах (тиннитус)', hint:'Нарушение микроциркуляции. Пентоксифиллин. Проверить АД' },
+                    { s:'Одышка при нагрузке', hint:'Снижение кислородной ёмкости. Проверить Hct {'>'}52%' },
+                    { s:'Гематомы без причины', hint:'Избыток антикоагуляции. МНО >1.5 при аспирине. Проверить свёртываемость' },
+                  ].map((x, i) => (
+                    <div key={i} style={{ padding:'6px 8px', borderRadius:6, marginBottom:4, background:'rgba(239,68,68,0.03)', border:'1px solid rgba(239,68,68,0.08)' }}>
+                      <span style={{ fontSize:9, color:'var(--text-light)' }}>{x.s}</span>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:2 }}>💡 {x.hint}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Cross-protocol warnings */}
+            <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🔗 Перекрёстные предупреждения</div>
+              <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                • ❤️ <b>Кардио:</b> Hct {'>'}50% + ААС = риск тромбоза. Аспирин 100 мг — база. Флеботомия при {'>'}54%<br/>
+                • 🫁 <b>Печень:</b> Hct {'>'}50% + 17α-алкилы = риск веноокклюзионной болезни печени (редиайше)<br/>
+                • ⚖️ <b>Метаболизм:</b> Hct ↑ → нагрузка на миокард. Контроль липидов (ААС ↓ ЛПВП)
+              </div>
+            </div>
+
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ МЕТАБОЛИЗМ ══════════ */}
+          {protocolTab === 'metabolic' && (<InfoErrorBoundary label="Метаболизм">
+            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#a855f7', marginBottom:2 }}>⚖️ Метаболическая поддержка</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Контроль дислипидемии, инсулинорезистентности, электролитных нарушений. ААС-индуцированные метаболические изменения.</p>
+              </div>
+
+              {/* Sub-tabs */}
+              <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
+                {[
+                  { id:'mechanisms', label:'🔬 Механизмы' },
+                  { id:'protocol', label:'💊 Фазы протокола' },
+                  { id:'timing', label:'⏰ Тайминг' },
+                  { id:'monitoring', label:'🧪 Мониторинг' },
+                ].map((t: any) => (
+                  <button key={t.id} onClick={() => setMetabolicTab(t.id)}
+                    style={metabolicTab === t.id ? pillActive('#a855f7') : pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+
+              {/* Mechanisms */}
+              {metabolicTab === 'mechanisms' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🔬 Метаболические механизмы ААС</div>
+                  {[{ m:'Дислипидемия', e:'ААС снижают ЛПВП на 20-50% (особенно оральные 17α-алкилы), повышают ЛПНП на 10-20%, ↑ ЛП(а). Основной драйвер атеросклероза на курсе' },
+                    { m:'Инсулинорезистентность', e:'ААС ↓ чувствительность тканей к инсулину (особенно оксандролон, метандростенолон). ↑ риск СД 2 типа при длительных курсах' },
+                    { m:'Электролитные нарушения', e:'Задержка Na⁺ (ароматизируемые ААС → эстрадиол → ↑ альдостерон), потеря K⁺, Mg²⁺. Риск гипокалиемии и аритмий' },
+                    { m:'Липогенез и ожирение', e:'ААС ↑ липолиз в жировой ткани (через β-адренорецепторы), но ↓ чувствительность к инсулину в жировой ткани → ↑ свободных жирных кислот' },
+                  ].map((x, i) => (
+                    <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.08)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#d8b4fe', marginBottom:2 }}>{x.m}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>{x.e}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Protocol phases */}
+              {metabolicTab === 'protocol' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    { phase:'ФАЗА 1 · ПРОФИЛАКТИКА', label:'Липиды + глюкоза — норма', color:'#22c55e', condition:'ЛПНП {'<'}130, ЛПВП {'>'}40, глюкоза {'<'}5.6', desc:'Поддержка метаболического здоровья на курсе',
+                      items:[
+                        { name:'Омега-3 (EPA+DHA)', dose:'2-4 г/день', timing:'С едой', note:'↓ ЛПНП, ↓ триглицеридов, ↑ ЛПВП. Базовая метаболическая поддержка' },
+                        { name:'Берберин 500 мг', dose:'500 мг', timing:'2×/день до еды', note:'Активатор AMPK → ↓ инсулинорезистентности, ↓ глюкозы, ↓ липидов' },
+                        { name:'Магний (цитрат/глицинат)', dose:'400-600 мг', timing:'Вечер', note:'↓ АД, ↓ риск аритмий, улучшение чувствительности к инсулину' },
+                        { name:'Калий (калия цитрат)', dose:'500-1000 мг', timing:'С едой', note:'Восполнение потерь K⁺. Контроль K⁺ при терапии спиронолактоном/эплереноном' },
+                      ]},
+                    { phase:'ФАЗА 2 · КОРРЕКЦИЯ ДИСЛИПИДЕМИИ', label:'ЛПНП 130-160 / ЛПВП {'<'}35', color:'#f59e0b', condition:'ЛПНП 130-160, ЛПВП {'<'}35', desc:'Целенаправленная коррекция липидного профиля',
+                      items:[
+                        { name:'Эзетимиб 10 мг', dose:'10 мг', timing:'Утро', note:'Ингибитор всасывания холестерина в тонком кишечнике. ↓ ЛПНП на 15-20%. Не влияет на ЛПВП' },
+                        { name:'Красный рис (монаколин K) 10 мг', dose:'10 мг', timing:'Вечер', note:'Ингибитор HMG-CoA редуктазы (природный статин). ↓ ЛПНП на 20-30%. Контроль АЛТ/АСТ' },
+                        { name:'Берберин 500 мг', dose:'500 мг', timing:'2×/день', note:'↓ ЛПНП ещё на 15-20% дополнительно к эзетимибу' },
+                      ]},
+                    { phase:'ФАЗА 3 · КОРРЕКЦИЯ ИР/ГЛЮКОЗЫ', label:'Глюкоза 5.6-7.0 / HOMA-IR {'>'}2.5', color:'#f97316', condition:'Глюкоза {'>'}5.6 или HOMA-IR {'>'}2.5', desc:'Снижение инсулинорезистентности (особенно на оксандролоне/метандростенолоне)',
+                      items:[
+                        { name:'Метформин 500-1000 мг', dose:'500 мг', timing:'2×/день с едой', note:'Снижает продукцию глюкозы печенью. ↑ чувствительность к инсулину. ↓ риска СД 2 типа' },
+                        { name:'Берберин 500 мг', dose:'500 мг', timing:'2×/день', note:'Синергия с метформином через AMPK. ↓ гликированного гемоглобина на 0.5-1%' },
+                        { name:'Хром (пиколинат)', dose:'200-400 мкг', timing:'Утро', note:'Усиливает действие инсулина. ↓ тягу к углеводам' },
+                        { name:'Магний 400 мг', dose:'400 мг', timing:'Вечер', note:'Дефицит Mg²⁺ — независимый фактор ИР. Восполнение улучшает гликемию' },
+                      ]},
+                    { phase:'ФАЗА 4 · КОРРЕКЦИЯ ЭЛЕКТРОЛИТОВ', label:'K⁺/Mg²⁺ низкие / отёки', color:'#ef4444', condition:'K⁺ {'<'}3.5 / Mg²⁺ {'<'}0.75 / отёки 2+', desc:'Восстановление водно-электролитного баланса',
+                      items:[
+                        { name:'Калия цитрат 500-1500 мг', dose:'500-1500 мг', timing:'2-3×/день с едой', note:'Целевой K⁺ 4.0-5.0. Контроль K⁺ каждые 1-2 нед при терапии' },
+                        { name:'Магния цитрат 400-600 мг', dose:'400-600 мг', timing:'Вечер', note:'Целевой Mg²⁺ {'>'}0.85. Магний ↓ риск аритмий' },
+                        { name:'Калий + магний (аспарагинат)', dose:'1-2 таб', timing:'2×/день', note:'Комбинированный препарат. Лучшая биодоступность' },
+                        { name:'Верошпирон (спиронолактон) 25-50 мг', dose:'25-50 мг', timing:'Утро', note:'Антагонист альдостерона. Снижает задержку Na⁺/H₂O. Сохраняет K⁺. Контроль K⁺!' },
+                      ]},
+                  ].map((p: any, i: any) => (
+                    <div key={i} style={{ borderRadius:12, background:p.color+'08', border:'1px solid '+p.color+'22', padding:10 }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:p.color }}>{p.phase}</div>
+                      <div style={{ fontSize:8, fontWeight:600, color:p.color+'aa', marginBottom:2 }}>{p.label}</div>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:4 }}>{p.condition}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>{p.desc}</div>
+                      {p.items.map((x: any, xi: any) => (
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:6, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:700, color:'var(--text-light)' }}>{x.name}</span>
+                          <span style={{ fontSize:7, color:p.color, marginLeft:4 }}>{x.dose}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>· {x.timing}</span>
+                          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>💡 {x.note}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Timing */}
+              {metabolicTab === 'timing' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>⏰ Суточный тайминг метаболической поддержки</div>
+                  <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Антигипертензивные утром, метформин с едой, вечером — восстановление электролитов.</p>
+                  {[
+                    { time:'🌅 Утро (06:00–09:00)', color:'#f59e0b', items:[
+                      { n:'Эзетимиб 10 мг (фаза 2)', why:'Утром. Ингибитор всасывания холестерина' },
+                      { n:'Хром 200-400 мкг', why:'Утром натощак. Усиление действия инсулина' },
+                      { n:'Омега-3 2-4 г', why:'С завтраком. Липидная поддержка' },
+                    ]},
+                    { time:'☀️ День (12:00–16:00)', color:'#f97316', items:[
+                      { n:'Метформин 500 мг с обедом', why:'С едой. Снижение постпрандиальной глюкозы' },
+                      { n:'Берберин 500 мг до обеда', why:'За 30 мин до еды. AMPK-активация. ↓ глюкозы на 20-30%' },
+                    ]},
+                    { time:'🌙 Вечер (19:00–22:00)', color:'#6366f1', items:[
+                      { n:'Метформин 500 мг с ужином', why:'С едой. Вторая доза' },
+                      { n:'Магний 400-600 мг', why:'Вечером. Расслабление, ↓ АД, антиаритмический' },
+                      { n:'Калия цитрат 500-1000 мг', why:'С ужином. Восполнение потерь K⁺' },
+                    ]},
+                  ].map((slot: any, si: any) =>(
+                    <div key={si} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:slot.color+'0a', border:'1px solid '+slot.color+'22' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:slot.color, marginBottom:4 }}>{slot.time}</div>
+                      {slot.items.map((x: any, xi: any) =>(
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{x.n}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:6 }}>— {x.why}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Monitoring */}
+              {metabolicTab === 'monitoring' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={cardBg}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🧪 Лабораторный мониторинг метаболизма</div>
+                    {[{ marker:'Липидный профиль (ЛПНП, ЛПВП, ТГ, ЛП(а))', target:'ЛПНП {'<'}130', when:'Каждые 4-8 нед', action:'ЛПНП {'>'}160 — фаза 2. ТГ {'>'}2.3 — рассмотреть фенофибрат' },
+                      { marker:'Глюкоза + HOMA-IR', target:'Глюкоза {'<'}5.6', when:'Каждые 4 нед', action:'{'>'}5.6 — фаза 3. HOMA-IR {'>'}2.5 — метформин' },
+                      { marker:'Калий (K⁺)', target:'3.5-5.0 ммоль/л', when:'Каждые 2-4 нед', action:'{'<'}3.5 — калий. {'>'}5.5 — риск гиперкалиемии при верошпироне/эплереноне' },
+                      { marker:'Магний (Mg²⁺)', target:'{'>'}0.85 ммоль/л', when:'Каждые 4-8 нед', action:'{'<'}0.75 — фаза 4. Mg риск аритмий' },
+                      { marker:'Мочевая кислота', target:'{'<'}420 мкмоль/л', when:'Каждые 8 нед', action:'{'>'}420 — риск подагры. Аллопуринол/фебуксостат' },
+                      { marker:'HbA1c (гликированный)', target:'{'<'}6.0%', when:'Каждые 12 нед', action:'{'>'}6.5% — СД 2 типа. Эндокринолог' },
+                    ].map((m: any, i: any) =>(
+                      <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.08)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                          <span style={{ fontSize:9, fontWeight:700, color:'#d8b4fe' }}>{m.marker}</span>
+                          <span style={{ fontSize:8, fontWeight:600, color:'#a855f7' }}>{m.when}</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}><b style={{color:'#d8b4fe'}}>Цель: {m.target}</b></div>
+                        <div style={{ fontSize:7, color:'#d8b4fe', lineHeight:1.3, padding:'4px 6px', borderRadius:4, background:'rgba(168,85,247,0.06)' }}>💡 {m.action}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Cross-protocol warnings */}
+            <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🔗 Перекрёстные предупреждения</div>
+              <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                • ❤️ <b>Кардио:</b> Эзетимиб + статины = синергия ↓ ЛПНП. Статины увеличивают риск СД — контроль глюкозы<br/>
+                • 🫁 <b>Печень:</b> Метформин + 17α-алкилы = риск лактат-ацидоза (очень редко, исключить при АЛТ {'>'}3×). Берберин — безопасная альтернатива<br/>
+                • 💧 <b>Почки:</b> Метформин отменить при СКФ {'<'}30. Снизить при {'<'}45<br/>
+                • 🩸 <b>Гематология:</b> Метформин {'>'}2 г/день → риск дефицита B12. Контроль B12 каждые 6-12 мес
+              </div>
+            </div>
+
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ ЖКТ ══════════ */}
+          {protocolTab === 'gi' && (<InfoErrorBoundary label="ЖКТ">
+            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#a3e635', marginBottom:2 }}>🫀 ЖКТ — защита слизистой и микробиома</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Профилактика гастропатии, дисбактериоза и синдрома дырявого кишечника на курсе ААС.</p>
+              </div>
+
+              {/* Sub-tabs */}
+              <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
+                {[
+                  { id:'mechanisms', label:'🔬 Механизмы' },
+                  { id:'protocol', label:'💊 Фазы протокола' },
+                  { id:'timing', label:'⏰ Тайминг' },
+                  { id:'monitoring', label:'🧪 Мониторинг' },
+                ].map((t: any) => (
+                  <button key={t.id} onClick={() => setGiTab(t.id)}
+                    style={giTab === t.id ? pillActive('#a3e635') : pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+
+              {/* Mechanisms */}
+              {giTab === 'mechanisms' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🔬 Механизмы поражения ЖКТ на ААС</div>
+                  {[{ m:'Гастропатия от НПВС', e:'НПВС (диклофенак, ибупрофен) ингибируют ЦОГ-1 → ↓ простагландинов → ↓ защитной слизи → язва/эрозии' },
+                    { m:'Нарушение микробиома', e:'Оральные ААС (метандростенолон, станозолол) → дисбактериоз → ↓ diversity → ↑ проницаемость кишечника' },
+                    { m:'Холестаз / застой желчи', e:'17α-алкилы → ↓ секреции желчи → ↓ эмульгации жиров → стеаторея → дефицит жирорастворимых витаминов' },
+                    { m:'Синдром дырявого кишечника (leaky gut)', e:'ААС → ↑ зонулина → ↑ проницаемость → ЛПС → системное воспаление → цитокиновый шторм' },
+                  ].map((x, i) => (
+                    <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(163,230,53,0.04)', border:'1px solid rgba(163,230,53,0.08)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#bef264', marginBottom:2 }}>{x.m}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>{x.e}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Protocol phases */}
+              {giTab === 'protocol' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    { phase:'ФАЗА 1 · ПРОФИЛАКТИКА', label:'Нет симптомов', color:'#22c55e', condition:'Нет диспепсии, стул нормальный', desc:'Поддержка ЖКТ на курсе',
+                      items:[
+                        { name:'Пробиотики (Lacto+Bifido+пребиотик)', dose:'1 капс', timing:'Утро натощак', note:'Поддержка diversity микробиома. Не менее 10⁹ КОЕ. 8+ штаммов' },
+                        { name:'Цинк-карнозин', dose:'75 мг', timing:'2×/день между едой', note:'Защита слизистой желудка. Цинк + L-карнозин — фиксация на язвах' },
+                        { name:'DGL (деглицирризированный лакричник)', dose:'1-2 таб', timing:'До еды', note:'Увеличивает защитную слизь желудка. Без глицирризина (↓ АД)' },
+                      ]},
+                    { phase:'ФАЗА 2 · ДИСПЕПСИЯ', label:'Тяжесть, изжога, вздутие', color:'#f59e0b', condition:'Эпизодическая изжога, тяжесть', desc:'Симптоматическая терапия',
+                      items:[
+                        { name:'ИПП (омепразол 20 мг / пантопразол 40 мг)', dose:'20-40 мг', timing:'Утро за 30 мин до еды', note:'Блокада протонной помпы. Курс 4-8 нед. Контроль B12, Mg²⁺ при длительном приёме' },
+                        { name:'Алгедрат+Магния гидроксид (Маалокс)', dose:'1-2 таб', timing:'После еды и на ночь', note:'Антацид. Быстрое снятие изжоги. НЕ одновременно с ИПП — интервал 2 ч' },
+                        { name:'Урсодезоксихолевая кислота (УДХК) 500 мг', dose:'500 мг', timing:'На ночь', note:'При холестазе (оральные ААС). Защита гепатоцитов + ↓ стеатореи' },
+                      ]},
+                    { phase:'ФАЗА 3 · ДИСБАКТЕРИОЗ', label:'Диарея/запор / вздутие ≥2 нед', color:'#f97316', condition:'Диарея/запор, метеоризм', desc:'Коррекция микробиома',
+                      items:[
+                        { name:'Пробиотики (усиленная формула)', dose:'2 капс', timing:'Утро натощак + вечер', note:'20+ штаммов, 10⁹ КОЕ. Saccharomyces boulardii для профилактики диареи' },
+                        { name:'Бутират (масляная кислота)', dose:'300-600 мг', timing:'2×/день с едой', note:'Пища для колоноцитов. Восстановление барьерной функции кишечника' },
+                        { name:'Энтеросгель / Полисорб', dose:'1 ст.л.', timing:'За 1-2 ч до еды', note:'Сорбент. При диарее — 3-5 дней. НЕ вместе с едой/лекарствами' },
+                        { name:'Глютамин 5-10 г', dose:'5 г', timing:'2×/день между едой', note:'Аминокислота для энтероцитов. Восстанавливает tight junctions → ↓ leaky gut' },
+                      ]},
+                    { phase:'ФАЗА 4 · ЛЕЧЕБНАЯ (синдром Мэлори-Вейса / язва)', label:'Кровь/мелена / сильная боль', color:'#ef4444', condition:'Мелена, рвота кофейной гущей', desc:'Неотложная. Исключить алкоголь, НПВС, оральные 17α-алкилы до заживления',
+                      items:[
+                        { name:'ИПП в/в (омепрозол 40 мг)', dose:'40-80 мг', timing:'В/в болюс', note:'Неотложно. Только в стационаре под контролем ФГДС' },
+                        { name:'ФГДС с гемостазом', dose:'—', timing:'Срочно', note:'Эндоскопический гемостаз (клипирование/коагуляция). При активном кровотечении' },
+                        { name:'Суктральфат (алсукрал)', dose:'1 г', timing:'За 30 мин до еды', note:'Гастропротектор. Образует плёнку на язве. НЕ одновременно с едой/препаратами' },
+                      ]},
+                  ].map((p: any, i: any) => (
+                    <div key={i} style={{ borderRadius:12, background:p.color+'08', border:'1px solid '+p.color+'22', padding:10 }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:p.color }}>{p.phase}</div>
+                      <div style={{ fontSize:8, fontWeight:600, color:p.color+'aa', marginBottom:2 }}>{p.label}</div>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:4 }}>{p.condition}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>{p.desc}</div>
+                      {p.items.map((x: any, xi: any) => (
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:6, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:700, color:'var(--text-light)' }}>{x.name}</span>
+                          <span style={{ fontSize:7, color:p.color, marginLeft:4 }}>{x.dose}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>· {x.timing}</span>
+                          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>💡 {x.note}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Timing */}
+              {giTab === 'timing' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>⏰ Суточный тайминг поддержки ЖКТ</div>
+                  <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Пробиотики утром натощак, ИПП за 30 мин до завтрака, вечером — сорбенты отдельно.</p>
+                  {[
+                    { time:'🌅 Утро (06:00–09:00)', color:'#f59e0b', items:[
+                      { n:'ИПП (омепразол 20 мг)', why:'За 30-60 мин до завтрака. Макс. ингибирование протонной помпы на целый день' },
+                      { n:'Пробиотики 1-2 капс', why:'Натощак. Без контакта с едой — лучшая выживаемость бактерий' },
+                      { n:'Цинк-карнозин 75 мг', why:'За 30 мин до еды. Защитная плёнка на слизистой' },
+                    ]},
+                    { time:'☀️ День (12:00–16:00)', color:'#f97316', items:[
+                      { n:'Бутират 300 мг с обедом', why:'С едой. Масляная кислота для колоноцитов' },
+                      { n:'DGL 1-2 таб до еды', why:'Защитная слизь. Безопасен при длительном приёме' },
+                    ]},
+                    { time:'🌙 Вечер (19:00–22:00)', color:'#6366f1', items:[
+                      { n:'УДХК 500 мг на ночь', why:'Натощак перед сном. Макс. холеретический эффект' },
+                      { n:'Глютамин 5-10 г', why:'Между едой. Восстановление энтероцитов' },
+                      { n:'Сорбенты (при диарее)', why:'За 1-2 ч до/после еды. Отдельно от лекарств' },
+                    ]},
+                  ].map((slot: any, si: any) =>(
+                    <div key={si} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:slot.color+'0a', border:'1px solid '+slot.color+'22' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:slot.color, marginBottom:4 }}>{slot.time}</div>
+                      {slot.items.map((x: any, xi: any) =>(
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{x.n}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:6 }}>— {x.why}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Monitoring */}
+              {giTab === 'monitoring' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={cardBg}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🧪 Лабораторный мониторинг ЖКТ</div>
+                    {[{ marker:'ФГДС (гастроскопия)', target:'Норма', when:'До курса + при симптомах', action:'Эрозии/язва — фаза 4. Helicobacter pylori — эрадикация' },
+                      { marker:'Кальпротектин фекальный', target:'{'<'}50 мкг/г', when:'При подозрении на ВЗК', action:'{'>'}50 — воспаление кишечника. Колоноскопия' },
+                      { marker:'Зонулин фекальный', target:'{'<'}50 нг/мг', when:'При leaky gut', action:'{'>'}50 — повышенная проницаемость. Глютамин + бутират' },
+                      { marker:'Витамин B12', target:'200-900 пг/мл', when:'Ежегодно при длительном ИПП', action:'ИПП {'>'}6 мес → контроль B12. При дефиците — метилкобаламин' },
+                      { marker:'Магний (Mg²⁺)', target:'0.85-1.2 ммоль/л', when:'Ежегодно при длительном ИПП', action:'ИПП {'>'}1 год → риск гипомагниемии. Магния цитрат' },
+                    ].map((m: any, i: any) =>(
+                      <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(163,230,53,0.04)', border:'1px solid rgba(163,230,53,0.08)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                          <span style={{ fontSize:9, fontWeight:700, color:'#bef264' }}>{m.marker}</span>
+                          <span style={{ fontSize:8, fontWeight:600, color:'#a3e635' }}>{m.when}</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}><b style={{color:'#bef264'}}>Цель: {m.target}</b></div>
+                        <div style={{ fontSize:7, color:'#bef264', lineHeight:1.3, padding:'4px 6px', borderRadius:4, background:'rgba(163,230,53,0.06)' }}>💡 {m.action}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Cross-protocol warnings */}
+            <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🔗 Перекрёстные предупреждения</div>
+              <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                • ❤️ <b>Кардио:</b> ИПП + клопидогрель = ↓ эффекта клопидогреля (CYP2C19). Рассмотреть пантопразол вместо омепразола<br/>
+                • 🫁 <b>Печень:</b> УДХК + 17α-алкилы = синергия. УДХК снижает холестаз от токсичных метаболитов<br/>
+                • 💧 <b>Почки:</b> ИПП {'>'}3 года → риск ХБП. Контроль креатинина каждые 6-12 мес<br/>
+                • 🩸 <b>Гематология:</b> Пробиотики + иммуносупрессия = риск бактериемии (редко). Не для пациентов с ЦВК
+              </div>
+            </div>
+
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ КОЖА/ВОЛОСЫ ══════════ */}
+          {protocolTab === 'hair' && (<InfoErrorBoundary label="Кожа/Волосы">
+            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#f472b6', marginBottom:2 }}>💇 Защита кожи и волос на курсе ААС</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Профилактика андрогенетической алопеции, акне, стрий, ухудшения качества кожи.</p>
+              </div>
+
+              {/* Sub-tabs */}
+              <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
+                {[
+                  { id:'mechanisms', label:'🔬 Механизмы' },
+                  { id:'protocol', label:'💊 Фазы протокола' },
+                  { id:'timing', label:'⏰ Тайминг' },
+                  { id:'monitoring', label:'🧪 Мониторинг' },
+                ].map((t: any) => (
+                  <button key={t.id} onClick={() => setHairTab(t.id)}
+                    style={hairTab === t.id ? pillActive('#f472b6') : pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+
+              {/* Mechanisms */}
+              {hairTab === 'mechanisms' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🔬 Механизмы поражения кожи/волос на ААС</div>
+                  {[{ m:'DHT → миниатюризация фолликулов', e:'DHT (5α-дигидротестостерон) — основной андроген кожи. Связывается с AR в фолликулах → миниатюризация → андрогенетическая алопеция' },
+                    { m:'Себум → акне', e:'Андрогены стимулируют сальные железы → гиперсекреция себума → закупорка пор → C. acnes → воспаление → акне' },
+                    { m:'Коллаген → стрии', e:'ААС ↑ mTOR → гипертрофия мышц быстрее, чем адаптация коллагена. Перерастяжение дермы → стрии (растяжки)' },
+                  ].map((x, i) => (
+                    <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(244,114,182,0.04)', border:'1px solid rgba(244,114,182,0.08)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#f9a8d4', marginBottom:2 }}>{x.m}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>{x.e}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Protocol phases */}
+              {hairTab === 'protocol' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    { phase:'ФАЗА 1 · ПРОФИЛАКТИКА', label:'Нет симптомов', color:'#22c55e', condition:'Нет выпадения, нет акне', desc:'Базовая поддержка кожи/волос на курсе',
+                      items:[
+                        { name:'Цинк (пиколинат)', dose:'30-50 мг', timing:'Вечер', note:'Ингибирует 5α-редуктазу → ↓ DHT в коже. Противовоспалительное' },
+                        { name:'Витамин D3', dose:'2000-5000 МЕ', timing:'С жирной едой', note:'Участвует в цикле волосяного фолликула. Дефицит D3 — выпадение' },
+                        { name:'Биотин (B7)', dose:'5000-10000 мкг', timing:'Утро', note:'Синтез кератина. Укрепление волос и ногтей' },
+                        { name:'Коллаген (гидролизованный)', dose:'10-15 г', timing:'С витамином C', note:'Субстрат для синтеза коллагена кожи. Профилактика стрий' },
+                      ]},
+                    { phase:'ФАЗА 2 · ВЫПАДЕНИЕ ВОЛОС', label:'{'>'}100 волос/день', color:'#f59e0b', condition:'Заметное выпадение', desc:'Анти-DHT и рост-стимулирующая терапия',
+                      items:[
+                        { name:'Финастерид 0.5-1 мг (только при АГА)', dose:'0.5-1 мг', timing:'Утро', note:'Ингибитор 5α-редуктазы 2 типа. ↓ DHT в коже на 60-70%. Эффект через 3-6 мес' },
+                        { name:'Дутастерид 0.5 мг (резистентность к финастериду)', dose:'0.5 мг', timing:'Утро', note:'Ингибитор 5α-редуктазы 1+2 типа. ↓ DHT на 90%. Сильнее, но больше побочек' },
+                        { name:'Миноксидил 5% топический', dose:'1 мл', timing:'2×/день', note:'Вазодилататор фолликулов. Продлевает фазу анагена. Эффект через 4-6 мес' },
+                        { name:'Кетоконазол 2% шампунь', dose:'Как шампунь', timing:'2-3×/нед', note:'Слабая антиандрогенная активность. Противогрибковое. ↓ шелушения' },
+                      ]},
+                    { phase:'ФАЗА 3 · АКНЕ (AAS-ИНДУЦИРОВАННОЕ)', label:'Папулы/пустулы', color:'#f97316', condition:'Акне на спине/плечах/лице', desc:'См. отдельный протокол Акне',
+                      items:[
+                        { name:'Салициловая кислота 2% скраб', dose:'1-2×/день', timing:'Утро', note:'Кератолитик. Открывает поры. Использовать на спину/плечи' },
+                        { name:'Бензоил пероксид 5% гель', dose:'Локально', timing:'Вечер', note:'Уничтожает C. acnes. Не вызывает резистентности' },
+                        { name:'Цинк (пиколинат) 50 мг', dose:'50 мг', timing:'Вечер', note:'Ингибирует 5α-редуктазу. Антивоспалительный. Продолжить из фазы 1' },
+                      ]},
+                    { phase:'ФАЗА 4 · СТРИИ (РАСТЯЖКИ)', label:'Появляющиеся стрии', color:'#ef4444', condition:'Стрии на груди/плечах/бёдрах', desc:'Профилактика и лечение стрий',
+                      items:[
+                        { name:'Третиноин 0.05% крем', dose:'Тонкий слой', timing:'На ночь локально', note:'Ретиноид. Стимулирует синтез коллагена. Фотосенсибилизация — SPF 50+' },
+                        { name:'Гиалуроновая кислота + витамин C сыворотка', dose:'Несколько капель', timing:'Утро', note:'Гидратация + антиоксидант + стимуляция коллагена' },
+                        { name:'Микронидлинг (дермапен)', dose:'0.5-1 мм', timing:'1×/2-4 нед', note:'Стимуляция неоколлагенеза. Только в кабинете косметолога' },
+                        { name:'Масло ши + витамин E', dose:'Массаж', timing:'Вечер', note:'Увлажнение и питание рубцовой ткани' },
+                      ]},
+                  ].map((p: any, i: any) => (
+                    <div key={i} style={{ borderRadius:12, background:p.color+'08', border:'1px solid '+p.color+'22', padding:10 }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:p.color }}>{p.phase}</div>
+                      <div style={{ fontSize:8, fontWeight:600, color:p.color+'aa', marginBottom:2 }}>{p.label}</div>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:4 }}>{p.condition}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>{p.desc}</div>
+                      {p.items.map((x: any, xi: any) => (
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:6, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:700, color:'var(--text-light)' }}>{x.name}</span>
+                          <span style={{ fontSize:7, color:p.color, marginLeft:4 }}>{x.dose}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>· {x.timing}</span>
+                          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>💡 {x.note}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Timing */}
+              {hairTab === 'timing' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>⏰ Суточный тайминг поддержки кожи/волос</div>
+                  <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Утром — анти-DHT и витамины. Вечером — топические средства.</p>
+                  {[
+                    { time:'🌅 Утро (06:00–09:00)', color:'#f59e0b', items:[
+                      { n:'Финастерид/дутастерид (если назначен)', why:'Один раз в день. ↓ DHT на 60-90%' },
+                      { n:'Биотин 5000-10000 мкг', why:'Синтез кератина. С завтраком' },
+                      { n:'Миноксидил 5% топический', why:'На сухую кожу головы. Массаж 2-3 мин' },
+                      { n:'Сыворотка с гиалуроновой кислотой + C', why:'На лицо/шею. Увлажнение + коллаген' },
+                    ]},
+                    { time:'☀️ День (12:00–16:00)', color:'#f97316', items:[
+                      { n:'D3 2000-5000 МЕ с обедом', why:'С жирной едой. Цикл волосяного фолликула' },
+                      { n:'Коллаген 10-15 г', why:'С витамином C (апельсиновый сок). Синтез коллагена' },
+                      { n:'Коллагенарий/скраб с салициловой к-той (спина)', why:'При акне на спине. После душа' },
+                    ]},
+                    { time:'🌙 Вечер (19:00–22:00)', color:'#6366f1', items:[
+                      { n:'Цинк 30-50 мг', why:'На ночь. Ингибитор 5α-редуктазы' },
+                      { n:'Третиноин 0.05% крем (локально)', why:'На стрии/акне. SPF на утро обязательно!' },
+                      { n:'Масло ши + витамин E', why:'Массаж зон стрий. Увлажнение ' },
+                      { n:'Миноксидил 5% топический', why:'На сухую кожу головы. Второй приём' },
+                    ]},
+                  ].map((slot: any, si: any) =>(
+                    <div key={si} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:slot.color+'0a', border:'1px solid '+slot.color+'22' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:slot.color, marginBottom:4 }}>{slot.time}</div>
+                      {slot.items.map((x: any, xi: any) =>(
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{x.n}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:6 }}>— {x.why}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Monitoring */}
+              {hairTab === 'monitoring' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={cardBg}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🧪 Мониторинг кожи/волос</div>
+                    {[{ marker:'Фототрихограмма', target:'Анаген {'>'}80%', when:'Каждые 6 мес', action:'Анаген {'<'}80% — прогрессия алопеции. Рассмотреть финастерид/дутастерид' },
+                      { marker:'DHT (сывороточный)', target:'{'<'}250 пг/мл', when:'Через 3 мес терапии финастеридом', action:'{'>'}250 — резистентность к финастериду. Перейти на дутастерид' },
+                      { marker:'Цинк в сыворотке', target:'0.75-1.5 мкг/мл', when:'Каждые 12 нед', action:'{'<'}0.75 — дефицит цинка. Увеличить дозу до 50 мг' },
+                      { marker:'Ферритин', target:'{'>'}70 нг/мл', when:'Каждые 12 нед', action:'{'<'}70 — дефицит железа. Ассоциирован с выпадением' },
+                    ].map((m: any, i: any) =>(
+                      <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(244,114,182,0.04)', border:'1px solid rgba(244,114,182,0.08)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                          <span style={{ fontSize:9, fontWeight:700, color:'#f9a8d4' }}>{m.marker}</span>
+                          <span style={{ fontSize:8, fontWeight:600, color:'#f472b6' }}>{m.when}</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}><b style={{color:'#f9a8d4'}}>Цель: {m.target}</b></div>
+                        <div style={{ fontSize:7, color:'#f9a8d4', lineHeight:1.3, padding:'4px 6px', borderRadius:4, background:'rgba(244,114,182,0.06)' }}>💡 {m.action}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Cross-protocol warnings */}
+            <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🔗 Перекрёстные предупреждения</div>
+              <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                • ❤️ <b>Кардио:</b> Финастерид/дутастерид снижают DHT на 60-90% → возможна гипотензия. Контроль АД первые 2 нед<br/>
+                • 🫁 <b>Печень:</b> Финастерид метаболизируется в печени. Контроль АЛТ/АСТ при длительном приёме {'>'}1 года<br/>
+                • 🔴 <b>Акне:</b> См. отдельный протокол акне. Комплексная терапия — топики + системные антибиотики + БПО
+              </div>
+            </div>
+
           </InfoErrorBoundary>)}
 
         </div>

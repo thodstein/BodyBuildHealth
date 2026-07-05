@@ -499,7 +499,7 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
       }
       if (e.key === 'he_training_tab') {
         const val = localStorage.getItem('he_training_tab');
-        const validTabs: TrainingTab[] = ['plan', 'cycles', 'programs', 'mytraining', 'programcalc', 'volume', 'library', 'analytics', 'visual', 'progress', 'excalc', 'methods', 'timers', 'history', 'reports', 'srcbb'];
+        const validTabs: TrainingTab[] = ['plan', 'cycles', 'programs', 'mytraining', 'programcalc', 'volume', 'library', 'analytics', 'visual', 'progress', 'excalc', 'methods', 'timers', 'history', 'reports', 'srcbb', 'specialization'];
         if (val && validTabs.includes(val as TrainingTab)) {
           setTab(val as TrainingTab);
         }
@@ -3712,7 +3712,19 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
         } catch { return <div style={{ padding:20, textAlign:'center', color:'rgba(255,255,255,0.3)', fontSize:11 }}>Ошибка загрузки истории</div>; }
       })()}</InfoErrorBoundary>}
       {/* ═══════════ ANALYTICS TAB ═══════════ */}
-      {tab === 'analytics' && <InfoErrorBoundary label="Аналитика"><><div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', marginBottom: 8, fontSize: 10, color: 'var(--text-dim)' }}>💡 Аналитика также доступна во вкладке «Дневник тренировок» → режим «Аналитика»</div><MuscleProgressCard sessions={historyWorkouts} level={level} /><VolumeTrendCard sessions={historyWorkouts} /><LoadRadarCard sessions={historyWorkouts} level={level} /><WeekCompareCard sessions={historyWorkouts} /><LiftHistoryCard sessions={historyWorkouts} /><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /><AllExercisesTrendCard sessions={historyWorkouts} /><StandardForecastCard sessions={historyWorkouts} /><VolumeRecoveryCorrelationCard sessions={historyWorkouts} /><StickingPointAnalysisCard sessions={historyWorkouts} /></></InfoErrorBoundary>}
+      {tab === 'analytics' && (() => {
+        const calcE1rm = (w: number, r: number) => r <= 1 ? w : w * (1 + Math.min(r, 30) / 30);
+        const srpe = loadSRPESessions();
+        const acwrVal = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)).ratio : 1.0;
+        const monoVal = srpe.length >= 7 ? weeklyMonotony(toDailyLoads(srpe)).monotony : 0;
+        const hist = historyWorkouts || [];
+        const exMap = new Map<string,{first:number;last:number}>();
+        for (const w of hist) { const exs: any[] = (w as any).exercises || []; for (const ex of exs) { const nm = ex.name || ex.exerciseId || '?'; if (!exMap.has(nm)) exMap.set(nm,{first:0,last:0}); const v = calcE1rm(ex.weight||0, ex.reps||5); const cur = exMap.get(nm)!; if (!cur.first || (v > 0 && v < cur.first)) cur.first = v; if (v > cur.last) cur.last = v; } }
+        const exercises = Array.from(exMap.entries()).filter(([,v]) => v.first>0&&v.last>0).slice(0,10).map(([name,v]) => ({name,e1rmBefore:Math.round(v.first),e1rmAfter:Math.round(v.last)}));
+        const recentVol = hist.slice(-14).reduce((s:number,w:any) => s + ((w.exercises||[]).length), 0);
+        const rirStats = loadRirCalibrationStats();
+        return <><div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', marginBottom: 8, fontSize: 10, color: 'var(--text-dim)' }}>💡 Аналитика также доступна во вкладке «Дневник тренировок» → режим «Аналитика»</div><RIRCalibrationCard /><MesoCorrectionCard profile={tprofile} acwr={acwrVal} monotony={monoVal} avgReadiness={(() => { const r = linked.readiness; return r ? (r.recovery + (100 - r.fatigue)) / 2 : 70; })()} mesoWeeks={16} missedSessions={0} exercises={exercises} currentVolume={recentVol > 0 ? Math.round(recentVol / Math.max(1, Math.floor(hist.length / 14))) : 16} currentRir={rirStats.bias >= 0 ? 2 : 1} /><MuscleProgressCard sessions={historyWorkouts} level={level} /><VolumeTrendCard sessions={historyWorkouts} /><LoadRadarCard sessions={historyWorkouts} level={level} /><WeekCompareCard sessions={historyWorkouts} /><LiftHistoryCard sessions={historyWorkouts} /><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /><AllExercisesTrendCard sessions={historyWorkouts} /><StandardForecastCard sessions={historyWorkouts} /><VolumeRecoveryCorrelationCard sessions={historyWorkouts} /><StickingPointAnalysisCard sessions={historyWorkouts} /></>;
+      })()}
       {tab === 'library' && (
   <InfoErrorBoundary label="Каталог циклов">
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -3759,6 +3771,10 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
       {tab === 'calc_mrv' && <InfoErrorBoundary label="Оценщик MRV"><MRVEstimatorTab /></InfoErrorBoundary>}
       {tab === 'tempo' && <InfoErrorBoundary label="Темп повторений"><TempoTab /></InfoErrorBoundary>}
       {tab === 'meso_tracker' && <InfoErrorBoundary label="Трекер мезоциклов"><MesocycleTrackerTab /></InfoErrorBoundary>}
+      {tab === 'specialization' && <InfoErrorBoundary label="Специализация"><SpecializationTab /></InfoErrorBoundary>}
+      {tab === 'peaking' && <InfoErrorBoundary label="Пик-протоколы"><PeakingProtocolTab /></InfoErrorBoundary>}
+      {tab === 'conjugate' && <InfoErrorBoundary label="Конъюгат"><ConjugateTab /></InfoErrorBoundary>}
+      {tab === 'mmc_tracking' && <InfoErrorBoundary label="MMC-трекинг"><MMCTrackingCard /></InfoErrorBoundary>}
 
       {/* ═══════════ MY TRAINING TAB ═══════════ */}
       {tab === 'mytraining' && (
@@ -3921,4 +3937,11 @@ import { FatigueIndexTab } from './TrainingScreen_parts/FatigueIndexTab';
 import { MRVEstimatorTab } from './TrainingScreen_parts/MRVEstimatorTab';
 import { TempoTab } from './TrainingScreen_parts/TempoTab';
 import { MesocycleTrackerTab } from './TrainingScreen_parts/MesocycleTrackerTab';
+import { RIRCalibrationCard } from './TrainingScreen_parts/RIRCalibrationCard';
+import MesoCorrectionCard from './TrainingScreen_parts/MesoCorrectionCard';
+import SpecializationTab from './TrainingScreen_parts/SpecializationTab';
+import PeakingProtocolTab from './TrainingScreen_parts/PeakingProtocolTab';
+import ConjugateTab from './TrainingScreen_parts/ConjugateTab';
+import MMCTrackingCard from './TrainingScreen_parts/MMCTrackingCard';
+import { loadRirCalibrationStats } from '../../engines/meso-correction.engine';
 

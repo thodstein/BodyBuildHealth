@@ -1078,14 +1078,27 @@ function toSystemRisksFromTz(
 const SUB_ALIAS: Record<string, string> = {
   zinc_sup: 'zinc', selenium_sup: 'selenium',
   taurine_sup: 'taurine', curcumin_sup: 'curcumin',
-  collagen_ii: 'collagen', calcium_supplement: 'calcium',
+  collagen_ii: 'collagen', collagen_uc2: 'collagen',
+  calcium_supplement: 'calcium',
   probiotic: 'probiotics', probiotics_sup: 'probiotics',
   methylfolate: 'folate', methylcobalamin: 'vitamin_b12',
   red_yeast_rice: 'red_yeast',
   acetyl_l_carnitine: 'l_carnitine', carnitine: 'l_carnitine',
   grape_seed_extract: 'grape_seed',
   l_theanine: 'theanine', l_tyrosine: 'tyrosine', l_dopa: 'l_dopa',
-  saw_palmetto: 'saw_palmetto', // canonical already
+  l_lysine: 'lysine', l_tryptophan: 'tryptophan',
+  saw_palmetto: 'saw_palmetto',
+  telmi: 'telmisartan',
+  pharma_anastrozole: 'anastrozole',
+  pharma_cabergoline: 'cabergoline',
+  pharma_clomiphene: 'clomi',
+  pharma_enclomiphene: 'clomi',
+  pharma_letrozole: 'letrozole',
+  metformin_dup: 'metformin',
+  levothyroxine_dup: 'levothyroxine',
+  liothyronine_dup: 'liothyronine',
+  hyaluronic: 'hyaluronic_acid',
+  chondroitin: 'chondroitin_sulfate',
 };
 function canonId(id: string): string { return SUB_ALIAS[id] || id; }
 
@@ -1095,31 +1108,61 @@ function canonId(id: string): string { return SUB_ALIAS[id] || id; }
 // 3) НПВС и кортикостероиды — препараты по показаниям, не «поддержка» на курсе
 // 4) Узкие/экспериментальные компоненты без стандарта применения
 const TZ_AUTO_BLACKLIST = new Set<string>([
-  // Сырые химикалии/минералы/гормоны — не являются препаратами поддержки:
+  // ── Сырые химикалии/минералы/элементы — НЕ препараты поддержки:
   'sodium', 'caffeine', 'adrenaline', 'copper', 'iron',
   'flavonoids', 'anthocyanins', 'c60',
-  'omega6', 'omega7', 'omega9', // неосновные Омега (нужна только omega3)
+  'omega6', 'omega7', 'omega9',
   'l_histidine', 'ornithine', 'inosine', 'nrf2_activator',
   'lecithin', 'taxifolin',
-  // Рецептурные препараты — только врач, не авто-подбор:
-  'warfarin', 'rivaroxaban', 'apixaban', 'dabigatran', // антикоагулянты
-  'clopidogrel', 'ticagrelor', // антиагреганты
-  'fluoxetine', 'sertraline', 'citalopram', 'escitalopram', 'venlafaxine', 'duloxetine', // антидепрессанты
-  'olanzapine', 'quetiapine', 'risperidone', 'aripiprazole', 'haloperidol', // нейролептики
-  'alprazolam', 'diazepam', 'lorazepam', 'clonazepam', 'buspirone', // анксиолитики/БЗР
-  'valproate', 'lamotrigine', 'carbamazepine', 'phenytoin', // противосудорожные
-  // НПВС и кортикостероиды — не «поддержка»:
-  'ibuprofen', 'naproxen', 'celecoxib', 'diclofenac',
+  'glutamate', 'histidine', 'lactate',
+  'endocrine_marker', 'endocannabinoid',
+  'antacid', 'pharma',
+  // ── Рецептурные ноотропы/нейромодуляторы (не авто-подбор):
+  'phenibut', 'selegiline', 'ketamine', 'modafinil', 'tianeptine', 'lithium',
+  'memantine', 'bromantane', 'noopept', 'semax', 'selank',
+  'cerebrolysin', 'cortexin', 'dsip', 'ibudilast',
+  'piracetam', 'aniracetam', 'oxiracetam', 'pramiracetam', 'coluracetam', 'fasoracetam',
+  // ── Экспериментальные пептиды/сенолитики (не для авто-назначения):
+  'bpc157', 'tb500', 'thymosin_alpha1', 'cjc1295', 'ghrp2', 'ghrp6', 'ipamorelin',
+  'ghk_cu', 'p21', 'urolithin_a', 'spermidine', 'fisetin', 'humanin', 'ss31', 'mots_c',
+  // ── Пептидные гормоны / нейропептиды (RX):
+  'gonadorelin', 'kisspeptin', 'oxytocin', 'pt141', 'melanotan1', 'melanotan2',
+  // ── Гормоны/стероиды — это сама фармакология, не «поддержка»:
+  'pregnenolone', 'neurosteroid', 'progesterone', 'dhea',
+  'estradiol', 'testosterone', 'cortisol', 'insulin', 'glucagon', 'vasopressin',
+  'follistatin', 'igf1', 'mgf', 'finasteride', 'gip', 'glp1',
+  // ── Рецептурные препараты — только врач:
+  'warfarin', 'rivaroxaban', 'apixaban', 'dabigatran',
+  'clopidogrel', 'ticagrelor',
+  'fluoxetine', 'sertraline', 'citalopram', 'escitalopram', 'venlafaxine', 'duloxetine',
+  'olanzapine', 'quetiapine', 'risperidone', 'aripiprazole', 'haloperidol',
+  'alprazolam', 'diazepam', 'lorazepam', 'clonazepam', 'buspirone',
+  'valproate', 'lamotrigine', 'carbamazepine', 'phenytoin',
+  // ── НПВС и кортикостероиды — не «поддержка»:
+  'ibuprofen', 'naproxen', 'celecoxib', 'diclofenac', 'meloxicam',
   'prednisone', 'dexamethasone', 'hydrocortisone', 'methylprednisolone',
-  // Врачебные рецептурные (не назначаем автоматически — только через явный fallback в rec-engine):
-  'furosemide', 'hydrochlorothiazide', 'chlorthalidone', // диуретики — врачебное назначение
-  'atorvastatin', 'rosuvastatin', 'simvastatin', 'pravastatin', 'pitavastatin', // статины
-  'lisinopril', 'enalapril', 'ramipril', 'perindopril', 'captopril', // АПФ-ингибиторы
-  'metoprolol', 'atenolol', 'bisoprolol', 'carvedilol', 'propranolol', // бета-блокаторы (кроме небиволола)
-  'amlodipine', 'nifedipine', 'verapamil', 'diltiazem', // БКК
-  'losartan', 'valsartan', 'irbesartan', 'olmesartan', 'candesartan', // БРА (кроме телмисартана)
-  // Гастро/ферменты (назначаются по показаниям ЖКТ, а не ТВ-движком):
+  // ── Врачебные рецептурные (не назначаем автоматически):
+  'furosemide', 'hydrochlorothiazide', 'chlorthalidone', 'spironolactone',
+  'atorvastatin', 'rosuvastatin', 'simvastatin', 'pravastatin', 'pitavastatin',
+  'lisinopril', 'enalapril', 'ramipril', 'perindopril', 'captopril',
+  'metoprolol', 'atenolol', 'bisoprolol', 'carvedilol', 'propranolol',
+  'amlodipine', 'nifedipine', 'verapamil', 'diltiazem',
+  'losartan', 'valsartan', 'irbesartan', 'olmesartan', 'candesartan',
+  // ── Сахароснижающие (врачебное назначение):
+  'metformin', 'pioglitazone', 'acarbose', 'semaglutide',
+  // ── Тиреоидные (врачебное назначение):
+  'levothyroxine', 'liothyronine', 'methimazole', 'propylthiouracil',
+  'levothyroxine_dup', 'liothyronine_dup', 'metformin_dup',
+  // ── Иммунодепрессанты:
+  'tacrolimus', 'cyclosporine', 'mycophenolate', 'azathioprine',
+  // ── Гастро/ферменты (назначаются по показаниям ЖКТ):
   'digestive_enzymes', 'gentian', 'licorice',
+  // ── Абстрактные классы препаратов (не вещества):
+  'ace_inhibitor_drugs', 'antibiotic_drugs', 'anticoagulant_drugs', 'anticonvulsant_drugs',
+  'antidepressant_drugs', 'antidiabetic_drugs', 'antihistamine_drugs', 'antiplatelet_drugs',
+  'antipsychotic_drugs', 'antithyroid_drugs', 'anxiolytic_drugs', 'arb_drugs',
+  'beta_blocker_drugs', 'ccb_drugs', 'corticosteroid_drugs', 'diuretic_drugs',
+  'immunosuppressant_drugs', 'nsaid_drugs', 'ppi_drugs', 'statin_drugs', 'thyroid_drugs',
 ]);
 
 export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
@@ -1170,7 +1213,14 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   // 3. ТZ-подбор: breadth + targeted без ограничений
   interface DBEntry { organId: string; mechId: string; k: number; q: string; }
   const allDb: Record<string, DBEntry[]> = {};
-  Object.assign(allDb, SUPPLEMENTS_DB || {}, PHARMACY_DB || {});
+  const _mergedDb: Record<string, DBEntry[]> = {};
+  Object.assign(_mergedDb, SUPPLEMENTS_DB || {}, PHARMACY_DB || {});
+  // Фильтруем: пустые записи (entries.length === 0) и записи из блэклиста не участвуют в подборе
+  for (const [id, entries] of Object.entries(_mergedDb)) {
+    if (!entries || entries.length === 0) continue;
+    if (TZ_AUTO_BLACKLIST.has(id)) continue;
+    allDb[id] = entries;
+  }
 
   // Считаем сколько веществ уже покрывают каждую систему
   const sysCoverageCount: Record<string, number> = {};

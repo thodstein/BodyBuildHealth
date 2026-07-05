@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import { FOOD_DB } from '../../../core/nutrition-database';
 import { analyzeDailyDiet, getDefaultProfile, type DailyDietReport, type UserDietProfile } from '../../../engines/product-usefulness-v2.engine';
+import { calculateMealHGI, type HGIMealInput } from '../../../engines/nutrition-hgi.engine';
+import { FOOD_DRUG_INTERACTIONS, type FoodDrugInteraction } from '../../../engines/nutrition-pharma-interactions';
 import { usePlanCtx } from './IndividualPlan/IndividualPlanContext';
 
 const BAR_CSS: React.CSSProperties = { height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' };
@@ -50,8 +52,42 @@ export const DailyDietDashboard: React.FC = () => {
     } catch (e) { console.error('DailyDietDashboard error:', e); return null; }
   }, [dayPlan, ctx.weight, ctx.bodyFatPct, ctx.v2Phase, ctx.v2Labs, ctx.v2Pharma]);
 
+  const hgiResult = useMemo(() => {
+    if (!dayPlan || !dayPlan.meals) return null;
+    const allFoods = dayPlan.meals.flatMap((m: any) =>
+      (m.items || []).map((it: any) => ({
+        name: it.name || '',
+        kcal: it.kcal || 0,
+        protein: it.p || 0,
+        fat: it.f || 0,
+        carbs: it.c || 0,
+        fiber: it.fiber || 0,
+        gi: it.gi,
+      }))
+    );
+    if (!allFoods.length) return null;
+    return calculateMealHGI({ foods: allFoods });
+  }, [dayPlan]);
+
+  const foodDrugWarnings = useMemo(() => {
+    const pharma = ctx.v2Pharma || {};
+    const activeDrugClasses: string[] = [];
+    if (pharma.AAS_ORAL) activeDrugClasses.push('oral_17aa', 'testosterone');
+    if (pharma.AAS_INJECTABLE) activeDrugClasses.push('testosterone');
+    if (pharma.SARMS) activeDrugClasses.push('sarm');
+    if (pharma.PCT_MEDS) activeDrugClasses.push('pct_serm', 'pct_aromatase', 'pct_dopamine');
+    if (pharma.HGH) activeDrugClasses.push('hgh');
+    if (pharma.INSULIN_USE) activeDrugClasses.push('insulin');
+    if (pharma.STIMULATORS) activeDrugClasses.push('stimulants');
+    if (activeDrugClasses.length === 0) return [];
+    return FOOD_DRUG_INTERACTIONS.filter(
+      i => activeDrugClasses.includes(i.drugClass)
+    );
+  }, [ctx.v2Pharma]);
+
   if (!report) return null;
 
+  const hgi = hgiResult;
   const bars = [
     { key: 'mtor', label: 'mTOR', pct: report.mtorTriggered ? 100 : Math.min(100, (3000 - report.mtorDeficitMg) / 3000 * 100), color: report.mtorTriggered ? '#22c55e' : '#f59e0b', icon: '🧬' },
     { key: 'gi', label: 'ЖКТ', pct: Math.min(100, report.giLoad / 60 * 100), color: report.giLoadWarning ? '#ef4444' : '#22c55e', icon: '🫁' },
@@ -62,6 +98,7 @@ export const DailyDietDashboard: React.FC = () => {
     { key: 'insulin', label: 'Инсулин', pct: report.insulinRicohet ? 100 : 20, color: report.insulinRicohet ? '#ef4444' : '#22c55e', icon: '💉' },
     { key: 'cortisol', label: 'Кортизол', pct: report.cortisolRisk ? 80 : 20, color: report.cortisolRisk ? '#f59e0b' : '#22c55e', icon: '🧠' },
     { key: 'micro', label: 'Микро', pct: report.microDeficits.length > 0 ? 60 : 20, color: report.microDeficits.length > 0 ? '#f59e0b' : '#22c55e', icon: '💊' },
+    ...(hgi ? [{ key: 'hgi', label: 'HGI', pct: hgi.hgiScore, color: hgi.color, icon: '🍚' }] : []),
   ];
 
   return (
@@ -147,6 +184,30 @@ export const DailyDietDashboard: React.FC = () => {
       {report.histamineWarning && (
         <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.1)', fontSize: 7, color: '#ef4444' }}>
           {report.histamineWarning}
+        </div>
+      )}
+
+      {hgi && hgi.recommendations.length > 0 && (
+        <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.1)', fontSize: 7, color: '#f59e0b' }}>
+          🍚 HGI {hgi.hgiScore} ({hgi.label}) — {hgi.recommendations[0]}
+        </div>
+      )}
+
+      {foodDrugWarnings.length > 0 && (
+        <div style={{ marginTop: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)' }}>
+          <div style={{ fontSize: 8, fontWeight: 700, color: '#ef4444', marginBottom: 3 }}>⚠ Взаимодействие еды и препаратов</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {foodDrugWarnings.slice(0, 4).map((w, i) => (
+              <div key={i} style={{ fontSize: 7, padding: '3px 5px', borderRadius: 4, background: w.severity === 'CRITICAL' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.08)', color: w.severity === 'CRITICAL' ? '#ef4444' : '#f59e0b', lineHeight: 1.3 }}>
+                {w.severity === 'CRITICAL' ? '🔴' : w.severity === 'HIGH' ? '🟡' : '🟢'} {w.effect}. {w.recommendation}
+              </div>
+            ))}
+            {foodDrugWarnings.length > 4 && (
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', padding: '2px 4px' }}>
+                + ещё {foodDrugWarnings.length - 4} взаимодействий
+              </div>
+            )}
+          </div>
         </div>
       )}
 

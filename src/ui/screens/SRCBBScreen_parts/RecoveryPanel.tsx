@@ -5,6 +5,7 @@
 import React, { useMemo, useState } from 'react';
 import { analyzeRecovery, shouldTrain, type RecoveryOutput } from '../../../engines/recovery-optimization.engine';
 import { getMobilityFlows, getAllCorrectives } from '../../../engines/federation-grip-mobility.engine';
+import { DeloadProtocolCard } from '../TrainingScreen_parts/DeloadProtocolCard';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -79,6 +80,15 @@ export const RecoveryPanel: React.FC = () => {
             <div style={ROW}><span>Риск перетрена</span><span style={{ color: out.overtrainingRisk > 60 ? '#ef4444' : ACCENT }}>{out.overtrainingRisk}/100</span></div>
             <div style={ROW}><span>Суперкомпенсация</span><span>~{out.supercompensationHours}ч</span></div>
             {out.deloadRecommended && <div style={{ ...SMALL, color: '#f59e0b', marginTop: 6 }}>⚠ Разгрузка рекомендована: {out.deloadReason}</div>}
+            {out.deloadRecommended && (
+              <div style={{ marginTop: 8 }}>
+                <DeloadProtocolCard ctx={{
+                  acwr: 1.3, weeksSinceDeload: 6, fatigue: fatigue, recovery: readiness,
+                  hasCompetitionSoon: false, jointPain: injuries.length > 0, cnsFatigue: out.overtrainingRisk > 50,
+                  goal: 'hypertrophy',
+                }} />
+              </div>
+            )}
           </div>
 
           <div style={{ ...CARD, borderColor: verdict.train ? ACCENT : '#ef4444' }}>

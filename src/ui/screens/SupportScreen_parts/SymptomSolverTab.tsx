@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   SYMPTOM_DB, SYMPTOM_CATEGORY_LABELS, SYMPTOM_CATEGORY_ICONS,
   PROBABILITY_LABELS, PROBABILITY_COLORS, EVIDENCE_LABELS, EVIDENCE_COLORS,
@@ -8,6 +8,14 @@ import {
   searchSymptoms, findSymptomById, findSymptomsByDrug, getAllLinkedDrugs, getSymptomStats,
   type SymptomEntry, type ProblemEntry, type SymptomCategory, type UrgencyLevel,
 } from '../../../engines/symptom-solver.engine';
+import {
+  resolveCatalogId, isLifestyleOnly, getSymptomSolutionDisplayName, getCatalogEntryForSymptomSolution,
+} from '../../../engines/symptom-catalog-bridge';
+import {
+  derivePlanFromSymptoms, getUrgencyLabel, groupSubstancesBySystem,
+  type SelectedSymptom,
+} from '../../../engines/symptom-priority-engine';
+import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 
 const glassCard: React.CSSProperties = {
   padding: '12px 14px', borderRadius: 12, background: 'var(--bg-secondary)',
@@ -82,6 +90,13 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
     try { return JSON.parse(localStorage.getItem(SAVED_KEY) || '[]'); } catch { return []; }
   });
 
+  // ── НОВОЕ: Выбранные симптомы + проблемные индексы для построения плана ──
+  const [selectedForPlan, setSelectedForPlan] = useState<Record<string, number[]>>(() => {
+    try { return JSON.parse(localStorage.getItem('he_symptom_selected') || '{}'); } catch { return {}; }
+  });
+  const [planToast, setPlanToast] = useState('');
+  const [showPlanSummary, setShowPlanSummary] = useState(false);
+
   const allDrugs = useMemo(() => getAllLinkedDrugs(), []);
 
   const filteredSymptoms = useMemo(() => {
@@ -104,6 +119,106 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
 
   const stats = useMemo(() => getSymptomStats(), []);
 
+  // ── Логика выбора симптомов ──
+  const toggleSymptomSelection = (symId: string, problemIdx?: number) => {
+    setSelectedForPlan((prev: Record<string, number[]>) => {
+      const next = { ...prev };
+      if (problemIdx === undefined) {
+        // toggle whole symptom
+        if (next[symId] && next[symId].length === 0) {
+          // already selected with empty = all, deselect
+          delete next[symId];
+        } else {
+          // select all problems
+          next[symId] = [];
+        }
+      } else {
+        // toggle specific problem
+        const current = next[symId] || [];
+        if (current.length === 0) {
+          // was "all" → now select specific
+          const sym = findSymptomById(symId);
+          if (sym) {
+            next[symId] = [problemIdx];
+          }
+        } else {
+          const idx = current.indexOf(problemIdx);
+          if (idx >= 0) {
+            if (current.length === 1) {
+              delete next[symId];
+            } else {
+              next[symId] = current.filter((i: number) => i !== problemIdx);
+            }
+          } else {
+            next[symId] = [...current, problemIdx].sort();
+          }
+        }
+      }
+      localStorage.setItem('he_symptom_selected', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const isSymptomSelected = (symId: string): boolean => {
+    return symId in selectedForPlan;
+  };
+
+  const isProblemSelected = (symId: string, problemIdx: number): boolean => {
+    const val = selectedForPlan[symId];
+    if (!val) return false;
+    return val.length === 0 || val.includes(problemIdx);
+  };
+
+  const selectedSymptomsList = useMemo(() => {
+    return Object.keys(selectedForPlan).map((id) => findSymptomById(id)).filter(Boolean) as SymptomEntry[];
+  }, [selectedForPlan]);
+
+  const derivedPlan = useMemo(() => {
+    if (selectedSymptomsList.length === 0) return null;
+    return derivePlanFromSymptoms(selectedSymptomsList, selectedForPlan);
+  }, [selectedSymptomsList, selectedForPlan]);
+
+  // ── Добавление вещества в план ──
+  const addSubstanceToPlan = (substanceId: string, name: string) => {
+    const catalogId = resolveCatalogId(substanceId);
+    if (!catalogId) {
+      setPlanToast(`«${name}» — образ жизни, не добавляется в план`);
+      setTimeout(() => setPlanToast(''), 3000);
+      return;
+    }
+    // Получаем текущие subs из состояния
+    const currentSubs: string[] = s.supportDrugs || [];
+    if (currentSubs.includes(catalogId)) {
+      setPlanToast(`«${name}» уже в плане`);
+    } else {
+      const newSubs = [...currentSubs, catalogId];
+      s.setSupportDrugs(newSubs);
+      setPlanToast(`«${name}» добавлен в план`);
+      // Пересчитываем план, если есть calcSupport
+      if (typeof s.calcSupport === 'function') {
+        setTimeout(() => s.calcSupport(s.supportLevel, newSubs), 100);
+      }
+    }
+    setTimeout(() => setPlanToast(''), 3000);
+  };
+
+  // ── Создать план по выбранным симптомам ──
+  const createPlanFromSymptoms = () => {
+    if (!derivedPlan) return;
+    const currentSubs: string[] = s.supportDrugs || [];
+    const merged = [...new Set([...currentSubs, ...derivedPlan.substanceIds])];
+    s.setSupportDrugs(merged);
+    setShowPlanSummary(true);
+    setPlanToast(`План создан: ${derivedPlan.substanceIds.length} веществ по ${derivedPlan.symptomCount} симптомам`);
+    setTimeout(() => setPlanToast(''), 4000);
+    setShowPlanSummary(false);
+  };
+
+  const clearSelection = () => {
+    setSelectedForPlan({});
+    localStorage.setItem('he_symptom_selected', '{}');
+  };
+
   const toggleSaved = (id: string) => {
     setSavedIds((prev) => {
       const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
@@ -112,6 +227,7 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
     });
   };
 
+  // ═══ ДЕТАЛЬНЫЙ ПРОСМОТР СИМПТОМА ═══
   if (selectedSymptom) {
     const related = (selectedSymptom.relatedSymptoms || [])
       .map((rid) => findSymptomById(rid))
@@ -129,9 +245,13 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
             color: savedIds.includes(selectedSymptom.id) ? '#ff9800' : 'var(--text-dim)',
             border: `1px solid ${savedIds.includes(selectedSymptom.id) ? '#ff9800' : 'var(--border)'}`,
           }}>{savedIds.includes(selectedSymptom.id) ? '★ Сохранено' : '☆ Сохранить'}</button>
+          {/* Кнопка выбора симптома для плана */}
+          <button onClick={() => toggleSymptomSelection(selectedSymptom.id)}
+            style={pillBtn(isSymptomSelected(selectedSymptom.id), '#8b5cf6')}>
+            {isSymptomSelected(selectedSymptom.id) ? '✓ В плане' : '☐ В план'}
+          </button>
         </div>
 
-        {/* Заголовок симптома */}
         <div style={{ ...glassCard, borderColor: selectedSymptom.urgency ? URGENCY_COLORS[selectedSymptom.urgency] : 'var(--border)' }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
             <span style={{ fontSize: 18 }}>{SYMPTOM_CATEGORY_ICONS[selectedSymptom.category]}</span>
@@ -152,8 +272,6 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: '1.5', marginTop: 6 }}>
             {selectedSymptom.generalInfo}
           </div>
-
-          {/* Связанные препараты */}
           {selectedSymptom.linkedDrugs && selectedSymptom.linkedDrugs.length > 0 && (
             <div style={{ marginTop: 8, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ fontSize: 8, color: 'var(--text-light)' }}>Связан с:</span>
@@ -168,8 +286,6 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
               })}
             </div>
           )}
-
-          {/* Быстрые факты */}
           {selectedSymptom.quickFacts && selectedSymptom.quickFacts.length > 0 && (
             <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)' }}>
               <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--accent)', marginBottom: 4 }}>Быстрые факты</div>
@@ -180,7 +296,6 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
           )}
         </div>
 
-        {/* Проблемы */}
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', marginTop: 14, marginBottom: 6 }}>
           Возможные причины ({selectedSymptom.problems.length})
         </div>
@@ -215,22 +330,42 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
                     </div>
                   </div>
                 ))}
+
                 <div style={{ ...sectionTitle, fontSize: 10, marginTop: 12, marginBottom: 6 }}>Препараты и решения ({problem.solutions.length})</div>
-                {problem.solutions.map((sol, i) => (
-                  <div key={i} style={{ padding: '8px 10px', borderRadius: 8, marginBottom: 4, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.1)', fontSize: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2, gap: 4 }}>
-                      <span style={{ fontWeight: 700, color: 'var(--text)' }}>{sol.name}</span>
-                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        <span style={chip(sol.type === 'pharma' ? '#e91e63' : sol.type === 'supplement' ? '#2196f3' : '#ff9800')}>
-                          {sol.type === 'pharma' ? 'Фарма' : sol.type === 'supplement' ? 'БАД' : 'Образ жизни'}
+                {problem.solutions.map((sol, i) => {
+                  const catalogEntry = getCatalogEntryForSymptomSolution(sol.substanceId);
+                  return (
+                    <div key={i} style={{ padding: '8px 10px', borderRadius: 8, marginBottom: 4, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.1)', fontSize: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2, gap: 4 }}>
+                        <span style={{ fontWeight: 700, color: 'var(--text)' }}>
+                          {getSymptomSolutionDisplayName(sol.substanceId, sol.name)}
                         </span>
-                        <span style={chip(EVIDENCE_COLORS[sol.evidenceLevel])}>{EVIDENCE_LABELS[sol.evidenceLevel]}</span>
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0, alignItems: 'center' }}>
+                          <span style={chip(sol.type === 'pharma' ? '#e91e63' : sol.type === 'supplement' ? '#3b82f6' : '#ff9800')}>
+                            {sol.type === 'pharma' ? 'Фарма' : sol.type === 'supplement' ? 'БАД' : 'Образ жизни'}
+                          </span>
+                          <span style={chip(EVIDENCE_COLORS[sol.evidenceLevel])}>{EVIDENCE_LABELS[sol.evidenceLevel]}</span>
+                          {/* КНОПКА «В ПЛАН» */}
+                          {sol.type !== 'lifestyle' && catalogEntry && (
+                            <button
+                              onClick={() => addSubstanceToPlan(sol.substanceId, sol.name)}
+                              title="Добавить в план поддержки"
+                              style={{
+                                padding: '2px 8px', borderRadius: 8, fontSize: 8, fontWeight: 700,
+                                cursor: 'pointer', background: 'rgba(0,230,138,0.12)',
+                                border: '1px solid rgba(0,230,138,0.3)', color: 'var(--accent)',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >➕ В план</button>
+                          )}
+                        </div>
                       </div>
+                      <div style={{ color: 'var(--text-dim)', fontSize: 9, marginBottom: 2 }}><strong>Доза:</strong> {sol.dose}</div>
+                      <div style={{ color: 'var(--text-light)', fontSize: 9, fontStyle: 'italic' }}>{sol.mechanism}</div>
                     </div>
-                    <div style={{ color: 'var(--text-dim)', fontSize: 9, marginBottom: 2 }}><strong>Доза:</strong> {sol.dose}</div>
-                    <div style={{ color: 'var(--text-light)', fontSize: 9, fontStyle: 'italic' }}>{sol.mechanism}</div>
-                  </div>
-                ))}
+                  );
+                })}
+
                 <div style={{ ...sectionTitle, fontSize: 10, marginTop: 12, marginBottom: 6 }}>К чему быть готовым ({problem.expectations.length})</div>
                 {problem.expectations.map((exp, i) => (
                   <div key={i} style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(255,152,0,0.05)', border: '1px solid rgba(255,152,0,0.1)', fontSize: 10 }}>
@@ -275,6 +410,63 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
         {stats.criticalCount > 0 && <span style={{ color: '#f44336', fontWeight: 600 }}> · {stats.criticalCount} критических</span>}
         {stats.warningCount > 0 && <span style={{ color: '#ff9800', fontWeight: 600 }}> · {stats.warningCount} требующих внимания</span>}
       </div>
+
+      {/* ПАНЕЛЬ: Выбранные симптомы → Создать план */}
+      {selectedSymptomsList.length > 0 && (
+        <div style={{ marginBottom: 10, position: 'relative' }}>
+          <div style={{ padding: '10px 12px', borderRadius: 10, background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(0,230,138,0.08))', border: '1px solid rgba(139,92,246,0.25)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6' }}>
+                ☑ {selectedSymptomsList.length} симптом{selectedSymptomsList.length === 1 ? '' : 'ов'} выбрано
+              </span>
+              <button onClick={clearSelection} style={{
+                padding: '2px 8px', borderRadius: 8, fontSize: 8, cursor: 'pointer',
+                background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-dim)',
+              }}>✕ Сбросить</button>
+            </div>
+            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 4 }}>
+              {selectedSymptomsList.slice(0, 8).map((sym) => (
+                <span key={sym.id} style={chip('#8b5cf6', '#fff')}>
+                  {SYMPTOM_CATEGORY_ICONS[sym.category]} {sym.symptom.length > 20 ? sym.symptom.slice(0, 20) + '…' : sym.symptom}
+                </span>
+              ))}
+              {selectedSymptomsList.length > 8 && (
+                <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>+{selectedSymptomsList.length - 8}</span>
+              )}
+            </div>
+            {derivedPlan && (
+              <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>
+                Рекомендовано веществ: <strong>{derivedPlan.substanceIds.length}</strong>
+                {derivedPlan.requiresDoctor && (
+                  <span style={{ color: '#f44336', marginLeft: 6 }}>🔴 Требуется врач</span>
+                )}
+              </div>
+            )}
+            <button
+              onClick={createPlanFromSymptoms}
+              disabled={!derivedPlan || derivedPlan.substanceIds.length === 0}
+              style={{
+                width: '100%', padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700,
+                cursor: derivedPlan?.substanceIds.length ? 'pointer' : 'not-allowed',
+                background: derivedPlan?.substanceIds.length ? 'linear-gradient(135deg, #8b5cf6, #00e68a)' : 'var(--bg-secondary)',
+                border: 'none', color: derivedPlan?.substanceIds.length ? '#000' : 'var(--text-dim)',
+                opacity: derivedPlan?.substanceIds.length ? 1 : 0.5,
+              }}
+            >📋 Создать план поддержки по симптомам</button>
+          </div>
+        </div>
+      )}
+
+      {/* TOAST */}
+      {planToast && (
+        <div style={{
+          position: 'fixed', bottom: 20, left: 16, right: 16, zIndex: 200,
+          padding: '10px 14px', borderRadius: 12,
+          background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(0,230,138,0.3)',
+          color: '#00e68a', fontSize: 11, fontWeight: 600, textAlign: 'center',
+          backdropFilter: 'blur(8px)',
+        }}>{planToast}</div>
+      )}
 
       {/* Сохранённые */}
       {savedIds.length > 0 && (
@@ -337,48 +529,68 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {symptoms.map((sym) => (
-              <button key={sym.id} onClick={() => setSelectedSymptom(sym)} style={{
-                padding: '10px 12px', borderRadius: 10, background: 'var(--bg-secondary)',
-                border: `1px solid ${sym.urgency && sym.urgency !== 'standard' ? URGENCY_COLORS[sym.urgency] + '44' : 'var(--border)'}`,
-                cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
-              }} onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)';
-                (e.currentTarget as HTMLElement).style.background = 'rgba(0,230,138,0.04)';
-              }} onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.borderColor = sym.urgency && sym.urgency !== 'standard' ? URGENCY_COLORS[sym.urgency] + '44' : 'var(--border)';
-                (e.currentTarget as HTMLElement).style.background = 'var(--bg-secondary)';
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-                      {sym.symptom}
-                      {sym.urgency && sym.urgency !== 'standard' && <span style={{ fontSize: 12 }}>{URGENCY_ICONS[sym.urgency]}</span>}
-                    </div>
-                    <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>
-                        {sym.problems.length} {sym.problems.length === 1 ? 'причина' : sym.problems.length < 5 ? 'причины' : 'причин'}
-                      </span>
-                      <span style={{ fontSize: 8, color: 'var(--text-light)' }}>·</span>
-                      <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>
-                        {sym.problems.reduce((acc, p) => acc + p.solutions.length, 0)} решений
-                      </span>
-                      {sym.urgency === 'critical' && (
-                        <>
-                          <span style={{ fontSize: 8, color: 'var(--text-light)' }}>·</span>
-                          <span style={{ fontSize: 8, color: '#f44336', fontWeight: 600 }}>СРОЧНО</span>
-                        </>
-                      )}
-                      {sym.linkedDrugs && sym.linkedDrugs.length > 0 && (
-                        <span style={{ fontSize: 8, color: 'var(--accent)', marginLeft: 2, background: 'rgba(0,230,138,0.08)', padding: '1px 4px', borderRadius: 4 }}>
-                          {sym.linkedDrugs.slice(0, 2).map((d) => DRUG_LABELS[d] || d).join(', ')}
-                          {sym.linkedDrugs.length > 2 ? '...' : ''}
+              <div key={sym.id} style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
+                {/* Кнопка выбора для плана */}
+                <button
+                  onClick={() => toggleSymptomSelection(sym.id)}
+                  style={{
+                    width: 28, minWidth: 28, borderRadius: 8,
+                    background: isSymptomSelected(sym.id) ? '#8b5cf6' : 'var(--bg-secondary)',
+                    border: `1px solid ${isSymptomSelected(sym.id) ? '#8b5cf6' : 'var(--border)'}`,
+                    color: isSymptomSelected(sym.id) ? '#fff' : 'var(--text-dim)',
+                    fontSize: 11, cursor: 'pointer', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.15s',
+                  }}
+                  title={isSymptomSelected(sym.id) ? 'Убрать из плана' : 'Добавить в план'}
+                >{isSymptomSelected(sym.id) ? '✓' : '+'}</button>
+
+                {/* Карточка симптома */}
+                <button onClick={() => setSelectedSymptom(sym)} style={{
+                  flex: 1, padding: '10px 12px', borderRadius: 10, background: 'var(--bg-secondary)',
+                  border: `1px solid ${sym.urgency && sym.urgency !== 'standard' ? URGENCY_COLORS[sym.urgency] + '44' : 'var(--border)'}`,
+                  cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
+                }} onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)';
+                  (e.currentTarget as HTMLElement).style.background = 'rgba(0,230,138,0.04)';
+                }} onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.borderColor = sym.urgency && sym.urgency !== 'standard' ? URGENCY_COLORS[sym.urgency] + '44' : 'var(--border)';
+                  (e.currentTarget as HTMLElement).style.background = 'var(--bg-secondary)';
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                        {sym.symptom}
+                        {sym.urgency && sym.urgency !== 'standard' && <span style={{ fontSize: 12 }}>{URGENCY_ICONS[sym.urgency]}</span>}
+                      </div>
+                      <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>
+                          {sym.problems.length} {sym.problems.length === 1 ? 'причина' : sym.problems.length < 5 ? 'причины' : 'причин'}
                         </span>
-                      )}
+                        <span style={{ fontSize: 8, color: 'var(--text-light)' }}>·</span>
+                        <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>
+                          {sym.problems.reduce((acc, p) => acc + p.solutions.length, 0)} решений
+                        </span>
+                        {sym.urgency === 'critical' && (
+                          <>
+                            <span style={{ fontSize: 8, color: 'var(--text-light)' }}>·</span>
+                            <span style={{ fontSize: 8, color: '#f44336', fontWeight: 600 }}>СРОЧНО</span>
+                          </>
+                        )}
+                        {sym.linkedDrugs && sym.linkedDrugs.length > 0 && (
+                          <span style={{ fontSize: 8, color: 'var(--accent)', marginLeft: 2, background: 'rgba(0,230,138,0.08)', padding: '1px 4px', borderRadius: 4 }}>
+                            {sym.linkedDrugs.slice(0, 2).map((d) => DRUG_LABELS[d] || d).join(', ')}
+                            {sym.linkedDrugs.length > 2 ? '...' : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {savedIds.includes(sym.id) && <span style={{ fontSize: 12, color: '#ff9800' }}>★</span>}
                     </div>
                   </div>
-                  {savedIds.includes(sym.id) && <span style={{ fontSize: 12, color: '#ff9800' }}>★</span>}
-                </div>
-              </button>
+                </button>
+              </div>
             ))}
           </div>
         </div>

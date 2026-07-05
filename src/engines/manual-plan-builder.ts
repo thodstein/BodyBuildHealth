@@ -3,6 +3,7 @@ import type { Exercise } from '../core/types';
 import { calcExercisePrescription } from './training.engine';
 import { prescribeExercises, forceVector, lengthenedPartials } from './pro/exercise-prescription.engine';
 import { generateRepTempo } from './rep-tempo-engine';
+import { selectExercisesSmart } from './exercise-selector.engine';
 
 export type PlanEx = { name: string; sets: number; reps: string; rir: number; rest: number; group: string; weight: number; tempo?: string; forceVec?: string; jointStress?: string };
 export type PlanDay = { day: number; groups: string[]; exercises: PlanEx[] };
@@ -47,13 +48,35 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
         if (pool.length === 0) { poolFinal = allPool; groupCorrections.push(`Группа «${g}»: нет упражнений по выбранному оборудованию — взят полный каталог (без фильтра).`); }
         else if (pool.length < allPool.length) groupCorrections.push(`Группа «${g}»: исключено ${allPool.length - pool.length} упражнений без доступного оборудования.`);
       }
-      // PRO: биомеханический скоринг через prescribeExercises
-      const proRanked = prescribeExercises({ muscle: g, goal: goal as 'strength'|'hypertrophy'|'power', equipment, limit: 10 });
-      const proIds = new Set(proRanked.map(r => r.id));
-      const rank = (e: Exercise) => (e.type === 'compound' ? 100 : 0) + (e.equipment === 'barbell' ? 10 : e.equipment === 'dumbbell' ? 5 : 0) + (isWeak(g) ? 5 : 0) + (proIds.has(e.id) ? 20 : 0);
-      const compounds = [...poolFinal].filter(e => e.type === 'compound').sort((a, b) => rank(b) - rank(a)).slice(0, 2);
-      const isolations = [...poolFinal].filter(e => e.type === 'isolation').sort((a, b) => rank(b) - rank(a)).slice(0, 2);
-      const chosen = [...compounds, ...isolations];
+      // PRO: интеллектуальный отбор (6 критериев: weakZones, углы, суставы, push/pull, паттерны, оборудование)
+      const alreadyChosen = exs.map(e => e.name);
+      const selectedIds = alreadyChosen.map(name => EXERCISE_CATALOG.find(ex => ex.name === name)?.id).filter(Boolean) as string[];
+      const injuryProfile = injuries.map(i => i.muscle);
+      const weakZonesList = isWeak(g) ? [g] : [];
+      const smartCompounds = selectExercisesSmart({
+        candidates: poolFinal,
+        muscleGroup: g,
+        count: 2,
+        selectedIds,
+        equipment,
+        weakZones: weakZonesList,
+        level,
+        injuryProfile,
+        type: 'compound',
+      });
+      const compoundIds = new Set(smartCompounds.map(e => e.id));
+      const smartIsolations = selectExercisesSmart({
+        candidates: poolFinal,
+        muscleGroup: g,
+        count: 2,
+        selectedIds: [...selectedIds, ...smartCompounds.map(e => e.id)],
+        equipment,
+        weakZones: weakZonesList,
+        level,
+        injuryProfile,
+        type: 'isolation',
+      });
+      const chosen = [...smartCompounds, ...smartIsolations];
       let capped = false;
       for (const ex of chosen) {
         const already = weeklySets[g] || 0;

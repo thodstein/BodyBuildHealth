@@ -3,6 +3,7 @@ import { autoSchedule, detectOvertraining, type AutoScheduleOutput, type Schedul
 import { loadSRPESessions, type SRPESession } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../../engines/pro/training-load.engine';
 import { useDataLink } from '../../../core/data-link';
+import { DeloadProtocolCard } from './DeloadProtocolCard';
 
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: '12px', margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -82,6 +83,10 @@ export const DeloadSchedulerTab: React.FC = () => {
   }), [linked.readiness, linked.profile, acwr, otSymptoms, perfDecline, restingHR]);
 
   const otResult = useMemo(() => detectOvertraining(otInput), [otInput]);
+  const fatigueLevel = (linked.readiness?.fatigue ?? 30) / 10;
+  const recoveryLevel = (linked.readiness?.recovery ?? 80) / 10;
+  const overtraining = otInput;
+  const deloadGoal = goal as 'strength' | 'hypertrophy' | 'maintenance' | 'peaking' | 'rehab';
 
   const schedule: AutoScheduleOutput = useMemo(() => {
     const base = autoSchedule({
@@ -379,16 +384,18 @@ export const DeloadSchedulerTab: React.FC = () => {
         </div>
       )}
 
-      {/* Советы */}
-      <div style={{ ...CARD, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>💡 Стратегия делода</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
-          • <b>40% объёма</b> — сохраняем паттерн движения, снимаем нагрузку с ЦНС и суставов<br />
-          • <b>RIR 4</b> — далеко от отказа, чистая техника<br />
-          • <b>2-3 сессии</b> — поддерживаем привычку, не перегружаем<br />
-          • <b>Фокус на мобильность</b> — растяжка, МФР, лёгкое кардио<br />
-          • После делода: старт нового мезоцикла с возросшей работоспособностью и свежими ПМ
-        </div>
+      {/* Структурированный протокол делода */}
+      <div style={{ marginTop: 8 }}>
+        <DeloadProtocolCard ctx={{
+          acwr: acwr?.ratio ?? 1.0,
+          weeksSinceDeload: schedule.deloadWeeks.length === 0 ? 99 : 0,
+          fatigue: fatigueLevel,
+          recovery: recoveryLevel,
+          hasCompetitionSoon: deloadGoal === 'peaking',
+          jointPain: overtraining.jointPainIncrease,
+          cnsFatigue: overtraining.rpeInflation || overtraining.recoveryTimeExtension,
+          goal: deloadGoal,
+        }} />
       </div>
     </div>
   );

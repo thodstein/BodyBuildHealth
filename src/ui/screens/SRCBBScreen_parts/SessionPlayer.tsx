@@ -18,6 +18,8 @@ import { calculatePlates } from '../../../engines/gym-competition.engine';
 import { saveSRPESession } from '../../../engines/pro/srpe-store';
 import { useTrainingProfile } from '../TrainingScreen_parts/training-profile';
 import { recommendTempo, formatTempo, TEMPO_PRESETS } from '../../../engines/rep-tempo.engine';
+import { recordSessionRIR, getSessionRIRFeedback } from '../../../engines/rir-calibration.engine';
+import { recordMMC } from '../../../engines/mmc-tracking.engine';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -95,6 +97,8 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   const [exDone, setExDone] = useState<Record<string, boolean>>({});
   // P11: VBT-ввод скорости штанги (м/с) на сет + авторегуляция по потере скорости
   const [vel, setVel] = useState<Record<string, number>>({});
+  const [mmco, setMMCOpen] = useState<string>('');
+  const [mmcVals, setMMCVals] = useState<Record<string, number>>({});
   const [vbtIntent, setVbtIntent] = useState<VBTIntent>('strength');
   const [sessionRPE, setSessionRPE] = useState<number>(7);
   const [sessionDur, setSessionDur] = useState<number>(60);
@@ -210,6 +214,23 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     setCooldownDone({});
 
     try { saveSRPESession({ date: finished.date, sRPE: sessionRPE, durationMin: finished.durationMin || sessionDur }); } catch { /* ignore */ }
+    // RIR-калибровка: записываем фактические RIR по подходам
+    try { recordSessionRIR(finished, { exercises: day.exercises.map(ex => ({ name: ex.name, targetSets: ex.targetSets })) }); } catch { /* ignore */ }
+    // MMC-трекинг
+    try {
+      const mmcEntries = Object.entries(mmcVals).filter(([,v]) => v > 0);
+      if (mmcEntries.length > 0) {
+        mmcEntries.forEach(([key, val]) => {
+          const parts = key.split('_');
+          const si = parseInt(parts[0] || '0');
+          const field = parts[1] || '';
+          const exName = day.exercises.find((_, i) => si >= i*10 && si < (i+1)*10)?.name || '';
+          if (field === 'mmc' || field === 'pump' || field === 'joint' || field === 'energy') {
+            recordMMC({ date: finished.date, exerciseId: exName, exerciseName: exName, setNumber: si, mmc: field === 'mmc' ? val : 5, pump: field === 'pump' ? val : 5, jointDiscomfort: field === 'joint' ? val : 0, energy: field === 'energy' ? val : 5 });
+          }
+        });
+      }
+    } catch { /* ignore */ }
     setDone(finished);
     setSession(null);
   };
@@ -292,6 +313,12 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   }, [done, day]);
 
   const anyDeload = nextSuggestions.some(s => s.deload);
+
+  // RIR-калибровка: фидбек по сессии
+  const rirFeedback = useMemo(() => {
+    if (!done || !day) return null;
+    try { return getSessionRIRFeedback(done, { exercises: day.exercises.map(ex => ({ name: ex.name, targetSets: ex.targetSets })) }); } catch { return null; }
+  }, [done, day]);
 
   // D1: LMS-метрики фактической сессии (Тоннаж/КПШ/Инт.отн/УОИ/Инт.Ф+Б) — считаются для done-состояния
   const lms = useMemo(() => computeSessionMetrics(done, day), [done, day]);
@@ -389,18 +416,34 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
                        <input style={{ ...IN, width: 48 }} type="number" step="0.01" placeholder="v" value={vel[k] ?? ""} onChange={e => setVel(p => ({ ...p, [k]: +e.target.value }))} aria-label="скорость м/с" />
                        <button style={logged ? BTN_GHOST : BTN} onClick={() => logOne(ei, si)}>{logged ? '✓' : 'OK'}</button>
                      </div>
-                     {logged && (
-                       <div style={{ width: '100%', fontSize: 10, color: 'rgba(255,255,255,0.55)', paddingLeft: 56, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                         <span style={{ color: 'rgba(255,255,255,0.8)' }}>🏋️ {formatPlates(a.weight)}</span>
-                         <span>факт <b style={{ color: '#fff' }}>{a.weight}кг×{a.reps}</b>{a.rpe > 0 ? `@RPE${a.rpe}` : ''}</span>
-                         <span style={{ color: dW === 0 ? 'var(--text-dim)' : dW > 0 ? '#22c55e' : '#f59e0b' }}>Δвес {dW > 0 ? '+' : ''}{dW}</span>
-                         <span style={{ color: dR === 0 ? 'var(--text-dim)' : dR > 0 ? '#22c55e' : '#f59e0b' }}>Δповт {dR > 0 ? '+' : ''}{dR}</span>
-                         {a.rpe > 0 && <span style={{ color: rpeDelta > 0 ? '#ef4444' : rpeDelta < -1 ? '#22c55e' : 'var(--text-dim)' }}>RPE vs цели({targetRPE}): {rpeDelta > 0 ? '+' : ''}{rpeDelta}</span>}
-                         {a.rpe > 0 && (rpeDelta > 0 || rpeDelta < -1) && (
-                           <span style={{ color: ACCENT, fontWeight: 700 }}>→ след. сет: {nextW}кг×{nextR}{rpeDelta > 0 ? ' (легче)' : ' (тяжелее)'}</span>
-                         )}
-                       </div>
-                     )}
+                      {logged && (
+                        <div style={{ width: '100%', fontSize: 10, color: 'rgba(255,255,255,0.55)', paddingLeft: 56, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <span style={{ color: 'rgba(255,255,255,0.8)' }}>🏋️ {formatPlates(a.weight)}</span>
+                          <span>факт <b style={{ color: '#fff' }}>{a.weight}кг×{a.reps}</b>{a.rpe > 0 ? `@RPE${a.rpe}` : ''}</span>
+                          <span style={{ color: dW === 0 ? 'var(--text-dim)' : dW > 0 ? '#22c55e' : '#f59e0b' }}>Δвес {dW > 0 ? '+' : ''}{dW}</span>
+                          <span style={{ color: dR === 0 ? 'var(--text-dim)' : dR > 0 ? '#22c55e' : '#f59e0b' }}>Δповт {dR > 0 ? '+' : ''}{dR}</span>
+                          {a.rpe > 0 && <span style={{ color: rpeDelta > 0 ? '#ef4444' : rpeDelta < -1 ? '#22c55e' : 'var(--text-dim)' }}>RPE vs цели({targetRPE}): {rpeDelta > 0 ? '+' : ''}{rpeDelta}</span>}
+                          {a.rpe > 0 && (rpeDelta > 0 || rpeDelta < -1) && (
+                            <span style={{ color: ACCENT, fontWeight: 700 }}>→ след. сет: {nextW}кг×{nextR}{rpeDelta > 0 ? ' (легче)' : ' (тяжелее)'}</span>
+                          )}
+                          {/* MMC-трекинг */}
+                          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', cursor: 'pointer', userSelect:'none', borderBottom:'1px dashed rgba(255,255,255,0.15)' }} onClick={() => setMMCOpen(mmco === k ? '' : k)}>
+                            {mmco === k ? '🔼 скрыть MMC' : '🔽 MMC/Пампинг/Суставы'}
+                          </span>
+                          {mmco === k && <div style={{ width: '100%', display: 'flex', gap: 8, padding: '4px 0' }}>
+                            {([['mmc','🧠 MMC',7],['pump','💪 Пампинг',6],['joint','🦵 Суставы',0],['energy','⚡ Энергия',7]] as any[]).map((item: any[]) => {
+                              const f = item[0]; const label = item[1]; const def = item[2];
+                              const valKey = k + '_' + f;
+                              return <label key={f} style={{ display:'flex', alignItems:'center', gap:4, fontSize:9, color:'rgba(255,255,255,0.4)' }}>
+                                <span style={{minWidth:42}}>{label}</span>
+                                <input style={{width:32,padding:'2px 4px',borderRadius:4,border:'1px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.04)',color:'#fff',fontSize:9,textAlign:'center'}}
+                                  type="number" min={0} max={10} value={mmcVals[valKey] ?? def}
+                                  onChange={e => setMMCVals(p => ({...p, [valKey]: +e.target.value}))} />
+                              </label>
+                            })}
+                          </div>}
+                        </div>
+                      )}
 
                   </div>
                 );
@@ -496,6 +539,24 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
                   <b style={{ color: '#fff' }}>{s.name}</b> → след. {s.nextWeight}кг×{s.nextReps}. <span style={{ color: 'var(--text-dim)' }}>{s.note}</span>
                 </div>
               ))}
+            </div>
+          )}
+          {/* RIR-калибровка: фидбек по каждому упражнению */}
+          {rirFeedback && rirFeedback.exerciseFeedbacks.length > 0 && (
+            <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: rirFeedback.sessionQuality === 'отлично' ? 'rgba(0,230,138,0.06)' : rirFeedback.sessionQuality === 'плохо' ? 'rgba(239,68,68,0.06)' : 'rgba(234,179,8,0.06)', border: '1px solid ' + (rirFeedback.sessionQuality === 'отлично' ? 'rgba(0,230,138,0.2)' : rirFeedback.sessionQuality === 'плохо' ? 'rgba(239,68,68,0.25)' : 'rgba(234,179,8,0.25)') }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: rirFeedback.sessionQuality === 'отлично' ? '#00e68a' : rirFeedback.sessionQuality === 'плохо' ? '#ef4444' : '#eab308', marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>🎯 RIR-калибровка: {rirFeedback.sessionQuality}</span>
+                <span style={{ fontSize: 10, fontWeight: 400, color: 'rgba(255,255,255,0.5)' }}>bias {rirFeedback.overallBias > 0 ? '+' : ''}{rirFeedback.overallBias} RIR</span>
+              </div>
+              {rirFeedback.exerciseFeedbacks.map((f, i) => (
+                <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginBottom: 4, paddingLeft: 4, borderLeft: '2px solid ' + (Math.abs(f.bias) > 1 ? '#ef4444' : Math.abs(f.bias) > 0.3 ? '#eab308' : 'rgba(0,230,138,0.4)') }}>
+                  <b style={{ color: '#fff' }}>{f.name}</b>
+                  <span style={{ color: 'var(--text-dim)' }}> bias {f.bias > 0 ? '+' : ''}{f.bias} · согласованность {f.consistency}% — {f.recommendation}</span>
+                </div>
+              ))}
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>
+                RIR-калибровка накапливается: чем больше подходов с RPE, тем точнее рекомендации.
+              </div>
             </div>
           )}
           {lms && (

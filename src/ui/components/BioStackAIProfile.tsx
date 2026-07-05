@@ -342,6 +342,68 @@ function PopupSupplements({ profile, u, onClose }: { profile: BioStackProfile; u
   </PopupOverlay>;
 }
 
+/* ─── Popup: Клинические данные ─── */
+function PopupClinical({ profile, u, onClose }: { profile: BioStackProfile; u: (p: Partial<BioStackProfile>) => void; onClose: () => void }) {
+  const [meds, setMeds] = useState(profile.currentMeds.join(', '));
+  const [allergies, setAllergies] = useState(profile.drugAllergies.join(', '));
+  const [cyp, setCyp] = useState(profile.cyp450Status);
+  const [preg, setPreg] = useState(profile.isPregnant);
+  const [lact, setLact] = useState(profile.lactating);
+  const [surgery, setSurgery] = useState(profile.surgeryHistory.join(', '));
+  const [family, setFamily] = useState(profile.familyHistory.join(', '));
+  const save = () => {
+    u({
+      currentMeds: meds.split(',').map(s=>s.trim()).filter(Boolean),
+      drugAllergies: allergies.split(',').map(s=>s.trim()).filter(Boolean),
+      cyp450Status: cyp,
+      isPregnant: preg, lactating: lact,
+      surgeryHistory: surgery.split(',').map(s=>s.trim()).filter(Boolean),
+      familyHistory: family.split(',').map(s=>s.trim()).filter(Boolean),
+    });
+    onClose();
+  };
+  return <PopupOverlay title="Клинические данные" icon="🏥" color="#ef4444" onClose={onClose}>
+    <div style={{marginBottom:6}}>
+      <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',display:'block',marginBottom:2}}>💊 Лекарства (МНН, через запятую):</label>
+      <input value={meds} onChange={e=>setMeds(e.target.value)} placeholder="варфарин, метформин, аторвастатин..."
+        style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:10,boxSizing:'border-box'}} />
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}}>
+      <div>
+        <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',display:'block',marginBottom:2}}>⚠ Аллергии:</label>
+        <input value={allergies} onChange={e=>setAllergies(e.target.value)} placeholder="пенициллин..."
+          style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:10,boxSizing:'border-box'}} />
+      </div>
+      <div>
+        <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',display:'block',marginBottom:2}}>🧬 CYP450:</label>
+        <select value={cyp} onChange={e=>setCyp(e.target.value)}
+          style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:10,appearance:'none'}}>
+          <option value="unknown">❓ Неизвестен</option><option value="normal">🟢 Нормальный (EM)</option>
+          <option value="poor">🔴 Медленный (PM)</option><option value="intermediate">🟡 Промежуточный (IM)</option>
+          <option value="rapid">🔵 Быстрый (RM)</option>
+        </select>
+      </div>
+    </div>
+    {profile.sex === 'female' && <div style={{display:'flex',gap:6,marginBottom:6}}>
+      <PillBtn active={preg} onClick={()=>setPreg(!preg)} color="#f472b6">{preg?'🤰 Беременность ✓':'🤰 Беременность'}</PillBtn>
+      <PillBtn active={lact} onClick={()=>setLact(!lact)} color="#f472b6">{lact?'🍼 Лактация ✓':'🍼 Лактация'}</PillBtn>
+    </div>}
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}}>
+      <div>
+        <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',display:'block',marginBottom:2}}>🩺 Операции (через запятую):</label>
+        <input value={surgery} onChange={e=>setSurgery(e.target.value)} placeholder="холецистэктомия, аппендэктомия..."
+          style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:10,boxSizing:'border-box'}} />
+      </div>
+      <div>
+        <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',display:'block',marginBottom:2}}>🧬 Сем. анамнез (через запятую):</label>
+        <input value={family} onChange={e=>setFamily(e.target.value)} placeholder="гипертония, диабет 2 типа, онкология..."
+          style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:10,boxSizing:'border-box'}} />
+      </div>
+    </div>
+    <button onClick={save} style={{width:'100%',padding:'10px 0',borderRadius:10,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#ef4444,#dc2626)',color:'#fff',fontWeight:700,fontSize:12}}>✅ Применить</button>
+  </PopupOverlay>;
+}
+
 /* ─── Пресет: тип ─── */
 type PresetEntry = {
   id: string; icon: string; name: string; desc: string;
@@ -523,6 +585,11 @@ export function ProfileTab({ profile, setProfile, setStackIds }: { profile: BioS
         count={profile.currentSupplements.length}
         onClick={() => setPopup('supplements')} />
 
+      <CardBtn icon="🏥" title="Клинические данные" color="#ef4444"
+        subtitle={`${profile.currentMeds.length ? profile.currentMeds.join(', ').slice(0,30)+'...' : 'Нет лекарств'} · CYP: ${profile.cyp450Status === 'unknown' ? '?' : profile.cyp450Status}`}
+        count={profile.currentMeds.length}
+        onClick={() => setPopup('clinical')} />
+
       <CardBtn icon="🚀" title="Быстрые пресеты" color="#00e68a"
         subtitle="Заполнить профиль по шаблону: Бодибилдер, ЗОЖ, Ноотроп, Спортсмен..."
         onClick={() => setPopup('presets')} />
@@ -557,6 +624,7 @@ export function ProfileTab({ profile, setProfile, setStackIds }: { profile: BioS
       {popup === 'systems' && <PopupSystems profile={profile} u={u} onClose={() => setPopup(null)} />}
       {popup === 'mechanisms' && <PopupMechanisms profile={profile} u={u} onClose={() => setPopup(null)} />}
       {popup === 'supplements' && <PopupSupplements profile={profile} u={u} onClose={() => setPopup(null)} />}
+      {popup === 'clinical' && <PopupClinical profile={profile} u={u} onClose={() => setPopup(null)} />}
       {popup === 'presets' && <PopupPresets profile={profile} u={u} onClose={() => setPopup(null)} />}
     </div>
   );
@@ -614,6 +682,10 @@ export function BioStackAISettings({ onProfileChange }: { onProfileChange?: (p: 
         subtitle={profile.currentSupplements.length ? `${profile.currentSupplements.length} БАДов` : 'Не указаны'}
         count={profile.currentSupplements.length}
         onClick={() => setPopup('supplements')} />
+      <CardBtn icon="🏥" title="Клинические данные" color="#ef4444"
+        subtitle={`${profile.currentMeds.length ? profile.currentMeds.join(', ').slice(0,30)+'...' : 'Нет лекарств'} · CYP: ${profile.cyp450Status === 'unknown' ? '?' : profile.cyp450Status}`}
+        count={profile.currentMeds.length}
+        onClick={() => setPopup('clinical')} />
       <div style={{ textAlign:'center', fontSize:8, color:'rgba(255,255,255,0.25)', marginTop:4 }}>
         ⚡ Профиль BioStack сохраняется автоматически
       </div>
@@ -626,6 +698,7 @@ export function BioStackAISettings({ onProfileChange }: { onProfileChange?: (p: 
       {popup === 'systems' && <PopupSystems profile={profile} u={u} onClose={() => setPopup(null)} />}
       {popup === 'mechanisms' && <PopupMechanisms profile={profile} u={u} onClose={() => setPopup(null)} />}
       {popup === 'supplements' && <PopupSupplements profile={profile} u={u} onClose={() => setPopup(null)} />}
+      {popup === 'clinical' && <PopupClinical profile={profile} u={u} onClose={() => setPopup(null)} />}
     </div>
   );
 }

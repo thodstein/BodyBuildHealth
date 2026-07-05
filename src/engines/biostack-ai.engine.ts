@@ -34,6 +34,14 @@ export interface BioStackProfile {
   currentSupplements: string[]; stackComplexity: StackComplexity;
   targetOrgans: string[];  // органы-мишени (ключи из ORGANS)
   targetSystems: string[]; // системы-мишени (ключи из SYSTEMS)
+  // ── Клинические поля (врачебный блок) ──
+  currentMeds: string[];       // текущие рецептурные препараты (МНН через запятую)
+  drugAllergies: string[];     // лекарственные аллергии
+  cyp450Status: string;        // CYP450 генотип (если известен): 'normal' | 'poor' | 'intermediate' | 'rapid' | 'unknown'
+  isPregnant: boolean;         // беременность
+  lactating: boolean;          // лактация
+  surgeryHistory: string[];    // перенесённые операции
+  familyHistory: string[];     // семейный анамнез: сердечно-сосудистые, диабет, онкология, аутоиммунные
 }
 
 export function getDefaultBioStackProfile(): BioStackProfile {
@@ -49,6 +57,8 @@ export function getDefaultBioStackProfile(): BioStackProfile {
     dietType: 'mixed', chronotype: 'mixed', stressLevel: 5,
     currentSupplements: [], stackComplexity: 'balanced',
     targetOrgans: [], targetSystems: [],
+    currentMeds: [], drugAllergies: [], cyp450Status: 'unknown',
+    isPregnant: false, lactating: false, surgeryHistory: [], familyHistory: [],
   };
 }
 

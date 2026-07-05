@@ -364,6 +364,178 @@ export function generateDeload(input: DeloadInput): DeloadProtocol {
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 3b. PRO Deload Protocols — 4 структурированных протокола с расписанием
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface DeloadDay {
+  day: number;
+  type: 'rest' | 'cardio_light' | 'mobility' | 'light_weights' | 'technique' | 'pump' | 'stretching' | 'massage';
+  description: string;
+  exercises?: { name: string; sets: number; reps: string; intensityPct?: number }[];
+  notes?: string;
+}
+
+export interface StructuredDeload {
+  protocolName: string;
+  protocolType: 'full' | 'backoff' | 'active' | 'minimal';
+  days: number;
+  volumeReductionPct: number;
+  intensityReductionPct: number;
+  rirTarget: number;
+  weeklySchedule: DeloadDay[];
+  warnings: string[];
+  expectedRecovery: string;
+  contraindications: string[];
+}
+
+/** 4 PRO-протокола делода */
+export const DELOAD_PROTOCOLS: Record<string, StructuredDeload> = {
+  full: {
+    protocolName: 'Полный делод (ЦНС + суставы)',
+    protocolType: 'full',
+    days: 7,
+    volumeReductionPct: 60,
+    intensityReductionPct: 10,
+    rirTarget: 4,
+    weeklySchedule: [
+      { day: 1, type: 'rest', description: 'Полный отдых. Никаких тренировок.', notes: 'Сон +1 час, баня/сауна' },
+      { day: 2, type: 'mobility', description: 'Мобильность 20-30 мин. Ролл, растяжка.', notes: 'Фокус на проблемные зоны (плечи/таз/голеностоп)' },
+      { day: 3, type: 'cardio_light', description: 'Лёгкое кардио 20 мин (ходьба 120 уд/мин). Растяжка 15 мин.', notes: 'ЧСС ≤ 120 уд/мин. Никакой нагрузки на суставы' },
+      { day: 4, type: 'rest', description: 'Полный отдых.', notes: 'Массаж при возможности' },
+      { day: 5, type: 'technique', description: 'Техническая работа. Compound 50% 1ПМ × 3×3, RIR 4.', exercises: [
+        { name: 'Присед (техника)', sets: 3, reps: '3', intensityPct: 50 },
+        { name: 'Жим (техника)', sets: 3, reps: '3', intensityPct: 50 },
+        { name: 'Тяга (техника)', sets: 3, reps: '3', intensityPct: 50 },
+      ], notes: 'Только техника. Никакого отказа. Темп 3-0-3-0.' },
+      { day: 6, type: 'stretching', description: 'Растяжка 30 мин. Дыхание.', notes: 'Фасциальный релиз' },
+      { day: 7, type: 'massage', description: 'Лёгкое кардио 15 мин + массаж/ролл.', notes: 'Оценка готовности к возврату' },
+    ],
+    warnings: ['Не выполнять никаких отказных подходов', 'Снизить шаги до 5000/день', 'Исключить алкоголь'],
+    expectedRecovery: 'Восстановление ЦНС на 80-100% через 7 дней. Суперкомпенсация на 8-10 день.',
+    contraindications: ['Неделя перед соревнованиями (использовать back-off)', 'ACWR < 0.8 (недотренированность — не нужен)'],
+  },
+
+  backoff: {
+    protocolName: 'Back-off делод (перед пиком / поддержание)',
+    protocolType: 'backoff',
+    days: 5,
+    volumeReductionPct: 30,
+    intensityReductionPct: 5,
+    rirTarget: 2,
+    weeklySchedule: [
+      { day: 1, type: 'light_weights', description: 'Compound 70% 1ПМ × 3×5, RIR 2. Без подсобки.', exercises: [
+        { name: 'Присед', sets: 3, reps: '5', intensityPct: 70 },
+      ], notes: 'Только база. Восстановление без потери тонуса.' },
+      { day: 2, type: 'light_weights', description: 'Жим 70% × 3×5 + тяга 70% × 2×5, RIR 2.', exercises: [
+        { name: 'Жим лёжа', sets: 3, reps: '5', intensityPct: 70 },
+        { name: 'Тяга штанги', sets: 2, reps: '5', intensityPct: 70 },
+      ] },
+      { day: 3, type: 'rest', description: 'Отдых. Мобильность 15 мин (опционально).' },
+      { day: 4, type: 'light_weights', description: 'Compound 75% 1ПМ × 2×3, RIR 2.', exercises: [
+        { name: 'Присед', sets: 2, reps: '3', intensityPct: 75 },
+        { name: 'Жим', sets: 2, reps: '3', intensityPct: 75 },
+        { name: 'Тяга', sets: 2, reps: '3', intensityPct: 75 },
+      ] },
+      { day: 5, type: 'cardio_light', description: 'Лёгкое кардио 15 мин. Оценка готовности.' },
+    ],
+    warnings: ['Не повышать интенсивность выше 75%', 'Выполнять подходы свежим'],
+    expectedRecovery: 'Поддержание нейромышечного тонуса. Готовность к пику через 5 дней.',
+    contraindications: ['Сильная ЦНС-усталость (использовать full deload)', 'Травма (нужен active)'],
+  },
+
+  active: {
+    protocolName: 'Активное восстановление (травмы / низкая готовность)',
+    protocolType: 'active',
+    days: 7,
+    volumeReductionPct: 50,
+    intensityReductionPct: 10,
+    rirTarget: 4,
+    weeklySchedule: [
+      { day: 1, type: 'mobility', description: 'Мобильность 20 мин + лёгкие машины 2×15, RIR 4.', exercises: [
+        { name: 'Разгибание ног в тренажёре', sets: 2, reps: '15' },
+        { name: 'Тяга верхнего блока', sets: 2, reps: '15' },
+      ], notes: 'Без осевой нагрузки. Машины + блоки.' },
+      { day: 2, type: 'cardio_light', description: 'Ходьба 30 мин. Растяжка 15 мин.' },
+      { day: 3, type: 'light_weights', description: 'Изоляция 3×12-15, RIR 4.', exercises: [
+        { name: 'Жим гантелей под углом', sets: 3, reps: '12-15' },
+        { name: 'Тяга гантели', sets: 3, reps: '12-15' },
+        { name: 'Сгибание ног', sets: 3, reps: '12-15' },
+      ], notes: 'Только изоляция. Пампинг без отказа.' },
+      { day: 4, type: 'rest', description: 'Отдых.' },
+      { day: 5, type: 'pump', description: 'Пампинг-сессия 30 мин. Кровоток в целевые группы.', exercises: [
+        { name: 'Разводки гантелей', sets: 3, reps: '15-20' },
+        { name: 'Бицепс со штангой', sets: 3, reps: '15' },
+        { name: 'Трицепс на блоке', sets: 3, reps: '15' },
+      ] },
+      { day: 6, type: 'stretching', description: 'Растяжка + ролл 30 мин. Дыхание.' },
+      { day: 7, type: 'massage', description: 'Ходьба 20 мин + массаж. Оценка готовности.' },
+    ],
+    warnings: ['Исключить compound движения с осевой нагрузкой', 'ЧСС не выше 130'],
+    expectedRecovery: 'Снижение мышечной боли через 3-4 дня, полное восстановление через 7 дней.',
+    contraindications: ['Перед соревнованиями (использовать back-off)', 'После длительного перерыва (начинать с разминки)'],
+  },
+
+  minimal: {
+    protocolName: 'Микро-разгрузка (ACWR / перегрузка без усталости)',
+    protocolType: 'minimal',
+    days: 5,
+    volumeReductionPct: 20,
+    intensityReductionPct: 0,
+    rirTarget: 3,
+    weeklySchedule: [
+      { day: 1, type: 'light_weights', description: 'Обычный сплит, но −20% подходов, RIR 3.', notes: 'Сохранить интенсивность (80-85% 1ПМ) при сниженном объёме' },
+      { day: 2, type: 'light_weights', description: 'Обычный сплит, −20% подходов, RIR 3.', notes: 'Убрать подсобку на 50%' },
+      { day: 3, type: 'rest', description: 'Отдых.' },
+      { day: 4, type: 'light_weights', description: 'Обычный сплит, −10% подходов, RIR 2.', notes: 'Возврат к нормальному объёму на 50%' },
+      { day: 5, type: 'cardio_light', description: 'Лёгкое кардио + оценка.' },
+    ],
+    warnings: ['Не снижать вес на базовых движениях', 'Следить за RIR — не подходить к отказу'],
+    expectedRecovery: 'Лёгкая разгрузка. Возврат к 100% объёму через 5 дней.',
+    contraindications: ['Сильная усталость — нужен full deload'],
+  },
+};
+
+/** Выбрать протокол делода по контексту */
+export function selectDeloadProtocol(ctx: {
+  acwr: number;
+  weeksSinceDeload: number;
+  fatigue: number;
+  recovery: number;
+  hasCompetitionSoon: boolean;
+  jointPain: boolean;
+  cnsFatigue: boolean;
+  goal: string;
+}): StructuredDeload {
+  const s = ctx;
+
+  // Полный делод: ЦНС усталость, ACWR > 1.5, 8+ нед без делода
+  if (s.cnsFatigue || s.weeksSinceDeload >= 8 || (s.acwr > 1.5 && s.fatigue >= 7)) {
+    return DELOAD_PROTOCOLS.full;
+  }
+
+  // Активное восстановление: травмы, recovery < 50
+  if (s.jointPain || s.recovery < 50) {
+    return DELOAD_PROTOCOLS.active;
+  }
+
+  // Back-off: перед соревнованиями или ACWR 1.3-1.5
+  if (s.hasCompetitionSoon || (s.acwr > 1.3 && s.fatigue >= 5)) {
+    return DELOAD_PROTOCOLS.backoff;
+  }
+
+  // Микро-разгрузка: лёгкий ACWR или профилактика
+  return DELOAD_PROTOCOLS.minimal;
+}
+
+/** Сформировать план делода в формате дней */
+export function buildDeloadWeek(ctx: {
+  acwr: number; weeksSinceDeload: number; fatigue: number; recovery: number;
+  hasCompetitionSoon: boolean; jointPain: boolean; cnsFatigue: boolean; goal: string;
+}): StructuredDeload {
+  return selectDeloadProtocol(ctx);
+}
+
 export function getDeloadChecklist(protocol: DeloadProtocol): string[] {
   const checklist: string[] = [
     'Снизить количество рабочих подходов',

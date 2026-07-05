@@ -7,6 +7,7 @@
 import { EXERCISE_CATALOG, getExercisesByGroup } from "../../core/exercise-catalog";
 import { diagnoseWeakPoint } from "../lms/weakpoint-pl";
 import type { Lift, WeakPoint } from "../lms/weakpoint-pl";
+import { selectExercisesSmart } from "../exercise-selector.engine";
 
 export type ForceVector = "horizontal_push" | "horizontal_pull" | "vertical_push" | "vertical_pull" | "knee_dominant" | "hip_dominant" | "core_anti" | "other";
 
@@ -119,7 +120,27 @@ export function prescribeExercises(input: PrescriptionInput): PrescribedExercise
       };
     });
   }
-  const main = ranked.filter(e => e.score > 0).sort((a, b) => b.score - a.score).slice(0, limit);
+  // Умный отбор: заменяем тупой slice(0,limit) на интеллектуальный выбор
+  const smart = selectExercisesSmart({
+    candidates: EXERCISE_CATALOG.filter(ex => muscle ? ex.group === muscle : true),
+    muscleGroup: muscle,
+    count: Math.max(2, limit - assistance.length),
+    selectedIds: assistance.map(a => a.id).filter(Boolean),
+    equipment: equipment || [],
+    weakZones: [],
+    level: 'intermediate',
+    injuryProfile: constraints,
+    type: 'any',
+  });
+  const smartPrescribed: PrescribedExercise[] = smart.map(ex => {
+    const existing = ranked.find(r => r.id === ex.id);
+    return existing || {
+      id: ex.id, name: ex.name, group: ex.group, type: ex.type, equipment: ex.equipment,
+      jointStress: ex.jointStress, forceVector: forceVector(ex.group, ex.type, ex.name),
+      score: ex.selectionScore, rationale: ex.selectionRationale.join('; '),
+    };
+  });
+  const main = smartPrescribed.filter(e => e.score > 0);
   return [...assistance.slice(0, 3), ...main].slice(0, limit + 3);
 }
 

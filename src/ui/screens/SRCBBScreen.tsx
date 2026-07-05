@@ -42,6 +42,7 @@ import { lmsPlanToSessions, bbPlanToSessions, autoregPlan as autoregPlanBridge, 
 import type { BridgeSession, ReadinessInput, ProgressSnapshot } from '../../engines/training-integration.engine';
 import { generateRepTempo, type RepTempoOutput } from '../../engines/rep-tempo-engine';
 import { MesocycleProgressionCard } from './TrainingScreen_parts/MesocycleProgressionCard';
+import { DeloadProtocolCard } from './TrainingScreen_parts/DeloadProtocolCard';
 
 const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepTempoOutput => {
   const isCompound = !exerciseName.toLowerCase().includes('сгибан') &&
@@ -642,7 +643,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   </div>
                 );
               })()}
-              {(() => { const srpe = loadSRPESessions(); if (srpe.length < 2) return null; const acwr = acuteChronicRatio(toDailyLoads(srpe)); if (acwr.ratio <= 1.5) return null; return <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', fontSize: 10, fontWeight: 600 }}>🚨 ACWR {acwr.ratio.toFixed(2)} — опасная зона. Рекомендуется разгрузочная неделя: объём −40%, RIR 4, без отказных подходов. Включите авторегуляцию или снизьте сеты по мышцам до MRV.</div>; })()}
+              {(() => { const srpe = loadSRPESessions(); if (srpe.length < 2) return null; const acwr = acuteChronicRatio(toDailyLoads(srpe)); if (acwr.ratio <= 1.5) return null; const srpeList = loadSRPESessions(); const loads = toDailyLoads(srpeList); const ratio = acuteChronicRatio(loads); return <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}><div style={{ color: '#ef4444', fontSize: 10, fontWeight: 600, marginBottom: 6 }}>🚨 ACWR {ratio.ratio.toFixed(2)} — опасная зона. Рекомендуется разгрузка.</div><DeloadProtocolCard ctx={{ acwr: ratio.ratio, weeksSinceDeload: 0, fatigue: 6, recovery: 50, hasCompetitionSoon: false, jointPain: false, cnsFatigue: false, goal: 'hypertrophy' }} /></div>; })()}
               {builtBb.rationale.map((r, i) => <div key={i} style={{ ...SMALL, marginTop: 4 }}>{r}</div>)}
               {/* Выбор недели */}
               <div style={{ marginTop: 10 }}>

@@ -1,6 +1,8 @@
 import { EXERCISE_DB, canReplace, getSubstitutes, getExerciseById, calcExercisePrescription } from './training.engine';
 import type { Exercise } from '../core/types';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../core/exercise-catalog';
+import { selectExercisesSmart } from './exercise-selector.engine';
+import { applyNattyEnhancedToConfig } from './natty-enhanced.engine';
 
 export type MesocycleType = 'accumulation' | 'intensification' | 'peaking' | 'deload' | 'recovery';
 
@@ -72,6 +74,7 @@ export interface MacrocycleInput {
   daysPerWeek: number;
   readinessScore: number;
   isOnCourse: boolean;
+  courseIntensity?: 'mild' | 'moderate' | 'heavy';
   weakPoints: string[];
   injuries: string[];
   experience: 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
@@ -327,8 +330,19 @@ function applyVolumeCurve(base: number, w: number, totalMesoWeeks: number, curve
 }
 
 export function generateMacrocycle(input: MacrocycleInput): MacrocyclePlan {
-  const { goal, level, daysPerWeek, readinessScore, isOnCourse, weakPoints, injuries, periodizationType, cycleType } = input;
+  const { goal, level, daysPerWeek, readinessScore, isOnCourse, courseIntensity, weakPoints, injuries, periodizationType, cycleType } = input;
   const levelConfig = LEVEL_CONFIGS[level] || LEVEL_CONFIGS.intermediate;
+
+  // Применяем Natty/Enhanced-параметры
+  const status = isOnCourse ? 'enhanced' : 'natty';
+  const adjustedLevelConfig = applyNattyEnhancedToConfig(status, courseIntensity, {
+    volumeMod: levelConfig.volumeBase / 16,
+    rirBase: levelConfig.rirBase,
+    deloadFreq: levelConfig.deloadFreq,
+    progressionPct: levelConfig.progressionPct,
+    maxMRV: levelConfig.volumeBase,
+    frequency: 2,
+  });
   const goalConfig = GOAL_CONFIGS[goal] || GOAL_CONFIGS.maintenance;
   const goalSeq = GOAL_CYCLE_SEQUENCES[goal] || GOAL_CYCLE_SEQUENCES.maintenance;
   const levelSeqs = goalSeq[level] || goalSeq.intermediate;
@@ -380,10 +394,12 @@ export function generateMacrocycle(input: MacrocycleInput): MacrocyclePlan {
       const isDeload = mesoType === 'deload' || (w === mesoWeeks - 1 && (mesoType as string) !== 'deload' && mesoWeeks > 3);
       const readinessMod = adjustedReadiness < 40 ? 0.6 : adjustedReadiness < 60 ? 0.8 : adjustedReadiness < 75 ? 0.9 : 1.0;
       const courseMod = isOnCourse ? 1.15 : 1.0;
-      const weekRir = params.rirRange[0] + Math.round((params.rirRange[1] - params.rirRange[0]) * (w / Math.max(1, mesoWeeks - 1)));
+      // Базовый RIR от типа мезоцикла с поправкой на Natty/Enhanced (enhanced = дальше от отказа)
+      const rirAdjust = adjustedLevelConfig.rirBase - levelConfig.rirBase;
+      const weekRir = Math.round(params.rirRange[0] + Math.round((params.rirRange[1] - params.rirRange[0]) * (w / Math.max(1, mesoWeeks - 1))) + rirAdjust);
 
       // Apply volume curve per week within the mesocycle
-      const curveBase = params.volumeMultiplier * goalConfig.volumeMod * readinessMod * courseMod;
+      const curveBase = params.volumeMultiplier * goalConfig.volumeMod * readinessMod * courseMod * adjustedLevelConfig.volumeMod;
       const adjustedVolume = applyVolumeCurve(curveBase, w, mesoWeeks, curve);
 
       const goalRepsRange: [number, number] = goal === 'strength' ? [3, 6] : goal === 'cut' ? [10, 15] : goal === 'bulk' ? [8, 12] : goalConfig.repsRange;
@@ -468,14 +484,37 @@ function generateWeekDays(
         const compoundCount = isDeload ? 1 : Math.max(1, Math.round(compoundPriority * 2.5));
         const isolationCount = isDeload ? 0 : isWeak && !isDeload ? Math.max(1, Math.round((1 - compoundPriority) * 2.5) + 1) : Math.max(0, Math.round((1 - compoundPriority) * 2));
 
-        const compounds = shuffleArr(groupExercises
-          .filter(e => e.type === 'compound' && (!avoidHighJoint || e.jointStress !== 'high') && (!isDeload || e.fatigueCost <= 6) && (level === 'beginner' ? e.difficulty !== 'advanced' : true))
-          .sort((a, b) => (a.order ?? 2) - (b.order ?? 2)))
-          .slice(0, compoundCount);
-        const isolations = shuffleArr(groupExercises
-          .filter(e => e.type === 'isolation' && (!avoidHighJoint || e.jointStress !== 'high') && (!isDeload || e.fatigueCost <= 4))
-          .sort((a, b) => (a.order ?? 3) - (b.order ?? 3)))
-          .slice(0, isolationCount);
+        // Интеллектуальный отбор: заменяет shuffle+sort+slice на 6-критериальный выбор
+        const selectedExprIds = exercises.map(e => e.name).map(n => EXERCISE_CATALOG.find(ex => ex.name === n)?.id).filter(Boolean) as string[];
+        const filteredPool = groupExercises.filter(e =>
+          (!avoidHighJoint || e.jointStress !== 'high') &&
+          (!isDeload || (e.type === 'compound' ? e.fatigueCost <= 6 : e.fatigueCost <= 4)) &&
+          (level !== 'beginner' || e.difficulty !== 'advanced')
+        );
+        const smartCompounds = selectExercisesSmart({
+          candidates: filteredPool,
+          muscleGroup: group,
+          count: compoundCount,
+          selectedIds: selectedExprIds,
+          equipment: [],
+          weakZones: isWeak ? [group] : [],
+          level,
+          injuryProfile: injuries,
+          type: 'compound',
+        });
+        const smartIsolations = selectExercisesSmart({
+          candidates: filteredPool,
+          muscleGroup: group,
+          count: isolationCount,
+          selectedIds: [...selectedExprIds, ...smartCompounds.map(e => e.id)],
+          equipment: [],
+          weakZones: isWeak ? [group] : [],
+          level,
+          injuryProfile: injuries,
+          type: 'isolation',
+        });
+        const compounds = smartCompounds;
+        const isolations = smartIsolations;
 
         for (const ex of [...compounds, ...isolations]) {
           const prescription = calcExercisePrescription(ex, goal, level, isWeak, isDeload, volumeMultiplier);

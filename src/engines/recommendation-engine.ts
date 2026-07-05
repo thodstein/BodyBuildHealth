@@ -39,6 +39,62 @@ export interface CoverageResult {
   synergyScore: number;
 }
 
+// ── Блэклист: вещества, которые НЕ должны рекомендоваться как «поддержка» ──
+// RDRU-препараты (НПВС, кортикостероиды, рецептурные), ноотропы/пептиды (экспериментальные),
+// гормоны/стероиды (не поддержка, а сама фармакология), сырые химикалии,
+// абстрактные классы препаратов (`*_drugs`), пустые/технические записи БД.
+export const REC_BLACKLIST = new Set<string>([
+  // Сырые химикалии/минералы/элементы:
+  'sodium','caffeine','adrenaline','copper','iron','flavonoids','anthocyanins','c60',
+  'omega6','omega7','omega9','l_histidine','ornithine','inosine','nrf2_activator',
+  'lecithin','taxifolin','glutamate','histidine','lactate','endocrine_marker','endocannabinoid',
+  'antacid','pharma',
+  // Рецептурные ноотропы/нейромодуляторы:
+  'phenibut','selegiline','ketamine','modafinil','tianeptine','lithium','memantine',
+  'bromantane','noopept','semax','selank','cerebrolysin','cortexin','dsip','ibudilast',
+  'piracetam','aniracetam','oxiracetam','pramiracetam','coluracetam','fasoracetam',
+  // Экспериментальные пептиды/сенолитики:
+  'bpc157','tb500','thymosin_alpha1','cjc1295','ghrp2','ghrp6','ipamorelin','ghk_cu',
+  'p21','urolithin_a','spermidine','fisetin','humanin','ss31','mots_c',
+  // Пептидные гормоны / нейропептиды:
+  'gonadorelin','kisspeptin','oxytocin','pt141','melanotan1','melanotan2',
+  // Гормоны/стероиды — сама фармакология, не «поддержка»:
+  'pregnenolone','neurosteroid','progesterone','dhea',
+  'estradiol','testosterone','cortisol','insulin','glucagon','vasopressin','follistatin',
+  'igf1','mgf','finasteride','gip','glp1',
+  // Рецептурные препараты:
+  'warfarin','rivaroxaban','apixaban','dabigatran','clopidogrel','ticagrelor',
+  'fluoxetine','sertraline','citalopram','escitalopram','venlafaxine','duloxetine',
+  'olanzapine','quetiapine','risperidone','aripiprazole','haloperidol',
+  'alprazolam','diazepam','lorazepam','clonazepam','buspirone',
+  'valproate','lamotrigine','carbamazepine','phenytoin',
+  // НПВС и кортикостероиды:
+  'ibuprofen','naproxen','celecoxib','diclofenac','meloxicam',
+  'prednisone','dexamethasone','hydrocortisone','methylprednisolone',
+  // Врачебные рецептурные:
+  'furosemide','hydrochlorothiazide','chlorthalidone','spironolactone',
+  'atorvastatin','rosuvastatin','simvastatin','pravastatin','pitavastatin',
+  'lisinopril','enalapril','ramipril','perindopril','captopril',
+  'metoprolol','atenolol','bisoprolol','carvedilol','propranolol',
+  'amlodipine','nifedipine','verapamil','diltiazem',
+  'losartan','valsartan','irbesartan','olmesartan','candesartan',
+  // Сахароснижающие:
+  'metformin','pioglitazone','acarbose','semaglutide',
+  // Тиреоидные:
+  'levothyroxine','liothyronine','methimazole','propylthiouracil',
+  'levothyroxine_dup','liothyronine_dup','metformin_dup',
+  // Иммунодепрессанты:
+  'tacrolimus','cyclosporine','mycophenolate','azathioprine',
+  // Гастро/ферменты:
+  'digestive_enzymes','gentian','licorice',
+  // Абстрактные классы препаратов:
+  'ace_inhibitor_drugs','antibiotic_drugs','anticoagulant_drugs','anticonvulsant_drugs',
+  'antidepressant_drugs','antidiabetic_drugs','antihistamine_drugs','antiplatelet_drugs',
+  'antipsychotic_drugs','antithyroid_drugs','anxiolytic_drugs','arb_drugs',
+  'beta_blocker_drugs','ccb_drugs','corticosteroid_drugs','diuretic_drugs',
+  'immunosuppressant_drugs','nsaid_drugs','ppi_drugs','statin_drugs','thyroid_drugs',
+]);
+
 function getV(fp: LabSlice | null | undefined, panel: keyof LabSlice, key: string): number | null {
   if (!fp) return null;
   const pv = fp[panel] as Record<string, string> | undefined;
@@ -70,17 +126,20 @@ function makeSub(id: string, reasoning: string): { id: string; name: string; dos
 }
 
 // Find support substances by mechanisms, deduplicate, limit to top N
+// Отфильтрованы вещества из REC_BLACKLIST (не-препараты, рецептурные, экспериментальные)
 function findSupportByMechanisms(mechs: string[], maxResults: number = 6): string[] {
   const ids = new Set<string>();
   for (const m of mechs) {
-    for (const id of (MECHANISM_TO_SUPPORT[m] || [])) ids.add(id);
+    for (const id of (MECHANISM_TO_SUPPORT[m] || [])) {
+      if (!REC_BLACKLIST.has(id)) ids.add(id);
+    }
   }
   return [...ids].slice(0, maxResults);
 }
 
 // Find support by category + mechanism intersection
 function findSupportByCategoryAndMech(category: string, ...mechs: string[]): string[] {
-  const catIds = new Set(CATEGORY_TO_SUPPORT[category] || []);
+  const catIds = new Set((CATEGORY_TO_SUPPORT[category] || []).filter((id: string) => !REC_BLACKLIST.has(id)));
   const mechIds = new Set(findSupportByMechanisms(mechs, 50));
   return [...catIds].filter(x => mechIds.has(x)).slice(0, 4);
 }
@@ -99,7 +158,7 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
   const endingSoon = drugs.filter(a => (a.endWeek || (a.weeks || 12)) === week);
 
   const addRec = (id: string, severity: RecSeverity, system: string, systemLabel: string, title: string, substanceIds: string[], reasoningMap: Record<string, string>, escalation: string, monitoring: string) => {
-    const substances = substanceIds.filter(sid => !blockedIds.includes(sid)).map(sid => {
+    const substances = substanceIds.filter(sid => !blockedIds.includes(sid) && !REC_BLACKLIST.has(sid)).map(sid => {
       const s = makeSub(sid, reasoningMap[sid] || '');
       if (blockedIds.includes(sid)) { s.name += ' [⚠ ЗАБЛОКИРОВАН]'; s.reasoning += ' — замена по механизму'; }
       return s;
@@ -189,7 +248,7 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
   // ── Neurotoxicity → query neuroprotectors ──
   if (maxNeuro >= 0.3 || state.neuro.memoryIssues || state.neuro.focusIssues) {
     let ids: string[] = findSupportByCategoryAndMech('neuroprotector', 'NGF_STIMULATION', 'NEUROPROTECTION', 'DOPAMINE_PRECURSOR', 'GABA_MODULATION');
-    if (ids.length < 3) ids = ['citicoline', 'fasoracetam', 'bromantane', 'lions_mane'];
+    if (ids.length < 3) ids = ['citicoline', 'lions_mane', 'alpha_gpc', 'tyrosine'];
     const reasoning: Record<string, string> = {};
     ids.forEach(id => { reasoning[id] = 'Нейропротектор, поддержка когнитивных функций'; });
     if (state.neuro.dopamineScore <= 2) {
@@ -427,8 +486,8 @@ let ids: string[] = findSupportByMechanisms(['AROMATASE_INHIBITION', 'ESTROGEN_M
     const triggered = rule.threshold.higherIsWorse ? val > rule.threshold.value : val < rule.threshold.value;
     if (!triggered) continue;
 
-    // Find support substances from index
-    const labMatches = findByLabMarker(rule.marker);
+    // Find support substances from index (filtered through REC_BLACKLIST)
+    const labMatches = findByLabMarker(rule.marker).filter(m => !REC_BLACKLIST.has(m.substanceId));
     const ids = labMatches.slice(0, 3).map(m => m.substanceId);
     if (ids.length === 0) continue;
 
