@@ -1810,3 +1810,39 @@ interface AdvancedProductCard {
 - `tsc --noEmit`: 0 ошибок в изменённых файлах (3 предсуществующие в ManualPlanEditor.tsx).
 - `vite build`: падает только на CsvImportTab.tsx (не мой файл).
 - UTF-8 noBOM: 5 файлов OK.
+
+---
+
+## Session Summary (Jul 05) — Symptom Diary + Lab Link + Complaints Tab + DRUG_LABELS
+
+### ✅ Done
+
+- **`src/engines/symptom-diary.engine.ts`** — ежедневный трекинг симптомов:
+  - `updateSymptomToday` — добавить/обновить оценку симптома (0–10) с авто-расчётом тренда (сравнение с предыдущими 3 днями)
+  - `getSymptomHistory` — история одного симптома
+  - `getSymptomDiaryStats` — сводка: activeSymptoms, improving, worsening, resolved, stable, todayScore, weekAvgScore
+  - `getSymptomChartData(7|30)` — данные для графика
+  - `getSymptomDiarySummary(7)` — сводка по всем симптомам за период
+  - localStorage `he_symptom_diary`
+
+- **`src/engines/symptom-lab-link.ts`** — авто-подсветка симптомов по lab-значениям:
+  - 22 правила: ALT→liver_pain/nausea, AST→fatigue, GGT→nausea/jaundice, BILIRUBIN→jaundice, CREATININE→lower_back_pain/edema, GLUCOSE→hypoglycemia/thirst, GLUCOSE_LOW→sweating/tremor, HEMOGLOBIN→fatigue/dizziness, HEMATOCRIT→headache/flushed_skin, K+→cramps/palpitations, TSH→fatigue/insomnia, CRP→joint_pain, ESTRADIOL→edema/mood_swings/gynecomastia, PROLACTIN→libido_decrease и др.
+  - `linkSymptomsToLabs(labValues, activeSymptomIds)` — relevance 0.3–0.8, дедупликация (макс relevance), alerts
+  - `getLabNorm(marker)`, `getAllLabMarkers()`
+  - Обратные маркеры (GLUCOSE_LOW, TSH_LOW, POTASSIUM_HIGH, ESTRADIOL_LOW) для low-диапазона
+
+- **`src/ui/screens/SupportScreen_parts/ComplaintsTab.tsx`** — новая вкладка genTab='complaints':
+  - 3 режима: 📊 Обзор (MiniStatCard: улучшаются/стабильны/ухудшаются/решены, динамика за 7д, категории), 📝 Дневник (пооценка 0–10 по категориям), 📈 График (SVG-бары 7/30 дн)
+  - Кнопка «🔍 Решить симптом» → переключение на SymptomSolverTab
+  - `ComplaintsTab({ onOpenSolver })` — колбэк открытия солвера
+
+- **Интеграция в SupportScreen.tsx**:
+  - Тип genTab расширен: `'complaints'`
+  - Pill-кнопка «🩺 Жалобы» добавлена в навигацию (calculator/dosages/complaints/info)
+  - `genTab === 'complaints'` рендерит `<ComplaintsTab>` с paddingTop:80 для header
+  - `onOpenSolver` → `setGenTab('calculator'); setInfoView('symptoms'); setTab('calculator')`
+
+- **DRUG_LABELS / DRUG_CATEGORIES** — добавлены 12 новых записей:
+  - `reduce_dose`, `reduce_gh_dose`, `stop_gh`, `stop_finasteride`, `reduce_melatonin`, `reduce_diuretic`, `reduce_insulin`, `reduce_ai`, `glucose_urgent`, `site_rotation`, `night_splint`, `nsaids`, `astaxanthin`, `enclomiphene`, `metformin_mr`, `avoid_alcohol`, `therapy`
+
+- `**tsc --noEmit**` — 0 errors. `**vite build**` — OK (43.8s). **UTF-8 noBOM** — 3 новых файла OK.

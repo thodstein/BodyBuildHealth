@@ -40,60 +40,71 @@ export interface CoverageResult {
 }
 
 // ── Блэклист: вещества, которые НЕ должны рекомендоваться как «поддержка» ──
-// RDRU-препараты (НПВС, кортикостероиды, рецептурные), ноотропы/пептиды (экспериментальные),
-// гормоны/стероиды (не поддержка, а сама фармакология), сырые химикалии,
-// абстрактные классы препаратов (`*_drugs`), пустые/технические записи БД.
+// Политика: ноотропы, пептиды и врачебные рецептурные ДОЛЖНЫ оставаться в выдаче
+// (по явному требованию пользователя). Блэклист содержит ТОЛЬКО:
+//   1) Сырые химические элементы/компоненты — НЕ препараты
+//   2) Гормоны/стероиды — сама фармакология, не «поддержка»
+//   3) Абстрактные классы препаратов (`*_drugs`) — не конкретные вещества
+//   4) Технические дубликаты записей БД (`*_dup`)
+// Дубли препаратов одного класса (AI, SERM, статины…) устраняются через REC_SAME_CLASS_GROUPS.
 export const REC_BLACKLIST = new Set<string>([
   // Сырые химикалии/минералы/элементы:
   'sodium','caffeine','adrenaline','copper','iron','flavonoids','anthocyanins','c60',
   'omega6','omega7','omega9','l_histidine','ornithine','inosine','nrf2_activator',
   'lecithin','taxifolin','glutamate','histidine','lactate','endocrine_marker','endocannabinoid',
   'antacid','pharma',
-  // Рецептурные ноотропы/нейромодуляторы:
-  'phenibut','selegiline','ketamine','modafinil','tianeptine','lithium','memantine',
-  'bromantane','noopept','semax','selank','cerebrolysin','cortexin','dsip','ibudilast',
-  'piracetam','aniracetam','oxiracetam','pramiracetam','coluracetam','fasoracetam',
-  // Экспериментальные пептиды/сенолитики:
-  'bpc157','tb500','thymosin_alpha1','cjc1295','ghrp2','ghrp6','ipamorelin','ghk_cu',
-  'p21','urolithin_a','spermidine','fisetin','humanin','ss31','mots_c',
-  // Пептидные гормоны / нейропептиды:
-  'gonadorelin','kisspeptin','oxytocin','pt141','melanotan1','melanotan2',
   // Гормоны/стероиды — сама фармакология, не «поддержка»:
   'pregnenolone','neurosteroid','progesterone','dhea',
   'estradiol','testosterone','cortisol','insulin','glucagon','vasopressin','follistatin',
-  'igf1','mgf','finasteride','gip','glp1',
-  // Рецептурные препараты:
-  'warfarin','rivaroxaban','apixaban','dabigatran','clopidogrel','ticagrelor',
-  'fluoxetine','sertraline','citalopram','escitalopram','venlafaxine','duloxetine',
-  'olanzapine','quetiapine','risperidone','aripiprazole','haloperidol',
-  'alprazolam','diazepam','lorazepam','clonazepam','buspirone',
-  'valproate','lamotrigine','carbamazepine','phenytoin',
-  // НПВС и кортикостероиды:
-  'ibuprofen','naproxen','celecoxib','diclofenac','meloxicam',
-  'prednisone','dexamethasone','hydrocortisone','methylprednisolone',
-  // Врачебные рецептурные:
-  'furosemide','hydrochlorothiazide','chlorthalidone','spironolactone',
-  'atorvastatin','rosuvastatin','simvastatin','pravastatin','pitavastatin',
-  'lisinopril','enalapril','ramipril','perindopril','captopril',
-  'metoprolol','atenolol','bisoprolol','carvedilol','propranolol',
-  'amlodipine','nifedipine','verapamil','diltiazem',
-  'losartan','valsartan','irbesartan','olmesartan','candesartan',
-  // Сахароснижающие:
-  'metformin','pioglitazone','acarbose','semaglutide',
-  // Тиреоидные:
-  'levothyroxine','liothyronine','methimazole','propylthiouracil',
+  'igf1','mgf','gip','glp1',
+  // Технические дубликаты записей БД:
   'levothyroxine_dup','liothyronine_dup','metformin_dup',
-  // Иммунодепрессанты:
-  'tacrolimus','cyclosporine','mycophenolate','azathioprine',
-  // Гастро/ферменты:
-  'digestive_enzymes','gentian','licorice',
-  // Абстрактные классы препаратов:
+  // Абстрактные классы препаратов (не вещества):
   'ace_inhibitor_drugs','antibiotic_drugs','anticoagulant_drugs','anticonvulsant_drugs',
   'antidepressant_drugs','antidiabetic_drugs','antihistamine_drugs','antiplatelet_drugs',
   'antipsychotic_drugs','antithyroid_drugs','anxiolytic_drugs','arb_drugs',
   'beta_blocker_drugs','ccb_drugs','corticosteroid_drugs','diuretic_drugs',
   'immunosuppressant_drugs','nsaid_drugs','ppi_drugs','statin_drugs','thyroid_drugs',
 ]);
+
+// ── Same-class дедупликация в рекомендательном движке ──
+// При addRec(id): если id ∈ группе → все ID группы блокируются от дальнейшего добавления.
+// Синхронизировано с SAME_CLASS_GROUPS в support-plan/engine.ts.
+const REC_SAME_CLASS_GROUPS: Record<string, string[]> = {
+  ai:           ['anastrozole', 'letrozole', 'exemestane', 'arimidex', 'femara'],
+  serm:         ['tamoxifen', 'tamox', 'clomi', 'clomid', 'enclomid', 'enclomiphene', 'raloxifene'],
+  statin:       ['atorvastatin', 'rosuvastatin', 'simvastatin', 'pravastatin', 'pitavastatin', 'red_yeast', 'red_yeast_rice'],
+  arb:          ['telmisartan', 'losartan', 'valsartan', 'irbesartan', 'olmesartan', 'candesartan'],
+  ace:          ['lisinopril', 'enalapril', 'ramipril', 'perindopril', 'captopril'],
+  bb:           ['metoprolol', 'atenolol', 'bisoprolol', 'carvedilol', 'propranolol', 'nebivolol'],
+  ccb:          ['amlodipine', 'nifedipine', 'verapamil', 'diltiazem'],
+  diuretic:     ['furosemide', 'hydrochlorothiazide', 'chlorthalidone', 'spironolactone'],
+  anticoag:     ['warfarin', 'rivaroxaban', 'apixaban', 'dabigatran'],
+  antiplatelet: ['clopidogrel', 'ticagrelor', 'aspirin'],
+  racetam:      ['piracetam', 'aniracetam', 'oxiracetam', 'pramiracetam', 'coluracetam', 'fasoracetam'],
+  choline_donor:['citicoline', 'alpha_gpc', 'l_alpha_gpc', 'choline', 'cdp_choline'],
+  ssri:         ['fluoxetine', 'sertraline', 'citalopram', 'escitalopram'],
+  snri:         ['venlafaxine', 'duloxetine'],
+  benzodiazepine:['alprazolam', 'diazepam', 'lorazepam', 'clonazepam'],
+  antipsychotic:['olanzapine', 'quetiapine', 'risperidone', 'aripiprazole', 'haloperidol'],
+  nsaid:        ['ibuprofen', 'naproxen', 'celecoxib', 'diclofenac', 'meloxicam'],
+  corticosteroid:['prednisone', 'dexamethasone', 'hydrocortisone', 'methylprednisolone'],
+  antidiabetic: ['metformin', 'pioglitazone', 'acarbose', 'semaglutide'],
+  thyroid:      ['levothyroxine', 'liothyronine', 'methimazole', 'propylthiouracil'],
+  dopamine_agonist:['cabergoline', 'bromocriptine', 'pramipexole'],
+  anticonvulsant:['valproate', 'lamotrigine', 'carbamazepine', 'phenytoin'],
+  maoi:         ['selegiline', 'rasagiline', 'moclobemide'],
+};
+const REC_ID_TO_CLASS: Record<string, string> = (() => {
+  const m: Record<string, string> = {};
+  for (const [cls, ids] of Object.entries(REC_SAME_CLASS_GROUPS)) for (const id of ids) m[id] = cls;
+  return m;
+})();
+// Возвращает ID всех препаратов того же класса (пусто, если id не в группе)
+export function recSameClassIds(id: string): string[] {
+  const cls = REC_ID_TO_CLASS[id];
+  return cls ? REC_SAME_CLASS_GROUPS[cls] : [];
+}
 
 function getV(fp: LabSlice | null | undefined, panel: keyof LabSlice, key: string): number | null {
   if (!fp) return null;
@@ -157,13 +168,30 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
   const startingThisWeek = drugs.filter(a => (a.startWeek || 1) === week);
   const endingSoon = drugs.filter(a => (a.endWeek || (a.weeks || 12)) === week);
 
+  // Track added substances для same-class дедупликации: если anastrozole уже
+  // назначен, последующие letrozole/exemestane отфильтровываются (REC_SAME_CLASS_GROUPS).
+  const usedSubstanceIds = new Set<string>();
+  const isClassBlocked = (sid: string): boolean => {
+    const alts = recSameClassIds(sid);
+    return alts.some(alt => usedSubstanceIds.has(alt) && alt !== sid);
+  };
   const addRec = (id: string, severity: RecSeverity, system: string, systemLabel: string, title: string, substanceIds: string[], reasoningMap: Record<string, string>, escalation: string, monitoring: string) => {
-    const substances = substanceIds.filter(sid => !blockedIds.includes(sid) && !REC_BLACKLIST.has(sid)).map(sid => {
+    const substances = substanceIds.filter(sid =>
+      !blockedIds.includes(sid) &&
+      !REC_BLACKLIST.has(sid) &&
+      !usedSubstanceIds.has(sid) &&
+      !isClassBlocked(sid)
+    ).map(sid => {
       const s = makeSub(sid, reasoningMap[sid] || '');
       if (blockedIds.includes(sid)) { s.name += ' [⚠ ЗАБЛОКИРОВАН]'; s.reasoning += ' — замена по механизму'; }
       return s;
     });
     if (substances.length === 0) return;
+    // Mark added substances (включая их same-class альтернативы) для будущей дедупликации
+    for (const s of substances) {
+      usedSubstanceIds.add(s.id);
+      for (const alt of recSameClassIds(s.id)) usedSubstanceIds.add(alt);
+    }
     recs.push({ id, severity, system, systemLabel, title, status: 'active', substances, escalation, monitoring, conflicts: [] });
   };
 

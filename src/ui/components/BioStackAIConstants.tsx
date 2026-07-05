@@ -3,7 +3,7 @@ import { type GoalType, type HealthCondition, type BioStackProfile } from '../..
 import { type FinderProfile, type GoalType as FinderGoal } from '../../engines/supplement-finder.engine';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 
-export type BSTab = 'profile' | 'search' | 'build' | 'stack' | 'risks' | 'compare' | 'reports' | 'periodization' | 'interactions' | 'clinical' | 'drugcheck';
+export type BSTab = 'profile' | 'search' | 'build' | 'stack' | 'risks' | 'compare' | 'reports' | 'periodization' | 'interactions' | 'clinical' | 'drugcheck' | 'lab';
 
 export const SUB_TABS: { id: BSTab; label: string }[] = [
   { id: 'profile', label: '👤 Профиль' },
@@ -14,8 +14,9 @@ export const SUB_TABS: { id: BSTab; label: string }[] = [
   { id: 'compare', label: '⚖ Сравнение' },
   { id: 'reports', label: '📊 Отчёты' },
   { id: 'clinical', label: '🏥 Клиника' },
-  { id: 'interactions', label: '⚡ Взаимодействия' },
+  { id: 'lab', label: '🧪 Лаборатория' },
   { id: 'drugcheck', label: '💊 Лекарства' },
+  { id: 'interactions', label: '⚡ Взаимодействия' },
   { id: 'periodization', label: '🔄 Циклы' },
 ];
 
@@ -184,8 +185,8 @@ export const inputS: React.CSSProperties = {
 export const selectS: React.CSSProperties = { ...inputS, appearance: 'none' };
 
 /* ─── Shared Components ─── */
-export const GlassCard: React.FC<{ title?: string; icon?: string; color?: string; children: React.ReactNode; style?: React.CSSProperties }> = ({ title, icon, color, children, style }) => (
-  <div style={{ borderRadius: 18, overflow: 'hidden', background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 20px rgba(0,0,0,0.3)', marginBottom: 10, ...style }}>
+export const GlassCard: React.FC<{ title?: string; icon?: string; color?: string; children: React.ReactNode; style?: React.CSSProperties; onClick?: () => void }> = ({ title, icon, color, children, style, onClick }) => (
+  <div onClick={onClick} style={{ borderRadius: 18, overflow: 'hidden', background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 20px rgba(0,0,0,0.3)', marginBottom: 10, cursor: onClick ? 'pointer' : undefined, ...style }}>
     {color && <div style={{ height: 4, background: `linear-gradient(90deg, ${color}, ${color}66, transparent)` }} />}
     {title && <div style={{ padding: '14px 18px 0', fontSize: 14, color: color || 'rgba(255,255,255,0.75)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>{icon && <span>{icon}</span>}{title}</div>}
     <div style={{ padding: title ? '12px 18px 18px' : 18 }}>{children}</div>

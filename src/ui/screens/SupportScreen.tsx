@@ -73,6 +73,7 @@ import { SupportDiaryView } from './SupportScreen_parts/SupportDiaryView';
 import { SupportStacksView } from './SupportScreen_parts/SupportStacksView';
 import { SupportCalcResult } from './SupportScreen_parts/SupportCalcResult';
 import { DosageDatabaseView } from '../components/DosageCalculator';
+import { ComplaintsTab } from './SupportScreen_parts/ComplaintsTab';
 import { SupportProtocols } from './SupportScreen_parts/SupportProtocols';
 import { SupportBioavailability } from './SupportScreen_parts/SupportBioavailability';
 import { SymptomSolverTab } from './SupportScreen_parts/SymptomSolverTab';
@@ -84,7 +85,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [calcView, setCalcView] = useState<CalcView>('main');
   const [infoView, setInfoView] = useState<InfoView>('main');
   const [section, setSection] = useState<'home'|'generator'|'protocols'|'info'>('home');
-  const [genTab, setGenTab] = useState<'calculator'|'info'|'dosages'>('calculator');
+  const [genTab, setGenTab] = useState<'calculator'|'info'|'dosages'|'complaints'>('calculator');
   const [protocolTab, setProtocolTab] = useState<'pct'|'fertility'|'hrt'|'neuro'|'joints'|'acne'|'injections'>('pct');
   const [infoTab, setInfoTab] = useState<string>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
@@ -2993,7 +2994,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['calculator','🧮 Калькулятор'],['dosages','📋 Дозировки'],['info','📖 О подборе']].map(([id,label]) => (
+            {[['calculator','🧮 Калькулятор'],['dosages','📋 Дозировки'],['complaints','🩺 Жалобы'],['info','📖 О подборе']].map(([id,label]) => (
               <button key={id} onClick={() => { setGenTab(id as any); 
               const a: Record<string,()=>void> = {
                 calculator: ()=>{ setTab('calculator'); setSupportView('calc'); },
@@ -3309,6 +3310,20 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
       {/* ===== DOSAGE DATABASE VIEW ===== */}
       {section === 'generator' && genTab === 'dosages' && (
         <DosageDatabaseView />
+      )}
+
+      {/* ===== COMPLAINTS TAB ===== */}
+      {genTab === 'complaints' && (
+        <div style={{ paddingTop: 80, paddingLeft: 8, paddingRight: 8 }}>
+          <ComplaintsTab
+            onOpenSolver={() => {
+              setGenTab('calculator' as any);
+              setTab('calculator');
+              setSupportView('calc');
+              setInfoView('symptoms' as any);
+            }}
+          />
+        </div>
       )}
 
       {/* ===== PEPTIDE CALCULATOR ===== */}

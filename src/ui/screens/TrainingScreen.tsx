@@ -499,7 +499,7 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
       }
       if (e.key === 'he_training_tab') {
         const val = localStorage.getItem('he_training_tab');
-        const validTabs: TrainingTab[] = ['plan', 'cycles', 'programs', 'mytraining', 'programcalc', 'volume', 'library', 'analytics', 'visual', 'progress', 'excalc', 'methods', 'timers', 'history', 'reports', 'srcbb', 'specialization'];
+        const validTabs: TrainingTab[] = ['plan', 'cycles', 'programs', 'mytraining', 'programcalc', 'volume', 'library', 'analytics', 'visual', 'progress', 'exercise_lab', 'methods', 'timers', 'history', 'reports', 'srcbb', 'specialization'];
         if (val && validTabs.includes(val as TrainingTab)) {
           setTab(val as TrainingTab);
         }
@@ -2268,26 +2268,22 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
           </div>
           </>)}
 
-          {/* ═══════ EXERCISE GENERATOR + Периодизация (объединено) ═══════ */}
+          {/* ═══════ Периодизация ═══════ */}
           {showNonBuilder && (
             <div className="card" style={{ padding: '10px 12px' }}>
-              <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🏋️ Генератор упражнений</h3>
-              <ExerciseGeneratorContent />
-              <div style={{ borderTop:'1px solid var(--border)', marginTop:6, paddingTop:6 }}>
-                <h4 style={{ margin: '0 0 6px', fontSize: 11 }}>📐 Тип периодизации</h4>
-                <div style={{ display:'flex', gap:4, flexWrap:'wrap', fontSize:10, color:'var(--text-dim)' }}>
-                  {[
-                    { v:'auto', l:'Авто' }, { v:'linear', l:'Линейная' },
-                    { v:'undulating', l:'DUP' }, { v:'block', l:'Блочная' },
-                  ].map(p => (
-                    <button key={p.v} onClick={() => setPeriodizationType(p.v as 'auto' | 'linear' | 'undulating' | 'block' | 'conjugate')}
-                      style={{
-                        padding:'4px 10px', borderRadius:6, fontSize:10, fontWeight: periodizationType === p.v ? 700 : 400, cursor:'pointer',
-                        border: periodizationType === p.v ? '1px solid var(--accent)' : '1px solid var(--border)',
-                        background: periodizationType === p.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
-                      }}>{p.l}</button>
-                  ))}
-                </div>
+              <h4 style={{ margin: '0 0 6px', fontSize: 11 }}>📐 Тип периодизации</h4>
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap', fontSize:10, color:'var(--text-dim)' }}>
+                {[
+                  { v:'auto', l:'Авто' }, { v:'linear', l:'Линейная' },
+                  { v:'undulating', l:'DUP' }, { v:'block', l:'Блочная' },
+                ].map(p => (
+                  <button key={p.v} onClick={() => setPeriodizationType(p.v as 'auto' | 'linear' | 'undulating' | 'block' | 'conjugate')}
+                    style={{
+                      padding:'4px 10px', borderRadius:6, fontSize:10, fontWeight: periodizationType === p.v ? 700 : 400, cursor:'pointer',
+                      border: periodizationType === p.v ? '1px solid var(--accent)' : '1px solid var(--border)',
+                      background: periodizationType === p.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
+                    }}>{p.l}</button>
+                ))}
               </div>
             </div>
           )}
@@ -3745,7 +3741,7 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
       {tab === 'programs' && <InfoErrorBoundary label="Программы"><ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} onAddToMyTraining={(exs) => setCustomExercises(prev => [...prev, ...exs])} /></InfoErrorBoundary>}
       {tab === 'timers' && <InfoErrorBoundary label="Таймеры"><TimersTab /></InfoErrorBoundary>}
       {tab === 'progress' && <InfoErrorBoundary label="Прогресс"><ProgressTab historyWorkouts={historyWorkouts} /></InfoErrorBoundary>}
-       {tab === 'excalc' && <InfoErrorBoundary label="Калькулятор упражнений"><ExerciseCalcTab /></InfoErrorBoundary>}
+        {tab === 'exercise_lab' && <InfoErrorBoundary label="Лаборатория упражнений"><ExerciseLab /></InfoErrorBoundary>}
        {tab === 'calc_plates' && <InfoErrorBoundary label="Калькулятор блинов"><PlateCalculator /></InfoErrorBoundary>}
        {tab === 'calc_vbt' && <InfoErrorBoundary label="VBT-калькулятор"><VBTCalculator /></InfoErrorBoundary>}
        {tab === 'calc_mrv' && <InfoErrorBoundary label="Оценщик MRV"><MRVEstimator /></InfoErrorBoundary>}
@@ -3760,8 +3756,6 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
       {tab === 'rel_strength' && <InfoErrorBoundary label="Относительная сила"><RelativeStrengthCalcTab /></InfoErrorBoundary>}
       {tab === 'calendar' && <InfoErrorBoundary label="Календарь тренировок"><TrainingCalendarTab /></InfoErrorBoundary>}
       {tab === 'periodization_designer' && <InfoErrorBoundary label="Дизайнер периодизации"><PeriodizationDesignerTab /></InfoErrorBoundary>}
-      {tab === 'tech_calc' && <InfoErrorBoundary label="Техника упражнений"><TechniqueCalcTab /></InfoErrorBoundary>}
-      {tab === 'target_muscle' && <InfoErrorBoundary label="Целевая мышца"><TargetMuscleCalcTab /></InfoErrorBoundary>}
       {tab === 'deload_scheduler' && <InfoErrorBoundary label="Планировщик делода"><DeloadSchedulerTab /></InfoErrorBoundary>}
       {tab === 'meso_progression' && <InfoErrorBoundary label="Прогрессия мезо"><div style={{ maxWidth: 720, margin: '0 auto', padding: 12 }}><MesocycleProgressionCard weeks={mesoLength} goal={goal === 'strength' ? 'strength' : goal === 'bulk' ? 'hypertrophy' : 'hypertrophy'} /></div></InfoErrorBoundary>}
       {tab === 'calc_taper' && <InfoErrorBoundary label="Тапер-планер"><TaperPlannerTab /></InfoErrorBoundary>}
@@ -3900,7 +3894,7 @@ import { VisualTab } from './TrainingScreen_parts/VisualTab';
 import { AnalyticsTab } from './TrainingScreen_parts/AnalyticsTab';
 import { ProgramsTab } from './TrainingScreen_parts/ProgramsTab';
 import { VolumeOptimizerTab } from './TrainingScreen_parts/VolumeOptimizerTab';
-import { ExerciseCalcTab } from './TrainingScreen_parts/ExerciseCalcTab';
+import { ExerciseLab } from './TrainingScreen_parts/ExerciseLab';
 import { TrainingLoadCalculator } from './TrainingScreen_parts/TrainingLoadCalculator';
 import { TonnageCalcTab } from './TrainingScreen_parts/TonnageCalcTab';
 import { WhatIfCard } from './TrainingScreen_parts/WhatIfCard';
@@ -3920,16 +3914,13 @@ import { TimersTab } from './TrainingScreen_parts/TimersTab';
 import { ProgressTab } from './TrainingScreen_parts/ProgressTab';
 import { StrengthLevelCard } from './TrainingScreen_parts/StrengthLevelCard';
 import { StructuredAnalyticsCard } from './TrainingScreen_parts/StructuredAnalyticsCard';
-import { ExerciseGeneratorContent } from './TrainingScreen_parts/ExerciseGenerator';
 import { TrainingMixTab } from './TrainingScreen_parts/TrainingMixTab';
 import { ProPlToolsTab } from './TrainingScreen_parts/ProPlToolsTab';
 import { RelativeStrengthCalcTab } from './TrainingScreen_parts/RelativeStrengthCalcTab';
 import { TrainingCalendarTab } from './TrainingScreen_parts/TrainingCalendarTab';
 import { PeriodizationDesignerTab } from './TrainingScreen_parts/PeriodizationDesignerTab';
-import { TechniqueCalcTab } from './TrainingScreen_parts/TechniqueCalcTab';
 import { DeloadSchedulerTab } from './TrainingScreen_parts/DeloadSchedulerTab';
 import { MesocycleProgressionCard } from './TrainingScreen_parts/MesocycleProgressionCard';
-import { TargetMuscleCalcTab } from './TrainingScreen_parts/TargetMuscleCalcTab';
 import { TaperPlannerTab } from './TrainingScreen_parts/TaperPlannerTab';
 import { PlateCalcTab } from './TrainingScreen_parts/PlateCalcTab';
 import { VBTCalcTab } from './TrainingScreen_parts/VBTCalcTab';

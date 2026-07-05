@@ -15,6 +15,7 @@ import { PeriodizationTab } from './BioStackAIPeriodization';
 import { InteractionsTab } from './BioStackAIInteractions';
 import { ClinicalTab } from './BioStackAIClinical';
 import { DrugCheckTab } from './BioStackAIDrugCheck';
+import { LabTab } from './BioStackAILab';
 
 const BIO_TAB_KEY = 'he_biostack_tab';
 
@@ -112,7 +113,8 @@ export const BioStackAIScreen: React.FC = () => {
     reports: <ReportsTab profile={profile} stackIds={stackIds} linked={linked} />,
     periodization: <PeriodizationTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
     interactions: <InteractionsTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
-    clinical: <ClinicalTab profile={profile} setProfile={setProfile} stackIds={stackIds} linked={linked} />,
+    clinical: <ClinicalTab profile={profile} setProfile={setProfile} stackIds={stackIds} linked={linked} onNavigateLab={() => setTab('lab')} />,
+    lab: <LabTab linked={linked} stackIds={stackIds} />,
     drugcheck: <DrugCheckTab profile={profile} stackIds={stackIds} />,
   };
 

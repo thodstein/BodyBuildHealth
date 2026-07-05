@@ -134,6 +134,23 @@ export const URGENCY_ICONS: Record<UrgencyLevel, string> = {
 /** Метки препаратов для связи симптом↔вещество */
 export const DRUG_LABELS: Record<string, string> = {
   testosterone: 'Тестостерон',
+  reduce_dose: 'Снижение дозы',
+  reduce_gh_dose: 'Снижение дозы GH',
+  stop_gh: 'Прекращение GH',
+  stop_finasteride: 'Отмена финастерида',
+  reduce_melatonin: 'Снижение дозы мелатонина',
+  reduce_diuretic: 'Отмена диуретика',
+  reduce_insulin: 'Коррекция инсулина',
+  reduce_ai: 'Отмена AI',
+  glucose_urgent: 'Глюкоза (быстрые УД)',
+  site_rotation: 'Ротация мест',
+  night_splint: 'Ночной ортез',
+  nsaids: 'НПВС (диклофенак)',
+  astaxanthin: 'Астаксантин',
+  enclomiphene: 'Энкломифен',
+  metformin_mr: 'Метформин пролонг',
+  avoid_alcohol: 'Отказ от алкоголя',
+  therapy: 'Психотерапия',
   trenbolone: 'Тренболон',
   nandrolone: 'Нандролон (Дека)',
   methandienone: 'Метандиенон (Дианобол)',
@@ -205,6 +222,23 @@ export const DRUG_LABELS: Record<string, string> = {
 };
 
 export const DRUG_CATEGORIES: Record<string, string> = {
+  reduce_dose: 'Lifestyle',
+  reduce_gh_dose: 'Lifestyle',
+  reduce_melatonin: 'Lifestyle',
+  reduce_diuretic: 'Lifestyle',
+  reduce_insulin: 'Lifestyle',
+  reduce_ai: 'Lifestyle',
+  stop_gh: 'Lifestyle',
+  stop_finasteride: 'Lifestyle',
+  glucose_urgent: 'Lifestyle',
+  site_rotation: 'Lifestyle',
+  night_splint: 'Lifestyle',
+  nsaids: 'Вспом.',
+  astaxanthin: 'Вспом.',
+  enclomiphene: 'SERM',
+  metformin_mr: 'Вспом.',
+  avoid_alcohol: 'Lifestyle',
+  therapy: 'Lifestyle',
   testosterone: 'AAS',
   trenbolone: 'AAS',
   nandrolone: 'AAS',
@@ -3224,6 +3258,440 @@ export const SYMPTOM_DB: SymptomEntry[] = [
         ],
       },
     ],
+  },
+
+  // ═══ СИМПТОМЫ SARMs ═══
+  {
+    id: 'vision_changes_sarm',
+    symptom: 'Изменение зрения / светобоязнь (на RAD-140)',
+    category: 'cns',
+    urgency: 'warning',
+    linkedDrugs: ['rad140'],
+    relatedSymptoms: ['headaches', 'tachycardia'],
+    quickFacts: [
+      'RAD-140 в дозах >20 мг/сут вызывает преходящую светобоязнь у 15-30%',
+      'Механизм: перекрёстная активация 5-HT2B рецепторов сетчатки',
+      'Обычно обратимо, но при игнорировании — риск отслойки сетчатки',
+    ],
+    generalInfo: 'Изменения зрения (светобоязнь, размытость, "вспышки") на фоне RAD-140 — дозозависимый эффект, связанный с 5-HT2B-агонизмом. При появлении — снижение дозы или отмена.',
+    problems: [{
+      problem: '5-HT2B-агонизм RAD-140 → вазоконстрикция сетчатки',
+      probability: 'medium',
+      mechanism: 'RAD-140 и его метаболиты активируют 5-HT2B-рецепторы (в 40× сильнее, чем тестостерон) → вазоконстрикция хориоидальных сосудов → гипоксия фоторецепторов',
+      labMarkers: [
+        { marker: 'Симптомы', expectedChange: '↑', targetRange: 'Нет симптомов', when: 'Ежедневно при приёме' },
+      ],
+      solutions: [
+        { substanceId: 'reduce_dose', name: 'Снизить дозу RAD-140 до 10 мг/сут', type: 'lifestyle', dose: '10 мг/сут', mechanism: 'Линейная зависимость доза→эффект', evidenceLevel: 'C' },
+        { substanceId: 'omega3', name: 'Омега-3 (EPA/DHA)', type: 'supplement', dose: '3-4 г/сут', mechanism: '↓ воспаление сетчатки, ↑ хориоидальный кровоток', evidenceLevel: 'B' },
+        { substanceId: 'astaxanthin', name: 'Астаксантин', type: 'supplement', dose: '4-12 мг/сут', mechanism: 'Суперантиоксидант, защита фоторецепторов', evidenceLevel: 'B' },
+      ],
+      expectations: [
+        { timeline: '3-7 дней', effect: 'Снижение светобоязни при уменьшении дозы' },
+        { timeline: '2-4 нед', effect: 'Полное исчезновение симптомов при отмене' },
+      ],
+    }],
+  },
+  {
+    id: 'sarm_lethargy',
+    symptom: 'Вялость / апатия на SARMs (Ostarine/LGD-4033)',
+    category: 'endocrine',
+    urgency: 'standard',
+    linkedDrugs: ['ostarine', 'lgd4033'],
+    relatedSymptoms: ['fatigue', 'libido_drop', 'depression_mood'],
+    quickFacts: [
+      'SARMs подавляют HPTA в 50-70% от степени ААС (доза-зависимо)',
+      'Ostarine при 25 мг/сут ↓ Т до надира на 50-70% за 4 нед',
+      'LGD-4033 даже 5 мг/сут ↓ общий Т на 40-50%',
+    ],
+    generalInfo: 'Вялость, апатия, упадок сил на SARMs — следствие супрессии эндогенного тестостерона. Многие пользователи ошибочно считают SARMs «безопасными для гормонов» и не ожидают этого эффекта.',
+    problems: [{
+      problem: 'HPTA-супрессия SARMs → ↓ эндогенный тестостерон',
+      probability: 'high',
+      mechanism: 'SARMs активируют AR в гипоталамусе → ↓ GnRH → ↓ LH/FSH → ↓ тестостерон яичек. Степень супрессии: LGD > RAD > Ostarine',
+      labMarkers: [
+        { marker: 'Общий тестостерон', expectedChange: '↓↓', targetRange: '≥20 нмоль/л', when: 'Через 4 нед приёма' },
+        { marker: 'LH', expectedChange: '↓', targetRange: '2-9 МЕ/л', when: 'Через 4 нед' },
+        { marker: 'FSH', expectedChange: '↓', targetRange: '1.5-12 МЕ/л', when: 'Через 4 нед' },
+      ],
+      solutions: [
+        { substanceId: 'hcg', name: 'hCG 250 МЕ 2×/нед', type: 'pharma', dose: '250 МЕ 2×/нед', mechanism: 'Аналог LH → стимуляция Лейдига', evidenceLevel: 'B' },
+        { substanceId: 'enclomiphene', name: 'Энкломифен 12.5 мг/день', type: 'pharma', dose: '12.5 мг/день', mechanism: '↑ GnRH через блокаду ER в гипоталамусе', evidenceLevel: 'B' },
+        { substanceId: 'vitamin_d3', name: 'Витамин D3', type: 'supplement', dose: '2000-5000 МЕ/сут', mechanism: 'Кофактор стероидогенеза', evidenceLevel: 'B' },
+        { substanceId: 'zinc', name: 'Цинк пиколинат', type: 'supplement', dose: '15-30 мг/сут', mechanism: 'Кофактор 17β-HSD и 3β-HSD', evidenceLevel: 'B' },
+      ],
+      expectations: [
+        { timeline: '2-4 нед', effect: 'Восстановление энергии на hCG/энкломифене' },
+        { timeline: '4-8 нед', effect: 'Нормализация тестостерона после отмены' },
+      ],
+    }],
+  },
+  {
+    id: 'sarm_joint_dryness',
+    symptom: 'Сухость/скованность суставов на SARMs',
+    category: 'musculoskeletal',
+    urgency: 'standard',
+    linkedDrugs: ['rad140', 'lgd4033', 'ostarine'],
+    relatedSymptoms: ['joint_pain'],
+    quickFacts: [
+      'SARMs ↓ эстрадиол (из-за HPTA-супрессии) → ↓ синовиальной жидкости',
+      'Эстрадиол стимулирует гиалуронан-синтазу в синовиоцитах',
+      'Сухость суставов на SARMs — маркер глубокого ↓ E2',
+    ],
+    generalInfo: 'Сухость, скованность, хруст в суставах на SARMs без боли — следствие снижения эстрадиола, который критически важен для увлажнения суставных поверхностей.',
+    problems: [{
+      problem: '↓ E2 → ↓ гиалуроновой кислоты в синовии',
+      probability: 'medium',
+      mechanism: 'SARMs → ↓ GnRH → ↓ LH → ↓ T → ↓ E2 (ароматаза не работает при низком T). E2 стимулирует гиалуронан-синтазу 2 (HAS2) в синовиоцитах. При ↓ E2 — ↓ смазки.',
+      labMarkers: [
+        { marker: 'Эстрадиол (E2)', expectedChange: '↓', targetRange: '20-50 пг/мл ♂', when: 'Через 4 нед приёма' },
+      ],
+      solutions: [
+        { substanceId: 'hyaluronic_acid', name: 'Гиалуроновая кислота (перорально)', type: 'supplement', dose: '100-200 мг/сут', mechanism: 'Субстрат для синтеза синовиальной жидкости', evidenceLevel: 'C' },
+        { substanceId: 'collagen_uc2', name: 'Коллаген UC-II (неденатурир.)', type: 'supplement', dose: '40 мг/сут', mechanism: 'Иммунная толерантность к хрящу', evidenceLevel: 'B' },
+        { substanceId: 'vitamin_d3', name: 'Витамин D3 + K2', type: 'supplement', dose: '2000-5000 МЕ + 100 мкг', mechanism: 'Кальциевый обмен + GI-белки', evidenceLevel: 'B' },
+      ],
+      expectations: [
+        { timeline: '2-4 нед', effect: 'Улучшение подвижности на гиалуронате' },
+        { timeline: '4-8 нед', effect: 'Восстановление синовии после отмены SARMs' },
+      ],
+    }],
+  },
+
+  // ═══ СИМПТОМЫ GH / ПЕПТИДЫ ═══
+  {
+    id: 'gh_carpal_tunnel',
+    symptom: 'Синдром запястного канала (онемение пальцев) на GH',
+    category: 'musculoskeletal',
+    urgency: 'warning',
+    linkedDrugs: ['gh', 'igf1'],
+    relatedSymptoms: ['edema', 'gh_joint_pain'],
+    quickFacts: [
+      'Классический побочный эффект GH — карпальный туннель: 20-40% при 4-6 МЕ/сут',
+      'Механизм: ↑IGF-1 → пролиферация синовии → сдавление n.medianus',
+      'При ↓ дозы GH на 30-50% симптомы регрессируют за 2-4 нед',
+    ],
+    generalInfo: 'Онемение, покалывание, боль в I-III пальцах кисти (n.medianus). Усиливается ночью. Типично для доз GH >4 МЕ/сут (1.3 мг/сут). У пользователей с ожирением/СД риск выше.',
+    problems: [{
+      problem: 'IGF-1-опосредованная гипертрофия синовии',
+      probability: 'high',
+      mechanism: 'GH → ↑IGF-1 → стимуляция пролиферации фибробластов и хондроцитов → утолщение связки запястья → ↓ объём карпального канала → компрессия n.medianus',
+      labMarkers: [
+        { marker: 'IGF-1', expectedChange: '↑↑', targetRange: '150-350 нг/мл', when: 'Через 2 нед от старта' },
+        { marker: 'GH сыворотка (утро)', expectedChange: '↑', targetRange: '<5 нг/мл', when: 'При симптомах' },
+      ],
+      solutions: [
+        { substanceId: 'reduce_gh_dose', name: 'Снизить дозу GH 30-50%', type: 'lifestyle', dose: '-30-50%', mechanism: '↓IGF-1 → ↓ гипертрофии', evidenceLevel: 'A' },
+        { substanceId: 'vitamin_b6', name: 'Витамин B6 (пиридоксин)', type: 'supplement', dose: '50-100 мг/сут', mechanism: '↑ ГАМК-ергическое торможение, нейропротекция', evidenceLevel: 'B' },
+        { substanceId: 'nsaids', name: 'НПВС местно (диклофенак-гель)', type: 'pharma', dose: '1-2% 2-3р/день', mechanism: '↓ локального воспаления', evidenceLevel: 'B' },
+        { substanceId: 'night_splint', name: 'Ночной ортез кисти', type: 'lifestyle', dose: 'На ночь', mechanism: 'Фиксация кисти в нейтральном положении', evidenceLevel: 'A' },
+      ],
+      expectations: [
+        { timeline: '1-2 нед', effect: 'Снижение симптомов при ↓ дозы GH', sideNote: 'При сохранении — тиразид по ночам' },
+        { timeline: '4-6 нед', effect: 'Полный регресс при отмене/снижении дозы' },
+      ],
+    }],
+  },
+  {
+    id: 'gh_acromegaly_signs',
+    symptom: 'Акромегалоидные изменения (увеличение стоп/носа/челюсти)',
+    category: 'endocrine',
+    urgency: 'critical',
+    linkedDrugs: ['gh', 'igf1', 'cjc1295', 'ipamorelin', 'ghrp2', 'ghrp6', 'hexarelin', 'tesamorelin'],
+    relatedSymptoms: ['gh_carpal_tunnel', 'edema', 'gh_joint_pain'],
+    quickFacts: [
+      'IGF-1 >400 нг/мл в сочетании с курсом >6 мес → необратимые костные изменения',
+      'Первые признаки: увеличение размера обуви (ширина стопы), грубые черты лица',
+      'Прогрессия: утолщение челюсти (прогнатизм), огрубение голоса',
+    ],
+    generalInfo: 'Необратимые костные изменения при хронически высоком IGF-1. Начинаются с мягких тканей (нос, уши, губы), затем кости. Критически важно выявить на ранней стадии.',
+    problems: [{
+      problem: 'Хроническая гиперстимуляция IGF-1 рецепторов → пролиферация хряща',
+      probability: 'medium',
+      mechanism: 'GH → ↑IGF-1 → активация IGF-1R → ↑ пролиферация хондроцитов в эпифизарных пластинках (ещё не закрытых) и периостальный рост костей. После закрытия пластинок — утолщение костей.',
+      labMarkers: [
+        { marker: 'IGF-1', expectedChange: '↑↑', targetRange: '<350 нг/мл', when: 'Каждые 4 нед на GH' },
+        { marker: 'GH (ночной, пиковый)', expectedChange: '↑', targetRange: '<10 нг/мл', when: 'При IGF-1 >400' },
+        { marker: 'Размер обуви', expectedChange: '↑', targetRange: 'Без изменений', when: 'Каждые 3 мес' },
+      ],
+      solutions: [
+        { substanceId: 'stop_gh', name: 'НЕМЕДЛЕННО прекратить GH/пептиды', type: 'lifestyle', dose: '0 МЕ/сут', mechanism: 'Прекращение стимуляции IGF-1', evidenceLevel: 'A' },
+        { substanceId: 'hospital', name: 'Консультация эндокринолога', type: 'lifestyle', dose: 'Срочно', mechanism: 'Исключение акромегалии', evidenceLevel: 'A' },
+      ],
+      expectations: [
+        { timeline: '2-4 нед', effect: '↓ IGF-1 после отмены GH', sideNote: 'Пептиды — 1-2 нед' },
+        { timeline: '3-6 мес', effect: 'Регресс мягких тканей; кости — необратимо' },
+      ],
+    }],
+  },
+  {
+    id: 'gh_insulin_resistance',
+    symptom: 'Инсулинорезистентность / ↑ глюкозы на GH',
+    category: 'endocrine',
+    urgency: 'warning',
+    linkedDrugs: ['gh', 'igf1', 'cjc1295', 'ipamorelin', 'tesamorelin'],
+    relatedSymptoms: ['insulin_sensitivity_down'],
+    quickFacts: [
+      'GH ↑ глюконеогенез в печени + ↓ захват глюкозы мышцами (контринсулярный)',
+      'Глюкоза натощак >6.1 ммоль/л — ранний маркер',
+      'У бодибилдеров на GH + инсулин риск ↑ глюкозы в 3× выше',
+    ],
+    generalInfo: 'GH повышает глюкозу через контринсулярный эффект (↑ глюконеогенез, ↓ утилизация глюкозы). При длительном приёме + буфферная еда → метаболический синдром.',
+    problems: [{
+      problem: 'GH-опосредованная ↓ захвата глюкозы мышечной тканью',
+      probability: 'high',
+      mechanism: 'GH → ↓ IRS-1/PI3K → ↓ транслокация GLUT4 в мышцах + ↑ глюконеогенез из аминокислот в печени через PEPCK.',
+      labMarkers: [
+        { marker: 'Глюкоза натощак', expectedChange: '↑', targetRange: '3.9-5.6 ммоль/л', when: 'Еженедельно' },
+        { marker: 'HbA1c', expectedChange: '↑', targetRange: '<5.7%', when: 'Каждые 3 мес' },
+        { marker: 'Инсулин натощак', expectedChange: '↑', targetRange: '<10 мкМЕ/мл', when: 'При ↑ глюкозы' },
+        { marker: 'HOMA-IR', expectedChange: '↑', targetRange: '<2.5', when: 'Рассчётно' },
+      ],
+      solutions: [
+        { substanceId: 'berberine', name: 'Берберин', type: 'supplement', dose: '500 мг 3р/день', mechanism: 'AMPK-активатор, ↑ GLUT4 транслокацию', evidenceLevel: 'A' },
+        { substanceId: 'metformin', name: 'Метформин', type: 'pharma', dose: '500-1000 мг/сут', mechanism: '↓ глюконеогенез в печени', evidenceLevel: 'A' },
+        { substanceId: 'chromium', name: 'Хром пиколинат', type: 'supplement', dose: '200-400 мкг/сут', mechanism: '↑ инсулин-рецепторную тирозинкиназу', evidenceLevel: 'B' },
+        { substanceId: 'meal_spacing', name: 'Интервальное питание (16/8)', type: 'lifestyle', dose: '16 ч голод / 8 ч еда', mechanism: '↓ базального инсулина, ↑ чувствительности', evidenceLevel: 'A' },
+        { substanceId: 'reduce_gh', name: 'Снизить дозу GH', type: 'lifestyle', dose: '-30%', mechanism: '↓ контринсулярный эффект', evidenceLevel: 'A' },
+      ],
+      expectations: [
+        { timeline: '1-3 дня', effect: 'Берберин ↓ глюкозы на 15-25%' },
+        { timeline: '2-4 нед', effect: 'Метформин + берберин: ↓ HbA1c на 0.5-1%' },
+      ],
+    }],
+  },
+
+  // ═══ СИМПТОМЫ ИНСУЛИН ═══
+  {
+    id: 'insulin_hypoglycemia',
+    symptom: 'Гипогликемия (тремор, потливость, голод, спутанность)',
+    category: 'endocrine',
+    urgency: 'critical',
+    linkedDrugs: ['insulin', 'insulin_rapid', 'lantus'],
+    relatedSymptoms: ['tachycardia', 'insulin_sensitivity_down'],
+    quickFacts: [
+      'Гипогликемия <3.0 ммоль/л — неотложное состояние',
+      'Симптомы: тремор, холодный пот, голод, тахикардия, спутанность',
+      'При <2.5 ммоль/л — риск потери сознания и гипогликемической комы',
+    ],
+    generalInfo: 'Гипогликемия — самый опасный побочный эффект инсулина. Причины: передозировка, пропуск приёма пищи, нерасчёт времени пика/базы. У спортсменов на PED + инсулин риск кратно выше.',
+    problems: [{
+      problem: 'Передозировка инсулина / несовпадение пика с едой',
+      probability: 'high',
+      mechanism: 'Инсулин → ↓ глюкоза плазмы через ↑ захват мышцами/печенью + ↓ глюконеогенез. При превышении дозы или смещении пика → глюкоза падает <3.3 ммоль/л → нейрогликопения.',
+      labMarkers: [
+        { marker: 'Глюкоза (капиллярная)', expectedChange: '↓↓', targetRange: '4.0-5.5 ммоль/л', when: 'Через 15-30 мин после укола' },
+      ],
+      solutions: [
+        { substanceId: 'glucose_urgent', name: '15 г быстрых углеводов (3 куска сахара, 150 мл сока)', type: 'lifestyle', dose: '15 г глюкозы', mechanism: 'Немедленный подъём глюкозы', evidenceLevel: 'A' },
+        { substanceId: 'hospital', name: 'При потере сознания — глюкагон в/м', type: 'lifestyle', dose: '1 мг в/м', mechanism: 'Гликогенолиз', evidenceLevel: 'A' },
+        { substanceId: 'reduce_insulin', name: 'Пересчёт дозы инсулина', type: 'lifestyle', dose: 'Коррекция -30-50%', mechanism: 'Предотвращение рецидива', evidenceLevel: 'A' },
+      ],
+      expectations: [
+        { timeline: '5-15 мин', effect: 'Углеводы: подъём глюкозы на 2-3 ммоль/л' },
+        { timeline: '30-60 мин', effect: 'Стабилизация состояния', sideNote: 'мониторинг глюкозы каждые 15 мин' },
+      ],
+    }],
+  },
+  {
+    id: 'insulin_lipodystrophy',
+    symptom: 'Липодистрофия (атрофия жира / уплотнения в местах инъекций)',
+    category: 'dermatologic',
+    urgency: 'standard',
+    linkedDrugs: ['insulin', 'insulin_rapid', 'lantus'],
+    quickFacts: [
+      'Повторные инъекции в одно место → липоатрофия или гипертрофия',
+      'Ротация мест инъекции — главная профилактика',
+      'Липогипертрофия нарушает всасывание инсулина → нестабильный эффект',
+    ],
+    generalInfo: 'Липодистрофия — изменение подкожно-жировой клетчатки в местах частых инъекций. Липоатрофия (ямки) или липогипертрофия (уплотнения). Ухудшает предсказуемость действия инсулина.',
+    problems: [{
+      problem: 'Хроническая травматизация подкожной клетчатки инъекциями',
+      probability: 'medium',
+      mechanism: 'Повторные инъекции → локальное воспаление → активация макрофагов/фибробластов → или атрофия (липоатрофия) или фиброз (гипертрофия). ЛС-опосредованный липолиз.',
+      labMarkers: [
+        { marker: 'Осмотр мест инъекции', expectedChange: '↔', targetRange: 'Без уплотнений', when: 'Еженедельно' },
+      ],
+      solutions: [
+        { substanceId: 'site_rotation', name: 'Ротация мест инъекции', type: 'lifestyle', dose: 'Каждый раз новое место', mechanism: '↓ травматизации', evidenceLevel: 'A' },
+        { substanceId: 'more_frequent_inj', name: 'Уменьшить объём на точку', type: 'lifestyle', dose: '≤1 мл/место', mechanism: '↓ объёма травмы', evidenceLevel: 'B' },
+        { substanceId: 'topical_retinoid', name: 'Мази с гепарином/троксевазином', type: 'lifestyle', dose: '2р/день', mechanism: '↓ фиброза, ↑ микроциркуляции', evidenceLevel: 'C' },
+      ],
+      expectations: [
+        { timeline: '2-4 нед', effect: 'Уменьшение уплотнений при ротации' },
+        { timeline: '3-6 мес', effect: 'Полное рассасывание при правильной ротации' },
+      ],
+    }],
+  },
+
+  // ═══ СИМПТОМЫ ДИУРЕТИКИ ═══
+  {
+    id: 'diuretic_electrolyte',
+    symptom: 'Нарушение электролитов на диуретиках (слабость, судороги, аритмия)',
+    category: 'hematologic',
+    urgency: 'critical',
+    linkedDrugs: ['diuretics'],
+    relatedSymptoms: ['cramps', 'arrhythmia', 'fatigue'],
+    quickFacts: [
+      '↓K⁺ <3.0 ммоль/л — жизнеугрожающая аритмия',
+      '↓Na⁺ <125 ммоль/л — отёк мозга, судороги, кома',
+      'Дихлотиазид + кетогенная диета = двойной риск ↓K⁺',
+    ],
+    generalInfo: 'Диуретики — мощные препараты, часто используемые для «сушки». Нарушение электролитного баланса — самое частое и опасное осложнение. Может протекать бессимптомно до критического уровня.',
+    problems: [{
+      problem: 'Калийурез и гипокалиемия',
+      probability: 'high',
+      mechanism: 'Тиазидные (дихлотиазид) и петлевые (фуросемид) диуретики → ↓ реабсорбция Na⁺/Cl⁻ в дистальных канальцах/петле Генле → ↑ доставка Na⁺ к дистальным отделам → ↑ Na⁺/K⁺ обмен → ↑ экскреция K⁺ + Mg²⁺',
+      labMarkers: [
+        { marker: 'K⁺ сыворотки', expectedChange: '↓↓', targetRange: '3.5-5.1 ммоль/л', when: 'Ежедневно на диуретиках' },
+        { marker: 'Na⁺ сыворотки', expectedChange: '↓', targetRange: '135-145 ммоль/л', when: 'Каждые 3 дня' },
+        { marker: 'Mg²⁺ сыворотки', expectedChange: '↓', targetRange: '0.7-1.0 ммоль/л', when: 'Каждые 3 дня' },
+        { marker: 'ЭКГ (QTc, зубец U)', expectedChange: '↑', targetRange: 'QTc <440 мс ♂', when: 'При K⁺ <3.5' },
+      ],
+      solutions: [
+        { substanceId: 'potassium', name: 'Калия цитрат/хлорид', type: 'supplement', dose: '1000-2000 мг/сут', mechanism: 'Восполнение K⁺, профилактика аритмии', evidenceLevel: 'A' },
+        { substanceId: 'magnesium', name: 'Магний глицинат/цитрат', type: 'supplement', dose: '400-600 мг/сут', mechanism: 'Mg ко-фактор Na⁺/K⁺-ATPазы', evidenceLevel: 'A' },
+        { substanceId: 'hydration_forced', name: 'Контроль гидратации (пить по жажде)', type: 'lifestyle', dose: '30-40 мл/кг/сут', mechanism: 'Профилактика дегидратации', evidenceLevel: 'A' },
+        { substanceId: 'reduce_ai', name: 'При K⁺ <3.5 — прекратить диуретик', type: 'lifestyle', dose: 'Прекращение', mechanism: 'Экстренная мера', evidenceLevel: 'A' },
+      ],
+      expectations: [
+        { timeline: '1-2 ч', effect: 'Калий внутрь: начало подъёма K⁺' },
+        { timeline: '24-48 ч', effect: 'Нормализация K⁺ на пероральном K⁺+Mg', sideNote: 'При K⁺ <3.0 — в/в коррекция' },
+      ],
+    }],
+  },
+  {
+    id: 'diuretic_dehydration',
+    symptom: 'Дегидратация / сухость кожи и слизистых на диуретиках',
+    category: 'renal',
+    urgency: 'warning',
+    linkedDrugs: ['diuretics'],
+    relatedSymptoms: ['diuretic_electrolyte', 'hypertension'],
+    quickFacts: [
+      'Потеря 5% массы тела за 1-2 дня = тяжёлая дегидратация',
+      'Жажда — ненадёжный маркер, особенно на стимуляторах',
+      'Вертикальное АД + тахикардия = ранний маркер гиповолемии',
+    ],
+    generalInfo: 'Дегидратация при приёме диуретиков — следствие ↓ ОЦК. Проявляется жаждой, сухостью кожи/языка, ↓ тургора, ↓ диуреза. В сочетании с высокими дозами — риск коллапса.',
+    problems: [{
+      problem: 'Гиповолемия (↓ ОЦК) на диуретиках',
+      probability: 'high',
+      mechanism: 'Диуретики блокируют реабсорбцию Na⁺ → осмотический диурез → ↓ ОЦК → барорецепторы → компенсаторная тахикардия + вазоконстрикция.',
+      labMarkers: [
+        { marker: 'Вертикальное АД', expectedChange: '↓', targetRange: 'САД >100 мм рт.ст.', when: 'Ежедневно' },
+        { marker: 'ЧСС стоя', expectedChange: '↑', targetRange: '<90 уд/мин', when: 'Ежедневно' },
+        { marker: 'Na⁺ сыворотки', expectedChange: '↑', targetRange: '135-145', when: 'Каждые 3 дня' },
+        { marker: 'Мочевина/креатинин', expectedChange: '↑', targetRange: 'Мочевина <8', when: 'Каждые 3 дня' },
+      ],
+      solutions: [
+        { substanceId: 'hydration', name: 'Увеличение приёма воды', type: 'lifestyle', dose: '+0.5-1 л/сут', mechanism: 'Восполнение ОЦК', evidenceLevel: 'A' },
+        { substanceId: 'potassium', name: 'Электролиты (K⁺, Na⁺, Mg²⁺)', type: 'supplement', dose: 'По анализам', mechanism: 'Восполнение потерь', evidenceLevel: 'A' },
+        { substanceId: 'reduce_diuretic', name: 'Снизить или отменить диуретик', type: 'lifestyle', dose: '-25-50%', mechanism: 'Прекращение потери жидкости', evidenceLevel: 'A' },
+      ],
+      expectations: [
+        { timeline: '1-2 ч', effect: 'Вода + электролиты: улучшение самочувствия' },
+        { timeline: '24-48 ч', effect: 'Нормализация ОЦК при отмене диуретика' },
+      ],
+    }],
+  },
+
+  // ═══ СИМПТОМЫ: ДРУГИЕ ПРЕПАРАТЫ ═══
+  {
+    id: 'finasteride_sides',
+    symptom: 'Пост-финастеридный синдром (↓ либидо, депрессия, усталость)',
+    category: 'endocrine',
+    urgency: 'warning',
+    linkedDrugs: ['finasteride', 'dutasteride'],
+    relatedSymptoms: ['libido_drop', 'depression_mood', 'fatigue'],
+    quickFacts: [
+      'PFS — редкий (1-3%), но тяжёлый побочный эффект',
+      '↑ DHT не восстанавливается даже после отмены у части пациентов',
+      'Механизм: ингибиция 5α-редуктазы → ↑ аллопрегнанолон → нейростероидный дисбаланс',
+    ],
+    generalInfo: 'Пост-финастеридный синдром (PFS) — персистирующие симптомы даже после отмены финастерида/дутастерида. Включает ↓ либидо, ЭД, депрессию, туман в голове, хроническую усталость.',
+    problems: [{
+      problem: 'Нейростероидный дисбаланс из-за ингибиции 5α-редуктазы',
+      probability: 'low',
+      mechanism: 'Финастерид ингибирует 5α-редуктазу 2 → ↓ DHT + ↓ аллопрегнанолон (нейростероид, модулирующий ГАМК-A). Длительная блокада → адаптация рецепторов → симптомы сохраняются после отмены.',
+      labMarkers: [
+        { marker: 'DHT', expectedChange: '↓↓', targetRange: '250-990 пг/мл ♂', when: 'На фоне приёма' },
+        { marker: 'Аллопрегнанолон', expectedChange: '↓', targetRange: 'Не стандартизован', when: 'Специализированные лаб' },
+      ],
+      solutions: [
+        { substanceId: 'stop_finasteride', name: 'Немедленная отмена финастерида/дутастерида', type: 'lifestyle', dose: '0 мг/сут', mechanism: 'Прекращение блокады 5α-редуктазы', evidenceLevel: 'A' },
+        { substanceId: 'hcg', name: 'hCG 500 МЕ 2×/нед + энкломифен', type: 'pharma', dose: '500 МЕ 2×/нед', mechanism: 'LH-стимуляция Лейдига → ↑ T', evidenceLevel: 'C' },
+        { substanceId: 'ashwagandha', name: 'Ашваганда KSM-66', type: 'supplement', dose: '600 мг/сут', mechanism: '↑ ГАМК, ↓ кортизол', evidenceLevel: 'B' },
+        { substanceId: 'theanine', name: 'L-теанин', type: 'supplement', dose: '200 мг 2×/день', mechanism: 'α-волны, ↓ тревоги', evidenceLevel: 'B' },
+      ],
+      expectations: [
+        { timeline: '1-2 нед', effect: 'Улучшение после отмены; не у всех', sideNote: 'PFS может длиться месяцами' },
+        { timeline: '3-6 мес', effect: 'Постепенное восстановление у 50%' },
+      ],
+    }],
+  },
+  {
+    id: 'melatonin_overuse',
+    symptom: 'Злоупотребление мелатонином (утренняя сонливость, кошмары, ↓ эндогенного)',
+    category: 'psychological',
+    urgency: 'standard',
+    linkedDrugs: [],
+    relatedSymptoms: ['insomnia', 'depression_mood', 'cognitive_difficulty'],
+    quickFacts: [
+      'Мелатонин — не снотворное, а сигнал темноты',
+      'Дозы >5 мг вызывают утреннюю сонливость (t½ = 40-60 мин, но рецепторы)', 
+      'Длительный приём → ↓ эндогенной продукции',
+    ],
+    generalInfo: 'Мелатонин — гормон шишковидной железы, регулирующий циркадианные ритмы. При злоупотреблении (каждую ночь, высокие дозы) — утренняя сонливость, ↓ эндогенной продукции, яркие/кошмарные сны.',
+    problems: [{
+      problem: 'Супрафизиологические дозы → рецепторная десенситизация',
+      probability: 'medium',
+      mechanism: 'Экзогенный мелатонин >0.3 мг → активация MT1/MT2 рецепторов. При ежедневном приёме высоких доз → ↓ чувствительность рецепторов + ↓ эндогенной продукции через ↓ активность AANAT.',
+      labMarkers: [
+        { marker: 'Субъективная оценка', expectedChange: '↔', targetRange: 'Нет утренней сонливости', when: 'Ежедневно' },
+      ],
+      solutions: [
+        { substanceId: 'reduce_melatonin', name: 'Снизить дозу до 0.3-1 мг', type: 'lifestyle', dose: '0.3-1 мг/ночь', mechanism: 'Физиологическая доза', evidenceLevel: 'A' },
+        { substanceId: 'sleep_hygiene', name: 'Гигиена сна (синий свет, режим)', type: 'lifestyle', dose: '22:30-07:00', mechanism: 'Естественная регуляция', evidenceLevel: 'A' },
+        { substanceId: 'glycine', name: 'Глицин', type: 'supplement', dose: '3 г перед сном', mechanism: '↓ температура тела, ↑ качество сна', evidenceLevel: 'B' },
+        { substanceId: 'magnesium', name: 'Магний глицинат', type: 'supplement', dose: '200-400 мг вечером', mechanism: 'ГАМК-ергический эффект', evidenceLevel: 'B' },
+      ],
+      expectations: [
+        { timeline: '3-7 дней', effect: 'Уменьшение утренней сонливости' },
+        { timeline: '1-2 нед', effect: 'Восстановление собственного ритма', sideNote: 'Не использовать каждую ночь' },
+      ],
+    }],
+  },
+  {
+    id: 'metformin_gi',
+    symptom: 'ЖКТ-непереносимость метформина (диарея, тошнота, ↓ B12)',
+    category: 'gastrointestinal',
+    urgency: 'standard',
+    linkedDrugs: ['metformin'],
+    relatedSymptoms: ['diarrhea', 'nausea'],
+    quickFacts: [
+      '30-40% пользователей имеют ЖКТ-побочки от метформина',
+      'Витамин B12 ↓ на 10-20% при приёме >6 мес',
+      'MR (extended release) формы снижают GI-побочки в 2×',
+    ],
+    generalInfo: 'Метформин — первый препарат для метаболической коррекции на курсе. GI-побочки (диарея, тошнота, газообразование) связаны с ↑ серотонина в кишечнике и ↓ всасывания B12.',
+    problems: [{
+      problem: 'Метформин-индуцированная диарея и мальабсорбция B12',
+      probability: 'high',
+      mechanism: 'Метформин → ↑ серотонина в энтерохромаффинных клетках → ↑ перистальтика (диарея). + ↓ кальций-зависимый IF-B12 рецептор в подвздошной → ↓ B12 на 10-20%/год.',
+      labMarkers: [
+        { marker: 'B12 сыворотки', expectedChange: '↓', targetRange: '200-700 пг/мл', when: 'Каждые 3 мес' },
+        { marker: 'Голотранскобаламин', expectedChange: '↓', targetRange: '>50 пмоль/л', when: 'При ↓ B12' },
+      ],
+      solutions: [
+        { substanceId: 'metformin_mr', name: 'Метформин пролонг (MR)', type: 'pharma', dose: '500-1000 мг/сут', mechanism: 'Медленное высвобождение, ↓ GI', evidenceLevel: 'A' },
+        { substanceId: 'vitamin_b12', name: 'B12 (метилкобаламин)', type: 'supplement', dose: '500-1000 мкг/сут', mechanism: 'Восполнение дефицита', evidenceLevel: 'A' },
+        { substanceId: 'probiotics', name: 'Пробиотики (Lactobacillus)', type: 'supplement', dose: '10-20 млрд КОЕ/сут', mechanism: '↓ GI-побочек', evidenceLevel: 'B' },
+      ],
+      expectations: [
+        { timeline: '3-7 дней', effect: '↓ диареи при приёме с едой' },
+        { timeline: '2-4 нед', effect: 'Адаптация к MR-форме' },
+      ],
+    }],
   },
 ];
 

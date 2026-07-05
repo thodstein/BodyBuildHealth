@@ -1103,10 +1103,13 @@ const SUB_ALIAS: Record<string, string> = {
 function canonId(id: string): string { return SUB_ALIAS[id] || id; }
 
 // ── Блэклист: вещества ИЗ SUPPLEMENTS_DB/PHARMACY_DB, которые НЕ должны назначаться автоматически ──
-// 1) Сырые химические элементы/компоненты — НЕ препараты (натрий=соль, кофеин=стимулянт, адреналин=гормон)
-// 2) Рецептурные препараты, требующие назначения врача (антикоагулянты, антидепрессанты, нейролептики, БЗР)
-// 3) НПВС и кортикостероиды — препараты по показаниям, не «поддержка» на курсе
-// 4) Узкие/экспериментальные компоненты без стандарта применения
+// Политика: ноотропы, пептиды и врачебные рецептурные ДОЛЖНЫ оставаться в выдаче
+// (по явному требованию пользователя). Блэклист содержит ТОЛЬКО:
+//   1) Сырые химические элементы/компоненты — НЕ препараты (соль, кофеин, адреналин)
+//   2) Гормоны/стероиды — это сама фармакология, не «поддержка»
+//   3) Абстрактные классы препаратов (`*_drugs`) — не конкретные вещества
+//   4) Технические дубликаты записей (`*_dup`)
+// Дубли препаратов одного класса (AI, SERM, статины…) устраняются через SAME_CLASS_GROUPS.
 const TZ_AUTO_BLACKLIST = new Set<string>([
   // ── Сырые химикалии/минералы/элементы — НЕ препараты поддержки:
   'sodium', 'caffeine', 'adrenaline', 'copper', 'iron',
@@ -1117,46 +1120,12 @@ const TZ_AUTO_BLACKLIST = new Set<string>([
   'glutamate', 'histidine', 'lactate',
   'endocrine_marker', 'endocannabinoid',
   'antacid', 'pharma',
-  // ── Рецептурные ноотропы/нейромодуляторы (не авто-подбор):
-  'phenibut', 'selegiline', 'ketamine', 'modafinil', 'tianeptine', 'lithium',
-  'memantine', 'bromantane', 'noopept', 'semax', 'selank',
-  'cerebrolysin', 'cortexin', 'dsip', 'ibudilast',
-  'piracetam', 'aniracetam', 'oxiracetam', 'pramiracetam', 'coluracetam', 'fasoracetam',
-  // ── Экспериментальные пептиды/сенолитики (не для авто-назначения):
-  'bpc157', 'tb500', 'thymosin_alpha1', 'cjc1295', 'ghrp2', 'ghrp6', 'ipamorelin',
-  'ghk_cu', 'p21', 'urolithin_a', 'spermidine', 'fisetin', 'humanin', 'ss31', 'mots_c',
-  // ── Пептидные гормоны / нейропептиды (RX):
-  'gonadorelin', 'kisspeptin', 'oxytocin', 'pt141', 'melanotan1', 'melanotan2',
   // ── Гормоны/стероиды — это сама фармакология, не «поддержка»:
   'pregnenolone', 'neurosteroid', 'progesterone', 'dhea',
   'estradiol', 'testosterone', 'cortisol', 'insulin', 'glucagon', 'vasopressin',
-  'follistatin', 'igf1', 'mgf', 'finasteride', 'gip', 'glp1',
-  // ── Рецептурные препараты — только врач:
-  'warfarin', 'rivaroxaban', 'apixaban', 'dabigatran',
-  'clopidogrel', 'ticagrelor',
-  'fluoxetine', 'sertraline', 'citalopram', 'escitalopram', 'venlafaxine', 'duloxetine',
-  'olanzapine', 'quetiapine', 'risperidone', 'aripiprazole', 'haloperidol',
-  'alprazolam', 'diazepam', 'lorazepam', 'clonazepam', 'buspirone',
-  'valproate', 'lamotrigine', 'carbamazepine', 'phenytoin',
-  // ── НПВС и кортикостероиды — не «поддержка»:
-  'ibuprofen', 'naproxen', 'celecoxib', 'diclofenac', 'meloxicam',
-  'prednisone', 'dexamethasone', 'hydrocortisone', 'methylprednisolone',
-  // ── Врачебные рецептурные (не назначаем автоматически):
-  'furosemide', 'hydrochlorothiazide', 'chlorthalidone', 'spironolactone',
-  'atorvastatin', 'rosuvastatin', 'simvastatin', 'pravastatin', 'pitavastatin',
-  'lisinopril', 'enalapril', 'ramipril', 'perindopril', 'captopril',
-  'metoprolol', 'atenolol', 'bisoprolol', 'carvedilol', 'propranolol',
-  'amlodipine', 'nifedipine', 'verapamil', 'diltiazem',
-  'losartan', 'valsartan', 'irbesartan', 'olmesartan', 'candesartan',
-  // ── Сахароснижающие (врачебное назначение):
-  'metformin', 'pioglitazone', 'acarbose', 'semaglutide',
-  // ── Тиреоидные (врачебное назначение):
-  'levothyroxine', 'liothyronine', 'methimazole', 'propylthiouracil',
+  'follistatin', 'igf1', 'mgf', 'gip', 'glp1',
+  // ── Технические дубликаты записей БД:
   'levothyroxine_dup', 'liothyronine_dup', 'metformin_dup',
-  // ── Иммунодепрессанты:
-  'tacrolimus', 'cyclosporine', 'mycophenolate', 'azathioprine',
-  // ── Гастро/ферменты (назначаются по показаниям ЖКТ):
-  'digestive_enzymes', 'gentian', 'licorice',
   // ── Абстрактные классы препаратов (не вещества):
   'ace_inhibitor_drugs', 'antibiotic_drugs', 'anticoagulant_drugs', 'anticonvulsant_drugs',
   'antidepressant_drugs', 'antidiabetic_drugs', 'antihistamine_drugs', 'antiplatelet_drugs',
@@ -1164,6 +1133,46 @@ const TZ_AUTO_BLACKLIST = new Set<string>([
   'beta_blocker_drugs', 'ccb_drugs', 'corticosteroid_drugs', 'diuretic_drugs',
   'immunosuppressant_drugs', 'nsaid_drugs', 'ppi_drugs', 'statin_drugs', 'thyroid_drugs',
 ]);
+
+// ── Same-class дедупликация: выбор препарата из класса блокирует альтернативы ──
+// Решает проблему дублей: anastrozole + letrozole в одном плане.
+// При markUsed(id): если id ∈ группе → ALL ID группы помечаются как used.
+// Канонизация (canonId) применяется перед поиском группы.
+const SAME_CLASS_GROUPS: Record<string, string[]> = {
+  ai:           ['anastrozole', 'letrozole', 'exemestane', 'arimidex', 'femara'],
+  serm:         ['tamoxifen', 'tamox', 'clomi', 'clomid', 'enclomid', 'enclomiphene', 'raloxifene'],
+  statin:       ['atorvastatin', 'rosuvastatin', 'simvastatin', 'pravastatin', 'pitavastatin', 'red_yeast', 'red_yeast_rice'],
+  arb:          ['telmisartan', 'losartan', 'valsartan', 'irbesartan', 'olmesartan', 'candesartan'],
+  ace:          ['lisinopril', 'enalapril', 'ramipril', 'perindopril', 'captopril'],
+  bb:           ['metoprolol', 'atenolol', 'bisoprolol', 'carvedilol', 'propranolol', 'nebivolol'],
+  ccb:          ['amlodipine', 'nifedipine', 'verapamil', 'diltiazem'],
+  diuretic:     ['furosemide', 'hydrochlorothiazide', 'chlorthalidone', 'spironolactone'],
+  anticoag:     ['warfarin', 'rivaroxaban', 'apixaban', 'dabigatran'],
+  antiplatelet: ['clopidogrel', 'ticagrelor', 'aspirin'],
+  racetam:      ['piracetam', 'aniracetam', 'oxiracetam', 'pramiracetam', 'coluracetam', 'fasoracetam'],
+  choline_donor:['citicoline', 'alpha_gpc', 'l_alpha_gpc', 'choline', 'cdp_choline'],
+  ssri:         ['fluoxetine', 'sertraline', 'citalopram', 'escitalopram'],
+  snri:         ['venlafaxine', 'duloxetine'],
+  benzodiazepine:['alprazolam', 'diazepam', 'lorazepam', 'clonazepam'],
+  antipsychotic:['olanzapine', 'quetiapine', 'risperidone', 'aripiprazole', 'haloperidol'],
+  nsaid:        ['ibuprofen', 'naproxen', 'celecoxib', 'diclofenac', 'meloxicam'],
+  corticosteroid:['prednisone', 'dexamethasone', 'hydrocortisone', 'methylprednisolone'],
+  antidiabetic: ['metformin', 'pioglitazone', 'acarbose', 'semaglutide'],
+  thyroid:      ['levothyroxine', 'liothyronine', 'methimazole', 'propylthiouracil'],
+  dopamine_agonist:['cabergoline', 'bromocriptine', 'pramipexole'],
+  anticonvulsant:['valproate', 'lamotrigine', 'carbamazepine', 'phenytoin'],
+  maoi:         ['selegiline', 'rasagiline', 'moclobemide'],
+};
+// Обратный индекс: id → ключ группы (для быстрого lookup)
+const ID_TO_CLASS: Record<string, string> = (() => {
+  const m: Record<string, string> = {};
+  for (const [cls, ids] of Object.entries(SAME_CLASS_GROUPS)) for (const id of ids) m[id] = cls;
+  return m;
+})();
+function sameClassIds(id: string): string[] {
+  const cls = ID_TO_CLASS[canonId(id)] || ID_TO_CLASS[id];
+  return cls ? SAME_CLASS_GROUPS[cls] : [];
+}
 
 export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   try {
@@ -1178,7 +1187,17 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   const used = new Set<string>();
   // Храним КАНОНИЧЕСКИЕ ID в usedCanon для семантической дедупликации
   const usedCanon = new Set<string>();
-  const markUsed = (id: string) => { used.add(id); usedCanon.add(canonId(id)); };
+  // markUsed: добавляет id + его canonId + все альтернативы того же класса
+  // (для блокировки дублей типа anastrozole+letrozole — выбор одного препарата
+  // из группы делает остальные ID группы недоступными для дальнейшего подбора).
+  const markUsed = (id: string) => {
+    used.add(id);
+    usedCanon.add(canonId(id));
+    for (const alt of sameClassIds(id)) {
+      used.add(alt);
+      usedCanon.add(canonId(alt));
+    }
+  };
   const isUsed = (id: string): boolean => used.has(id) || usedCanon.has(canonId(id));
   for (const b of blacklist) { used.add(b); usedCanon.add(canonId(b)); }
 

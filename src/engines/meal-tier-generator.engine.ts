@@ -204,18 +204,30 @@ function getFoodsForTier(cat: string, tier: MealTier): FoodItem[] {
   return foods.filter(f => { if (seen.has(f.id)) return false; seen.add(f.id); return true; });
 }
 
+const CATEGORY_DB_KEYS: Record<string, string[]> = {
+  protein: ['protein'],
+  carb: ['grain', 'carb'],
+  fat: ['fat'],
+  veg_fruit: ['veg_fruit'],
+  dairy: ['dairy'],
+  supplement: ['supplement'],
+};
+
 function pickFoodForCategory(cat: string, tier: MealTier, count: number): FoodItem[] {
   const all = getFoodsForTier(cat, tier);
-  if (all.length === 0) {
-    const fallback = FOOD_DB.filter(f => f.category === cat);
-    return [...fallback].sort(() => Math.random() - 0.5).slice(0, count);
+  const dbCats = CATEGORY_DB_KEYS[cat] || [cat];
+  let pool: FoodItem[];
+  if (all.length < count) {
+    const usedIds = new Set(all.map(f => f.id));
+    const extras = FOOD_DB.filter(f => dbCats.includes(f.category) && !usedIds.has(f.id));
+    pool = [...all, ...extras];
+  } else {
+    pool = all;
   }
-  const shuffled = [...all].sort(() => Math.random() - 0.5);
-  const result: FoodItem[] = [];
-  for (let i = 0; i < count && i < shuffled.length; i++) {
-    result.push(shuffled[i]);
+  if (pool.length === 0) {
+    pool = FOOD_DB.filter(f => dbCats.includes(f.category));
   }
-  return result;
+  return [...pool].sort(() => Math.random() - 0.5).slice(0, Math.min(count, pool.length));
 }
 
 function mkItem(food: FoodItem, grams: number): MealItem {
@@ -233,11 +245,11 @@ function generateDayPlan(
   tier: MealTier, includeWorkoutMeals: boolean,
 ): DayPlan {
   const meals: MealSlot[] = [];
-  const proteinFoods = pickFoodForCategory('protein', tier, 4);
-  const carbFoods = pickFoodForCategory('carb', tier, 4);
-  const fatFoods = pickFoodForCategory('fat', tier, 2);
-  const vegFoods = pickFoodForCategory('veg_fruit', tier, 2);
-  const shift = dayIndex % Math.max(proteinFoods.length, 1);
+  const proteinFoods = pickFoodForCategory('protein', tier, 7);
+  const carbFoods = pickFoodForCategory('carb', tier, 7);
+  const fatFoods = pickFoodForCategory('fat', tier, 4);
+  const vegFoods = pickFoodForCategory('veg_fruit', tier, 4);
+  const shift = dayIndex;
 
   if (isTrainingDay && includeWorkoutMeals) {
     const preW = MEAL_TIMING.pre_workout;
@@ -281,8 +293,8 @@ function generateDayPlan(
     if (lunchVeg) lunchItems.push(mkItem(lunchVeg, 150));
     meals.push({ name: 'Обед', time: '13:00', items: lunchItems });
 
-    const dinnerProt = proteinFoods[(0 + shift) % proteinFoods.length];
-    const dinnerCarb = carbFoods[(1 + shift) % carbFoods.length];
+    const dinnerProt = proteinFoods[(4 + shift) % proteinFoods.length];
+    const dinnerCarb = carbFoods[(4 + shift) % carbFoods.length];
     const dinnerVeg = vegFoods[(1 + shift) % vegFoods.length];
     const dinnerItems = [
       mkItem(dinnerProt, Math.round(totalProtein * 0.30 * remProtPct / Math.max(dinnerProt.protein, 0.1) * 100)),
