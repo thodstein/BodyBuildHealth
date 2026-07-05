@@ -118,29 +118,55 @@ export const SupportPeptideCalc: React.FC<{ s: Record<string, any> }> = ({ s }) 
             {peptideId && (() => {
               const sel = PEPTIDE_LIST.find((p: any) => p.id === peptideId);
               if (!sel) return null;
-              const tHalf = sel.tHalfHours || 4;
-              const peakTime = tHalf * 0.33;
-              const steadyState = tHalf * 5;
-              const clearanceTime = tHalf * 6;
+              // Двухфазная PK: α-фаза (распределение) + β-фаза (терминальное выведение)
+              const tHalfAlpha = sel.tHalfAlphaHours || sel.tHalfHours * 0.25 || 0.5;  // распределение
+              const tHalfBeta = sel.tHalfHours || 4;                                       // терминальное
+              const hasBiphasic = !!(sel.tHalfAlphaHours || sel.tHalfBetaHours);
+              const tMax = tHalfBeta * 0.25 * (hasBiphasic ? 0.5 : 1); // Время до Cmax
+              const alphaDuration = tHalfAlpha * 4; // ~4α = окончание фазы распределения
+              const steadyStateDays = Math.ceil(tHalfBeta * 5 / 24); // дней до стабильного состояния
+              const clearanceDays = Math.ceil(tHalfBeta * 6 / 24); // дней до полного клиренса
+              // Деградация восстановленного пептида
+              const fridgeLifeDays = sel.fridgeLifeDays || 21; // дней в холодильнике
+              const rtLifeHours = sel.rtLifeHours || 24; // часов при комнатной t°
               return (
                 <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
                   <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#a78bfa' }}>📈 Фармакокинетика (PK)</h4>
+                  {hasBiphasic && (
+                    <div style={{ fontSize:7, color:'#60a5fa', marginBottom:6, padding:'3px 6px', borderRadius:4, background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.15)' }}>
+                      Двухфазная модель: α-фаза (распределение) {tHalfAlpha.toFixed(1)}ч → β-фаза (терминальная) {tHalfBeta.toFixed(1)}ч
+                    </div>
+                  )}
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                     <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.1)' }}>
-                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Период полувыведения (T½)</div>
-                      <div style={{ fontSize:16, fontWeight:800, color:'#a78bfa' }}>{tHalf.toFixed(1)} ч</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>T½ β (терм.)</div>
+                      <div style={{ fontSize:16, fontWeight:800, color:'#a78bfa' }}>{tHalfBeta.toFixed(1)} ч</div>
                     </div>
                     <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.1)' }}>
-                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Пик концентрации (Cmax)</div>
-                      <div style={{ fontSize:16, fontWeight:800, color:'#a78bfa' }}>{peakTime.toFixed(1)} ч</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Tmax (пик конц.)</div>
+                      <div style={{ fontSize:16, fontWeight:800, color:'#a78bfa' }}>{tMax.toFixed(1)} ч</div>
                     </div>
                     <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.1)' }}>
-                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Стабильное состояние (5×T½)</div>
-                      <div style={{ fontSize:16, fontWeight:800, color:'#a78bfa' }}>{steadyState.toFixed(1)} ч</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Стабильное сост.</div>
+                      <div style={{ fontSize:16, fontWeight:800, color:'#a78bfa' }}>{steadyStateDays} д</div>
                     </div>
                     <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.1)' }}>
-                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Полный клиренс (6×T½)</div>
-                      <div style={{ fontSize:16, fontWeight:800, color:'#a78bfa' }}>{clearanceTime.toFixed(1)} ч</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Полный клиренс</div>
+                      <div style={{ fontSize:16, fontWeight:800, color:'#a78bfa' }}>{clearanceDays} д</div>
+                    </div>
+                  </div>
+                  {hasBiphasic && (
+                    <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:6, lineHeight:1.4 }}>
+                      α-фаза (распр.): {tHalfAlpha.toFixed(1)}ч — быстрое распределение в ткани после введения. Длится ~{alphaDuration.toFixed(1)}ч.<br/>
+                      β-фаза (терм.): {tHalfBeta.toFixed(1)}ч — медленное выведение из плазмы и тканей.
+                    </div>
+                  )}
+                  {/* Стабильность и хранение */}
+                  <div style={{ marginTop:6, padding:'6px 8px', borderRadius:6, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.15)' }}>
+                    <div style={{ fontSize:8, color:'#f59e0b', fontWeight:600, marginBottom:2 }}>🧊 Стабильность восстановленного раствора</div>
+                    <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.3 }}>
+                      В холодильнике (2-8°C): ~{fridgeLifeDays} дней · При комнатной t°: ~{rtLifeHours}ч<br/>
+                      ⚠ Не замораживать повторно. Избегать УФ-света. Помутнение/осадок = деградация.
                     </div>
                   </div>
                 </div>

@@ -216,10 +216,20 @@ export const OrganLoadCalculator: React.FC = () => {
 
   // ── Comparison state ──
   const [compB, setCompB] = useState<OrganLoadInput | null>(null);
+  const [scenB, setScenB] = useState({ protein: 120, fat: 50, satFat: 15, transFat: 0, carbs: 300, sugar: 50, fiber: 30, omega3: 2000, chol: 200, sodium: 1500, potassium: 4700, water: 2800, weight: 70 });
+  const setFieldB = (k: string) => (v: number) => setScenB(prev => ({ ...prev, [k]: v }));
   const comparison = useMemo(() => {
     if (!compB) return null;
     return compareScenarios(buildInput(), compB);
   }, [buildInput, compB]);
+
+  const buildBFromScen = (): OrganLoadInput => ({
+    proteinG: scenB.protein, fatG: scenB.fat, satFatG: scenB.satFat, transFatG: scenB.transFat,
+    carbsG: scenB.carbs, sugarG: scenB.sugar, fiberG: scenB.fiber, omega3Mg: scenB.omega3,
+    cholesterolMg: scenB.chol, sodiumMg: scenB.sodium, potassiumMg: scenB.potassium,
+    waterMl: scenB.water, bodyWeightKg: scenB.weight || bw, heightCm: height, leanMassKg: (scenB.weight || bw) * 0.75,
+    trainingHours: train, mealsPerDay: meals, totalKcal: scenB.protein * 4 + scenB.fat * 9 + scenB.carbs * 4,
+  });
 
   const renderComparisonDeltas = () => {
     if (!comparison) return null;
@@ -490,34 +500,45 @@ export const OrganLoadCalculator: React.FC = () => {
             </div>
             {!compB ? (
               <div>
-                <div style={{ fontSize: 8, fontWeight: 600, color: '#60a5fa', marginBottom: 4 }}>Сценарий B (задайте):</div>
+                <div style={{ fontSize: 8, fontWeight: 600, color: '#60a5fa', marginBottom: 4 }}>Сценарий B (редактируемый):</div>
                 <ManualFields
-                  values={{ protein: 120, fat: 50, satFat: 15, transFat: 0, carbs: 300, sugar: 50, fiber: 30, omega3: 2000, chol: 200, sodium: 1500, potassium: 4700, water: 2800, weight: bw }}
+                  values={{ protein: scenB.protein, fat: scenB.fat, satFat: scenB.satFat, transFat: scenB.transFat, carbs: scenB.carbs, sugar: scenB.sugar, fiber: scenB.fiber, omega3: scenB.omega3, chol: scenB.chol, sodium: scenB.sodium, potassium: scenB.potassium, water: scenB.water, weight: scenB.weight }}
                   setters={{
-                    protein: (v) => {}, fat: (v) => {}, satFat: (v) => {}, transFat: (v) => {},
-                    carbs: (v) => {}, sugar: (v) => {}, fiber: (v) => {}, omega3: (v) => {},
-                    chol: (v) => {}, sodium: (v) => {}, potassium: (v) => {}, water: (v) => {}, weight: (v) => {},
+                    protein: setFieldB('protein'), fat: setFieldB('fat'), satFat: setFieldB('satFat'), transFat: setFieldB('transFat'),
+                    carbs: setFieldB('carbs'), sugar: setFieldB('sugar'), fiber: setFieldB('fiber'), omega3: setFieldB('omega3'),
+                    chol: setFieldB('chol'), sodium: setFieldB('sodium'), potassium: setFieldB('potassium'), water: setFieldB('water'), weight: setFieldB('weight'),
                   }}
                 />
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <button onClick={() => setCompB({
-                    proteinG: 120, fatG: 50, satFatG: 15, transFatG: 0, carbsG: 300, sugarG: 50,
-                    fiberG: 30, omega3Mg: 2000, cholesterolMg: 200, sodiumMg: 1500, potassiumMg: 4700,
-                    waterMl: 2800, bodyWeightKg: bw, heightCm: height, leanMassKg: bw * 0.75,
-                    trainingHours: train, mealsPerDay: meals, totalKcal: 120 * 4 + 50 * 9 + 300 * 4,
-                  })} style={{ fontSize: 8, padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  <button onClick={() => {
+                    const newScen = { protein: 120, fat: 50, satFat: 15, transFat: 0, carbs: 300, sugar: 50, fiber: 30, omega3: 2000, chol: 200, sodium: 1500, potassium: 4700, water: 2800, weight: bw };
+                    setScenB(newScen);
+                    setCompB({ proteinG: 120, fatG: 50, satFatG: 15, transFatG: 0, carbsG: 300, sugarG: 50,
+                      fiberG: 30, omega3Mg: 2000, cholesterolMg: 200, sodiumMg: 1500, potassiumMg: 4700,
+                      waterMl: 2800, bodyWeightKg: bw, heightCm: height, leanMassKg: bw * 0.75,
+                      trainingHours: train, mealsPerDay: meals, totalKcal: 120 * 4 + 50 * 9 + 300 * 4 });
+                  }} style={{ fontSize: 8, padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
                     background: '#60a5fa', border: 'none', color: '#000', fontWeight: 700 }}>
                     🥗 ЗОЖ-сценарий
                   </button>
-                  <button onClick={() => setCompB({
-                    proteinG: bw * 2.2, fatG: bw * 1.4, satFatG: bw * 0.5, transFatG: 2, carbsG: bw * 2.5, sugarG: bw,
-                    fiberG: 15, omega3Mg: 300, cholesterolMg: 600, sodiumMg: 3500, potassiumMg: 2500,
-                    waterMl: bw * 25, bodyWeightKg: bw, heightCm: height, leanMassKg: bw * 0.75,
-                    trainingHours: train, mealsPerDay: 3, totalKcal: bw * 2.2 * 4 + bw * 1.4 * 9 + bw * 2.5 * 4,
-                  })} style={{ fontSize: 8, padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+                  <button onClick={() => {
+                    const newScen = { protein: Math.round(bw * 2.2), fat: Math.round(bw * 1.4), satFat: Math.round(bw * 0.5), transFat: 2, carbs: Math.round(bw * 2.5), sugar: Math.round(bw), fiber: 15, omega3: 300, chol: 600, sodium: 3500, potassium: 2500, water: Math.round(bw * 25), weight: bw };
+                    setScenB(newScen);
+                    setCompB({ proteinG: bw * 2.2, fatG: bw * 1.4, satFatG: bw * 0.5, transFatG: 2, carbsG: bw * 2.5, sugarG: bw,
+                      fiberG: 15, omega3Mg: 300, cholesterolMg: 600, sodiumMg: 3500, potassiumMg: 2500,
+                      waterMl: bw * 25, bodyWeightKg: bw, heightCm: height, leanMassKg: bw * 0.75,
+                      trainingHours: train, mealsPerDay: 3, totalKcal: bw * 2.2 * 4 + bw * 1.4 * 9 + bw * 2.5 * 4 });
+                  }} style={{ fontSize: 8, padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
                     background: '#ef4444', border: 'none', color: '#fff', fontWeight: 700 }}>
                     🍔 Массонабор
                   </button>
+                  <button onClick={() => setCompB(buildBFromScen())} style={{ fontSize: 8, padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+                    background: '#f59e0b', border: 'none', color: '#000', fontWeight: 700 }}>
+                    ✅ Применить B
+                  </button>
+                </div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>
+                  Отредактируйте поля выше и нажмите «Применить B» для сравнения, либо выберите готовый сценарий.
                 </div>
               </div>
             ) : (

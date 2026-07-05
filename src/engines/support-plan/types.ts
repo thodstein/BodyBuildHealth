@@ -252,6 +252,10 @@ export interface CalculatorResult {
   synergyRecommendations?: SynergyRecommendation[];
   boostAdded?: string[];
   timestamp: string;
+  /** Нутрициологические предупреждения */
+  depletionWarnings?: Array<{ depleter: string; depleted: string; mechanism: string; severity: string; recommendation: string }>;
+  ulWarnings?: Array<{ substanceId: string; currentDoseMg: number; ulMg: number; percentUL: number; risk: string; recommendation: string }>;
+  dailyLoad?: Record<string, { totalMg: number; contributors: string[]; hasUL: boolean; ulMg?: number }>;
 }
 
 export interface TimelineWeekData {
@@ -340,8 +344,12 @@ export interface PlanResult {
   coverageGaps: Array<{ system: string; label: string; raw: number; net: number; gapPercent: number }>;
   weekScale: number;
   stackRecommendations: StackRecommendation[];
-  conflicts: Array<{ a: string; b: string; aName: string; bName: string; effect: string; severity: string }>;
+  conflicts: Array<{ a: string; b: string; aName: string; bName: string; effect: string; severity: string; mechanism: string; separationAdvice: string }>;
   riskBreakdown: Record<string, string[]>;
+  /** Нутрициологические данные */
+  depletionWarnings?: Array<{ depleter: string; depleterName: string; depleted: string; depletedName: string; mechanism: string; severity: string; recommendation: string }>;
+  cumulativeLoad?: Array<{ nutrientId: string; nutrientName: string; totalMg: number; ulMg?: number; percentUL?: number; isOverUL: boolean; contributors: string[] }>;
+  pillBurden?: { totalSubstances: number; estimatedPillsPerDay: number; morningPills: number; afternoonPills: number; eveningPills: number; feasibility: string; message: string };
 }
 
 export interface StackRecommendation {
@@ -405,3 +413,144 @@ export function catalogEntry(id: string): any {
 export function defaultDosage(id: string): { mg: number; timing: string } | undefined {
   return DEFAULT_DOSAGES[id];
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  НУТРИЦИОЛОГИЧЕСКИЕ КОНСТАНТЫ (UL, depletion, t½, meal-context)
+// ═══════════════════════════════════════════════════════════════
+
+/** Верхний допустимый уровень потребления (UL) — суммарно из всех источников, мг/сут.
+ *  Источники: EFSA 2024, IOM (NASEM), JECFA. */
+export const NUTRIENT_UL: Record<string, number> = {
+  zinc: 40,          // мг/сут (IOM 2001, EFSA 2006)
+  magnesium: 350,    // мг/сут — только из добавок (не из пищи); диарея при превышении
+  calcium: 2500,     // мг/сут (IOM 2011)
+  iron: 45,          // мг/сут (IOM 2001)
+  selenium: 400,     // мкг/сут (IOM 2000)
+  vitamin_b6: 100,   // мг/сут (IOM 1998)
+  vitamin_c: 2000,   // мг/сут (IOM 2000)
+  vitamin_d3: 100,   // мкг/сут = 4000 МЕ (IOM 2011)
+  vitamin_e: 1000,   // мг/сут альфа-токоферол (IOM 2000)
+  vitamin_k2: 1000,  // мкг/сут (нет установленного UL, ориентир)
+  vitamin_b12: 2000, // мкг/сут (нет UL, ориентир)
+  folate: 1000,      // мкг/сут (IOM 1998)
+  boron: 20,         // мг/сут (IOM 2001)
+  potassium: 3700,   // мг/сут — только из добавок
+  copper: 10,        // мг/сут (IOM 2001)
+  iodine: 1100,      // мкг/сут (IOM 2001)
+  manganese: 11,     // мг/сут (IOM 2001)
+  molybdenum: 2000,  // мкг/сут (IOM 2001)
+  chromium: 1000,    // мкг/сут (IOM 2001)
+  nac: 2400,         // мг/сут (клинический ориентир; тошнота/головная боль)
+  alpha_lipoic: 1800,// мг/сут (клинический ориентир; GI)
+  coq10: 3000,       // мг/сут (клинический ориентир)
+  betaine: 4000,     // мг/сут (клинический ориентир)
+  glycine: 60000,    // мг/сут (~1 г/кг, клинический ориентир)
+  taurine: 10000,    // мг/сут (клинический ориентир)
+  inositol: 18000,   // мг/сут (клинический ориентир)
+  curcumin: 8000,    // мг/сут (гепатотоксичность при >8g)
+};
+
+/** Каскады истощения: вещество X в высокой дозе → истощает Y.
+ *  Каждая запись: [истощающее, истощаемое, порог мг/сут для истощения, механизм] */
+export const DEPLETION_CASCADES: Array<{
+  depleter: string; depleted: string; thresholdMg: number;
+  mechanism: string; severity: 'HIGH' | 'MEDIUM' | 'LOW';
+}> = [
+  { depleter: 'zinc', depleted: 'copper', thresholdMg: 30, mechanism: 'Индукция металлотионеина в энтероцитах → связывание Cu → ↓ всасывания Cu на 50-70%', severity: 'HIGH' },
+  { depleter: 'zinc', depleted: 'iron', thresholdMg: 50, mechanism: 'Конкуренция за DMT1-транспортёр в дуоденальных энтероцитах', severity: 'MEDIUM' },
+  { depleter: 'calcium', depleted: 'magnesium', thresholdMg: 1000, mechanism: 'Конкуренция за парацеллюлярный транспорт в толстом кишечнике; Ca >1000 мг ↓ Mg на 30%', severity: 'MEDIUM' },
+  { depleter: 'vitamin_d3', depleted: 'magnesium', thresholdMg: 0.1, mechanism: 'D3 активирует кальбиндин → ↑ потребность в Mg как кофакторе CYP2R1/CYP27B1; Mg расходуется на гидроксилирование', severity: 'MEDIUM' },
+  { depleter: 'calcium', depleted: 'iron', thresholdMg: 500, mechanism: 'Ca ингибирует гемовое и негемовое всасывание Fe на 40-60% при совместном приёме', severity: 'HIGH' },
+  { depleter: 'iron', depleted: 'zinc', thresholdMg: 25, mechanism: 'Конкуренция за DMT1; Fe >25 мг ↓ Zn всасывание на 30%', severity: 'MEDIUM' },
+  { depleter: 'vitamin_c', depleted: 'copper', thresholdMg: 1500, mechanism: 'Аскорбат восстанавливает Cu²⁺→Cu⁺, снижая доступность для церулоплазмина', severity: 'LOW' },
+  { depleter: 'omega3', depleted: 'vitamin_e', thresholdMg: 3000, mechanism: 'ПНЖК ↑ перекисное окисление → ↑ расход вит.E как антиоксиданта; соотношение 0.4-0.6 мг вит.E/г ПНЖК', severity: 'MEDIUM' },
+  { depleter: 'selenium', depleted: 'zinc', thresholdMg: 0.4, mechanism: 'Селенометионин конкурирует с метионином → ↓ синтез MT → изменённый Zn-гомеостаз', severity: 'LOW' },
+  { depleter: 'selenium', depleted: 'copper', thresholdMg: 0.8, mechanism: 'Высокие дозы Se ↑ синтез металлотионеина → связывание Cu', severity: 'MEDIUM' },
+];
+
+/** Категории периодов полувыведения для планирования кратности приёма. */
+export type HalfLifeCategory = 'ultra_short' | 'short' | 'medium' | 'long' | 'ultra_long';
+export const SUBSTANCE_HALF_LIFE: Record<string, HalfLifeCategory> = {
+  nac: 'short',          // t½ ≈ 2h → 2-3×/день
+  alpha_lipoic: 'short', // t½ ≈ 30min → 2-3×/день
+  vitamin_c: 'short',    // t½ ≈ 30-60min → 2×/день
+  theanine: 'short',     // t½ ≈ 1-3h → 2×/день
+  tyrosine: 'short',     // t½ ≈ 1.5h → 2-3×/день
+  x5htp: 'short',        // t½ ≈ 2h → 2×/день
+  glycine: 'short',      // t½ ≈ 1-2h → 2×/день
+  magnesium: 'short',    // t½ ≈ 4h → 2×/день
+  zinc: 'medium',        // t½ ≈ 12h → 1-2×/день
+  coq10: 'medium',       // t½ ≈ 33h → 1×/день (лучше 2× для ↑биодоступности)
+  vitamin_b6: 'medium',  // t½ ≈ 3-4h → 2×/день
+  vitamin_b12: 'long',   // t½ ≈ 6 дней → 1×/день
+  vitamin_d3: 'long',    // t½ ≈ 25 дней → 1×/день
+  vitamin_k2: 'short',   // t½ ≈ 1-2h → 2×/день
+  omega3: 'long',        // t½ ≈ 37h → 1×/день
+  ashwagandha: 'medium', // t½ ≈ 2-4h → 2×/день
+  curcumin: 'short',     // t½ ≈ 2h → 2×/день
+  berberine: 'short',    // t½ ≈ 0.5-1.5h → 3×/день
+  milk_thistle: 'medium',// t½ ≈ 2-3h → 2-3×/день
+  tudca: 'medium',       // t½ ≈ 4-8h → 2×/день
+  melatonin: 'short',    // t½ ≈ 30-50min → 1×/день (на ночь)
+  gaba: 'short',         // t½ ≈ 1h → 2×/день
+  potassium: 'short',    // t½ ≈ 4h → 2×/день
+  taurine: 'medium',     // t½ ≈ 1.5-3h → 2×/день
+  inositol: 'short',     // t½ ≈ 3h → 2×/день
+  folate: 'medium',      // t½ ≈ 3-4h → 2×/день
+  selenium: 'long',      // t½ ≈ 20 дней → 1×/день
+  betaine: 'short',      // t½ ≈ 0.5h → 2-3×/день
+};
+
+/** Множители биодоступности по форме (из SupportBioavailability). */
+export const FORM_BIOAVAIL_MULT: Record<string, number> = {
+  mg_oxide: 0.04, mg_citrate: 0.25, mg_glycinate: 0.45, mg_malate: 0.30,
+  mg_threonate: 0.35, mg_taurate: 0.30, mg_chloride: 0.35, mg_sulfate: 0.10,
+  zn_oxide: 0.20, zn_citrate: 0.45, zn_glycinate: 0.55, zn_picolinate: 0.50,
+  zn_monomethionine: 0.50, zn_sulfate: 0.35, zn_gluconate: 0.40,
+  ca_carbonate: 0.25, ca_citrate: 0.35, ca_malate: 0.30,
+  fe_sulfate: 0.20, fe_bisglycinate: 0.45, fe_fumarate: 0.25,
+  se_selenomethionine: 0.85, se_selenite: 0.50, se_selenate: 0.70,
+  vitE_natural: 1.0, vitE_synthetic: 0.50,
+  vitK2_mk4: 0.20, vitK2_mk7: 0.95,
+  vitD3_oil: 0.80, vitD3_powder: 0.50,
+  curcumin_standard: 0.02, curcumin_phytosome: 0.30, curcumin_liposomal: 0.50,
+  coq10_ubiquinone: 0.05, coq10_ubiquinol: 0.25, coq10_liposomal: 0.50,
+  omega3_ee: 0.70, omega3_tg: 0.85, omega3_pl: 0.95,
+};
+
+/** Рекомендуемый интервал между конкурентными минералами (часы). */
+export const MINERAL_SEPARATION_HOURS: Record<string, number> = {
+  'zinc||calcium': 2, 'zinc||iron': 2, 'zinc||magnesium': 1,
+  'calcium||iron': 4, 'calcium||magnesium': 2, 'iron||magnesium': 2,
+  'calcium||zinc': 2, 'iron||zinc': 2, 'magnesium||zinc': 1,
+  'iron||calcium': 4, 'magnesium||calcium': 2, 'magnesium||iron': 2,
+  'zinc||copper': 6,
+};
+
+/** Правила контекста приёма пищи для веществ. */
+export interface MealContextRule {
+  substanceId: string;
+  requireWithFood: boolean;   // нужно с едой
+  requireFat: boolean;         // нужно с жирной пищей
+  emptyStomach: boolean;       // натощак
+  avoidCa: boolean;            // не с кальцием/молочкой
+  avoidFiber: boolean;         // не с клетчаткой
+  avoidCaffeine: boolean;      // не с кофеином
+}
+export const MEAL_CONTEXT_RULES: MealContextRule[] = [
+  { substanceId: 'vitamin_d3', requireWithFood: true, requireFat: true, emptyStomach: false, avoidCa: false, avoidFiber: false, avoidCaffeine: false },
+  { substanceId: 'vitamin_k2', requireWithFood: true, requireFat: true, emptyStomach: false, avoidCa: false, avoidFiber: false, avoidCaffeine: false },
+  { substanceId: 'coq10', requireWithFood: true, requireFat: true, emptyStomach: false, avoidCa: false, avoidFiber: false, avoidCaffeine: false },
+  { substanceId: 'omega3', requireWithFood: true, requireFat: true, emptyStomach: false, avoidCa: false, avoidFiber: false, avoidCaffeine: false },
+  { substanceId: 'curcumin', requireWithFood: true, requireFat: true, emptyStomach: false, avoidCa: false, avoidFiber: false, avoidCaffeine: false },
+  { substanceId: 'zinc', requireWithFood: true, requireFat: false, emptyStomach: false, avoidCa: true, avoidFiber: true, avoidCaffeine: false },
+  { substanceId: 'iron', requireWithFood: false, requireFat: false, emptyStomach: true, avoidCa: true, avoidFiber: true, avoidCaffeine: true },
+  { substanceId: 'calcium', requireWithFood: false, requireFat: false, emptyStomach: false, avoidCa: false, avoidFiber: true, avoidCaffeine: false },
+  { substanceId: 'magnesium', requireWithFood: false, requireFat: false, emptyStomach: false, avoidCa: true, avoidFiber: false, avoidCaffeine: false },
+  { substanceId: 'nac', requireWithFood: true, requireFat: false, emptyStomach: false, avoidCa: false, avoidFiber: false, avoidCaffeine: false },
+  { substanceId: 'tudca', requireWithFood: true, requireFat: false, emptyStomach: false, avoidCa: false, avoidFiber: false, avoidCaffeine: false },
+  { substanceId: 'berberine', requireWithFood: true, requireFat: false, emptyStomach: false, avoidCa: false, avoidFiber: false, avoidCaffeine: false },
+  { substanceId: 'vitamin_e', requireWithFood: true, requireFat: true, emptyStomach: false, avoidCa: false, avoidFiber: false, avoidCaffeine: false },
+  { substanceId: 'selenium', requireWithFood: true, requireFat: false, emptyStomach: false, avoidCa: false, avoidFiber: false, avoidCaffeine: false },
+  { substanceId: 'potassium', requireWithFood: true, requireFat: false, emptyStomach: false, avoidCa: false, avoidFiber: false, avoidCaffeine: false },
+];

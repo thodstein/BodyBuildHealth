@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { TrainingOutput, Exercise } from '../../../core/types';
 import type { MacrocyclePlan } from '../../../engines/training-periodization.engine';
 import type { SplitCandidate } from '../../../engines/split-selector.engine';
@@ -36,10 +36,28 @@ export const PlanTraining: React.FC<{
 
   const rirForGoal = getRIR(goalState, level, trainingResult.isDeload);
 
+  const [clipboardDay, setClipboardDay] = useState<any>(null);
+  const [localPlan, setLocalPlan] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (trainingResult) {
+      setLocalPlan(buildDayPlan(trainingResult, daysPerWeek, weakPoints, bestSplit?.groupsPerDay));
+    }
+  }, [trainingResult, daysPerWeek, weakPoints, bestSplit]);
+
+  const updateExercise = (dayIndex: number, exIndex: number, field: keyof Exercise, value: any) => {
+    const newPlan = [...localPlan];
+    newPlan[dayIndex].exercises[exIndex] = {
+      ...newPlan[dayIndex].exercises[exIndex],
+      [field]: value
+    };
+    setLocalPlan(newPlan);
+  };
   return (
     <div className="plan-training">
       <div className="card input-form">
         <h3>Настройки тренировок</h3>
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <div className="form-group">
             <label>Цель</label>
@@ -159,9 +177,23 @@ export const PlanTraining: React.FC<{
       {!macrocycle && (
         <div className="card week-plan">
           <p>{trainingResult.weekPlan}</p>
-          {buildDayPlan(trainingResult, daysPerWeek, weakPoints, bestSplit?.groupsPerDay).map((day) => (
+          {localPlan.map((day, dayIndex) => (
             <div key={day.day} className="day-block">
-              <h4>{day.day} день {day.name}</h4>
+              <div className="day-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h4>{day.day} день {day.name}</h4>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button onClick={() => {
+                    setClipboardDay(day.exercises);
+                  }} style={{ padding: '2px 8px', fontSize: 10 }}>Копировать</button>
+                  {clipboardDay && (
+                    <button onClick={() => {
+                      const newPlan = [...localPlan];
+                      newPlan[dayIndex].exercises = [...clipboardDay];
+                      setLocalPlan(newPlan);
+                    }} style={{ padding: '2px 8px', fontSize: 10 }}>Вставить</button>
+                  )}
+                </div>
+              </div>
               {day.exercises.length === 0 ? (
                 <p>Отдых, восстановление, массаж</p>
               ) : (
@@ -172,16 +204,38 @@ export const PlanTraining: React.FC<{
                   <tbody>
                     {day.exercises.map((ex: Exercise, i: number) => (
                       <tr key={i}>
+                        <td style={{ display: 'flex', gap: 4 }}>
+                          <button onClick={() => {
+                            const newPlan = [...localPlan];
+                            const exercises = newPlan[dayIndex].exercises;
+                            if(i > 0) {
+                                [exercises[i], exercises[i-1]] = [exercises[i-1], exercises[i]];
+                                setLocalPlan(newPlan);
+                            }
+                          }}>↑</button>
+                          <button onClick={() => {
+                            const newPlan = [...localPlan];
+                            const exercises = newPlan[dayIndex].exercises;
+                            if(i < exercises.length - 1) {
+                                [exercises[i], exercises[i+1]] = [exercises[i+1], exercises[i]];
+                                setLocalPlan(newPlan);
+                            }
+                          }}>↓</button>
+                        </td>
                         <td style={{ maxWidth: 180 }}>
                           <div style={{ fontWeight: 600 }}>{ex.name}</div>
                           {ex.targetMuscle && <div style={{ fontSize: 10 }}>{ex.targetMuscle}</div>}
                         </td>
-                        <td>{ex.sets}</td>
-                        <td>{ex.reps}</td>
+                        <td>
+                          <input type="number" value={ex.sets || 0} onChange={(e) => updateExercise(dayIndex, i, 'sets', parseInt(e.target.value))} style={{width: 30}} />
+                        </td>
+                        <td>
+                          <input type="number" value={ex.reps || 0} onChange={(e) => updateExercise(dayIndex, i, 'reps', parseInt(e.target.value))} style={{width: 30}} />
+                        </td>
                         <td>{ex.rir}</td>
                         <td>{ex.rest}</td>
                         <td>
-                          <div style={{ fontWeight: 700 }}>?</div>
+                          <input type="number" value={ex.weight || 0} onChange={(e) => updateExercise(dayIndex, i, 'weight', parseFloat(e.target.value))} style={{width: 40}} />
                         </td>
                       </tr>
                     ))}

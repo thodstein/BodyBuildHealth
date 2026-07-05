@@ -10,9 +10,10 @@ import { DosageCalculatorTab } from './DosageCalculatorTab';
 import { InteractionCheckerTab } from './InteractionCheckerTab';
 import { MapperTab } from './MapperTab';
 import { DiagnosticsTab } from './DiagnosticsTab';
+import { PharmaPeptideCalc } from './PharmaPeptideCalc';
 
 type PharmaPage = 'main' | 'course' | 'calculators' | 'info';
-type SubTab = 'catalog' | 'pkpd' | 'dosage' | 'interactions';
+type SubTab = 'catalog' | 'pkpd' | 'dosage' | 'peptides' | 'interactions';
 
 export const PharmaScreen: React.FC = () => {
   const [page, setPage] = useState<PharmaPage>('main');
@@ -39,7 +40,7 @@ export const PharmaScreen: React.FC = () => {
   if (page === 'main') {
     const cards = [
       { key:'course' as const, icon:'📋', title:'Курс', desc:'Управление курсом, маппинг препаратов, диагностика', color:'#8b5cf6' },
-      { key:'calculators' as const, icon:'⚙️', title:'Калькуляторы', desc:'PK/PD симуляция, расчёт дозировок', color:'#3b82f6' },
+      { key:'calculators' as const, icon:'⚙️', title:'Калькуляторы', desc:'PK/PD симуляция, расчёт дозировок, пептиды', color:'#3b82f6' },
       { key:'info' as const, icon:'📖', title:'Общая информация', desc:'Каталог веществ и проверка взаимодействий', color:'#22c55e' },
     ];
     return (
@@ -124,14 +125,14 @@ export const PharmaScreen: React.FC = () => {
     border: `1px solid ${courseSub === t ? 'var(--accent)' : 'var(--border)'}`,
   }}>{t === 'course' ? '📋 Курс' : t === 'mapper' ? '🗺 Маппер' : t === 'diagnostics' ? '🩺 Диагностика' : '📄 Отчёты'}</button>
 ))}
-        {page === 'calculators' && (['pkpd','dosage'] as const).map(t => (
+        {page === 'calculators' && (['pkpd','dosage','peptides'] as const).map(t => (
           <button key={t} onClick={() => setSubTab(t)} style={{
             padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
             cursor:'pointer', flexShrink:0,
             background: subTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
             color: subTab === t ? '#000' : 'var(--text-dim)',
             border: `1px solid ${subTab === t ? 'var(--accent)' : 'var(--border)'}`,
-          }}>{t === 'pkpd' ? '⚙️ PK/PD' : '💊 Дозировки'}</button>
+          }}>{t === 'pkpd' ? '⚙️ PK/PD' : t === 'dosage' ? '💊 Дозировки' : '🧪 Пептиды'}</button>
         ))}
         {page === 'info' && (['catalog','interactions'] as const).map(t => (
           <button key={t} onClick={() => setSubTab(t)} style={{
@@ -214,6 +215,7 @@ export const PharmaScreen: React.FC = () => {
       })()}
       {page === 'calculators' && subTab === 'pkpd' && <PKPDSimulationTab />}
       {page === 'calculators' && subTab === 'dosage' && <DosageCalculatorTab />}
+      {page === 'calculators' && subTab === 'peptides' && <PharmaPeptideCalc />}
       {page === 'info' && subTab === 'catalog' && <CatalogTab />}
       {page === 'info' && subTab === 'interactions' && <InteractionCheckerTab />}
     </div>

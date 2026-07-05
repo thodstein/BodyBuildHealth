@@ -149,6 +149,8 @@ export const TrainingScreen: React.FC = () => {
   // Unified program builder state
   const [builderStep, setBuilderStep] = useState(1);
   const [manualCfg, setManualCfg] = useState<Record<string, string>>({});
+  const [exerciseTempos, setExerciseTempos] = useState<Record<string, string>>({});
+  const [tempoPicker, setTempoPicker] = useState<{ dayIdx: number; exIdx: number } | null>(null);
   const [injMuscle, setInjMuscle] = useState<string>('chest');
   const [injFrom, setInjFrom] = useState<string>('');
   const [injTo, setInjTo] = useState<string>('');
@@ -2357,8 +2359,9 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
                 </div>
                 {showMacroPreview && <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.15)' }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>📅 Предпросмотр макроцикла: {mesoLength} нед × {manualResult.days.length} дн</div>
+                  {(() => { const deloadFreq = level === 'beginner' ? 6 : level === 'advanced' ? 4 : 5; const deloadWeeks = new Set<number>(); for (let w = deloadFreq; w <= mesoLength; w += deloadFreq) deloadWeeks.add(w); return <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>🟦 Делод каждые {deloadFreq} нед (нед: {[...deloadWeeks].join(', ')})</div>; })()}
                   <div style={{ overflowX: 'auto' }}><div style={{ display: 'flex', gap: 4, minWidth: 'max-content' }}>
-                    {[...Array(Math.ceil(mesoLength))].map((_, wi) => { const heat = Math.min(1, (wi < mesoLength/2 ? 65 + wi : 85 - (wi - mesoLength/2)) / 100); return <div key={wi} style={{ padding: '4px 6px', borderRadius: 8, background: `rgba(168,85,247,${0.04 + heat * 0.1})`, border: `1px solid rgba(168,85,247,${0.1 + heat * 0.2})`, minWidth: 72 }}><div style={{ fontSize: 8, fontWeight: 700, color: '#a855f7', textAlign: 'center', marginBottom: 3 }}>Нед {wi + 1}</div><div style={{ display: 'grid', gridTemplateColumns: `repeat(${manualResult.days.length}, 1fr)`, gap: 2 }}>{manualResult.days.map((_, di2) => <div key={di2} style={{ height: 18, borderRadius: 3, background: `rgba(0,230,138,${0.15 + heat * 0.35})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>Д{di2 + 1}</span></div>)}</div><div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', marginTop: 2, overflow: 'hidden' }}><div style={{ height: '100%', width: Math.round(heat * 100) + '%', borderRadius: 2, background: heat > 0.75 ? '#f59e0b' : '#00e68a' }} /></div><div style={{ fontSize: 6, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>{Math.round(65 + heat * 35)}% инт.</div></div>; })}
+                    {[...Array(Math.ceil(mesoLength))].map((_, wi) => { const wk = wi + 1; const deloadFreq = level === 'beginner' ? 6 : level === 'advanced' ? 4 : 5; const isDeload = wk % deloadFreq === 0 && wk > 0; const heat = isDeload ? 0.25 : Math.min(1, (wi < mesoLength/2 ? 65 + wi : 85 - (wi - mesoLength/2)) / 100); const accentColor = isDeload ? '#60a5fa' : '#a855f7'; return <div key={wi} style={{ padding: '4px 6px', borderRadius: 8, background: isDeload ? 'rgba(96,165,250,0.1)' : `rgba(168,85,247,${0.04 + heat * 0.1})`, border: `1px solid ${isDeload ? 'rgba(96,165,250,0.3)' : `rgba(168,85,247,${0.1 + heat * 0.2})`}`, minWidth: 72 }}><div style={{ fontSize: 8, fontWeight: 700, color: accentColor, textAlign: 'center', marginBottom: 3 }}>{isDeload ? `🔄 Делод` : `Нед ${wk}`}</div><div style={{ display: 'grid', gridTemplateColumns: `repeat(${manualResult.days.length}, 1fr)`, gap: 2 }}>{manualResult.days.map((_, di2) => <div key={di2} style={{ height: 18, borderRadius: 3, background: isDeload ? 'rgba(96,165,250,0.3)' : `rgba(0,230,138,${0.15 + heat * 0.35})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ fontSize: 7, color: isDeload ? '#fff' : 'rgba(255,255,255,0.6)' }}>{isDeload ? '—' : `Д${di2 + 1}`}</span></div>)}</div><div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', marginTop: 2, overflow: 'hidden' }}><div style={{ height: '100%', width: isDeload ? '40%' : Math.round(heat * 100) + '%', borderRadius: 2, background: isDeload ? '#60a5fa' : heat > 0.75 ? '#f59e0b' : '#00e68a' }} /></div><div style={{ fontSize: 6, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>{isDeload ? '40% объёма' : `${Math.round(65 + heat * 35)}% инт.`}</div></div>; })}
                   </div></div>
                 </div>}
                 <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -2374,12 +2377,25 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
                       <div style={{ display: 'grid', gridTemplateColumns: '14px 1.8fr 0.7fr 0.7fr 0.5fr 0.5fr 0.5fr 0.7fr', gap: 2, padding: '4px 10px', fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
                         <span></span><span>Упражнение</span><span>Сеты×повт</span><span>RIR</span><span>Вес</span><span>Группа</span><span>Отдых</span><span>Действия</span>
                       </div>
-                      {d.exercises.map((e, ei) => {
-                        const tmpo = generateRepTempo({ goal: goal === 'strength' ? 'strength' : 'hypertrophy', riskLevel: 'low', difficultyLevel: 'medium', techniqueIssues: [], isMainLift: ei === 0 });
-                        return (
-                        <div key={ei} draggable onDragStart={ev => dragStart(ev, di, ei)} onDragOver={dragOver} onDrop={ev => dropEx(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'grid', gridTemplateColumns: '14px 1.8fr 0.7fr 0.7fr 0.5fr 0.5fr 0.5fr 0.7fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab', alignItems: 'center' }}>
-                          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', cursor: 'grab', userSelect: 'none' }}>⠿</span>
-                          <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>{e.name}<span style={{ fontSize: 7, color: '#a855f7', fontWeight: 700, background: 'rgba(168,85,247,0.1)', padding: '1px 5px', borderRadius: 4, whiteSpace: 'nowrap' }}>{tmpo.tempo.toString}</span></span>
+                        {d.exercises.map((e, ei) => {
+                          const tempoKey = `${di}-${ei}`;
+                          const overrideTempo = exerciseTempos[tempoKey];
+                          const tmpo = overrideTempo
+                            ? { tempo: { toString: overrideTempo } }
+                            : generateRepTempo({ goal: goal === 'strength' ? 'strength' : 'hypertrophy', riskLevel: 'low', difficultyLevel: 'medium', techniqueIssues: [], isMainLift: ei === 0 });
+                          return (
+                          <div key={ei} draggable onDragStart={ev => dragStart(ev, di, ei)} onDragOver={dragOver} onDrop={ev => dropEx(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'grid', gridTemplateColumns: '14px 1.8fr 0.7fr 0.7fr 0.5fr 0.5fr 0.5fr 0.7fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab', alignItems: 'center' }}>
+                            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', cursor: 'grab', userSelect: 'none' }}>⠿</span>
+                            <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                              {e.name}
+                              <span
+                                onClick={(ev) => { ev.stopPropagation(); setTempoPicker({ dayIdx: di, exIdx: ei }); }}
+                                title="Нажмите чтобы сменить темп"
+                                style={{ fontSize: 7, color: '#a855f7', fontWeight: 700, background: 'rgba(168,85,247,0.1)', padding: '1px 5px', borderRadius: 4, whiteSpace: 'nowrap', cursor: 'pointer', border: overrideTempo ? '1px solid #a855f7' : '1px solid transparent' }}
+                              >
+                                {overrideTempo || tmpo.tempo.toString}{overrideTempo ? ' *' : ''}
+                              </span>
+                            </span>
                           <span onClick={() => startInline(di, ei, 'sets', e.sets)} style={{ cursor: 'text', color: 'var(--accent)', fontWeight: 700 }}>{e.sets}×{e.reps}</span>
                           <span onClick={() => startInline(di, ei, 'rir', e.rir)} style={{ cursor: 'text', color: '#f59e0b' }}>{e.rir}</span>
                           <span onClick={() => startInline(di, ei, 'weight', e.weight)} style={{ cursor: 'text', color: '#60a5fa', fontWeight: 700 }}>{e.weight} кг</span>
@@ -2451,6 +2467,53 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
                     </div>
                   </div>
                 )}
+                {tempoPicker && (() => {
+                  const presets = [
+                    { label: 'Стандартный (2-0-1-0)', tempo: '2-0-1-0' },
+                    { label: 'Гипертрофия (3-1-1-0)', tempo: '3-1-1-0' },
+                    { label: 'Силовой (2-1-1-0)', tempo: '2-1-1-0' },
+                    { label: 'Взрывной (1-0-0-0)', tempo: '1-0-0-0' },
+                    { label: 'Медленный TUL (4-2-2-1)', tempo: '4-2-2-1' },
+                    { label: 'TUL-макс (4-2-1-1)', tempo: '4-2-1-1' },
+                    { label: 'Tempo 3-0-1-0', tempo: '3-0-1-0' },
+                    { label: 'Растяжение (2-3-1-0)', tempo: '2-3-1-0' },
+                    { label: 'Авто (убрать ручной)', tempo: '' },
+                  ];
+                  const exName = manualResult?.days[tempoPicker.dayIdx]?.exercises[tempoPicker.exIdx]?.name || '';
+                  return (
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }} onClick={() => setTempoPicker(null)}>
+                      <div onClick={ev => ev.stopPropagation()} style={{ background: '#18181b', border: '1px solid rgba(168,85,247,0.3)', borderRadius: 14, padding: 16, minWidth: 280, maxWidth: '90vw' }}>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: '#a855f7', marginBottom: 2 }}>⏱️ Темп упражнения</div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>{exName}</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {presets.map(p => (
+                            <button
+                              key={p.tempo}
+                              onClick={() => {
+                                if (p.tempo) {
+                                  setExerciseTempos(prev => ({ ...prev, [`${tempoPicker.dayIdx}-${tempoPicker.exIdx}`]: p.tempo }));
+                                } else {
+                                  setExerciseTempos(prev => { const nv = { ...prev }; delete nv[`${tempoPicker.dayIdx}-${tempoPicker.exIdx}`]; return nv; });
+                                }
+                                setTempoPicker(null);
+                              }}
+                              style={{
+                                textAlign: 'left', padding: '8px 10px', borderRadius: 8,
+                                border: '1px solid ' + (exerciseTempos[`${tempoPicker.dayIdx}-${tempoPicker.exIdx}`] === p.tempo ? '#a855f7' : 'rgba(255,255,255,0.08)'),
+                                background: exerciseTempos[`${tempoPicker.dayIdx}-${tempoPicker.exIdx}`] === p.tempo ? 'rgba(168,85,247,0.1)' : 'rgba(255,255,255,0.03)',
+                                color: '#fff', fontSize: 10, cursor: 'pointer', fontWeight: 600,
+                                transition: 'all 0.15s',
+                              }}
+                            >
+                              {p.label}
+                            </button>
+                          ))}
+                        </div>
+                        <button onClick={() => setTempoPicker(null)} style={{ width: '100%', marginTop: 8, padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 10 }}>Отмена</button>
+                      </div>
+                    </div>
+                  );
+                })()}
                 {/* Сводка качества плана */}
                 {(() => {
                   const _labAdj = labTrainingAdjust(linked.labAnalysis);
@@ -3694,6 +3757,8 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
       {tab === 'calc_vbt' && <InfoErrorBoundary label="VBT / скорость"><VBTCalcTab /></InfoErrorBoundary>}
       {tab === 'calc_fatigue' && <InfoErrorBoundary label="Индекс усталости"><FatigueIndexTab /></InfoErrorBoundary>}
       {tab === 'calc_mrv' && <InfoErrorBoundary label="Оценщик MRV"><MRVEstimatorTab /></InfoErrorBoundary>}
+      {tab === 'tempo' && <InfoErrorBoundary label="Темп повторений"><TempoTab /></InfoErrorBoundary>}
+      {tab === 'meso_tracker' && <InfoErrorBoundary label="Трекер мезоциклов"><MesocycleTrackerTab /></InfoErrorBoundary>}
 
       {/* ═══════════ MY TRAINING TAB ═══════════ */}
       {tab === 'mytraining' && (
@@ -3850,4 +3915,6 @@ import { PlateCalcTab } from './TrainingScreen_parts/PlateCalcTab';
 import { VBTCalcTab } from './TrainingScreen_parts/VBTCalcTab';
 import { FatigueIndexTab } from './TrainingScreen_parts/FatigueIndexTab';
 import { MRVEstimatorTab } from './TrainingScreen_parts/MRVEstimatorTab';
+import { TempoTab } from './TrainingScreen_parts/TempoTab';
+import { MesocycleTrackerTab } from './TrainingScreen_parts/MesocycleTrackerTab';
 

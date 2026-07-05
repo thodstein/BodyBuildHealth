@@ -112,13 +112,18 @@ export const SupportMixCalc: React.FC<{ s: Record<string, any> }> = ({ s }) => {
             </div>
             {(mixInsulin>0 || mixDrugIGF>0 || mixDrugGH>0 || mixDrugMGF>0) && (
               <div style={{ fontSize:7, color:'#8b5cf6', marginBottom:6, lineHeight:1.3 }}>
-                {mixInsulin>0 && <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:2}}>
-                  <span>• Инсулин {mixInsulin}ЕД ·</span>
-                  <select value={mixInsulinTiming} onChange={e=>setMixInsulinTiming(e.target.value as any)} style={{fontSize:7,padding:'1px 4px',borderRadius:4,background:'rgba(139,92,246,0.1)',border:'1px solid rgba(139,92,246,0.2)',color:'#a78bfa'}}>
-                    <option value="pre">перед тренировкой</option>
-                    <option value="post">после тренировки</option>
-                  </select>
-                </div>}
+                {mixInsulin>0 && <>
+                  <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:2}}>
+                    <span>• Инсулин {mixInsulin}ЕД ·</span>
+                    <select value={mixInsulinTiming} onChange={e=>setMixInsulinTiming(e.target.value as any)} style={{fontSize:7,padding:'1px 4px',borderRadius:4,background:'rgba(139,92,246,0.1)',border:'1px solid rgba(139,92,246,0.2)',color:'#a78bfa'}}>
+                      <option value="pre">перед тренировкой</option>
+                      <option value="post">после тренировки</option>
+                    </select>
+                  </div>
+                  <div style={{background:'rgba(239,68,68,0.12)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:6,padding:'5px 7px',marginBottom:4,color:'#f87171',fontSize:7,lineHeight:1.4}}>
+                    ⚠️ Инсулин требует точного расчёта дозы относительно углеводов (1 ЕД на 10-15г углеводов). При гипогликемии — немедленно принять быстрые углеводы. Всегда иметь глюкометр. Доза без учёта диеты опасна для жизни.
+                  </div>
+                </>}
                 {mixDrugIGF>0 && <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:2}}>
                   <span>• ИГФ-1 {mixDrugIGF}мкг ·</span>
                   <select value={mixDrugIGFTiming} onChange={e=>setMixDrugIGFTiming(e.target.value as any)} style={{fontSize:7,padding:'1px 4px',borderRadius:4,background:'rgba(139,92,246,0.1)',border:'1px solid rgba(139,92,246,0.2)',color:'#a78bfa'}}>

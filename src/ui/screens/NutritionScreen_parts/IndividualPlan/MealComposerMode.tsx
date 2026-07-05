@@ -1,13 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { AdvancedFilter } from '../../../../engines/kbju-food-match.engine';
+import type { NutrientGapResult, NutrientGap } from '../../../../engines/nutrient-gap-filler.engine';
+import { buildGapSummary, type GapSummary } from '../../../../engines/composer-targeting-integration';
 
-export type ComposerMode = 'basic' | 'advanced';
+export type ComposerMode = 'basic' | 'advanced' | 'targeting';
 
 interface Props {
   mode: ComposerMode;
   onModeChange: (mode: ComposerMode) => void;
   advancedFilter: AdvancedFilter;
   onAdvancedFilterChange: (f: AdvancedFilter) => void;
+  gapResult?: NutrientGapResult | null;
+  gapSummary?: GapSummary[];
 }
 
 const btnCardStyle: React.CSSProperties = {
@@ -62,7 +66,7 @@ const sliderStyle: React.CSSProperties = {
 };
 
 export const MealComposerMode: React.FC<Props> = ({
-  mode, onModeChange, advancedFilter, onAdvancedFilterChange,
+  mode, onModeChange, advancedFilter, onAdvancedFilterChange, gapResult, gapSummary,
 }) => {
   const [showAdvSettings, setShowAdvSettings] = useState(false);
 
@@ -78,6 +82,16 @@ export const MealComposerMode: React.FC<Props> = ({
     onAdvancedFilterChange({ ...advancedFilter, tierMin: t });
   };
 
+  const gapStats = useMemo(() => {
+    if (!gapResult) return { total: 0, deficits: 0, marginal: 0, ok: 0 };
+    return {
+      total: gapResult.gaps.length,
+      deficits: gapResult.gaps.filter(g => g.percentCovered < 50).length,
+      marginal: gapResult.gaps.filter(g => g.percentCovered >= 50 && g.percentCovered < 80).length,
+      ok: gapResult.gaps.filter(g => g.percentCovered >= 80).length,
+    };
+  }, [gapResult]);
+
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -85,7 +99,7 @@ export const MealComposerMode: React.FC<Props> = ({
       </div>
 
       {/* Mode selection buttons */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: mode === 'advanced' ? 8 : 0 }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: mode === 'advanced' || mode === 'targeting' ? 8 : 0 }}>
         <div
           style={mode === 'basic' ? activeCardStyle : btnCardStyle}
           onClick={() => onModeChange('basic')}
@@ -105,6 +119,21 @@ export const MealComposerMode: React.FC<Props> = ({
           <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.45)', lineHeight: 1.3 }}>
             DIAAS · GI · PRAL · Обработка
           </span>
+        </div>
+        <div
+          style={mode === 'targeting' ? { ...activeCardStyle, borderColor: 'rgba(6,182,212,0.4)', background: 'rgba(6,182,212,0.08)', boxShadow: '0 0 16px rgba(6,182,212,0.06)' } : btnCardStyle}
+          onClick={() => onModeChange('targeting')}
+        >
+          <span style={{ fontSize: 18 }}>🎯</span>
+          <span>Таргетинг</span>
+          <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.45)', lineHeight: 1.3 }}>
+            Закрытие дефицитов
+          </span>
+          {mode !== 'targeting' && gapStats.deficits > 0 && (
+            <span style={{ fontSize: 6, padding: '1px 5px', borderRadius: 4, background: '#ef444420', color: '#ef4444', marginTop: 1 }}>
+              {gapStats.deficits} дефицита
+            </span>
+          )}
         </div>
         {mode === 'advanced' && (
           <div
@@ -163,6 +192,70 @@ export const MealComposerMode: React.FC<Props> = ({
         </div>
       )}
 
+      {/* Targeting mode: gap analysis summary */}
+      {mode === 'targeting' && (
+        <div style={{ marginBottom: 6 }}>
+          {/* Gap stats bar */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+            <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: gapStats.deficits > 0 ? 'rgba(239,68,68,0.06)' : 'rgba(34,197,94,0.06)', border: `1px solid ${gapStats.deficits > 0 ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)'}`, textAlign: 'center' }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: gapStats.deficits > 0 ? '#ef4444' : '#22c55e' }}>{gapStats.deficits}</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)' }}>Дефициты</div>
+            </div>
+            <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: gapStats.marginal > 0 ? 'rgba(245,158,11,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${gapStats.marginal > 0 ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)'}`, textAlign: 'center' }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: gapStats.marginal > 0 ? '#f59e0b' : 'rgba(255,255,255,0.4)' }}>{gapStats.marginal}</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)' }}>На грани</div>
+            </div>
+            <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.1)', textAlign: 'center' }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#22c55e' }}>{gapStats.ok}</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)' }}>В норме</div>
+            </div>
+          </div>
+
+          {/* Category breakdown */}
+          {gapSummary && gapSummary.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {gapSummary.filter(c => c.deficits > 0 || c.marginal > 0).map(cat => {
+                const deficitPct = Math.round((cat.deficits / Math.max(1, cat.nutrients.length)) * 100);
+                const color = deficitPct >= 50 ? '#ef4444' : deficitPct > 0 ? '#f59e0b' : '#22c55e';
+                return (
+                  <div key={cat.catKey} style={{ padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)' }}>{cat.catLabel}</span>
+                      <span style={{ fontSize: 7, fontWeight: 600, color }}>
+                        {cat.deficits > 0 ? `${cat.deficits} деф. ` : ''}{cat.marginal > 0 ? `${cat.marginal} на гр.` : ''}
+                      </span>
+                    </div>
+                    <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.min(100, cat.nutrients.filter(g => g.percentCovered >= 80).length / Math.max(1, cat.nutrients.length) * 100)}%`, height: '100%', borderRadius: 2, background: '#22c55e', transition: 'width 0.3s' }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>
+                      {cat.nutrients.filter(g => g.percentCovered < 80).slice(0, 4).map(g => {
+                        const pctColor = g.percentCovered < 50 ? '#ef4444' : '#f59e0b';
+                        return (
+                          <span key={g.nutrient} style={{ fontSize: 6, padding: '1px 5px', borderRadius: 4, background: `${pctColor}12`, color: pctColor, border: `1px solid ${pctColor}20` }}>
+                            {g.label} {g.percentCovered}%
+                          </span>
+                        );
+                      })}
+                      {cat.nutrients.filter(g => g.percentCovered < 80).length > 4 && (
+                        <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)' }}>+{cat.nutrients.filter(g => g.percentCovered < 80).length - 4}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {gapResult && gapResult.gaps.length === 0 && (
+            <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', fontSize: 8, color: '#22c55e', textAlign: 'center' }}>
+              ✅ Все нутриенты в норме — дефицитов нет
+            </div>
+          )}
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 4, lineHeight: 1.3 }}>
+            🎯 В режиме таргетинга продукты ранжируются по эффективности закрытия дефицитов. Продукты, закрывающие несколько дыр, получают приоритет.
+          </div>
+        </div>
+      )}
       {/* Advanced settings popup */}
       {showAdvSettings && (
         <div style={popupOverlay} onClick={() => setShowAdvSettings(false)}>

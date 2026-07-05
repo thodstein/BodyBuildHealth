@@ -36,6 +36,7 @@ import {
   buildSynergyComment, buildMonitoring, buildSpecialInstructions,
   buildConflicts, buildCautions, buildLabFindings,
   calcStackSynergyScore, suggestSynergyAdditions,
+  buildDepletionWarnings, buildCumulativeLoad, buildPillBurden,
 } from './display';
 import { recommendStacksLight } from './stacks';
 
@@ -106,6 +107,15 @@ export function runSupportUnified(state: CalculatorState): PlanResult {
   // ── 17. Schedule ──
   const schedule = buildSchedule(tzRes.selectedSubstances);
 
+  // ── 18. Depletion warnings ──
+  const depletionWarnings = buildDepletionWarnings(tzRes);
+
+  // ── 19. Cumulative nutrient load ──
+  const cumulativeLoad = buildCumulativeLoad(tzRes);
+
+  // ── 20. Pill burden ──
+  const pillBurden = buildPillBurden(tzRes);
+
   return {
     substances,
     dosages,
@@ -126,6 +136,9 @@ export function runSupportUnified(state: CalculatorState): PlanResult {
     stackRecommendations,
     conflicts,
     riskBreakdown,
+    depletionWarnings: depletionWarnings.length > 0 ? depletionWarnings : undefined,
+    cumulativeLoad: cumulativeLoad.length > 0 ? cumulativeLoad : undefined,
+    pillBurden,
   };
 }
 

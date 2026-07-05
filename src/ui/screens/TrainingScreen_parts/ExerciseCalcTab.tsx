@@ -8,6 +8,8 @@ import { PopupSelect, PopupNumber, PopupText, ExpandableCard, MetricCard } from 
 import { useDataLink } from '../../../core/data-link';
 import type { Exercise } from '../../../core/types';
 
+const PCT_FOR_RIR: Record<number, number> = { 0: 100, 1: 95, 2: 92, 3: 89, 4: 86, 5: 83, 6: 80, 8: 75, 10: 70 };
+
 const ACCENT = '#00e68a';
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
 const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 40, width: '100%', boxSizing: 'border-box' as const, fontSize: 11 };
@@ -208,7 +210,7 @@ const [savedCalcs, setSavedCalcs] = useState<Array<{ id: number; name: string; g
              onChange={v => setOneRM(v)}
            />
          </div>
-         <div>
+<div>
            <PopupText
              label="Темп (опц.)"
              value={manualTempo}
@@ -216,15 +218,29 @@ const [savedCalcs, setSavedCalcs] = useState<Array<{ id: number; name: string; g
              hint="ECC-BOT-CON-TOP"
              onChange={(v: string) => setManualTempo(v)}
            />
-
          </div>
+       </div>
 
-      </div>
+       {/* Level selector */}
+       <div style={{ marginBottom: 12 }}>
+         <PopupSelect
+           label="Уровень"
+           value={level}
+           options={[
+             { id: 'beginner', label: 'Новичок', desc: 'MEV, низкая интенсивность, простой прогресс' },
+             { id: 'intermediate', label: 'Средний', desc: 'MAV, умеренная прогрессия' },
+             { id: 'advanced', label: 'Продвинутый', desc: 'MAV-MRV, сложная периодизация' },
+           ]}
+           hint="Уровень тренированности"
+           onChange={v => setLevel(v as 'beginner' | 'intermediate' | 'advanced')}
+         />
+       </div>
 
       {!ex ? (
         <div style={{ ...SMALL, textAlign: 'center', padding: 20 }}>Выберите упражнение выше.</div>
       ) : (
         <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, marginTop: 10 }}>
           <MetricCard title="Предопределённый вес" icon="🔸" accent={ACCENT}>
             <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{workWeight}</div>
             <div style={{ ...SMALL }}>кг</div>
@@ -245,13 +261,83 @@ const [savedCalcs, setSavedCalcs] = useState<Array<{ id: number; name: string; g
             <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{presc?.rest ?? '-'}</div>
             <div style={{ ...SMALL }}>сек</div>
           </MetricCard>
+          </div>
           {presc?.dropSet && <div style={{ ...SMALL, marginTop: 8 }}>🔻 Дроп-сет: {presc?.dropSetReps}</div>}
           {presc?.backoffSet && <div style={{ ...SMALL }}>↩️ Включить backoff‑сет (объёмный доборный подход).</div>}
 
+          {/* Weekly progression chart */}
+          {ex && (() => {
+            const weeks: number[] = [];
+            for (let w = 1; w <= totalWeeks; w++) weeks.push(w);
+            const projections = weeks.map(w => {
+              try {
+                const p = calcExercisePrescription(ex as Exercise, goal, level, false, false, 1, w, totalWeeks);
+                const repsN = parseInt(p.reps) || 5;
+                const pctN = 100 / (1 + repsN / 30);
+                const weight = +(oneRM * pctN / 100).toFixed(1);
+                return { w, sets: p.sets, reps: repsN, rir: p.rir, weight };
+              } catch { return { w, sets: 0, reps: 0, rir: 0, weight: 0 }; }
+            });
+            const wMax = Math.max(...projections.map(p => p.weight), 1);
+            const svgW = 320, svgH = 120, pad = 28;
+            const toX = (i: number) => pad + (i / (projections.length - 1 || 1)) * (svgW - pad * 2);
+            const toY = (value: number) => svgH - pad - (value / wMax) * (svgH - pad * 2);
+            return (
+              <div style={{ marginTop: 12, padding: 12, background: 'rgba(59,130,246,0.06)', borderRadius: 8, border: '1px solid rgba(59,130,246,0.2)' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>📈 Прогрессия нагрузки по неделям</div>
+                <svg width="100%" height={svgH} viewBox={`0 0 ${svgW} ${svgH}`} style={{ overflow: 'visible' }}>
+                  {[0, 0.5, 1].map(t => {
+                    const val = Math.round(wMax * t);
+                    const y = svgH - pad - (val / wMax) * (svgH - pad * 2);
+                    return (
+                      <g key={t}>
+                        <line x1={pad} y1={y} x2={svgW - pad} y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth={1} />
+                        <text x={pad - 4} y={y + 3} textAnchor="end" fill="rgba(255,255,255,0.4)" fontSize={7}>{val}</text>
+                      </g>
+                    );
+                  })}
+                  {/* Weight line */}
+                  <path d={projections.map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(i)} ${toY(p.weight)}`).join(' ')} fill="none" stroke="#60a5fa" strokeWidth={2} strokeLinejoin="round" />
+                  {projections.map((p, i) => (
+                    <g key={i}>
+                      <circle cx={toX(i)} cy={toY(p.weight)} r={2.5} fill="#60a5fa" />
+                      {i % Math.max(1, Math.ceil(projections.length / 8)) === 0 && (
+                        <text x={toX(i)} y={svgH - pad + 12} textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize={7}>{p.w}</text>
+                      )}
+                    </g>
+                  ))}
+                  {/* RIR line */}
+                  <path d={projections.map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(i)} ${svgH - pad - (p.rir / 5) * (svgH - pad * 2)}`).join(' ')} fill="none" stroke={ACCENT} strokeWidth={1.5} strokeDasharray="4,3" />
+                  <text x={svgW / 2} y={svgH - 2} textAnchor="middle" fill="rgba(255,255,255,0.5)" fontSize={8}>Неделя</text>
+                  <text x={6} y={svgH / 2} textAnchor="middle" fill="rgba(255,255,255,0.5)" fontSize={8} transform={`rotate(-90, 6, ${svgH / 2})`}>Вес (кг)</text>
+                </svg>
+                <div style={{ display: 'flex', gap: 10, fontSize: 9, marginTop: 4 }}>
+                  <span style={{ color: '#60a5fa' }}>— Вес (кг)</span>
+                  <span style={{ color: ACCENT }}>--- RIR</span>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Блок рекомендаций по замене */}
-          <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+          <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button onClick={handleSubstituteButton} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 600 }}>Подобрать замену</button>
             <button onClick={saveCalc} disabled={!ex || !presc} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid rgba(59,130,246,0.3)', background: ex && presc ? 'rgba(59,130,246,0.08)' : 'transparent', color: ex && presc ? '#60a5fa' : 'var(--text-dim)', cursor: ex && presc ? 'pointer' : 'not-allowed', fontWeight: 600 }}>💾 Сохранить расчёт</button>
+            <button onClick={() => {
+              if (!ex || !presc) return;
+              const lines: string[] = [];
+              lines.push('=== Калькулятор упражнений — Отчёт ===');
+              lines.push(`Дата: ${new Date().toLocaleDateString('ru-RU')}`);
+              lines.push(`Упражнение: ${ex.name} (${GROUP_RU[ex.group] ?? ex.group})`);
+              lines.push(`Цель: ${goal} · Уровень: ${level} · Неделя ${week}/${totalWeeks}`);
+              lines.push(`1ПМ: ${oneRM} кг`);
+              lines.push(`Вес: ${workWeight} кг · Повт: ${presc.reps} · Сеты: ${presc.sets} · RIR: ${presc.rir} · Отдых: ${presc.rest} с`);
+              if (presc.tempo) lines.push(`Темп: ${manualTempo || presc.tempo}`);
+              if (presc.dropSet) lines.push(`Дроп-сет: ${presc.dropSetReps}`);
+              if (weakPointAdvice) lines.push(`Объём/SL: ${weakPointAdvice}`);
+              const text = lines.join('\n');
+              navigator.clipboard?.writeText(text).then(() => { /* ok */ }).catch(() => { /* ignore */ });
+            }} disabled={!ex || !presc} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid rgba(168,85,247,0.3)', background: ex && presc ? 'rgba(168,85,247,0.08)' : 'transparent', color: ex && presc ? '#a855f7' : 'var(--text-dim)', cursor: ex && presc ? 'pointer' : 'not-allowed', fontWeight: 600 }}>📋 Экспорт</button>
           </div>
 
           {/* Отображаем список замен, если нужно */}

@@ -10,10 +10,18 @@ export interface PeptideInfo {
   amountMg: number;
   bioavailability: Record<string, { min: number; max: number; avg: number }>;
   tHalfHours: number;
+  /** Двухфазная PK: α-фаза (распределение) */
+  tHalfAlphaHours?: number;
+  /** Двухфазная PK: β-фаза (терминальное выведение) */
+  tHalfBetaHours?: number;
   mechanisms: string[];
   effects: string[];
   riskLevel: 'low' | 'medium' | 'high';
   riskNotes: string[];
+  /** Стабильность: дней в холодильнике (2-8°C) */
+  fridgeLifeDays?: number;
+  /** Стабильность: часов при комнатной t° */
+  rtLifeHours?: number;
 }
 
 export interface DilutionInput {
@@ -247,20 +255,24 @@ export const PEPTIDE_DB: Record<string, PeptideInfo> = {
     riskLevel: 'medium', riskNotes: ['gh_axis_modulation', 'water_retention'],
   },
   bpc157: {
-    id: 'bpc157', name: 'BPC-157', className: 'healing', routes: ['sc', 'oral'],
+    id: 'bpc157', name: 'BPC-157', className: 'Регенератор ЖКТ/тканей', routes: ['sc', 'oral'],
     shortName: 'BPC-157', amountMg: 5,
     bioavailability: { sc: { min: 85, max: 100, avg: 95 }, oral: { min: 30, max: 50, avg: 40 } },
-    tHalfHours: 4, mechanisms: ['ANGIOGENESIS', 'TISSUE_REPAIR'],
-    effects: ['gi_healing', 'recovery', 'anti_inflammation'],
-    riskLevel: 'low', riskNotes: ['angiogenesis_modulation'],
+    tHalfHours: 4, tHalfAlphaHours: 0.5, tHalfBetaHours: 4,
+    mechanisms: ['ANGIOGENESIS', 'TISSUE_REPAIR'],
+    effects: ['Регенерация ЖКТ','Ускорение заживления связок','Защита эндотелия','Заживление язв','Нейропротекция'],
+    riskLevel: 'low', riskNotes: ['Не сочетать с НПВС — снижают эффективность'],
+    fridgeLifeDays: 14, rtLifeHours: 48,
   },
   tb500: {
-    id: 'tb500', name: 'TB-500', className: 'healing', routes: ['sc'],
+    id: 'tb500', name: 'TB-500 (Thymosin Beta-4)', className: 'Регенератор тканей', routes: ['sc', 'im'],
     shortName: 'TB-500', amountMg: 5,
     bioavailability: { sc: { min: 80, max: 98, avg: 90 } },
-    tHalfHours: 4, mechanisms: ['CELL_MIGRATION', 'TISSUE_REPAIR'],
-    effects: ['recovery', 'tissue_healing', 'anti_inflammation'],
-    riskLevel: 'medium', riskNotes: ['angiogenesis_modulation'],
+    tHalfHours: 4, tHalfAlphaHours: 0.3, tHalfBetaHours: 4,
+    mechanisms: ['CELL_MIGRATION', 'TISSUE_REPAIR'],
+    effects: ['Регенерация связок','Ангиогенез','Противовоспалительное','Миграция клеток'],
+    riskLevel: 'low', riskNotes: ['Не для онкобольных — стимулирует ангиогенез'],
+    fridgeLifeDays: 30, rtLifeHours: 72,
   },
   mots_c: {
     id: 'mots_c', name: 'MOTS-c', className: 'mitochondrial', routes: ['sc'],

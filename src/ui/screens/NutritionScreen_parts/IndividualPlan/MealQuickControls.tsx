@@ -6,6 +6,8 @@ import {
   scoreFoodsForKBJU, getMealKBJUTarget, getMealCurrentKBJU,
   type KbjuMatchResult, type AdvancedFilter,
 } from "../../../../engines/kbju-food-match.engine";
+import { scoreFoodsWithGapPriority, type GapAwareScore } from "../../../../engines/composer-targeting-integration";
+import type { NutrientGapResult } from "../../../../engines/nutrient-gap-filler.engine";
 import type { ComposerMode } from "./MealComposerMode";
 
 const btnCard: React.CSSProperties = {
@@ -59,9 +61,10 @@ const CATEGORY_LABELS: Record<string, string> = {
 interface Props {
   mode?: ComposerMode;
   advancedFilter?: AdvancedFilter;
+  gapResult?: NutrientGapResult | null;
 }
 
-export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFilter = {} }) => {
+export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFilter = {}, gapResult = null }) => {
   const ctx = usePlanCtx();
   const {
     dayPlan, generated,
@@ -233,7 +236,12 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
       const mealTarget = getMealKBJUTarget(dayPlan, popup.selectedMealIdx);
       const mealCur = getMealCurrentKBJU(dayPlan, popup.selectedMealIdx);
       const defaultTarget = mealTarget || { kcal: 600, protein: 40, fat: 20, carbs: 60 };
-      const scored = scoreFoodsForKBJU(raw, defaultTarget, mealCur || undefined, mode === 'advanced' ? advancedFilter : undefined, 20);
+      let scored: any[];
+      if (mode === 'targeting' && gapResult) {
+        scored = scoreFoodsWithGapPriority(raw, defaultTarget, gapResult, mealCur || undefined, advancedFilter, 20, 0.4);
+      } else {
+        scored = scoreFoodsForKBJU(raw, defaultTarget, mealCur || undefined, mode === 'advanced' ? advancedFilter : undefined, 20);
+      }
       setPopup({ ...popup, searchQuery: q, searchResults: raw.slice(0, 20), scoredResults: scored });
     }
   };
@@ -541,8 +549,24 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
                           <div style={{ width: `${result.matchScore}%`, height: '100%', borderRadius: 2, background: result.color }} />
                         </div>
                       </div>
+                      {/* Gap-filler badge for targeting mode */}
+                      {mode === 'targeting' && (result as any).isGapFiller && (
+                        <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 6, padding: '1px 5px', borderRadius: 4, background: 'rgba(6,182,212,0.1)', color: '#06b6d4', border: '1px solid rgba(6,182,212,0.15)', fontWeight: 600 }}>
+                            🎯 Закрывает {(result as any).gapsCovered}/{((result as any).totalGaps)} дефицитов
+                          </span>
+                          {(result as any).gapNutrients?.slice(0, 3).map((n: string) => {
+                            const gap = gapResult?.gaps?.find(g => g.nutrient === n);
+                            return gap ? (
+                              <span key={n} style={{ fontSize: 6, padding: '1px 4px', borderRadius: 3, background: 'rgba(239,68,68,0.06)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.1)' }}>
+                                {gap.label} {gap.percentCovered}%
+                              </span>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
                       {/* Row 2: advanced mode details */}
-                      {mode === 'advanced' && (
+                      {(mode === 'advanced' || mode === 'targeting') && (
                         <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', fontSize: 7 }}>
                           {result.diaas !== undefined && result.diaas > 0 && (
                             <span style={{ color: result.diaas >= 1 ? '#00e68a' : result.diaas >= 0.75 ? '#f59e0b' : '#ef4444' }}>

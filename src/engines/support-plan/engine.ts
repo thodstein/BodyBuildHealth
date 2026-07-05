@@ -4,6 +4,8 @@ import {
   type ScheduleItem, type TimeBlock, type SynergyId,
   type PowerLevel, type LabSlice, type TimelineWeekData,
   SYNERGY_ID_SUBSTANCES, TITRATION_RULES, SYNERGY_ID_LABELS,
+  NUTRIENT_UL, DEPLETION_CASCADES, SUBSTANCE_HALF_LIFE,
+  FORM_BIOAVAIL_MULT, MINERAL_SEPARATION_HOURS, MEAL_CONTEXT_RULES,
 } from './types';
 import { evaluateRecommendations } from '../recommendation-engine';
 import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, type DrugInput, type TzSpecResult, type TzSpecMechanismResult } from '../risk-engine-tz-spec';
@@ -13,6 +15,145 @@ import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { normalizeLabValue } from '../../core/constants';
 import { SYNERGY_NETWORK } from '../../data/support-synergy-network';
+
+// ═══════════════════════════════════════════════════════════════
+//  НУТРИЦИОЛОГИЧЕСКИЕ ФУНКЦИИ (body-weight dosing, depletion, UL, t½)
+// ═══════════════════════════════════════════════════════════════
+
+/** Нормализация дозы по весу тела (мг → мг с учётом кг).
+ *  weightNormalized = baseDose × (bodyWeight / referenceWeight)^0.75
+ *  Показатель 0.75 — аллометрическое масштабирование Клейбера. */
+function normalizeDoseByWeight(baseDoseMg: number, bodyWeightKg: number, refWeightKg = 80): number {
+  const bmiFactor = Math.pow(bodyWeightKg / refWeightKg, 0.75);
+  return Math.round(baseDoseMg * bmiFactor);
+}
+
+/** Проверка каскадов истощения: если вещество X > порога → флаг истощения Y.
+ *  Возвращает массив предупреждений. */
+interface DepletionWarning {
+  depleter: string; depleted: string; mechanism: string; severity: string;
+  recommendation: string;
+}
+function checkDepletionCascade(
+  substances: string[],
+  doses: Record<string, number>,
+): DepletionWarning[] {
+  const warnings: DepletionWarning[] = [];
+  for (const cascade of DEPLETION_CASCADES) {
+    const doseMg = doses[cascade.depleter] || 0;
+    if (doseMg >= cascade.thresholdMg && substances.includes(cascade.depleter)) {
+      const depletedInPlan = substances.includes(cascade.depleted);
+      warnings.push({
+        depleter: cascade.depleter,
+        depleted: cascade.depleted,
+        mechanism: cascade.mechanism,
+        severity: cascade.severity,
+        recommendation: depletedInPlan
+          ? `Принимать ${cascade.depleter} и ${cascade.depleted} раздельно (≥${MINERAL_SEPARATION_HOURS[`${cascade.depleter}||${cascade.depleted}`] || 2}ч).`
+          : `Рассмотреть добавление ${cascade.depleted} для профилактики дефицита.`,
+      });
+    }
+  }
+  return warnings;
+}
+
+/** Проверка превышения верхнего допустимого уровня (UL).
+ *  Возвращает массив предупреждений. */
+interface ULWarning {
+  substanceId: string; currentDoseMg: number; ulMg: number;
+  percentUL: number; risk: string; recommendation: string;
+}
+function checkUpperLimits(
+  substances: string[],
+  doses: Record<string, number>,
+): ULWarning[] {
+  const warnings: ULWarning[] = [];
+  for (const subId of substances) {
+    const ul = NUTRIENT_UL[subId];
+    if (!ul) continue;
+    const doseMg = doses[subId] || 0;
+    if (doseMg > ul) {
+      const pct = Math.round(doseMg / ul * 100);
+      warnings.push({
+        substanceId: subId,
+        currentDoseMg: doseMg,
+        ulMg: ul,
+        percentUL: pct,
+        risk: pct > 200 ? 'Высокий риск токсичности' : pct > 150 ? 'Значительное превышение UL' : pct > 100 ? 'Превышение UL' : 'В пределах нормы',
+        recommendation: pct > 150
+          ? `Снизить дозу до ≤${ul * 1.5} мг/сут под контролем врача.`
+          : `Рассмотреть снижение дозы до ≤${ul} мг/сут.`,
+      });
+    }
+  }
+  return warnings;
+}
+
+/** Агрегация суммарной суточной нагрузки минералов/витаминов по всем веществам в плане.
+ *  Учитывает, что multiple вещества могут содержать один и тот же нутриент. */
+function aggregateDailyLoad(
+  substances: string[],
+  doses: Record<string, number>,
+): Record<string, { totalMg: number; contributors: string[]; hasUL: boolean; ulMg?: number }> {
+  const agg: Record<string, { totalMg: number; contributors: string[]; hasUL: boolean; ulMg?: number }> = {};
+  for (const subId of substances) {
+    const doseMg = doses[subId] || 0;
+    if (doseMg <= 0) continue;
+    // Сначала само вещество как нутриент
+    if (NUTRIENT_UL[subId] !== undefined) {
+      if (!agg[subId]) agg[subId] = { totalMg: 0, contributors: [], hasUL: true, ulMg: NUTRIENT_UL[subId] };
+      agg[subId].totalMg += doseMg;
+      agg[subId].contributors.push(subId);
+    }
+    // Дополнительные кроссиды: vitamin_d3 содержит D3, но ID уже vitamin_d3
+  }
+  return agg;
+}
+
+/** Кратность приёма по периоду полувыведения.
+ *  ultra_short → 3-4×/день, short → 2-3×, medium → 1-2×, long → 1× */
+function halfLifeMultiplicity(id: string): number {
+  const cat = SUBSTANCE_HALF_LIFE[id];
+  if (!cat) return 1;
+  switch (cat) {
+    case 'ultra_short': return 3;
+    case 'short': return 2;
+    case 'medium': return 1;
+    case 'long': return 1;
+    case 'ultra_long': return 1;
+  }
+}
+
+/** Корректировка дозы по биодоступности формы (если известна форма из каталога). */
+function adjustForBioavailability(subId: string, baseDoseMg: number): { adjustedMg: number; formInfo: string } {
+  const entry = SUPPORT_CATALOG_DATA[subId] || SUPPORT_CATALOG_DATA[subId.toUpperCase()];
+  if (!entry) return { adjustedMg: baseDoseMg, formInfo: '' };
+  const forms = entry.forms;
+  if (!forms || !Array.isArray(forms) || forms.length === 0) return { adjustedMg: baseDoseMg, formInfo: '' };
+  const bestForm = forms.find((f: any) => f.best) || forms[0];
+  const formKey = (subId + '_' + (bestForm.nameRu || bestForm.name || '')).toLowerCase();
+  // Ищем коэффициент биодоступности
+  let baCoeff = 0.65; // стандартный fallback
+  let formName = bestForm.nameRu || bestForm.name || '';
+  for (const [key, coeff] of Object.entries(FORM_BIOAVAIL_MULT)) {
+    if (formKey.includes(key)) { baCoeff = coeff; break; }
+  }
+  // Нормализуем к стандартной биодоступности 0.40 (reference)
+  const adjustedMg = Math.round(baseDoseMg * (0.40 / Math.max(0.02, baCoeff)));
+  return {
+    adjustedMg: Math.max(baseDoseMg * 0.3, adjustedMg), // не меньше 30% от базовой дозы
+    formInfo: `Биодоступность формы "${formName}": ${Math.round(baCoeff * 100)}% → доза скорректирована: ${adjustedMg} мг`,
+  };
+}
+
+/** Оптимизация времени приёма с учётом полувыведения.
+ *  Возвращает рекомендацию по кратности для schedule. */
+function getHalfLifeInstructions(subId: string): string {
+  const mult = halfLifeMultiplicity(subId);
+  if (mult >= 3) return 'Разделить на 3-4 приёма в течение дня для поддержания концентрации';
+  if (mult === 2) return 'Разделить на 2 приёма (утро + вечер) для стабильного эффекта';
+  return '1 раз в день';
+}
 
 // ── Synergy helpers ──
 // Ищет все синергии кандидата с уже выбранными веществами
@@ -468,6 +609,7 @@ function applyTitration(substances: string[], state: CalculatorState): Record<st
   const d: Record<string, number> = {};
   const c = state.cardio; const p = state.pharma;
   const cw = state.courseWeek ?? 1;
+  const bw = state.profile?.weight || 80;
   // Week scaling: early = 0.5x, mid = 0.75x, late = 1.0x
   const weekScale = cw <= 2 ? 0.5 : cw <= 4 ? 0.75 : cw <= 6 ? 0.9 : 1.0;
   if (substances.includes('telmisartan')) {
@@ -487,8 +629,19 @@ function applyTitration(substances: string[], state: CalculatorState): Record<st
     d.cabergoline = cw <= 2 ? 0.125 : 0.25;
   }
   // NAC / TUDCA titration: build up to avoid GI upset
-  if (substances.includes('nac')) d.nac = cw <= 2 ? 1200 : 1800;
-  if (substances.includes('tudca')) d.tudca = cw <= 2 ? 500 : 1000;
+  if (substances.includes('nac')) d.nac = cw <= 2 ? normalizeDoseByWeight(1200, bw) : normalizeDoseByWeight(1800, bw);
+  if (substances.includes('tudca')) d.tudca = cw <= 2 ? normalizeDoseByWeight(500, bw) : normalizeDoseByWeight(1000, bw);
+  // Body-weight normalized minerals/vitamins
+  if (substances.includes('magnesium')) d.magnesium = normalizeDoseByWeight(200, bw);
+  if (substances.includes('zinc')) d.zinc = normalizeDoseByWeight(15, bw);
+  if (substances.includes('vitamin_d3')) d.vitamin_d3 = normalizeDoseByWeight(2000, bw, 70);
+  if (substances.includes('omega3')) d.omega3 = normalizeDoseByWeight(2000, bw);
+  if (substances.includes('alpha_lipoic')) d.alpha_lipoic = normalizeDoseByWeight(300, bw);
+  if (substances.includes('coq10')) d.coq10 = normalizeDoseByWeight(100, bw);
+  if (substances.includes('glycine')) d.glycine = normalizeDoseByWeight(2000, bw);
+  if (substances.includes('potassium')) d.potassium = normalizeDoseByWeight(200, bw);
+  if (substances.includes('vitamin_c')) d.vitamin_c = normalizeDoseByWeight(500, bw);
+  if (substances.includes('selenium')) d.selenium = normalizeDoseByWeight(50, bw, 70);
   return d;
 }
 
@@ -524,15 +677,29 @@ const SUB_NAMES: Record<string, string> = {
   l_citrulline:'L-Цитруллин', beet_root:'Свёкла',
 };
 
-function generateSchedule(substances: string[], synergyIds: SynergyId[], doses: Record<string, number>): ScheduleItem[] {
+function generateSchedule(substances: string[], synergyIds: SynergyId[], doses: Record<string, number>, state: CalculatorState): ScheduleItem[] {
   const schedule: ScheduleItem[] = [];
   const used = new Set<string>();
-  const morningGroup = ['vitamin_c','vitamin_d3','vitamin_e','coq10','alpha_lipoic','selenium','boron','zinc','telmisartan','nebivolol','ashwagandha','calcium','vitamin_k2','probiotics','anastrozole','cabergoline','hcg','curcumin','dhea','pregnenolone','collagen','melatonin','l_citrulline','DIM','saw_palmetto'];
+  const morningGroup = ['vitamin_c','vitamin_d3','vitamin_e','coq10','alpha_lipoic','selenium','boron','zinc','telmisartan','nebivolol','ashwagandha','calcium','vitamin_k2','probiotics','anastrozole','cabergoline','hcg','curcumin','dhea','pregnenolone','collagen','l_citrulline','DIM','saw_palmetto','tyrosine'];
   const afternoonGroup = ['berberine','bromelain','nattokinase','betaine','folate','vitamin_b12','magnesium','potassium','artichoke','bile_acids','omega3','glucosamine','msm','boswellia','chondroitin_sulfate','taurine','inositol','piperine','reishi','maitake','shilajit','chaga','cordyceps','lions_mane'];
-  const eveningGroup = ['nac','tudca','milk_thistle','glycine','theanine','gaba','tyrosine','l_dopa','x5htp','vitamin_b6','astragalus','celery_extract','glutathione','bergamot','red_yeast','aspirin','tamoxifen','5htp','hyaluronic_acid','bpc157','tb500'];
+  const eveningGroup = ['nac','tudca','milk_thistle','glycine','theanine','gaba','x5htp','vitamin_b6','astragalus','celery_extract','glutathione','bergamot','red_yeast','aspirin','tamoxifen','5htp','hyaluronic_acid','bpc157','tb500','melatonin'];
   const timeOf = (id: string): TimeBlock => morningGroup.includes(id) ? 'morning' : afternoonGroup.includes(id) ? 'afternoon' : 'evening';
+  const bw = state.profile?.weight || 80;
+
   const doseStr = (id: string): string => {
-    if (doses[id]) return doses[id] + ' мг';
+    if (doses[id]) {
+      const val = doses[id];
+      // МКГ-единицы для микродоз
+      if (id === 'selenium' || id === 'folate' || id === 'vitamin_k2' || id === 'boron')
+        return val + ' мкг';
+      // МЕ для витамина D
+      if (id === 'vitamin_d3') {
+        const iu = Math.round(val * 40); // 1 мкг = 40 МЕ
+        return iu >= 1000 ? iu + ' МЕ' : val + ' мкг';
+      }
+      if (id === 'bpc157' || id === 'tb500') return val + ' мкг';
+      return val + ' мг';
+    }
     const defs: Record<string, string> = {
       nac:'1200 мг', alpha_lipoic:'300 мг', tudca:'500 мг', milk_thistle:'280 мг',
       omega3:'2000 мг', coq10:'100 мг', magnesium:'200 мг', telmisartan:'40 мг',
@@ -558,15 +725,37 @@ function generateSchedule(substances: string[], synergyIds: SynergyId[], doses: 
     };
     return defs[id] || 'по инструкции';
   };
-    for (const sub of substances) {
+
+  /** Контекст приёма пищи для вещества. */
+  const mealCtxFor = (id: string): string => {
+    const rule = MEAL_CONTEXT_RULES.find(r => r.substanceId === id);
+    if (!rule) return 'С едой';
+    if (rule.emptyStomach) return 'Натощак (за 30-60 мин до еды)';
+    if (rule.requireFat) return 'С пищей, содержащей жиры (для усвоения)';
+    if (rule.requireWithFood) return 'С едой';
+    return 'С едой';
+  };
+
+  /** Half-life-aware инструкция. */
+  const hlInst = (id: string): string => {
+    const mult = halfLifeMultiplicity(id);
+    if (mult >= 3) return `Разделить на 3-4 приёма (t½ < 2ч). ${mealCtxFor(id)}`;
+    if (mult === 2) return `Разделить на 2 приёма (t½ 2-6ч). ${mealCtxFor(id)}`;
+    return mealCtxFor(id);
+  };
+
+  for (const sub of substances) {
     if (used.has(sub)) continue; used.add(sub);
     const block = timeOf(sub);
     const catEntry = SUPPORT_CATALOG_DATA[sub] || SUPPORT_CATALOG_DATA[sub.toUpperCase()];
     const name = SUB_NAMES[sub] || catEntry?.nameRu || catEntry?.name || sub;
+    // Bioavailability-adjusted dose display
+    const { formInfo } = adjustForBioavailability(sub, doses[sub] || 0);
     schedule.push({
       substanceId: sub, name,
-      dose: doseStr(sub), timeBlock: block,
-      instructions: block === 'morning' ? 'С завтраком' : block === 'afternoon' ? 'С обедом' : 'За 1-2 ч до сна',
+      dose: doseStr(sub),
+      timeBlock: block,
+      instructions: hlInst(sub) + (formInfo ? `. ${formInfo}` : ''),
       synergyGroup: synergyIds.find(sid => SYNERGY_ID_SUBSTANCES[sid]?.includes(sub)),
     });
   }
@@ -882,6 +1071,57 @@ function toSystemRisksFromTz(
   });
 }
 
+// ── Канонические алиасы веществ ──
+// Решает проблему семантических дубликатов: рекомендательный движок использует ID с суффиксами
+// (_sup, _ii, _supplement, singular/plural), а SUPPLEMENTS_DB/PHARMACY_DB — базовые ID.
+// Без этой мапы один и тот же препарат попадает в план дважды под разными ID.
+const SUB_ALIAS: Record<string, string> = {
+  zinc_sup: 'zinc', selenium_sup: 'selenium',
+  taurine_sup: 'taurine', curcumin_sup: 'curcumin',
+  collagen_ii: 'collagen', calcium_supplement: 'calcium',
+  probiotic: 'probiotics', probiotics_sup: 'probiotics',
+  methylfolate: 'folate', methylcobalamin: 'vitamin_b12',
+  red_yeast_rice: 'red_yeast',
+  acetyl_l_carnitine: 'l_carnitine', carnitine: 'l_carnitine',
+  grape_seed_extract: 'grape_seed',
+  l_theanine: 'theanine', l_tyrosine: 'tyrosine', l_dopa: 'l_dopa',
+  saw_palmetto: 'saw_palmetto', // canonical already
+};
+function canonId(id: string): string { return SUB_ALIAS[id] || id; }
+
+// ── Блэклист: вещества ИЗ SUPPLEMENTS_DB/PHARMACY_DB, которые НЕ должны назначаться автоматически ──
+// 1) Сырые химические элементы/компоненты — НЕ препараты (натрий=соль, кофеин=стимулянт, адреналин=гормон)
+// 2) Рецептурные препараты, требующие назначения врача (антикоагулянты, антидепрессанты, нейролептики, БЗР)
+// 3) НПВС и кортикостероиды — препараты по показаниям, не «поддержка» на курсе
+// 4) Узкие/экспериментальные компоненты без стандарта применения
+const TZ_AUTO_BLACKLIST = new Set<string>([
+  // Сырые химикалии/минералы/гормоны — не являются препаратами поддержки:
+  'sodium', 'caffeine', 'adrenaline', 'copper', 'iron',
+  'flavonoids', 'anthocyanins', 'c60',
+  'omega6', 'omega7', 'omega9', // неосновные Омега (нужна только omega3)
+  'l_histidine', 'ornithine', 'inosine', 'nrf2_activator',
+  'lecithin', 'taxifolin',
+  // Рецептурные препараты — только врач, не авто-подбор:
+  'warfarin', 'rivaroxaban', 'apixaban', 'dabigatran', // антикоагулянты
+  'clopidogrel', 'ticagrelor', // антиагреганты
+  'fluoxetine', 'sertraline', 'citalopram', 'escitalopram', 'venlafaxine', 'duloxetine', // антидепрессанты
+  'olanzapine', 'quetiapine', 'risperidone', 'aripiprazole', 'haloperidol', // нейролептики
+  'alprazolam', 'diazepam', 'lorazepam', 'clonazepam', 'buspirone', // анксиолитики/БЗР
+  'valproate', 'lamotrigine', 'carbamazepine', 'phenytoin', // противосудорожные
+  // НПВС и кортикостероиды — не «поддержка»:
+  'ibuprofen', 'naproxen', 'celecoxib', 'diclofenac',
+  'prednisone', 'dexamethasone', 'hydrocortisone', 'methylprednisolone',
+  // Врачебные рецептурные (не назначаем автоматически — только через явный fallback в rec-engine):
+  'furosemide', 'hydrochlorothiazide', 'chlorthalidone', // диуретики — врачебное назначение
+  'atorvastatin', 'rosuvastatin', 'simvastatin', 'pravastatin', 'pitavastatin', // статины
+  'lisinopril', 'enalapril', 'ramipril', 'perindopril', 'captopril', // АПФ-ингибиторы
+  'metoprolol', 'atenolol', 'bisoprolol', 'carvedilol', 'propranolol', // бета-блокаторы (кроме небиволола)
+  'amlodipine', 'nifedipine', 'verapamil', 'diltiazem', // БКК
+  'losartan', 'valsartan', 'irbesartan', 'olmesartan', 'candesartan', // БРА (кроме телмисартана)
+  // Гастро/ферменты (назначаются по показаниям ЖКТ, а не ТВ-движком):
+  'digestive_enzymes', 'gentian', 'licorice',
+]);
+
 export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   try {
   const blacklist = getBlacklist(state);
@@ -893,15 +1133,19 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   const synergyIds: SynergyId[] = [];
   const substances: string[] = [];
   const used = new Set<string>();
-  for (const b of blacklist) used.add(b);
+  // Храним КАНОНИЧЕСКИЕ ID в usedCanon для семантической дедупликации
+  const usedCanon = new Set<string>();
+  const markUsed = (id: string) => { used.add(id); usedCanon.add(canonId(id)); };
+  const isUsed = (id: string): boolean => used.has(id) || usedCanon.has(canonId(id));
+  for (const b of blacklist) { used.add(b); usedCanon.add(canonId(b)); }
 
   // 1. Обязательные препараты на курсе ААС (mandatory logic, BUG 7)
   if (state.pharma.aas.length > 0) {
-    if (!state.pharma.hasHCG && !used.has('hcg')) { substances.push('hcg'); used.add('hcg'); }
+    if (!state.pharma.hasHCG && !isUsed('hcg')) { substances.push('hcg'); markUsed('hcg'); }
     const hasArom = state.pharma.aas.some((a: any) => (a.id||'').toLowerCase().includes('test') || (a.id||'').toLowerCase().includes('meth'));
-    if (hasArom && !state.pharma.hasAI && !used.has('anastrozole') && !used.has('tamoxifen')) { substances.push('anastrozole'); used.add('anastrozole'); }
+    if (hasArom && !state.pharma.hasAI && !isUsed('anastrozole') && !isUsed('tamoxifen')) { substances.push('anastrozole'); markUsed('anastrozole'); }
     if (state.pharma.aas.some((a: any) => ['tren','nandrolone','deca','npp','trest'].some(x => (a.id||'').toLowerCase().includes(x)))) {
-      if (!state.pharma.hasCaber && !used.has('cabergoline')) { substances.push('cabergoline'); used.add('cabergoline'); }
+      if (!state.pharma.hasCaber && !isUsed('cabergoline')) { substances.push('cabergoline'); markUsed('cabergoline'); }
     }
   }
 
@@ -910,7 +1154,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   const recommendations = evaluateRecommendations(state, resultPre);
   for (const rec of recommendations)
     for (const sub of rec.substances)
-      if (!used.has(sub.id)) { substances.push(sub.id); used.add(sub.id); }
+      if (!isUsed(sub.id)) { substances.push(sub.id); markUsed(sub.id); }
 
   // 2a. Отмечаем какие системы уже покрыты рекомендациями (чтобы TZ не дублировал)
   const recCoveredSystems = new Set<string>();
@@ -1002,8 +1246,9 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       // [id, matchCount, totalK, synergyBonus]
       const scored: [string, number, number, number][] = [];
       for (const [id, entries] of Object.entries(allDb)) {
-        if (used.has(id) || !entries.length) continue;
+        if (isUsed(id) || !entries.length) continue;
         if (tBoosterBlacklist.has(id)) continue;
+        if (TZ_AUTO_BLACKLIST.has(id)) continue; // не назначать сырые химикалии/рецептурные автоматически
         let matchCount = 0; let totalK = 0;
         for (const e of entries) {
           if (systemsNeedingCoverage.includes(e.organId as RiskSystemId)) { matchCount++; totalK += e.k; }
@@ -1016,8 +1261,8 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       // Синергия даёт бонус к скорингу: matchCount×20 + totalK + synergyBonus×3
       scored.sort((a, b) => (b[1] * 20 + b[2] + b[3] * 3) - (a[1] * 20 + a[2] + a[3] * 3));
       for (const [id] of scored.slice(0, 3)) {
-        if (used.has(id)) continue;
-        substances.push(id); used.add(id);
+        if (isUsed(id)) continue;
+        substances.push(id); markUsed(id);
       }
     }
 
@@ -1031,8 +1276,9 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
         // Найти лучшее вещество для этой системы (k + синергия с уже выбранными)
         let best: [string, number, number] | null = null; // [id, k, synergyBonus]
         for (const [id, entries] of Object.entries(allDb)) {
-          if (used.has(id)) continue;
+          if (isUsed(id)) continue;
           if (tBoosterBlacklist.has(id)) continue;
+          if (TZ_AUTO_BLACKLIST.has(id)) continue; // не назначать сырые химикалии/рецептурные
           // Проверка конфликтов
           if (conflictScoreWithPlan(id, substances) > 0) continue;
           for (const e of entries) {
@@ -1046,7 +1292,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
           }
         }
         if (!best) break;
-        substances.push(best[0]); used.add(best[0]);
+        substances.push(best[0]); markUsed(best[0]);
         currentCount++;
         sysCoverageCount[tzSys] = currentCount;
         // Проверяем — достаточно ли?
@@ -1079,8 +1325,9 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
         // Ищем вещество с максимальной синергией к плану, покрывающее эту систему
         let bestBoost: [string, number, number] | null = null; // [id, synScore, k]
         for (const [id, entries] of Object.entries(allDb)) {
-          if (used.has(id)) continue;
+          if (isUsed(id)) continue;
           if (tBoosterBlacklist.has(id)) continue;
+          if (TZ_AUTO_BLACKLIST.has(id)) continue; // не назначать сырые химикалии/рецептурные
           if (conflictScoreWithPlan(id, substances) > 0) continue;
           const hasSys = entries.some(e => e.organId === tzSys || e.organId === sys);
           if (!hasSys) continue;
@@ -1092,7 +1339,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
           }
         }
         if (bestBoost) {
-          substances.push(bestBoost[0]); used.add(bestBoost[0]);
+          substances.push(bestBoost[0]); markUsed(bestBoost[0]);
           boostAdded.push(bestBoost[0]);
           sysCoverageCount[tzSys] = (sysCoverageCount[tzSys] || 0) + 1;
         }
@@ -1103,7 +1350,12 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   // ── Финальный расчёт риска С поддержкой (TZ engine) ──
   const titration = applyTitration(substances, state);
   const labDeltas = calcLabDeltas(state);
-  const schedule = generateSchedule(substances, synergyIds, titration);
+  const schedule = generateSchedule(substances, synergyIds, titration, state);
+
+  // ── Нутрициологические проверки (depletion cascade, UL) ──
+  const depletionWarnings = checkDepletionCascade(substances, titration);
+  const ulWarnings = checkUpperLimits(substances, titration);
+  const dailyLoad = aggregateDailyLoad(substances, titration);
 
   let overallRaw: number;
   let overallAfterSupport: number;
@@ -1180,7 +1432,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   if (state.jointMode) {
     const jointIds = ['collagen','glucosamine','msm','boswellia','chondroitin_sulfate','hyaluronic_acid','bpc157','tb500','vitamin_c','curcumin','omega3'];
     for (const jid of jointIds) {
-      if (!used.has(jid)) jointSubs.push(jid);
+      if (!isUsed(jid)) jointSubs.push(jid);
     }
   }
 
@@ -1188,16 +1440,16 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   if (state.reproMode) {
     const reproIds = ['hcg','zinc','vitamin_d3','coq10','ashwagandha','saw_palmetto'];
     for (const rid of reproIds) {
-      if (!used.has(rid)) { substances.push(rid); used.add(rid); }
+      if (!isUsed(rid)) { substances.push(rid); markUsed(rid); }
     }
   }
 
   // ── Нейропротекция: ручная кнопка (добавляет ноотропы/нейропротекторы) ──
   const neuroSubs: string[] = [];
   if (state.neuroMode) {
-    const neuroIds = ['nac','alpha_lipoic','omega3','coq10','magnesium','lions_mane','theanine','tyrosine','vitamin_b6','vitamin_b12','folate','ashwagandha','bromantan','fasoracetam','lions_mane','huperzine','semax','cerebrolysin'];
+    const neuroIds = ['nac','alpha_lipoic','omega3','coq10','magnesium','lions_mane','theanine','tyrosine','vitamin_b6','vitamin_b12','folate','ashwagandha','bromantan','fasoracetam','huperzine','semax','cerebrolysin'];
     for (const nid of neuroIds) {
-      if (!used.has(nid)) { neuroSubs.push(nid); used.add(nid); }
+      if (!isUsed(nid)) { neuroSubs.push(nid); markUsed(nid); }
     }
   }
 
@@ -1257,6 +1509,9 @@ const _skipMusculo = !state.jointMode;
     synergyRecommendations: synergyRecs.length > 0 ? synergyRecs : undefined,
     boostAdded: boostAdded.length > 0 ? boostAdded : undefined,
     timestamp: new Date().toISOString(),
+    depletionWarnings: depletionWarnings.length > 0 ? depletionWarnings : undefined,
+    ulWarnings: ulWarnings.length > 0 ? ulWarnings : undefined,
+    dailyLoad: Object.keys(dailyLoad).length > 0 ? dailyLoad : undefined,
   };
   result.risk.systems = tzResultFinal
     ? toSystemRisksFromTz(tzResultFinal, finalScores, synergyIds.length)

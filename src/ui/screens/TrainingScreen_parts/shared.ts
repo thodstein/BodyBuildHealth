@@ -43,14 +43,15 @@ export type TrainingTab =
   | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress' | 'mytraining'
   | 'programcalc' | 'reports' | 'srcbb' | 'volume' | 'library' | 'powerlifting' | 'bodybuilding'
   | 'calc_substitute' | 'calc_quality' | 'calc_1rm' | 'import_data' | 'pl_norms' | 'pl_pro' | 'rel_strength' | 'calendar' | 'mixes' | 'periodization_designer' | 'tech_calc' | 'deload_scheduler' | 'meso_progression'
-  | 'calc_taper' | 'calc_fatigue' | 'calc_vbt' | 'calc_plates' | 'calc_mrv' | 'target_muscle';
+  | 'calc_taper' | 'calc_fatigue' | 'calc_vbt' | 'calc_plates' | 'calc_mrv' | 'target_muscle'
+  | 'tempo' | 'meso_tracker';
 export type TrainingPage = 'hero' | 'tabs';
 // Главная — ровно 3 раздела: Тренировка (вести), Планирование (планировать), Инфо (смотреть).
 export type TrainingGroup = 'training' | 'planning' | 'info' | null;
 
 export const TAB_GROUPS: Record<string, { title: string; icon: string; tabs: TrainingTab[]; color: string }> = {
   training: { title: '🏋️ Тренировка', icon: '🏋️', tabs: ['runtime', 'timers', 'diary', 'mixes'], color: 'var(--accent)' },
-  planning: { title: '📐 Планирование', icon: '📐', tabs: ['srcbb', 'plan', 'cycles', 'mytraining', 'programcalc', 'volume', 'powerlifting', 'bodybuilding', 'excalc', 'calc_substitute', 'calc_quality', 'calc_1rm', 'calculators', 'periodization_designer', 'deload_scheduler', 'meso_progression', 'rel_strength', 'calc_taper', 'calc_fatigue', 'calc_vbt', 'calc_plates', 'calc_mrv'], color: '#3b82f6' },
+  planning: { title: '📐 Планирование', icon: '📐', tabs: ['srcbb', 'plan', 'cycles', 'mytraining', 'programcalc', 'volume', 'powerlifting', 'bodybuilding', 'excalc', 'calc_substitute', 'calc_quality', 'calc_1rm', 'calculators', 'periodization_designer', 'deload_scheduler', 'meso_progression', 'rel_strength', 'calc_taper', 'calc_fatigue', 'calc_vbt', 'calc_plates', 'calc_mrv', 'tempo', 'meso_tracker'], color: '#3b82f6' },
   info: { title: '📊 Инфо', icon: '📊', tabs: ['analytics', 'visual', 'progress', 'history', 'reports', 'exercises', 'methods', 'programs', 'library', 'calendar', 'import_data'], color: '#a855f7' },
 };
 
@@ -83,6 +84,8 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   calc_plates: '🧮 Калькулятор блинов',
   calc_mrv: '🎯 Оценщик MRV',
   target_muscle: '🎯 Целевая мышца',
+  tempo: '⏱️ Темп повторений',
+  meso_tracker: '📈 Трекер мезоциклов',
 };
 
 // ══ Этап R/U: 3 плоские трассы планировщика (ПЛ / ББ / Ручной сбор), одна вкладка — один клик.
@@ -101,7 +104,7 @@ export const PL_PLANNING_TABS: TrainingTab[] = ['srcbb', 'volume', 'powerlifting
 export const BB_PLANNING_TABS: TrainingTab[] = ['srcbb', 'volume', 'bodybuilding'];
 export const MANUAL_PLANNING_TABS: TrainingTab[] = ['plan', 'cycles', 'mytraining', 'programcalc', 'volume'];
 // Калькуляторы доступны в любой трассе планировщика (подбор / замена / качество / нагрузка)
-const CALC_TABS: TrainingTab[] = ['excalc', 'calc_substitute', 'calc_quality', 'calc_1rm', 'pl_norms', 'pl_pro', 'rel_strength', 'calculators', 'tech_calc', 'target_muscle', 'calc_taper', 'calc_fatigue', 'calc_vbt', 'calc_plates', 'calc_mrv', 'deload_scheduler'];
+const CALC_TABS: TrainingTab[] = ['excalc', 'calc_substitute', 'calc_quality', 'calc_1rm', 'pl_norms', 'pl_pro', 'rel_strength', 'calculators', 'tech_calc', 'target_muscle', 'calc_taper', 'calc_fatigue', 'calc_vbt', 'calc_plates', 'calc_mrv', 'deload_scheduler', 'tempo', 'meso_tracker'];
 export function planningTabsFor(track: PlanningTrack): TrainingTab[] {
   const base = track === 'manual' ? MANUAL_PLANNING_TABS : track === 'bb' ? BB_PLANNING_TABS : PL_PLANNING_TABS;
   return [...base, ...CALC_TABS];

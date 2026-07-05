@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { usePlanCtx } from "./IndividualPlanContext";
 import { FOOD_DB } from "../../../../core/nutrition-database";
 import { getRecipesByMeal } from "../../../../engines/nutrition-periodization.engine";
 import { MealQuickControls } from "./MealQuickControls";
 import { MealComposerMode, type ComposerMode } from "./MealComposerMode";
 import type { AdvancedFilter } from "../../../../engines/kbju-food-match.engine";
+import { analyzeNutrientGaps } from "../../../../engines/nutrient-gap-filler.engine";
+import { getGapAwareComboResult, buildGapSummary, applyGapComboToPlan } from "../../../../engines/composer-targeting-integration";
 
 const KbjuProgressBars: React.FC<{ dayPlan: any; targetKcal: number; targetP: number; targetF: number; targetC: number }> = ({
   dayPlan, targetKcal, targetP, targetF, targetC,
@@ -59,6 +61,17 @@ const KbjuProgressBars: React.FC<{ dayPlan: any; targetKcal: number; targetP: nu
   );
 };
 
+const getProductsFromDayPlan = (dp: any): { foodId: string; weightGrams: number }[] => {
+  if (!dp?.meals) return [];
+  const items: { foodId: string; weightGrams: number }[] = [];
+  for (const meal of dp.meals) {
+    for (const item of (meal.items || [])) {
+      if (item.id) items.push({ foodId: item.id, weightGrams: item.amount || 100 });
+    }
+  }
+  return items;
+};
+
 export const MealComposer: React.FC = () => {
   const {
     dayPlan, threeDayPlan, generatePlan,
@@ -68,10 +81,36 @@ export const MealComposer: React.FC = () => {
     renderMealList,
     recipePickerMeal, setRecipePickerMeal, replaceMealWithRecipe,
     effectiveKcal, effectiveP, effectiveF, effectiveC,
+    setDayPlan, saveUndo,
   } = usePlanCtx();
 
   const [composerMode, setComposerMode] = useState<ComposerMode>('basic');
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilter>({});
+  const [selectedMealForTargeting, setSelectedMealForTargeting] = useState<number | null>(null);
+
+  const currentDay = dayPlan || (threeDayPlan ? threeDayPlan[selectedDayIndex] : null);
+  const dayProducts = useMemo(() => getProductsFromDayPlan(currentDay), [currentDay]);
+  const gapResult = useMemo(() => {
+    if (composerMode !== 'targeting' || dayProducts.length === 0) return null;
+    return analyzeNutrientGaps(dayProducts);
+  }, [composerMode, dayProducts]);
+  const gapSummary = useMemo(() => {
+    if (!gapResult) return [];
+    return buildGapSummary(gapResult);
+  }, [gapResult]);
+
+  const comboResult = useMemo(() => {
+    if (composerMode !== 'targeting' || dayProducts.length === 0) return null;
+    return getGapAwareComboResult(dayProducts, 5);
+  }, [composerMode, dayProducts]);
+
+  const handleApplyCombo = (foodId: string, weightGrams: number) => {
+    if (selectedMealForTargeting === null) return;
+    saveUndo();
+    const newPlan = applyGapComboToPlan(currentDay, selectedMealForTargeting, [{ foodId, weightGrams }]);
+    if (newPlan) setDayPlan(newPlan);
+    setSelectedMealForTargeting(null);
+  };
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
@@ -104,6 +143,8 @@ export const MealComposer: React.FC = () => {
             onModeChange={setComposerMode}
             advancedFilter={advancedFilter}
             onAdvancedFilterChange={setAdvancedFilter}
+            gapResult={gapResult}
+            gapSummary={gapSummary}
           />
 
           {/* KBJU progress bars */}
@@ -115,7 +156,70 @@ export const MealComposer: React.FC = () => {
             targetC={effectiveC}
           />
 
-          <MealQuickControls mode={composerMode} advancedFilter={advancedFilter} />
+          {composerMode === 'targeting' && gapResult && comboResult && comboResult.suggestions.length > 0 && (
+            <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(6,182,212,0.04)', border: '1px solid rgba(6,182,212,0.12)', marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#06b6d4' }}>🎯 Продукты для закрытия дефицитов</span>
+                <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)' }}>Выберите приём для добавления</span>
+              </div>
+              {selectedMealForTargeting === null && dayPlan?.meals ? (
+                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
+                  {dayPlan.meals.map((m: any, i: number) => (
+                    <button key={i} onClick={() => setSelectedMealForTargeting(i)} style={{
+                      padding: '4px 8px', borderRadius: 6, fontSize: 7, cursor: 'pointer',
+                      background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.15)',
+                      color: '#06b6d4', fontWeight: 600,
+                    }}>{m.time} {m.label}</button>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 7, color: '#06b6d4', marginBottom: 6 }}>
+                  Добавление в: <b>{dayPlan?.meals?.[selectedMealForTargeting ?? 0]?.label}</b>
+                  <span onClick={() => setSelectedMealForTargeting(null)} style={{ marginLeft: 6, cursor: 'pointer', color: '#ef4444', fontWeight: 700 }}>✕</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {comboResult.suggestions.slice(0, 5).map(s => (
+                  <div key={s.foodId} style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 8,
+                    background: s.gapCoveragePct >= 50 ? 'rgba(0,230,138,0.04)' : 'rgba(245,158,11,0.04)',
+                    border: `1px solid ${s.gapCoveragePct >= 50 ? 'rgba(0,230,138,0.12)' : 'rgba(245,158,11,0.12)'}`,
+                  }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `${s.color}15`, border: `1px solid ${s.color}25`, flexShrink: 0 }}>
+                      <span style={{ fontSize: 9, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.gapsCovered}</span>
+                      <span style={{ fontSize: 5, color: s.color + 'aa', lineHeight: 1 }}>{s.totalGaps > 0 ? `/ ${s.totalGaps}` : ''}</span>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 8, fontWeight: 600, color: '#fff' }}>{s.foodName}</div>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>
+                        {s.gapNutrients.slice(0, 3).map(n => {
+                          const gap = gapResult.gaps.find(g => g.nutrient === n);
+                          return gap?.label || n;
+                        }).join(', ')}
+                        {s.gapNutrients.length > 3 && <span style={{ color: 'rgba(255,255,255,0.3)' }}> +{s.gapNutrients.length - 3}</span>}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', flexShrink: 0 }}>
+                      {s.kcal} ккал
+                    </div>
+                    {selectedMealForTargeting !== null && (
+                      <button onClick={() => handleApplyCombo(s.foodId, 100)} style={{
+                        padding: '3px 8px', borderRadius: 6, fontSize: 7, fontWeight: 600, cursor: 'pointer',
+                        background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', flexShrink: 0,
+                      }}>+</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {comboResult.suggestions.length === 0 && (
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', textAlign: 'center', padding: 8 }}>
+                  Все дефициты покрыты текущими продуктами
+                </div>
+              )}
+            </div>
+          )}
+
+          <MealQuickControls mode={composerMode} advancedFilter={advancedFilter} gapResult={composerMode === 'targeting' ? gapResult : null} />
 
           <div style={{ display:'flex', gap:4, justifyContent:'center', flexWrap:'wrap' }}>
             {DAY_LABELS.map((label: string, idx: number) => (

@@ -29,7 +29,7 @@ export function buildSubstances(ids: string[], _tzRes: CalculatorResult): PlanSu
       name: e?.nameRu || e?.name || id,
       doseMg,
       doseDisplay,
-      timing: def?.timing || e?.dosageForms?.[0]?.dosage || 'с едой',
+      timing: def?.timing || e?.dosage?.timing || e?.forms?.[0]?.dose || 'с едой',
       category: e?.category || [],
       tier: e?.tier || 'standard',
       targetSystems: e?.targetSystems || e?.systems || [],

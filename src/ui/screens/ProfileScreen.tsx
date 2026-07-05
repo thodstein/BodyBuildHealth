@@ -12,6 +12,7 @@ import { useDataLink } from '../../core/data-link';
 import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { BioStackAISettings } from '../components/BioStackAIProfile';
 import { BPDiaryTab } from '../components/BPDiaryTab';
+import { ProfessionalReports, ReportData } from './ProfileScreen_parts/ProfessionalReports';
 
 type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'health' | 'genetics' | 'injuries' | 'diaries' | 'biostack_profile' | 'progress' | 'analytics' | 'contacts' | 'measurements';
 type ProfilePage = 'hero' | 'tabs';
@@ -2288,6 +2289,22 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
               }
             };
 
+            const reportData: ReportData = {
+              profile: { name: profile.name || '', age: settings.age || '', sex: settings.sex || 'male', weight: settings.weight || '', height: settings.height || '', bodyFat: settings.bodyFat || '', bloodType: settings.bloodType || '', allergyNotes: settings.allergyNotes || '', emergencyName: settings.emergencyName || '', emergencyPhone: settings.emergencyPhone || '' },
+              training: { experience: String(settings.trainingExperience || ''), level: settings.trainingLevel || '', sport: SPORT_TYPES.find(s => s.id === settings.sportType)?.label || '', goal: goalLabelR, workoutsPerWeek: String(settings.workoutsPerWeek || ''), avgWorkoutMinutes: String(settings.avgWorkoutMinutes || ''), programName, currentSplit: workoutLogs.length > 0 ? (workoutLogs[0].split || 'не указан') : ((() => { try { const ap = JSON.parse(localStorage.getItem('activeProgram') || 'null'); return ap?.weeks?.[0]?.days?.[0]?.name || ap?.name || 'не задан'; } catch { return 'не задан'; } })()), lastWorkoutDate: workoutLogs.length > 0 ? workoutLogs[0].date : 'нет записей', weekVolume: (() => { const last7 = new Date(Date.now() - 7*86400000).toISOString().split('T')[0]; const wkLogs = workoutLogs.filter(w => w.date >= last7); const wkVol = wkLogs.reduce((s, w) => s + (w.exercises??[]).reduce((ss, e) => ss + (e.totalVolume??0), 0), 0); return wkVol > 0 ? `${wkVol.toFixed(0)} кг` : 'нет данных'; })(), lastWorkouts: workoutSummary },
+              body: { bmi: String(bmiVal), ffmi: String(ffmiVal), lbm: String(lbmVal), targetWeight: String(settings.targetWeight || '') },
+              course: { phase: COURSE_PHASES.find(p => p.id === settings.phase)?.label || 'База', medsList, suppsList, courseStartDate: settings.courseStartDate },
+              risk: riskData,
+              labs: { list: labsList, recentList: labs.length > 0 ? labs.sort((a:LabPoint,b:LabPoint) => b.date.localeCompare(a.date)).slice(0,5).map(l => `${l.code} ${l.value}${l.unit} (${l.date})`).join(', ') : 'нет данных' },
+              nutrition: { dietType: DIET_TYPES.find(d => d.id === settings.dietType)?.label || '', mealsPerDay: String(settings.mealsPerDay || ''), avgKcal: foodDiaryAvg?.avgKcal ? String(foodDiaryAvg.avgKcal) : undefined, avgProtein: foodDiaryAvg?.avgProtein ? String(foodDiaryAvg.avgProtein) : undefined, avgFat: foodDiaryAvg?.avgFat ? String(foodDiaryAvg.avgFat) : undefined, avgCarbs: foodDiaryAvg?.avgCarbs ? String(foodDiaryAvg.avgCarbs) : undefined },
+              measurements: measSummary,
+              chronic: chronicList,
+              weightLogCount: weightLog.length,
+              workoutSummary,
+              last3Meas: measSummary,
+              foodDiaryAvg,
+            };
+
             return (
               <div>
                 {/* Analytics sub-tabs: Отчёты / Дневник прогресса */}
@@ -2355,251 +2372,22 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                     </div>
                   </div>
                 ) : (
-                <div>
-                <div style={{ marginBottom:10 }}>
-                  <div style={{ display:'flex', gap:4 }}>
-                    <button onClick={() => setReportTab('current')} style={{
-                      padding:'6px 14px', borderRadius:16, fontSize:10, fontWeight:700, cursor:'pointer',
-                      background: reportTab === 'current' ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
-                      color: reportTab === 'current' ? '#000' : 'rgba(255,255,255,0.85)',
-                      border: 'none',
-                    }}>📋 Текущие</button>
-                    <button onClick={() => setReportTab('archive')} style={{
-                      padding:'6px 14px', borderRadius:16, fontSize:10, fontWeight:700, cursor:'pointer',
-                      background: reportTab === 'archive' ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
-                      color: reportTab === 'archive' ? '#000' : 'rgba(255,255,255,0.85)',
-                      border: 'none',
-                    }}>📦 Архив</button>
-                  </div>
-                </div>
-                 {reportTab === 'current' && (
-                   <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                     {/* Generate buttons */}
-                     <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:4 }}>
-                       {[
-                         { label:'🏋️ Тренеру', color:'#3b82f6', report:trainerReport },
-                         { label:'🏥 Врачу', color:'#ef4444', report:doctorReport },
-                          { label:'📋 Общий', color:'#00e68a', report:generalReport },
-                          { label:'🎨 Свой', color:'#8b5cf6', report:'custom' },
-                        ].map((btn, i) => (
-                          <button key={i} onClick={() => {
-                            if (btn.report === 'custom') { setShowCustomReport(true); return; }
-                            try {
-                              const rep = { id: Date.now().toString(), date: new Date().toISOString().slice(0,10), type: btn.label, text: btn.report, timestamp: Date.now() };
-                              const archive = JSON.parse(localStorage.getItem('he_profile_reports') || '[]');
-                              archive.unshift(rep);
-                              localStorage.setItem('he_profile_reports', JSON.stringify(archive.slice(0, 30)));
-                            } catch {}
-                          }} style={{
-                            padding:'6px 12px', borderRadius:8, fontSize:9, cursor:'pointer', fontWeight:600,
-                            background: btn.color + '15', border: '1px solid ' + btn.color + '30',
-                            color: btn.color, whiteSpace:'nowrap',
-                          }}>📄 {btn.label}</button>
-                        ))}
-                      </div>
-
-                      {/* Custom report popup */}
-                      {showCustomReport && (
-                        <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.6)', padding:20 }} onClick={() => setShowCustomReport(false)}>
-                          <div style={{ background:'#18181b', borderRadius:16, padding:20, maxWidth:380, width:'100%', border:'1px solid rgba(255,255,255,0.06)' }} onClick={e => e.stopPropagation()}>
-                            <h3 style={{ margin:'0 0 4px', fontSize:14, fontWeight:700, color:'#fff' }}>🎨 Свой отчёт</h3>
-                            <p style={{ fontSize:9, color:'rgba(255,255,255,0.6)', margin:'0 0 12px' }}>Выберите блоки для включения в отчёт</p>
-                            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:12 }}>
-                              {[
-                                { key:'profile', label:'Профиль', icon:'👤', color:'#a78bfa' },
-                                { key:'training', label:'Тренировки', icon:'🏋️', color:'#3b82f6' },
-                                { key:'nutrition', label:'Питание', icon:'🥗', color:'#22c55e' },
-                                { key:'labs', label:'Анализы', icon:'🩸', color:'#ef4444' },
-                                { key:'pharma', label:'Курс', icon:'💊', color:'#ec4899' },
-                                { key:'risk', label:'Риски', icon:'⚠️', color:'#f97316' },
-                                { key:'support', label:'Поддержка', icon:'🧪', color:'#06b6d4' },
-                                { key:'bp', label:'Давление', icon:'❤️', color:'#f43f5e' },
-                                { key:'sleep', label:'Сон', icon:'🛌', color:'#8b5cf6' },
-                              ].map(b => (
-                                <label key={b.key} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', cursor:'pointer' }}>
-                                  <input type="checkbox" checked={!!customReportBlocks[b.key]} onChange={() => setCustomReportBlocks(prev => ({ ...prev, [b.key]: !prev[b.key] }))} style={{ width:16, height:16, accentColor:'#00e68a', cursor:'pointer' }} />
-                                  <span style={{ fontSize:12 }}>{b.icon}</span>
-                                  <span style={{ fontSize:10, color:'rgba(255,255,255,0.85)', fontWeight:600, flex:1 }}>{b.label}</span>
-                                </label>
-                              ))}
-                            </div>
-                            <button onClick={() => {
-                              const sections: string[] = [];
-                              if (customReportBlocks.profile) sections.push(`👤 Профиль:\n  Имя: ${profile.name || '—'} · ${settings.age || '—'} лет · ${settings.weight || '—'} кг · ${settings.height || '—'} см · BMI: ${bmiVal} · Цель: ${goalLabelR}`);
-                              if (customReportBlocks.training) sections.push(`🏋️ Тренировки:\n  Частота: ${settings.workoutsPerWeek || '—'}/нед · Длит: ${settings.avgWorkoutMinutes || '—'} мин · Программа: ${localStorage.getItem('he_current_program') || '—'}\n${workoutSummary}`);
-                              if (customReportBlocks.nutrition) sections.push(`🥗 Питание:\n  Ккал: ${foodDiaryAvg?.avgKcal || '—'} · Б: ${foodDiaryAvg?.avgProtein || '—'}г · Ж: ${foodDiaryAvg?.avgFat || '—'}г · У: ${foodDiaryAvg?.avgCarbs || '—'}г`);
-                              if (customReportBlocks.labs) sections.push(`🩸 Анализы:\n  ${labsList || 'нет данных'}`);
-                              if (customReportBlocks.pharma) sections.push(`💊 Курс:\n  ${medsList || 'нет'}`);
-                              if (customReportBlocks.risk) sections.push(`⚠️ Риски:\n  Общий: ${riskData?.overallNet || '—'}% · Без поддержки: ${riskData?.overallRaw || '—'}%`);
-                              if (customReportBlocks.support) sections.push(`🧪 Поддержка:\n  ${suppsList || 'нет'}`);
-                              if (customReportBlocks.bp) {
-                                const bpd = getBPDiary(); const lastBp = bpd[0];
-                                sections.push(`❤️ Давление:\n  ${lastBp ? `${lastBp.systolic}/${lastBp.diastolic} · Пульс: ${lastBp.hr} · ${lastBp.date}` : 'нет записей'} (всего: ${bpd.length} зап.)`);
-                              }
-                              if (customReportBlocks.sleep) {
-                                const sleepDiary = (() => { try { return JSON.parse(localStorage.getItem('he_sleep_diary') || '[]'); } catch { return []; } })();
-                                const avgHours = sleepDiary.length > 0 ? (sleepDiary.reduce((s: number, e: any) => s + e.hours, 0) / sleepDiary.length).toFixed(1) : '—';
-                                sections.push(`🛌 Сон:\n  Средняя длит: ${avgHours}ч · Записей: ${sleepDiary.length}`);
-                              }
-                              const text = sections.join('\n\n');
-                              const rep = { id: Date.now().toString(), date: new Date().toISOString().slice(0,10), type: '🎨 Свой отчёт', text, timestamp: Date.now() };
-                              try {
-                                const archive = JSON.parse(localStorage.getItem('he_profile_reports') || '[]');
-                                archive.unshift(rep);
-                                localStorage.setItem('he_profile_reports', JSON.stringify(archive.slice(0, 30)));
-                              } catch {}
-                              setShowCustomReport(false);
-                            }} style={{ width:'100%', padding:'10px', borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:12 }}>
-                              📄 Сгенерировать отчёт
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {[
-                 { title: 'Отчёт для тренера', text: trainerReport, color: '#3b82f6', icon: '🏋️' },
-                { title: 'Отчёт для врача', text: doctorReport, color: '#ef4444', icon: '🏥' },
-                { title: 'Общий отчёт', text: generalReport, color: '#00e68a', icon: '📋' },
-              ].map(r => (
-                <div key={r.title} style={{
-                  ...glassCard, borderLeft:`3px solid ${r.color}`, background:`${r.color}06`,
-                }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                    <span style={{ fontSize:16 }}>{r.icon}</span>
-                    <div style={{ fontSize:13, fontWeight:700, color: r.color }}>{r.title}</div>
-                  </div>
-                  <pre style={{
-                    fontSize:9, color: apple.textPrimary, whiteSpace:'pre-wrap',
-                    fontFamily:'SF Mono, Consolas, monospace',
-                    margin:'0 0 10px', background:'rgba(0,0,0,0.2)', borderRadius:10,
-                    padding:10, maxHeight:250, overflowY:'auto', lineHeight:1.5,
-                    border: apple.glassBorder,
-                  }}>{r.text}</pre>
-                  <div style={{ display:'flex', gap:6 }}>
-                    <button onClick={() => copyReport(r.text)} style={{
-                      flex:1, padding:'8px 12px', borderRadius:10, cursor:'pointer',
-                      border: apple.glassBorder, background: apple.glassBg,
-                      color: apple.textSecondary, fontSize:11, fontWeight:600,
-                    }}>Копировать</button>
-                    <button onClick={() => sendReport(r.text)} style={{
-                      flex:1, padding:'8px 12px', borderRadius:10, cursor:'pointer',
-                      border:'none', background: r.color, color:'#fff', fontSize:11, fontWeight:600,
-                    }}>Отправить</button>
-                  </div>
-                </div>
-              ))}
-              {/* Nutrition report card */}
-              {(() => { try { const reports = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]'); if (reports.length === 0) return null; const r = reports[0]; return (
-                <div style={{ ...glassCard, borderLeft:'3px solid #3b82f6', background:'rgba(59,130,246,0.06)' }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
-                    <span style={{ fontSize:16 }}>📋</span>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#3b82f6' }}>Отчёт о питании</div>
-                    <span style={{ marginLeft:'auto', fontSize:16, fontWeight:800, color: r.overallGrade === 'A' ? '#22c55e' : r.overallGrade === 'B' ? '#8b5cf6' : r.overallGrade === 'C' ? '#f59e0b' : '#ef4444' }}>{r.overallGrade}</span>
-                  </div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>{r.overallGradeLabel} · {r.generatedAt?.slice(0,10)}</div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4, marginBottom:6 }}>
-                    {[{l:'Ккал',v:r.kbjuPct?.kcal},{l:'Белки',v:r.kbjuPct?.p},{l:'Жиры',v:r.kbjuPct?.f},{l:'Угл.',v:r.kbjuPct?.c}].map(s => (
-                      <div key={s.l} style={{ background:'rgba(0,0,0,0.2)', borderRadius:6, padding:'4px', textAlign:'center' }}>
-                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)' }}>{s.l}</div>
-                        <div style={{ fontSize:13, fontWeight:700, color: s.v >= 85 && s.v <= 115 ? '#22c55e' : s.v >= 70 ? '#f59e0b' : '#ef4444' }}>{s.v}%</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ display:'flex', gap:6, marginBottom:4 }}>
-                    <div style={{ flex:1, background:'rgba(59,130,246,0.06)', borderRadius:6, padding:'4px 6px' }}>
-                      <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)' }}>Вес/нед</div>
-                      <div style={{ fontSize:11, fontWeight:700, color: r.weightDynamicsBasic?.direction === 'loss' ? '#22c55e' : r.weightDynamicsBasic?.direction === 'gain' ? '#f59e0b' : '#fff' }}>
-                        {r.weightDynamicsBasic?.direction === 'loss' ? '−' : r.weightDynamicsBasic?.direction === 'gain' ? '+' : '∼'}{r.weightDynamicsBasic?.weeklyKg || '0'} кг
-                      </div>
-                    </div>
-                    <div style={{ flex:1, background:'rgba(139,92,246,0.06)', borderRadius:6, padding:'4px 6px' }}>
-                      <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)' }}>Качество</div>
-                      <div style={{ fontSize:11, fontWeight:700, color: r.foodQualityScore >= 7 ? '#22c55e' : '#f59e0b' }}>{r.foodQualityScore || '—'}/10</div>
-                    </div>
-                  </div>
-                  {(r.microDeficiencies || []).length > 0 && <div style={{ fontSize:8, color:'#f59e0b' }}>⚠ {r.microDeficiencies.slice(0,3).join('; ')}</div>}
-                </div>
-              ); } catch { return null; }})()}
-              {(() => { try { const reports = JSON.parse(localStorage.getItem('he_profile_support_reports') || '[]'); if (reports.length === 0) return null; const r = reports[0]; return (
-                <div style={{ ...glassCard, borderLeft:'3px solid #8b5cf6', background:'rgba(139,92,246,0.06)' }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
-                    <span style={{ fontSize:16 }}>🧩</span>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#8b5cf6' }}>Отчёт о поддержке</div>
-                    <span style={{ marginLeft:'auto', fontSize:16, fontWeight:800, color: r.grade === 'A' ? '#22c55e' : r.grade === 'B' ? '#8b5cf6' : r.grade === 'C' ? '#f59e0b' : '#ef4444' }}>{r.grade}</span>
-                  </div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>{r.date?.slice(0,10)} · Риск {r.overallNet}/100</div>
-                  <div style={{ display:'flex', gap:6 }}>
-                    <div style={{ flex:1, background:'rgba(139,92,246,0.06)', borderRadius:6, padding:'4px 6px' }}>
-                      <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)' }}>Соединений</div>
-                      <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{r.compoundsCount || '—'}</div>
-                    </div>
-                    <div style={{ flex:1, background:'rgba(0,230,138,0.06)', borderRadius:6, padding:'4px 6px' }}>
-                      <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)' }}>Поддержка</div>
-                      <div style={{ fontSize:11, fontWeight:700, color:'#00e68a' }}>{r.supportCount || '—'}</div>
-                    </div>
-                  </div>
-                </div>
-              ); } catch { return null; }})()}
-                  </div>
-                )}
-                {reportTab === 'archive' && (() => {
-                  const allArchives: any[] = [];
-                  try {
-                    const labReports = JSON.parse(localStorage.getItem('he_lab_reports') || '[]');
-                    const riskReports = JSON.parse(localStorage.getItem('he_risk_reports') || '[]');
-                    const courseReports = JSON.parse(localStorage.getItem('he_pharma_reports') || '[]');
-                    const trainingReports = JSON.parse(localStorage.getItem('he_training_reports') || '[]');
-                    const nutritionReports = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]');
-                    allArchives.push(...labReports.map((r:any) => ({ ...r, block:'Лаборатория' })));
-                    allArchives.push(...riskReports.map((r:any) => ({ ...r, block:'Риски' })));
-                    allArchives.push(...courseReports.map((r:any) => ({ ...r, block:'Курс' })));
-                    allArchives.push(...trainingReports.map((r:any) => ({ ...r, block:'Тренировки' })));
-                    allArchives.push(...nutritionReports.map((r:any) => ({ ...r, block:'Питание' })));
-                    allArchives.sort((a,b) => b.timestamp - a.timestamp);
-                  } catch {}
-                  return (
-                    <div>
-                      {allArchives.length > 0 ? (
-                        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                          {allArchives.slice(0, 50).map((r: any, i: number) => (
-                            <div key={r.id || i} onClick={() => setSelectedArchiveItem(selectedArchiveItem?.id === r.id ? null : r)} style={{ borderRadius:10, padding:10, background: selectedArchiveItem?.id === r.id ? 'rgba(0,230,138,0.06)' : 'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.03)', cursor:'pointer' }}>
-                              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                                <div>
-                                  <span style={{ fontSize:11, fontWeight:700, color:'#00e68a' }}>{r.block}</span>
-                                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginLeft:6 }}>от {r.date}</span>
-                                </div>
-                                <span style={{ fontSize:9, padding:'2px 8px', borderRadius:4, background:'rgba(0,230,138,0.1)', color:'#00e68a' }}>
-                                  {r.overallNet !== undefined ? `${Math.round(r.overallNet)}%` : r.compoundCount ? `${r.compoundCount} преп.` : r.totalMarkers ? `${r.totalMarkers} марк.` : '✓'}
-                                </span>
-                              </div>
-                              {r.overallRaw !== undefined && (
-                                <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginTop:2 }}>
-                                  raw: {Math.round(r.overallRaw)}% · net: {Math.round(r.overallNet)}% · систем: {r.systems?.length || 0}
-                                </div>
-                              )}
-                              {r.compounds && (
-                                <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginTop:2 }}>
-                                  {r.compoundCount} преп. · {r.totalWeeks} нед · риск {Math.round(r.risk)}%
-                                </div>
-                              )}
-                              {selectedArchiveItem?.id === r.id && (
-                                <div style={{ marginTop:6, padding:8, background:'rgba(0,0,0,0.15)', borderRadius:6, fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4, whiteSpace:'pre-wrap', maxHeight:300, overflowY:'auto' }}>
-                                  {JSON.stringify(r, null, 2).slice(0, 2000)}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div style={{ textAlign:'center', padding:30, fontSize:11, color:'rgba(255,255,255,0.5)' }}>
-                          Нет архивных отчётов. Сгенерируйте отчёты в Лаборатории, Рисках, Курсе или Тренировках.
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
+                <ProfessionalReports
+                  data={reportData}
+                  reportTab={reportTab}
+                  onTabChange={setReportTab}
+                  showCustomReport={showCustomReport}
+                  onCustomReportToggle={setShowCustomReport}
+                  onSaveReport={(type, text) => {
+                    try {
+                      const rep = { id: Date.now().toString(), date: new Date().toISOString().slice(0,10), type, text, timestamp: Date.now() };
+                      const archive = JSON.parse(localStorage.getItem('he_profile_reports') || '[]');
+                      archive.unshift(rep);
+                      localStorage.setItem('he_profile_reports', JSON.stringify(archive.slice(0, 30)));
+                    } catch {}
+                  }}
+                />
+              )}
           </div>);
           })()}</InfoErrorBoundary>}
          
