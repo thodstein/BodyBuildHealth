@@ -393,6 +393,17 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const goalMap: Record<string, string> = { bulk: 'muscle_gain', cut: 'fat_loss', strength: 'strength', endurance: 'endurance', recomp: 'recomp', maintenance: 'maintenance' };
     const goal = s.goal || s.primaryGoal || 'maintenance';
     if (goalMap[goal]) setSupportGoal(goalMap[goal]);
+    // Проверка флага навигации из ProfileScreen → БАД-дневник
+    try {
+      if (localStorage.getItem('he_nav_to_diary') === '1') {
+        localStorage.removeItem('he_nav_to_diary');
+        setTab('main');
+        setSupportView('calc');
+        setCalcView('info');
+        setSection('home');
+        setInfoView('diary');
+      }
+    } catch {}
   }, []);
 
   // Sync supportDrugs with linked.course
@@ -3295,6 +3306,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
         <AutoCalculator
           embedded
           courseWeek={courseWeekState}
+          courseLinked={linked.course as any}
           onApply={(r) => {
             setAutoCalcResult(r);
             calcSupport(r.level as PowerLevel, r.subs);

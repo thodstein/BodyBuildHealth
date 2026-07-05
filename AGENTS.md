@@ -1845,4 +1845,46 @@ interface AdvancedProductCard {
 - **DRUG_LABELS / DRUG_CATEGORIES** — добавлены 12 новых записей:
   - `reduce_dose`, `reduce_gh_dose`, `stop_gh`, `stop_finasteride`, `reduce_melatonin`, `reduce_diuretic`, `reduce_insulin`, `reduce_ai`, `glucose_urgent`, `site_rotation`, `night_splint`, `nsaids`, `astaxanthin`, `enclomiphene`, `metformin_mr`, `avoid_alcohol`, `therapy`
 
-- `**tsc --noEmit**` — 0 errors. `**vite build**` — OK (43.8s). **UTF-8 noBOM** — 3 новых файла OK.
+### ✅ Jul 05 Part 2 — Symptom Adherence Treker + BPDiary Trend + Diary Cards Expansion
+
+- **`src/engines/symptom-adherence.engine.ts`** — трекер приёма решений: addAssignment, markIntake, getAdherenceStats (приверженность 7д, пропущенные), getSymptomVsAdherenceData (симптом vs приём). localStorage `he_symptom_assignments` + `he_symptom_intake_log`
+- **SymptomSolverTab.tsx** — график динамики симптома из дневника (мини-бар 14д), лабораторная корреляция из `symptom-lab-link.ts`, блок назначений (➕ Назначить препарат, ✓ приём, ✕ стоп). «➕ В план» теперь создаёт Assignment в трекере
+- **ComplaintsTab.tsx** — ⚠ баннер ухудшения («N симптомов ухудшается» с именами), 🖨 кнопка «Отчёт» (print-friendly окно с таблицей за 7д)
+- **DashboardScreen.tsx** — карточка симптомов (активные/улучшаются/ухудшаются/решены + приверженность) на главном экране
+- **`src/ui/screens/ProfileScreen_parts/SleepDiaryTab.tsx`** — вынесен из ProfileScreen.tsx (удалены ~200 строк inline-кода). Добавлены: calcSleepTrend (часы/качество/пробуждения vs последние 7д), MiniStatCard, TrendCard (up/down/stable с цветом), Stats-режим, улучшенный график с цветом по качеству
+- **BPDiaryTab.tsx** — добавлены тренд-карточки (7д) для систол./диастол./пульс с цветовой индикацией (🔴↑ опасно, 🟢↓ хорошо)
+- **ProfileScreen.tsx (diaries)** — внешняя навигация расширена до 6 карточек (Питание/Тренировки/Фарма/Поддержка/Анализы/Риски) с подписями, убраны conditional-фильтры (всегда видны). Internal sub-tabs: Сон/Давление/Замеры/Прогресс/Травмы (добавлена подвкладка травм с редактором)
+- **Bugfix:** AutoCalculator.tsx — исправлена unicode-кавычка в строке ternary (`morning'?` → `morning'?`)
+- **Bugfix:** TrainingScreen.tsx — убран stray `</>` фрагмент, сломавший сборку
+- `**tsc --noEmit**` — 0 errors. `**vite build**` — OK (63s). **UTF-8 noBOM** — все файлы OK
+
+---
+
+## Session Summary (Jul 05 — Part 2) — Трекер приёма + график + уведомления + отчёт + дашборд
+
+### ✅ Done
+- **`src/engines/symptom-adherence.engine.ts`** — трекер приёма решений:
+  - `addAssignment(symptomId, substanceId, name, dose)` — назначить препарат на симптом
+  - `markIntake(assignmentId, taken)` — отметить приём сегодня
+  - `getAdherenceStats()` — % приверженности за 7д, пропущенные сегодня, активные назначения
+  - `getSymptomVsAdherenceData(symptomId)` — данные для графика «симптом vs приём»
+  - localStorage `he_symptom_assignments` + `he_symptom_intake_log`
+
+- **SymptomSolverTab.tsx** — в детальном просмотре симптома добавлены 3 блока:
+  - `📈 Динамика симптома (дневник)` — мини-бар график истории severity за 14 дней
+  - `🔬 Лабораторная корреляция` — подсветка lab-связей из `symptom-lab-link.ts` при наличии данных
+  - `💊 Назначения` — кнопка «➕ Назначить препарат», отметка приёма ✓, остановка ✕
+  - При «➕ В план» теперь также создаётся запись в трекере приёма
+
+- **ComplaintsTab.tsx** — сводный отчёт + уведомления:
+  - ⚠ Баннер ухудшения: «N симптомов ухудшается» с перечислением (если worsening > 0)
+  - 🖨 Кнопка «Отчёт» — print-friendly окно с таблицей динамики за 7 дней
+
+- **DashboardScreen.tsx** — карточка симптомов на главном экране:
+  - `🩺 Симптомы: N активных` с цветными счётчиками (улучшаются/стабильны/ухудшаются/решены)
+  - `💊 Назначений: N · Приверженность: N%` (из adherence)
+
+- **Связь с календарём/дашбордом**: симптом-tracker добавлен на главный экран (DashboardScreen)
+- **Трекер приёма решений**: полный цикл — назначение → отметка приёма → статистика приверженности
+
+- `**tsc --noEmit**` — 0 errors. `**vite build**` — OK (31.55s). **UTF-8 noBOM** — 4 файла OK.

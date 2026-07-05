@@ -31,12 +31,29 @@ export const NutritionMealGen: React.FC<{ profile: UserProfile | null; labAnalys
   const [workouts, setWorkouts] = useState(s?.workoutsPerWeek ?? 3);
   const [workoutMin, setWorkoutMin] = useState(s?.avgWorkoutMinutes ?? 60);
   const [includeWorkout, setIncludeWorkout] = useState(true);
+  const [varietyLevel, setVarietyLevel] = useState<'sparse' | 'rich'>('rich');
+  const [excludePork, setExcludePork] = useState(false);
+  const [excludeFish, setExcludeFish] = useState(false);
+  const [excludeDairy, setExcludeDairy] = useState(false);
+  const [excludeEggs, setExcludeEggs] = useState(false);
+  const [excludeBeef, setExcludeBeef] = useState(false);
   const [result, setResult] = useState<MealPlanResult | null>(null);
   const [selectedDay, setSelectedDay] = useState(0);
+
+  const buildExcludeIds = (): string[] => {
+    const ids: string[] = [];
+    if (excludePork) ids.push('pork_tenderloin');
+    if (excludeFish) ids.push('salmon', 'tuna_canned', 'white_fish_cod', 'white_fish_mintai', 'white_fish_halibut', 'red_fish', 'squid', 'shrimp', 'mussels');
+    if (excludeDairy) ids.push('cottage_cheese_5', 'kefir', 'yogurt_greek', 'cheese_hard', 'milk', 'dairy_mozzarella', 'dairy_ricotta', 'dairy_quark', 'dairy_skyr', 'dairy_kefir_0', 'cheese_parmesan', 'cheese_gouda', 'cheese_feta');
+    if (excludeEggs) ids.push('egg_whole', 'egg_white');
+    if (excludeBeef) ids.push('beef_lean', 'beef_minced');
+    return ids;
+  };
 
   const generate = () => {
     const input: MealPlanInput = {
       weightKg: weight, heightCm: height, age, sex, goal, tier,
+      varietyLevel, excludeFoodIds: buildExcludeIds(),
       trainingDaysPerWeek: workouts, avgWorkoutMinutes: workoutMin,
       includeWorkoutMeals: includeWorkout,
       labsContext: labAnalysis ? {
@@ -106,6 +123,43 @@ export const NutritionMealGen: React.FC<{ profile: UserProfile | null; labAnalys
             <input type="checkbox" checked={includeWorkout} onChange={e => setIncludeWorkout(e.target.checked)} style={{ accentColor: '#00e68a' }} />
             <span>Питание вокруг тренировки</span>
           </label>
+        </div>
+
+        {/* Variety level toggle */}
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <button onClick={() => setVarietyLevel('sparse')} style={{
+            flex: 1, padding: '8px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+            background: varietyLevel === 'sparse' ? 'rgba(34,197,94,0.15)' : 'var(--bg-secondary)',
+            border: varietyLevel === 'sparse' ? '1.5px solid #22c55e' : '1px solid var(--border)',
+            color: varietyLevel === 'sparse' ? '#22c55e' : 'var(--text-dim)',
+          }}>🟢 Скудный (4×белка)</button>
+          <button onClick={() => setVarietyLevel('rich')} style={{
+            flex: 1, padding: '8px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+            background: varietyLevel === 'rich' ? 'rgba(168,85,247,0.15)' : 'var(--bg-secondary)',
+            border: varietyLevel === 'rich' ? '1.5px solid #a855f7' : '1px solid var(--border)',
+            color: varietyLevel === 'rich' ? '#a855f7' : 'var(--text-dim)',
+          }}>🟣 Богатый (7×белка)</button>
+        </div>
+
+        {/* Exclusions */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+          {([
+            { l: 'Свинина', v: excludePork, s: setExcludePork },
+            { l: 'Рыба', v: excludeFish, s: setExcludeFish },
+            { l: 'Молочка', v: excludeDairy, s: setExcludeDairy },
+            { l: 'Яйца', v: excludeEggs, s: setExcludeEggs },
+            { l: 'Говядина', v: excludeBeef, s: setExcludeBeef },
+          ] as const).map(ex => (
+            <label key={ex.l} style={{
+              display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 6,
+              background: ex.v ? 'rgba(239,68,68,0.1)' : 'var(--bg-secondary)',
+              border: ex.v ? '1px solid rgba(239,68,68,0.3)' : '1px solid var(--border)',
+              cursor: 'pointer', fontSize: 10,
+            }}>
+              <input type="checkbox" checked={ex.v} onChange={() => ex.s(!ex.v)} style={{ accentColor: '#ef4444' }} />
+              <span style={{ color: ex.v ? '#ef4444' : 'var(--text-dim)' }}>{ex.l}</span>
+            </label>
+          ))}
         </div>
         <button onClick={generate} style={{ width: '100%', marginTop: 10, padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 14 }}>
           🍽️ Сгенерировать план питания

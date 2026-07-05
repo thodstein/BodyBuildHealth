@@ -162,7 +162,108 @@ const KNOWN_DRUG_SUP_INTERACTIONS: Array<{ drug: string; substance: string; effe
   { drug: 'триптаны (суматриптан)', substance: '5htp', effect: 'Серотониновый синдром (риск вазоспазма)', severity: 'HIGH', mechanism: 'Агонисты 5-HT1B/1D + избыток 5-HT' },
   { drug: 'дифенгидрамин', substance: 'melatonin', effect: 'Чрезмерная седация днём', severity: 'LOW', mechanism: 'Антигистаминный + мелатониновый эффект' },
   { drug: 'бетаметазон (топический)', substance: 'vitamin_d3', effect: 'Снижение местного воспаления (аддитивный)', severity: 'LOW', mechanism: 'VDR-опосредованная регуляция иммунитета' },
+
+  // ── ПРОТИВОТУБЕРКУЛЁЗНЫЕ ──
+  { drug: 'изониазид', substance: 'b6', effect: 'Профилактика периферической нейропатии (изониазид ↓ B6)', severity: 'MEDIUM', mechanism: 'Конкурентное ингибирование пиридоксалькиназы' },
+  { drug: 'изониазид', substance: 'niacin', effect: 'Риск гепатотоксичности (аддитивный)', severity: 'MEDIUM', mechanism: 'Суммация метаболической нагрузки на печень' },
+  { drug: 'рифампицин', substance: 'vitamin_d3', effect: 'Дефицит D3 (CYP индукция → ускорение катаболизма)', severity: 'MEDIUM', mechanism: 'Индукция CYP3A4 — ускорение метаболизма D3' },
+  { drug: 'рифампицин', substance: 'curcumin', effect: 'Снижение концентрации куркумина (индукция P-gp/CYP)', severity: 'LOW', mechanism: 'Индукция P-гликопротеина и CYP3A4' },
+
+  // ── ОРЛИСТАТ (МАЛЬАБСОРБЦИЯ ЖИРОРАСТВОРИМЫХ) ──
+  { drug: 'орлистат', substance: 'vitamin_d3', effect: 'Снижение всасывания D3 (блокада панкреатической липазы)', severity: 'MEDIUM', mechanism: 'Орлистат блокирует гидролиз жиров → ↓ D3' },
+  { drug: 'орлистат', substance: 'vitamin_k2', effect: 'Снижение всасывания витамина K2', severity: 'MEDIUM', mechanism: 'Мальабсорбция жирорастворимых витаминов' },
+  { drug: 'орлистат', substance: 'omega3', effect: 'Снижение всасывания Омега-3 (длительный приём)', severity: 'MEDIUM', mechanism: 'Блокада панкреатической липазы орлистатом' },
+  { drug: 'орлистат', substance: 'vitamin_e', effect: 'Снижение всасывания витамина E', severity: 'MEDIUM', mechanism: 'Мальабсорбция жирорастворимых витаминов' },
+
+  // ── ИНГИБИТОРЫ ФОСФОДИЭСТЕРАЗЫ 5 (ПДЭ-5) ──
+  { drug: 'ПДЭ-5 (силденафил)', substance: 'нитраты', effect: 'ВЫРАЖЕННАЯ ГИПОТОНИЯ (жизнеугрожающее состояние)', severity: 'HIGH', mechanism: 'Суммация NO/цГМФ пути — абсолютное противопоказание' },
+  { drug: 'ПДЭ-5 (тадалафил)', substance: 'нитраты', effect: 'ВЫРАЖЕННАЯ ГИПОТОНИЯ', severity: 'HIGH', mechanism: 'NO-доноры + PDE5 = абсолютное противопоказание' },
+  { drug: 'силденафил', substance: 'citrulline', effect: 'Избыточное снижение АД (суммация NO-эффекта)', severity: 'MEDIUM', mechanism: 'Донация NO (цитруллин→аргинин) + PDE5 ингибитор' },
+  { drug: 'тадалафил', substance: 'citrulline', effect: 'Гипотония, ортостатический коллапс (риск)', severity: 'MEDIUM', mechanism: 'Синергизм донации NO и ингибирования PDE5' },
+  { drug: 'силденафил', substance: 'arginine', effect: 'Избыточное снижение АД (суммация NO-пути)', severity: 'MEDIUM', mechanism: 'NO-донор + PDE5 ингибитор → ↑ цГМФ' },
+
+  // ── 5α-РЕДУКТАЗЫ (ФИНАСТЕРИД, ДУТАСТЕРИД) ──
+  { drug: 'финастерид', substance: 'saw_palmetto', effect: 'Суммация ингибирования 5α-редуктазы (дублирование)', severity: 'LOW', mechanism: 'Дублирование блокады 5AR II типа' },
+  { drug: 'дутастерид', substance: 'saw_palmetto', effect: 'Избыточное снижение ДГТ (риск побочных)', severity: 'LOW', mechanism: 'Дублирование ингибирования 5AR I и II типа' },
+  { drug: 'финастерид', substance: 'zinc', effect: 'Дополнительное снижение ДГТ (аддитивно)', severity: 'LOW', mechanism: 'Цинк — ингибитор 5α-редуктазы in vitro' },
+
+  // ── КОЛХИЦИН (ПРОТИВОПОДАГРИЧЕСКОЕ) ──
+  { drug: 'колхицин', substance: 'curcumin', effect: 'Повышение концентрации колхицина (риск токсичности)', severity: 'HIGH', mechanism: 'Ингибирование CYP3A4 и P-гликопротеина куркумином' },
+  { drug: 'колхицин', substance: 'b12', effect: 'Мальабсорбция B12 на фоне колхицина', severity: 'MEDIUM', mechanism: 'Повреждение ворсинок тонкого кишечника' },
+
+  // ── АЛЛОПУРИНОЛ ──
+  { drug: 'аллопуринол', substance: 'vitamin_c', effect: 'Усиление экскреции мочевой кислоты (аддитивно)', severity: 'LOW', mechanism: 'Уратурический эффект витамина C' },
+
+  // ── АНТИЭМЕТИКИ (5-HT3 АНТАГОНИСТЫ) ──
+  { drug: 'ондансетрон', substance: '5htp', effect: 'СЕРОТОНИНОВЫЙ СИНДРОМ (риск)', severity: 'HIGH', mechanism: '5-HT3 антагонизм + избыток 5-HT (суммация)' },
+
+  // ── ПРОКИНЕТИКИ ──
+  { drug: 'домперидон', substance: 'naringin', effect: 'Повышение концентрации домперидона (риск аритмии)', severity: 'MEDIUM', mechanism: 'Ингибирование CYP3A4 грейпфрутом → ↑ домперидон' },
+  { drug: 'метоклопрамид', substance: 'b6', effect: 'Снижение экстрапирамидных побочных эффектов', severity: 'LOW', mechanism: 'B6 — кофактор синтеза дофамина, профилактика дискинезий' },
+
+  // ── ОТКАЗ ОТ КУРЕНИЯ ──
+  { drug: 'варениклин', substance: 'theanine', effect: 'Снижение тревожности, синергизм отказа от курения', severity: 'LOW', mechanism: 'GABA-ергическая модуляция дофаминовой отдачи' },
+  { drug: 'бупропион', substance: '5htp', effect: 'Серотониновый синдром, риск судорог', severity: 'HIGH', mechanism: 'NDRI + серотонинергик — суммация ЦНС-стимуляции' },
+
+  // ── ПРОТИВОВИРУСНЫЕ ──
+  { drug: 'тенофовир', substance: 'astragalus', effect: 'Нефропротекция, снижение тубулярной токсичности', severity: 'LOW', mechanism: 'Антиоксидантная защита канальцев почек' },
+  { drug: 'ацикловир', substance: 'taurine', effect: 'Нефропротекция (снижение кристаллурии)', severity: 'LOW', mechanism: 'Осмотическая + антиоксидантная защита нефрона' },
+
+  // ── МИОРЕЛАКСАНТЫ (α2-АГОНИСТЫ, GABA-Б) ──
+  { drug: 'тизанидин', substance: 'caffeine', effect: 'Снижение концентрации и эффекта тизанидина', severity: 'MEDIUM', mechanism: 'Тизанидин ингибирует CYP1A2 → кофеин ↓ эффект' },
+  { drug: 'клонидин', substance: 'magnesium', effect: 'Избыточное снижение АД и брадикардия', severity: 'MEDIUM', mechanism: 'Синергизм симпатолитического α2-агониста + Mg' },
+  { drug: 'баклофен', substance: 'theanine', effect: 'Чрезмерная седация, миорелаксация', severity: 'MEDIUM', mechanism: 'GABA-B агонизм + GABA-ергический синергизм' },
+  { drug: 'баклофен', substance: 'gaba', effect: 'Избыточная седация, слабость, атаксия', severity: 'MEDIUM', mechanism: 'Суммация GABA-ергического торможения' },
+
+  // ── ПРОТИВОГРИБКОВЫЕ (АЗОЛЫ) ──
+  { drug: 'кетоконазол', substance: 'curcumin', effect: 'Повышение концентрации кетоконазола (гепатотоксичность)', severity: 'MEDIUM', mechanism: 'Ингибирование CYP3A4 (обоюдное)' },
+  { drug: 'кетоконазол', substance: 'calcium', effect: 'Снижение всасывания кетоконазола (при ахлоргидрии)', severity: 'MEDIUM', mechanism: 'Кетоконазол требует кислой среды для растворения' },
+
+  // ── ИНГИБИТОРЫ КАРБОАНГИДРАЗЫ ──
+  { drug: 'ацетазоламид', substance: 'potassium', effect: 'Гипокалиемия на фоне ацетазоламида', severity: 'MEDIUM', mechanism: 'Ингибирование карбоангидразы → ↑ потери K+' },
+  { drug: 'ацетазоламид', substance: 'bicarbonate', effect: 'Метаболический ацидоз на фоне ацетазоламида', severity: 'MEDIUM', mechanism: 'Потери HCO3⁻ через почки' },
 ];
+
+// ─── Drug synonym/class map: конкретные МНН → каноническое имя в KNOWN_DRUG_SUP_INTERACTIONS ───
+const DRUG_SYNONYM_MAP_DRUGCHECK: Record<string, string[]> = {
+  'иАПФ': ['иАПФ (рамиприл)', 'лизиноприл', 'эналаприл', 'каптоприл', 'периндоприл', 'квинаприл', 'фозиноприл', 'трандолаприл', 'беназеприл', 'моэксиприл'],
+  'АРА': ['АРА (лозартан)', 'лозартан', 'валсартан', 'ирбесартан', 'кандесартан', 'телмисартан', 'эпросартан', 'олмесартан', 'азилсартан'],
+  'β-блокаторы': ['β-блокаторы (бисопролол)', 'бисопролол', 'метопролол', 'атенолол', 'пропранолол', 'небиволол', 'карведилол', 'лабеталол', 'бетаксолол','эсмолол'],
+  'БКК': ['БКК (амлодипин)', 'амлодипин', 'нифедипин', 'фелодипин', 'верапамил', 'дилтиазем', 'лацидипин', 'лерканидипин'],
+  'СИОЗС': ['эсциталопрам (СИОЗС)', 'эсциталопрам', 'циталопрам', 'флуоксетин', 'пароксетин', 'сертралин', 'флувоксамин'],
+  'СИОЗСиН': ['СИОЗСиН (венлафаксин)', 'венлафаксин', 'дулоксетин', 'левомилнаципран'],
+  'ИПП': ['ингибиторы протонной помпы', 'омепразол', 'эзомепразол', 'лансопразол', 'пантопразол', 'рабепразол'],
+  'статины': ['аторвастатин', 'розувастатин', 'симвастатин', 'ловастатин', 'правастатин', 'питавастатин', 'флувастатин'],
+  'НПВС': ['НПВС (ибупрофен)', 'НПВС (диклофенак)', 'ибупрофен', 'диклофенак', 'напроксен', 'кетопрофен', 'индометацин', 'мелоксикам', 'целекоксиб', 'эторикоксиб'],
+  'ГКС': ['глюкокортикоиды (преднизолон)', 'преднизолон', 'метилпреднизолон', 'дексаметазон', 'гидрокортизон', 'триамцинолон'],
+  'диуретики': ['тиазидные (гидрохлоротиазид)', 'петлевые (фуросемид)', 'калийсберегающие (спиронолактон)', 'гидрохлоротиазид', 'фуросемид', 'торасемид', 'индапамид', 'хлорталидон'],
+  'антикоагулянты': ['варфарин', 'апиксабан', 'дабигатран', 'ривароксабан', 'эдоксабан'],
+  'противоэпилептические': ['вальпроат', 'карбамазепин', 'топирамат', 'ламотриджин', 'окскарбазепин', 'леветирацетам'],
+  'бензодиазепины': ['бензодиазепины', 'диазепам', 'алпразолам', 'лоразепам', 'клоназепам', 'феназепам', 'бромазепам'],
+  'антипсихотики': ['оланзапин', 'клозапин', 'рисперидон', 'кетоконазол', 'галоперидол', 'кветиапин'],
+  'метформин': ['метформин', 'сиофор', 'глюкофаж'],
+  'ПДЭ-5': ['ПДЭ-5 (силденафил)', 'ПДЭ-5 (тадалафил)', 'силденафил', 'тадалафил', 'варденафил'],
+};
+
+function expandDrugMatches(input: string): string[] {
+  const lowered = input.toLowerCase().trim();
+  const results = new Set<string>();
+  results.add(lowered);
+  for (const [className, synonyms] of Object.entries(DRUG_SYNONYM_MAP_DRUGCHECK)) {
+    const loweredClass = className.toLowerCase();
+    if (lowered.includes(loweredClass) || loweredClass.includes(lowered)) {
+      synonyms.forEach(s => results.add(s.toLowerCase()));
+    }
+    for (const syn of synonyms) {
+      const loweredSyn = syn.toLowerCase();
+      if (lowered.includes(loweredSyn) || loweredSyn.includes(lowered)) {
+        results.add(loweredClass);
+        synonyms.forEach(s => results.add(s.toLowerCase()));
+      }
+    }
+  }
+  return [...results];
+}
 
 const CYP450_LABELS: Record<string, string> = {
   unknown: '❓ Неизвестен',
@@ -196,10 +297,11 @@ export function DrugCheckTab({ profile, stackIds }: { profile: BioStackProfile; 
     if (drugs.length === 0) return null;
     const found: Array<{ drug: string; substance: string; effect: string; severity: string; mechanism: string }> = [];
     for (const drug of drugs) {
+      const expandedDrugs = expandDrugMatches(drug);
       for (const [id, cat] of Object.entries(SUPPORT_CATALOG_DATA)) {
         const subName = (cat.nameRu || cat.name || id).toLowerCase();
         const direct = KNOWN_DRUG_SUP_INTERACTIONS.filter(k =>
-          (drug.includes(k.drug) || k.drug.includes(drug)) &&
+          expandedDrugs.some(d => d.includes(k.drug) || k.drug.includes(d)) &&
           (subName.includes(k.substance) || id.includes(k.substance))
         );
         direct.forEach(d => found.push({ ...d, substance: cat.nameRu || cat.name || id }));
@@ -219,12 +321,13 @@ export function DrugCheckTab({ profile, stackIds }: { profile: BioStackProfile; 
     const targetIds = checkMode === 'stack' ? stackIds : Object.keys(SUPPORT_CATALOG_DATA).slice(0, 50);
 
     for (const drug of drugs) {
+      const expandedDrugs = expandDrugMatches(drug);
       for (const id of targetIds) {
         const cat = SUPPORT_CATALOG_DATA[id];
         if (!cat) continue;
         const subName = (cat.nameRu || cat.name || id).toLowerCase();
         const direct = KNOWN_DRUG_SUP_INTERACTIONS.filter(k =>
-          (drug.includes(k.drug) || k.drug.includes(drug)) &&
+          expandedDrugs.some(d => d.includes(k.drug) || k.drug.includes(d)) &&
           (subName.includes(k.substance) || id.includes(k.substance))
         );
         direct.forEach(d => res.push({ ...d, substance: cat.nameRu || cat.name || id }));
@@ -254,6 +357,9 @@ export function DrugCheckTab({ profile, stackIds }: { profile: BioStackProfile; 
       });
     }
     setResults(res);
+    // Persist HIGH interactions to localStorage for Dashboard warning
+    const high = res.filter(r => r.severity === 'HIGH');
+    try { localStorage.setItem('he_drug_warnings', JSON.stringify({ date: new Date().toISOString(), count: res.length, highCount: high.length, warnings: high.map(r => `${r.drug} + ${r.substance}`) })); } catch {}
   };
 
   const maxSev = results ? Math.max(...results.map(r => r.severity === 'HIGH' ? 2 : r.severity === 'MEDIUM' ? 1 : 0)) : 0;
@@ -327,6 +433,40 @@ export function DrugCheckTab({ profile, stackIds }: { profile: BioStackProfile; 
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>{CYP_DETAILS[cypState]}</div>
             </div>
           )}
+
+          {(() => {
+            const drugs = medInput.split(',').map((d: string) => d.trim().toLowerCase()).filter(Boolean);
+            if (drugs.length === 0) return null;
+            const riskIcons: Record<string, string> = { cv:'❤️', liv:'🟢', ren:'🔵', cns:'🧠', rep:'🔴', hem:'💉' };
+            const riskNotes: Record<string, string[]> = {};
+            for (const drug of drugs) {
+              const lowered = drug.trim();
+              if (lowered.includes('иАПФ') || lowered.includes('рамиприл') || lowered.includes('эналаприл')) riskNotes['ren'] = ['ren','Гемодинамика почек (креатинин ↑)'];
+              if (lowered.includes('АРА') || lowered.includes('лозартан') || lowered.includes('валсартан')) riskNotes['ren'] = ['ren','Нефропротекция'];
+              if (lowered.includes('блокатор') || lowered.includes('бисопролол') || lowered.includes('метопролол')) riskNotes['cv'] = ['cv','ЧСС ↓ — защита, блокада β₂'];
+              if (lowered.includes('БКК') || lowered.includes('амлодипин') || lowered.includes('нифедипин')) riskNotes['cv'] = ['cv','Снижение АД, антиангинальный'];
+              if (lowered.includes('диуретик') || lowered.includes('фуросемид') || lowered.includes('гидрохлоротиазид')) { riskNotes['ren'] = ['ren','Водно-электролитные сдвиги']; riskNotes['hem'] = ['hem','Гипокалиемия → ↑ глюкоза']; }
+              if (lowered.includes('СИОЗС') || lowered.includes('эсциталопрам') || lowered.includes('флуоксетин')) { riskNotes['cns'] = ['cns','↑ Серотонин, риск серотонинового синдрома']; riskNotes['rep'] = ['rep','↓ Либидо']; }
+              if (lowered.includes('статины') || lowered.includes('аторвастатин') || lowered.includes('розувастатин')) riskNotes['liv'] = ['liv','↑ Трансаминаз'];
+              if (lowered.includes('НПВС') || lowered.includes('ибупрофен') || lowered.includes('диклофенак')) { riskNotes['ren'] = ['ren','↓ Почечный кровоток']; riskNotes['cv'] = ['cv','↑ АД, ↑ тромботический риск']; }
+              if (lowered.includes('метформин')) riskNotes['hem'] = ['hem','↓ Инсулинорезистентность'];
+              if (lowered.includes('ГКС') || lowered.includes('преднизолон') || lowered.includes('дексаметазон')) { riskNotes['hem'] = ['hem','Инсулинорезистентность']; riskNotes['cv'] = ['cv','Задержка Na/H₂O']; }
+              if (lowered.includes('антикоагулянт') || lowered.includes('варфарин') || lowered.includes('апиксабан')) riskNotes['hem'] = ['hem','Геморрагический риск'];
+            }
+            const riskEntries = Object.values(riskNotes);
+            if (riskEntries.length === 0) return null;
+            return (
+              <div style={{ marginTop: 8, padding: '7px 9px', borderRadius: 8, background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.08)' }}>
+                <div style={{ fontSize: 8, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>⚠ Влияние лекарств на системы риска</div>
+                {riskEntries.map(([sys, note], i) => (
+                  <div key={i} style={{ display:'flex', gap:6, alignItems:'flex-start', marginBottom: i < riskEntries.length - 1 ? 3 : 0 }}>
+                    <span style={{ fontSize:8 }}>{riskIcons[sys] || '⚪'}</span>
+                    <span style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>{note}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {results.map((r, i) => (

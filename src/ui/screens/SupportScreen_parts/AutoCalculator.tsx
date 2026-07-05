@@ -5,9 +5,12 @@ import { SYNERGY_ID_LABELS } from '../../../engines/support-plan';
 import { PHARMA_DB, PHARMA_CLASSES } from '../../../core/pharma-database';
 import { SUPPORT_COVERAGE_MAP } from '../../../data/support-coverage-map';
 import { evaluateRecommendations, applyCoverageLevel, computeCoverageRisk, buildPreApplyCard } from '../../../engines/recommendation-engine';
-import { calculateWeeklyRiskDynamics } from '../../../engines/weekly-risk-dynamics.engine';
 
-interface AutoCalculatorProps { onApply: (result: { level: string; subs: string[]; result: CalculatorResult }) => void; embedded?: boolean; courseWeek?: number; }
+interface AutoCalculatorProps {
+  onApply: (result: { level: string; subs: string[]; result: CalculatorResult }) => void;
+  embedded?: boolean; courseWeek?: number;
+  courseLinked?: { substanceId: string; doseValue: number; frequency: number; startWeek: number; endWeek: number }[];
+}
 const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 16, padding: 12 };
 const PILL: React.CSSProperties = { padding: '6px 14px', borderRadius: 22, border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' };
 const INPUT: React.CSSProperties = { width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 10px', color: '#fff', fontSize: 11, boxSizing: 'border-box' };
@@ -278,19 +281,35 @@ function RiskBar({ label, icon, value }: { label: string; icon: string; value: n
 
 function MechanismView({ sys }: { sys: SystemRisk }) {
   const [open, setOpen] = useState(false);
+  const hasTzData = sys.mechanisms.some(m => m.mechId !== undefined);
+  const tzBadge = hasTzData
+    ? <span style={{ fontSize: 7, fontWeight: 700, color: '#00e68a', background: 'rgba(0,230,138,0.1)', padding: '1px 4px', borderRadius: 4, marginRight: 4 }}>TZ</span>
+    : <span style={{ fontSize: 7, fontWeight: 700, color: 'var(--text-dim)', background: 'rgba(255,255,255,0.04)', padding: '1px 4px', borderRadius: 4, marginRight: 4 }}>эвр</span>;
   return <div>
     <div onClick={() => setOpen(!open)} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '4px 0' }}>
+      {tzBadge}
       <span style={{ fontSize: 10, fontWeight: 600 }}>{sys.icon} {sys.label}</span>
       <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 800, color: sys.rawScore >= 60 ? '#ef4444' : sys.rawScore >= 30 ? '#fbbf24' : '#22c55e' }}>{sys.rawScore}% → {sys.afterSupport}%</span>
       <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{open ? '▲' : '▼'}</span>
     </div>
-    {open && <div style={{ paddingLeft: 12 }}>{sys.mechanisms.map(m =>
-      <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2, fontSize: 8, color: m.active ? 'var(--text)' : 'var(--text-dim)' }}>
-        <div style={{ width: 4, height: 4, borderRadius: '50%', background: m.active ? '#fbbf24' : 'rgba(255,255,255,0.15)' }} />
-        <span style={{ flex: 1 }}>{m.name}</span>
-        <span style={{ color: m.contribution > 30 ? '#ef4444' : '#fbbf24' }}>{m.contribution}%</span>
-      </div>
-    )}</div>}
+    {open && <div style={{ paddingLeft: 12 }}>{sys.mechanisms.map(m => {
+      const qColor = m.q_label === 'A' ? '#22c55e' : m.q_label === 'B' ? '#fbbf24' : m.q_label === 'C' ? '#f97316' : 'var(--text-dim)';
+      return <div key={m.id} style={{ marginBottom: 4, fontSize: 8, color: m.active ? 'var(--text)' : 'var(--text-dim)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ width: 4, height: 4, borderRadius: '50%', background: m.active ? '#fbbf24' : 'rgba(255,255,255,0.15)' }} />
+          <span style={{ flex: 1 }}>{m.name}</span>
+          {m.mechId && <span style={{ fontSize: 6, color: 'var(--text-dim)' }}>{m.mechId}</span>}
+          <span style={{ color: m.contribution > 30 ? '#ef4444' : '#fbbf24' }}>{m.contribution}%</span>
+        </div>
+        {hasTzData && m.mechId && <div style={{ paddingLeft: 8, marginTop: 1, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {m.weight !== undefined && <span style={{ color: '#818cf8' }}>w={m.weight}</span>}
+          {m.m_i !== undefined && <span style={{ color: '#06b6d4' }}>m={m.m_i.toFixed(2)}</span>}
+          {m.E_i !== undefined && <span style={{ color: '#a855f7' }}>E={m.E_i.toFixed(2)}</span>}
+          {m.k_used !== undefined && m.k_used > 0 && <span style={{ color: '#22c55e' }}>k={m.k_used.toFixed(2)}</span>}
+          {m.q_label && <span style={{ color: qColor, fontWeight: 700 }}>док:{m.q_label}</span>}
+        </div>}
+      </div>;
+    })}</div>}
   </div>;
 }
 
@@ -512,7 +531,7 @@ function deriveStateFromLabs(fp: LabSlice): {
   return { hepatobiliary: hep, cardio: card, urinary: urin, goals, contraindications: contr, derivedFields: derived };
 }
 
-export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek }) => {
+export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek, courseLinked }) => {
   const [state, setState] = useState<CalculatorState>(() => {
     const h = hydrateState();
     return { ...DEFAULT_STATE, ...h, profile: { ...DEFAULT_STATE.profile, ...(h.profile || {}) }, pharma: { ...DEFAULT_STATE.pharma, ...(h.pharma || {}) }, labs: { ...DEFAULT_STATE.labs, ...(h.labs || {}), fullPanel: h.labs?.fullPanel || DEFAULT_STATE.labs.fullPanel } };
@@ -535,58 +554,9 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
 
   const effectiveWeek = propWeek || Math.min(state.goals.cycleWeeks || 12, Math.max(1, ...state.pharma.aas.map(a => a.weeks || 12), 6));
 
-  const result = useMemo<CalculatorResult>(() => calculateSupportTZ(state), [state]);
+  const result = useMemo<CalculatorResult>(() => calculateSupportTZ({ ...state, courseWeek: effectiveWeek }), [state, effectiveWeek]);
 
-  // Weekly risk dynamics
-  const weeklyDynamics = useMemo(() => {
-    const course: { id: string; substanceId: string; doseValue: number; doseUnit: string; frequency: number; startWeek: number; endWeek: number }[] = state.pharma.aas.map(a => ({
-      id: a.id, substanceId: a.id, doseValue: a.doseMgWeek, doseUnit: 'mg', frequency: 1, startWeek: 1, endWeek: a.weeks || state.goals.cycleWeeks || 12
-    }));
-    const activeDrugs: Record<string, { dosePerWeek: number }> = {};
-    for (const a of state.pharma.aas) activeDrugs[a.id] = { dosePerWeek: a.doseMgWeek };
-    const supCov: Record<string, number> = {};
-    for (const sys of result.risk.systems) {
-      if (sys.rawScore > 0 && sys.afterSupport < sys.rawScore) supCov[sys.id] = 1 - sys.afterSupport / Math.max(1, sys.rawScore);
-    }
-    return calculateWeeklyRiskDynamics({ genetics: state.genetics as any, nutritionFactor: state.nutrition.calories / 2500, trainingFactor: Math.min(1.5, state.profile.workoutsPerWeek * state.profile.avgWorkoutMinutes / 420), activeDrugs, supportCoverage: supCov }, course);
-  }, [state, result]);
-
-  // Lab forecast (heuristic: current value + drug-induced trend × weeks)
-  const labForecast = useMemo(() => {
-    const fp = state.labs.fullPanel;
-    if (!fp) return null;
-    const trend = (now: number | null, per4wk: number): { w4: number; w8: number; w12: number } | null => {
-      if (now === null) return null;
-      return { w4: now + per4wk, w8: now + per4wk * 2, w12: now + per4wk * 3 };
-    };
-    const getV = (panel: keyof typeof fp, key: string): number | null => {
-      const pv = fp[panel] as Record<string, string> | undefined;
-      if (!pv) return null;
-      const v = parseFloat(pv[key]);
-      return isNaN(v) ? null : v;
-    };
-    const totalDose = state.pharma.aas.reduce((s, a) => s + (a.doseMgWeek || 0), 0);
-    const toxicityFactor = Math.min(2, totalDose / 1000);
-    const hasOral = state.pharma.aas.some(a => a.id.includes('oxan') || a.id.includes('meth') || a.id.includes('stan') || a.id.includes('halo') || a.id.includes('trena'));
-    const alt = getV('panelBiochem', 'ALT');
-    const ast = getV('panelBiochem', 'AST');
-    const hct = getV('panelHematology', 'HCT');
-    const ldl = getV('panelLipid', 'LDL');
-    const hdl = getV('panelLipid', 'HDL');
-    const tg = getV('panelLipid', 'Triglycerides');
-    const creat = getV('panelBiochem', 'Creatinine');
-    const ggt = getV('panelBiochem', 'GGT');
-    return {
-      ALT: trend(alt, 8 * toxicityFactor * (hasOral ? 1.5 : 1)),
-      AST: trend(ast, 5 * toxicityFactor),
-      HCT: trend(hct, 1.5 * toxicityFactor),
-      LDL: trend(ldl, 0.3 * toxicityFactor),
-      HDL: trend(hdl, -0.1 * toxicityFactor),
-      TG: trend(tg, 0.2 * toxicityFactor),
-      Creatinine: trend(creat, 2 * toxicityFactor),
-      GGT: trend(ggt, 6 * toxicityFactor * (hasOral ? 1.5 : 1)),
-    };
-  }, [state]);
+  const coverageLabel = coverageLevel === 'basic' ? 'Базовый' : coverageLevel === 'mid' ? 'Средний' : coverageLevel === 'max' ? 'Максимум' : 'Буст';
 
   // Auto-save state to localStorage (data feeds into calcSupport() via hydrateState)
   React.useEffect(() => {
@@ -594,6 +564,34 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       localStorage.setItem('he_autocalc_state', JSON.stringify(state));
     } catch {}
   }, [state]);
+
+  // ═══ ИМПОРТ ААС ИЗ PHARMA-ЭКРАНА (linked.course) ═══
+  // При изменении курса в Pharma экране обновляем AAS в калькуляторе,
+  // чтобы preview соответствовал реальному курсу пользователя.
+  React.useEffect(() => {
+    if (!courseLinked || courseLinked.length === 0) return;
+    const aasClasses = ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm'];
+    const linkedAas = courseLinked
+      .filter(c => {
+        const ph = (PHARMA_DB as any)[c.substanceId];
+        return ph?.class && aasClasses.includes(ph.class);
+      })
+      .map(c => ({
+        id: c.substanceId,
+        doseMgWeek: (c.doseValue || 0) * (c.frequency || 1),
+        weeks: (c.endWeek || 12) - (c.startWeek || 0),
+        startWeek: c.startWeek || 1,
+        endWeek: c.endWeek || 12,
+      }));
+    if (linkedAas.length === 0) return;
+    setState(s => {
+      const existingIds = new Set(s.pharma.aas.map(a => a.id));
+      const newAas = linkedAas.filter(a => !existingIds.has(a.id));
+      if (newAas.length === 0) return s;
+      return { ...s, pharma: { ...s.pharma, aas: [...s.pharma.aas, ...newAas] } };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseLinked]);
 
   // ═══ АВТО-ВЫВОД КАРТОЧЕК ИЗ АНАЛИЗОВ ═══
   React.useEffect(() => {
@@ -661,8 +659,39 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
     setCopied(true); setTimeout(() => setCopied(false), 2500);
   }, [state, result]);
 
+  const handlePrint = useCallback(() => {
+    const w = window.open('', '_blank', 'width=600,height=800');
+    if (!w) return;
+    const style = `body{font-family:system,sans-serif;padding:20px;color:#111;background:#fff;font-size:12px;line-height:1.5}h1{font-size:16px}h2{font-size:13px;margin-top:8px}table{width:100%;border-collapse:collapse;margin:4px 0}td,th{border:1px solid #ddd;padding:4px 6px;font-size:11px}th{background:#f0f0f0}.pill{display:inline-block;padding:2px 6px;border-radius:4px;background:#e8f5e9;color:#1b5e20;font-size:10px;margin:1px}.warn{color:#c62828}.muted{color:#666;font-size:10px}`;
+    const sysRows = result.risk.systems.filter(s => s.rawScore > 0).map(s => '<tr><td>' + (s.icon||'') + ' ' + s.label + '</td><td>' + s.rawScore + '%</td><td>' + s.afterSupport + '%</td></tr>').join('');
+    const schedRows = result.schedule.map(i => {
+      const emoji = i.timeBlock === 'morning' ? '\u{1F305}' : i.timeBlock === 'afternoon' ? '\u2600\uFE0F' : '\u{1F319}';
+      return '<tr><td>' + emoji + '</td><td>' + i.name + '</td><td>' + i.dose + '</td><td>' + (i.instructions || '') + '</td></tr>';
+    }).join('');
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>План поддержки</title><style>${style}</style></head><body>
+<h1>🧮 Калькулятор поддержки — отчёт</h1>
+<p class="muted">📅 ${new Date().toLocaleString('ru-RU')} · 👤 ${state.profile.weight}кг · ${state.profile.age}лет · ${state.profile.sex==='male'?'М':'Ж'} · Уровень: ${coverageLabel}</p>
+<h2>📊 Общий риск: <b>${result.overallRiskBefore}% → ${result.overallRiskAfter}%</b></h2>
+${sysRows ? `<h2>Системы:</h2><table><tr><th>Система</th><th>До</th><th>После</th></tr>${sysRows}</table>` : ''}
+${result.labDeltas.length ? `<h2>🧪 Лаборатория:</h2><ul>${result.labDeltas.filter(d=>d.trend!=='stable').map(d=>`<li>${d.marker}: ${d.trend}</li>`).join('')}</ul>` : ''}
+<h2>💊 План поддержки (${result.schedule.length}):</h2>
+<table><tr><th></th><th>Препарат</th><th>Доза</th><th>Инструкция</th></tr>${schedRows}</table>
+${Object.keys(result.titrationApplied).length ? `<h2>⚖ Титрация: ${Object.entries(result.titrationApplied).map(([k,v])=>`${k}=${v}мг`).join(', ')}</h2>` : ''}
+<h2>🔗 Синергии: ${result.synergyIdsUsed.length}</h2>
+<p>${result.synergyIdsUsed.map(id=>`<span class="pill">${SYNERGY_ID_LABELS[id]||id}</span>`).join(' ')||'<span class="muted">нет</span>'}</p>
+${result.contraindicationAlerts.length ? `<h2 class="warn">⚠ Противопоказания:</h2><ul class="warn">${result.contraindicationAlerts.map(a=>`<li>${a}</li>`).join('')}</ul>` : ''}
+${result.negativeBlocks.length ? `<h2 class="warn">🚫 Заблокировано: ${result.negativeBlocks.join(', ')}</h2>` : ''}
+</body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 300);
+  }, [state, result, coverageLevel]);
+
   const tabs = [
     { id: 'cards', label: '📝 Данные' },
+    { id: 'labs', label: '🧪 Анализы' },
+    { id: 'risk', label: '⚠️ Риск' },
+    { id: 'schedule', label: '📋 План' },
   ] as const;
 
   return (
@@ -671,6 +700,27 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>🧮 Калькулятор поддержки</div>
         <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight:1.4 }}>Подбор рекомендуемой поддержки на основе данных пользователя, анализов, фармакологии и расчёта рисков</div>
       </div>}
+
+      {/* ── Табы навигации ── */}
+      <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
+        {tabs.map(t => <button key={t.id} onClick={() => setTab(t.id as any)} style={{
+          padding:'6px 12px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap',
+          background: tab === t.id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+          border: `1px solid ${tab === t.id ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`,
+          color: tab === t.id ? '#00e68a' : 'rgba(255,255,255,0.6)',
+        }}>{t.label}</button>)}
+      </div>
+
+      {/* ── Селектор уровня покрытия (basic/mid/max/boost) ── */}
+      <div style={{ display:'flex', gap:3, marginBottom:6, flexWrap:'wrap' }}>
+        <span style={{ fontSize:8, color:'var(--text-dim)', alignSelf:'center', marginRight:4 }}>Уровень:</span>
+        {[{id:'basic',label:'Базовый'},{id:'mid',label:'Средний'},{id:'max',label:'Максимум'},{id:'boost',label:'Буст'}].map(lv => <button key={lv.id} onClick={() => { setCoverageLevel(lv.id as any); setState(s => ({ ...s, powerLevel: lv.id as any })); }} style={{
+          padding:'4px 10px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap',
+          background: coverageLevel === lv.id ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.03)',
+          border: `1px solid ${coverageLevel === lv.id ? 'var(--accent)' : 'rgba(255,255,255,0.06)'}`,
+          color: coverageLevel === lv.id ? '#000' : 'var(--text-dim)',
+        }}>{lv.label}</button>)}
+      </div>
 
       {tab === 'cards' && <div>
 
@@ -728,12 +778,19 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           <div style={{ gridColumn: '1 / -1' }}>
             <div style={{ fontSize:9, fontWeight:600, color:'var(--text-dim)', marginBottom:4 }}>ААС препараты</div>
             {state.pharma.aas.length > 0 && <div style={{ marginBottom: 4 }}>
-              {state.pharma.aas.map((a, i) =>
-                <div key={i} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:6, padding: '3px 8px', marginBottom: 2, display: 'flex', justifyContent: 'space-between', fontSize: 9 }}>
-                  <span style={{ color: 'var(--text)' }}>{a.id} — {a.doseMgWeek} мг/нед × {a.weeks} нед</span>
-                  <button onClick={() => uPharm({ aas: state.pharma.aas.filter((_, j) => j !== i) })} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: 10 }}>✕</button>
-                </div>
-              )}
+              {state.pharma.aas.map((a, i) => {
+                const phName = (PHARMA_DB as any)[a.id]?.name || a.id;
+                return <div key={i} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:6, padding: '4px 8px', marginBottom: 2, fontSize: 9 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                    <span style={{ color: 'var(--text)', fontWeight:700 }}>{phName}</span>
+                    <button onClick={() => uPharm({ aas: state.pharma.aas.filter((_, j) => j !== i) })} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: 10 }}>✕</button>
+                  </div>
+                  <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                    <div style={{ flex:1 }}><PopupNumber label={`Доза: ${a.doseMgWeek} мг/нед`} value={a.doseMgWeek} min={50} max={3000} step={50} suffix="мг/нед" onChange={v => uPharm({ aas: state.pharma.aas.map((x, j) => j === i ? { ...x, doseMgWeek: v } : x) })} /></div>
+                    <div style={{ flex:1 }}><PopupNumber label={`Длит: ${a.weeks} нед`} value={a.weeks} min={1} max={52} suffix="нед" onChange={v => uPharm({ aas: state.pharma.aas.map((x, j) => j === i ? { ...x, weeks: v } : x) })} /></div>
+                  </div>
+                </div>;
+              })}
             </div>}
             <button onClick={() => setShowPharmaPicker(true)} style={{ padding:'6px 10px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a' }}>+ Добавить препарат</button>
           </div>
@@ -1000,6 +1057,10 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           )}
         </div>
         <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>🔍 Механизмы риска</div>
+        <div style={{ fontSize: 7, color: 'var(--text-dim)', marginBottom: 4, display: 'flex', gap: 8 }}>
+          <span><span style={{ color: '#00e68a', fontWeight: 700 }}>TZ</span> = механизм-ориентированная модель (R = Σ(w×m×E×U×Π(1−k)))</span>
+          <span><span style={{ color: 'var(--text-dim)', fontWeight: 700 }}>эвр</span> = эвристика (нет в TZ-модели: endocrine, musculoskeletal)</span>
+        </div>
         {result.risk.systems.filter(s => s.rawScore > 0).map(sys =>
           <div key={sys.id} style={{ ...GLASS, padding: '4px 10px', marginBottom: 3 }}>
             <MechanismView sys={sys} />
@@ -1043,6 +1104,10 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           {result.schedule.length} позиций · {result.synergyIdsUsed.length} синергий · риск {result.overallRiskBefore}% → {result.overallRiskAfter}%
           {result.negativeBlocks.length > 0 && ` · 🚫 ${result.negativeBlocks.length} заблокировано`}
         </div>
+        <div style={{ display:'flex', gap:4, marginTop:6 }}>
+          <button onClick={handleCopy} style={{ flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.15)', color:'#60a5fa' }}>📋 Скопировать отчёт</button>
+          <button onClick={handlePrint} style={{ flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.15)', color:'var(--accent)' }}>🖨 Печать / PDF</button>
+        </div>
       </div>}
 
       {copied && <div style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)', background: 'var(--bg-primary)', border: '1px solid var(--accent)', borderRadius: 12, padding: '8px 16px', fontSize: 10, color: 'var(--accent)', zIndex: 999 }}>📋 Отчёт скопирован</div>}
@@ -1053,6 +1118,10 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           <div style={{ height: 3, background: 'linear-gradient(90deg, #00e68a, #00c853)' }} />
           <div style={{ padding: '12px 16px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>💉 Выбор препарата</div>
+            <div style={{ display:'flex', gap:4, marginBottom:6 }}>
+              <div style={{ flex:1 }}><PopupNumber label={`Доза по умолч.: ${aasEditor.doseMgWeek} мг/нед`} value={aasEditor.doseMgWeek} min={50} max={3000} step={50} suffix="мг/нед" onChange={v => setAasEditor(s => ({ ...s, doseMgWeek: v }))} /></div>
+              <div style={{ flex:1 }}><PopupNumber label={`Длит. по умолч.: ${aasEditor.weeks} нед`} value={aasEditor.weeks} min={1} max={52} suffix="нед" onChange={v => setAasEditor(s => ({ ...s, weeks: v }))} /></div>
+            </div>
             <input value={pharmaSearch} onChange={e => setPharmaSearch(e.target.value)} placeholder="Поиск..." style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 11, marginBottom: 8, boxSizing: 'border-box' }} />
             <div style={{ maxHeight: '55vh', overflowY: 'auto' }}>
               {Object.entries(PHARMA_DB)
@@ -1060,7 +1129,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
                 .filter(([id]) => PHARMA_CLASSES.includes((PHARMA_DB[id] as any)?.class))
                 .slice(0, 40)
                 .map(([id, ph]) => (
-                <button key={id} onClick={() => { uPharm({ aas: [...state.pharma.aas, { id, doseMgWeek: 500, weeks: 12 }] }); setShowPharmaPicker(false); }} style={{
+                <button key={id} onClick={() => { uPharm({ aas: [...state.pharma.aas, { id, doseMgWeek: aasEditor.doseMgWeek, weeks: aasEditor.weeks, startWeek: 1, endWeek: aasEditor.weeks }] }); setShowPharmaPicker(false); }} style={{
                   display: 'block', width: '100%', padding: '8px 10px', marginBottom: 2, borderRadius: 8, cursor: 'pointer', fontSize: 10, textAlign: 'left',
                   background: aasEditor.id === id ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
                   border: aasEditor.id === id ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',

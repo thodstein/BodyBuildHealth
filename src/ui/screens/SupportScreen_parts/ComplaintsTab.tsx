@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { SYMPTOM_DB, SymptomEntry } from '../../../engines/symptom-solver.engine';
-import { getSymptomDiaryStats, getSymptomChartData, getSymptomDiarySummary, updateSymptomToday, SymptomTrend } from '../../../engines/symptom-diary.engine';
+import React, { useState, useMemo, useCallback } from 'react';
+import { SYMPTOM_DB, SymptomEntry, findSymptomById } from '../../../engines/symptom-solver.engine';
+import { getSymptomDiaryStats, getSymptomChartData, getSymptomDiarySummary, updateSymptomToday, SymptomTrend, getSymptomDiary } from '../../../engines/symptom-diary.engine';
 // ─── Локальные стили ───
 const GLASS_CARD: React.CSSProperties = {
   background: 'rgba(24,24,27,0.6)',
@@ -81,9 +81,44 @@ export function ComplaintsTab({ onOpenSolver }: { onOpenSolver?: () => void }) {
     setDiaryValues((prev) => ({ ...prev, [symId]: severity }));
   };
 
+  /** Сформировать отчёт для печати */
+  const handlePrintReport = useCallback(() => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    const printedDate = new Date().toLocaleDateString('ru-RU');
+    w.document.write(`
+      <html><head><title>Сводка жалоб</title>
+      <style>
+        body { font-family: 'Segoe UI', sans-serif; font-size: 12px; padding: 20px; color: #222; }
+        h1 { font-size: 18px; border-bottom: 2px solid #333; padding-bottom: 6px; }
+        h2 { font-size: 14px; margin-top: 16px; color: #444; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th, td { padding: 6px 8px; border: 1px solid #ddd; text-align: left; font-size: 11px; }
+        th { background: #f5f5f5; font-weight: 700; }
+        .sev-high { color: #f44336; font-weight: 700; }
+        .sev-mid { color: #ff9800; font-weight: 600; }
+        .sev-low { color: #4caf50; }
+        .footer { margin-top: 20px; font-size: 10px; color: #999; }
+      </style></head><body>
+      <h1>📋 Сводка жалоб</h1>
+      <p>Дата: ${printedDate} · Активных: ${stats.activeSymptoms} · Средняя тяжесть: ${stats.todayScore}/10</p>
+      <p>Улучшаются: ${stats.improving} · Стабильны: ${stats.stable} · Ухудшаются: ${stats.worsening} · Решены: ${stats.resolved}</p>
+      <h2>Детальная динамика за 7 дней</h2>
+      <table><tr><th>Симптом</th><th>Категория</th><th>Тренд</th><th>Текущий</th><th>Средний</th></tr>
+      ${summary.map(s => `<tr><td>${s.symptomName}</td><td>${s.category}</td><td>${s.trend}</td><td class="${s.currentSeverity >= 7 ? 'sev-high' : s.currentSeverity >= 4 ? 'sev-mid' : 'sev-low'}">${s.currentSeverity}/10</td><td>${s.avgSeverity}/10</td></tr>`).join('')}
+      </table>
+      <h2>График (7 дней)</h2>
+      <p>${chartData.d7.labels.map((l, i) => `${l}: ${chartData.d7.values[i]}/10`).join(' → ')}</p>
+      <div class="footer">Сгенерировано BodyBuildHealth · symptom-diary.engine.ts</div>
+      </body></html>
+    `);
+    w.document.close();
+    setTimeout(() => w.print(), 500);
+  }, [stats, summary, chartData]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 4px' }}>
-      {/* Заголовок */}
+      {/* ЗАГОЛОВОК */}
       <div style={{ ...GLASS_CARD, padding: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <div>
@@ -94,12 +129,31 @@ export function ComplaintsTab({ onOpenSolver }: { onOpenSolver?: () => void }) {
               Сегодня: {stats.activeSymptoms} симптомов · Средняя тяжесть: {stats.todayScore}/10
             </div>
           </div>
-          {onOpenSolver && (
-            <button className="pill-btn" style={{ ...PILL_BTN, background: '#3b82f6' }} onClick={onOpenSolver}>
-              🔍 Решить симптом
+          <div style={{ display: 'flex', gap: 6 }}>
+            {onOpenSolver && (
+              <button className="pill-btn" style={{ ...PILL_BTN, background: '#3b82f6' }} onClick={onOpenSolver}>
+                🔍 Решить симптом
+              </button>
+            )}
+            <button className="pill-btn" style={{ ...PILL_BTN, background: '#ff9800' }} onClick={handlePrintReport}>
+              🖨 Отчёт
             </button>
-          )}
+          </div>
         </div>
+
+        {/* ⚠ БАННЕР УХУДШЕНИЯ */}
+        {stats.worsening > 0 && (
+          <div style={{
+            marginTop: 8, padding: '8px 12px', borderRadius: 8,
+            background: 'rgba(244,67,54,0.1)', border: '1px solid rgba(244,67,54,0.25)',
+            fontSize: 11, color: '#f44336', fontWeight: 600,
+          }}>
+            ⚠ {stats.worsening} симптом{stats.worsening === 1 ? '' : 'ов'} ухудшается
+            {summary.filter(s => s.trend === 'worsening').slice(0, 3).map(s => ` «${s.symptomName}»`).join(', ')}
+            {summary.filter(s => s.trend === 'worsening').length > 3 ? '...' : ''}
+          </div>
+        )}
+
         {/* Быстрые pill-кнопки */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
           {(['overview', 'diary', 'chart'] as const).map((m) => (

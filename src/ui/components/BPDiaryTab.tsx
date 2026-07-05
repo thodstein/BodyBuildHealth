@@ -106,6 +106,27 @@ export const BPDiaryTab: React.FC = () => {
   const avgD = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.diastolic, 0) / filtered.length) : 0;
   const avgH = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.hr, 0) / filtered.length) : 0;
 
+  // Trend analysis
+  const calcTrend = (values: number[]): { diff: number; trend: 'up' | 'down' | 'stable' } => {
+    if (values.length < 2) return { diff: 0, trend: 'stable' };
+    const recent = values.slice(-3).reduce((s, v) => s + v, 0) / 3;
+    const prev = values.slice(-6, -3).reduce((s, v) => s + v, 0) / 3;
+    const diff = recent - prev;
+    return { diff: Math.round(diff), trend: diff > 5 ? 'up' : diff < -5 ? 'down' : 'stable' };
+  };
+  const sysVals = filtered.map(e => e.systolic);
+  const diaVals = filtered.map(e => e.diastolic);
+  const hrVals = filtered.map(e => e.hr);
+  const sysTrend = calcTrend(sysVals);
+  const diaTrend = calcTrend(diaVals);
+  const hrTrend = calcTrend(hrVals);
+
+  const trendColor = (t: 'up' | 'down' | 'stable', upBad: boolean) => {
+    if (t === 'stable') return '#94a3b8';
+    return upBad ? (t === 'up' ? '#ef4444' : '#4caf50') : (t === 'up' ? '#4caf50' : '#ef4444');
+  };
+  const trendArrow = (t: 'up' | 'down' | 'stable') => t === 'up' ? '↑' : t === 'down' ? '↓' : '→';
+
   // Line chart
   const chartH = 140;
   const chartW = 360;
@@ -215,6 +236,23 @@ export const BPDiaryTab: React.FC = () => {
             </div>
           ))}
         </div>
+
+        {/* Trend cards */}
+        {filtered.length >= 5 && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 10 }}>
+            {[
+              { label: 'Систол. (тренд 7д)', val: `${sysTrend.diff >= 0 ? '+' : ''}${sysTrend.diff}`, unit: 'мм рт. ст.', color: trendColor(sysTrend.trend, true), arrow: trendArrow(sysTrend.trend) },
+              { label: 'Диастол. (тренд 7д)', val: `${diaTrend.diff >= 0 ? '+' : ''}${diaTrend.diff}`, unit: 'мм рт. ст.', color: trendColor(diaTrend.trend, true), arrow: trendArrow(diaTrend.trend) },
+              { label: 'Пульс (тренд 7д)', val: `${hrTrend.diff >= 0 ? '+' : ''}${hrTrend.diff}`, unit: 'уд/мин', color: trendColor(hrTrend.trend, true), arrow: trendArrow(hrTrend.trend) },
+            ].map((c, i) => (
+              <div key={i} style={{ ...glassCard, textAlign: 'center', padding: '8px 6px' }}>
+                <div style={{ fontSize: 8, color: apple.textDim, marginBottom: 2 }}>{c.label}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: c.color }}>{c.arrow} {c.val}</div>
+                <div style={{ fontSize: 7, color: apple.textDim }}>{c.unit}</div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Line chart */}
         {filtered.length >= 1 && (

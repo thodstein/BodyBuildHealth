@@ -1058,14 +1058,11 @@ function toSystemRisksFromTz(
     const afterSupport = tzAfterMap.get(tzId) ?? Math.max(0, raw - Math.round(raw * Math.min(0.7, 0.3 + synergyCount * 0.02)));
     const mechs: MechanismDetail[] = tzMechs.length > 0
       ? tzMechs.map((m, i) => ({
-          id: i + 1, name: m.name,
-          contribution: Math.round(m.raw),
-          active: m.raw > 5, triggers: [],
+          id: i + 1, name: m.name, contribution: Math.round(m.raw), active: m.raw > 5, triggers: [],
+          mechId: m.id, weight: m.weight, m_i: m.m_i, E_i: m.E_i, k_used: m.k_used, q_label: m.q_label,
         }))
       : MECH_NAMES[id].slice(0, 7).map((name, i) => ({
-          id: i + 1, name,
-          contribution: raw > 0 ? Math.round(raw / 7 * (i + 1)) : 0,
-          active: false, triggers: [],
+          id: i + 1, name, contribution: raw > 0 ? Math.round(raw / 7 * (i + 1)) : 0, active: false, triggers: [],
         }));
     return { id, label: SYS_META[id].label, icon: SYS_META[id].icon, rawScore: raw, afterSupport, mechanisms: mechs };
   });

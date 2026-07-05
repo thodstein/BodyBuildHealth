@@ -34,7 +34,7 @@ const JOINT_RU: Record<string, string> = { knee: 'Колено', hip: 'Таз', 
 const RIR_TO_RPE: Record<number, number> = { 0: 10, 1: 9, 2: 8, 3: 7, 4: 6, 5: 5, 6: 4, 7: 3, 8: 2 };
 const RPE_LABEL: Record<number, string> = { 10: 'Максимально', 9: 'Тяжело', 8: 'Умеренно тяжело', 7: 'Средне', 6: 'Легко', 5: 'Очень легко', 4: 'Разминка' };
 
-type LabMode = 'prescription' | 'technique' | 'compare';
+type LabMode = 'prescription' | 'technique' | 'compare' | 'pro';
 
 // ════════════════ SUB-REGION DEFINITIONS ════════════════
 const SUBREGION_DEFS: Record<string, { id: string; name: string; keywords: string[]; description: string }[]> = {
@@ -554,6 +554,99 @@ const PrescriptionTab: React.FC = () => {
     return weeks;
   }, [ex, presc, workWeight, goal, level, week, totalWeeks, oneRM]);
 
+  // Fatigue analysis
+  const fatigueAnalysis = useMemo(() => {
+    if (!ex || !presc) return null;
+    const isCompound = ex.type === 'compound';
+    const js = ex.jointStress || 'medium';
+    const baseFatigue = ex.fatigueCost || 5;
+    const cnsBase = isCompound ? (js === 'high' ? 7 : 5) : 2;
+    const cnsSetFactor = Math.min(presc.sets / 3, 1.5);
+    const cnsRirPenalty = presc.rir <= 1 ? 1.2 : presc.rir >= 4 ? 0.6 : 1;
+    const cnsDeload = isDeload ? 0.3 : 1;
+    const cnsLoad = Math.min(10, +(cnsBase * cnsSetFactor * cnsRirPenalty * cnsDeload).toFixed(1));
+    const muscBase = isCompound ? 4 : 7;
+    const muscSetFactor = Math.min(presc.sets / 4, 1.6);
+    const muscFatigueMult = baseFatigue / 5;
+    const muscDeload = isDeload ? 0.35 : 1;
+    const muscularLoad = Math.min(10, +(muscBase * muscSetFactor * muscFatigueMult * muscDeload).toFixed(1));
+    const totalLoad = cnsLoad + muscularLoad;
+    const recHours = Math.round((isCompound ? 48 : 24) * (totalLoad / 12) * (isDeload ? 0.5 : 1));
+    let advice = '';
+    if (cnsLoad >= 7) advice = 'Лимит — ЦНС. Восст. 48-72ч. Сон ≥8ч, минимизировать доп. работу на синергисты.';
+    else if (muscularLoad >= 7) advice = 'Метаболический стресс. Восст. 24-48ч. Лёгкая ходьба, белок 2г/кг.';
+    else if (totalLoad <= 4) advice = 'Низкое утомление. Можно ежедневно. Подходит для разминки/восстановления.';
+    else advice = 'Умеренная нагрузка. Восст. 24-48ч. Не прибавляйте >10%/нед.';
+    return { cnsLoad, muscularLoad, recoveryHours: recHours, cnsLabel: cnsLoad >= 7 ? 'Высокая (ЦНС)' : 'Умеренная', muscularLabel: muscularLoad >= 7 ? 'Высокая (мышцы)' : 'Умеренная', advice };
+  }, [ex, presc, isDeload]);
+
+  // Warm-up ramp
+  const warmupRamp = useMemo(() => {
+    if (!ex || !presc || !workWeight || workWeight <= 0) return null;
+    const w = workWeight;
+    const pcts = w >= 150 ? [0.3, 0.4, 0.5, 0.6, 0.7] : w >= 80 ? [0.35, 0.45, 0.55, 0.65] : [0.4, 0.55, 0.7];
+    const steps = pcts.map((pct, i) => ({ pct: Math.round(pct * 100), weight: +(w * pct).toFixed(1), reps: isDeload ? 5 : Math.max(2, pcts.length - i + 2), label: i === 0 ? 'Пустой гриф / лёгкий' : i === pcts.length - 1 ? 'Подход-разминка' : 'Разминочный' }));
+    return { steps, w };
+  }, [ex, presc, workWeight, isDeload]);
+
+  // Metabolic cost
+  const metabolicCost = useMemo(() => {
+    if (!ex || !presc || !tutInfo || !workWeight) return null;
+    const bodyWeight = profile?.settings?.weight ?? 80;
+    const isCompound = ex.type === 'compound';
+    const met = isCompound ? 6.0 : 3.5;
+    const avgReps = (parseInt(presc.reps.split('-')[0]) + parseInt(presc.reps.split('-')[1] || presc.reps.split('-')[0])) / 2;
+    const timePerSetH = (avgReps * tutInfo.repDuration + 0.5) / 3600;
+    const totalTimeH = timePerSetH * presc.sets;
+    const totalCal = Math.round(met * bodyWeight * totalTimeH * 1.05);
+    const glycogen = Math.round((isCompound ? 1.5 : 0.8) * presc.sets);
+    const epoc = Math.round(totalCal * 0.12);
+    return { totalCal, glycogen, epoc, met, totalTimeMin: Math.round(totalTimeH * 60) };
+  }, [ex, presc, tutInfo, workWeight, profile]);
+
+  // Exercise ranking
+  const exerciseRanking = useMemo(() => {
+    if (!ex) return null;
+    const groupExs = EXERCISE_CATALOG.filter(e => e.group === ex.group && e.id !== ex.id).slice(0, 15);
+    const scored = groupExs.map(e => {
+      try {
+        const p = calcExercisePrescription(e, goal, level, false, false, 1, week, totalWeeks);
+        const rp = getResistanceProfile(e);
+        const goalBonus = goal === 'hypertrophy' && rp.curve === 'stretch_mediated' ? 3 : goal === 'strength' && rp.curve === 'mid_range' ? 3 : 0;
+        return { id: e.id, name: e.name, score: Math.min(100, Math.round(rp.score * 7 + goalBonus * 3 + (e.type === 'compound' ? 5 : 0))), type: e.type };
+      } catch { return null; }
+    }).filter((s): s is NonNullable<typeof s> => s !== null).sort((a, b) => b.score - a.score).slice(0, 8);
+    const currentRp = resistanceProfile;
+    const currentScore = currentRp ? Math.min(100, Math.round(currentRp.score * 7 + (ex.type === 'compound' ? 5 : 0))) : 50;
+    const rank = scored.findIndex(s => s.score < currentScore);
+    return { list: scored, currentScore, currentRank: rank === -1 ? scored.length + 1 : rank + 1, total: scored.length + 1 };
+  }, [ex, goal, level, week, totalWeeks, resistanceProfile]);
+
+  // Saved history
+  const [savedCalcs, setSavedCalcs] = useState<Array<{ id: number; name: string; goal: string; level: string; week: number; oneRM: number; reps: string; sets: number; rir: number; rest: number; weight: number; date: string }>>(() => { try { return JSON.parse(localStorage.getItem('he_excalc_saved') || '[]'); } catch { return []; } });
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const saveCalc = () => {
+    if (!ex || !presc) return;
+    const item = { id: Date.now(), name: ex.name, goal, level, week, oneRM, reps: presc.reps, sets: presc.sets, rir: presc.rir, rest: presc.rest, weight: workWeight, date: new Date().toISOString().slice(0, 10) };
+    const arr: any[] = [item, ...(JSON.parse(localStorage.getItem('he_excalc_saved') || '[]'))];
+    localStorage.setItem('he_excalc_saved', JSON.stringify(arr.slice(0, 30)));
+    setSavedCalcs(arr.slice(0, 30));
+  };
+
+  const exportText = () => {
+    if (!ex || !presc) return;
+    const lines = [
+      `=== Калькулятор: ${ex.name} ===`, `${GROUP_RU[ex.group]} · ${TYPE_RU[ex.type]} · ${level} · ${goal}`,
+      `1ПМ: ${oneRM} кг · Вес: ${workWeight} кг (${pct}%) · ${presc.sets}×${presc.reps} · RIR ${presc.rir} · RPE ${rpeInfo?.rpe}/10 · Отдых ${presc.rest}с`,
+      `Объём: ${(volumeLoad / 1000).toFixed(1)}k кг · Утомление: ${fatigueScore}/20 · AMRAP: ~${amrapEstimate}`,
+    ];
+    if (resistanceProfile) lines.push(`Профиль: ${resistanceProfile.label} (${resistanceProfile.score}/10) · ${resistanceProfile.bestGoal}`);
+    if (fatigueAnalysis) lines.push(`ЦНС: ${fatigueAnalysis.cnsLoad}/10 · Мышцы: ${fatigueAnalysis.muscularLoad}/10 · Восст.: ${fatigueAnalysis.recoveryHours}ч`);
+    if (metabolicCost) lines.push(`Метаболизм: ${metabolicCost.totalCal} ккал · Гликоген: ${metabolicCost.glycogen}г · EPOC: +${metabolicCost.epoc} ккал`);
+    if (oneRMProjection) lines.push(`Прогноз 1ПМ: ${oneRMProjection.projected} кг (+${oneRMProjection.pctGain}%) через ${oneRMProjection.progressionWeeks} нед`);
+    navigator.clipboard?.writeText(lines.join('\n')).catch(() => {});
+  };
+
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
       {/* ── QUICK GENERATOR ── */}
@@ -750,6 +843,86 @@ const PrescriptionTab: React.FC = () => {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+          {/* Fatigue analysis */}
+          {fatigueAnalysis && (
+            <div style={{ ...CARD, marginTop: 10, border: '1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>⚡ Анализ утомления</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 6 }}>
+                <div><span style={{ ...SMALL }}>ЦНС</span><div style={{ fontSize: 16, fontWeight: 700, color: fatigueAnalysis.cnsLoad >= 7 ? '#ef4444' : fatigueAnalysis.cnsLoad >= 4 ? '#f59e0b' : '#22c55e' }}>{fatigueAnalysis.cnsLoad}/10</div><div style={{ ...SMALL, fontSize: 9 }}>{fatigueAnalysis.cnsLabel}</div></div>
+                <div><span style={{ ...SMALL }}>Мышцы</span><div style={{ fontSize: 16, fontWeight: 700, color: fatigueAnalysis.muscularLoad >= 7 ? '#ef4444' : fatigueAnalysis.muscularLoad >= 4 ? '#f59e0b' : '#22c55e' }}>{fatigueAnalysis.muscularLoad}/10</div><div style={{ ...SMALL, fontSize: 9 }}>{fatigueAnalysis.muscularLabel}</div></div>
+                <div><span style={{ ...SMALL }}>Восст.</span><div style={{ fontSize: 16, fontWeight: 700, color: '#60a5fa' }}>{fatigueAnalysis.recoveryHours}ч</div><div style={{ ...SMALL, fontSize: 9 }}>до след. тяжёлой</div></div>
+              </div>
+              <div style={{ ...SMALL, fontSize: 9, marginTop: 4, lineHeight: 1.3 }}>{fatigueAnalysis.advice}</div>
+            </div>
+          )}
+
+          {/* Warm-up ramp */}
+          {warmupRamp && (
+            <div style={{ ...CARD, marginTop: 10, border: '1px solid rgba(251,146,60,0.2)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fb923c', marginBottom: 4 }}>🔥 Разминочная рампа</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {warmupRamp.steps.map((s, i) => (
+                  <div key={i} style={{ flex: '1 0 60px', textAlign: 'center', padding: 6, background: 'rgba(0,0,0,0.15)', borderRadius: 6, border: `1px solid ${i === warmupRamp.steps.length - 1 ? 'rgba(251,146,60,0.3)' : 'rgba(255,255,255,0.04)'}` }}>
+                    <div style={{ fontSize: 8, color: DIM }}>{s.label}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{s.weight} кг</div>
+                    <div style={{ fontSize: 9, color: DIM }}>{s.pct}% · {s.reps} повт</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Metabolic cost */}
+          {metabolicCost && (
+            <div style={{ ...CARD, marginTop: 10, border: '1px solid rgba(251,146,60,0.2)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fb923c', marginBottom: 4 }}>⚡ Метаболическая стоимость</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 6 }}>
+                <div><span style={{ ...SMALL }}>Калорий</span><div style={{ fontSize: 14, fontWeight: 700, color: '#fb923c' }}>~{metabolicCost.totalCal}</div></div>
+                <div><span style={{ ...SMALL }}>Гликоген</span><div style={{ fontSize: 14, fontWeight: 700 }}>~{metabolicCost.glycogen}г</div></div>
+                <div><span style={{ ...SMALL }}>EPOC</span><div style={{ fontSize: 14, fontWeight: 700 }}>+{metabolicCost.epoc} ккал</div></div>
+                <div><span style={{ ...SMALL }}>MET</span><div style={{ fontSize: 14, fontWeight: 700, color: DIM }}>{metabolicCost.met}</div></div>
+                <div><span style={{ ...SMALL }}>Время</span><div style={{ fontSize: 14, fontWeight: 700, color: DIM }}>~{metabolicCost.totalTimeMin}м</div></div>
+              </div>
+            </div>
+          )}
+
+          {/* Exercise ranking */}
+          {exerciseRanking && exerciseRanking.list.length > 0 && (
+            <div style={{ ...CARD, marginTop: 10, border: '1px solid rgba(59,130,246,0.2)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>🏅 Рейтинг в группе «{GROUP_RU[ex!.group]}» (цель: {goal === 'hypertrophy' ? 'гипертрофия' : goal})</div>
+              <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Позиция: <b style={{ color: ACCENT }}>#{exerciseRanking.currentRank}</b> из {exerciseRanking.total} · score: {exerciseRanking.currentScore}</div>
+              {exerciseRanking.list.map((item, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', borderRadius: 4, marginBottom: 2, background: item.id === ex!.id ? 'rgba(0,230,138,0.08)' : 'transparent', fontSize: 9 }}>
+                  <span style={{ color: item.id === ex!.id ? ACCENT : DIM }}>#{i + 1} {item.name}</span>
+                  <span style={{ color: DIM }}>{item.type === 'compound' ? 'База' : 'Изол.'} · {item.score} pts</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Actions: save / export */}
+          {ex && presc && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              <button onClick={saveCalc} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>💾 Сохранить расчёт</button>
+              <button onClick={exportText} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.06)', color: '#60a5fa', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>📋 Копировать отчёт</button>
+              <button onClick={() => setHistoryOpen(v => !v)} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.06)', color: '#a855f7', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>📂 История ({savedCalcs.length})</button>
+            </div>
+          )}
+
+          {/* Saved history */}
+          {historyOpen && savedCalcs.length > 0 && (
+            <div style={{ ...CARD, marginTop: 10, border: '1px solid rgba(168,85,247,0.2)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>📂 Сохранённые расчёты (последние {savedCalcs.length})</div>
+              {savedCalcs.map((s, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 6px', borderRadius: 4, marginBottom: 2, background: 'rgba(255,255,255,0.02)', fontSize: 9, cursor: 'pointer' }}
+                  onClick={() => { const found = EXERCISE_CATALOG.find(e => e.name === s.name); if (found) { setGroup(found.group); setExId(found.id); setGoal(s.goal); setWeek(s.week); setOneRM(s.oneRM); } }}>
+                  <span style={{ fontWeight: 600 }}>{s.name}</span>
+                  <span style={{ color: DIM }}>{s.date} · {s.sets}×{s.reps} · RIR {s.rir} · {s.weight} кг</span>
+                  <button onClick={e => { e.stopPropagation(); try { const arr = (JSON.parse(localStorage.getItem('he_excalc_saved') || '[]') as any[]).filter((x: any) => x.id !== s.id); localStorage.setItem('he_excalc_saved', JSON.stringify(arr)); setSavedCalcs(arr); } catch {} }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 11 }}>✕</button>
+                </div>
+              ))}
             </div>
           )}
         </>
@@ -956,9 +1129,19 @@ const TechniqueTab: React.FC<{ onSelectForCompare: (id: string) => void }> = ({ 
                         {renderExHeader(ex, score, bio, isFav, safety)}
                       </div>
                       {isExpanded && <TechniqueDetail ex={ex} technique={technique} score={score} cues={cues} errors={errors} progression={progression} synergy={synergy} jointStress={jointStress} classification={classification} fVector={fVector} lengthened={lengthened} safety={safety} bio={bio} cssScale={0.9} />}
-                      <div style={{ marginTop: isExpanded ? 10 : 4, textAlign: 'center' }}>
+                      <div style={{ marginTop: isExpanded ? 10 : 4, textAlign: 'center', display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
                         <button onClick={() => toggleExpandEx(ex.id)} style={{ padding: '3px 14px', borderRadius: 14, border: '1px solid rgba(0,230,138,0.15)', background: isExpanded ? 'rgba(0,230,138,0.06)' : 'transparent', color: isExpanded ? ACCENT : DIM, cursor: 'pointer', fontSize: 9, fontWeight: 600 }}>{isExpanded ? '▲ Свернуть' : '▼ Разбор'}</button>
+                        {isExpanded && <>
+                          <button onClick={() => { const el = document.getElementById(`elab-t-${ex.id}`); if (el) { const w = window.open('', '_blank', 'width=800,height=600'); if (w) { w.document.write(`<html><head><title>${ex.name} - Техника</title><style>body{font-family:sans-serif;font-size:12px;line-height:1.6;padding:20px;color:#000;background:#fff}h2{color:#333}</style></head><body>${el.innerHTML}</body></html>`); w.document.close(); setTimeout(() => w.print(), 300); } } }} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 600, fontSize: 9 }}>🖨 Печать</button>
+                          <button onClick={() => { navigator.clipboard.writeText(document.getElementById(`elab-t-${ex.id}`)?.innerText || ''); }} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.06)', color: '#60a5fa', cursor: 'pointer', fontWeight: 600, fontSize: 9 }}>📋 Копировать</button>
+                        </>}
                       </div>
+                      {isExpanded && <div id={`elab-t-${ex.id}`} style={{ display: 'none' }}>
+                        <h2>{ex.name}</h2><p>Тип: {TYPE_RU[ex.type]} · Оборудование: {EQUIP_RU[ex.equipment]} · Сложность: {score.label} ({score.total}/100)</p>
+                        {technique && <><p><b>Исходное положение:</b></p><ul>{technique.setup.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul><p><b>Выполнение:</b></p><ul>{technique.execution.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul><p><b>Дыхание:</b></p><ul>{technique.breathing.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></>}
+                        {errors.length > 0 && <><p><b>Ошибки:</b></p><ul>{errors.map((e: any, i: number) => <li key={i}><b>{e.error}</b> — {e.fix}</li>)}</ul></>}
+                        <p>Безопасность: {safety.score}/100 {safety.requiresSpotter ? '(требуется споттер)' : ''}</p>
+                      </div>}
                     </div>
                   );
                 })}
@@ -979,9 +1162,18 @@ const TechniqueTab: React.FC<{ onSelectForCompare: (id: string) => void }> = ({ 
               {renderExHeader(ex, score, bio, isFav, safety)}
             </div>
             {isExpanded && <TechniqueDetail ex={ex} technique={technique} score={score} cues={cues} errors={errors} progression={progression} synergy={synergy} jointStress={jointStress} classification={classification} fVector={fVector} lengthened={lengthened} safety={safety} bio={bio} />}
-            <div style={{ marginTop: isExpanded ? 10 : 4, textAlign: 'center' }}>
+            <div style={{ marginTop: isExpanded ? 10 : 4, textAlign: 'center', display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={() => toggleExpandEx(ex.id)} style={{ padding: '3px 14px', borderRadius: 14, border: '1px solid rgba(0,230,138,0.15)', background: isExpanded ? 'rgba(0,230,138,0.06)' : 'transparent', color: isExpanded ? ACCENT : DIM, cursor: 'pointer', fontSize: 9, fontWeight: 600 }}>{isExpanded ? '▲ Свернуть разбор' : '▼ Развернуть разбор'}</button>
+              {isExpanded && <>
+                <button onClick={() => { const el = document.getElementById(`elab-l-${ex.id}`); if (el) { const w = window.open('', '_blank', 'width=800,height=600'); if (w) { w.document.write(`<html><head><title>${ex.name} - Техника</title><style>body{font-family:sans-serif;font-size:12px;line-height:1.6;padding:20px}</style></head><body>${el.innerHTML}</body></html>`); w.document.close(); setTimeout(() => w.print(), 300); } } }} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 600, fontSize: 9 }}>🖨 Печать</button>
+                <button onClick={() => { navigator.clipboard.writeText(document.getElementById(`elab-l-${ex.id}`)?.innerText || ''); }} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.06)', color: '#60a5fa', cursor: 'pointer', fontWeight: 600, fontSize: 9 }}>📋 Копировать</button>
+              </>}
             </div>
+            {isExpanded && <div id={`elab-l-${ex.id}`} style={{ display: 'none' }}>
+              <h2>{ex.name}</h2><p>Тип: {TYPE_RU[ex.type]} · Сложность: {score.label} ({score.total}/100)</p>
+              {technique && <><p><b>Техника:</b></p><ul>{technique.setup.map((s: string, i: number) => <li key={i}>{s}</li>)}{technique.execution.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></>}
+              <p>Безопасность: {safety.score}/100</p>
+            </div>}
           </div>
         );
       })}
@@ -1103,6 +1295,7 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
 
       {/* Full technique comparison */}
       {d1 && d2 && (
+        <>
         <div style={{ marginTop: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, marginBottom: 10 }}>🔬 Сравнение техники</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -1116,7 +1309,225 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
             </div>
           </div>
         </div>
+
+        {/* Winner recommendation */}
+        <div style={{ ...CARD, marginTop: 12, border: `1px solid ${ACCENT}33`, background: 'rgba(0,230,138,0.04)' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8 }}>🏆 Итоговая рекомендация</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 10, lineHeight: 1.6, color: 'rgba(255,255,255,0.7)' }}>
+            <div style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(0,0,0,0.12)' }}>
+              <div style={{ fontWeight: 700, color: ACCENT, marginBottom: 4 }}>{ex1!.name}</div>
+              <div>Тех. счёт: <b>{d1.score.total}/100</b></div>
+              <div>Безопасность: <b style={{ color: getRiskColor(d1.safety.level) }}>{d1.safety.score}/100</b></div>
+              <div>ЦНС: <b>{d1.bio?.cnsDemand || '?'}/5</b></div>
+              <div>Объём: <b>{d1.presc.sets}×{d1.presc.reps}</b></div>
+              <div>Профиль: <b>{getResistanceProfile(ex1!).curve.replace('_', ' ')}</b></div>
+            </div>
+            <div style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(0,0,0,0.12)' }}>
+              <div style={{ fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>{ex2!.name}</div>
+              <div>Тех. счёт: <b>{d2.score.total}/100</b></div>
+              <div>Безопасность: <b style={{ color: getRiskColor(d2.safety.level) }}>{d2.safety.score}/100</b></div>
+              <div>ЦНС: <b>{d2.bio?.cnsDemand || '?'}/5</b></div>
+              <div>Объём: <b>{d2.presc.sets}×{d2.presc.reps}</b></div>
+              <div>Профиль: <b>{getResistanceProfile(ex2!).curve.replace('_', ' ')}</b></div>
+            </div>
+          </div>
+          {(() => {
+            const rp1 = getResistanceProfile(ex1!);
+            const rp2 = getResistanceProfile(ex2!);
+            let winner: 1 | 2 = 1; let reason = '';
+            if (goal === 'hypertrophy') {
+              if (rp1.curve === 'stretch_mediated' && rp2.curve !== 'stretch_mediated') { winner = 1; reason = 'stretch-mediated профиль лучше для гипертрофии'; }
+              else if (rp2.curve === 'stretch_mediated' && rp1.curve !== 'stretch_mediated') { winner = 2; reason = 'stretch-mediated профиль лучше для гипертрофии'; }
+              else if (rp1.score > rp2.score) { winner = 1; reason = 'выше resistance-оценка'; }
+              else if (rp2.score > rp1.score) { winner = 2; reason = 'выше resistance-оценка'; }
+              else { winner = d1.score.total > d2.score.total ? 1 : 2; reason = 'выше технический счёт'; }
+            } else if (goal === 'strength') {
+              if (ex1!.type === 'compound' && ex2!.type !== 'compound') { winner = 1; reason = 'базовое движение для силы'; }
+              else if (ex2!.type === 'compound' && ex1!.type !== 'compound') { winner = 2; reason = 'базовое движение для силы'; }
+              else { winner = d1.score.total > d2.score.total ? 1 : 2; reason = 'выше технический счёт'; }
+            } else {
+              if (d1.safety.score > d2.safety.score) { winner = 1; reason = 'безопаснее'; }
+              else if (d2.safety.score > d1.safety.score) { winner = 2; reason = 'безопаснее'; }
+              else { winner = d1.score.total > d2.score.total ? 1 : 2; reason = 'выше тех. счёт'; }
+            }
+            const wName = winner === 1 ? ex1!.name : ex2!.name;
+            const wColor = winner === 1 ? ACCENT : '#60a5fa';
+            return (
+              <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: wColor }}>🏅 Рекомендовано: {wName}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>Причина: {reason}. Цель: {goal === 'hypertrophy' ? 'гипертрофия' : goal}.</div>
+              </div>
+            );
+          })()}
+        </div>
+        </>
       )}
+    </div>
+  );
+};
+
+// ════════════════ PRO-ANALYSIS SUB-TAB ════════════════
+const ProAnalysisTab: React.FC = () => {
+  const [proGroup, setProGroup] = useState('chest');
+
+  const groupExercises = useMemo(() =>
+    EXERCISE_CATALOG.filter(e => e.group === proGroup).map(ex => ({
+      exercise: ex,
+      rp: getResistanceProfile(ex),
+      fv: forceVector(ex.group, ex.type, ex.name),
+      score: calcTechniqueScore(ex),
+      safety: assessSafety(ex.id, [], calcTechniqueScore(ex).total / 100),
+      lp: lengthenedPartials(ex.group),
+    })).sort((a, b) => b.rp.score - a.rp.score),
+  [proGroup]);
+
+  // Force-vector distribution
+  const fvDist = useMemo(() => {
+    const map: Record<string, number> = {};
+    groupExercises.forEach(g => { map[g.fv] = (map[g.fv] || 0) + 1; });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]);
+  }, [groupExercises]);
+
+  // Stretch-mediated leaders
+  const stretchLeaders = useMemo(() => groupExercises.filter(g => g.rp.curve === 'stretch_mediated').slice(0, 5), [groupExercises]);
+
+  // Synergy pairs: find exercises that use different force vectors (superset potential)
+  const synergyPairs = useMemo(() => {
+    const pairs: Array<{ a: string; b: string; type: string; reason: string }> = [];
+    const seen = new Set<string>();
+    const antagonistMap: Record<string, string[]> = {
+      horizontal_push: ['horizontal_pull'], horizontal_pull: ['horizontal_push'],
+      vertical_push: ['vertical_pull'], vertical_pull: ['vertical_push'],
+      knee_dominant: ['hip_dominant'], hip_dominant: ['knee_dominant'],
+      core_anti: [], other: [],
+    };
+    groupExercises.forEach(a => {
+      groupExercises.forEach(b => {
+        if (a.exercise.id === b.exercise.id) return;
+        const key = [a.exercise.id, b.exercise.id].sort().join('|');
+        if (seen.has(key)) return;
+        const agn = antagonistMap[a.fv] || [];
+        if (agn.includes(b.fv)) {
+          seen.add(key);
+          pairs.push({ a: a.exercise.name, b: b.exercise.name, type: 'антагонист', reason: `${a.fv} ↔ ${b.fv} — суперсет без перекрёстного утомления` });
+        }
+        if (a.fv === b.fv && a.rp.curve !== b.rp.curve) {
+          seen.add(key);
+          pairs.push({ a: a.exercise.name, b: b.exercise.name, type: 'вариация', reason: `один вектор (${a.fv}), разные кривые: ${a.rp.label} vs ${b.rp.label}` });
+        }
+      });
+    });
+    return pairs.slice(0, 10);
+  }, [groupExercises]);
+
+  // Regional coverage assessment
+  const regionalCoverage = useMemo(() => {
+    const regions = SUBREGION_DEFS[proGroup] || [];
+    const covered: string[] = [];
+    const uncovered: string[] = [];
+    regions.forEach(r => {
+      const has = groupExercises.some(g => {
+        const tm = (g.exercise.targetMuscle || '').toLowerCase();
+        return r.keywords.some(kw => tm.includes(kw.toLowerCase()));
+      });
+      if (has) covered.push(r.name);
+      else uncovered.push(r.name);
+    });
+    return { covered, uncovered, total: regions.length };
+  }, [proGroup, groupExercises]);
+
+  return (
+    <div style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8, marginBottom: 12 }}>
+        <PopupSelect label="Группа мышц" value={proGroup} options={GROUPS.filter(g => g !== 'all').map(g => ({ id: g, label: `${GROUP_ICON[g] || ''} ${GROUP_RU[g]}`, desc: '' }))} hint="Группа для анализа" onChange={v => setProGroup(v)} />
+      </div>
+
+      {/* Force-vector distribution */}
+      <div style={{ ...CARD, marginBottom: 12, border: '1px solid rgba(168,85,247,0.2)' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#a855f7', marginBottom: 8 }}>📐 Распределение force-векторов</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {fvDist.map(([fv, count]) => (
+            <div key={fv} style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.15)', textAlign: 'center' }}>
+              <div style={{ fontSize: 10, color: '#c084fc' }}>{fv.replace(/_/g, ' ')}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#c084fc' }}>{count}</div>
+              <div style={{ fontSize: 8, color: DIM }}>упражнений</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Stretch-mediated leaders */}
+      <div style={{ ...CARD, marginBottom: 12, border: '1px solid rgba(34,197,94,0.2)' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#22c55e', marginBottom: 8 }}>🏆 Stretch-mediated лидеры (топ-5)</div>
+        {stretchLeaders.length > 0 ? (
+          stretchLeaders.map((g, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', borderRadius: 4, marginBottom: 3, background: i === 0 ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.02)', fontSize: 10 }}>
+              <span style={{ fontWeight: 600 }}>#{i + 1} {g.exercise.name}</span>
+              <span style={{ color: '#22c55e' }}>{g.rp.score}/10</span>
+              <span style={{ color: DIM, fontSize: 8 }}>{g.exercise.type === 'compound' ? 'База' : 'Изол.'}</span>
+            </div>
+          ))
+        ) : (
+          <div style={{ fontSize: 10, color: DIM, padding: 8 }}>Нет stretch-mediated упражнений в этой группе.</div>
+        )}
+      </div>
+
+      {/* Regional coverage */}
+      <div style={{ ...CARD, marginBottom: 12, border: '1px solid rgba(59,130,246,0.2)' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 8 }}>📍 Покрытие подрегионов: {regionalCoverage.covered.length}/{regionalCoverage.total}</div>
+        {regionalCoverage.covered.length > 0 && (
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ fontSize: 9, color: '#22c55e', fontWeight: 600, marginBottom: 2 }}>✅ Покрыты:</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+              {regionalCoverage.covered.map(r => <span key={r} style={{ padding: '2px 8px', borderRadius: 10, fontSize: 8, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{r}</span>)}
+            </div>
+          </div>
+        )}
+        {regionalCoverage.uncovered.length > 0 && (
+          <div>
+            <div style={{ fontSize: 9, color: '#ef4444', fontWeight: 600, marginBottom: 2 }}>❌ Не покрыты:</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+              {regionalCoverage.uncovered.map(r => <span key={r} style={{ padding: '2px 8px', borderRadius: 10, fontSize: 8, background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>{r}</span>)}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Synergy/conflict pairs */}
+      <div style={{ ...CARD, marginBottom: 12, border: '1px solid rgba(251,146,60,0.2)' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#fb923c', marginBottom: 8 }}>🔗 Сила синергии: лучшие пары</div>
+        {synergyPairs.length > 0 ? (
+          synergyPairs.map((p, i) => (
+            <div key={i} style={{ padding: '6px 8px', borderRadius: 6, marginBottom: 4, background: 'rgba(251,146,60,0.04)', border: '1px solid rgba(251,146,60,0.1)', fontSize: 9 }}>
+              <div style={{ fontWeight: 700, color: '#fff', marginBottom: 2 }}>{p.a} + {p.b}</div>
+              <div style={{ color: DIM }}>{p.type}: {p.reason}</div>
+            </div>
+          ))
+        ) : (
+          <div style={{ fontSize: 10, color: DIM, padding: 8 }}>Нет явных синергетических пар в этой группе.</div>
+        )}
+      </div>
+
+      {/* Full table */}
+      <div style={{ ...CARD, border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: DIM, marginBottom: 8 }}>📋 Полная таблица анализа</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: '2px 4px', fontSize: 8, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 4, marginBottom: 4 }}>
+          <span style={{ color: DIM }}>Упражнение</span>
+          <span style={{ color: DIM, textAlign: 'center' }}>Профиль</span>
+          <span style={{ color: DIM, textAlign: 'center' }}>Force-вектор</span>
+          <span style={{ color: DIM, textAlign: 'center' }}>Тех. счёт</span>
+          <span style={{ color: DIM, textAlign: 'center' }}>Безоп.</span>
+        </div>
+        {groupExercises.map((g, i) => (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: '2px 4px', padding: '3px 0', fontSize: 8, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+            <span style={{ fontWeight: 600 }}>{g.exercise.name}</span>
+            <span style={{ textAlign: 'center', color: g.rp.curve === 'stretch_mediated' ? '#22c55e' : g.rp.curve === 'mid_range' ? '#60a5fa' : '#f59e0b' }}>{g.rp.score}/10</span>
+            <span style={{ textAlign: 'center', color: '#c084fc' }}>{g.fv.replace(/_/g, ' ')}</span>
+            <span style={{ textAlign: 'center', color: getRiskColor(g.score.level) }}>{g.score.total}</span>
+            <span style={{ textAlign: 'center', color: getRiskColor(g.safety.level) }}>{g.safety.score}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
@@ -1155,7 +1566,7 @@ const ExerciseLab: React.FC = () => {
       {/* Header */}
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🧬 Лаборатория упражнений</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 12 }}>
-        Подбор нагрузки, анализ техники, сравнение упражнений — всё в одном инструменте.
+        Подбор нагрузки, анализ техники, сравнение, ПРО-анализ force-векторов и синергии — всё в одном инструменте.
       </div>
 
       {/* Mode tabs */}
@@ -1163,12 +1574,14 @@ const ExerciseLab: React.FC = () => {
         {modeBtn('prescription', 'Подбор', '📐')}
         {modeBtn('technique', 'Техника', '🔬')}
         {modeBtn('compare', 'Сравнение', '⚖️')}
+        {modeBtn('pro', 'ПРО-анализ', '🔮')}
       </div>
 
       {/* Content */}
       {mode === 'prescription' && <PrescriptionTab />}
       {mode === 'technique' && <TechniqueTab onSelectForCompare={handleSelectForCompare} />}
       {mode === 'compare' && <CompareTab initialId1={compareIds[0] || ''} initialId2={compareIds[1] || ''} />}
+      {mode === 'pro' && <ProAnalysisTab />}
     </div>
   );
 };

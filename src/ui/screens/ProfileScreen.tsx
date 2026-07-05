@@ -12,7 +12,10 @@ import { useDataLink } from '../../core/data-link';
 import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { BioStackAISettings } from '../components/BioStackAIProfile';
 import { BPDiaryTab } from '../components/BPDiaryTab';
+import { SupportDiaryView } from '../screens/SupportScreen_parts/SupportDiaryView';
+import { LabDiaryTab } from '../screens/LabsScreen_parts/LabDiaryTab';
 import { ProfessionalReports, ReportData } from './ProfileScreen_parts/ProfessionalReports';
+import { SleepDiaryTab } from './ProfileScreen_parts/SleepDiaryTab';
 
 type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'health' | 'genetics' | 'injuries' | 'diaries' | 'biostack_profile' | 'progress' | 'analytics' | 'contacts' | 'measurements';
 type ProfilePage = 'hero' | 'tabs';
@@ -213,189 +216,7 @@ const diaryCardDesc: React.CSSProperties = {
   fontSize:9, color: apple.textDim, lineHeight:1.2,
 };
 
-const SLEEP_DIARY_KEY = 'he_sleep_diary';
-
-interface SleepEntry {
-  date: string;
-  hours: number;
-  quality: number;
-  awakenings: number;
-  bedtime: string;
-  wakeTime: string;
-  notes: string;
-}
-
-const loadSleepDiary = (): SleepEntry[] => {
-  try { return JSON.parse(localStorage.getItem(SLEEP_DIARY_KEY) || '[]'); } catch { return []; }
-};
-
-const saveSleepDiaryEntry = (entry: SleepEntry) => {
-  try {
-    const diary = loadSleepDiary();
-    const idx = diary.findIndex(e => e.date === entry.date);
-    if (idx >= 0) diary[idx] = entry; else diary.unshift(entry);
-    localStorage.setItem(SLEEP_DIARY_KEY, JSON.stringify(diary.slice(0, 365)));
-  } catch {}
-};
-
-const deleteSleepEntry = (date: string) => {
-  try {
-    const diary = loadSleepDiary().filter(e => e.date !== date);
-    localStorage.setItem(SLEEP_DIARY_KEY, JSON.stringify(diary));
-  } catch {}
-};
-
-const SleepDiary: React.FC<{ settings: any; save: (data: any) => void }> = ({ settings, save }) => {
-  const [diary, setDiary] = useState<SleepEntry[]>(loadSleepDiary);
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [hours, setHours] = useState(settings.baselineSleepHours ?? 7);
-  const [quality, setQuality] = useState(settings.baselineSleepQuality ?? 5);
-  const [awakenings, setAwakenings] = useState(settings.nightAwakenings ?? 1);
-  const [bedtime, setBedtime] = useState(settings.bedtime ?? '23:00');
-  const [wakeTime, setWakeTime] = useState(settings.wakeTime ?? '07:00');
-  const [notes, setNotes] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [viewMode, setViewMode] = useState<'diary' | 'chart'>('diary');
-
-  const addEntry = () => {
-    const entry: SleepEntry = { date, hours, quality, awakenings, bedtime, wakeTime, notes };
-    saveSleepDiaryEntry(entry);
-    setDiary(loadSleepDiary());
-    setShowForm(false);
-    setNotes('');
-  };
-
-  const removeEntry = (d: string) => {
-    deleteSleepEntry(d);
-    setDiary(loadSleepDiary());
-  };
-
-  const weekData = diary.slice(0, 7).reverse();
-  const maxHeight = 60;
-
-  return (
-    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-      <button onClick={() => setShowForm(!showForm)} style={{
-        width:'100%', padding:'10px', borderRadius:12, border:apple.accentBorder,
-        background:apple.accentDim, color:apple.accent, cursor:'pointer', fontSize:12, fontWeight:700,
-      }}>
-        {showForm ? '✕ Закрыть' : '➕ Добавить запись сна'}
-      </button>
-
-      {showForm && (
-        <div style={glassCard}>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
-            <div>
-              <span style={sectionLabel}>Дата</span>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)} style={appleInput} />
-            </div>
-            <div>
-              <span style={sectionLabel}>Часов сна</span>
-              <input type="number" min={0} max={24} step={0.5} value={hours} onChange={e => setHours(parseFloat(e.target.value) || 0)} style={appleInput} />
-            </div>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
-            <div>
-              <span style={sectionLabel}>Качество (1-10)</span>
-              <input type="range" min={1} max={10} step={1} value={quality} onChange={e => setQuality(parseInt(e.target.value))} style={appleSlider} />
-              <div style={{ fontSize:11, fontWeight:700, color:apple.accent, textAlign:'center' }}>{quality}/10</div>
-            </div>
-            <div>
-              <span style={sectionLabel}>Пробуждения</span>
-              <input type="range" min={0} max={10} step={1} value={awakenings} onChange={e => setAwakenings(parseInt(e.target.value))} style={appleSlider} />
-              <div style={{ fontSize:11, fontWeight:700, color:apple.accent, textAlign:'center' }}>{awakenings}</div>
-            </div>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
-            <div><span style={sectionLabel}>Засыпание</span><input type="time" value={bedtime} onChange={e => setBedtime(e.target.value)} style={appleInput} /></div>
-            <div><span style={sectionLabel}>Подъём</span><input type="time" value={wakeTime} onChange={e => setWakeTime(e.target.value)} style={appleInput} /></div>
-          </div>
-          <div style={{ marginBottom:8 }}>
-            <span style={sectionLabel}>Заметки</span>
-            <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Стресс, кофеин, алкоголь..." style={appleInput} />
-          </div>
-          <div style={{ display:'flex', gap:6 }}>
-            <button onClick={addEntry} style={{
-              flex:1, padding:'8px', borderRadius:10, border:'none', cursor:'pointer',
-              background:apple.gradientGreen, color:'#000', fontWeight:700, fontSize:11,
-            }}>💾 Сохранить</button>
-            <button onClick={() => {
-              save({ baselineSleepHours: hours, baselineSleepQuality: quality, nightAwakenings: awakenings, bedtime, wakeTime });
-            }} style={{
-              padding:'8px 12px', borderRadius:10, cursor:'pointer', fontSize:10, fontWeight:600,
-              border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.9)',
-            }}>↕ В профиль</button>
-          </div>
-        </div>
-      )}
-
-      {/* View mode toggle */}
-      <div style={{ display:'flex', gap:6, marginBottom:4 }}>
-        {['diary','chart'].map(m => (
-          <button key={m} onClick={() => setViewMode(m as any)} style={pillBtn(viewMode === m)}>
-            {m === 'diary' ? '📋 Журнал' : '📊 График'}
-          </button>
-        ))}
-      </div>
-
-      {/* Chart view */}
-      {viewMode === 'chart' && diary.length > 0 && (
-        <div style={glassCard}>
-          <span style={sectionLabel}>Последние 7 дней</span>
-          <div style={{ display:'flex', alignItems:'flex-end', gap:4, height:maxHeight+30, padding:'8px 0' }}>
-            {weekData.map((e, i) => {
-              const h = Math.min(maxHeight, (e.hours / 12) * maxHeight);
-              return <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-                <div style={{ width:'100%', background:'rgba(0,230,138,0.12)', borderRadius:'4px 4px 0 0', height:h, minHeight:4, position:'relative', border:'1px solid rgba(0,230,138,0.2)' }}>
-                  <div style={{ position:'absolute', top:-14, left:'50%', transform:'translateX(-50%)', fontSize:8, fontWeight:700, color:apple.accent, whiteSpace:'nowrap' }}>{e.hours}ч</div>
-                </div>
-                <span style={{ fontSize:7, color:apple.textSecondary, textAlign:'center' }}>{e.date.slice(5)}</span>
-              </div>;
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Diary log */}
-      {viewMode === 'diary' && (
-        <div style={glassCard}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-            <span style={sectionLabel}>История сна ({diary.length} записей)</span>
-          </div>
-          {diary.length === 0 ? (
-            <div style={{ textAlign:'center', padding:20, fontSize:10, color:apple.textSecondary }}>
-              Нет записей. Добавьте первую запись сна.
-            </div>
-          ) : (
-            <div style={{ maxHeight:400, overflowY:'auto', display:'flex', flexDirection:'column', gap:4 }}>
-              {diary.map((e, i) => (
-                <div key={i} style={{
-                  padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.02)',
-                  border:'1px solid rgba(255,255,255,0.04)',
-                }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                    <span style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{e.date}</span>
-                    <button onClick={() => removeEntry(e.date)} style={{
-                      padding:'2px 6px', borderRadius:6, fontSize:8, cursor:'pointer',
-                      border:'1px solid rgba(239,68,68,0.2)', background:'rgba(239,68,68,0.06)', color:'#ef4444',
-                    }}>✕</button>
-                  </div>
-                  <div style={{ display:'flex', gap:8, fontSize:9, color:apple.textSecondary }}>
-                    <span style={{ color:apple.accent, fontWeight:700 }}>💤 {e.hours}ч</span>
-                    <span style={{ color: e.quality >= 7 ? '#00e68a' : e.quality >= 4 ? '#f59e0b' : '#ef4444' }}>⭐ {e.quality}/10</span>
-                    <span>🌙 {e.awakenings} проб.</span>
-                    <span>🛌 {e.bedtime}-{e.wakeTime}</span>
-                  </div>
-                  {e.notes && <div style={{ fontSize:8, color:apple.textDim, marginTop:2 }}>{e.notes}</div>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
+// SleepDiary вынесен в ProfileScreen_parts/SleepDiaryTab.tsx
 
 /* ── helper components for health tab cards ── */
 const HealthSelect: React.FC<{ label:string; value:string; opts:[string,string][]; onChange:(v:string)=>void }> = ({label,value,opts,onChange}) => (
@@ -446,7 +267,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
   const [reportTab, setReportTab] = useState<'current' | 'archive'>('current');
   const [analyticsSubTab, setAnalyticsSubTab] = useState<'reports' | 'progress'>('reports');
-  const [diarySubTab, setDiarySubTab] = useState<'sleep' | 'bp' | 'measurements' | 'progress'>('sleep');
+  const [diarySubTab, setDiarySubTab] = useState<'sleep' | 'bp' | 'measurements' | 'progress' | 'injuries' | 'support_diary' | 'lab_diary'>('sleep');
   const [selectedArchiveItem, setSelectedArchiveItem] = useState<any>(null);
   const [showCustomReport, setShowCustomReport] = useState(false);
   const [customReportBlocks, setCustomReportBlocks] = useState<Record<string, boolean>>({
@@ -1819,23 +1640,48 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                     <button onClick={() => onNavigate?.('nutrition')} style={{ ...diaryCardBase, background:'rgba(16,185,129,0.08)', border:'1px solid rgba(16,185,129,0.15)' }}>
                       <div style={diaryIconWrap}>🍽️</div>
                       <div style={diaryCardTitle}>Питание</div>
+                      <div style={diaryCardDesc}>КБЖУ, приёмы</div>
                     </button>
                     <button onClick={() => onNavigate?.('training')} style={{ ...diaryCardBase, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)' }}>
                       <div style={diaryIconWrap}>🏋️</div>
                       <div style={diaryCardTitle}>Тренировки</div>
+                      <div style={diaryCardDesc}>Дневник, план</div>
                     </button>
-                    {settings.phase === 'course' && (
-                      <button onClick={() => onNavigate?.('pharma')} style={{ ...diaryCardBase, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.15)' }}>
-                        <div style={diaryIconWrap}>💉</div>
-                        <div style={diaryCardTitle}>Фарма</div>
-                      </button>
-                    )}
-                    {(localStorage.getItem('he_autocalc_state') || localStorage.getItem('he_support_substances')) && (
-                      <button onClick={() => onNavigate?.('support')} style={{ ...diaryCardBase, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.15)' }}>
-                        <div style={diaryIconWrap}>🧪</div>
-                        <div style={diaryCardTitle}>Поддержка</div>
-                      </button>
-                    )}
+                    <button onClick={() => onNavigate?.('pharma')} style={{ ...diaryCardBase, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.15)' }}>
+                      <div style={diaryIconWrap}>💉</div>
+                      <div style={diaryCardTitle}>Фарма / Курс</div>
+                      <div style={diaryCardDesc}>Препараты, цикл</div>
+                    </button>
+                    <button onClick={() => onNavigate?.('support')} style={{ ...diaryCardBase, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.15)' }}>
+                      <div style={diaryIconWrap}>🧪</div>
+                      <div style={diaryCardTitle}>Поддержка</div>
+                      <div style={diaryCardDesc}>БАДы, симптомы</div>
+                    </button>
+                    <button onClick={() => { try { localStorage.setItem('he_nav_to_diary', '1'); } catch {} onNavigate?.('support'); }} style={{ ...diaryCardBase, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.15)' }}>
+                      <div style={diaryIconWrap}>📓</div>
+                      <div style={diaryCardTitle}>БАД-дневник</div>
+                      <div style={diaryCardDesc}>Приём, дозы, эффекты</div>
+                    </button>
+                    <button onClick={() => { try { localStorage.setItem('he_nav_to_lab_diary', '1'); } catch {} onNavigate?.('labs'); }} style={{ ...diaryCardBase, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)' }}>
+                      <div style={diaryIconWrap}>📊</div>
+                      <div style={diaryCardTitle}>Дневник анализов</div>
+                      <div style={diaryCardDesc}>Динамика, графики</div>
+                    </button>
+                    <button onClick={() => { setDiarySubTab('lab_diary'); }} style={{ ...diaryCardBase, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)' }}>
+                      <div style={diaryIconWrap}>📊</div>
+                      <div style={diaryCardTitle}>Дневник анализов</div>
+                      <div style={diaryCardDesc}>Динамика, графики</div>
+                    </button>
+                    <button onClick={() => onNavigate?.('labs')} style={{ ...diaryCardBase, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)' }}>
+                      <div style={diaryIconWrap}>🔬</div>
+                      <div style={diaryCardTitle}>Анализы</div>
+                      <div style={diaryCardDesc}>Лаборатория</div>
+                    </button>
+                    <button onClick={() => onNavigate?.('risks')} style={{ ...diaryCardBase, background:'rgba(244,67,54,0.08)', border:'1px solid rgba(244,67,54,0.15)' }}>
+                      <div style={diaryIconWrap}>🩺</div>
+                      <div style={diaryCardTitle}>Риски</div>
+                      <div style={diaryCardDesc}>Оценка здоровья</div>
+                    </button>
                   </div>
                 </div>
 
@@ -1846,6 +1692,9 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                     { id:'bp', label:'🫀 Давление' },
                     { id:'measurements', label:'📏 Замеры' },
                     { id:'progress', label:'📈 Прогресс' },
+                    { id:'injuries', label:'🩼 Травмы' },
+                    { id:'support_diary', label:'📓 БАД-дневник' },
+                    { id:'lab_diary', label:'📊 Анализы' },
                   ].map(d => (
                     <button key={d.id} onClick={() => setDiarySubTab(d.id as any)} style={{
                       padding:'6px 14px', borderRadius:18, fontSize:10, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0,
@@ -1857,7 +1706,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                 </div>
 
                 {/* ═══ SLEEP DIARY ═══ */}
-                {diarySubTab === 'sleep' && <SleepDiary settings={settings} save={save} />}
+                {diarySubTab === 'sleep' && <SleepDiaryTab settings={settings} save={save} />}
 
                 {/* ═══ BP DIARY ═══ */}
                 {diarySubTab === 'bp' && <BPDiaryTab />}
@@ -2022,6 +1871,89 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                         </div>
                       );
                     })()}
+                  </div>
+                )}
+
+                {/* ═══ INJURIES DIARY ═══ */}
+                {diarySubTab === 'injuries' && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={glassCard}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                        <div style={{ ...sectionLabel, color:'#ef4444' }}>🩼 Травмы</div>
+                        <button style={pillBtn(true)} onClick={addInjury}>+ Добавить</button>
+                      </div>
+                    </div>
+                    {(settings.injuries ?? []).map(inj => (
+                      <div key={inj.id} style={glassCard}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                          <strong style={{ fontSize:12, color: apple.textPrimary }}>{inj.location} — {INJURY_TYPES.find(t => t.id === inj.type)?.label ?? inj.type}</strong>
+                          <div style={{ display:'flex', gap:4 }}>
+                            <button style={pillBtn(false)} onClick={() => setEditInjury(inj)}>Ред.</button>
+                            <button style={{ padding:'4px 8px', borderRadius:6, border:'1px solid rgba(239,68,68,0.3)', background:'transparent', color:'#ef4444', fontSize:10, cursor:'pointer' }} onClick={() => deleteInjury(inj.id)}>Удалить</button>
+                          </div>
+                        </div>
+                        <div style={{ fontSize:11, color: apple.textSecondary }}>
+                          Боль: {inj.painLevel}/10 | Ограничение: {MOVEMENT_LIMITS.find(m => m.id === inj.movementLimit)?.label} | Сторона: {inj.side === 'left' ? 'Левая' : inj.side === 'right' ? 'Правая' : 'Обе'} | {inj.chronic ? 'Хроническая' : 'Острая'}
+                        </div>
+                        {inj.notes && <div style={{ fontSize:10, color: apple.textDim, marginTop:4 }}>{inj.notes}</div>}
+                      </div>
+                    ))}
+                    {editInjury && (
+                      <div style={{ ...glassCard, border: apple.accentBorder }}>
+                        <div style={sectionLabel}>{editInjury.id && (settings.injuries ?? []).find(i => i.id === editInjury.id) ? 'Редактирование' : 'Новая травма'}</div>
+                        <div style={{ marginTop:8 }}>
+                          <span style={sectionLabel}>Тип</span>
+                          <div style={{ display:'flex', gap:4, marginTop:2 }}>{INJURY_TYPES.map(t => <button key={t.id} style={pillBtn(editInjury.type === t.id)} onClick={() => setEditInjury({ ...editInjury, type: t.id })}>{t.label}</button>)}</div>
+                        </div>
+                        <div style={{ marginTop:8 }}>
+                          <span style={sectionLabel}>Локализация</span>
+                          <select style={appleInput} value={editInjury.location} onChange={e => setEditInjury({ ...editInjury, location: e.target.value })}>
+                            {INJURY_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
+                          </select>
+                        </div>
+                        <div style={{ marginTop:8 }}>
+                          <div style={{ display:'flex', justifyContent:'space-between' }}><span style={sectionLabel}>Боль</span><span style={{ fontSize:13, fontWeight:700, color:'#ef4444' }}>{editInjury.painLevel}/10</span></div>
+                          <input style={appleSlider} type="range" min="1" max="10" value={editInjury.painLevel} onChange={e => setEditInjury({ ...editInjury, painLevel: parseFloat(e.target.value) || 0 })} />
+                        </div>
+                        <div style={{ marginTop:8 }}>
+                          <span style={sectionLabel}>Ограничение движений</span>
+                          <div style={{ display:'flex', gap:4, marginTop:2 }}>{MOVEMENT_LIMITS.map(m => <button key={m.id} style={pillBtn(editInjury.movementLimit === m.id)} onClick={() => setEditInjury({ ...editInjury, movementLimit: m.id })}>{m.label}</button>)}</div>
+                        </div>
+                        <div style={{ marginTop:8 }}>
+                          <span style={sectionLabel}>Сторона</span>
+                          <div style={{ display:'flex', gap:4, marginTop:2 }}>
+                            {[{ id:'left', label:'Левая' }, { id:'right', label:'Правая' }, { id:'both', label:'Обе' }].map(x => <button key={x.id} style={pillBtn(editInjury.side === x.id)} onClick={() => setEditInjury({ ...editInjury, side: x.id as any })}>{x.label}</button>)}
+                          </div>
+                        </div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:8 }}>
+                          <div><span style={sectionLabel}>Дата</span><input style={appleInput} type="date" value={editInjury.date ?? ''} onChange={e => setEditInjury({ ...editInjury, date: e.target.value })} /></div>
+                          <div>
+                            <span style={sectionLabel}>Хроническая</span>
+                            <div style={{ display:'flex', gap:4, marginTop:2 }}>
+                              <button style={pillBtn(editInjury.chronic)} onClick={() => setEditInjury({ ...editInjury, chronic: true })}>Да</button>
+                              <button style={pillBtn(!editInjury.chronic)} onClick={() => setEditInjury({ ...editInjury, chronic: false })}>Нет</button>
+                            </div>
+                          </div>
+                        </div>
+                        <button style={{ ...pillBtn(true), marginTop:10, width:'100%' }} onClick={() => saveInjury(editInjury)}>
+                          {editInjury.id && (settings.injuries ?? []).find(i => i.id === editInjury.id) ? 'Сохранить' : 'Добавить'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ═══ SUPPORT DIARY ═══ */}
+                {diarySubTab === 'support_diary' && (
+                  <div style={{ marginTop: 8 }}>
+                    <SupportDiaryView s={{ SUPPORT_LEVELS: {}, supportLevel: '' }} />
+                  </div>
+                )}
+
+                {/* ═══ LAB DIARY ═══ */}
+                {diarySubTab === 'lab_diary' && (
+                  <div style={{ marginTop: 8 }}>
+                    <LabDiaryTab labs={labs} />
                   </div>
                 )}
               </div>

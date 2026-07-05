@@ -79,6 +79,8 @@ export interface MealPlanInput {
   sex: 'male' | 'female';
   goal: MealGoal;
   tier: MealTier;
+  varietyLevel?: 'sparse' | 'rich';
+  excludeFoodIds?: string[];
   trainingDaysPerWeek: number;
   avgWorkoutMinutes: number;
   includeWorkoutMeals?: boolean;
@@ -213,19 +215,51 @@ const CATEGORY_DB_KEYS: Record<string, string[]> = {
   supplement: ['supplement'],
 };
 
-function pickFoodForCategory(cat: string, tier: MealTier, count: number): FoodItem[] {
-  const all = getFoodsForTier(cat, tier);
+function categoryForCustomFood(c: string): string {
+  if (c === 'protein' || c === 'carb' || c === 'fat' || c === 'veg_fruit' || c === 'dairy' || c === 'supplement') return c;
+  if (c === 'grain') return 'carb';
+  return 'veg_fruit';
+}
+
+function getAllFoodsForCategory(cat: string, excludeIds: Set<string>): FoodItem[] {
   const dbCats = CATEGORY_DB_KEYS[cat] || [cat];
+  const main = FOOD_DB.filter(f => dbCats.includes(f.category) && !excludeIds.has(f.id));
+  const custom = loadCustomFoods().filter(f => categoryForCustomFood(f.category) === cat && !excludeIds.has(f.id));
+  const mapped: FoodItem[] = custom.map(c => ({
+    id: c.id, name: c.name, category: c.category as FoodItem['category'],
+    kcal: c.kcal, protein: c.protein, fat: c.fat, carbs: c.carbs,
+    fiber: c.fiber, gi: 50, servingSize: c.servingSize || '100 г',
+    tier: 'basic',
+    micros: {
+      ...(c.potassium_mg !== undefined ? { K: c.potassium_mg } : {}),
+      ...(c.magnesium_mg !== undefined ? { Mg: c.magnesium_mg } : {}),
+      ...(c.calcium_mg !== undefined ? { Ca: c.calcium_mg } : {}),
+      ...(c.sodium_mg !== undefined ? { Na: c.sodium_mg } : {}),
+      ...(c.zinc_mg !== undefined ? { Zn: c.zinc_mg } : {}),
+      ...(c.iron_mg !== undefined ? { Fe: c.iron_mg } : {}),
+      ...(c.selenium_mcg !== undefined ? { Se: c.selenium_mcg } : {}),
+    },
+  }));
+  return [...main, ...mapped];
+}
+
+function pickFoodForCategory(cat: string, tier: MealTier, count: number, varietyLevel: 'sparse' | 'rich', excludeIds: Set<string>): FoodItem[] {
   let pool: FoodItem[];
-  if (all.length < count) {
-    const usedIds = new Set(all.map(f => f.id));
-    const extras = FOOD_DB.filter(f => dbCats.includes(f.category) && !usedIds.has(f.id));
-    pool = [...all, ...extras];
+  if (varietyLevel === 'sparse') {
+    const tierFoods = getFoodsForTier(cat, tier).filter(f => !excludeIds.has(f.id));
+    if (tierFoods.length < count) {
+      const usedIds = new Set(tierFoods.map(f => f.id));
+      const extras = getAllFoodsForCategory(cat, new Set([...excludeIds, ...usedIds]));
+      pool = [...tierFoods, ...extras];
+    } else {
+      pool = tierFoods;
+    }
   } else {
-    pool = all;
+    pool = getAllFoodsForCategory(cat, excludeIds);
   }
   if (pool.length === 0) {
-    pool = FOOD_DB.filter(f => dbCats.includes(f.category));
+    const dbCats = CATEGORY_DB_KEYS[cat] || [cat];
+    pool = FOOD_DB.filter(f => dbCats.includes(f.category) && !excludeIds.has(f.id));
   }
   return [...pool].sort(() => Math.random() - 0.5).slice(0, Math.min(count, pool.length));
 }
@@ -243,12 +277,15 @@ function generateDayPlan(
   dayIndex: number, isTrainingDay: boolean,
   totalKcal: number, totalProtein: number, totalFat: number, totalCarbs: number,
   tier: MealTier, includeWorkoutMeals: boolean,
+  varietyLevel: 'sparse' | 'rich' = 'rich',
+  excludeIds: Set<string> = new Set(),
 ): DayPlan {
   const meals: MealSlot[] = [];
-  const proteinFoods = pickFoodForCategory('protein', tier, 7);
-  const carbFoods = pickFoodForCategory('carb', tier, 7);
-  const fatFoods = pickFoodForCategory('fat', tier, 4);
-  const vegFoods = pickFoodForCategory('veg_fruit', tier, 4);
+  const [protCnt, carbCnt, fatCnt, vegCnt] = varietyLevel === 'sparse' ? [4, 4, 2, 2] : [7, 7, 4, 4];
+  const proteinFoods = pickFoodForCategory('protein', tier, protCnt, varietyLevel, excludeIds);
+  const carbFoods = pickFoodForCategory('carb', tier, carbCnt, varietyLevel, excludeIds);
+  const fatFoods = pickFoodForCategory('fat', tier, fatCnt, varietyLevel, excludeIds);
+  const vegFoods = pickFoodForCategory('veg_fruit', tier, vegCnt, varietyLevel, excludeIds);
   const shift = dayIndex;
 
   if (isTrainingDay && includeWorkoutMeals) {
@@ -348,7 +385,7 @@ function generateDayPlan(
 }
 
 export function generateTierMealPlan(input: MealPlanInput): MealPlanResult {
-  const { weightKg, heightCm, age, sex, goal, tier, trainingDaysPerWeek, avgWorkoutMinutes, includeWorkoutMeals, labsContext } = input;
+  const { weightKg, heightCm, age, sex, goal, tier, varietyLevel, excludeFoodIds, trainingDaysPerWeek, avgWorkoutMinutes, includeWorkoutMeals, labsContext } = input;
   const tc = TIER_CONFIG[tier];
   const ga = GOAL_ADJUST[goal];
   const bmr = calcBMR(weightKg, heightCm, age, sex);
@@ -365,9 +402,11 @@ export function generateTierMealPlan(input: MealPlanInput): MealPlanResult {
     for (let i = 0; i < trainingDaysPerWeek && i < 7; i++) trainingDays.add(i * step);
   }
 
+  const vl = varietyLevel ?? 'sparse';
+  const excl = new Set(excludeFoodIds ?? []);
   const dayPlans: DayPlan[] = [];
   for (let d = 0; d < 7; d++) {
-    dayPlans.push(generateDayPlan(d, trainingDays.has(d), totalKcal, totalProtein, totalFat, totalCarbs, tier, includeWorkoutMeals ?? false));
+    dayPlans.push(generateDayPlan(d, trainingDays.has(d), totalKcal, totalProtein, totalFat, totalCarbs, tier, includeWorkoutMeals ?? false, vl, excl));
   }
 
   let workoutMealPlan: WorkoutMealPlan | null = null;

@@ -3,6 +3,7 @@ import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, REQUIRED_LABS_PER_PHASE, UCUM_MAP } fro
 import type { RiskResult, LabPoint } from '../../core/types';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
 import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine';
+import { LabDiaryTab } from './LabsScreen_parts/LabDiaryTab';
 import { computeLabIndexDetails, type LabIndexDetail } from '../../engines/labs-indices.engine';
 import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
@@ -144,9 +145,10 @@ const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
   { id: 'schedule', label: 'График сдачи', icon: '📅' },
   { id: 'reports', label: 'Отчёты', icon: '📄' },
   { id: 'extended', label: 'Все маркеры', icon: '🔬' },
+  { id: 'diary', label: 'Дневник', icon: '📓' },
 ];
 
-type LabSubTab = 'hero' | 'overview' | 'current' | 'archive' | 'catalog' | 'chart' | 'schedule' | 'reports' | 'extended';
+type LabSubTab = 'hero' | 'overview' | 'current' | 'archive' | 'catalog' | 'chart' | 'schedule' | 'reports' | 'extended' | 'diary';
 
 export const LabsScreen: React.FC = () => {
   const linked = useDataLink();
@@ -184,6 +186,15 @@ export const LabsScreen: React.FC = () => {
   const [addError, setAddError] = useState('');
   const [labReportGenerated, setLabReportGenerated] = useState(false);
   useEffect(() => { try { if (localStorage.getItem('he_labs_report_current')) setLabReportGenerated(true); } catch {} }, []);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('he_nav_to_lab_diary') === '1') {
+        localStorage.removeItem('he_nav_to_lab_diary');
+        setMainTab('lab');
+        setSubTab('diary');
+      }
+    } catch {}
+  }, []);
   const [selectedArchivedLabReport, setSelectedArchivedLabReport] = useState<any>(null);
   const [labArchive, setLabArchive] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_lab_reports') || '[]'); } catch { return []; }
@@ -1368,6 +1379,11 @@ export const LabsScreen: React.FC = () => {
           onPhaseChange={handlePhaseChange}
           tick={tick}
         />
+      )}
+
+      {/* ≡≡≡ LAB DIARY TAB ≡≡≡ */}
+      {mainTab === 'lab' && subTab === 'diary' && (
+        <LabDiaryTab labs={labs} />
       )}
 
 

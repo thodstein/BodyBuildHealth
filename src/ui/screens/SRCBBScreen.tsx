@@ -26,9 +26,6 @@ import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
 import { useDataLink } from '../../core/data-link';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
 import { TRAINING_SPLITS } from '../../engines/training.engine';
-import { getMethodsByCategory } from '../../engines/training-methodology.engine';
-import { FULL_PROGRAM_LIBRARY } from '../../engines/complete-program-library.engine';
-import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './TrainingScreen_parts/programs-data';
 import { loadTrainingProfile, saveTrainingProfile } from './TrainingScreen_parts/training-profile';
 import { StrengthDiary } from '../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../core/types';
@@ -731,76 +728,33 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
         </div>
       )}
 
-      {/* ── Ручной сбор ── */}
-      {mainTab === 'manual' && (() => {
-        const [manualWorkout, setManualWorkout] = React.useState<{ name: string; exercises: { name: string; sets: number; reps: number; weight: number }[]; date: string; cfg?: Record<string, string> }>({ name: '', exercises: [{ name: '', sets: 3, reps: 10, weight: 0 }], date: new Date().toISOString().slice(0, 10) });
-        const [saved, setSaved] = React.useState<typeof manualWorkout[]>(() => { try { return JSON.parse(localStorage.getItem('he_manual_workouts') || '[]'); } catch { return []; } });
-        const addEx = () => setManualWorkout(p => ({ ...p, exercises: [...p.exercises, { name: '', sets: 3, reps: 10, weight: 0 }] }));
-        const updEx = (i: number, field: string, val: any) => setManualWorkout(p => { const ex = [...p.exercises]; ex[i] = { ...ex[i], [field]: val }; return { ...p, exercises: ex }; });
-        const [cfg, setCfg] = React.useState<Record<string, string>>({});
-        const setCfgField = (k: string, v: string) => setCfg(p => ({ ...p, [k]: v }));
-        const saveWorkout = () => { if (!manualWorkout.name.trim() || manualWorkout.exercises.every(e => !e.name.trim())) return; const item = { ...manualWorkout, cfg }; const updated = [...saved, item]; setSaved(updated); localStorage.setItem('he_manual_workouts', JSON.stringify(updated)); setCfg({}); setManualWorkout({ name: '', exercises: [{ name: '', sets: 3, reps: 10, weight: 0 }], date: new Date().toISOString().slice(0, 10) }); };
-        const delWorkout = (i: number) => { const updated = saved.filter((_, idx) => idx !== i); setSaved(updated); localStorage.setItem('he_manual_workouts', JSON.stringify(updated)); };
-        const splitOpts = Object.entries(TRAINING_SPLITS).map(([id, s]: [string, { name: string; desc: string }]) => ({ id, label: s.name, desc: s.desc }));
-        const DIR_RU: Record<string, string> = { powerlifting: 'Троеборье', bench: 'Жим лёжа', deadlift_bench: 'Тяга+Жим', armwrestling: 'Армрестлинг', bodybuilding: 'Бодибилдинг' };
-        const cycleOpts = LMS_CYCLES.map(c => { const cat = c.meta.id.startsWith("block") ? "Блок" : c.meta.id.startsWith("embed") ? "Встроенная программа" : "СРЦ-цикл"; return { id: c.meta.id, label: c.meta.title, desc: cat + " · " + (DIR_RU[c.meta.direction] || c.meta.direction) + " · " + c.meta.level }; });
-        const progOpts = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS].map((p: any) => ({ id: p.id, label: p.name, desc: p.type + " · " + p.goal + " · " + p.level }));
-        const methodOpts = (cat: string) => getMethodsByCategory(cat).map(m => ({ id: m.name, label: m.name, desc: m.bestFor }));
-        const CFG_LABEL: Record<string, string> = { split: 'сплит', cycle: 'цикл', program: 'программа', periodization: 'периодизация', progression: 'прогрессия', intensity: 'интенсивность', technique: 'техника', volume: 'объём', frequency: 'частота' };
-        const cfgSummary = Object.entries(cfg).filter(([, v]) => v);
-        return <div>
-          <div style={{ ...CARD, marginBottom: 12 }}>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#00e68a', marginBottom: 10 }}>🛠 Ручной конструктор тренировки</div>
-            <div style={{ ...H, margin: '4px 0 8px' }}>⚙️ Конфигурация программы</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <PopupSelect label='Тип сплита' value={cfg.split || ''} onChange={v => setCfgField('split', v)} options={splitOpts} hint='Все доступные сплиты из библиотеки.' />
-              <PopupSelect label='Тип цикла' value={cfg.cycle || ''} onChange={v => setCfgField('cycle', v)} options={cycleOpts} hint='Все циклы (СРЦ, блоки, встроенные программы) по категориям.' />
-              <PopupSelect label='Программа тренировок' value={cfg.program || ''} onChange={v => setCfgField('program', v)} options={progOpts} hint='Готовые программы из библиотеки.' />
-              <PopupSelect label='Периодизация' value={cfg.periodization || ''} onChange={v => setCfgField('periodization', v)} options={methodOpts('periodization')} />
-              <PopupSelect label='Прогрессия' value={cfg.progression || ''} onChange={v => setCfgField('progression', v)} options={methodOpts('progression')} />
-              <PopupSelect label='Интенсивность' value={cfg.intensity || ''} onChange={v => setCfgField('intensity', v)} options={methodOpts('intensity')} />
-              <PopupSelect label='Техника' value={cfg.technique || ''} onChange={v => setCfgField('technique', v)} options={methodOpts('technique')} />
-              <PopupSelect label='Объём' value={cfg.volume || ''} onChange={v => setCfgField('volume', v)} options={methodOpts('volume')} />
-              <PopupSelect label='Частота' value={cfg.frequency || ''} onChange={v => setCfgField('frequency', v)} options={methodOpts('frequency')} />
-            </div>
-            {cfgSummary.length > 0 && <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', fontSize: 10, color: '#00e68a', lineHeight: 1.6 }}>✓ Выбрано: {cfgSummary.map(([k, v]) => (CFG_LABEL[k] || k) + ': ' + v).join(' · ')}</div>}
-            <div style={{ ...H, margin: '12px 0 8px' }}>📝 Состав тренировки</div>
-            <div style={LABEL}>Название тренировки</div>
-            <input style={IN} value={manualWorkout.name} onChange={e => setManualWorkout(p => ({ ...p, name: e.target.value }))} placeholder="Грудные + трицепс" />
-            <div style={LABEL}>Дата</div>
-            <input style={IN} type="date" value={manualWorkout.date} onChange={e => setManualWorkout(p => ({ ...p, date: e.target.value }))} />
-            {manualWorkout.exercises.map((ex, i) => (
-              <div key={i} style={{ display: 'flex', gap: 4, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                <input style={{ ...IN, flex: 3, minWidth: 80 }} value={ex.name} onChange={e => updEx(i, 'name', e.target.value)} placeholder="Упражнение" list="ex-list" />
-                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>С</span>
-                <input style={{ ...IN, flex: 1, minWidth: 36, textAlign: 'center' }} type="number" min={1} max={20} value={ex.sets} onChange={e => updEx(i, 'sets', +e.target.value)} placeholder="С" />
-                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>П</span>
-                <input style={{ ...IN, flex: 1, minWidth: 36, textAlign: 'center' }} type="number" min={1} max={100} value={ex.reps} onChange={e => updEx(i, 'reps', +e.target.value)} placeholder="П" />
-                <input style={{ ...IN, flex: 1.5, minWidth: 50, textAlign: 'center' }} type="number" min={0} step={2.5} value={ex.weight} onChange={e => updEx(i, 'weight', +e.target.value)} placeholder="кг" />
-                {manualWorkout.exercises.length > 1 && <button style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 12 }} onClick={() => setManualWorkout(p => ({ ...p, exercises: p.exercises.filter((_, idx) => idx !== i) }))}>✕</button>}
-              </div>
-            ))}
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button style={{ ...BTN, flex: 1 }} onClick={addEx}>+ Упражнение</button>
-              <SaveButton label="💾 Сохранить тренировку" savedLabel="✓ Тренировка сохранена" disabled={!manualWorkout.name.trim() || manualWorkout.exercises.every(e => !e.name.trim())} onSave={saveWorkout} />
-            </div>
-            <datalist id="ex-list">{EXERCISE_CATALOG.slice(0, 100).map(e => <option key={e.id} value={e.name} />)}</datalist>
+      {/* ── Ручной сбор (перенаправлен в полный конструктор) ── */}
+      {mainTab === 'manual' && (
+        <div style={{ ...CARD, padding: 20, textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🛠️</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#00e68a', marginBottom: 8 }}>Ручной конструктор переехал</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 16, lineHeight: 1.6 }}>
+            Полный ручной конструктор теперь доступен в разделе <b style={{ color: '#00e68a' }}>📐 Планирование → 🛠️ Ручной конструктор</b>.<br />
+            Там вас ждёт: авто-подбор сплита, генерация плана, оценка качества, MRV-guardrails,<br />
+            применение методик, экспорт в PDF, выполнение через SessionPlayer и многое другое.
           </div>
-          {saved.length > 0 && <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 8 }}>Сохранённые тренировки ({saved.length})</div>
-            {saved.map((w, i) => (
-              <div key={i} style={{ ...CARD, marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <span style={{ fontWeight: 700, color: '#00e68a', fontSize: 12 }}>{w.name}</span>
-                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>{w.date}</span>
-                </div>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 6, lineHeight: 1.4 }}>{w.exercises.map(e => `${e.name}: ${e.sets}×${e.reps}@${e.weight}кг`).join(' · ')}</div>
-                <button style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444', borderRadius: 8, padding: '4px 12px', cursor: 'pointer', fontSize: 10 }} onClick={() => delWorkout(i)}>✕ Удалить</button>
-              </div>
-            ))}
-          </div>}
-        </div>;
-      })()}
+          <button onClick={() => {
+            try { localStorage.setItem('he_training_planning_track', 'manual'); } catch {}
+            if (typeof (window as any).__navigateToTrainingTab === 'function') {
+              (window as any).__navigateToTrainingTab('programcalc');
+            }
+          }} style={{
+            padding: '12px 24px', borderRadius: 10, border: 'none', cursor: 'pointer',
+            background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000',
+            fontWeight: 800, fontSize: 13,
+          }}>
+            🚀 Открыть полный конструктор
+          </button>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 12 }}>
+            Также доступен на вкладке «Ручной конструктор» в разделе Планирование
+          </div>
+        </div>
+      )}
 
       {subView === 'bridge' && (
         <div style={CARD}>

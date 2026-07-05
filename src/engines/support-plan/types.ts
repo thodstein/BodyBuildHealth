@@ -112,7 +112,10 @@ export interface LabPanelData {
 
 // ─── Block 10: Integrated Risk ───
 export type RiskSystemId = 'cardio'|'hepatic'|'renal'|'neuro'|'endocrine'|'hematologic'|'reproductive'|'musculoskeletal';
-export interface MechanismDetail { id: number; name: string; contribution: number; active: boolean; triggers: string[]; }
+export interface MechanismDetail {
+  id: number; name: string; contribution: number; active: boolean; triggers: string[];
+  mechId?: string; weight?: number; m_i?: number; E_i?: number; k_used?: number; q_label?: string;
+}
 export interface SystemRisk { id: RiskSystemId; label: string; icon: string; rawScore: number; afterSupport: number; mechanisms: MechanismDetail[]; }
 
 // ─── Block 11: Nutrition ───

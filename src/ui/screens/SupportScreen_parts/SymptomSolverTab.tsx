@@ -16,6 +16,12 @@ import {
   type SelectedSymptom,
 } from '../../../engines/symptom-priority-engine';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
+import { getSymptomHistory, getSymptomChartData } from '../../../engines/symptom-diary.engine';
+import { linkSymptomsToLabs } from '../../../engines/symptom-lab-link';
+import {
+  getActiveAssignments, addAssignment, stopAssignment, markIntake,
+  getAssignmentsForSymptom, getSymptomVsAdherenceData,
+} from '../../../engines/symptom-adherence.engine';
 
 const glassCard: React.CSSProperties = {
   padding: '12px 14px', borderRadius: 12, background: 'var(--bg-secondary)',
@@ -179,12 +185,16 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
   }, [selectedSymptomsList, selectedForPlan]);
 
   // ── Добавление вещества в план ──
-  const addSubstanceToPlan = (substanceId: string, name: string) => {
+  const addSubstanceToPlan = (substanceId: string, name: string, dose?: string) => {
     const catalogId = resolveCatalogId(substanceId);
     if (!catalogId) {
       setPlanToast(`«${name}» — образ жизни, не добавляется в план`);
       setTimeout(() => setPlanToast(''), 3000);
       return;
+    }
+    // Также создаём запись в трекере приёма (если выбран симптом)
+    if (selectedSymptom) {
+      addAssignment(selectedSymptom.id, catalogId, name, dose || '');
     }
     // Получаем текущие subs из состояния
     const currentSubs: string[] = s.supportDrugs || [];
@@ -294,6 +304,15 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
               ))}
             </div>
           )}
+
+          {/* 📈 График динамики симптома из дневника */}
+          <SymptomDiaryMiniChart symptomId={selectedSymptom.id} />
+
+          {/* 🔬 Лабораторная подсветка */}
+          <SymptomLabLinkBlock symptomId={selectedSymptom.id} />
+
+          {/* 💊 Назначения и приём */}
+          <SymptomAdherenceBlock symptomId={selectedSymptom.id} />
         </div>
 
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', marginTop: 14, marginBottom: 6 }}>
@@ -348,7 +367,7 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
                           {/* КНОПКА «В ПЛАН» */}
                           {sol.type !== 'lifestyle' && catalogEntry && (
                             <button
-                              onClick={() => addSubstanceToPlan(sol.substanceId, sol.name)}
+                              onClick={() => addSubstanceToPlan(sol.substanceId, sol.name, sol.dose)}
                               title="Добавить в план поддержки"
                               style={{
                                 padding: '2px 8px', borderRadius: 8, fontSize: 8, fontWeight: 700,
@@ -604,3 +623,142 @@ export const SymptomSolverTab: React.FC<{ s: Record<string, any> }> = ({ s }) =>
     </div>
   );
 };
+
+// ════════════════════════════════════════════
+// Вспомогательные блоки для детального просмотра
+// ════════════════════════════════════════════
+
+function SymptomDiaryMiniChart({ symptomId }: { symptomId: string }) {
+  const history = getSymptomHistory(symptomId);
+  if (history.length < 2) return null;
+
+  const max = Math.max(...history.map((h) => h.severity), 1);
+  return (
+    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.12)' }}>
+      <div style={{ fontSize: 9, fontWeight: 700, color: '#3b82f6', marginBottom: 6 }}>📈 Динамика симптома (дневник)</div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 50, paddingTop: 4 }}>
+        {history.slice(-14).map((h, i) => {
+          const barH = (h.severity / Math.max(max, 10)) * 44;
+          const color = h.severity >= 7 ? '#f44336' : h.severity >= 4 ? '#ff9800' : '#4caf50';
+          return (
+            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+              <div style={{ width: '80%', height: Math.max(barH, 2), background: color, borderRadius: '2px 2px 0 0', transition: 'height 0.3s' }} />
+              <span style={{ fontSize: 6, color: 'var(--text-dim)', transform: 'rotate(-45deg)', whiteSpace: 'nowrap' }}>
+                {h.date.slice(5)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SymptomLabLinkBlock({ symptomId }: { symptomId: string }) {
+  // Пробуем получить lab-значения из localStorage
+  const labRaw = React.useMemo(() => {
+    try {
+      const stored = localStorage.getItem('he_lab_values') || localStorage.getItem('he_lab_inputs');
+      if (stored) return JSON.parse(stored);
+      return {};
+    } catch { return {}; }
+  }, []);
+
+  const labResult = React.useMemo(() => {
+    if (Object.keys(labRaw).length === 0) return null;
+    return linkSymptomsToLabs(labRaw, [symptomId]);
+  }, [labRaw, symptomId]);
+
+  if (!labResult || labResult.linked.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(244,67,54,0.04)', border: '1px solid rgba(244,67,54,0.12)' }}>
+      <div style={{ fontSize: 9, fontWeight: 700, color: '#f44336', marginBottom: 4 }}>🔬 Лабораторная корреляция</div>
+      {labResult.linked.map((item, i) => (
+        <div key={i} style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: '1.5', marginBottom: 2 }}>
+          • {item.labMarker}: <strong>{item.labValue}</strong> {item.labUnit} ({item.labStatus === 'high' ? '↑' : '↓'})
+          <div style={{ color: '#f44336', fontSize: 8, fontStyle: 'italic' }}>{item.explanation}</div>
+        </div>
+      ))}
+      {labResult.alerts.length > 0 && (
+        <div style={{ marginTop: 4, fontSize: 8, color: '#ff9800' }}>
+          ⚠ {labResult.alerts.join('; ')}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SymptomAdherenceBlock({ symptomId }: { symptomId: string }) {
+  const assignments = getAssignmentsForSymptom(symptomId);
+  const [takenMap, setTakenMap] = React.useState<Record<string, boolean>>({});
+
+  const handleAssign = () => {
+    const name = prompt('Название препарата:');
+    if (!name) return;
+    const dose = prompt('Дозировка (напр. "500 мг 2р/день"):') || '';
+    addAssignment(symptomId, name, name, dose);
+    // force re-render
+    setTakenMap({});
+  };
+
+  const handleMark = (assignmentId: string, taken: boolean) => {
+    markIntake(assignmentId, taken);
+    setTakenMap((prev) => ({ ...prev, [assignmentId]: taken }));
+  };
+
+  const handleStop = (id: string) => {
+    stopAssignment(id);
+    setTakenMap({});
+  };
+
+  if (assignments.length === 0) {
+    return (
+      <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.12)' }}>
+        <div style={{ fontSize: 9, fontWeight: 700, color: '#8b5cf6', marginBottom: 4 }}>💊 Назначения на этот симптом</div>
+        <button onClick={handleAssign} style={{
+          padding: '4px 10px', borderRadius: 8, fontSize: 9, fontWeight: 600, cursor: 'pointer',
+          background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#8b5cf6',
+        }}>➕ Назначить препарат</button>
+      </div>
+    );
+  }
+
+  const active = assignments.filter((a) => a.status === 'active');
+  const stopped = assignments.filter((a) => a.status !== 'active');
+
+  return (
+    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.12)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <span style={{ fontSize: 9, fontWeight: 700, color: '#8b5cf6' }}>💊 Назначения</span>
+        <button onClick={handleAssign} style={{
+          padding: '2px 8px', borderRadius: 6, fontSize: 8, fontWeight: 600, cursor: 'pointer',
+          background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#8b5cf6',
+        }}>+ Добавить</button>
+      </div>
+      {active.map((a) => (
+        <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 9 }}>
+          <span style={{ color: 'var(--text)', flex: 1 }}>{a.substanceName}</span>
+          <span style={{ color: 'var(--text-dim)', fontSize: 8 }}>{a.dose}</span>
+          <button onClick={() => handleMark(a.id, true)}
+            style={{
+              width: 18, height: 18, borderRadius: '50%', cursor: 'pointer', fontSize: 8,
+              background: (takenMap[a.id] !== false) ? 'rgba(76,175,80,0.2)' : 'var(--bg-secondary)',
+              border: `1px solid ${(takenMap[a.id] !== false) ? '#4caf50' : 'var(--border)'}`,
+              color: (takenMap[a.id] !== false) ? '#4caf50' : 'var(--text-dim)',
+            }}
+          >✓</button>
+          <button onClick={() => handleStop(a.id)} style={{
+            padding: '2px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 8,
+            background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-dim)',
+          }}>✕</button>
+        </div>
+      ))}
+      {stopped.length > 0 && (
+        <div style={{ marginTop: 4, fontSize: 8, color: 'var(--text-dim)' }}>
+          Отменено: {stopped.map((s) => s.substanceName).join(', ')}
+        </div>
+      )}
+    </div>
+  );
+}
