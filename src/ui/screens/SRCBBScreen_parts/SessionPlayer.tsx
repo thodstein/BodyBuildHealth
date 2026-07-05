@@ -17,6 +17,7 @@ import { velocityLoss, velocityLossZone, thresholdForIntent, type VBTIntent } fr
 import { calculatePlates } from '../../../engines/gym-competition.engine';
 import { saveSRPESession } from '../../../engines/pro/srpe-store';
 import { useTrainingProfile } from '../TrainingScreen_parts/training-profile';
+import { recommendTempo, formatTempo, TEMPO_PRESETS } from '../../../engines/rep-tempo.engine';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -218,6 +219,16 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   };
 
 
+  const toggleWarmup = (blockIdx: number, exIdx: number) => {
+    const id = `w_${blockIdx}_${exIdx}`;
+    setWarmupDone(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const toggleCooldown = (blockIdx: number, exIdx: number) => {
+    const id = `c_${blockIdx}_${exIdx}`;
+    setCooldownDone(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const keyFor = (ei: number, si: number) => `${ei}_${si}`;
 
   const logOne = (ei: number, si: number) => {
@@ -242,11 +253,12 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
 
   // Фактические метрики сессии
   const factVol = useMemo(() => {
-    if (!session) return { volume: 0, sets: 0 };
+    const src = session || done;
+    if (!src) return { volume: 0, sets: 0 };
     let v = 0, n = 0;
-    session.exercises.forEach(ex => ex.sets.forEach(s => { v += s.weightKg * s.reps; n++; }));
+    src.exercises.forEach(ex => ex.sets.forEach(s => { v += s.weightKg * s.reps; n++; }));
     return { volume: Math.round(v), sets: n };
-  }, [session]);
+  }, [session, done]);
 
   // 1.4: оценка e1RM (Epley) по лучшему сету сессии
   const topE1RM = useMemo(() => {
@@ -294,36 +306,47 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
         ))}
       </div>
 
-       {!session && !done && (
+      {phase === 'ready' && (
         <div style={{ marginTop: 8 }}>
-          {warmupBlocks.length > 0 && (
-            <div style={{ ...CARD, marginBottom: 8 }}>
-              <div style={H}>🤸 Разминка перед: {day.label}</div>
-              {warmupBlocks.map((b: WarmupBlock, i: number) => (
-                <div key={i} style={{ marginBottom: 4 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT }}>
-                    {b.type === 'general' ? 'Кардио' : b.type === 'mobility' ? 'Суставная разминка' : b.type === 'activation' ? 'Активация мышц' : 'Специальная'}
-                    <span style={{ fontWeight: 400, fontSize: 10, color: 'rgba(255,255,255,0.5)', marginLeft: 6 }}>{b.durationSec}с</span>
-                  </div>
-                  {b.notes && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{b.notes}</div>}
-                  <ul style={{ paddingLeft: 16, margin: '2px 0' }}>
-                    {b.exercises.map((ex, j: number) => (
-                      <li key={j} style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>
-                        {wLabel(ex.exerciseId)}
-                        {'intensityPct' in ex && ex.intensityPct ? ` · ${ex.intensityPct}% x ${ex.sets}x${ex.reps}` : ` · ${ex.sets}x${ex.reps}`}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+          <button style={{ ...BTN, width: '100%' }} onClick={begin}>▶ Начать тренировку — {day.label} (нед {weekNumber})</button>
+          {last && (
+            <div style={{ ...CARD, marginTop: 8 }}>
+              <div style={LABEL}>⏱ Последняя сессия</div>
+              <div style={SMALL}>{last.date} {last.startTime}–{last.endTime} · {last.focus} · {last.exercises.length} упр.</div>
             </div>
           )}
-          <button style={{ ...BTN, width: '100%' }} onClick={begin}>▶ Начать тренировку — {day.label} (нед {weekNumber})</button>
         </div>
       )}
 
+      {phase === 'warmup' && (
+        <div style={{ marginTop: 8 }}>
+          <div style={H}>🤸 Разминка: {day.label}</div>
+          {warmupBlocks.map((b, i) => (
+            <div key={i} style={{ ...CARD, marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT, marginBottom: 4 }}>
+                {b.type === 'general' ? 'Кардио' : b.type === 'mobility' ? 'Суставная разминка' : b.type === 'activation' ? 'Активация мышц' : 'Специальная'}
+                <span style={{ fontWeight: 400, fontSize: 10, color: 'rgba(255,255,255,0.5)', marginLeft: 6 }}>{b.durationSec}с</span>
+              </div>
+              {b.notes && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>{b.notes}</div>}
+              <ul style={{ paddingLeft: 16, margin: '2px 0', listStyle: 'none' }}>
+                {b.exercises.map((ex, j) => {
+                  const isDone = warmupDone[`w_${i}_${j}`];
+                  return (
+                    <li key={j} style={{ fontSize: 11, color: isDone ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.8)', textDecoration: isDone ? 'line-through' : 'none', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input type="checkbox" checked={isDone} onChange={() => toggleWarmup(i, j)} />
+                      {wLabel(ex.exerciseId)}
+                      {'intensityPct' in ex && ex.intensityPct ? ` · ${ex.intensityPct}% x ${ex.sets}x${ex.reps}` : ` · ${ex.sets}x${ex.reps}`}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+          <button style={{ ...BTN, width: '100%', marginTop: 12 }} onClick={startMain}>🚀 Перейти к основной тренировке</button>
+        </div>
+      )}
 
-      {session && (
+      {phase === 'main' && session && (
         <div style={CARD}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={H}>🏃 {day.label}</div>
@@ -339,7 +362,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
           </div>
           {day.exercises.map((ex, ei) => (
             <div key={ei} style={{ marginTop: 8, padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>{ex.name} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>({ex.muscleGroup})</span></div>
+              <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>{ex.name} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>({ex.muscleGroup})</span>{(() => { const isCompound = ['chest','back','quads','hamstrings','shoulders','legs'].includes(ex.muscleGroup?.toLowerCase() || ''); const t = TEMPO_PRESETS[recommendTempo('hypertrophy', isCompound ? 'compound' : 'isolation')]; return <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginLeft:6 }} title={t?.nameRu}>⏱ {formatTempo(t?.tempo)}</span>; })()}</div>
               {ex.targetSets.map((t, si) => {
                 const k = keyFor(ei, si);
                 const a = actual[k] || { weight: t.weight, reps: t.reps, rpe: 0 };
@@ -422,10 +445,37 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
         </div>
       )}
 
-      {done && (
+      {phase === 'cooldown' && (
+        <div style={{ marginTop: 8 }}>
+          <div style={H}>🧘 Заминка: {day.label}</div>
+          {cooldownBlocks.map((b, i) => (
+            <div key={i} style={{ ...CARD, marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT, marginBottom: 4 }}>
+                {b.type === 'stretch' ? 'Стретчинг' : b.type === 'breathing' ? 'Дыхание' : 'Восстановление'}
+                <span style={{ fontWeight: 400, fontSize: 10, color: 'rgba(255,255,255,0.5)', marginLeft: 6 }}>{b.durationSec}с</span>
+              </div>
+              <ul style={{ paddingLeft: 16, margin: '2px 0', listStyle: 'none' }}>
+                {b.exercises.map((ex, j) => {
+                  const isDone = cooldownDone[`c_${i}_${j}`];
+                  return (
+                    <li key={j} style={{ fontSize: 11, color: isDone ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.8)', textDecoration: isDone ? 'line-through' : 'none', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input type="checkbox" checked={isDone} onChange={() => toggleCooldown(i, j)} />
+                      {cLabel(ex.exerciseId)}
+                      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}> · {ex.durationSec}с</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+          <button style={{ ...BTN, width: '100%', marginTop: 12 }} onClick={exitSession}>✓ Завершить и выйти</button>
+        </div>
+      )}
+
+      {phase === 'done' && (
         <div style={CARD}>
           <div style={H}>✅ Тренировка завершена</div>
-          <div style={SMALL}>{done.date} · {done.startTime}–{done.endTime} · фокус: {done.focus}</div>
+          <div style={SMALL}>{done?.date} · {done?.startTime}–{done?.endTime} · фокус: {done?.focus}</div>
           <div style={ROW}><span>Сессий записано всего:</span><span style={{ color: ACCENT }}>{getLastSession() ? 'сохранено в дневник' : '—'}</span></div>
           <div style={ROW}><span>Объём факт vs план:</span><span style={{ color: ACCENT }}>{factVol.volume} / {planned.volume} кг·пов</span></div>
           <div style={ROW}><span>Сеты факт vs план:</span><span style={{ color: ACCENT }}>{factVol.sets} / {planned.sets}</span></div>
@@ -462,37 +512,10 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
             </div>
           )}
           {prs.length > 0 && <div style={{ marginTop: 8 }}><div style={LABEL}>🏆 Последние PR:</div>{prs.map((p, i) => <div key={i} style={SMALL}>• {p.exercise}: {p.weight}кг×{p.reps} ({p.date})</div>)}</div>}
-          {cooldownBlocks.length > 0 && (
-            <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.1)' }}>
-              <div style={H}>🧘 Рекомендованная заминка</div>
-              {cooldownBlocks.map((b: CooldownBlock, i: number) => (
-                <div key={i} style={{ marginBottom: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT }}>
-                    {b.type === 'stretch' ? 'Стретчинг' : b.type === 'breathing' ? 'Дыхание' : 'Восстановление'}
-                    <span style={{ fontWeight: 400, fontSize: 10, color: 'rgba(255,255,255,0.5)', marginLeft: 6 }}>{b.durationSec}с</span>
-                  </div>
-                  <ul style={{ paddingLeft: 16, margin: '2px 0' }}>
-                    {b.exercises.map((ex, j: number) => (
-                      <li key={j} style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>
-                        {cLabel(ex.exerciseId)}
-                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}> · {ex.durationSec}с</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          )}
-          <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); }}>← Новая тренировка</button>
+          <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setPhase('ready'); }}>← Новая тренировка</button>
         </div>
       )}
 
-      {!session && !done && last && (
-        <div style={{ ...CARD, marginTop: 8 }}>
-          <div style={LABEL}>⏱ Последняя сессия</div>
-          <div style={SMALL}>{last.date} {last.startTime}–{last.endTime} · {last.focus} · {last.exercises.length} упр.</div>
-        </div>
-      )}
     </div>
   );
 };

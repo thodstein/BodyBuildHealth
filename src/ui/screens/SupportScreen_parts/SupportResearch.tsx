@@ -3,10 +3,26 @@
  * SupportResearch.tsx — извлечено из SupportScreen.tsx
  * Секция: protocols
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { searchPubMed, type PubMedArticle } from '../../../engines/pubmed-search.engine';
+import { SUPPORT_RESEARCH } from '../../../engines/support.engine';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { InfoErrorBoundary } from './SupportScreenData';
+
+const SUBSTANCE_NAMES_RU: Record<string, string> = {
+  telmisartan: 'Телмисартан', nebivolol: 'Небиволол', nac: 'NAC', tudca: 'TUDCA',
+  omega3: 'Омега-3', magnesium: 'Магний', berberine: 'Берберин', coq10: 'CoQ10',
+  vitamin_d3: 'Витамин D3', zinc: 'Цинк', hcg: 'ХГЧ', alpha_lipoic: 'α-Липоевая к-та',
+  ashwagandha: 'Ашваганда', milk_thistle: 'Расторопша', melatonin: 'Мелатонин',
+  curcumin: 'Куркумин', phosphatidylcholine: 'Фосфатидилхолин', l_carnitine: 'L-Карнитин',
+  glucosamine: 'Глюкозамин', collagen: 'Коллаген', bpc157: 'BPC-157', tb500: 'TB-500',
+  vitamin_c: 'Витамин C', vitamin_b12: 'Витамин B12', folate: 'Фолат',
+  meloxicam: 'Мелоксикам', diclofenac: 'Диклофенак', selenium: 'Селен',
+  taurine: 'Таурин', saw_palmetto: 'Палметто', egcg: 'EGCG', ginseng: 'Женьшень',
+  vitamin_k2: 'Витамин K2', iron: 'Железо', hyaluronic: 'Гиалуроновая к-та',
+  msm: 'MSM', boswellia: 'Босвеллия', bromelain: 'Бромелайн', probiotics: 'Пробиотики',
+  copper: 'Медь', astragalus: 'Астрагал',
+};
 
 export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const {
@@ -36,10 +52,12 @@ export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => 
     handleFDASearch
   } = s;
 
+  const [researchDbQuery, setResearchDbQuery] = useState('');
+
   return (
                 <div>
                   <div style={{fontSize:13,fontWeight:700,color:'var(--accent)',marginBottom:4}}>🔬 Поиск исследований</div>
-                  <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:8}}>PubMed, PubChem, Google Scholar, OpenFDA и каталог препаратов</div>
+                  <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:8}}>PubMed, PubChem, Google Scholar, OpenFDA, Каталог и база исследований</div>
 
                   {/* Source Pills */}
                   <div style={{display:'flex',gap:4,marginBottom:10,overflowX:'auto',scrollbarWidth:'none',flexShrink:0}}>
@@ -49,6 +67,7 @@ export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => 
                       {key:'scholar',label:'🎓 Scholar',color:'#f59e0b'},
                       {key:'fda',label:'💊 OpenFDA',color:'#ef4444'},
                       {key:'pharma',label:'📋 Каталог',color:'#00e68a'},
+                      {key:'researchDb',label:'📖 База исследований',color:'#a855f7'},
                     ] as const).map((s: any) => (
                       <button key={s.key} onClick={() => {setResearchSource(s.key);if(s.key==='pubchem')handlePubchemSearch();if(s.key==='fda')handleFDASearch();}} style={{
                         padding:'7px 14px',borderRadius:20,fontSize:10,fontWeight:700,whiteSpace:'nowrap',cursor:'pointer',flexShrink:0,
@@ -60,6 +79,7 @@ export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => 
                   </div>
 
                   {/* Shared search input */}
+                  {researchSource !== 'researchDb' && (
                   <div style={{display:'flex',gap:6,marginBottom:10}}>
                     <input value={pubMedQuery} onChange={e=>setPubMedQuery(e.target.value)}
                       onKeyDown={e=>{if(e.key==='Enter'){if(researchSource==='pubmed')handlePubMedSearch();if(researchSource==='pubchem')handlePubchemSearch();if(researchSource==='fda')handleFDASearch();}}}
@@ -71,6 +91,7 @@ export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => 
                       {((researchSource==='pubmed'&&pubMedLoading)||(researchSource==='pubchem'&&pubchemLoading)||(researchSource==='fda'&&fdaLoading))?'⏳':researchSource==='scholar'?'🔗':'🔍'}
                     </button>
                   </div>
+                  )}
 
                   {/* === PUBMED === */}
                   {researchSource === 'pubmed' && (
@@ -198,7 +219,37 @@ export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => 
                     </div>
                   )}
 
+                  {/* === RESEARCH DATABASE (static curated references) === */}
+                  {researchSource === 'researchDb' && (
+                    <div>
+                      <div style={{display:'flex',gap:6,marginBottom:10}}>
+                        <input value={researchDbQuery} onChange={e=>setResearchDbQuery(e.target.value)}
+                          placeholder="Поиск по веществу..."
+                          style={{flex:1,padding:'8px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
+                      </div>
+                      {Object.entries(SUPPORT_RESEARCH)
+                        .filter(([id]) => !researchDbQuery || SUBSTANCE_NAMES_RU[id]?.toLowerCase().includes(researchDbQuery.toLowerCase()) || id.includes(researchDbQuery.toLowerCase()))
+                        .sort(([a], [b]) => (SUBSTANCE_NAMES_RU[a] || a).localeCompare(SUBSTANCE_NAMES_RU[b] || b))
+                        .map(([id, entries]) => (
+                          <div key={id} style={{padding:'10px 12px',borderRadius:10,background:'var(--bg-secondary)',border:'1px solid var(--border)',marginBottom:8}}>
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                              <span style={{fontSize:12,fontWeight:700,color:'#a855f7'}}>{SUBSTANCE_NAMES_RU[id] || id}</span>
+                              <span style={{fontSize:8,padding:'2px 6px',borderRadius:4,background:'rgba(168,85,247,0.1)',color:'#a855f7'}}>{entries.length} {entries.length === 1 ? 'исследование' : 'исследования'}</span>
+                            </div>
+                            {entries.map((e, i) => (
+                              <div key={i} style={{padding:'6px 8px',borderRadius:6,background:'rgba(0,0,0,0.08)',marginBottom:i < entries.length - 1 ? 4 : 0}}>
+                                <div style={{fontSize:9,color:'#60a5fa',fontWeight:600,marginBottom:2,fontStyle:'italic'}}>📄 {e.study}</div>
+                                <div style={{fontSize:9,color:'var(--text-dim)',lineHeight:1.4,marginBottom:2}}>{e.conclusion}</div>
+                                <div style={{fontSize:8,color:'rgba(255,255,255,0.3)'}}>Год: {e.year}</div>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+
                   {/* Quick Research Links — expanded Russian presets */}
+                  {researchSource !== 'researchDb' && (
                   <div className="card" style={{marginBottom:12}}>
                     <h4 style={{margin:'0 0 6px',fontSize:12}}>📚 Быстрый поиск по темам</h4>
                     <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
@@ -228,6 +279,7 @@ export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => 
                       ))}
                     </div>
                   </div>
+                  )}
                 </div>
               
   );

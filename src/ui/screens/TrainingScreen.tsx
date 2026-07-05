@@ -3712,7 +3712,7 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
         } catch { return <div style={{ padding:20, textAlign:'center', color:'rgba(255,255,255,0.3)', fontSize:11 }}>Ошибка загрузки истории</div>; }
       })()}</InfoErrorBoundary>}
       {/* ═══════════ ANALYTICS TAB ═══════════ */}
-      {tab === 'analytics' && <InfoErrorBoundary label="Аналитика"><><div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', marginBottom: 8, fontSize: 10, color: 'var(--text-dim)' }}>💡 Аналитика также доступна во вкладке «Дневник тренировок» → режим «Аналитика»</div><MuscleProgressCard sessions={historyWorkouts} level={level} /><VolumeTrendCard sessions={historyWorkouts} /><LoadRadarCard sessions={historyWorkouts} level={level} /><WeekCompareCard sessions={historyWorkouts} /><LiftHistoryCard sessions={historyWorkouts} /><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /></></InfoErrorBoundary>}
+      {tab === 'analytics' && <InfoErrorBoundary label="Аналитика"><><div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', marginBottom: 8, fontSize: 10, color: 'var(--text-dim)' }}>💡 Аналитика также доступна во вкладке «Дневник тренировок» → режим «Аналитика»</div><MuscleProgressCard sessions={historyWorkouts} level={level} /><VolumeTrendCard sessions={historyWorkouts} /><LoadRadarCard sessions={historyWorkouts} level={level} /><WeekCompareCard sessions={historyWorkouts} /><LiftHistoryCard sessions={historyWorkouts} /><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /><AllExercisesTrendCard sessions={historyWorkouts} /><StandardForecastCard sessions={historyWorkouts} /><VolumeRecoveryCorrelationCard sessions={historyWorkouts} /><StickingPointAnalysisCard sessions={historyWorkouts} /></></InfoErrorBoundary>}
       {tab === 'library' && (
   <InfoErrorBoundary label="Каталог циклов">
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -3869,6 +3869,10 @@ import { OneRmCalcTab } from './TrainingScreen_parts/OneRmCalcTab';
 import { PlNormsCalcTab } from './TrainingScreen_parts/PlNormsCalcTab';
 import { LiftHistoryCard } from './TrainingScreen_parts/LiftHistoryCard';
 import { VolumeTrendCard } from './TrainingScreen_parts/VolumeTrendCard';
+import AllExercisesTrendCard from './TrainingScreen_parts/AllExercisesTrendCard';
+import StandardForecastCard from './TrainingScreen_parts/StandardForecastCard';
+import VolumeRecoveryCorrelationCard from './TrainingScreen_parts/VolumeRecoveryCorrelationCard';
+import StickingPointAnalysisCard from './TrainingScreen_parts/StickingPointAnalysisCard';
 import { LoadRadarCard } from './TrainingScreen_parts/LoadRadarCard';
 import { WeekCompareCard } from './TrainingScreen_parts/WeekCompareCard';
 import { CsvImportTab } from './TrainingScreen_parts/CsvImportTab';

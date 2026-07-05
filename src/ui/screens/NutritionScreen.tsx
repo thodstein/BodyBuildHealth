@@ -19,6 +19,7 @@ import { MealVisualizer } from './NutritionScreen_parts/MealVisualizer';
 import { Achievements } from './NutritionScreen_parts/Achievements';
 import { DailyQuests } from './NutritionScreen_parts/DailyQuests';
 import { PeriWorkoutCard } from './NutritionScreen_parts/PeriWorkoutCard';
+import { NutritionWeeklyComparison } from './NutritionScreen_parts/NutritionWeeklyComparison';
 
 const NutritionCharts = lazy(() => import('./NutritionScreen_parts/NutritionCharts').then(m => ({ default: m.NutritionCharts })));
 import { generateNutritionReport, NutritionReport } from '../../engines/nutrition-report.engine';
@@ -1264,6 +1265,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
           );
         } catch { return null; }
       })()}
+      <NutritionWeeklyComparison diaryData={raw} selectedDate={reportDate} targets={targets} />
       {reportMode === 'day' && Object.keys(byMeal).length > 0 && <div>
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>По приёмам пищи:</div>
         {Object.entries(byMeal).map(([meal, vals]) => <div key={meal} style={{ display:'flex', justifyContent:'space-between', padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff' }}>

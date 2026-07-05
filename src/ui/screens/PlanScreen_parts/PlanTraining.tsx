@@ -5,6 +5,7 @@ import type { SplitCandidate } from '../../../engines/split-selector.engine';
 import type { ProgressionRule } from '../../../engines/progression.engine';
 import { calcSuggestedWeight } from '../../../engines/progression.engine';
 import { getExerciseById } from '../../../core/exercise-catalog';
+import { recommendTempo, formatTempo, TEMPO_PRESETS } from '../../../engines/rep-tempo.engine';
 import { getRIR, formatSplitGroups, buildDayPlan } from './PlanUtils';
 
 export const PlanTraining: React.FC<{
@@ -238,7 +239,7 @@ export const PlanTraining: React.FC<{
               ) : (
                 <table className="exercise-table">
                   <thead>
-                    <tr><th>Упражнение</th><th>Подходы</th><th>Повторения</th><th>RIR</th><th>Отдых</th><th>Вес</th></tr>
+                    <tr><th></th><th>Упражнение</th><th>Подходы</th><th>Повторения</th><th>RIR</th><th>Отдых</th><th>Темп</th><th>Вес</th></tr>
                   </thead>
                   <tbody>
                     {day.exercises.map((ex: Exercise, i: number) => (
@@ -291,6 +292,13 @@ export const PlanTraining: React.FC<{
                         </td>
                         <td>{ex.rir}</td>
                         <td>{ex.rest}</td>
+                        <td>
+                          {(() => {
+                            const isCompound = ['chest','back','quads','hamstrings','shoulders','legs'].includes(ex.group?.toLowerCase() || ex.targetMuscle?.toLowerCase() || '');
+                            const tKey = recommendTempo(goalState, isCompound ? 'compound' : 'isolation');
+                            const preset = TEMPO_PRESETS[tKey];
+                            return <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }} title={preset?.nameRu}>{formatTempo(preset?.tempo)}</span>;
+                          })()}</td>
                         <td>
                           <input type="number" value={ex.weight || 0} onChange={(e) => updateExercise(dayIndex, i, 'weight', parseFloat(e.target.value))} style={{width: 40}} />
                         </td>

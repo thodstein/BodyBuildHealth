@@ -5,6 +5,7 @@ import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { GlassCard, estCost, showToast } from './BioStackAIConstants';
 import { toFinderProfile } from './BioStackAIConstants';
 import { PopupSelect } from './PopupXxx';
+import type { LinkedData } from '../../core/data-link';
 
 type CompareView = 'all' | 'price' | 'mechanisms' | 'synergy' | 'coverage';
 
@@ -24,7 +25,7 @@ function resolveMech(m: string): string {
   return MECH_TRANSLATIONS_RU[m] || m.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-export function CompareTab({ profile, stackIds, setStackIds }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void }) {
+export function CompareTab({ profile, stackIds, setStackIds, linked }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void; linked?: LinkedData }) {
   const [stackB, setStackB] = useState<string[]>(() => {
     try { const s = localStorage.getItem('he_biostack_compare_b'); return s ? JSON.parse(s) : []; } catch { return []; }
   });
@@ -526,6 +527,68 @@ export function CompareTab({ profile, stackIds, setStackIds }: { profile: BioSta
               ))}
             </div>
           )}
+        </GlassCard>
+      )}
+
+      {/* AI-анализ: текстовый вывод рекомендации */}
+      {stackB.length > 0 && overlap && (
+        <GlassCard title="🤖 AI-анализ: какой стек лучше" icon="🤖" color="#22c55e">
+          <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.08)' }}>
+            <div style={{ fontSize: 9, color: '#4ade80', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+              {(() => {
+                const aSyn = curExp?.totalSynergyScore ?? 0;
+                const bSyn = bExp?.totalSynergyScore ?? 0;
+                const aCov = curExp?.completeness ?? 0;
+                const bCov = bExp?.completeness ?? 0;
+                const aWarn = curExp?.warnings.length ?? 0;
+                const bWarn = bExp?.warnings.length ?? 0;
+                const aOnlyCount = overlap.onlyA.length;
+                const bOnlyCount = overlap.onlyB.length;
+                const commonCount = overlap.common.length;
+
+                const lines: string[] = [];
+                lines.push(`📊 Стек A (${stackIds.length} в-в) vs Стек B (${stackB.length} в-в)`);
+                lines.push('');
+                if (commonCount > 0) lines.push(`🔄 Общих веществ: ${commonCount}.`);
+                if (aOnlyCount > 0) {
+                  const namesA = overlap.onlyA.slice(0, 3).map(id => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id).join(', ');
+                  lines.push(`➖ Только в A: ${aOnlyCount} шт (${namesA}${aOnlyCount > 3 ? '...' : ''})`);
+                }
+                if (bOnlyCount > 0) {
+                  const namesB = overlap.onlyB.slice(0, 3).map(id => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id).join(', ');
+                  lines.push(`➕ Только в B: ${bOnlyCount} шт (${namesB}${bOnlyCount > 3 ? '...' : ''})`);
+                }
+                lines.push('');
+                if (bSyn > aSyn) lines.push(`🤝 Стек B синергичнее (+${bSyn - aSyn} пунктов).`);
+                else if (aSyn > bSyn) lines.push(`🤝 Стек A синергичнее (+${aSyn - bSyn} пунктов).`);
+                if (bCov > aCov) lines.push(`🎯 Стек B лучше покрывает системы (${bCov}% vs ${aCov}%).`);
+                else if (aCov > bCov) lines.push(`🎯 Стек A лучше покрывает системы (${aCov}% vs ${bCov}%).`);
+                if (curCost !== bCost) {
+                  const diff = Math.abs(bCost - curCost);
+                  lines.push(`💰 Разница в цене: ${bCost > curCost ? 'B дороже' : 'B дешевле'} на ${diff}₽/мес.`);
+                }
+                if (aWarn !== bWarn) lines.push(`⚠ Предупреждений: A (${aWarn}) vs B (${bWarn}).`);
+                lines.push('');
+                const aScore = aSyn + aCov - aWarn * 5;
+                const bScore = bSyn + bCov - bWarn * 5;
+                if (bScore > aScore + 10) {
+                  lines.push(`🏆 Рекомендация: Стек B — лучшее покрытие при сопоставимых рисках.`);
+                  lines.push(`💡 Замените A на B кнопкой «Заменить стек A на B» выше.`);
+                } else if (aScore > bScore + 10) {
+                  lines.push(`🏆 Рекомендация: Стек A — оптимален.`);
+                  lines.push(`💡 Если цель — снизить стоимость, посмотрите «Сделать дешевле» во вкладке Стек.`);
+                } else {
+                  lines.push(`⚖ Стеки примерно равнозначны.`);
+                  lines.push(`💡 Выберите по бюджету: A (${curCost}₽) vs B (${bCost}₽).`);
+                }
+                if (profile.healthConditions && profile.healthConditions.length > 0) {
+                  lines.push('');
+                  lines.push(`👤 Учитывая: ${profile.healthConditions.join(', ')} — проверьте на вкладке «Риски».`);
+                }
+                return lines.join('\n');
+              })()}
+            </div>
+          </div>
         </GlassCard>
       )}
 

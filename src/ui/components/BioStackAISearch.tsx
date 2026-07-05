@@ -2,11 +2,13 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { type GoalType } from '../../engines/biostack-ai.engine';
 import { findSupplements } from '../../engines/supplement-finder.engine';
+import { searchBioStack, type RecGoal } from '../../engines/biostack-recommender.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS } from '../../data/support-database';
 import { TZ_MECH_LABELS } from '../../data/support-db';
 import { PillBtn, inputS, PURE_GOALS, ORGANS, SYSTEMS, TOP_MECHANISMS, SYMPTOMS, toFinderProfile, PRICE_RUB } from './BioStackAIConstants';
 import { resolveLabMarker } from '../../core/labs-mapping';
 import { LAB_MARKER_MAP } from '../../data/lab-marker-map';
+import type { LinkedData } from '../../core/data-link';
 
 const TIERS = [
   { key: 'core', label: '🟢 Core', color: '#22c55e', desc: 'Обязательно на любом курсе' },
@@ -80,7 +82,7 @@ function searchByIndex(query: string): Set<string> {
 
 type FilterType = 'cat' | 'tier' | 'organ' | 'system' | 'mech' | 'goal';
 
-export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void }) {
+export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void; linked?: LinkedData }) {
   const [searchText, setSearchText] = useState('');
   const [catFilter, setCatFilter] = useState<string[]>([]);
   const [tierFilter, setTierFilter] = useState<string[]>([]);
@@ -94,7 +96,28 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
     try { return JSON.parse(localStorage.getItem('he_biostack_favorites') || '[]'); } catch { return []; }
   });
   const [favOnly, setFavOnly] = useState(false);
+  const [profileOnly, setProfileOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'price_asc' | 'price_desc'>('name');
+
+  const profileRelevantIds = useMemo(() => {
+    if (!profileOnly) return null;
+    const recGoals = profile.goals.map(g => {
+      const m: Record<string, RecGoal> = {
+        muscle_gain: 'performance', fat_loss: 'energy', endurance: 'performance', sleep: 'sleep',
+        recovery: 'recovery', energy: 'energy', immunity: 'immunity', liver_health: 'detox',
+        cardio_health: 'longevity', joints: 'joints',
+        hormones: 'libido', stress: 'stress', longevity: 'longevity', detox: 'detox',
+        libido: 'libido', mood: 'stress', brain: 'focus', concentration: 'focus',
+        digestion: 'digestion', kidney: 'detox',
+      };
+      return m[g] || 'immunity';
+    }).filter(g => g) as RecGoal[];
+    if (recGoals.length === 0) return null;
+    const results = searchBioStack({ goals: recGoals, limit: 200 }, profile);
+    const scores = new Map<string, number>();
+    results.forEach(r => scores.set(r.id, r.score));
+    return scores;
+  }, [profileOnly, profile]);
 
   const toggleFav = useCallback((id: string) => {
     const u = favorites.includes(id) ? favorites.filter(f => f !== id) : [...favorites, id];
@@ -128,6 +151,7 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
       list = list.filter(c => directMatch(c) || indexedIds.has(c.id));
     }
     if (favOnly) list = list.filter(c => favorites.includes(c.id));
+    if (profileOnly && profileRelevantIds) list = list.filter(c => profileRelevantIds.has(c.id));
     if (sortBy !== 'name') {
       list = [...list].sort((a, b) => {
         const pa = PRICE_RUB[a.id] || 999999;
@@ -152,11 +176,11 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
     return entries;
   }, [filtered]);
 
-  const hasAnyFilter = catFilter.length > 0 || tierFilter.length > 0 || organFilter.length > 0 || systemFilter.length > 0 || mechFilter.length > 0 || goalFilter !== null || searchText.trim() || favOnly;
+  const hasAnyFilter = catFilter.length > 0 || tierFilter.length > 0 || organFilter.length > 0 || systemFilter.length > 0 || mechFilter.length > 0 || goalFilter !== null || searchText.trim() || favOnly || profileOnly;
 
   const clearAll = useCallback(() => {
     setCatFilter([]); setTierFilter([]); setOrganFilter([]); setSystemFilter([]);
-    setMechFilter([]); setGoalFilter(null); setSearchText(''); setFavOnly(false);
+    setMechFilter([]); setGoalFilter(null); setSearchText(''); setFavOnly(false); setProfileOnly(false);
   }, []);
 
   const toggleArr = (arr: string[], set: (v: string[]) => void, v: string) => {
@@ -182,6 +206,7 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
     mechFilter.forEach(m => chips.push({ label: TZ_MECH_LABELS[m] || m, onRemove: () => toggleArr(mechFilter, setMechFilter, m) }));
     if (goalFilter) chips.push({ label: '🎯 ' + (PURE_GOALS.find(g => g.key === goalFilter)?.label || goalFilter), onRemove: () => setGoalFilter(null) });
     if (favOnly) chips.push({ label: '⭐ Избранное', onRemove: () => setFavOnly(false) });
+    if (profileOnly) chips.push({ label: `🧩 Под профиль (${profileRelevantIds?.size || 0})`, onRemove: () => setProfileOnly(false) });
     return chips;
   };
 
@@ -256,6 +281,12 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
           border: favOnly ? '1.5px solid #f59e0b' : '1px solid rgba(255,255,255,0.06)',
           color: favOnly ? '#f59e0b' : 'rgba(255,255,255,0.5)',
         }}>⭐ Избранное</button>
+        <button onClick={() => setProfileOnly(!profileOnly)} style={{
+          flexShrink: 0, padding: '6px 10px', borderRadius: 12, fontSize: 8, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+          background: profileOnly ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.03)',
+          border: profileOnly ? '1.5px solid #8b5cf6' : '1px solid rgba(255,255,255,0.06)',
+          color: profileOnly ? '#8b5cf6' : 'rgba(255,255,255,0.5)',
+        }}>🧩 Под профиль</button>
         <button onClick={() => setSortBy(sortBy === 'name' ? 'price_asc' : sortBy === 'price_asc' ? 'price_desc' : 'name')} style={{
           flexShrink: 0, padding: '6px 10px', borderRadius: 12, fontSize: 8, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
           background: sortBy !== 'name' ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.03)',
@@ -454,12 +485,17 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
                       <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 2 }}>
                         {c.nameRu || c.name}
                       </div>
-                      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                        {tierInfo && (
-                          <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 7, fontWeight: 700, background: tierInfo.color + '20', color: tierInfo.color, border: `1px solid ${tierInfo.color}30` }}>
-                            {tierInfo.label}
-                          </span>
-                        )}
+                       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                          {tierInfo && (
+                            <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 7, fontWeight: 700, background: tierInfo.color + '20', color: tierInfo.color, border: `1px solid ${tierInfo.color}30` }}>
+                              {tierInfo.label}
+                            </span>
+                          )}
+                          {profileOnly && profileRelevantIds && profileRelevantIds.has(c.id) && (
+                            <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 7, fontWeight: 700, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', border: '1px solid rgba(139,92,246,0.2)' }}>
+                              🎯 {profileRelevantIds.get(c.id) || 0}
+                            </span>
+                          )}
                         {c.category?.slice(0, 3).map((cc: string) => (
                           <span key={cc} style={{ padding: '1px 4px', borderRadius: 3, fontSize: 6, background: 'rgba(96,165,250,0.08)', color: '#60a5fa' }}>
                             {catLabel(cc)}
@@ -475,13 +511,13 @@ export function SearchTab({ profile, stackIds, setStackIds }: { profile: BioStac
                     <div style={{ display: 'flex', gap: 3, alignItems: 'center', flexShrink: 0 }}>
                       {inStack ? (
                         <button onClick={e => { e.stopPropagation(); setStackIds(stackIds.filter(s => s !== c.id)); }}
-                          style={{ padding: '4px 8px', borderRadius: 6, fontSize: 7, fontWeight: 700, cursor: 'pointer',
+                          style={{ padding: '8px 10px', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                             background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>
                           ✕
                         </button>
                       ) : (
                         <button onClick={e => { e.stopPropagation(); setStackIds([...stackIds, c.id]); }}
-                          style={{ padding: '4px 8px', borderRadius: 6, fontSize: 7, fontWeight: 700, cursor: 'pointer',
+                          style={{ padding: '8px 10px', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                             background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a' }}>
                           +
                         </button>

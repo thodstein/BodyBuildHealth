@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { loadBioStackProfile, autoFillFromMainProfile } from '../../engines/biostack-ai.engine';
 import { SUB_TABS, BIO_ANIM_CSS, type BSTab, initBioToast, SkeletonLoader, showToast } from './BioStackAIConstants';
+import { useDataLink, type LinkedData } from '../../core/data-link';
+import type { LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { ProfileTab } from './BioStackAIProfile';
 import { SearchTab } from './BioStackAISearch';
 import { BuildTab } from './BioStackAIBuild';
@@ -10,6 +12,7 @@ import { RisksTab } from './BioStackAIRisks';
 import { CompareTab } from './BioStackAICompare';
 import { ReportsTab } from './BioStackAIReports';
 import { PeriodizationTab } from './BioStackAIPeriodization';
+import { InteractionsTab } from './BioStackAIInteractions';
 
 const BIO_TAB_KEY = 'he_biostack_tab';
 
@@ -26,6 +29,16 @@ export const BioStackAIScreen: React.FC = () => {
     return saved;
   });
   const [loading, setLoading] = useState(true);
+  const linked = useDataLink();
+  const labAnalysis: LabCompositeResult | null = linked?.labAnalysis || null;
+  const activeAAS = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('he_course_data');
+      if (!raw) return [] as string[];
+      const course = JSON.parse(raw);
+      return (course.aas || []).filter((a: any) => a.active !== false).map((a: any) => a.id?.toLowerCase?.() || a.id || '').filter(Boolean);
+    } catch { return [] as string[]; }
+  }, []);
   /* ── Multi-stack ── */
   const STACKS_KEY = 'he_biostack_stacks';
   const IDX_KEY = 'he_biostack_active_idx';
@@ -72,8 +85,8 @@ export const BioStackAIScreen: React.FC = () => {
 
   const tabContent: Record<BSTab, React.ReactNode> = {
     profile: <ProfileTab profile={profile} setProfile={setProfile} setStackIds={setStackIdsAndSync} />,
-    search: <SearchTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
-    build: <BuildTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
+    search: <SearchTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} />,
+    build: <BuildTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} labAnalysis={labAnalysis} linked={linked} />,
     stack: <StackTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync}
       allStacks={allStacks} activeStackIdx={activeStackIdx}
       setActiveStackIdx={setActiveStackIdx}
@@ -90,11 +103,13 @@ export const BioStackAIScreen: React.FC = () => {
         const keys = `he_biostack_name_${i}`;
         localStorage.setItem(keys, name);
       }}
+      linked={linked}
     />,
-    risks: <RisksTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
-    compare: <CompareTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
-    reports: <ReportsTab profile={profile} stackIds={stackIds} />,
+    risks: <RisksTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} activeAAS={activeAAS} />,
+    compare: <CompareTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} />,
+    reports: <ReportsTab profile={profile} stackIds={stackIds} linked={linked} />,
     periodization: <PeriodizationTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
+    interactions: <InteractionsTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
   };
 
   return (

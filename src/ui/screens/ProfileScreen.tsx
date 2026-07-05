@@ -1284,7 +1284,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   }}>🧩 Поддержка</button>
                 </div>
                 <div style={{ fontSize:8, color:'rgba(255,255,255,0.25)', marginTop:6, textAlign:'center' }}>
-                  Лабораторные цифры (Labs) + карточки «🫁 Гепатобилиарная», «❤️ ССС», «💧 Мочевыделительная» и т.д. ниже — все данные склеиваются в общий профиль здоровья
+                  Лабораторные цифры (Labs) + субъективные карточки ниже — все данные склеиваются в общий профиль здоровья
                 </div>
               </div>
               {(() => {
@@ -1294,63 +1294,6 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   summary: (d: any) => string;
                   fields: (d: any, u: Function) => React.ReactNode;
                 }[] = [
-                  { id:'hepatobiliary', icon:'🫁', title:'Гепатобилиарная', color:'#34d399',
-                    summary: d => {
-                      const alt = d?.altAstElevation || 'none'; const ggt = d?.ggtElevation || 'none';
-                      const bil = d?.bilirubinElevation || 'none';
-                      const flags = [d?.fattyLiver ? 'Жир.печень' : '', d?.cholecystitis ? 'Холецистит' : ''].filter(Boolean).join(', ');
-                      return `АЛТ/АСТ: ${alt==='none'?'Норма':alt==='mild'?'↑':alt==='moderate'?'↑↑':'↑↑↑'} | ГГТ: ${ggt==='none'?'Норма':ggt==='mild'?'↑':ggt==='moderate'?'↑↑':'↑↑↑'}${flags ? ' | '+flags : ''}`;
-                    },
-                    fields: (d, u) => <>
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                        <HealthSelect label="АЛТ/АСТ" value={d?.altAstElevation||'none'} opts={[['none','Норма'],['mild','Лёгкое ↑'],['moderate','Умеренное ↑'],['severe','Выраженное ↑']]} onChange={v => u('hepatobiliary',{...d,altAstElevation:v})} />
-                        <HealthSelect label="ГГТ" value={d?.ggtElevation||'none'} opts={[['none','Норма'],['mild','Лёгкое ↑'],['moderate','Умеренное ↑'],['severe','Выраженное ↑']]} onChange={v => u('hepatobiliary',{...d,ggtElevation:v})} />
-                        <HealthSelect label="Билирубин" value={d?.bilirubinElevation||'none'} opts={[['none','Норма'],['mild','Лёгкое ↑'],['moderate','Умеренное ↑']]} onChange={v => u('hepatobiliary',{...d,bilirubinElevation:v})} />
-                        <div style={{ display:'flex', gap:4, alignItems:'end', paddingBottom:4 }}>
-                          <HealthBool label="Жир.печень" active={!!d?.fattyLiver} onClick={() => u('hepatobiliary',{...d,fattyLiver:!d?.fattyLiver})} />
-                          <HealthBool label="Холецистит" active={!!d?.cholecystitis} onClick={() => u('hepatobiliary',{...d,cholecystitis:!d?.cholecystitis})} />
-                        </div>
-                      </div>
-                    </>
-                  },
-                  { id:'urinary', icon:'💧', title:'Мочевыделительная', color:'#60a5fa',
-                    summary: d => {
-                      const cr = d?.creatinineElevation||'none'; const ur = d?.ureaElevation||'none';
-                      const flags = [d?.proteinuria?'Протеинурия':'',d?.hypertension?'Гипертония':'',d?.diabetes?'Диабет':''].filter(Boolean).join(', ');
-                      return `Креатинин: ${cr==='none'?'Норма':cr==='mild'?'↑':'↑↑'} | Мочевина: ${ur==='none'?'Норма':ur==='mild'?'↑':'↑↑'}${flags ? ' | '+flags : ''}`;
-                    },
-                    fields: (d, u) => <>
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                        <HealthSelect label="Креатинин" value={d?.creatinineElevation||'none'} opts={[['none','Норма'],['mild','Лёгкое ↑'],['moderate','Умеренное ↑']]} onChange={v => u('urinary',{...d,creatinineElevation:v})} />
-                        <HealthSelect label="Мочевина" value={d?.ureaElevation||'none'} opts={[['none','Норма'],['mild','Лёгкое ↑'],['moderate','Умеренное ↑']]} onChange={v => u('urinary',{...d,ureaElevation:v})} />
-                      </div>
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
-                        <HealthBool label="Протеинурия" active={!!d?.proteinuria} onClick={() => u('urinary',{...d,proteinuria:!d?.proteinuria})} />
-                        <HealthBool label="Гипертония" active={!!d?.hypertension} onClick={() => u('urinary',{...d,hypertension:!d?.hypertension})} />
-                        <HealthBool label="Диабет" active={!!d?.diabetes} onClick={() => u('urinary',{...d,diabetes:!d?.diabetes})} />
-                      </div>
-                    </>
-                  },
-                  { id:'cardio', icon:'❤️', title:'ССС', color:'#f87171',
-                    summary: d => {
-                      const bp = d?.bpStage||'normal'; const hr = d?.heartRate||'';
-                      const ldl = d?.ldlElevation||'none'; const hct = d?.hctElevation||'none';
-                      const f = [d?.previousCVD?'ССЗ':'',d?.familyCVD?'Наслед.':''].filter(Boolean).join(',');
-                      return `АД: ${bp==='normal'?'Норма':bp==='high_normal'?'↑':bp==='hypertension1'?'I ст.':'II ст.'}${hr?' | ЧСС: '+hr:''}${f?' | '+f:''}`;
-                    },
-                    fields: (d, u) => <>
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                        <HealthSelect label="АД" value={d?.bpStage||'normal'} opts={[['normal','Норма'],['high_normal','Высокая норма'],['hypertension1','Гипертензия 1'],['hypertension2','Гипертензия 2']]} onChange={v => u('cardio',{...d,bpStage:v})} />
-                        <HealthNumber label="ЧСС" value={d?.heartRate||''} onChange={v => u('cardio',{...d,heartRate:v ? parseInt(v)||0 : 0})} placeholder="70" />
-                        <HealthSelect label="ЛПНП" value={d?.ldlElevation||'none'} opts={[['none','Норма'],['mild','Лёгкое ↑'],['moderate','Умеренное ↑'],['severe','Выраженное ↑']]} onChange={v => u('cardio',{...d,ldlElevation:v})} />
-                        <HealthSelect label="Гематокрит" value={d?.hctElevation||'none'} opts={[['none','Норма'],['mild','Лёгкое ↑'],['moderate','Умеренное ↑'],['severe','Выраженное ↑']]} onChange={v => u('cardio',{...d,hctElevation:v})} />
-                      </div>
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
-                        <HealthBool label="ССЗ в анамнезе" active={!!d?.previousCVD} onClick={() => u('cardio',{...d,previousCVD:!d?.previousCVD})} />
-                        <HealthBool label="Наследственность" active={!!d?.familyCVD} onClick={() => u('cardio',{...d,familyCVD:!d?.familyCVD})} />
-                      </div>
-                    </>
-                  },
                   { id:'neuro', icon:'🧠', title:'Неврология', color:'#a78bfa',
                     summary: d => `Дофамин: ${d?.dopamineScore||'—'} | Серотонин: ${d?.serotoninScore||'—'} | Агрессия: ${d?.aggressionScore||'—'}${[d?.memoryIssues?'Память':'',d?.focusIssues?'Конц.':'',d?.headaches?'Боли':''].filter(Boolean).length ? ' | '+[d?.memoryIssues?'Память':'',d?.focusIssues?'Конц.':'',d?.headaches?'Боли':''].filter(Boolean).join(',') : ''}`,
                     fields: (d, u) => <>
@@ -1365,16 +1308,6 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                         <HealthBool label="Головные боли" active={!!d?.headaches} onClick={() => u('neuro',{...d,headaches:!d?.headaches})} />
                       </div>
                     </>
-                  },
-                  { id:'gi', icon:'🫀', title:'ЖКТ', color:'#fbbf24',
-                    summary: d => { const a = [d?.bloating?'Вздутие':'',d?.heartburn?'Изжога':'',d?.diarrhea?'Диарея':'',d?.constipation?'Запор':'',d?.diagnosedIBS?'СРК':''].filter(Boolean); return a.length ? a.join(', ') : 'Нет жалоб'; },
-                    fields: (d, u) => <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                      <HealthBool label="Вздутие" active={!!d?.bloating} onClick={() => u('gi',{...d,bloating:!d?.bloating})} />
-                      <HealthBool label="Изжога" active={!!d?.heartburn} onClick={() => u('gi',{...d,heartburn:!d?.heartburn})} />
-                      <HealthBool label="Диарея" active={!!d?.diarrhea} onClick={() => u('gi',{...d,diarrhea:!d?.diarrhea})} />
-                      <HealthBool label="Запор" active={!!d?.constipation} onClick={() => u('gi',{...d,constipation:!d?.constipation})} />
-                      <HealthBool label="СРК" active={!!d?.diagnosedIBS} onClick={() => u('gi',{...d,diagnosedIBS:!d?.diagnosedIBS})} />
-                    </div>
                   },
                   { id:'oda', icon:'🦴', title:'ОДА', color:'#f97316',
                     summary: d => { const a = [d?.jointPain==='mild'?'Боль в суставах':'',d?.ligamentIssues?'Связки':'',d?.backPain?'Боль в спине':'']; return a.filter(Boolean).length ? a.filter(Boolean).join(', ') : 'Нет жалоб'; },
@@ -1395,15 +1328,12 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                     </div>
                   },
                   { id:'goals', icon:'🎯', title:'Цели курса', color:'#fb923c',
-                    summary: d => { const a = [d?.healthMaintenance?'Здоровье':'',d?.competitionPrep?'Соревн.':'',d?.lipidCorrection?'Липиды':'',d?.bloodThinning?'Кровь':'',d?.liverDetox?'Печень':'',d?.bpControl?'АД':'']; const s = a.filter(Boolean).join(', '); return (s||'—')+(d?.cycleWeeks?` | ${d.cycleWeeks} нед`:''); },
+                    summary: d => { const a = [d?.healthMaintenance?'Здоровье':'',d?.competitionPrep?'Соревн.':'',d?.sleepRecovery?'Сон':'']; const s = a.filter(Boolean).join(', '); return (s||'—')+(d?.cycleWeeks?` | ${d.cycleWeeks} нед`:''); },
                     fields: (d, u) => <>
                       <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
                         <HealthBool label="Здоровье" active={!!d?.healthMaintenance} onClick={() => u('goals',{...d,healthMaintenance:!d?.healthMaintenance})} />
                         <HealthBool label="Соревнования" active={!!d?.competitionPrep} onClick={() => u('goals',{...d,competitionPrep:!d?.competitionPrep})} />
-                        <HealthBool label="Липиды" active={!!d?.lipidCorrection} onClick={() => u('goals',{...d,lipidCorrection:!d?.lipidCorrection})} />
-                        <HealthBool label="Кровь" active={!!d?.bloodThinning} onClick={() => u('goals',{...d,bloodThinning:!d?.bloodThinning})} />
-                        <HealthBool label="Печень" active={!!d?.liverDetox} onClick={() => u('goals',{...d,liverDetox:!d?.liverDetox})} />
-                        <HealthBool label="АД" active={!!d?.bpControl} onClick={() => u('goals',{...d,bpControl:!d?.bpControl})} />
+                        <HealthBool label="Сон" active={!!d?.sleepRecovery} onClick={() => u('goals',{...d,sleepRecovery:!d?.sleepRecovery})} />
                       </div>
                       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginTop:6 }}>
                         <HealthNumber label="Длина цикла (нед)" value={d?.cycleWeeks||12} onChange={v => u('goals',{...d,cycleWeeks:parseInt(v)||12})} />
@@ -2789,10 +2719,6 @@ const ProfileCalcData: React.FC = () => {
       <PopToggle label="Здоровье" value={!!calcData.goals?.healthMaintenance} onChange={v=>up('goals.healthMaintenance',v)} />
       <PopToggle label="Подготовка к соревн." value={!!calcData.goals?.competitionPrep} onChange={v=>up('goals.competitionPrep',v)} />
       <PopToggle label="Восст. сна" value={!!calcData.goals?.sleepRecovery} onChange={v=>up('goals.sleepRecovery',v)} />
-      <PopToggle label="Коррекция липидов" value={!!calcData.goals?.lipidCorrection} onChange={v=>up('goals.lipidCorrection',v)} />
-      <PopToggle label="Разжижение крови" value={!!calcData.goals?.bloodThinning} onChange={v=>up('goals.bloodThinning',v)} />
-      <PopToggle label="Детокс печени" value={!!calcData.goals?.liverDetox} onChange={v=>up('goals.liverDetox',v)} />
-      <PopToggle label="Контроль АД" value={!!calcData.goals?.bpControl} onChange={v=>up('goals.bpControl',v)} />
       <PopNum label="Длит. цикла" value={calcData.goals?.cycleWeeks||12} min={1} max={52} suffix="нед" onChange={v=>up('goals.cycleWeeks',v)} />
       <PopNum label="Прошло циклов" value={calcData.goals?.previousCycles||1} min={0} max={20} suffix="раз" onChange={v=>up('goals.previousCycles',v)} />
     </Card>
@@ -2809,28 +2735,6 @@ const ProfileCalcData: React.FC = () => {
       <PopToggle label="Психиатрия" value={!!calcData.contraindications?.psychiatric} onChange={v=>up('contraindications.psychiatric',v)} />
     </Card>
 
-    <Card title="🫁 Гепатобилиарная" color="#f59e0b">
-      <SevSelect label="АЛТ/АСТ" value={calcData.hepatobiliary?.altAstElevation||'none'} onChange={v=>up('hepatobiliary.altAstElevation',v)} />
-      <SevSelect label="ГГТ" value={calcData.hepatobiliary?.ggtElevation||'none'} onChange={v=>up('hepatobiliary.ggtElevation',v)} />
-      <SevSelect label="Билирубин" value={calcData.hepatobiliary?.bilirubinElevation||'none'} onChange={v=>up('hepatobiliary.bilirubinElevation',v)} />
-      <SevSelect label="Жировой гепатоз" value={calcData.hepatobiliary?.fattyLiver||'none'} onChange={v=>up('hepatobiliary.fattyLiver',v)} />
-    </Card>
-
-    <Card title="💧 Мочевыделительная" color="#22c55e">
-      <SevSelect label="СКФ снижение" value={calcData.urinary?.gfrReduction||'none'} onChange={v=>up('urinary.gfrReduction',v)} />
-      <SevSelect label="Креатинин ↑" value={calcData.urinary?.creatinineElevation||'none'} onChange={v=>up('urinary.creatinineElevation',v)} />
-      <SevSelect label="Протеинурия" value={calcData.urinary?.proteinuria||'none'} onChange={v=>up('urinary.proteinuria',v)} />
-      <SevSelect label="МКБ/камни" value={calcData.urinary?.kidneyStones||'none'} onChange={v=>up('urinary.kidneyStones',v)} />
-    </Card>
-
-    <Card title="❤️ Сердечно-сосудистая" color="#ef4444">
-      <SevSelect label="ЛПНП" value={calcData.cardio?.ldlElevation||'none'} onChange={v=>up('cardio.ldlElevation',v)} />
-      <SevSelect label="Гематокрит" value={calcData.cardio?.hctElevation||'none'} onChange={v=>up('cardio.hctElevation',v)} />
-      <SevSelect label="АД" value={calcData.cardio?.bpElevation||'none'} onChange={v=>up('cardio.bpElevation',v)} />
-      <SevSelect label="Триглицериды" value={calcData.cardio?.triglycerides||'none'} onChange={v=>up('cardio.triglycerides',v)} />
-      <PopToggle label="Низкий ЛПВП" value={!!calcData.cardio?.hdlLow} onChange={v=>up('cardio.hdlLow',v)} />
-    </Card>
-
     <Card title="🦴 ОДА / Суставы" color="#8b5cf6">
       <SevSelect label="Артралгия" value={calcData.oda?.arthralgia||'none'} onChange={v=>up('oda.arthralgia',v)} />
       <SevSelect label="Тендинит" value={calcData.oda?.tendinitis||'none'} onChange={v=>up('oda.tendinitis',v)} />
@@ -2843,16 +2747,6 @@ const ProfileCalcData: React.FC = () => {
       <PopNum label="Натрий" value={calcData.nutrition?.sodiumMg||3500} min={500} max={8000} step={100} suffix="мг" onChange={v=>up('nutrition.sodiumMg',v)} />
       <PopNum label="Калий" value={calcData.nutrition?.potassiumMg||4500} min={1000} max={8000} step={100} suffix="мг" onChange={v=>up('nutrition.potassiumMg',v)} />
       <PopNum label="Вода" value={calcData.nutrition?.waterLiters||3} min={1} max={6} step={0.5} suffix="л/д" onChange={v=>up('nutrition.waterLiters',v)} />
-    </Card>
-
-    <Card title="🫀 ЖКТ" color="#fbbf24" cols={2}>
-      <PopToggle label="Гастрит" value={!!calcData.gi?.gastritis} onChange={v=>up('gi.gastritis',v)} />
-      <PopToggle label="Язва" value={!!calcData.gi?.ulcer} onChange={v=>up('gi.ulcer',v)} />
-      <PopToggle label="СРК" value={!!calcData.gi?.ibs} onChange={v=>up('gi.ibs',v)} />
-      <PopToggle label="Запор" value={!!calcData.gi?.constipation} onChange={v=>up('gi.constipation',v)} />
-      <PopToggle label="Диарея" value={!!calcData.gi?.diarrhea} onChange={v=>up('gi.diarrhea',v)} />
-      <PopToggle label="Вздутие" value={!!calcData.gi?.bloating} onChange={v=>up('gi.bloating',v)} />
-      <PopToggle label="Рефлюкс" value={!!calcData.gi?.reflux} onChange={v=>up('gi.reflux',v)} />
     </Card>
 
     <Card title="☣️ Токсическая нагрузка" color="#ec4899" cols={3}>

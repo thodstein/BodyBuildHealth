@@ -10,12 +10,16 @@ import { calculatePlates, warmupPlateSequence, getPlateLoadingOrder } from '../.
 import { getRequiredPatterns, getBlockedPatterns } from '../../engines/exercise-pattern.engine';
 import { defaultPeriodization, getBlockTemplates, createMesocycle } from '../../engines/periodization-designer.engine';
 import { computeOrthopedicConstraints, distributeWeeklyLoad } from '../../engines/orthopedic-load-engines';
+import { detectOvertraining, autoSchedule, type OvertrainingInput, type AutoScheduleInput } from '../../engines/overtraining-scheduler.engine';
+import { TEMPO_PRESETS, recommendTempo, formatTempo, type TempoPhase } from '../../engines/rep-tempo.engine';
+import { generateInterMesocycleProgression, generateMesocycleProgression, type MesocycleConfig } from '../../engines/pro/mesocycle-progression.engine';
+import { useTrainingProfile } from './TrainingScreen_parts/training-profile';
 import type { MovementPattern } from '../../core/types';
 
 export const TrainingToolkitScreen: React.FC = () => {
   const [tab, setTab] = useState('movement');
-  const tabs = ['movement','peaking','calendar','autoreg','reps','gym','patterns','design','logger','ortho','mrv'];
-  const labels: Record<string,string> = {movement:'🏃 Движение',peaking:'🏆 Пик',calendar:'📅 Календарь',autoreg:'⚙ Авторег',reps:'🔢 Повторы',gym:'🏋️ Зал',patterns:'🧩 Паттерны',design:'🧱 Блоки',logger:'📝 Логгер',ortho:'🦴 Ортопедия',mrv:'📉 MRV'};
+  const tabs = ['movement','peaking','calendar','autoreg','reps','gym','patterns','design','logger','ortho','mrv','deload','tempo','mesoprog'];
+  const labels: Record<string,string> = {movement:'🏃 Движение',peaking:'🏆 Пик',calendar:'📅 Календарь',autoreg:'⚙ Авторег',reps:'🔢 Повторы',gym:'🏋️ Зал',patterns:'🧩 Паттерны',design:'🧱 Блоки',logger:'📝 Логгер',ortho:'🦴 Ортопедия',mrv:'📉 MRV',deload:'📉 Делод',tempo:'⏱ Темп',mesoprog:'🔄 Мезоцикл'};
   return (<div className="screen"><h2>🧰 Инструментарий</h2>
     <div style={{ display:'flex',gap:3,marginBottom:10,overflowX:'auto' }}>
       {tabs.map(t => <button key={t} onClick={()=>setTab(t)} style={{ padding:'6px 10px',borderRadius:8,fontSize:11,cursor:'pointer',whiteSpace:'nowrap',background:tab===t?'var(--accent-green)':'var(--bg-secondary)',color:tab===t?'#000':'var(--text-dim)',border:'none',fontWeight:tab===t?700:400 }}>{labels[t]}</button>)}
@@ -31,6 +35,9 @@ export const TrainingToolkitScreen: React.FC = () => {
      {tab==='logger' && <LoggerTab />}
      {tab==='ortho' && <OrthoTab />}
      {tab==='mrv' && <MRVEstimatorTab />}
+     {tab==='deload' && <DeloadPlannerTab />}
+     {tab==='tempo' && <TempoTab />}
+     {tab==='mesoprog' && <MesoProgTab />}
    </div>);
 
 };
@@ -330,3 +337,139 @@ const MRVEstimatorTab: React.FC = () => {
     </div>
   </div>);
 };
+
+const DeloadPlannerTab: React.FC = () => {
+  const [profile] = useTrainingProfile();
+  const [goal, setGoal] = useState('strength');
+  const [level, setLevel] = useState('intermediate');
+  const [weeks, setWeeks] = useState(12);
+  const [currentWk, setCurrentWk] = useState(1);
+  const [fatigue, setFatigue] = useState(profile?.fatigue || 30);
+  const [recovery, setRecovery] = useState(70);
+  const [acwr, setAcwr] = useState(1.1);
+  const [schedule, setSchedule] = useState<any>(null);
+
+  const run = () => {
+    const input: AutoScheduleInput = {
+      goal: goal as any, level: level as any,
+      weeksUntilGoal: weeks, currentWeek: currentWk,
+      fatigueLevel: fatigue, recoveryLevel: recovery,
+      overtrainingRisk: fatigue > 70 ? 60 : 20,
+      acwr, monotony: 1.5, strain: 500,
+    };
+    setSchedule(autoSchedule(input));
+  };
+
+  return (<div>
+    <div className="card" style={{ padding:10, marginBottom:8 }}>
+      <h4 style={{ margin:'0 0 6px',fontSize:12 }}>📉 Планировщик делода (sRPE ACWR)</h4>
+      <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:4 }}>
+        <select value={goal} onChange={e=>setGoal(e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:10 }}>
+          <option value="strength">Сила</option><option value="hypertrophy">Гипертрофия</option><option value="peaking">Пик</option><option value="recomposition">Рекомпозиция</option>
+        </select>
+        <select value={level} onChange={e=>setLevel(e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:10 }}>
+          <option value="beginner">Новичок</option><option value="intermediate">Средний</option><option value="advanced">Продвинутый</option>
+        </select>
+        <div><label style={{ fontSize:9 }}>Недель</label><input type="number" value={weeks} onChange={e=>setWeeks(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:10,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Тек. неделя</label><input type="number" value={currentWk} onChange={e=>setCurrentWk(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:10,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Усталость %</label><input type="number" value={fatigue} onChange={e=>setFatigue(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:10,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Восст. %</label><input type="number" value={recovery} onChange={e=>setRecovery(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:10,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>ACWR</label><input type="number" step="0.1" value={acwr} onChange={e=>setAcwr(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:10,boxSizing:'border-box' }} /></div>
+      </div>
+      <button onClick={run} style={{ width:'100%',padding:8,borderRadius:6,border:'none',cursor:'pointer',marginTop:6,background:'var(--accent)',color:'#000',fontWeight:600,fontSize:12 }}>Построить расписание</button>
+    </div>
+    {schedule && (
+      <div className="card" style={{ padding:10 }}>
+        <div style={{ fontSize:10,marginBottom:4 }}>Делод-недели: {schedule.deloadWeeks?.join(', ') || '—'} | Пик: нед {schedule.peakWeek || '—'}</div>
+        {schedule.warnings?.map((w:string,i:number)=><div key={i} style={{ fontSize:9,color:'#f59e0b' }}>⚠ {w}</div>)}
+        <div style={{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:2,marginTop:6 }}>
+          {schedule.weeks?.map((w:any,i:number)=>{
+            const isDeload = w.phase === 'deload' || w.phase === 'active_rest';
+            return <div key={i} style={{ padding:4,borderRadius:4,fontSize:8,textAlign:'center',background:isDeload?'rgba(239,68,68,0.15)':'rgba(0,230,138,0.08)',border:isDeload?'1px solid rgba(239,68,68,0.3)':'1px solid rgba(0,230,138,0.15)' }}>
+              <div style={{ fontWeight:600 }}>Нед {w.week}</div>
+              <div style={{ fontSize:7 }}>{w.phase}</div>
+              <div>Об {w.volumePercent}%</div>
+              <div>Инт {w.intensityPercent}%</div>
+              <div>RIR {w.rirTarget}</div>
+            </div>;
+          })}
+        </div>
+      </div>
+    )}
+  </div>);
+};
+
+const TempoTab: React.FC = () => {
+  const [goal, setGoal] = useState('hypertrophy');
+  const [exType, setExType] = useState<'compound'|'isolation'>('compound');
+  const recKey = recommendTempo(goal, exType);
+  return (<div>
+    <div className="card" style={{ padding:10,marginBottom:8 }}>
+      <h4 style={{ margin:'0 0 6px',fontSize:12 }}>⏱ Темп повторений (эксцентрика-пауза-концентрика-пауза)</h4>
+      <div style={{ display:'flex',gap:4,marginBottom:8 }}>
+        <select value={goal} onChange={e=>setGoal(e.target.value)} style={{ flex:1,padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:10 }}>
+          <option value="strength">Сила</option><option value="hypertrophy">Гипертрофия</option><option value="power">Взрывная сила</option>
+        </select>
+        <select value={exType} onChange={e=>setExType(e.target.value as any)} style={{ flex:1,padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:10 }}>
+          <option value="compound">Базовое</option><option value="isolation">Изолированное</option>
+        </select>
+      </div>
+      <div style={{ fontSize:10,padding:6,borderRadius:6,background:'rgba(0,230,138,0.08)',border:'1px solid rgba(0,230,138,0.15)',marginBottom:8 }}>
+        ▶ Рекомендованный: <b style={{ color:'var(--accent)' }}>{recKey}</b> — {TEMPO_PRESETS[recKey]?.nameRu} ({formatTempo(TEMPO_PRESETS[recKey]?.tempo)})
+      </div>
+      {Object.values(TEMPO_PRESETS).map(p => (
+        <div key={p.id} style={{ padding:'6px 8px',marginBottom:4,borderRadius:6,background:'var(--bg-secondary)',border:recKey===p.id?'1px solid var(--accent)':'1px solid transparent' }}>
+          <div style={{ fontSize:11,fontWeight:600 }}>{p.nameRu} <span style={{ color:'var(--accent)',fontSize:10 }}>({formatTempo(p.tempo)})</span></div>
+          <div style={{ fontSize:9,color:'var(--text-dim)' }}>{p.description} · цель: {p.goal}</div>
+        </div>
+      ))}
+    </div>
+  </div>);
+};
+
+const MesoProgTab: React.FC = () => {
+  const [goal, setGoal] = useState('strength');
+  const [weeks, setWeeks] = useState(6);
+  const [startVol, setStartVol] = useState(12);
+  const [startInt, setStartInt] = useState(0.72);
+  const [startRIR, setStartRIR] = useState(3);
+  const [mesoCount, setMesoCount] = useState(3);
+
+  const interMeso = useMemo(() => {
+    const cfg: MesocycleConfig = { weeks, startVolumeSets: startVol, startIntensityPct: startInt, startRIR, goal: goal as any };
+    return generateInterMesocycleProgression(cfg, mesoCount);
+  }, [goal, weeks, startVol, startInt, startRIR, mesoCount]);
+
+  return (<div>
+    <div className="card" style={{ padding:10,marginBottom:8 }}>
+      <h4 style={{ margin:'0 0 6px',fontSize:12 }}>🔄 Прогрессия мезоциклов (Мезо 1→2→3)</h4>
+      <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:4 }}>
+        <select value={goal} onChange={e=>setGoal(e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:10 }}>
+          <option value="strength">Сила</option><option value="hypertrophy">Гипертрофия</option><option value="power">Мощность</option>
+        </select>
+        <div><label style={{ fontSize:9 }}>Недель/мезо</label><input type="number" value={weeks} onChange={e=>setWeeks(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:10,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Старт объём (сетов)</label><input type="number" value={startVol} onChange={e=>setStartVol(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:10,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Старт инт. %1RM</label><input type="number" step="0.01" value={startInt} onChange={e=>setStartInt(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:10,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Старт RIR</label><input type="number" value={startRIR} onChange={e=>setStartRIR(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:10,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Мезоциклов</label><input type="number" value={mesoCount} onChange={e=>setMesoCount(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:10,boxSizing:'border-box' }} /></div>
+      </div>
+    </div>
+    <div className="card" style={{ padding:10 }}>
+      <h4 style={{ margin:'0 0 6px',fontSize:12 }}>📊 Рост между мезоциклами</h4>
+      <div style={{ display:'grid',gap:6 }}>
+        {interMeso.map((step, i) => (
+          <div key={i} style={{ padding:'8px',borderRadius:8,background: i===0?'rgba(59,130,246,0.08)':'rgba(0,230,138,0.06)',border:'1px solid '+(i===0?'rgba(59,130,246,0.2)':'rgba(0,230,138,0.15)') }}>
+            <div style={{ fontSize:11,fontWeight:700 }}>Мезоцикл {i+1}</div>
+            <div style={{ fontSize:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:2,marginTop:4 }}>
+              <div>Объём: <b style={{ color:'var(--accent)' }}>{Math.round(step.startVolumeSets)}</b> сетов</div>
+              <div>Интенсивность: <b style={{ color:'var(--accent)' }}>{Math.round(step.startIntensityPct*100)}%</b></div>
+              <div>Старт RIR: <b style={{ color:'var(--accent)' }}>{step.startRIR}</b></div>
+            </div>
+            {step.growthRationale && <div style={{ fontSize:9,color:'var(--text-dim)',marginTop:2 }}>{step.growthRationale}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+   </div>);
+};
+

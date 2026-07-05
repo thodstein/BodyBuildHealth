@@ -76,6 +76,7 @@ import { DosageDatabaseView } from '../components/DosageCalculator';
 import { SupportProtocols } from './SupportScreen_parts/SupportProtocols';
 import { SupportBioavailability } from './SupportScreen_parts/SupportBioavailability';
 import { SymptomSolverTab } from './SupportScreen_parts/SymptomSolverTab';
+import { AutoCalculator } from './SupportScreen_parts/AutoCalculator';
 export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTab }) => {
   const linked = useDataLink();
   const [tab, setTab] = useState<SupportTab>(initialTab || 'main');
@@ -670,6 +671,19 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [planSaved, setPlanSaved] = useState<string | boolean>(false);
   const [reportGenerated, setReportGenerated] = useState(false);
   useEffect(() => { try { const saved = localStorage.getItem('he_support_report_current'); if (saved) { setReportGenerated(true); setSupportReportCurrent(JSON.parse(saved)); } } catch {} }, []);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('he_biostack_to_plan');
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data.stackIds && Array.isArray(data.stackIds) && data.stackIds.length > 0) {
+          setEnhancedSubs(prev => [...new Set([...prev, ...data.stackIds])]);
+          localStorage.removeItem('he_biostack_to_plan');
+          showToast(`BioStack: +${data.stackIds.length} веществ добавлено в план`, 'success');
+        }
+      }
+    } catch {}
+  }, []);
   const [planSubTab, setPlanSubTab] = useState<'active' | 'archive' | 'myplans'>('active');
   const [favSearch, setFavSearch] = useState('');
   const [archivedPlans, setArchivedPlans] = useState<any[]>(() => {
@@ -3274,6 +3288,18 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
         </div>
       )}
 
+
+      {/* ===== AUTO CALCULATOR (input card with import-from-labs button) ===== */}
+      {section === 'generator' && genTab === 'calculator' && ((tab === 'main' && supportView === 'calc' && calcView === 'calculator') || tab === 'calculator') && (
+        <AutoCalculator
+          embedded
+          courseWeek={courseWeekState}
+          onApply={(r) => {
+            setAutoCalcResult(r);
+            calcSupport(r.level as PowerLevel, r.subs);
+          }}
+        />
+      )}
 
       {/* ===== SUPPORT CALCULATOR RESULT ===== */}
       {section === 'generator' && genTab === 'calculator' && ((tab === 'main' && supportView === 'calc' && calcView === 'calculator') || tab === 'calculator') && (

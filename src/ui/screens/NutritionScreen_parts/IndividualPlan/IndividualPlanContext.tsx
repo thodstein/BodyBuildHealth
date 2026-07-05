@@ -292,37 +292,39 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const injectDrugTypes = ['инсулин', 'ГР', 'ИФР-1', 'MGF', 'IGF-1 DES', 'IGF-1 LR3', 'HMG', 'HCG', 'GHRP', 'CJC', 'BPC-157', 'TB-500', 'меланотан', 'семаглутид', 'тирзепатид', 'другое'];
 
   const calcTargets = useMemo(() => {
-    const wpw = s?.workoutsPerWeek || 3; const awm = s?.avgWorkoutMinutes || 60;
-    let pal = 1.2 + wpw * 0.075; if (awm > 60) pal += 0.1; if (awm > 90) pal += 0.05; if (wpw >= 6) pal += 0.05;
-    if (dailySteps >= 15000) pal += 0.15; else if (dailySteps >= 10000) pal += 0.1; else if (dailySteps >= 7500) pal += 0.05;
-    if (householdActivity === 'active') pal += 0.15; else if (householdActivity === 'moderate') pal += 0.1; else if (householdActivity === 'light') pal += 0.05;
-    if (trainType === 'hiit') pal += 0.1; else if (trainType === 'cardio') pal += 0.05; else if (trainType === 'mixed') pal += 0.03;
-    if (trainIntensity === 'high') pal += 0.1; else if (trainIntensity === 'medium') pal += 0.05;
-    pal = Math.min(1.9, Math.max(1.2, Math.round(pal * 1000) / 1000));
-    const goalMap: Record<string, string> = { mass:'bulk',strength:'strength',fat_loss:'cut',cutting:'cut',post_cut:'maintenance',maintenance:'maintenance',recomposition:'recomp',rehab:'rehab' };
-    const engineGoal = goalMap[goal] || 'maintenance';
-    let weightAdj = 1.0;
-    if (weightAdaptMode && weightLogWeek.length >= 2) { const actualLoss = weightLogWeek[0] - weightLogWeek[weightLogWeek.length - 1]; const weeklyAvgLoss = actualLoss > 0 ? actualLoss / (weightLogWeek.length - 1) * 7 / Math.max(1, weightLogWeek.length - 1) : 0; if (expectedLossKgWeek > 0 && weeklyAvgLoss < expectedLossKgWeek * 0.7) weightAdj = 1 - (expectedLossKgWeek - Math.max(0, weeklyAvgLoss)) * 2 / Math.max(1, weight); else if (weeklyAvgLoss > expectedLossKgWeek * 1.3) weightAdj = 1 + (weeklyAvgLoss - expectedLossKgWeek) * 2 / Math.max(1, weight); weightAdj = Math.max(0.8, Math.min(1.2, weightAdj)); }
-    const targetsV2 = (() => { try { return calcNutritionV2({ weightKg: weight, heightCm: height, age, sex: sex || 'male', pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal as any, bodyFatPercent: bodyFatPct }); } catch { return null; } })();
-    const baseTdeeV2 = targetsV2?.baseTdee || 0; const adjV2 = targetsV2?.adjustment || 0;
-    let targets: any = targetsV2 ? { bmr: baseTdeeV2 > 0 ? Math.round(baseTdeeV2 / (pal || 1.2)) : 0, tdee: baseTdeeV2 || Math.round(targetsV2.kcal - adjV2), kcal: targetsV2.kcal, protein: targetsV2.proteinG, fats: targetsV2.fatG, carbs: targetsV2.carbsG, adjustment: adjV2 } : (() => { try { const r = calcNutrition({ weightKg: weight, heightCm: height, age, sex, pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal }); return { bmr: r.bmr, tdee: r.tdee, kcal: r.kcal, protein: r.protein, fats: r.fats, carbs: r.carbs, adjustment: r.kcal - r.tdee }; } catch { return { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300, adjustment: 0 }; } })();
-    if (engineGoal === 'bulk' && surplusPct !== 10) { targets.kcal = Math.round((targets.tdee || targets.kcal) * (1 + surplusPct / 100)); targets.carbs = Math.round((targets.kcal - targets.protein * 4 - targets.fats * 9) / 4); }
-    const phaseMult: Record<string, { kcalMod: number; pAdd: number }> = { course:{kcalMod:1.0,pAdd:0.3},bridge:{kcalMod:0.95,pAdd:0},pct:{kcalMod:0.9,pAdd:0},recovery:{kcalMod:1.05,pAdd:0.3},cutting:{kcalMod:0.8,pAdd:0.2},maintenance:{kcalMod:1.0,pAdd:0},recomp:{kcalMod:0.9,pAdd:0.1},fat_loss:{kcalMod:0.75,pAdd:0.2},post_cut:{kcalMod:1.05,pAdd:0.1} };
-    const pm = phaseMult[phase] || { kcalMod: 1.0, pAdd: 0 };
-    targets.kcal = Math.round(targets.kcal * pm.kcalMod); targets.protein = Math.round(targets.protein + weight * pm.pAdd);
-    if (pm.kcalMod !== 1.0 || pm.pAdd !== 0) { const pKcal = targets.protein * 4; const remaining = Math.max(0, targets.kcal - pKcal); if (targets.fats > 0 || targets.carbs > 0) { const fRatio = (targets.fats * 9) / Math.max(1, targets.fats * 9 + targets.carbs * 4); targets.fats = Math.round((remaining * fRatio) / 9); targets.carbs = Math.round((remaining * (1 - fRatio)) / 4); } else { targets.fats = Math.round((remaining * 0.25) / 9); targets.carbs = Math.round((remaining * 0.75) / 4); } }
-    const hasAAS = injections.some(i => i.type === 'ААС'); const hasShortInsulin = injections.some(i => i.type === 'инсулин' && i.esterType !== 'long'); const hasInsulin = injections.some(i => i.type === 'инсулин'); const hasGLP = injections.some(i => i.type === 'семаглутид' || i.type === 'тирзепатид');
-    if (hasAAS) targets.protein = Math.round(targets.protein + weight * 0.3);
-    if (hasShortInsulin) { const totalInsulinDose = injections.filter(i => i.type === 'инсулин' && i.esterType !== 'long').reduce((s, i) => s + i.dose, 0); const minInsulinCarbs = totalInsulinDose * 10; if (targets.carbs < minInsulinCarbs) targets.carbs = Math.round(minInsulinCarbs * 1.2); const maxFat = Math.round(weight * 0.5); if (targets.fats > maxFat) targets.fats = maxFat; targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4; }
-    if (hasInsulin) { const maxFat = Math.round(weight * 0.5); if (targets.fats > maxFat) targets.fats = maxFat; targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4; }
-    if (hasGLP) { targets.fats = Math.min(targets.fats, Math.round(weight * 0.4)); targets.protein = Math.round(targets.protein + weight * 0.2); targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4; }
-    if (weightAdj !== 1.0) { targets.kcal = Math.round(targets.kcal * weightAdj); targets.protein = Math.round(targets.protein * weightAdj); targets.fats = Math.round(targets.fats * weightAdj); targets.carbs = Math.round(targets.carbs * weightAdj); }
-    if (metabolicAdaptEnabled && metabolicAdaptPct > 0) { const adaptFactor = 1 - metabolicAdaptPct / 100; targets.kcal = Math.round(targets.kcal * adaptFactor); targets.protein = Math.round(targets.protein * adaptFactor); targets.fats = Math.round(targets.fats * adaptFactor); targets.carbs = Math.round(targets.carbs * adaptFactor); }
-    if (manualGPerKg.protein > 0) targets.protein = Math.round(weight * manualGPerKg.protein);
-    if (manualGPerKg.fat > 0) targets.fats = Math.round(weight * manualGPerKg.fat);
-    if (manualGPerKg.carbs > 0) targets.carbs = Math.round(weight * manualGPerKg.carbs);
-    if (manualGPerKg.protein > 0 || manualGPerKg.fat > 0 || manualGPerKg.carbs > 0) targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
-    return targets;
+    try {
+      const wpw = s?.workoutsPerWeek || 3; const awm = s?.avgWorkoutMinutes || 60;
+      let pal = 1.2 + wpw * 0.075; if (awm > 60) pal += 0.1; if (awm > 90) pal += 0.05; if (wpw >= 6) pal += 0.05;
+      if (dailySteps >= 15000) pal += 0.15; else if (dailySteps >= 10000) pal += 0.1; else if (dailySteps >= 7500) pal += 0.05;
+      if (householdActivity === 'active') pal += 0.15; else if (householdActivity === 'moderate') pal += 0.1; else if (householdActivity === 'light') pal += 0.05;
+      if (trainType === 'hiit') pal += 0.1; else if (trainType === 'cardio') pal += 0.05; else if (trainType === 'mixed') pal += 0.03;
+      if (trainIntensity === 'high') pal += 0.1; else if (trainIntensity === 'medium') pal += 0.05;
+      pal = Math.min(1.9, Math.max(1.2, Math.round(pal * 1000) / 1000));
+      const goalMap: Record<string, string> = { mass:'bulk',strength:'strength',fat_loss:'cut',cutting:'cut',post_cut:'maintenance',maintenance:'maintenance',recomposition:'recomp',rehab:'rehab' };
+      const engineGoal = goalMap[goal] || 'maintenance';
+      let weightAdj = 1.0;
+      if (weightAdaptMode && weightLogWeek.length >= 2) { const actualLoss = weightLogWeek[0] - weightLogWeek[weightLogWeek.length - 1]; const weeklyAvgLoss = actualLoss > 0 ? actualLoss / (weightLogWeek.length - 1) * 7 / Math.max(1, weightLogWeek.length - 1) : 0; if (expectedLossKgWeek > 0 && weeklyAvgLoss < expectedLossKgWeek * 0.7) weightAdj = 1 - (expectedLossKgWeek - Math.max(0, weeklyAvgLoss)) * 2 / Math.max(1, weight); else if (weeklyAvgLoss > expectedLossKgWeek * 1.3) weightAdj = 1 + (weeklyAvgLoss - expectedLossKgWeek) * 2 / Math.max(1, weight); weightAdj = Math.max(0.8, Math.min(1.2, weightAdj)); }
+      const targetsV2 = (() => { try { return calcNutritionV2({ weightKg: weight, heightCm: height, age, sex: sex || 'male', pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal as any, bodyFatPercent: bodyFatPct }); } catch { return null; } })();
+      const baseTdeeV2 = targetsV2?.baseTdee || 0; const adjV2 = targetsV2?.adjustment || 0;
+      let targets: any = targetsV2 ? { bmr: baseTdeeV2 > 0 ? Math.round(baseTdeeV2 / (pal || 1.2)) : 0, tdee: baseTdeeV2 || Math.round(targetsV2.kcal - adjV2), kcal: targetsV2.kcal, protein: targetsV2.proteinG, fats: targetsV2.fatG, carbs: targetsV2.carbsG, adjustment: adjV2 } : (() => { try { const r = calcNutrition({ weightKg: weight, heightCm: height, age, sex, pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal }); return { bmr: r.bmr, tdee: r.tdee, kcal: r.kcal, protein: r.protein, fats: r.fats, carbs: r.carbs, adjustment: r.kcal - r.tdee }; } catch { return { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300, adjustment: 0 }; } })();
+      if (engineGoal === 'bulk' && surplusPct !== 10) { targets.kcal = Math.round((targets.tdee || targets.kcal) * (1 + surplusPct / 100)); targets.carbs = Math.round((targets.kcal - targets.protein * 4 - targets.fats * 9) / 4); }
+      const phaseMult: Record<string, { kcalMod: number; pAdd: number }> = { course:{kcalMod:1.0,pAdd:0.3},bridge:{kcalMod:0.95,pAdd:0},pct:{kcalMod:0.9,pAdd:0},recovery:{kcalMod:1.05,pAdd:0.3},cutting:{kcalMod:0.8,pAdd:0.2},maintenance:{kcalMod:1.0,pAdd:0},recomp:{kcalMod:0.9,pAdd:0.1},fat_loss:{kcalMod:0.75,pAdd:0.2},post_cut:{kcalMod:1.05,pAdd:0.1} };
+      const pm = phaseMult[phase] || { kcalMod: 1.0, pAdd: 0 };
+      targets.kcal = Math.round(targets.kcal * pm.kcalMod); targets.protein = Math.round(targets.protein + weight * pm.pAdd);
+      if (pm.kcalMod !== 1.0 || pm.pAdd !== 0) { const pKcal = targets.protein * 4; const remaining = Math.max(0, targets.kcal - pKcal); if (targets.fats > 0 || targets.carbs > 0) { const fRatio = (targets.fats * 9) / Math.max(1, targets.fats * 9 + targets.carbs * 4); targets.fats = Math.round((remaining * fRatio) / 9); targets.carbs = Math.round((remaining * (1 - fRatio)) / 4); } else { targets.fats = Math.round((remaining * 0.25) / 9); targets.carbs = Math.round((remaining * 0.75) / 4); } }
+      const hasAAS = injections.some(i => i.type === 'ААС'); const hasShortInsulin = injections.some(i => i.type === 'инсулин' && i.esterType !== 'long'); const hasInsulin = injections.some(i => i.type === 'инсулин'); const hasGLP = injections.some(i => i.type === 'семаглутид' || i.type === 'тирзепатид');
+      if (hasAAS) targets.protein = Math.round(targets.protein + weight * 0.3);
+      if (hasShortInsulin) { const totalInsulinDose = injections.filter(i => i.type === 'инсулин' && i.esterType !== 'long').reduce((s, i) => s + i.dose, 0); const minInsulinCarbs = totalInsulinDose * 10; if (targets.carbs < minInsulinCarbs) targets.carbs = Math.round(minInsulinCarbs * 1.2); const maxFat = Math.round(weight * 0.5); if (targets.fats > maxFat) targets.fats = maxFat; targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4; }
+      if (hasInsulin) { const maxFat = Math.round(weight * 0.5); if (targets.fats > maxFat) targets.fats = maxFat; targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4; }
+      if (hasGLP) { targets.fats = Math.min(targets.fats, Math.round(weight * 0.4)); targets.protein = Math.round(targets.protein + weight * 0.2); targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4; }
+      if (weightAdj !== 1.0) { targets.kcal = Math.round(targets.kcal * weightAdj); targets.protein = Math.round(targets.protein * weightAdj); targets.fats = Math.round(targets.fats * weightAdj); targets.carbs = Math.round(targets.carbs * weightAdj); }
+      if (metabolicAdaptEnabled && metabolicAdaptPct > 0) { const adaptFactor = 1 - metabolicAdaptPct / 100; targets.kcal = Math.round(targets.kcal * adaptFactor); targets.protein = Math.round(targets.protein * adaptFactor); targets.fats = Math.round(targets.fats * adaptFactor); targets.carbs = Math.round(targets.carbs * adaptFactor); }
+      if (manualGPerKg.protein > 0) targets.protein = Math.round(weight * manualGPerKg.protein);
+      if (manualGPerKg.fat > 0) targets.fats = Math.round(weight * manualGPerKg.fat);
+      if (manualGPerKg.carbs > 0) targets.carbs = Math.round(weight * manualGPerKg.carbs);
+      if (manualGPerKg.protein > 0 || manualGPerKg.fat > 0 || manualGPerKg.carbs > 0) targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
+      return targets;
+    } catch { return { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300, adjustment: 0 }; }
   }, [weight, height, age, sex, goal, s?.workoutsPerWeek, s?.avgWorkoutMinutes, injections, phase, bodyFatPct, weightAdaptMode, weightLogWeek, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, dailySteps, householdActivity, trainType, trainIntensity]);
 
   const [manualKcal, setManualKcal] = useState<number | null>(null);
@@ -332,15 +334,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [kbjuMode, setKbjuMode] = useState<'auto' | 'manual' | 'profile'>('auto');
 
   const profileTargets = useMemo(() => {
-    const wpw = s?.workoutsPerWeek || 3; const awm = s?.avgWorkoutMinutes || 60;
-    let pal = 1.2 + wpw * 0.075; if (awm > 60) pal += 0.1; if (awm > 90) pal += 0.05; if (wpw >= 6) pal += 0.05;
-    if (dailySteps >= 15000) pal += 0.15; else if (dailySteps >= 10000) pal += 0.1; else if (dailySteps >= 7500) pal += 0.05;
-    if (householdActivity === 'active') pal += 0.15; else if (householdActivity === 'moderate') pal += 0.1; else if (householdActivity === 'light') pal += 0.05;
-    if (trainType === 'hiit') pal += 0.1; else if (trainType === 'cardio') pal += 0.05; else if (trainType === 'mixed') pal += 0.03;
-    if (trainIntensity === 'high') pal += 0.1; else if (trainIntensity === 'medium') pal += 0.05;
-    pal = Math.min(1.9, Math.max(1.2, Math.round(pal * 1000) / 1000));
-    const gm: Record<string, string> = { mass:'bulk',strength:'strength',fat_loss:'cut',cutting:'cut',post_cut:'maintenance',maintenance:'maintenance',recomposition:'recomp',rehab:'rehab' };
-    return calcNutrition({ weightKg: s?.weight || weight, heightCm: s?.height || height, age: s?.age || age, sex: s?.sex || sex, pal, goal: gm[goal] || 'maintenance' });
+    try {
+      const wpw = s?.workoutsPerWeek || 3; const awm = s?.avgWorkoutMinutes || 60;
+      let pal = 1.2 + wpw * 0.075; if (awm > 60) pal += 0.1; if (awm > 90) pal += 0.05; if (wpw >= 6) pal += 0.05;
+      if (dailySteps >= 15000) pal += 0.15; else if (dailySteps >= 10000) pal += 0.1; else if (dailySteps >= 7500) pal += 0.05;
+      if (householdActivity === 'active') pal += 0.15; else if (householdActivity === 'moderate') pal += 0.1; else if (householdActivity === 'light') pal += 0.05;
+      if (trainType === 'hiit') pal += 0.1; else if (trainType === 'cardio') pal += 0.05; else if (trainType === 'mixed') pal += 0.03;
+      if (trainIntensity === 'high') pal += 0.1; else if (trainIntensity === 'medium') pal += 0.05;
+      pal = Math.min(1.9, Math.max(1.2, Math.round(pal * 1000) / 1000));
+      const gm: Record<string, string> = { mass:'bulk',strength:'strength',fat_loss:'cut',cutting:'cut',post_cut:'maintenance',maintenance:'maintenance',recomposition:'recomp',rehab:'rehab' };
+      return calcNutrition({ weightKg: s?.weight || weight, heightCm: s?.height || height, age: s?.age || age, sex: s?.sex || sex, pal, goal: gm[goal] || 'maintenance' });
+    } catch { return { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300 }; }
   }, [s?.weight, s?.height, s?.age, s?.sex, s?.workoutsPerWeek, s?.avgWorkoutMinutes, goal, dailySteps, householdActivity, trainType, trainIntensity]);
 
   const effectiveKcal = kbjuMode === 'profile' ? profileTargets.kcal : (manualKcal ?? calcTargets.kcal);

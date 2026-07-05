@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CustomUserReport } from './CustomUserReport';
 
 // ── Types ──
 export interface ReportData {
@@ -145,6 +146,7 @@ function formatTrainerText(data: ReportData): string {
   lines.push(`  ${data.profile.age} лет · ${data.profile.sex === 'male' ? 'муж' : 'жен'}`);
   lines.push(`  Вес: ${data.profile.weight} кг · Рост: ${data.profile.height} см`);
   lines.push(`  BMI: ${data.body.bmi} · FFMI: ${data.body.ffmi} · BF: ${data.profile.bodyFat}%`);
+  lines.push(`  Тощая масса: ${data.body.lbm} кг · Цель: ${data.body.targetWeight} кг`);
   lines.push('');
   lines.push('▎ЦЕЛЬ И ОПЫТ');
   lines.push(`  Цель: ${data.training.goal}`);
@@ -162,13 +164,76 @@ function formatTrainerText(data: ReportData): string {
   lines.push('▎ПОСЛЕДНИЕ ТРЕНИРОВКИ');
   lines.push(data.training.lastWorkouts);
   lines.push('');
+  lines.push('▎ТРЕНИРОВОЧНАЯ НАГРУЗКА (ACWR)');
+  (() => {
+    try {
+      const sessions = JSON.parse(localStorage.getItem('load_srpe_sessions') || '[]');
+      if (sessions.length >= 3) {
+        const now = Date.now();
+        const day = 86400000;
+        const acute = sessions.filter((s: any) => now - new Date(s.date).getTime() < 7 * day);
+        const chronic = sessions.filter((s: any) => now - new Date(s.date).getTime() < 28 * day);
+        const aLoad = acute.reduce((s: number, se: any) => s + (se.rpe || 0) * (se.duration || 0), 0) / 7;
+        const cLoad = chronic.reduce((s: number, se: any) => s + (se.rpe || 0) * (se.duration || 0), 0) / 28;
+        const acwr = cLoad > 0 ? (aLoad / cLoad).toFixed(2) : '—';
+        const zone = !acwr || acwr === '—' ? '—' : Number(acwr) < 0.8 ? 'Недотрен' : Number(acwr) < 1.3 ? 'Оптимум' : Number(acwr) < 1.5 ? 'Повышенная' : 'Опасная';
+        lines.push(`  Острая/Хроническая: ${aLoad.toFixed(0)}/${cLoad.toFixed(0)} · ACWR: ${acwr} (${zone})`);
+        const mono = sessions.length >= 7 ? (() => {
+          const days7 = sessions.filter((s: any) => now - new Date(s.date).getTime() < 7 * day);
+          const loads = days7.map((s: any) => (s.rpe || 0) * (s.duration || 0));
+          if (loads.length < 3) return '—';
+          const mean = loads.reduce((s: number, v: number) => s + v, 0) / loads.length;
+          const sd = Math.sqrt(loads.reduce((s: number, v: number) => s + (v - mean) ** 2, 0) / loads.length);
+          const monoVal = sd > 0 ? (mean / sd).toFixed(2) : '—';
+          return `Монотонность: ${monoVal}${Number(monoVal) > 2 ? ' ⚠' : ''}`;
+        })() : '—';
+        if (mono !== '—') lines.push(`  ${mono}`);
+        lines.push(`  Сессий за 28д: ${chronic.length}`);
+      } else {
+        lines.push('  Недостаточно данных (мин. 3 сессии)');
+      }
+    } catch {
+      lines.push('  Нет данных о нагрузке');
+    }
+  })();
+  lines.push('');
+  lines.push('▎ВОССТАНОВЛЕНИЕ И ГОТОВНОСТЬ');
+  (() => {
+    try {
+      const readiness = JSON.parse(localStorage.getItem('he_readyness') || '{}');
+      if (readiness.recovery) lines.push(`  Готовность: ${readiness.recovery}%`);
+      if (readiness.fatigue) lines.push(`  Усталость: ${readiness.fatigue}%`);
+      if (readiness.soreness) lines.push(`  Крепатура: ${readiness.soreness}/10`);
+      if (readiness.sleepQuality) lines.push(`  Качество сна: ${readiness.sleepQuality}/5`);
+      if (readiness.stress) lines.push(`  Стресс: ${readiness.stress}/10`);
+      if (readiness.hrv) lines.push(`  HRV: ${readiness.hrv} мс`);
+      if (!readiness.recovery && !readiness.fatigue) lines.push('  Нет данных о готовности');
+    } catch {
+      lines.push('  Нет данных о готовности');
+    }
+  })();
+  lines.push('');
   lines.push('▎ФАЗА КУРСА');
   lines.push(`  ${data.course.phase}${data.course.courseStartDate ? ` (с ${data.course.courseStartDate})` : ''}`);
   if (data.course.medsList && data.course.medsList !== 'нет') lines.push(`  Препараты: ${data.course.medsList}`);
+  if (data.course.suppsList && data.course.suppsList !== 'нет') lines.push(`  БАДы: ${data.course.suppsList}`);
   lines.push('');
   lines.push('▎ПРОГРЕСС ВЕСА');
   lines.push(`  Тек: ${data.profile.weight} кг · Цель: ${data.body.targetWeight} кг`);
   lines.push(`  Записей: ${data.weightLogCount}`);
+  lines.push('');
+  lines.push('▎ЗАМЕРЫ (последние 3)');
+  lines.push(data.last3Meas || 'нет данных');
+  lines.push('');
+  lines.push('▎ПИТАНИЕ');
+  lines.push(`  Тип: ${data.nutrition.dietType || '—'} · Приёмы: ${data.nutrition.mealsPerDay || '—'}/день`);
+  if (data.nutrition.avgKcal) lines.push(`  Среднее: ${data.nutrition.avgKcal} ккал · Б:${data.nutrition.avgProtein}г · Ж:${data.nutrition.avgFat}г · У:${data.nutrition.avgCarbs}г`);
+  (() => {
+    try {
+      const r = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]')[0];
+      if (r) lines.push(`  Оценка: ${r.overallGrade || '—'} · Качество: ${r.foodQualityScore || '—'}/10`);
+    } catch {}
+  })();
   lines.push('');
   lines.push('▎РЕКОМЕНДАЦИИ ТРЕНЕРА');
   lines.push('  (заполняется тренером)');
@@ -176,6 +241,8 @@ function formatTrainerText(data: ReportData): string {
   lines.push('  ▸ Частота: ______________________________');
   lines.push('  ▸ Слабые группы: ________________________');
   lines.push('  ▸ Коррекция техники: ____________________');
+  lines.push('  ▸ Питание: ______________________________');
+  lines.push('  ▸ Восстановление: _______________________');
   lines.push('  ▸ Примечания: ___________________________');
   lines.push('');
   lines.push(`  Дата: ${new Date().toLocaleDateString('ru')}`);
@@ -193,34 +260,84 @@ function formatDoctorText(data: ReportData): string {
   lines.push('▎ПАЦИЕНТ');
   lines.push(`  ${data.profile.name || '—'}`);
   lines.push(`  ${data.profile.age} лет · ${data.profile.sex === 'male' ? 'мужской' : 'женский'} пол`);
-  lines.push(`  Группа крови: ${data.profile.bloodType || '—'}`);
+  lines.push(`  Группа крови: ${data.profile.bloodType || '—'} · Резус-фактор: ${data.profile.bloodType?.includes('+') ? '+' : data.profile.bloodType?.includes('-') ? '−' : '—'}`);
   lines.push(`  Вес: ${data.profile.weight} кг · Рост: ${data.profile.height} см · BMI: ${data.body.bmi}`);
+  lines.push(`  Тощая масса (LBM): ${data.body.lbm} кг · FFMI: ${data.body.ffmi}`);
   lines.push(`  Аллергии: ${data.profile.allergyNotes || 'нет'}`);
   lines.push('');
   lines.push('▎ЛАБОРАТОРНЫЕ ДАННЫЕ');
-  lines.push(`  ${data.labs.list || 'нет данных'}`);
+  lines.push(`  Все маркеры: ${data.labs.list || 'нет данных'}`);
   lines.push(`  Последние: ${data.labs.recentList || 'нет данных'}`);
+  (() => {
+    try {
+      const labs = JSON.parse(localStorage.getItem('he_lab_analysis') || '[]');
+      if (labs.length === 0) return;
+      const abn = labs.filter((l: any) => l.status === 'high' || l.status === 'low' || l.status === 'critical');
+      if (abn.length > 0) {
+        lines.push('');
+        lines.push('  ОТКЛОНЕНИЯ:');
+        for (const l of abn.slice(0, 10)) {
+          const flag = l.status === 'critical' ? '⚠ КРИТИЧНО' : l.status === 'high' ? '↑ ВЫШЕ' : '↓ НИЖЕ';
+          lines.push(`    ${l.code || l.name}: ${l.value} ${l.unit} (${flag})`);
+        }
+      }
+    } catch {}
+  })();
+  lines.push('');
+  lines.push('▎ВИТАЛЬНЫЕ ПОКАЗАТЕЛИ');
+  (() => {
+    try {
+      const bpd = JSON.parse(localStorage.getItem('he_bp_diary') || '[]');
+      if (bpd.length > 0) {
+        const last = bpd[0];
+        lines.push(`  Последнее АД: ${last.systolic}/${last.diastolic} мм рт.ст. · Пульс: ${last.hr || '—'} уд/мин`);
+        const sysArr = bpd.map((b: any) => b.systolic).filter(Boolean);
+        const diaArr = bpd.map((b: any) => b.diastolic).filter(Boolean);
+        if (sysArr.length > 0) {
+          const avgSys = (sysArr.reduce((s: number, v: number) => s + v, 0) / sysArr.length).toFixed(0);
+          const avgDia = (diaArr.reduce((s: number, v: number) => s + v, 0) / diaArr.length).toFixed(0);
+          lines.push(`  Среднее АД: ${avgSys}/${avgDia} мм рт.ст. · Записей: ${bpd.length}`);
+        }
+      } else {
+        lines.push('  Нет записей АД');
+      }
+    } catch { lines.push('  Нет данных АД'); }
+  })();
+  (() => {
+    try {
+      const sd = JSON.parse(localStorage.getItem('he_sleep_diary') || '[]');
+      if (sd.length > 0) {
+        const hours = sd.map((e: any) => Number(e.hours)).filter((v: number) => v > 0);
+        const avgHours = hours.length > 0 ? (hours.reduce((s: number, v: number) => s + v, 0) / hours.length).toFixed(1) : '—';
+        lines.push(`  Сон: ср. ${avgHours} ч/ночь · Записей: ${sd.length}`);
+      }
+    } catch {}
+  })();
   lines.push('');
   lines.push('▎СТРАТИФИКАЦИЯ РИСКОВ');
   if (data.risk?.systemBreakdown) {
     for (const sys of RISK_SYSTEMS) {
       const v = data.risk.systemBreakdown[sys];
       const pct = v?.net !== undefined ? `${v.net}%` : '—';
+      const raw = v?.raw !== undefined ? `(raw: ${v.raw}%)` : '';
       const rl = riskLevel(v?.net || 0);
-      lines.push(`  ${(SYS_FULL[sys] || sys).padEnd(20)} ${pct.padEnd(6)} ${rl.label}`);
+      lines.push(`  ${(SYS_FULL[sys] || sys).padEnd(20)} ${pct.padEnd(6)} ${rl.label} ${raw}`);
     }
   } else {
     lines.push('  — нет данных');
   }
   lines.push(`  Общий риск: ${data.risk?.overallNet || '—'}%`);
+  lines.push(`  Риск без поддержки: ${data.risk?.overallRaw || '—'}%`);
   lines.push('');
   lines.push('▎ФАРМАКОТЕРАПИЯ');
+  lines.push(`  Фаза: ${data.course.phase}${data.course.courseStartDate ? ` (с ${data.course.courseStartDate})` : ''}`);
   lines.push(`  Препараты: ${data.course.medsList || 'нет'}`);
   lines.push(`  БАДы: ${data.course.suppsList || 'нет'}`);
   if (data.risk?.systemSupport) {
+    lines.push('  Покрытие рисков поддержкой:');
     for (const sys of RISK_SYSTEMS) {
       if (data.risk.systemSupport[sys] !== undefined) {
-        lines.push(`  ${(SYS_FULL[sys] || sys)}: покрытие ${Math.round(data.risk.systemSupport[sys])}%`);
+        lines.push(`    ${(SYS_FULL[sys] || sys)}: ${Math.round(data.risk.systemSupport[sys])}%`);
       }
     }
   }
@@ -228,14 +345,29 @@ function formatDoctorText(data: ReportData): string {
   lines.push('');
   lines.push('▎ХРОНИЧЕСКИЕ ЗАБОЛЕВАНИЯ');
   lines.push(`  ${data.chronic || 'нет'}`);
+  (() => {
+    try {
+      const gen = JSON.parse(localStorage.getItem('he_genetics_data') || '{}');
+      const feats: string[] = [];
+      if (gen.lactose_intolerance) feats.push('Лактозная непереносимость');
+      if (gen.gluten_sensitivity) feats.push('Чувствительность к глютену');
+      if (gen.fast_metabolizer) feats.push('Быстрый метаболизатор CYP450');
+      if (feats.length > 0) lines.push(`  Генетические особенности: ${feats.join(' · ')}`);
+    } catch {}
+  })();
   lines.push('');
   lines.push('▎КЛИНИЧЕСКИЕ РЕКОМЕНДАЦИИ');
   lines.push('  (заполняется врачом)');
-  lines.push('  ▸ Лабораторный контроль: _________________');
-  lines.push('  ▸ Коррекция терапии: ____________________');
-  lines.push('  ▸ Доп. обследования: ____________________');
-  lines.push('  ▸ Противопоказания: _____________________');
-  lines.push('  ▸ Заключение: ___________________________');
+  lines.push('  ▸ Лабораторный контроль (какие маркеры, периодичность):');
+  lines.push('    ___________________________________________________');
+  lines.push('  ▸ Коррекция терапии:');
+  lines.push('    ___________________________________________________');
+  lines.push('  ▸ Доп. обследования:');
+  lines.push('    ___________________________________________________');
+  lines.push('  ▸ Противопоказания:');
+  lines.push('    ___________________________________________________');
+  lines.push('  ▸ Заключение:');
+  lines.push('    ___________________________________________________');
   lines.push('');
   lines.push('▎ЭКСТРЕННЫЙ КОНТАКТ');
   lines.push(`  ${data.profile.emergencyName || '—'} / ${data.profile.emergencyPhone || '—'}`);
@@ -255,44 +387,107 @@ function formatGeneralText(data: ReportData): string {
   lines.push('▎ПРОФИЛЬ');
   lines.push(`  ${data.profile.name || '—'} · ${data.profile.age} лет · ${data.profile.sex === 'male' ? 'М' : 'Ж'}`);
   lines.push(`  Вес: ${data.profile.weight} кг · Рост: ${data.profile.height} см · BMI: ${data.body.bmi}`);
-  lines.push(`  FFMI: ${data.body.ffmi} · BF: ${data.profile.bodyFat}%`);
+  lines.push(`  FFMI: ${data.body.ffmi} · LBM: ${data.body.lbm} кг · BF: ${data.profile.bodyFat}%`);
+  lines.push(`  Группа крови: ${data.profile.bloodType || '—'} · Цель: ${data.body.targetWeight} кг`);
   lines.push('');
   lines.push('▎ТРЕНИРОВКИ');
   lines.push(`  Спорт: ${data.training.sport} · Стаж: ${data.training.experience} лет`);
   lines.push(`  Уровень: ${data.training.level} · Цель: ${data.training.goal}`);
   lines.push(`  ${data.training.workoutsPerWeek}×/нед × ${data.training.avgWorkoutMinutes} мин · Программа: ${data.training.programName}`);
-  lines.push(`  Объём за нед: ${data.training.weekVolume}`);
+  lines.push(`  Сплит: ${data.training.currentSplit} · Объём за нед: ${data.training.weekVolume}`);
+  // ACWR data
+  (() => {
+    try {
+      const sessions = JSON.parse(localStorage.getItem('load_srpe_sessions') || '[]');
+      if (sessions.length >= 3) {
+        const now = Date.now(); const day = 86400000;
+        const acute = sessions.filter((s: any) => now - new Date(s.date).getTime() < 7 * day);
+        const chronic = sessions.filter((s: any) => now - new Date(s.date).getTime() < 28 * day);
+        const aLoad = acute.reduce((s: number, se: any) => s + (se.rpe || 0) * (se.duration || 0), 0) / 7;
+        const cLoad = chronic.reduce((s: number, se: any) => s + (se.rpe || 0) * (se.duration || 0), 0) / 28;
+        const acwr = cLoad > 0 ? (aLoad / cLoad).toFixed(2) : '—';
+        if (acwr !== '—') lines.push(`  ACWR: ${acwr} · Сессий: ${chronic.length}`);
+      }
+    } catch {}
+  })();
   lines.push('');
   lines.push('▎ПИТАНИЕ');
-  lines.push(`  Тип: ${data.nutrition.dietType} · Приёмы: ${data.nutrition.mealsPerDay}/день`);
+  lines.push(`  Тип: ${data.nutrition.dietType || '—'} · Приёмы: ${data.nutrition.mealsPerDay || '—'}/день`);
   if (data.nutrition.avgKcal) lines.push(`  Среднее: ${data.nutrition.avgKcal} ккал · Б:${data.nutrition.avgProtein}г · Ж:${data.nutrition.avgFat}г · У:${data.nutrition.avgCarbs}г`);
-  const nRep = (() => { try { const r = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]')[0]; if (!r) return null; return r; } catch { return null; } })();
-  if (nRep) lines.push(`  Оценка: ${nRep.overallGrade || '—'} · Качество: ${nRep.foodQualityScore || '—'}/10`);
+  (() => {
+    try {
+      const r = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]')[0];
+      if (r) {
+        lines.push(`  Оценка: ${r.overallGrade || '—'} · Качество: ${r.foodQualityScore || '—'}/10`);
+        if (r.weightDynamicsBasic) lines.push(`  Вес/нед: ${r.weightDynamicsBasic.direction === 'loss' ? '−' : r.weightDynamicsBasic.direction === 'gain' ? '+' : '∼'}${r.weightDynamicsBasic.weeklyKg || '0'} кг`);
+        if (r.microDeficiencies?.length) lines.push(`  Дефициты: ${r.microDeficiencies.slice(0, 4).join(' · ')}`);
+      }
+    } catch {}
+  })();
   lines.push('');
   lines.push('▎ФАРМАКОЛОГИЯ');
-  lines.push(`  Фаза: ${data.course.phase} · Препараты: ${data.course.medsList}`);
-  lines.push(`  БАДы: ${data.course.suppsList}`);
+  lines.push(`  Фаза: ${data.course.phase}${data.course.courseStartDate ? ` (с ${data.course.courseStartDate})` : ''}`);
+  lines.push(`  Препараты: ${data.course.medsList || 'нет'}`);
+  lines.push(`  БАДы: ${data.course.suppsList || 'нет'}`);
   if (data.risk?.systemSupport) {
     for (const sys of RISK_SYSTEMS) {
       if (data.risk.systemSupport[sys] !== undefined) lines.push(`  ${SYS_LABELS[sys]}: покрытие ${Math.round(data.risk.systemSupport[sys])}%`);
     }
   }
-  lines.push(`  Покрытие: ${data.risk?.totalSupport ? Math.round(data.risk.totalSupport) + '%' : '—'}`);
+  lines.push(`  Общее покрытие поддержки: ${data.risk?.totalSupport ? Math.round(data.risk.totalSupport) + '%' : '—'}`);
   lines.push('');
   lines.push('▎РИСКИ');
-  lines.push(`  Общий: ${data.risk?.overallNet || '—'}%`);
+  lines.push(`  Общий (с подд.): ${data.risk?.overallNet || '—'}% · Без подд.: ${data.risk?.overallRaw || '—'}%`);
   if (data.risk?.systemBreakdown) {
     for (const sys of RISK_SYSTEMS) {
-      if (data.risk.systemBreakdown[sys]?.net > 0) lines.push(`  ${SYS_LABELS[sys]}: ${data.risk.systemBreakdown[sys].net}%`);
+      if (data.risk.systemBreakdown[sys]?.net > 0) lines.push(`  ${SYS_LABELS[sys]}: ${data.risk.systemBreakdown[sys].net}% (raw: ${Math.round(data.risk.systemBreakdown[sys].raw || 0)}%)`);
     }
   }
   lines.push('');
-  lines.push('▎ЗАМЕРЫ');
+  lines.push('▎ЗАМЕРЫ (последние 3)');
   lines.push(data.last3Meas || 'нет данных');
   lines.push('');
+  lines.push('▎ВИТАЛЬНЫЕ ПОКАЗАТЕЛИ');
+  (() => {
+    try {
+      const bpd = JSON.parse(localStorage.getItem('he_bp_diary') || '[]');
+      if (bpd.length > 0) {
+        const last = bpd[0];
+        lines.push(`  АД: ${last.systolic}/${last.diastolic} мм · Пульс: ${last.hr || '—'} уд/мин (${last.date || '—'})`);
+        const avgSys = (bpd.reduce((s: number, b: any) => s + (b.systolic || 0), 0) / Math.max(1, bpd.length)).toFixed(0);
+        const avgDia = (bpd.reduce((s: number, b: any) => s + (b.diastolic || 0), 0) / Math.max(1, bpd.length)).toFixed(0);
+        lines.push(`  Среднее АД за весь период: ${avgSys}/${avgDia} мм · Записей: ${bpd.length}`);
+      } else { lines.push('  Нет записей АД'); }
+    } catch { lines.push('  Нет данных АД'); }
+  })();
+  (() => {
+    try {
+      const sd = JSON.parse(localStorage.getItem('he_sleep_diary') || '[]');
+      if (sd.length > 0) {
+        const hours = sd.map((e: any) => Number(e.hours)).filter((v: number) => v > 0);
+        const qual = sd.map((e: any) => Number(e.quality)).filter((v: number) => v > 0);
+        const avgH = hours.length > 0 ? (hours.reduce((s: number, v: number) => s + v, 0) / hours.length).toFixed(1) : '—';
+        const avgQ = qual.length > 0 ? (qual.reduce((s: number, v: number) => s + v, 0) / qual.length).toFixed(1) : '—';
+        lines.push(`  Сон: ср. ${avgH} ч/ночь · Качество: ${avgQ}/5 · Записей: ${sd.length}`);
+      } else { lines.push('  Сон: нет данных'); }
+    } catch { lines.push('  Сон: нет данных'); }
+  })();
+  lines.push('');
   lines.push('▎ЗДОРОВЬЕ');
-  lines.push(`  Кровь: ${data.profile.bloodType || '—'} · Хроника: ${data.chronic}`);
-  lines.push(`  Экстренный: ${data.profile.emergencyName || '—'} / ${data.profile.emergencyPhone || '—'}`);
+  lines.push(`  Хроника: ${data.chronic || 'нет'}`);
+  lines.push(`  Аллергии: ${data.profile.allergyNotes || 'нет'}`);
+  lines.push(`  Экстренный контакт: ${data.profile.emergencyName || '—'} / ${data.profile.emergencyPhone || '—'}`);
+  (() => {
+    try {
+      const gen = JSON.parse(localStorage.getItem('he_genetics_data') || '{}');
+      const snps = Object.entries(gen).filter(([k]) => k.startsWith('snp_')).map(([k, v]) => `${k.replace('snp_', '').toUpperCase()}:${v}`);
+      if (snps.length > 0) lines.push(`  SNP: ${snps.join(' · ')}`);
+    } catch {}
+  })();
+  lines.push('');
+  lines.push('▎ЛАБОРАТОРИЯ');
+  lines.push(`  ${data.labs.list || 'нет данных'}`);
+  if (data.labs.recentList && data.labs.recentList !== 'нет данных') lines.push(`  Последние: ${data.labs.recentList}`);
   lines.push('');
   lines.push(`  Дата: ${new Date().toLocaleDateString('ru')}`);
   lines.push('══════════════════════════════════════════');
@@ -344,10 +539,60 @@ const TrainerReportCard: React.FC<{ data: ReportData; onCopy: (t: string) => voi
         )}
       </SectionBlock>
 
+      <SectionBlock title="Тренировочная нагрузка" icon="📈" color="#3b82f6">
+        {(() => {
+          try {
+            const sessions = JSON.parse(localStorage.getItem('load_srpe_sessions') || '[]');
+            if (sessions.length < 3) return <div style={{fontSize:9,color:'rgba(255,255,255,0.4)'}}>Недостаточно данных (мин. 3 сессии)</div>;
+            const now = Date.now(); const day = 86400000;
+            const acute = sessions.filter((s:any) => now - new Date(s.date).getTime() < 7*day);
+            const chronic = sessions.filter((s:any) => now - new Date(s.date).getTime() < 28*day);
+            const aLoad = acute.reduce((s:number,se:any) => s+(se.rpe||0)*(se.duration||0),0)/7;
+            const cLoad = chronic.reduce((s:number,se:any) => s+(se.rpe||0)*(se.duration||0),0)/28;
+            const acwr = cLoad > 0 ? (aLoad/cLoad).toFixed(2) : '—';
+            const zone = acwr === '—' ? '—' : Number(acwr) < 0.8 ? 'Недотрен' : Number(acwr) < 1.3 ? 'Оптимум' : Number(acwr) < 1.5 ? 'Повышена' : 'Опасная';
+            const zoneColor = zone === 'Оптимум' ? '#22c55e' : zone === 'Недотрен' ? '#3b82f6' : zone === 'Повышена' ? '#f59e0b' : '#ef4444';
+            return (
+              <div>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                  <span style={{fontSize:9,color:'rgba(255,255,255,0.6)'}}>ACWR</span>
+                  <span style={{fontSize:16,fontWeight:800,color:zoneColor}}>{acwr}</span>
+                </div>
+                <DataRow label="Зона" value={zone} color={zoneColor} />
+                <DataRow label="Острая (7д)" value={aLoad.toFixed(0)} />
+                <DataRow label="Хроническая (28д)" value={cLoad.toFixed(0)} />
+                <DataRow label="Сессий в анализе" value={`${chronic.length}`} />
+              </div>
+            );
+          } catch { return <div style={{fontSize:9,color:'rgba(255,255,255,0.4)'}}>Нет данных о нагрузке</div>; }
+        })()}
+      </SectionBlock>
+
+      <SectionBlock title="Восстановление" icon="🔄" color="#3b82f6">
+        {(() => {
+          try {
+            const readiness = JSON.parse(localStorage.getItem('he_readyness') || '{}');
+            const items: {label:string;val:string;col:string}[] = [];
+            if (readiness.recovery) items.push({label:'Готовность',val:`${readiness.recovery}%`,col:'#22c55e'});
+            if (readiness.fatigue) items.push({label:'Усталость',val:`${readiness.fatigue}%`,col:'#f59e0b'});
+            if (readiness.soreness) items.push({label:'Крепатура',val:`${readiness.soreness}/10`,col:'#ef4444'});
+            if (readiness.sleepQuality) items.push({label:'Сон',val:`${readiness.sleepQuality}/5`,col:'#8b5cf6'});
+            if (readiness.stress) items.push({label:'Стресс',val:`${readiness.stress}/10`,col:'#f97316'});
+            if (items.length === 0) return <div style={{fontSize:9,color:'rgba(255,255,255,0.4)'}}>Нет данных о готовности</div>;
+            return (
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:4}}>
+                {items.map(it => <MetricCard key={it.label} label={it.label} value={it.val} color={it.col} />)}
+              </div>
+            );
+          } catch { return <div style={{fontSize:9,color:'rgba(255,255,255,0.4)'}}>Нет данных о готовности</div>; }
+        })()}
+      </SectionBlock>
+
       <SectionBlock title="Фаза курса" icon="💊" color="#3b82f6">
         <DataRow label="Текущая фаза" value={data.course.phase} color="#3b82f6" />
         {data.course.courseStartDate && <DataRow label="Начало курса" value={data.course.courseStartDate} />}
         {data.course.medsList && data.course.medsList !== 'нет' && <DataRow label="Препараты" value={data.course.medsList} />}
+        {data.course.suppsList && data.course.suppsList !== 'нет' && <DataRow label="БАДы" value={data.course.suppsList} />}
       </SectionBlock>
 
       <SectionBlock title="Прогресс веса" icon="⚖️" color="#3b82f6">
@@ -356,6 +601,25 @@ const TrainerReportCard: React.FC<{ data: ReportData; onCopy: (t: string) => voi
           <MetricCard label="Целевой" value={`${data.body.targetWeight}`} unit="кг" color="rgba(255,255,255,0.6)" />
           <MetricCard label="Записей" value={`${data.weightLogCount}`} color="rgba(255,255,255,0.6)" />
         </div>
+      </SectionBlock>
+
+      <SectionBlock title="Замеры" icon="📏" color="#3b82f6">
+        <div style={{fontSize:9,color:'rgba(255,255,255,0.7)',whiteSpace:'pre-wrap',lineHeight:1.6}}>
+          {data.last3Meas || 'Нет данных'}
+        </div>
+      </SectionBlock>
+
+      <SectionBlock title="Питание" icon="🥗" color="#3b82f6">
+        <DataRow label="Тип" value={data.nutrition.dietType || '—'} />
+        <DataRow label="Приёмы/день" value={data.nutrition.mealsPerDay || '—'} />
+        {data.nutrition.avgKcal && (
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:4,marginTop:6}}>
+            <MetricCard label="Ккал" value={data.nutrition.avgKcal} color="#f59e0b" />
+            <MetricCard label="Белки" value={`${data.nutrition.avgProtein}г`} color="#3b82f6" />
+            <MetricCard label="Жиры" value={`${data.nutrition.avgFat}г`} color="#ef4444" />
+            <MetricCard label="Угл." value={`${data.nutrition.avgCarbs}г`} color="#22c55e" />
+          </div>
+        )}
       </SectionBlock>
 
       <SectionBlock title="Рекомендации тренера" icon="📝" color="rgba(255,255,255,0.5)">
@@ -405,6 +669,77 @@ const DoctorReportCard: React.FC<{ data: ReportData; onCopy: (t: string) => void
             Последние: {data.labs.recentList}
           </div>
         )}
+        {(() => {
+          try {
+            const labs = JSON.parse(localStorage.getItem('he_lab_analysis') || '[]');
+            const abn = labs.filter((l:any) => l.status === 'high' || l.status === 'low' || l.status === 'critical');
+            if (abn.length === 0) return null;
+            return (
+              <div style={{marginTop:8,background:'rgba(239,68,68,0.06)',borderRadius:8,padding:8}}>
+                <div style={{fontSize:8,fontWeight:700,color:'#ef4444',marginBottom:4}}>⚠ Отклонения ({abn.length})</div>
+                {abn.slice(0,8).map((l:any,i:number) => {
+                  const flag = l.status === 'critical' ? '⚠' : l.status === 'high' ? '↑' : '↓';
+                  const flagColor = l.status === 'critical' ? '#dc2626' : '#f97316';
+                  return (
+                    <div key={i} style={{display:'flex',gap:6,padding:'2px 0',fontSize:8,color:'rgba(255,255,255,0.85)'}}>
+                      <span style={{color:flagColor,fontWeight:700}}>{flag}</span>
+                      <span style={{minWidth:50}}>{l.code || l.name}</span>
+                      <span>{l.value}{l.unit}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          } catch { return null; }
+        })()}
+      </SectionBlock>
+
+      <SectionBlock title="Витальные показатели" icon="❤️" color="#ef4444">
+        {(() => {
+          try {
+            const bpd = JSON.parse(localStorage.getItem('he_bp_diary') || '[]');
+            if (bpd.length === 0) return <div style={{fontSize:9,color:'rgba(255,255,255,0.4)'}}>Нет записей</div>;
+            const last = bpd[0];
+            const sysArr = bpd.map((b:any)=>b.systolic).filter(Boolean);
+            const diaArr = bpd.map((b:any)=>b.diastolic).filter(Boolean);
+            const hrArr = bpd.map((b:any)=>b.hr).filter(Boolean);
+            const avgSys = sysArr.length > 0 ? (sysArr.reduce((s:number,v:number)=>s+v,0)/sysArr.length).toFixed(0) : '—';
+            const avgDia = diaArr.length > 0 ? (diaArr.reduce((s:number,v:number)=>s+v,0)/diaArr.length).toFixed(0) : '—';
+            return (
+              <div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:6}}>
+                  <MetricCard label="Посл. АД" value={`${last.systolic}/${last.diastolic}`} unit="мм" color="#ef4444" sub={last.date||''} />
+                  <MetricCard label="Ср. САД" value={avgSys} unit="мм" color="#f97316" />
+                  <MetricCard label="Ср. ДАД" value={avgDia} unit="мм" color="#3b82f6" />
+                </div>
+                {hrArr.length > 0 && <DataRow label="Средний пульс" value={`${(hrArr.reduce((s:number,v:number)=>s+v,0)/hrArr.length).toFixed(0)} уд/мин`} />}
+                <DataRow label="Всего записей" value={`${bpd.length}`} />
+              </div>
+            );
+          } catch { return <div style={{fontSize:9,color:'rgba(255,255,255,0.4)'}}>Нет данных</div>; }
+        })()}
+        {(() => {
+          try {
+            const sd = JSON.parse(localStorage.getItem('he_sleep_diary') || '[]');
+            if (sd.length === 0) return null;
+            const hours = sd.map((e:any)=>Number(e.hours)).filter((v:number)=>v>0);
+            const qual = sd.map((e:any)=>Number(e.quality)).filter((v:number)=>v>0);
+            const avgH = hours.length > 0 ? (hours.reduce((s:number,v:number)=>s+v,0)/hours.length).toFixed(1) : '—';
+            const avgQ = qual.length > 0 ? (qual.reduce((s:number,v:number)=>s+v,0)/qual.length).toFixed(1) : '—';
+            return (
+              <div style={{marginTop:6,display:'flex',gap:6}}>
+                <div style={{flex:1,background:'rgba(139,92,246,0.06)',borderRadius:8,padding:6,textAlign:'center'}}>
+                  <div style={{fontSize:8,color:'rgba(255,255,255,0.5)'}}>Сон (ср.)</div>
+                  <div style={{fontSize:14,fontWeight:700,color:'#8b5cf6'}}>{avgH}<span style={{fontSize:8,fontWeight:400}}> ч</span></div>
+                </div>
+                <div style={{flex:1,background:'rgba(139,92,246,0.06)',borderRadius:8,padding:6,textAlign:'center'}}>
+                  <div style={{fontSize:8,color:'rgba(255,255,255,0.5)'}}>Качество</div>
+                  <div style={{fontSize:14,fontWeight:700,color:'#8b5cf6'}}>{avgQ}<span style={{fontSize:8,fontWeight:400}}> /5</span></div>
+                </div>
+              </div>
+            );
+          } catch { return null; }
+        })()}
       </SectionBlock>
 
       <SectionBlock title="Стратификация рисков" icon="⚠️" color="#ef4444">
@@ -444,21 +779,43 @@ const DoctorReportCard: React.FC<{ data: ReportData; onCopy: (t: string) => void
       </SectionBlock>
 
       <SectionBlock title="Фармакотерапия" icon="💊" color="#ef4444">
+        <DataRow label="Фаза" value={data.course.phase} />
+        {data.course.courseStartDate && <DataRow label="Начало курса" value={data.course.courseStartDate} />}
         <DataRow label="Препараты" value={data.course.medsList || 'Нет'} />
         <DataRow label="БАДы и поддержка" value={data.course.suppsList || 'Нет'} />
         {data.risk?.systemSupport && (
           <div style={{ marginTop: 8 }}>
+            <div style={{fontSize:8,fontWeight:600,color:'rgba(255,255,255,0.6)',marginBottom:4}}>Покрытие рисков поддержкой:</div>
             {RISK_SYSTEMS.filter(sys => data.risk.systemSupport[sys] !== undefined).map(sys => (
-              <RiskBar key={sys} pct={data.risk.systemSupport[sys]} label={`${SYS_FULL[sys] || sys} (покрытие)`} />
+              <RiskBar key={sys} pct={data.risk.systemSupport[sys]} label={`${SYS_FULL[sys] || sys}`} />
             ))}
           </div>
         )}
         <DataRow label="Общее покрытие" value={data.risk?.totalSupport ? `${Math.round(data.risk.totalSupport)}%` : '—'} color="#22c55e" />
+        {(() => {
+          try {
+            const sr = JSON.parse(localStorage.getItem('he_profile_support_reports') || '[]')[0];
+            if (!sr) return null;
+            return <DataRow label="Отчёт поддержки" value={`${sr.grade || '—'} · ${sr.compoundsCount || '—'} в-в`} color="#8b5cf6" />;
+          } catch { return null; }
+        })()}
       </SectionBlock>
 
       <SectionBlock title="Анамнез" icon="📋" color="#ef4444">
         <DataRow label="Хронические заболевания" value={data.chronic || 'Нет'} color={data.chronic && data.chronic !== 'нет' ? '#f59e0b' : undefined} />
+        <DataRow label="Аллергии" value={data.profile.allergyNotes || 'Нет'} color={data.profile.allergyNotes ? '#f59e0b' : undefined} />
         <DataRow label="Экстренный контакт" value={`${data.profile.emergencyName || '—'} / ${data.profile.emergencyPhone || '—'}`} />
+        {(() => {
+          try {
+            const gen = JSON.parse(localStorage.getItem('he_genetics_data') || '{}');
+            const feats: string[] = [];
+            if (gen.lactose_intolerance) feats.push('Лактозная непереносимость');
+            if (gen.gluten_sensitivity) feats.push('Чувствительность к глютену');
+            if (gen.fast_metabolizer) feats.push('Быстрый метаболизатор');
+            if (feats.length === 0) return null;
+            return <div style={{marginTop:4,fontSize:8,color:'#8b5cf6'}}>🧬 Генетика: {feats.join(' · ')}</div>;
+          } catch { return null; }
+        })()}
       </SectionBlock>
 
       <SectionBlock title="Клинические рекомендации" icon="📝" color="rgba(255,255,255,0.5)">
@@ -563,10 +920,76 @@ const GeneralReportCard: React.FC<{ data: ReportData; onCopy: (t: string) => voi
         </div>
       </SectionBlock>
 
-      <SectionBlock title="Здоровье" icon="❤️" color="#00e68a">
+      <SectionBlock title="Витальные показатели" icon="❤️" color="#00e68a">
+        {(() => {
+          try {
+            const bpd = JSON.parse(localStorage.getItem('he_bp_diary') || '[]');
+            if (bpd.length === 0) return <div style={{fontSize:9,color:'rgba(255,255,255,0.4)'}}>Нет записей АД</div>;
+            const last = bpd[0];
+            const sysArr = bpd.map((b:any)=>b.systolic).filter(Boolean);
+            const diaArr = bpd.map((b:any)=>b.diastolic).filter(Boolean);
+            const avgSys = sysArr.length > 0 ? (sysArr.reduce((s:number,v:number)=>s+v,0)/sysArr.length).toFixed(0) : '—';
+            const avgDia = diaArr.length > 0 ? (diaArr.reduce((s:number,v:number)=>s+v,0)/diaArr.length).toFixed(0) : '—';
+            return (
+              <div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
+                  <MetricCard label="Посл. АД" value={`${last.systolic}/${last.diastolic}`} unit="мм" color="#ef4444" sub={last.date||''} />
+                  <MetricCard label="Ср. САД" value={avgSys} unit="мм" color="#f97316" />
+                  <MetricCard label="Ср. ДАД" value={avgDia} unit="мм" color="#3b82f6" />
+                </div>
+                <DataRow label="Записей АД" value={`${bpd.length}`} />
+              </div>
+            );
+          } catch { return <div style={{fontSize:9,color:'rgba(255,255,255,0.4)'}}>Нет данных АД</div>; }
+        })()}
+        {(() => {
+          try {
+            const sd = JSON.parse(localStorage.getItem('he_sleep_diary') || '[]');
+            if (sd.length === 0) return null;
+            const hours = sd.map((e:any)=>Number(e.hours)).filter((v:number)=>v>0);
+            const qual = sd.map((e:any)=>Number(e.quality)).filter((v:number)=>v>0);
+            const avgH = hours.length > 0 ? (hours.reduce((s:number,v:number)=>s+v,0)/hours.length).toFixed(1) : '—';
+            const avgQ = qual.length > 0 ? (qual.reduce((s:number,v:number)=>s+v,0)/qual.length).toFixed(1) : '—';
+            return (
+              <div style={{marginTop:4,display:'flex',gap:6}}>
+                <div style={{flex:1,background:'rgba(139,92,246,0.06)',borderRadius:8,padding:6,textAlign:'center'}}>
+                  <div style={{fontSize:8,color:'rgba(255,255,255,0.5)'}}>Сон</div>
+                  <div style={{fontSize:14,fontWeight:700,color:'#8b5cf6'}}>{avgH} <span style={{fontSize:8}}>ч</span></div>
+                </div>
+                <div style={{flex:1,background:'rgba(139,92,246,0.06)',borderRadius:8,padding:6,textAlign:'center'}}>
+                  <div style={{fontSize:8,color:'rgba(255,255,255,0.5)'}}>Качество</div>
+                  <div style={{fontSize:14,fontWeight:700,color:'#8b5cf6'}}>{avgQ} <span style={{fontSize:8}}>/5</span></div>
+                </div>
+              </div>
+            );
+          } catch { return null; }
+        })()}
+      </SectionBlock>
+
+      <SectionBlock title="Лаборатория" icon="🩸" color="#00e68a">
+        <div style={{fontSize:9,color:'rgba(255,255,255,0.7)',lineHeight:1.6,whiteSpace:'pre-wrap'}}>
+          {data.labs.list || 'Нет данных'}
+        </div>
+        {data.labs.recentList && data.labs.recentList !== 'нет данных' && (
+          <div style={{marginTop:4,fontSize:8,color:'rgba(255,255,255,0.45)'}}>
+            Последние: {data.labs.recentList}
+          </div>
+        )}
+      </SectionBlock>
+
+      <SectionBlock title="Здоровье" icon="🩺" color="#00e68a">
         <DataRow label="Группа крови" value={data.profile.bloodType || '—'} />
+        <DataRow label="Аллергии" value={data.profile.allergyNotes || 'Нет'} />
         <DataRow label="Хроника" value={data.chronic || 'Нет'} />
         <DataRow label="Экстренный" value={`${data.profile.emergencyName || '—'} / ${data.profile.emergencyPhone || '—'}`} />
+        {(() => {
+          try {
+            const gen = JSON.parse(localStorage.getItem('he_genetics_data') || '{}');
+            const snps = Object.entries(gen).filter(([k]) => k.startsWith('snp_')).map(([k,v]) => `${k.replace('snp_','').toUpperCase()}:${v}`);
+            if (snps.length === 0) return null;
+            return <div style={{marginTop:4,fontSize:8,color:'#8b5cf6'}}>🧬 SNP: {snps.join(' · ')}</div>;
+          } catch { return null; }
+        })()}
       </SectionBlock>
 
       <div style={{ padding: '12px 20px', display: 'flex', gap: 8 }}>
@@ -920,7 +1343,7 @@ export const ProfessionalReports: React.FC<{
   onCustomReportToggle: (v: boolean) => void;
   onSaveReport: (type: string, text: string) => void;
 }> = ({ data, reportTab, onTabChange, showCustomReport, onCustomReportToggle, onSaveReport }) => {
-  const [activeReport, setActiveReport] = useState<'trainer' | 'doctor' | 'general' | null>(null);
+  const [activeReport, setActiveReport] = useState<'trainer' | 'doctor' | 'general' | 'custom' | 'usercustom' | null>(null);
 
   const copyReport = (text: string) => {
     navigator.clipboard?.writeText(text).then(() => {
@@ -978,9 +1401,11 @@ export const ProfessionalReports: React.FC<{
               { label: '🏥 Врачу', color: '#ef4444', key: 'doctor' as const },
               { label: '📋 Общий', color: '#00e68a', key: 'general' as const },
               { label: '🎨 Свой', color: '#8b5cf6', key: 'custom' as const },
+              { label: '👤 Пользовательский', color: '#14b8a6', key: 'usercustom' as const },
             ].map(btn => (
               <button key={btn.key} onClick={() => {
                 if (btn.key === 'custom') { onCustomReportToggle(true); return; }
+                if (btn.key === 'usercustom') { setActiveReport(activeReport === 'usercustom' ? null : 'usercustom'); return; }
                 setActiveReport(activeReport === btn.key ? null : btn.key);
                 const text = btn.key === 'trainer' ? formatTrainerText(data)
                   : btn.key === 'doctor' ? formatDoctorText(data)
@@ -993,7 +1418,7 @@ export const ProfessionalReports: React.FC<{
                 padding: '7px 14px', borderRadius: 20, fontSize: 9, cursor: 'pointer', fontWeight: 600, border: 'none',
                 background: activeReport === btn.key ? btn.color : `${btn.color}12`,
                 color: btn.color, whiteSpace: 'nowrap',
-              }}>{btn.key === 'custom' ? '🎨 Свой' : `📄 ${btn.label}`}</button>
+              }}>{btn.key === 'custom' ? '🎨 Свой' : btn.key === 'usercustom' ? '👤 Пользов.' : `📄 ${btn.label}`}</button>
             ))}
           </div>
 
@@ -1010,6 +1435,24 @@ export const ProfessionalReports: React.FC<{
           {/* General Report */}
           {(!activeReport || activeReport === 'general') && (
             <GeneralReportCard data={data} onCopy={copyReport} onSend={sendReport} onPrint={printReport} />
+          )}
+
+          {/* Custom User Report */}
+          {activeReport === 'usercustom' && (
+            <CustomUserReport
+              data={{
+                profile: data.profile,
+                training: data.training,
+                nutrition: data.nutrition,
+                labs: data.labs,
+                course: data.course,
+                risk: data.risk || {},
+              }}
+              onCopy={copyReport}
+              onPrint={printReport}
+              onSend={sendReport}
+              onSave={onSaveReport}
+            />
           )}
 
           {/* Nutrition card */}

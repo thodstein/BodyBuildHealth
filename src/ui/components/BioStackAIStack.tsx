@@ -5,7 +5,8 @@ import { buildSmartStack } from '../../engines/biostack-recommender.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS, ALL_SUBSTANCES } from '../../data/support-database';
 import { TZ_MECH_LABELS } from '../../data/support-db';
 import { decodeGarbled } from '../../utils/text-sanitizer';
-import { GlassCard, StatBox, ORGANS, toFinderProfile, ConfirmModal, showToast, PRICE_RUB } from './BioStackAIConstants';
+import { GlassCard, StatBox, ORGANS, toFinderProfile, ConfirmModal, showToast, PRICE_RUB, estCost } from './BioStackAIConstants';
+import type { LinkedData } from '../../core/data-link';
 
 function getTitration(id: string, cat: any): string | null {
   const needy = ['ashwagandha', 'rhodiola', 'shilajit', 'berberine', 'tongkat_ali', 'fadogia', 'ashwa', 'probiotics', 'bromelain', 'serrapeptase', 'nattokinase'];
@@ -20,10 +21,11 @@ function getTitration(id: string, cat: any): string | null {
   return null;
 }
 
-export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStackIdx, setActiveStackIdx, createStack, deleteStack, renameStack }: {
+export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStackIdx, setActiveStackIdx, createStack, deleteStack, renameStack, linked }: {
   profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void;
   allStacks: string[][]; activeStackIdx: number; setActiveStackIdx: (i: number) => void;
   createStack: () => void; deleteStack: (i: number) => void; renameStack: (i: number, name: string) => void;
+  linked?: LinkedData;
 }) {
   const explanation = useMemo(() => {
     if (stackIds.length === 0) return null;
@@ -377,29 +379,35 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
         if (stackIds.length === 0) return;
         setActionLoading('cheaper');
         setTimeout(() => {
-          const ALT: Record<string, string[]> = { omega3: ['flax_oil', 'chia'], coq10: ['idebenone', 'pqq'], probiotics: ['kefir', 'sauerkraut'], collagen: ['bone_broth', 'gelatin'], ashwagandha: ['rhodiola', 'schisandra'], lions_mane: ['alpha_gpc', 'phosphatidylserine'], tongkat_ali: ['fadogia', 'shilajit'] };
-          const swaps: Array<{ fromId: string; toId: string; saving: number }> = [];
+          const fp = toFinderProfile(profile);
+          const swaps: Array<{ fromId: string; fromName: string; toId: string; toName: string; saving: number }> = [];
           const ns = [...stackIds];
           for (let i = 0; i < ns.length; i++) {
             const id = ns[i];
-            const alts = ALT[id];
-            if (alts) {
-              const ch = alts.find(a => (PRICE_RUB[a] || 999) < (PRICE_RUB[id] || 999));
-              if (ch && SUPPORT_CATALOG_DATA[ch]) {
-                swaps.push({ fromId: id, toId: ch, saving: (PRICE_RUB[id] || 0) - (PRICE_RUB[ch] || 0) });
-                ns[i] = ch;
+            const replacements = findReplacement(id, 'cheaper', fp);
+            if (replacements.length > 0) {
+              const best = replacements[0];
+              if (SUPPORT_CATALOG_DATA[best.replacementId]) {
+                const fromCost = PRICE_RUB[id] || estCost(id);
+                const toCost = PRICE_RUB[best.replacementId] || estCost(best.replacementId);
+                if (toCost < fromCost) {
+                  swaps.push({
+                    fromId: id, fromName: SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id,
+                    toId: best.replacementId, toName: best.replacementName,
+                    saving: fromCost - toCost,
+                  });
+                  ns[i] = best.replacementId;
+                }
               }
             }
           }
           if (swaps.length === 0) {
-            setActionResult({ title: '💰 Оптимизация стоимости', sections: [{ icon: '💡', text: 'Не найдено более дешёвых аналогов в базе.', color: '#f59e0b' }] });
+            setActionResult({ title: '💰 Оптимизация стоимости', sections: [{ icon: '💡', text: 'Не найдено более дешёвых аналогов в базе. Все вещества уже оптимальны по цене.', color: '#22c55e' }] });
           } else {
             const totalSaving = swaps.reduce((s, x) => s + x.saving, 0);
-            const swapLines = swaps.map(s => {
-              const fromName = SUPPORT_CATALOG_DATA[s.fromId]?.nameRu || SUPPORT_CATALOG_DATA[s.fromId]?.name || s.fromId;
-              const toName = SUPPORT_CATALOG_DATA[s.toId]?.nameRu || SUPPORT_CATALOG_DATA[s.toId]?.name || s.toId;
-              return `• ${fromName} (${PRICE_RUB[s.fromId] || '?'}₽) → ${toName} (${PRICE_RUB[s.toId] || '?'}₽) — экономия ${s.saving}₽`;
-            });
+            const swapLines = swaps.map(s =>
+              `• ${s.fromName} (${PRICE_RUB[s.fromId] || estCost(s.fromId)}₽) → ${s.toName} (${PRICE_RUB[s.toId] || estCost(s.toId)}₽) — экономия ${s.saving}₽`
+            );
             setActionResult({
               title: `💰 ${swaps.length} замен — экономия ~${totalSaving}₽/мес`,
               sections: [
@@ -682,6 +690,25 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
             background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: '#818cf8',
           }}>📦 В мои стеки</button>
           <button onClick={() => {
+            try {
+              const planSubs = { stackIds, dosages: {} as Record<string, { mg: number; timing: string }>, date: new Date().toISOString() };
+              for (const id of stackIds) {
+                const cat = SUPPORT_CATALOG_DATA[id];
+                if (cat?.dosage) {
+                  const weightAdj = profile.weight > 90 ? 1.3 : 1.0;
+                  planSubs.dosages[id] = { mg: Math.round((cat.dosage.mg || 500) * weightAdj), timing: cat.dosage.timing || 'утро' };
+                } else {
+                  planSubs.dosages[id] = { mg: 500, timing: 'утро' };
+                }
+              }
+              localStorage.setItem('he_biostack_to_plan', JSON.stringify(planSubs));
+              showToast('📋 Стек отправлен в план поддержки! Перейдите в Поддержка → фармплан', 'success');
+            } catch {}
+          }} style={{
+            flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+            background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a',
+          }}>📋 В план</button>
+          <button onClick={() => {
             const lines: string[] = [];
             lines.push(`🧬 BioStack AI — Стек (${stackIds.length} веществ)`);
             lines.push('');
@@ -807,7 +834,8 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
             const taken = todayTaken.includes(id);
             return (
               <button key={id} onClick={() => toggleTaken(id)} style={{
-                padding: '4px 8px', borderRadius: 8, fontSize: 8, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                padding: '8px 10px', borderRadius: 10, fontSize: 8, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                minHeight: 44, minWidth: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 background: taken ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.03)',
                 border: `1px solid ${taken ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.06)'}`,
                 color: taken ? '#22c55e' : 'rgba(255,255,255,0.4)',
@@ -1074,6 +1102,11 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
                 </div>
                 <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
                   💊 {cat.dosage?.mg ? `${cat.dosage.mg} мг` : '—'} · {cat.dosage?.timing || (cat as any)?.timingDosage || '—'}
+                  {cat.dosage?.mg && (
+                    <span style={{ marginLeft: 4, color: profile.weight > 90 ? '#f59e0b' : 'rgba(255,255,255,0.25)' }}>
+                      {profile.weight > 90 ? ` (под вес: ${Math.round(cat.dosage.mg * 1.3)} мг)` : ` (на ${profile.weight} кг)`}
+                    </span>
+                  )}
                   {cat.dosage?.mg && <span style={{ marginLeft: 4, color: '#f59e0b' }}>~{(PRICE_RUB[entry.id] || '?')} ₽/мес</span>}
                 </div>
               </div>

@@ -3,8 +3,9 @@ import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { explainStack } from '../../engines/supplement-finder.engine';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { GlassCard, StatBox, toFinderProfile, estCost } from './BioStackAIConstants';
+import type { LinkedData } from '../../core/data-link';
 
-export function ReportsTab({ profile, stackIds }: { profile: BioStackProfile; stackIds: string[] }) {
+export function ReportsTab({ profile, stackIds, linked }: { profile: BioStackProfile; stackIds: string[]; linked?: LinkedData }) {
   const [reports, setReports] = useState<{ date: string; text: string }[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_biostack_reports') || '[]'); } catch { return []; }
   });

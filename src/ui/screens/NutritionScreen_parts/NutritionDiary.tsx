@@ -7,6 +7,7 @@ import { FOOD_DB } from '../../../core/nutrition-database';
 import { CAT_MAP_EMOJI } from '../../../core/nutrition-utils';
 import { calcMealQuality, getQualityLabel } from '../../../engines/nutrition-quality.engine';
 import { NutritionQualityCard } from '../../components/NutritionQualityCard';
+import { NutritionDiaryCharts } from './NutritionDiaryCharts';
 
 type FoodItemLike = { id: string; name: string; kcal: number; protein: number; fat: number; carbs: number; fiber?: number; category?: string; tier?: string; description?: string; isVegetarian?: boolean; isGlutenFree?: boolean; isDairyFree?: boolean };
 
@@ -66,6 +67,12 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   // Bug 27: Food patterns & triggers
   const [foodPatterns, setFoodPatterns] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('he_food_patterns') || '{}'); } catch { return {}; } });
   const [foodTriggers, setFoodTriggers] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('he_food_triggers') || '{}'); } catch { return {}; } });
+  const [mealMood, setMealMood] = useState<Record<string, { satiety: number; enjoyment: number; note: string }>>(() => { try { return JSON.parse(localStorage.getItem('he_meal_mood') || '{}'); } catch { return {}; } });
+  const saveMealMood = (date: string, mood: { satiety: number; enjoyment: number; note: string }) => {
+    const upd = { ...mealMood, [date]: mood };
+    setMealMood(upd);
+    localStorage.setItem('he_meal_mood', JSON.stringify(upd));
+  };
   const savePatterns = (date: string, patterns: string[]) => {
     const upd = { ...foodPatterns, [date]: patterns };
     setFoodPatterns(upd);
@@ -520,6 +527,57 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 );
               } catch { return null; }
             })()}
+
+            {/* NutritionDiaryCharts - enhanced visualizations */}
+            <NutritionDiaryCharts
+              dayMeals={dayMeals}
+              dayTotals={dayTotals}
+              targets={targets}
+              diaryData={diaryData}
+              selectedDate={selectedDate}
+              refreshKey={refreshKey}
+            />
+
+            {/* Meal satisfaction / mood rating */}
+            <div style={{ padding:'8px 10px', borderRadius:10, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.15)', marginBottom:8 }}>
+              <div style={{ fontSize:9, fontWeight:700, color:'#ec4899', marginBottom:4 }}>😋 Оценка питания</div>
+              <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:4 }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', marginBottom:2 }}>Сытость</div>
+                  <div style={{ display:'flex', gap:2 }}>
+                    {[1,2,3,4,5].map(s => {
+                      const active = s <= (mealMood[selectedDate]?.satiety || 0);
+                      return (
+                        <button key={s} onClick={() => saveMealMood(selectedDate, { ...(mealMood[selectedDate] || { satiety: 0, enjoyment: 0, note: '' }), satiety: s === mealMood[selectedDate]?.satiety ? 0 : s })}
+                          style={{ fontSize:14, cursor:'pointer', background:'none', border:'none', padding:0, opacity: active ? 1 : 0.3, filter: active ? 'none' : 'grayscale(1)', transition:'all 0.15s' }}>
+                          🟢
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', marginBottom:2 }}>Удовольствие</div>
+                  <div style={{ display:'flex', gap:2 }}>
+                    {[1,2,3,4,5].map(s => {
+                      const active = s <= (mealMood[selectedDate]?.enjoyment || 0);
+                      return (
+                        <button key={s} onClick={() => saveMealMood(selectedDate, { ...(mealMood[selectedDate] || { satiety: 0, enjoyment: 0, note: '' }), enjoyment: s === mealMood[selectedDate]?.enjoyment ? 0 : s })}
+                          style={{ fontSize:14, cursor:'pointer', background:'none', border:'none', padding:0, opacity: active ? 1 : 0.3, filter: active ? 'none' : 'grayscale(1)', transition:'all 0.15s' }}>
+                          ⭐
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              <input
+                value={mealMood[selectedDate]?.note || ''}
+                onChange={e => saveMealMood(selectedDate, { ...(mealMood[selectedDate] || { satiety: 0, enjoyment: 0, note: '' }), note: e.target.value })}
+                placeholder="Заметка о питании..."
+                style={{ width:'100%', padding:'4px 8px', borderRadius:6, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:8, boxSizing:'border-box', outline:'none' }}
+              />
+            </div>
 
             {/* Nutrition Quality Card */}
             {(() => {

@@ -9,6 +9,8 @@ import { STACK_TEMPLATES, type BioStackTemplate } from '../../engines/biostack-t
 import { SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX } from '../../data/support-meta';
 import { GlassCard, PillBtn, StatBox, ORGANS, SYSTEMS, PURE_GOALS, TARGET_SYSTEMS, toFinderProfile, showToast, estCost } from './BioStackAIConstants';
 import { buildSmartStackMulti, type BuildVariant } from '../../engines/biostack-recommender.engine';
+import type { LabCompositeResult } from '../../engines/lab-analysis.engine';
+import type { LinkedData } from '../../core/data-link';
 
 type LMState = Record<string, 'off' | 'maintain' | 'correct'>;
 
@@ -267,23 +269,44 @@ function ExtStack({ item, type, onLoad }: {
 }
 
 /* ─── Main BuildTab ─── */
-export function BuildTab({ profile, stackIds, setStackIds }: {
+export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }: {
   profile: BioStackProfile;
   stackIds: string[];
   setStackIds: (ids: string[]) => void;
+  labAnalysis?: LabCompositeResult | null;
+  linked?: LinkedData;
 }) {
   const [goals, setGoals] = useState<GoalType[]>(profile.goals);
   const [selOrgans, setSelOrgans] = useState<string[]>(profile.targetOrgans || []);
   const [selSystems, setSelSystems] = useState<string[]>(profile.targetSystems || []);
   const [selTargets, setSelTargets] = useState<GoalType[]>([]);
   const [targetSize, setTargetSize] = useState(() => profile.stackComplexity === 'minimal' ? 5 : profile.stackComplexity === 'balanced' ? 10 : 18);
-  const [lmState, setLmState] = useState<LMState>({});
+  const [lmState, setLmState] = useState<LMState>(() => {
+    const init: LMState = {};
+    if (labAnalysis?.interpretations) {
+      for (const interp of labAnalysis.interpretations) {
+        if (interp.status === 'high' || interp.status === 'critical_high' || interp.status === 'low') {
+          const marker = LAB_MARKER_MAP.find(m =>
+            m.marker.toLowerCase() === interp.code.toLowerCase() ||
+            m.name.toLowerCase() === interp.code.toLowerCase() ||
+            m.name.toLowerCase().includes(interp.code.toLowerCase())
+          );
+          if (marker) {
+            init[marker.marker] = 'correct';
+          }
+        }
+      }
+    }
+    return init;
+  });
   const [result, setResult] = useState<{ stack: string[]; explanation: StackExplanation; budgetNote?: string } | null>(null);
   const [multiResult, setMultiResult] = useState<{ variant: BuildVariant; stack: string[]; estCost: number; synergyScore: number; coverage: string; substanceCount: number }[] | null>(null);
   const [avoidConflicts, setAvoidConflicts] = useState(true);
   const [stkQuery, setStkQuery] = useState('');
   const [stkFilter, setStkFilter] = useState('all');
   const [replaceOpen, setReplaceOpen] = useState(true);
+  const [buildLoading, setBuildLoading] = useState(false);
+  const [multiLoading, setMultiLoading] = useState(false);
 
   const mergedStacks = useMemo(() => {
     const templates: ExtStackItem[] = STACK_TEMPLATES.map(t => ({
@@ -311,6 +334,8 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
   }, [mergedStacks, stkFilter, stkQuery]);
 
   const handleBuild = useCallback(() => {
+    setBuildLoading(true);
+    setTimeout(() => {
     const queryOrgans = [...selOrgans];
     const queryMechs: string[] = [];
     const targetToOrgan: Record<string, string> = {
@@ -377,6 +402,8 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
     }
     const exp = explainStack(filteredStack, fp);
     setResult({ stack: filteredStack, explanation: exp, budgetNote });
+    setBuildLoading(false);
+    }, 100);
   }, [goals, selTargets, selOrgans, selSystems, targetSize, lmState, stackIds, profile, avoidConflicts]);
 
   const handleSaveStack = useCallback(() => {
@@ -388,8 +415,11 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
 
   const handleMultiBuild = useCallback(() => {
     const allGoals = [...new Set([...goals, ...selTargets, ...profile.goals])] as GoalType[];
+    if (allGoals.length === 0) { showToast('Выберите хотя бы одну цель', 'error'); return; }
+    setMultiLoading(true);
+    setTimeout(() => {
     const recGoals = allGoals.map(g => g === 'muscle_gain' ? 'performance' as const : g === 'fat_loss' ? 'energy' as const : g === 'concentration' ? 'focus' as const : g === 'brain' ? 'focus' as const : g === 'cardio_health' ? 'longevity' as const : g === 'liver_health' ? 'detox' as const : g === 'kidney' ? 'detox' as const : g === 'sleep' ? 'sleep' as const : g === 'recovery' ? 'recovery' as const : g === 'energy' ? 'energy' as const : g === 'immunity' ? 'immunity' as const : g === 'stress' ? 'stress' as const : g === 'libido' ? 'libido' as const : g === 'joints' ? 'joints' as const : g === 'digestion' ? 'digestion' as const : g === 'detox' ? 'detox' as const : g === 'longevity' ? 'longevity' as const : g === 'mood' ? 'stress' as const : g === 'hormones' ? 'libido' as const : 'immunity' as const);
-    if (recGoals.length === 0) { showToast('Выберите хотя бы одну цель', 'error'); return; }
+    if (recGoals.length === 0) { showToast('Выберите хотя бы одну цель', 'error'); setMultiLoading(false); return; }
     const variants = buildSmartStackMulti(recGoals, profile);
     setMultiResult(variants.map(v => ({
       variant: v.variant,
@@ -400,6 +430,8 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
       substanceCount: v.stack.substances.length,
     })));
     showToast('🧩 Собрано 3 варианта', 'success');
+    setMultiLoading(false);
+    }, 100);
   }, [goals, selTargets, profile]);
 
   const handleLoadIds = useCallback((ids: string[]) => {
@@ -459,7 +491,12 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
       </GlassCard>
 
       {/* ─── Card 2: Лабораторные маркеры ─── */}
-      <GlassCard title="🧪 Анализы" icon="🧪" color="#a78bfa">
+      <GlassCard title={`🧪 Анализы${labAnalysis ? ' (авто-заполнено из лаборатории)' : ''}`} icon="🧪" color="#a78bfa">
+        {labAnalysis && (
+          <div style={{ fontSize: 7, color: '#22c55e', marginBottom: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.1)' }}>
+            🔗 Авто-синхронизация: {Object.values(lmState).filter(v => v === 'correct').length} маркеров предзаполнено
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 4, marginBottom: 4 }}>
           <PopupLabs label="Маркеры" markers={LAB_MARKER_MAP} lmState={lmState}
             onChange={(id, st) => setLmState(prev => ({ ...prev, [id]: st }))} />
@@ -506,21 +543,25 @@ export function BuildTab({ profile, stackIds, setStackIds }: {
 
       {/* ─── Build buttons ─── */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-        <button onClick={handleBuild} style={{
+        <button onClick={handleBuild} disabled={buildLoading}
+          style={{
           flex: 1, padding: '14px 0', borderRadius: 14, fontSize: 12, fontWeight: 800,
-          cursor: 'pointer',
-          background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#000',
-          boxShadow: '0 4px 20px rgba(0,230,138,0.2)',
+          cursor: buildLoading ? 'wait' : 'pointer',
+          background: buildLoading ? 'rgba(0,230,138,0.3)' : 'linear-gradient(135deg,#00e68a,#00c8a0)',
+          border: 'none', color: buildLoading ? 'rgba(0,0,0,0.4)' : '#000',
+          boxShadow: buildLoading ? 'none' : '0 4px 20px rgba(0,230,138,0.2)',
         }}>
-          🧩 Собрать стек
+          {buildLoading ? '⏳ Собираем...' : '🧩 Собрать стек'}
         </button>
-        <button onClick={handleMultiBuild} style={{
+        <button onClick={handleMultiBuild} disabled={multiLoading}
+          style={{
           flex: 1, padding: '14px 0', borderRadius: 14, fontSize: 12, fontWeight: 800,
-          cursor: 'pointer',
-          background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)', border: 'none', color: '#fff',
-          boxShadow: '0 4px 20px rgba(139,92,246,0.2)',
+          cursor: multiLoading ? 'wait' : 'pointer',
+          background: multiLoading ? 'rgba(139,92,246,0.3)' : 'linear-gradient(135deg,#8b5cf6,#7c3aed)',
+          border: 'none', color: multiLoading ? 'rgba(255,255,255,0.4)' : '#fff',
+          boxShadow: multiLoading ? 'none' : '0 4px 20px rgba(139,92,246,0.2)',
         }}>
-          🎲 3 варианта
+          {multiLoading ? '⏳ Генерируем...' : '🎲 3 варианта'}
         </button>
       </div>
 

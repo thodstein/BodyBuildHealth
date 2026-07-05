@@ -1,15 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS } from '../../data/support-database';
 import { getStackInteractions, getStackCoverageStats, RISK_SYSTEM_LABELS, getStackTzMechanismCoverage, type TzCoverageResult } from '../../engines/biostack-bridge';
 import { GlassCard } from './BioStackAIConstants';
+import type { LinkedData } from '../../core/data-link';
 
 type SubRisk = {
   id: string; name: string; conflictCount: number; highCount: number;
   profileIssues: string[];
 };
 
-export function RisksTab({ profile, stackIds, setStackIds }: { profile: BioStackProfile; stackIds: string[]; setStackIds?: (ids: string[]) => void }) {
+export function RisksTab({ profile, stackIds, setStackIds, linked, activeAAS }: { profile: BioStackProfile; stackIds: string[]; setStackIds?: (ids: string[]) => void; linked?: LinkedData; activeAAS?: string[] }) {
   const [syncWithEngine, setSyncWithEngine] = useState(false);
 
   const analysis = useMemo(() => {
@@ -374,44 +375,86 @@ export function RisksTab({ profile, stackIds, setStackIds }: { profile: BioStack
 
       {/* AAS course compatibility */}
       {(() => {
+        const aasList = activeAAS || [];
         try {
-          const courseRaw = localStorage.getItem('he_course_data');
-          if (!courseRaw) return null;
-          const course = JSON.parse(courseRaw);
-          const activeAAS: string[] = (course.aas || []).filter((a: any) => a.active !== false).map((a: any) => a.id?.toLowerCase?.() || a.id || '').filter(Boolean);
-          if (activeAAS.length === 0) return null;
+          if (activeAAS === undefined) return null;
+          if (aasList.length === 0) {
+            try {
+              const courseRaw = localStorage.getItem('he_course_data');
+              if (!courseRaw) return null;
+              const course = JSON.parse(courseRaw);
+              const ids: string[] = (course.aas || []).filter((a: any) => a.active !== false).map((a: any) => a.id?.toLowerCase?.() || a.id || '').filter(Boolean);
+              if (ids.length === 0) return null;
+              aasList.push(...ids);
+            } catch { return null; }
+          }
+          if (aasList.length === 0) return null;
           const aasConflicts: Array<{ aasName: string; subName: string; effect: string; severity: string }> = [];
-          for (const aasId of activeAAS) {
+          for (const aasId of aasList) {
             for (const subId of stackIds) {
               const inx = ALL_INTERACTIONS.find((i: any) =>
                 (i.substanceA?.toLowerCase?.() === aasId && i.substanceB?.toLowerCase?.() === subId) ||
                 (i.substanceB?.toLowerCase?.() === aasId && i.substanceA?.toLowerCase?.() === subId));
               if (inx && (inx.severity === 'HIGH' || inx.severity === 'MEDIUM') && (inx.type === 'conflict' || inx.type === 'caution')) {
-                const aasName = SUPPORT_CATALOG_DATA[activeAAS.find(x => x === aasId) || '']?.nameRu || aasId;
+                const aasName = SUPPORT_CATALOG_DATA[aasId]?.nameRu || aasId;
                 const subName = SUPPORT_CATALOG_DATA[subId]?.nameRu || SUPPORT_CATALOG_DATA[subId]?.name || subId;
                 aasConflicts.push({ aasName, subName, effect: inx.effect || 'Взаимодействие', severity: inx.severity });
               }
             }
           }
-          if (aasConflicts.length === 0) return null;
+
+          // Core recommendations for AAS course
+          const CORE_FOR_AAS = ['nac', 'omega3', 'tudca', 'magnesium', 'zinc', 'vitamin_d3', 'milk_thistle', 'coq10'];
+          const missingCore = CORE_FOR_AAS.filter(id => !stackIds.includes(id) && SUPPORT_CATALOG_DATA[id]);
+
           return (
-            <GlassCard title={`💉 Совместимость с курсом (${activeAAS.length} AAS)`} icon="💉" color="#ef4444">
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>
-                Обнаружены взаимодействия с активными препаратами курса ({activeAAS.map((a: string) => SUPPORT_CATALOG_DATA[a]?.nameRu || a).join(', ')}):
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {aasConflicts.map((c, i) => (
-                  <div key={i} style={{
-                    padding: '6px 8px', borderRadius: 8,
-                    background: c.severity === 'HIGH' ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.04)',
-                    border: c.severity === 'HIGH' ? '1px solid rgba(239,68,68,0.12)' : '1px solid rgba(245,158,11,0.1)',
-                  }}>
-                    <span style={{ fontSize: 8, color: c.severity === 'HIGH' ? '#ef4444' : '#f59e0b' }}>
-                      {c.severity === 'HIGH' ? '🔴' : '🟡'} <strong>{c.aasName}</strong> + <strong>{c.subName}</strong>: {c.effect}
-                    </span>
+            <GlassCard title={`💉 Совместимость с курсом (${aasList.length} AAS)`} icon="💉" color={aasConflicts.length > 0 ? '#ef4444' : '#f59e0b'}>
+              {aasList.length > 0 && (
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>
+                  Активные AAS: {aasList.map((a: string) => SUPPORT_CATALOG_DATA[a]?.nameRu || a).join(', ')}
+                </div>
+              )}
+              {aasConflicts.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 6 }}>
+                  {aasConflicts.map((c, i) => (
+                    <div key={i} style={{
+                      padding: '6px 8px', borderRadius: 8,
+                      background: c.severity === 'HIGH' ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.04)',
+                      border: c.severity === 'HIGH' ? '1px solid rgba(239,68,68,0.12)' : '1px solid rgba(245,158,11,0.1)',
+                    }}>
+                      <span style={{ fontSize: 8, color: c.severity === 'HIGH' ? '#ef4444' : '#f59e0b' }}>
+                        {c.severity === 'HIGH' ? '🔴' : '🟡'} <strong>{c.aasName}</strong> + <strong>{c.subName}</strong>: {c.effect}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {aasConflicts.length === 0 && (
+                <div style={{ fontSize: 8, color: '#22c55e', marginBottom: 6 }}>✅ Конфликтов с курсом не обнаружено.</div>
+              )}
+              {missingCore.length > 0 && setStackIds && (
+                <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.08)' }}>
+                  <div style={{ fontSize: 8, color: '#4ade80', fontWeight: 600, marginBottom: 4 }}>
+                    💡 На курсе AAS рекомендованы ({missingCore.length}):
                   </div>
-                ))}
-              </div>
+                  <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginBottom: 6 }}>
+                    {missingCore.map(id => (
+                      <span key={id} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 7, background: 'rgba(0,230,138,0.06)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.1)' }}>
+                        {SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id}
+                      </span>
+                    ))}
+                  </div>
+                  <button onClick={() => {
+                    const newStack = [...new Set([...stackIds, ...missingCore])];
+                    setStackIds(newStack);
+                  }} style={{
+                    padding: '6px 12px', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+                    background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a',
+                  }}>
+                    + Добавить {missingCore.length} базовых веществ
+                  </button>
+                </div>
+              )}
             </GlassCard>
           );
         } catch { return null; }
