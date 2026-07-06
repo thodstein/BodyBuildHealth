@@ -322,6 +322,8 @@ export interface PlanSubstance {
   category: string[]; tier: string; targetSystems: string[];
   comment: string; mechanismReason: string;
   fromJoint: boolean; fromBoost: boolean; fromNeuro: boolean;
+  priority?: number;
+  brandName?: string;
 }
 
 export interface PlanMechanism {

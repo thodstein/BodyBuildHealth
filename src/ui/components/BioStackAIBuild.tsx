@@ -9,6 +9,7 @@ import { STACK_TEMPLATES, type BioStackTemplate } from '../../engines/biostack-t
 import { SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX } from '../../data/support-meta';
 import { GlassCard, PillBtn, StatBox, ORGANS, SYSTEMS, PURE_GOALS, TARGET_SYSTEMS, toFinderProfile, showToast, estCost } from './BioStackAIConstants';
 import { buildSmartStackMulti, type BuildVariant } from '../../engines/biostack-recommender.engine';
+import { getSafeStackRecommendations } from '../../engines/biostack-safety.engine';
 import type { LabCompositeResult } from '../../engines/lab-analysis.engine';
 import type { LinkedData } from '../../core/data-link';
 
@@ -400,8 +401,18 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
         filteredStack = tierEd;
       }
     }
+    // Drug-safety filter: exclude HIGH-severity drug interactions
+    let drugSafetyNote = '';
+    if (profile.currentMeds?.length) {
+      const { safe, excluded } = getSafeStackRecommendations(filteredStack, profile.currentMeds);
+      if (excluded.length > 0) {
+        const excludedNames = excluded.map(e => e.substanceName).slice(0, 3).join(', ');
+        drugSafetyNote = `💊 Лекарственная безопасность: исключено ${excluded.length} БАДов из-за HIGH-взаимодействий с вашими препаратами (${excludedNames}${excluded.length > 3 ? '...' : ''})`;
+        filteredStack = safe;
+      }
+    }
     const exp = explainStack(filteredStack, fp);
-    setResult({ stack: filteredStack, explanation: exp, budgetNote });
+    setResult({ stack: filteredStack, explanation: exp, budgetNote: budgetNote + (drugSafetyNote ? '\n' + drugSafetyNote : '') });
     setBuildLoading(false);
     }, 100);
   }, [goals, selTargets, selOrgans, selSystems, targetSize, lmState, stackIds, profile, avoidConflicts]);
@@ -442,7 +453,7 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
     <div style={{ paddingBottom: 80 }}>
       {/* ─── Card 1: Параметры сборки ─── */}
       <GlassCard title="🎯 Параметры сборки" icon="🎯" color="#00e68a">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 6, marginBottom: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 4, marginBottom: 6 }}>
           <PopupChips label="🎯 Цели"
             options={GOAL_GROUPS.map(g => ({ id: g.goal, label: g.label }))}
             selected={goals} onChange={ids => setGoals(ids as GoalType[])}
@@ -542,24 +553,24 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
       </GlassCard>
 
       {/* ─── Build buttons ─── */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
         <button onClick={handleBuild} disabled={buildLoading}
           style={{
-          flex: 1, padding: '14px 0', borderRadius: 14, fontSize: 12, fontWeight: 800,
+          flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 11, fontWeight: 800,
           cursor: buildLoading ? 'wait' : 'pointer',
           background: buildLoading ? 'rgba(0,230,138,0.3)' : 'linear-gradient(135deg,#00e68a,#00c8a0)',
           border: 'none', color: buildLoading ? 'rgba(0,0,0,0.4)' : '#000',
-          boxShadow: buildLoading ? 'none' : '0 4px 20px rgba(0,230,138,0.2)',
+          boxShadow: buildLoading ? 'none' : '0 2px 12px rgba(0,230,138,0.15)',
         }}>
           {buildLoading ? '⏳ Собираем...' : '🧩 Собрать стек'}
         </button>
         <button onClick={handleMultiBuild} disabled={multiLoading}
           style={{
-          flex: 1, padding: '14px 0', borderRadius: 14, fontSize: 12, fontWeight: 800,
+          flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 11, fontWeight: 800,
           cursor: multiLoading ? 'wait' : 'pointer',
           background: multiLoading ? 'rgba(139,92,246,0.3)' : 'linear-gradient(135deg,#8b5cf6,#7c3aed)',
           border: 'none', color: multiLoading ? 'rgba(255,255,255,0.4)' : '#fff',
-          boxShadow: multiLoading ? 'none' : '0 4px 20px rgba(139,92,246,0.2)',
+          boxShadow: multiLoading ? 'none' : '0 2px 12px rgba(139,92,246,0.15)',
         }}>
           {multiLoading ? '⏳ Генерируем...' : '🎲 3 варианта'}
         </button>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { PHARMA_DB, getPharmaDetail } from '../../../core/pharma-database';
 import { db } from '../../../core/db';
 import { PHARMA_DETAILS, type PharmaDetail } from '../../../data/support-category-data';
@@ -13,25 +13,69 @@ import {
   PHARMA_CLASSES, type PharmaClass,
 } from './constants';
 
-export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> = ({ sub, detail }) => {
+export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> = React.memo(({ sub, detail }) => {
   const pd = sub.pd || {} as PharmaSubstance['pd'];
   const pdEntries = Object.entries(pd) as [keyof PD, number][];
   const [expandedPD, setExpandedPD] = useState<string | null>(null);
 
-  const riskLabels: string[] = [];
-  if (pd.hepatotoxicity >= 2) riskLabels.push('Гепатотоксичен');
-  if (pd.aromatization >= 0.7) riskLabels.push('Ароматизируется');
-  if (pd.progestogenic >= 0.3) riskLabels.push('Прогестагенный');
-  if (pd.neuro_toxicity >= 0.3) riskLabels.push('Нейротоксичен');
-  if (pd.lipid_impact <= -0.5) riskLabels.push('Ухудшает липиды');
-  if (pd.hct_impact >= 4) riskLabels.push('Повышает HCT');
+  const handleAddToCourse = useCallback(() => {
+    const dr = (detail?.dosageRange || sub.dosageRange);
+    const val = dr ? Math.round((dr.min + dr.max) / 2) : 250;
+    const unit = dr?.unit || 'mg/wk';
+    db.put('course_log', {
+      id: crypto.randomUUID(), substanceId: sub.id,
+      doseValue: val, doseUnit: unit,
+      frequency: dr?.frequency || '2x/wk',
+      startWeek: 1, endWeek: 12,
+    }).catch(() => {});
+  }, [sub.id, sub.dosageRange, detail?.dosageRange]);
 
-  const effectLabels: string[] = [];
-  if (pd.AR_affinity >= 1.0) effectLabels.push('Высокая андрогенность');
-  else if (pd.AR_affinity >= 0.7) effectLabels.push('Средняя андрогенность');
-  if (pd.five_alpha_reduction >= 0.5) effectLabels.push('Восст. в ДГТ');
-  if (pd.aromatization === 0) effectLabels.push('Не ароматизируется');
-  if (sub.class === 'sarm') effectLabels.push('SARM (селективный)');
+  const handleAddToCart = useCallback(() => {
+    try {
+      const existing = JSON.parse(localStorage.getItem('supportCart') || '[]');
+      if (!existing.some((x: any) => x.id === sub.id)) {
+        localStorage.setItem('supportCart', JSON.stringify([...existing, { id: sub.id, name: sub.name, dose: (detail?.dosageRange || sub.dosageRange)?.min ? `${(detail?.dosageRange || sub.dosageRange)!.min} ${(detail?.dosageRange || sub.dosageRange)!.unit}` : '—', timing: 'daily' }]));
+      }
+    } catch {}
+  }, [sub.id, sub.name, sub.dosageRange, detail?.dosageRange]);
+
+  const riskLabels = useMemo(() => {
+    const labels: string[] = [];
+    if (pd.hepatotoxicity >= 2) labels.push('Гепатотоксичен');
+    if (pd.aromatization >= 0.7) labels.push('Ароматизируется');
+    if (pd.progestogenic >= 0.3) labels.push('Прогестагенный');
+    if (pd.neuro_toxicity >= 0.3) labels.push('Нейротоксичен');
+    if (pd.lipid_impact <= -0.5) labels.push('Ухудшает липиды');
+    if (pd.hct_impact >= 4) labels.push('Повышает HCT');
+    return labels;
+  }, [pd.hepatotoxicity, pd.aromatization, pd.progestogenic, pd.neuro_toxicity, pd.lipid_impact, pd.hct_impact]);
+
+  const effectLabels = useMemo(() => {
+    const labels: string[] = [];
+    if (pd.AR_affinity >= 1.0) labels.push('Высокая андрогенность');
+    else if (pd.AR_affinity >= 0.7) labels.push('Средняя андрогенность');
+    if (pd.five_alpha_reduction >= 0.5) labels.push('Восст. в ДГТ');
+    if (pd.aromatization === 0) labels.push('Не ароматизируется');
+    if (sub.class === 'sarm') labels.push('SARM (селективный)');
+    return labels;
+  }, [pd.AR_affinity, pd.five_alpha_reduction, pd.aromatization, sub.class]);
+
+  const labMarkers = useMemo(() => getPharmaLabMarkers(sub.id), [sub.id]);
+
+  const tzGroupedData = useMemo(() => {
+    const tzMechs = getDrugTzMechanisms(sub.id);
+    if (!tzMechs.length) return null;
+    const grouped: Record<string, { mechId: string; label: string; weight: number }[]> = {};
+    for (const m of tzMechs) {
+      if (!grouped[m.organId]) grouped[m.organId] = [];
+      grouped[m.organId].push({ mechId: m.mechId, label: TZ_MECH_LABELS[m.mechId] || m.mechId, weight: m.weight });
+    }
+    return grouped;
+  }, [sub.id]);
+
+  const labInfoData = useMemo(() => getLabEffectsForDrug(sub.id), [sub.id]);
+  const dirColor: Record<string, string> = { up: '#ef4444', down: '#00e68a', normalize: '#60a5fa' };
+  const dirArrow: Record<string, string> = { up: '↑', down: '↓', normalize: '↕' };
 
   return (
     <div className="card" style={{ fontSize: 12, lineHeight: 1.6 }}>
@@ -71,16 +115,16 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
           </div>
         </div>
       )}
-      {(() => { const m = getPharmaLabMarkers(sub.id); return m.length > 0 ? (
+      {labMarkers.length > 0 ? (
         <div style={{ marginBottom: 6 }}>
           <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>🩸 Контролировать анализы</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-            {m.map((marker: string) => (
+            {labMarkers.map((marker: string) => (
               <span key={marker} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(255,152,0,0.12)', color: '#ff9800', fontWeight: 500 }}>{marker}</span>
             ))}
           </div>
         </div>
-      ) : null; })()}
+      ) : null}
 
       {/* linked risks chips */}
       {sub.linkedRisks && sub.linkedRisks.length > 0 && (
@@ -230,18 +274,10 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
       )}
 
       {/* ── ТЗ механизмы ── */}
-      {(() => {
-        const tzMechs = getDrugTzMechanisms(sub.id);
-        if (!tzMechs.length) return null;
-        const grouped: Record<string, { mechId: string; label: string; weight: number }[]> = {};
-        for (const m of tzMechs) {
-          if (!grouped[m.organId]) grouped[m.organId] = [];
-          grouped[m.organId].push({ mechId: m.mechId, label: TZ_MECH_LABELS[m.mechId] || m.mechId, weight: m.weight });
-        }
-        return (
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#00e68a', marginBottom: 6 }}>🧬 Механизм-ориентированная модель (ТЗ)</div>
-            {Object.entries(grouped).map(([organId, mechs]) => (
+      {tzGroupedData && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#00e68a', marginBottom: 6 }}>🧬 Механизм-ориентированная модель (ТЗ)</div>
+          {Object.entries(tzGroupedData).map(([organId, mechs]) => (
               <details key={organId} style={{ marginBottom: 4 }}>
                 <summary style={{ cursor:'pointer', padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', fontSize:10, fontWeight:600, listStyle:'none', display:'flex', alignItems:'center', gap:4 }}>
                   {TZ_SYSTEM_ICONS[organId] || '•'} {TZ_SYSTEM_LABELS[organId] || organId}
@@ -260,19 +296,13 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
               </details>
             ))}
           </div>
-        );
-      })()}
+        )}
 
-      {(() => {
-        const labInfo = getLabEffectsForDrug(sub.id);
-        if (!labInfo.effects.length) return null;
-        const dirColor: Record<string, string> = { up: '#ef4444', down: '#00e68a', normalize: '#60a5fa' };
-        const dirArrow: Record<string, string> = { up: '↑', down: '↓', normalize: '↕' };
-        return (
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>🩸 Влияние на анализы</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {labInfo.effects.map((eff, i) => (
+      {labInfoData.effects.length > 0 && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>🩸 Влияние на анализы</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {labInfoData.effects.map((eff, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
                   <span style={{ color: dirColor[eff.direction], fontWeight: 700, fontSize: 14, lineHeight: 1 }}>{dirArrow[eff.direction]}</span>
                   <div style={{ flex: 1 }}>
@@ -285,11 +315,10 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
                     <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>{eff.reason}</div>
                   </div>
                 </div>
-              ))}
-            </div>
+            ))}
           </div>
-        );
-      })()}
+        </div>
+      )}
 
       {(sub.description || (detail?.description)) && (
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
@@ -370,35 +399,18 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
       )}
 
       <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-        <button onClick={() => {
-          const dr = (detail?.dosageRange || sub.dosageRange);
-          const val = dr ? Math.round((dr.min + dr.max) / 2) : 250;
-          const unit = dr?.unit || 'mg/wk';
-          db.put('course_log', {
-            id: crypto.randomUUID(), substanceId: sub.id,
-            doseValue: val, doseUnit: unit,
-            frequency: dr?.frequency || '2x/wk',
-            startWeek: 1, endWeek: 12,
-          }).catch(() => {});
-        }} style={{
+        <button onClick={handleAddToCourse} style={{
           flex: 1, padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
           fontSize: 11, fontWeight: 700, background: 'rgba(0,230,138,0.12)', color: '#00e68a',
         }}>+ В план</button>
-        <button onClick={() => {
-          try {
-            const existing = JSON.parse(localStorage.getItem('supportCart') || '[]');
-            if (!existing.some((x: any) => x.id === sub.id)) {
-              localStorage.setItem('supportCart', JSON.stringify([...existing, { id: sub.id, name: sub.name, dose: (detail?.dosageRange || sub.dosageRange)?.min ? `${(detail?.dosageRange || sub.dosageRange)!.min} ${(detail?.dosageRange || sub.dosageRange)!.unit}` : '—', timing: 'daily' }]));
-            }
-          } catch {}
-        }} style={{
+        <button onClick={handleAddToCart} style={{
           flex: 1, padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
           fontSize: 11, fontWeight: 700, background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
         }}>🛒 В корзину</button>
       </div>
     </div>
   );
-};
+});
 
 export const CatalogTab: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -439,8 +451,29 @@ export const CatalogTab: React.FC = () => {
     return groupedByClass;
   }, [filterClass, searchQuery, groupedByClass]);
 
-  const selected = selectedId ? getPharmaDetail(selectedId) : null;
-  const detail = selectedId ? PHARMA_DETAILS[selectedId] : undefined;
+  const selected = useMemo(() => selectedId ? getPharmaDetail(selectedId) : null, [selectedId]);
+  const detail = useMemo(() => selectedId ? (PHARMA_DETAILS as Record<string, PharmaDetail>)[selectedId] : undefined, [selectedId]);
+
+  const addToCourse = useCallback((s: PharmaSubstance) => {
+    const dr = s.dosageRange;
+    const val = dr ? Math.round((dr.min + dr.max) / 2) : 250;
+    const unit = dr?.unit || 'mg/wk';
+    db.put('course_log', {
+      id: crypto.randomUUID(), substanceId: s.id,
+      doseValue: val, doseUnit: unit,
+      frequency: dr?.frequency || '2x/wk',
+      startWeek: 1, endWeek: 12,
+    }).catch(() => {});
+  }, []);
+
+  const addToCart = useCallback((s: PharmaSubstance) => {
+    try {
+      const existing = JSON.parse(localStorage.getItem('supportCart') || '[]');
+      if (!existing.some((x: any) => x.id === s.id)) {
+        localStorage.setItem('supportCart', JSON.stringify([...existing, { id: s.id, name: s.name, dose: '—', timing: 'daily' }]));
+      }
+    } catch {}
+  }, []);
 
   return (
     <div>
@@ -496,13 +529,8 @@ export const CatalogTab: React.FC = () => {
                   }} onClick={() => setSelectedId(s.id)}>
                     <div style={{ fontWeight: 600, fontSize: 12 }}>{s.name}</div>
                     <div style={{ display: 'flex', gap: 2 }} onClick={e => e.stopPropagation()}>
-                      <button onClick={() => {
-                        const dr = s.dosageRange; const val = dr ? Math.round((dr.min+dr.max)/2) : 250; const unit = dr?.unit||'mg/wk';
-                        db.put('course_log', { id:crypto.randomUUID(), substanceId:s.id, doseValue:val, doseUnit:unit, frequency:dr?.frequency||'2x/wk', startWeek:1, endWeek:12 }).catch(()=>{});
-                      }} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(0,230,138,0.12)', color:'#00e68a' }}>+</button>
-                      <button onClick={() => {
-                        try { const e=JSON.parse(localStorage.getItem('supportCart')||'[]'); if(!e.some((x:any)=>x.id===s.id)) localStorage.setItem('supportCart', JSON.stringify([...e,{id:s.id,name:s.name,dose:'—',timing:'daily'}])); } catch{}
-                      }} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🛒</button>
+                      <button onClick={() => addToCourse(s)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(0,230,138,0.12)', color:'#00e68a' }}>+</button>
+                      <button onClick={() => addToCart(s)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🛒</button>
                     </div>
                   </div>
                 ))}
@@ -524,13 +552,8 @@ export const CatalogTab: React.FC = () => {
               <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
             </div>
             <div style={{ display: 'flex', gap: 2 }} onClick={e => e.stopPropagation()}>
-              <button onClick={() => {
-                const dr = s.dosageRange; const val = dr ? Math.round((dr.min+dr.max)/2) : 250; const unit = dr?.unit||'mg/wk';
-                db.put('course_log', { id:crypto.randomUUID(), substanceId:s.id, doseValue:val, doseUnit:unit, frequency:dr?.frequency||'2x/wk', startWeek:1, endWeek:12 }).catch(()=>{});
-              }} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(0,230,138,0.12)', color:'#00e68a' }}>+</button>
-              <button onClick={() => {
-                try { const e=JSON.parse(localStorage.getItem('supportCart')||'[]'); if(!e.some((x:any)=>x.id===s.id)) localStorage.setItem('supportCart', JSON.stringify([...e,{id:s.id,name:s.name,dose:'—',timing:'daily'}])); } catch{}
-              }} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🛒</button>
+              <button onClick={() => addToCourse(s)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(0,230,138,0.12)', color:'#00e68a' }}>+</button>
+              <button onClick={() => addToCart(s)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🛒</button>
             </div>
           </div>
         ))

@@ -19,9 +19,11 @@ const TAB_META: { key: PlanTab; label: string; icon: string }[] = [
 
 export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: any[] }> = ({ profile, course }) => {
   const [tab, setTab] = useState<PlanTab>('settings');
+  const [disclaimerDismissed, setDisclaimerDismissed] = useState(() => localStorage.getItem('he_disclaimer_dismissed') === 'true');
 
   return (
     <IndividualPlanProvider profile={profile} course={course}>
+      {!disclaimerDismissed && <MedicalDisclaimer onDismiss={() => { setDisclaimerDismissed(true); localStorage.setItem('he_disclaimer_dismissed', 'true'); }} />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 80, maxWidth: 540, margin: '0 auto' }}>
         <div style={{ display:'flex', gap:3, padding:'4px 0', overflowX:'auto', scrollbarWidth:'none' }}>
           {TAB_META.map(t => (
@@ -46,6 +48,20 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     </IndividualPlanProvider>
   );
 };
+
+const MedicalDisclaimer: React.FC<{ onDismiss: () => void }> = ({ onDismiss }) => (
+  <div style={{margin:8,padding:12,borderRadius:12,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.2)',fontSize:9}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+      <span style={{fontWeight:800,color:'#ef4444',fontSize:11}}>⚠️ Медицинская информация</span>
+      <button onClick={onDismiss} style={{padding:'4px 10px',borderRadius:8,background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.2)',color:'#ef4444',cursor:'pointer',fontSize:9,fontWeight:700}}>Понятно</button>
+    </div>
+    <div style={{color:'rgba(255,255,255,0.75)',lineHeight:1.6}}>
+      <p style={{margin:'0 0 6px'}}>Данный планировщик питания <b>не является медицинским прибором</b>. Перед началом любой диеты или приёма добавок проконсультируйтесь с врачом.</p>
+      <p style={{margin:'0 0 6px'}}>Информация о добавках (NAC, TUDCA, берберин, омега-3 и др.) носит ознакомительный характер. Дозировки ориентировочные и должны уточняться с лечащим врачом.</p>
+      <p style={{margin:0}}><b>Анаболические стероиды — рецептурные препараты.</b> Их применение без назначения врача незаконно и сопряжено с рисками: гепатотоксичность, кардиомиопатия, тромбоз, бесплодие. Приложение не поощряет использование ААС и предоставляет информацию исключительно для снижения вреда.</p>
+    </div>
+  </div>
+);
 
 const ReportTab: React.FC = () => {
   const { generateFullNutritionReport, nutritionReport } = usePlanCtx();

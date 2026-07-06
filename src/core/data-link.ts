@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { UserProfile, LabPoint, CourseEntry, InjuryRecord } from './types';
 import { getProfile, updateProfile, onProfileChange } from './profile-manager';
 import { db } from './db';
@@ -157,7 +157,7 @@ export function useDataLink(): LinkedData {
   const sRpeFatigueAdj = _acwr ? Math.max(0, (_acwr.ratio - 1.3) * 4) : 0;  // доп. пункты усталости при ACWR>1.3
   const sRpeLoadAdj = _acwr ? (_acwr.ratio < 0.8 ? -0.15 : _acwr.ratio > 1.5 ? 0.2 : 0) : 0; // коррекция trainingLoad
 
-  const readiness = (() => {
+  const readiness = useMemo(() => {
     const altVal = getLatestLabValue(labs, 'ALT');
     const astVal = getLatestLabValue(labs, 'AST');
     const crpVal = getLatestLabValue(labs, 'CRP');
@@ -205,9 +205,9 @@ export function useDataLink(): LinkedData {
       hrIncrease: crpNorm > 0.6 ? 0.3 : 0.1,
       mixQualityScore: lastMix?.score ?? undefined,
     });
-  })();
+  }, [labs, profile, sRpeFatigueAdj, sRpeLoadAdj, trainingLoad]);
 
-  const risk = (() => {
+  const risk = useMemo(() => {
     // Default risk result for error fallback
     const defaultRisk = {
       overallRaw: 5, overallNet: 5,
@@ -268,13 +268,13 @@ export function useDataLink(): LinkedData {
       }
       return { ...defaultRisk, coverageMap: fallbackCoverage } as RiskCalculationResult;
     }
-  })();
+  }, [profile, activeDrugs, labs]);
 
-  const avg = computeWeeklyAverages();
-  const labAnalysis = labs.length > 0 ? interpretLabs(labs) : null;
+  const avg = useMemo(() => computeWeeklyAverages(), []);
+  const labAnalysisMemo = useMemo(() => labs.length > 0 ? interpretLabs(labs) : null, [labs]);
 
-  return {
-    profile, labs, course, readiness, risk, labAnalysis,
+  return useMemo(() => ({
+    profile, labs, course, readiness, risk, labAnalysis: labAnalysisMemo,
     avgWeeklyKcal: avg.kcal, avgWeeklyProtein: avg.protein,
     avgWeeklyFat: avg.fat, avgWeeklyCarbs: avg.carbs,
     activeDrugs,
@@ -282,7 +282,7 @@ export function useDataLink(): LinkedData {
     pal,
     trainingLoadRatio: Math.max(0.2, Math.min(1.5, trainingLoad + sRpeLoadAdj)),
     refetch,
-  };
+  }), [profile, labs, course, readiness, risk, labAnalysisMemo, avg, activeDrugs, pal, sRpeLoadAdj, trainingLoad, refetch]);
 }
 
 export { getLatestLabValue };

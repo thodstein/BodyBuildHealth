@@ -98,24 +98,26 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
   const [favOnly, setFavOnly] = useState(false);
   const [profileOnly, setProfileOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'price_asc' | 'price_desc'>('name');
+  const [swapMode, setSwapMode] = useState(false);
   /* ── Replacement / Complex search popup ── */
-  const [replacePopup, setReplacePopup] = useState<{ id: string; name: string; type: ReplacementType; results: ReplacementResult[]; loading: boolean } | null>(null);
+  const [replacePopup, setReplacePopup] = useState<{ id: string; name: string; type: ReplacementType; results: { key: ReplacementType; label: string; icon: string; results: ReplacementResult[] }[]; loading: boolean } | null>(null);
   const [complexPopup, setComplexPopup] = useState<{ id: string; name: string; matches: ComplexMatch[]; loading: boolean } | null>(null);
 
+  /* ── Pre-compute ALL replacement types on open ── */
   const openReplacePopup = useCallback((id: string, name: string) => {
-    setReplacePopup({ id, name, type: 'functional', results: [], loading: true });
     const fp = toFinderProfile(profile);
-    const results = findReplacement(id, 'functional', fp);
-    setReplacePopup(prev => prev && prev.id === id ? { ...prev, results, loading: false } : prev);
+    const allTypes: { key: ReplacementType; label: string; icon: string; results: ReplacementResult[] }[] = REPLACE_TYPES.map(rt => {
+      const results = findReplacement(id, rt.key, fp);
+      return { key: rt.key, label: rt.label, icon: rt.icon, results };
+    });
+    const nonEmpty = allTypes.filter(t => t.results.length > 0);
+    setReplacePopup({ id, name, type: nonEmpty[0]?.key || 'functional', results: allTypes, loading: false });
   }, [profile]);
 
   const switchReplaceType = useCallback((type: ReplacementType) => {
     if (!replacePopup) return;
-    setReplacePopup(prev => prev ? { ...prev, type, loading: true } : null);
-    const fp = toFinderProfile(profile);
-    const results = findReplacement(replacePopup.id, type, fp);
-    setReplacePopup(prev => prev ? { ...prev, results, loading: false } : null);
-  }, [profile, replacePopup]);
+    setReplacePopup(prev => prev ? { ...prev, type } : null);
+  }, [replacePopup]);
 
   const openComplexPopup = useCallback((id: string, name: string) => {
     setComplexPopup({ id, name, matches: [], loading: true });
@@ -241,6 +243,7 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
     if (goalFilter) chips.push({ label: '🎯 ' + (PURE_GOALS.find(g => g.key === goalFilter)?.label || goalFilter), onRemove: () => setGoalFilter(null) });
     if (favOnly) chips.push({ label: '⭐ Избранное', onRemove: () => setFavOnly(false) });
     if (profileOnly) chips.push({ label: `🧩 Под профиль (${profileRelevantIds?.size || 0})`, onRemove: () => setProfileOnly(false) });
+    if (swapMode) chips.push({ label: '🔁 Свап-режим (клик → замена)', onRemove: () => setSwapMode(false) });
     return chips;
   };
 
@@ -327,6 +330,12 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
           border: sortBy !== 'name' ? '1.5px solid rgba(34,197,94,0.2)' : '1px solid rgba(255,255,255,0.06)',
           color: sortBy !== 'name' ? '#22c55e' : 'rgba(255,255,255,0.5)',
         }}>💰 {sortBy === 'price_asc' ? 'Дешевле' : sortBy === 'price_desc' ? 'Дороже' : 'По цене'}</button>
+        <button onClick={() => setSwapMode(!swapMode)} style={{
+          flexShrink: 0, padding: '6px 10px', borderRadius: 12, fontSize: 8, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+          background: swapMode ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)',
+          border: swapMode ? '1.5px solid #ef4444' : '1px solid rgba(255,255,255,0.06)',
+          color: swapMode ? '#ef4444' : 'rgba(255,255,255,0.5)',
+        }} title="Клик по + открывает замену вместо добавления">🔁 Свап-режим</button>
       </div>
 
       {/* Filter popups */}
@@ -511,8 +520,8 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
                   overflow: 'hidden',
                 }}>
                   <div onClick={() => setExpanded(prev => ({ ...prev, [c.id]: !exp }))}
-                    style={{ padding: '8px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div onClick={e => { e.stopPropagation(); toggleFav(c.id); }} style={{ cursor: 'pointer', fontSize: 10, flexShrink: 0 }}>
+                    style={{ padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div onClick={e => { e.stopPropagation(); toggleFav(c.id); }} style={{ cursor: 'pointer', fontSize: 9, flexShrink: 0 }}>
                       {isFav ? '⭐' : '☆'}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -543,11 +552,23 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 3, alignItems: 'center', flexShrink: 0 }}>
+                      <button onClick={e => { e.stopPropagation(); openReplacePopup(c.id, c.nameRu || c.name); }}
+                        title="Найти замену"
+                        style={{ padding: '8px 10px', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#8b5cf6' }}>
+                        🔄
+                      </button>
                       {inStack ? (
                         <button onClick={e => { e.stopPropagation(); setStackIds(stackIds.filter(s => s !== c.id)); }}
                           style={{ padding: '8px 10px', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                             background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>
                           ✕
+                        </button>
+                      ) : swapMode ? (
+                        <button onClick={e => { e.stopPropagation(); openReplacePopup(c.id, c.nameRu || c.name); }}
+                          style={{ padding: '8px 10px', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>
+                          🔁
                         </button>
                       ) : (
                         <button onClick={e => { e.stopPropagation(); setStackIds([...stackIds, c.id]); }}
@@ -560,7 +581,7 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
                     </div>
                   </div>
                   {exp && (
-                    <div style={{ padding: '0 10px 8px' }}>
+                    <div style={{ padding: '0 8px 6px' }}>
                       {c.description && (
                         <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3, marginBottom: 4 }}>
                           📝 {c.description}
@@ -592,13 +613,13 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
                       )}
                       {c.dosage && <div style={{ fontSize: 7, color: '#60a5fa', marginTop: 2 }}>💊 {c.dosage.mg} мг{c.dosage.timing ? ` • ${c.dosage.timing}` : ''}</div>}
                       {tierInfo && <div style={{ fontSize: 7, color: tierInfo.color, marginTop: 2 }}>{tierInfo.desc}</div>}
-                      <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                      <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
                         <button onClick={(e) => { e.stopPropagation(); openReplacePopup(c.id, c.nameRu || c.name); }} style={{
-                          flex: 1, padding: '5px 0', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+                          flex: 1, padding: '4px 0', borderRadius: 6, fontSize: 7, fontWeight: 700, cursor: 'pointer',
                           background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', color: '#8b5cf6',
                         }}>🔄 Найти замену</button>
                         <button onClick={(e) => { e.stopPropagation(); openComplexPopup(c.id, c.nameRu || c.name); }} style={{
-                          flex: 1, padding: '5px 0', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+                          flex: 1, padding: '4px 0', borderRadius: 6, fontSize: 7, fontWeight: 700, cursor: 'pointer',
                           background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.15)', color: '#fbbf24',
                         }}>📦 Найти комплекс</button>
                       </div>
@@ -610,7 +631,7 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
           </div>
         </div>
       ))}
-      {/* ── Replacement popup ── */}
+      {/* ── Replacement popup (optimized: all types with counts) ── */}
       {replacePopup && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 251,
@@ -618,58 +639,81 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
           background: 'rgba(0,0,0,0.85)',
         }} onClick={() => setReplacePopup(null)}>
           <div onClick={e => e.stopPropagation()} style={{
-            width: '90%', maxWidth: 360, maxHeight: '75vh', borderRadius: 16,
+            width: '90%', maxWidth: 360, maxHeight: '80vh', borderRadius: 16,
             background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden',
           }}>
             <div style={{ height: 3, background: 'linear-gradient(90deg,#8b5cf6,#6d28d9)' }} />
-            <div style={{ padding: '14px 16px', maxHeight: 'calc(75vh - 3px)', overflowY: 'auto' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#c4b5fd', marginBottom: 8 }}>
+            <div style={{ padding: '14px 16px', maxHeight: 'calc(80vh - 3px)', overflowY: 'auto' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#c4b5fd', marginBottom: 10 }}>
                 🔄 Замена: {replacePopup.name}
-              </div>
-              <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginBottom: 8 }}>
-                {REPLACE_TYPES.map(rt => (
-                  <button key={rt.key} onClick={() => switchReplaceType(rt.key)} style={{
-                    padding: '3px 8px', borderRadius: 8, fontSize: 7, fontWeight: 600, cursor: 'pointer',
-                    background: replacePopup.type === rt.key ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
-                    border: replacePopup.type === rt.key ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)',
-                    color: replacePopup.type === rt.key ? '#00e68a' : 'rgba(255,255,255,0.4)',
-                  }}>{rt.icon} {rt.label}</button>
-                ))}
               </div>
               {replacePopup.loading ? (
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>Загрузка...</div>
-              ) : replacePopup.results.length > 0 ? replacePopup.results.slice(0, 6).map((r, i) => (
-                <div key={i} onClick={() => {
-                  const newStack = stackIds.includes(replacePopup.id)
-                    ? stackIds.map(s => s === replacePopup.id ? r.replacementId : s)
-                    : [...stackIds.filter(s => s !== replacePopup.id), r.replacementId];
-                  setStackIds(newStack);
-                  setReplacePopup(null);
-                }} style={{
-                  padding: '8px 10px', marginBottom: 4, borderRadius: 8, cursor: 'pointer',
-                  background: r.personalMatch ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)',
-                  border: `1px solid ${r.personalMatch ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)'}`,
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                    <span style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{r.replacementName}</span>
-                    <span style={{ fontSize: 7, padding: '2px 6px', borderRadius: 6,
-                      background: r.tierChange === 'upgrade' ? 'rgba(34,197,94,0.1)' : r.tierChange === 'downgrade' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.05)',
-                      color: r.tierChange === 'upgrade' ? '#22c55e' : r.tierChange === 'downgrade' ? '#ef4444' : 'rgba(255,255,255,0.5)',
-                    }}>{r.tierLabel}</span>
+              ) : (
+                <>
+                  {/* Type selector - vertical list with counts */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 10 }}>
+                    {replacePopup.results.map(rt => (
+                      <button key={rt.key} onClick={() => switchReplaceType(rt.key)} style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '6px 10px', borderRadius: 8, fontSize: 8, fontWeight: 600, cursor: 'pointer', border: 'none',
+                        background: replacePopup.type === rt.key ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.02)',
+                        color: replacePopup.type === rt.key ? '#a78bfa' : 'rgba(255,255,255,0.5)',
+                        transition: 'all 0.12s',
+                      }}>
+                        <span style={{ fontSize: 10 }}>{rt.icon}</span>
+                        <span style={{ flex: 1, textAlign: 'left' }}>{rt.label}</span>
+                        <span style={{
+                          padding: '2px 6px', borderRadius: 8, fontSize: 7, fontWeight: 700,
+                          background: rt.results.length > 0 ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)',
+                          color: rt.results.length > 0 ? '#a78bfa' : 'rgba(255,255,255,0.25)',
+                        }}>{rt.results.length}</span>
+                      </button>
+                    ))}
                   </div>
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{r.explanation}</div>
-                  <div style={{ display: 'flex', gap: 4, fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>
-                    <span>{r.bestForm}</span>
-                    <span style={{ color: r.priceDelta === 'cheaper' ? '#22c55e' : r.priceDelta === 'expensive' ? '#ef4444' : 'rgba(255,255,255,0.3)' }}>
-                      {r.priceDelta === 'cheaper' ? '💰' : r.priceDelta === 'expensive' ? '💎' : ''}
-                    </span>
-                  </div>
-                </div>
-              )) : (
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>
-                  Нет результатов по этому типу
-                </div>
+                  {/* Results for selected type */}
+                  {(() => {
+                    const active = replacePopup.results.find(rt => rt.key === replacePopup.type);
+                    if (!active || active.results.length === 0) {
+                      return <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>
+                        Нет результатов по этому типу
+                      </div>;
+                    }
+                    return active.results.slice(0, 6).map((r, i) => (
+                      <div key={i} onClick={() => {
+                        const newStack = stackIds.includes(replacePopup.id)
+                          ? stackIds.map(s => s === replacePopup.id ? r.replacementId : s)
+                          : [...stackIds.filter(s => s !== replacePopup.id), r.replacementId];
+                        setStackIds(newStack);
+                        setReplacePopup(null);
+                      }} style={{
+                        padding: '8px 10px', marginBottom: 4, borderRadius: 8, cursor: 'pointer',
+                        background: r.personalMatch ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)',
+                        border: `1px solid ${r.personalMatch ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)'}`,
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{r.replacementName}</span>
+                          <span style={{ fontSize: 7, padding: '2px 6px', borderRadius: 6,
+                            background: r.tierChange === 'upgrade' ? 'rgba(34,197,94,0.1)' : r.tierChange === 'downgrade' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.05)',
+                            color: r.tierChange === 'upgrade' ? '#22c55e' : r.tierChange === 'downgrade' ? '#ef4444' : 'rgba(255,255,255,0.5)',
+                          }}>{r.tierLabel}</span>
+                        </div>
+                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{r.explanation}</div>
+                        <div style={{ display: 'flex', gap: 4, fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>
+                          <span>{r.bestForm}</span>
+                          <span style={{ color: r.priceDelta === 'cheaper' ? '#22c55e' : r.priceDelta === 'expensive' ? '#ef4444' : 'rgba(255,255,255,0.3)' }}>
+                            {r.priceDelta === 'cheaper' ? '💰' : r.priceDelta === 'expensive' ? '💎' : ''}
+                          </span>
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </>
               )}
+              <button onClick={() => setReplacePopup(null)} style={{
+                width: '100%', padding: '10px 0', borderRadius: 10, marginTop: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700,
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
+              }}>✕ Закрыть</button>
             </div>
           </div>
         </div>

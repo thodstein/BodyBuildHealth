@@ -8,6 +8,10 @@ import { decodeGarbled } from '../../utils/text-sanitizer';
 import { GlassCard, StatBox, ORGANS, toFinderProfile, ConfirmModal, showToast, PRICE_RUB, estCost } from './BioStackAIConstants';
 import { SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX } from '../../data/support-meta';
 import type { LinkedData } from '../../core/data-link';
+import { checkStackToxicity, checkNutrientConflicts, optimizeTiming, findAbsorptionEnhancers, getReminderConfig, saveReminderConfig, scheduleTelegramReminder } from '../../engines/biostack-safety.engine';
+import { getStackEffectiveness, trackStackStart } from '../../engines/biostack-feedback.engine';
+import { getStackCostBreakdown, buildBudgetStack } from '../../engines/biostack-budget.engine';
+import { LAB_MARKER_MAP } from '../../data/lab-marker-map';
 
 function getTitration(id: string, cat: any): string | null {
   const needy = ['ashwagandha', 'rhodiola', 'shilajit', 'berberine', 'tongkat_ali', 'fadogia', 'ashwa', 'probiotics', 'bromelain', 'serrapeptase', 'nattokinase'];
@@ -158,22 +162,22 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
     return [...sys];
   }, [stackIds]);
 
-  const [replacePopup, setReplacePopup] = useState<{ id: string; type: ReplacementType; results: ReplacementResult[]; loading: boolean; name: string } | null>(null);
-
+  const [replacePopup, setReplacePopup] = useState<{ id: string; type: ReplacementType; results: { key: ReplacementType; label: string; icon: string; results: ReplacementResult[] }[]; loading: boolean; name: string } | null>(null);
+  const [swapMode, setSwapMode] = useState(false);
   const openReplacePopup = useCallback((id: string, name: string) => {
-    setReplacePopup({ id, type: 'functional', results: [], loading: true, name });
     const fp = toFinderProfile(profile);
-    const results = findReplacement(id, 'functional', fp);
-    setReplacePopup(prev => prev && prev.id === id ? { ...prev, results, loading: false } : prev);
+    const allTypes = REPLACE_TYPES.map(rt => {
+      const results = findReplacement(id, rt.key, fp);
+      return { key: rt.key, label: rt.label, icon: rt.icon, results };
+    });
+    const nonEmpty = allTypes.filter(t => t.results.length > 0);
+    setReplacePopup({ id, type: nonEmpty[0]?.key || 'functional', results: allTypes, loading: false, name });
   }, [profile]);
 
   const switchReplaceType = useCallback((type: ReplacementType) => {
     if (!replacePopup) return;
-    setReplacePopup(prev => prev ? { ...prev, type, loading: true } : null);
-    const fp = toFinderProfile(profile);
-    const results = findReplacement(replacePopup.id, type, fp);
-    setReplacePopup(prev => prev ? { ...prev, results, loading: false } : null);
-  }, [profile, replacePopup]);
+    setReplacePopup(prev => prev ? { ...prev, type } : null);
+  }, [replacePopup]);
 
   const REPLACE_TYPES: { key: ReplacementType; label: string; icon: string }[] = [
     { key: 'direct_analog', label: 'Прямые аналоги', icon: '🔄' },
@@ -192,6 +196,9 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
     try { return JSON.parse(localStorage.getItem('he_finder_saved_stacks') || '[]'); } catch { return []; }
   });
   const [confirmClear, setConfirmClear] = useState(false);
+  const [feedbackExpanded, setFeedbackExpanded] = useState(false);
+  // Track stack start date for effectiveness feedback
+  React.useEffect(() => { trackStackStart(stackIds); }, [stackIds]);
 
   const handleRemove = useCallback((id: string) => {
     setStackIds(stackIds.filter(s => s !== id));
@@ -421,6 +428,73 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
           setActionLoading(null);
         }, 400);
       }},
+    { id: 'safer', label: 'Сделать безопаснее', icon: '🛡️', color: '#ec4899',
+      run: () => {
+        if (stackIds.length === 0) return;
+        setActionLoading('safer');
+        setTimeout(() => {
+          const fp = toFinderProfile(profile);
+          const swaps: Array<{ fromId: string; fromName: string; toId: string; toName: string; reason: string }> = [];
+          const ns = [...stackIds];
+          for (let i = 0; i < ns.length; i++) {
+            const id = ns[i];
+            const replacements = findReplacement(id, 'safer', fp);
+            if (replacements.length > 0) {
+              const best = replacements[0];
+              if (best.safetyDelta > 0 && SUPPORT_CATALOG_DATA[best.replacementId]) {
+                swaps.push({
+                  fromId: id, fromName: SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id,
+                  toId: best.replacementId, toName: best.replacementName, reason: best.reason,
+                });
+                ns[i] = best.replacementId;
+              }
+            }
+          }
+          if (swaps.length === 0) {
+            setActionResult({ title: '🛡️ Оптимизация безопасности', sections: [{ icon: '💡', text: 'Все вещества уже оптимальны по безопасности. Замен не найдено.', color: '#22c55e' }] });
+          } else {
+            const lines = swaps.map(s => `• ${s.fromName} → ${s.toName}: ${s.reason}`);
+            setActionResult({
+              title: `🛡️ ${swaps.length} замен на более безопасные`,
+              sections: [
+                { icon: '🔄', text: lines.join('\n'), color: '#ec4899' },
+                { icon: '🛡️', text: 'Замены снижают риск побочных эффектов, сохраняя эффективность', color: '#22c55e' },
+              ],
+              resultStack: ns,
+            });
+          }
+          setActionLoading(null);
+        }, 400);
+      }},
+    { id: 'budget', label: 'Оптимизировать бюджет', icon: '💵', color: '#06b6d4',
+      run: () => {
+        if (stackIds.length === 0) return;
+        setActionLoading('budget');
+        setTimeout(() => {
+          const fp = toFinderProfile(profile);
+          const currentCost = stackIds.reduce((s, id) => s + (PRICE_RUB[id] || estCost(id)), 0);
+          const targetBudget = Math.max(1500, Math.round(currentCost * 0.7));
+          const result = buildBudgetStack(fp, targetBudget, undefined, []);
+          const curNames = stackIds.map(id => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id);
+          const budgetNames = result.stack.map(id => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id);
+          const onlyCur = curNames.filter(n => !budgetNames.includes(n));
+          const onlyBud = budgetNames.filter(n => !curNames.includes(n));
+          const common = curNames.filter(n => budgetNames.includes(n));
+          setActionResult({
+            title: `💵 Бюджетная оптимизация · ~${result.totalCost}₽`,
+            sections: [
+              { icon: '💰', text: `Текущий: ~${currentCost}₽ (${stackIds.length} БАДов)`, color: '#8b5cf6' },
+              { icon: '💵', text: `Оптимизированный: ~${result.totalCost}₽ (${result.stack.length} БАДов)`, color: '#06b6d4' },
+              { icon: '🔄', text: result.message, color: '#22c55e' },
+              ...(onlyCur.length > 0 ? [{ icon: '➖', text: `Убраны: ${onlyCur.slice(0, 5).join(', ')}`, color: '#ef4444' }] : []),
+              ...(onlyBud.length > 0 ? [{ icon: '➕', text: `Добавлены: ${onlyBud.slice(0, 5).join(', ')}`, color: '#22c55e' }] : []),
+              ...(result.savings.length > 0 ? [{ icon: '💰', text: `Экономия: ${result.savings.reduce((s,x)=>s+x.saved,0)}₽ на исключённых БАДах`, color: '#22c55e' }] : []),
+            ],
+            resultStack: result.stack,
+          });
+          setActionLoading(null);
+        }, 500);
+      }},
     { id: 'complex', label: 'Собрать в комплекс', icon: '📦', color: '#f59e0b',
       run: () => {
         if (stackIds.length < 2) return;
@@ -535,11 +609,11 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
 
   const cardHeaderS: React.CSSProperties = {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer',
-    padding: '12px 14px', borderRadius: 12,
+    padding: '8px 10px', borderRadius: 10,
     background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)',
   };
   const cardBodyS: React.CSSProperties = {
-    padding: '0 14px 14px', marginTop: -6, borderBottomLeftRadius: 12, borderBottomRightRadius: 12,
+    padding: '0 10px 10px', marginTop: -4, borderBottomLeftRadius: 10, borderBottomRightRadius: 10,
     background: 'rgba(24,24,27,0.3)', border: '1px solid rgba(255,255,255,0.04)', borderTop: 'none',
   };
 
@@ -683,7 +757,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
       )}
 
       <GlassCard title={`📋 Стек • ${stackIds.length} компонентов`} icon="📊" color="#00e68a">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 4, marginBottom: 6 }}>
           <StatBox label="Компонентов" value={stackIds.length} color="#00e68a" />
           <StatBox label="Синергия" value={explanation?.totalSynergyScore ?? 0} color="#8b5cf6" />
           <StatBox label="Покрытие" value={`${explanation?.completeness ?? 0}%`} color="#60a5fa" />
@@ -694,11 +768,17 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
             ⚠ Превышен лимит ({profile.maxStackSize || 8}) — рекомендуется сократить стек
           </div>
         )}
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
           <button onClick={handleSaveStack} style={{
-            flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+            flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 9, fontWeight: 700, cursor: 'pointer',
             background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a',
           }}>💾 Сохранить стек</button>
+          <button onClick={() => setSwapMode(!swapMode)} title="Клик по названию → замена вместо раскрытия" style={{
+            flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 9, fontWeight: 700, cursor: 'pointer',
+            background: swapMode ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)',
+            border: swapMode ? '1.5px solid rgba(239,68,68,0.2)' : '1px solid rgba(255,255,255,0.06)',
+            color: swapMode ? '#ef4444' : 'rgba(255,255,255,0.5)',
+          }}>🔁 {swapMode ? 'Свап ON' : 'Свап-режим'}</button>
         </div>
         <div style={{ display: 'flex', gap: 2, marginTop: 4, justifyContent: 'flex-end' }}>
           <button onClick={() => {
@@ -760,7 +840,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
               }
             } catch {}
           }} style={{
-            flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+            flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 9, fontWeight: 700, cursor: 'pointer',
             background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: '#818cf8',
           }}>📦 В мои стеки</button>
           <button onClick={() => {
@@ -779,7 +859,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
               showToast('📋 Стек отправлен в план поддержки! Перейдите в Поддержка → фармплан', 'success');
             } catch {}
           }} style={{
-            flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+            flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 9, fontWeight: 700, cursor: 'pointer',
             background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a',
           }}>📋 В план</button>
           <button onClick={() => {
@@ -810,7 +890,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
             background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.15)', color: '#a855f7',
           }}>📋</button>
           <button onClick={() => setConfirmClear(true)} style={{
-            flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+            flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 9, fontWeight: 700, cursor: 'pointer',
             background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444',
           }}>🗑 Очистить</button>
         </div>
@@ -982,16 +1062,179 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
         return null;
       })()}
 
+      {/* 🔬 Nutrient competition warnings */}
+      {(() => {
+        const compWarnings = checkNutrientConflicts(stackIds);
+        const timingRecs = optimizeTiming(stackIds);
+        const absEnhancers = findAbsorptionEnhancers(stackIds).filter(e => !e.inStack);
+        if (compWarnings.length === 0 && timingRecs.length === 0 && absEnhancers.length === 0) return null;
+        return (
+          <GlassCard title="🥗 Нутрициология: оптимизация усвоения" icon="🥗" color="#f59e0b">
+            {compWarnings.length > 0 && (
+              <div style={{ marginBottom: 6, padding: '4px 6px', borderRadius: 6, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.1)' }}>
+                <div style={{ fontSize: 7, fontWeight: 600, color: '#fbbf24', marginBottom: 3 }}>⚡ Конкуренция нутриентов — разнесите приём:</div>
+                {compWarnings.map((w, i) => (
+                  <div key={i} style={{ fontSize: 7, color: '#fbbf24', lineHeight: 1.3, marginBottom: 2 }}>
+                    {w.nameA} + {w.nameB}: {w.effect} → {w.recommendation}
+                  </div>
+                ))}
+              </div>
+            )}
+            {timingRecs.length > 0 && (
+              <div style={{ marginBottom: 6, padding: '4px 6px', borderRadius: 6, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.1)' }}>
+                <div style={{ fontSize: 7, fontWeight: 600, color: '#60a5fa', marginBottom: 3 }}>🕐 Оптимизация времени приёма:</div>
+                {timingRecs.map((r, i) => (
+                  <div key={i} style={{ fontSize: 7, color: '#60a5fa', lineHeight: 1.3, marginBottom: 2 }}>
+                    {r.name}: сейчас «{r.currentTiming}» → лучше «{r.type === 'fat_soluble' ? 'с жирной едой' : r.type === 'sedative' ? 'вечером' : r.type === 'stimulant' ? 'утром' : 'с едой'}» ({r.reason.slice(0, 80)})
+                  </div>
+                ))}
+              </div>
+            )}
+            {absEnhancers.length > 0 && (
+              <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.1)' }}>
+                <div style={{ fontSize: 7, fontWeight: 600, color: '#22c55e', marginBottom: 3 }}>💡 Улучшите усвоение — добавьте в стек:</div>
+                {absEnhancers.slice(0, 3).map((e, i) => (
+                  <div key={i} style={{ fontSize: 7, color: '#22c55e', lineHeight: 1.3, marginBottom: 1 }}>
+                    {e.targetName} + {e.enhancerName}: {e.effect.slice(0, 80)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </GlassCard>
+        );
+      })()}
+
+      {/* 🛡️ Toxicity check */}
+      {(() => {
+        const toxWarnings = checkStackToxicity(stackIds);
+        if (toxWarnings.length === 0) return null;
+        return (
+          <GlassCard title="🛡️ Проверка дозировок (UL)" icon="🛡️" color="#ef4444">
+            {toxWarnings.map((w, i) => (
+              <div key={i} style={{
+                padding: '4px 6px', borderRadius: 6, marginBottom: 2,
+                background: w.severity === 'danger' ? 'rgba(239,68,68,0.08)' : w.severity === 'warning' ? 'rgba(251,191,36,0.08)' : 'rgba(34,197,94,0.06)',
+                border: `1px solid ${w.severity === 'danger' ? 'rgba(239,68,68,0.15)' : w.severity === 'warning' ? 'rgba(251,191,36,0.15)' : 'rgba(34,197,94,0.1)'}`,
+              }}>
+                <div style={{ fontSize: 8, fontWeight: 600, color: w.severity === 'danger' ? '#ef4444' : w.severity === 'warning' ? '#fbbf24' : '#22c55e', lineHeight: 1.3 }}>
+                  {w.message}
+                </div>
+              </div>
+            ))}
+          </GlassCard>
+        );
+      })()}
+
+      {/* 📊 Эффективность стека (feedback loop) */}
+      {(() => {
+        const feedback = getStackEffectiveness(stackIds, profile.goals || [], 14);
+        if (!feedback || feedback.symptomTrends.length === 0) return null;
+        return (
+          <GlassCard title={`📊 Эффективность стека · ${feedback.overallScore}/100`} icon="📊" color={feedback.overallScore >= 60 ? '#22c55e' : feedback.overallScore >= 40 ? '#f59e0b' : '#ef4444'}>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+              <StatBox label="Улучшается" value={feedback.improvingGoals.length} color="#22c55e" />
+              <StatBox label="Ухудшается" value={feedback.worseningGoals.length} color="#ef4444" />
+              <StatBox label="Стабильно" value={feedback.stableGoals.length} color="#f59e0b" />
+              <StatBox label="Симптомов" value={feedback.symptomTrends.length} color="#60a5fa" />
+            </div>
+            {feedback.symptomTrends.slice(0, feedbackExpanded ? 99 : 4).map((t, i) => (
+              <div key={i} style={{ fontSize: 7, color: t.trend === 'improving' ? '#22c55e' : t.trend === 'worsening' ? '#ef4444' : 'rgba(255,255,255,0.4)', lineHeight: 1.3, marginBottom: 1 }}>
+                {t.trend === 'improving' ? '✅' : t.trend === 'worsening' ? '⚠' : '•'} {t.label}: {t.startAvg} → {t.endAvg} ({(t.delta > 0 ? '↓' : '↑')}{Math.abs(t.delta)})
+                {t.relatedGoals.length > 0 && <span style={{ color: 'rgba(255,255,255,0.2)', marginLeft: 2 }}>🎯 {t.relatedGoals.join(', ')}</span>}
+              </div>
+            ))}
+            {feedback.symptomTrends.length > 4 && (
+              <button onClick={() => setFeedbackExpanded(!feedbackExpanded)} style={{
+                padding: '2px 8px', borderRadius: 4, fontSize: 7, cursor: 'pointer', marginTop: 2,
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)',
+              }}>{feedbackExpanded ? 'Свернуть' : `+ ещё ${feedback.symptomTrends.length - 4}`}</button>
+            )}
+            {feedback.recommendations.length > 0 && (
+              <div style={{ marginTop: 4, padding: '4px 6px', borderRadius: 6, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.1)' }}>
+                {feedback.recommendations.slice(0, 2).map((r, i) => (
+                  <div key={i} style={{ fontSize: 7, color: '#60a5fa', lineHeight: 1.3 }}>{r}</div>
+                ))}
+              </div>
+            )}
+            <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.25)', marginTop: 2 }}>
+              Период: {feedback.startDate} — {feedback.endDate}
+            </div>
+          </GlassCard>
+        );
+      })()}
+
+      {/* 🔬 Лабораторная корреляция стека */}
+      {(() => {
+        const affectedMarkers = LAB_MARKER_MAP.filter(m =>
+          m.correctionIds.some(cid => stackIds.some(sid => sid.toLowerCase().includes(cid.toLowerCase()) || cid.toLowerCase().includes(sid.toLowerCase())))
+        );
+        if (affectedMarkers.length === 0) return null;
+        return (
+          <GlassCard title={`🔬 Влияние стека на анализы · ${affectedMarkers.length} маркеров`} icon="🔬" color="#60a5fa">
+            <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              {affectedMarkers.slice(0, 12).map((m, i) => {
+                const affectingSubs = stackIds.filter(sid =>
+                  m.correctionIds.some(cid => sid.toLowerCase().includes(cid.toLowerCase()) || cid.toLowerCase().includes(sid.toLowerCase()))
+                );
+                return (
+                  <span key={i} title={`Влияет: ${affectingSubs.map(s => SUPPORT_CATALOG_DATA[s]?.nameRu || s).join(', ')}`}
+                    style={{ padding: '2px 6px', borderRadius: 6, fontSize: 7, fontWeight: 600,
+                      background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.12)', color: '#60a5fa' }}>
+                    {m.name} ← {affectingSubs.length} БАД
+                  </span>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>
+              Маркеры, на которые БАДы в стеке оказывают корректирующее влияние
+            </div>
+          </GlassCard>
+        );
+      })()}
+
+      {/* 🔔 Telegram напоминания */}
+      {(() => {
+        const config = getReminderConfig();
+        const toggle = () => {
+          const updated = { ...config, enabled: !config.enabled };
+          saveReminderConfig(updated);
+          if (updated.enabled) scheduleTelegramReminder(updated);
+          window.dispatchEvent(new Event('storage'));
+        };
+        const tg = (window as any).Telegram?.WebApp;
+        if (!tg) return null;
+        return (
+          <GlassCard title="🔔 Напоминания Telegram" icon="🔔" color="#8b5cf6">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 600, color: '#fff', marginBottom: 1 }}>
+                  {config.enabled ? '🔔 Включены' : '🔕 Выключены'}
+                </div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>
+                  {config.enabled ? `Утро ${config.morningTime} · Вечер ${config.eveningTime}` : 'Нажмите для включения ежедневных напоминаний'}
+                </div>
+              </div>
+              <button onClick={toggle} style={{
+                padding: '6px 12px', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+                background: config.enabled ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${config.enabled ? 'rgba(0,230,138,0.2)' : 'rgba(255,255,255,0.06)'}`,
+                color: config.enabled ? '#00e68a' : 'rgba(255,255,255,0.5)',
+              }}>{config.enabled ? 'ON' : 'OFF'}</button>
+            </div>
+          </GlassCard>
+        );
+      })()}
+
       {/* 🚀 Действия со стеком — компактная кнопка-попап */}
       {(() => {
         const [actOpen, setActOpen] = useState(false);
         return (
           <>
             <button onClick={() => setActOpen(true)} style={{
-              width: '100%', padding: '14px 0', borderRadius: 14, fontSize: 13, fontWeight: 800,
-              cursor: 'pointer', marginBottom: 10,
+              width: '100%', padding: '10px 0', borderRadius: 10, fontSize: 11, fontWeight: 800,
+              cursor: 'pointer', marginBottom: 6,
               background: 'linear-gradient(135deg,#8b5cf6,#6d28d9)', border: 'none', color: '#fff',
-              boxShadow: '0 4px 20px rgba(139,92,246,0.2)',
+              boxShadow: '0 2px 12px rgba(139,92,246,0.15)',
             }}>
               🚀 Действия со стеком
             </button>
@@ -1026,6 +1269,8 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
                            a.id === 'optimize' ? 'Добавить недостающие компоненты' :
                            a.id === 'risks' ? 'Убрать конфликтующие препараты' :
                            a.id === 'cheaper' ? 'Найти бюджетные аналоги' :
+                           a.id === 'safer' ? 'Заменить на более безопасные аналоги' :
+                           a.id === 'budget' ? 'Собрать стек под заданный бюджет' :
                            a.id === 'complex' ? 'Заменить N препаратов одним комплексом' :
                            'Анализ совместимости с профилем'}
                         </div>
@@ -1153,7 +1398,10 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
             className={isDragging ? 'bio-dragging' : isDropOver ? 'bio-drag-over' : ''}
             style={{ marginBottom: 8, transition: 'all 0.15s ease' }}>
           <GlassCard style={{ marginBottom: 0 }}>
-            <div onClick={() => setExpanded(prev => ({ ...prev, [entry.id]: !prev[entry.id] }))} style={cardHeaderS}>
+            <div onClick={() => {
+              if (swapMode) { openReplacePopup(entry.id, cat.nameRu || cat.name); }
+              else { setExpanded(prev => ({ ...prev, [entry.id]: !prev[entry.id] })); }
+            }} style={cardHeaderS}>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 2 }}>
                   {cat.nameRu || cat.name}
@@ -1186,6 +1434,12 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button onClick={(e) => { e.stopPropagation(); openReplacePopup(entry.id, cat.nameRu || cat.name); }}
+                  title="Найти замену"
+                  style={{ padding: '8px 10px', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#8b5cf6' }}>
+                  🔄
+                </button>
                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{isExpanded ? '▲' : '▼'}</span>
               </div>
             </div>
@@ -1285,7 +1539,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
         );
       })}
 
-      {/* Global replace popup */}
+      {/* Global replace popup (optimized: all types with counts) */}
       {replacePopup && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 251,
@@ -1293,58 +1547,77 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
           background: 'rgba(0,0,0,0.85)'
         }} onClick={() => setReplacePopup(null)}>
           <div onClick={e => e.stopPropagation()} style={{
-            width: '90%', maxWidth: 360, maxHeight: '75vh', borderRadius: 16,
+            width: '90%', maxWidth: 360, maxHeight: '80vh', borderRadius: 16,
             background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden',
           }}>
             <div style={{ height: 3, background: 'linear-gradient(90deg,#8b5cf6,#6d28d9)' }} />
-            <div style={{ padding: '14px 16px', maxHeight: 'calc(75vh - 3px)', overflowY: 'auto' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#c4b5fd', marginBottom: 8 }}>
+            <div style={{ padding: '14px 16px', maxHeight: 'calc(80vh - 3px)', overflowY: 'auto' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#c4b5fd', marginBottom: 10 }}>
                 🔄 Замена: {replacePopup.name}
-              </div>
-              <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginBottom: 8 }}>
-                {REPLACE_TYPES.map(rt => (
-                  <button key={rt.key} onClick={() => switchReplaceType(rt.key)} style={{
-                    padding:'3px 8px', borderRadius:8, fontSize:7, fontWeight:600, cursor:'pointer',
-                    background: replacePopup.type === rt.key ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
-                    border: replacePopup.type === rt.key ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)',
-                    color: replacePopup.type === rt.key ? '#00e68a' : 'rgba(255,255,255,0.4)',
-                  }}>{rt.icon} {rt.label}</button>
-                ))}
               </div>
               {replacePopup.loading ? (
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>Загрузка...</div>
-              ) : replacePopup.results.length > 0 ? replacePopup.results.slice(0, 6).map((r, i) => (
-                <div key={i} onClick={() => { handleReplace(replacePopup.id, r.replacementId); setReplacePopup(null); }}
-                  style={{
-                    padding: '8px 10px', marginBottom: 4, borderRadius: 8, cursor: 'pointer',
-                    background: r.personalMatch ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)',
-                    border: `1px solid ${r.personalMatch ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)'}`,
-                  }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 2 }}>
-                    <span style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{r.replacementName}</span>
-                    <div style={{ display:'flex', gap:3 }}>
-                      <span style={{ padding:'1px 5px', borderRadius:4, fontSize:7, fontWeight:600,
-                        background: r.tierChange === 'upgrade' ? 'rgba(0,230,138,0.1)' : r.tierChange === 'downgrade' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
-                        color: r.tierChange === 'upgrade' ? '#00e68a' : r.tierChange === 'downgrade' ? '#ef4444' : 'rgba(255,255,255,0.3)',
-                      }}>{r.tierChange === 'upgrade' ? '↑' : r.tierChange === 'downgrade' ? '↓' : '∼'}</span>
-                      <span style={{ padding:'1px 5px', borderRadius:4, fontSize:7, fontWeight:600,
-                        background: r.priceDelta === 'cheaper' ? 'rgba(0,230,138,0.1)' : r.priceDelta === 'expensive' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
-                        color: r.priceDelta === 'cheaper' ? '#00e68a' : r.priceDelta === 'expensive' ? '#ef4444' : 'rgba(255,255,255,0.3)',
-                      }}>{r.priceDelta === 'cheaper' ? '💰-' : r.priceDelta === 'expensive' ? '💰+' : '💰='}</span>
-                    </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 10 }}>
+                    {replacePopup.results.map(rt => (
+                      <button key={rt.key} onClick={() => switchReplaceType(rt.key)} style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '6px 10px', borderRadius: 8, fontSize: 8, fontWeight: 600, cursor: 'pointer', border: 'none',
+                        background: replacePopup.type === rt.key ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.02)',
+                        color: replacePopup.type === rt.key ? '#a78bfa' : 'rgba(255,255,255,0.5)',
+                        transition: 'all 0.12s',
+                      }}>
+                        <span style={{ fontSize: 10 }}>{rt.icon}</span>
+                        <span style={{ flex: 1, textAlign: 'left' }}>{rt.label}</span>
+                        <span style={{
+                          padding: '2px 6px', borderRadius: 8, fontSize: 7, fontWeight: 700,
+                          background: rt.results.length > 0 ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)',
+                          color: rt.results.length > 0 ? '#a78bfa' : 'rgba(255,255,255,0.25)',
+                        }}>{rt.results.length}</span>
+                      </button>
+                    ))}
                   </div>
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{r.reason}</div>
-                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', lineHeight: 1.3 }}>
-                    {r.explanation}
-                    {r.bestForm && <span style={{ color:'#60a5fa' }}> • 💊 {r.bestForm}</span>}
-                  </div>
-                </div>
-              )) : (
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 8 }}>Нет подходящих замен</div>
+                  {(() => {
+                    const active = replacePopup.results.find(rt => rt.key === replacePopup.type);
+                    if (!active || active.results.length === 0) {
+                      return <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>
+                        Нет результатов по этому типу
+                      </div>;
+                    }
+                    return active.results.slice(0, 6).map((r, i) => (
+                      <div key={i} onClick={() => { handleReplace(replacePopup.id, r.replacementId); setReplacePopup(null); }}
+                        style={{
+                          padding: '8px 10px', marginBottom: 4, borderRadius: 8, cursor: 'pointer',
+                          background: r.personalMatch ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)',
+                          border: `1px solid ${r.personalMatch ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)'}`,
+                        }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 2 }}>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{r.replacementName}</span>
+                          <div style={{ display:'flex', gap:3 }}>
+                            <span style={{ padding:'1px 5px', borderRadius:4, fontSize:7, fontWeight:600,
+                              background: r.tierChange === 'upgrade' ? 'rgba(0,230,138,0.1)' : r.tierChange === 'downgrade' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
+                              color: r.tierChange === 'upgrade' ? '#00e68a' : r.tierChange === 'downgrade' ? '#ef4444' : 'rgba(255,255,255,0.3)',
+                            }}>{r.tierChange === 'upgrade' ? '↑' : r.tierChange === 'downgrade' ? '↓' : '∼'}</span>
+                            <span style={{ padding:'1px 5px', borderRadius:4, fontSize:7, fontWeight:600,
+                              background: r.priceDelta === 'cheaper' ? 'rgba(0,230,138,0.1)' : r.priceDelta === 'expensive' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
+                              color: r.priceDelta === 'cheaper' ? '#00e68a' : r.priceDelta === 'expensive' ? '#ef4444' : 'rgba(255,255,255,0.3)',
+                            }}>{r.priceDelta === 'cheaper' ? '💰-' : r.priceDelta === 'expensive' ? '💰+' : '💰='}</span>
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{r.reason}</div>
+                        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', lineHeight: 1.3 }}>
+                          {r.explanation}
+                          {r.bestForm && <span style={{ color:'#60a5fa' }}> • 💊 {r.bestForm}</span>}
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </>
               )}
               <button onClick={() => setReplacePopup(null)} style={{
-                width:'100%', padding:'8px 0', borderRadius:8, marginTop:4, cursor:'pointer',
-                background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.5)', fontSize:9, fontWeight:700,
+                width:'100%', padding:'10px 0', borderRadius:10, marginTop:8, cursor:'pointer',
+                background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.5)', fontSize:10, fontWeight:700,
               }}>✕ Закрыть</button>
             </div>
           </div>

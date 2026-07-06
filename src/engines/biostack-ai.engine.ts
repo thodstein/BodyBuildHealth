@@ -26,22 +26,9 @@ export interface BioStackProfile {
   experience: ExperienceLevel; goals: GoalType[]; aasStatus: AASStatus;
   healthConditions: HealthCondition[]; budget: BudgetLevel; avoidIds: string[];
   maxStackSize: number;
-  cognitiveTask: CognitiveTask; stimSensitivity: StimSensitivity;
-  anxietyLevel: number; sleepQuality: number; caffeineLevel: CaffeineLevel;
-  adClass: ADClass; bpSystolic: number; bpDiastolic: number;
-  gutSensitivity: GutSensitivity; smoke: boolean; alcoholLevel: AlcoholLevel;
-  dietType: DietType; chronotype: Chronotype; stressLevel: number;
-  currentSupplements: string[]; stackComplexity: StackComplexity;
-  targetOrgans: string[];  // органы-мишени (ключи из ORGANS)
-  targetSystems: string[]; // системы-мишени (ключи из SYSTEMS)
-  // ── Клинические поля (врачебный блок) ──
-  currentMeds: string[];       // текущие рецептурные препараты (МНН через запятую)
-  drugAllergies: string[];     // лекарственные аллергии
-  cyp450Status: string;        // CYP450 генотип (если известен): 'normal' | 'poor' | 'intermediate' | 'rapid' | 'unknown'
-  isPregnant: boolean;         // беременность
-  lactating: boolean;          // лактация
-  surgeryHistory: string[];    // перенесённые операции
-  familyHistory: string[];     // семейный анамнез: сердечно-сосудистые, диабет, онкология, аутоиммунные
+  adClass: ADClass; stackComplexity: StackComplexity;
+  targetOrgans: string[]; targetSystems: string[];
+  currentMeds: string[]; drugAllergies: string[];
 }
 
 export function getDefaultBioStackProfile(): BioStackProfile {
@@ -50,15 +37,9 @@ export function getDefaultBioStackProfile(): BioStackProfile {
     experience: 'intermediate', goals: ['muscle_gain'],
     aasStatus: 'none', healthConditions: [], budget: 'medium',
     avoidIds: [], maxStackSize: 8,
-    cognitiveTask: 'focus', stimSensitivity: 'medium',
-    anxietyLevel: 5, sleepQuality: 7, caffeineLevel: 'moderate',
-    adClass: 'none', bpSystolic: 120, bpDiastolic: 80,
-    gutSensitivity: 'normal', smoke: false, alcoholLevel: 'rare',
-    dietType: 'mixed', chronotype: 'mixed', stressLevel: 5,
-    currentSupplements: [], stackComplexity: 'balanced',
+    adClass: 'none', stackComplexity: 'balanced',
     targetOrgans: [], targetSystems: [],
-    currentMeds: [], drugAllergies: [], cyp450Status: 'unknown',
-    isPregnant: false, lactating: false, surgeryHistory: [], familyHistory: [],
+    currentMeds: [], drugAllergies: [],
   };
 }
 
@@ -78,15 +59,6 @@ export function autoFillFromMainProfile(): Partial<BioStackProfile> {
       const g: Record<string, GoalType> = { bulk: 'muscle_gain', cut: 'fat_loss', maintenance: 'recovery', strength: 'muscle_gain', endurance: 'endurance', health: 'immunity' };
       if (g[s.primaryGoal]) filled.goals = [g[s.primaryGoal]];
     }
-    if (s.chronotype) filled.chronotype = s.chronotype as Chronotype;
-    if (s.baselineSleepQuality) filled.sleepQuality = s.baselineSleepQuality;
-    if (s.baselineStressLevel !== undefined) filled.stressLevel = s.baselineStressLevel;
-    if (s.dietType) {
-      const d: Record<string, DietType> = { omnivore: 'mixed', vegetarian: 'vegetarian', vegan: 'vegan', keto: 'keto', paleo: 'paleo', mediterranean: 'mediterranean' };
-      if (d[s.dietType]) filled.dietType = d[s.dietType];
-    }
-    if (s.smoke !== undefined) filled.smoke = s.smoke;
-    if (s.currentSupplements) filled.currentSupplements = s.currentSupplements.map((x: any) => x.id || x.name || String(x));
     if (s.medicalConditions) {
       const hc: HealthCondition[] = [];
       for (const c of s.medicalConditions) {
@@ -101,6 +73,12 @@ export function autoFillFromMainProfile(): Partial<BioStackProfile> {
         if (cl.includes('pressure') || cl.includes('давлен')) { hc.push('pressure_high'); }
       }
       if (hc.length > 0) filled.healthConditions = hc;
+    }
+    if ((s as any).currentMedications?.length) {
+      filled.currentMeds = (s as any).currentMedications.map((m: any) => m.name || String(m));
+    }
+    if ((s as any).allergies?.length) {
+      filled.drugAllergies = (s as any).allergies;
     }
     return filled;
   } catch { return {}; }

@@ -1,8 +1,10 @@
 import type { CalculatorState, CalculatorResult, LabSlice } from './support-plan/types';
+import { TZ_AUTO_BLACKLIST, sameClassIds } from './support-plan/shared-constants';
 import { PHARMA_DB } from '../core/pharma-database';
 import { MECHANISM_TO_SUPPORT, ORGAN_TO_SUPPORT, SYSTEM_TO_SUPPORT, CATEGORY_TO_SUPPORT, DRUG_PD_EFFECT_TO_SUPPORT, getSupportEntry, findByMechanisms, findByLabMarker, findByCategoryAndMech, findByOrganAndMech, SUPPORT_CATALOG_DATA, ALL_SUPPORT_IDS, filterByCoverageLevel, getEntryTier, getSynergyScore, getConflictScore, scoreCombination, COVERAGE_TIER_MAP, getBoostSubstances } from '../data/support-index';
 import { getSupportByMechanism, getSupportBySystem, getFullChainSupport } from '../data/mechanism-support-bridge';
 import { normalizeLabValue } from '../core/constants';
+import { getPrioritySubstances, getBrandName, getSubstancePriority, getPriorityReason, deriveSeverity, type SeverityLevel } from '../data/lab-priority-map';
 
 export type RecSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 export type RecStatus = 'active' | 'escalated' | 'blocked' | 'covered';
@@ -13,6 +15,8 @@ export interface RecSubstance {
   dose: string;
   reasoning: string;
   tier: 'base' | 'first' | 'second' | 'third';
+  priority?: number;
+  brandName?: string;
 }
 
 export interface Recommendation {
@@ -39,72 +43,12 @@ export interface CoverageResult {
   synergyScore: number;
 }
 
-// ── Блэклист: вещества, которые НЕ должны рекомендоваться как «поддержка» ──
-// Политика: ноотропы, пептиды и врачебные рецептурные ДОЛЖНЫ оставаться в выдаче
-// (по явному требованию пользователя). Блэклист содержит ТОЛЬКО:
-//   1) Сырые химические элементы/компоненты — НЕ препараты
-//   2) Гормоны/стероиды — сама фармакология, не «поддержка»
-//   3) Абстрактные классы препаратов (`*_drugs`) — не конкретные вещества
-//   4) Технические дубликаты записей БД (`*_dup`)
-// Дубли препаратов одного класса (AI, SERM, статины…) устраняются через REC_SAME_CLASS_GROUPS.
-export const REC_BLACKLIST = new Set<string>([
-  // Сырые химикалии/минералы/элементы:
-  'sodium','caffeine','adrenaline','copper','iron','flavonoids','anthocyanins','c60',
-  'omega6','omega7','omega9','l_histidine','ornithine','inosine','nrf2_activator',
-  'lecithin','taxifolin','glutamate','histidine','lactate','endocrine_marker','endocannabinoid',
-  'antacid','pharma',
-  // Гормоны/стероиды — сама фармакология, не «поддержка»:
-  'pregnenolone','neurosteroid','progesterone','dhea',
-  'estradiol','testosterone','cortisol','insulin','glucagon','vasopressin','follistatin',
-  'igf1','mgf','gip','glp1',
-  // Технические дубликаты записей БД:
-  'levothyroxine_dup','liothyronine_dup','metformin_dup',
-  // Абстрактные классы препаратов (не вещества):
-  'ace_inhibitor_drugs','antibiotic_drugs','anticoagulant_drugs','anticonvulsant_drugs',
-  'antidepressant_drugs','antidiabetic_drugs','antihistamine_drugs','antiplatelet_drugs',
-  'antipsychotic_drugs','antithyroid_drugs','anxiolytic_drugs','arb_drugs',
-  'beta_blocker_drugs','ccb_drugs','corticosteroid_drugs','diuretic_drugs',
-  'immunosuppressant_drugs','nsaid_drugs','ppi_drugs','statin_drugs','thyroid_drugs',
-]);
-
-// ── Same-class дедупликация в рекомендательном движке ──
-// При addRec(id): если id ∈ группе → все ID группы блокируются от дальнейшего добавления.
-// Синхронизировано с SAME_CLASS_GROUPS в support-plan/engine.ts.
-const REC_SAME_CLASS_GROUPS: Record<string, string[]> = {
-  ai:           ['anastrozole', 'letrozole', 'exemestane', 'arimidex', 'femara'],
-  serm:         ['tamoxifen', 'tamox', 'clomi', 'clomid', 'enclomid', 'enclomiphene', 'raloxifene'],
-  statin:       ['atorvastatin', 'rosuvastatin', 'simvastatin', 'pravastatin', 'pitavastatin', 'red_yeast', 'red_yeast_rice'],
-  arb:          ['telmisartan', 'losartan', 'valsartan', 'irbesartan', 'olmesartan', 'candesartan'],
-  ace:          ['lisinopril', 'enalapril', 'ramipril', 'perindopril', 'captopril'],
-  bb:           ['metoprolol', 'atenolol', 'bisoprolol', 'carvedilol', 'propranolol', 'nebivolol'],
-  ccb:          ['amlodipine', 'nifedipine', 'verapamil', 'diltiazem'],
-  diuretic:     ['furosemide', 'hydrochlorothiazide', 'chlorthalidone', 'spironolactone'],
-  anticoag:     ['warfarin', 'rivaroxaban', 'apixaban', 'dabigatran'],
-  antiplatelet: ['clopidogrel', 'ticagrelor', 'aspirin'],
-  racetam:      ['piracetam', 'aniracetam', 'oxiracetam', 'pramiracetam', 'coluracetam', 'fasoracetam'],
-  choline_donor:['citicoline', 'alpha_gpc', 'l_alpha_gpc', 'choline', 'cdp_choline'],
-  ssri:         ['fluoxetine', 'sertraline', 'citalopram', 'escitalopram'],
-  snri:         ['venlafaxine', 'duloxetine'],
-  benzodiazepine:['alprazolam', 'diazepam', 'lorazepam', 'clonazepam'],
-  antipsychotic:['olanzapine', 'quetiapine', 'risperidone', 'aripiprazole', 'haloperidol'],
-  nsaid:        ['ibuprofen', 'naproxen', 'celecoxib', 'diclofenac', 'meloxicam'],
-  corticosteroid:['prednisone', 'dexamethasone', 'hydrocortisone', 'methylprednisolone'],
-  antidiabetic: ['metformin', 'pioglitazone', 'acarbose', 'semaglutide'],
-  thyroid:      ['levothyroxine', 'liothyronine', 'methimazole', 'propylthiouracil'],
-  dopamine_agonist:['cabergoline', 'bromocriptine', 'pramipexole'],
-  anticonvulsant:['valproate', 'lamotrigine', 'carbamazepine', 'phenytoin'],
-  maoi:         ['selegiline', 'rasagiline', 'moclobemide'],
-};
-const REC_ID_TO_CLASS: Record<string, string> = (() => {
-  const m: Record<string, string> = {};
-  for (const [cls, ids] of Object.entries(REC_SAME_CLASS_GROUPS)) for (const id of ids) m[id] = cls;
-  return m;
-})();
-// Возвращает ID всех препаратов того же класса (пусто, если id не в группе)
-export function recSameClassIds(id: string): string[] {
-  const cls = REC_ID_TO_CLASS[id];
-  return cls ? REC_SAME_CLASS_GROUPS[cls] : [];
-}
+// ── Блэклист и same-class дедупликация — ЕДИНЫЙ источник в shared-constants.ts ──
+// Раньше были дублирующие копии (REC_BLACKLIST, REC_SAME_CLASS_GROUPS), что приводило
+// к рассинхрону: вещество могло быть заблокировано в engine, но пройти в recommendation-engine.
+// Теперь оба движка используют одни и те же константы.
+export const REC_BLACKLIST = TZ_AUTO_BLACKLIST;
+const recSameClassIds = sameClassIds;
 
 function getV(fp: LabSlice | null | undefined, panel: keyof LabSlice, key: string): number | null {
   if (!fp) return null;
@@ -131,9 +75,18 @@ function subInfo(id: string): { name: string; dose: string; tier: 'first' | 'sec
 }
 
 // Build substance entry with reasoning from catalog
-function makeSub(id: string, reasoning: string): { id: string; name: string; dose: string; reasoning: string; tier: 'first' | 'second' | 'third' | 'base' } {
+// If marker is provided, looks up priority and brandName from lab-priority-map
+function makeSub(id: string, reasoning: string, marker?: string): { id: string; name: string; dose: string; reasoning: string; tier: 'first' | 'second' | 'third' | 'base'; priority?: number; brandName?: string } {
   const info = subInfo(id);
-  return { id, name: info.name, dose: info.dose, reasoning, tier: info.tier };
+  const priority = marker ? getSubstancePriority(marker, id) : undefined;
+  const brand = getBrandName(id);
+  const reasonText = marker ? (getPriorityReason(marker, id) || reasoning) : reasoning;
+  const result: { id: string; name: string; dose: string; reasoning: string; tier: 'first' | 'second' | 'third' | 'base'; priority?: number; brandName?: string } = {
+    id, name: info.name, dose: info.dose, reasoning: reasonText, tier: info.tier,
+  };
+  if (priority !== undefined) result.priority = priority;
+  if (brand) result.brandName = brand;
+  return result;
 }
 
 // Find support substances by mechanisms, deduplicate, limit to top N
@@ -175,14 +128,25 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
     const alts = recSameClassIds(sid);
     return alts.some(alt => usedSubstanceIds.has(alt) && alt !== sid);
   };
-  const addRec = (id: string, severity: RecSeverity, system: string, systemLabel: string, title: string, substanceIds: string[], reasoningMap: Record<string, string>, escalation: string, monitoring: string) => {
-    const substances = substanceIds.filter(sid =>
+// Order substance ids by priority from lab-priority-map (if marker is known)
+function orderByPriority(ids: string[], marker?: string): string[] {
+  if (!marker) return ids;
+  return [...ids].sort((a, b) => {
+    const pa = getSubstancePriority(marker, a) ?? 99;
+    const pb = getSubstancePriority(marker, b) ?? 99;
+    return pa - pb;
+  });
+}
+
+  const addRec = (id: string, severity: RecSeverity, system: string, systemLabel: string, title: string, substanceIds: string[], reasoningMap: Record<string, string>, escalation: string, monitoring: string, marker?: string) => {
+    const orderedIds = orderByPriority(substanceIds, marker);
+    const substances = orderedIds.filter(sid =>
       !blockedIds.includes(sid) &&
       !REC_BLACKLIST.has(sid) &&
       !usedSubstanceIds.has(sid) &&
       !isClassBlocked(sid)
     ).map(sid => {
-      const s = makeSub(sid, reasoningMap[sid] || '');
+      const s = makeSub(sid, reasoningMap[sid] || '', marker);
       if (blockedIds.includes(sid)) { s.name += ' [⚠ ЗАБЛОКИРОВАН]'; s.reasoning += ' — замена по механизму'; }
       return s;
     });
@@ -232,14 +196,16 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
     recs.push({ id:'__week_change', severity:'info', system:'', systemLabel:'📅 Неделя ' + week, title: weekChanges.join(' · '), status:'active', substances:[], escalation:'', monitoring:'', conflicts:[] });
   }
 
-  // ── HCT impact → query support by mechanism ──
+  // ── HCT impact → query support by mechanism + priority ──
   const hctVal = getV(fp, 'panelHematology', 'HCT');
   if (maxHct >= 3 || state.cardio.hctElevation !== 'none' || (hctVal !== null && hctVal > (sex === 'male' ? 47 : 44))) {
     const severe = maxHct >= 5 || (hctVal !== null && hctVal > 52) || state.cardio.hctElevation === 'severe';
-    let hctIds: string[] = findSupportByMechanisms(['PLATELET_AGGREGATION_INHIBITION', 'FIBRINOLYSIS']);
+    const hctSev: SeverityLevel = severe ? 'severe' : 'moderate';
+    const priorityIds = getPrioritySubstances('HCT', hctSev).map(e => e.substanceId);
+    let hctIds: string[] = priorityIds.length >= 2 ? [...priorityIds] : findSupportByMechanisms(['PLATELET_AGGREGATION_INHIBITION', 'FIBRINOLYSIS']);
     if (hctIds.length < 2) hctIds = ['serrapeptase', 'nattokinase'];
     const hctReasoning: Record<string, string> = {};
-    hctIds.forEach(id => { hctReasoning[id] = `Фибринолитик${severe ? ' (усиленный режим)' : ''}`; });
+    hctIds.forEach(id => { hctReasoning[id] = getPriorityReason('HCT', id) || `Фибринолитик${severe ? ' (усиленный режим)' : ''}`; });
     if (severe || state.contraindications.hasThrombophilia) {
       const extra = findSupportByMechanisms(['ANTICOAGULANT']);
       extra.forEach(id => { if (!hctIds.includes(id)) { hctIds.push(id); hctReasoning[id] = 'Антикоагулянт'; } });
@@ -248,19 +214,21 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
       `HCT ↑${hctVal !== null ? ': ' + hctVal + '%' : ''} от ${drugNames.join(', ')}${state.contraindications.hasThrombophilia ? ' (тромбофилия)' : ''}`,
       hctIds, hctReasoning,
       `HCT > 52: усилить фибринолиз. Контроль D-димера. Гидратация 3+ л/день.`,
-      'HCT, Hb, RBC, D-димер, фибриноген каждые 2 нед');
+      'HCT, Hb, RBC, D-димер, фибриноген каждые 2 нед',
+      'HCT');
   }
 
-  // ── Hepatotoxicity → query hepatoprotectors ──
+  // ── Hepatotoxicity → query hepatoprotectors (priority: ALT) ──
   const altVal = getV(fp, 'panelBiochem', 'ALT');
   if (maxHep > 0 || hasOral || state.hepatobiliary.altAstElevation !== 'none' || (altVal !== null && altVal > 40)) {
     const severe = maxHep >= 2.5 || hasOral || (altVal !== null && altVal > 100);
-    let ids: string[] = findSupportByCategoryAndMech('hepatoprotector', 'GLUTATHIONE_SYNTHESIS', 'ANTIOXIDANT', 'BILE_ACID_MOD');
+    const hepSev: SeverityLevel = severe ? 'severe' : 'moderate';
+    const priorityIds = getPrioritySubstances('ALT', hepSev).map(e => e.substanceId);
+    let ids: string[] = priorityIds.length >= 2 ? [...priorityIds] : findSupportByCategoryAndMech('hepatoprotector', 'GLUTATHIONE_SYNTHESIS', 'ANTIOXIDANT', 'BILE_ACID_MOD');
     if (ids.length < 3) ids = ['nac', 'tudca', 'milk_thistle'];
     const reasoning: Record<string, string> = {};
     ids.forEach(id => {
-      const entry = getSupportEntry(id);
-      reasoning[id] = entry?.description?.slice(0, 100) || `Гепатопротектор${severe ? ' (усиленный)' : ''}`;
+      reasoning[id] = getPriorityReason('ALT', id) || getSupportEntry(id)?.description?.slice(0, 100) || `Гепатопротектор${severe ? ' (усиленный)' : ''}`;
     });
     if (severe || hasOral) {
       const extra = findByMechanisms('MEMBRANE_PHOSPHOLIPID');
@@ -270,7 +238,8 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
       `Гепатотоксичность${altVal !== null ? ': АЛТ ' + altVal : ''}${hasOral ? ' (оральные ААС)' : ''} от ${drugNames.join(', ')}`,
       ids, reasoning,
       `АЛТ > 100: NAC → 2400 мг. ${hasOral ? 'Курс оральных не более 6 нед.' : ''}Контроль каждые 2 нед.`,
-      'АЛТ, АСТ, ГГТ, ЩФ, билирубин каждые 2-4 нед');
+      'АЛТ, АСТ, ГГТ, ЩФ, билирубин каждые 2-4 нед',
+      'ALT');
   }
 
   // ── Neurotoxicity → query neuroprotectors ──
@@ -290,13 +259,15 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
       'Когнитивные функции, качество сна, агрессия каждую нед');
   }
 
-  // ── Aromatization → E2 control ──
+  // ── Aromatization → E2 control (priority: E2) ──
   const e2Val = getV(fp, 'panelSex', 'E2');
   if (maxAro > 0 || state.epicrisis.pastGyno || (e2Val !== null && e2Val > 40)) {
-let ids: string[] = findSupportByMechanisms(['AROMATASE_INHIBITION', 'ESTROGEN_MODULATION']);
+    const e2Sev: SeverityLevel = (e2Val !== null && e2Val > 55) ? 'severe' : 'moderate';
+    const priorityIds = getPrioritySubstances('E2', e2Sev).map(e => e.substanceId);
+    let ids: string[] = priorityIds.length >= 2 ? [...priorityIds] : findSupportByMechanisms(['AROMATASE_INHIBITION', 'ESTROGEN_MODULATION']);
     if (ids.length === 0) ids = ['dim', 'indinol'];
     const reasoning: Record<string, string> = {};
-    ids.forEach(id => { reasoning[id] = 'контроль ароматизации эстрогенов'; });
+    ids.forEach(id => { reasoning[id] = getPriorityReason('E2', id) || 'контроль ароматизации эстрогенов'; });
     if (maxAro >= 0.5 || (e2Val !== null && e2Val > 55)) {
       if (!ids.includes('anastrozole') && !ids.some(id => id.toLowerCase() === 'pharma_anastrozole')) {
         ids.push('anastrozole');
@@ -315,25 +286,31 @@ let ids: string[] = findSupportByMechanisms(['AROMATASE_INHIBITION', 'ESTROGEN_M
       `Ароматизация${e2Val !== null ? ' (E2: ' + e2Val + ' pg/mL)' : ''} от ${drugNames.join(', ')}${state.epicrisis.pastGyno ? ' · гинекомастия в анамнезе' : ''}`,
       ids, reasoning,
       'E2 > 55 pg/mL: +Анастрозол 1 мг 2×/нед, доза по E2. Контроль E2 каждые 4 нед.',
-      'E2, пролактин, ЛГ, ФСГ каждые 4 нед');
+      'E2, пролактин, ЛГ, ФСГ каждые 4 нед',
+      'E2');
   }
 
-  // ── Progestogenic / 19-nor → prolactin control ──
+  // ── Progestogenic / 19-nor → prolactin control (priority: PRL) ──
   const prolVal = getV(fp, 'panelSex', 'Prolactin');
   if (maxProg > 0 || has19Nor || (prolVal !== null && prolVal > 25)) {
-    let ids: string[] = findSupportByMechanisms(['PROLACTIN_SUPPRESSION', 'DOPAMINE_PRECURSOR']);
+    const prolSev: SeverityLevel = (prolVal !== null && prolVal > 40) ? 'severe' : 'moderate';
+    const priorityIds = getPrioritySubstances('PRL', prolSev).map(e => e.substanceId);
+    let ids: string[] = priorityIds.length >= 2 ? [...priorityIds] : findSupportByMechanisms(['PROLACTIN_SUPPRESSION', 'DOPAMINE_PRECURSOR']);
     if (ids.length === 0) ids = ['vitex', 'p5p'];
     const reasoning: Record<string, string> = {};
-    ids.forEach(id => { reasoning[id] = 'Снижение пролактина'; });
+    ids.forEach(id => { reasoning[id] = getPriorityReason('PRL', id) || 'Снижение пролактина'; });
     if (maxProg >= 0.4 || has19Nor) {
-      ids.push('cabergoline');
-      reasoning['cabergoline'] = 'D2-агонист — доза и приём по пролактину';
+      if (!ids.includes('cabergoline')) {
+        ids.push('cabergoline');
+        reasoning['cabergoline'] = 'D2-агонист — доза и приём по пролактину';
+      }
     }
     addRec('prolactin', (prolVal !== null && prolVal > 40) ? 'critical' : 'high', 'endocrine', 'Пролактин',
       `Прогестиновая активность от ${drugNames.filter(n => ['tren','nandrolone','deca','npp','trest'].some(x => n.toLowerCase().includes(x))).join(', ')}${prolVal !== null ? ' (пролактин: ' + prolVal + ')' : ''}`,
       ids, reasoning,
       'Пролактин > 40: +Каберголин 0.25 мг. Контроль пролактина каждые 4 нед.',
-      'Пролактин, E2, ЛГ, ФСГ каждые 4 нед');
+      'Пролактин, E2, ЛГ, ФСГ каждые 4 нед',
+      'PRL');
   }
 
   // ── hCG auto-assign: any AAS → hCG 500 IU 2×/week, 3 weeks on / 1 week off ──
@@ -365,13 +342,15 @@ let ids: string[] = findSupportByMechanisms(['AROMATASE_INHIBITION', 'ESTROGEN_M
       'Пролактин каждые 4 нед');
   }
 
-  // ── Lipid impact ──
+  // ── Lipid impact (priority: LDL) ──
   const ldlVal = getV(fp, 'panelLipid', 'LDL');
   if (maxLipid > 0.2 || state.cardio.ldlElevation !== 'none' || state.goals.lipidCorrection) {
-    let ids: string[] = findSupportByMechanisms(['CHOLESTEROL_REDUCTION', 'AMPK_ACTIVATION', 'LIPID_LOWERING', 'EPA_DHA_UP']);
-    if (ids.length < 3) ids = ['omega3', 'bergamot', 'vitamin_e', 'berberine', 'coq10'];
+    const ldlSev: SeverityLevel = (state.cardio.ldlElevation === 'severe' || (ldlVal !== null && ldlVal > 4.5)) ? 'severe' : 'moderate';
+    const priorityIds = getPrioritySubstances('LDL', ldlSev).map(e => e.substanceId);
+    let ids: string[] = priorityIds.length >= 2 ? [...priorityIds] : findSupportByMechanisms(['CHOLESTEROL_REDUCTION', 'AMPK_ACTIVATION', 'LIPID_LOWERING', 'EPA_DHA_UP']);
+    if (ids.length < 3) ids = ['bergamot', 'berberine', 'omega3', 'vitamin_e', 'coq10'];
     const reasoning: Record<string, string> = {};
-    ids.forEach(id => { const e = getSupportEntry(id); reasoning[id] = e?.description?.slice(0, 80) || 'Липидная поддержка'; });
+    ids.forEach(id => { reasoning[id] = getPriorityReason('LDL', id) || getSupportEntry(id)?.description?.slice(0, 80) || 'Липидная поддержка'; });
     if (state.cardio.ldlElevation === 'severe' || (ldlVal !== null && ldlVal > 4.5)) {
       ['red_yeast_rice', 'ezetimibe'].forEach(id => { if (!ids.includes(id)) { ids.push(id); reasoning[id] = 'Ингибитор HMG-CoA / NPC1L1'; } });
     }
@@ -379,23 +358,27 @@ let ids: string[] = findSupportByMechanisms(['AROMATASE_INHIBITION', 'ESTROGEN_M
       `Дислипидемия${ldlVal !== null ? ': ЛПНП ' + ldlVal : ''} от ${drugNames.join(', ')}`,
       ids, reasoning,
       'ЛПНП > 4.5: +Красный рис + Эзетимиб. Контроль АЛТ на красном рисе.',
-      'Липидограмма, АЛТ каждые 4 нед');
+      'Липидограмма, АЛТ каждые 4 нед',
+      'LDL');
   }
 
-  // ── BP / Cardiovascular ──
+  // ── BP / Cardiovascular (priority: BP_SYSTOLIC) ──
   if (state.cardio.bpStage !== 'normal' || state.cardio.heartRate > 85) {
-    let ids: string[] = findSupportByMechanisms(['BP_REDUCTION', 'NO_RELEASE', 'BETA1_BLOCKADE', 'PPAR_GAMMA_ACTIVATION']);
+    const bpSev: SeverityLevel = state.cardio.bpStage === 'hypertension2' ? 'severe' : 'moderate';
+    const priorityIds = getPrioritySubstances('BP_SYSTOLIC', bpSev).map(e => e.substanceId);
+    let ids: string[] = priorityIds.length >= 2 ? [...priorityIds] : findSupportByMechanisms(['BP_REDUCTION', 'NO_RELEASE', 'BETA1_BLOCKADE', 'PPAR_GAMMA_ACTIVATION']);
     if (ids.length < 2) ids = ['telmisartan', 'diosmin', 'hesperidin', 'pycnogenol'];
     const reasoning: Record<string, string> = {};
-    ids.forEach(id => { const e = getSupportEntry(id); reasoning[id] = e?.description?.slice(0, 80) || 'Поддержка ССС'; });
+    ids.forEach(id => { reasoning[id] = getPriorityReason('BP_SYSTOLIC', id) || getSupportEntry(id)?.description?.slice(0, 80) || 'Поддержка ССС'; });
     if (state.cardio.bpStage === 'hypertension2' || state.cardio.heartRate > 90) {
-      ids.push('nebivolol'); reasoning['nebivolol'] = 'β1-блокатор + NO-донор, ↓ ЧСС и АД';
+      if (!ids.includes('nebivolol')) { ids.push('nebivolol'); reasoning['nebivolol'] = 'β1-блокатор + NO-донор, ↓ ЧСС и АД'; }
     }
     addRec('bp', state.cardio.bpStage === 'hypertension2' ? 'critical' : 'high', 'cardio', 'ССС',
       `АД: ${state.cardio.bpStage}, ЧСС: ${state.cardio.heartRate}`,
       ids, reasoning,
       'АД > 130/80 через 2 нед: +Небиволол 5 мг. Контроль калия и креатинина.',
-      'АД ежедневно, ЧСС, калий, креатинин, ЭКГ каждые 4 нед');
+      'АД ежедневно, ЧСС, калий, креатинин, ЭКГ каждые 4 нед',
+      'BP_SYSTOLIC');
   }
 
   // ════════════════════════════════════════════════════════════════
@@ -413,70 +396,100 @@ let ids: string[] = findSupportByMechanisms(['AROMATASE_INHIBITION', 'ESTROGEN_M
   //  PHASE 3: Labs → query index for each marker
   // ════════════════════════════════════════════════════════════════
 
-  // ── Vitamin D deficiency → D3 + K2 + Mg ──
+  // ── Vitamin D deficiency → D3 + K2 + Mg (priority: VITD) ──
   const vitDVal = getV(fp, 'panelVitamin', 'Vitamin D (25-OH)');
   if (vitDVal !== null && vitDVal < 30) {
+    const vitdSev: SeverityLevel = vitDVal < 15 ? 'severe' : vitDVal < 20 ? 'moderate' : 'mild';
+    const priorityIds = getPrioritySubstances('VITD', vitdSev).map(e => e.substanceId);
+    const ids = priorityIds.length >= 2 ? priorityIds : ['vitamin_d3', 'vitamin_k2', 'magnesium'];
+    const reasoning: Record<string, string> = {};
+    ids.forEach(id => { reasoning[id] = getPriorityReason('VITD', id) || 'Восполнение дефицита'; });
     addRec('lab_vitd', 'medium', 'endocrine', 'Витамины',
       `Витамин D: ${vitDVal} < 30 нг/мл — дефицит`,
-      ['vitamin_d3', 'vitamin_k2', 'magnesium'],
-      { vitamin_d3: 'Восполнение дефицита 2000-5000 МЕ/сут', vitamin_k2: 'Кофактор — направление Ca в кость, ↓кальцификации сосудов', magnesium: 'Кофактор активации витамина D' },
+      ids, reasoning,
       'Контроль 25-OH D через 8 нед. Цель: 40-60 нг/мл.',
-      '25-OH витамин D каждые 8 нед');
+      '25-OH витамин D каждые 8 нед',
+      'VITD');
   }
 
-  // ── B12 deficiency → methylcobalamin + folate ──
+  // ── B12 deficiency → methylcobalamin + folate (priority: B12) ──
   const b12Val = getV(fp, 'panelVitamin', 'B12');
   if (b12Val !== null && b12Val < 210) {
+    const b12Sev: SeverityLevel = b12Val < 100 ? 'severe' : 'moderate';
+    const priorityIds = getPrioritySubstances('B12', b12Sev).map(e => e.substanceId);
+    const ids = priorityIds.length >= 2 ? priorityIds : ['methylcobalamin', 'folate', 'tmg'];
+    const reasoning: Record<string, string> = {};
+    ids.forEach(id => { reasoning[id] = getPriorityReason('B12', id) || 'Восполнение дефицита B12'; });
     addRec('lab_b12', 'medium', 'hematologic', 'Витамины',
       `B12: ${b12Val} < 210 пг/мл — дефицит`,
-      ['vitamin_b12', 'folate', 'betaine'],
-      { vitamin_b12: 'Метилкобаламин 1000 мкг — восполнение дефицита', folate: '5-МТГФ 400 мкг — кофактор', betaine: 'TMG 1000 мг — поддержка метилирования' },
+      ids, reasoning,
       'Контроль B12, гомоцистеин через 4 нед.',
-      'B12, гомоцистеин, фолат каждые 4 нед');
+      'B12, гомоцистеин, фолат каждые 4 нед',
+      'B12');
   }
 
-  // ── High Ferritin → iron chelation + antioxidant ──
+  // ── High Ferritin → iron chelation + antioxidant (priority: FERRITIN) ──
   const ferVal = getV(fp, 'panelIron', 'Ferritin');
   if (ferVal !== null && ferVal > 300) {
+    const ferSev: SeverityLevel = ferVal > 500 ? 'severe' : 'moderate';
+    const priorityIds = getPrioritySubstances('FERRITIN', ferSev).map(e => e.substanceId);
+    const ids = priorityIds.length >= 2 ? priorityIds : ['curcumin_sup', 'aspirin', 'vitamin_e'];
+    const reasoning: Record<string, string> = {};
+    ids.forEach(id => { reasoning[id] = getPriorityReason('FERRITIN', id) || 'Хелатация железа, антиоксидант'; });
     addRec('lab_ferritin', 'medium', 'hematologic', 'Железо',
       `Ферритин: ${ferVal} > 300 — избыток железа`,
-      ['milk_thistle', 'vitamin_c', 'nac'],
-      { milk_thistle: 'Силимарин — гепатопротекция при перегрузке железом', vitamin_c: 'Витамин C — хелатор железа при избытке', nac: 'NAC — связывание свободного железа' },
+      ids, reasoning,
       'Кровопускание при ферритине >500. Контроль ферритина, Fe, ТФК.',
-      'Ферритин, железо, ТФК, % насыщения трансферрина каждые 8 нед');
+      'Ферритин, железо, ТФК, % насыщения трансферрина каждые 8 нед',
+      'FERRITIN');
   }
 
-  // ── Low DHEA-S → DHEA support ──
+  // ── Low DHEA-S → DHEA support (priority: DHEA_S) ──
   const dheaVal = getV(fp, 'panelAdrenal', 'DHEA-S');
   if (dheaVal !== null && dheaVal < 100 && sex === 'male') {
+    const dheaSev: SeverityLevel = dheaVal < 50 ? 'severe' : 'moderate';
+    const priorityIds = getPrioritySubstances('DHEA_S', dheaSev).map(e => e.substanceId);
+    const ids = priorityIds.length >= 2 ? priorityIds : ['ashwagandha', 'shilajit', 'pregnenolone'];
+    const reasoning: Record<string, string> = {};
+    ids.forEach(id => { reasoning[id] = getPriorityReason('DHEA_S', id) || 'Поддержка надпочечников'; });
     addRec('lab_dheas', 'low', 'endocrine', 'Надпочечники',
       `DHEA-S: ${dheaVal} < 100 мкг/дл — надпочечниковая недостаточность`,
-      ['ashwagandha', 'vitamin_c', 'pantethine'],
-      { ashwagandha: 'Адаптоген — поддержка надпочечников', vitamin_c: 'Кофактор стероидогенеза', pantethine: 'Предшественник CoA — синтез гормонов' },
+      ids, reasoning,
       'Контроль DHEA-S, кортизол через 8 нед.',
-      'DHEA-S, кортизол утром каждые 8 нед');
+      'DHEA-S, кортизол утром каждые 8 нед',
+      'DHEA_S');
   }
 
-  // ── High Homocysteine → methylation support ──
+  // ── High Homocysteine → methylation support (priority: HOMOCYSTEINE) ──
   const hcyVal = getV(fp, 'panelBiochem', 'Homocysteine');
   if (hcyVal !== null && hcyVal > 15) {
+    const hcySev: SeverityLevel = hcyVal > 30 ? 'severe' : 'moderate';
+    const priorityIds = getPrioritySubstances('HOMOCYSTEINE', hcySev).map(e => e.substanceId);
+    const ids = priorityIds.length >= 2 ? priorityIds : ['methylfolate', 'methylcobalamin', 'tmg', 'vitamin_b6'];
+    const reasoning: Record<string, string> = {};
+    ids.forEach(id => { reasoning[id] = getPriorityReason('HOMOCYSTEINE', id) || 'Поддержка метилирования'; });
     addRec('lab_hcy', 'medium', 'hematologic', 'Метилирование',
       `Гомоцистеин: ${hcyVal} > 15 — нарушение метилирования`,
-      ['betaine', 'folate', 'vitamin_b12', 'vitamin_b6'],
-      { betaine: 'TMG 1000 мг — донор метильных групп', folate: '5-МТГФ 400 мкг — активная форма фолата', vitamin_b12: 'B12 1000 мкг — кофактор метилтрансферазы', vitamin_b6: 'B6 25 мг — кофактор цистатионин-β-синтазы' },
+      ids, reasoning,
       'Контроль гомоцистеина через 4 нед. Цель: <10.',
-      'Гомоцистеин, B12, фолат каждые 4 нед');
+      'Гомоцистеин, B12, фолат каждые 4 нед',
+      'HOMOCYSTEINE');
   }
 
-  // ── High CRP → anti-inflammatory support ──
+  // ── High CRP → anti-inflammatory support (priority: CRP) ──
   const crpVal = getV(fp, 'panelBiochem', 'CRP');
   if (crpVal !== null && crpVal > 5) {
+    const crpSev: SeverityLevel = crpVal > 20 ? 'severe' : 'moderate';
+    const priorityIds = getPrioritySubstances('CRP', crpSev).map(e => e.substanceId);
+    const ids = priorityIds.length >= 2 ? priorityIds : ['omega3', 'curcumin_sup', 'ashwagandha', 'probiotic'];
+    const reasoning: Record<string, string> = {};
+    ids.forEach(id => { reasoning[id] = getPriorityReason('CRP', id) || 'Противовоспалительная поддержка'; });
     addRec('lab_crp', 'medium', '', 'Воспаление',
       `СРБ: ${crpVal} > 5 — системное воспаление`,
-      ['omega3', 'curcumin', 'vitamin_c', 'coq10'],
-      { omega3: 'EPA+DHA — анти-воспалительный (↓IL-6, ↓TNF-α)', curcumin: 'Куркумин — ↓NF-κB, ↓COX-2', vitamin_c: 'Антиоксидант — ↓окислительного стресса', coq10: 'Mitochondrial protection — ↓воспаления' },
+      ids, reasoning,
       'Контроль СРБ, IL-6 через 4 нед.',
-      'СРБ, IL-6, ферритин каждые 4 нед');
+      'СРБ, IL-6, ферритин каждые 4 нед',
+      'CRP');
   }
 
   const labRules: { marker: string; panels: (keyof LabSlice)[]; threshold: { higherIsWorse: boolean; value: number }; system: string; label: string }[] = [
@@ -514,9 +527,18 @@ let ids: string[] = findSupportByMechanisms(['AROMATASE_INHIBITION', 'ESTROGEN_M
     const triggered = rule.threshold.higherIsWorse ? val > rule.threshold.value : val < rule.threshold.value;
     if (!triggered) continue;
 
-    // Find support substances from index (filtered through REC_BLACKLIST)
-    const labMatches = findByLabMarker(rule.marker).filter(m => !REC_BLACKLIST.has(m.substanceId));
-    const ids = labMatches.slice(0, 3).map(m => m.substanceId);
+    // Derive severity from value vs threshold
+    const ruleSev: SeverityLevel = deriveSeverity(val, rule.threshold.value, rule.threshold.higherIsWorse);
+
+    // Try priority-based selection first, fall back to index search
+    const priorityIds = getPrioritySubstances(rule.marker, ruleSev).map(e => e.substanceId);
+    let ids: string[];
+    if (priorityIds.length >= 2) {
+      ids = priorityIds;
+    } else {
+      const labMatches = findByLabMarker(rule.marker).filter(m => !REC_BLACKLIST.has(m.substanceId));
+      ids = labMatches.slice(0, 3).map(m => m.substanceId);
+    }
     if (ids.length === 0) continue;
 
     const recId = 'lab_' + rule.marker;
@@ -524,13 +546,14 @@ let ids: string[] = findSupportByMechanisms(['AROMATASE_INHIBITION', 'ESTROGEN_M
     coveredSystems.add(recId);
 
     const reasoning: Record<string, string> = {};
-    ids.forEach(id => { const m = labMatches.find(x => x.substanceId === id); reasoning[id] = m?.mechanism || 'По результатам анализов'; });
+    ids.forEach(id => { reasoning[id] = getPriorityReason(rule.marker, id) || 'По результатам анализов'; });
 
     addRec(recId, 'medium', rule.system, rule.label,
       `${rule.marker}: ${val} ${rule.threshold.higherIsWorse ? '>' : '<'} ${rule.threshold.value}`,
       ids, reasoning,
       `Повторный контроль ${rule.marker} через 2-4 нед. Коррекция дозы по динамике.`,
-      `${rule.marker} каждые 2-4 нед`);
+      `${rule.marker} каждые 2-4 нед`,
+      rule.marker);
   }
 
   // ════════════════════════════════════════════════════════════════
@@ -698,7 +721,7 @@ let ids: string[] = findSupportByMechanisms(['AROMATASE_INHIBITION', 'ESTROGEN_M
     if (state.toxicLoad.hazardousWork || state.toxicLoad.otherHeavyDrugs) baseIds.push('glutathione');
     const reasoning: Record<string, string> = {};
     baseIds.forEach(id => { const e = getSupportEntry(id); reasoning[id] = e?.description?.slice(0, 100) || 'Базовая поддержка'; });
-    addRec('base_antioxidant', 'info', '', 'Базовая защита',
+    addRec('base_antioxidant', 'low', '', 'Базовая защита',
       `Базовая поддержка: ${drugs.length > 0 ? 'курс ' + state.goals.cycleWeeks + ' нед' : ''}${state.toxicLoad.hazardousWork ? ', токсическая нагрузка' : ''}`,
       baseIds, reasoning,
       state.toxicLoad.hazardousWork ? 'Токсическая нагрузка: +Глутатион' : '',

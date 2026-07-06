@@ -270,6 +270,7 @@ export const TrainingConstructor: React.FC<Props> = ({
           currentMicrocycle={currentMicrocycle}
           setCurrentMicrocycle={setCurrentMicrocycle}
           onToRuntime={macroToRuntime}
+          setTab={setTab}
         />
       )}
     </div>

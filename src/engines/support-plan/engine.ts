@@ -10,11 +10,13 @@ import {
   toSystemRisksFromTz, toSystemRisks, getContraindicationAlerts,
   generateSynergyRecommendations,
   SYS_META, TZ_AUTO_BLACKLIST,
+  PHASE_BLOCKLIST,
 } from './engine-helpers';
 import { evaluateRecommendations } from '../recommendation-engine';
 import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, type TzSpecResult } from '../risk-engine-tz-spec';
 import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
+import { getPrioritySubstances, getSubstancePriority, type SeverityLevel } from '../../data/lab-priority-map';
 
 // ═══════════════════════════════════════════════════════════════
 //  ЕДИНСТВЕННЫЙ движок поддержки — calculateSupportTZ
@@ -41,27 +43,72 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     };
     const isUsed = (id: string): boolean => used.has(id) || usedCanon.has(canonId(id));
     for (const b of blacklist) { used.add(b); usedCanon.add(canonId(b)); }
+    // Phase-блэклист: Т-бустеры на курсе, AI на ПКТ и т.д.
+    const phaseKey = state.pharma?.phase || 'course';
+    const phaseBlocked = PHASE_BLOCKLIST[phaseKey];
+    if (phaseBlocked) for (const b of phaseBlocked) { used.add(b); usedCanon.add(canonId(b)); }
 
     // ── 1. Обязательные препараты на курсе ААС (mandatory logic) ──
     if (state.pharma.aas.length > 0) {
+      const aasIds = state.pharma.aas.map((a: any) => (a.id||'').toLowerCase());
+      const hasTest = aasIds.some(id => id.includes('test'));
+      const hasTren = aasIds.some(id => id.includes('tren'));
+      const hasNandrolone = aasIds.some(id => ['nandrolone','deca','npp'].some(x => id.includes(x)));
+      const hasBoldenone = aasIds.some(id => id.includes('bold') || id.includes('equipoise'));
+      const hasOral = state.pharma.aas.some((a: any) =>
+        a.form === 'oral' ||
+        ['oxandrolone','anavar','stanozolol','winstrol','methandienone','dianabol',
+         'fluoxymesterone','halotestin','oxymetholone','anadrol','turinabol',
+         'oral_turinabol','methyltestosterone','cheque_drops']
+          .some(x => (a.id||'').toLowerCase().includes(x)));
+
+      // hCG при любом AAS
       if (!state.pharma.hasHCG && !isUsed('hcg')) { substances.push('hcg'); markUsed('hcg'); }
-      const hasArom = state.pharma.aas.some((a: any) => (a.id||'').toLowerCase().includes('test') || (a.id||'').toLowerCase().includes('meth'));
-      if (hasArom && !state.pharma.hasAI && !isUsed('anastrozole') && !isUsed('tamoxifen')) { substances.push('anastrozole'); markUsed('anastrozole'); }
-      if (state.pharma.aas.some((a: any) => ['tren','nandrolone','deca','npp','trest'].some(x => (a.id||'').toLowerCase().includes(x)))) {
-        if (!state.pharma.hasCaber && !isUsed('cabergoline')) { substances.push('cabergoline'); markUsed('cabergoline'); }
+
+      // Антиароматаза при тестостероне/метилтестостероне
+      if (hasTest && !state.pharma.hasAI && !isUsed('anastrozole') && !isUsed('tamoxifen')) {
+        substances.push('anastrozole'); markUsed('anastrozole');
+      }
+
+      // Каберголин при прогестагенных (трен, нандрон, болденон)
+      if ((hasTren || hasNandrolone || hasBoldenone) && !state.pharma.hasCaber && !isUsed('cabergoline')) {
+        substances.push('cabergoline'); markUsed('cabergoline');
+      }
+
+      // Тренболон → NAC + астрагал + кордицепс (нефропротекция)
+      if (hasTren) {
+        if (!isUsed('nac')) { substances.push('nac'); markUsed('nac'); }
+        if (!isUsed('astragalus')) { substances.push('astragalus'); markUsed('astragalus'); }
+        if (!isUsed('cordyceps')) { substances.push('cordyceps'); markUsed('cordyceps'); }
+      }
+
+      // Оральные 17α-алкилированные → TUDCA + NAC (гепатопротекция)
+      if (hasOral) {
+        if (!isUsed('tudca')) { substances.push('tudca'); markUsed('tudca'); }
+        if (!isUsed('nac')) { substances.push('nac'); markUsed('nac'); }
+        if (!isUsed('milk_thistle')) { substances.push('milk_thistle'); markUsed('milk_thistle'); }
       }
     }
 
-    // ── 2. Рекомендации по анализам ──
+    // ── 2. Рекомендации по анализам (фильтрация по severity → level) ──
+    // basic: только critical/high; mid: +medium; max: +low; boost: все
+    const recSeverityByLevel: Record<string, Set<string>> = {
+      basic: new Set(['critical', 'high']),
+      mid:   new Set(['critical', 'high', 'medium']),
+      max:   new Set(['critical', 'high', 'medium', 'low']),
+      boost: new Set(['critical', 'high', 'medium', 'low', 'info']),
+    };
+    const allowedSeverity = recSeverityByLevel[state.powerLevel] ?? recSeverityByLevel.mid;
     const resultPre: any = { selectedSubstances: substances, schedule: [], synergyIdsUsed: synergyIds, overallRiskBefore: 0, overallRiskAfter: 0 };
     const recommendations = evaluateRecommendations(state, resultPre);
-    for (const rec of recommendations)
+    const filteredRecs = recommendations.filter(r => allowedSeverity.has(r.severity));
+    for (const rec of filteredRecs)
       for (const sub of rec.substances)
         if (!isUsed(sub.id)) { substances.push(sub.id); markUsed(sub.id); }
 
     // 2a. Отмечаем какие системы уже покрыты рекомендациями
     const recCoveredSystems = new Set<string>();
-    for (const rec of recommendations) {
+    for (const rec of filteredRecs) {
       if (rec.system) recCoveredSystems.add(rec.system);
       if (rec.id === 'estradiol' || rec.id === 'prolactin' || rec.id === 'hcg' || rec.id === 'always_hcg') recCoveredSystems.add('reproductive');
       if (rec.id === 'hepatic') recCoveredSystems.add('hepatic');
@@ -79,6 +126,18 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       if (!entries || entries.length === 0) continue;
       if (TZ_AUTO_BLACKLIST.has(id)) continue;
       allDb[id] = entries;
+    }
+
+    // ── 2a. Базовые витамины/минералы (всегда в плане, независимо от риска) ──
+    const baseSupplements = [
+      'vitamin_d3', 'vitamin_k2', 'magnesium', 'zinc',
+      'omega3', 'vitamin_c', 'vitamin_e', 'coq10',
+    ];
+    for (const baseId of baseSupplements) {
+      if (isUsed(baseId)) continue;
+      if (!allDb[baseId]) continue;
+      substances.push(baseId);
+      markUsed(baseId);
     }
 
     const sysCoverageCount: Record<string, number> = {};
@@ -110,6 +169,50 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       const targetMin = Math.max(5, baseRange[0] - (state.boostEnabled ? 5 : 0));
       const target = targetMin;
       const maxPerSys = (maxPerSystem[state.powerLevel] ?? 2) + (state.boostEnabled ? 1 : 0);
+
+      // ── Priority bonus from lab-priority-map ──
+      // Substances that are 1st/2nd choice for active lab markers get a scoring bonus
+      const priorityBonus = new Map<string, number>();
+      const fp = state.labs?.fullPanel;
+      if (fp) {
+        const labChecks: Array<{ panel: keyof typeof fp; key: string; marker: string; higherIsWorse: boolean; threshold: number }> = [
+          { panel: 'panelBiochem', key: 'ALT', marker: 'ALT', higherIsWorse: true, threshold: 40 },
+          { panel: 'panelBiochem', key: 'AST', marker: 'AST', higherIsWorse: true, threshold: 40 },
+          { panel: 'panelBiochem', key: 'GGT', marker: 'GGT', higherIsWorse: true, threshold: 55 },
+          { panel: 'panelBiochem', key: 'Bilirubin', marker: 'Bilirubin', higherIsWorse: true, threshold: 21 },
+          { panel: 'panelBiochem', key: 'Glucose', marker: 'GLU', higherIsWorse: true, threshold: 5.6 },
+          { panel: 'panelBiochem', key: 'Homocysteine', marker: 'HOMOCYSTEINE', higherIsWorse: true, threshold: 15 },
+          { panel: 'panelBiochem', key: 'CRP', marker: 'CRP', higherIsWorse: true, threshold: 5 },
+          { panel: 'panelBiochem', key: 'Creatinine', marker: 'Creatinine', higherIsWorse: true, threshold: 105 },
+          { panel: 'panelLipid', key: 'LDL', marker: 'LDL', higherIsWorse: true, threshold: 3 },
+          { panel: 'panelLipid', key: 'Triglycerides', marker: 'Triglycerides', higherIsWorse: true, threshold: 1.7 },
+          { panel: 'panelHematology', key: 'HCT', marker: 'HCT', higherIsWorse: true, threshold: 48 },
+          { panel: 'panelCoagulation', key: 'D-dimer', marker: 'D-dimer', higherIsWorse: true, threshold: 0.5 },
+          { panel: 'panelSex', key: 'E2', marker: 'E2', higherIsWorse: true, threshold: 40 },
+          { panel: 'panelSex', key: 'Prolactin', marker: 'PRL', higherIsWorse: true, threshold: 25 },
+          { panel: 'panelSex', key: 'Cortisol', marker: 'CORTISOL', higherIsWorse: true, threshold: 550 },
+          { panel: 'panelThyroid', key: 'TSH', marker: 'TSH', higherIsWorse: true, threshold: 4.5 },
+          { panel: 'panelVitamin', key: 'Vitamin D (25-OH)', marker: 'VITD', higherIsWorse: false, threshold: 30 },
+          { panel: 'panelVitamin', key: 'B12', marker: 'B12', higherIsWorse: false, threshold: 210 },
+          { panel: 'panelIron', key: 'Ferritin', marker: 'FERRITIN', higherIsWorse: true, threshold: 300 },
+        ];
+        for (const lc of labChecks) {
+          const pv = fp[lc.panel] as Record<string, string> | undefined;
+          if (!pv) continue;
+          const raw = parseFloat(pv[lc.key]);
+          if (isNaN(raw)) continue;
+          const triggered = lc.higherIsWorse ? raw > lc.threshold : raw < lc.threshold;
+          if (!triggered) continue;
+          const sev: SeverityLevel = lc.higherIsWorse
+            ? (raw > lc.threshold * 3 ? 'severe' : raw > lc.threshold * 2 ? 'moderate' : 'mild')
+            : (lc.threshold / Math.max(raw, 0.01) > 3 ? 'severe' : lc.threshold / Math.max(raw, 0.01) > 2 ? 'moderate' : 'mild');
+          const entries = getPrioritySubstances(lc.marker, sev);
+          for (const e of entries) {
+            const bonus = e.priority === 1 ? 8 : e.priority === 2 ? 4 : e.priority === 3 ? 2 : 1;
+            priorityBonus.set(e.substanceId, Math.max(priorityBonus.get(e.substanceId) || 0, bonus));
+          }
+        }
+      }
 
       const phase = state.pharma?.phase || 'course';
       const skipReproductive = phase === 'course' || phase === 'bridge';
@@ -148,7 +251,8 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
           }
           if (matchCount > 0) {
             const synBonus = synergyScoreWithPlan(id, substances);
-            scored.push([id, matchCount, totalK, synBonus]);
+            const pBonus = priorityBonus.get(id) || 0;
+            scored.push([id, matchCount, totalK, synBonus + pBonus]);
           }
         }
         scored.sort((a, b) => (b[1] * 20 + b[2] + b[3] * 3) - (a[1] * 20 + a[2] + a[3] * 3));
@@ -173,9 +277,10 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
             for (const e of entries) {
               if ((e.organId === tzSys || e.organId === sys) && e.k > 0) {
                 const synBonus = synergyScoreWithPlan(id, substances);
-                const compositeScore = e.k + synBonus * 0.3;
+                const pBonus = priorityBonus.get(id) || 0;
+                const compositeScore = e.k + (synBonus + pBonus) * 0.3;
                 if (!best || compositeScore > (best[1] + best[2] * 0.3)) {
-                  best = [id, e.k, synBonus];
+                  best = [id, e.k, synBonus + pBonus];
                 }
               }
             }
@@ -216,10 +321,11 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
             const hasSys = entries.some(e => e.organId === tzSys || e.organId === sys);
             if (!hasSys) continue;
             const synScore = synergyScoreWithPlan(id, substances);
-            if (synScore < 4) continue;
+            const pBonus = priorityBonus.get(id) || 0;
+            if (synScore + pBonus < 4) continue;
             const bestK = Math.max(...entries.filter(e => e.organId === tzSys || e.organId === sys).map(e => e.k));
-            if (!bestBoost || synScore > bestBoost[1] || (synScore === bestBoost[1] && bestK > bestBoost[2])) {
-              bestBoost = [id, synScore, bestK];
+            if (!bestBoost || (synScore + pBonus) > bestBoost[1] || ((synScore + pBonus) === bestBoost[1] && bestK > bestBoost[2])) {
+              bestBoost = [id, synScore + pBonus, bestK];
             }
           }
           if (bestBoost) {
@@ -231,29 +337,62 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       }
     }
 
-    // ── 4. Суставы: добавляем в ЕДИНЫЙ substances, тег в jointSubs ──
+    // ── Level caps для mode-блоков: basic=3, mid=5, max=8, boost=all ──
+    const modeCap: Record<string, number> = { basic: 3, mid: 5, max: 8, boost: 99 };
+    const modeLimit = modeCap[state.powerLevel] ?? 5;
+
+    // ── 4. Суставы: добавляем prioritized subset, тег в jointSubs ──
     const jointSubs: string[] = [];
     if (state.jointMode) {
-      const jointIds = ['collagen','glucosamine','msm','boswellia','chondroitin_sulfate','hyaluronic_acid','bpc157','tb500','vitamin_c','curcumin','omega3'];
-      for (const jid of jointIds) {
-        if (!isUsed(jid)) { substances.push(jid); markUsed(jid); jointSubs.push(jid); }
+      const jointPriority = ['collagen','glucosamine','omega3','curcumin','msm','boswellia','chondroitin_sulfate','hyaluronic_acid','vitamin_c','bpc157','tb500'];
+      let added = 0;
+      for (const jid of jointPriority) {
+        if (added >= modeLimit) break;
+        if (!isUsed(jid)) { substances.push(jid); markUsed(jid); jointSubs.push(jid); added++; }
       }
     }
 
-    // ── 5. Репродуктивная система: добавляем в ЕДИНЫЙ substances ──
+    // ── 5. Репродуктивная система: prioritized subset ──
     if (state.reproMode) {
-      const reproIds = ['hcg','zinc','vitamin_d3','coq10','ashwagandha','saw_palmetto'];
-      for (const rid of reproIds) {
-        if (!isUsed(rid)) { substances.push(rid); markUsed(rid); }
+      const reproPriority = ['hcg','zinc','vitamin_d3','coq10','ashwagandha','saw_palmetto'];
+      let added = 0;
+      for (const rid of reproPriority) {
+        if (added >= modeLimit) break;
+        if (!isUsed(rid)) { substances.push(rid); markUsed(rid); added++; }
       }
     }
 
-    // ── 6. Нейропротекция: добавляем в ЕДИНЫЙ substances, тег в neuroSubs ──
+    // ── 6. Нейропротекция: prioritized subset, тег в neuroSubs ──
     const neuroSubs: string[] = [];
     if (state.neuroMode) {
-      const neuroIds = ['nac','alpha_lipoic','omega3','coq10','magnesium','lions_mane','theanine','tyrosine','vitamin_b6','vitamin_b12','folate','ashwagandha','bromantan','fasoracetam','huperzine','semax','cerebrolysin'];
-      for (const nid of neuroIds) {
-        if (!isUsed(nid)) { substances.push(nid); markUsed(nid); neuroSubs.push(nid); }
+      const neuroPriority = ['nac','omega3','magnesium','alpha_lipoic','coq10','lions_mane','theanine','tyrosine','vitamin_b6','vitamin_b12','folate','ashwagandha','bromantan','fasoracetam','huperzine','semax','cerebrolysin'];
+      let added = 0;
+      for (const nid of neuroPriority) {
+        if (added >= modeLimit) break;
+        if (!isUsed(nid)) { substances.push(nid); markUsed(nid); neuroSubs.push(nid); added++; }
+      }
+    }
+
+    // ── 6a. Синергетические пары (комплексный выбор) ──
+    // Если выбран один из пары — добавить партнёра автоматически
+    const SYNERGY_PAIRS: Record<string, string[]> = {
+      serrapeptase: ['nattokinase'],
+      nattokinase: ['serrapeptase'],
+    };
+    for (const [id, partners] of Object.entries(SYNERGY_PAIRS)) {
+      if (isUsed(id)) {
+        for (const partner of partners) {
+          if (!isUsed(partner)) {
+            substances.push(partner);
+            markUsed(partner);
+            const pEntries = allDb[partner];
+            if (pEntries) {
+              for (const e of pEntries) {
+                sysCoverageCount[e.organId] = (sysCoverageCount[e.organId] || 0) + 1;
+              }
+            }
+          }
+        }
       }
     }
 
@@ -487,5 +626,79 @@ export function hydrateState(): Partial<CalculatorState> {
       }
     } catch {}
   }
+
+  // ── Авто-вывод state-полей из анализов (если карточки убраны из UI) ──
+  // Беpём midCourse slice (наиболее актуальный) и выводим hepatobiliary/cardio/urinary
+  const labSlice = result.labs?.midCourse || result.labs?.preCourse || result.labs?.fullPanel as any;
+  if (labSlice) {
+    try {
+      const getV = (panel: string, key: string): number | null => {
+        const pv = (labSlice as any)[panel] as Record<string, string> | undefined;
+        if (!pv) return null;
+        const v = parseFloat(pv[key]);
+        return isNaN(v) ? null : v;
+      };
+      const alt = getV('panelBiochem', 'ALT');
+      const ast = getV('panelBiochem', 'AST');
+      const ggt = getV('panelBiochem', 'GGT');
+      const bilirubin = getV('panelBiochem', 'Bilirubin');
+      const creatinine = getV('panelBiochem', 'Creatinine');
+      const ldl = getV('panelLipid', 'LDL');
+      const hdl = getV('panelLipid', 'HDL');
+      const tg = getV('panelLipid', 'Triglycerides');
+      const hct = getV('panelHematology', 'HCT');
+
+      if (!result.hepatobiliary) result.hepatobiliary = { altAstElevation: 'none', ggtElevation: 'none', bilirubinElevation: 'none', fattyLiver: false, cholecystitis: false, alcoholHistory: 'none' } as any;
+      const hep = result.hepatobiliary!;
+      if (alt !== null || ast !== null) {
+        const maxTransam = Math.max(alt ?? 0, ast ?? 0);
+        hep.altAstElevation = maxTransam < 40 ? 'none' : maxTransam < 80 ? 'mild' : maxTransam < 120 ? 'moderate' : 'severe';
+      }
+      if (ggt !== null) hep.ggtElevation = ggt < 55 ? 'none' : ggt < 100 ? 'mild' : ggt < 200 ? 'moderate' : 'severe';
+      if (bilirubin !== null) hep.bilirubinElevation = bilirubin < 21 ? 'none' : bilirubin < 40 ? 'mild' : bilirubin < 60 ? 'moderate' : 'severe';
+
+      if (!result.urinary) result.urinary = { creatinineElevation: 'none', ureaElevation: 'none', proteinuria: false, nephrotoxicDrugs: false, hypertension: false, diabetes: false, urinationPattern: 'normal' } as any;
+      if (creatinine !== null) result.urinary!.creatinineElevation = creatinine < 110 ? 'none' : creatinine < 130 ? 'mild' : creatinine < 150 ? 'moderate' : 'severe';
+
+      if (!result.cardio) result.cardio = { bpStage: 'normal', heartRate: 70, ldlElevation: 'none', hctElevation: 'none', hdlLow: false, triglycerides: 'normal', previousCVD: false, familyCVD: false } as any;
+      const card = result.cardio!;
+      if (ldl !== null) card.ldlElevation = ldl < 3.0 ? 'none' : ldl < 4.0 ? 'mild' : ldl < 5.0 ? 'moderate' : 'severe';
+      if (hdl !== null) card.hdlLow = hdl < 1.0;
+      if (tg !== null) card.triglycerides = tg < 1.7 ? 'normal' : tg < 2.3 ? 'elevated' : 'high';
+      if (hct !== null) card.hctElevation = hct < 52 ? 'none' : hct < 56 ? 'mild' : hct < 60 ? 'moderate' : 'severe';
+    } catch {}
+  }
+
+  // ── Авто-вывод питания из he_nutrition_diary (если карточка убрана) ──
+  if (!result.nutrition) {
+    try {
+      const raw = localStorage.getItem('he_nutrition_diary');
+      if (raw) {
+        const diary = JSON.parse(raw);
+        const today = new Date().toISOString().slice(0, 10);
+        const todayEntries = Array.isArray(diary) ? diary.filter((e: any) => (e.date || '').slice(0, 10) === today) : [];
+        if (todayEntries.length > 0) {
+          const totals = todayEntries.reduce((acc: any, e: any) => ({
+            calories: (acc.calories || 0) + (e.calories || 0),
+            proteinG: (acc.proteinG || 0) + (e.protein || 0),
+            fatG: (acc.fatG || 0) + (e.fat || 0),
+            carbsG: (acc.carbsG || 0) + (e.carbs || 0),
+            fiberG: (acc.fiberG || 0) + (e.fiber || 0),
+            waterL: (acc.waterL || 0) + (e.water || 0),
+          }), {});
+          result.nutrition = {
+            calories: Math.round(totals.calories || 0),
+            proteinG: Math.round(totals.proteinG || 0),
+            fatG: Math.round(totals.fatG || 0),
+            carbsG: Math.round(totals.carbsG || 0),
+            fiberG: Math.round(totals.fiberG || 0),
+            waterL: Math.round((totals.waterL || 0) * 10) / 10,
+            omega3: false, sodiumMg: 3500, potassiumMg: 4500, saltIntake: 'normal',
+          } as any;
+        }
+      }
+    } catch {}
+  }
+
   return result;
 }

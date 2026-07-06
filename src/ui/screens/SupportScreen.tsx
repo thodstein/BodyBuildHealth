@@ -41,7 +41,7 @@ import { calculateSupportTZ, hydrateState } from '../../engines/support-plan';
 import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engines/support-plan';
 import { getDrugTzMechanisms, getSupportTzDisplay, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../data/support-db';
 import { getLabEffectsForDrug, getMarkerName } from '../../data/support-lab-effects';
-import { runSupportUnified, runSupportForLevel } from '../../engines/support-plan';
+import { runSupportUnified, runSupportForLevel, canonId } from '../../engines/support-plan';
 import type { PlanResult, PlanSubstance } from '../../engines/support-plan';
 import { writeRiskBridge } from '../../engines/risk-bridge';
 import { buildPreApplyCard, evaluateRecommendations, computeCoverageRisk } from '../../engines/recommendation-engine';
@@ -73,7 +73,6 @@ import { SupportDiaryView } from './SupportScreen_parts/SupportDiaryView';
 import { SupportStacksView } from './SupportScreen_parts/SupportStacksView';
 import { SupportCalcResult } from './SupportScreen_parts/SupportCalcResult';
 import { DosageDatabaseView } from '../components/DosageCalculator';
-import { ComplaintsTab } from './SupportScreen_parts/ComplaintsTab';
 import { SupportProtocols } from './SupportScreen_parts/SupportProtocols';
 import { SupportBioavailability } from './SupportScreen_parts/SupportBioavailability';
 import { SymptomSolverTab } from './SupportScreen_parts/SymptomSolverTab';
@@ -85,7 +84,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [calcView, setCalcView] = useState<CalcView>('main');
   const [infoView, setInfoView] = useState<InfoView>('main');
   const [section, setSection] = useState<'home'|'generator'|'protocols'|'info'>('home');
-  const [genTab, setGenTab] = useState<'calculator'|'info'|'dosages'|'complaints'>('calculator');
+  const [genTab, setGenTab] = useState<'calculator'|'info'|'dosages'>('calculator');
   const [protocolTab, setProtocolTab] = useState<'pct'|'fertility'|'hrt'|'neuro'|'joints'|'acne'|'injections'>('pct');
   const [infoTab, setInfoTab] = useState<string>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
@@ -500,9 +499,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         dosages[analogId] = analogDosage;
       }
     }
-    // Add enhancedSubs (manual additions) — с dedup
+    // Add enhancedSubs (manual additions) — с dedup по canonId
     for (const enhId of enhancedSubs) {
-      if (!subs.includes(enhId)) {
+      const enhCanon = canonId(enhId);
+      if (!subs.some(s => canonId(s) === enhCanon)) {
         subs.push(enhId);
         const d = DEFAULT_DOSAGES[enhId];
         dosages[enhId] = d ? { mg: d.mg, timing: d.timing } : { mg: 500, timing: 'с едой' };
@@ -532,9 +532,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       pharma: {
         ...defaults.pharma,
         ...(h.pharma || {}),
-        // Merge AAS from both sources: linked.course (primary) + saved data
         aas: [...(defaults.pharma?.aas || []), ...((h.pharma?.aas || []) as any[]).filter((a: any) => !defaults.pharma?.aas?.some((d: any) => d.id === a.id))],
-        // Preserve hasHCG from linked.course
         hasHCG: defaults.pharma?.hasHCG || h.pharma?.hasHCG || false,
       },
       powerLevel: level,
@@ -545,10 +543,38 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       neuroMode: neuroMode,
     } as CalculatorState;
     stateRef.current = state;
-    const tzResult: CalculatorResult = calculateSupportTZ(state);
+
+    // ── Переиспользуем planResult если уровень совпадает (устраняем дубль вызова движка) ──
+    let tzResult: CalculatorResult;
+    if (planResult && level === supportLevel && !overrideSubs) {
+      //planResult уже вычислен effectiveLevel useMemo — пересобираем CalculatorResult из него
+      const selSubs = planResult.substances.map(p => p.id);
+      const sysBreakdown: Record<string, { raw: number; net: number }> = {};
+      for (const [sysId, sysData] of Object.entries(planResult.systems)) {
+        sysBreakdown[sysId] = { raw: sysData.raw, net: sysData.net };
+      }
+      tzResult = {
+        risk: { systems: [], overallRaw: planResult.overallRiskBefore, overallAfterSupport: planResult.overallRiskAfter, timestamp: new Date().toISOString() },
+        schedule: planResult.schedule,
+        selectedSubstances: selSubs,
+        jointSubs: planResult.substances.filter(p => p.fromJoint).map(p => p.id) as any,
+        neuroSubs: planResult.substances.filter(p => p.fromNeuro).map(p => p.id) as any,
+        boostAdded: planResult.substances.filter(p => p.fromBoost).map(p => p.id) as any,
+        synergyIdsUsed: [],
+        titrationApplied: {},
+        labDeltas: [],
+        overallRiskBefore: planResult.overallRiskBefore,
+        overallRiskAfter: planResult.overallRiskAfter,
+        contraindicationAlerts: [],
+        negativeBlocks: [],
+        comparisonBeforeAfter: Object.entries(sysBreakdown).map(([system, v]) => ({ system, before: v.raw, after: v.net })),
+        synergyRecommendations: planResult.stackRecommendations as any,
+        timestamp: new Date().toISOString(),
+      } as unknown as CalculatorResult;
+    } else {
+      tzResult = calculateSupportTZ(state);
+    }
     // ── ЕДИНЫЙ ДВИЖОК РИСКА: calculateTzSpecRisk (механизм-ориентированная модель) ──
-    // calculateSupportTZ уже использует calculateTzSpecRisk внутри.
-    // Никаких вторых движков (calculateTZRisk удалён — был рассинхрон).
     const systemBreakdown: Record<string, { raw: number; net: number }> = {};
     for (const cmp of (tzResult.comparisonBeforeAfter || [])) {
       systemBreakdown[cmp.system] = { raw: cmp.before, net: cmp.after };
@@ -3005,7 +3031,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['calculator','🧮 Калькулятор'],['dosages','📋 Дозировки'],['complaints','🩺 Жалобы'],['info','📖 О подборе']].map(([id,label]) => (
+            {[['calculator','🧮 Калькулятор'],['dosages','📋 Дозировки'],['info','📖 О подборе']].map(([id,label]) => (
               <button key={id} onClick={() => { setGenTab(id as any); 
               const a: Record<string,()=>void> = {
                 calculator: ()=>{ setTab('calculator'); setSupportView('calc'); },
@@ -3090,7 +3116,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             )}
             {renderView(infoView, 'diary', () =>
               <div style={{ padding: '0 4px' }}>
-                <SupportDiaryView s={s} />
+                <SupportDiaryView s={s} onOpenSolver={() => setInfoView('symptoms' as any)} />
               </div>
             )}
             {renderView(infoView, 'bioavailability', () =>
@@ -3322,20 +3348,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
       {/* ===== DOSAGE DATABASE VIEW ===== */}
       {section === 'generator' && genTab === 'dosages' && (
         <DosageDatabaseView />
-      )}
-
-      {/* ===== COMPLAINTS TAB ===== */}
-      {genTab === 'complaints' && (
-        <div style={{ paddingTop: 80, paddingLeft: 8, paddingRight: 8 }}>
-          <ComplaintsTab
-            onOpenSolver={() => {
-              setGenTab('calculator' as any);
-              setTab('calculator');
-              setSupportView('calc');
-              setInfoView('symptoms' as any);
-            }}
-          />
-        </div>
       )}
 
       {/* ===== PEPTIDE CALCULATOR ===== */}

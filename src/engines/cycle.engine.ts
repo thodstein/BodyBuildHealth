@@ -271,6 +271,17 @@ export function generateCyclePlan(
   return generateCyclePlanInternal(template, weeks, goal, level, recovery);
 }
 
+// Блок A: построение CyclePlan из конкретного выбранного шаблона (ручной макро-конструктор).
+export function generateCyclePlanFromTemplate(
+  template: CycleTemplate,
+  weeks: number,
+  goal: string,
+  level: string,
+  recovery: number
+): CyclePlan {
+  return generateCyclePlanInternal(template, weeks, goal, level, recovery);
+}
+
 function mapToRirPhase(
   phase: MesocyclePhase,
   phaseWeek: number,

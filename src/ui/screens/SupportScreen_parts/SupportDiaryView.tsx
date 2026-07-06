@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
 import { getSubstanceName } from '../../../engines/stack-optimizer.engine';
+import { ComplaintsTab } from './ComplaintsTab';
 
 const DIARY_KEY = 'he_support_diary';
 
@@ -154,13 +155,13 @@ const sx = {
   } as React.CSSProperties,
 };
 
-export const SupportDiaryView: React.FC<{ s: Record<string, any> }> = ({ s }) => {
+export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?: () => void }> = ({ s, onOpenSolver }) => {
   const { SUPPORT_LEVELS, supportLevel } = s;
   const [entries, setEntries] = useState<DiaryEntry[]>(loadDiary);
   const [notes, setNotes] = useState('');
   const [mood, setMood] = useState<MoodLevel>(3);
   const [viewDate, setViewDate] = useState(todayStr);
-  const [tab, setTab] = useState<'today' | 'week' | 'history' | 'stats'>('today');
+  const [tab, setTab] = useState<'today' | 'week' | 'history' | 'stats' | 'complaints'>('today');
   const [customSubInput, setCustomSubInput] = useState('');
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [filterText, setFilterText] = useState('');
@@ -406,6 +407,7 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any> }> = ({ s }) =>
           ['week', '📅 Неделя'],
           ['history', '📊 История'],
           ['stats', '📈 Статистика'],
+          ['complaints', '🩺 Жалобы'],
         ].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id as any)} style={sx.pill(tab === id)}>{label}</button>
         ))}
@@ -950,6 +952,11 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any> }> = ({ s }) =>
             🖨 Экспорт дневника (PDF / печать)
           </button>
         </div>
+      )}
+
+      {/* ═══════════════ COMPLAINTS TAB ═══════════════ */}
+      {tab === 'complaints' && (
+        <ComplaintsTab onOpenSolver={onOpenSolver} />
       )}
     </div>
   );

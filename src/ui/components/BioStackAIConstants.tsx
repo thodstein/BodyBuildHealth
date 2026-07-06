@@ -177,19 +177,19 @@ export const GROUP_LABELS = ['🫁 Печень','🧬 Метилировани�
 
 /* ─── Styles ─── */
 export const inputS: React.CSSProperties = {
-  width: '100%', padding: '10px 14px', borderRadius: 12,
+  width: '100%', padding: '8px 12px', borderRadius: 10,
   background: '#202023', border: '1px solid rgba(255,255,255,0.06)',
-  color: '#fff', fontSize: 13, boxSizing: 'border-box', outline: 'none',
+  color: '#fff', fontSize: 11, boxSizing: 'border-box', outline: 'none',
 };
 
 export const selectS: React.CSSProperties = { ...inputS, appearance: 'none' };
 
 /* ─── Shared Components ─── */
 export const GlassCard: React.FC<{ title?: string; icon?: string; color?: string; children: React.ReactNode; style?: React.CSSProperties; onClick?: () => void }> = ({ title, icon, color, children, style, onClick }) => (
-  <div onClick={onClick} style={{ borderRadius: 18, overflow: 'hidden', background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 20px rgba(0,0,0,0.3)', marginBottom: 10, cursor: onClick ? 'pointer' : undefined, ...style }}>
-    {color && <div style={{ height: 4, background: `linear-gradient(90deg, ${color}, ${color}66, transparent)` }} />}
-    {title && <div style={{ padding: '14px 18px 0', fontSize: 14, color: color || 'rgba(255,255,255,0.75)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>{icon && <span>{icon}</span>}{title}</div>}
-    <div style={{ padding: title ? '12px 18px 18px' : 18 }}>{children}</div>
+  <div onClick={onClick} style={{ borderRadius: 12, overflow: 'hidden', background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 1px 12px rgba(0,0,0,0.25)', marginBottom: 6, cursor: onClick ? 'pointer' : undefined, ...style }}>
+    {color && <div style={{ height: 3, background: `linear-gradient(90deg, ${color}, ${color}66, transparent)` }} />}
+    {title && <div style={{ padding: '10px 14px 0', fontSize: 12, color: color || 'rgba(255,255,255,0.75)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>{icon && <span>{icon}</span>}{title}</div>}
+    <div style={{ padding: title ? '8px 14px 12px' : 10 }}>{children}</div>
   </div>
 );
 
@@ -216,10 +216,10 @@ export const Slider: React.FC<{ value: number; onChange: (v: number) => void; la
 
 export function StatBox({ label, value, color, sub }: { label: string; value: string | number; color: string; sub?: string }) {
   return (
-    <div style={{ padding: '8px 10px', borderRadius: 10, background: color + '08', border: '1px solid ' + color + '20', textAlign: 'center' }}>
-      <div style={{ fontSize: 16, fontWeight: 800, color }}>{value}</div>
-      <div style={{ fontSize: 7, color }}>{label}</div>
-      {sub && <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{sub}</div>}
+    <div style={{ padding: '5px 7px', borderRadius: 8, background: color + '08', border: '1px solid ' + color + '20', textAlign: 'center' }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color }}>{value}</div>
+      <div style={{ fontSize: 6, color }}>{label}</div>
+      {sub && <div style={{ fontSize: 5, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{sub}</div>}
     </div>
   );
 }
@@ -281,19 +281,19 @@ export function ConfirmModal({ title, text, confirmLabel, cancelLabel, onConfirm
 }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)' }} onClick={onCancel}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '88%', maxWidth: 340, borderRadius: 18, background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
-        <div style={{ height: 4, background: `linear-gradient(90deg, ${confirmColor || '#00e68a'}, ${confirmColor || '#00e68a'}66, transparent)` }} />
-        <div style={{ padding: '20px 18px' }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 8 }}>{title}</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.4, marginBottom: 16 }}>{text}</div>
-          <div style={{ display: 'flex', gap: 8 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '88%', maxWidth: 320, borderRadius: 14, background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+        <div style={{ height: 3, background: `linear-gradient(90deg, ${confirmColor || '#00e68a'}, ${confirmColor || '#00e68a'}66, transparent)` }} />
+        <div style={{ padding: '14px 14px' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 6 }}>{title}</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', lineHeight: 1.4, marginBottom: 12 }}>{text}</div>
+          <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={onCancel} style={{
-              flex: 1, padding: '10px 0', borderRadius: 10, cursor: 'pointer',
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontWeight: 600, fontSize: 11,
+              flex: 1, padding: '8px 0', borderRadius: 8, cursor: 'pointer',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontWeight: 600, fontSize: 10,
             }}>{cancelLabel || 'Отмена'}</button>
             <button onClick={onConfirm} style={{
-              flex: 1, padding: '10px 0', borderRadius: 10, cursor: 'pointer',
-              background: `${confirmColor || '#00e68a'}18`, border: `1px solid ${confirmColor || '#00e68a'}30`, color: confirmColor || '#00e68a', fontWeight: 700, fontSize: 11,
+              flex: 1, padding: '8px 0', borderRadius: 8, cursor: 'pointer',
+              background: `${confirmColor || '#00e68a'}18`, border: `1px solid ${confirmColor || '#00e68a'}30`, color: confirmColor || '#00e68a', fontWeight: 700, fontSize: 10,
             }}>{confirmLabel || 'Подтвердить'}</button>
           </div>
         </div>
@@ -305,10 +305,10 @@ export function ConfirmModal({ title, text, confirmLabel, cancelLabel, onConfirm
 /* ─── SkeletonLoader ─── */
 export function SkeletonLoader({ count = 3 }: { count?: number }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} style={{
-          borderRadius: 18, height: 80, background: '#18181b',
+          borderRadius: 10, height: 56, background: '#18181b',
           border: '1px solid rgba(255,255,255,0.04)',
           animation: 'bioPulse 1.5s ease-in-out infinite',
           opacity: 1 - i * 0.1,

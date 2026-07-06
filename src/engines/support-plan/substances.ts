@@ -5,43 +5,135 @@
 import { DEFAULT_DOSAGES } from '../../data/support-database';
 import type { CalculatorResult, PlanSubstance } from './types';
 import { catalogEntry } from './types';
+import { canonId } from './shared-constants';
+import { getBrandName, getSubstancePriorityAny } from '../../data/lab-priority-map';
+
+// ═══════════════════════════════════════════════════════════════
+//  WEIGHT_BASED_DOSING — дозировки, зависящие от веса тела
+// ═══════════════════════════════════════════════════════════════
+const WEIGHT_BASED_DOSING: Record<string, { mgPerKg: number; minMg: number; maxMg: number }> = {
+  nac:          { mgPerKg: 15,  minMg: 600,  maxMg: 1800 },
+  omega3:       { mgPerKg: 50,  minMg: 2000, maxMg: 6000 },
+  vitamin_c:    { mgPerKg: 10,  minMg: 500,  maxMg: 1500 },
+  magnesium:    { mgPerKg: 6,   minMg: 300,  maxMg: 800  },
+  taurine:      { mgPerKg: 20,  minMg: 1000, maxMg: 3000 },
+  glycine:      { mgPerKg: 40,  minMg: 1000, maxMg: 5000 },
+  alpha_lipoic: { mgPerKg: 5,   minMg: 300,  maxMg: 800  },
+  coq10:        { mgPerKg: 3,   minMg: 100,  maxMg: 400  },
+  zinc:         { mgPerKg: 0.5, minMg: 15,   maxMg: 50   },
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  SUBSTANCE_REASONS — однострочное обоснование для каждого вещества
+// ═══════════════════════════════════════════════════════════════
+const SUBSTANCE_REASONS: Record<string, string> = {
+  nac: 'Гепатопротекция: ↑ глутатион, связывает токсичные метаболиты ААС',
+  tudca: 'Гепатопротекция: ↓ ER-стресс, улучшает желчеотток (BSEP)',
+  milk_thistle: 'Гепатопротекция: стабилизация мембран гепатоцитов',
+  alpha_lipoic: 'Антиоксидант: Nrf2-активация, регенерация витаминов C/E',
+  omega3: 'ССС: ↓ ТГ 20-30%, ↑ ЛПВП, антиатерогенный эффект',
+  vitamin_d3: 'Иммунитет: VDR-агонизм, ↑ тестостерон, минерализация костей',
+  vitamin_k2: 'ССС: ↓ кальцификации сосудов (MGP), ↑ остеокальцин',
+  vitamin_c: 'Антиоксидант: кофактор синтеза коллагена, ↓ окислительного стресса',
+  vitamin_e: 'Антиоксидант: защита мембран от перекисного окисления',
+  magnesium: 'ССС: ↓ QT, ↓ аритмий, электролитный баланс',
+  zinc: 'Репродукция: кофактор стероидогенеза, ↓ ароматазы',
+  coq10: 'Митохондрии: ↓ окислительного стресса миокарда, ↑ АТФ',
+  serrapeptase: 'Фибринолиз: расщепление α2-макроглобулина, ↑ текучесть крови',
+  nattokinase: 'Фибринолиз: прямая активация плазминогена, ↓ вязкости',
+  naringin: 'Реология: ингибиция агрегации тромбоцитов, ↓ вязкости',
+  lumbrokinase: 'Фибринолиз: мощный плазминоген-активатор, ↓ фибриногена',
+  bergamot: 'Липиды: ингибиция HMG-CoA редуктазы (натуральный статин)',
+  berberine: 'Метаболизм: AMPK-активация, ↑ рецепторы ЛПНП',
+  telmisartan: 'ССС: ARB, ↓ АД, ↓ гипертрофии ЛЖ',
+  nebivolol: 'ССС: β1-блокада + NO-модуляция, ↓ ЧСС',
+  diosmin: 'ССС: венотоник, ↓ растяжимости вен',
+  dim: 'Эстрадиол: сдвиг метаболизма E2 → 2-OH (защитный путь)',
+  vitex: 'Пролактин: D2-агонист, ↓ пролактина',
+  p5p: 'Пролактин: кофактор дофамина, ↓ пролактина',
+  taurine: 'Нейро: осморегуляция, защита миокарда от гипогликемии',
+  pqq: 'Нейро: митохондриальный биогенез, ↑ NGF',
+  lithium: 'Нейро: ↓ возбудимости, нейропротекция',
+  glycine: 'Нейро: ↑ ГАМК, ↓ кортизола, улучшение сна',
+  lions_mane: 'Нейро: ↑ NGF, восстановление миелина',
+  theanine: 'Нейро: ↑ ГАМК, ↓ тревожности, α-волны',
+  tyrosine: 'Нейро: предшественник дофамина/норадреналина',
+  ashwagandha: 'Адаптоген: ↓ кортизола, ↑ тестостерона',
+  astragalus: 'Почки: ↓ протеинурии, антиоксидант гепатоцитов',
+  cordyceps: 'Почки: нефропротекция, ↓ гиперфильтрации клубочков',
+  hcg: 'Репродукция: ↑ эндогенный T, профилактика атрофии яичек',
+  anastrozole: 'Эстрадиол: ингибиция ароматазы, ↓ E2',
+  cabergoline: 'Пролактин: D2-агонист, ↓ пролактина',
+  folate: 'Метилирование: ↓ гомоцистеина, кофактор метилирования',
+  methylcobalamin: 'Нейро: миелинизация, ↓ гомоцистеина',
+  tmg: 'Метилирование: донатор метильных групп, ↓ гомоцистеина',
+  niacin: 'Липиды: ↑ ЛПВП +15-35%, ↓ ЛПНП',
+  vitamin_b6: 'Нейро: кофактор серотонина/дофамина',
+  glutamine: 'ЖКТ: репарация энтероцитов, ↑ барьер',
+  calcium: 'Кости: минерализация, ↓ судорог',
+  potassium: 'ССС: электролит, ↓ аритмий',
+  boron: 'Репродукция: ↑ T через ↓ SHBG',
+  selenium: 'Антиоксидант: селенопротеины, ↑ глутатионпероксидаза',
+  aspirin: 'ССС: ↓ агрегации тромбоцитов, ↓ тромбоз',
+  celery_extract: 'ССС: апигенин, ↓ АД, диуретик',
+  glutathione: 'Антиоксидант: прямое восполнение GSH',
+};
 
 /**
- * Преобразует список id веществ в PlanSubstance[] (с dedup).
+ * Преобразует список id веществ в PlanSubstance[] (с dedup по canonId).
  * Берёт display-инфо из каталога SUPPORT_CATALOG_DATA, дозировки из DEFAULT_DOSAGES.
+ * Если передан weight — применяет вес-зависимые дозировки.
  */
-export function buildSubstances(ids: string[], _tzRes: CalculatorResult, tags?: { boostAdded?: string[]; jointSubs?: string[]; neuroSubs?: string[] }): PlanSubstance[] {
+export function buildSubstances(
+  ids: string[],
+  _tzRes: CalculatorResult,
+  tags?: { boostAdded?: string[]; jointSubs?: string[]; neuroSubs?: string[] },
+  weight?: number
+): PlanSubstance[] {
   const boostSet = new Set(tags?.boostAdded || []);
   const jointSet = new Set(tags?.jointSubs || []);
   const neuroSet = new Set(tags?.neuroSubs || []);
   const seen = new Set<string>();
+  const seenCanon = new Set<string>();
   const out: PlanSubstance[] = [];
   for (const id of ids) {
-    if (seen.has(id)) continue; // dedup — BUG 8
+    const cid = canonId(id);
+    if (seen.has(id) || seenCanon.has(cid)) continue;
     seen.add(id);
+    seenCanon.add(cid);
     const e = catalogEntry(id);
     const def = DEFAULT_DOSAGES[id];
-    const doseMg = def?.mg ?? e?.dosage?.mg ?? 500;
-    const doseDisplay = def
-      ? (def.mg >= 1000 ? `${(def.mg / 1000).toFixed(1)} г` : `${def.mg} мг`)
-      : (e?.dosage?.mg
-          ? (e.dosage.mg >= 1000 ? `${(e.dosage.mg / 1000).toFixed(1)} г` : `${e.dosage.mg} мг`)
-          : 'по инструкции');
-    out.push({
+    // Weight-based dosing
+    let doseMg = def?.mg ?? e?.dosage?.mg ?? 500;
+    const wbd = WEIGHT_BASED_DOSING[cid];
+    if (wbd && weight && weight > 0) {
+      doseMg = Math.round(Math.max(wbd.minMg, Math.min(wbd.maxMg, weight * wbd.mgPerKg)));
+    }
+    const doseDisplay = doseMg >= 1000
+      ? `${(doseMg / 1000).toFixed(1)} г`
+      : `${doseMg} мг`;
+    const entry = {
       id,
       name: e?.nameRu || e?.name || id,
       doseMg,
-      doseDisplay,
+      doseDisplay: (def && !wbd) || !e?.dosage?.mg
+        ? doseDisplay
+        : (e.dosage.mg > 0 ? doseDisplay : 'по инструкции'),
       timing: def?.timing || e?.dosage?.timing || e?.forms?.[0]?.dose || 'с едой',
       category: e?.category || [],
       tier: e?.tier || 'standard',
       targetSystems: e?.targetSystems || e?.systems || [],
       comment: e?.description || '',
-      mechanismReason: e?.mechanisms?.[0] || '',
+      mechanismReason: SUBSTANCE_REASONS[cid] || e?.mechanismOfAction || e?.mechanisms?.[0] || '',
       fromJoint: jointSet.has(id),
       fromBoost: boostSet.has(id),
       fromNeuro: neuroSet.has(id),
-    });
+    } as PlanSubstance;
+    const brand = getBrandName(id);
+    if (brand) entry.brandName = brand;
+    const prio = getSubstancePriorityAny(id);
+    if (prio) entry.priority = prio;
+    out.push(entry);
   }
   return out;
 }
@@ -82,9 +174,12 @@ export function buildSchedule(
     morning: [], afternoon: [], evening: [],
   };
   const seen = new Set<string>();
+  const seenCanon = new Set<string>();
   for (const id of ids) {
-    if (seen.has(id)) continue;
+    const cid = canonId(id);
+    if (seen.has(id) || seenCanon.has(cid)) continue;
     seen.add(id);
+    seenCanon.add(cid);
     const e = catalogEntry(id);
     const def = DEFAULT_DOSAGES[id];
     const name = e?.nameRu || e?.name || id;

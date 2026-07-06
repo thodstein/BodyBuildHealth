@@ -1412,6 +1412,18 @@ export const NutritionScreen: React.FC = () => {
     } catch {}
   }, []);
 
+  // Open diary tab directly when navigated from Profile → diaries → Питание
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('he_nav_nutrition_diary') === '1') {
+        localStorage.removeItem('he_nav_nutrition_diary');
+        setTab('diary');
+        setPage('tabs');
+        setNutritionSection('diary');
+      }
+    } catch {}
+  }, []);
+
   // Daily aggregates: group food entries by date for correct weekly averages and charts
   const dailyAggregates = useMemo(() => {
     const days = Object.entries(dailyLogs).sort(([a], [b]) => a.localeCompare(b));

@@ -25,8 +25,8 @@ import { getStrengthLevel, getNextLevelTarget } from '../../../engines/performan
 import { computeStructuredAnalytics } from '../../../engines/structured-analytics.engine';
 import {
   WARMUP_LABELS, GOALS, LEVELS, MUSCLE_GROUPS, GROUP_LABELS, EQUIP_LABELS, JOINT_LABELS,
-  PHASE_LABELS, PHASE_HINTS, TAB_GROUPS, TAB_LABELS,
-  type TrainingTab, type TrainingPage, type TrainingGroup,
+  PHASE_LABELS, PHASE_HINTS, TAB_LABELS,
+  type TrainingTab, type TrainingPage,
 } from './shared';
 
 import {

@@ -7,6 +7,12 @@ import {
   NUTRIENT_UL, DEPLETION_CASCADES, SUBSTANCE_HALF_LIFE,
   FORM_BIOAVAIL_MULT, MINERAL_SEPARATION_HOURS, MEAL_CONTEXT_RULES,
 } from './types';
+import {
+  SUB_ALIAS, canonId, TZ_AUTO_BLACKLIST,
+  SAME_CLASS_GROUPS, ID_TO_CLASS, sameClassIds,
+  PHASE_BLOCKLIST,
+} from './shared-constants';
+export { SUB_ALIAS, canonId, TZ_AUTO_BLACKLIST, SAME_CLASS_GROUPS, ID_TO_CLASS, sameClassIds, PHASE_BLOCKLIST };
 import { evaluateRecommendations } from '../recommendation-engine';
 import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, type DrugInput, type TzSpecResult, type TzSpecMechanismResult } from '../risk-engine-tz-spec';
 import { DRUG_DB } from '../../data/support-db';
@@ -1067,105 +1073,7 @@ export function toSystemRisksFromTz(
   });
 }
 
-// ── Канонические алиасы веществ ──
-// Решает проблему семантических дубликатов: рекомендательный движок использует ID с суффиксами
-// (_sup, _ii, _supplement, singular/plural), а SUPPLEMENTS_DB/PHARMACY_DB — базовые ID.
-// Без этой мапы один и тот же препарат попадает в план дважды под разными ID.
-export const SUB_ALIAS: Record<string, string> = {
-  zinc_sup: 'zinc', selenium_sup: 'selenium',
-  taurine_sup: 'taurine', curcumin_sup: 'curcumin',
-  collagen_ii: 'collagen', collagen_uc2: 'collagen',
-  calcium_supplement: 'calcium',
-  probiotic: 'probiotics', probiotics_sup: 'probiotics',
-  methylfolate: 'folate', methylcobalamin: 'vitamin_b12',
-  red_yeast_rice: 'red_yeast',
-  acetyl_l_carnitine: 'l_carnitine', carnitine: 'l_carnitine',
-  grape_seed_extract: 'grape_seed',
-  l_theanine: 'theanine', l_tyrosine: 'tyrosine', l_dopa: 'l_dopa',
-  l_lysine: 'lysine', l_tryptophan: 'tryptophan',
-  saw_palmetto: 'saw_palmetto',
-  telmi: 'telmisartan',
-  pharma_anastrozole: 'anastrozole',
-  pharma_cabergoline: 'cabergoline',
-  pharma_clomiphene: 'clomi',
-  pharma_enclomiphene: 'clomi',
-  pharma_letrozole: 'letrozole',
-  metformin_dup: 'metformin',
-  levothyroxine_dup: 'levothyroxine',
-  liothyronine_dup: 'liothyronine',
-  hyaluronic: 'hyaluronic_acid',
-  chondroitin: 'chondroitin_sulfate',
-};
-export function canonId(id: string): string { return SUB_ALIAS[id] || id; }
-
-// ── Блэклист: вещества ИЗ SUPPLEMENTS_DB/PHARMACY_DB, которые НЕ должны назначаться автоматически ──
-// Политика: ноотропы, пептиды и врачебные рецептурные ДОЛЖНЫ оставаться в выдаче
-// (по явному требованию пользователя). Блэклист содержит ТОЛЬКО:
-//   1) Сырые химические элементы/компоненты — НЕ препараты (соль, кофеин, адреналин)
-//   2) Гормоны/стероиды — это сама фармакология, не «поддержка»
-//   3) Абстрактные классы препаратов (`*_drugs`) — не конкретные вещества
-//   4) Технические дубликаты записей (`*_dup`)
-// Дубли препаратов одного класса (AI, SERM, статины…) устраняются через SAME_CLASS_GROUPS.
-export const TZ_AUTO_BLACKLIST = new Set<string>([
-  // ── Сырые химикалии/минералы/элементы — НЕ препараты поддержки:
-  'sodium', 'caffeine', 'adrenaline', 'copper', 'iron',
-  'flavonoids', 'anthocyanins', 'c60',
-  'omega6', 'omega7', 'omega9',
-  'l_histidine', 'ornithine', 'inosine', 'nrf2_activator',
-  'lecithin', 'taxifolin',
-  'glutamate', 'histidine', 'lactate',
-  'endocrine_marker', 'endocannabinoid',
-  'antacid', 'pharma',
-  // ── Гормоны/стероиды — это сама фармакология, не «поддержка»:
-  'pregnenolone', 'neurosteroid', 'progesterone', 'dhea',
-  'estradiol', 'testosterone', 'cortisol', 'insulin', 'glucagon', 'vasopressin',
-  'follistatin', 'igf1', 'mgf', 'gip', 'glp1',
-  // ── Технические дубликаты записей БД:
-  'levothyroxine_dup', 'liothyronine_dup', 'metformin_dup',
-  // ── Абстрактные классы препаратов (не вещества):
-  'ace_inhibitor_drugs', 'antibiotic_drugs', 'anticoagulant_drugs', 'anticonvulsant_drugs',
-  'antidepressant_drugs', 'antidiabetic_drugs', 'antihistamine_drugs', 'antiplatelet_drugs',
-  'antipsychotic_drugs', 'antithyroid_drugs', 'anxiolytic_drugs', 'arb_drugs',
-  'beta_blocker_drugs', 'ccb_drugs', 'corticosteroid_drugs', 'diuretic_drugs',
-  'immunosuppressant_drugs', 'nsaid_drugs', 'ppi_drugs', 'statin_drugs', 'thyroid_drugs',
-]);
-
-// ── Same-class дедупликация: выбор препарата из класса блокирует альтернативы ──
-// Решает проблему дублей: anastrozole + letrozole в одном плане.
-// При markUsed(id): если id ∈ группе → ALL ID группы помечаются как used.
-// Канонизация (canonId) применяется перед поиском группы.
-export const SAME_CLASS_GROUPS: Record<string, string[]> = {
-  ai:           ['anastrozole', 'letrozole', 'exemestane', 'arimidex', 'femara'],
-  serm:         ['tamoxifen', 'tamox', 'clomi', 'clomid', 'enclomid', 'enclomiphene', 'raloxifene'],
-  statin:       ['atorvastatin', 'rosuvastatin', 'simvastatin', 'pravastatin', 'pitavastatin', 'red_yeast', 'red_yeast_rice'],
-  arb:          ['telmisartan', 'losartan', 'valsartan', 'irbesartan', 'olmesartan', 'candesartan'],
-  ace:          ['lisinopril', 'enalapril', 'ramipril', 'perindopril', 'captopril'],
-  bb:           ['metoprolol', 'atenolol', 'bisoprolol', 'carvedilol', 'propranolol', 'nebivolol'],
-  ccb:          ['amlodipine', 'nifedipine', 'verapamil', 'diltiazem'],
-  diuretic:     ['furosemide', 'hydrochlorothiazide', 'chlorthalidone', 'spironolactone'],
-  anticoag:     ['warfarin', 'rivaroxaban', 'apixaban', 'dabigatran'],
-  antiplatelet: ['clopidogrel', 'ticagrelor', 'aspirin'],
-  racetam:      ['piracetam', 'aniracetam', 'oxiracetam', 'pramiracetam', 'coluracetam', 'fasoracetam'],
-  choline_donor:['citicoline', 'alpha_gpc', 'l_alpha_gpc', 'choline', 'cdp_choline'],
-  ssri:         ['fluoxetine', 'sertraline', 'citalopram', 'escitalopram'],
-  snri:         ['venlafaxine', 'duloxetine'],
-  benzodiazepine:['alprazolam', 'diazepam', 'lorazepam', 'clonazepam'],
-  antipsychotic:['olanzapine', 'quetiapine', 'risperidone', 'aripiprazole', 'haloperidol'],
-  nsaid:        ['ibuprofen', 'naproxen', 'celecoxib', 'diclofenac', 'meloxicam'],
-  corticosteroid:['prednisone', 'dexamethasone', 'hydrocortisone', 'methylprednisolone'],
-  antidiabetic: ['metformin', 'pioglitazone', 'acarbose', 'semaglutide'],
-  thyroid:      ['levothyroxine', 'liothyronine', 'methimazole', 'propylthiouracil'],
-  dopamine_agonist:['cabergoline', 'bromocriptine', 'pramipexole'],
-  anticonvulsant:['valproate', 'lamotrigine', 'carbamazepine', 'phenytoin'],
-  maoi:         ['selegiline', 'rasagiline', 'moclobemide'],
-};
-// Обратный индекс: id → ключ группы (для быстрого lookup)
-export const ID_TO_CLASS: Record<string, string> = (() => {
-  const m: Record<string, string> = {};
-  for (const [cls, ids] of Object.entries(SAME_CLASS_GROUPS)) for (const id of ids) m[id] = cls;
-  return m;
-})();
-export function sameClassIds(id: string): string[] {
-  const cls = ID_TO_CLASS[canonId(id)] || ID_TO_CLASS[id];
-  return cls ? SAME_CLASS_GROUPS[cls] : [];
-}
+// Константы SUB_ALIAS, canonId, TZ_AUTO_BLACKLIST, SAME_CLASS_GROUPS,
+// ID_TO_CLASS, sameClassIds — перенесены в ./shared-constants.ts
+// (разрыв circular dependency с recommendation-engine.ts).
+// Ре-экспорт через `export { ... }` в шапке файла.

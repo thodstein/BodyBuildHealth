@@ -54,11 +54,12 @@ export function runSupportUnified(state: CalculatorState): PlanResult {
   const tzRes = calculateSupportTZ(state);
 
   // ── 1. Substances (deduped, PlanSubstance[]) ──
+  const weight = state.profile?.weight || 80;
   const substances = buildSubstances(tzRes.selectedSubstances, tzRes, {
     boostAdded: tzRes.boostAdded,
     jointSubs: tzRes.jointSubs,
     neuroSubs: tzRes.neuroSubs,
-  });
+  }, weight);
 
   // ── 2. Dosages ──
   const dosages: Record<string, { mg: number; timing: string }> = {};
@@ -161,5 +162,6 @@ export function runSupportForLevel(
 export { calculateSupportTZ, hydrateState } from './engine';
 export { generateSynergyRecommendations } from './engine-helpers';
 export { SYNERGY_ID_LABELS, SYNERGY_ID_SUBSTANCES, TITRATION_RULES, SYSTEM_LABELS_RU, SYS_ORDER, clamp, sysName, sysEmoji, catalogEntry, defaultDosage } from './types';
+export { canonId, SUB_ALIAS, TZ_AUTO_BLACKLIST, sameClassIds } from './shared-constants';
 export type { CalculatorState, CalculatorResult, PlanResult, PlanSubstance, PlanMechanism, StackRecommendation, RiskSystemId, PowerLevel, SynergyId, SystemRisk, MechanismDetail, LabDelta, ScheduleItem, TimeBlock, LabSlice, TimelineWeekData, LabPanelData, UserProfileData, NeuroStatusData, PharmaStackData, AASEntry, GoalsData, HepatobiliaryData, UrinaryData, CardiovascularData, ODAData, NutritionData, ContraindicationsData, ExperienceJournal, EpicrisisData, ToxicLoadData, DentalData, GeneticData, GIData, PsychData, InjectionData, Sex, CoursePhase, SynergyRecommendation } from './types';
 export { buildSynergyComment, buildMonitoring, buildSpecialInstructions, buildConflicts, buildCautions, buildLabFindings, calcStackSynergyScore, suggestSynergyAdditions } from './display';

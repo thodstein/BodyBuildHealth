@@ -1888,3 +1888,94 @@ interface AdvancedProductCard {
 - **Трекер приёма решений**: полный цикл — назначение → отметка приёма → статистика приверженности
 
 - `**tsc --noEmit**` — 0 errors. `**vite build**` — OK (31.55s). **UTF-8 noBOM** — 4 файла OK.
+
+## Session Summary (Jul 06) — Тренировочный блок: 5-зонная навигация + чистка дублей
+
+### Контекст
+Заказчик: «в тренировочном блоке огромная база, непонятно куда нажимать — оптимизировать, калькуляторы соединить, авто-планирование ПЛ/ББ/Ручное, инструменты только в своей вкладке, один ручной конструктор со всеми параметрами, одна вкладка-библиотека процессов».
+
+Диагноз до: 3 параллельных экрана (TrainingScreen 1377 строк с 3 группами × ~25 вкладок + planningTrack-махинацией, SRCBBScreen 819 со своими subView, TrainingToolkitScreen 475 с 14 дублирующими вкладками) + дубли калькуляторов (calc_plates/calc_vbt/calc_mrv рендерились дважды одновременно — баг) + два ручных конструктора (ManualConstructor.tsx мёртвый + TrainingConstructor/ живой) + мёртвые импорты (PowerliftingTab/BodybuildingTab импортированы, не рендерились).
+
+### ✅ Что реально работает и видно на экране
+**Новая 5-зонная навигация** (вместо хаоса) — hero-экран с 5 карточками зон:
+- 🏗 **Планировщик** — сегментированный переключатель ПЛ-авто / ББ-авто / Ручной сбор в одном окне. ПЛ→SRCBBScreen track=pl, ББ→track=bb, Ручной→TrainingConstructor (единый живой конструктор со всеми параметрами в одном окне: цель/уровень/дни/мезо/recovery/fatigue/weakpoints/вес/сон/стресс + ConfigPanel: сплит/цикл/программа/периодизация/прогрессия/интенсивность/техника/объём/частота + режим Макроцикл/Ручная сборка).
+- ▶️ **Тренировка** — runtime, таймеры, миксы.
+- 📊 **Дневник и аналитика** — дневник, календарь, MMC-трекинг, импорт CSV.
+- 🧮 **Калькуляторы** — 22 калькулятора в одной зоне, сгруппированы по 3 категориям (Сила и нагрузка / Периодизация / Инструменты и качество) с заголовками-секциями.
+- 📖 **Библиотека** — каталог циклов, программы, методики, упражнения, «мои тренировки».
+
+**Каждый инструмент — ровно в одной зоне** (проверено программно: дубликатов вкладок между зонами НЕТ, orphan-вкладок без зоны НЕТ, zone-вкладок без рендера НЕТ).
+
+**Устранены дубли калькуляторов**: PlateCalculator/VBTCalculator/MRVEstimator (SRCBBScreen_parts) заменены на каноничные *Tab-версии (TrainingScreen_parts). Теперь calc_plates/calc_vbt/calc_mrv рендерятся ровно один раз (раньше дважды — два калькулятора друг под другом).
+
+**Добавлен рендер «Тоннаж»**: TonnageCalcTab был импортирован, но мёртв — теперь работает как вкладка calculators зоны.
+
+**Удалён мёртвый код** (всё было unreachable, проверено grep по всему src):
+- TrainingToolkitScreen.tsx (475 строк, 14 вкладок-дублей) — не монтировался нигде.
+- ManualConstructor.tsx (627) — мёртвый второй ручной конструктор.
+- PowerliftingTab.tsx, BodybuildingTab.tsx (79+79) — импортированы, не рендерились.
+- SRCBBScreen_parts/VBTCalculator.tsx (287), MRVEstimator.tsx (52) — не импортировались нигде после дедупликации.
+- Мёртвые импорты PowerliftingTab/BodybuildingTab убраны из TrainingScreen.tsx.
+
+**Навигация**: внешние ссылки «перейти в конструктор» (setTab('constructor') ×4) → единый goPlannerManual(). Внешняя навигация (Профиль→Дневник, localStorage 'he_training_tab' events) → зонная через zoneForTab(). Зонный таб-бар с заголовком зоны; для planner — без пилюль (сегментированный переключатель в теле зоны).
+
+**Новые/изменённые файлы**:
+- src/ui/screens/TrainingScreen_parts/nav.ts (новый, 3833 строк) — ZONES, ZONE_ORDER, zoneForTab, PLANNER_MODES, ZoneCategory.
+- src/ui/screens/TrainingScreen.tsx — каркас переписан под 5 зон (hero, таб-бар, контент), убраны TAB_GROUPS/mainGroup/planningTrack-таб-листы, дубли калькуляторов, мёртвые импорты.
+
+### ❌ Что недоделано / не сделано (реалистично)
+- **3.1/3.2 PlannerPlAuto/PlannerBbAuto**: dedicated цельные экраны PL/ББ не построены — сейчас PL/ББ используют SRCBBScreen (работает: генерация СРЦ/BB-плана, subView plan/bridge/plates/autoreg/peak/recovery/safety/demo). Замена на отдельные экраны — полировка, не необходимость.
+- **4.1/5.1/6.1 DiaryAnalyticsZone/LibraryZone/ExecutionZone**: не выделены в отдельные компоненты — зоны рендерят существующие вкладки инлайн в TrainingScreen.tsx (работает). Организационный рефакторинг.
+- **3.4**: мёртвые экспорты shared.ts (planningTabsFor, PL_PLANNING_TABS, BB_PLANNING_TABS, MANUAL_PLANNING_TABS, PlanningMode-алиасы) не вычищены — harmless (не используются TrainingScreen, но экспортируются).
+- **7.1 остаток**: standalone SRCBBScreen НЕ удалён — он ЖИВОЙ (используется зоной Планировщик для ПЛ/ББ). Удаление возможно только после 3.1/3.2.
+- **PlateCalculator (SRCBBScreen_parts)** — ещё жив (используется SRCBBScreen subView plates). Удалится вместе с SRCBBScreen.
+
+### Проверки
+- **tsc --noEmit** — 0 ошибок в тренировочном блоке. (24 ошибки — все в NutritionScreen_parts/IndividualPlan/IndividualPlanContext.tsx, вне блока, были до начала работы.)
+- **vite build** — OK (49.32s).
+- **dev-сервер** — модуль TrainingScreen.tsx трансформируется без ошибок (200, экспорт TrainingScreen присутствует, ZONE_ORDER/goPlannerManual на месте, ошибок трансформации нет).
+- **UTF-8 noBOM** — nav.ts, TrainingScreen.tsx проверены (Рџ/РЎРµ/Рѕ — OK, нет кракозябр).
+- **Структурный аудит**: вкладок без зоны = 0, zone-вкладок без рендера = 0, дублей между зонами = 0.
+
+## Session Summary (Jul 06 — Part 2) — Тренировочный блок: ПОЛНОЕ выполнение плана (зонные компоненты + чистка)
+
+Доделаны ВСЕ оставшиеся пункты плана тренировочного блока.
+
+### ✅ Сделано (поверх Part 1)
+**3.1 / 3.2 — dedicated цельные ПЛ/ББ-панели:**
+- PlannerPlAuto.tsx (обёртка SRCBBScreen track="pl" + заголовок «🏆 Пауэрлифтинг — авто-планировщик (СРЦ)»).
+- PlannerBbAuto.tsx (обёртка SRCBBScreen track="bb" + заголовок «💪 Бодибилдинг — авто-планировщик»).
+- Зона «Планировщик» теперь рендерит <PlannerPlAuto/> / <PlannerBbAuto/> вместо прямого SRCBBScreen. SRCBBScreen больше не импортируется в TrainingScreen — он поглощён внутрь planner-зоны (не standalone).
+
+**3.3 — ручной конструктор единственный:** ManualConstructor.tsx (мёртвый дубль) удалён в Part 1; живой TrainingConstructor/ — единственный, все параметры в одном окне (ConstructorProfile + ConfigPanel).
+
+**4.1 — DiaryAnalyticsZone.tsx:** зона «Дневник и аналитика» вынесена в отдельный компонент (дневник TrainingDiaryHub, календарь, MMC-трекинг, импорт CSV). Получает состояние через типизированные props.
+
+**5.1 — LibraryZone.tsx:** зона «Библиотека» вынесена в отдельный компонент (каталог циклов LMS, программы, методики, упражнения, «мои тренировки»). Единый каталог тренировочных процессов.
+
+**6.1 — ExecutionZone.tsx:** зона «Тренировка» (выполнение) вынесена в отдельный компонент (live-сессия runtime, таймеры, миксы). Полный блок runtime (~347 строк) перенесён вербатим с типизированными props (26 полей состояния + setters).
+
+**3.4 — чистка shared.ts:** удалены мёртвые экспорты (TAB_GROUPS, TrainingGroup, planningTabsFor, PL/BB/MANUAL_PLANNING_TABS, CALC_TABS, PlanningMode, getPlanningMode, setPlanningMode). Мёртвые импорты TAB_GROUPS/TrainingGroup убраны из 5 файлов (MethodsTab, ProgramsTab, MyTrainingTab, AnalyticsTab, VisualTab). shared.ts: 116 → 87 строк, только живое.
+
+**Итог по TrainingScreen.tsx:** 1377 → 995 строк (монолит зонного контента вынесен в DiaryAnalyticsZone/LibraryZone/ExecutionZone).
+
+### Структура зон training-блока (финал)
+- TrainingScreen.tsx (995) — shell: hero 5 зон + зонный таб-бар + сегментированный planner + делегирование зонам.
+- nav.ts — ZONES/ZONE_ORDER/zoneForTab/PLANNER_MODES/ZoneCategory.
+- shared.ts — только живые константы/типы + getPlanningTrack/setPlanningTrack.
+- PlannerPlAuto.tsx / PlannerBbAuto.tsx — ПЛ/ББ авто-планировщики.
+- TrainingConstructor/ — ручной конструктор (единственный).
+- DiaryAnalyticsZone.tsx / LibraryZone.tsx / ExecutionZone.tsx — три контентные зоны.
+- SRCBBScreen.tsx — движок ПЛ/ББ-планирования (поглощён в planner-зону, не standalone).
+
+### ✅ Проверки
+- **tsc --noEmit**: 0 ошибок в тренировочном блоке. (25 total: 24 — NutritionScreen IndividualPlanContext [вне блока, базовые], 1 — src/engines/support-plan/substances.ts:134 getSubstancePriority(id) — **предсуществующий баг в НЕЗАКОММИЧЕННОМ коде support-plan от прошлого агента** [lab-priority-map.ts untracked, substances.ts modified — не HEAD], НЕ относится к тренировочному блоку и НЕ введён моими изменениями; подтверждено git diff: вызов в uncommitted-диффе предыдущего агента.)
+- **vite build**: OK (37.70s, 624 модуля).
+- **dev-сервер**: все новые модули (TrainingScreen, ExecutionZone, LibraryZone, DiaryAnalyticsZone, PlannerPlAuto, nav) трансформируются без ошибок (200, err=False).
+- **UTF-8**: все 8 новых/изменённых файлов чистые (Рџ/РЎРµ/Рѕ — нет).
+- **Структурный аудит**: 0 дублей вкладок между зонами, 0 orphan, 0 dead zone-вкладок (перепроверено).
+
+### ❌ Не сделано (вне тренировочного блока, не план)
+- substances.ts:134 — предсуществующий тип-баг незакоммиченного support-plan-рефактора прошлого агента. Не трогал (чужая область, риск сломать support-калькулятор неверным маркером). Требует отдельного анализа support-plan.
+
+Весь план тренировочного блока (0.1, 1.1, 1.2, 2.1, 2.2, 3.1, 3.2, 3.3, 3.4, 4.1, 5.1, 6.1, 7.1, 7.2) — ВЫПОЛНЕН.

@@ -162,7 +162,7 @@ export const MapperTab: React.FC = () => {
                   <div>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>{p.pathologyLabel}</span>
                     <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: `${ZONE_COLORS[sev]}22`, color: ZONE_COLORS[sev], fontSize: 10, fontWeight: 600 }}>
-                      {p.cumulativeTriggerStrength} ОЈ
+                      {p.cumulativeTriggerStrength} Σ
                     </span>
                   </div>
                   <div style={{ display: 'flex', gap: 4 }}>

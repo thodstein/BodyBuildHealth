@@ -34,6 +34,13 @@ export const BioStackAIScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const linked = useDataLink();
   const labAnalysis: LabCompositeResult | null = linked?.labAnalysis || null;
+  const [persona, setPersona] = useState<'athlete' | 'doctor'>(() => {
+    try { return (localStorage.getItem('he_biostack_persona') as 'athlete' | 'doctor') || 'athlete'; } catch { return 'athlete'; }
+  });
+  const visibleTabs = useMemo(() => {
+    if (persona === 'doctor') return SUB_TABS.filter(t => ['profile','search','stack','risks','reports','clinical','lab','interactions'].includes(t.id));
+    return SUB_TABS.filter(t => t.id !== 'drugcheck' && t.id !== 'clinical');
+  }, [persona]);
   const activeAAS = useMemo(() => {
     try {
       const raw = localStorage.getItem('he_course_data');
@@ -121,20 +128,27 @@ export const BioStackAIScreen: React.FC = () => {
   return (
     <div style={{ padding: '0 0 80px' }}>
       <style>{BIO_ANIM_CSS}</style>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', textAlign: 'center', marginBottom: 6 }}>
+      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', textAlign: 'center', marginBottom: 4 }}>
         🧬 BioStack AI — Операционная система управления БАДами
+        <span onClick={() => { const next = persona === 'athlete' ? 'doctor' : 'athlete'; setPersona(next); localStorage.setItem('he_biostack_persona', next); }}
+          style={{ marginLeft: 8, padding: '2px 6px', borderRadius: 6, fontSize: 7, cursor: 'pointer',
+            background: persona === 'doctor' ? 'rgba(239,68,68,0.1)' : 'rgba(96,165,250,0.1)',
+            border: `1px solid ${persona === 'doctor' ? 'rgba(239,68,68,0.2)' : 'rgba(96,165,250,0.2)'}`,
+            color: persona === 'doctor' ? '#ef4444' : '#60a5fa' }}>
+          {persona === 'athlete' ? '🏋️ Спортсмен' : '👨‍⚕️ Врач'}
+        </span>
       </div>
 
       {/* ── Sub tab bar ── */}
-      <div style={{ display: 'flex', gap: 3, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 4 }}>
-        {SUB_TABS.map(t => (
+      <div style={{ display: 'flex', gap: 2, marginBottom: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}>
+        {visibleTabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
-            flexShrink: 0, padding: '7px 12px', borderRadius: 16, fontSize: 9, fontWeight: 700,
+            flexShrink: 0, padding: '5px 8px', borderRadius: 12, fontSize: 8, fontWeight: 700,
             cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s',
             background: tab === t.id ? 'var(--accent)' : '#202023',
             color: tab === t.id ? '#000' : 'rgba(255,255,255,0.7)',
             border: `1px solid ${tab === t.id ? 'var(--accent)' : 'rgba(255,255,255,0.06)'}`,
-            boxShadow: tab === t.id ? '0 0 12px rgba(0,230,138,0.2)' : 'none',
+            boxShadow: tab === t.id ? '0 0 8px rgba(0,230,138,0.15)' : 'none',
           }}>{t.label}</button>
         ))}
       </div>

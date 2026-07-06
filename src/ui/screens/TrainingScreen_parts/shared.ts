@@ -1,4 +1,5 @@
-/** shared.ts — общие константы/типы TrainingScreen (вынесено из монолита). */
+/** shared.ts — общие константы/типы TrainingScreen (вынесено из монолита).
+ * Чистая версия: только то, что реально используется. 5-зонная навигация — в nav.ts. */
 export const WARMUP_LABELS: Record<string, string> = {
   jumping_jack: 'Прыжки Jumping Jack', arm_circles: 'Круги руками', leg_swings: 'Махи ногами',
   hip_circle: 'Круги тазом', ankle_mobility: 'Мобилизация голеностопа', shoulder_circle: 'Круги плечами',
@@ -38,6 +39,8 @@ export const PHASE_HINTS: Record<string, string> = {
   deload: 'Разгрузка: снижаем объём и интенсивность, восстанавливаем суставы и нервную систему.',
 };
 
+/** Полный набор возможных вкладок тренировочного блока (включая sentinel/legacy значения).
+ *  Актуальная 5-зонная группировка — в nav.ts (ZONES). */
 export type TrainingTab =
   | 'constructor' | 'runtime' | 'exercises' | 'exercise_lab' | 'calculators' | 'diary' | 'cycles' | 'history'
   | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress' | 'mytraining'
@@ -46,17 +49,9 @@ export type TrainingTab =
   | 'calc_taper' | 'calc_fatigue' | 'calc_vbt' | 'calc_plates' | 'calc_mrv'
   | 'tempo' | 'meso_tracker' | 'specialization' | 'peaking' | 'conjugate' | 'mmc_tracking';
 export type TrainingPage = 'hero' | 'tabs';
-// Главная — ровно 3 раздела: Тренировка (вести), Планирование (планировать), Инфо (смотреть).
-export type TrainingGroup = 'training' | 'planning' | 'info' | null;
-
-export const TAB_GROUPS: Record<string, { title: string; icon: string; tabs: TrainingTab[]; color: string }> = {
-  training: { title: '🏋️ Тренировка', icon: '🏋️', tabs: ['runtime', 'timers', 'diary', 'mixes'], color: 'var(--accent)' },
-  planning: { title: '📐 Планирование', icon: '📐', tabs: ['srcbb', 'constructor', 'cycles', 'mytraining', 'volume', 'powerlifting', 'bodybuilding', 'exercise_lab', 'calc_quality', 'calc_1rm', 'calculators', 'periodization_designer', 'deload_scheduler', 'meso_progression', 'rel_strength', 'calc_taper', 'calc_fatigue', 'calc_vbt', 'calc_plates', 'calc_mrv', 'tempo', 'meso_tracker', 'specialization', 'peaking', 'conjugate'], color: '#3b82f6' },
-  info: { title: '📊 Инфо', icon: '📊', tabs: ['exercises', 'methods', 'programs', 'library', 'calendar', 'import_data', 'mmc_tracking'], color: '#a855f7' },
-};
 
 export const TAB_LABELS: Record<TrainingTab, string> = {
-  constructor: '🛠 Конструктор тренировок', runtime: '▶️ Проведение тренировки', exercises: '🏋️ Упражнения', calculators: '⚖️ Нагрузка/тоннаж',
+  constructor: '🛠 Конструктор тренировок', runtime: '▶️ Проведение тренировки', exercises: '🏋️ Упражнения', calculators: '⚖️ Тоннаж',
   diary: '📝 Дневник + аналитика + отчёты', cycles: '🔄 Циклы', history: '📜 История', analytics: '📊 Аналитика',
   methods: '🧠 Методики', visual: '📈 Визуализация', programs: '📚 Программы', timers: '⏱️ Таймеры отдыха',
   progress: '📏 Прогресс', mytraining: '⭐ Мои тренировки', exercise_lab: '🧬 Лаборатория упражнений', volume: '📐 Расчёт объёма',
@@ -89,10 +84,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   mmc_tracking: '🔄 MMC/Пампинг/Суставы',
 };
 
-// ══ Этап R/U: 3 плоские трассы планировщика (ПЛ / ББ / Ручной сбор), одна вкладка — один клик.
-//   pl    → ПЛ (сила, СРЦ-авто)        → SRCBBScreen track='pl'
-//   bb    → ББ (бодибилдинг, авто)     → SRCBBScreen track='bb'
-//   manual→ Ручной сбор (план/циклы/методики/калькулятор)
+// ══ Режим зоны «Планировщик»: ПЛ-авто / ББ-авто / Ручной сбор (сегментированный переключатель в nav.ts).
 export type PlanningTrack = 'pl' | 'bb' | 'manual';
 const PT_KEY = 'he_training_planning_track';
 export function getPlanningTrack(): PlanningTrack {
@@ -101,16 +93,3 @@ export function getPlanningTrack(): PlanningTrack {
 export function setPlanningTrack(t: PlanningTrack): void {
   try { localStorage.setItem(PT_KEY, t); } catch { /* ignore */ }
 }
-export const PL_PLANNING_TABS: TrainingTab[] = ['srcbb', 'volume', 'powerlifting', 'specialization', 'peaking', 'conjugate'];
-export const BB_PLANNING_TABS: TrainingTab[] = ['srcbb', 'volume', 'bodybuilding', 'specialization', 'peaking', 'conjugate'];
-export const MANUAL_PLANNING_TABS: TrainingTab[] = ['constructor', 'cycles', 'mytraining', 'volume', 'specialization', 'peaking', 'conjugate'];
-// Калькуляторы доступны в любой трассе планировщика (подбор / замена / качество / нагрузка)
-const CALC_TABS: TrainingTab[] = ['exercise_lab', 'calc_quality', 'calc_1rm', 'pl_norms', 'pl_pro', 'rel_strength', 'calculators', 'calc_taper', 'calc_fatigue', 'calc_vbt', 'calc_plates', 'calc_mrv', 'deload_scheduler', 'tempo', 'meso_tracker'];
-export function planningTabsFor(track: PlanningTrack): TrainingTab[] {
-  const base = track === 'manual' ? MANUAL_PLANNING_TABS : track === 'bb' ? BB_PLANNING_TABS : PL_PLANNING_TABS;
-  return [...base, ...CALC_TABS];
-}
-// Бэкворд-совместимость (старый импорт PlanningMode)
-export type PlanningMode = PlanningTrack;
-export const getPlanningMode = getPlanningTrack;
-export const setPlanningMode = (m: string) => setPlanningTrack(m === 'constructor' ? 'manual' : m === 'src_auto' ? 'pl' : 'pl');

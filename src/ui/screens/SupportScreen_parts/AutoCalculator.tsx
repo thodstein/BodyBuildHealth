@@ -742,35 +742,6 @@ ${result.negativeBlocks.length ? `<h2 class="warn">🚫 Заблокирован
           </span>}
         </div>
 
-        <Card icon="👤" title="Профиль" defaultOpen cols={3}>
-          <PopupNumber label="Вес" value={state.profile.weight} min={30} max={250} suffix="кг" onChange={v => uProf({ weight: v })} />
-          <PopupNumber label="Возраст" value={state.profile.age} min={14} max={90} suffix="лет" onChange={v => uProf({ age: v })} />
-          <PopupSelect label="Пол" value={state.profile.sex} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} onChange={v => uProf({ sex: v as Sex })} />
-          <PopupNumber label="Рост" value={state.profile.height || 175} min={140} max={220} suffix="см" onChange={v => uProf({ height: v })} />
-          <PopupNumber label="Жир" value={state.profile.bodyfat || 15} min={4} max={50} suffix="%" onChange={v => uProf({ bodyfat: v })} />
-          <PopupNumber label="Тренировки/нед" value={state.profile.workoutsPerWeek} min={0} max={14} suffix="раз" onChange={v => uProf({ workoutsPerWeek: v })} />
-          <PopupNumber label="Длит. тренировки" value={state.profile.avgWorkoutMinutes} min={15} max={180} suffix="мин" onChange={v => uProf({ avgWorkoutMinutes: v })} />
-          <PopupNumber label="Сон" value={state.profile.sleepHours} min={3} max={12} suffix="ч" onChange={v => uProf({ sleepHours: v })} />
-          <PopupNumber label="Стресс (1-10)" value={state.profile.stressLevel} min={1} max={10} onChange={v => uProf({ stressLevel: v })} />
-          <PopupBool label="Курение" value={state.profile.smoker} onChange={v => uProf({ smoker: v })} />
-          <PopupSelect label="Алкоголь" value={state.profile.alcohol} options={[{id:'never',label:'Никогда'},{id:'rare',label:'Редко'},{id:'sometimes',label:'Иногда'},{id:'regular',label:'Регулярно'}]} onChange={v => uProf({ alcohol: v as any })} />
-          <PopupNumber label="Кофеин" value={state.profile.caffeineMg} min={0} max={2000} step={50} suffix="мг" onChange={v => uProf({ caffeineMg: v })} />
-        </Card>
-
-        <Card icon="🧠" title="Неврологический статус" cols={2}>
-          <PopupNumber label="Дофамин" value={state.neuro.dopamineScore} min={1} max={5} onChange={v => uNeuro({ dopamineScore: v })} />
-          <PopupNumber label="Серотонин" value={state.neuro.serotoninScore} min={1} max={5} onChange={v => uNeuro({ serotoninScore: v })} />
-          <PopupNumber label="Агрессия" value={state.neuro.aggressionScore} min={1} max={5} onChange={v => uNeuro({ aggressionScore: v })} />
-          <PopupSelect label="ГАМК баланс" value={state.neuro.gabaBalance} options={[{id:'balance',label:'Норма'},{id:'overexcited',label:'Возбуждение'},{id:'inhibited',label:'Заторможенность'}]} onChange={v => uNeuro({ gabaBalance: v as any })} />
-          <PopupSelect label="Качество сна" value={state.neuro.sleepQuality} options={[{id:'good',label:'Хорошее'},{id:'fair',label:'Среднее'},{id:'poor',label:'Плохое'}]} onChange={v => uNeuro({ sleepQuality: v as any })} />
-          <PopupBool label="Проблемы с памятью" value={state.neuro.memoryIssues} onChange={v => uNeuro({ memoryIssues: v })} />
-          <PopupBool label="Проблемы с фокусом" value={state.neuro.focusIssues} onChange={v => uNeuro({ focusIssues: v })} />
-          <PopupBool label="Замедленное мышление" value={state.neuro.slowThinking} onChange={v => uNeuro({ slowThinking: v })} />
-          <PopupBool label="Координация" value={state.neuro.coordinationIssues} onChange={v => uNeuro({ coordinationIssues: v })} />
-          <PopupBool label="Головные боли" value={state.neuro.headaches} onChange={v => uNeuro({ headaches: v })} />
-          <PopupBool label="Метеозависимость" value={state.neuro.weatherDependent} onChange={v => uNeuro({ weatherDependent: v })} />
-        </Card>
-
         <Card icon="💉" title="Фарма стек / Курс" cols={2}>
           <div style={{ gridColumn: '1 / -1' }}>
             <PopupSelect label="Фаза курса" value={state.pharma.phase} options={[{id:'course',label:'Курс'},{id:'bridge',label:'Бридж'},{id:'pct',label:'ПКТ'},{id:'base',label:'База'}]} onChange={v => uPharm({ phase: v as any })} />
@@ -827,95 +798,10 @@ ${result.negativeBlocks.length ? `<h2 class="warn">🚫 Заблокирован
           <div style={{ gridColumn: '1 / -1' }}>
             <PopupSelect label="Тип цикла" value={state.goals.trainingCycle} options={[{id:'mass',label:'Масса'},{id:'cut',label:'Сушка'},{id:'maintenance',label:'Поддержка'},{id:'endurance',label:'Выносливость'}]} onChange={v => uGoals({ trainingCycle: v as any })} />
           </div>
-          <PopupBool label="Здоровье" value={state.goals.healthMaintenance} onChange={v => uGoals({ healthMaintenance: v })} />
-          <PopupBool label="Подготовка к соревн." value={state.goals.competitionPrep} onChange={v => uGoals({ competitionPrep: v })} />
-          <PopupBool label="Восстановление сна" value={state.goals.sleepRecovery} onChange={v => uGoals({ sleepRecovery: v })} />
-          <PopupBool label="Коррекция липидов" value={state.goals.lipidCorrection} onChange={v => uGoals({ lipidCorrection: v })} />
-          <PopupBool label="Разжижение крови" value={state.goals.bloodThinning} onChange={v => uGoals({ bloodThinning: v })} />
-          <PopupBool label="Детокс печени" value={state.goals.liverDetox} onChange={v => uGoals({ liverDetox: v })} />
-          <PopupBool label="Контроль АД" value={state.goals.bpControl} onChange={v => uGoals({ bpControl: v })} />
           <PopupNumber label="Длит. цикла" value={state.goals.cycleWeeks} min={1} max={52} suffix="нед" onChange={v => uGoals({ cycleWeeks: v })} />
           <PopupNumber label="Прошло циклов" value={state.goals.previousCycles} min={0} max={20} suffix="раз" onChange={v => uGoals({ previousCycles: v })} />
           <div style={{ gridColumn: '1 / -1' }}>
             <PopupSelect label="Время с последнего цикла" value={state.goals.timeSinceLastCycle} options={[{id:'none',label:'Первый'},{id:'<3mo',label:'<3 мес'},{id:'3-6mo',label:'3-6 мес'},{id:'>6mo',label:'>6 мес'},{id:'trt',label:'TRT'}]} onChange={v => uGoals({ timeSinceLastCycle: v as any })} />
-          </div>
-        </Card>
-
-        <Card icon="🫁" title="Гепатобилиарная" cols={2}>
-          {labDerivedFields.some(f => f.startsWith('hepatobiliary.')) && autoFromLabs &&
-            <div style={{ gridColumn:'1 / -1', marginBottom:4 }}><span style={BADGE('rgba(0,230,138,0.2)')}>🤖 Авто из анализов</span></div>}
-          <SevSelect label="АЛТ/АСТ" value={state.hepatobiliary.altAstElevation} onChange={v => uHep({ altAstElevation: v as any })} />
-          <SevSelect label="ГГТ" value={state.hepatobiliary.ggtElevation} onChange={v => uHep({ ggtElevation: v as any })} />
-          <SevSelect label="Билирубин" value={state.hepatobiliary.bilirubinElevation} onChange={v => uHep({ bilirubinElevation: v as any })} />
-          <PopupBool label="Жировой гепатоз" value={state.hepatobiliary.fattyLiver} onChange={v => uHep({ fattyLiver: v })} />
-          <PopupBool label="Холецистит" value={state.hepatobiliary.cholecystitis} onChange={v => uHep({ cholecystitis: v })} />
-          <PopupSelect label="Алкогольная история" value={state.hepatobiliary.alcoholHistory} options={[{id:'none',label:'Нет'},{id:'past',label:'В прошлом'},{id:'current',label:'Сейчас'}]} onChange={v => uHep({ alcoholHistory: v as any })} />
-        </Card>
-
-        <Card icon="💧" title="Мочевыделительная" cols={2}>
-          {labDerivedFields.some(f => f.startsWith('urinary.')) && autoFromLabs &&
-            <div style={{ gridColumn:'1 / -1', marginBottom:4 }}><span style={BADGE('rgba(0,230,138,0.2)')}>🤖 Авто из анализов</span></div>}
-          <SevSelect label="Креатинин" value={state.urinary.creatinineElevation} onChange={v => uUrin({ creatinineElevation: v as any })} />
-          <SevSelect label="Мочевина" value={state.urinary.ureaElevation} onChange={v => uUrin({ ureaElevation: v as any })} />
-          <PopupBool label="Протеинурия" value={state.urinary.proteinuria} onChange={v => uUrin({ proteinuria: v })} />
-          <PopupBool label="Нефротокс. препараты" value={state.urinary.nephrotoxicDrugs} onChange={v => uUrin({ nephrotoxicDrugs: v })} />
-          <PopupBool label="Гипертензия" value={state.urinary.hypertension} onChange={v => uUrin({ hypertension: v })} />
-          <PopupBool label="Диабет" value={state.urinary.diabetes} onChange={v => uUrin({ diabetes: v })} />
-          <div style={{ gridColumn: '1 / -1' }}>
-            <PopupSelect label="Характер мочеиспускания" value={state.urinary.urinationPattern} options={[{id:'normal',label:'Норма'},{id:'frequent',label:'Частое'},{id:'nocturia',label:'Ночное'},{id:'painful',label:'Болезненное'}]} onChange={v => uUrin({ urinationPattern: v as any })} />
-          </div>
-        </Card>
-
-        <Card icon="❤️" title="Сердечно-сосудистая" cols={2}>
-          {labDerivedFields.some(f => f.startsWith('cardio.')) && autoFromLabs &&
-            <div style={{ gridColumn:'1 / -1', marginBottom:4 }}><span style={BADGE('rgba(0,230,138,0.2)')}>🤖 Авто из анализов</span></div>}
-          <PopupSelect label="АД стадия" value={state.cardio.bpStage} options={[{id:'normal',label:'Норма'},{id:'prehypertension',label:'Прегипертензия'},{id:'hypertension1',label:'Гипертензия 1'},{id:'hypertension2',label:'Гипертензия 2'}]} onChange={v => uCard({ bpStage: v as any })} />
-          <PopupNumber label="ЧСС" value={state.cardio.heartRate} min={40} max={120} suffix="уд/мин" onChange={v => uCard({ heartRate: v })} />
-          <SevSelect label="ЛПНП" value={state.cardio.ldlElevation} onChange={v => uCard({ ldlElevation: v as any })} />
-          <SevSelect label="Гематокрит" value={state.cardio.hctElevation} onChange={v => uCard({ hctElevation: v as any })} />
-          <PopupBool label="Низкий ЛПВП" value={state.cardio.hdlLow} onChange={v => uCard({ hdlLow: v })} />
-          <PopupSelect label="Триглицериды" value={state.cardio.triglycerides} options={[{id:'normal',label:'Норма'},{id:'elevated',label:'Повышены'},{id:'high',label:'Высокие'}]} onChange={v => uCard({ triglycerides: v as any })} />
-          <PopupBool label="ССЗ в анамнезе" value={state.cardio.previousCVD} onChange={v => uCard({ previousCVD: v })} />
-          <PopupBool label="ССЗ в семье" value={state.cardio.familyCVD} onChange={v => uCard({ familyCVD: v })} />
-        </Card>
-
-        <Card icon="🦴" title="ОДА / Суставы" cols={2}>
-          <SevSelect label="Боль в суставах" value={state.oda.jointPain} onChange={v => uODA({ jointPain: v as any })} />
-          <PopupBool label="Проблемы со связками" value={state.oda.ligamentIssues} onChange={v => uODA({ ligamentIssues: v })} />
-          <PopupBool label="Боль в спине" value={state.oda.backPain} onChange={v => uODA({ backPain: v })} />
-          <div style={{ gridColumn: '1 / -1' }}>
-            <span style={LABEL}>Травмы</span>
-            <input value={state.oda.injuries.join(', ')} onChange={e => uODA({ injuries: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} style={INPUT} />
-          </div>
-        </Card>
-
-        <Card icon="🥗" title="Питание / Метаболизм" cols={3}>
-          <PopupNumber label="Калории" value={state.nutrition.calories} min={800} max={8000} step={50} suffix="ккал" onChange={v => uNutr({ calories: v })} />
-          <PopupNumber label="Белок" value={state.nutrition.proteinG} min={0} max={500} suffix="г" onChange={v => uNutr({ proteinG: v })} />
-          <PopupNumber label="Жиры" value={state.nutrition.fatG} min={0} max={300} suffix="г" onChange={v => uNutr({ fatG: v })} />
-          <PopupNumber label="Углеводы" value={state.nutrition.carbsG} min={0} max={1000} suffix="г" onChange={v => uNutr({ carbsG: v })} />
-          <PopupNumber label="Вода" value={state.nutrition.waterL} min={0.5} max={6} step={0.1} suffix="л" onChange={v => uNutr({ waterL: v })} />
-          <PopupNumber label="Клетчатка" value={state.nutrition.fiberG} min={0} max={100} suffix="г" onChange={v => uNutr({ fiberG: v })} />
-          <PopupBool label="Омега-3" value={state.nutrition.omega3} onChange={v => uNutr({ omega3: v })} />
-          <PopupNumber label="Натрий" value={state.nutrition.sodiumMg||3500} min={500} max={8000} step={100} suffix="мг" onChange={v => uNutr({ sodiumMg: v })} />
-          <PopupNumber label="Калий" value={state.nutrition.potassiumMg||4500} min={500} max={8000} step={100} suffix="мг" onChange={v => uNutr({ potassiumMg: v })} />
-          <PopupSelect label="Соль" value={state.nutrition.saltIntake} options={[{id:'low',label:'Мало'},{id:'normal',label:'Норма'},{id:'high',label:'Много'}]} onChange={v => uNutr({ saltIntake: v as any })} />
-        </Card>
-
-        <Card icon="🩺" title="Медицинские противопоказания" cols={3}>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <PopupText label="Аллергии" value={state.contraindications.allergies} onChange={v => uContr({ allergies: v })} placeholder="укажите" />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-            <PopupBool label="ССЗ" value={state.contraindications.hasCVD} onChange={v => uContr({ hasCVD: v })} />
-            <PopupBool label="Тромбофилия" value={state.contraindications.hasThrombophilia} onChange={v => uContr({ hasThrombophilia: v })} />
-            <PopupBool label="Диабет" value={state.contraindications.hasDiabetes} onChange={v => uContr({ hasDiabetes: v })} />
-            <PopupBool label="Эпилепсия" value={state.contraindications.hasEpilepsy} onChange={v => uContr({ hasEpilepsy: v })} />
-            <PopupBool label="Психические расстройства" value={state.contraindications.hasMentalIllness} onChange={v => uContr({ hasMentalIllness: v })} />
-            <PopupBool label="Болезни печени" value={state.contraindications.hasLiverDisease} onChange={v => uContr({ hasLiverDisease: v })} />
-            <PopupBool label="Болезни почек" value={state.contraindications.hasKidneyDisease} onChange={v => uContr({ hasKidneyDisease: v })} />
-            <PopupBool label="ЖКТ заболевания" value={state.contraindications.hasGI} onChange={v => uContr({ hasGI: v })} />
-            <PopupBool label="Простата" value={state.contraindications.hasProstateIssues} onChange={v => uContr({ hasProstateIssues: v })} />
           </div>
         </Card>
 
@@ -941,51 +827,34 @@ ${result.negativeBlocks.length ? `<h2 class="warn">🚫 Заблокирован
           <PopupBool label="Проблемы с почками" value={state.epicrisis.pastKidneyIssues} onChange={v => uEpic({ pastKidneyIssues: v })} />
         </Card>
 
-        <Card icon="☣️" title="Токсическая нагрузка / Детокс" cols={2}>
-          <PopupBool label="Вредное производство" value={state.toxicLoad.hazardousWork} onChange={v => uToxic({ hazardousWork: v })} />
-          <PopupBool label="Регулярные НПВС" value={state.toxicLoad.regularNSAIDs} onChange={v => uToxic({ regularNSAIDs: v })} />
-          <PopupBool label="Другие тяжёлые препараты" value={state.toxicLoad.otherHeavyDrugs} onChange={v => uToxic({ otherHeavyDrugs: v })} />
+        <Card icon="🩺" title="Здоровье" cols={3} defaultOpen>
+          {labDerivedFields.length > 0 && autoFromLabs &&
+            <div style={{ gridColumn:'1 / -1', marginBottom:4 }}><span style={BADGE('rgba(0,230,138,0.2)')}>🤖 {labDerivedFields.length} полей авто из анализов</span></div>}
+          {/* Неврология → 3 поля */}
+          <PopupNumber label="Дофамин (1-5)" value={state.neuro.dopamineScore} min={1} max={5} onChange={v => uNeuro({ dopamineScore: v })} />
+          <PopupNumber label="Серотонин (1-5)" value={state.neuro.serotoninScore} min={1} max={5} onChange={v => uNeuro({ serotoninScore: v })} />
+          <PopupSelect label="Качество сна" value={state.neuro.sleepQuality} options={[{id:'good',label:'Хорошее'},{id:'fair',label:'Среднее'},{id:'poor',label:'Плохое'}]} onChange={v => uNeuro({ sleepQuality: v as any })} />
+          {/* ССС → 2 поля */}
+          <PopupSelect label="АД стадия" value={state.cardio.bpStage} options={[{id:'normal',label:'Норма'},{id:'prehypertension',label:'Прегипертензия'},{id:'hypertension1',label:'Гипертензия 1'},{id:'hypertension2',label:'Гипертензия 2'}]} onChange={v => uCard({ bpStage: v as any })} />
+          <SevSelect label="Гематокрит" value={state.cardio.hctElevation} onChange={v => uCard({ hctElevation: v as any })} />
+          {/* ОДА → 2 поля */}
+          <SevSelect label="Боль в суставах" value={state.oda.jointPain} onChange={v => uODA({ jointPain: v as any })} />
           <div style={{ gridColumn: '1 / -1' }}>
-            <PopupSelect label="Частота стула" value={state.toxicLoad.bowelFrequency} options={[{id:'regular',label:'Регулярный'},{id:'constipation',label:'Запоры'}]} onChange={v => uToxic({ bowelFrequency: v as any })} />
+            <PopupText label="Травмы" value={state.oda.injuries.join(', ')} onChange={v => uODA({ injuries: v.split(',').map(s => s.trim()).filter(Boolean) })} placeholder="укажите" />
           </div>
-        </Card>
-
-        <Card icon="🦷" title="Стоматология / Минеральный обмен" cols={2}>
-          <PopupBool label="Кровоточивость дёсен" value={state.dental.bleedingGums} onChange={v => uDent({ bleedingGums: v })} />
-          <PopupBool label="Шатаются зубы" value={state.dental.looseTeeth} onChange={v => uDent({ looseTeeth: v })} />
-          <PopupBool label="Бруксизм (скрежет)" value={state.dental.nightGrinding} onChange={v => uDent({ nightGrinding: v })} />
-          <PopupBool label="Переломы костей" value={state.dental.boneFractures} onChange={v => uDent({ boneFractures: v })} />
-          <PopupBool label="Судороги (крампи)" value={state.dental.cramps} onChange={v => uDent({ cramps: v })} />
-        </Card>
-
-        <Card icon="🧬" title="Генетические полиморфизмы" cols={2}>
-          <PopupSelect label="CYP19A1" value={state.genetics.cyp19a1} options={[{id:'high',label:'Высокая активность'},{id:'normal',label:'Норма'},{id:'unknown',label:'Неизвестно'}]} onChange={v => uGen({ cyp19a1: v as any })} />
-          <PopupSelect label="SRD5A2" value={state.genetics.srd5a2} options={[{id:'hypersensitive',label:'Гиперчувствительность'},{id:'normal',label:'Норма'},{id:'unknown',label:'Неизвестно'}]} onChange={v => uGen({ srd5a2: v as any })} />
-          <PopupSelect label="Чувствительность АР" value={state.genetics.arSensitivity} options={[{id:'high',label:'Высокая'},{id:'normal',label:'Норма'},{id:'low',label:'Низкая'},{id:'unknown',label:'Неизвестно'}]} onChange={v => uGen({ arSensitivity: v as any })} />
-          <PopupSelect label="MTHFR" value={state.genetics.mthfr} options={[{id:'c677t',label:'C677T (мутация)'},{id:'normal',label:'Норма'},{id:'unknown',label:'Неизвестно'}]} onChange={v => uGen({ mthfr: v as any })} />
-        </Card>
-
-        <Card icon="🫀" title="ЖКТ / Микробиом" cols={2}>
+          {/* ЖКТ → 2 поля */}
           <PopupBool label="Вздутие" value={state.gi.bloating} onChange={v => uGI({ bloating: v })} />
           <PopupBool label="Изжога" value={state.gi.heartburn} onChange={v => uGI({ heartburn: v })} />
-          <PopupBool label="Диарея" value={state.gi.diarrhea} onChange={v => uGI({ diarrhea: v })} />
-          <PopupBool label="Запоры" value={state.gi.constipation} onChange={v => uGI({ constipation: v })} />
-          <PopupBool label="СРК (диагноз)" value={state.gi.diagnosedIBS} onChange={v => uGI({ diagnosedIBS: v })} />
-          <PopupBool label="Ферментная поддержка" value={state.gi.enzymeSupport} onChange={v => uGI({ enzymeSupport: v })} />
-          <PopupBool label="Пробиотики" value={state.gi.probioticUse} onChange={v => uGI({ probioticUse: v })} />
-        </Card>
-
-        <Card icon="🧘" title="Психологическая зависимость" cols={3}>
-          <PopupNumber label="Страх потери" value={state.psych.fearOfLoss} min={1} max={5} onChange={v => uPsych({ fearOfLoss: v })} />
-          <PopupNumber label="Одержимость зеркалом" value={state.psych.mirrorObsession} min={1} max={5} onChange={v => uPsych({ mirrorObsession: v })} />
-          <PopupNumber label="Апатия вне курса" value={state.psych.apathyOffCycle} min={1} max={5} onChange={v => uPsych({ apathyOffCycle: v })} />
-        </Card>
-
-        <Card icon="💉" title="Мониторинг зон инъекций" cols={2}>
-          <PopupSelect label="Ягодицы" value={state.injection.glutes} options={[{id:'',label:'—'},{id:'ok',label:'OK'},{id:'уплотнение',label:'Уплотнение'},{id:'боль',label:'Боль'},{id:'гематома',label:'Гематома'}]} onChange={v => uInj({ glutes: v })} />
-          <PopupSelect label="Квадрицепсы" value={state.injection.quads} options={[{id:'',label:'—'},{id:'ok',label:'OK'},{id:'уплотнение',label:'Уплотнение'},{id:'боль',label:'Боль'},{id:'гематома',label:'Гематома'}]} onChange={v => uInj({ quads: v })} />
-          <PopupSelect label="Дельты" value={state.injection.delts} options={[{id:'',label:'—'},{id:'ok',label:'OK'},{id:'уплотнение',label:'Уплотнение'},{id:'боль',label:'Боль'},{id:'гематома',label:'Гематома'}]} onChange={v => uInj({ delts: v })} />
-          <PopupSelect label="Локальные зоны" value={state.injection.localAreas} options={[{id:'',label:'—'},{id:'ok',label:'OK'},{id:'уплотнение',label:'Уплотнение'},{id:'боль',label:'Боль'},{id:'гематома',label:'Гематома'}]} onChange={v => uInj({ localAreas: v })} />
+          {/* Противопоказания → 3 поля */}
+          <div style={{ gridColumn: '1 / -1' }}>
+            <PopupText label="Аллергии" value={state.contraindications.allergies} onChange={v => uContr({ allergies: v })} placeholder="укажите" />
+          </div>
+          <PopupBool label="Диабет" value={state.contraindications.hasDiabetes} onChange={v => uContr({ hasDiabetes: v })} />
+          <PopupBool label="Болезни печени/почек" value={state.contraindications.hasLiverDisease || state.contraindications.hasKidneyDisease} onChange={v => { uContr({ hasLiverDisease: v }); uContr({ hasKidneyDisease: v }); }} />
+          {/* Психология → 1 поле */}
+          <PopupNumber label="Апатия вне курса (1-5)" value={state.psych.apathyOffCycle} min={1} max={5} onChange={v => uPsych({ apathyOffCycle: v })} />
+          {/* Токс. нагрузка → 1 поле */}
+          <PopupBool label="Вредное производство" value={state.toxicLoad.hazardousWork} onChange={v => uToxic({ hazardousWork: v })} />
         </Card>
 
         {/* Лаборатория — полный спектр */}

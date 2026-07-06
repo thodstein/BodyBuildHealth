@@ -36,7 +36,7 @@ export interface TzStackEntry {
   substances: string[];
   coverage: Record<string, TzStackSubstance>;  // organId → вещество
   organCoverage: string[];
-  totalK: Record<string, number>;  // organId в†’ СЃСѓРјРјР°СЂРЅС‹Р№ k
+  totalK: Record<string, number>;  // organId → суммарный k
 }
 
 // в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ
@@ -53,7 +53,7 @@ export const DRUG_DB: Record<string, TzDrugEntry> = {
     targetOrgans:['cardio','hepatic','cns','reproductive','hematologic','renal'],
     organMechanisms:{ cardio:['cv1','cv2','cv3','cv4','cv5'], hepatic:['liv1','liv2'], cns:['cns1','cns2','cns4'], reproductive:['rep1','rep2','rep3','rep4','rep5'], hematologic:['hem1','hem2'], renal:['ren1','ren2'] },
     mechanismWeights:{cv1:4, cv2:4, cv5:4, rep1:4, rep2:4, liv1:3, hem1:3, cns1:3, cv3:2, cv4:2, liv2:2, cns2:2, cns4:2, rep3:2, rep4:2, rep5:2, hem2:2, ren1:2, ren2:2}, pk:{halfLifeHours:72}, doseModifier:1.0 },
-  test_enan: { name:'Тестостерон СЌРЅР°РЅС‚Р°С‚', class:'aas', form:'inject',
+  test_enan: { name:'Тестостерон энантат', class:'aas', form:'inject',
     targetOrgans:['cardio','hepatic','cns','reproductive','hematologic','renal'],
     organMechanisms:{ cardio:['cv1','cv2','cv3','cv4','cv5'], hepatic:['liv1','liv2'], cns:['cns1','cns2','cns4'], reproductive:['rep1','rep2','rep3','rep4','rep5'], hematologic:['hem1','hem2'], renal:['ren1','ren2'] },
     mechanismWeights:{cv1:4, cv2:4, cv5:4, rep1:4, rep2:4, liv1:3, hem1:3, cns1:3, cv3:2, cv4:2, liv2:2, cns2:2, cns4:2, rep3:2, rep4:2, rep5:2, hem2:2, ren1:2, ren2:2}, pk:{halfLifeHours:168}, doseModifier:1.0 },
@@ -113,7 +113,7 @@ export const DRUG_DB: Record<string, TzDrugEntry> = {
     targetOrgans:['cardio','reproductive','hematologic'],
     organMechanisms:{ cardio:['cv2'], reproductive:['rep1','rep2','rep4','rep5'], hematologic:['hem1','hem2'] },
     mechanismWeights:{rep1:3, rep2:3, rep4:2, cv2:2, hem1:2, cv3:1, cv4:1, rep3:1, rep5:1, hem2:1, cns1:1}, pk:{halfLifeHours:96}, doseModifier:1.0 },
-  drostanolone_enan: { name:'Дростанолон СЌРЅР°РЅС‚Р°С‚', class:'aas', form:'inject',
+  drostanolone_enan: { name:'Дростанолон энантат', class:'aas', form:'inject',
     targetOrgans:['cardio','reproductive','hematologic'],
     organMechanisms:{ cardio:['cv2'], reproductive:['rep1','rep2','rep4','rep5'], hematologic:['hem1','hem2'] },
     mechanismWeights:{rep1:3, rep2:3, rep4:2, cv2:2, hem1:2, cv3:1, cv4:1, rep3:1, rep5:1, hem2:1, cns1:1}, pk:{halfLifeHours:216}, doseModifier:1.0 },
@@ -250,12 +250,12 @@ export const DRUG_DB: Record<string, TzDrugEntry> = {
     organMechanisms:{ hematologic:['hem2','hem3'], cardio:['cv3'], cns:['cns5'] },
     mechanismWeights:{hem3:3, hem2:2, cv3:1, cns5:1}, doseModifier:0.5 },
 
-  // ── РРЅСЃСѓР»и�ЅС‹ (4) ──
+  // ── Инсулины (4) ──
   ins_short: { name:'Инсулин короткий', class:'insulin', form:'inject',
     targetOrgans:['cns','hematologic','cardio','renal'],
     organMechanisms:{ cns:['cns5'], hematologic:['hem3','hem4','hem5'], cardio:['cv3','cv5'], renal:['ren4'] },
     mechanismWeights:{hem3:4, cns5:4, hem4:3, cv5:3, hem5:2, cv3:2, ren4:2}, doseModifier:1.0 },
-  ins_long: { name:'РРЅСЃСѓР»и�Ѕ РґР»и�ЅРЅС‹Р№', class:'insulin', form:'inject',
+  ins_long: { name:'Инсулин длинный', class:'insulin', form:'inject',
     targetOrgans:['cns','hematologic','cardio','renal'],
     organMechanisms:{ cns:['cns5'], hematologic:['hem2','hem3','hem5'], cardio:['cv3'], renal:['ren4'] },
     mechanismWeights:{hem3:3, cns5:3, hem2:3, hem5:2, cv3:2, ren4:2}, doseModifier:0.8 },
@@ -263,7 +263,7 @@ export const DRUG_DB: Record<string, TzDrugEntry> = {
     targetOrgans:['cns','hematologic','cardio','renal'],
     organMechanisms:{ cns:['cns5'], hematologic:['hem3','hem4','hem5'], cardio:['cv3','cv5'], renal:['ren4'] },
     mechanismWeights:{hem3:4, cns5:4, hem4:3, cv5:3, hem5:2, cv3:2, ren4:2}, doseModifier:1.0 },
-  ins_detemir: { name:'РРЅСЃСѓР»и�Ѕ РґРµС‚РµРји�Ђ', class:'insulin', form:'inject',
+  ins_detemir: { name:'Инсулин детемир', class:'insulin', form:'inject',
     targetOrgans:['cns','hematologic','cardio','renal'],
     organMechanisms:{ cns:['cns5'], hematologic:['hem2','hem3','hem5'], cardio:['cv3'], renal:['ren4'] },
     mechanismWeights:{hem3:3, cns5:3, hem2:3, hem5:2, cv3:2, ren4:2}, doseModifier:0.8 },
@@ -273,7 +273,7 @@ export const DRUG_DB: Record<string, TzDrugEntry> = {
 // 2. ПОЛНАЯ БД ПРЕПАРАТОВ ПОДДЕРЖКИ (328 веществ × ТЗ-механизмы)
 // в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ
 // k — 0..1 коэффициент снижения механизма
-// q вЂ” A (прямые данные) / B (суррогатные маркеры) / C (правдоподобность)
+// q → A (прямые данные) / B (суррогатные маркеры) / C (правдоподобность)
 // source — источник обоснования
 // Запрещено: generic-строки, нереалистичные k, механизмы не из ТЗ
 // [] — вещество не имеет прямого маппинга на 28 механизмов ТЗ
@@ -283,9 +283,9 @@ export const SUPPORT_DB: Record<string, TzSupportEntry[]> = {};
 // в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ
 // 3. БД СТЕКОВ (ТЗ-механизмы)
 // в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ
-// coverage вЂ” какие механизмы ТЗ покрывает стек
+// coverage → какие механизмы ТЗ покрывает стек
 // substances — список ID веществ в стеке
-// totalK вЂ” суммарный k по органу
+// totalK → суммарный k по органу
 
 export const STACK_DB: Record<string, TzStackEntry> = {
   hepatoprotection_stack: { id:'hepatoprotection_stack', name:'Гепатопротекция: глутатион + ER-стресс + мембраны',
@@ -294,7 +294,7 @@ export const STACK_DB: Record<string, TzStackEntry> = {
     organCoverage:['hepatic'], totalK:{ hepatic:0.61 } },
   cardioprotection_stack: { id:'cardioprotection_stack', name:'Кардиопротекция: липиды + энергия + электролиты',
     substances:['omega3','magnesium','coq10','taurine_sup'],
-    coverage:{ c1:{ id:'omega3', name:'Омега-3', targets:['cv2','cv4'], k:0.30, q:'B' }, c2:{ id:'magnesium', name:'РњР°РіРЅи�№', targets:['cv5'], k:0.35, q:'B' } },
+    coverage:{ c1:{ id:'omega3', name:'Омега-3', targets:['cv2','cv4'], k:0.30, q:'B' }, c2:{ id:'magnesium', name:'Магний', targets:['cv5'], k:0.35, q:'B' } },
     organCoverage:['cardio'], totalK:{ cardio:0.52 } },
   nephroprotection_stack: { id:'nephroprotection_stack', name:'Нефропротекция',
     substances:['telmi','omega3','nac'],
@@ -314,17 +314,17 @@ export const STACK_DB: Record<string, TzStackEntry> = {
     organCoverage:['reproductive'], totalK:{ reproductive:0.70 } },
   glycemic_control_stack: { id:'glycemic_control_stack', name:'Метаболический контроль',
     substances:['berberine','alpha_lipoic','omega3'],
-    coverage:{ g1:{ id:'berberine', name:'Р‘РµСЂР±РµСЂи�Ѕ', targets:['hem2'], k:0.40, q:'B' }, g2:{ id:'alpha_lipoic', name:'АЛЬК', targets:['hem2'], k:0.20, q:'C' } },
+    coverage:{ g1:{ id:'berberine', name:'Берберин', targets:['hem2'], k:0.40, q:'B' }, g2:{ id:'alpha_lipoic', name:'АЛЬК', targets:['hem2'], k:0.20, q:'C' } },
     organCoverage:['hematologic'], totalK:{ hematologic:0.52 } },
   adaptogenic_stack: { id:'adaptogenic_stack', name:'Адаптогенный',
     substances:['ashwagandha','magnesium','rhodiola','ginseng_sup'],
-    coverage:{ a1:{ id:'ashwagandha', name:'РђС€РІР°РіР°РЅРґР°', targets:['cns1','cns4'], k:0.15, q:'C' }, a2:{ id:'magnesium', name:'Mg', targets:['cns1'], k:0.20, q:'C' } },
+    coverage:{ a1:{ id:'ashwagandha', name:'Ашваганда', targets:['cns1','cns4'], k:0.15, q:'C' }, a2:{ id:'magnesium', name:'Mg', targets:['cns1'], k:0.20, q:'C' } },
     organCoverage:['cns'], totalK:{ cns:0.32 } },
   articular_stack: { id:'articular_stack', name:'Суставной',
     substances:['collagen','msm','glucosamine','vitamin_d3'],
     coverage:{ ac1:{ id:'vitamin_d3', name:'D3', targets:['hem2'], k:0.10, q:'C' } },
     organCoverage:['hematologic'], totalK:{ hematologic:0.10 } },
-  immune_stack: { id:'immune_stack', name:'РРјРјСѓРЅРЅС‹Р№',
+  immune_stack: { id:'immune_stack', name:'Иммунный',
     substances:['vitamin_d3','zinc_sup','probiotics_sup'],
     coverage:{ i1:{ id:'vitamin_d3', name:'D3', targets:['hem2'], k:0.10, q:'C' }, i2:{ id:'zinc_sup', name:'Zn', targets:['rep2'], k:0.15, q:'C' } },
     organCoverage:['hematologic','reproductive'], totalK:{ hematologic:0.10, reproductive:0.15 } },
@@ -338,7 +338,7 @@ export const STACK_DB: Record<string, TzStackEntry> = {
     organCoverage:['cns'], totalK:{ cns:0.48 } },
   anti_stress_stack: { id:'anti_stress_stack', name:'Антистрессовый',
     substances:['ashwagandha','magnesium'],
-    coverage:{ as1:{ id:'ashwagandha', name:'РђС€РІР°РіР°РЅРґР°', targets:['cns1','cns4'], k:0.15, q:'C' }, as2:{ id:'magnesium', name:'Mg', targets:['cns1'], k:0.20, q:'C' } },
+    coverage:{ as1:{ id:'ashwagandha', name:'Ашваганда', targets:['cns1','cns4'], k:0.15, q:'C' }, as2:{ id:'magnesium', name:'Mg', targets:['cns1'], k:0.20, q:'C' } },
     organCoverage:['cns'], totalK:{ cns:0.32 } },
   bone_stack: { id:'bone_stack', name:'Костный',
     substances:['vitamin_d3','vitamin_k2','magnesium','boron'],
@@ -348,17 +348,17 @@ export const STACK_DB: Record<string, TzStackEntry> = {
     substances:['probiotics_sup','glutamine','zinc_sup'],
     coverage:{ g1:{ id:'zinc_sup', name:'Zn', targets:['rep2'], k:0.15, q:'C' } },
     organCoverage:['reproductive'], totalK:{ reproductive:0.15 } },
-  antioxidant_network_stack: { id:'antioxidant_network_stack', name:'АнтиоксидантРЅС‹Р№',
+  antioxidant_network_stack: { id:'antioxidant_network_stack', name:'Антиоксидантный',
     substances:['alpha_lipoic','coq10','selenium_sup','vitamin_b6'],
     coverage:{ ao1:{ id:'alpha_lipoic', name:'АЛЬК', targets:['cns2','hem2'], k:0.30, q:'C' }, ao2:{ id:'coq10', name:'CoQ10', targets:['cns2'], k:0.25, q:'C' } },
     organCoverage:['cns','hematologic'], totalK:{ cns:0.44, hematologic:0.20 } },
   sleep_stack: { id:'sleep_stack', name:'Сон',
     substances:['magnesium','ashwagandha','taurine_sup'],
-    coverage:{ sl1:{ id:'magnesium', name:'Mg', targets:['cns1'], k:0.20, q:'C' }, sl2:{ id:'ashwagandha', name:'РђС€РІР°РіР°РЅРґР°', targets:['cns1','cns4'], k:0.15, q:'C' } },
+    coverage:{ sl1:{ id:'magnesium', name:'Mg', targets:['cns1'], k:0.20, q:'C' }, sl2:{ id:'ashwagandha', name:'Ашваганда', targets:['cns1','cns4'], k:0.15, q:'C' } },
     organCoverage:['cns'], totalK:{ cns:0.32 } },
   thyroid_stack: { id:'thyroid_stack', name:'Тиреоидная поддержка',
     substances:['selenium_sup','zinc_sup','ashwagandha'],
-    coverage:{ th1:{ id:'zinc_sup', name:'Zn', targets:['rep2'], k:0.15, q:'C' }, th2:{ id:'ashwagandha', name:'РђС€РІР°РіР°РЅРґР°', targets:['cns4'], k:0.15, q:'C' } },
+    coverage:{ th1:{ id:'zinc_sup', name:'Zn', targets:['rep2'], k:0.15, q:'C' }, th2:{ id:'ashwagandha', name:'Ашваганда', targets:['cns4'], k:0.15, q:'C' } },
     organCoverage:['reproductive','cns'], totalK:{ reproductive:0.15, cns:0.15 } },
   endothelial_no_stack: { id:'endothelial_no_stack', name:'Сосудистая поддержка',
     substances:['omega3','coq10','taurine_sup'],
@@ -366,7 +366,7 @@ export const STACK_DB: Record<string, TzStackEntry> = {
     organCoverage:['cardio'], totalK:{ cardio:0.44 } },
   anti_inflammatory_stack: { id:'anti_inflammatory_stack', name:'Противовоспалительный',
     substances:['omega3','curcumin_sup','coq10'],
-    coverage:{ ai1:{ id:'omega3', name:'Омега-3', targets:['cv2','hem2'], k:0.30, q:'B' }, ai2:{ id:'curcumin_sup', name:'РљСѓСЂРєСѓРји�Ѕ', targets:['cv2','cns2','hem2'], k:0.20, q:'C' } },
+    coverage:{ ai1:{ id:'omega3', name:'Омега-3', targets:['cv2','hem2'], k:0.30, q:'B' }, ai2:{ id:'curcumin_sup', name:'Куркумин', targets:['cv2','cns2','hem2'], k:0.20, q:'C' } },
     organCoverage:['cardio','hematologic','cns'], totalK:{ cardio:0.44, hematologic:0.44, cns:0.20 } },
   skin_collagen_stack: { id:'skin_collagen_stack', name:'Кожа и коллаген',
     substances:['zinc_sup','selenium_sup','vitamin_d3'],
@@ -384,15 +384,15 @@ export const STACK_DB: Record<string, TzStackEntry> = {
     substances:['zinc_sup','selenium_sup','vitamin_b6','biotin'],
     coverage:{ hs1:{ id:'zinc_sup', name:'Zn', targets:['rep2'], k:0.15, q:'C' } },
     organCoverage:['reproductive'], totalK:{ reproductive:0.15 } },
-  detox_heavy_metals_stack: { id:'detox_heavy_metals_stack', name:'������ ��������',
+  detox_heavy_metals_stack: { id:'detox_heavy_metals_stack', name:'Детокс тяжелых металлов',
     substances:['alpha_lipoic','nac','selenium_sup','zinc_sup'],
-    coverage:{ dh1:{ id:'nac', name:'NAC', targets:['liv1'], k:0.40, q:'B' }, dh2:{ id:'alpha_lipoic', name:'�ђР›Р¬Рљ', targets:['cns2'], k:0.30, q:'C' } },
+    coverage:{ dh1:{ id:'nac', name:'NAC', targets:['liv1'], k:0.40, q:'B' }, dh2:{ id:'alpha_lipoic', name:'АЛЬК', targets:['cns2'], k:0.30, q:'C' } },
     organCoverage:['hepatic','cns'], totalK:{ hepatic:0.40, cns:0.30 } },
   sleep_recovery_stack: { id:'sleep_recovery_stack', name:'Сон и восстановление',
     substances:['magnesium','ashwagandha','taurine_sup','glycine'],
-    coverage:{ sr1:{ id:'magnesium', name:'Mg', targets:['cns1','cv5'], k:0.35, q:'B' }, sr2:{ id:'ashwagandha', name:'РђС€РІР°РіР°РЅРґР°', targets:['cns1','cns4'], k:0.15, q:'C' } },
+    coverage:{ sr1:{ id:'magnesium', name:'Mg', targets:['cns1','cv5'], k:0.35, q:'B' }, sr2:{ id:'ashwagandha', name:'Ашваганда', targets:['cns1','cns4'], k:0.15, q:'C' } },
     organCoverage:['cns','cardio'], totalK:{ cns:0.44, cardio:0.35 } },
-  nootropic_energy_stack: { id:'nootropic_energy_stack', name:'Ноотропный СЌРЅРµСЂРіРµС‚и�є',
+  nootropic_energy_stack: { id:'nootropic_energy_stack', name:'Ноотропный энергетик',
     substances:['alpha_lipoic','coq10','creatine','vitamin_b6','vitamin_b12'],
     coverage:{ ne1:{ id:'alpha_lipoic', name:'АЛЬК', targets:['cns2','hem2'], k:0.30, q:'C' }, ne2:{ id:'coq10', name:'CoQ10', targets:['cns2'], k:0.25, q:'C' } },
     organCoverage:['cns','hematologic'], totalK:{ cns:0.44, hematologic:0.20 } },
@@ -402,15 +402,15 @@ export const STACK_DB: Record<string, TzStackEntry> = {
     organCoverage:['hematologic'], totalK:{ hematologic:0.24 } },
   blood_flow_no_stack: { id:'blood_flow_no_stack', name:'Кровоток и NO',
     substances:['omega3','taurine_sup','coq10'],
-    coverage:{ bf1:{ id:'omega3', name:'�����-3', targets:['cv2','cv4'], k:0.30, q:'B' }, bf2:{ id:'taurine_sup', name:'�ўР°СѓСЂи�Ѕ', targets:['cv5','cv3'], k:0.20, q:'C' } },
+    coverage:{ bf1:{ id:'omega3', name:'Омега-3', targets:['cv2','cv4'], k:0.30, q:'B' }, bf2:{ id:'taurine_sup', name:'Таурин', targets:['cv5','cv3'], k:0.20, q:'C' } },
     organCoverage:['cardio'], totalK:{ cardio:0.44 } },
   insulin_sensitivity_stack: { id:'insulin_sensitivity_stack', name:'Инсулиновая чувствительность',
     substances:['berberine','alpha_lipoic','magnesium'],
-    coverage:{ is1:{ id:'berberine', name:'Р‘РµСЂР±РµСЂи�Ѕ', targets:['hem2'], k:0.40, q:'B' }, is2:{ id:'alpha_lipoic', name:'АЛЬК', targets:['hem2'], k:0.20, q:'C' } },
+    coverage:{ is1:{ id:'berberine', name:'Берберин', targets:['hem2'], k:0.40, q:'B' }, is2:{ id:'alpha_lipoic', name:'АЛЬК', targets:['hem2'], k:0.20, q:'C' } },
     organCoverage:['hematologic'], totalK:{ hematologic:0.52 } },
   pancreas_liver_stack: { id:'pancreas_liver_stack', name:'Поджелудочная и печень',
     substances:['berberine','nac','alpha_lipoic','tudca','milk_thistle'],
-    coverage:{ pl1:{ id:'nac', name:'NAC', targets:['liv1'], k:0.40, q:'B' }, pl2:{ id:'tudca', name:'TUDCA', targets:['liv1','liv2'], k:0.45, q:'B' }, pl3:{ id:'berberine', name:'Р‘РµСЂР±РµСЂи�Ѕ', targets:['hem2'], k:0.40, q:'B' } },
+    coverage:{ pl1:{ id:'nac', name:'NAC', targets:['liv1'], k:0.40, q:'B' }, pl2:{ id:'tudca', name:'TUDCA', targets:['liv1','liv2'], k:0.45, q:'B' }, pl3:{ id:'berberine', name:'Берберин', targets:['hem2'], k:0.40, q:'B' } },
     organCoverage:['hepatic','hematologic'], totalK:{ hepatic:0.61, hematologic:0.40 } },
   iron_absorption_stack: { id:'iron_absorption_stack', name:'Повышение Р¶РµР»РµР·Р°',
     substances:['lactoferrin','vitamin_c','zinc_sup'],
@@ -440,7 +440,7 @@ export const STACK_DB: Record<string, TzStackEntry> = {
     substances:['nac','tudca','selenium_sup','molybdenum'],
     coverage:{ hn1:{ id:'nac', name:'NAC', targets:['liv1'], k:0.40, q:'B' }, hn2:{ id:'tudca', name:'TUDCA', targets:['liv1','liv2'], k:0.45, q:'B' } },
     organCoverage:['hepatic'], totalK:{ hepatic:0.61 } },
-  hepatic_nac_udca_tudca_stack: { id:'hepatic_nac_udca_tudca_stack', name:'Гепатопротекция СѓСЃи�»РµРЅРЅР°СЏ',
+  hepatic_nac_udca_tudca_stack: { id:'hepatic_nac_udca_tudca_stack', name:'Гепатопротекция усиленная',
     substances:['nac','tudca','udca'],
     coverage:{ hu1:{ id:'nac', name:'NAC', targets:['liv1'], k:0.40, q:'B' }, hu2:{ id:'tudca', name:'TUDCA', targets:['liv1','liv2'], k:0.45, q:'B' } },
     organCoverage:['hepatic'], totalK:{ hepatic:0.61 } },
@@ -448,7 +448,7 @@ export const STACK_DB: Record<string, TzStackEntry> = {
     substances:['nac','tudca','udca','phosphatidylcholine','alpha_lipoic'],
     coverage:{ he1:{ id:'nac', name:'NAC', targets:['liv1'], k:0.40, q:'B' }, he2:{ id:'tudca', name:'TUDCA', targets:['liv1','liv2'], k:0.45, q:'B' }, he3:{ id:'phosphatidylcholine', name:'ФА', targets:['liv2'], k:0.15, q:'C' } },
     organCoverage:['hepatic'], totalK:{ hepatic:0.67 } },
-  hepatic_max_stack: { id:'hepatic_max_stack', name:'Гепатокомплекс РјР°РєСЃи�јСѓРј',
+  hepatic_max_stack: { id:'hepatic_max_stack', name:'Гепатокомплекс максимум',
     substances:['nac','tudca','udca','phosphatidylcholine','alpha_lipoic','milk_thistle'],
     coverage:{ hm1:{ id:'nac', name:'NAC', targets:['liv1'], k:0.40, q:'B' }, hm2:{ id:'tudca', name:'TUDCA', targets:['liv1','liv2'], k:0.45, q:'B' }, hm3:{ id:'milk_thistle', name:'Силимарин', targets:['liv1'], k:0.25, q:'B' } },
     organCoverage:['hepatic'], totalK:{ hepatic:0.71 } },
@@ -490,7 +490,7 @@ export const STACK_DB: Record<string, TzStackEntry> = {
     organCoverage:['hematologic'], totalK:{ hematologic:0.10 } },
   mega_total_support_35: { id:'mega_total_support_35', name:'Мега-стек тотальной поддержки',
     substances:['nac','tudca','milk_thistle','omega3','coq10','magnesium','telmi','aspirin','berberine','vitamin_d3','zinc_sup','selenium_sup','ashwagandha','taurine_sup','alpha_lipoic'],
-    coverage:{ ms1:{ id:'nac', name:'NAC', targets:['liv1'], k:0.40, q:'B' }, ms2:{ id:'tudca', name:'TUDCA', targets:['liv1','liv2'], k:0.45, q:'B' }, ms3:{ id:'omega3', name:'Омега-3', targets:['cv2','cv4','hem2','hem1'], k:0.30, q:'B' }, ms4:{ id:'telmi', name:'Телмисартан', targets:['cv3','ren1','ren3'], k:0.50, q:'A' }, ms5:{ id:'magnesium', name:'Mg', targets:['cv5','cns1','hem4'], k:0.35, q:'B' }, ms6:{ id:'berberine', name:'Р‘РµСЂР±РµСЂи�Ѕ', targets:['hem2'], k:0.40, q:'B' } },
+    coverage:{ ms1:{ id:'nac', name:'NAC', targets:['liv1'], k:0.40, q:'B' }, ms2:{ id:'tudca', name:'TUDCA', targets:['liv1','liv2'], k:0.45, q:'B' }, ms3:{ id:'omega3', name:'Омега-3', targets:['cv2','cv4','hem2','hem1'], k:0.30, q:'B' }, ms4:{ id:'telmi', name:'Телмисартан', targets:['cv3','ren1','ren3'], k:0.50, q:'A' }, ms5:{ id:'magnesium', name:'Mg', targets:['cv5','cns1','hem4'], k:0.35, q:'B' }, ms6:{ id:'berberine', name:'Берберин', targets:['hem2'], k:0.40, q:'B' } },
     organCoverage:['cardio','hepatic','renal','cns','hematologic'], totalK:{ cardio:0.68, hepatic:0.61, renal:0.45, cns:0.44, hematologic:0.64 } },
   total_health_optimization_stack: { id:'total_health_optimization_stack', name:'Тотальная оптимизация',
     substances:['omega3','coq10','magnesium','alpha_lipoic','vitamin_d3','ashwagandha'],
@@ -517,14 +517,14 @@ export const TZ_MECH_LABELS: Record<string, string> = {
   ren1: 'Гемодинамическое нефроповреждение',
   ren2: 'Гиперфильтрационное / клубочковое перенапряжение',
   ren3: 'Гломерулярно-протеинурическое повреждение',
-  ren4: 'Водно-электролитный РјРµС…Р°РЅи�·Рј',
+  ren4: 'Водно-электролитный механизм',
   cns1: 'Нейромедиаторная дизрегуляция',
   cns2: 'Оксидативный стресс / митохондриальная дисфункция',
   cns3: 'Апоптоз / нейродегенеративный механизм',
   cns4: 'Нейроэндокринная дизрегуляция',
   cns5: 'Нейроглюкопения / энергетический дефицит нейронов',
-  cns6: 'Внутричерепная гипертензия / компрессионно-нейропатический РјРµС…Р°РЅи�·Рј',
-  rep1: '��������� GnRH/LH/FSH',
+  cns6: 'Внутричерепная гипертензия / компрессионно-нейропатический механизм',
+  rep1: 'Супрессия GnRH/LH/FSH',
   rep2: 'Снижение интратестикулярного тестостерона',
   rep3: 'Нарушение сперматогенеза',
   rep4: 'Эстрогенный сдвиг / ароматизация',
@@ -540,7 +540,7 @@ export const TZ_SYSTEM_LABELS: Record<string, string> = {
   cardio: 'Сердечно-сосудистая система',
   hepatic: 'Печень',
   renal: 'Почки',
-  cns: 'Р¦РµРЅС‚СЂР°Р»СЊРЅР°СЏ РЅРµСЂРІРЅР°СЏ СЃи�ЃС‚РµРјР°',
+  cns: 'Центральная нервная система',
   reproductive: 'Репродуктивная система / HPG-ось',
   hematologic: 'Гематолого-метаболический блок',
 };

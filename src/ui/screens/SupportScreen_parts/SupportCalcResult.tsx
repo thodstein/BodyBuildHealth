@@ -517,39 +517,51 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
 
                   {/* ===== SUBSTANCE DETAIL LIST (D3: click to expand) ===== */}
                   {(() => {
-                    // Sort subs by time of day (morning → afternoon → evening → other)
-                    const sortOrder: Record<string, number> = { утро: 0, 'утро,': 0, натощак: 0, день: 1, обед: 1, вечер: 2, 'на ночь': 2, ночь: 2 };
-                    const timedSubs = [...(effectiveLevel?.subs || [])].sort((a: any, b: any) => {
-                      const ta = effectiveLevel?.dosages?.[a]?.timing?.toLowerCase() || '';
-                      const tb = effectiveLevel?.dosages?.[b]?.timing?.toLowerCase() || '';
-                      const sa = Object.entries(sortOrder).find(([k]: [string, any]) => ta.includes(k))?.[1] ?? 3;
-                      const sb = Object.entries(sortOrder).find(([k]: [string, any]) => tb.includes(k))?.[1] ?? 3;
-                      return sa - sb;
-                    });
-                    return (
-                    <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'40vh', overflowY:'auto', marginBottom:8 }}>
-                      {timedSubs.map((id: string) => {
-                      const sub = allSupport.find((s: any) => s.id === id);
+                    // Group subs by time of day with section headers
+                    const allSubs = effectiveLevel?.subs || [];
+                    const getTimeGroup = (timing: string): number => {
+                      const t = (timing || '').toLowerCase();
+                      if (t.includes('на ночь') || t.includes('ночь')) return 4;
+                      if (t.includes('натощак')) return 0;
+                      if (t.includes('утро')) return 1;
+                      if (t.includes('вечер')) return 3;
+                      if (t.includes('обед') || t.includes('день')) return 2;
+                      if (t.includes('с едой')) return 1;
+                      return 2;
+                    };
+                    const GROUP_LABELS = ['🌅 Натощак', '🍳 Утро (с едой)', '🌆 День', '🌙 Вечер', '💤 На ночь'];
+                    const groups: string[][] = [[],[],[],[],[]];
+                    for (const id of allSubs) {
                       const d = effectiveLevel?.dosages?.[id];
+                      const g = getTimeGroup(d?.timing || '');
+                      groups[g].push(id);
+                    }
+                    return (
+                    <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:'45vh', overflowY:'auto', marginBottom:8 }}>
+                      {groups.map((groupIds: string[], gi: number) => groupIds.length > 0 && (
+                        <div key={gi}>
+                          <div style={{ fontSize:8, fontWeight:700, color:'#00e68a', marginBottom:3, padding:'2px 6px', background:'rgba(0,230,138,0.06)', borderRadius:4, borderLeft:'3px solid #00e68a' }}>{GROUP_LABELS[gi]} ({groupIds.length})</div>
+                          {groupIds.map((id: string) => {
+                      const sub = allSupport.find((s: any) => s.id === id);
                       const planInfo = planResult?.substances?.find((s: PlanSubstance) => s.id === id);
                       const catalogEntry = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
                       const isExpanded = expandedCategories[id];
                       return sub ? (
-                        <div key={id} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)', fontSize:9, cursor:'pointer' }}
+                        <div key={id} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)', fontSize:9, cursor:'pointer', marginBottom:2 }}
                           onClick={() => setExpandedCategories(p => ({ ...p, [id]: !p[id] }))}>
                           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                            <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                            <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
                               <span style={{ fontSize:10, transform: isExpanded ? 'rotate(90deg)':'none', transition:'0.2s' }}>▶</span>
                               <span style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</span>
+                              {planInfo?.brandName && <span style={{ fontSize:7, color:'#60a5fa', fontWeight:600, marginLeft:2 }}>({planInfo.brandName})</span>}
+                              {planInfo?.priority && planInfo.priority <= 2 && <span style={{ fontSize:6, padding:'1px 3px', borderRadius:3, fontWeight:700, marginLeft:2, background: planInfo.priority === 1 ? 'rgba(0,230,138,0.18)' : 'rgba(96,165,250,0.15)', color: planInfo.priority === 1 ? '#00e68a' : '#60a5fa' }}>{planInfo.priority === 1 ? '1-й выбор' : '2-й'}</span>}
                             </div>
                             <div style={{ display:'flex', gap:2, alignItems:'center' }}>
-                              {d && <span style={{ color:'#00e68a', fontSize:8, fontWeight:600 }}>{d.mg >= 5000 ? `${(d.mg/1000).toFixed(1)} г` : `${d.mg} мг`} — {d.timing}</span>}
+                              {planInfo && <span style={{ color:'#00e68a', fontSize:8, fontWeight:600 }}>{planInfo.doseDisplay} — {planInfo.timing}</span>}
                               <span onClick={(e) => {
                                 e.stopPropagation();
-                                // Find analogs and offer replacement via search pre-fill
                                 const analogs = catalogEntry?.analog || [];
                                 if (analogs.length > 0) {
-                                  // Replace with first analog directly
                                   const analog = analogs[0];
                                   const analogEntry = SUPPORT_CATALOG_DATA[analog] || SUPPORT_CATALOG_DATA[analog.toUpperCase()];
                                   if (analogEntry) {
@@ -561,7 +573,6 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                                     showToast(`🔁 ${sub.name} → ${analogEntry.nameRu || analogEntry.name}`, 'success');
                                   }
                                 } else {
-                                  // No known analog — open search for this substance
                                   const subName = (sub.name || id).toLowerCase();
                                   setSubSearch(subName);
                                   showToast('🔍 Введите аналог в поиске', 'warning');
@@ -570,18 +581,9 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                               <span onClick={(e) => { e.stopPropagation(); setEnhancedSubs(prev => prev.filter((s: any) => s !== id)); }} style={{ cursor:'pointer', fontSize:10, color:'#ef4444', padding:'0 4px', lineHeight:1 }} title="Удалить из плана">✕</span>
                             </div>
                           </div>
-                          {planInfo?.comment && !isExpanded && (
-                            <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.3, paddingLeft:4, borderLeft:'2px solid rgba(0,230,138,0.3)' }}>
-                              {planInfo.comment.split(';')[0]}
-                              {planResult?.mechanisms && (
-                                (() => {
-                                  const coveredMechs = planResult.mechanisms.filter((m: any) => (m.substances || []).includes(id));
-                                  if (coveredMechs.length > 0) {
-                                    return <span style={{ color:'#60a5fa', marginLeft:4 }}>({coveredMechs.length} мех.)</span>;
-                                  }
-                                  return null;
-                                })()
-                              )}
+                          {planInfo?.mechanismReason && !isExpanded && (
+                            <div style={{ fontSize:7, color:'#a3e635', lineHeight:1.3, paddingLeft:4, borderLeft:'2px solid rgba(0,230,138,0.3)' }}>
+                              {planInfo.mechanismReason}
                             </div>
                           )}
                           {/* D3: Expanded detail card */}
@@ -751,7 +753,9 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                         </div>
                       ) : null;
                     })}
-                  </div>
+                        </div>
+                      ))}
+                    </div>
                     );
                   })()}
 
@@ -1120,6 +1124,8 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                           <div key={id} style={{ marginBottom:3, padding:'4px 8px', borderRadius:6, background:'rgba(0,0,0,0.04)', fontSize:8, display:'flex', alignItems:'center', gap:6, cursor:'pointer' }}
                             onClick={() => setExpandedCategories(p => ({ ...p, [`whatif_${id}`]: !p[`whatif_${id}`] }))}>
                             <span style={{ fontWeight:600, color:'var(--text-light)', flex:1 }}>{sub.name}</span>
+                            {planInfo?.brandName && <span style={{ fontSize:6, color:'#60a5fa', fontWeight:600 }}>({planInfo.brandName})</span>}
+                            {planInfo?.priority && planInfo.priority <= 2 && <span style={{ fontSize:5, padding:'1px 2px', borderRadius:2, fontWeight:700, background: planInfo.priority === 1 ? 'rgba(0,230,138,0.18)' : 'rgba(96,165,250,0.15)', color: planInfo.priority === 1 ? '#00e68a' : '#60a5fa' }}>{planInfo.priority === 1 ? '1-й' : '2-й'}</span>}
                             {isWhatIf ? (
                               <span style={{ color:'#ef4444', fontSize:7 }}>
                                 Без: +{Math.round(planInfo?.doseMg ? planInfo.doseMg / 50 : 5)}% риска · Покрывает {coveredMechs.length} мех.
@@ -1151,16 +1157,52 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                     </details>
                   )}
 
-                  {/* ===== MONITORING CARD ===== */}
-                  {planResult?.monitoring && planResult.monitoring.length > 0 && (
-                    <details style={{ marginBottom:10 }}>
-                      <summary style={{ fontSize:10, fontWeight:700, color:'#f59e0b', cursor:'pointer', marginBottom:4 }}>📊 Мониторинг: что и когда контролировать</summary>
-                      <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.03)', border:'1px solid rgba(245,158,11,0.12)' }}>
-                        <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5, whiteSpace:'pre-line' }}>
-                          {planResult.monitoring.slice(0, 12).join('\n')}
-                        </div>
+                  {/* ===== INTERACTION WARNINGS ===== */}
+                  {(() => {
+                    const planIds = (effectiveLevel?.subs || []) as string[];
+                    const warnings: Array<{a:string;b:string;effect:string;severity:string}> = [];
+                    for (const id of planIds) {
+                      const entry = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
+                      if (!entry?.conflicts) continue;
+                      for (const c of entry.conflicts) {
+                        if (planIds.includes(c.with) || planIds.includes(c.with.toLowerCase())) {
+                          warnings.push({ a: entry.nameRu||entry.name||id, b: c.with, effect: c.effect, severity: c.severity||'MEDIUM' });
+                        }
+                      }
+                    }
+                    if (warnings.length === 0) return null;
+                    return (
+                      <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.25)' }}>
+                        <div style={{ fontSize:10, fontWeight:700, color:'#ef4444', marginBottom:6 }}>⚠️ Взаимодействия в плане ({warnings.length})</div>
+                        {warnings.slice(0,6).map((w,i) => (
+                          <div key={i} style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3, padding:'4px 6px', borderRadius:6, background:'rgba(239,68,68,0.04)' }}>
+                            <span style={{ color:'#ef4444', fontWeight:600 }}>{w.a}</span>
+                            {' + '}
+                            <span style={{ color:'#ef4444', fontWeight:600 }}>{w.b}</span>
+                            {' — '}
+                            <span style={{ color:'var(--text-light)' }}>{w.effect}</span>
+                            <span style={{ marginLeft:4, fontSize:7, padding:'1px 4px', borderRadius:3, background: w.severity==='HIGH'?'rgba(239,68,68,0.15)':'rgba(245,158,11,0.1)', color: w.severity==='HIGH'?'#ef4444':'#f59e0b' }}>{w.severity}</span>
+                          </div>
+                        ))}
                       </div>
-                    </details>
+                    );
+                  })()}
+
+                  {/* ===== MONITORING CARD (always visible) ===== */}
+                  {planResult?.monitoring && planResult.monitoring.length > 0 && (
+                    <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.25)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:6, display:'flex', alignItems:'center', gap:4 }}>
+                        <span>📊</span><span>Мониторинг: сдать через 4 недели</span>
+                      </div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                        {planResult.monitoring.slice(0, 10).map((m: string, i: number) => (
+                          <div key={i} style={{ fontSize:8, color:'var(--text-light)', padding:'3px 8px', borderRadius:6, background:'rgba(245,158,11,0.04)', display:'flex', alignItems:'center', gap:4 }}>
+                            <span style={{ color:'#f59e0b', fontWeight:700 }}>•</span>
+                            <span>{m}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
 
                   {/* ===== SPECIAL INSTRUCTIONS CARD ===== */}
@@ -1230,7 +1272,7 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
                             return (
                               <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
                                 <td style={{ padding:'3px 5px', color:'var(--text-dim)', fontSize:7 }}>{d.timing}</td>
-                                <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub.name}</td>
+                                <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub.name}{planInfo?.brandName ? <span style={{ fontSize:6, color:'#60a5fa', fontWeight:600 }}> ({planInfo.brandName})</span> : null}{planInfo?.priority && planInfo.priority <= 2 ? <span style={{ fontSize:5, padding:'1px 2px', borderRadius:2, fontWeight:700, marginLeft:2, background: planInfo.priority === 1 ? 'rgba(0,230,138,0.18)' : 'rgba(96,165,250,0.15)', color: planInfo.priority === 1 ? '#00e68a' : '#60a5fa' }}>{planInfo.priority === 1 ? '1-й' : '2-й'}</span> : null}</td>
                                 <td style={{ padding:'3px 5px', color:'#00e68a' }}>{d.mg >= 5000 ? `${(d.mg/1000).toFixed(1)} г` : `${d.mg} мг`}</td>
                                 <td style={{ padding:'3px 5px', color:'var(--text-dim)', maxWidth:250, fontSize:7, lineHeight:1.3 }}>{planInfo?.comment || sub.description || ''}</td>
                               </tr>

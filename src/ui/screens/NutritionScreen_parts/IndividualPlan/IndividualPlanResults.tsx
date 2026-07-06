@@ -807,43 +807,62 @@ export const IndividualPlanResults: React.FC = () => {
             shoppingList.forEach((item: any) => {
               const cat = CAT_RU[item.catLabel || item.category] || item.catLabel || item.category || '📦 Прочее';
               if (!groups[cat]) groups[cat] = [];
-              groups[cat].push(item);
+              const existing = groups[cat].find((g: any) => g.id === item.id);
+              if (existing) { existing.amount += item.amount || 0; existing.packs = (existing.packs || 1) + 1; }
+              else groups[cat].push({ ...item, packs: 1 });
             });
-            const totalItems = shoppingList.length;
-            const totalGrams = shoppingList.reduce((s: number, i: any) => s + (i.amount || 0), 0);
+            const allItems = Object.values(groups).flat() as any[];
+            const totalItems = allItems.length;
+            const totalGrams = allItems.reduce((s: number, i: any) => s + (i.amount || 0), 0);
             const pricePerKg: Record<string, number> = { low: 4, medium: 7, max: 12, enhanced: 18 };
             const estCost = Math.round(totalGrams / 1000 * (pricePerKg[budget] || 7));
-            const exportText = shoppingList.map((i: any) => `${i.name} — ${i.amount >= 1000 ? `${(i.amount/1000).toFixed(1)} кг` : `${Math.round(i.amount)} г`}`).join('\n');
+            const exportText = allItems.map((i: any) => `${i.name} — ${i.amount >= 1000 ? `${(i.amount/1000).toFixed(1)} кг` : `${Math.round(i.amount)} г`}`).join('\n');
+            // 🟠8 — Checked items state
+            const [checked, setChecked] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('he_shopping_checked') || '[]')); } catch { return new Set<string>(); } });
+            const toggleChecked = (id: string) => { setChecked(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); localStorage.setItem('he_shopping_checked', JSON.stringify([...n])); return n; }); };
+            const checkedCount = allItems.filter((i: any) => checked.has(i.id)).length;
+            // 🟡13 — Pack estimates
+            const PACK_SIZES: Record<string, number> = { chicken_breast:500, turkey_breast:500, beef_steak:400, salmon:300, cod:400, tuna:200, egg_whole:600, egg_white:500, rice_white:900, buckwheat:800, pasta:500, oatmeal:500, potato:1000, broccoli:400, cauliflower:500, carrot:1000, tomato:500, cucumber:400, spinach:200, milk:1000, yogurt_greek:500, cottage_cheese_5:250, cheese:200, butter:200, olive_oil:500, avocado:200, nuts_almonds:200, banana:1000, apple:1000, berries:300, bread_white:500, whey_isolate:1000, casein:1000, creatine:500 };
             return (
               <>
                 <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                  <button onClick={() => { shoppingList.forEach((i: any) => addToCart({ name: i.name, kcal: i.kcal || 0, amount: i.amount, category: i.catLabel || i.category })); }} style={{ flex:1, padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(249,115,22,0.2)', background: 'rgba(249,115,22,0.06)', color: '#f97316', cursor: 'pointer', fontSize: 8, fontWeight: 600 }}>
+                  <button onClick={() => { allItems.forEach((i: any) => addToCart({ name: i.name, kcal: i.kcal || 0, amount: i.amount, category: i.catLabel || i.category })); }} style={{ flex:1, padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(249,115,22,0.2)', background: 'rgba(249,115,22,0.06)', color: '#f97316', cursor: 'pointer', fontSize: 8, fontWeight: 600 }}>
                     🛒 В корзину ({totalItems})
                   </button>
-                  <div style={{ padding: '5px 8px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a', fontSize: 8, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    💰 ~{estCost}€
+                  <div style={{ padding: '5px 8px', borderRadius: 8, background: checkedCount === totalItems && totalItems > 0 ? 'rgba(34,197,94,0.1)' : 'rgba(0,230,138,0.06)', border: checkedCount === totalItems && totalItems > 0 ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(0,230,138,0.15)', color: checkedCount === totalItems && totalItems > 0 ? '#22c55e' : '#00e68a', fontSize: 8, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    💰 ~{estCost * 100}₽
                   </div>
-                  <button onClick={() => { navigator.clipboard?.writeText(exportText); }} style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.06)', color: '#60a5fa', cursor: 'pointer', fontSize: 8, fontWeight: 600 }}>
-                    📋
-                  </button>
+                  <button onClick={() => { navigator.clipboard?.writeText(exportText); }} style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.06)', color: '#60a5fa', cursor: 'pointer', fontSize: 8, fontWeight: 600 }}>📋</button>
+                  {checkedCount > 0 && <button onClick={() => { localStorage.setItem('he_shopping_checked', '[]'); setChecked(new Set()); }} style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)', color: '#ef4444', cursor: 'pointer', fontSize: 8, fontWeight: 600 }}>✕ Сброс</button>}
                 </div>
+                {checkedCount > 0 && <div style={{marginBottom:6,height:4,borderRadius:2,background:'rgba(255,255,255,0.06)',overflow:'hidden'}}><div style={{height:'100%',width:`${Math.round(checkedCount/totalItems*100)}%`,borderRadius:2,background:'#22c55e',transition:'width 0.3s'}}/></div>}
+                {(shoppingList as any)._diversity && <div style={{marginBottom:6,fontSize:8,color:((shoppingList as any)._diversity.score >= 7 ? '#22c55e' : '#f59e0b'),fontWeight:600}}>🌈 Разнообразие: {((shoppingList as any)._diversity.uniqueFoods)} видов продуктов · {((shoppingList as any)._diversity.note)}</div>}
                 {Object.entries(groups).map(([cat, items]) => (
                   <div key={cat} style={{ marginBottom: 6 }}>
                     <div style={{ fontSize: 9, fontWeight: 700, color: '#f97316', marginBottom: 2, padding: '2px 0 2px 4px', borderLeft: '2px solid rgba(249,115,22,0.3)', display: 'flex', alignItems: 'center', gap: 4 }}>
                       {cat}
                       <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)', marginLeft: 'auto' }}>{items.length} шт</span>
                     </div>
-                    {items.map((data: any, i: number) => (
-                      <div key={data.name + i} style={{ fontSize: 9, padding: '3px 0 3px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'rgba(255,255,255,0.85)' }}>
-                        <span>{data.name}</span>
+                    {items.map((data: any, i: number) => {
+                      const isChecked = checked.has(data.id);
+                      const packSize = PACK_SIZES[data.id];
+                      const packEstimate = packSize ? `~${Math.max(1, Math.round(data.amount / packSize))} уп.` : '';
+                      return (
+                      <div key={data.name + i} style={{ fontSize: 9, padding: '3px 0 3px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: isChecked ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.85)', textDecoration: isChecked ? 'line-through' : 'none', transition: 'all 0.2s' }}>
+                        <span style={{display:'flex',alignItems:'center',gap:4}}>
+                          <span onClick={() => toggleChecked(data.id)} style={{cursor:'pointer',fontSize:11,color:isChecked?'#22c55e':'rgba(255,255,255,0.2)',userSelect:'none',width:16,textAlign:'center'}}>{isChecked ? '☑' : '☐'}</span>
+                          <span>{data.name}</span>
+                        </span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                          {packEstimate && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{packEstimate}</span>}
+                          <span style={{ color: isChecked ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                             {data.amount >= 1000 ? `${(data.amount / 1000).toFixed(1)} кг` : `${Math.round(data.amount)} г`}
                           </span>
                           <button onClick={() => addToCart({ name: data.name, kcal: data.kcal || 0, amount: data.amount, category: data.catLabel || data.category })} style={{ padding: '2px 4px', borderRadius: 4, border: 'none', background: 'rgba(249,115,22,0.12)', color: '#f97316', cursor: 'pointer', fontSize: 7 }}>🛒</button>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ))}
               </>

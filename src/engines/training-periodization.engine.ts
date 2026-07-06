@@ -442,7 +442,7 @@ export function generateMacrocycle(input: MacrocycleInput): MacrocyclePlan {
   };
 }
 
-function generateWeekDays(
+export function generateWeekDays(
   daysPerWeek: number,
   goal: string,
   level: string,
