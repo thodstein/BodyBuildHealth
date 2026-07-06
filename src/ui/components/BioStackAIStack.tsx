@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
-import { buildStack, explainStack, findReplacement, type ReplacementResult, type ReplacementType } from '../../engines/supplement-finder.engine';
+import { buildStack, explainStack, findReplacement, findComplexForStack, type ReplacementResult, type ReplacementType, type ComplexMatch } from '../../engines/supplement-finder.engine';
 import { buildSmartStack } from '../../engines/biostack-recommender.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS, ALL_SUBSTANCES } from '../../data/support-database';
 import { TZ_MECH_LABELS } from '../../data/support-db';
 import { decodeGarbled } from '../../utils/text-sanitizer';
 import { GlassCard, StatBox, ORGANS, toFinderProfile, ConfirmModal, showToast, PRICE_RUB, estCost } from './BioStackAIConstants';
+import { SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX } from '../../data/support-meta';
 import type { LinkedData } from '../../core/data-link';
 
 function getTitration(id: string, cat: any): string | null {
@@ -419,6 +420,79 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
           }
           setActionLoading(null);
         }, 400);
+      }},
+    { id: 'complex', label: 'Собрать в комплекс', icon: '📦', color: '#f59e0b',
+      run: () => {
+        if (stackIds.length < 2) return;
+        setActionLoading('complex');
+        setTimeout(() => {
+          const merges: { targetId: string; targetName: string; ids: string[]; coverage: number }[] = [];
+          // Check SUPPLEMENT_COMPOSITION: find complexes whose components are in the stack
+          for (const [complexId, components] of Object.entries(SUPPLEMENT_COMPOSITION)) {
+            const inStack = components.filter(c => stackIds.some(s => s.toLowerCase() === c.toLowerCase()));
+            if (inStack.length >= 2 && SUPPORT_CATALOG_DATA[complexId]) {
+              merges.push({
+                targetId: complexId,
+                targetName: SUPPORT_CATALOG_DATA[complexId]?.nameRu || SUPPORT_CATALOG_DATA[complexId]?.name || complexId,
+                ids: inStack,
+                coverage: inStack.length / components.length,
+              });
+            }
+          }
+          // Also check COMPONENT_TO_COMPLEX for reverse matches
+          for (const sid of stackIds) {
+            const complexes = COMPONENT_TO_COMPLEX[sid] || COMPONENT_TO_COMPLEX[sid.toLowerCase()] || [];
+            for (const cid of complexes) {
+              if (merges.some(m => m.targetId === cid)) continue;
+              const components = SUPPLEMENT_COMPOSITION[cid] || [];
+              const inStack = components.filter(c => stackIds.some(s => s.toLowerCase() === c.toLowerCase()));
+              if (inStack.length >= 2 && SUPPORT_CATALOG_DATA[cid]) {
+                merges.push({
+                  targetId: cid,
+                  targetName: SUPPORT_CATALOG_DATA[cid]?.nameRu || SUPPORT_CATALOG_DATA[cid]?.name || cid,
+                  ids: inStack,
+                  coverage: inStack.length / stackIds.length,
+                });
+              }
+            }
+          }
+          // Algorithmic: findSingleReplacementForStack is separate - use findComplexForStack
+          const algoMatches = findComplexForStack(stackIds);
+          for (const m of algoMatches) {
+            if (!merges.some(x => x.targetId === m.complexId)) {
+              merges.push({
+                targetId: m.complexId,
+                targetName: m.complexName,
+                ids: m.matchedIds,
+                coverage: m.coverage,
+              });
+            }
+          }
+
+          if (merges.length === 0) {
+            setActionResult({
+              title: '📦 Комплексы не найдены',
+              sections: [{ icon: '💡', text: 'В базе нет комплексов, покрывающих 2+ вещества из вашего стека. Попробуйте поиск вручную.', color: '#f59e0b' }],
+            });
+          } else {
+            const best = merges.sort((a, b) => b.coverage - a.coverage);
+            const lines = best.slice(0, 5).map(m => {
+              const names = m.ids.map(id => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id).join(', ');
+              return `• ${m.targetName} → заменяет ${m.ids.length} шт: ${names} (покрытие ${Math.round(m.coverage * 100)}%)`;
+            });
+            setActionResult({
+              title: `📦 Найдено ${merges.length} комплексов`,
+              sections: [
+                { icon: '📦', text: `Можно заменить ${best[0]?.ids.length || 0} веществ на один комплекс:\n${lines.join('\n')}`, color: '#fbbf24' },
+                { icon: '💡', text: 'Комплекс заменяет несколько отдельных препаратов — меньше капсул, проще приём.', color: '#f59e0b' },
+              ],
+              resultStack: best.length > 0
+                ? [...stackIds.filter(s => !best[0].ids.some(rid => rid.toLowerCase() === s.toLowerCase())), best[0].targetId]
+                : stackIds,
+            });
+          }
+          setActionLoading(null);
+        }, 500);
       }},
     { id: 'why', label: 'Почему мне хуже', icon: '🤔', color: '#60a5fa',
       run: () => {
@@ -952,6 +1026,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
                            a.id === 'optimize' ? 'Добавить недостающие компоненты' :
                            a.id === 'risks' ? 'Убрать конфликтующие препараты' :
                            a.id === 'cheaper' ? 'Найти бюджетные аналоги' :
+                           a.id === 'complex' ? 'Заменить N препаратов одним комплексом' :
                            'Анализ совместимости с профилем'}
                         </div>
                       </div>

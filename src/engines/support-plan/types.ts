@@ -321,7 +321,7 @@ export interface PlanSubstance {
   id: string; name: string; doseMg: number; doseDisplay: string; timing: string;
   category: string[]; tier: string; targetSystems: string[];
   comment: string; mechanismReason: string;
-  fromJoint: boolean; fromBoost: boolean;
+  fromJoint: boolean; fromBoost: boolean; fromNeuro: boolean;
 }
 
 export interface PlanMechanism {

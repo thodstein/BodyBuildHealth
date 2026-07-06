@@ -2,7 +2,7 @@ import { SUPPORT_CATALOG_DATA } from '../data/support-database';
 import { ALL_SUBSTANCES, ALL_INTERACTIONS } from '../data/support-database';
 import { SUPPORT_SUBSTANCE_MAP } from '../data/support-substances';
 import { getSubstanceTier } from '../data/support-database';
-import { SUBSTANCE_ANALOGS } from '../data/support-meta';
+import { SUBSTANCE_ANALOGS, SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX } from '../data/support-meta';
 
 export type GoalType =
   | 'sleep' | 'energy' | 'concentration' | 'muscle_gain' | 'fat_loss'
@@ -683,6 +683,124 @@ export function findSingleReplacementForStack(substanceIds: string[], profile?: 
 export function autoCompleteStack(baseIds: string[], targetSize: number, constraints?: { avoidIds?: string[]; preferredCategories?: string[]; profile?: FinderProfile }): string[] {
   const q: StackQuery = { baseIds, targetSize, autoFill: true, avoidIds: constraints?.avoidIds, categories: constraints?.preferredCategories, profile: constraints?.profile };
   return buildStack(q).stack;
+}
+
+// ─── COMPLEX FINDER ──────────────────────────────────────────────────────────
+
+export interface ComplexMatch {
+  complexId: string;
+  complexName: string;
+  matchedIds: string[];
+  totalComponents: number;
+  coverage: number;
+  priceEstimate: 'low' | 'medium' | 'high';
+  explanation: string;
+}
+
+/** Find complexes that contain a specific substance */
+export function findComplexesForSubstance(id: string): ComplexMatch[] {
+  const results: ComplexMatch[] = [];
+  const lower = id.toLowerCase();
+  for (const [complexId, components] of Object.entries(SUPPLEMENT_COMPOSITION)) {
+    if (components.some(c => c.toLowerCase() === lower || lower.includes(c.toLowerCase()) || c.toLowerCase().includes(lower))) {
+      const entry = getEntry(complexId);
+      if (!entry) continue;
+      const matched = components.filter(c => {
+        const e = getEntry(c);
+        return !!e;
+      });
+      results.push({
+        complexId,
+        complexName: entry.nameRu || entry.name || complexId,
+        matchedIds: matched,
+        totalComponents: components.length,
+        coverage: matched.length / components.length,
+        priceEstimate: estimatePrice(complexId),
+        explanation: `Комплекс содержит ${matched.length} из ${components.length} компонентов, связанных с ${getEntryName(id)}`,
+      });
+    }
+  }
+  // Also check COMPONENT_TO_COMPLEX for reverse mapping
+  const reverseComplexes = COMPONENT_TO_COMPLEX[id] || COMPONENT_TO_COMPLEX[id.toLowerCase()] || [];
+  for (const cid of reverseComplexes) {
+    if (results.some(r => r.complexId === cid)) continue;
+    const entry = getEntry(cid);
+    if (!entry) continue;
+    const components = SUPPLEMENT_COMPOSITION[cid] || [];
+    results.push({
+      complexId: cid,
+      complexName: entry.nameRu || entry.name || cid,
+      matchedIds: components,
+      totalComponents: components.length,
+      coverage: 1,
+      priceEstimate: estimatePrice(cid),
+      explanation: `Комплекс содержит компонент ${getEntryName(id)}`,
+    });
+  }
+  return results.sort((a, b) => b.coverage - a.coverage).slice(0, 10);
+}
+
+/** Find a single complex that can replace multiple substances in a stack */
+export function findComplexForStack(substanceIds: string[]): ComplexMatch[] {
+  if (substanceIds.length < 2) return [];
+  const lowerIds = new Set(substanceIds.map(id => id.toLowerCase()));
+  const results: ComplexMatch[] = [];
+
+  for (const [complexId, components] of Object.entries(SUPPLEMENT_COMPOSITION)) {
+    const entry = getEntry(complexId);
+    if (!entry) continue;
+    const lowerComps = components.map(c => c.toLowerCase());
+    const matched = components.filter(c => lowerIds.has(c.toLowerCase()));
+    // Also check if component names/aliases match
+    const extraMatched: string[] = [];
+    for (const sid of substanceIds) {
+      if (matched.some(m => m.toLowerCase() === sid.toLowerCase())) continue;
+      const sEntry = getEntry(sid);
+      if (!sEntry) continue;
+      const sName = (sEntry.nameRu || sEntry.name || '').toLowerCase();
+      if (lowerComps.some(c => sName.includes(c) || c.includes(sName))) {
+        extraMatched.push(sid);
+      }
+    }
+    const allMatched = [...new Set([...matched, ...extraMatched])];
+    if (allMatched.length >= 2) {
+      results.push({
+        complexId,
+        complexName: entry.nameRu || entry.name || complexId,
+        matchedIds: allMatched,
+        totalComponents: components.length,
+        coverage: allMatched.length / Math.max(substanceIds.length, 1),
+        priceEstimate: estimatePrice(complexId),
+        explanation: `Комплекс покрывает ${allMatched.length} из ${substanceIds.length} веществ стека: ${allMatched.map(m => getEntryName(m)).join(', ')}`,
+      });
+    }
+  }
+
+  // Also check COMPONENT_TO_COMPLEX: find complexes whose components intersect with stack
+  for (const sid of substanceIds) {
+    const complexes = COMPONENT_TO_COMPLEX[sid] || COMPONENT_TO_COMPLEX[sid.toLowerCase()] || [];
+    for (const cid of complexes) {
+      if (results.some(r => r.complexId === cid)) continue;
+      const components = SUPPLEMENT_COMPOSITION[cid] || [];
+      const lowerComps = components.map(c => c.toLowerCase());
+      const matched = substanceIds.filter(id => lowerComps.includes(id.toLowerCase()));
+      if (matched.length >= 2) {
+        const entry = getEntry(cid);
+        if (!entry) continue;
+        results.push({
+          complexId: cid,
+          complexName: entry.nameRu || entry.name || cid,
+          matchedIds: matched,
+          totalComponents: components.length,
+          coverage: matched.length / substanceIds.length,
+          priceEstimate: estimatePrice(cid),
+          explanation: `Комплекс содержит ${matched.length} из ${substanceIds.length} веществ: ${matched.map(m => getEntryName(m)).join(', ')}`,
+        });
+      }
+    }
+  }
+
+  return results.sort((a, b) => b.coverage - a.coverage).slice(0, 10);
 }
 
 // ─── DEFAULT PROFILE ────────────────────────────────────────────────────────

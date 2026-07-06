@@ -25,7 +25,7 @@ import { getExerciseBio } from '../../data/exercise-biomechanics-db';
 import { getStrengthLevel, getNextLevelTarget } from '../../engines/performance-analytics.engine';
 import { computeStructuredAnalytics } from '../../engines/structured-analytics.engine';
 import { SRCBBScreen } from './SRCBBScreen';
-import { DiaryAndAnalyticsTab } from './TrainingScreen_parts/DiaryAndAnalyticsTab';
+import { TrainingDiaryHub } from './TrainingScreen_parts/TrainingDiaryHub';
 import { VBTCalculator } from './SRCBBScreen_parts/VBTCalculator';
 import { MRVEstimator } from './SRCBBScreen_parts/MRVEstimator';
 import { PlateCalculator } from './SRCBBScreen_parts/PlateCalculator';
@@ -46,7 +46,7 @@ export const TrainingScreen: React.FC = () => {
   const diary = useMemo(() => new StrengthDiary(), []);
   // Этап R: режим планирования (устраняет дубли программ СРЦ/BB ↔ конструктор, AGENTS.md баг #1)
   const [planningTrack, setPlanningTrackState] = useState<PlanningTrack>(getPlanningTrack());
-  const [tab, setTab] = useState<TrainingTab>(getPlanningTrack() === 'manual' ? 'plan' : 'srcbb');
+  const [tab, setTab] = useState<TrainingTab>(getPlanningTrack() === 'manual' ? 'constructor' : 'srcbb');
   const [page, setPage] = useState<TrainingPage>('hero');
   const [mainGroup, setMainGroup] = useState<TrainingGroup>(null);
   // Эффективные группы вкладок: «Планирование» зависит от режима (взаимоисключающие наборы — нет дублей)
@@ -83,7 +83,6 @@ export const TrainingScreen: React.FC = () => {
   // Синхронизируем локальные состояния из единого профиля (профиль — мастер для конструктора)
   useEffect(() => { setGoal(tprofile.goal); setLevel(tprofile.level); setDaysPerWeek(tprofile.daysPerWeek); setRecovery(tprofile.recovery); setFatigue(tprofile.fatigue); setWeakPoints(tprofile.weakPoints); setBodyWeight(tprofile.bodyWeight); setSleepHours(tprofile.sleepHours); setStressLevel(tprofile.stressLevel); }, [tprofile]);
   const [customExercises, setCustomExercises] = useState<{ name: string; sets: number; reps: number; rir: number }[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingExercises') || '[]'); } catch { return []; } });
-  const [lastAddedEx, setLastAddedEx] = useState<string | null>(null);
   const [trainingOutput, setTrainingOutput] = useState<TrainingOutput | null>(null);
   const [macrocycle, setMacrocycle] = useState<MacrocyclePlan | null>(() => { try { return JSON.parse(localStorage.getItem('he_macro_session') || 'null'); } catch { return null; } });
   useEffect(() => { try { localStorage.setItem('he_macro_session', JSON.stringify(macrocycle)); } catch {} }, [macrocycle]);
@@ -101,13 +100,7 @@ export const TrainingScreen: React.FC = () => {
   const appliedMethod = Object.values(appliedMethods)[0] || null; // бэкворд-совместимость
 
   // Exercise DB state
-  const [exSearch, setExSearch] = useState('');
-  const [exGroup, setExGroup] = useState('all');
-  const [exType, setExType] = useState('all');
-  const [exEquipment, setExEquipment] = useState('all');
-  const [exDifficulty, setExDifficulty] = useState('all');
-  const [exVisible, setExVisible] = useState(80);
-  const [selectedEx, setSelectedEx] = useState<Exercise | null>(null);
+
 
   // Calculator state
   const [calcWeight, setCalcWeight] = useState(100);
@@ -147,132 +140,12 @@ export const TrainingScreen: React.FC = () => {
   const [exCalcEquip, setExCalcEquip] = useState('');
 
   // Unified program builder state
-  const [builderStep, setBuilderStep] = useState(1);
-  const [manualCfg, setManualCfg] = useState<Record<string, string>>({});
-  const [exerciseTempos, setExerciseTempos] = useState<Record<string, string>>({});
-  const [tempoPicker, setTempoPicker] = useState<{ dayIdx: number; exIdx: number } | null>(null);
   const [injMuscle, setInjMuscle] = useState<string>('chest');
   const [injFrom, setInjFrom] = useState<string>('');
   const [injTo, setInjTo] = useState<string>('');
-  const setManual = (k: string, v: string) => setManualCfg(p => ({ ...p, [k]: v }));
-  const [showWizard, setShowWizard] = useState(false);
-  const [manualWorkMax, setManualWorkMax] = useState<Record<string, number>>({ chest: 100, back: 110, legs: 140, shoulders: 60, arms: 50, core: 60 });
-  const setManualWm = (k: string, v: number) => setManualWorkMax(p => ({ ...p, [k]: v }));
   const PCT_FOR_RIR_MAN: Record<number, number> = { 0: 1.0, 1: 0.96, 2: 0.92, 3: 0.88, 4: 0.84, 5: 0.80 };
   const [manualResult, setManualResult] = useState<{ splitName: string; corrections: string[]; days: { day: number; groups: string[]; exercises: { name: string; sets: number; reps: string; rir: number; rest: number; group: string; weight: number }[] }[] } | null>(() => { try { return JSON.parse(localStorage.getItem('he_manual_session') || 'null'); } catch { return null; } });
   useEffect(() => { try { localStorage.setItem('he_manual_session', JSON.stringify(manualResult)); } catch { /* ignore */ } }, [manualResult]);
-  const [manualSavedPlans, setManualSavedPlans] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); } catch { return []; } });
-  const loadManualPlan = (plan: any) => { if (plan?.cfg) setManualCfg(plan.cfg); if (plan?.days) setManualResult({ splitName: plan.name || 'Загруженный план', corrections: plan.corrections || [], days: plan.days }); };
-  const refreshManualSaved = () => { try { setManualSavedPlans(JSON.parse(localStorage.getItem('myTrainingPlans') || '[]')); } catch { setManualSavedPlans([]); } };
-const [subModal, setSubModal] = useState<{ dayIdx: number; exIdx: number; options: { id: string; name: string; reason: string }[] } | null>(null);
-  const [inlineEdit, setInlineEdit] = useState<{ dayIdx: number; exIdx: number; field: string; value: string } | null>(null);
-  const [dragFrom, setDragFrom] = useState<{ dayIdx: number; exIdx: number } | null>(null);
-  const [showMacroPreview, setShowMacroPreview] = useState(false);
-  const inlineRef = useRef<HTMLInputElement | null>(null);
-  const openSubstitute = (dayIdx: number, exIdx: number) => {
-    if (!manualResult) return;
-    const e = manualResult.days[dayIdx]?.exercises[exIdx];
-    if (!e) return;
-    const cat = EXERCISE_CATALOG.find(c => c.name === e.name) || getExerciseById(e.name);
-    if (!cat) { setSubModal({ dayIdx, exIdx, options: [] }); return; }
-    const sub = getSubstitutes(cat.id);
-    const opts: { id: string; name: string; reason: string }[] = [];
-    if (sub) {
-      for (const s of sub.substitutes) {
-        if (!canReplace(cat.id, s.id)) continue;
-        const rep = getExerciseById(s.id);
-        opts.push({ id: s.id, name: rep?.name || s.id, reason: s.reason });
-      }
-    }
-    if (opts.length === 0) {
-      EXERCISE_CATALOG.filter(c => c.group === cat.group && c.id !== cat.id && canReplace(cat.id, c.id)).slice(0, 6).forEach(c => opts.push({ id: c.id, name: c.name, reason: 'Альтернатива той же группы' }));
-    }
-    setSubModal({ dayIdx, exIdx, options: opts });
-  };
-  const applySubstitute = (newId: string) => {
-    if (!subModal || !manualResult) return;
-    const rep = getExerciseById(newId);
-    if (!rep) { setSubModal(null); return; }
-    const dayIdx = subModal.dayIdx, exIdx = subModal.exIdx;
-    const old = manualResult.days[dayIdx].exercises[exIdx];
-    const reason = subModal.options.find(o => o.id === newId)?.reason || '';
-    const wm = (tprofile.workMax[rep.group] || manualWorkMax[rep.group] || 80);
-    const pct = PCT_FOR_RIR_MAN[Math.max(0, Math.min(5, old.rir))] ?? 0.9;
-    const weight = Math.round(wm * pct);
-    const days = manualResult.days.map((d, di) => di === dayIdx ? { ...d, exercises: d.exercises.map((ex, ei) => ei === exIdx ? { ...ex, name: rep.name, group: rep.group, weight } : ex) } : d);
-    setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, `🔄 Замена: «${old.name}» → «${rep.name}» (${reason || 'по выбору'}). Группа: ${rep.group}, вес пересчитан ${weight} кг.`] });
-    setSubModal(null);
-  };
-const [improveModal, setImproveModal] = useState<{ notes: string[]; apply: () => void } | null>(null);
-  const improveProgram = () => {
-    if (!manualResult) return;
-    const GRP_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор' };
-    const ru = (g: string) => GRP_RU[g] || g;
-    const wk: Record<string, number> = {};
-    manualResult.days.forEach(d => d.exercises.forEach(e => { wk[e.group] = (wk[e.group] || 0) + e.sets; }));
-    const mrv = ((LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20) * (tprofile.onCourse ? 1.2 : 1) * labTrainingAdjust(linked.labAnalysis).mrvMultiplier;
-    const notes: string[] = [];
-    let days = manualResult.days.map(d => ({ ...d, exercises: d.exercises.map(e => ({ ...e })) }));
-    Object.entries(wk).forEach(([g, s]) => {
-      if (s > mrv) {
-        const excess = s - Math.round(mrv);
-        let reduced = 0;
-        for (const d of days) { for (const e of d.exercises) { if (e.group === g && reduced < excess) { const take = Math.min(Math.max(0, e.sets - 1), excess - reduced); if (take > 0) { e.sets -= take; reduced += take; } } } }
-        if (reduced > 0) notes.push(`Снижен объём группы «${ru(g)}»: −${reduced} сетов (было >MRV ${Math.round(mrv)}).`);
-      }
-    });
-    tprofile.weakPoints.forEach(w => {
-      if ((wk[w] || 0) === 0) {
-        const cat = EXERCISE_CATALOG.find(e => e.group === w && e.type === 'compound' && (tprofile.equipment.length === 0 || tprofile.equipment.includes(e.equipment)));
-        if (cat) {
-          const dayIdx = days.findIndex(d => d.groups.includes(w)); const target = dayIdx >= 0 ? dayIdx : 0;
-          const pr = calcExercisePrescription(cat, goal, level, true, false, 1, 1, mesoLength);
-          const wm = tprofile.workMax[w] || manualWorkMax[w] || 80;
-          const pct = PCT_FOR_RIR_MAN[Math.max(0, Math.min(5, pr.rir))] ?? 0.9;
-          days[target].exercises.push({ name: cat.name, sets: pr.sets, reps: pr.reps, rir: pr.rir, rest: pr.rest, group: w, weight: Math.round(wm * pct) });
-          notes.push(`Добавлено упражнение для слабой группы «${ru(w)}»: ${cat.name} (${pr.sets}×${pr.reps}).`);
-        } else {
-          notes.push(`Слабая группа «${ru(w)}» не покрыта — нет подходящего упражнения в каталоге, добавьте вручную.`);
-        }
-      }
-    });
-    Object.entries(wk).forEach(([g, s]) => {
-      if (s > 0 && s < Math.max(4, mrv * 0.4)) {
-        for (const d of days) { const e = d.exercises.find(ex => ex.group === g); if (e) { e.sets += 1; notes.push(`Группа «${ru(g)}»: низкий объём (${s} сетов) — +1 подход к «${e.name}».`); break; } }
-      }
-    });
-    if (notes.length === 0) { setImproveModal({ notes: ['План уже сбалансирован: нет превышений MRV, слабые группы покрыты, объём в норме.'], apply: () => setImproveModal(null) }); return; }
-    setImproveModal({ notes, apply: () => { setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, '🎯 Улучшение программы применено:', ...notes] }); setImproveModal(null); } });
-  };
-const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingTemplates') || '[]'); } catch { return []; } });
-  const refreshManualTemplates = () => { try { setManualTemplates(JSON.parse(localStorage.getItem('myTrainingTemplates') || '[]')); } catch { setManualTemplates([]); } };
-  const saveAsTemplate = () => {
-    if (!manualResult) return;
-    const name = window.prompt('Название шаблона:', manualResult.splitName);
-    if (!name) return;
-    try { const t = { name, date: new Date().toISOString().slice(0,10), cfg: manualCfg, days: manualResult.days }; const ex = JSON.parse(localStorage.getItem('myTrainingTemplates') || '[]'); ex.unshift(t); localStorage.setItem('myTrainingTemplates', JSON.stringify(ex.slice(0,30))); refreshManualTemplates(); } catch {}
-  };
-  const deleteTemplate = (i: number) => { try { const ex = JSON.parse(localStorage.getItem('myTrainingTemplates') || '[]'); ex.splice(i,1); localStorage.setItem('myTrainingTemplates', JSON.stringify(ex)); refreshManualTemplates(); } catch {} };
-  const recalcWeightsByLevel = () => {
-    if (!manualResult) return;
-    const days = manualResult.days.map(d => ({ ...d, exercises: d.exercises.map(e => {
-      const cat = EXERCISE_CATALOG.find(cc => cc.name === e.name);
-      const g = cat?.group || e.group;
-      const wm = tprofile.workMax[g] || manualWorkMax[g] || 80;
-      const pct = PCT_FOR_RIR_MAN[Math.max(0, Math.min(5, e.rir))] ?? 0.9;
-      return { ...e, weight: Math.round(wm * pct) };
-    }) }));
-    setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, `🔄 Веса пересчитаны по workMax × %1RM(RIR) для уровня «${level}».`] });
-  };
-  const [comparePlan, setComparePlan] = useState<any | null>(null);
-  const [planCopied, setPlanCopied] = useState(false);
-  const applyMethodicToPlan = () => { if (!manualResult) return; const corr: string[] = []; const name = manualCfg.intensity || manualCfg.technique || manualCfg.volume || ''; if (!name) { corr.push('Выберите методику (Интенсивность/Техника/Объём), чтобы применить к плану.'); setManualResult({ ...manualResult, corrections: [...manualResult.corrections, ...corr] }); return; } const days = manualResult.days.map(d => ({ ...d, exercises: d.exercises.map(e => { const wm = tprofile.workMax[e.group] || 80; let ne = { ...e }; if (/10×10|GVT|German Volume/i.test(name)) { ne = { ...e, sets: 10, reps: '10', weight: Math.round(wm * 0.6), rir: 3, rest: 90 }; corr.push(e.name + ': → 10×10 @60% (GVT)'); } else if (/Cluster 5×5|Кластер/i.test(name)) { ne = { ...e, sets: 5, reps: '5', weight: Math.round(wm * 0.85), rir: 1, rest: 180 }; corr.push(e.name + ': → 5×5 кластерами @85% (RIR 1)'); } else if (/Rest-Pause/i.test(name)) { ne = { ...e, sets: 1, reps: 'до отказа +3-5', weight: Math.round(wm * 0.8), rir: 0, rest: 180 }; corr.push(e.name + ': → 1 подход rest-pause @80% до отказа + мини-сеты'); } else if (/Tempo|Темп/i.test(name)) { ne = { ...e, weight: Math.round(wm * 0.7), rir: 2, rest: 60 }; corr.push(e.name + ': → темп 3-1-1-0, вес снижен до 70%, отдых 60с'); } else if (/Drop|Дроп/i.test(name)) { ne = { ...e, rir: 0, rest: 90 }; corr.push(e.name + ': → последний подход до отказа + 2 дропа −20%'); } else { corr.push(e.name + ': методика «' + name + '» применена концептуально (вес/объём без авто-изменения — отредактируйте вручную)'); } return ne; }) })); corr.unshift('Применена методика: «' + name + '» к ' + days.reduce((s, d) => s + d.exercises.length, 0) + ' упражнениям.'); setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, ...corr] }); };
-  const manualToRuntime = () => { if (!manualResult) return; const days: PlayerDay[] = manualResult.days.map(d => ({ label: 'Д' + d.day, exercises: d.exercises.map(e => ({ name: e.name, muscleGroup: e.group, targetSets: Array.from({ length: e.sets }, () => ({ weight: e.weight, reps: parseInt(e.reps) || 10, rir: e.rir })) })) })); try { localStorage.setItem('he_pl_runtime', JSON.stringify({ days, focus: manualResult.splitName, week: 1, track: 'manual' })); } catch {} setTab('runtime'); };
-  const exportFullReport = () => { const la = labTrainingAdjust(linked.labAnalysis); const wk: Record<string, number> = {}; const GRP_RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор', full:'Общее' }; if (manualResult) manualResult.days.forEach(d => d.exercises.forEach(e => { wk[e.group] = (wk[e.group] || 0) + e.sets; })); const mrv = ((LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20) * (tprofile.onCourse ? 1.2 : 1) * la.mrvMultiplier; const total = Object.values(wk).reduce((a,b)=>a+b,0); const rh = loadReadinessHistory().slice(-7); const ms = loadMeasurements().slice(-3); const esc = (s: string) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); const planHtml = manualResult ? manualResult.days.map(d => '<h3>День '+d.day+' ('+esc(d.groups.join(', '))+')</h3><table border=1 cellpadding=4 style=border-collapse:collapse;width:100%><tr><th>Упражнение</th><th>Сеты×повт</th><th>RIR</th><th>Вес</th><th>Отдых</th></tr>'+d.exercises.map(e => '<tr><td>'+esc(e.name)+'</td><td>'+e.sets+'×'+esc(e.reps)+'</td><td>'+e.rir+'</td><td>'+e.weight+' кг</td><td>'+e.rest+'с</td></tr>').join('')+'</table>').join('') : '<p>План не построен.</p>'; const corrHtml = manualResult?.corrections?.length ? '<h2>Журнал правок</h2><ul>'+manualResult.corrections.map(c => '<li>'+esc(c)+'</li>').join('')+'</ul>' : ''; const volRows = Object.keys(wk).length ? Object.entries(wk).map(([g,s]) => '<tr><td>'+esc(GRP_RU[g]||g)+'</td><td>'+s+'</td><td>'+(s>mrv?'⚠ >MRV':'ок')+'</td></tr>').join('') : '<tr><td colspan=3>нет данных</td></tr>'; const labHtml = la.warnings.length ? '<h2>Лабораторная коррекция (MRV ×'+la.mrvMultiplier.toFixed(2)+')</h2><ul>'+la.warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul>' : '<h2>Лабораторная коррекция</h2><p>нет данных / в норме.</p>'; const rhHtml = rh.length ? '<h2>Готовность (последние '+rh.length+' дн)</h2><table border=1 cellpadding=4 style=border-collapse:collapse><tr><th>Дата</th><th>Готовность</th><th>Усталость</th></tr>'+rh.map(p=>'<tr><td>'+p.date+'</td><td>'+p.recovery+'%</td><td>'+p.fatigue+'%</td></tr>').join('')+'</table>' : ''; const msHtml = ms.length ? '<h2>Замеры (последние '+ms.length+')</h2><table border=1 cellpadding=4 style=border-collapse:collapse><tr><th>Дата</th><th>Вес</th><th>Талия</th><th>Грудь</th></tr>'+ms.map((m:any)=>'<tr><td>'+m.date+'</td><td>'+m.weightKg+'кг</td><td>'+m.waistCm+'см</td><td>'+m.chestCm+'см</td></tr>').join('')+'</table>' : ''; const html = '<html><head><meta charset=utf-8><title>Отчёт тренировочного блока</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#111}h1{color:#008}h2{color:#060;margin-top:16px;border-bottom:1px solid #ccc;padding-bottom:2px}h3{margin-top:12px;color:#333}table{font-size:11px}</style></head><body><h1>Отчёт тренировочного блока</h1><h2>Профиль тренированности</h2><p>Цель: '+esc(tprofile.goal)+' · Уровень: '+esc(tprofile.level)+' · Дней/нед: '+tprofile.daysPerWeek+' · Вес: '+tprofile.bodyWeight+'кг<br>ПМ: присед '+tprofile.pmSquat+', жим '+tprofile.pmBench+', тяга '+tprofile.pmDead+' кг<br>Курс: '+(tprofile.onCourse?'да ('+tprofile.courseIntensity+')':'натурал')+' · Слабые группы: '+esc(tprofile.weakPoints.join(', ')||'—')+' · Оборудование: '+esc(tprofile.equipment.join(', ')||'—')+'</p>'+(manualResult?'<h2>План: '+esc(manualResult.splitName)+'</h2>':'') + planHtml + '<h2>Объём по группам (всего '+total+' сетов, MRV '+Math.round(mrv)+')</h2><table border=1 cellpadding=4 style=border-collapse:collapse><tr><th>Группа</th><th>Сетов</th><th>Статус</th></tr>'+volRows+'</table>' + corrHtml + labHtml + rhHtml + msHtml + '<p style=margin-top:20px;color:#888;font-size:10px>Сгенерировано: '+new Date().toLocaleString()+'</p></body></html>'; const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(() => w.print(), 350); } };
-  const printManualPlan = () => { if (!manualResult) return; const rows = manualResult.days.map(d => '<h3>День ' + d.day + ' (' + d.groups.join(', ') + ')</h3><table border=1 cellpadding=4 style=border-collapse:collapse;width:100%><tr><th>Упражнение</th><th>Сеты×повт</th><th>RIR</th><th>Вес</th><th>Отдых</th></tr>' + d.exercises.map(e => '<tr><td>' + e.name + '</td><td>' + e.sets + '×' + e.reps + '</td><td>' + e.rir + '</td><td>' + e.weight + ' кг</td><td>' + e.rest + 'с</td></tr>').join('') + '</table>').join(''); const html = '<html><head><meta charset=utf-8><title>' + manualResult.splitName + '</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#111}h1{color:#008}h3{margin-top:14px;color:#060}table{font-size:12px}</style></head><body><h1>' + manualResult.splitName + '</h1><p>Уровень: ' + level + ' · Цель: ' + goal + ' · ' + daysPerWeek + ' дн/нед · ' + mesoLength + ' нед</p>' + rows + '</body></html>'; const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(() => w.print(), 300); } };
-  const exportManualPlanText = () => { if (!manualResult) return; const lines: string[] = []; lines.push('Тренировочный план: ' + manualResult.splitName); lines.push('Параметры: ' + Object.entries(manualCfg).filter(([,v]) => v).map(([k,v]) => k + '=' + v).join(', ')); lines.push('Уровень: ' + level + ' · Цель: ' + goal + ' · Дней/нед: ' + daysPerWeek + ' · Длина: ' + mesoLength + ' нед'); lines.push(''); if (manualResult.corrections && manualResult.corrections.length) { lines.push('Комментарии к плану:'); manualResult.corrections.forEach(corr => lines.push('  • ' + corr)); lines.push(''); } manualResult.days.forEach(d => { lines.push('День ' + d.day + ' (' + d.groups.join(', ') + ')'); d.exercises.forEach(e => lines.push('  ' + e.name + ' — ' + e.sets + 'x' + e.reps + ' @ RIR' + e.rir + ' · ' + e.weight + ' кг · отдых ' + e.rest + 'с (' + e.group + ')')); lines.push(''); }); const txt = lines.join(String.fromCharCode(10)); try { navigator.clipboard?.writeText(txt); } catch {} setPlanCopied(true); setTimeout(() => setPlanCopied(false), 1800); };
-  const detectGroup = (name: string): string => { const n = name.toLowerCase(); if (/squat|присед|leg|quad|ножн|выпад|lunge/.test(n)) return 'legs'; if (/bench|жим|chest|груд|press|плеч|shoulder|delt/.test(n)) return n.includes('shoulder')||/delt|плеч/.test(n) ? 'shoulders' : 'chest'; if (/deadlift|станов|тяга|row|pull|спин|back|chin|lat/.test(n)) return 'back'; if (/curl|бицеп|bicep/.test(n)) return 'arms'; if (/tricep|трицеп|extension|пресс|ab|core/.test(n)) return /пресс|ab|core/.test(n) ? 'core' : 'arms'; return 'full'; };
-  const loadProgramToConstructor = (programId: string) => { const lib: FullProgram[] = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS]; const prog = lib.find(p => p.id === programId); if (!prog || !prog.weeks?.length) return; const wk = prog.weeks[0]; const days = wk.days.map((d: ProgramDay, di: number) => ({ day: di + 1, groups: Array.from(new Set((d.exercises || []).map((e: ProgramDay['exercises'][number]) => detectGroup(e.name)))), exercises: (d.exercises || []).map((e: ProgramDay['exercises'][number]) => { const g = detectGroup(e.name); const rir = e.rir ?? (e.rpe ? Math.max(0, 10 - e.rpe) : 2); const pct = PCT_FOR_RIR_MAN[Math.max(0, Math.min(5, rir))] ?? 0.9; const reps = parseInt(e.reps) || (parseInt(String(e.reps).replace(/[^0-9]/g,'')) || 8); const weight = Math.round((tprofile.workMax[g] || 80) * pct); return { name: e.name, sets: e.sets, reps: String(e.reps), rir, rest: e.restSec || 120, group: g, weight }; }) })); const corrections: string[] = []; corrections.push('Загружена готовая программа «' + prog.name + '» (' + (prog.author || '') + ', ' + prog.goal + ', ' + prog.level + ') — неделя 1, ' + days.length + ' дн.'); corrections.push('Программа доступна для редактирования, применения методик и выполнения. Веса рассчитаны из workMax×%1RM(RIR); отредактируйте при необходимости.'); if (prog.warnings?.length) corrections.push('Предупреждения программы: ' + prog.warnings.join('; ')); setManualResult({ splitName: prog.name + ' (неделя 1)', corrections, days }); };
   const GRP_RU_M: Record<string, string> = { chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор', full: 'Общее' };
   const SET_TEMPLATES: Record<string, { sets: number; reps: string; rir: number; rest: number }> = {
     '5×5': { sets: 5, reps: '5', rir: 1, rest: 180 }, '3×8': { sets: 3, reps: '8', rir: 2, rest: 90 },
@@ -280,104 +153,6 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
     'AMRAP': { sets: 1, reps: 'AMRAP', rir: 0, rest: 180 }, 'Myo-rep': { sets: 1, reps: '15 + 5×3', rir: 0, rest: 120 },
     '10×10 GVT': { sets: 10, reps: '10', rir: 3, rest: 60 }, '5/3/1': { sets: 3, reps: '5/3/1+', rir: 1, rest: 180 },
   };
-  const startInline = (di: number, ei: number, field: string, val: string | number) => { setInlineEdit({ dayIdx: di, exIdx: ei, field, value: String(val) }); setTimeout(() => inlineRef.current?.focus(), 10); };
-  const commitInline = () => {
-    if (!inlineEdit || !manualResult) { setInlineEdit(null); return; }
-    const { dayIdx, exIdx, field, value } = inlineEdit;
-    const old = manualResult.days[dayIdx]?.exercises[exIdx];
-    if (!old) { setInlineEdit(null); return; }
-    const days = manualResult.days.map((d, di) => di === dayIdx ? { ...d, exercises: d.exercises.map((ex, ei) => {
-      if (ei !== exIdx) return ex; const ne = { ...ex };
-      if (field === 'sets') ne.sets = parseInt(value) || ex.sets;
-      else if (field === 'reps') ne.reps = value;
-      else if (field === 'rir') { const v = parseInt(value); if (!isNaN(v)) ne.rir = v; }
-      else if (field === 'weight') { const v = parseInt(value); if (!isNaN(v)) ne.weight = v; }
-      else if (field === 'rest') { const v = parseInt(value); if (!isNaN(v)) ne.rest = v; }
-      return ne;
-    }) } : d);
-    setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, `✏️ ${old.name}: ${field}=${value}`] });
-    setInlineEdit(null);
-  };
-  const dragStart = (e: React.DragEvent, di: number, ei: number) => { setDragFrom({ dayIdx: di, exIdx: ei }); e.dataTransfer.effectAllowed = 'move'; };
-  const dragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
-  const dropEx = (e: React.DragEvent, tDay: number, tEx: number) => {
-    e.preventDefault(); if (!dragFrom || !manualResult) return;
-    const { dayIdx: fDay, exIdx: fEx } = dragFrom;
-    if (fDay === tDay && fEx === tEx) { setDragFrom(null); return; }
-    const days = manualResult.days.map(d => ({ ...d, exercises: [...d.exercises.map(ee => ({ ...ee }))] }));
-    const moved = days[fDay].exercises.splice(fEx, 1)[0];
-    if (!moved) { setDragFrom(null); return; }
-    const insertAt = fDay === tDay && tEx > fEx ? tEx - 1 : tEx;
-    days[tDay].exercises.splice(insertAt, 0, moved);
-    const msg = fDay === tDay ? `↕️ «${moved.name}» перемещён в Дне ${days[fDay].day}.` : `↕️ «${moved.name}» из Дня ${days[fDay].day} → День ${days[tDay].day}.`;
-    setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, msg] });
-    setDragFrom(null);
-  };
-  const copyDay = (di: number) => {
-    if (!manualResult) return;
-    const src = manualResult.days[di];
-    const newNum = Math.max(...manualResult.days.map(d => d.day)) + 1;
-    const days = [...manualResult.days, { ...src, day: newNum, exercises: src.exercises.map(e => ({ ...e })) }];
-    setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, `📋 День ${src.day} скопирован → День ${newNum}.`] });
-  };
-  const massEditWeight = (pct: number) => {
-    if (!manualResult) return;
-    const sgn = pct > 0 ? '+' : '';
-    const days = manualResult.days.map(d => ({ ...d, exercises: d.exercises.map(e => ({ ...e, weight: Math.round(e.weight * (1 + pct / 100)) })) }));
-    setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, `⚡ Масс-правка: все веса ${sgn}${pct}%.`] });
-  };
-  const massEditVolume = (pct: number) => {
-    if (!manualResult) return;
-    const sgn = pct > 0 ? '+' : '';
-    const days = manualResult.days.map(d => ({ ...d, exercises: d.exercises.map(e => ({ ...e, sets: Math.max(1, Math.round(e.sets * (1 + pct / 100))) })) }));
-    setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, `⚡ Масс-правка: объём ${sgn}${pct}%.`] });
-  };
-  const applySetTemplate = (di: number, ei: number, key: string) => {
-    if (!manualResult) return;
-    const t = SET_TEMPLATES[key]; if (!t) return;
-    const e = manualResult.days[di].exercises[ei];
-    const pct = PCT_FOR_RIR_MAN[Math.max(0, Math.min(5, t.rir))] ?? 0.9;
-    const wm = tprofile.workMax[e.group] || manualWorkMax[e.group] || 80;
-    const days = manualResult.days.map((d, di2) => di2 === di ? { ...d, exercises: d.exercises.map((ex, ei2) => ei2 === ei ? { ...ex, sets: t.sets, reps: t.reps, rir: t.rir, rest: t.rest, weight: Math.round(wm * pct) } : ex) } : d);
-    setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, `⚡ Шаблон «${key}» → «${e.name}»: ${t.sets}×${t.reps}, RIR ${t.rir}.`] });
-  };
-  const buildPlan = usePlanGeneration({ goal, level, mesoLength, weakPoints, equipment: tprofile.equipment, workMax: tprofile.workMax, manualWorkMax, injuries: tprofile.injuries || [], pctForRir: PCT_FOR_RIR_MAN });
-  const generateManualPlan = () => {
-    const corrections: string[] = [];
-    const inp = { goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as TrainingInput;
-    const auto = selectSplit(inp);
-    const manualSp = manualCfg.split ? TRAINING_SPLITS[manualCfg.split] : null;
-    const sp = manualSp ? { id: manualCfg.split!, name: manualSp.name, desc: manualSp.desc, groupsPerDay: manualSp.groupsPerDay, score: 100, rationale: ['Ручной выбор'] } as SplitCandidate : auto[0];
-    if (!sp) { setManualResult(null); return; }
-    if (manualSp) corrections.push(`Сплит выбран вручную: «${sp.name}» (вместо авто-подбора).`); else corrections.push(`Сплит подобран автоматически: «${sp.name}».`);
-    const cycle: string[][] = []; let gi = 0; while (cycle.length < daysPerWeek) { cycle.push(sp.groupsPerDay[gi % sp.groupsPerDay.length]); gi++; }
-    const _labAdj = labTrainingAdjust(linked.labAnalysis);
-    const courseMult = tprofile.onCourse ? (tprofile.courseIntensity === 'heavy' ? 1.3 : tprofile.courseIntensity === 'mild' ? 1.15 : 1.2) : 1;
-    const baseMrv = (LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20;
-    let mrv = baseMrv * courseMult * _labAdj.mrvMultiplier;
-    try { const _rh = loadReadinessHistory(); if (_rh.length) { const _last = _rh[_rh.length - 1]; if ((_last?.recovery ?? 100) < 60) { mrv = mrv * 0.85; corrections.push(`🩺 Готовность прошлой недели ${Math.round(_last.recovery)}% (<60) — объём снижен на 15% (авторегуляция, анти-перетрен).`); } } } catch { /* ignore */ }
-    if (tprofile.onCourse) corrections.push(`MRV повышен на курсе: база ${baseMrv} × ${courseMult} (интенсивность курса) = ${Math.round(baseMrv * courseMult)}.`);
-    if (_labAdj.mrvMultiplier < 1) corrections.push(`MRV снижен по лаборатории ×${_labAdj.mrvMultiplier.toFixed(2)}: ${_labAdj.warnings.join(' ')}`);
-    corrections.push(`Допустимый объём (MRV): ${Math.round(mrv)} сетов/нед на группу.`);
-    if (weakPoints.length > 0) corrections.push(`Слабые группы (${weakPoints.join(', ')}): приоритет в отборе + RIR ↓ (ближе к отказу) для акцента.`);
-    if (tprofile.equipment.length > 0) corrections.push(`Фильтр оборудования: только ${tprofile.equipment.join(', ')}.`);
-    const built = buildPlan(cycle, mrv);
-    const days = built.days;
-    const weeklySets = built.weeklySets;
-    corrections.push(...built.groupCorrections);
-    
-    Object.entries(weeklySets).forEach(([g, s]) => { if (s < Math.max(4, mrv * 0.4) && s > 0) corrections.push(`Группа «${g}»: низкий объём (${s} сетов) — ниже зоны адаптации, рассмотрите добор.`); });
-    weakPoints.forEach(w => { if (!weeklySets[w] || weeklySets[w] === 0) corrections.push(`⚠ Слабая группа «${w}» не включена в сплит — добавьте специализированное упражнение для акцента.`); });
-    setManualResult({ splitName: sp.name, corrections, days });
-  };
-  const [builderSplit, setBuilderSplit] = useState<SplitCandidate | null>(null);
-  const [builderDayExercises, setBuilderDayExercises] = useState<Record<number, { name: string; sets: number; reps: string; rir: number; rest: number; group: string; type?: string; rpeHint?: string; dropSet?: boolean; backoffSet?: boolean; substitutes?: string[] }[]>>({});
-  const [builderMacroResult, setBuilderMacroResult] = useState<any[] | null>(null);
-  const [builderShowSubs, setBuilderShowSubs] = useState<string | null>(null);
-  const [builderAddExDay, setBuilderAddExDay] = useState<number | null>(null);
-  const [generatorSeed, setGeneratorSeed] = useState(Date.now());
-  const [builderMesoLength, setBuilderMesoLength] = useState(8);
-  const [builderSavedMsg, setBuilderSavedMsg] = useState('');
 
   // Diary state
   const [diaryStats, setDiaryStats] = useState<StrengthStats[]>([]);
@@ -441,19 +216,6 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
     } catch (e) { setCyclesError('Ошибка генерации: ' + String(e)); }
   }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, splitType, periodizationType, cycleType]);
   // Мост макроцикл -> выполнение (единый поток через SessionPlayer)
-  const applyMacroToRuntime = () => {
-    if (!currentMicrocycle) return;
-    const days: PlayerDay[] = currentMicrocycle.days.filter((d: any) => d.isTraining).map((d: any, i: number) => ({
-      label: 'Д' + (i + 1),
-      exercises: (d.exercises || []).map((e: any) => ({
-        name: e.name,
-        muscleGroup: e.group,
-        targetSets: Array.from({ length: e.sets || 3 }, () => ({ weight: Math.round((e.weight || tprofile.workMax[e.group] || 80) * 0.8), reps: parseInt(e.reps) || 10, rir: e.rir ?? 2 })),
-      })),
-    }));
-    try { localStorage.setItem('he_pl_runtime', JSON.stringify({ days, focus: 'Макроцикл ' + (currentMicrocycle.mesocycleType || ''), week: selectedWeek, track: 'macro' })); } catch {}
-    setTab('runtime');
-  };
 
   // Auto-regenerate when days/sparse
   const loadDiaryStats = async () => {
@@ -499,7 +261,7 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
       }
       if (e.key === 'he_training_tab') {
         const val = localStorage.getItem('he_training_tab');
-        const validTabs: TrainingTab[] = ['plan', 'cycles', 'programs', 'mytraining', 'programcalc', 'volume', 'library', 'analytics', 'visual', 'progress', 'exercise_lab', 'methods', 'timers', 'history', 'reports', 'srcbb', 'specialization'];
+        const validTabs: TrainingTab[] = ['constructor', 'cycles', 'programs', 'mytraining', 'volume', 'library', 'analytics', 'visual', 'progress', 'exercise_lab', 'methods', 'timers', 'history', 'reports', 'srcbb', 'specialization'];
         if (val && validTabs.includes(val as TrainingTab)) {
           setTab(val as TrainingTab);
         }
@@ -521,20 +283,6 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
       setCurrentMicrocycle(getCurrentWeekPlan(macrocycle, selectedWeek));
     }
   }, [macrocycle, selectedWeek]);
-
-  const filteredExercises = useMemo(() => {
-    let list = EXERCISE_CATALOG;
-    if (exSearch) {
-      const q = exSearch.toLowerCase();
-      list = list.filter(e => (e.name||'').toLowerCase().includes(q) || (e.id||'').toLowerCase().includes(q) || (e.targetMuscle || '').toLowerCase().includes(q));
-    }
-    if (exGroup !== 'all') list = list.filter(e => e.group === exGroup);
-    if (exType !== 'all') list = list.filter(e => e.type === exType);
-    if (exEquipment !== 'all') list = list.filter(e => e.equipment === exEquipment);
-    if (exDifficulty !== 'all') list = list.filter(e => e.difficulty === exDifficulty);
-    return list;
-  }, [exSearch, exGroup, exType, exEquipment, exDifficulty]);
-  useEffect(() => { setExVisible(80); }, [exSearch, exGroup, exType, exEquipment, exDifficulty]);
 
   const calcResults = useMemo(() => {
     const epley1RM = calcWeight * (1 + calcReps / 30);
@@ -653,7 +401,7 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
 
   const bmiCategory = (v: number) => v < 18.5 ? 'Недостаток веса' : v < 25 ? 'Норма' : v < 30 ? 'Избыток' : 'Ожирение';
 
-  const showNonBuilder = tab !== 'programcalc';
+  const showNonBuilder = tab !== 'constructor';
 
   return (
     <div className="screen training-screen" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: 0 }}>
@@ -802,714 +550,23 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
     </div>
   </InfoErrorBoundary>
 )}
-          {tab === 'plan' && (
-        <InfoErrorBoundary label="План тренировок">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>⚙️ Параметры плана</h3>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-              {GOALS.map(g => (
-                <button key={g.value} onClick={() => setGoal(g.value)} style={{
-                  padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: goal === g.value ? 700 : 400,
-                  cursor: 'pointer', border: goal === g.value ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  background: goal === g.value ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
-                }}>{g.icon} {g.label}</button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-              {LEVELS.map(l => (
-                <button key={l.value} onClick={() => setLevel(l.value)} style={{
-                  padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: level === l.value ? 700 : 400,
-                  cursor: 'pointer', border: level === l.value ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  background: level === l.value ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
-                }}>{l.icon} {l.label}</button>
-              ))}
-            </div>
-            <div style={{ marginBottom: 8 }}>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 3, display: 'block' }}>Тип сплита</label>
-              <button onClick={() => { setShowSplitPicker(!showSplitPicker); if (!splitCandidates.length) { const opts = getSplitOptions({ goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] }); setSplitCandidates(opts.slice(0, 12)); } }} style={{
-                width: '100%', padding: '6px 10px', borderRadius: 8, textAlign: 'left', cursor: 'pointer',
-                background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11,
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              }}>
-                <span>{splitType === 'auto' ? 'Авто-выбор сплита' : splitCandidates.find(c => c.id === splitType)?.name || splitType}</span>
-                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{showSplitPicker ? '▴' : '▾'}</span>
-              </button>
-              {showSplitPicker && (
-                <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 220, overflowY: 'auto', background: 'var(--bg-secondary)', borderRadius: 8, padding: '4px 6px', border: '1px solid var(--border)' }}>
-                  <div key="auto" onClick={() => { setSplitType('auto'); setShowSplitPicker(false); setTimeout(() => generatePlan(), 50); }} style={{
-                    padding: '5px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11,
-                    background: splitType === 'auto' ? 'rgba(0,230,138,0.1)' : 'transparent',
-                    border: splitType === 'auto' ? '1px solid var(--accent)' : '1px solid transparent',
-                  }}>
-                    <div style={{ fontWeight: 600 }}>🤖 Авто-выбор</div>
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Движок сам подберёт оптимальный сплит</div>
-                  </div>
-                   {splitCandidates.map(c => (
-                     <div key={c.id || c.name} onClick={() => { const newType = c.id || c.name; setSplitType(newType); setShowSplitPicker(false); setTimeout(() => generatePlan(newType), 50); }} style={{
-                      padding: '5px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11,
-                      background: splitType === (c.id || c.name) ? 'rgba(0,230,138,0.1)' : 'transparent',
-                      border: splitType === (c.id || c.name) ? '1px solid var(--accent)' : '1px solid transparent',
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 600 }}>{c.name}</span>
-                        <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: 'rgba(0,230,138,0.1)', color: 'var(--accent)', fontWeight: 600 }}>{(c.score * 100).toFixed(0)}%</span>
-                      </div>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{c.desc?.slice(0, 80)}{c.desc && c.desc.length > 80 ? '...' : ''}</div>
-                      {c.rationale && <div style={{ fontSize: 8, color: 'var(--accent)', marginTop: 1 }}>{c.rationale.slice(0, 60)}</div>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div style={{ marginBottom: 8 }}>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>Тип периодизации</label>
-              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                {[
-                  { v: 'auto', l: 'Авто', desc: 'Автоматический выбор по уровню' },
-                  { v: 'linear', l: 'Линейная', desc: 'Объём ↓, интенсивность ↑. Классическая.' },
-                  { v: 'undulating', l: 'Волновая DUP', desc: 'Смена нагрузки внутри недели. Гибкая.' },
-                  { v: 'block', l: 'Блочная', desc: 'Блоки по 3-6 нед с одной целью. Продвинутая.' },
-                ].map(p => (
-                  <button key={p.v} onClick={() => { setPeriodizationType(p.v as 'auto' | 'linear' | 'undulating' | 'block' | 'conjugate'); setTimeout(generatePlan, 50); }} style={{
-                    padding: '3px 7px', borderRadius: 6, fontSize: 9, fontWeight: periodizationType === p.v ? 700 : 400, cursor: 'pointer',
-                    border: periodizationType === p.v ? '1px solid var(--accent)' : '1px solid var(--border)',
-                    background: periodizationType === p.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
-                    position:'relative',
-                  }} title={p.desc}>{p.l}</button>
-                ))}
-              </div>
-              <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2 }}>
-                {periodizationType === 'auto' && 'Автоматический подбор по цели и уровню'}
-                {periodizationType === 'linear' && 'Объём снижается, интенсивность растёт от блока к блоку. RIR повышен.'}
-                {periodizationType === 'undulating' && 'Объём/интенсивность меняются каждый день/неделю. RIR средний.'}
-                {periodizationType === 'block' && 'Блоки по 3-6 нед с одной целью. RIR снижен, объём повышен.'}
-              </div>
-              {periodizationType === 'block' && (() => {
-                const seq = BLOCK_SEQUENCES[level] || BLOCK_SEQUENCES.intermediate;
-                const colors: Record<string,string> = { accumulation:'#22c55e', transmutation:'#3b82f6', realization:'#f97316', active_rest:'#eab308' };
-                const labels: Record<string,string> = { accumulation:'Акк', transmutation:'Транс', realization:'Реал', active_rest:'Отдых' };
-                return <div style={{ marginTop:4, display:'flex', gap:4, flexWrap:'wrap' }}>
-                  {seq.map((b, i) => <span key={b.id} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:(colors[b.id]||'#888')+'22', color:colors[b.id]||'#888', fontWeight:600, whiteSpace:'nowrap' }}>{labels[b.id]||b.id} {b.weeks}н{i < seq.length-1 ? ' →' : ''}</span>)}
-                </div>;
-              })()}
-            </div>
-            <div style={{ marginBottom: 8 }}>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>Тип цикла</label>
-              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                {[
-                  { v: 'auto', l: 'Авто', desc: 'Авто' }, { v: 'pl_strength', l: 'PL Сила', desc: 'Пауэрлифтинг сила' }, { v: 'pl_peaking', l: 'PL Пик', desc: 'Пауэрлифтинг пик' },
-                  { v: 'bb_mass', l: 'BB Масса', desc: 'Бодибилдинг масса' }, { v: 'bb_specialization', l: 'BB Спец', desc: 'Бодибилдинг спец' },
-                  { v: 'rehab', l: 'Реабилитация', desc: 'Реабилитация' }, { v: 'wl_tech', l: 'WL Техника', desc: 'Тяжелая атлетика техника' },
-                ].map(c => (
-                  <button key={c.v} onClick={() => { setCycleType(c.v); setTimeout(generatePlan, 50); }} style={{
-                    padding: '3px 7px', borderRadius: 6, fontSize: 9, fontWeight: cycleType === c.v ? 700 : 400, cursor: 'pointer',
-                    border: cycleType === c.v ? '1px solid var(--accent)' : '1px solid var(--border)',
-                    background: cycleType === c.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
-                  }} title={c.desc}>{c.l}</button>
-                ))}
-              </div>
-            </div>
-            <div style={{ marginBottom: 8 }}>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>Длина цикла</label>
-              <div style={{ display: 'flex', gap: 3 }}>
-                {[4, 8, 12].map(w => (
-                  <button key={w} onClick={() => setMesoLength(w)} style={{
-                    padding: '3px 10px', borderRadius: 6, fontSize: 10, fontWeight: mesoLength === w ? 700 : 400, cursor: 'pointer',
-                    border: mesoLength === w ? '1px solid var(--accent)' : '1px solid var(--border)',
-                    background: mesoLength === w ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
-                  }}>{w} нед</button>
-                ))}
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Дней/нед</label>
-                <input type="range" min={2} max={7} value={daysPerWeek} onChange={e => { setDaysPerWeek(parseFloat(e.target.value) || 0); setTimeout(generatePlan, 50); }}
-                  style={{ width: '100%', accentColor: 'var(--accent)' }} />
-                <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-dim)' }}>{daysPerWeek}</div>
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Восстановление</label>
-                <input type="range" min={1} max={10} value={recovery} onChange={e => setRecovery(parseFloat(e.target.value) || 0)}
-                  style={{ width: '100%', accentColor: 'var(--accent)' }} />
-                <div style={{ textAlign: 'center', fontSize: 10, color: recovery < 4 ? '#ef4444' : recovery < 6 ? '#ff9100' : '#22c55e' }}>
-                  <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: recovery < 4 ? '#ef4444' : recovery < 6 ? '#ff9100' : '#22c55e', marginRight: 4 }} />
-                  {recovery}/10 — {recovery < 4 ? 'низкое' : recovery < 6 ? 'умеренное' : recovery < 8 ? 'хорошее' : 'отличное'}
-                </div>
-                <div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'center', marginTop:1 }}>Низкий → требуется больше отдыха</div>
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Усталость</label>
-                <input type="range" min={1} max={10} value={fatigue} onChange={e => setFatigue(parseFloat(e.target.value) || 0)}
-                  style={{ width: '100%', accentColor: 'var(--accent)' }} />
-                <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-dim)' }}>{fatigue}/10</div>
-                <div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'center', marginTop:1 }}>
-                  {fatigue <= 3 ? 'Свежий' : fatigue <= 6 ? 'Умеренная усталость' : fatigue <= 8 ? 'Высокая нагрузка' : 'Перетренированность'}
-                </div>
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
-                <input type="number" value={bodyWeight} onChange={e => setBodyWeight(parseFloat(e.target.value) || 0)}
-                  style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Сон (ч)</label>
-                <input type="number" min={0} max={12} value={sleepHours || ''} onChange={e => setSleepHours(parseFloat(e.target.value) || 0)}
-                  style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-                <div style={{ fontSize:8, color: sleepHours < 6 ? '#ef4444' : sleepHours <= 7 ? '#ff9100' : sleepHours <= 9 ? '#22c55e' : '#ff9100', marginTop:1, textAlign:'center' }}>
-                  {sleepHours < 6 ? '<6: Недостаточно' : sleepHours <= 7 ? '6-7: Минимум' : sleepHours <= 9 ? '7-9: Оптимум' : '>9: Избыток'}
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Стресс (1-10)</label>
-                <input type="number" min={1} max={10} value={stressLevel || ''} onChange={e => setStressLevel(parseFloat(e.target.value) || 0)}
-                  style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-                <div style={{ fontSize:8, color: stressLevel <= 3 ? '#22c55e' : stressLevel <= 6 ? '#ff9100' : '#ef4444', marginTop:1, textAlign:'center' }}>
-                  {stressLevel <= 3 ? '1-3: Низкий' : stressLevel <= 6 ? '4-6: Средний' : '7-10: Высокий'}
-                </div>
-              </div>
-            </div>
-            <div style={{ marginBottom: 8 }}>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>Слабые зоны</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                {MUSCLE_GROUPS.map(g => {
-                  const active = weakPoints.includes(g);
-                  return (
-                    <button key={g} onClick={() => setWeakPoints(active ? weakPoints.filter(w => w !== g) : [...weakPoints, g])} style={{
-                      padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
-                      border: active ? '1px solid #ff9100' : '1px solid var(--border)',
-                      background: active ? 'rgba(255,145,0,0.15)' : 'var(--bg-secondary)',
-                      color: active ? '#ff9100' : 'var(--text-dim)', fontWeight: active ? 600 : 400,
-                    }}>{GROUP_LABELS[g]}</button>
-                  );
-                })}
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={() => generatePlan()} style={{
-                flex: 1, padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: 'linear-gradient(135deg, var(--accent), #00c853)', color: '#000', fontWeight: 700, fontSize: 13,
-              }}>▶ Сгенерировать план</button>
-              {currentMicrocycle ? <button onClick={applyMacroToRuntime} title="Перенести текущую неделю макроцикла во вкладку Тренировки для выполнения через SessionPlayer" style={{ padding: 10, borderRadius: 8, border: '1px solid var(--accent)', cursor: 'pointer', background: 'rgba(0,230,138,0.08)', color: 'var(--accent)', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>▶ К выполнению</button> : null}
-              {trainingOutput && (
-                <button onClick={() => { generatePlan(); }} style={{
-                  padding: 10, borderRadius: 8, border: '1px solid var(--accent)', cursor: 'pointer',
-                  background: 'rgba(0,230,138,0.08)', color: 'var(--accent)', fontWeight: 600, fontSize: 12,
-                  whiteSpace: 'nowrap',
-                }}>🔄 Заново</button>
-              )}
-            </div>
-          </div>
-
-          {trainingOutput && (
-            <>
-              {/* Training constraints check */}
-              {(() => {
-                const constraints = computeConstraints({
-                  riskSnapshot: {},
-                  fatigueLevel: fatigue / 10,
-                  recoveryLevel: recovery / 10,
-                  priScore: recovery / 10,
-                  jointFatigue: {},
-                  cumulativeLoad: { weekly: 0, patternLoad: {}, jointLoad: {}, overload: false },
-                  equipmentAvailable: ['barbell', 'dumbbell', 'bench'],
-                  goal,
-                });
-                if (constraints.recommendations.length === 0) return null;
-                return (
-                  <div key="constraints" className="card" style={{
-                    marginBottom: 8, padding: '6px 10px',
-                    background: 'rgba(249,115,22,0.06)', borderLeft: '3px solid #f97316',
-                  }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: '#f97316' }}>⚠ Ограничения тренировки</div>
-                    {constraints.recommendations.map((r, i) => (
-                      <div key={i} style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>• {r}</div>
-                    ))}
-                  </div>
-                );
-              })()}
-              {/* Smart Recommendations */}
-              {(() => {
-                const tips: { icon: string; text: string; color: string }[] = [];
-                if (recovery < 5) tips.push({ icon: '⚠️', text: 'Низкое восстановление: сократите объём на 10-20% или держите RIR выше.', color: '#ef4444' });
-                if (sleepHours < 7) tips.push({ icon: '😴', text: `Сон ${sleepHours} ч: добавьте 30-60 минут сна перед тяжёлыми днями.`, color: '#ff9100' });
-                if (stressLevel > 7) tips.push({ icon: '🧠', text: 'Высокий стресс: избегайте отказных подходов и контролируйте RPE.', color: '#ff9100' });
-                if (currentMicrocycle?.mesocycleType === 'deload') tips.push({ icon: '🧊', text: 'Неделя разгрузки: цель — восстановление, а не рекорды.', color: '#3b82f6' });
-                else if (currentMicrocycle?.mesocycleType === 'peaking') tips.push({ icon: '🎯', text: 'Пиковая фаза: держите технику стабильной и не добавляйте лишний объём.', color: '#ef4444' });
-                else if (currentMicrocycle?.mesocycleType === 'accumulation') tips.push({ icon: '📈', text: 'Фаза накопления: постепенно увеличивайте объём при сохранении качества повторений.', color: '#22c55e' });
-                if (weakPoints.length > 0) tips.push({ icon: '🔎', text: `Фокус на слабых зонах: ${weakPoints.map(w => GROUP_LABELS[w] || w).join(', ')}.`, color: '#8b5cf6' });
-                if (recovery > 8 && fatigue < 3) tips.push({ icon: '✅', text: 'Готовность высокая: можно добавить один качественный подход в приоритетную группу.', color: '#22c55e' });
-                if (tips.length === 0) tips.push({ icon: '✅', text: 'Параметры выглядят сбалансированно: выполняйте план без лишних изменений.', color: 'var(--accent)' });
-                return (
-                  <div key="recommendations" className="card" style={{ padding: '10px 12px', border: '1px solid rgba(0,230,138,0.2)' }}>
-                    <h4 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--accent)' }}>💡 Рекомендации</h4>
-                    {tips.map((t, i) => (
-                      <div key={i} style={{ fontSize: 10, color: 'var(--text-dim)', padding: '2px 0', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-                        <span>{t.icon}</span>
-                        <span style={{ color: t.color }}>{t.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-              <div className="card" style={{ padding: '10px 12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <div>
-                    <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--accent)' }}>{trainingOutput.splitName}</span>
-                    <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>RIR {getRIRstr(goal, level, trainingOutput.isDeload)}</span>
-                  </div>
-                  {trainingOutput.isDeload && (
-                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,145,0,0.15)', color: '#ff9100', fontWeight: 600 }}>РАЗГРУЗКА</span>
-                  )}
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>{trainingOutput.splitDesc}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{formatSplitGroups(trainingOutput)}</div>
-              </div>
-
-              <div className="card" style={{ padding: '8px 10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>Нед {selectedWeek}</span>
-                  <input type="range" min={1} max={macrocycle?.totalWeeks || 12} value={selectedWeek}
-                    onChange={e => setSelectedWeek(parseFloat(e.target.value) || 0)}
-                    style={{ flex: 1, accentColor: 'var(--accent)' }} />
-                </div>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  <button onClick={() => setShowWarmup(!showWarmup)} style={{
-                    padding: '3px 8px', borderRadius: 4, fontSize: 9, cursor: 'pointer',
-                    background: showWarmup ? 'rgba(255,145,0,0.15)' : 'var(--bg-secondary)',
-                    border: showWarmup ? '1px solid #ff9100' : '1px solid var(--border)',
-                    color: showWarmup ? '#ff9100' : 'var(--text-dim)',
-                  }}>🔥 Разминка</button>
-                  <button onClick={() => setShowCooldown(!showCooldown)} style={{
-                    padding: '3px 8px', borderRadius: 4, fontSize: 9, cursor: 'pointer',
-                    background: showCooldown ? 'rgba(59,130,246,0.15)' : 'var(--bg-secondary)',
-                    border: showCooldown ? '1px solid #3b82f6' : '1px solid var(--border)',
-                    color: showCooldown ? '#3b82f6' : 'var(--text-dim)',
-                  }}>🧊 Заминка</button>
-                </div>
-              </div>
-
-              {/* Warmup */}
-              {showWarmup && currentMicrocycle && currentMicrocycle.days.length > 0 && (() => {
-                const wuInput = {
-                  sessionFocus: currentMicrocycle.days[0]?.split || 'fullbody',
-                  primaryExercises: currentMicrocycle.days[0]?.exercises?.slice(0, 2).map((e: any) => e.name) || [],
-                  riskFlags: {} as Record<string, string>,
-                  techniqueIssues: [] as string[],
-                  fatigueLevel: fatigue / 10,
-                  equipmentAvailable: ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'],
-                };
-                const warmup = generateWarmup(wuInput);
-                return (
-                  <div key="warmup" className="card" style={{ padding: '8px 10px', border: '1px solid rgba(255,145,0,0.2)' }}>
-                    <div style={{ fontWeight: 600, fontSize: 12, color: '#ff9100', marginBottom: 4 }}>🔥 Разминка</div>
-                    {warmup.map((b, bi) => (
-                      <div key={bi} style={{ fontSize: 10, marginBottom: 2, color: 'var(--text-dim)' }}>
-                        <span style={{ fontWeight: 600, color: '#ff9100' }}>
-                          {b.type === 'general' ? 'Общая' : b.type === 'mobility' ? 'Мобилизация' : b.type === 'activation' ? 'Активация' : 'Разминка'} ({b.durationSec}с)
-                        </span>
-                        {b.exercises?.map((ex, exi) => (
-                          <span key={exi} style={{ marginLeft: 6, color: 'var(--text-dim)' }}>
-                            {WARMUP_LABELS[ex.exerciseId] || ex.exerciseId.replace(/_/g, ' ')} {ex.sets ? `×${ex.sets}` : ''}
-                          </span>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-
-              {currentMicrocycle && (
-                <div className="card" style={{ padding: '10px 12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700 }}>
-                      {PHASE_LABELS[currentMicrocycle.mesocycleType] || 'Рабочая фаза'} — Неделя {selectedWeek}
-                    </span>
-                    <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                      Объём ×{currentMicrocycle.volumeMultiplier} | RIR {currentMicrocycle.rirRange[0]}-{currentMicrocycle.rirRange[1]}
-                      {currentMicrocycle.mesocycleType !== 'deload' && currentMicrocycle.mesocycleType !== 'peaking' && (
-                        <span style={{ color: '#22c55e', fontWeight: 600, marginLeft: 6 }}>
-                          ↑+{(currentMicrocycle.mesocycleType === 'accumulation' ? 2.5 : 3.75)}%/нед
-                        </span>
-                      )}
-                      {currentMicrocycle.mesocycleType === 'deload' && (
-                        <span style={{ color: '#3b82f6', fontWeight: 600, marginLeft: 6 }}>↓-50%</span>
-                      )}
-                    </span>
-                      </div>
-                      {/* Phase training tip */}
-                      {currentMicrocycle && (
-                        <div style={{ padding: '6px 8px', background: 'rgba(0,230,138,0.04)', borderRadius: 6, fontSize: 10, color: 'var(--accent)', marginBottom: 6, lineHeight: 1.4 }}>
-                          {PHASE_HINTS[currentMicrocycle.mesocycleType] || 'Рабочая неделя: сохраняйте заданный объём, интенсивность и RIR.'}
-                        </div>
-                      )}
-                      {/* MRV guardrail — анти-перетрен по объёму недели */}
-                      {currentMicrocycle && (() => {
-                        const _labAdj = labTrainingAdjust(linked.labAnalysis);
-    const mrv = ((LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20) * (tprofile.onCourse ? (tprofile.courseIntensity === 'heavy' ? 1.3 : tprofile.courseIntensity === 'mild' ? 1.15 : 1.2) : 1) * _labAdj.mrvMultiplier;
-                        const wk: Record<string, number> = {};
-                        currentMicrocycle.days.filter((d: any) => d.isTraining).forEach((d: any) => (d.exercises || []).forEach((e: any) => { wk[e.group] = (wk[e.group] || 0) + (e.sets || 0); }));
-                        const over = Object.entries(wk).filter(([, s]) => s > mrv);
-                        if (over.length === 0) return null;
-                        const GRP_RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' };
-                        return <div style={{ padding: '6px 8px', background: 'rgba(239,68,68,0.08)', borderRadius: 6, fontSize: 10, color: '#ef4444', marginBottom: 6, lineHeight: 1.4, border: '1px solid rgba(239,68,68,0.2)' }}>
-                          ⚠ Объём превышает MRV ({mrv} сетов/нед): {over.map(([g, s]) => `${GRP_RU[g] || g} ${s}`).join(' · ')}. Снизьте число подходов или добавьте восстановление.
-                        </div>;
-                      })()}
-                      {currentMicrocycle.days.filter((d: any) => d.isTraining).map((day: any, di: number) => {
-                    const dayExCount = day.exercises?.length || 0;
-                    const dayCompounds = day.exercises?.filter((e: any) => e.isCompound).length || 0;
-                    const difficultyScore = Math.min(10, Math.round((dayCompounds * 2 + dayExCount) * (day.intensity === 'very_high' ? 1.4 : day.intensity === 'high' ? 1.2 : 1)));
-                    const diffLabel = difficultyScore <= 3 ? 'лёгко' : difficultyScore <= 5 ? 'умеренно' : difficultyScore <= 7 ? 'тяжело' : 'очень тяжело';
-                    const diffColor = difficultyScore <= 3 ? '#22c55e' : difficultyScore <= 5 ? '#84cc16' : difficultyScore <= 7 ? '#ff9100' : '#ef4444';
-                    const adjRecovery = recovery / 10;
-                    const autoRegNote = adjRecovery < 0.4 ? '⚠ Снизить объём на 20% — низкое восстановление' :
-                                       adjRecovery < 0.6 ? '⚡ Умеренная нагрузка — следи за RPE' :
-                                       adjRecovery > 0.8 ? '✅ Высокая готовность — можно добавить подход' : '';
-                    const labWarnings: string[] = [];
-                    if (labAnalysis) {
-                      if (labAnalysis.liverStress > 60) labWarnings.push(`⚠ Печень ${labAnalysis.liverStress}% — исключить гепатотоксичные нагрузки`);
-                      if (labAnalysis.inflammation > 5) labWarnings.push(`⚠ Воспаление ${labAnalysis.inflammation.toFixed(1)} — рекомендован deload`);
-                      if (labAnalysis.kidneyStress > 50) labWarnings.push(`⚠ Почки ${labAnalysis.kidneyStress}% — контроль гидратации`);
-                    }
-                    return (
-                    <div key={di} style={{ marginBottom: 6, background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <span style={{ fontWeight: 600, fontSize: 11 }}>{day.day}</span>
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          {(() => {
-                            const hasSquat = day.exercises?.some((e: any) => e.exerciseId?.includes('squat') || e.name?.toLowerCase().includes('присед'));
-                            const hasBench = day.exercises?.some((e: any) => e.exerciseId?.includes('bench') || e.name?.toLowerCase().includes('жим'));
-                            const hasDead = day.exercises?.some((e: any) => e.exerciseId?.includes('deadlift') || e.name?.toLowerCase().includes('тяга'));
-                            const focusTag = hasSquat ? 'Присед' : hasBench ? 'Жим' : hasDead ? 'Тяга' : '';
-                            return focusTag ? <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600 }}>{focusTag}</span> : null;
-              })()}
-
-              {/* Periodization phase info */}
-              {(() => {
-                const pp = getPhaseParams({
-                  goal: ({ bulk: 'hypertrophy', cut: 'conditioning', strength: 'strength', maintenance: 'hypertrophy', recomp: 'hypertrophy', rehab: 'rehab', powerlifting: 'powerlifting', bodybuilding: 'bodybuilding' } as Record<string, GoalType>)[goal] ?? 'hypertrophy',
-                  phase: cycleType === 'peaking' ? 'peaking' : cycleType === 'intensification' ? 'intensification' : cycleType === 'deload' ? 'deload' : 'accumulation',
-                  analytics: { fatigue: fatigue / 10, recovery: recovery / 10, risk: 0 },
-                });
-                return (
-                  <div className="card" style={{ marginBottom: 8, padding: '6px 10px', background: 'rgba(139,92,246,0.06)', borderLeft: '3px solid #8b5cf6' }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: '#8b5cf6', marginBottom: 2 }}>
-                      🔄 Фаза: {cycleType === 'peaking' ? 'Пик' : cycleType === 'intensification' ? 'Интенсификация' : cycleType === 'deload' ? 'Разгрузка' : 'Накопление'}
-                    </div>
-                    <div style={{ display: 'flex', gap: 10, fontSize: 9, color: 'var(--text-dim)' }}>
-                      <span>Объём: <b>{pp.volumeLevel}</b></span>
-                      <span>Интенсивность: <b>{pp.intensityLevel}</b></span>
-                      <span>Частота: <b>{pp.frequencyLevel}</b></span>
-                      <span>Приоритет: <b>{pp.priority}</b></span>
-                    </div>
-                  </div>
-                );
-              })()}
-                          <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: `${diffColor}22`, color: diffColor, fontWeight: 600 }}>{diffLabel} {difficultyScore}/10</span>
-                          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{day.duration} мин</span>
-                        </div>
-                      </div>
-                      {autoRegNote && (
-                        <div style={{ fontSize: 9, color: adjRecovery < 0.4 ? '#ef4444' : adjRecovery < 0.6 ? '#ff9100' : '#22c55e', marginBottom: 3, background: `${adjRecovery < 0.4 ? '#ef4444' : adjRecovery < 0.6 ? '#ff9100' : '#22c55e'}11`, padding: '2px 6px', borderRadius: 3 }}>
-                          {autoRegNote}
-                        </div>
-                      )}
-                      {labWarnings.length > 0 && labWarnings.map((w, wi) => (
-                        <div key={wi} style={{ fontSize: 9, color: '#ef4444', marginBottom: 3, background: 'rgba(239,68,68,0.08)', padding: '2px 6px', borderRadius: 3 }}>
-                          {w}
-                        </div>
-                      ))}
-                      <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 3, padding: '1px 4px', background: 'rgba(255,165,2,0.05)', borderRadius: 3 }}>
-                        🍎 {goal === 'bulk' ? 'Профицит 5-10%, белок 1.8-2.2 г/кг, углеводы вокруг тренировки.' : goal === 'cut' ? 'Дефицит 10-20%, белок 2.0-2.4 г/кг, углеводы до/после тренировки.' : goal === 'strength' ? 'Поддерживайте калории около TDEE и держите углеводы перед тяжёлыми подходами.' : 'Калории около TDEE, белок 1.8-2.2 г/кг, стабильный режим питания.'}
-                      </div>
-                      {day.exercises.map((ex: any, ei: number) => {
-                        const scheme = selectSetScheme({
-                          goal, movementPattern: 'squat' as MovementPattern, difficultyLevel: level === 'beginner' ? 'low' : level === 'intermediate' ? 'medium' : 'high',
-                          techniqueIssues: [], riskFlags: {}, fatigueScore: fatigue / 10, repPattern: 'normal', isPrimaryLift: ei === 0,
-                        });
-                        const tempo = selectTempo(goal, [], {}, ex.isCompound);
-                        const exCat = EXERCISE_CATALOG.find(ec => ec.id === ex.exerciseId || ec.name === ex.name);
-                        const estMax = ex.weight ? Math.round(ex.weight * (1 + Number(ex.reps) / 30)) : 0;
-                        const substitute = exCat?.canReplace?.[0] ? EXERCISE_CATALOG.find(e => e.id === exCat.canReplace![0]) : null;
-                        const role = ei === 0 ? 'main' : ei <= 2 ? 'secondary' : 'accessory';
-                        const roleColor = role === 'main' ? '#ef4444' : role === 'secondary' ? '#f97316' : '#6b7280';
-                        const roleLabel = role === 'main' ? 'ОСН' : role === 'secondary' ? 'ДОП' : 'АКС';
-                        const restSec = ei === 0 ? (goal === 'strength' ? 180 : 120) : ei <= 2 ? 90 : 60;
-                        return (
-                        <div key={ei} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0', fontSize: 10, borderBottom: ei < day.exercises.length - 1 ? '1px solid var(--border)' : 'none', gap: 2 }}>
-                          <span style={{ fontSize: 7, padding: '1px 3px', borderRadius: 2, background: `${roleColor}22`, color: roleColor, fontWeight: 700, minWidth: 22, textAlign: 'center', flexShrink: 0 }}>{roleLabel}</span>
-                          <span style={{ flex: 1 }} title={ex.technique || ''}>{ex.name}</span>
-                          <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 55, textAlign: 'right' }}>{ex.sets}×{ex.reps}</span>
-                          {estMax > 0 && <span style={{ fontSize: 8, color: '#00e68a', minWidth: 40, textAlign: 'right' }}>~{estMax}кг</span>}
-                          <span style={{ fontSize: 8, color: 'var(--text-dim)', minWidth: 25, textAlign: 'right' }}>RIR{ex.rir}</span>
-                          <span style={{ fontSize: 6, padding: '1px 2px', borderRadius: 2, background: 'rgba(0,230,138,0.1)', color: '#00e68a', whiteSpace: 'nowrap' }}>{scheme?.schemeType?.slice(0, 6) || '—'}</span>
-                          <span style={{ fontSize: 6, padding: '1px 2px', borderRadius: 2, background: 'rgba(249,115,22,0.1)', color: '#f97316', whiteSpace: 'nowrap' }}>⏱{restSec}с</span>
-                          {substitute && <span style={{ fontSize: 6, color: 'var(--text-dim)', maxWidth: 50, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={``}>↔{substitute.name.slice(0, 8)}</span>}
-                        </div>
-                        );
-                      })}
-                      {/* Rotation suggestion for main lifts */}
-                      {day.exercises?.filter((e: any) => e.isCompound).slice(0, 2).map((ex: any, ei: number) => {
-                        const cat = EXERCISE_CATALOG.find(ec => ec.id === ex.exerciseId || ec.name === ex.name);
-                        const alts = cat?.canReplace?.filter(r => !day.exercises.some((de: any) => de.exerciseId === r || de.name === r)).slice(0, 2) || [];
-                        if (alts.length === 0) return null;
-                        return (
-                          <div key={`rot-${ei}`} style={{ fontSize: 8, color: 'var(--text-dim)', padding: '1px 0', marginLeft: 26, marginBottom: 1 }}>
-                            <span style={{ color: '#8b5cf6' }}>🔄 {ex.name.slice(0, 12)} → </span>
-                            {alts.map((a: string, ai: number) => {
-                              const altEx = EXERCISE_CATALOG.find(e => e.id === a);
-                              return <span key={ai}>{altEx?.name || a}{ai < alts.length - 1 ? ', ' : ''}</span>;
-                            })}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-                  <div style={{ marginTop: 4, padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 4, fontSize: 9, color: 'var(--text-dim)' }}>
-                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
-                         {PHASE_HINTS[currentMicrocycle.mesocycleType] || 'Следуйте заданным подходам, повторам и RIR.'}
-                      </span>
-                    </div>
-                </div>
-              )}
-
-              {/* Quick week summary */}
-              {currentMicrocycle && (
-                <div className="card" style={{ padding: '8px 10px' }}>
-                  <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--accent)', marginBottom: 4 }}>📋 Сводка недели {selectedWeek}</div>
-                  {(() => {
-                    const days = currentMicrocycle.days.filter((d: any) => d.isTraining);
-                    const totalSets = days.reduce((s: number, d: any) => s + (d.exercises?.reduce((ss: number, e: any) => ss + (e.sets || 0), 0) || 0), 0);
-                    const totalReps = days.reduce((s: number, d: any) => s + (d.exercises?.reduce((ss: number, e: any) => ss + (parseInt(String(e.reps)) || 0) * (e.sets || 0), 0) || 0), 0);
-                    const totalTonnage = days.reduce((s: number, d: any) => s + (d.exercises?.reduce((ss: number, e: any) => ss + (e.sets || 0) * (parseInt(String(e.reps)) || 0) * (e.weight || 0), 0) || 0), 0);
-                    const totalMin = days.reduce((s: number, d: any) => s + (d.duration || 0), 0);
-                    const density = totalMin > 0 ? Math.round(totalTonnage / totalMin) : 0;
-                    return (
-                      <div key="week-summary" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 4, fontSize: 10 }}>
-                        <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
-                          <div style={{ color: 'var(--text-dim)' }}>Дней</div>
-                          <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{days.length}</div>
-                        </div>
-                        <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
-                          <div style={{ color: 'var(--text-dim)' }}>Подходов</div>
-                          <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalSets}</div>
-                        </div>
-                        <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
-                          <div style={{ color: 'var(--text-dim)' }}>Повторов</div>
-                          <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalReps}</div>
-                        </div>
-                        <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
-                          <div style={{ color: 'var(--text-dim)' }}>Тоннаж</div>
-                          <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalTonnage > 0 ? `${(totalTonnage / 1000).toFixed(1)}т` : '—'}</div>
-                        </div>
-                        <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
-                          <div style={{ color: 'var(--text-dim)' }}>Плотность</div>
-                          <div style={{ fontWeight: 700, color: density > 50 ? '#22c55e' : density > 25 ? '#ff9100' : '#ef4444' }}>{density} кг/мин</div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* Weekly training calendar (TZ) */}
-              {currentMicrocycle && (
-                <div className="card" style={{ padding: '10px 12px', marginTop: 8 }}>
-                  <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>📅 Календарь недели</h4>
-                  <div style={{ display: 'flex', gap: 3 }}>
-                    {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((dayName, di) => {
-                      const day = currentMicrocycle.days.find((d: any) => d.isTraining && d.day?.includes(dayName));
-                      const isTraining = !!day;
-                      return (
-                        <div key={di} style={{
-                          flex: 1, textAlign: 'center', padding: '4px 2px', borderRadius: 6, fontSize: 9,
-                          background: isTraining ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)',
-                          border: isTraining ? '1px solid rgba(0,230,138,0.2)' : '1px solid var(--border)',
-                          color: isTraining ? 'var(--accent)' : 'var(--text-dim)',
-                          fontWeight: isTraining ? 600 : 400,
-                        }}>
-                          <div>{dayName}</div>
-                          {isTraining && <div style={{ fontSize: 7, marginTop: 1 }}>{day?.exercises?.length || 0} упр</div>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Cooldown */}
-              {showCooldown && currentMicrocycle && currentMicrocycle.days.length > 0 && (() => {
-                const cdInput = {
-                  muscleGroupsUsed: currentMicrocycle.days[0]?.exercises?.map((e: any) => e.group).filter(Boolean) || [],
-                  fatigueScore: fatigue / 10,
-                  riskFlags: {} as Record<string, string>,
-                  sessionDuration: currentMicrocycle.days[0]?.duration || 60,
-                };
-                const cooldown = generateCooldown(cdInput);
-                return (
-                  <div key="cooldown" className="card" style={{ padding: '8px 10px', border: '1px solid rgba(59,130,246,0.2)' }}>
-                    <div style={{ fontWeight: 600, fontSize: 12, color: '#3b82f6', marginBottom: 4 }}>🧊 Заминка</div>
-                    {cooldown.map((b, bi) => (
-                      <div key={bi} style={{ fontSize: 10, marginBottom: 2, color: 'var(--text-dim)' }}>
-                        <span style={{ fontWeight: 600, color: '#3b82f6' }}>
-                          {b.type === 'breathing' ? 'Дыхание' : b.type === 'stretch' ? 'Растяжка' : 'Заминка'} ({b.durationSec}с)
-                        </span>
-                        {b.exercises?.map((ex, exi) => (
-                          <span key={exi} style={{ marginLeft: 6, color: 'var(--text-dim)' }}>
-                            {WARMUP_LABELS[ex.exerciseId] || ex.exerciseId.replace(/_/g, ' ')}
-                          </span>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })(              )}
-
-              {/* Custom added exercises */}
-              {customExercises.length > 0 && (
-                <div className="card" style={{ padding: '8px 10px', border: '1px dashed rgba(139,92,246,0.3)' }}>
-                  <div style={{ fontWeight: 600, fontSize: 11, color: '#8b5cf6', marginBottom: 4 }}>📝 Добавленные ({customExercises.length})</div>
-                  {customExercises.map((ce, ci) => (
-                    <div key={ci} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, padding: '2px 0', borderBottom: ci < customExercises.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                      <span>{ce.name}</span>
-                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{ce.sets}×{ce.reps}</span>
-                      <span style={{ color: 'var(--text-dim)', fontSize: 9 }}>RIR {ce.rir}</span>
-                      <button onClick={() => setCustomExercises(customExercises.filter((_, i) => i !== ci))} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, padding: 0 }}>×</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Intensity zone distribution (TZ) */}
-              {currentMicrocycle?.days && (
-                <div className="card" style={{ padding: '8px 10px', marginTop: 8 }}>
-                  <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--accent)', marginBottom: 4 }}>📊 Зоны интенсивности</div>
-                  {(() => {
-                    const reps = currentMicrocycle.days.filter((d: any) => d.isTraining)
-                      .flatMap((d: any) => d.exercises?.map((e: any) => parseInt(String(e.reps)) || 8) || []) || [];
-                    const str = reps.filter(r => r >= 1 && r <= 6).length;
-                    const hyp = reps.filter(r => r >= 7 && r <= 12).length;
-                    const end = reps.filter(r => r >= 13).length;
-                    const total = reps.length || 1;
-                    return (
-                      <div key="intensity-zones">
-                        <div style={{ display: 'flex', gap: 2, height: 18, borderRadius: 6, overflow: 'hidden', marginBottom: 4 }}>
-                          <div style={{ flex: str || 0.1, background: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#fff', fontWeight: 600, minWidth: str > 0 ? 20 : 0 }}>
-                            {str > 0 ? `${Math.round((str/total)*100)}%` : ''}
-                          </div>
-                          <div style={{ flex: hyp || 0.1, background: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#fff', fontWeight: 600, minWidth: hyp > 0 ? 20 : 0 }}>
-                            {hyp > 0 ? `${Math.round((hyp/total)*100)}%` : ''}
-                          </div>
-                          <div style={{ flex: end || 0.1, background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#fff', fontWeight: 600, minWidth: end > 0 ? 20 : 0 }}>
-                            {end > 0 ? `${Math.round((end/total)*100)}%` : ''}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 8, fontSize: 9, color: 'var(--text-dim)' }}>
-                          <span>🔴 Сила ({str})</span><span>🟢 Гипертрофия ({hyp})</span><span>🔵 Выносливость ({end})</span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* Workout nutrition tips */}
-              <div className="card" style={{ padding: '8px 10px', border: '1px solid rgba(255,165,2,0.2)', marginTop: 8 }}>
-                <div style={{ fontWeight: 600, fontSize: 11, color: '#ffa502', marginBottom: 4 }}>🍎 Питание вокруг тренировки</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5 }}>
-                  {goal === 'bulk' ? 'За 60-120 минут до тренировки: углеводы + белок. После: белок 30-40 г и углеводы по аппетиту.' :
-                   goal === 'cut' ? 'Перед тренировкой оставьте часть дневных углеводов. После тренировки держите белок и не превышайте дефицит.' :
-                   goal === 'strength' ? 'Перед тяжёлой сессией добавьте быстрые углеводы и соль; после восстановите жидкость и белок.' :
-                   'Держите стабильный белок и распределяйте углеводы вокруг самых тяжёлых тренировок.'}
-                </div>
-              </div>
-
-              {/* Strength balance (TZ 38) */}
-              {trainingOutput.volumePerGroup && (() => {
-                const groups = trainingOutput.volumePerGroup as Record<string, number>;
-                const pushVol = (groups.chest || 0) + (groups.shoulders || 0);
-                const pullVol = (groups.back || 0);
-                const quadVol = groups.legs || 0;
-                const ratio = pullVol > 0 ? (pushVol / pullVol).toFixed(1) : '—';
-                const balanced = parseFloat(ratio as string) >= 0.8 && parseFloat(ratio as string) <= 1.2;
-                return (
-                  <div key="strength-balance" className="card" style={{ padding: '8px 10px', border: '1px solid rgba(139,92,246,0.2)' }}>
-                    <div style={{ fontWeight: 600, fontSize: 11, color: '#8b5cf6', marginBottom: 4 }}>⚖️ Баланс нагрузки</div>
-                    <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'var(--text-dim)' }}>
-                      <span>Push/Pull: <b style={{ color: balanced ? '#22c55e' : '#ff9100' }}>{ratio}</b> {balanced ? '✓' : '⚠'}</span>
-                      <span>Ноги/Верх: <b>{(quadVol / Math.max(1, pushVol + pullVol)).toFixed(1)}</b></span>
-                    </div>
-                  </div>
-                );
-              })(                  )}
-
-              {/* Overtraining risk assessment */}
-              {currentMicrocycle && (() => {
-                const acRatio = currentMicrocycle.volumeMultiplier * 100 / 85;
-                const riskScore = (acRatio > 120 ? 3 : acRatio > 100 ? 1 : 0) + (sleepHours < 6 ? 2 : sleepHours < 7 ? 1 : 0) + (stressLevel > 7 ? 2 : stressLevel > 5 ? 1 : 0);
-                const riskLabel = riskScore >= 5 ? '🚨 Высокий риск перегрузки' : riskScore >= 3 ? '⚠️ Умеренный риск' : riskScore >= 1 ? '⚡ Повышенная нагрузка' : '';
-                if (!riskLabel) return null;
-                return (
-                  <div key="overtraining-risk" className="card" style={{ padding: '6px 10px', border: `1px solid ${riskScore >= 5 ? 'rgba(239,68,68,0.3)' : 'rgba(255,145,0,0.3)'}`, background: riskScore >= 5 ? 'rgba(239,68,68,0.05)' : 'rgba(255,145,0,0.05)' }}>
-                    <div style={{ fontSize: 10, color: riskScore >= 5 ? '#ef4444' : '#ff9100', fontWeight: 600 }}>
-                      {riskLabel} — {riskScore >= 5 ? 'снизьте объём и добавьте отдых' : riskScore >= 3 ? 'контролируйте сон, стресс и RPE' : 'следите за восстановлением'}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {trainingOutput.volumePerGroup && (
-                <div className="card" style={{ padding: '10px 12px' }}>
-                  <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>📊 Объём по группам</h4>
-                  {Object.entries(trainingOutput.volumePerGroup).map(([g, v]) => (
-                    <div key={g} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontSize: 11, minWidth: 50 }}>{GROUP_LABELS[g] || g}</span>
-                      <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 3, height: 6, overflow: 'hidden' }}>
-                        <div style={{ width: `${Math.min(100, v / 2)}%`, height: '100%', background: 'var(--accent)', borderRadius: 3 }} />
-                      </div>
-                      <span style={{ fontSize: 10, color: 'var(--text-dim)', minWidth: 40, textAlign: 'right' }}>{v} подх</span>
-                    </div>
-                  ))}
-                  {trainingOutput.estimatedProgress !== undefined && (
-                    <div style={{ marginTop: 6, padding: '6px 8px', background: 'rgba(0,230,138,0.05)', borderRadius: 6, fontSize: 10 }}>
-                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>📈 Прогресс: +{trainingOutput.estimatedProgress}%/нед</span>
-                      <span style={{ color: 'var(--text-dim)', marginLeft: 8 }}>
-                        {trainingOutput.progressionModel || '—'} · {cycleType === 'auto' ? 'Автоцикл' : cycleType}
-                      </span>
-                      <span style={{ color: 'var(--text-dim)', marginLeft: 6, fontSize: 9 }}>
-                        {goal} · {periodizationType !== 'auto' ? periodizationType : ''}
-                      </span>
-                    </div>
-                  )}
-                  {/* Workload ratio + Monotony/Strain (TZ 71-72) */}
-                  {currentMicrocycle && (
-                    <div style={{ marginTop: 4, padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 4, fontSize: 9 }}>
-                      <span style={{ fontWeight: 600, color: 'var(--text-dim)' }}>🔬 Нагрузка: </span>
-                      <span style={{ color: 'var(--accent)' }}>Острая: {Math.round(currentMicrocycle.volumeMultiplier * bodyWeight * daysPerWeek)} кг/нед</span>
-                      <span style={{ color: 'var(--text-dim)', marginLeft: 4 }}>
-                        Хрон.: {Math.round(currentMicrocycle.volumeMultiplier * bodyWeight * daysPerWeek * 0.85)} кг/нед
-                      </span>
-                      <span style={{ marginLeft: 4, color: currentMicrocycle.volumeMultiplier > 1.2 ? '#ef4444' : currentMicrocycle.mesocycleType === 'deload' ? '#22c55e' : '#ff9100' }}>
-                        A/C: {(currentMicrocycle.volumeMultiplier * 100 / 85).toFixed(0)}%
-                      </span>
-                      {currentMicrocycle.volumeMultiplier > 1.3 && (
-                        <span style={{ marginLeft: 4, color: '#ef4444', fontWeight: 600 }}>⚠ Высокий риск перегрузки</span>
-                      )}
-                      <span style={{ marginLeft: 4, color: sleepHours < 6 ? '#ef4444' : sleepHours < 7 ? '#ff9100' : '#22c55e' }}>
-                        Сон: {sleepHours}ч | Стресс: {stressLevel}/10
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+          {tab === 'constructor' && (
+        <InfoErrorBoundary label="Конструктор тренировок">
+        <TrainingConstructor
+          tprofile={tprofile} updateTProfile={updateTProfile}
+          goal={goal} setGoal={setGoal}
+          level={level} setLevel={setLevel}
+          daysPerWeek={daysPerWeek} setDaysPerWeek={setDaysPerWeek}
+          recovery={recovery} setRecovery={setRecovery}
+          fatigue={fatigue} setFatigue={setFatigue}
+          weakPoints={weakPoints} setWeakPoints={setWeakPoints}
+          bodyWeight={bodyWeight} setBodyWeight={setBodyWeight}
+          sleepHours={sleepHours} setSleepHours={setSleepHours}
+          stressLevel={stressLevel} setStressLevel={setStressLevel}
+          mesoLength={mesoLength} setMesoLength={setMesoLength}
+          labAnalysis={linked.labAnalysis}
+          setTab={setTab}
+        />
         </InfoErrorBoundary>
       )}
 
@@ -1862,455 +919,19 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
         </InfoErrorBoundary>
       )}
 
-      {/* ═══════════ EXERCISES TAB (Apple-style) ═══════════ */}
+      {/* ═══════════ EXERCISES TAB (каталог) ═══════════ */}
       {tab === 'exercises' && (
         <InfoErrorBoundary label="Упражнения">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {/* Search + filters */}
-          <div style={{ background:'var(--bg-secondary)', borderRadius:14, padding:'8px 10px', border:'1px solid var(--border)' }}>
-            <input type="text" value={exSearch} onChange={e => setExSearch(e.target.value)}
-              placeholder="🔍 Поиск упражнений..." 
-              style={{ width:'100%', padding:'10px 12px', borderRadius:10, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:13, boxSizing:'border-box', marginBottom:6 }} />
-            <div style={{ display:'flex', gap:4 }}>
-              {[{ key:'exGroup', val:exGroup, set:(v:string)=>setExGroup(v), opts:[['all','Группа'],...MUSCLE_GROUPS.map(g=>[g,GROUP_LABELS[g]] as [string,string])] },
-                { key:'exType', val:exType, set:(v:string)=>setExType(v), opts:[['all','Тип'],['compound','Базовые'],['isolation','Изо']] },
-                { key:'exEquipment', val:exEquipment, set:(v:string)=>setExEquipment(v), opts:[['all','Инвентарь'],['barbell','Штанга'],['dumbbell','Гантели'],['machine','Тренажёр'],['cable','Блок'],['bodyweight','Вес']] },
-                { key:'exDifficulty', val:exDifficulty, set:(v:string)=>setExDifficulty(v), opts:[['all','Сложность'],['beginner','Начальные'],['intermediate','Средние'],['advanced','Продвинутые']] }
-              ].map(f => (
-                <select key={f.key} value={f.val} onChange={e => f.set(e.target.value)} style={{ flex:1, padding:'7px 4px', borderRadius:8, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, fontWeight:600, textAlign:'center', minWidth:0 }}>
-                  {f.opts.map(([v,l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
-              ))}
-            </div>
-          </div>
-
-          {/* Exercise list */}
-          <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:'50vh', overflowY:'auto', paddingRight:2 }}>
-            {filteredExercises.slice(0, exVisible).map(ex => {
-              const isSelected = selectedEx?.id === ex.id;
-              const typeIcon = ex.type === 'compound' ? '🔩' : '🎯';
-              const equipIcon = { barbell:'🏋️', dumbbell:'💪', machine:'⚙️', cable:'🔗', bodyweight:'🧘' }[ex.equipment] || '📦';
-              return (
-                <div key={ex.id} onClick={() => setSelectedEx(isSelected ? null : ex)} style={{
-                  padding:'8px 10px', borderRadius:12, cursor:'pointer',
-                  background: isSelected ? 'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(59,130,246,0.04))' : 'var(--bg-secondary)',
-                  border: isSelected ? '1px solid rgba(0,230,138,0.3)' : '1px solid var(--border)',
-                  transition:'all 0.15s',
-                }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                    <div style={{ width:32, height:32, borderRadius:10, background:isSelected?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>
-                      {typeIcon}
-                    </div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:12, fontWeight:600, color:isSelected?'var(--accent)':'var(--text-light)', lineHeight:1.2 }}>{ex.name}</div>
-                      <div style={{ display:'flex', gap:3, marginTop:2, flexWrap:'wrap' }}>
-                        <span style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.04)', color:'var(--text-dim)' }}>{equipIcon} {EQUIP_LABELS[ex.equipment]||ex.equipment}</span>
-                        <span style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.04)', color:'var(--text-dim)' }}>{GROUP_LABELS[ex.group]}</span>
-                        <span style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:ex.jointStress==='high'?'rgba(239,68,68,0.08)':'rgba(34,197,94,0.08)', color:ex.jointStress==='high'?'#ef4444':'#22c55e' }}>{JOINT_LABELS[ex.jointStress]||ex.jointStress}</span>
-                      </div>
-                    </div>
-                    <span style={{ fontSize:10, color:isSelected?'var(--accent)':'var(--text-dim)', transition:'transform 0.15s', transform:isSelected?'rotate(180deg)':'none' }}>▼</span>
-                  </div>
-
-                  {/* Detail panel inline (Apple bottom-sheet style) */}
-                  {isSelected && (
-                    <div style={{ marginTop:8, paddingTop:8, borderTop:'1px solid var(--border)' }}>
-                      {/* Tags row */}
-                      <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
-                        <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'var(--accent)' }}>{ex.type==='compound'?'Базовое':'Изолирующее'}</span>
-                        {ex.difficulty && <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:ex.difficulty==='advanced'?'rgba(239,68,68,0.08)':'rgba(249,115,22,0.08)', color:ex.difficulty==='advanced'?'#ef4444':ex.difficulty==='intermediate'?'#f97316':'#22c55e' }}>{ex.difficulty==='advanced'?'Продвинутое':ex.difficulty==='intermediate'?'Среднее':'Начальное'}</span>}
-                        <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(139,92,246,0.08)', color:'#8b5cf6' }}>Усталость: {ex.fatigueCost}/10</span>
-                        {ex.targetMuscle && <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(236,72,153,0.08)', color:'#ec4899' }}>🎯 {ex.targetMuscle}</span>}
-                      </div>
-                      {/* Technique */}
-                      {ex.technique && <div style={{ marginBottom:4, background:'rgba(0,230,138,0.04)', borderRadius:8, padding:'6px 8px', fontSize:10, color:'var(--text)', lineHeight:1.4 }}>🎯 {ex.technique}</div>}
-                      {/* Comments */}
-                      {ex.comments && <div style={{ marginBottom:4, background:'rgba(255,145,0,0.04)', borderRadius:8, padding:'6px 8px', fontSize:10, color:'var(--text-dim)', lineHeight:1.4 }}>💡 {ex.comments}</div>}
-                      {/* Biomechanics */}
-                      {(() => { const bio = getExerciseBio(ex.id); if (!bio) return null; const js = bio.jointStress; const strs = Object.entries(js||{}).map(([k,v])=>`${k} ${v}/10`); return <div style={{ marginBottom:4, background:'rgba(59,130,246,0.04)', borderRadius:8, padding:'5px 8px', fontSize:8, color:'var(--text-dim)' }}>
-                        🔬 Биомеханика: {strs.join(', ')} | Сложность: {bio.difficulty}/10 | ЦНС: {bio.cnsDemand||5}/10
-                      </div>; })()}
-                      {/* Replacements */}
-                      {ex.canReplace && ex.canReplace.length > 0 && <div style={{ display:'flex', flexWrap:'wrap', gap:3, alignItems:'center', marginBottom:4 }}>
-                        <span style={{ fontSize:8, color:'var(--text-dim)' }}>Замена:</span>
-                        {ex.canReplace.map(r => { const rep = EXERCISE_CATALOG.find(e => e.id === r); return rep ? <span key={r} style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.06)', color:'var(--accent)' }}>{rep.name}</span> : null; })}
-                      </div>}
-                      {/* Add to plan button */}
-                      <button onClick={() => {
-                        setCustomExercises([...customExercises, { name: ex.name, sets:3, reps:10, rir:2 }]);
-                        setLastAddedEx(ex.id);
-                        setTimeout(() => setLastAddedEx(null), 1500);
-                        setSelectedEx(null);
-                      }} style={{
-                        width:'100%', marginTop:4, padding:'8px', borderRadius:8,
-                        border: lastAddedEx === ex.id ? '1px solid rgba(0,230,138,0.5)' : '1px solid rgba(0,230,138,0.3)',
-                        background: lastAddedEx === ex.id ? 'rgba(0,230,138,0.15)' : 'rgba(0,230,138,0.06)',
-                        color: lastAddedEx === ex.id ? 'var(--accent)' : 'var(--accent)', fontWeight:700, fontSize:11, cursor:'pointer',
-                        transition:'all 0.3s',
-                      }}>{lastAddedEx === ex.id ? '✓ Добавлено!' : '+ Добавить в план'}</button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {filteredExercises.length === 0 && <div style={{ textAlign:'center', padding:20, color:'var(--text-dim)', fontSize:11 }}>Упражнения не найдены</div>}
-            {filteredExercises.length > exVisible && (
-              <button onClick={() => setExVisible(v => v + 80)} style={{ width:'100%', padding:10, borderRadius:8, border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.04)', color:'var(--accent)', cursor:'pointer', fontSize:11, fontWeight:600, marginTop:4 }}>▼ Показать ещё ({filteredExercises.length - exVisible} из {filteredExercises.length})</button>
-            )}
-          </div>
-        </div>
+          <ExerciseLabCatalog />
         </InfoErrorBoundary>
       )}
 
       {/* ═══════════ CALCULATORS TAB (also serves programcalc) ═══════════ */}
-      {(tab === 'calculators' || tab === 'programcalc') && (
-        <InfoErrorBoundary label="Калькуляторы">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {tab === 'calculators' && <TrainingLoadCalculator />}
-          {tab === 'calculators' && <TonnageCalcTab />}
-          {tab === 'calculators' && <WhatIfCard baseRisk={linked.risk?.overallNet ?? 5} baseReadiness={linked.readiness?.recovery ?? 70} />}
-          {showNonBuilder && (<>
-          <div className="card" style={{ padding: '12px 14px', background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)', borderRadius:14 }}>
-            <h3 style={{ margin: '0 0 4px', fontSize: 13, color:'var(--accent)' }}>📐 Калькулятор 1RM</h3>
-            <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:10 }}>Вес × Повторения → 1ПМ</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom:3, display:'block' }}>Вес (кг)</label>
-                <input type="number" value={calcWeight || ''} onChange={e => setCalcWeight(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid var(--glass-border)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom:3, display:'block' }}>Повторения</label>
-                <input type="number" value={calcReps || ''} onChange={e => setCalcReps(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid var(--glass-border)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }} />
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-              <div style={{ background: 'rgba(0,230,138,0.1)', borderRadius: 12, padding: 10, textAlign: 'center', border:'1px solid rgba(0,230,138,0.15)' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Epley</div>
-                <div style={{ fontSize: 20, fontWeight: 800, background:'linear-gradient(135deg, var(--accent), #00c853)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>{calcResults.epley1RM.toFixed(1)}</div>
-                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>кг</div>
-              </div>
-              <div style={{ background: 'rgba(59,130,246,0.1)', borderRadius: 12, padding: 10, textAlign: 'center', border:'1px solid rgba(59,130,246,0.15)' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Brzycki</div>
-                <div style={{ fontSize: 20, fontWeight: 800, background:'linear-gradient(135deg, #3b82f6, #60a5fa)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>{calcResults.brzycki1RM.toFixed(1)}</div>
-                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>кг</div>
-              </div>
-              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 12, padding: 10, textAlign: 'center', border:'1px solid rgba(0,230,138,0.15)' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Среднее</div>
-                <div style={{ fontSize: 20, fontWeight: 800, background:'linear-gradient(135deg, #00e68a, #00cc7a)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>{((calcResults.epley1RM + calcResults.brzycki1RM) / 2).toFixed(1)}</div>
-                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>кг</div>
-              </div>
-            </div>
-          </div>
 
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>📊 RPE ↔ %1RM</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
-                <input type="number" value={calcWeight} onChange={e => setCalcWeight(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Повторения</label>
-                <input type="number" value={calcReps} onChange={e => setCalcReps(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>RPE (1-10)</label>
-                <input type="number" min={1} max={10} value={calcRPE} onChange={e => setCalcRPE(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>1RM (через RPE)</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{calcResults.rpe1RM.toFixed(1)}</div>
-                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>кг</div>
-              </div>
-              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>%1RM при RPE{calcRPE}</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{(calcResults.rpePercent * 100).toFixed(1)}%</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🎯 %1RM → Рабочий вес</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>1RM (кг)</label>
-                <input type="number" value={calc1RM} onChange={e => setCalc1RM(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>% от 1RM</label>
-                <input type="number" min={30} max={100} value={calcPercent} onChange={e => setCalcPercent(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-            </div>
-            <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Рабочий вес ({calcPercent}% от {calc1RM}кг)</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{calcResults.percentWeight.toFixed(1)} кг</div>
-            </div>
-          </div>
-
-          {/* Powerlifting Indexes (TZ 7.12) */}
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🏆 Силовые индексы (Wilks/Dots)</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-              {[
-                { k: plSquat, s: setPlSquat, l: 'Присед' },
-                { k: plBench, s: setPlBench, l: 'Жим' },
-                { k: plDeadlift, s: setPlDeadlift, l: 'Тяга' },
-                { k: plWeight, s: setPlWeight, l: 'Вес тела' },
-              ].map(f => (
-                <div key={f.l}>
-                  <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>{f.l}</label>
-                  <input type="number" value={f.k} onChange={e => f.s(parseFloat(e.target.value) || 0)}
-                    style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-                </div>
-              ))}
-              <div>
-                <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Пол</label>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {(['male', 'female'] as const).map(s => (
-                    <button key={s} onClick={() => setPlSex(s)} style={{
-                      flex: 1, padding: '6px 4px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
-                      background: plSex === s ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-                      border: plSex === s ? '1px solid var(--accent)' : '1px solid var(--border)',
-                      color: plSex === s ? 'var(--accent)' : 'var(--text-dim)', fontWeight: plSex === s ? 700 : 400,
-                    }}>{s === 'male' ? 'Мужской' : 'Женский'}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            {(() => {
-              const total = plSquat + plBench + plDeadlift;
-              const w = Math.max(plWeight, 30);
-              const coef = plSex === 'male'
-                ? { a: -216.0475144, b: 16.2606339, c: -0.002388645, d: -0.00113732, e: 7.01863e-6, f: -1.291e-8 }
-                : { a: 594.31747775582, b: -27.23842536447, c: 0.82112226871, d: -0.00930733913, e: 4.731582e-5, f: -9.054e-8 };
-              const denom = coef.a + coef.b * w + coef.c * w * w + coef.d * w * w * w + coef.e * w * w * w * w + coef.f * w * w * w * w * w;
-              const dots = denom > 0 ? total * 500 / denom : 0;
-              return (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-                  <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Сумма</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{total} кг</div>
-                  </div>
-                  <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Dots</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: '#00e68a' }}>{dots.toFixed(2)}</div>
-                  </div>
-                  <div style={{ background: 'rgba(249,115,22,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Отн. вес</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: '#f97316' }}>{(total / w).toFixed(1)}×</div>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-          <StrengthLevelCard />
-
-          {/* ═══ BMI ═══ */}
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>⚖️ Индекс массы тела (BMI)</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
-                <input type="number" value={bmiWeight} onChange={e => setBmiWeight(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Рост (см)</label>
-                <input type="number" value={bmiHeight} onChange={e => setBmiHeight(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-            </div>
-            <button onClick={calcBMI} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Рассчитать</button>
-            {bmiResult !== null && (
-              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{bmiResult.toFixed(1)}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{bmiCategory(bmiResult)}</div>
-              </div>
-            )}
-          </div>
-
-          {/* ═══ BMR Mifflin-St Jeor ═══ */}
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🔥 BMR (Миффлин-Сан Жеор)</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
-                <input type="number" value={bmrWeight} onChange={e => setBmrWeight(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Рост (см)</label>
-                <input type="number" value={bmrHeight} onChange={e => setBmrHeight(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Возраст</label>
-                <input type="number" value={bmrAge} onChange={e => setBmrAge(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Пол</label>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {(['male', 'female'] as const).map(s => (
-                    <button key={s} onClick={() => setBmrSex(s)} style={{
-                      flex: 1, padding: '6px 4px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
-                      background: bmrSex === s ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-                      border: bmrSex === s ? '1px solid var(--accent)' : '1px solid var(--border)',
-                      color: bmrSex === s ? 'var(--accent)' : 'var(--text-dim)', fontWeight: bmrSex === s ? 700 : 400,
-                    }}>{s === 'male' ? 'Мужской' : 'Женский'}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <button onClick={calcBMR} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Рассчитать</button>
-            {bmrResult !== null && (
-              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{bmrResult.toFixed(0)}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>ккал/день</div>
-              </div>
-            )}
-          </div>
-
-          {/* ═══ BMR Katch-McArdle ═══ */}
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🔥 BMR (Кэтч-Мкардл)</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
-                <input type="number" value={bmrKmWeight} onChange={e => setBmrKmWeight(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>% жира</label>
-                <input type="number" step="0.1" value={bmrKmBodyFat} onChange={e => setBmrKmBodyFat(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-            </div>
-            <button onClick={calcBMR_KM} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Рассчитать</button>
-            {bmrKmResult !== null && (
-              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{bmrKmResult.toFixed(0)}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>ккал/день (LBM: {(bmrKmWeight * (100 - bmrKmBodyFat) / 100).toFixed(1)} кг)</div>
-              </div>
-            )}
-          </div>
-
-          {/* ═══ TDEE ═══ */}
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>⚡ TDEE</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>BMR (ккал)</label>
-                <input type="number" value={tdeeBmr} onChange={e => setTdeeBmr(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>PAL</label>
-                <select value={tdeePal} onChange={e => setTdeePal(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }}>
-                  {PAL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </div>
-            </div>
-            <button onClick={calcTDEE} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Рассчитать</button>
-            {tdeeResult !== null && (
-              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{tdeeResult.toFixed(0)}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>ккал/день</div>
-              </div>
-            )}
-          </div>
-
-          {/* ═══ Grip Strength ═══ */}
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🤚 Сила хвата</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Сила (кг)</label>
-                <input type="number" value={gripKg} onChange={e => setGripKg(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Пол</label>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {(['male', 'female'] as const).map(s => (
-                    <button key={s} onClick={() => setGripSex(s)} style={{
-                      flex: 1, padding: '6px 4px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
-                      background: gripSex === s ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-                      border: gripSex === s ? '1px solid var(--accent)' : '1px solid var(--border)',
-                      color: gripSex === s ? 'var(--accent)' : 'var(--text-dim)', fontWeight: gripSex === s ? 700 : 400,
-                    }}>{s === 'male' ? 'Мужской' : 'Женский'}</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Возраст</label>
-                <input type="number" value={gripAge} onChange={e => setGripAge(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-            </div>
-            <button onClick={calcGrip} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Оценить</button>
-            {gripResult !== null && (
-              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{gripResult.percentile}%</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{gripResult.level}</div>
-              </div>
-            )}
-          </div>
-
-          {/* ═══ Stress (HRV) ═══ */}
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🧠 Стресс (HRV)</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6, marginBottom: 8 }}>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>RMSSD / HRV (мс)</label>
-                <input type="number" value={hrvValue} onChange={e => setHrvValue(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-            </div>
-            <button onClick={calcStress} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Оценить</button>
-            {stressResult !== null && (
-              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{stressResult.stress}%</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{stressResult.level}</div>
-              </div>
-            )}
-          </div>
-          </>)}
-
-          {/* ═══════ Периодизация ═══════ */}
-          {showNonBuilder && (
-            <div className="card" style={{ padding: '10px 12px' }}>
-              <h4 style={{ margin: '0 0 6px', fontSize: 11 }}>📐 Тип периодизации</h4>
-              <div style={{ display:'flex', gap:4, flexWrap:'wrap', fontSize:10, color:'var(--text-dim)' }}>
-                {[
-                  { v:'auto', l:'Авто' }, { v:'linear', l:'Линейная' },
-                  { v:'undulating', l:'DUP' }, { v:'block', l:'Блочная' },
-                ].map(p => (
-                  <button key={p.v} onClick={() => setPeriodizationType(p.v as 'auto' | 'linear' | 'undulating' | 'block' | 'conjugate')}
-                    style={{
-                      padding:'4px 10px', borderRadius:6, fontSize:10, fontWeight: periodizationType === p.v ? 700 : 400, cursor:'pointer',
-                      border: periodizationType === p.v ? '1px solid var(--accent)' : '1px solid var(--border)',
-                      background: periodizationType === p.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
-                    }}>{p.l}</button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ═══════ UNIFIED PROGRAM BUILDER (только в Ручном конструкторе) ═══════ */}
-          {tab === 'programcalc' && (
-            <ManualConstructor
-              goal={goal} setGoal={setGoal}
-              level={level} setLevel={setLevel}
-              daysPerWeek={daysPerWeek} setDaysPerWeek={setDaysPerWeek}
-              mesoLength={mesoLength} setMesoLength={setMesoLength}
-              tprofile={tprofile} updateTProfile={updateTProfile}
-              labAnalysis={linked.labAnalysis}
-              setTab={setTab}
-              weakPoints={weakPoints}
-              recovery={recovery}
-              fatigue={fatigue}
-            />
-          )}
-        </div>
-        </InfoErrorBoundary>
-      )}
-
-            {/* ═══════════ DIARY AND ANALYTICS TAB (объединённый дневник+аналитика) ═══════════ */}
+            {/* ═══════════ DIARY AND ANALYTICS TAB (объединённый дневник+аналитика+прогресс+визуализация+отчёты) ═══════════ */}
       {tab === 'diary' && (
         <InfoErrorBoundary label="Дневник">
-          <DiaryAndAnalyticsTab
+          <TrainingDiaryHub
             diary={diary}
             diaryStats={diaryStats}
             diaryProgress={diaryProgress}
@@ -2319,6 +940,14 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
             selectedWeek={selectedWeek}
             level={level}
             onRefresh={loadDiaryStats}
+            trainingOutput={trainingOutput}
+            goal={goal}
+            daysPerWeek={daysPerWeek}
+            splitType={splitType}
+            periodizationType={periodizationType}
+            mesoLength={mesoLength}
+            tprofile={tprofile}
+            linked={linked}
           />
         </InfoErrorBoundary>
       )}
@@ -2465,7 +1094,7 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
                                  mc?.mesocycleType === 'peaking' ? '#ef4444' : '#6b7280';
                     return (
                       <div key={wi} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:1, cursor:'pointer' }}
-                        onClick={() => { setSelectedWeek(wi + 1); setTab('plan'); }}>
+                          onClick={() => { setSelectedWeek(wi + 1); setTab('constructor'); }}>
                         <div style={{ width:'70%', height:volH, background:color, borderRadius:'2px 2px 0 0', opacity: isCurrent ? 1 : 0.4, transition:'height 0.2s' }} />
                         <div style={{ width:'40%', height:intH, background:color, borderRadius:'2px 2px 0 0', opacity: isCurrent ? 0.8 : 0.3 }} />
                         <span style={{ fontSize:7, color: isCurrent ? 'var(--accent)' : 'rgba(255,255,255,0.3)', fontWeight: isCurrent ? 700 : 400 }}>{wi + 1}</span>
@@ -2515,7 +1144,7 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
                           border: selectedWeek === weekNum ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
                           fontSize:8, color: selectedWeek === weekNum ? 'var(--accent)' : 'rgba(255,255,255,0.4)',
                           cursor:'pointer', transition:'all 0.15s',
-                        }} onClick={(e) => { e.stopPropagation(); setSelectedWeek(weekNum); setTab('plan'); }}>
+                        }} onClick={(e) => { e.stopPropagation(); setSelectedWeek(weekNum); setTab('constructor'); }}>
                           {weekNum}
                         </div>;
                       })}
@@ -2604,135 +1233,7 @@ const [manualTemplates, setManualTemplates] = useState<any[]>(() => { try { retu
           </div>
           </InfoErrorBoundary>
         )}
-      {/* ═══════════ HISTORY TAB ═══════════ */}
-      {tab === 'history' && <InfoErrorBoundary label="История">{(() => {
-        try {
-        const gCard: React.CSSProperties = { padding:12, borderRadius:14, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)', marginBottom:8 };
-        if (diaryProgress.length === 0) return (
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            <div style={gCard}>
-              <div style={{ textAlign:'center', padding:20 }}>
-                <div style={{ fontSize:28, marginBottom:6 }}>📜</div>
-                <div style={{ fontSize:11, color:'rgba(255,255,255,0.4)' }}>Нет записей. Начните вести дневник на вкладке «Дневник».</div>
-              </div>
-            </div>
-          </div>
-        );
-return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-            <TrainingRecommendationsCard historyWorkouts={historyWorkouts} level={level} weakPoints={tprofile.weakPoints} readinessHistory={loadReadinessHistory()} acwr={(() => { try { const _s = loadSRPESessions(); if (_s.length < 2) return undefined; return acuteChronicRatio(toDailyLoads(_s)).ratio; } catch { return undefined; } })()} nutrition={{ kcal: linked.avgWeeklyKcal, protein: linked.avgWeeklyProtein, fat: linked.avgWeeklyFat, carbs: linked.avgWeeklyCarbs }} bodyWeight={tprofile.bodyWeight} labAnalysis={linked.labAnalysis ? { liverStress: linked.labAnalysis.liverStress, cardioRisk: linked.labAnalysis.cardioRisk, inflammation: linked.labAnalysis.inflammation, kidneyStress: linked.labAnalysis.kidneyStress, hormoneScore: linked.labAnalysis.hormoneScore, homaIR: linked.labAnalysis.homaIR } : undefined} onCourse={tprofile.onCourse} courseIntensity={tprofile.courseIntensity} supportCoverage={linked.supportCoverage} />
-          <div style={gCard}>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, letterSpacing:'0.3px', textTransform:'uppercase', marginBottom:8 }}>📜 История тренировок</div>
-            <div style={{ display:'flex', gap:6, marginBottom:8 }}>
-              {[
-                { label:'Недель', value:diaryProgress.length, color:'#34d399' },
-                { label:'Тренировок', value:diaryProgress.reduce((s,w)=>s+w.workoutCount,0), color:'#60a5fa' },
-                { label:'Объём', value:diaryProgress.length > 0 ? `${(diaryProgress[diaryProgress.length-1]?.totalVolume/1000).toFixed(1)}т` : '—', color:'#f59e0b' },
-              ].map((s,i) => <div key={i} style={{ flex:1, background:'rgba(255,255,255,0.03)', borderRadius:8, padding:'6px 4px', textAlign:'center' }}>
-                <div style={{ fontSize:8, color:'rgba(255,255,255,0.35)' }}>{s.label}</div>
-                <div style={{ fontSize:16, fontWeight:800, color:s.color }}>{s.value}</div>
-              </div>)}
-            </div>
-            {historyWorkouts.length > 0 && (() => {
-              const byDay: Record<string, number> = {};
-              historyWorkouts.forEach((w: any) => { byDay[w.date] = (byDay[w.date] || 0) + (w.exercises || []).reduce((s: number, e: any) => s + (e.totalVolume || 0), 0); });
-              const cells: { date: string; vol: number }[] = [];
-              const today = new Date();
-              for (let i = 83; i >= 0; i--) { const d = new Date(today); d.setDate(d.getDate() - i); const ds = d.toISOString().slice(0, 10); cells.push({ date: ds, vol: byDay[ds] || 0 }); }
-              const maxVol = Math.max(1, ...cells.map(c => c.vol));
-              const col = (v: number) => v === 0 ? 'rgba(255,255,255,0.04)' : v < maxVol * 0.33 ? 'rgba(0,230,138,0.25)' : v < maxVol * 0.66 ? 'rgba(0,230,138,0.5)' : 'rgba(0,230,138,0.85)';
-              const weeks: { date: string; vol: number }[][] = [];
-              for (let w = 0; w < 12; w++) weeks.push(cells.slice(w * 7, w * 7 + 7));
-              return (
-                <div style={{ marginBottom: 8, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 700, marginBottom: 6 }}>🔥 Тепловая карта тренировок (12 нед)</div>
-                  <div style={{ display: 'flex', gap: 3 }}>
-                    {weeks.map((wk, wi) => (
-                      <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
-                        {wk.map((c, di) => <div key={di} title={c.date + (c.vol > 0 ? ': ' + Math.round(c.vol) + ' кг·повт' : '')} style={{ aspectRatio: '1', borderRadius: 3, background: col(c.vol) }} />)}
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}><span>меньше</span><span>больше</span></div>
-                </div>
-              );
-            })()}
-            {historyWorkouts.length > 0 && (() => {
-              const lvlKey = (level === 'enhanced' ? 'advanced' : level) as 'beginner' | 'intermediate' | 'advanced';
-              const mrvBase = (((LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv) ?? 20) * (tprofile.onCourse ? 1.2 : 1);
-              const ws = (d0: Date) => { const x = new Date(d0); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); x.setHours(0,0,0,0); return x; };
-              const now = new Date();
-              const wkSets = (weeksAgo: number) => { const s = ws(now); s.setDate(s.getDate() - weeksAgo * 7); const e = new Date(s); e.setDate(e.getDate() + 6); const ss = s.toISOString().slice(0,10), ee = e.toISOString().slice(0,10); const m: Record<string, number> = {}; historyWorkouts.forEach((w: any) => { if (w.date >= ss && w.date <= ee) (w.exercises || []).forEach((ex: any) => { const cat = EXERCISE_CATALOG.find((c: any) => c.id === ex.exerciseId); if (cat) m[cat.group] = (m[cat.group] || 0) + (ex.sets?.length || 0); }); }); return m; };
-              const w1 = wkSets(1), w2 = wkSets(0);
-              const groups = Array.from(new Set([...Object.keys(w1), ...Object.keys(w2)]));
-              const over2 = groups.filter(g => (w1[g] || 0) > mrvBase && (w2[g] || 0) > mrvBase);
-              const over1 = groups.filter(g => ((w1[g] || 0) > mrvBase || (w2[g] || 0) > mrvBase) && !over2.includes(g));
-              if (over2.length === 0 && over1.length === 0) return null;
-              const GRP_RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' };
-              const ru = (g: string) => GRP_RU[g] || g;
-              const color = over2.length > 0 ? '#ef4444' : '#f59e0b';
-              return (
-                <div style={{ marginBottom: 8, padding: 10, borderRadius: 10, background: color + '12', border: '1px solid ' + color + '40' }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, color, marginBottom: 4 }}>{over2.length > 0 ? '🔴 Риск перетренированности' : '🟡 Превышение объёма'}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>
-                    {over2.length > 0 ? `Группы выше MRV (${Math.round(mrvBase)} сетов) 2 недели подряд: ${over2.map(ru).join(', ')}. Снизьте объём на 10–15% в следующем микроцикле.` : `Группы выше MRV на прошлой/текущей неделе: ${over1.map(ru).join(', ')}. Следите за восстановлением.`}
-                  </div>
-                </div>
-              );
-            })()}
-            {[...diaryProgress].sort((a,b)=>b.week-a.week).map((w,wi) => (
-              <div key={wi} style={{ borderRadius:10, marginBottom:4, overflow:'hidden', background:'rgba(255,255,255,0.02)', border: historyExpanded===`w${wi}` ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.03)', transition:'border 0.2s' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', cursor:'pointer' }} onClick={()=>setHistoryExpanded(historyExpanded===`w${wi}`?null:`w${wi}`)}>
-                  <div>
-                    <span style={{ fontWeight:700, fontSize:12, color:'rgba(255,255,255,0.8)' }}>Неделя {w.week}</span>
-                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginLeft:6 }}>{w.workoutCount} тр.</span>
-                  </div>
-                  <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                    {(() => { try { const sorted = [...diaryProgress].sort((a,b)=>b.week-a.week); const prev = sorted[wi+1]; if (!prev) return null; const d = Math.round((w.totalVolume-prev.totalVolume)/Math.max(1,prev.totalVolume)*100); return <span style={{ fontSize:11, fontWeight:700, color:d>5?'#34d399':d<-5?'#f87171':'#6b7280' }}>{d>5?'↑':d<-5?'↓':'→'}</span>; } catch{ return null; } })()}
-                    <span style={{ fontSize:11, fontWeight:700, color:'#34d399' }}>{Math.round(w.totalVolume).toLocaleString()} кг</span>
-                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)' }}>{historyExpanded===`w${wi}`?'▴':'▾'}</span>
-                  </div>
-                </div>
-                {historyExpanded===`w${wi}` && <div style={{ padding:'0 10px 8px', borderTop:'1px solid rgba(255,255,255,0.04)', paddingTop:6 }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:6 }}>
-                    {[
-                      { label:'Объём', value:`${Math.round(w.totalVolume)} кг`, color:'#34d399' },
-                      { label:'Тренировок', value:w.workoutCount, color:'#60a5fa' },
-                      { label:'1RM ср.', value:`${Math.round(w.total1RM)} кг`, color:'#f59e0b' },
-                    ].map((s,i) => <div key={i} style={{ background:'rgba(255,255,255,0.02)', borderRadius:6, padding:'4px 6px', textAlign:'center' }}>
-                      <div style={{ fontSize:8, color:'rgba(255,255,255,0.3)' }}>{s.label}</div>
-                      <div style={{ fontSize:12, fontWeight:700, color:s.color }}>{s.value}</div>
-                    </div>)}
-                  </div>
-                  {(diaryStats.filter(s=>s.workoutCount>0).slice(0,5).length > 0) && <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)' }}>
-                    {diaryStats.filter(s=>s.workoutCount>0).slice(0,5).map(s => (
-                      <div key={s.exerciseId} style={{ display:'flex', justifyContent:'space-between', padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
-                        <span style={{ color:'rgba(255,255,255,0.6)' }}>{s.exerciseName}</span>
-                        <span style={{ color:'#34d399', fontWeight:600 }}>{s.maxWeight}×{s.maxReps}</span>
-                        <span style={{ color:'rgba(255,255,255,0.3)' }}>1RM {Math.round(s.max1RM)} кг</span>
-                      </div>
-                    ))}
-                  </div>}
-                </div>}
-              </div>
-            ))}
-          </div>
-        </div>);
-        } catch { return <div style={{ padding:20, textAlign:'center', color:'rgba(255,255,255,0.3)', fontSize:11 }}>Ошибка загрузки истории</div>; }
-      })()}</InfoErrorBoundary>}
-      {/* ═══════════ ANALYTICS TAB ═══════════ */}
-      {tab === 'analytics' && (() => {
-        const calcE1rm = (w: number, r: number) => r <= 1 ? w : w * (1 + Math.min(r, 30) / 30);
-        const srpe = loadSRPESessions();
-        const acwrVal = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)).ratio : 1.0;
-        const monoVal = srpe.length >= 7 ? weeklyMonotony(toDailyLoads(srpe)).monotony : 0;
-        const hist = historyWorkouts || [];
-        const exMap = new Map<string,{first:number;last:number}>();
-        for (const w of hist) { const exs: any[] = (w as any).exercises || []; for (const ex of exs) { const nm = ex.name || ex.exerciseId || '?'; if (!exMap.has(nm)) exMap.set(nm,{first:0,last:0}); const v = calcE1rm(ex.weight||0, ex.reps||5); const cur = exMap.get(nm)!; if (!cur.first || (v > 0 && v < cur.first)) cur.first = v; if (v > cur.last) cur.last = v; } }
-        const exercises = Array.from(exMap.entries()).filter(([,v]) => v.first>0&&v.last>0).slice(0,10).map(([name,v]) => ({name,e1rmBefore:Math.round(v.first),e1rmAfter:Math.round(v.last)}));
-        const recentVol = hist.slice(-14).reduce((s:number,w:any) => s + ((w.exercises||[]).length), 0);
-        const rirStats = loadRirCalibrationStats();
-        return <><div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', marginBottom: 8, fontSize: 10, color: 'var(--text-dim)' }}>💡 Аналитика также доступна во вкладке «Дневник тренировок» → режим «Аналитика»</div><RIRCalibrationCard /><MesoCorrectionCard profile={tprofile} acwr={acwrVal} monotony={monoVal} avgReadiness={(() => { const r = linked.readiness; return r ? (r.recovery + (100 - r.fatigue)) / 2 : 70; })()} mesoWeeks={16} missedSessions={0} exercises={exercises} currentVolume={recentVol > 0 ? Math.round(recentVol / Math.max(1, Math.floor(hist.length / 14))) : 16} currentRir={rirStats.bias >= 0 ? 2 : 1} /><MuscleProgressCard sessions={historyWorkouts} level={level} /><VolumeTrendCard sessions={historyWorkouts} /><LoadRadarCard sessions={historyWorkouts} level={level} /><WeekCompareCard sessions={historyWorkouts} /><LiftHistoryCard sessions={historyWorkouts} /><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /><AllExercisesTrendCard sessions={historyWorkouts} /><StandardForecastCard sessions={historyWorkouts} /><VolumeRecoveryCorrelationCard sessions={historyWorkouts} /><StickingPointAnalysisCard sessions={historyWorkouts} /></>;
-      })()}
+      {/* history, analytics tabs moved to TrainingDiaryHub (diary tab sub-modes) */}
       {tab === 'library' && (
   <InfoErrorBoundary label="Каталог циклов">
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -2748,11 +1249,10 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
     </div>
   </InfoErrorBoundary>
 )}
-{tab === 'methods' && <InfoErrorBoundary label="Методы"><MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} appliedMethods={appliedMethods} onToggleMethod={(name, category) => setAppliedMethods(prev => { const next = { ...prev }; if (next[category] === name) delete next[category]; else next[category] = name; return next; })} onApplyComposition={() => { applyMethodComposition(); setTab('plan'); }} /></InfoErrorBoundary>}
-      {tab === 'visual' && <InfoErrorBoundary label="Визуализация"><VisualTab sessions={historyWorkouts} /></InfoErrorBoundary>}
+{tab === 'methods' && <InfoErrorBoundary label="Методы"><MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} appliedMethods={appliedMethods} onToggleMethod={(name, category) => setAppliedMethods(prev => { const next = { ...prev }; if (next[category] === name) delete next[category]; else next[category] = name; return next; })} onApplyComposition={() => { applyMethodComposition(); setTab('constructor'); }} /></InfoErrorBoundary>}
       {tab === 'programs' && <InfoErrorBoundary label="Программы"><ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} onAddToMyTraining={(exs) => setCustomExercises(prev => [...prev, ...exs])} /></InfoErrorBoundary>}
       {tab === 'timers' && <InfoErrorBoundary label="Таймеры"><TimersTab /></InfoErrorBoundary>}
-      {tab === 'progress' && <InfoErrorBoundary label="Прогресс"><ProgressTab historyWorkouts={historyWorkouts} /></InfoErrorBoundary>}
+      {/* visual, progress tabs moved to TrainingDiaryHub (diary tab sub-modes) */}
         {tab === 'exercise_lab' && <InfoErrorBoundary label="Лаборатория упражнений"><ExerciseLab /></InfoErrorBoundary>}
        {tab === 'calc_plates' && <InfoErrorBoundary label="Калькулятор блинов"><PlateCalculator /></InfoErrorBoundary>}
        {tab === 'calc_vbt' && <InfoErrorBoundary label="VBT-калькулятор"><VBTCalculator /></InfoErrorBoundary>}
@@ -2762,8 +1262,8 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
       {tab === 'pl_norms' && <InfoErrorBoundary label="Нормативы ПЛ"><PlNormsCalcTab /></InfoErrorBoundary>}
       {tab === 'import_data' && <InfoErrorBoundary label="Импорт CSV"><CsvImportTab onDone={loadDiaryStats} /></InfoErrorBoundary>}
       {tab === 'volume' && <InfoErrorBoundary label="Расчёт объёма"><VolumeOptimizerTab /></InfoErrorBoundary>}
-      {tab === 'calc_substitute' && <InfoErrorBoundary label="Замена упражнения"><CalcSubstituteTab /></InfoErrorBoundary>}
-      {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} onBuildPlan={() => setTab('plan')} /></InfoErrorBoundary>}
+
+      {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} onBuildPlan={() => setTab('constructor')} /></InfoErrorBoundary>}
       {tab === 'pl_pro' && <InfoErrorBoundary label="Pro ПЛ-инструменты"><ProPlToolsTab /></InfoErrorBoundary>}
       {tab === 'rel_strength' && <InfoErrorBoundary label="Относительная сила"><RelativeStrengthCalcTab /></InfoErrorBoundary>}
       {tab === 'calendar' && <InfoErrorBoundary label="Календарь тренировок"><TrainingCalendarTab /></InfoErrorBoundary>}
@@ -2791,98 +1291,15 @@ return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
         </InfoErrorBoundary>
       )}
 
-      {/* ═══════════ REPORTS TAB ═══════════ */}
-      {tab === 'reports' && (
-        <InfoErrorBoundary label="Отчёты">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 4px', fontSize: 13 }}>📄 Отчёты по тренировкам</h3>
-            <p style={{ margin: '0 0 8px', fontSize: 11, color: 'var(--text-dim)' }}>
-              Сгенерируйте комплексный отчёт по вашим тренировкам: информация из каталога упражнений, статистика плана (недели, упражнения в неделю), метрики тренировок (объём, интенсивность).
-            </p>
-
-            <button onClick={() => {
-              const planWeeks = macrocycle?.totalWeeks ?? (trainingOutput?.plan?.length && daysPerWeek > 0 ? Math.ceil(trainingOutput.plan.length / daysPerWeek) : 0);
-              const totalVolume = trainingOutput?.weeklyVolume ?? 0;
-              const avgIntensity = trainingOutput?.estimatedProgress ? Math.round(50 + trainingOutput.estimatedProgress * 5) : 0;
-              const report = {
-                id: 'report_' + Date.now(),
-                date: new Date().toISOString(),
-                exerciseCatalogCount: Object.keys(EXERCISE_CATALOG).length,
-                planWeeks,
-                exercisesPerWeek: daysPerWeek,
-                totalVolume,
-                avgIntensity,
-                goal, level, daysPerWeek, splitType, periodizationType, mesoLength,
-              };
-              const updated = [report, ...trainingArchive].slice(0, 20);
-              setTrainingArchive(updated);
-              try { localStorage.setItem('he_training_reports', JSON.stringify(updated)); } catch {}
-              try { localStorage.setItem('he_training_report_current', JSON.stringify(report)); } catch {}
-              setTrainingReportGenerated(true);
-            }} style={{
-              padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-              background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer',
-            }}>Сгенерировать отчёт</button>
-
-            {trainingReportGenerated && (
-              <p style={{ margin: '6px 0 0', fontSize: 11, color: '#22c55e' }}>✓ Отчёт сгенерирован и сохранён в архиве</p>
-            )}
-          </div>
-
-          {/* Archive */}
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <h4 style={{ margin: 0, fontSize: 12 }}>📦 Архив отчетов ({trainingArchive.length})</h4>
-              {trainingArchive.length > 0 && (
-                <button onClick={() => {
-                  setTrainingArchive([]);
-                  localStorage.removeItem('he_training_reports');
-                  localStorage.removeItem('he_training_report_current');
-                  setTrainingReportGenerated(false);
-                }} style={{
-                  padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 600,
-                  background: 'rgba(239,68,68,0.2)', color: '#ef4444', border: 'none', cursor: 'pointer',
-                }}>Очистить архив</button>
-              )}
-            </div>
-            {trainingArchive.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 11, color: 'var(--text-dim)' }}>Архив пуст. Сгенерируйте первый отчёт.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {[...trainingArchive].reverse().map((r: any) => (
-                  <div key={r.id} style={{
-                    padding: '8px 10px', borderRadius: 6,
-                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                      <span style={{ fontSize: 11, fontWeight: 600 }}>Отчёт {new Date(r.date).toLocaleDateString('ru')}</span>
-                      <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{new Date(r.date).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px', fontSize: 10, color: 'var(--text-dim)' }}>
-                      <span>Упражнений в каталоге: {r.exerciseCatalogCount}</span>
-                      <span>Недель в плане: {r.planWeeks}</span>
-                      <span>Тренировок/нед: {r.exercisesPerWeek}</span>
-                      <span>Общий объём: {r.totalVolume}</span>
-                      <span>Ср. интенсивность: {r.avgIntensity}%</span>
-                      <span>Цель: {r.goal}, Уровень: {r.level}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-        </InfoErrorBoundary>
-      )}
-    </div>
+      {/* reports tab moved to TrainingDiaryHub (diary tab sub-mode) */}
+     </div>
       )}
     </div>
   );
 };
 
 import { MyTrainingTab } from './TrainingScreen_parts/MyTrainingTab';
-import { CalcSubstituteTab } from './TrainingScreen_parts/CalcSubstituteTab';
+import ExerciseLabCatalog from './TrainingScreen_parts/ExerciseLabCatalog';
 import { CalcQualityTab } from './TrainingScreen_parts/CalcQualityTab';
 import { MuscleProgressCard } from './TrainingScreen_parts/MuscleProgressCard';
 import { MicrocyclePlannerCard } from './TrainingScreen_parts/MicrocyclePlannerCard';
@@ -2906,7 +1323,7 @@ import { VisualTab } from './TrainingScreen_parts/VisualTab';
 import { AnalyticsTab } from './TrainingScreen_parts/AnalyticsTab';
 import { ProgramsTab } from './TrainingScreen_parts/ProgramsTab';
 import { VolumeOptimizerTab } from './TrainingScreen_parts/VolumeOptimizerTab';
-import { ExerciseLab } from './TrainingScreen_parts/ExerciseLab';
+import ExerciseLab from './TrainingScreen_parts/ExerciseLab';
 import { TrainingLoadCalculator } from './TrainingScreen_parts/TrainingLoadCalculator';
 import { TonnageCalcTab } from './TrainingScreen_parts/TonnageCalcTab';
 import { WhatIfCard } from './TrainingScreen_parts/WhatIfCard';
@@ -2948,4 +1365,4 @@ import ConjugateTab from './TrainingScreen_parts/ConjugateTab';
 import MMCTrackingCard from './TrainingScreen_parts/MMCTrackingCard';
 import { loadRirCalibrationStats } from '../../engines/meso-correction.engine';
 
-import ManualConstructor from './TrainingScreen_parts/ManualConstructor';
+import { TrainingConstructor } from './TrainingScreen_parts/TrainingConstructor';

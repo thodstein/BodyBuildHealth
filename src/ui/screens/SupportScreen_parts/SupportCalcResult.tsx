@@ -604,6 +604,7 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                                 })()}
                                 {planInfo?.fromJoint && <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.08)', color:'#8b5cf6' }}>Суставы 🦴</span>}
                                 {planInfo?.fromBoost && <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(239,68,68,0.08)', color:'#ef4444' }}>Усиление 🔥</span>}
+                                {planInfo?.fromNeuro && <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(59,130,246,0.08)', color:'#3b82f6' }}>Нейро 🧠</span>}
                                 {/* Count synergy partners in current plan */}
                                 {(() => {
                                   if (!catalogEntry?.synergies) return null;
@@ -918,30 +919,7 @@ export const SupportCalcResult: React.FC<{ s: Record<string, any> }> = ({ s }) =
                     );
                   })()}
 
-                  {/* ===== BOOST INDICATOR ===== */}
-                  {calcResult?.boostAdded && calcResult.boostAdded.length > 0 && (() => {
-                    const boostNames = calcResult.boostAdded.map((id: string) => {
-                      const cat = SUPPORT_CATALOG_DATA[id];
-                      return cat?.name || id;
-                    });
-                    return (
-                      <div style={{ marginBottom: 8, padding: '8px 12px', borderRadius: 10, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>
-                          🔥 Усиление: добавлены синергисты
-                        </div>
-                        <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>
-                          {boostNames.map((n: string, i: number) => (
-                            <span key={i} style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.1)', color: '#f59e0b', fontWeight: 600, marginRight: 4, marginBottom: 2 }}>
-                              {n}
-                            </span>
-                          ))}
-                        </div>
-                        <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 4 }}>
-                          Добавлены по принципу максимальной синергии с веществами плана на системы с наибольшим остаточным риском.
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  {/* ===== BOOST INDICATOR — removed (tags shown as badges in main list) ===== */}
 
                   {/* ===== INTERACTION MATRIX ===== */}
                   {planResult?.substances && planResult.substances.length > 4 && (
@@ -1279,27 +1257,7 @@ ${planResult.labFindings.length > 0 ? '\nОТКЛОНЕНИЯ АНАЛИЗОВ:\
                     </div>
                   )}
 
-                  {/* ===== JOINT SUBS (separate, not in main stack) ===== */}
-                  {calcResult?.jointSubs && calcResult.jointSubs.length > 0 && (
-                    <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.2)' }}>
-                      <div style={{ fontSize:10, fontWeight:700, color:'#8b5cf6', marginBottom:6, display:'flex', alignItems:'center', gap:6 }}>
-                        🦴 Суставы и связки ({calcResult.jointSubs.length})
-                      </div>
-                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>Отдельные препараты — не входят в основной стек поддержки</div>
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                        {calcResult.jointSubs.map((jid: string) => {
-                          const entry = SUPPORT_CATALOG_DATA[jid] || SUPPORT_CATALOG_DATA[jid.toUpperCase()];
-                          const name = entry?.nameRu || entry?.name || jid;
-                          const dose = entry?.dosage?.mg ? (entry.dosage.mg >= 1000 ? `${(entry.dosage.mg/1000).toFixed(1)} г` : `${entry.dosage.mg} мг`) : '—';
-                          return (
-                            <span key={jid} style={{ fontSize:8, padding:'3px 8px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.15)', color:'#c4b5fd' }}>
-                              {name} <span style={{ color:'var(--text-dim)' }}>{dose}</span>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                  {/* ===== JOINT SUBS — removed (tags shown as badges in main list) ===== */}
             </>)}
           </div>
       )}

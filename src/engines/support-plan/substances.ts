@@ -10,7 +10,10 @@ import { catalogEntry } from './types';
  * Преобразует список id веществ в PlanSubstance[] (с dedup).
  * Берёт display-инфо из каталога SUPPORT_CATALOG_DATA, дозировки из DEFAULT_DOSAGES.
  */
-export function buildSubstances(ids: string[], _tzRes: CalculatorResult): PlanSubstance[] {
+export function buildSubstances(ids: string[], _tzRes: CalculatorResult, tags?: { boostAdded?: string[]; jointSubs?: string[]; neuroSubs?: string[] }): PlanSubstance[] {
+  const boostSet = new Set(tags?.boostAdded || []);
+  const jointSet = new Set(tags?.jointSubs || []);
+  const neuroSet = new Set(tags?.neuroSubs || []);
   const seen = new Set<string>();
   const out: PlanSubstance[] = [];
   for (const id of ids) {
@@ -35,8 +38,9 @@ export function buildSubstances(ids: string[], _tzRes: CalculatorResult): PlanSu
       targetSystems: e?.targetSystems || e?.systems || [],
       comment: e?.description || '',
       mechanismReason: e?.mechanisms?.[0] || '',
-      fromJoint: false,
-      fromBoost: false,
+      fromJoint: jointSet.has(id),
+      fromBoost: boostSet.has(id),
+      fromNeuro: neuroSet.has(id),
     });
   }
   return out;

@@ -609,7 +609,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       let sorted = [...pool];
       if (highQuality) sorted = qualitySort(sorted, true);
       else if (lowQuality) sorted = qualitySort(sorted, false);
-      else sorted = [...sorted].sort((a, b) => { const sa = Math.sin(seed * 10007 + (a.id?.length || 0)); const sb = Math.sin(seed * 10007 + (b.id?.length || 0)); return sa - sb; });
+      else sorted = [...sorted].sort(() => Math.random() - 0.5);
       return sorted.slice(0, variety === 'minimal' ? 4 : variety === 'medium' ? 8 : 12);
     };
     // N1: track used food IDs across meals to avoid duplicates when budget=max
@@ -696,18 +696,22 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const pickItem = (foodPool: any[], targetG: number, seed: number, maxItems = 2): any[] => { const result: any[] = []; let pool = applyFoodPrefs(foodPool, 'any'); if (pool.length === 0) return result; const highQ = budget === 'max' || budget === 'enhanced'; const lowQ = budget === 'low'; if (highQ) pool = qualitySort(pool, true); else if (lowQ) pool = qualitySort(pool, false); const preferPool = preferredSet.size > 0 ? pool.filter(f => preferredSet.has(f.id)) : []; let mainPool = preferPool.length > 0 ? preferPool : pool; if (lazyDayMode) { mainPool = mainPool.filter(f => f.tier === 'basic'); } // N4: lazyDayMode — only basic foods
         if (highQ && usedFoodIds.size > 0) { const unused = mainPool.filter(f => !usedFoodIds.has(f.id)); if (unused.length > 0) mainPool = unused; }
         const lm = lazyDayMode ? 1 : maxItems; // N4: lazyDayMode — 1 item max per meal
-        for (let i = 0; i < lm && targetG > 5; i++) { const idx = highQ ? 0 : lowQ ? (mainPool.length - 1 - i) : Math.floor(seedRand(seed + i * 997) * mainPool.length); const food = mainPool[Math.min(idx, mainPool.length - 1)]; if (!food) break; usedFoodIds.add(food.id); const portion = Math.min(1, targetG / Math.max(1, food.protein || food.fat || food.carbs || 1)); result.push({ name: food.name, id: food.id, amount: Math.round(portion * (parseInt(food.servingSize) || 100)), kcal: Math.round(food.kcal * portion), p: Math.round(food.protein * portion), f: Math.round(food.fat * portion), c: Math.round(food.carbs * portion) }); targetG -= food.protein * portion || 0; } return result; };
+        for (let i = 0; i < lm && targetG > 5; i++) { const idx = highQ ? Math.floor(Math.random() * Math.min(4, mainPool.length)) : lowQ ? (mainPool.length - 1 - i) : Math.floor(Math.random() * mainPool.length); const food = mainPool[Math.min(idx, mainPool.length - 1)]; if (!food) break; usedFoodIds.add(food.id); const portion = Math.min(1, targetG / Math.max(1, food.protein || food.fat || food.carbs || 1)); result.push({ name: food.name, id: food.id, amount: Math.round(portion * (parseInt(food.servingSize) || 100)), kcal: Math.round(food.kcal * portion), p: Math.round(food.protein * portion), f: Math.round(food.fat * portion), c: Math.round(food.carbs * portion) }); targetG -= food.protein * portion || 0; } return result; };
         if (isPreWorkout) {
-          const preProtein = FOOD_DB.find(f => f.id === 'whey_isolate'); if (preProtein) items.push({ name: preProtein.name, id: 'whey_isolate', amount: 40, kcal: Math.round(preProtein.kcal * 0.4), p: Math.round(preProtein.protein * 0.4), f: Math.round(preProtein.fat * 0.4), c: Math.round(preProtein.carbs * 0.4) });
-          const preCarb = FOOD_DB.find(f => f.id === 'banana'); if (preCarb) items.push({ name: preCarb.name, id: 'banana', amount: 100, kcal: Math.round(preCarb.kcal), p: Math.round(preCarb.protein), f: Math.round(preCarb.fat), c: Math.round(preCarb.carbs) });
+          const preProteinPool = ['whey_isolate']; const prePPick = preProteinPool[Math.floor(Math.random() * preProteinPool.length)];
+          const preProtein = FOOD_DB.find(f => f.id === prePPick); if (preProtein) items.push({ name: preProtein.name, id: prePPick, amount: 40, kcal: Math.round(preProtein.kcal * 0.4), p: Math.round(preProtein.protein * 0.4), f: Math.round(preProtein.fat * 0.4), c: Math.round(preProtein.carbs * 0.4) });
+          const preCarbPool = ['banana']; const preCPick = preCarbPool[Math.floor(Math.random() * preCarbPool.length)];
+          const preCarb = FOOD_DB.find(f => f.id === preCPick); if (preCarb) items.push({ name: preCarb.name, id: preCPick, amount: 100, kcal: Math.round(preCarb.kcal), p: Math.round(preCarb.protein), f: Math.round(preCarb.fat), c: Math.round(preCarb.carbs) });
         } else if (isPostWorkout) {
-          const postProtein = FOOD_DB.find(f => f.id === 'whey_isolate'); if (postProtein) items.push({ name: postProtein.name, id: 'whey_isolate', amount: 50, kcal: Math.round(postProtein.kcal * 0.5), p: Math.round(postProtein.protein * 0.5), f: Math.round(postProtein.fat * 0.5), c: Math.round(postProtein.carbs * 0.5) });
-          const postCarb = FOOD_DB.find(f => f.id === 'rice_white'); if (postCarb) items.push({ name: postCarb.name, id: 'rice_white', amount: 150, kcal: Math.round(postCarb.kcal * 1.5), p: Math.round(postCarb.protein * 1.5), f: Math.round(postCarb.fat * 1.5), c: Math.round(postCarb.carbs * 1.5) });
+          const postProteinPool = ['whey_isolate']; const postPPick = postProteinPool[Math.floor(Math.random() * postProteinPool.length)];
+          const postProtein = FOOD_DB.find(f => f.id === postPPick); if (postProtein) items.push({ name: postProtein.name, id: postPPick, amount: 50, kcal: Math.round(postProtein.kcal * 0.5), p: Math.round(postProtein.protein * 0.5), f: Math.round(postProtein.fat * 0.5), c: Math.round(postProtein.carbs * 0.5) });
+          const postCarbPool = ['rice_white', 'buckwheat', 'pasta']; const postCPick = postCarbPool[Math.floor(Math.random() * postCarbPool.length)];
+          const postCarb = FOOD_DB.find(f => f.id === postCPick); if (postCarb) items.push({ name: postCarb.name, id: postCPick, amount: 150, kcal: Math.round(postCarb.kcal * 1.5), p: Math.round(postCarb.protein * 1.5), f: Math.round(postCarb.fat * 1.5), c: Math.round(postCarb.carbs * 1.5) });
         } else {
           // N4: cravingMode — add a treat to one random meal per day
           if (cravingMode && idx === 2) {
             const treatPool = ['chocolate','cookie','ice_cream','marmalade'];
-            const treatId = treatPool[Math.floor(seedRand(sSeed + 999) * treatPool.length)];
+            const treatId = treatPool[Math.floor(Math.random() * treatPool.length)];
             const treat = FOOD_DB.find(f => f.id === treatId);
             if (treat && !excludedIds.has(treat.id) && !allergenIds.has(treat.id)) {
               items.push({ name: treat.name, id: treat.id, amount: 30, kcal: Math.round(treat.kcal * 0.3), p: Math.round(treat.protein * 0.3), f: Math.round(treat.fat * 0.3), c: Math.round(treat.carbs * 0.3) });
@@ -715,8 +719,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             }
           }
           const protItems = pickItem(topProtein, remainingP, sSeed, 1); protItems.forEach(i => { items.push(i); remainingP -= i.p || 0; remainingF -= i.f || 0; remainingC -= i.c || 0; });
-          const carbPool = applyFoodPrefs(slowCarbs, 'carb'); if (carbPool.length > 0 && remainingC > 10) { const cPool = highQuality ? qualitySort(carbPool, true) : carbPool; const cIdx = highQuality ? 0 : Math.floor(seedRand(sSeed + 3) * cPool.length); const cF = cPool[cIdx % cPool.length]; usedFoodIds.add(cF.id); const cPortion = Math.min(1, remainingC / Math.max(1, cF.carbs || 1)); items.push({ name: cF.name, id: cF.id, amount: Math.round(cPortion * (parseInt(cF.servingSize) || 100)), kcal: Math.round(cF.kcal * cPortion), p: Math.round(cF.protein * cPortion), f: Math.round(cF.fat * cPortion), c: Math.round(cF.carbs * cPortion) }); }
-          const vegPool = limitPool(applyFoodPrefs(qualityRange(FOOD_DB.filter(f => f.category === 'veg_fruit')), 'veg'), foodSeed + 4); if (vegPool.length > 0) { const vIdx = highQuality ? 0 : Math.floor(seedRand(foodSeed + 4) * vegPool.length); const v = vegPool[vIdx % vegPool.length]; usedFoodIds.add(v.id); items.push({ name: v.name, id: v.id, amount: 80, kcal: Math.round(v.kcal * 0.8), p: Math.round(v.protein * 0.8), f: Math.round(v.fat * 0.8), c: Math.round(v.carbs * 0.8) }); }
+          const carbPool = applyFoodPrefs(slowCarbs, 'carb'); if (carbPool.length > 0 && remainingC > 10) { const cPool = highQuality ? qualitySort(carbPool, true) : carbPool; const cIdx = Math.floor(Math.random() * Math.min(4, cPool.length)); const cF = cPool[cIdx % cPool.length]; usedFoodIds.add(cF.id); const cPortion = Math.min(1, remainingC / Math.max(1, cF.carbs || 1)); items.push({ name: cF.name, id: cF.id, amount: Math.round(cPortion * (parseInt(cF.servingSize) || 100)), kcal: Math.round(cF.kcal * cPortion), p: Math.round(cF.protein * cPortion), f: Math.round(cF.fat * cPortion), c: Math.round(cF.carbs * cPortion) }); }
+          const vegPool = limitPool(applyFoodPrefs(qualityRange(FOOD_DB.filter(f => f.category === 'veg_fruit')), 'veg'), foodSeed + 4); if (vegPool.length > 0) { const vIdx = Math.floor(Math.random() * vegPool.length); const v = vegPool[vIdx % vegPool.length]; usedFoodIds.add(v.id); items.push({ name: v.name, id: v.id, amount: 80, kcal: Math.round(v.kcal * 0.8), p: Math.round(v.protein * 0.8), f: Math.round(v.fat * 0.8), c: Math.round(v.carbs * 0.8) }); }
         }
         const tot = { kcal: items.reduce((s,i) => s + i.kcal, 0), p: items.reduce((s,i) => s + i.p, 0), f: items.reduce((s,i) => s + i.f, 0), c: items.reduce((s,i) => s + i.c, 0) };
         return { ...mt, items, totals: tot, idx };
@@ -728,9 +732,26 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const addMacroTopUp = (macro: 'p' | 'f' | 'c', deficit: number) => {
         if (deficit <= 0 || meals.length === 0) return;
         const targetMeal = meals[meals.length - 1];
-        const candidateId = macro === 'p' ? 'whey_isolate' : macro === 'f' ? 'olive_oil' : 'rice_white';
+        const PROTEIN_TOPPERS = ['whey_isolate','chicken_breast','egg_whole','cottage_cheese','turkey_breast'];
+        const FAT_TOPPERS = ['olive_oil','avocado','nuts_almonds','flaxseed_oil'];
+        const CARB_TOPPERS = ['rice_white','buckwheat','pasta','oatmeal','potato'];
+        const topperPool = macro === 'p' ? PROTEIN_TOPPERS : macro === 'f' ? FAT_TOPPERS : CARB_TOPPERS;
+        const candidateId = topperPool[Math.floor(Math.random() * topperPool.length)];
         const food = FOOD_DB.find(f => f.id === candidateId);
-        if (!food) return;
+        if (!food) {
+          const fallbackId = macro === 'p' ? 'whey_isolate' : macro === 'f' ? 'olive_oil' : 'rice_white';
+          const fb = FOOD_DB.find(f => f.id === fallbackId);
+          if (!fb) return;
+          const per100 = macro === 'p' ? fb.protein : macro === 'f' ? fb.fat : fb.carbs;
+          if (!per100) return;
+          const amount = Math.min(macro === 'f' ? 25 : 120, Math.max(macro === 'f' ? 5 : 20, Math.round(deficit / per100 * 100)));
+          const r = amount / 100;
+          const item = { name: fb.name, id: fb.id, amount, kcal: Math.round(fb.kcal * r), p: Math.round(fb.protein * r), f: Math.round(fb.fat * r), c: Math.round(fb.carbs * r) };
+          targetMeal.items.push(item);
+          targetMeal.totals = { kcal: targetMeal.items.reduce((s: number, i: any) => s + i.kcal, 0), p: targetMeal.items.reduce((s: number, i: any) => s + i.p, 0), f: targetMeal.items.reduce((s: number, i: any) => s + i.f, 0), c: targetMeal.items.reduce((s: number, i: any) => s + i.c, 0) };
+          return;
+        }
+
         const per100 = macro === 'p' ? food.protein : macro === 'f' ? food.fat : food.carbs;
         if (!per100) return;
         const amount = Math.min(macro === 'f' ? 25 : 120, Math.max(macro === 'f' ? 5 : 20, Math.round(deficit / per100 * 100)));

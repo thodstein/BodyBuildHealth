@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { type GoalType } from '../../engines/biostack-ai.engine';
-import { findSupplements } from '../../engines/supplement-finder.engine';
+import { findSupplements, findReplacement, findComplexesForSubstance, type ReplacementType, type ReplacementResult, type ComplexMatch } from '../../engines/supplement-finder.engine';
 import { searchBioStack, type RecGoal } from '../../engines/biostack-recommender.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS } from '../../data/support-database';
 import { TZ_MECH_LABELS } from '../../data/support-db';
@@ -98,6 +98,40 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
   const [favOnly, setFavOnly] = useState(false);
   const [profileOnly, setProfileOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'price_asc' | 'price_desc'>('name');
+  /* ── Replacement / Complex search popup ── */
+  const [replacePopup, setReplacePopup] = useState<{ id: string; name: string; type: ReplacementType; results: ReplacementResult[]; loading: boolean } | null>(null);
+  const [complexPopup, setComplexPopup] = useState<{ id: string; name: string; matches: ComplexMatch[]; loading: boolean } | null>(null);
+
+  const openReplacePopup = useCallback((id: string, name: string) => {
+    setReplacePopup({ id, name, type: 'functional', results: [], loading: true });
+    const fp = toFinderProfile(profile);
+    const results = findReplacement(id, 'functional', fp);
+    setReplacePopup(prev => prev && prev.id === id ? { ...prev, results, loading: false } : prev);
+  }, [profile]);
+
+  const switchReplaceType = useCallback((type: ReplacementType) => {
+    if (!replacePopup) return;
+    setReplacePopup(prev => prev ? { ...prev, type, loading: true } : null);
+    const fp = toFinderProfile(profile);
+    const results = findReplacement(replacePopup.id, type, fp);
+    setReplacePopup(prev => prev ? { ...prev, results, loading: false } : null);
+  }, [profile, replacePopup]);
+
+  const openComplexPopup = useCallback((id: string, name: string) => {
+    setComplexPopup({ id, name, matches: [], loading: true });
+    const matches = findComplexesForSubstance(id);
+    setComplexPopup(prev => prev && prev.id === id ? { ...prev, matches, loading: false } : prev);
+  }, [profile]);
+
+  const REPLACE_TYPES: { key: ReplacementType; label: string; icon: string }[] = [
+    { key: 'direct_analog', label: 'Прямые аналоги', icon: '🔄' },
+    { key: 'functional', label: 'Функциональные', icon: '⚙' },
+    { key: 'safer', label: 'Безопаснее', icon: '🛡️' },
+    { key: 'stronger', label: 'Сильнее', icon: '⚡' },
+    { key: 'cheaper', label: 'Дешевле', icon: '💰' },
+    { key: 'stack_to_single', label: 'Стек→Один', icon: '⬇' },
+    { key: 'single_to_stack', label: 'Один→Стек', icon: '⬆' },
+  ];
 
   const profileRelevantIds = useMemo(() => {
     if (!profileOnly) return null;
@@ -558,6 +592,16 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
                       )}
                       {c.dosage && <div style={{ fontSize: 7, color: '#60a5fa', marginTop: 2 }}>💊 {c.dosage.mg} мг{c.dosage.timing ? ` • ${c.dosage.timing}` : ''}</div>}
                       {tierInfo && <div style={{ fontSize: 7, color: tierInfo.color, marginTop: 2 }}>{tierInfo.desc}</div>}
+                      <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                        <button onClick={(e) => { e.stopPropagation(); openReplacePopup(c.id, c.nameRu || c.name); }} style={{
+                          flex: 1, padding: '5px 0', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+                          background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', color: '#8b5cf6',
+                        }}>🔄 Найти замену</button>
+                        <button onClick={(e) => { e.stopPropagation(); openComplexPopup(c.id, c.nameRu || c.name); }} style={{
+                          flex: 1, padding: '5px 0', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+                          background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.15)', color: '#fbbf24',
+                        }}>📦 Найти комплекс</button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -566,6 +610,134 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
           </div>
         </div>
       ))}
+      {/* ── Replacement popup ── */}
+      {replacePopup && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 251,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.85)',
+        }} onClick={() => setReplacePopup(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '90%', maxWidth: 360, maxHeight: '75vh', borderRadius: 16,
+            background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden',
+          }}>
+            <div style={{ height: 3, background: 'linear-gradient(90deg,#8b5cf6,#6d28d9)' }} />
+            <div style={{ padding: '14px 16px', maxHeight: 'calc(75vh - 3px)', overflowY: 'auto' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#c4b5fd', marginBottom: 8 }}>
+                🔄 Замена: {replacePopup.name}
+              </div>
+              <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginBottom: 8 }}>
+                {REPLACE_TYPES.map(rt => (
+                  <button key={rt.key} onClick={() => switchReplaceType(rt.key)} style={{
+                    padding: '3px 8px', borderRadius: 8, fontSize: 7, fontWeight: 600, cursor: 'pointer',
+                    background: replacePopup.type === rt.key ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                    border: replacePopup.type === rt.key ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)',
+                    color: replacePopup.type === rt.key ? '#00e68a' : 'rgba(255,255,255,0.4)',
+                  }}>{rt.icon} {rt.label}</button>
+                ))}
+              </div>
+              {replacePopup.loading ? (
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>Загрузка...</div>
+              ) : replacePopup.results.length > 0 ? replacePopup.results.slice(0, 6).map((r, i) => (
+                <div key={i} onClick={() => {
+                  const newStack = stackIds.includes(replacePopup.id)
+                    ? stackIds.map(s => s === replacePopup.id ? r.replacementId : s)
+                    : [...stackIds.filter(s => s !== replacePopup.id), r.replacementId];
+                  setStackIds(newStack);
+                  setReplacePopup(null);
+                }} style={{
+                  padding: '8px 10px', marginBottom: 4, borderRadius: 8, cursor: 'pointer',
+                  background: r.personalMatch ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)',
+                  border: `1px solid ${r.personalMatch ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)'}`,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{r.replacementName}</span>
+                    <span style={{ fontSize: 7, padding: '2px 6px', borderRadius: 6,
+                      background: r.tierChange === 'upgrade' ? 'rgba(34,197,94,0.1)' : r.tierChange === 'downgrade' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.05)',
+                      color: r.tierChange === 'upgrade' ? '#22c55e' : r.tierChange === 'downgrade' ? '#ef4444' : 'rgba(255,255,255,0.5)',
+                    }}>{r.tierLabel}</span>
+                  </div>
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{r.explanation}</div>
+                  <div style={{ display: 'flex', gap: 4, fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>
+                    <span>{r.bestForm}</span>
+                    <span style={{ color: r.priceDelta === 'cheaper' ? '#22c55e' : r.priceDelta === 'expensive' ? '#ef4444' : 'rgba(255,255,255,0.3)' }}>
+                      {r.priceDelta === 'cheaper' ? '💰' : r.priceDelta === 'expensive' ? '💎' : ''}
+                    </span>
+                  </div>
+                </div>
+              )) : (
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>
+                  Нет результатов по этому типу
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Complex popup ── */}
+      {complexPopup && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 251,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.85)',
+        }} onClick={() => setComplexPopup(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '90%', maxWidth: 360, maxHeight: '75vh', borderRadius: 16,
+            background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden',
+          }}>
+            <div style={{ height: 3, background: 'linear-gradient(90deg,#f59e0b,#fbbf24)' }} />
+            <div style={{ padding: '14px 16px', maxHeight: 'calc(75vh - 3px)', overflowY: 'auto' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#fbbf24', marginBottom: 4 }}>
+                📦 Комплексы с: {complexPopup.name}
+              </div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>
+                Комплексы, в состав которых входит это вещество
+              </div>
+              {complexPopup.loading ? (
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>Загрузка...</div>
+              ) : complexPopup.matches.length > 0 ? complexPopup.matches.map((m, i) => {
+                const cEntry = SUPPORT_CATALOG_DATA[m.complexId];
+                const allComps = m.matchedIds.map(cid => SUPPORT_CATALOG_DATA[cid]?.nameRu || SUPPORT_CATALOG_DATA[cid]?.name || cid);
+                return (
+                  <div key={i} onClick={() => {
+                    const newStack = [...stackIds.filter(s => s !== complexPopup.id), m.complexId];
+                    if (!newStack.includes(m.complexId)) newStack.push(m.complexId);
+                    setStackIds(newStack);
+                    setComplexPopup(null);
+                  }} style={{
+                    padding: '8px 10px', marginBottom: 4, borderRadius: 8, cursor: 'pointer',
+                    background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.1)',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24' }}>
+                        {m.complexName}
+                      </span>
+                      <span style={{ fontSize: 7, padding: '2px 6px', borderRadius: 6, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>
+                        {m.matchedIds.length}/{m.totalComponents} компон.
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginBottom: 2 }}>
+                      {allComps.slice(0, 6).map((cn, j) => (
+                        <span key={j} style={{ padding: '1px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', fontSize: 7 }}>
+                          {cn}
+                        </span>
+                      ))}
+                      {allComps.length > 6 && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)' }}>+{allComps.length - 6}</span>}
+                    </div>
+                    {cEntry?.description && (
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)' }}>📝 {cEntry.description.slice(0, 120)}</div>
+                    )}
+                  </div>
+                );
+              }) : (
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>
+                  Комплексы не найдены в базе
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
