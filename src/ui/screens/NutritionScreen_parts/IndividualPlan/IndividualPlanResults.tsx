@@ -274,27 +274,21 @@ export const IndividualPlanResults: React.FC = () => {
   };
 
 
+  const runMonthPlan = () => {
+    setMonthPlanMode(true);
+    setMonthPlan([]);
+    const weeks = [0, 1, 2, 3];
+    weeks.forEach((w, i) => {
+      setTimeout(() => generatePlan(7, w), 120 * (i + 1));
+    });
+    setTimeout(() => {
+      setSelectedWeek(0);
+      generatePlan(7, 0);
+    }, 700);
+  };
+
   return (
     <>
-      <button onClick={() => generatePlan(1)} style={{
-        ...greenBtn, fontSize: 14, padding: 14,
-        boxShadow: '0 4px 20px rgba(0,230,138,0.2)',
-      }}>
-        ✨ Сгенерировать план питания
-      </button>
-      <button onClick={() => {
-        setMonthPlanMode(true);
-        setMonthPlan([]);
-        for (let w = 0; w < 4; w++) {
-          setTimeout(() => generatePlan(7, w), w * 500);
-        }
-      }} style={{
-        ...greenBtn, fontSize: 10, padding: 10,
-        background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa',
-      }}>
-        📅 План на месяц (4 недели)
-      </button>
-
       <div ref={resultsRef as any} />
       {generated && (<>
         <MealQuickControls />
@@ -320,23 +314,55 @@ export const IndividualPlanResults: React.FC = () => {
               );
             })}
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:6 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:6 }}>
+            <button onClick={() => { setPlanDays(1); generatePlan(1); }} style={{
+              padding:'10px', borderRadius:10, cursor:'pointer', textAlign:'center',
+              background: planDays === 1 ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+              border: planDays === 1 ? 'none' : '1px solid rgba(255,255,255,0.06)',
+              color: planDays === 1 ? '#000' : 'rgba(255,255,255,0.85)',
+              fontWeight:700, fontSize:10,
+            }}>📅 1 день</button>
             <button onClick={() => { setPlanDays(3); generatePlan(3); }} style={{
               padding:'10px', borderRadius:10, cursor:'pointer', textAlign:'center',
               background: planDays === 3 ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
               border: planDays === 3 ? 'none' : '1px solid rgba(255,255,255,0.06)',
               color: planDays === 3 ? '#000' : 'rgba(255,255,255,0.85)',
               fontWeight:700, fontSize:10,
-            }}>📅 На 3 дня</button>
-            <button onClick={() => { setPlanDays(7); setPlanView('calendar'); if (!weekPlan) generatePlan(7); }} style={{
+            }}>📅 3 дня</button>
+            <button onClick={() => { setPlanDays(7); setPlanView('calendar'); generatePlan(7); }} style={{
               padding:'10px', borderRadius:10, cursor:'pointer', textAlign:'center',
-              background: planDays === 7 ? 'linear-gradient(135deg,#8b5cf6,#7c3aed)' : '#202023',
-              border: planDays === 7 ? 'none' : '1px solid rgba(255,255,255,0.06)',
-              color: planDays === 7 ? '#fff' : 'rgba(255,255,255,0.85)',
+              background: planDays === 7 && !monthPlanMode ? 'linear-gradient(135deg,#8b5cf6,#7c3aed)' : '#202023',
+              border: planDays === 7 && !monthPlanMode ? 'none' : '1px solid rgba(255,255,255,0.06)',
+              color: planDays === 7 && !monthPlanMode ? '#fff' : 'rgba(255,255,255,0.85)',
               fontWeight:700, fontSize:10,
             }}>📆 Неделя</button>
           </div>
-          {planDays === 7 && (
+          {/* --- Month block --- */}
+          <div style={{ marginBottom:6 }}>
+            <button onClick={runMonthPlan} style={{
+              padding:'10px', borderRadius:10, cursor:'pointer', textAlign:'center', width:'100%',
+              background: monthPlanMode ? 'linear-gradient(135deg,#a78bfa,#7c3aed)' : 'rgba(139,92,246,0.08)',
+              border: monthPlanMode ? 'none' : '1px solid rgba(139,92,246,0.25)',
+              color: monthPlanMode ? '#fff' : '#a78bfa',
+              fontWeight:700, fontSize:10,
+            }}>
+              📅 План на месяц (4 недели)
+            </button>
+          </div>
+          {monthPlan.length > 0 && (
+            <button onClick={() => {
+              if (monthPlanMode) { setMonthPlanMode(false); setPlanDays(7); }
+              else { setMonthPlanMode(true); setPlanDays(7); setSelectedWeek(0); if (monthPlan[0]) setWeekPlan(monthPlan[0]); }
+            }} style={{
+              marginBottom:6, padding:'8px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600, width:'100%',
+              background: monthPlanMode ? 'rgba(139,92,246,0.15)' : '#202023',
+              border: monthPlanMode ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(255,255,255,0.06)',
+              color: monthPlanMode ? '#a78bfa' : 'rgba(255,255,255,0.85)',
+            }}>
+              {monthPlanMode ? '📋 Список недель (выйти из месяца)' : '📅 Месячное отображение'}
+            </button>
+          )}
+          {planDays === 7 && !monthPlanMode && (
             <button onClick={() => setPlanView(planView === 'list' ? 'calendar' : 'list')} style={{
               marginTop: 0, marginBottom:6, padding: '6px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600, width: '100%',
               background: planView === 'calendar' ? 'rgba(139,92,246,0.15)' : '#202023',
@@ -344,9 +370,14 @@ export const IndividualPlanResults: React.FC = () => {
               color: planView === 'calendar' ? '#a78bfa' : 'rgba(255,255,255,0.85)',
             }}>📅 {planView === 'calendar' ? 'Список' : 'Календарь'}</button>
           )}
-          {planDays !== 1 && (
+          {planDays !== 1 && !monthPlanMode && (
             <button onClick={() => generatePlan(planDays)} style={{ marginTop: 0, marginBottom:6, padding: '8px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.06)', color: '#00e68a', cursor: 'pointer', fontSize: 9, fontWeight: 600, width: '100%' }}>
               🔄 Перегенерировать {planDays === 3 ? '3 дня' : 'неделю'}
+            </button>
+          )}
+          {monthPlanMode && monthPlan.length > 0 && (
+            <button onClick={runMonthPlan} style={{ marginTop: 0, marginBottom:6, padding: '8px', borderRadius: 8, border: '1px solid rgba(168,85,247,0.25)', background: 'rgba(168,85,247,0.06)', color: '#a78bfa', cursor: 'pointer', fontSize: 9, fontWeight: 600, width: '100%' }}>
+              🔄 Перегенерировать месяц (4 недели)
             </button>
           )}
           <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
@@ -365,6 +396,35 @@ export const IndividualPlanResults: React.FC = () => {
           </div>
         </GlassCard>
       </>)}
+      {/* Pro Engine MPS-сводка */}
+      {generated && dayPlan && (dayPlan as any).mpsSummary && (
+        <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)', marginBottom:8 }}>
+          <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', marginBottom:4 }}>🧬 Muscle Protein Synthesis</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontSize:14, fontWeight:800, color:'#00e68a' }}>{(dayPlan as any).mpsSummary.feedings}</div>
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)' }}>MPS feedings</div>
+            </div>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontSize:14, fontWeight:800, color:'#3b82f6' }}>{(dayPlan as any).mpsSummary.avg_protein_per_meal_g}г</div>
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)' }}>Белок/приём</div>
+            </div>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontSize:14, fontWeight:800, color:'#f59e0b' }}>{(dayPlan as any).mpsSummary.avg_leucine_g}г</div>
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)' }}>Лейцин/приём</div>
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:4, marginTop:6, flexWrap:'wrap' }}>
+            {(dayPlan as any).mpsSummary.prePostWindow && <span style={{ fontSize:7, padding:'2px 6px', borderRadius:4, background:'rgba(34,197,94,0.1)', color:'#22c55e', border:'1px solid rgba(34,197,94,0.2)' }}>✅ Pre/Post-W</span>}
+            {(dayPlan as any).mpsSummary.intra_workout && <span style={{ fontSize:7, padding:'2px 6px', borderRadius:4, background:'rgba(168,85,247,0.1)', color:'#a855f7', border:'1px solid rgba(168,85,247,0.2)' }}>✅ Intra-W</span>}
+          </div>
+          {(dayPlan as any).proNotes && (dayPlan as any).proNotes.length > 0 && (
+            <div style={{ marginTop:6, fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.5 }}>
+              {(dayPlan as any).proNotes.map((n: string, i: number) => <div key={i} style={{ marginBottom:1 }}>• {n}</div>)}
+            </div>
+          )}
+        </div>
+      )}
       {generated && dayPlan && <DailyDietDashboard />}
       {generated && dayPlan && (
         <NutritionQualityCard
@@ -596,6 +656,14 @@ export const IndividualPlanResults: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                     <span style={{ fontSize: 8, fontWeight: 600, color: '#06b6d4', minWidth: 40 }}>{m.time}</span>
                     <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>{m.label}</span>
+                    {m.mpsCheck && (m.mpsCheck.triggers_mTOR
+                      ? <span style={{ fontSize: 6, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', marginLeft:4 }}>⚡ mTOR</span>
+                      : <span style={{ fontSize: 6, padding:'1px 4px', borderRadius:3, background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.2)', color:'#f59e0b', marginLeft:4 }}>⚠ {Math.round(m.mpsCheck.leucineG * 10) / 10}г лейц</span>)}
+                    {m.rationale && m.rationale.length > 0 && (
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', marginTop: 3, lineHeight: 1.4, fontStyle: 'italic' }}>
+                        {m.rationale.slice(0, 2).map((r: string, i: number) => <div key={i}>• {r}</div>)}
+                      </div>
+                    )}
                     <span style={{ fontSize: 8, color: '#00e68a', fontWeight: 700 }}>{k} ккал</span>
                     <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Б {Math.round(m.totals?.p || 0)} Ж {Math.round(m.totals?.f || 0)} У {Math.round(m.totals?.c || 0)}</span>
                   </div>

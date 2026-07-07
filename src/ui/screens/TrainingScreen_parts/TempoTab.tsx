@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { applyToPlanner } from './planner-bridge';
 import {
   TEMPO_PRESETS,
   formatTempo,
@@ -293,6 +294,10 @@ export const TempoTab: React.FC = () => {
           • <b>Техника (4-2-2-1):</b> медленно во всех фазах. Идеально для обучения новому движению.<br />
           • Нажми на чип темпа в ручном конструкторе, чтобы сменить темп упражнения.
         </div>
+      </div>
+      <div style={{ marginTop: 6, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить темп <b style={{ color: '#00e68a' }}>{formatTempo(customTempo)}</b> к активному планировщику — все упражнения плана получат этот темп (эксцентрика/пауза/концентрика/пауза).</div>
+        <button onClick={() => applyToPlanner({ kind: 'tempo', label: 'Темп ' + formatTempo(customTempo), data: { ...customTempo, label: formatTempo(customTempo) } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить темп к планировщику</button>
       </div>
     </div>
   );

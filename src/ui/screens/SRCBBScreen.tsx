@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LMS_CYCLES, getCycleById } from '../../data/lms-cycles/lms-cycle-index';
 import { rankCycles, selectBestCycle, explainSelection, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
 import { buildLMSPlan, type LMSBuildOutput } from '../../engines/lms/lms-builder.engine';
@@ -27,6 +27,7 @@ import { useDataLink } from '../../core/data-link';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
 import { TRAINING_SPLITS } from '../../engines/training.engine';
 import { loadTrainingProfile, saveTrainingProfile } from './TrainingScreen_parts/training-profile';
+import { subscribePlannerApply, getPlannerApply, clearPlannerApply, type PlannerApply } from './TrainingScreen_parts/planner-bridge';
 import { StrengthDiary } from '../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../core/types';
 import { AnalyticsTab } from './TrainingScreen_parts/AnalyticsTab';
@@ -157,6 +158,22 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [weakPoints, setWeakPoints] = useState<string[]>(_profPL.weakPoints || []);
   const toggleWeak = (g: string) => setWeakPoints(p => p.includes(g) ? p.filter(x => x !== g) : [...p, g]);
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), weakPoints }); } catch {} }, [weakPoints]);
+  // 🔗 planner-bridge: приём корректировок от калькуляторов (ПМ/слабые точки/PRI/сплит)
+  const [applyPayload, setApplyPayload] = useState<PlannerApply | null>(() => getPlannerApply());
+  const [priAdjust, setPriAdjust] = useState<{ volumeMult: number; rirShift: number } | null>(null);
+  const [tempoAdjust, setTempoAdjust] = useState<{ eccentric: number; bottomPause: number; concentric: number; topPause: number; label?: string } | null>(null);
+  const [rirShiftAdjust, setRirShiftAdjust] = useState<number>(0);
+  const [mrvOverride, setMrvOverride] = useState<number | null>(null);
+  const [deloadAdjust, setDeloadAdjust] = useState<{ volumeMult: number; rirShift: number; weeks: number[] } | null>(null);
+  const [peakAdjust, setPeakAdjust] = useState<{ volumeMult: number; rirTarget: number } | null>(null);
+  const [volumeTarget, setVolumeTarget] = useState<Record<string, number> | null>(null);
+  const pendingApplyRef = useRef<PlannerApply | null>(null);
+  useEffect(() => subscribePlannerApply(p => setApplyPayload(p)), []);
+  // производные от bridge-корректировок (видны в таблице плана ПЛ/ББ и в runtime)
+  const tempoStr = tempoAdjust ? `${tempoAdjust.eccentric}-${tempoAdjust.bottomPause}-${tempoAdjust.concentric}-${tempoAdjust.topPause}` : '';
+  const bridgeMult = (priAdjust ? priAdjust.volumeMult : 1) * (deloadAdjust ? deloadAdjust.volumeMult : 1) * (peakAdjust ? peakAdjust.volumeMult : 1);
+  const bridgeRir = (priAdjust ? priAdjust.rirShift : 0) + rirShiftAdjust + (deloadAdjust ? deloadAdjust.rirShift : 0);
+  const peakRirTarget = peakAdjust ? peakAdjust.rirTarget : null;
   const BB_WM_KEYS = ['chest','back','quads','hamstrings','shoulders','biceps','triceps','glutes','calves','abs'] as const;
   const BB_WM_RU: Record<string,string> = { chest:'Грудь', back:'Спина', quads:'Квадрицепсы', hamstrings:'Бицепс бедра', shoulders:'Плечи', biceps:'Бицепс', triceps:'Трицепс', glutes:'Ягодичные', calves:'Икры', abs:'Пресс' };
   const [bbWorkMax, setBbWorkMax] = useState<Record<string, number>>({ chest: 100, back: 110, quads: 140, hamstrings: 90, shoulders: 60, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60, ...(_profPL?.workMax || {}), ...(_bbSaved?.bbWorkMax || {}) });
@@ -234,7 +251,58 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     // TRAINING INTEGRATION: конвертировать BB план в сессии
     try { const sessions = bbPlanToSessions(plan); saveBridgeSessions(sessions); } catch { /* ignore */ }
   };
-  const baseMrv = useMemo(() => Object.fromEntries(Object.entries(getAllVolumeLandmarks(bbLevel)).map(([k, v]) => [k, v.mrv])), [bbLevel]);
+  // 🔗 применение корректировок из калькуляторов к активному плану (ПЛ/ББ)
+  const applyExternal = () => {
+    const p = getPlannerApply();
+    if (!p) return;
+    if (p.kind === 'pm') {
+      const pm = p.data || {};
+      if (pm.lift && pm.value) {
+        // одиночный 1RM (из калькулятора 1RM)
+        if (mainTab === 'pl') {
+          if (pm.lift === 'squat') setPmSquat(pm.value);
+          else if (pm.lift === 'bench') setPmBench(pm.value);
+          else if (pm.lift === 'dead') setPmDead(pm.value);
+          pendingApplyRef.current = p;
+        } else if (mainTab === 'bb') {
+          setBbWorkMax(w => ({ ...w, quads: pm.lift === 'squat' ? pm.value : w.quads, chest: pm.lift === 'bench' ? pm.value : w.chest, hamstrings: pm.lift === 'dead' ? pm.value : w.hamstrings }));
+          pendingApplyRef.current = p;
+        }
+      } else {
+        if (mainTab === 'pl') { setPmSquat(pm.squat || pmSquat); setPmBench(pm.bench || pmBench); setPmDead(pm.dead || pmDead); pendingApplyRef.current = p; }
+        else if (mainTab === 'bb') { setBbWorkMax(w => ({ ...w, quads: pm.squat || w.quads, chest: pm.bench || w.chest, hamstrings: pm.dead || w.hamstrings })); pendingApplyRef.current = p; }
+      }
+    } else if (p.kind === 'weakpoints') {
+      setWeakPoints(p.data?.groups || []); pendingApplyRef.current = p;
+    } else if (p.kind === 'pri') {
+      setPriAdjust({ volumeMult: (p.data?.volumeMult ?? 1) as number, rirShift: (p.data?.rirShift ?? 0) as number });
+    } else if (p.kind === 'split') {
+      if (mainTab === 'bb') { setBbDays(p.data?.cycle?.length || bbDays); pendingApplyRef.current = p; }
+    } else if (p.kind === 'tempo') {
+      setTempoAdjust(p.data ? { ...p.data } : null);
+    } else if (p.kind === 'rir') {
+      // объединить со существующим priAdjust: добавка к RIR
+      setRirShiftAdjust((p.data?.rirShift ?? 0) as number);
+    } else if (p.kind === 'mrv') {
+      if (mainTab === 'bb') { setMrvOverride((p.data?.mrv ?? null) as number | null); pendingApplyRef.current = p; }
+      else { pendingApplyRef.current = p; }
+    } else if (p.kind === 'deload') {
+      setDeloadAdjust({ volumeMult: (p.data?.volumeMult ?? 0.5) as number, rirShift: (p.data?.rirShift ?? 3) as number, weeks: (p.data?.weeks || []) as number[] });
+    } else if (p.kind === 'peak') {
+      setPeakAdjust({ volumeMult: (p.data?.volumeMult ?? 0.5) as number, rirTarget: (p.data?.rirTarget ?? 0) as number });
+    } else if (p.kind === 'volume') {
+      setVolumeTarget((p.data?.sets || null) as Record<string, number> | null);
+    }
+    clearPlannerApply(); setApplyPayload(null);
+  };
+  useEffect(() => {
+    const p = pendingApplyRef.current;
+    if (!p) return;
+    pendingApplyRef.current = null;
+    if (mainTab === 'pl') { try { buildSrc(); } catch { /* ignore */ } }
+    else if (mainTab === 'bb') { try { buildBb(); } catch { /* ignore */ } }
+  }, [pmSquat, pmBench, pmDead, weakPoints, bbDays, bbWorkMax, mrvOverride, mainTab]);
+  const baseMrv = useMemo(() => Object.fromEntries(Object.entries(getAllVolumeLandmarks(bbLevel)).map(([k, v]) => [k, mrvOverride != null ? mrvOverride : v.mrv])), [bbLevel, mrvOverride]);
   const pedAdapt = useMemo(() => adaptForPEDs(peds, baseMrv), [peds, baseMrv]);
 
   const togglePed = (p: PED) => setPeds(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
@@ -246,7 +314,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       exercises: [
         ...d.exercises.map((e, ei) => ({
           name: e.name, muscleGroup: e.group,
-          targetSets: e.workSets.flatMap((ws, si) => { let es = effSet(w0, i, ei, si, ws); if (autoRegOn && autoRegResult) { es = { ...es, sets: Math.round(es.sets * autoRegResult.volumeMultiplier), weight: Math.round(es.weight * autoRegResult.topSetPctMultiplier * 10) / 10 }; } return Array.from({ length: es.sets }, () => ({ weight: es.weight, reps: es.reps, rir: 0 })); }),
+          targetSets: e.workSets.flatMap((ws, si) => { let es = effSet(w0, i, ei, si, ws); if (autoRegOn && autoRegResult) { es = { ...es, sets: Math.round(es.sets * autoRegResult.volumeMultiplier), weight: Math.round(es.weight * autoRegResult.topSetPctMultiplier * 10) / 10 }; } const priMult = (priAdjust ? priAdjust.volumeMult : 1) * (deloadAdjust ? deloadAdjust.volumeMult : 1) * (peakAdjust ? peakAdjust.volumeMult : 1); const priRir = peakAdjust ? peakAdjust.rirTarget : ((priAdjust ? priAdjust.rirShift : 0) + rirShiftAdjust + (deloadAdjust ? deloadAdjust.rirShift : 0)); es = { ...es, sets: Math.max(1, Math.round(es.sets * priMult)) }; return Array.from({ length: es.sets }, () => ({ weight: es.weight, reps: es.reps, rir: Math.max(0, priRir), tempo: tempoAdjust ? tempoAdjust : undefined })); }),
           pm: e.pm, coef: e.coef, mnosz: e.mnosz, group: e.group,
         })),
         ...(srcAdditions[dayKey(w0, i)] || []).map(a => ({
@@ -256,7 +324,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
         })),
       ],
     }));
-  }, [builtSrc, srcEdits, srcAdditions, autoRegOn, autoRegResult]);
+  }, [builtSrc, srcEdits, srcAdditions, autoRegOn, autoRegResult, priAdjust, tempoAdjust, rirShiftAdjust, deloadAdjust, peakAdjust]);
 
   const bbDaysArr: PlayerDay[] = useMemo(() => {
     if (!builtBb) return [];
@@ -271,13 +339,17 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           w = Math.round(w * autoRegResult.topSetPctMultiplier * 10) / 10;
           sets = Math.max(1, Math.round(sets * autoRegResult.volumeMultiplier));
         }
+        const priMult = (priAdjust ? priAdjust.volumeMult : 1) * (deloadAdjust ? deloadAdjust.volumeMult : 1) * (peakAdjust ? peakAdjust.volumeMult : 1);
+        const priRir = peakAdjust ? peakAdjust.rirTarget : ((priAdjust ? priAdjust.rirShift : 0) + rirShiftAdjust + (deloadAdjust ? deloadAdjust.rirShift : 0));
+        sets = Math.max(1, Math.round(sets * priMult));
+        const rirOut = Math.max(0, peakAdjust ? peakAdjust.rirTarget : (e.rir + priRir));
         return {
           name: e.muscle, muscleGroup: e.muscle,
-          targetSets: Array.from({ length: sets }, () => ({ weight: w, reps, rir: e.rir })),
+          targetSets: Array.from({ length: sets }, () => ({ weight: w, reps, rir: rirOut, tempo: tempoAdjust ? tempoAdjust : undefined })),
         };
       }),
     }));
-  }, [builtBb, autoRegOn, autoRegResult]);
+  }, [builtBb, autoRegOn, autoRegResult, priAdjust, tempoAdjust, rirShiftAdjust, deloadAdjust, peakAdjust]);
 
   const playerDays: PlayerDay[] = mainTab === 'pl' ? srcDays : bbDaysArr;
   const workingWeight = useMemo(() => {
@@ -316,6 +388,15 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)', textAlign: 'center' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: '#00e68a' }}>{mainTab === 'pl' ? '🏆 Силовой цикл (ПЛ)' : mainTab === 'bb' ? '💪 Бодибилдинг (ББ)' : '🛠 Ручной конструктор'}</span>
       </div>
+      {applyPayload && (
+        <div style={{ padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: '#00e68a', fontWeight: 700 }}>🔗 Калькулятор рекомендует: {applyPayload.label}</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={applyExternal} style={{ padding: '8px 14px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}>Применить</button>
+            <button onClick={() => { clearPlannerApply(); setApplyPayload(null); }} style={{ padding: '8px 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>✕</button>
+          </div>
+        </div>
+      )}
       {/* sub-view pill nav for PL/BB */}
       {mainTab !== 'manual' && subViewList[mainTab].length > 0 && (
         <div style={{ display: 'flex', gap: 4, marginBottom: 10, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4, scrollbarWidth: 'none' }}>
@@ -367,7 +448,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             const setStr = (s: { sets: number; reps: number; weight: number; pct: number }) => {
               let sets = s.sets, weight = s.weight;
               if (autoRegOn && autoRegResult) { sets = Math.round(sets * autoRegResult.volumeMultiplier); weight = Math.round(weight * autoRegResult.topSetPctMultiplier * 10) / 10; }
-              return sets + 'x' + s.reps + 'x' + weight + 'кг (' + Math.round(s.pct*100) + '%)' + (autoRegOn && autoRegResult && (autoRegResult.topSetPctMultiplier !== 1 || autoRegResult.volumeMultiplier !== 1) ? ' ⚡' : '');
+              sets = Math.max(1, Math.round(sets * bridgeMult));
+              return sets + 'x' + s.reps + 'x' + weight + 'кг (' + Math.round(s.pct*100) + '%)' + (autoRegOn && autoRegResult && (autoRegResult.topSetPctMultiplier !== 1 || autoRegResult.volumeMultiplier !== 1) ? ' ⚡' : '') + (bridgeMult !== 1 || bridgeRir !== 0 ? ' 🔗' : '');
             };
             return <div style={CARD}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8 }}>
@@ -498,14 +580,14 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                          const tmpo = getTempo(e.name, goal, e.load === 'main');
                          const currentT = e.workSets.map((ws, si) => {
                            const k = setKey(wk.week, di, ei, si);
-                           return srcEdits[k]?.tempo || tmpo.tempo.toString;
+                           return tempoStr || srcEdits[k]?.tempo || tmpo.tempo.toString;
                          });
                          return (
                          <div key={ei} style={{ display:'grid', gridTemplateColumns:'2fr 0.5fr 1.1fr 0.7fr', gap:2, padding:'5px 8px', fontSize:10, color:'rgba(255,255,255,0.9)', borderTop:'1px solid rgba(255,255,255,0.04)', alignItems:'center' }}>
                            <span style={{ fontWeight:600 }}>{e.name}</span>
                            <span style={{ fontSize:9, fontWeight:700, color:e.load === 'main' ? '#00e68a' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.4)' }}>{e.load === 'main' ? 'ОСН' : e.load === 'additional' ? 'ДОП' : 'АКС'}</span>
                            <span style={{ color:'rgba(255,255,255,0.85)' }}>{e.workSets.map((ws, si) => setStr(effSet(wk.week, di, ei, si, ws))).join('  ·  ')}</span>
-                           <span style={{ fontSize:8, color:'#a855f7', fontWeight:700, background:'rgba(168,85,247,0.1)', padding:'2px 6px', borderRadius:4, textAlign:'center' }}>{currentT[0]}</span>
+                           <span style={{ fontSize:8, color:'#a855f7', fontWeight:700, background:'rgba(168,85,247,0.1)', padding:'2px 6px', borderRadius:4, textAlign:'center' }}>{tempoStr || currentT[0]}</span>
                          </div>
                          );
                        })}
@@ -679,16 +761,17 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                       {s.exercises.map((e, ei) => {
                         const rawW = e.workSets[0].weight;
                         const adjW = autoRegOn && autoRegResult ? Math.round(rawW * autoRegResult.topSetPctMultiplier * 10) / 10 : rawW;
-                        const adjSets = autoRegOn && autoRegResult ? Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier)) : e.sets;
+                        const adjSets0 = autoRegOn && autoRegResult ? Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier)) : e.sets;
+                        const adjSets = Math.max(1, Math.round(adjSets0 * bridgeMult));
                         const tmpo = getTempo(e.muscle, bbGoal, e.character === 'тяж');
                         return (
                         <div key={ei} style={{ display:'grid', gridTemplateColumns:'1.4fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr', gap:2, padding:'5px 10px', fontSize:10, color:'rgba(255,255,255,0.85)', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
                           <span style={{ fontWeight:600 }}>{e.muscle}</span>
                           <span style={{ color:'rgba(255,255,255,0.6)' }}>{e.character}</span>
                           <span>{adjSets}×{e.workSets[0].reps}</span>
-                          <span style={{ color:'#f59e0b' }}>{e.rir}{autoRegOn && autoRegResult?.rirShift ? `+${autoRegResult.rirShift}` : ''}</span>
+                          <span style={{ color:'#f59e0b' }}>{peakRirTarget != null ? peakRirTarget : Math.max(0, e.rir + bridgeRir)}{autoRegOn && autoRegResult?.rirShift ? `+${autoRegResult.rirShift}` : ''}</span>
                           <span style={{ color: adjW !== rawW ? '#f59e0b' : ACCENT, fontWeight:700 }}>{adjW} кг{adjW !== rawW ? ' ⚡' : ''}</span>
-                          <span style={{ fontSize:8, color:'#a855f7', fontWeight:700, background:'rgba(168,85,247,0.1)', padding:'2px 6px', borderRadius:4, textAlign:'center' }}>{tmpo.tempo.toString}</span>
+                          <span style={{ fontSize:8, color:'#a855f7', fontWeight:700, background:'rgba(168,85,247,0.1)', padding:'2px 6px', borderRadius:4, textAlign:'center' }}>{tempoStr || tmpo.tempo.toString}</span>
                         </div>
                         );
                       })}

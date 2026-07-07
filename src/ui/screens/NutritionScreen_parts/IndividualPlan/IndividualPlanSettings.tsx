@@ -76,7 +76,10 @@ export const IndividualPlanSettings: React.FC = () => {
     v2Phase, setV2Phase, v2Labs, setV2Labs, v2Pharma, setV2Pharma,
     histamineSensitive, setHistamineSensitive,
     dietPrefs, setDietPrefs,
-    userRecipes,
+    userRecipes, labAnalysis, labs,
+    errorMsg, setErrorMsg,
+    generatePlan,
+    useProEngine, setUseProEngine,
   } = usePlanCtx();
 
   const [showSpecialMealModal, setShowSpecialMealModal] = useState(false);
@@ -127,6 +130,34 @@ export const IndividualPlanSettings: React.FC = () => {
 
   return (
     <>
+      {/* Pro Engine переключатель + быстрая кнопка генерации */}
+      <GlassCard title="🧬 Движок генерации" icon="🧬" color="#00e68a">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <button onClick={() => setUseProEngine(!useProEngine)} style={{
+            width: 40, height: 22, borderRadius: 12, cursor: 'pointer', border: 'none',
+            background: useProEngine ? '#00e68a' : 'rgba(255,255,255,0.15)',
+            position: 'relative' as const, transition: 'background 0.2s', flexShrink: 0,
+          }}>
+            <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 2, left: useProEngine ? 20 : 2, transition: 'left 0.2s' }} />
+          </button>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: useProEngine ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>
+              {useProEngine ? '✅ Pro Engine (MPS, mTOR, пери-воркаут)' : '⚙️ Классический движок'}
+            </div>
+            {useProEngine && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+              Порог лейцина 2.5г · LBM-based белок · carb periodization · pre/intra/post-W
+            </div>}
+          </div>
+        </div>
+        {errorMsg && <div style={{ fontSize: 9, color: '#ef4444', padding: '4px 8px', background: 'rgba(239,68,68,0.06)', borderRadius: 6, marginBottom: 6 }}>⚠️ {errorMsg}</div>}
+        <button onClick={() => { setErrorMsg(null); generatePlan(1); }} style={{
+          width: '100%', padding: '12px', borderRadius: 10, cursor: 'pointer',
+          fontSize: 12, fontWeight: 700,
+          background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#000',
+          boxShadow: '0 4px 16px rgba(0,230,138,0.2)',
+        }}>✨ Сгенерировать план питания</button>
+      </GlassCard>
+
       <GlassCard title="Пользователь" icon="👤" color="#a78bfa">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
           <PopupNumber label="⚖️ Вес (кг)" value={weight} min={30} max={250} suffix="кг" onChange={setWeight} />
@@ -137,17 +168,58 @@ export const IndividualPlanSettings: React.FC = () => {
           <PopupSelect label="🧑 Пол" value={sex} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} onChange={v => setSex(v as 'male'|'female')} />
           <PopupNumber label="🚶 Шагов/день" value={dailySteps} min={0} max={50000} step={500} suffix="шаг" onChange={setDailySteps} />
         </div>
-        <button onClick={() => {
-          setWeight(s?.weight || weight);
-          setHeight(s?.height || height);
-          setAge(s?.age || age);
-          setSex(s?.sex || sex);
-          setDailySteps(s?.dailySteps || dailySteps);
-        }} style={{
-          width:'100%', padding:'5px 8px', borderRadius:8, cursor:'pointer', fontSize:8, fontWeight:600,
-          background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.2)', color:'#60a5fa',
-          marginBottom:6,
-        }}>👤 Автозаполнение из профиля</button>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+          <button onClick={() => {
+            setWeight(s?.weight || weight);
+            setHeight(s?.height || height);
+            setAge(s?.age || age);
+            setSex(s?.sex || sex);
+            setDailySteps(s?.dailySteps || dailySteps);
+            setBodyFatPct(s?.bodyFat || bodyFatPct);
+            setSleepHours(s?.baselineSleepHours || sleepHours);
+            setSleepQuality(s?.baselineSleepQuality || sleepQuality);
+            setStressLevel(s?.baselineStressLevel || stressLevel);
+            if (s?.primaryGoal) {
+              const goalMap: Record<string, any> = { bulk: 'mass', cut: 'fat_loss', maintenance: 'maintenance', strength: 'strength', recomposition: 'recomposition', rehab: 'rehab' };
+              setGoal(goalMap[s.primaryGoal] || 'maintenance');
+            }
+            if (s?.workoutsPerWeek) setMealsCount(Math.max(3, Math.min(7, s.workoutsPerWeek + 1)));
+            if (s?.bedtime) setBedTime(s.bedtime);
+            if (s?.wakeTime) setWakeTime(s.wakeTime);
+          }} style={{
+            flex: 1, padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:8, fontWeight:600,
+            background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.2)', color:'#60a5fa',
+          }}>👤 Заполнить из профиля</button>
+          <button onClick={() => {
+            const labPoints = labs || [];
+            if (labPoints.length === 0) return;
+            const newLabs: Record<string, string> = { ...v2Labs };
+            const codeMap: Record<string, string> = {
+              ALT: 'alt', AST: 'ast', GGT: 'ggt', LDL: 'ldl', HDL: 'hdl',
+              TRIGLYCERIDES: 'triglycerides', CRP: 'crp', CREATININE: 'creatinine',
+              HEMOGLOBIN: 'hemoglobin', HEMATOCRIT: 'hematocrit',
+              ESTRADIOL: 'estradiol', TESTOSTERONE_TOTAL: 'testosterone',
+              TESTOSTERONE_FREE: 'testosterone_free', GLUCOSE: 'glucose',
+              POTASSIUM: 'potassium', SODIUM: 'sodium', MAGNESIUM: 'magnesium',
+              TSH: 'tsh', T3: 't3', T4: 't4', PROLACTIN: 'prolactin',
+              LH: 'lh', FSH: 'fsh', BILIRUBIN_TOTAL: 'bilirubin',
+              CHOLESTEROL: 'cholesterol', UREA: 'urea', URIC_ACID: 'uric_acid',
+              INSULIN: 'insulin', FERRITIN: 'ferritin', IRON: 'iron',
+            };
+            labPoints.forEach(lp => {
+              const field = codeMap[lp.code];
+              if (field && lp.value !== undefined && lp.value !== null) {
+                newLabs[field] = String(Math.round(lp.value * 100) / 100);
+              }
+            });
+            setV2Labs(newLabs);
+          }} style={{
+            flex: 1, padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:8, fontWeight:600,
+            background: (labs || []).length > 0 ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(239,68,68,0.2)', color: (labs || []).length > 0 ? '#ef4444' : 'rgba(255,255,255,0.3)',
+            opacity: (labs || []).length > 0 ? 1 : 0.5,
+          }}>🩸 Анализы</button>
+        </div>
         <div style={{ marginBottom: 6 }}>
           <PopupNumber label="🍳 Время на готовку" value={cookTimeMin} min={0} max={300} step={5} suffix="мин" onChange={setCookTimeMin} />
         </div>
@@ -524,7 +596,21 @@ export const IndividualPlanSettings: React.FC = () => {
             onClick={() => setShowSuppPicker(false)}>
             <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:400, maxHeight:'85vh', padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.15)', overflowY:'auto' }}>
               <div style={{ fontSize:14, fontWeight:700, color:'#c4b5fd', marginBottom:8, textAlign:'center' }}>🌿 Выберите принимаемые БАД</div>
-              <input value={suppSearch} onChange={e => setSuppSearch(e.target.value)} placeholder="Поиск БАД..." style={{ ...inputStyle, marginBottom:8, fontSize:11, padding:'8px 10px', boxSizing:'border-box' }} />
+              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                <input value={suppSearch} onChange={e => setSuppSearch(e.target.value)} placeholder="Поиск БАД..." style={{ ...inputStyle, flex: 1, fontSize:11, padding:'8px 10px', boxSizing:'border-box' }} />
+                <button onClick={() => {
+                  try {
+                    const planData = JSON.parse(localStorage.getItem('he_support_plan_result') || 'null');
+                    if (planData && Array.isArray(planData)) {
+                      const newIds = planData.filter((id: string) => !takenSupplements.includes(id));
+                      if (newIds.length > 0) setTakenSupplements([...takenSupplements, ...newIds]);
+                    }
+                  } catch {}
+                }} style={{
+                  padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:8, fontWeight:600, whiteSpace:'nowrap',
+                  background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.2)', color:'#a78bfa',
+                }}>📋 Из плана</button>
+              </div>
               <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'50vh', overflowY:'auto' }}>
                 {ALL_SUBSTANCES.filter(s => !suppSearch || (s.name||'').toLowerCase().includes(suppSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(suppSearch.toLowerCase())).slice(0,80).map(s => {
                   const sel = takenSupplements.includes(s.id);

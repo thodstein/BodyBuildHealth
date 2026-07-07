@@ -1233,10 +1233,19 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
       {/* Generate + save button */}
       <button onClick={() => {
         try {
-          const report = { id: Date.now().toString(), date: new Date().toISOString().slice(0,10), kcal: Math.round(totals.kcal), protein: Math.round(totals.p), fat: Math.round(totals.f), carbs: Math.round(totals.c), items: data.length, timestamp: Date.now(), overallGrade: '—', kbjuPct: { kcal: Math.round(totals.kcal), protein: Math.round(totals.p), fat: Math.round(totals.f), carbs: Math.round(totals.c) }, mealCount: data.length, dietQuality: { score: 0, label: '—' }, risks: [], recommendations: [], plan: { days: [] } };
-          const archive = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]');
-          archive.unshift(report);
-          localStorage.setItem('he_nutrition_report_archive', JSON.stringify(archive.slice(0, 20)));
+          const meals = [{ label: reportMode === 'day' ? 'День' : reportMode === 'week' ? 'Неделя' : 'Месяц', items: data.map((i:any) => ({ name: i.name, id: i.id || '', amount: i.amount || 100, kcal: i.kcal||0, p: i.p||0, f: i.f||0, c: i.c||0 })), totals }];
+          const rep = generateNutritionReport({ meals, totals,
+            targets: targets || { kcal: 2500, protein: 160, fats: 70, carbs: 300 },
+            userWeight: profile?.settings?.weight || 80,
+            userTDEE: targets?.kcal || 2500,
+            healthIssues: [], planType: 'classic', variety: 'max', budget: 'medium',
+            allergens: [], cyclingMode: 'none', goal: 'maintenance',
+          });
+          setFullReport(rep);
+          setReportEditText(JSON.stringify(rep, null, 2));
+          setReportEditMode(false);
+          try { localStorage.setItem('he_nutrition_report_current', JSON.stringify(rep)); } catch {}
+          saveReportToArchive(rep);
         } catch {}
       }} style={{ width:'100%', padding:'8px', borderRadius:8, border:'1px solid rgba(0,230,138,0.25)', background:'rgba(0,230,138,0.06)', color:'#00e68a', cursor:'pointer', fontSize:9, fontWeight:600, marginBottom:8 }}>📄 Сгенерировать и сохранить отчёт</button>
       {reportMode === 'week' && <div style={{ display:'flex', gap:2, marginBottom:8 }}>
@@ -1481,7 +1490,7 @@ export const NutritionScreen: React.FC = () => {
     switch (tab) {
       case 'diary': return <InfoErrorBoundary label="Дневник питания"><NutritionDiary foodEntries={foodEntries} targets={macroTargets} weight={linked.profile?.settings?.weight} age={linked.profile?.settings?.age} sex={linked.profile?.settings?.sex} /></InfoErrorBoundary>;
       case 'charts': return <InfoErrorBoundary label="Графики"><Suspense fallback={<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Загрузка графиков...</div>}><NutritionCharts kcalData={chartKcalData} proteinData={chartProteinData} labels={chartLabels} dailyLogs={dailyLogs} /></Suspense></InfoErrorBoundary>;
-      case 'mealplan': return <InfoErrorBoundary label="План питания"><IndividualPlan profile={linked.profile} course={linked.course} /></InfoErrorBoundary>;
+      case 'mealplan': return <InfoErrorBoundary label="План питания"><IndividualPlan profile={linked.profile} course={linked.course} labs={linked.labs} labAnalysis={linked.labAnalysis} /></InfoErrorBoundary>;
       case 'cart': return <CartTab />;
       case 'restaurant': return <RestaurantTab />;
       case 'favorites': return <FavoritesTab />;

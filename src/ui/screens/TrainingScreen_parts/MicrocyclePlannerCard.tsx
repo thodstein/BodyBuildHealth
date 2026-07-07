@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { generatePeriodization, type GoalType, type PhaseType, type PhaseParams } from '../../../engines/cycle-periodization.engine';
 import { PHASE_LABELS, PHASE_HINTS } from './shared';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
@@ -82,6 +83,10 @@ const MicrocyclePlannerCardBase: React.FC = () => {
             </div>
           ))}
         </div>
+      </div>
+      <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить первую фазу «{PHASE_LABELS[plan.phases[0].phase] || plan.phases[0].phase}» (объём {plan.phases[0].params.volumeLevel}) к планировщику. Последовательность: {plan.phases.map(ph => (PHASE_LABELS[ph.phase] || ph.phase) + ' ' + ph.weeks + 'нед').join(' → ')}.</div>
+        <button onClick={() => { const p = plan.phases[0]; const vmap: Record<string, number> = { very_low: 0.7, low: 0.85, medium: 1, high: 1.15, very_high: 1.3 }; const imap: Record<string, number> = { very_low: 2, low: 1, medium: 0, high: -1, very_high: -2 }; applyToPlanner({ kind: 'pri', label: 'Микроциклы: ' + plan.phases.map(ph => (PHASE_LABELS[ph.phase] || ph.phase) + ' ' + ph.weeks + 'нед').join(' → '), data: { volumeMult: vmap[p.params.volumeLevel] ?? 1, rirShift: imap[p.params.intensityLevel] ?? 0 } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить периодизацию к планировщику</button>
       </div>
     </div>
   );

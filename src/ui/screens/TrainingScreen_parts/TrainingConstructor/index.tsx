@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { selectSplit } from '../../../../engines/split-selector.engine';
 import { TRAINING_SPLITS, calcTraining, LEVEL_VOLUMES } from '../../../../engines/training.engine';
 import { FULL_PROGRAM_LIBRARY } from '../../../../engines/complete-program-library.engine';
@@ -16,6 +16,7 @@ import { ConfigPanel } from './ConfigPanel';
 import { PlanDisplay } from './PlanDisplay';
 import { ToolsPanel } from './ToolsPanel';
 import { MacrocyclePanel } from './MacrocyclePanel';
+import { subscribePlannerApply, getPlannerApply, clearPlannerApply, type PlannerApply } from '../planner-bridge';
 
 interface Props {
   tprofile: TrainingProfile;
@@ -74,6 +75,10 @@ export const TrainingConstructor: React.FC<Props> = ({
     manualWorkMax, injuries: tprofile.injuries || [], pctForRir: PCT_FOR_RIR,
   });
 
+  const [tempoAdjust, setTempoAdjust] = useState<{ eccentric: number; bottomPause: number; concentric: number; topPause: number; label?: string } | null>(null);
+  const [mrvOverride, setMrvOverride] = useState<number | null>(null);
+  const globalTempoStr = tempoAdjust ? `${tempoAdjust.eccentric}-${tempoAdjust.bottomPause}-${tempoAdjust.concentric}-${tempoAdjust.topPause}` : undefined;
+
   const generateManualPlan = useCallback(() => {
     const corrections: string[] = [];
     const auto = selectSplit({ goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as any);
@@ -84,8 +89,9 @@ export const TrainingConstructor: React.FC<Props> = ({
     const cycle: string[][] = []; let gi = 0;
     while (cycle.length < daysPerWeek) { cycle.push(sp.groupsPerDay[gi % sp.groupsPerDay.length]); gi++; }
     const labAdj = labTrainingAdjust(labAnalysis);
-    const mrv = getMrv(level, tprofile.onCourse, tprofile.courseIntensity, labAdj.mrvMultiplier);
-    corrections.push(`Допустимый объём (MRV): ${Math.round(mrv)} сетов/нед на группу.`);
+
+    const mrv = mrvOverride ?? getMrv(level, tprofile.onCourse, tprofile.courseIntensity, labAdj.mrvMultiplier);
+    corrections.push(`Допустимый объём (MRV): ${Math.round(mrv)} сетов/нед на группу${mrvOverride ? ' (из калькулятора MRV)' : ''}.`);
     if (tprofile.onCourse) corrections.push(`MRV повышен на курсе (интенсивность: ${tprofile.courseIntensity}).`);
     if (labAdj.mrvMultiplier < 1) corrections.push(`MRV снижен по лаборатории ×${labAdj.mrvMultiplier.toFixed(2)}: ${labAdj.warnings.join(' ')}`);
     if (weakPoints.length > 0) corrections.push(`Слабые группы (${weakPoints.join(', ')}): приоритет + RIR ↓.`);
@@ -97,7 +103,7 @@ export const TrainingConstructor: React.FC<Props> = ({
     Object.entries(ws).forEach(([g, s]: [string, any]) => { if (s < Math.max(4, mrv * 0.4) && s > 0) corrections.push(`Группа «${g}»: низкий объём (${s} сетов) — ниже зоны адаптации.`); });
     weakPoints.forEach(w => { if (!ws[w] || ws[w] === 0) corrections.push(`⚠ Слабая группа «${w}» не включена — добавьте специализированное упражнение.`); });
     setManualResult({ splitName: sp.name, corrections, days: built.days });
-  }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, manualCfg, tprofile, labAnalysis, buildPlan]);
+  }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, manualCfg, tprofile, labAnalysis, buildPlan, mrvOverride]);
 
   const loadProgramToConstructor = useCallback((programId: string) => {
     const lib: FullProgram[] = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS];
@@ -154,6 +160,94 @@ export const TrainingConstructor: React.FC<Props> = ({
 
   const labAdj = labTrainingAdjust(labAnalysis);
 
+  // 🔗 приём корректировок из калькуляторов (planner-bridge): сплит/PRI/слабые точки/ПМ.
+  const [applyPayload, setApplyPayload] = useState<PlannerApply | null>(() => getPlannerApply());
+  useEffect(() => subscribePlannerApply(p => setApplyPayload(p)), []);
+  const pendingApplyRef = useRef<PlannerApply | null>(null);
+  const applyExternal = useCallback(() => {
+    const p = getPlannerApply();
+    if (!p) return;
+    const mrvBase = getMrv(level, tprofile.onCourse, tprofile.courseIntensity, labAdj.mrvMultiplier);
+    if (p.kind === 'split' && p.data?.cycle) {
+      const cycle: string[][] = p.data.cycle;
+      const built = buildPlan(cycle, mrvBase);
+      const corrections: string[] = [
+        `🔗 Сплит применён из калькулятора: «${p.data.name || p.label}» (${cycle.length} дн).`,
+        `Структура дней: ${cycle.map((g, i) => 'Д' + (i + 1) + ':' + g.join('+')).join(' | ')}.`,
+        `Допустимый объём (MRV): ${Math.round(mrvBase)} сетов/нед на группу.`,
+        ...built.groupCorrections,
+      ];
+      setManualResult({ splitName: p.data.name || p.label || 'Сплит из калькулятора', corrections, days: built.days });
+    } else if (p.kind === 'pri') {
+      const mult = (p.data?.volumeMult ?? 1) as number;
+      const rirShift = (p.data?.rirShift ?? 0) as number;
+      const cycle: string[][] = manualResult ? manualResult.days.map(d => d.groups) : [['full']];
+      const built = buildPlan(cycle, Math.max(4, mrvBase * mult));
+      built.days.forEach(d => d.exercises.forEach(e => { e.rir = Math.max(0, e.rir + rirShift); }));
+      const corrections: string[] = [
+        `🔗 PRI применён: объём ×${mult}, RIR +${rirShift}. MRV: ${Math.round(mrvBase)} → ${Math.round(Math.max(4, mrvBase * mult))}.`,
+        ...built.groupCorrections,
+      ];
+      setManualResult({ splitName: manualResult?.splitName || 'План с PRI', corrections, days: built.days });
+    } else if (p.kind === 'weakpoints') {
+      const groups: string[] = p.data?.groups || [];
+      setWeakPoints(groups);
+      pendingApplyRef.current = p;
+    } else if (p.kind === 'pm') {
+      const pm = p.data || {};
+      if (pm.lift && pm.value) { setManualWorkMax(w => ({ ...w, legs: pm.lift === 'squat' ? pm.value : w.legs, chest: pm.lift === 'bench' ? pm.value : w.chest, back: pm.lift === 'dead' ? pm.value : w.back })); }
+      else { setManualWorkMax(w => ({ ...w, legs: pm.squat || w.legs, chest: pm.bench || w.chest, back: pm.dead || w.back })); }
+      pendingApplyRef.current = p;
+    } else if (p.kind === 'tempo') {
+      setTempoAdjust(p.data ? { ...p.data } : null);
+      if (manualResult) setManualResult({ ...manualResult, corrections: [...manualResult.corrections, `🔗 Темп применён ко всем упражнениям: ${p.data?.label || ''}.`] });
+    } else if (p.kind === 'rir') {
+      const shift = (p.data?.rirShift ?? 0) as number;
+      if (manualResult) {
+        const days = manualResult.days.map(d => ({ ...d, exercises: d.exercises.map(e => ({ ...e, rir: Math.max(0, e.rir + shift) })) }));
+        setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, `🔗 RIR-коррекция: все RIR ${shift >= 0 ? '+' : ''}${shift}.`] });
+      }
+    } else if (p.kind === 'deload') {
+      const dmult = (p.data?.volumeMult ?? 0.5) as number;
+      const dshift = (p.data?.rirShift ?? 3) as number;
+      if (manualResult) {
+        const days = manualResult.days.map(d => ({ ...d, exercises: d.exercises.map(e => ({ ...e, sets: Math.max(1, Math.round(e.sets * dmult)), rir: Math.max(0, e.rir + dshift) })) }));
+        setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, `🔗 Делод применён: объём ×${dmult}, RIR +${dshift}, недели ${(p.data?.weeks || []).join(', ')}.`] });
+      }
+    } else if (p.kind === 'peak') {
+      const pmult = (p.data?.volumeMult ?? 0.5) as number;
+      const ptarget = (p.data?.rirTarget ?? 0) as number;
+      if (manualResult) {
+        const days = manualResult.days.map(d => ({ ...d, exercises: d.exercises.map(e => ({ ...e, sets: Math.max(1, Math.round(e.sets * pmult)), rir: Math.max(0, ptarget) })) }));
+        setManualResult({ ...manualResult, days, corrections: [...manualResult.corrections, `🔗 Пик применён: объём ×${pmult}, RIR→${ptarget}.`] });
+      }
+    } else if (p.kind === 'mrv') {
+      setMrvOverride((p.data?.mrv ?? null) as number | null); pendingApplyRef.current = p;
+    } else if (p.kind === 'volume') {
+      const sets = (p.data?.sets || {}) as Record<string, number>;
+      if (manualResult) setManualResult({ ...manualResult, corrections: [...manualResult.corrections, `🔗 Целевой объём по группам: ${Object.entries(sets).map(([g, s]) => g + '=' + s).join(', ')} сет/нед.`] });
+    }
+    clearPlannerApply(); setApplyPayload(null);
+  }, [buildPlan, level, tprofile, labAdj, manualResult, mrvOverride]);
+
+  // достроить план после того, как weakPoints/ManualWorkMax обновились (buildPlan пересоздастся)
+  useEffect(() => {
+    const p = pendingApplyRef.current;
+    if (!p) return;
+    if (!manualResult) { pendingApplyRef.current = null; return; }
+    pendingApplyRef.current = null;
+    const cycle: string[][] = manualResult.days.map(d => d.groups);
+    const mrv = mrvOverride ?? getMrv(level, tprofile.onCourse, tprofile.courseIntensity, labAdj.mrvMultiplier);
+    const built = buildPlan(cycle, mrv);
+    const corrections: string[] = [
+      p.kind === 'weakpoints'
+        ? `🔗 Слабые группы применены: ${(p.data?.groups || []).join(', ')} — приоритет объёма и ↓RIR.`
+        : `🔗 ПМ применён к рабочим максимумам: присед→ноги, жим→грудь, тяга→спина.`,
+      ...built.groupCorrections,
+    ];
+    setManualResult({ splitName: manualResult.splitName, corrections, days: built.days });
+  }, [buildPlan, manualResult, weakPoints, manualWorkMax, level, tprofile, labAdj, mrvOverride]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 800, color: ACCENT }}>
@@ -163,6 +257,16 @@ export const TrainingConstructor: React.FC<Props> = ({
         Единый инструмент для построения тренировочных программ. Выберите режим: автоматический макроцикл или ручная сборка.
         Доступны все сплиты, циклы, программы, методики, калькуляторы и инструменты качества.
       </div>
+
+      {applyPayload && (
+        <div style={{ padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700 }}>🔗 Калькулятор рекомендует: {applyPayload.label}</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={applyExternal} style={{ padding: '8px 14px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}>Применить</button>
+            <button onClick={() => { clearPlannerApply(); setApplyPayload(null); }} style={{ padding: '8px 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: DIM, fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>✕</button>
+          </div>
+        </div>
+      )}
 
       <div style={{
         display: 'flex', gap: 4, marginBottom: 6,
@@ -238,6 +342,7 @@ export const TrainingConstructor: React.FC<Props> = ({
             mesoLength={mesoLength} daysPerWeek={daysPerWeek}
             setResult={setManualResult}
             onToRuntime={manualToRuntime}
+            globalTempoStr={globalTempoStr}
           />
 
           <ToolsPanel

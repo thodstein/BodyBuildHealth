@@ -230,7 +230,9 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
 
     // 6. Оборудование: предпочитаем доступное
     if (equipment.length > 0) {
-      const exEq = (ex as any).equipment || [];
+      // AUDIT-FIX: в каталоге equipment может быть строкой ('barbell'), а не массивом — нормализуем.
+      const rawEq = (ex as any).equipment;
+      const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
       const hasEquipment = exEq.length === 0 || exEq.some((eq: string) => equipment.includes(eq));
       if (!hasEquipment) {
         score -= 5;

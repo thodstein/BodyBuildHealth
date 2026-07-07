@@ -28,6 +28,16 @@ import { PlannerPlAuto } from './TrainingScreen_parts/PlannerPlAuto';
 import { PlannerBbAuto } from './TrainingScreen_parts/PlannerBbAuto';
 import { DiaryAnalyticsZone } from './TrainingScreen_parts/DiaryAnalyticsZone';
 import { LibraryZone } from './TrainingScreen_parts/LibraryZone';
+import { BbToolsCard } from './TrainingScreen_parts/BbToolsCard';
+import { PlWeakpointsCard } from './TrainingScreen_parts/PlWeakpointsCard';
+import { LoadSafetyCard } from './TrainingScreen_parts/LoadSafetyCard';
+import { SplitGenCard } from './TrainingScreen_parts/SplitGenCard';
+import { CompetitionCard } from './TrainingScreen_parts/CompetitionCard';
+import { GoalsHabitsCard } from './TrainingScreen_parts/GoalsHabitsCard';
+import { PriRepPatternCard } from './TrainingScreen_parts/PriRepPatternCard';
+import { MixPresetsCard } from './TrainingScreen_parts/MixPresetsCard';
+import { SynergyMatrixCard } from './TrainingScreen_parts/SynergyMatrixCard';
+import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { ExecutionZone } from './TrainingScreen_parts/ExecutionZone';
 import { TrainingDiaryHub } from './TrainingScreen_parts/TrainingDiaryHub';
 
@@ -583,6 +593,7 @@ export const TrainingScreen: React.FC = () => {
                 setTab={goTab}
               />
             )}
+            <PlannerToolsPanel mode={planningTrack} />
           </div>
         </InfoErrorBoundary>
       )}
@@ -921,7 +932,15 @@ export const TrainingScreen: React.FC = () => {
 
       {tab === 'calc_1rm' && <InfoErrorBoundary label="Калькулятор 1RM"><OneRmCalcTab /></InfoErrorBoundary>}
       {tab === 'pl_norms' && <InfoErrorBoundary label="Нормативы ПЛ"><PlNormsCalcTab /></InfoErrorBoundary>}
+      {tab === 'pl_weakpoints' && <InfoErrorBoundary label="Слабые точки ПЛ"><PlWeakpointsCard /></InfoErrorBoundary>}
       {tab === 'volume' && <InfoErrorBoundary label="Расчёт объёма"><VolumeOptimizerTab /></InfoErrorBoundary>}
+      {tab === 'bb_tools' && <InfoErrorBoundary label="ББ-инструменты"><BbToolsCard /></InfoErrorBoundary>}
+      {tab === 'load_safety' && <InfoErrorBoundary label="Нагрузка/авторег"><LoadSafetyCard /></InfoErrorBoundary>}
+      {tab === 'split_gen' && <InfoErrorBoundary label="Генератор сплитов"><SplitGenCard /></InfoErrorBoundary>}
+      {tab === 'competition' && <InfoErrorBoundary label="Соревнование"><CompetitionCard /></InfoErrorBoundary>}
+      {tab === 'pri_reppat' && <InfoErrorBoundary label="PRI/схема повт"><PriRepPatternCard /></InfoErrorBoundary>}
+      {tab === 'mix_presets' && <InfoErrorBoundary label="Пресеты миксов"><MixPresetsCard /></InfoErrorBoundary>}
+      {tab === 'synergy' && <InfoErrorBoundary label="Синергия веществ"><SynergyMatrixCard /></InfoErrorBoundary>}
       {tab === 'calculators' && <InfoErrorBoundary label="Тоннаж"><TonnageCalcTab /></InfoErrorBoundary>}
 
       {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}

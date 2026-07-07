@@ -547,6 +547,23 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'A_G_RATIO': { prefUnit: '', coeff: 1, uln: 2.0, lln: 1.1, name: 'А/Г коэффициент' },
   'OSMOLALITY': { prefUnit: 'mOsm/kg', coeff: 1, uln: 295, lln: 275, name: 'Осмоляльность' },
   'ANION_GAP': { prefUnit: 'mmol/L', coeff: 1, uln: 16, lln: 8, name: 'Анионный провал' },
+  // ── Недостающие маркеры (предсуществующие в проекте,/formally missing) ──
+  'GGT': { prefUnit: 'U/L', coeff: 1, uln: 55, lln: 0, name: 'ГГТ' },
+  'RBC': { prefUnit: '10^12/L', coeff: 1, uln: 5.8, lln: 4.0, name: 'Эритроциты' },
+  // ── Проблемно-ориентированные маркеры (расширение) ──
+  'ALDOSTERONE': { prefUnit: 'pg/mL', coeff: 1, uln: 300, lln: 30, name: 'Альдостерон' },
+  'RENIN': { prefUnit: 'pg/mL', coeff: 1, uln: 40, lln: 3, name: 'Ренин прямой' },
+  'ACTH': { prefUnit: 'pg/mL', coeff: 1, uln: 46, lln: 7, name: 'АКТГ' },
+  'OH17_PROGESTERONE': { prefUnit: 'nmol/L', coeff: 1, uln: 6.0, lln: 1.0, name: '17-ОН-прогестерон' },
+  'TPO_AB': { prefUnit: 'IU/mL', coeff: 1, uln: 34, lln: 0, name: 'Антитела к ТПО' },
+  'TG_AB': { prefUnit: 'IU/mL', coeff: 1, uln: 115, lln: 0, name: 'Антитела к ТГ' },
+  'MPV': { prefUnit: 'fL', coeff: 1, uln: 12, lln: 7, name: 'Средний объём тромбоцита' },
+  'URINE_PH': { prefUnit: '', coeff: 1, uln: 8.0, lln: 5.0, name: 'pH мочи' },
+  'URINE_OSM': { prefUnit: 'mOsm/kg', coeff: 1, uln: 1200, lln: 300, name: 'Осмоляльность мочи' },
+  'VITAMIN_B6': { prefUnit: 'nmol/L', coeff: 1, uln: 180, lln: 35, name: 'Витамин B6 (PLP)' },
+  'MAR_TEST': { prefUnit: '%', coeff: 1, uln: 10, lln: 0, name: 'MAR-тест (IgG)' },
+  'DFI': { prefUnit: '%', coeff: 1, uln: 15, lln: 0, name: 'Фрагментация ДНК (DFI)' },
+  'HDS': { prefUnit: '%', coeff: 1, uln: 15, lln: 0, name: 'HDS (незрелый хроматин)' },
 } as const;
 
 // ── Нормализация лабораторных значений к единицам РФ (Гемотест, Инвитро, Хеликс, КДЛ) ──

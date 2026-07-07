@@ -3,21 +3,17 @@ import { type GoalType, type HealthCondition, type BioStackProfile } from '../..
 import { type FinderProfile, type GoalType as FinderGoal } from '../../engines/supplement-finder.engine';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 
-export type BSTab = 'profile' | 'search' | 'build' | 'stack' | 'risks' | 'compare' | 'reports' | 'periodization' | 'interactions' | 'clinical' | 'drugcheck' | 'lab';
+export type BSTab = 'profile' | 'search' | 'build' | 'stack' | 'risks' | 'compare' | 'reports' | 'drugcheck';
 
 export const SUB_TABS: { id: BSTab; label: string }[] = [
   { id: 'profile', label: '👤 Профиль' },
   { id: 'search', label: '🔍 Поиск' },
   { id: 'build', label: '🧩 Сборка' },
   { id: 'stack', label: '📋 Мой стек' },
-  { id: 'risks', label: '⚠ Риски' },
-  { id: 'compare', label: '⚖ Сравнение' },
+  { id: 'risks', label: '⚠ Риски и лаб.' },
+  { id: 'compare', label: '⚖ Сравнение и совм.' },
   { id: 'reports', label: '📊 Отчёты' },
-  { id: 'clinical', label: '🏥 Клиника' },
-  { id: 'lab', label: '🧪 Лаборатория' },
   { id: 'drugcheck', label: '💊 Лекарства' },
-  { id: 'interactions', label: '⚡ Взаимодействия' },
-  { id: 'periodization', label: '🔄 Циклы' },
 ];
 
 export const GOALS: { key: GoalType; label: string }[] = [

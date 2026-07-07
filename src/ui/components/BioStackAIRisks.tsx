@@ -2,8 +2,28 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS } from '../../data/support-database';
 import { getStackInteractions, getStackCoverageStats, RISK_SYSTEM_LABELS, getStackTzMechanismCoverage, type TzCoverageResult } from '../../engines/biostack-bridge';
-import { GlassCard } from './BioStackAIConstants';
+import { GlassCard, PillBtn, showToast } from './BioStackAIConstants';
 import type { LinkedData } from '../../core/data-link';
+import { LAB_MARKER_MAP, LAB_MARKER_MAP_BY_NAME } from '../../data/lab-marker-map';
+
+type LabSystem = 'hepatic' | 'cardio' | 'renal' | 'endocrine' | 'hematologic' | 'metabolic' | 'immune' | 'neuro' | 'musculoskeletal' | 'reproductive' | 'all';
+
+const LAB_SYS_ICONS: Record<string, string> = {
+  hepatic: '🫁', cardio: '❤️', renal: '💧', endocrine: '🧬',
+  hematologic: '🩸', metabolic: '🔥', immune: '🛡️', neuro: '🧠',
+  musculoskeletal: '🦴', reproductive: '⚤', all: '📊',
+};
+const LAB_SYS_LABELS: Record<string, string> = {
+  all: 'Все системы', hepatic: 'Печень', cardio: 'ССС', renal: 'Почки',
+  endocrine: 'Гормоны', hematologic: 'Кровь', metabolic: 'Метаболизм',
+  immune: 'Иммунитет', neuro: 'Нервная', musculoskeletal: 'Кости/Мышцы',
+  reproductive: 'Репродуктивная',
+};
+const EVIDENCE_LABELS: Record<string, { label: string; color: string }> = {
+  A: { label: 'A — Мета-анализ/РКИ', color: '#22c55e' },
+  B: { label: 'B — Когортные/обсерв.', color: '#f59e0b' },
+  C: { label: 'C — Механизм/эксперт', color: '#6366f1' },
+};
 
 type SubRisk = {
   id: string; name: string; conflictCount: number; highCount: number;
@@ -76,14 +96,202 @@ export function RisksTab({ profile, stackIds, setStackIds, linked, activeAAS }: 
   const [expandedPair, setExpandedPair] = useState<Record<string, boolean>>({});
   const [graphTab, setGraphTab] = useState<'graph' | 'list'>('list');
 
-  if (stackIds.length < 2) {
-    return (
-      <div style={{ textAlign: 'center', paddingTop: 60, color: 'rgba(255,255,255,0.3)' }}>
-        <div style={{ fontSize: 48, marginBottom: 12 }}>⚠</div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Нет пар для анализа</div>
-        <div style={{ fontSize: 10, maxWidth: 280, margin: '0 auto', lineHeight: 1.5 }}>Добавьте минимум 2 препарата в стек для просмотра взаимодействий</div>
-      </div>
-    );
+  /* ── Lab analysis (merged from LabTab) ── */
+  const labs = linked?.labAnalysis;
+  const [labFilter, setLabFilter] = useState<LabSystem>('all');
+  const [labSortBy, setLabSortBy] = useState<'severity' | 'system' | 'name'>('severity');
+
+  const allDeviations = useMemo(() => {
+    if (!labs?.interpretations) return [];
+    return labs.interpretations
+      .filter(i => (i.status as string) === 'high' || (i.status as string) === 'critical_high' || (i.status as string) === 'low' || (i.status as string) === 'critical_low')
+      .map(i => {
+        const marker = LAB_MARKER_MAP_BY_NAME[i.code] || LAB_MARKER_MAP.find(m =>
+          m.name.toLowerCase().includes(i.code.toLowerCase()) ||
+          i.code.toLowerCase().includes(m.marker.toLowerCase())
+        );
+        const system = marker?.system || 'metabolic';
+        const suggestions: Array<{ id: string; name: string; evidence: string }> = [];
+        const seen = new Set<string>();
+        if (marker) {
+          marker.correctionIds.forEach(cid => {
+            if (seen.has(cid)) return; seen.add(cid);
+            const cat = SUPPORT_CATALOG_DATA[cid];
+            if (cat) suggestions.push({ id: cid, name: cat.nameRu || cat.name || cid, evidence: cat.tier === 'core' ? 'A' : cat.tier === 'standard' ? 'B' : 'C' });
+          });
+          marker.mechanisms.forEach(m => {
+            const found = Object.entries(SUPPORT_CATALOG_DATA).filter(([_, v]) =>
+              (v.mechanisms || []).includes(m) && !seen.has(v.id) && v.tier !== 'specialty'
+            );
+            found.slice(0, 1).forEach(([id, v]) => { seen.add(id); suggestions.push({ id, name: v.nameRu || v.name || id, evidence: v.tier === 'core' ? 'A' : v.tier === 'standard' ? 'B' : 'C' }); });
+          });
+        }
+        if (suggestions.length === 0) {
+          const code = i.code.toLowerCase();
+          const fallback: Record<string, string[]> = {
+            alt: ['NAC', 'Расторопша', 'TUDCA'], ast: ['NAC', 'Расторопша', 'TUDCA'],
+            ggt: ['TUDCA', 'Расторопша'], creatinine: ['Астрагал', 'Кордицепс'],
+            glucose: ['Берберин', 'Альфа-липоевая', 'Хром'], hba1c: ['Берберин', 'Альфа-липоевая'],
+            ldl: ['Омега-3', 'Берберин', 'Красный рис'], crp: ['Куркумин', 'Омега-3'],
+          };
+          for (const [key, vals] of Object.entries(fallback)) {
+            if (code.includes(key)) { vals.forEach(v => { if (!seen.has(v)) { seen.add(v); suggestions.push({ id: v, name: v, evidence: 'C' }); } }); break; }
+          }
+        }
+        return {
+          code: i.code, name: marker?.name || i.code, value: i.value?.toString() || '—',
+          status: i.status, unit: marker?.unit || '', ref: marker ? `${marker.defaultValue} ${marker.unit}` : '—',
+          system, organ: marker?.organ || '', suggestions: suggestions.slice(0, 5),
+        };
+      });
+  }, [labs]);
+
+  const labFiltered = useMemo(() => {
+    let arr = labFilter === 'all' ? allDeviations : allDeviations.filter(d => d.system === labFilter);
+    if (labSortBy === 'severity') arr = [...arr].sort((a, b) => (b.status.includes('critical') ? 2 : 1) - (a.status.includes('critical') ? 2 : 1));
+    if (labSortBy === 'name') arr = [...arr].sort((a, b) => a.name.localeCompare(b.name));
+    if (labSortBy === 'system') arr = [...arr].sort((a, b) => a.system.localeCompare(b.system));
+    return arr;
+  }, [allDeviations, labFilter, labSortBy]);
+
+  const labSysCounts = useMemo(() => {
+    const cnt: Record<string, number> = {};
+    allDeviations.forEach(d => { cnt[d.system] = (cnt[d.system] || 0) + 1; });
+    return cnt;
+  }, [allDeviations]);
+
+  const labSevColor = (s: string) => s.includes('critical') ? '#ef4444' : '#f59e0b';
+  const labSevIcon = (s: string) => s.includes('critical') ? '🔴' : '🟡';
+
+  const showRisk = stackIds.length >= 2 && analysis !== null;
+
+  const renderLabSection = () => (
+    <div style={{ marginBottom: 0 }}>
+      {!labs || allDeviations.length === 0 ? (
+        <GlassCard title="🧪 Лабораторный анализ" icon="🧪" color="#a78bfa">
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textAlign: 'center', padding: '14px 0', lineHeight: 1.5 }}>
+            {labs ? '✅ Все показатели в норме' : '🔬 Нет данных анализов'}
+          </div>
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>
+            Внесите анализы в Лабораторию на главном экране для интерпретации
+          </div>
+        </GlassCard>
+      ) : (
+        <>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginBottom: 8, lineHeight: 1.3, textAlign: 'center' }}>
+            🧪 Глубинная интерпретация лабораторных маркеров
+          </div>
+          <GlassCard title={`📊 Лаборатория: ${allDeviations.length} отклонений`} icon="📊" color="#a78bfa" style={{ marginBottom: 8 }}>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+              {Object.entries(labSysCounts).map(([sys, cnt]) => (
+                <span key={sys} style={{
+                  padding: '2px 8px', borderRadius: 10, fontSize: 7, fontWeight: 600,
+                  background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.12)', color: '#a78bfa',
+                }}>{LAB_SYS_ICONS[sys] || '📌'} {LAB_SYS_LABELS[sys] || sys}: {cnt}</span>
+              ))}
+            </div>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>
+              ⚠ Критических: {allDeviations.filter(d => d.status.includes('critical')).length} |
+              Отклонений: {allDeviations.filter(d => !d.status.includes('critical')).length} |
+              Систем: {Object.keys(labSysCounts).length}
+            </div>
+          </GlassCard>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 4, flexWrap: 'wrap' }}>
+            {(['all', 'hepatic', 'cardio', 'renal', 'endocrine', 'hematologic', 'metabolic', 'immune', 'neuro', 'musculoskeletal', 'reproductive'] as LabSystem[]).map(sys => (
+              labSysCounts[sys] || sys === 'all' ? (
+                <PillBtn key={sys} active={labFilter === sys} onClick={() => setLabFilter(sys)} color="#a78bfa">
+                  {LAB_SYS_ICONS[sys]}{LAB_SYS_LABELS[sys]}{sys !== 'all' ? ` (${labSysCounts[sys] || 0})` : ''}
+                </PillBtn>
+              ) : null
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+            {(['severity', 'system', 'name'] as const).map(s => (
+              <PillBtn key={s} active={labSortBy === s} onClick={() => setLabSortBy(s)} color="#6366f1">
+                {s === 'severity' ? '🔴 По риску' : s === 'system' ? '📂 По системе' : '📝 По названию'}
+              </PillBtn>
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 8 }}>
+            {labFiltered.map((d, i) => (
+              <div key={i} style={{
+                padding: '6px 8px', borderRadius: 8,
+                background: d.status.includes('critical') ? 'rgba(239,68,68,0.04)' : 'rgba(245,158,11,0.04)',
+                border: `1px solid ${d.status.includes('critical') ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)'}`,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 9, fontWeight: 600, color: '#fff' }}>{d.name}</span>
+                    <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)' }}>({d.code})</span>
+                  </div>
+                  <span style={{
+                    fontSize: 7, fontWeight: 600, padding: '1px 5px', borderRadius: 4,
+                    background: `${labSevColor(d.status)}12`, color: labSevColor(d.status),
+                  }}>{labSevIcon(d.status)} {d.status.includes('critical') ? 'Критично' : 'Отклонение'}</span>
+                </div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginBottom: 3, fontFamily: 'monospace' }}>
+                  Значение: <span style={{ color: labSevColor(d.status), fontWeight: 600 }}>{d.value} {d.unit}</span>
+                  {' | '}Норма: {d.ref}
+                </div>
+                {d.suggestions.length > 0 && (
+                  <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                    {d.suggestions.map((s, si) => {
+                      const inStack = stackIds.includes(s.id);
+                      const ev = EVIDENCE_LABELS[s.evidence] || EVIDENCE_LABELS.C;
+                      return (
+                        <span key={si} style={{
+                          padding: '2px 5px', borderRadius: 5, fontSize: 6, fontWeight: 600,
+                          background: inStack ? 'rgba(0,230,138,0.08)' : `${ev.color}08`,
+                          border: `1px solid ${inStack ? 'rgba(0,230,138,0.15)' : `${ev.color}15`}`,
+                          color: inStack ? '#00e68a' : ev.color, cursor: 'default',
+                        }}>{inStack ? '✅ ' : '+ '}{s.name}<span style={{ opacity: 0.5, marginLeft: 1 }}>{s.evidence}</span></span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          {labFiltered.length === 0 && labFilter !== 'all' && (
+            <div style={{ padding: '12px', textAlign: 'center', fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>
+              ✅ Нет отклонений по системе {LAB_SYS_LABELS[labFilter]}
+            </div>
+          )}
+          {labs.interpretations && (
+            <GlassCard title="📋 Маркеры в норме" color="#22c55e" style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', lineHeight: 1.3 }}>
+                {labs.interpretations.filter((i: any) => (i.status as string) === 'normal' || (i.status as string) === 'optimal').length} маркеров в пределах референсных значений.
+                {' '}Покрытие: {Math.round((labs.interpretations.filter((i: any) => (i.status as string) === 'normal' || (i.status as string) === 'optimal').length / labs.interpretations.length) * 100)}% в норме.
+              </div>
+              <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginTop: 3 }}>
+                {labs.interpretations.filter((i: any) => (i.status as string) === 'normal' || (i.status as string) === 'optimal').slice(0, 10).map((i: any, idx: number) => {
+                  const m = LAB_MARKER_MAP_BY_NAME[i.code];
+                  return <span key={idx} style={{ padding: '1px 5px', borderRadius: 4, fontSize: 6, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.08)', color: '#4ade80' }}>🟢 {m?.name || i.code}</span>;
+                })}
+              </div>
+            </GlassCard>
+          )}
+          <button onClick={() => {
+            const txt = [
+              `🧪 Отчёт по лаборатории (${new Date().toLocaleDateString('ru-RU')})`,
+              `Всего отклонений: ${allDeviations.length}, систем: ${Object.keys(labSysCounts).length}`,
+              '---',
+              ...labFiltered.map(d => `${labSevIcon(d.status)} ${d.name} (${d.value} ${d.unit}, норма: ${d.ref}) — ${LAB_SYS_LABELS[d.system] || d.system}` +
+                (d.suggestions.length > 0 ? `\n  Рекомендации: ${d.suggestions.map(s => s.name).join(', ')}` : '')),
+            ].join('\n');
+            navigator.clipboard.writeText(txt);
+            showToast('Скопировано', 'success');
+          }} style={{
+            width: '100%', padding: '8px 0', borderRadius: 8, marginBottom: 12, cursor: 'pointer', fontSize: 8, fontWeight: 600,
+            background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.1)', color: '#a78bfa',
+          }}>📋 Копировать отчёт по лаборатории</button>
+        </>
+      )}
+    </div>
+  );
+
+  if (!showRisk) {
+    return <div style={{ paddingBottom: 80 }}>{renderLabSection()}{stackIds.length > 0 && stackIds.length < 2 && <div style={{ textAlign:'center', paddingTop:20, color:'rgba(255,255,255,0.2)', fontSize:9 }}>Добавьте минимум 2 препарата для анализа взаимодействий</div>}</div>;
   }
 
   if (!analysis) return null;
@@ -95,6 +303,8 @@ export function RisksTab({ profile, stackIds, setStackIds, linked, activeAAS }: 
 
   return (
     <div style={{ paddingBottom: 80 }}>
+      {renderLabSection()}
+
       {/* Coverage overview (replaces heuristic risk score) */}
       <GlassCard title="🛡️ Покрытие систем" icon="📊" color="#60a5fa">
         <div style={{

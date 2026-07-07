@@ -26,11 +26,11 @@ export const LABS_PHASES = [
 ] as const;
 
 export const PHASE_REQUIRED_PANELS: Record<string, string[]> = {
-  baseline: ['cbc', 'liver_extended', 'kidney', 'electrolytes', 'lipids', 'thyroid', 'glucose', 'iron_studies', 'hormones_androgens', 'adrenal'],
-  on_cycle: ['cbc', 'liver_extended', 'kidney', 'electrolytes', 'lipids', 'hormones_androgens', 'glucose', 'iron_studies', 'prostate', 'bone_markers'],
-  pct: ['cbc', 'liver', 'kidney', 'lipids', 'hormones_axis', 'prolactin', 'thyroid', 'adrenal', 'iron_studies'],
-  bridge: ['cbc', 'liver', 'kidney', 'lipids', 'thyroid', 'bone_markers', 'iron_studies'],
-  fertility: ['cbc', 'hormones_fertility', 'semen', 'thyroid', 'iron_studies', 'electrolytes', 'prostate']
+  baseline: ['cbc', 'liver_extended', 'kidney', 'electrolytes', 'lipids', 'thyroid_autoimmune', 'glucose', 'iron_studies', 'hormones_androgens', 'adrenal', 'micronutrients'],
+  on_cycle: ['cbc', 'liver_extended', 'kidney', 'electrolytes', 'lipids', 'hormones_androgens', 'glucose', 'iron_studies', 'prostate', 'bone_markers', 'coag_full', 'cardio_raas'],
+  pct: ['cbc', 'liver', 'kidney', 'lipids', 'hormones_axis', 'prolactin', 'thyroid_autoimmune', 'adrenal', 'iron_studies'],
+  bridge: ['cbc', 'liver', 'kidney', 'lipids', 'thyroid_autoimmune', 'bone_markers', 'iron_studies', 'micronutrients'],
+  fertility: ['cbc', 'hormones_fertility', 'semen_extended', 'thyroid_autoimmune', 'iron_studies', 'electrolytes', 'prostate', 'micronutrients']
 };
 
 export const LAB_PANELS: Record<string, LabPanel> = {
@@ -223,6 +223,81 @@ export const LAB_PANELS: Record<string, LabPanel> = {
     markers: [
       { id: 'cortisol', label: 'Кортизол', unit: 'nmol/L', ref: [100, 550], importance: 'important', ucumCode: 'CORTISOL' },
       { id: 'dhea_s', label: 'ДГЭА-С', unit: 'ug/dL', ref: [80, 560], importance: 'important', ucumCode: 'DHEA_S' }
+    ]
+  },
+  // ── Проблемно-ориентированные панели (расширение) ──
+  micronutrients: {
+    id: 'micronutrients',
+    label: 'Микронутриенты',
+    weight: 0.95,
+    markers: [
+      { id: 'vitd', label: 'Витамин D', unit: 'ng/mL', ref: [30, 100], importance: 'critical', ucumCode: 'VITD' },
+      { id: 'zinc', label: 'Цинк', unit: 'umol/L', ref: [11, 20], importance: 'critical', ucumCode: 'ZINC' },
+      { id: 'magnesium', label: 'Магний', unit: 'mmol/L', ref: [0.7, 1.1], importance: 'critical', ucumCode: 'MAGNESIUM' },
+      { id: 'selenium', label: 'Селен', unit: 'ug/L', ref: [70, 150], importance: 'important', ucumCode: 'SELENIUM' },
+      { id: 'copper', label: 'Медь', unit: 'umol/L', ref: [10, 30], importance: 'important', ucumCode: 'COPPER' },
+      { id: 'vitamin_e', label: 'Витамин E', unit: 'umol/L', ref: [12, 35], importance: 'important', ucumCode: 'VITAMIN_E' },
+      { id: 'vitamin_b6', label: 'Витамин B6', unit: 'nmol/L', ref: [35, 180], importance: 'important', ucumCode: 'VITAMIN_B6' },
+      { id: 'b12', label: 'Витамин B12', unit: 'pg/mL', ref: [200, 900], importance: 'critical', ucumCode: 'B12' },
+      { id: 'fol', label: 'Фолат', unit: 'ng/mL', ref: [3, 20], importance: 'critical', ucumCode: 'FOL' }
+    ]
+  },
+  coag_full: {
+    id: 'coag_full',
+    label: 'Коагулограмма полная',
+    weight: 1.0,
+    markers: [
+      { id: 'd_dimer', label: 'D-димер', unit: 'ug/mL', ref: [0, 0.5], importance: 'critical', ucumCode: 'D_DIMER' },
+      { id: 'fibrinogen', label: 'Фибриноген', unit: 'g/L', ref: [2.0, 4.0], importance: 'critical', ucumCode: 'FIBRINOGEN' },
+      { id: 'inr', label: 'МНО', unit: '', ref: [0.8, 1.2], importance: 'critical', ucumCode: 'INR' },
+      { id: 'aptt', label: 'АЧТВ', unit: 'sec', ref: [25, 40], importance: 'important', ucumCode: 'APTT' },
+      { id: 'plt', label: 'Тромбоциты', unit: '10^9/L', ref: [150, 400], importance: 'critical', ucumCode: 'PLT' },
+      { id: 'mpv', label: 'MPV', unit: 'fL', ref: [7, 12], importance: 'important', ucumCode: 'MPV' },
+      { id: 'hct', label: 'Гематокрит', unit: '%', ref: [36, 52], importance: 'critical', ucumCode: 'HCT' }
+    ]
+  },
+  semen_extended: {
+    id: 'semen_extended',
+    label: 'Спермограмма расширенная + DFI',
+    weight: 1.3,
+    markers: [
+      { id: 'volume', label: 'Объём', unit: 'mL', ref: [1.5, 5], importance: 'important' },
+      { id: 'concentration', label: 'Концентрация', unit: 'млн/мл', ref: [16, 150], importance: 'critical' },
+      { id: 'total', label: 'Общее кол-во', unit: 'млн', ref: [39, 500], importance: 'critical' },
+      { id: 'pr', label: 'PR подвижность', unit: '%', ref: [30, 80], importance: 'critical' },
+      { id: 'np', label: 'NP подвижность', unit: '%', ref: [10, 30], importance: 'important' },
+      { id: 'immotile', label: 'Неподвижные', unit: '%', ref: [0, 30], importance: 'important' },
+      { id: 'morphology', label: 'Морфология', unit: '%', ref: [4, 15], importance: 'critical' },
+      { id: 'viability', label: 'Жизнеспособность', unit: '%', ref: [58, 100], importance: 'important' },
+      { id: 'dfi', label: 'DFI', unit: '%', ref: [0, 15], importance: 'critical', ucumCode: 'DFI' },
+      { id: 'hds', label: 'HDS', unit: '%', ref: [0, 15], importance: 'important', ucumCode: 'HDS' },
+      { id: 'mar', label: 'MAR-тест (IgG)', unit: '%', ref: [0, 10], importance: 'important', ucumCode: 'MAR_TEST' },
+      { id: 'ph', label: 'pH', unit: '', ref: [7.2, 8.0], importance: 'optional' }
+    ]
+  },
+  cardio_raas: {
+    id: 'cardio_raas',
+    label: 'РААС + эндотелий',
+    weight: 0.9,
+    markers: [
+      { id: 'aldosterone', label: 'Альдостерон', unit: 'pg/mL', ref: [30, 300], importance: 'important', ucumCode: 'ALDOSTERONE' },
+      { id: 'renin', label: 'Ренин прямой', unit: 'pg/mL', ref: [3, 40], importance: 'important', ucumCode: 'RENIN' },
+      { id: 'endothelin', label: 'Эндотелин-1', unit: 'pg/mL', ref: [0, 3.0], importance: 'important', ucumCode: 'ENDOTHELIN1' },
+      { id: 'nt_probnp', label: 'NT-proBNP', unit: 'pg/mL', ref: [0, 125], importance: 'critical', ucumCode: 'NT_PROBNP' },
+      { id: 'k', label: 'Калий', unit: 'mmol/L', ref: [3.5, 5.1], importance: 'critical', ucumCode: 'K' },
+      { id: 'na', label: 'Натрий', unit: 'mmol/L', ref: [135, 145], importance: 'important', ucumCode: 'NA' }
+    ]
+  },
+  thyroid_autoimmune: {
+    id: 'thyroid_autoimmune',
+    label: 'Щитовидная + антитела',
+    weight: 1.0,
+    markers: [
+      { id: 'tsh', label: 'ТТГ', unit: 'mIU/L', ref: [0.4, 4], importance: 'critical', ucumCode: 'TSH' },
+      { id: 'ft4', label: 'Св. T4', unit: 'pmol/L', ref: [10, 22], importance: 'critical', ucumCode: 'FT4' },
+      { id: 'ft3', label: 'Св. T3', unit: 'pmol/L', ref: [3.1, 6.0], importance: 'important', ucumCode: 'FT3' },
+      { id: 'tpo_ab', label: 'Анти-ТПО', unit: 'IU/mL', ref: [0, 34], importance: 'important', ucumCode: 'TPO_AB' },
+      { id: 'tg_ab', label: 'Анти-ТГ', unit: 'IU/mL', ref: [0, 115], importance: 'optional', ucumCode: 'TG_AB' }
     ]
   }
 };

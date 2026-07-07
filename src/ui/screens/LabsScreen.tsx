@@ -17,9 +17,9 @@ import { calculateTzSpecRisk, type TzSpecResult, type TzSpecOrganResult } from '
 import { db } from '../../core/db';
 import { LabsResults } from './LabsScreen_parts/LabsResults';
 import { LabsSchedule } from './LabsScreen_parts/LabsSchedule';
-import { LabsInvestigations } from './LabsScreen_parts/LabsInvestigations';
 import { LabsOverview } from './LabsScreen_parts/LabsOverview';
-import ExtendedLabsTab from './LabsScreen_parts/ExtendedLabsTab';
+import LabsCatalogTab from './LabsScreen_parts/LabsCatalogTab';
+import LabsProblemPanelsTab from './LabsScreen_parts/LabsProblemPanelsTab';
 import { processUploadedFile, saveParsedLabs, type ParsedLabValue, type OCRResult } from '../../core/ocr-engine';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 import { PopupNumber, PopupBool, PopupSelect } from '../components/PopupXxx';
@@ -129,12 +129,11 @@ const CATALOG_LAB_DESCRIPTIONS: Record<string, string> = {
 
 const MAIN_LAB_TABS: { id: MainLabTab; label: string; icon: string }[] = [
   { id: 'lab', label: 'Анализы', icon: '🔬' },
-  { id: 'investigations', label: 'Обследования', icon: '🩺' },
   { id: 'risks', label: 'Риски и индексы', icon: '⚠️' },
   { id: 'reports', label: 'Отчёты', icon: '📄' },
 ];
 
-type MainLabTab = 'hero' | 'lab' | 'investigations' | 'risks' | 'reports';
+type MainLabTab = 'hero' | 'lab' | 'risks' | 'reports';
 
 const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
   { id: 'overview', label: 'Обзор', icon: '📊' },
@@ -142,13 +141,11 @@ const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
   { id: 'archive', label: 'Архив', icon: '📦' },
   { id: 'catalog', label: 'Каталог', icon: '📖' },
   { id: 'chart', label: 'Динамика', icon: '📈' },
-  { id: 'schedule', label: 'График сдачи', icon: '📅' },
   { id: 'reports', label: 'Отчёты', icon: '📄' },
-  { id: 'extended', label: 'Все маркеры', icon: '🔬' },
   { id: 'diary', label: 'Дневник', icon: '📓' },
 ];
 
-type LabSubTab = 'hero' | 'overview' | 'current' | 'archive' | 'catalog' | 'chart' | 'schedule' | 'reports' | 'extended' | 'diary';
+type LabSubTab = 'hero' | 'overview' | 'current' | 'archive' | 'catalog' | 'chart' | 'reports' | 'diary';
 
 export const LabsScreen: React.FC = () => {
   const linked = useDataLink();
@@ -167,6 +164,7 @@ export const LabsScreen: React.FC = () => {
   const [inputUnit, setInputUnit] = useState('');
   const [inputDate, setInputDate] = useState(new Date().toISOString().split('T')[0]);
   const [tick, setTick] = useState(0);
+  const [catalogView, setCatalogView] = useState<'catalog' | 'schedule' | 'problems'>('catalog');
   const [showImport, setShowImport] = useState(false);
   const [ocrResult, setOcrResult] = useState<OCRResult | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -177,9 +175,6 @@ export const LabsScreen: React.FC = () => {
   const [chartSelectedCodes, setChartSelectedCodes] = useState<Set<string>>(new Set());
   const [chartFilterSys, setChartFilterSys] = useState('all');
   const [chartGridOpen, setChartGridOpen] = useState(true);
-  const [catalogSearch, setCatalogSearch] = useState('');
-  const [catalogDetail, setCatalogDetail] = useState<{ code: string; name: string; unit: string; uln: number; lln: number; system: string; description: string } | null>(null);
-  const [catFilterSys, setCatFilterSys] = useState('all');
   const [riskSections, setRiskSections] = useState<Record<string, boolean>>({
     pharma: true, indices: true, systems: true, markers: true, tz: true, requiredLabs: false, normalizeDrugs: false,
   });
@@ -325,50 +320,6 @@ export const LabsScreen: React.FC = () => {
       .map(l => ({ code: l.code.toUpperCase(), name: UCUM_MAP[l.code.toUpperCase()]?.name || l.name || l.code }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [labs]);
-
-  const catalogEntries = useMemo(() => {
-    const map: Record<string, { code: string; name: string; unit: string; uln: number; lln: number; system: string; description: string }> = {};
-    for (const [sys, codes] of Object.entries(LAB_SYSTEM_GROUPS)) {
-      for (const code of codes) {
-        if (map[code]) continue;
-        const info = UCUM_MAP[code];
-        if (info) {
-          map[code] = {
-            code, name: info.name, unit: info.prefUnit, uln: info.uln, lln: info.lln, system: sys,
-            description: CATALOG_LAB_DESCRIPTIONS[code] || '',
-          };
-        }
-      }
-    }
-    for (const code of Object.keys(UCUM_MAP)) {
-      if (map[code]) continue;
-      const info = UCUM_MAP[code];
-      map[code] = {
-        code, name: info.name, unit: info.prefUnit, uln: info.uln, lln: info.lln, system: 'other',
-        description: CATALOG_LAB_DESCRIPTIONS[code] || '',
-      };
-    }
-    return Object.values(map).sort((a, b) => a.name.localeCompare(b.name));
-  }, []);
-
-  const filteredCatalogEntries = useMemo(() => {
-    if (!catalogSearch) return catalogEntries;
-    const q = catalogSearch.toLowerCase();
-    return catalogEntries.filter(e => (e.code||'').toLowerCase().includes(q) || (e.name||'').toLowerCase().includes(q));
-  }, [catalogEntries, catalogSearch]);
-
-  const filteredCatalogBySys = useMemo(() => {
-    return catFilterSys === 'all' ? catalogEntries : catalogEntries.filter(e => e.system === catFilterSys);
-  }, [catalogEntries, catFilterSys]);
-
-  const groupedCatalog = useMemo(() => {
-    const g: Record<string, typeof filteredCatalogEntries> = {};
-    for (const e of filteredCatalogBySys) {
-      if (!g[e.system]) g[e.system] = [];
-      g[e.system].push(e);
-    }
-    return g;
-  }, [filteredCatalogBySys]);
 
   const chartData = useMemo(() => {
     if (chartSelectedCodes.size === 0) return [];
@@ -575,7 +526,6 @@ export const LabsScreen: React.FC = () => {
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
                 { id: 'lab', icon: '🔬', title: 'Анализы', desc: 'Ввод, просмотр и динамика лабораторных показателей. Каталог маркеров и графики.', color: 'var(--accent)' },
-                { id: 'investigations', icon: '🩺', title: 'Обследования', desc: 'Плановые чекапы, инструментальная диагностика и частота прохождения.', color: '#3b82f6' },
                 { id: 'risks', icon: '⚠️', title: 'Риски и индексы', desc: 'Агрегированные риски по системам, композитные индексы здоровья и отклонения.', color: '#f97316' },
               ].map(card => (
                 <button key={card.id} onClick={() => setMainTab(card.id as MainLabTab)} style={{
@@ -644,6 +594,175 @@ export const LabsScreen: React.FC = () => {
             forceNoLabs={globalNoLabs}
             setForceNoLabs={(v: boolean) => { setGlobalNoLabs(v); if (v) setNoLabsSystemsState([]); notifyDataChange(); }}
           />
+          {/* Динамика маркеров (перенесено из вкладки chart) */}
+          {(() => {
+            const selCodes = Array.from(chartSelectedCodes);
+            const chartPalette = ['var(--accent)','#3b82f6','#f97316','#a855f7','#ef4444','#eab308','#14b8a6','#ec4899'];
+            const seriesByCode: Record<string, LabPoint[]> = {};
+            if (selCodes.length > 0) {
+              for (const code of selCodes) {
+                seriesByCode[code] = labs.filter(l => l.code.toUpperCase() === code.toUpperCase()).sort((a,b) => a.date.localeCompare(b.date));
+              }
+            }
+            const allDatesSet = new Set<string>();
+            Object.values(seriesByCode).forEach(pts => pts.forEach(p => allDatesSet.add(p.date)));
+            const allDates = Array.from(allDatesSet).sort();
+            const globalVals = Object.values(seriesByCode).flat().map(d => d.value);
+            const globalMin = globalVals.length > 0 ? Math.min(...globalVals) : 0;
+            const globalMax = globalVals.length > 0 ? Math.max(...globalVals) : 100;
+            const pad = (globalMax - globalMin) * 0.2 || 10;
+            const chartMin = Math.max(0, globalMin - pad);
+            const chartMax = globalMax + pad;
+            const chartRange = chartMax - chartMin;
+            const n = allDates.length;
+            const barW = Math.max(28, Math.min(60, (320 - 50) / (n || 1)));
+            const chartW = Math.max(320, n * barW + 60 + 120);
+            const chartH = 220;
+            const xBase = 50;
+            const hasSelection = selCodes.length > 0;
+            return (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0' }}>
+                  <span style={{ fontSize: 18 }}>📈</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, flex: 1 }}>Динамика маркеров</span>
+                  {hasSelection && <span style={{ fontSize: 9, color: 'var(--accent)' }}>{selCodes.length} выбрано</span>}
+                  <button onClick={() => setChartGridOpen(g => !g)} style={{
+                    marginLeft: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                    borderRadius: 6, padding: '3px 8px', fontSize: 10, color: 'var(--text-dim)', cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}>{chartGridOpen ? '▲ Скрыть' : '▼ Маркеры'}</button>
+                </div>
+                {chartGridOpen && (<>
+                <div style={{ display: 'flex', gap: 4, overflowX: 'auto', marginBottom: 8, scrollbarWidth: 'none', paddingBottom: 4 }}>
+                  <button onClick={() => { setChartMarkerSearch(''); setChartFilterSys('all'); }} style={{
+                    padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
+                    background: chartFilterSys === 'all' ? 'var(--accent)' : 'var(--bg-secondary)',
+                    color: chartFilterSys === 'all' ? '#000' : 'var(--text-dim)',
+                    border: `1px solid ${chartFilterSys === 'all' ? 'var(--accent)' : 'var(--border)'}`,
+                  }}>Все</button>
+                  {['hepatic','renal','endocrine','hematologic','cardio','metabolic','reproductive','neuro','other'].map(sys => {
+                    const sysMarkers = uniqMarkers.filter(m => {
+                      const codes = LAB_SYSTEM_GROUPS[sys];
+                      return codes ? codes.includes(m.code) : false;
+                    });
+                    if (sysMarkers.length === 0) return null;
+                    return (
+                      <button key={sys} onClick={() => setChartFilterSys(prev => prev === sys ? 'all' : sys)} style={{
+                        padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
+                        background: chartFilterSys === sys ? 'var(--accent)' : 'var(--bg-secondary)',
+                        color: chartFilterSys === sys ? '#000' : 'var(--text-dim)',
+                        border: `1px solid ${chartFilterSys === sys ? 'var(--accent)' : 'var(--border)'}`,
+                      }}>
+                        {sysLabels[sys] || sys}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 8 }}>
+                  {(chartFilterSys !== 'all'
+                    ? uniqMarkers.filter(m => { const codes = LAB_SYSTEM_GROUPS[chartFilterSys]; return codes ? codes.includes(m.code) : false; })
+                    : uniqMarkers
+                  ).map(m => {
+                    const isSelected = chartSelectedCodes.has(m.code);
+                    return (
+                      <button key={m.code} onClick={() => {
+                        setChartSelectedCodes(prev => { const next = new Set(prev); if (next.has(m.code)) next.delete(m.code); else next.add(m.code); return next; });
+                      }} style={{
+                        display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                        background: isSelected ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
+                        border: `1px solid ${isSelected ? 'rgba(0,230,138,0.3)' : 'var(--border)'}`,
+                        color: 'var(--text)', fontSize: 11, transition: 'all 0.15s',
+                      }}>
+                        <div style={{
+                          width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                          background: isSelected ? 'var(--accent)' : 'rgba(0,230,138,0.12)',
+                          color: isSelected ? '#000' : 'var(--accent)', fontSize: 9, fontWeight: 700,
+                        }}>
+                          {isSelected ? '✓' : m.code.slice(0, 2)}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
+                          <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>{m.code}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {uniqMarkers.length === 0 && (
+                    <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 30, color: 'var(--text-dim)', fontSize: 12 }}>
+                      Введите анализы во вкладке «Текущие»
+                    </div>
+                  )}
+                </div>
+                </>)}
+                {hasSelection ? (
+                  <div className="card" style={{ padding: 12 }}>
+                    <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap', fontSize: 9 }}>
+                      {selCodes.map((code, i) => {
+                        const info = UCUM_MAP[code];
+                        return (
+                          <span key={code} style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
+                            <span style={{ width: 10, height: 10, borderRadius: 3, background: chartPalette[i % chartPalette.length], flexShrink: 0 }} />
+                            {info?.name || code}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <svg viewBox={`0 0 ${chartW} ${chartH + 40}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+                      <rect x={xBase} y={0} width={chartW - xBase - 10} height={chartH} fill="rgba(255,255,255,0.02)" rx={6} />
+                      {[0, 0.25, 0.5, 0.75, 1].map(f => {
+                        const y = chartH - f * chartH;
+                        return (
+                          <g key={f}>
+                            <line x1={xBase} y1={y} x2={chartW - 10} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth={0.5} />
+                            <text x={xBase - 5} y={y + 3} fill="var(--text-dim)" fontSize={8} textAnchor="end">{(chartMin + f * chartRange).toFixed(1)}</text>
+                          </g>
+                        );
+                      })}
+                      {allDates.map((date, di) => {
+                        const x = xBase + di * barW;
+                        const groupW = Math.max(6, barW - 4);
+                        const perBarW = selCodes.length > 1 ? groupW / selCodes.length : groupW;
+                        return (
+                          <g key={date}>
+                            <text x={x + barW / 2} y={chartH + 12} fill="var(--text-dim)" fontSize={7} textAnchor="middle">{date.slice(5)}</text>
+                            {selCodes.map((code, ci) => {
+                              const pts = seriesByCode[code] || [];
+                              const pt = pts.find(p => p.date === date);
+                              if (!pt) return null;
+                              const barH = Math.max(2, ((pt.value - chartMin) / chartRange) * chartH);
+                              const y = chartH - barH;
+                              const color = chartPalette[ci % chartPalette.length];
+                              return (
+                                <g key={`${date}_${code}`}>
+                                  <rect x={x + 2 + ci * perBarW} y={y} width={Math.max(3, perBarW - 2)} height={barH} fill={color} rx={2} opacity={0.85} />
+                                  {selCodes.length <= 2 && (
+                                    <text x={x + 2 + ci * perBarW + perBarW / 2} y={y - 3} fill={color} fontSize={7} textAnchor="middle" fontWeight={700}>{pt.value}</text>
+                                  )}
+                                </g>
+                              );
+                            })}
+                          </g>
+                        );
+                      })}
+                      <line x1={xBase} y1={chartH} x2={chartW - 10} y2={chartH} stroke="var(--border)" strokeWidth={1} />
+                    </svg>
+                    <div style={{ marginTop: 8, textAlign: 'center' }}>
+                      <button onClick={() => setChartSelectedCodes(new Set())} style={{
+                        fontSize: 9, color: 'var(--text-dim)', background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                        borderRadius: 8, padding: '4px 12px', cursor: 'pointer',
+                      }}>✕ Сбросить выбор</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 160, padding: 20 }}>
+                    <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-dim)' }}>
+                      <div style={{ fontSize: 28, marginBottom: 10 }}>📊</div>
+                      Выберите 1+ маркеров для сравнения
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -919,404 +1038,131 @@ export const LabsScreen: React.FC = () => {
         </div>
       )}
 
-      {/* ≡≡≡ CATALOG TAB — system-chip-based ≡≡≡ */}
-      {subTab === 'catalog' && (() => {
-        const systemOrder = ['hepatic','renal','endocrine','hematologic','cardio','metabolic','reproductive','neuro','other'];
-        const sysIcons: Record<string, string> = {
-          hepatic: '🫁', renal: '🫘', endocrine: '🧬', hematologic: '🩸',
-          cardio: '❤️', metabolic: '⚡', reproductive: '🧫', neuro: '🧠', other: '📋',
-        };
-        return (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0' }}>
-              <span style={{ fontSize: 18 }}>📖</span>
-              <span style={{ fontSize: 16, fontWeight: 700 }}>Каталог маркеров</span>
-              <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>{catalogEntries.length}</span>
-            </div>
-
-            {/* System filter chips */}
-            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', marginBottom: 10, scrollbarWidth: 'none', paddingBottom: 4 }}>
-              <button onClick={() => setCatFilterSys('all')} style={{
-                padding: '6px 12px', borderRadius: 16, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
-                background: catFilterSys === 'all' ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: catFilterSys === 'all' ? '#000' : 'var(--text-dim)',
-                border: `1px solid ${catFilterSys === 'all' ? 'var(--accent)' : 'var(--border)'}`,
-              }}>Все</button>
-              {systemOrder.map(sys => (
-                <button key={sys} onClick={() => setCatFilterSys(sys)} style={{
-                  padding: '6px 12px', borderRadius: 16, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
-                  background: catFilterSys === sys ? sysColors[sys] + '22' : 'var(--bg-secondary)',
-                  color: catFilterSys === sys ? sysColors[sys] : 'var(--text-dim)',
-                  border: `1px solid ${catFilterSys === sys ? sysColors[sys] : 'var(--border)'}`,
-                }}>
-                  {sysIcons[sys] || ''} {sysLabels[sys] || sys}
-                </button>
-              ))}
-            </div>
-
-            {/* Systems */}
-            {systemOrder.map(sys => {
-              const entries = groupedCatalog[sys];
-              if (!entries || entries.length === 0) return null;
-              return (
-                <div key={sys} className="card" style={{ marginBottom: 10, padding: 12, overflow: 'hidden' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <span style={{ fontSize: 18 }}>{sysIcons[sys] || '📋'}</span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{sysLabels[sys] || sys}</div>
-                      <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{entries.length} маркеров</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gap: 4 }}>
-                    {entries.map(entry => (
-                      <button key={entry.code} onClick={() => setCatalogDetail(entry)} style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left', width: '100%',
-                        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                        color: 'var(--text)', fontSize: 11, transition: 'all 0.15s',
-                      }}>
-                        <div style={{
-                          width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: sysColors[sys] + '18', color: sysColors[sys], fontWeight: 700, fontSize: 10, flexShrink: 0,
-                        }}>
-                          {entry.code.slice(0, 3)}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 2 }}>{entry.name}</div>
-                          <div style={{ fontSize: 9, color: 'var(--accent)' }}>{entry.lln}–{entry.uln} {entry.unit}</div>
-                        </div>
-                        <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>→</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-            {catalogEntries.length > 0 && Object.keys(groupedCatalog).length === 0 && (
-              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)', fontSize: 12 }}>
-                Нет маркеров в выбранной системе
-              </div>
-            )}
-
-            {/* Detail Modal */}
-            {catalogDetail && (() => {
-              const info = UCUM_MAP[catalogDetail.code];
-              return (
-                <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }} onClick={() => setCatalogDetail(null)}>
-                  <div style={{ width: '100%', maxWidth: 420, zIndex: 201, background: 'var(--bg)', borderRadius: 20, padding: '16px 18px', boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{
-                          width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: sysColors[catalogDetail.system] + '20', color: sysColors[catalogDetail.system], fontWeight: 700, fontSize: 12,
-                        }}>
-                          {catalogDetail.code.slice(0, 3)}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: 16 }}>{catalogDetail.name}</div>
-                          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{catalogDetail.code}</div>
-                        </div>
-                      </div>
-                      <button onClick={() => setCatalogDetail(null)} style={{ background: 'var(--bg-secondary)', border: 'none', color: 'var(--text-dim)', borderRadius: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>✕</button>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
-                      <div style={{ padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Система</div>
-                        <div style={{ fontSize: 12, fontWeight: 600 }}>{sysLabels[catalogDetail.system] || catalogDetail.system}</div>
-                      </div>
-                      <div style={{ padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Референс</div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>{catalogDetail.lln}–{catalogDetail.uln}</div>
-                      </div>
-                      <div style={{ padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Единица</div>
-                        <div style={{ fontSize: 12, fontWeight: 600 }}>{catalogDetail.unit || '—'}</div>
-                      </div>
-                      {info && info.coeff !== 1 && (
-                        <div style={{ padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
-                          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Коэффициент</div>
-                          <div style={{ fontSize: 12, fontWeight: 600 }}>{info.coeff}</div>
-                        </div>
-                      )}
-                    </div>
-                    {catalogDetail.description && (
-                      <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, padding: '10px 0', borderTop: '1px solid var(--border)' }}>
-                        {catalogDetail.description}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        );
-      })()}
-
-      {/* ≡≡≡ CHART TAB — multi-marker selector ≡≡≡ */}
-      {subTab === 'chart' && (() => {
-        const selCodes = Array.from(chartSelectedCodes);
-        const chartPalette = ['var(--accent)','#3b82f6','#f97316','#a855f7','#ef4444','#eab308','#14b8a6','#ec4899'];
-        // Group labs by code for multi-marker rendering
-        const seriesByCode: Record<string, LabPoint[]> = {};
-        if (selCodes.length > 0) {
-          for (const code of selCodes) {
-            seriesByCode[code] = labs.filter(l => l.code.toUpperCase() === code.toUpperCase()).sort((a,b) => a.date.localeCompare(b.date));
-          }
-        }
-        // All unique dates from all series
-        const allDatesSet = new Set<string>();
-        Object.values(seriesByCode).forEach(pts => pts.forEach(p => allDatesSet.add(p.date)));
-        const allDates = Array.from(allDatesSet).sort();
-        // Compute global chart bounds
-        const globalVals = Object.values(seriesByCode).flat().map(d => d.value);
-        const globalMin = globalVals.length > 0 ? Math.min(...globalVals) : 0;
-        const globalMax = globalVals.length > 0 ? Math.max(...globalVals) : 100;
-        const pad = (globalMax - globalMin) * 0.2 || 10;
-        const chartMin = Math.max(0, globalMin - pad);
-        const chartMax = globalMax + pad;
-        const chartRange = chartMax - chartMin;
-        const n = allDates.length;
-        const barW = Math.max(28, Math.min(60, (320 - 50) / (n || 1)));
-        const chartW = Math.max(320, n * barW + 60 + 120);
-        const chartH = 220;
-        const xBase = 50;
-        const hasSelection = selCodes.length > 0;
-        return (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0' }}>
-              <span style={{ fontSize: 18 }}>📈</span>
-              <span style={{ fontSize: 15, fontWeight: 700, flex: 1 }}>Графики маркеров</span>
-              {hasSelection && <span style={{ fontSize: 9, color: 'var(--accent)' }}>{selCodes.length} выбрано</span>}
-              <button onClick={() => setChartGridOpen(g => !g)} style={{
-                marginLeft: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                borderRadius: 6, padding: '3px 8px', fontSize: 10, color: 'var(--text-dim)', cursor: 'pointer', whiteSpace: 'nowrap',
-              }}>{chartGridOpen ? '▲ Скрыть' : '▼ Маркеры'}</button>
-            </div>
-
-            {/* System filter chips + marker grid (collapsible) */}
-            {chartGridOpen && (<>
-            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', marginBottom: 8, scrollbarWidth: 'none', paddingBottom: 4 }}>
-              <button onClick={() => { setChartMarkerSearch(''); setChartFilterSys('all'); }} style={{
-                padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
-                background: chartFilterSys === 'all' ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: chartFilterSys === 'all' ? '#000' : 'var(--text-dim)',
-                border: `1px solid ${chartFilterSys === 'all' ? 'var(--accent)' : 'var(--border)'}`,
-              }}>Все</button>
-              {['hepatic','renal','endocrine','hematologic','cardio','metabolic','reproductive','neuro','other'].map(sys => {
-                const sysMarkers = uniqMarkers.filter(m => {
-                  const codes = LAB_SYSTEM_GROUPS[sys];
-                  return codes ? codes.includes(m.code) : false;
-                });
-                if (sysMarkers.length === 0) return null;
-                return (
-                  <button key={sys} onClick={() => setChartFilterSys(prev => prev === sys ? 'all' : sys)} style={{
-                    padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
-                    background: chartFilterSys === sys ? 'var(--accent)' : 'var(--bg-secondary)',
-                    color: chartFilterSys === sys ? '#000' : 'var(--text-dim)',
-                    border: `1px solid ${chartFilterSys === sys ? 'var(--accent)' : 'var(--border)'}`,
-                  }}>
-                    {sysLabels[sys] || sys}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Marker grid — always visible for multi-select */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 8 }}>
-              {(chartFilterSys !== 'all'
-                ? uniqMarkers.filter(m => { const codes = LAB_SYSTEM_GROUPS[chartFilterSys]; return codes ? codes.includes(m.code) : false; })
-                : uniqMarkers
-              ).map(m => {
-                const isSelected = chartSelectedCodes.has(m.code);
-                return (
-                  <button key={m.code} onClick={() => {
-                    setChartSelectedCodes(prev => { const next = new Set(prev); if (next.has(m.code)) next.delete(m.code); else next.add(m.code); return next; });
-                  }} style={{
-                    display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-                    background: isSelected ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
-                    border: `1px solid ${isSelected ? 'rgba(0,230,138,0.3)' : 'var(--border)'}`,
-                    color: 'var(--text)', fontSize: 11, transition: 'all 0.15s',
-                  }}>
-                    <div style={{
-                      width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                      background: isSelected ? 'var(--accent)' : 'rgba(0,230,138,0.12)',
-                      color: isSelected ? '#000' : 'var(--accent)', fontSize: 9, fontWeight: 700,
-                    }}>
-                      {isSelected ? '✓' : m.code.slice(0, 2)}
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
-                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>{m.code}</div>
-                    </div>
-                  </button>
-                );
-              })}
-              {uniqMarkers.length === 0 && (
-                <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 30, color: 'var(--text-dim)', fontSize: 12 }}>
-                  Введите анализы во вкладке «Текущие»
-                </div>
-              )}
-            </div>
-
-            </>)}
-            {/* Chart area */}
-            {hasSelection ? (
-              <div className="card" style={{ padding: 12 }}>
-                {/* Legend */}
-                <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap', fontSize: 9 }}>
-                  {selCodes.map((code, i) => {
-                    const info = UCUM_MAP[code];
-                    return (
-                      <span key={code} style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
-                        <span style={{ width: 10, height: 10, borderRadius: 3, background: chartPalette[i % chartPalette.length], flexShrink: 0 }} />
-                        {info?.name || code}
-                      </span>
-                    );
-                  })}
-                </div>
-                {/* SVG Chart */}
-                <svg viewBox={`0 0 ${chartW} ${chartH + 40}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
-                  <rect x={xBase} y={0} width={chartW - xBase - 10} height={chartH} fill="rgba(255,255,255,0.02)" rx={6} />
-                  {[0, 0.25, 0.5, 0.75, 1].map(f => {
-                    const y = chartH - f * chartH;
-                    return (
-                      <g key={f}>
-                        <line x1={xBase} y1={y} x2={chartW - 10} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth={0.5} />
-                        <text x={xBase - 5} y={y + 3} fill="var(--text-dim)" fontSize={8} textAnchor="end">{(chartMin + f * chartRange).toFixed(1)}</text>
-                      </g>
-                    );
-                  })}
-                  {/* One bar group per date */}
-                  {allDates.map((date, di) => {
-                    const x = xBase + di * barW;
-                    const groupW = Math.max(6, barW - 4);
-                    const perBarW = selCodes.length > 1 ? groupW / selCodes.length : groupW;
-                    return (
-                      <g key={date}>
-                        {/* Date label */}
-                        <text x={x + barW / 2} y={chartH + 12} fill="var(--text-dim)" fontSize={7} textAnchor="middle">{date.slice(5)}</text>
-                        {/* Bars per code */}
-                        {selCodes.map((code, ci) => {
-                          const pts = seriesByCode[code] || [];
-                          const pt = pts.find(p => p.date === date);
-                          if (!pt) return null;
-                          const barH = Math.max(2, ((pt.value - chartMin) / chartRange) * chartH);
-                          const y = chartH - barH;
-                          const color = chartPalette[ci % chartPalette.length];
-                          return (
-                            <g key={`${date}_${code}`}>
-                              <rect x={x + 2 + ci * perBarW} y={y} width={Math.max(3, perBarW - 2)} height={barH} fill={color} rx={2} opacity={0.85} />
-                              {selCodes.length <= 2 && (
-                                <text x={x + 2 + ci * perBarW + perBarW / 2} y={y - 3} fill={color} fontSize={7} textAnchor="middle" fontWeight={700}>{pt.value}</text>
-                              )}
-                            </g>
-                          );
-                        })}
-                      </g>
-                    );
-                  })}
-                  <line x1={xBase} y1={chartH} x2={chartW - 10} y2={chartH} stroke="var(--border)" strokeWidth={1} />
-                </svg>
-                {/* Clear selection */}
-                <div style={{ marginTop: 8, textAlign: 'center' }}>
-                  <button onClick={() => setChartSelectedCodes(new Set())} style={{
-                    fontSize: 9, color: 'var(--text-dim)', background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                    borderRadius: 8, padding: '4px 12px', cursor: 'pointer',
-                  }}>✕ Сбросить выбор</button>
-                </div>
-              </div>
-            ) : (
-              <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 160, padding: 20 }}>
-                <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-dim)' }}>
-                  <div style={{ fontSize: 28, marginBottom: 10 }}>📊</div>
-                  Выберите 1+ маркеров для сравнения
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-        </>)}
-      {/* ≡≡≡ SCHEDULE TAB — график сдачи анализов по фазам ≡≡≡ */}
-      {subTab === 'schedule' && (
+      {/* ≡≡≡ CATALOG TAB — unified: system groups + input + save + investigations ≡≡≡ */}
+      {/* ≡≡≡ CATALOG TAB — unified: catalog + schedule + problem panels ≡≡≡ */}
+      {mainTab === 'lab' && subTab === 'catalog' && (
         <div>
-          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 0' }}>
-            <span style={{ fontSize:18 }}>📅</span>
-            <span style={{ fontSize:15, fontWeight:700 }}>График сдачи анализов</span>
-          </div>
-          {/* Phase selector */}
-          <div style={{ display:'flex', gap:3, overflowX:'auto', marginBottom:10, scrollbarWidth:'none' }}>
-            {Object.entries(PHASE_LABELS).map(([key,label]) => (
-              <button key={key} onClick={() => handlePhaseChange(key)} style={{
-                padding:'6px 12px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer',
-                background: selectedPhase===key?'var(--accent)':'var(--bg-secondary)',
-                color: selectedPhase===key?'#000':'var(--text-dim)',
-                border:`1px solid ${selectedPhase===key?'var(--accent)':'var(--border)'}`,
-              }}>{label}</button>
+          {/* Catalog sub-view switcher */}
+          <div style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '8px 0 4px', scrollbarWidth: 'none' }}>
+            {([
+              { id: 'catalog' as const, label: 'Каталог', icon: '📖' },
+              { id: 'schedule' as const, label: 'График сдачи', icon: '📅' },
+              { id: 'problems' as const, label: 'По проблеме', icon: '🔍' },
+            ]).map(v => (
+              <button key={v.id} onClick={() => setCatalogView(v.id)} style={{
+                padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
+                whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
+                background: catalogView === v.id ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: catalogView === v.id ? '#000' : 'var(--text-dim)',
+                border: `1px solid ${catalogView === v.id ? 'var(--accent)' : 'var(--border)'}`,
+              }}>
+                {v.icon} {v.label}
+              </button>
             ))}
           </div>
-          {/* Schedule info */}
-          <div className="card" style={{ marginBottom:10, padding:12, border:'1px solid rgba(0,230,138,0.2)' }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>
-              📋 План сдачи: {PHASE_LABELS[selectedPhase]}
-            </div>
-            <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8, lineHeight:1.5 }}>
-              {(() => {
-                const phases: Record<string,string> = {
-                  baseline:'Перед началом курса — полный базовый скрининг (49 маркеров)',
-                  on_cycle:'Каждые 4 недели на курсе — контроль печени, липидов, гормонов (35 маркеров)',
-                  bridge:'Между курсами — восстановительный мониторинг (30 маркеров)',
-                  pct:'Послекурсовая терапия — контроль восстановления оси HPG (29 маркеров)',
-                  post_pct:'Через 4-6 недель после ПКТ — финальная проверка (32 маркера)',
-                };
-                return phases[selectedPhase] || 'Следуйте рекомендованному графику';
-              })()}
-            </div>
-            <div style={{ display:'grid', gap:6 }}>
-              {Object.entries(labsBySystem).map(([system, codes]) => {
-                const submitted = codes.filter(c => submittedCodes.has(c.toUpperCase())).length;
-                const total = codes.length;
-                const pct = total > 0 ? Math.round(submitted/total*100) : 0;
-                return (
-                  <div key={system} style={{ padding:8, borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-secondary)' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
-                      <div style={{ width:8, height:8, borderRadius:'50%', background: sysColors[system]||'#6b7280' }}/>
-                      <span style={{ fontSize:10, fontWeight:600, color:'var(--accent)' }}>{sysLabels[system]||system}</span>
-                      <span style={{ fontSize:9, color:'var(--text-dim)', marginLeft:'auto' }}>{submitted}/{total} · {pct}%</span>
-                    </div>
-                    <div style={{ height:6, background:'rgba(255,255,255,0.05)', borderRadius:3, overflow:'hidden' }}>
-                      <div style={{ width:`${pct}%`, height:'100%', background:pct===100?'var(--accent)':pct>50?'#eab308':'#f97316', borderRadius:3, transition:'width 0.4s' }}/>
-                    </div>
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:4 }}>
-                      {codes.map(code => {
-                        const info = UCUM_MAP[code.toUpperCase()];
-                        const done = submittedCodes.has(code.toUpperCase());
-                        return (
-                          <span key={code} style={{
-                            fontSize:8, padding:'1px 5px', borderRadius:3,
-                            background: done ? 'rgba(0,230,138,0.12)' : 'rgba(239,68,68,0.08)',
-                            color: done ? 'var(--accent)' : '#ef4444',
-                            border:`1px solid ${done?'rgba(0,230,138,0.2)':'rgba(239,68,68,0.15)'}`,
-                          }}>
-                            {done ? '✓' : '○'} {info?.name||code}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            {missingLabs.length > 0 && (
-              <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
-                <div style={{ fontSize:10, fontWeight:600, color:'#ef4444', marginBottom:4 }}>⚠️ Не сдано ({missingLabs.length})</div>
-                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>{missingLabs.slice(0,15).join(', ')}{missingLabs.length>15?` +${missingLabs.length-15}`:''}</div>
+
+          {catalogView === 'catalog' && (
+            <LabsCatalogTab
+              labs={labs}
+              selectedPhase={selectedPhase}
+              onPhaseChange={handlePhaseChange}
+              tick={tick}
+            />
+          )}
+
+          {catalogView === 'schedule' && (
+            <div>
+              <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 0' }}>
+                <span style={{ fontSize:18 }}>📅</span>
+                <span style={{ fontSize:15, fontWeight:700 }}>График сдачи анализов</span>
               </div>
-            )}
-          </div>
+              <div style={{ display:'flex', gap:3, overflowX:'auto', marginBottom:10, scrollbarWidth:'none' }}>
+                {Object.entries(PHASE_LABELS).map(([key,label]) => (
+                  <button key={key} onClick={() => handlePhaseChange(key)} style={{
+                    padding:'6px 12px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer',
+                    background: selectedPhase===key?'var(--accent)':'var(--bg-secondary)',
+                    color: selectedPhase===key?'#000':'var(--text-dim)',
+                    border:`1px solid ${selectedPhase===key?'var(--accent)':'var(--border)'}`,
+                  }}>{label}</button>
+                ))}
+              </div>
+              <div className="card" style={{ marginBottom:10, padding:12, border:'1px solid rgba(0,230,138,0.2)' }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>
+                  📋 План сдачи: {PHASE_LABELS[selectedPhase]}
+                </div>
+                <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8, lineHeight:1.5 }}>
+                  {(() => {
+                    const phases: Record<string,string> = {
+                      baseline:'Перед началом курса — полный базовый скрининг (49 маркеров)',
+                      on_cycle:'Каждые 4 недели на курсе — контроль печени, липидов, гормонов (35 маркеров)',
+                      bridge:'Между курсами — восстановительный мониторинг (30 маркеров)',
+                      pct:'Послекурсовая терапия — контроль восстановления оси HPG (29 маркеров)',
+                      post_pct:'Через 4-6 недель после ПКТ — финальная проверка (32 маркера)',
+                    };
+                    return phases[selectedPhase] || 'Следуйте рекомендованному графику';
+                  })()}
+                </div>
+                <div style={{ display:'grid', gap:6 }}>
+                  {Object.entries(labsBySystem).map(([system, codes]) => {
+                    const submitted = codes.filter(c => submittedCodes.has(c.toUpperCase())).length;
+                    const total = codes.length;
+                    const pct = total > 0 ? Math.round(submitted/total*100) : 0;
+                    return (
+                      <div key={system} style={{ padding:8, borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-secondary)' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                          <div style={{ width:8, height:8, borderRadius:'50%', background: sysColors[system]||'#6b7280' }}/>
+                          <span style={{ fontSize:10, fontWeight:600, color:'var(--accent)' }}>{sysLabels[system]||system}</span>
+                          <span style={{ fontSize:9, color:'var(--text-dim)', marginLeft:'auto' }}>{submitted}/{total} · {pct}%</span>
+                        </div>
+                        <div style={{ height:6, background:'rgba(255,255,255,0.05)', borderRadius:3, overflow:'hidden' }}>
+                          <div style={{ width:`${pct}%`, height:'100%', background:pct===100?'var(--accent)':pct>50?'#eab308':'#f97316', borderRadius:3, transition:'width 0.4s' }}/>
+                        </div>
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:4 }}>
+                          {codes.map(code => {
+                            const info = UCUM_MAP[code.toUpperCase()];
+                            const done = submittedCodes.has(code.toUpperCase());
+                            return (
+                              <span key={code} style={{
+                                fontSize:8, padding:'1px 5px', borderRadius:3,
+                                background: done ? 'rgba(0,230,138,0.12)' : 'rgba(239,68,68,0.08)',
+                                color: done ? 'var(--accent)' : '#ef4444',
+                                border:`1px solid ${done?'rgba(0,230,138,0.2)':'rgba(239,68,68,0.15)'}`,
+                              }}>
+                                {done ? '✓' : '○'} {info?.name||code}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {missingLabs.length > 0 && (
+                  <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
+                    <div style={{ fontSize:10, fontWeight:600, color:'#ef4444', marginBottom:4 }}>⚠️ Не сдано ({missingLabs.length})</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>{missingLabs.slice(0,15).join(', ')}{missingLabs.length>15?` +${missingLabs.length-15}`:''}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {catalogView === 'problems' && (
+            <LabsProblemPanelsTab />
+          )}
+
+          {catalogView !== 'catalog' && catalogView !== 'schedule' && catalogView !== 'problems' && (
+            <LabsCatalogTab
+              labs={labs}
+              selectedPhase={selectedPhase}
+              onPhaseChange={handlePhaseChange}
+              tick={tick}
+            />
+          )}
         </div>
       )}
 
+        </>)}
       {/* ≡≡≡ LAB REPORTS SUB-TAB ≡≡≡ */}
       {mainTab === 'lab' && subTab === 'reports' && (
         <div style={{ padding:'0 0 80px' }}>
@@ -1371,28 +1217,11 @@ export const LabsScreen: React.FC = () => {
         </div>
       )}
 
-      {/* ≡≡≡ ALL MARKERS TAB ≡≡≡ */}
-      {mainTab === 'lab' && subTab === 'extended' && (
-        <ExtendedLabsTab
-          labs={labs}
-          selectedPhase={selectedPhase}
-          onPhaseChange={handlePhaseChange}
-          tick={tick}
-        />
-      )}
-
       {/* ≡≡≡ LAB DIARY TAB ≡≡≡ */}
       {mainTab === 'lab' && subTab === 'diary' && (
         <LabDiaryTab labs={labs} />
       )}
 
-
-      {/* ≡≡≡ INVESTIGATIONS TAB ≡≡≡ */}
-      {mainTab === 'investigations' && (
-        <div style={{ paddingTop: 8 }}>
-          <LabsInvestigations />
-        </div>
-      )}
 
       {/* ≡≡≡ RISKS & INDICES TAB ≡≡≡ */}
       {mainTab === 'risks' && (() => {

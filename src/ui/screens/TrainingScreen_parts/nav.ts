@@ -40,7 +40,7 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     icon: '📊',
     color: '#a855f7',
     subtitle: 'Дневник, история, аналитика, прогресс, календарь, отчёты',
-    tabs: ['diary', 'calendar', 'mmc_tracking', 'import_data'],
+    tabs: ['diary', 'insights', 'strength', 'goals', 'calendar', 'checkin', 'mmc_tracking', 'import_data'],
   },
   calculators: {
     title: '🧮 Калькуляторы',
@@ -51,13 +51,13 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
       'exercise_lab', 'calc_1rm', 'calc_plates', 'calc_vbt', 'calc_mrv',
       'calculators', 'calc_fatigue', 'tempo', 'deload_scheduler', 'calc_taper',
       'periodization_designer', 'meso_progression', 'meso_tracker', 'rel_strength',
-      'pl_norms', 'specialization', 'peaking', 'conjugate', 'pl_pro', 'calc_quality',
-      'volume', 'cycles',
+      'pl_norms', 'pl_weakpoints', 'specialization', 'peaking', 'conjugate', 'pl_pro', 'calc_quality',
+      'volume', 'cycles', 'bb_tools', 'load_safety', 'split_gen', 'competition', 'pri_reppat', 'mix_presets', 'synergy',
     ],
     categories: [
-      { label: 'Сила и нагрузка', icon: '🏋️', tabs: ['calc_1rm', 'calc_vbt', 'rel_strength', 'pl_norms', 'calculators', 'calc_mrv', 'calc_fatigue', 'volume'] },
+      { label: 'Сила и нагрузка', icon: '🏋️', tabs: ['calc_1rm', 'calc_vbt', 'rel_strength', 'pl_norms', 'pl_weakpoints', 'calculators', 'calc_mrv', 'calc_fatigue', 'volume'] },
       { label: 'Периодизация', icon: '🔄', tabs: ['periodization_designer', 'meso_progression', 'meso_tracker', 'deload_scheduler', 'calc_taper', 'specialization', 'peaking', 'conjugate', 'cycles'] },
-      { label: 'Инструменты и качество', icon: '🧪', tabs: ['calc_plates', 'tempo', 'exercise_lab', 'calc_quality', 'pl_pro'] },
+      { label: 'Инструменты и качество', icon: '🧪', tabs: ['calc_plates', 'tempo', 'exercise_lab', 'bb_tools', 'load_safety', 'competition', 'calc_quality', 'pl_pro'] },
     ],
   },
   library: {

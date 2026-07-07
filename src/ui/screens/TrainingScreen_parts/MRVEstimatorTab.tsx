@@ -10,6 +10,7 @@ import { loadSRPESessions, type SRPESession } from '../../../engines/pro/srpe-st
 import { toDailyLoads, weeklyMonotony, acuteChronicRatio, type DayLoad } from '../../../engines/pro/training-load.engine';
 import { loadReadinessHistory, type ReadinessHistoryPoint } from './readiness-history';
 import { PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -236,6 +237,12 @@ export const MRVEstimatorTab: React.FC = () => {
         MRV (Maximum Recoverable Volume) — максимальный тренировочный объём, при котором вы восстанавливаетесь к следующей неделе.
         Справочные значения: Helms M. (2018) — 12-30+ сет/м/нед по уровню/PED. Точка перегиба = первая неделя, где рост объёма привёл к падению recovery ≥5 п.
       </div>
+      {est.mrvVolume != null && (
+        <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить индивидуальный MRV (<b style={{ color: '#00e68a' }}>{perMuscleSets} сет/м/нед</b>) к планировщику — объём плана будет ограничен этой величиной.</div>
+          <button onClick={() => applyToPlanner({ kind: 'mrv', label: 'MRV ' + perMuscleSets + ' сет/м/нед', data: { mrv: perMuscleSets } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить MRV к планировщику</button>
+        </div>
+      )}
     </div>
   );
 };

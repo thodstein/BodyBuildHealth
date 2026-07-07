@@ -37,20 +37,22 @@ export function saveMeasurementsLog(log: MeasurementEntry[]) {
 export function syncBioStackProfile(settings: UserProfile['settings']): void {
   try {
     const p: Record<string, any> = {};
-    if (settings.age) p.age = settings.age;
-    if (settings.weight) p.weight = settings.weight;
-    if (settings.height) p.height = settings.height;
-    if (settings.sex) p.sex = settings.sex;
+    const keys: string[] = [];
+    if (settings.age) { p.age = settings.age; keys.push('age'); }
+    if (settings.weight) { p.weight = settings.weight; keys.push('weight'); }
+    if (settings.height) { p.height = settings.height; keys.push('height'); }
+    if (settings.sex) { p.sex = settings.sex; keys.push('sex'); }
     if (settings.trainingLevel) {
       p.experience = settings.trainingLevel === 'beginner' ? 'beginner'
         : settings.trainingLevel === 'intermediate' ? 'intermediate' : 'advanced';
+      keys.push('experience');
     }
     if (settings.primaryGoal) {
       const g: Record<string, string> = {
         bulk: 'muscle_gain', cut: 'fat_loss', maintenance: 'recovery',
         strength: 'muscle_gain', endurance: 'endurance', health: 'immunity'
       };
-      if (g[settings.primaryGoal]) p.goals = [g[settings.primaryGoal]];
+      if (g[settings.primaryGoal]) { p.goals = [g[settings.primaryGoal]]; keys.push('goals'); }
     }
     if (settings.medicalConditions?.length) {
       const hc: string[] = [];
@@ -63,9 +65,13 @@ export function syncBioStackProfile(settings: UserProfile['settings']): void {
         if (cl.includes('diabet') || cl.includes('диабет')) hc.push('diabetes');
         if (cl.includes('autoim') || cl.includes('аутоим')) hc.push('autoimmune');
       }
-      if (hc.length) p.healthConditions = hc;
+      if (hc.length) { p.healthConditions = hc; keys.push('healthConditions'); }
     }
     const existing = loadLocal(KEYS.biostack, {});
+    if (keys.length > 0) {
+      const prevAuto = (existing as any).autoFilledFields || [];
+      p.autoFilledFields = [...new Set([...prevAuto, ...keys])];
+    }
     saveLocal(KEYS.biostack, { ...existing, ...p });
   } catch { /* silent */ }
 }

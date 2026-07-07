@@ -3,6 +3,8 @@
  *
  * Анализирует lab-данные и автоматически подсвечивает релевантные симптомы,
  * указывая на возможную причину. Используется в SymptomSolverTab и отчётах.
+ *
+ * v2: + симптом → проблемная панель (symptom-panel-bridge)
  */
 import type { SymptomEntry } from './symptom-solver.engine';
 import { findSymptomById } from './symptom-solver.engine';
@@ -280,4 +282,64 @@ export function getLabNorm(marker: string): { low: number; high: number; unit: s
 /** Все известные lab-маркеры */
 export function getAllLabMarkers(): string[] {
   return Object.keys(LAB_NORMS);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  СИМПТОМ → ПРОБЛЕМНАЯ ПАНЕЛЬ (v2)
+// ═══════════════════════════════════════════════════════════
+
+/** Карта: symptomId → рекомендуемые problemPanel ids */
+const SYMPTOM_PANEL_MAP: Record<string, string[]> = {
+  liver_pain: ['hepatotoxicity_workup'],
+  nausea: ['hepatotoxicity_workup'],
+  jaundice: ['hepatotoxicity_workup'],
+  yellow_eyes: ['hepatotoxicity_workup'],
+  appetite_loss: ['hepatotoxicity_workup'],
+  gi_discomfort: ['hepatotoxicity_workup'],
+
+  gynecomastia: ['gynecomastia_workup'],
+  edema: ['gynecomastia_workup', 'hypertension_workup', 'renal_workup'],
+
+  hypertension_symptoms: ['hypertension_workup', 'cardio_full'],
+  headache: ['hypertension_workup', 'polycythemia_workup'],
+  dizziness: ['hypertension_workup', 'polycythemia_workup'],
+  dyspnea: ['cardio_full', 'polycythemia_workup'],
+  chest_pain: ['cardio_full'],
+  palpitations: ['cardio_full', 'ed_libido_workup'],
+
+  flushed_skin: ['polycythemia_workup'],
+  fatigue: ['hepatotoxicity_workup', 'renal_workup', 'neurotoxicity_workup', 'hpta_recovery_fail', 'hormone_passport', 'nutritional_passport'],
+  weakness: ['hpta_recovery_fail', 'nutritional_passport'],
+
+  lower_back_pain: ['renal_workup'],
+  urine_foam: ['renal_workup'],
+
+  libido_decrease: ['ed_libido_workup', 'hpta_recovery_fail', 'hormone_passport'],
+  mood_swings: ['hpta_recovery_fail', 'neurotoxicity_workup', 'gynecomastia_workup'],
+
+  anxiety: ['neurotoxicity_workup'],
+  insomnia: ['neurotoxicity_workup', 'ed_libido_workup'],
+
+  muscle_cramps: ['nutritional_passport'],
+  joint_pain: ['joint_pain_workup'],
+};
+
+/**
+ * Получить рекомендуемые проблемные панели для симптома
+ */
+export function getProblemPanelsForSymptom(symptomId: string): string[] {
+  return SYMPTOM_PANEL_MAP[symptomId] || [];
+}
+
+/**
+ * Получить рекомендуемые панели для списка симптомов (дедуплицированные)
+ */
+export function getProblemPanelsForSymptoms(symptomIds: string[]): string[] {
+  const panels = new Set<string>();
+  for (const id of symptomIds) {
+    for (const p of getProblemPanelsForSymptom(id)) {
+      panels.add(p);
+    }
+  }
+  return Array.from(panels);
 }

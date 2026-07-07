@@ -1,5 +1,6 @@
 ﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, findSupportByGoal, getSupportDatabaseStats, type SupportInput, type SupplementTarget } from '../../engines/support.engine';
+import type { SupportRecommendation } from '../../engines/tz-mapper-engine';
 import { decodeGarbled, cleanDesc } from '../../utils/text-sanitizer';
 import { SupportModals } from './SupportScreen_parts/SupportModals';
 import { ALL_RISK_SYSTEMS } from '../../core/constants';
@@ -71,12 +72,12 @@ import { SupportInteractionsView } from './SupportScreen_parts/SupportInteractio
 import { SupportFavoritesView } from './SupportScreen_parts/SupportFavoritesView';
 import { SupportDiaryView } from './SupportScreen_parts/SupportDiaryView';
 import { SupportStacksView } from './SupportScreen_parts/SupportStacksView';
-import { SupportCalcResult } from './SupportScreen_parts/SupportCalcResult';
+
 import { DosageDatabaseView } from '../components/DosageCalculator';
 import { SupportProtocols } from './SupportScreen_parts/SupportProtocols';
 import { SupportBioavailability } from './SupportScreen_parts/SupportBioavailability';
 import { SymptomSolverTab } from './SupportScreen_parts/SymptomSolverTab';
-import { AutoCalculator } from './SupportScreen_parts/AutoCalculator';
+import { AutoCalculator } from './Calculator';
 export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTab }) => {
   const linked = useDataLink();
   const [tab, setTab] = useState<SupportTab>(initialTab || 'main');
@@ -272,7 +273,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [supportResult, setSupportResult] = useState<ReturnType<typeof calculateSupport> | null>(null);
   const [calcResult, setCalcResult] = useState<any>(null);
   const [calcDone, setCalcDone] = useState(false);
-  const [autoCalcResult, setAutoCalcResult] = useState<{ level: string; subs: string[]; result: any } | null>(null);
+  const [autoCalcResult, setAutoCalcResult] = useState<{ level: string; subs: string[]; result?: any; tzRec?: SupportRecommendation } | null>(null);
 
   const [dbInteractions, setDbInteractions] = useState<ReturnType<typeof checkSupportInteractions> | null>(null);
   const [dbSearchQuery, setDbSearchQuery] = useState('');
@@ -400,7 +401,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         setSupportView('calc');
         setCalcView('info');
         setSection('home');
-        setInfoView('diary');
+        setInfoView('favorites');
+        setCombinedFavDiaryTab('diary');
       }
     } catch {}
   }, []);
@@ -483,6 +485,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     // ── ОДИН ВЫЗОВ ──
     const planRes = runSupportUnified(state);
     setPlanResult(planRes);
+    // Сохраняем ID веществ в localStorage для импорта в план питания
+    try { localStorage.setItem('he_support_plan_result', JSON.stringify(planRes.substances.map(p => p.id))); } catch {}
     // subs + dosages из единого результата (с dedup)
     const subs: string[] = [...new Set(planRes.substances.map(p => p.id))];
     const dosages: Record<string, { mg: number; timing: string }> = {};
@@ -743,6 +747,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [expandedStack, setExpandedStack] = useState<string | null>(null);
   const [favRefresh, setFavRefresh] = useState(0);
   const [favTab, setFavTab] = useState<string>('favorites');
+  const [combinedFavDiaryTab, setCombinedFavDiaryTab] = useState<'favorites'|'diary'>('favorites');
   const [showSavedPicker, setShowSavedPicker] = useState(false);
   const [researchSource, setResearchSource] = useState<'pubmed' | 'pubchem' | 'scholar' | 'fda' | 'pharma'>('pubmed');
   const [pubchemResults, setPubchemResults] = useState<any[]>([]);
@@ -2535,7 +2540,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     SYRINGE_TYPES,
     SYSTEM_INFO_ALL,
     SYSTEM_LABELS_CATALOG,
-    SupportCalcResult,
+
     SupportCatalogView,
     SupportFavoritesView,
     SupportGeneratorInfo,
@@ -3066,7 +3071,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['interactions','⚠ Взаимодействия'],['research','Исследования'],['favorites','Избранное'],['diary','📓 Дневник'],['bioavailability','🧬 Биодоступность'],['symptoms','🩺 Симптомы']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['research','Исследования'],['favorites','⭐ Избранное · Дневник'],['bioavailability','🧬 Биодоступность'],['symptoms','🩺 Симптомы']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 if (id === 'peptides') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); }
                 else { setTab('main'); setSupportView('calc'); setCalcView('info'); setSection('home'); setInfoView(id as InfoView); }
@@ -3095,16 +3100,28 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
       {renderView(infoView, 'catalog', () =>
         <SupportCatalogView s={s} />
       )}
-            {/* synergies merged into interactions tab */}
-            {/* ─── ВЗАИМОДЕЙСТВИЯ (единая вкладка: всё + калькулятор) ─── */}
-      {renderView(infoView, 'interactions', () =>
-        <SupportInteractionsView s={s} />
-      )}
       {renderView(infoView, 'stacks', () =>
         <SupportStacksView s={s} />
       )}
       {renderView(infoView, 'favorites', () =>
-        <SupportFavoritesView s={s} />
+        <div>
+          <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
+            {[['favorites','⭐ Избранное'],['diary','📓 Дневник']].map(([id,label]:any) => (
+              <button key={id} onClick={() => setCombinedFavDiaryTab(id as any)} style={{
+                padding:'6px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                background: combinedFavDiaryTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: combinedFavDiaryTab === id ? '#000' : 'var(--text-dim)',
+                border: '1px solid ' + (combinedFavDiaryTab === id ? 'var(--accent)' : 'var(--border)'),
+              }}>{label}</button>
+            ))}
+          </div>
+          {combinedFavDiaryTab === 'favorites' && <SupportFavoritesView s={s} />}
+          {combinedFavDiaryTab === 'diary' && (
+            <div style={{ padding: '0 4px' }}>
+              <SupportDiaryView s={s} onOpenSolver={() => setInfoView('symptoms' as any)} />
+            </div>
+          )}
+        </div>
       )}
       {renderView(infoView, 'research', () =>
         <SupportResearch s={s} />
@@ -3112,11 +3129,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             {renderView(infoView, 'biostack', () =>
               <div style={{ padding: '0 4px' }}>
                 <BioStackAIScreen />
-              </div>
-            )}
-            {renderView(infoView, 'diary', () =>
-              <div style={{ padding: '0 4px' }}>
-                <SupportDiaryView s={s} onOpenSolver={() => setInfoView('symptoms' as any)} />
               </div>
             )}
             {renderView(infoView, 'bioavailability', () =>
@@ -3327,22 +3339,18 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
       )}
 
 
-      {/* ===== AUTO CALCULATOR (input card with import-from-labs button) ===== */}
+      {/* ===== AUTO CALCULATOR (единый калькулятор — ввод + TZ-mapper результат) ===== */}
       {section === 'generator' && genTab === 'calculator' && ((tab === 'main' && supportView === 'calc' && calcView === 'calculator') || tab === 'calculator') && (
         <AutoCalculator
           embedded
           courseWeek={courseWeekState}
           courseLinked={linked.course as any}
+          labsLinked={(linked.labs && linked.labs.length > 0 ? linked.labs[0] : null) as any}
           onApply={(r) => {
             setAutoCalcResult(r);
-            calcSupport(r.level as PowerLevel, r.subs);
+            setCalcDone(true);
           }}
         />
-      )}
-
-      {/* ===== SUPPORT CALCULATOR RESULT ===== */}
-      {section === 'generator' && genTab === 'calculator' && ((tab === 'main' && supportView === 'calc' && calcView === 'calculator') || tab === 'calculator') && (
-        <SupportCalcResult s={s} />
       )}
 
       {/* ===== DOSAGE DATABASE VIEW ===== */}

@@ -5,6 +5,55 @@ import { ComplaintsTab } from './ComplaintsTab';
 
 const DIARY_KEY = 'he_support_diary';
 
+// ── Журнал негативного опыта: хранится в he_autocalc_state.journal.negative ──
+interface NegEntry { substanceId: string; symptom: string; comment: string; }
+function loadNegJournal(): NegEntry[] {
+  try {
+    const raw = localStorage.getItem('he_autocalc_state');
+    if (!raw) return [];
+    const s = JSON.parse(raw);
+    return Array.isArray(s?.journal?.negative) ? s.journal.negative : [];
+  } catch { return []; }
+}
+function saveNegJournal(list: NegEntry[]) {
+  try {
+    const raw = localStorage.getItem('he_autocalc_state');
+    const s = raw ? JSON.parse(raw) : {};
+    s.journal = { ...(s.journal || {}), negative: list };
+    localStorage.setItem('he_autocalc_state', JSON.stringify(s));
+  } catch {}
+}
+const NegativeJournalCard: React.FC = () => {
+  const [list, setList] = useState<NegEntry[]>(loadNegJournal);
+  const [text, setText] = useState('');
+  const add = () => {
+    if (!text.trim()) return;
+    const next = [...list, { substanceId: text.trim(), symptom: 'reaction', comment: '' }];
+    setList(next); saveNegJournal(next); setText('');
+  };
+  const remove = (i: number) => {
+    const next = list.filter((_, j) => j !== i);
+    setList(next); saveNegJournal(next);
+  };
+  return <div style={{ margin: '8px 4px', padding: 12, borderRadius: 12, background: 'var(--bg-secondary)', border: '1px solid rgba(239,68,68,0.2)' }}>
+    <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>📓 Журнал негативного опыта</div>
+    <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 8 }}>Вещества, на которые была негативная реакция. Эти препараты исключаются из подбора поддержки.</div>
+    <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+      <input value={text} onChange={e => setText(e.target.value)} placeholder="Название или ID вещества" style={{ flex: 1, padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 11, boxSizing: 'border-box' }} />
+      <button onClick={add} style={{ padding: '6px 12px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444' }}>＋</button>
+    </div>
+    {list.length > 0 && <div>
+      {list.map((n, i) =>
+        <div key={i} style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 6, padding: '4px 8px', marginBottom: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10 }}>
+          <span style={{ color: '#ef4444' }}>🚫 {n.substanceId}</span>
+          <button onClick={() => remove(i)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 11 }}>✕</button>
+        </div>
+      )}
+    </div>}
+    {list.length === 0 && <div style={{ fontSize: 9, color: 'var(--text-dim)', textAlign: 'center', padding: '8px 0' }}>Записей нет</div>}
+  </div>;
+};
+
 type TimeSlot = 'morning' | 'afternoon' | 'evening' | 'night';
 type MoodLevel = 1 | 2 | 3 | 4 | 5;
 
@@ -399,6 +448,8 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
           </div>
         </div>
       </div>
+
+      <NegativeJournalCard />
 
       {/* Tab pills */}
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>

@@ -5,6 +5,7 @@
 import React, { useMemo, useState } from 'react';
 import { runWhatIf } from '../../../engines/predictive.engine';
 import { PopupNumber, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.7)', fontSize: 11, lineHeight: 1.45 };
@@ -47,6 +48,10 @@ export const WhatIfCard: React.FC<{ baseRisk: number; baseReadiness: number }> =
         </div>
         <div style={{ ...SMALL, marginTop: 8, padding: 6, background: 'rgba(0,230,138,0.04)', borderRadius: 6 }}>{res.note}</div>
       </MetricCard>
+      <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить what-if сценарий к планировщику: прогноз готовности {Math.round(baseReadiness + res.readinessDelta)} → корректировка объёма/RIR.</div>
+        <button onClick={() => { const rd = res.readinessDelta; const mult = rd < -10 ? 0.85 : rd < 0 ? 0.93 : 1; const rsh = rd < -10 ? 1 : 0; applyToPlanner({ kind: 'pri', label: 'What-if: готовность ' + Math.round(baseReadiness + rd) + ' → объём ×' + mult, data: { volumeMult: mult, rirShift: rsh } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить what-if к планировщику</button>
+      </div>
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { generateConjugateWeek, getAllVariations, type ConjugateDay } from '../../../engines/conjugate.engine';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: 12, marginBottom: 10 };
@@ -96,6 +97,10 @@ const ConjugateTab: React.FC = () => {
             </span>
           ))}
         </div>
+      </div>
+      <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить фокус конъюгата «{LIFT_OPTIONS.find(o => o.id === lift)?.label || lift}» (ME/DE дни) к планировщику как приоритет группы.</div>
+        <button onClick={() => { const g = lift === 'squat' ? 'legs' : lift === 'bench' ? 'chest' : 'back'; applyToPlanner({ kind: 'weakpoints', label: 'Конъюгат фокус: ' + (LIFT_OPTIONS.find(o => o.id === lift)?.label || lift) + ' → ' + g, data: { groups: [g], lift } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Фокус конъюгата → планировщик</button>
       </div>
     </div>
   );

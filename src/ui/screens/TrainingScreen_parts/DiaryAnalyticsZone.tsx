@@ -10,6 +10,10 @@ import { TrainingDiaryHub } from './TrainingDiaryHub';
 import { TrainingCalendarTab } from './TrainingCalendarTab';
 import { CsvImportTab } from './CsvImportTab';
 import MMCTrackingCard from './MMCTrackingCard';
+import { CheckinMetricsCard } from './CheckinMetricsCard';
+import { StrengthAnalyticsCard } from './StrengthAnalyticsCard';
+import { GoalsHabitsCard } from './GoalsHabitsCard';
+import { InsightsCard } from './InsightsCard';
 import type { TrainingTab } from './shared';
 
 interface Props {
@@ -65,6 +69,26 @@ export const DiaryAnalyticsZone: React.FC<Props> = (p) => {
       {p.tab === 'mmc_tracking' && (
         <InfoErrorBoundary label="MMC-трекинг">
           <MMCTrackingCard />
+        </InfoErrorBoundary>
+      )}
+      {p.tab === 'checkin' && (
+        <InfoErrorBoundary label="Чек-ин метрик">
+          <CheckinMetricsCard />
+        </InfoErrorBoundary>
+      )}
+      {p.tab === 'insights' && (
+        <InfoErrorBoundary label="Авто-инсайты">
+          <InsightsCard />
+        </InfoErrorBoundary>
+      )}
+      {p.tab === 'strength' && (
+        <InfoErrorBoundary label="Аналитика силы">
+          <StrengthAnalyticsCard />
+        </InfoErrorBoundary>
+      )}
+      {p.tab === 'goals' && (
+        <InfoErrorBoundary label="Цели и привычки">
+          <GoalsHabitsCard />
         </InfoErrorBoundary>
       )}
       {p.tab === 'import_data' && (

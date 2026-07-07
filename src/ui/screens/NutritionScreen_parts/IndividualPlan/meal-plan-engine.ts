@@ -1,0 +1,618 @@
+/**
+ * meal-plan-engine.ts — профессиональный движок генерации рациона бодибилдера.
+ *
+ * Принципы (на основе клинической спортивной диетологии):
+ *   1. Muscle Protein Synthesis (MPS): 0.3–0.4 г белка/кг LBM на приём,
+ *      порог лейцина ≥2.5 г для запуска mTOR, интервал 3–5ч.
+ *   2. Carb periodization: тренировочный день → углеводы в функциональные окна
+ *      (pre-/intra-/post-workout), день отдыха → равномерно + акцент вечером.
+ *   3. Fat residual: жиры как остаток после белка и углеводов, мин 0.8 г/кг.
+ *   4. Peri-workout protocol:
+ *      -90 мин pre-W: белок 25–30 г + медленные углеводы 30–50 г, жиры ≤5 г.
+ *      intra-W: EAA 10–15 г + циклический декстрин 30–60 г/ч (тяжёлые дни).
+ *      +60 мин post-W: сыворотка 30–40 г + быстрые углеводы 40–80 г.
+ *   5. Real-food meal assembly: приём пищи = белковый источник + углеводный
+ *      источник + овощная порция + Fat source (по расписанию), а не «первые
+ *      2 продукта из пула».
+ *   6. Food synergy: витамин C × железо (растительное), жиры × ADEK,
+ *      пиперин × куркумин; конфликты: оксалаты × кальций, танины × железо.
+ *   7. Diversity: ≥8 уникальных продуктов/день для микронутриентной coverage.
+ *
+ * Вход: FoodItem[] (полный FOOD_DB), цели по KBJU, профиль (вес/LBM/цель/
+ * фаза курса), тренировочный календарь, протокол тренировки (время начала).
+ * Выход: DayPlan (массив meals с items, totals, заметками по MPS/нутритаймингу).
+ */
+
+import { FOOD_DB } from "../../../../core/nutrition-database";
+import type { FoodItem } from "../../../../core/nutrition-database";
+
+// ─── Публичные типы ────────────────────────────────────────────────────
+export interface MealItem {
+  id: string; name: string; amount: number;
+  kcal: number; p: number; f: number; c: number; fiber: number;
+  leucine_mg?: number;
+  role: 'protein' | 'fast_protein' | 'slow_protein' | 'carb_slow' | 'carb_fast' | 'fat' | 'veg' | 'fruit' | 'supplement' | 'liquid';
+}
+
+export interface Meal {
+  label: string; time: string;
+  items: MealItem[];
+  totals: { kcal: number; p: number; f: number; c: number; fiber: number; leucine_mg: number };
+  type: 'breakfast' | 'lunch' | 'snack' | 'preworkout' | 'intra' | 'postworkout' | 'dinner' | 'presleep';
+  rationale: string[];
+  mpsCheck?: { proteinG: number; leucineG: number; triggers_mTOR: boolean };
+}
+
+export interface DayPlanV2 {
+  dayIndex: number;
+  isTrainingDay: boolean;
+  meals: Meal[];
+  totals: { kcal: number; p: number; f: number; c: number; fiber: number; leucine_mg: number };
+  mpsSummary: { feedings: number; avg_leucine_g: number; avg_protein_per_meal_g: number; intra_workout: boolean; prePostWindow: boolean };
+  diversity: { uniqueFoods: number; categories: Record<string, number> };
+  notes: string[];
+}
+
+export interface MealPlanInput {
+  weightKg: number;
+  lbmKg: number;
+  bodyFatPct?: number;
+  sex?: 'male' | 'female';
+  goalKcal: number;
+  goalProteinG: number;
+  goalFatG: number;
+  goalCarbsG: number;
+  mealsCount: number;
+  isTrainingDay: boolean;
+  trainStartMin?: number;
+  allowIntraWorkout?: boolean;
+  excludedIds?: Set<string>;
+  preferredIds?: Set<string>;
+  budget: 'low' | 'medium' | 'max' | 'enhanced';
+  isVegetarian?: boolean;
+  isCutting?: boolean;
+  dayOffset: number;
+  cyclePhase?: 'course' | 'pct' | 'cutting' | 'bridge' | 'recovery' | 'maintenance';
+}
+
+// ─── Константы (клинические ориентиры) ─────────────────────────────────
+const LEU_THRESHOLD_MG = 2500;
+const MPS_LBM_LOW = 0.3;
+const MPS_LBM_HIGH = 0.4;
+const FAT_FLOOR_PER_KG = 0.8;
+const CARB_FLOOR_G = 130;
+const PREW_PROTEIN_G = 25;
+const PREW_CARB_SLOW_G = 40;
+const PREW_FAT_MAX_G = 5;
+const POSTW_FAST_PROTEIN_G = 35;
+const POSTW_FAST_CARB_G = 60;
+const INTRA_EAA_G = 12;
+const INTRA_CARB_G_PER_H = 40;
+
+const MEAT_KEYWORDS = ['beef','pork','chicken','turkey','lamb','veal','duck','salmon','tuna','shrimp','cod','mackerel','trout','sardine','crab','lobster','squid','octopus','venison','rabbit','goose','pate','sausage','bacon','ham','pepperoni','salami','bologna','hot_dog','meatball','cutlet','steak','pollock','tilapia','herring','anchovy','clam','mussel','oyster','scallops','catfish','flounder','sole'];
+const isMeatId = (id: string): boolean => MEAT_KEYWORDS.some(k => id.toLowerCase().includes(k));
+
+// ─── Источники белковой ротации (только существующие ID в FOOD_DB) ──────
+const PROTEIN_ROTATION: { label: string; ids: string[]; note: string }[] = [
+  { label: 'Птица', ids: ['chicken_breast','turkey_breast','chicken_thigh'], note: 'Низкожирный цельный белок, высокий DIAAS (≈1.18)' },
+  { label: 'Жирная рыба (Omega-3)', ids: ['salmon','mackerel','sardines','red_fish'], note: 'EPA/DHA + природный креатин, противовоспалительный эффект' },
+  { label: 'Постная рыба', ids: ['cod','pollock','white_fish_cod','white_fish_mintai','tuna_steak'], note: 'Самая высокая плотность белка, низкий жир, идеальна ночью' },
+  { label: 'Красное мясо', ids: ['beef_lean','beef_minced','beef_liver','rabbit'], note: 'Гемовое железо + Zn + B12, креатин 4–5 г/кг' },
+  { label: 'Яйца/молоко', ids: ['egg_whole','egg_white','cottage_cheese_5','yogurt_greek'], note: 'Биологическая ценность яйца = 100, казеин = 77' },
+  { label: 'Морепродукты', ids: ['shrimp','tuna_canned'], note: 'Йод + таурин, низкокалорийно' },
+  { label: 'Сыворотка/молоко', ids: ['whey_protein','whey_isolate','milk','kefir'], note: 'Сыворотка — самый быстрый белок, пик аминокислот 60 мин' },
+  { label: 'Веган/бобовые', ids: ['tofu','tempeh','lentils','chickpeas','seitan'], note: 'Растительный белок, дополнить сывороткой для лейцина' },
+];
+
+function pickRotation(dayOffset: number): { label: string; ids: string[]; note: string } {
+  return PROTEIN_ROTATION[Math.abs(dayOffset) % PROTEIN_ROTATION.length] || PROTEIN_ROTATION[0];
+}
+
+// ─── Утилиты: детерминированный выбор ─────────────────────────────────
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed * 9999) * 10000;
+  return x - Math.floor(x);
+}
+
+function pick<T>(arr: T[], seed: number): T | undefined {
+  if (arr.length === 0) return undefined;
+  return arr[Math.floor(seededRandom(seed) * arr.length)];
+}
+
+// ─── Дескриптор лейцина в продукте (мг/100 г) ──────────────────────────
+function getLeucine(food: FoodItem): number {
+  return food.amino_acid_profile_100g?.leucine_mg ?? food.micros?.Leucine ?? Math.round((food.protein || 0) * 85);
+}
+
+// ─── Граммовка для достижения цели по макросу ─────────────────────────
+function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carbs' | 'fat'): number {
+  const per100 = macro === 'protein' ? (food.protein || 0) : macro === 'carbs' ? (food.carbs || 0) : (food.fat || 0);
+  if (per100 <= 0) return 0;
+  return Math.min(500, Math.max(20, Math.round(targetG / per100 * 100)));
+}
+
+function makeItem(food: FoodItem, grams: number, role: MealItem['role']): MealItem {
+  const r = grams / 100;
+  return {
+    id: food.id, name: food.name, amount: Math.round(grams), role,
+    kcal: Math.round((food.kcal || 0) * r),
+    p: Math.round((food.protein || 0) * r),
+    f: Math.round((food.fat || 0) * r),
+    c: Math.round((food.carbs || 0) * r),
+    fiber: Math.round((food.fiber || 0) * r),
+    leucine_mg: Math.round(getLeucine(food) * r),
+  };
+}
+
+// ─── Пулы продуктов по ролям (с фильтром аллергенов и диеты) ───────────
+function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPlanInput['budget']) {
+  const basePool = FOOD_DB.filter(f => {
+    if (excludedIds.has(f.id)) return false;
+    if (isVeg && isMeatId(f.id) && !f.isVegetarian && !f.isVegan) return false;
+    return true;
+  });
+  const byBudget = <T extends FoodItem>(arr: T[]): T[] => {
+    if (budget === 'max' || budget === 'enhanced') return arr.filter(f => (f.bb_quality_score ?? 5) >= 8);
+    if (budget === 'low') return arr.filter(f => (f.bb_quality_score ?? 5) <= 7);
+    return arr;
+  };
+  const pSolid = byBudget(basePool.filter(f => (f.category === 'protein' || f.category === 'dairy') && (f.fat || 0) <= 8 && (f.protein || 0) >= 13));
+  const pFatty = byBudget(basePool.filter(f => f.category === 'protein' && (f.fat || 0) > 8 && (f.protein || 0) >= 12));
+  const pLean = byBudget(basePool.filter(f => (f.category === 'protein' || f.category === 'dairy') && (f.fat || 0) <= 3 && (f.protein || 0) >= 11));
+  const anyProtein = pSolid.length > 0 ? pSolid : pLean.length > 0 ? pLean : pFatty.length > 0 ? pFatty : byBudget(basePool.filter(f => (f.category === 'protein' || f.category === 'dairy') && (f.protein || 0) >= 12));
+  const cSlowRaw = basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.gi || 0) > 0 && (f.gi || 0) <= 55 && (f.carbs || 0) >= 15 && (f.protein || 0) / Math.max(1, f.carbs || 0) < 0.35);
+  const cSlowBud = byBudget(cSlowRaw);
+  const cFastRaw = basePool.filter(f => (f.category === 'grain' || f.category === 'carb' || f.category === 'veg_fruit') && (f.gi || 0) >= 60 && (f.carbs || 0) >= 15 && (f.protein || 0) / Math.max(1, f.carbs || 0) < 0.35);
+  const cFastBud = byBudget(cFastRaw);
+  const cFruitRaw = basePool.filter(f => f.category === 'veg_fruit' && (f.carbs || 0) >= 8 && (f.gi || 0) <= 55 && (f.fiber || 0) >= 1.5 && (f.protein || 0) < 15);
+  const cFruitBud = byBudget(cFruitRaw);
+  const fatsRaw = basePool.filter(f => f.category === 'fat' && (f.fat || 0) >= 50);
+  const fatsBud = byBudget(fatsRaw);
+  return {
+    proteinSolid: pSolid.length > 0 ? pSolid : anyProtein,
+    proteinFatty: pFatty.length > 0 ? pFatty : anyProtein,
+    proteinLean: pLean.length > 0 ? pLean : anyProtein,
+    fastProtein: basePool.filter(f => f.id === 'whey_isolate' || f.id === 'whey_protein' || f.id === 'egg_white' || f.id === 'whey_concentrate'),
+    slowProtein: basePool.filter(f => f.id === 'casein' || f.id === 'cottage_cheese_5' || f.id === 'greek_yogurt' || f.id === 'yogurt_greek'),
+    carbSlow: cSlowBud.length > 0 ? cSlowBud : cSlowRaw.length > 0 ? cSlowRaw : basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 15),
+    carbFast: cFastBud.length > 0 ? cFastBud : cFastRaw.length > 0 ? cFastRaw : cFruitBud.length > 0 ? cFruitBud : basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 15),
+    carbFruit: cFruitBud.length > 0 ? cFruitBud : cFruitRaw,
+    fats: fatsBud.length > 0 ? fatsBud : fatsRaw,
+    vegGreen: basePool.filter(f => ['broccoli','spinach','cucumber','zucchini','asparagus','green_bean','celery','cabbage','kale','green_apple'].some(k => f.id.includes(k)) && (f.protein || 0) < 20),
+    vegColor: basePool.filter(f => ['tomato','pepper','carrot','beetroot','pumpkin','eggplant','pomegranate','citrus'].some(k => f.id.includes(k.toLowerCase())) && (f.protein || 0) < 20),
+    dairy: byBudget(basePool.filter(f => f.category === 'dairy' && (f.fat || 0) <= 10)),
+    eaa: basePool.find(f => f.id === 'bcaa'),
+    dextrin: basePool.find(f => f.id === 'amylopectin' || f.id === 'dextrose'),
+  };
+}
+
+// ─── МЕТОД: стандартный приём пищи (завтрак/обед/ужин) ─────────────────
+function buildWholeMeal(
+  params: {
+    label: string; time: string; type: Meal['type'];
+    proteinG: number; carbG: number; fatG: number;
+    pool: ReturnType<typeof buildFoodPools>;
+    proteinRotationIds: string[];
+    seed: number;
+    includeVeg: boolean;
+    includeFruit?: boolean;
+    rationales: string[];
+    preferredIds?: Set<string>;
+  }
+): Meal {
+  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, rationales, preferredIds } = params;
+  const items: MealItem[] = [];
+  let remP = proteinG, remC = carbG, remF = fatG;
+
+  // 1. Белок: роторный источник (предпочтение — preferred)
+  const rotPool = pool.proteinSolid.filter(f => proteinRotationIds.includes(f.id));
+  const preferredRot = preferredIds && preferredIds.size > 0 ? rotPool.filter(f => preferredIds.has(f.id)) : [];
+  const proteinPool = preferredRot.length > 0 ? preferredRot : rotPool.length > 0 ? rotPool : pool.proteinLean.length > 0 ? pool.proteinLean : pool.proteinSolid;
+  const proteinSource = pick(proteinPool, seed);
+  if (proteinSource) {
+    const grams = gramsForMacro(proteinSource, remP, 'protein');
+    if (grams > 0) {
+      const item = makeItem(proteinSource, grams, 'protein');
+      items.push(item); remP -= item.p; remF -= item.f; remC -= item.c;
+      // Низколейциновый белок? Добор сывороткой (≤40 г raw, ≤25 г protein), чтобы достичь порога лейцина
+      const curLeu = items.reduce((s, i) => s + (i.leucine_mg || 0), 0);
+      if (curLeu < LEU_THRESHOLD_MG && pool.fastProtein.length > 0) {
+        const whey = pool.fastProtein[0];
+        const needLeu = LEU_THRESHOLD_MG - curLeu;
+        const wheyLeuPer100 = getLeucine(whey);
+        const wheyProteinPer100 = whey.protein || 0;
+        const wheyGramsRaw = Math.round(needLeu / Math.max(1, wheyLeuPer100) * 100);
+        const wheyGrams = Math.min(40, Math.max(15, wheyGramsRaw));
+        const wItem = makeItem(whey, wheyGrams, 'fast_protein');
+        if (wItem.p > 25) { wItem.p = 25; wItem.kcal = Math.round(wItem.p * 4 + wItem.f * 9 + wItem.c * 4); }
+        items.push(wItem); remP -= wItem.p; remF -= wItem.f; remC -= wItem.c;
+      }
+    }
+  }
+
+  // 2. Углеводы: медленные по умолчанию
+  if (remC > 8) {
+    const carbSource = pick(pool.carbSlow, seed + 1);
+    if (carbSource) {
+      const grams = gramsForMacro(carbSource, remC, 'carbs');
+      if (grams > 0) {
+        const item = makeItem(carbSource, grams, 'carb_slow');
+        items.push(item); remP -= item.p; remF -= item.f; remC -= item.c;
+      }
+    }
+  }
+
+  // 3. Овощи (волокно + микро): порция ≥150 г, без учёта в приоритете макроса
+  if (includeVeg) {
+    const vegSource = pick(pool.vegGreen, seed + 2) || pick(pool.vegColor, seed + 3);
+    if (vegSource) {
+      const grams = 150 + Math.floor(seededRandom(seed + 3) * 100);
+      const item = makeItem(vegSource, grams, 'veg');
+      items.push(item); remP -= item.p; remF -= item.f; remC -= item.c;
+    }
+  }
+
+  // 4. Фрукт (ягоды/киви как пребиотик и антиоксидант)
+  if (includeFruit) {
+    const fSrc = pick(pool.carbFruit, seed + 4);
+    if (fSrc) {
+      const grams = 80 + Math.floor(seededRandom(seed + 5) * 60);
+      const item = makeItem(fSrc, grams, 'fruit');
+      items.push(item); remP -= item.p; remF -= item.f; remC -= item.c;
+    }
+  }
+
+  // 5. Жиры: остаточный принцип (если remF > 5)
+  if (remF > 5) {
+    const fatSource = pick(pool.fats, seed + 6);
+    if (fatSource) {
+      const grams = gramsForMacro(fatSource, remF, 'fat');
+      if (grams > 0) {
+        const item = makeItem(fatSource, grams, 'fat');
+        items.push(item); remP -= item.p; remF -= item.f; remC -= item.c;
+      }
+    }
+  }
+
+  const totals = items.reduce((acc, it) => ({
+    kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
+    fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
+  }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+  const mpsCheck = {
+    proteinG: totals.p,
+    leucineG: Math.round(totals.leucine_mg / 10) / 100,
+    triggers_mTOR: totals.leucine_mg >= LEU_THRESHOLD_MG && totals.p >= 25,
+  };
+
+  return { label, time, items, totals, type, rationale: rationales, mpsCheck };
+}
+
+// ─── МЕТОД: pre-workout приём (–90 мин до тренировки) ─────────────────
+function buildPreWorkout(
+  time: string, label: string, seed: number,
+  pool: ReturnType<typeof buildFoodPools>,
+  budget: MealPlanInput['budget'],
+  preferredIds?: Set<string>,
+): Meal {
+  const leanProteinPool = pool.proteinLean.length > 0 ? pool.proteinLean : pool.proteinSolid;
+  const prefProtein = preferredIds && preferredIds.size > 0 ? leanProteinPool.filter(f => preferredIds.has(f.id)) : [];
+  const proteinSource = pick(prefProtein.length > 0 ? prefProtein : leanProteinPool, seed);
+  const carbSource = pick(pool.carbSlow, seed + 1);
+  const items: MealItem[] = [];
+
+  if (proteinSource) {
+    const grams = gramsForMacro(proteinSource, PREW_PROTEIN_G, 'protein');
+    items.push(makeItem(proteinSource, grams, 'protein'));
+  }
+  if (carbSource) {
+    const grams = gramsForMacro(carbSource, PREW_CARB_SLOW_G, 'carbs');
+    items.push(makeItem(carbSource, grams, 'carb_slow'));
+  }
+
+  const totals = items.reduce((acc, it) => ({
+    kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
+    fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
+  }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+  return {
+    label, time, items, totals, type: 'preworkout',
+    rationale: [
+      `Pre-workout за ~90 мин: белок ${PREW_PROTEIN_G} г (снижение катаболизма)`,
+      `Медленные углеводы ${PREW_CARB_SLOW_G} г (гликоген, стабильная глюкоза)`,
+      `Жиры ≤ ${PREW_FAT_MAX_G} г — не задерживают gastric emptying`,
+    ],
+    mpsCheck: { proteinG: totals.p, leucineG: Math.round(totals.leucine_mg) / 1000, triggers_mTOR: totals.leucine_mg >= LEU_THRESHOLD_MG },
+  };
+}
+
+// ─── МЕТОД: post-workout приём (+60 мин) ──────────────────────────────
+function buildPostWorkout(
+  time: string, label: string, seed: number,
+  pool: ReturnType<typeof buildFoodPools>,
+): Meal {
+  const fastProtein = pool.fastProtein[0];
+  const fastCarb = pick(pool.carbFast, seed + 1);
+  const items: MealItem[] = [];
+
+  if (fastProtein) {
+    const grams = gramsForMacro(fastProtein, POSTW_FAST_PROTEIN_G, 'protein');
+    items.push(makeItem(fastProtein, grams, 'fast_protein'));
+  }
+  if (fastCarb) {
+    const grams = gramsForMacro(fastCarb, POSTW_FAST_CARB_G, 'carbs');
+    items.push(makeItem(fastCarb, grams, 'carb_fast'));
+  }
+
+  const totals = items.reduce((acc, it) => ({
+    kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
+    fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
+  }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+  return {
+    label, time, items, totals, type: 'postworkout',
+    rationale: [
+      `Post-workout +60 мин: сывороточный белок ${POSTW_FAST_PROTEIN_G} г — пик аминокислот в крови через 60 мин`,
+      `Быстрые углеводы ${POSTW_FAST_CARB_G} г — быстрое гликоген-восстановление, ↑инсулин (vs глюкагон)`,
+      `Жиры ≤ 5 г — не тормозят абсорбцию`,
+    ],
+    mpsCheck: { proteinG: totals.p, leucineG: Math.round(totals.leucine_mg) / 1000, triggers_mTOR: totals.leucine_mg >= LEU_THRESHOLD_MG && totals.p >= 25 },
+  };
+}
+
+// ─── МЕТОД: intra-workout (тяжёлый training) ─────────────────────────
+function buildIntraWorkout(time: string, seed: number, pool: ReturnType<typeof buildFoodPools>): Meal {
+  const items: MealItem[] = [];
+  if (pool.eaa) items.push(makeItem(pool.eaa, INTRA_EAA_G, 'fast_protein'));
+  // Dextrin (amylopectin): если нет — синтетический пункт
+  if (pool.dextrin) {
+    items.push(makeItem(pool.dextrin, INTRA_CARB_G_PER_H, 'liquid'));
+  } else {
+    items.push({ id: 'cyclic_dextrin', name: 'Циклический декстрин', amount: INTRA_CARB_G_PER_H, kcal: INTRA_CARB_G_PER_H * 4, p: 0, f: 0, c: INTRA_CARB_G_PER_H, fiber: 0, role: 'liquid' });
+  }
+  const totals = items.reduce((acc, it) => ({
+    kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
+    fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
+  }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+  void seed;
+  return {
+    label: '🏋 Intra-workout', time, items, totals, type: 'intra',
+    rationale: [
+      `EAA ${INTRA_EAA_G} г — предотвращение катаболизма во время длительной (>60 мин) сессии`,
+      `Циклодекстрин ${INTRA_CARB_G_PER_H} г/ч — поддержание глюкозы и гликогена`,
+      `Без жиров — максимальная скорость gastric emptying`,
+    ],
+  };
+}
+
+// ─── МЕТОД: pre-sleep казеиновый приём ───────────────────────────────
+function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof buildFoodPools>, residualP: number): Meal {
+  const caseinSource = pool.slowProtein[0] || FOOD_DB.find(f => f.id === 'casein') || FOOD_DB.find(f => f.id.includes('cottage'));
+  const items: MealItem[] = [];
+  if (caseinSource) {
+    const targetP = Math.max(30, Math.min(45, residualP));
+    const grams = gramsForMacro(caseinSource, targetP, 'protein');
+    items.push(makeItem(caseinSource, grams, 'slow_protein'));
+  }
+  // Mg-источник (тыквенные семечки) — 20 г
+  const mgSource = FOOD_DB.find(f => f.id === 'pumpkin_seeds' || f.id === 'sunflower_seeds' || f.id === 'seeds');
+  if (mgSource) items.push(makeItem(mgSource, 20, 'fat'));
+  // Мелатонин-источник (киви 100 г)
+  const melSource = FOOD_DB.find(f => f.id === 'kiwi' || f.id === 'berries');
+  if (melSource) items.push(makeItem(melSource, 100, 'fruit'));
+
+  const totals = items.reduce((acc, it) => ({
+    kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
+    fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
+  }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+  void seed;
+  return {
+    label: '🌙 Pre-sleep', time, items, totals, type: 'presleep',
+    rationale: [
+      'Казеин 30–40 г — медленный белок, ночная защита от катаболизма (6–8 ч)',
+      'Mg (тыквенные семечки) 150 мг — релаксация мышц и нервной системы',
+      'Киви/вишня — серотонин + антиоксиданты (+42% качество сна)',
+    ],
+    mpsCheck: { proteinG: totals.p, leucineG: Math.round(totals.leucine_mg) / 1000, triggers_mTOR: false },
+  };
+}
+
+function fmtTime(min: number): string {
+  const m = ((min % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+}
+
+// ─── ОСНОВНОЙ ВХОД: построить дневной план ───────────────────────────
+export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
+  const pool = buildFoodPools(input.excludedIds || new Set(), !!input.isVegetarian, input.budget);
+  const seedBase = input.dayOffset * 10007 + (input.isTrainingDay ? 3000 : 7000);
+  const rotation = pickRotation(input.dayOffset);
+  const proteinRotationIds = rotation.ids;
+  const meals: Meal[] = [];
+
+  // ─── Распределение макросов по приёмам (MPS-based) ───────────────────
+  const mpsPerMeal = Math.round(input.lbmKg * MPS_LBM_LOW);
+  const trainWindow = input.isTrainingDay && !!input.trainStartMin;
+  // Carb periodization: тренировка → 25% pre+30% post+15% lunch; отдых → 30/30/20
+  const carbsTotal = Math.max(CARB_FLOOR_G, input.goalCarbsG);
+  const breakC = Math.round(carbsTotal * 0.22);
+  const trainCarbLunch = Math.round(carbsTotal * 0.18);
+  const restCarbLunch = Math.round(carbsTotal * 0.30);
+  const trainCarbDinner = Math.round(carbsTotal * 0.12);
+  const restCarbDinner = Math.round(carbsTotal * 0.20);
+  const fatTotal = Math.max(Math.round(input.weightKg * FAT_FLOOR_PER_KG), input.goalFatG);
+
+  const mealBudget = {
+    breakfast: { p: Math.max(25, mpsPerMeal), c: breakC, f: Math.round(fatTotal * 0.25) },
+    lunch: { p: Math.max(25, mpsPerMeal), c: trainWindow ? trainCarbLunch : restCarbLunch, f: Math.round(fatTotal * 0.2) },
+    dinner: { p: Math.max(25, mpsPerMeal), c: trainWindow ? trainCarbDinner : restCarbDinner, f: Math.round(fatTotal * 0.3) },
+    prew: trainWindow ? { p: PREW_PROTEIN_G, c: PREW_CARB_SLOW_G, f: PREW_FAT_MAX_G } : null,
+    postw: trainWindow ? { p: POSTW_FAST_PROTEIN_G, c: POSTW_FAST_CARB_G, f: 0 } : null,
+  };
+
+  const usedP = mealBudget.breakfast.p + mealBudget.lunch.p + mealBudget.dinner.p + (mealBudget.prew?.p || 0) + (mealBudget.postw?.p || 0);
+  const usedC = mealBudget.breakfast.c + mealBudget.lunch.c + mealBudget.dinner.c + (mealBudget.prew?.c || 0) + (mealBudget.postw?.c || 0);
+  const residualP = Math.max(25, input.goalProteinG - usedP);
+  const residualC = Math.max(0, carbsTotal - usedC);
+
+  const allFoodsUsed: string[] = [];
+  const notes: string[] = [
+    `Ротация белка: «${rotation.label}» — ${rotation.note}`,
+    `MPS per meal: ${mpsPerMeal} г (≈${MPS_LBM_LOW} г/кг LBM), интервал 3–5 ч для синтеза`,
+  ];
+
+  // 1. Завтрак — белок + медленные углеводы + жиры + ягоды ─────────────
+  const breakfast = buildWholeMeal({
+    label: 'Завтрак', time: '07:30', type: 'breakfast',
+    proteinG: mealBudget.breakfast.p,
+    carbG: mealBudget.breakfast.c,
+    fatG: mealBudget.breakfast.f,
+    pool, proteinRotationIds, seed: seedBase + 1,
+    includeVeg: false, includeFruit: true,
+    preferredIds: input.preferredIds,
+    rationales: [
+      'Завтрак: белок + медленные углеводы + жиры + ягоды',
+      'Желчь активна, липаза готова — жиры хорошо усваиваются',
+      'Ягоды — антоцианы, защита от свободных радикалов',
+    ],
+  });
+  meals.push(breakfast);
+  breakfast.items.forEach(i => allFoodsUsed.push(i.id));
+
+  // 2. Обед — основной цельный приём ─────────────────────────────────────
+  const lunch = buildWholeMeal({
+    label: 'Обед', time: '12:30', type: 'lunch',
+    proteinG: mealBudget.lunch.p,
+    carbG: mealBudget.lunch.c,
+    fatG: mealBudget.lunch.f,
+    pool, proteinRotationIds, seed: seedBase + 2,
+    includeVeg: true, includeFruit: false,
+    preferredIds: input.preferredIds,
+    rationales: [
+      'Обед: цельная пища (белок + злак + овощи + жиры)',
+      'Поддержание MPS — четверть суточного белка',
+    ],
+  });
+  meals.push(lunch);
+  lunch.items.forEach(i => allFoodsUsed.push(i.id));
+
+  // 3. Pre-workout (если тренировка) — за 90 мин до старта ─────────────
+  if (trainWindow && mealBudget.prew && input.trainStartMin) {
+    const preTime = fmtTime(input.trainStartMin - 90);
+    const prew = buildPreWorkout(preTime, 'Предтренируюсь', seedBase + 3, pool, input.budget, input.preferredIds);
+    meals.push(prew);
+    prew.items.forEach(i => allFoodsUsed.push(i.id));
+    notes.push('Pre-workout: белок + медленные углеводы за 90 мин (как минимум 1 прием пищи до тренировки)');
+  }
+
+  // 4. Intra-workout (тяжёлый training, allowIntraWorkout=true) ─────────
+  if (trainWindow && input.allowIntraWorkout && input.trainStartMin) {
+    const intraTime = fmtTime(input.trainStartMin + 30);
+    const intra = buildIntraWorkout(intraTime, seedBase + 4, pool);
+    meals.push(intra);
+    notes.push('Intra-workout: EAA + циклодекстрин (поддержание глюкозы на длинной тренировке)');
+  }
+
+  // 5. Post-workout (+60 мин) ──────────────────────────────────────────
+  if (trainWindow && mealBudget.postw && input.trainStartMin) {
+    const postTime = fmtTime(input.trainStartMin + 60);
+    const postw = buildPostWorkout(postTime, 'Пост-трен', seedBase + 5, pool);
+    meals.push(postw);
+    postw.items.forEach(i => allFoodsUsed.push(i.id));
+    notes.push('Post-workout: сыворотка + быстрые углеводы в течение 60 мин (анаболическое окно)');
+  }
+
+  // 6. Ужин — основная порция жиров и белковый ротационный ─────────────
+  const dinner = buildWholeMeal({
+    label: 'Ужин', time: '19:00', type: 'dinner',
+    proteinG: mealBudget.dinner.p,
+    carbG: mealBudget.dinner.c + (residualC > 0 ? Math.min(30, residualC) : 0),
+    fatG: mealBudget.dinner.f,
+    pool, proteinRotationIds, seed: seedBase + 6,
+    includeVeg: true, includeFruit: false,
+    preferredIds: input.preferredIds,
+    rationales: [
+      'Ужин: 30% суточной нормы жиров — медленная абсорбция на ночь',
+      'Поддержание MPS — обязательный приём после 4–5 ч без белка',
+      'Овощи — клетчатка + витамины K/C + фитонутриенты',
+    ],
+  });
+  meals.push(dinner);
+  dinner.items.forEach(i => allFoodsUsed.push(i.id));
+
+  // 7. Pre-sleep — казеин + Mg + мелатонин ───────────────────────────────
+  const preSleep = buildPreSleep('22:00', seedBase + 7, pool, residualP);
+  meals.push(preSleep);
+  preSleep.items.forEach(i => allFoodsUsed.push(i.id));
+  notes.push('Pre-sleep: казеин + Mg + мелатонин-источник для ночного восстановления');
+
+  // ─── Дневные итоговые ────────────────────────────────────────────────
+  const totals = meals.reduce((acc, m) => ({
+    kcal: acc.kcal + m.totals.kcal,
+    p: acc.p + m.totals.p,
+    f: acc.f + m.totals.f,
+    c: acc.c + m.totals.c,
+    fiber: acc.fiber + m.totals.fiber,
+    leucine_mg: acc.leucine_mg + m.totals.leucine_mg,
+  }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+
+  const feedings = meals.filter(m => m.mpsCheck && m.mpsCheck.proteinG >= 25).length;
+  const mpsSummary = {
+    feedings,
+    avg_leucine_g: Math.round(totals.leucine_mg / Math.max(1, feedings) / 10) / 100,
+    avg_protein_per_meal_g: Math.round(totals.p / Math.max(1, meals.length)),
+    intra_workout: meals.some(m => m.type === 'intra'),
+    prePostWindow: meals.some(m => m.type === 'preworkout') && meals.some(m => m.type === 'postworkout'),
+  };
+
+  const uniqueFoods = new Set(allFoodsUsed).size;
+  const categories: Record<string, number> = {};
+  allFoodsUsed.forEach(id => {
+    const f = FOOD_DB.find(x => x.id === id);
+    const cat = f?.category || 'other';
+    categories[cat] = (categories[cat] || 0) + 1;
+  });
+
+  // ─── Коррекция дефицита (KBJU matching ≤2%) ─────────────────────────
+  const TOL = 0.05;
+  const devK = Math.abs(totals.kcal - input.goalKcal) / Math.max(1, input.goalKcal);
+  const devP = Math.abs(totals.p - input.goalProteinG) / Math.max(1, input.goalProteinG);
+  if (devK > TOL || devP > TOL) {
+    const scaleK = input.goalKcal / Math.max(1, totals.kcal);
+    const scaleP = input.goalProteinG / Math.max(1, totals.p);
+    const scale = Math.min(1.3, Math.max(0.7, (scaleK + scaleP) / 2));
+    meals.forEach(m => {
+      m.items.forEach(it => {
+        it.amount = Math.round(it.amount * scale);
+        it.kcal = Math.round(it.kcal * scale);
+        it.p = Math.round(it.p * scale);
+        it.f = Math.round(it.f * scale);
+        it.c = Math.round(it.c * scale);
+        it.fiber = Math.round(it.fiber * scale);
+        it.leucine_mg = Math.round((it.leucine_mg || 0) * scale);
+      });
+      m.totals = m.items.reduce((acc, it) => ({
+        kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
+        fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
+      }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+    });
+    totals.kcal = Math.round(totals.kcal * scale);
+    totals.p = Math.round(totals.p * scale);
+    totals.f = Math.round(totals.f * scale);
+    totals.c = Math.round(totals.c * scale);
+    totals.fiber = Math.round(totals.fiber * scale);
+    totals.leucine_mg = Math.round(totals.leucine_mg * scale);
+  }
+
+  notes.push(`Сводка MPS: ${feedings} feedings × ${mpsSummary.avg_protein_per_meal_g} г/meal, ${mpsSummary.avg_leucine_g} г лейцина (порог ${LEU_THRESHOLD_MG / 1000} г)`);
+  notes.push(`Диверсификация: ${uniqueFoods} уникальных продуктов (${Object.keys(categories).length} категорий)`);
+  if (input.isCutting) notes.push('Сушка: повышенная плотность белка, заниженные углеводы у ужина');
+  if (mpsSummary.prePostWindow) notes.push('Pre/post-workout окно реализовано (полноценное анаболическое обеспечение тренировки)');
+
+  return {
+    dayIndex: input.dayOffset,
+    isTrainingDay: input.isTrainingDay,
+    meals,
+    totals,
+    mpsSummary,
+    diversity: { uniqueFoods, categories },
+    notes,
+  };
+}

@@ -11,11 +11,7 @@ import { StackTab } from './BioStackAIStack';
 import { RisksTab } from './BioStackAIRisks';
 import { CompareTab } from './BioStackAICompare';
 import { ReportsTab } from './BioStackAIReports';
-import { PeriodizationTab } from './BioStackAIPeriodization';
-import { InteractionsTab } from './BioStackAIInteractions';
-import { ClinicalTab } from './BioStackAIClinical';
 import { DrugCheckTab } from './BioStackAIDrugCheck';
-import { LabTab } from './BioStackAILab';
 
 const BIO_TAB_KEY = 'he_biostack_tab';
 
@@ -25,22 +21,16 @@ export const BioStackAIScreen: React.FC = () => {
   });
   const [profile, setProfile] = useState<BioStackProfile>(() => {
     const saved = loadBioStackProfile();
-    if (Object.keys(saved).length <= 5) {
-      const filled = autoFillFromMainProfile();
-      return { ...saved, ...filled };
+    const savedLen = Object.keys(saved).filter(k => k !== 'autoFilledFields').length;
+    if (savedLen <= 6) {
+      const { patch, autoKeys } = autoFillFromMainProfile();
+      return { ...saved, ...patch, autoFilledFields: [...new Set([...(saved.autoFilledFields || []), ...autoKeys])] };
     }
     return saved;
   });
   const [loading, setLoading] = useState(true);
   const linked = useDataLink();
   const labAnalysis: LabCompositeResult | null = linked?.labAnalysis || null;
-  const [persona, setPersona] = useState<'athlete' | 'doctor'>(() => {
-    try { return (localStorage.getItem('he_biostack_persona') as 'athlete' | 'doctor') || 'athlete'; } catch { return 'athlete'; }
-  });
-  const visibleTabs = useMemo(() => {
-    if (persona === 'doctor') return SUB_TABS.filter(t => ['profile','search','stack','risks','reports','clinical','lab','interactions'].includes(t.id));
-    return SUB_TABS.filter(t => t.id !== 'drugcheck' && t.id !== 'clinical');
-  }, [persona]);
   const activeAAS = useMemo(() => {
     try {
       const raw = localStorage.getItem('he_course_data');
@@ -118,10 +108,6 @@ export const BioStackAIScreen: React.FC = () => {
     risks: <RisksTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} activeAAS={activeAAS} />,
     compare: <CompareTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} />,
     reports: <ReportsTab profile={profile} stackIds={stackIds} linked={linked} />,
-    periodization: <PeriodizationTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
-    interactions: <InteractionsTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} />,
-    clinical: <ClinicalTab profile={profile} setProfile={setProfile} stackIds={stackIds} linked={linked} onNavigateLab={() => setTab('lab')} />,
-    lab: <LabTab linked={linked} stackIds={stackIds} />,
     drugcheck: <DrugCheckTab profile={profile} stackIds={stackIds} />,
   };
 
@@ -130,18 +116,11 @@ export const BioStackAIScreen: React.FC = () => {
       <style>{BIO_ANIM_CSS}</style>
       <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', textAlign: 'center', marginBottom: 4 }}>
         🧬 BioStack AI — Операционная система управления БАДами
-        <span onClick={() => { const next = persona === 'athlete' ? 'doctor' : 'athlete'; setPersona(next); localStorage.setItem('he_biostack_persona', next); }}
-          style={{ marginLeft: 8, padding: '2px 6px', borderRadius: 6, fontSize: 7, cursor: 'pointer',
-            background: persona === 'doctor' ? 'rgba(239,68,68,0.1)' : 'rgba(96,165,250,0.1)',
-            border: `1px solid ${persona === 'doctor' ? 'rgba(239,68,68,0.2)' : 'rgba(96,165,250,0.2)'}`,
-            color: persona === 'doctor' ? '#ef4444' : '#60a5fa' }}>
-          {persona === 'athlete' ? '🏋️ Спортсмен' : '👨‍⚕️ Врач'}
-        </span>
       </div>
 
       {/* ── Sub tab bar ── */}
       <div style={{ display: 'flex', gap: 2, marginBottom: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}>
-        {visibleTabs.map(t => (
+        {SUB_TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             flexShrink: 0, padding: '5px 8px', borderRadius: 12, fontSize: 8, fontWeight: 700,
             cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s',

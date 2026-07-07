@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import type { WorkoutLog } from '../../../core/types';
 import { loadReadinessHistory } from './readiness-history';
+import { applyToPlanner } from './planner-bridge';
 
 interface WeeklyPoint {
   weekStart: string;
@@ -139,6 +140,12 @@ const VolumeRecoveryCorrelationCard: React.FC<{ sessions: WorkoutLog[] }> = ({ s
           ⚠ При увеличении объёма готовность снижается. Рекомендуется не превышать {Math.round(points[points.length - 1]?.volume || 0).toLocaleString()} кг/нед.
         </div>
       )}
+{estimatedMRV != null && (
+      <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginBottom: 6 }}>🔗 MRV из корреляции объём↔восстановление: <b style={{ color: '#00e68a' }}>{estimatedMRV}</b> (объём, где готовность падает до 40).</div>
+        <button onClick={() => applyToPlanner({ kind: 'mrv', label: 'MRV (корреляция) ' + estimatedMRV, data: { mrv: estimatedMRV } })} style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 12, minHeight: 40 }}>🛠 Применить MRV к планировщику</button>
+      </div>
+    )}
     </div>
   );
 };

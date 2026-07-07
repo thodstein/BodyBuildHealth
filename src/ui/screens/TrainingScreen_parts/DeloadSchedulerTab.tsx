@@ -4,6 +4,7 @@ import { loadSRPESessions, type SRPESession } from '../../../engines/pro/srpe-st
 import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../../engines/pro/training-load.engine';
 import { useDataLink } from '../../../core/data-link';
 import { DeloadProtocolCard } from './DeloadProtocolCard';
+import { applyToPlanner } from './planner-bridge';
 
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: '12px', margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -397,6 +398,12 @@ export const DeloadSchedulerTab: React.FC = () => {
           goal: deloadGoal,
         }} />
       </div>
+      {schedule.deloadWeeks.length > 0 && (
+        <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить делод-недели ({schedule.deloadWeeks.join(', ')}) к планировщику — объём ×0.5, RIR +3 на этих неделях.</div>
+          <button onClick={() => applyToPlanner({ kind: 'deload', label: 'Делод: нед ' + schedule.deloadWeeks.join(','), data: { volumeMult: 0.5, rirShift: 3, weeks: schedule.deloadWeeks } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить делод к планировщику</button>
+        </div>
+      )}
     </div>
   );
 };

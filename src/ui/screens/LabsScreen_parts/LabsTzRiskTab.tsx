@@ -127,12 +127,19 @@ export const LabsTzRiskTab: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
           <div>
             <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Класс</div>
-            <select value={drugClass} onChange={e => setDrugClass(e.target.value as any)}
-              style={{ width: '100%', padding: '8px 6px', borderRadius: 8, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 10, fontWeight: 600 }}>
-              <option value="aas">💉 ААС</option>
-              <option value="gh">📈 GH</option>
-              <option value="insulin">🍬 Инсулин</option>
-            </select>
+            <div style={{ display: 'flex', gap: 3 }}>
+              {(['aas', 'gh', 'insulin'] as const).map(dc => (
+                <button key={dc} onClick={() => setDrugClass(dc)} style={{
+                  flex: 1, padding: '7px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 600,
+                  transition: 'all 0.2s', textAlign: 'center',
+                  background: drugClass === dc ? 'var(--accent)' : 'rgba(24,24,27,0.6)',
+                  color: drugClass === dc ? '#000' : '#fff',
+                  border: `1px solid ${drugClass === dc ? 'var(--accent)' : 'rgba(255,255,255,0.1)'}`,
+                }}>
+                  {dc === 'aas' ? '💉 ААС' : dc === 'gh' ? '📈 GH' : '🍬 Инсулин'}
+                </button>
+              ))}
+            </div>
           </div>
           <div>
             <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Доза</div>

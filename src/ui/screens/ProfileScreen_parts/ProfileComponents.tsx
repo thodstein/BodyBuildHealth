@@ -141,7 +141,7 @@ interface HealthBoolProps {
   onClick: () => void;
 }
 export const HealthBool: React.FC<HealthBoolProps> = ({ label, active, onClick }) => (
-  <button onClick={onClick} style={{
+  <button onClick={(e) => { e.stopPropagation(); onClick(); }} style={{
     padding: '5px 10px',
     borderRadius: 8,
     border: 'none',
@@ -178,6 +178,7 @@ export const HealthNumber: React.FC<HealthNumberProps> = ({ label, value, onChan
         }}
         type="number" min={min} max={max}
         value={value} onChange={e => onChange(e.target.value)}
+        onClick={e => e.stopPropagation()}
         placeholder={placeholder}
       />
       {suffix && <span style={{ fontSize: 9, color: theme.textDim, width: 20 }}>{suffix}</span>}
@@ -207,6 +208,7 @@ export const HealthSlider: React.FC<HealthSliderProps> = ({ label, value, min = 
       type="range" min={min} max={max} step={step}
       value={value}
       onChange={e => onChange(parseFloat(e.target.value) || 0)}
+      onClick={e => e.stopPropagation()}
       style={{ width: '100%', accentColor: theme.accent }}
     />
   </div>
@@ -248,8 +250,9 @@ interface ExpandableCardProps {
 }
 export const ExpandableCard: React.FC<ExpandableCardProps> = ({ icon, title, color = theme.accent, summary, open: controlledOpen, onToggle, children }) => {
   const [internalOpen, setInternalOpen] = React.useState(false);
-  const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
-  const handleToggle = onToggle || (() => setInternalOpen(p => !p));
+  const isControlled = controlledOpen !== undefined && onToggle !== undefined;
+  const isOpen = isControlled ? controlledOpen : internalOpen;
+  const handleToggle = isControlled ? onToggle! : (() => setInternalOpen(p => !p));
   return (
     <div style={{ ...glassCardStyle, cursor: 'pointer', borderColor: isOpen ? color : undefined }} onClick={handleToggle}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

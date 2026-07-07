@@ -9,6 +9,7 @@ import { PopupSelect } from '../../components/PopupXxx';
 import { InfoErrorBoundary, getCategoryInfo, CLASS_BASE_NAMES, MECH_TRANSLATIONS_RU, TYPE_LABELS_RU, MECH_LABELS } from './SupportScreenData';
 import { ALL_STACKS, ALL_INTERACTIONS, SUPPORT_CATALOG_DATA, getSubstanceTier, TIER_LABELS, SYSTEM_LABELS_CATALOG, type SupportSubstance } from '../../../data/support-database';
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../../data/support-db';
+import { SupportInteractionsView } from './SupportInteractionsView';
 
 export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const {
@@ -36,16 +37,16 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
   } = s;
   return (
               <div>
-                {/* Sub-tabs: По типам / По органам / Стеки */}
-                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
-                   {(['type','organ','stack'] as const).map((t: any) => (
-                     <button key={t} onClick={() => { if (t === 'organ') { setExpandedCategories(prev => { const n: Record<string,boolean>={}; Object.keys(prev).forEach((k: any) =>{if(k.startsWith('organ_'))n[k]=true}); return {...prev,...n}; }); } setCatalogSubTab(t); }} style={{
-                       padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
-                       background: catalogSubTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
-                       color: catalogSubTab === t ? '#000' : 'var(--text-dim)',
-                       border: `1px solid ${catalogSubTab === t ? 'var(--accent)' : 'var(--border)'}`,
-                     }}>{t === 'stack' ? '🧩 Готовые стеки' : t === 'type' ? '📋 По типам' : '🫀 По органам'}</button>
-                   ))}
+                 {/* Sub-tabs: По типам / По органам / Стеки / Взаимодействия */}
+                  <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
+                    {(['type','organ','stack','interactions'] as const).map((t: any) => (
+                      <button key={t} onClick={() => { if (t === 'organ') { setExpandedCategories(prev => { const n: Record<string,boolean>={}; Object.keys(prev).forEach((k: any) =>{if(k.startsWith('organ_'))n[k]=true}); return {...prev,...n}; }); } setCatalogSubTab(t); }} style={{
+                        padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
+                        background: catalogSubTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
+                        color: catalogSubTab === t ? '#000' : 'var(--text-dim)',
+                        border: `1px solid ${catalogSubTab === t ? 'var(--accent)' : 'var(--border)'}`,
+                      }}>{t === 'stack' ? '🧩 Готовые стеки' : t === 'type' ? '📋 По типам' : t === 'organ' ? '🫀 По органам' : '⚠ Взаимодействия'}</button>
+                    ))}
                  </div>
                 <div style={{ display:'flex', gap:6, marginBottom:8, alignItems:'center' }}>
                   <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-light)', fontSize:12 }} />
@@ -239,6 +240,10 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                       })}
                     </div>
                   )}
+                {/* ─── ВЗАИМОДЕЙСТВИЯ (подвкладка каталога) ─── */}
+                {catalogSubTab === 'interactions' && (
+                  <SupportInteractionsView s={s} />
+                )}
                 {/* Complexes tab removed — all substances now in type/organ/tier views */}
                 {(catalogSubTab === 'type' || !catalogSubTab) && (
                 /* По типам — все 280 препаратов, сгруппированы по типу (без органов/функций) */

@@ -15,11 +15,12 @@ interface Props {
   daysPerWeek: number;
   setResult: (r: ManualResult | null) => void;
   onToRuntime: () => void;
+  globalTempoStr?: string;
 }
 
 export const PlanDisplay: React.FC<Props> = ({
   result, manualWorkMax, tprofile, goal, level, mesoLength, daysPerWeek,
-  setResult, onToRuntime,
+  setResult, onToRuntime, globalTempoStr,
 }) => {
   const [subModal, setSubModal] = useState<{ dayIdx: number; exIdx: number; options: { id: string; name: string; reason: string }[] } | null>(null);
   const [inlineEdit, setInlineEdit] = useState<{ dayIdx: number; exIdx: number; field: string; value: string } | null>(null);
@@ -174,7 +175,7 @@ export const PlanDisplay: React.FC<Props> = ({
             {d.exercises.map((e, ei) => {
               const tempoKey = `${di}-${ei}`;
               const overrideTempo = exerciseTempos[tempoKey];
-              const tmpo = overrideTempo ? { tempo: { toString: overrideTempo } } : generateRepTempo({ goal: goal === 'strength' ? 'strength' : 'hypertrophy', riskLevel: 'low', difficultyLevel: 'medium', techniqueIssues: [], isMainLift: ei === 0 });
+              const tmpo = globalTempoStr ? { tempo: { toString: globalTempoStr } } : (overrideTempo ? { tempo: { toString: overrideTempo } } : generateRepTempo({ goal: goal === 'strength' ? 'strength' : 'hypertrophy', riskLevel: 'low', difficultyLevel: 'medium', techniqueIssues: [], isMainLift: ei === 0 }));
               return (
                 <div key={ei} draggable onDragStart={ev => handleDragStart(ev, di, ei)} onDragOver={handleDragOver} onDrop={ev => handleDrop(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'grid', gridTemplateColumns: '14px 1.8fr 0.7fr 0.7fr 0.5fr 0.5fr 0.5fr 0.7fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab', alignItems: 'center' }}>
                   <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', cursor: 'grab', userSelect: 'none' }}>⠿</span>

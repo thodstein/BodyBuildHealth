@@ -29,6 +29,78 @@ export interface BioStackProfile {
   adClass: ADClass; stackComplexity: StackComplexity;
   targetOrgans: string[]; targetSystems: string[];
   currentMeds: string[]; drugAllergies: string[];
+  autoFilledFields: string[];
+}
+
+/* ── Completeness ── */
+export interface ProfileCompleteness {
+  totalGroups: number;
+  filledGroups: number;
+  totalFields: number;
+  filledFields: number;
+  autoFilledCount: number;
+  manualFilledCount: number;
+  percent: number;
+  groupStatus: Record<string, { filled: boolean; source: 'auto' | 'manual' | 'empty' }>;
+}
+
+const FIELD_GROUPS: Record<string, string[]> = {
+  personal: ['age','weight','height','sex','experience'],
+  health: ['aasStatus','healthConditions','budget','stackComplexity'],
+  goals: ['goals'],
+  organs: ['targetOrgans'],
+  systems: ['targetSystems'],
+  avoid: ['avoidIds'],
+  clinical: ['currentMeds','drugAllergies','adClass'],
+};
+
+const AUTO_FILLABLE_KEYS = new Set([
+  'age','weight','height','sex','experience','goals','healthConditions','currentMeds','drugAllergies',
+]);
+
+export function getProfileCompleteness(p: BioStackProfile): ProfileCompleteness {
+  const autoSet = new Set(p.autoFilledFields || []);
+  let filledFields = 0; let autoCount = 0; let manualCount = 0;
+  for (const key of Object.keys(p)) {
+    if (key === 'autoFilledFields') continue;
+    const v = (p as any)[key];
+    const isFilled = Array.isArray(v) ? v.length > 0 : (v !== undefined && v !== null && v !== '' && v !== 0);
+    if (isFilled) {
+      filledFields++;
+      if (autoSet.has(key)) autoCount++;
+      else manualCount++;
+    }
+  }
+  const groupStatus: Record<string, { filled: boolean; source: 'auto' | 'manual' | 'empty' }> = {};
+  let filledGroups = 0;
+  for (const [gname, keys] of Object.entries(FIELD_GROUPS)) {
+    const allFilled = keys.every(k => {
+      const v = (p as any)[k];
+      return Array.isArray(v) ? v.length > 0 : (v !== undefined && v !== null && v !== '' && v !== 0);
+    });
+    if (allFilled) {
+      filledGroups++;
+      const allAuto = keys.every(k => autoSet.has(k));
+      groupStatus[gname] = { filled: true, source: allAuto ? 'auto' : 'manual' };
+    } else {
+      const someFilled = keys.some(k => {
+        const v = (p as any)[k];
+        return Array.isArray(v) ? v.length > 0 : (v !== undefined && v !== null && v !== '' && v !== 0);
+      });
+      groupStatus[gname] = { filled: false, source: someFilled ? 'manual' : 'empty' };
+    }
+  }
+  const totalFields = Object.keys(p).filter(k => k !== 'autoFilledFields').length;
+  return {
+    totalGroups: Object.keys(FIELD_GROUPS).length,
+    filledGroups,
+    totalFields,
+    filledFields,
+    autoFilledCount: autoCount,
+    manualFilledCount: manualCount,
+    percent: Math.round((filledFields / totalFields) * 100),
+    groupStatus,
+  };
 }
 
 export function getDefaultBioStackProfile(): BioStackProfile {
@@ -40,24 +112,27 @@ export function getDefaultBioStackProfile(): BioStackProfile {
     adClass: 'none', stackComplexity: 'balanced',
     targetOrgans: [], targetSystems: [],
     currentMeds: [], drugAllergies: [],
+    autoFilledFields: [],
   };
 }
 
-export function autoFillFromMainProfile(): Partial<BioStackProfile> {
+export function autoFillFromMainProfile(): { patch: Partial<BioStackProfile>; autoKeys: string[] } {
   try {
-    const p = getProfile(); if (!p) return {};
-    const s = p.settings; if (!s) return {};
+    const p = getProfile(); if (!p) return { patch: {}, autoKeys: [] };
+    const s = p.settings; if (!s) return { patch: {}, autoKeys: [] };
     const filled: Partial<BioStackProfile> = {};
-    if (s.age) filled.age = s.age;
-    if (s.weight) filled.weight = s.weight;
-    if (s.height) filled.height = s.height;
-    if (s.sex) filled.sex = s.sex;
+    const keys: string[] = [];
+    if (s.age) { filled.age = s.age; keys.push('age'); }
+    if (s.weight) { filled.weight = s.weight; keys.push('weight'); }
+    if (s.height) { filled.height = s.height; keys.push('height'); }
+    if (s.sex) { filled.sex = s.sex; keys.push('sex'); }
     if (s.trainingLevel) {
       filled.experience = s.trainingLevel === 'beginner' ? 'beginner' : s.trainingLevel === 'intermediate' ? 'intermediate' : 'advanced';
+      keys.push('experience');
     }
     if (s.primaryGoal) {
       const g: Record<string, GoalType> = { bulk: 'muscle_gain', cut: 'fat_loss', maintenance: 'recovery', strength: 'muscle_gain', endurance: 'endurance', health: 'immunity' };
-      if (g[s.primaryGoal]) filled.goals = [g[s.primaryGoal]];
+      if (g[s.primaryGoal]) { filled.goals = [g[s.primaryGoal]]; keys.push('goals'); }
     }
     if (s.medicalConditions) {
       const hc: HealthCondition[] = [];
@@ -72,16 +147,18 @@ export function autoFillFromMainProfile(): Partial<BioStackProfile> {
         if (cl.includes('autoim') || cl.includes('аутоим')) hc.push('autoimmune');
         if (cl.includes('pressure') || cl.includes('давлен')) { hc.push('pressure_high'); }
       }
-      if (hc.length > 0) filled.healthConditions = hc;
+      if (hc.length > 0) { filled.healthConditions = hc; keys.push('healthConditions'); }
     }
     if ((s as any).currentMedications?.length) {
       filled.currentMeds = (s as any).currentMedications.map((m: any) => m.name || String(m));
+      keys.push('currentMeds');
     }
     if ((s as any).allergies?.length) {
       filled.drugAllergies = (s as any).allergies;
+      keys.push('drugAllergies');
     }
-    return filled;
-  } catch { return {}; }
+    return { patch: filled, autoKeys: keys };
+  } catch { return { patch: {}, autoKeys: [] }; }
 }
 
 export function saveBioStackProfile(p: BioStackProfile): void {

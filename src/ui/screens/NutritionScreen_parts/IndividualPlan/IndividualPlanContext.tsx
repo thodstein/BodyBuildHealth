@@ -8,11 +8,13 @@ import { updateProfile } from "../../../../core/profile-manager";
 import { getRecipesByMeal, type Recipe } from "../../../../engines/nutrition-periodization.engine";
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type DailyDietReport, type MealScoreV2 } from "../../../../engines/product-usefulness-v2.engine";
 import { generateNutritionReport, type NutritionReport } from "../../../../engines/nutrition-report.engine";
-import type { UserProfile } from "../../../../core/types";
+import type { UserProfile, LabPoint } from "../../../../core/types";
 import { getContraindications, saveContraindications } from "../../../../core/contraindications";
 import { getNutritionV2Data, saveNutritionV2Data } from "../../../../core/nutrition-v2-data";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
+import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
+import { buildDayPlan as buildDayPlanV2, type DayPlanV2, type MealPlanInput } from "./meal-plan-engine";
 import {
   GOALS, PHASES, BUDGET_LEVELS, NUTRITION_LEVELS, PLAN_TYPES,
   ALLERGEN_LIST, HEALTH_ISSUES,
@@ -24,6 +26,8 @@ import { getProfileSafe, GlassCard, PillBtn, inputStyle, selectStyle, greenBtn, 
 
 export interface PlanCtx {
   profile: UserProfile | null;
+  labs: LabPoint[];
+  labAnalysis: LabCompositeResult | null | undefined;
   s: any;
   courseEntries: any[];
   weight: number; setWeight: (v: number) => void;
@@ -203,12 +207,14 @@ export interface PlanCtx {
   v2Pharma: Record<string, boolean>; setV2Pharma: (v: any) => void;
   histamineSensitive: boolean; setHistamineSensitive: (v: boolean) => void;
   dietPrefs: string[]; setDietPrefs: (v: string[]) => void;
+  errorMsg: string | null; setErrorMsg: (v: string | null) => void;
+  useProEngine: boolean; setUseProEngine: (v: boolean) => void;
 }
 
 const PlanContext = createContext<PlanCtx>(null as any);
 export const usePlanCtx = () => useContext(PlanContext);
 
-export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; course?: any[]; children: React.ReactNode }> = ({ profile: _profile, course: _course, children }) => {
+export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; course?: any[]; labs?: LabPoint[]; labAnalysis?: LabCompositeResult | null; children: React.ReactNode }> = ({ profile: _profile, course: _course, labs = [], labAnalysis, children }) => {
   const profile = _profile || getProfileSafe();
   const s = profile?.settings;
   const courseEntries = _course || [];
@@ -554,8 +560,90 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
 
   // ─── Generate Plan ───
   const generatePlan = (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number) => {
+    try {
     setPlanDays(days);
     if (dayIndex !== undefined) setSelectedDayIndex(dayIndex);
+
+    // ─── Pro Engine path (MPS-based, professional bodybuilding dietology) ───
+    if (useProEngine) {
+      const toMin = (t: string) => t?.includes(':') ? parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]) : 0;
+      const bfPct = bodyFatPct > 3 ? bodyFatPct : (sex === 'male' ? 15 : 22);
+      const lbmKg = weight * (1 - bfPct / 100);
+      const nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
+      const trainStartMin = linkToTraining && trainStart?.includes(':') ? toMin(trainStart) : undefined;
+      const excludedIds = new Set<string>(excludedFoods);
+      healthIssues.forEach(hid => { const issue = HEALTH_ISSUES.find(h => h.id === hid); if (issue?.foodIds) issue.foodIds.forEach(fid => excludedIds.add(fid)); });
+      if (dietPrefs.includes('vegetarian')) {
+        Object.entries(FOOD_ALLERGEN_DIET).forEach(([fid, tags]) => { if (tags.isVegetarian === false) excludedIds.add(fid); });
+      }
+      const dayIdx = days === 1 ? selectedDayIndex : 0;
+      const isTrainingDay = !!trainingDays[dayIdx];
+
+      const buildOneDay = (offset: number): any => {
+        const input: MealPlanInput = {
+          weightKg: weight, lbmKg, bodyFatPct: bfPct, sex,
+          goalKcal: Math.round((effectiveKcal || weight * 30) * nutrMult),
+          goalProteinG: Math.round((effectiveP || weight * 2) * nutrMult),
+          goalFatG: Math.round((effectiveF || weight * 0.8) * nutrMult),
+          goalCarbsG: Math.round((effectiveC || weight * 3.5) * nutrMult),
+          mealsCount, isTrainingDay: !!trainingDays[offset % 7],
+          trainStartMin: linkToTraining && trainingDays[offset % 7] ? toMin(trainStart) : undefined,
+          allowIntraWorkout: trainIntensity === 'high',
+          excludedIds, preferredIds: new Set(preferredFoods),
+          budget, isVegetarian: dietPrefs.includes('vegetarian'),
+          isCutting: goal === 'cutting' || goal === 'fat_loss',
+          dayOffset: offset, cyclePhase: phase as any,
+        };
+        const v2 = buildDayPlanV2(input);
+        // Преобразуем DayPlanV2 → совместимый формат старого dayPlan
+        const meals = v2.meals.map(m => ({
+          label: m.label, time: m.time, items: m.items.map(it => ({
+            name: it.name, id: it.id, amount: it.amount, kcal: it.kcal, p: it.p, f: it.f, c: it.c,
+          })), totals: { kcal: m.totals.kcal, p: m.totals.p, f: m.totals.f, c: m.totals.c },
+          conflictWarnings: undefined, synergyNotes: undefined,
+          rationale: m.rationale, mpsCheck: m.mpsCheck,
+        }));
+        return {
+          meals, totals: { kcal: v2.totals.kcal, p: v2.totals.p, f: v2.totals.f, c: v2.totals.c },
+          isTrainingDay: v2.isTrainingDay,
+          supplementTimeline: [], waterTimeline: [], nutritionLogic: [],
+          dietDiversity: { uniqueFoods: v2.diversity.uniqueFoods, totalPortions: 0, categories: v2.diversity.categories, score: Math.min(10, v2.diversity.uniqueFoods), note: `${v2.diversity.uniqueFoods} уникальных продуктов` },
+          timingScores: [], intraWorkout: null, mpsSummary: v2.mpsSummary, proNotes: v2.notes,
+        };
+      };
+
+      const d1 = buildOneDay(dayIdx);
+      setDayPlan(d1);
+      if (days >= 3) {
+        const d2 = buildOneDay(1); const d3 = buildOneDay(2);
+        setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: d1.totals.kcal + d2.totals.kcal + d3.totals.kcal, p: d1.totals.p + d2.totals.p + d3.totals.p, f: d1.totals.f + d2.totals.f + d3.totals.f, c: d1.totals.c + d2.totals.c + d3.totals.c } });
+      }
+      if (days >= 7) {
+        const weekDays = Array.from({ length: 7 }, (_, i) => buildOneDay(i));
+        const weekData = { days: weekDays, totals: { kcal: weekDays.reduce((s: any,d: any) => s + d.totals.kcal, 0), p: weekDays.reduce((s: any,d: any) => s + d.totals.p, 0), f: weekDays.reduce((s: any,d: any) => s + d.totals.f, 0), c: weekDays.reduce((s: any,d: any) => s + d.totals.c, 0) }};
+        if (weekIndex !== undefined) { setMonthPlan(prev => { const next = [...prev]; next[weekIndex] = weekData; return next; }); }
+        else setWeekPlan(weekData);
+      }
+      // Shopping list (упрощённый)
+      const shoppingMap = new Map<string, any>();
+      const allDayPlans = days >= 7 ? (Array.from({ length: 7 }, (_, i) => buildOneDay(i))) : days >= 3 ? [d1, buildOneDay(1), buildOneDay(2)] : [d1];
+      allDayPlans.forEach((dp: any) => { (dp.meals || []).forEach((m: any) => { (m.items || []).forEach((it: any) => {
+        const ex = shoppingMap.get(it.id);
+        if (ex) { ex.amount += it.amount || 0; ex.kcal += it.kcal || 0; ex.p += it.p || 0; ex.f += it.f || 0; ex.c += it.c || 0; }
+        else { const food = FOOD_DB.find(f => f.id === it.id); shoppingMap.set(it.id, { name: it.name, id: it.id, amount: it.amount || 100, kcal: it.kcal || 0, p: it.p || 0, f: it.f || 0, c: it.c || 0, category: food?.category || 'other' }); }
+      }); }); });
+      setShoppingList(Array.from(shoppingMap.values()).sort((a, b) => b.amount - a.amount));
+      // Water
+      const hasPharma = injections.length > 0 || (courseEntries?.length || 0) > 0;
+      const aasCount = injections.filter(i => i.type === 'ААС').length;
+      const pharmaHeavy = aasCount + injections.filter(i => i.type === 'инсулин').length + injections.filter(i => i.type === 'ГР').length;
+      const baseWaterMl = weight * Math.min(45, 40 + pharmaHeavy * 1.5);
+      setWaterCalc({ baseWater: Math.round(baseWaterMl / 10) / 10, pharmaBaseMl: 40, trainBonus: 0.3, fiberFactor: 0.1, pharmaBonus: hasPharma ? 0.5 : 0, total: Math.max(1.5, Math.round(baseWaterMl / 1000 * 10) / 10), hasPharma, electrolytes: { sodiumMg: 3500, potassiumMg: 3500, magnesiumMg: 400, note: 'Стандарт' } });
+      setGenerated(true);
+      generateRecommendations();
+      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+      return; // early return — Pro Engine завершён, старый код не выполняется
+    }
     const nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
     const budgetFilter = (id: BudgetLevel): number[] => { const map: Record<string, number[]> = { low:[0,5],medium:[5,8],max:[8,10],enhanced:[9,15] }; return map[id] || [5,10]; };
     const [bMin, bMax] = budgetFilter(budget);
@@ -1374,7 +1462,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         }
       }
       const weekData = { days: weekDays, totals: { kcal: weekDays.reduce((s: any,d: any) => s + d.totals.kcal, 0), p: weekDays.reduce((s: any,d: any) => s + d.totals.p, 0), f: weekDays.reduce((s: any,d: any) => s + d.totals.f, 0), c: weekDays.reduce((s: any,d: any) => s + d.totals.c, 0) }};
-      if (weekIndex !== undefined) { const mPlan = [...monthPlan]; mPlan[weekIndex] = weekData; setMonthPlan(mPlan); }
+      if (weekIndex !== undefined) { setMonthPlan(prev => { const next = [...prev]; next[weekIndex] = weekData; return next; }); }
       else setWeekPlan(weekData);
     }
     generateRecommendations();
@@ -1418,7 +1506,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     setWaterCalc({ baseWater: Math.round(baseWater * 10) / 10, pharmaBaseMl: Math.round(pharmaBaseMl), trainBonus, fiberFactor, pharmaBonus, total: waterTotal, hasPharma, electrolytes });
     setGenerated(true);
     setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    } catch (e: any) {
+      console.warn('[PlanGen] Error:', e?.message || e);
+      setErrorMsg(e?.message || 'Ошибка генерации плана. Проверьте введённые данные.');
+    }
   };
+
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [useProEngine, setUseProEngine] = useState(() => { try { return localStorage.getItem('he_use_pro_engine') !== 'false'; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem('he_use_pro_engine', useProEngine ? 'true' : 'false'); } catch {} }, [useProEngine]);
 
   const [specialMealMode, setSpecialMealMode] = useState(false);
   const [specialMealGoal, setSpecialMealGoal] = useState('custom');
@@ -1645,18 +1741,113 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const steps: MealPrepStep[] = []; let stepNum = 1;
     const allItems = days.flatMap((d: any) => d.meals.flatMap((m: any) => m.items.map((it: any) => ({ ...it, mealLabel: m.label, mealTime: m.time }))));
     const uniqueItems = [...new Map(allItems.map((it: any) => [it.name, it])).values()];
-    const grains = uniqueItems.filter((it: any) => { const n = it.name.toLowerCase(); return n.includes('рис')||n.includes('гречк')||n.includes('булгур')||n.includes('киноа')||n.includes('кус-кус')||n.includes('перловк')||n.includes('овсянк'); });
-    if (grains.length > 0) steps.push({ step: stepNum++, action:'Поставить вариться крупы', duration:25, items: grains.map((g:any)=>`${g.name} ×порций`) });
-    const meats = uniqueItems.filter((it: any) => { const n = it.name.toLowerCase(); return n.includes('куриц')||n.includes('индейк')||n.includes('говядин')||n.includes('лосос')||n.includes('треск'); });
-    if (meats.length > 0) steps.push({ step: stepNum++, action:'Замариновать мясо/рыбу', duration:5, items: meats.map((m:any)=>m.name) });
-    const ovenItems = meats; if (ovenItems.length > 0) steps.push({ step: stepNum++, action:'Поставить в духовку 180-200°C', duration:30, items: ovenItems.map((m:any)=>m.name) });
-    const veg = uniqueItems.filter((it: any) => { const n = it.name.toLowerCase(); return n.includes('брокколи')||n.includes('цветная капуст')||n.includes('морков')||n.includes('кабач')||n.includes('спарж'); });
-    if (veg.length > 0) steps.push({ step: stepNum++, action:'Нарезать и приготовить овощи', duration:15, items: veg.map((v:any)=>v.name) });
-    const fresh = uniqueItems.filter((it: any) => { const n = it.name.toLowerCase(); return n.includes('огурец')||n.includes('помидор')||n.includes('салат')||n.includes('зелен'); });
-    if (fresh.length > 0) steps.push({ step: stepNum++, action:'Помыть/нарезать свежие', duration:8, items: fresh.map((f:any)=>f.name) });
+    const n = (name: string) => name?.toLowerCase() || '';
+
+    // ─── Фаза 1: Mise en place ───
+    // Подготовка всех ингредиентов перед термообработкой
+    const allNames = uniqueItems.map((it: any) => n(it.name));
+    const hasOven = allNames.some(x => x.includes('лосос')||x.includes('форел')||x.includes('запеч')||x.includes('стейк')||x.includes('голяш')||x.includes('минт')||x.includes('батат')||x.includes('картоф'));
+    const hasSimmer = allNames.some(x => x.includes('суп')||x.includes('бульон')||x.includes('туш')||x.includes('карри')||x.includes('болонь'));
+    const hasPan = allNames.some(x => x.includes('куриц')||x.includes('индейк')||x.includes('говядин')||x.includes('котл')||x.includes('фарш')||x.includes('печен')||x.includes('гриб')||x.includes('шампиньон'));
+    const hasBoilGrain = allNames.some(x => x.includes('рис')||x.includes('гречк')||x.includes('булгур')||x.includes('киноа')||x.includes('кус-кус')||x.includes('перловк')||x.includes('пшен')||x.includes('чечевиц')||x.includes('маш')||x.includes('нут')||x.includes('паст')||x.includes('макар')||x.includes('лапш'));
+    const hasFreshVeg = allNames.some(x => x.includes('огурец')||x.includes('помидор')||x.includes('салат')||x.includes('руккол')||x.includes('шпинат')||x.includes('зелен'));
+    const hasRawPrep = allNames.some(x => x.includes('брокколи')||x.includes('цветная капуст')||x.includes('морков')||x.includes('кабач')||x.includes('спарж')||x.includes('перец болгар')||x.includes('капуст')||x.includes('цукин')||x.includes('баклаж'));
+    const hasMarinate = allNames.some(x => x.includes('куриц')||x.includes('индейк')||x.includes('говядин')||x.includes('свинин')||x.includes('баранин'));
+    const hasCottageCheese = allNames.some(x => x.includes('творог')||x.includes('рикотт'));
+    const hasBoiledEgg = allNames.some(x => x.includes('яйц')||x.includes('яич')||x.includes('омлет'));
+
+    // 1. Mise en place — подготовка
+    const miseItems: string[] = [];
+    if (hasFreshVeg) miseItems.push('Овощи: вымыть, обсушить, нарезать');
+    if (hasRawPrep) miseItems.push('Термообрабатываемые овощи: вымыть, нарезать кубиками/соломкой');
+    if (hasPan || hasOven) miseItems.push('Мясо/рыбу: обсушить бумажными полотенцами');
+    if (hasBoilGrain) miseItems.push('Крупы/бобовые: отмерить, промыть до прозрачной воды');
+    if (hasCottageCheese) miseItems.push('Творог: откинуть на сито, если влажный');
+    if (hasBoiledEgg) miseItems.push('Яйца: достать заранее — комнатной температуры равномернее готовятся');
+    if (miseItems.length > 0) steps.push({ step: stepNum++, action:'🔪 Mise en place — подготовка ингредиентов', duration:15, items: miseItems });
+
+    // 2. Поставить замачиваться бобовые / крупы
+    const pulseItems = uniqueItems.filter((it: any) => { const x = n(it.name); return x.includes('маш')||x.includes('нут сух')||x.includes('чечевиц'); });
+    if (pulseItems.length > 0) steps.push({ step: stepNum++, action:'Замочить бобовые в холодной воде (1:3) на 2+ ч', duration:5, items: pulseItems.map((p:any) => `${p.name} — залить водой 1:3, щепотка соды`), items_standby: true });
+
+    // 3. Поставить разогреваться духовку
+    if (hasOven) steps.push({ step: stepNum++, action:'🔥 Разогреть духовку до 190°C', duration:3, items:['Верх-низ без конвекции', 'Противень внутри для равномерного прогрева'], items_parallel: true });
+
+    // ─── Фаза 2: Термообработка (параллельные треки) ───
+    // Трек A — крупы/гарниры
+    const grains = uniqueItems.filter((it: any) => { const x = n(it.name); return x.includes('рис')||x.includes('гречк')||x.includes('булгур')||x.includes('киноа')||x.includes('кус-кус')||x.includes('перловк')||x.includes('пшен')||x.includes('чечевиц')||x.includes('нут'); });
+    if (grains.length > 0) {
+      const grainSteps = grains.map((g: any) => {
+        const gn = n(g.name);
+        if (gn.includes('гречк')) return `${g.name}: промыть, залить водой 1:2, варить 12 мин, укутать полотенцем на 10 мин`;
+        if (gn.includes('киноа')) return `${g.name}: промыть, залить водой 1:2, варить 15 мин, дать постоять 5 мин под крышкой`;
+        if (gn.includes('кус-кус')) return `${g.name}: залить кипятком 1:1.5, накрыть, настоять 5 мин, разрыхлить вилкой`;
+        if (gn.includes('перловк')) return `${g.name}: промыть, залить водой 1:3, варить 40 мин, слить лишнее`;
+        if (gn.includes('булгур')) return `${g.name}: залить кипятком 1:1.5, накрыть, настоять 12 мин`;
+        if (gn.includes('нут')) return `${g.name}: отварить 40-50 мин (если сухой) или прогреть 5 мин (консервированный)`;
+        if (gn.includes('чечевиц')) return `${g.name}: промыть, залить водой 1:2.5, варить 15-20 мин до мягкости, не переваривать`;
+        if (gn.includes('овсянк')||gn.includes('овсян')) return `${g.name}: залить молоком/водой 1:3, варить 5 мин помешивая, снять с огня, накрыть на 2 мин`;
+        return `${g.name}: варить согласно инструкции на упаковке, промыть, заправить маслом`;
+      });
+      steps.push({ step: stepNum++, action:'🍚 Гарниры: крупы и бобовые', duration:40, items: grainSteps, items_can_boil_simultaneously: true });
+    }
+
+    // Трек B — мясо/рыба (параллельно)
+    const meats = uniqueItems.filter((it: any) => { const x = n(it.name); return x.includes('куриц')||x.includes('индейк')||x.includes('говядин')||x.includes('лосос')||x.includes('форел')||x.includes('треск')||x.includes('минт')||x.includes('хека')||x.includes('телят')||x.includes('язык')||x.includes('печен')||x.includes('сердц'); });
+    if (meats.length > 0) {
+      const meatSteps = meats.map((m: any) => {
+        const mn = n(m.name);
+        if (mn.includes('лосос')||mn.includes('форел')) return `${m.name}: обсушить, сбрызнуть лимоном+маслом, 4 мин на стороне на сильном огне (кожа хрустящая) или запечь 15 мин при 190°C`;
+        if (mn.includes('стейк')||mn.includes('говядин')&&!mn.includes('фарш')&&!mn.includes('печен')) return `${m.name}: достать за 30 мин до готовки (комнатная темп.), промокнуть, соль+перец — на раскалённую сковороду, 4 мин сторона medium rare, 6 мин — medium, отдохнуть 5 мин под фольгой`;
+        if (mn.includes('куриц')||mn.includes('индейк')) return `${m.name}: нарезать кубиками 2-3 см, обжарить партиями по 4 мин до золотистой корочки, не перегружать сковороду`;
+        if (mn.includes('печен')) return `${m.name}: промыть, удалить протоки, обжарить с луком 5 мин на сильном огне, затем 3 мин под крышкой на среднем`;
+        if (mn.includes('фарш')) return `${m.name}: обжарить на сильном огне, разбивая лопаткой, 6 мин до выпаривания жидкости, затем добавить лук/специи`;
+        return `${m.name}: нарезать поперёк волокон, обжарить партиями по 3-4 мин`;
+      });
+      steps.push({ step: stepNum++, action:'🥩 Белковая часть: мясо/рыба', duration:25, items: meatSteps });
+    }
+
+    // Трек C — овощи, требующие термообработки
+    const hotVeg = uniqueItems.filter((it: any) => { const x = n(it.name); return x.includes('брокколи')||x.includes('цветная капуст')||x.includes('брюссель')||x.includes('спарж')||x.includes('фасол стручк'); });
+    if (hotVeg.length > 0) steps.push({ step: stepNum++, action:'🥦 Овощи: бланшировать', duration:8, items: hotVeg.map((v:any)=>`${v.name}: бланшировать в подсоленном кипятке 2-3 мин, затем в ледяную воду (сохранить цвет и текстуру)`) });
+
+    // Запечённые овощи/корнеплоды
+    const rootVeg = uniqueItems.filter((it: any) => { const x = n(it.name); return (x.includes('батат')||x.includes('картоф')||x.includes('морков')||x.includes('тыкв')||x.includes('свёкл')||x.includes('кабач')||x.includes('баклаж')) && !x.includes('пюре'); });
+    if (rootVeg.length > 0) steps.push({ step: stepNum++, action:'🌿 Корнеплоды: нарезать и запечь', duration:8, items: rootVeg.map((v:any)=>`${v.name}: нарезать кубиками/дольками 2см, сбрызнуть маслом, соль+розмарин, запечь 25-30 мин при 200°C`), items_parallel: true });
+
+    // Трек D — соусы/заправки
+    const hasSauce = allNames.some(x => x.includes('соус')||x.includes('песто')||x.includes('сметан')||x.includes('сливк')||x.includes('йогурт греч')||x.includes('заправк')||x.includes('томат паст'));
+    if (hasSauce) steps.push({ step: stepNum++, action:'🧂 Соусы и заправки', duration:6, items: ['Готовить с вечера — вкус раскрывается за 8-12 ч в холодильнике', 'Сметанные/йогуртовые — хранить отдельно, смешивать перед подачей', 'Томатные — тушить 10 мин минимум для раскрытия ликопина'] });
+
+    // ─── Фаза 3: Сборка ───
+    // Свежие овощи (без термообработки)
+    const freshVegItems = uniqueItems.filter((it: any) => { const x = n(it.name); return x.includes('огурец')||x.includes('помидор')||x.includes('салат')||x.includes('руккол')||x.includes('зелен'); });
+    if (freshVegItems.length > 0) steps.push({ step: stepNum++, action:'🥗 Свежие овощи и зелень', duration:8, items: freshVegItems.map((v:any)=>`${v.name}: нарезать непосредственно перед сборкой, не хранить в нарезке дольше 24ч`) });
+
+    // ─── Фаза 4: Охлаждение и фасовка ───
     const mealCount = days[0]?.meals?.length || 4;
-    steps.push({ step: stepNum++, action:`Разложить по ${mealCount} контейнерам`, duration:12, items:[`${mealCount} контейнеров × ${mealPrepDays} дня(ей)`] });
-    steps.push({ step: stepNum++, action:'Подписать и убрать', duration:5, items:['Холодильник: 3 дня','Морозилка: остальное'] });
+    steps.push({ step: stepNum++, action:'🧊 Охладить до комнатной температуры (20 мин, не убирать горячее в холодильник!)', duration:1, items:['Разложить на решётке/разделочной доске', 'Накрыть чистым полотенцем'] });
+    steps.push({ step: stepNum++, action:'📦 Разложить по контейнерам', duration:15, items:[
+      `${mealCount} приёмов × ${mealPrepDays} дн = ${mealCount * mealPrepDays} контейнеров`,
+      'Плотно утрамбовать — меньше воздуха = дольше свежесть',
+      'Соус/заправку — в отдельный мини-контейнер',
+      'Зелень и авокадо — добавлять утром перед едой',
+    ]});
+    steps.push({ step: stepNum++, action:'🏷️ Маркировка и хранение', duration:5, items:[
+      `Каждый контейнер: день+приём (например: «ПН обед»)`,
+      'Холодильник +2...+4°C — срок хранения 72ч (3 суток)',
+      'Морозилка -18°C — срок хранения до 3 мес',
+      'Разморозка: в холодильнике 12ч, не в микроволновке',
+    ]});
+
+    // ─── Фаза 5: Инструкции по разогреву ───
+    steps.push({ step: stepNum++, action:'♨️ Разогрев перед едой', duration:2, items:[
+      '🍚 Крупы: в микроволновке 2 мин с крышкой + 1 ст.л. воды',
+      '🥩 Мясо/рыба: на сковороде 3 мин с каплей воды под крышкой (не микроволновка — сушит)',
+      '🥦 Овощи: на пару 2 мин или микроволновка 1.5 мин',
+      '❌ Не разогревать повторно — только разовая порция',
+    ]});
+
     setMealPrepPlan({ steps, totalTime: steps.reduce((s, st) => s + st.duration, 0), containers: mealCount * mealPrepDays });
   };
 
@@ -1979,6 +2170,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     dietPrefs, setDietPrefs,
     v2Phase, setV2Phase, v2Labs, setV2Labs, v2Pharma, setV2Pharma,
     histamineSensitive, setHistamineSensitive,
+    labAnalysis,
+    errorMsg, setErrorMsg,
+    useProEngine, setUseProEngine,
+    labs,
   };
 
   return <PlanContext.Provider value={ctx}>{children}</PlanContext.Provider>;

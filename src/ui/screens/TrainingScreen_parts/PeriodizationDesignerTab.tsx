@@ -18,6 +18,7 @@ import {
   getDesignStats,
   getDefaultPresetDesigns,
 } from '../../../engines/periodization-designer.engine';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -364,6 +365,24 @@ export const PeriodizationDesignerTab: React.FC = () => {
           )}
         </>
       )}
+{current && current.blocks.length > 0 && (() => {
+        const fb = current.blocks[0];
+        const seq = current.blocks.map(b => (PHASE_LABELS_RU[b.phaseKey] || b.phaseKey) + ' ' + b.startWeek + '-' + b.endWeek).join(' · ');
+        const pick = (pk: PhaseKey) => {
+          if (pk === 'peaking') return { kind: 'peak' as const, data: { volumeMult: 0.6, rirTarget: 0 } };
+          if (pk === 'deload') return { kind: 'deload' as const, data: { volumeMult: 0.5, rirShift: 3, weeks: Array.from({ length: fb.endWeek - fb.startWeek + 1 }, (_, i) => fb.startWeek + i) } };
+          if (pk === 'intensification') return { kind: 'pri' as const, data: { volumeMult: 0.9, rirShift: -1 } };
+          if (pk === 'technique') return { kind: 'pri' as const, data: { volumeMult: 0.8, rirShift: 2 } };
+          return { kind: 'pri' as const, data: { volumeMult: 1.15, rirShift: 1 } };
+        };
+        const r = pick(fb.phaseKey);
+        return (
+          <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить первый блок «{PHASE_LABELS_RU[fb.phaseKey] || fb.phaseKey}» к планировщику. Полная последовательность: {seq}.</div>
+            <button onClick={() => applyToPlanner({ kind: r.kind, label: 'Периодизация: ' + seq, data: r.data })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить периодизацию к планировщику</button>
+          </div>
+        );
+      })()}
     </div>
   );
 };

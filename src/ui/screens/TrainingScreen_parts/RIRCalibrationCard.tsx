@@ -7,6 +7,7 @@ import React, { useMemo, useState } from 'react';
 import { getCalibrationStats, clearCalibrationData, type RIRCalibrationStats } from '../../../engines/rir-calibration.engine';
 import { loadSessions } from '../../../engines/workout-logger.engine';
 import { recordSessionRIR } from '../../../engines/rir-calibration.engine';
+import { applyToPlanner } from './planner-bridge';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -118,6 +119,12 @@ export const RIRCalibrationCard: React.FC = () => {
       <button style={{ marginTop: 8, padding: '4px 10px', borderRadius: 6, background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', fontSize: 9, cursor: 'pointer', minHeight: 28 }} onClick={reprocessAll} disabled={reprocessing}>
         {reprocessing ? 'Обработка...' : '🔄 Переобработать из истории'}
       </button>
+      {stats && (
+        <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить RIR-калибровку (bias {stats.overallAvgBias > 0 ? '+' : ''}{stats.overallAvgBias}) к планировщику — целевой RIR всех упражнений плана сместится на {stats.overallAvgBias > 0 ? '+' : ''}{stats.overallAvgBias}.</div>
+          <button onClick={() => applyToPlanner({ kind: 'rir', label: 'RIR-калибровка ' + (stats.overallAvgBias > 0 ? '+' : '') + stats.overallAvgBias, data: { rirShift: stats.overallAvgBias } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить RIR-коррекцию к планировщику</button>
+        </div>
+      )}
     </div>
   );
 };

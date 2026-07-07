@@ -1364,180 +1364,146 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
         </GlassCard>
       )}
 
-      {explanation?.substances.map((entry, idx) => {
-        const cat = SUPPORT_CATALOG_DATA[entry.id]
-          || SUPPORT_CATALOG_DATA[entry.id?.toUpperCase()]
-          || SUPPORT_CATALOG_DATA[(entry.id || '').toLowerCase()]
-          || SUPPORT_CATALOG_DATA[entry.id?.replace(/-/g, '_')];
-        if (!cat) {
-          const sub = (ALL_SUBSTANCES as any[]).find((s: any) => s.id === entry.id || s.id?.toUpperCase() === entry.id?.toUpperCase());
+      {/* ── Одна карточка со всеми препаратами стека ── */}
+      <GlassCard title={`📦 Препараты стека · ${stackIds.length} шт`} icon="📋" color="#00e68a" style={{ marginBottom: 10 }}>
+        {explanation?.substances.map((entry, idx) => {
+          const cat = SUPPORT_CATALOG_DATA[entry.id]
+            || SUPPORT_CATALOG_DATA[entry.id?.toUpperCase()]
+            || SUPPORT_CATALOG_DATA[(entry.id || '').toLowerCase()]
+            || SUPPORT_CATALOG_DATA[entry.id?.replace(/-/g, '_')];
+          if (!cat) {
+            return (
+              <div key={entry.id || idx} style={{
+                padding: '8px 10px', borderRadius: 8, marginBottom: 4,
+                background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)',
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>{entry.name || entry.id}</div>
+              </div>
+            );
+          }
+          const isExpanded = expanded[entry.id];
+          const isDragging = draggedIdx === idx;
+          const isDropOver = dropTarget === idx && draggedIdx !== idx;
+          const synergiesInStack = explanation.substances
+            .filter(s => s.id !== entry.id)
+            .map(s => {
+              const found = entry.synergiesWith.find(x => x.with === s.id);
+              return found ? { name: s.name || '', effect: found.effect } : null;
+            })
+            .filter((x): x is { name: string; effect: string } => x !== null);
+
           return (
-            <div key={entry.id || idx} style={{ marginBottom:8 }}>
-              <GlassCard style={{ marginBottom:0 }}>
-                <div style={cardHeaderS}>
-                  <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{entry.name || entry.id}</div>
+            <div key={entry.id} draggable onDragStart={e => handleDragStart(e, idx)} onDragOver={e => handleDragOver(e, idx)}
+              onDragLeave={handleDragLeave} onDrop={e => handleDrop(e, idx)} onDragEnd={handleDragEnd}
+              className={isDragging ? 'bio-dragging' : isDropOver ? 'bio-drag-over' : ''}
+              style={{ marginBottom: 4, transition: 'all 0.15s ease' }}>
+              <div onClick={() => {
+                if (swapMode) { openReplacePopup(entry.id, cat.nameRu || cat.name); }
+                else { setExpanded(prev => ({ ...prev, [entry.id]: !prev[entry.id] })); }
+              }} style={{
+                ...cardHeaderS, margin: isExpanded ? '0 0 0 0' : '0',
+                borderBottomLeftRadius: isExpanded ? 0 : 8, borderBottomRightRadius: isExpanded ? 0 : 8,
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 1 }}>
+                    {cat.nameRu || cat.name}
+                    <span style={{
+                      fontSize: 7, marginLeft: 5, fontWeight: 600,
+                      color: synergyExplanation?.roles[entry.id] === 'core' ? '#00e68a'
+                        : synergyExplanation?.roles[entry.id] === 'coverage' ? '#60a5fa'
+                        : synergyExplanation?.roles[entry.id] === 'synergy' ? '#8b5cf6'
+                        : '#00e68a',
+                    }}>
+                      ({synergyExplanation?.roles[entry.id]
+                        ? ({ core: 'основной', synergy: 'синергист', coverage: 'покрытие', support: 'вспом.' } as Record<string, string>)[synergyExplanation.roles[entry.id]]
+                        : entry.role})
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                    {[cat.tier, ...(cat.category?.slice(0, 2) || [])].filter(Boolean).map((c: any, i: number) => (
+                      <span key={i} style={{ padding: '1px 5px', borderRadius: 4, background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 7 }}>{catLabel(c)}</span>
+                    ))}
+                    <span>💊 {cat.dosage?.mg ? `${cat.dosage.mg} мг` : '—'} · {cat.dosage?.timing || (cat as any)?.timingDosage || '—'}</span>
+                  </div>
                 </div>
-              </GlassCard>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <button onClick={(e) => { e.stopPropagation(); openReplacePopup(entry.id, cat.nameRu || cat.name); }}
+                    title="Найти замену" style={{
+                      padding: '6px 8px', borderRadius: 6, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+                      minWidth: 38, minHeight: 38, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#8b5cf6',
+                    }}>🔄</button>
+                  <button onClick={(e) => { e.stopPropagation(); handleRemove(entry.id); }} title="Удалить из стека" style={{
+                    padding: '6px 8px', borderRadius: 6, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+                    minWidth: 38, minHeight: 38, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444',
+                  }}>✕</button>
+                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', minWidth: 16, textAlign: 'center' }}>{isExpanded ? '▲' : '▼'}</span>
+                </div>
+              </div>
+
+              {isExpanded && (
+                <div style={{
+                  padding: '4px 10px 8px', borderBottomLeftRadius: 8, borderBottomRightRadius: 8,
+                  background: 'rgba(24,24,27,0.3)', border: '1px solid rgba(255,255,255,0.04)', borderTop: 'none',
+                }}>
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4, marginBottom: 6 }}>
+                    🧬 <strong style={{ color: '#a78bfa' }}>Механизм:</strong> {entry.mechanism}
+                  </div>
+
+                  {(() => {
+                    const t = getTitration(entry.id, cat);
+                    if (!t) return null;
+                    return (
+                      <div style={{ padding: '3px 6px', borderRadius: 6, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.1)', marginBottom: 4, fontSize: 7, color: '#fbbf24', lineHeight: 1.3 }}>
+                        📈 Титрование: {t}
+                      </div>
+                    );
+                  })()}
+                  {cat.description && (
+                    <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4, marginBottom: 4 }}>
+                      📝 {decodeGarbled(cat.description)}
+                    </div>
+                  )}
+
+                  {(() => {
+                    const contrib = synergyExplanation?.contributions.find(c => c.id === entry.id);
+                    if (!contrib) return null;
+                    return (
+                      <div style={{ padding: '3px 6px', borderRadius: 6, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.06)', marginBottom: 4 }}>
+                        <div style={{ fontSize: 7, color: '#22c55e', fontWeight: 600 }}>💡 {contrib.text}</div>
+                      </div>
+                    );
+                  })()}
+
+                  {synergiesInStack.length > 0 && (
+                    <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)', marginBottom: 4 }}>
+                      <div style={{ fontSize: 7, color: '#8b5cf6', fontWeight: 600, marginBottom: 1 }}>🤝 Синергии в стеке:</div>
+                      {synergiesInStack.map((s, i) => (
+                        <div key={i} style={{ fontSize: 7, color: '#a78bfa', lineHeight: 1.3 }}>• {s.name} → {s.effect}</div>
+                      ))}
+                    </div>
+                  )}
+
+                  {cat.contraindications && cat.contraindications.length > 0 && (
+                    <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.06)', marginBottom: 4 }}>
+                      <div style={{ fontSize: 7, color: '#ef4444', fontWeight: 600, marginBottom: 1 }}>⚠ Противопоказания:</div>
+                      <div style={{ fontSize: 7, color: '#f87171', lineHeight: 1.3 }}>{cat.contraindications.slice(0, 2).join(', ')}</div>
+                    </div>
+                  )}
+
+                  {cat.sideEffects && cat.sideEffects.length > 0 && (
+                    <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(251,191,36,0.04)', border: '1px solid rgba(251,191,36,0.06)', marginBottom: 4 }}>
+                      <div style={{ fontSize: 7, color: '#f59e0b', fontWeight: 600, marginBottom: 1 }}>⚡ Побочные:</div>
+                      <div style={{ fontSize: 7, color: '#fbbf24', lineHeight: 1.3 }}>{cat.sideEffects.slice(0, 2).join(', ')}</div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
-        }
-        const isExpanded = expanded[entry.id];
-        const isDragging = draggedIdx === idx;
-        const isDropOver = dropTarget === idx && draggedIdx !== idx;
-        const synergiesInStack = explanation.substances
-          .filter(s => s.id !== entry.id)
-          .map(s => {
-            const found = entry.synergiesWith.find(x => x.with === s.id);
-            return found ? { name: s.name || '', effect: found.effect } : null;
-          })
-          .filter((x): x is { name: string; effect: string } => x !== null);
-
-        return (
-          <div key={entry.id} draggable onDragStart={e => handleDragStart(e, idx)} onDragOver={e => handleDragOver(e, idx)}
-            onDragLeave={handleDragLeave} onDrop={e => handleDrop(e, idx)} onDragEnd={handleDragEnd}
-            className={isDragging ? 'bio-dragging' : isDropOver ? 'bio-drag-over' : ''}
-            style={{ marginBottom: 8, transition: 'all 0.15s ease' }}>
-          <GlassCard style={{ marginBottom: 0 }}>
-            <div onClick={() => {
-              if (swapMode) { openReplacePopup(entry.id, cat.nameRu || cat.name); }
-              else { setExpanded(prev => ({ ...prev, [entry.id]: !prev[entry.id] })); }
-            }} style={cardHeaderS}>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 2 }}>
-                  {cat.nameRu || cat.name}
-                  <span style={{
-                    fontSize: 8, marginLeft: 6, fontWeight: 600,
-                    color: synergyExplanation?.roles[entry.id] === 'core' ? '#00e68a'
-                      : synergyExplanation?.roles[entry.id] === 'coverage' ? '#60a5fa'
-                      : synergyExplanation?.roles[entry.id] === 'synergy' ? '#8b5cf6'
-                      : '#00e68a',
-                  }}>
-                    ({synergyExplanation?.roles[entry.id]
-                      ? ({ core: 'основной', synergy: 'синергист', coverage: 'покрытие', support: 'вспом.' } as Record<string, string>)[synergyExplanation.roles[entry.id]]
-                      : entry.role})
-                  </span>
-                </div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  {[cat.tier, ...(cat.category?.slice(0, 2) || [])].filter(Boolean).map((c: any, i: number) => (
-                    <span key={i} style={{ padding: '1px 5px', borderRadius: 4, background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 7 }}>{catLabel(c)}</span>
-                  ))}
-                  <span style={{ color: '#60a5fa', fontSize: 7 }}>{cat.bestForm || (cat.forms?.find(f => f.best)?.nameRu || cat.forms?.[0]?.nameRu || '')}</span>
-                </div>
-                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
-                  💊 {cat.dosage?.mg ? `${cat.dosage.mg} мг` : '—'} · {cat.dosage?.timing || (cat as any)?.timingDosage || '—'}
-                  {cat.dosage?.mg && (
-                    <span style={{ marginLeft: 4, color: profile.weight > 90 ? '#f59e0b' : 'rgba(255,255,255,0.25)' }}>
-                      {profile.weight > 90 ? ` (под вес: ${Math.round(cat.dosage.mg * 1.3)} мг)` : ` (на ${profile.weight} кг)`}
-                    </span>
-                  )}
-                  {cat.dosage?.mg && <span style={{ marginLeft: 4, color: '#f59e0b' }}>~{(PRICE_RUB[entry.id] || '?')} ₽/мес</span>}
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <button onClick={(e) => { e.stopPropagation(); openReplacePopup(entry.id, cat.nameRu || cat.name); }}
-                  title="Найти замену"
-                  style={{ padding: '8px 10px', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#8b5cf6' }}>
-                  🔄
-                </button>
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{isExpanded ? '▲' : '▼'}</span>
-              </div>
-            </div>
-
-            {isExpanded && (
-              <div style={cardBodyS}>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, marginBottom: 8 }}>
-                  🧬 <strong style={{ color: '#a78bfa' }}>Механизм:</strong> {entry.mechanism}
-                </div>
-
-                {(() => {
-                  const t = getTitration(entry.id, cat);
-                  if (!t) return null;
-                  return (
-                    <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.1)', marginBottom: 6, fontSize: 8, color: '#fbbf24', lineHeight: 1.3 }}>
-                      📈 Титрование: {t}
-                    </div>
-                  );
-                })()}
-                {cat.description && (
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, marginBottom: 6 }}>
-                    📝 {decodeGarbled(cat.description)}
-                  </div>
-                )}
-
-                {(() => {
-                  const contrib = synergyExplanation?.contributions.find(c => c.id === entry.id);
-                  if (!contrib) return null;
-                  return (
-                    <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.06)', marginBottom: 6 }}>
-                      <div style={{ fontSize: 7, color: '#22c55e', fontWeight: 600 }}>💡 {contrib.text}</div>
-                    </div>
-                  );
-                })()}
-
-                {entry.dose && (
-                  <div style={{ fontSize: 9, color: '#60a5fa', marginBottom: 6 }}>
-                    💊 <strong>Дозировка:</strong> {entry.dose}
-                  </div>
-                )}
-                {cat.dosage && (
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>
-                    ⏱ {cat.dosage.timing ? `Приём: ${cat.dosage.timing}` : ''} {cat.dosage.mg ? `• ${cat.dosage.mg} мг${cat.dosage.form ? ' (' + cat.dosage.form + ')' : ''}` : ''}
-                  </div>
-                )}
-
-                {synergiesInStack.length > 0 && (
-                  <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)', marginBottom: 6 }}>
-                    <div style={{ fontSize: 7, color: '#8b5cf6', fontWeight: 600, marginBottom: 2 }}>🤝 Синергии в стеке:</div>
-                    {synergiesInStack.map((s, i) => (
-                      <div key={i} style={{ fontSize: 8, color: '#a78bfa', lineHeight: 1.3 }}>• {s.name} → {s.effect}</div>
-                    ))}
-                  </div>
-                )}
-
-                {cat.organs && cat.organs.length > 0 && (
-                  <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
-                    {cat.organs.map((o: string, i: number) => (
-                      <span key={i} style={{ padding: '2px 6px', borderRadius: 6, background: 'rgba(96,165,250,0.08)', color: '#60a5fa', fontSize: 7 }}>
-                        {ORGANS.find(x => x.key === o)?.label || o}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {cat.contraindications && cat.contraindications.length > 0 && (
-                  <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.06)', marginBottom: 6 }}>
-                    <div style={{ fontSize: 7, color: '#ef4444', fontWeight: 600, marginBottom: 2 }}>⚠ Противопоказания:</div>
-                    <div style={{ fontSize: 8, color: '#f87171', lineHeight: 1.3 }}>{cat.contraindications.slice(0, 3).join(', ')}</div>
-                  </div>
-                )}
-
-                {cat.sideEffects && cat.sideEffects.length > 0 && (
-                  <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(251,191,36,0.04)', border: '1px solid rgba(251,191,36,0.06)', marginBottom: 6 }}>
-                    <div style={{ fontSize: 7, color: '#f59e0b', fontWeight: 600, marginBottom: 2 }}>⚡ Побочные:</div>
-                    <div style={{ fontSize: 8, color: '#fbbf24', lineHeight: 1.3 }}>{cat.sideEffects.slice(0, 3).join(', ')}</div>
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-                  <button onClick={() => openReplacePopup(entry.id, cat.nameRu || cat.name)} style={{
-                    flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
-                    background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', color: '#8b5cf6',
-                  }}>
-                    🔄 Заменить
-                  </button>
-                  <button onClick={() => handleRemove(entry.id)} style={{
-                    padding: '6px 10px', borderRadius: 8, fontSize: 8, fontWeight: 700, cursor: 'pointer',
-                    background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444',
-                  }}>✕ Удалить</button>
-                </div>
-              </div>
-            )}
-          </GlassCard>
-          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.12)', textAlign: 'center', padding: '1px 0' }}>⠿</div>
-          </div>
-        );
-      })}
+        })}
+      </GlassCard>
 
       {/* Global replace popup (optimized: all types with counts) */}
       {replacePopup && (

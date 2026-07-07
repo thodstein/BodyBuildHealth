@@ -22,6 +22,7 @@ import {
   type VelocityLossThreshold,
 } from '../../../engines/pro/vbt.engine';
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -198,6 +199,12 @@ export const VBTCalcTab: React.FC = () => {
         Источники: Gonzalez-Badillo & Sanchez-Medina (2010) для приседа/жима; Jovanovic M. (2017) VBT-методология.
         Пороги потери скорости: power 10%, strength 20%, hypertrophy 25%, metabolic 40%.
       </div>
+{(lift === 'squat' || lift === 'bench' || lift === 'deadlift') && (
+        <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить e1RM ({LIFT_RU[lift]} = {e1RM} кг) как ПМ движения к планировщику — план пересчитает веса.</div>
+          <button onClick={() => applyToPlanner({ kind: 'pm', label: 'e1RM ' + LIFT_RU[lift] + ' ' + e1RM + ' кг', data: { lift: lift === 'deadlift' ? 'dead' : lift, value: e1RM } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить e1RM к ПМ планировщика</button>
+        </div>
+      )}
     </div>
   );
 };

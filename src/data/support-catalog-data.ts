@@ -11768,7 +11768,26 @@ kpv: {
 // ── Lowercase aliases for case-insensitive catalog lookup ──
 const _cat = SUPPORT_CATALOG_DATA as Record<string, any>;
 for (const _k of Object.keys(_cat)) { const _l = _k.toLowerCase(); if (_l !== _k && !(_l in _cat)) _cat[_l] = _cat[_k]; }
-const _extraAliases: Record<string, string> = { cabergoline:'PHARMA_CABERGOLINE', theanine:'L_THEANINE', };
+const _extraAliases: Record<string, string> = {
+  cabergoline:'PHARMA_CABERGOLINE', theanine:'L_THEANINE',
+  // ── Lab system aliases (lab-priority-map/lab-marker-map IDs → catalog keys) ──
+  daa:'d_aspartic_acid',                  // D-аспарагиновая к-та
+  thiamine:'vitamin_b1',                  // B1
+  iron_lipofer:'iron',                    // липосомальное Fe → iron
+  iron_supplement:'iron',                 // generic iron
+  collagen_ii:'collagen',                 // коллаген II типа
+  col_ii:'colostrum',                     // колострум
+  curcumin_sup:'curcumin',                // куркумин supp
+  copper_supp:'copper',                   // медь supp
+  copper_supplement:'copper',             // медь supplement
+  selenium_sup:'selenium',                // селен supp
+  zinc_sup:'zinc',                        // цинк supp
+  potassium_citrate:'potassium',          // калия цитрат → калий
+  garlic_extract:'garlic',                // чеснок
+  metformin_mr:'metformin',               // метформин MR
+  red_yeast_rice:'red_yeast',             // красный дрожжевой рис
+  methylcobalamin:'vitamin_b12',          // активная форма B12
+};
 for (const [_a,_k] of Object.entries(_extraAliases)) { if (_k in _cat && !(_a in _cat)) _cat[_a] = _cat[_k]; }
 
 // ── FROM: catalog-exports.ts ──

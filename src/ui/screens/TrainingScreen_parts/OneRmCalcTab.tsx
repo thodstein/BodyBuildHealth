@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { estimate1RMFormula, estimate1RMConsensus, type RMFormula } from '../../../engines/pro/estimate1rm.engine';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
@@ -71,6 +72,16 @@ export const OneRmCalcTab: React.FC = () => {
           </div>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8, lineHeight: 1.5 }}>💡 Консенсус — среднее по формулам. Epley/Brzycki точнее для 1–10 повт; для &gt;10 повт оценка грубее. Обновите workMax в профиле, если 1RM выше текущего.</div>
         </>
+      )}
+      {results && (
+        <div style={{ marginTop: 10, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить 1RM (<b style={{ color: '#00e68a' }}>{results.cons} кг</b>) как ПМ движения к активному планировщику:</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[['squat','Присед'],['bench','Жим'],['dead','Тяга']].map(([k,l]) => (
+              <button key={k} onClick={() => applyToPlanner({ kind: 'pm', label: 'ПМ ' + l + ' ' + results.cons + ' кг', data: { lift: k, value: results.cons } })} style={{ flex: 1, padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 12, minHeight: 40 }}>{l}</button>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

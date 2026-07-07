@@ -15,6 +15,7 @@ import {
   type Discipline,
 } from '../../../engines/pl-norms.engine';
 
+import { applyToPlanner } from './planner-bridge';
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
@@ -199,6 +200,10 @@ export const RelativeStrengthCalcTab: React.FC = () => {
         Формулы: <b>Wilks</b> — классический коэффициент IPF (до 2019). <b>DOTS</b> — актуальный коэффициент IPF (с 2019).
         <b>IPF GL</b> — Goodleigh points. <b>Allometric</b> — тотал / bw<sup>⅔</sup>. <b>Относительная</b> — тотал / bw.
         Нормативы: мужчины, RAW. Источник: спецификация 2026.
+      </div>
+<div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Определить слабейшее движение по относительной силе и применить как слабую группу к планировщику (приоритет объёма + ↓RIR).</div>
+        <button onClick={() => { const weak = liftsRs.reduce((a, b) => b.rs < a.rs ? b : a, liftsRs[0]); const g = weak.key === 'squat' ? 'legs' : weak.key === 'bench' ? 'chest' : 'back'; const ru = weak.key === 'squat' ? 'Присед→ноги' : weak.key === 'bench' ? 'Жим→грудь' : 'Тяга→спина'; applyToPlanner({ kind: 'weakpoints', label: 'Слабейшая группа: ' + ru, data: { groups: [g], lift: weak.key } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Слабейшая группа → планировщик</button>
       </div>
     </div>
   );

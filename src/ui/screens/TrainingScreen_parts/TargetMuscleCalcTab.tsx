@@ -7,6 +7,7 @@ import { generateRepTempo } from '../../../engines/rep-tempo-engine';
 import { forceVector, lengthenedPartials } from '../../../engines/pro/exercise-prescription.engine';
 import { PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import type { Exercise } from '../../../core/types';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -471,6 +472,10 @@ export const TargetMuscleCalcTab: React.FC = () => {
           </div>
         );
       })}
+      <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить целевую группу «{group}» к планировщику как приоритет (доп. объём + ↓RIR).</div>
+        <button onClick={() => applyToPlanner({ kind: 'weakpoints', label: 'Целевая группа: ' + group, data: { groups: [group] } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Целевая группа → планировщик</button>
+      </div>
     </div>
   );
 };

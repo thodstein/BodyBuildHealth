@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { analyzeMesoCycle, loadRirCalibrationStats, type MesoCorrectionInput } from '../../../engines/meso-correction.engine';
 import type { TrainingProfile } from './training-profile';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: 12, marginBottom: 10 };
@@ -90,6 +91,10 @@ const MesoCorrectionCard: React.FC<Props> = ({
           <span style={{ color: 'rgba(255,255,255,0.7)' }}>{a.reason}</span>
         </div>
       ))}
+<div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить коррекцию мезоцикла к планировщику — рекомендуемый объём {output.recommendedVolume} сет/нед, RIR→{output.recommendedRir}, делод каждые {output.recommendedDeloadFreq} нед.</div>
+        <button onClick={() => applyToPlanner({ kind: 'mrv', label: 'Мезо-коррекция: MRV ' + output.recommendedVolume + ' сет/нед, RIR→' + output.recommendedRir, data: { mrv: output.recommendedVolume } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить коррекцию мезо к планировщику</button>
+      </div>
     </div>
   );
 };

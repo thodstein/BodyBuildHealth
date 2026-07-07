@@ -5,6 +5,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { loadSRPESessions, type SRPESession } from '../../../engines/pro/srpe-store';
+import { applyToPlanner } from './planner-bridge';
 import {
   toDailyLoads,
   acuteChronicRatio,
@@ -236,6 +237,12 @@ export const FatigueIndexTab: React.FC = () => {
       <div style={{ fontSize: 9, color: DIM, marginTop: 12, lineHeight: 1.4 }}>
         Foster C., Impellizzeri F. (2017) — sRPE × длительность = AU. EWMA: Rollisson et al. — α=2/(N+1). ACWR zones (Gabbett): 0.8-1.3 optimum, &gt;1.5 опасно. Монотонность &gt;2 — высокий риск перетрена (Foster).
       </div>
+{acwr && (
+        <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 ACWR = {acwr.ratio.toFixed(2)}. Применить усталость к планировщику: объём ×{acwr.ratio > 1.5 ? 0.8 : acwr.ratio > 1.3 ? 0.9 : acwr.ratio < 0.8 ? 1.1 : 1}, RIR +{acwr.ratio > 1.5 ? 1 : 0} при перетренированности.</div>
+          <button onClick={() => { const mult = acwr.ratio > 1.5 ? 0.8 : acwr.ratio > 1.3 ? 0.9 : acwr.ratio < 0.8 ? 1.1 : 1; const rsh = acwr.ratio > 1.5 ? 1 : 0; applyToPlanner({ kind: 'pri', label: 'Усталость ACWR ' + acwr.ratio.toFixed(2) + ' → объём ×' + mult, data: { volumeMult: mult, rirShift: rsh } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить усталость к планировщику</button>
+        </div>
+      )}
     </div>
   );
 };

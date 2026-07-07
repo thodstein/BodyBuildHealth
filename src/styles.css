@@ -1669,20 +1669,24 @@ input[type="text"], input[type="number"], input[type="date"], select, textarea {
   /* Fix chart container */
   .nutrition-charts > div { min-width: 0 !important; }
 
-  /* Training screen mobile */
-  .training-screen .card { padding: 8px !important; }
+  /* Training block mobile (Telegram Mini App / phone) */
+  .training-screen .card { padding: 10px !important; }
+  .training-screen h2 { font-size: 15px !important; }
   .training-screen h3 { font-size: 13px !important; }
   .training-screen h4 { font-size: 12px !important; }
-  .training-screen button { font-size: 10px !important; }
-  .training-screen select { font-size: 9px !important; }
-  /* Collapse 3-col grids to 2-col */
+  /* Сенсорные цели крупнее; шрифт кнопок не уменьшаем — inline-размеры (10-13px) уже оптимальны */
+  .training-screen button { min-height: 38px; min-width: 38px; }
+  /* Схлопнуть 3- и 4-колоночные сетки до 2 колонок на телефоне */
+  .training-screen div[style*="grid-template-columns: 1fr 1fr 1fr 1fr"],
   .training-screen div[style*="grid-template-columns: 1fr 1fr 1fr"] {
     grid-template-columns: 1fr 1fr !important;
   }
-  /* Exercise detail squeezed */
-  .training-screen div[style*="0 0 280px"] { 
-    flex: 0 0 100% !important; 
+  /* Очень узкие экраны — плотные формы в 1 колонку */
+  @media (max-width: 360px) {
+    .training-screen div[style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
   }
+  /* Exercise detail squeezed */
+  .training-screen div[style*="0 0 280px"] { flex: 0 0 100% !important; }
 }
 
 /* === Telegram Mini App Specific === */
@@ -1728,4 +1732,202 @@ input[type="range"] {
 }
 input[type="range"]:active {
   opacity: 0.8;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   🍎 APPLE-STYLE POLISH — тренировочный блок (.training-screen)
+   Чистая типографика SF Pro, frosted-glass карточки, iOS-контролы,
+   мягкие тени, тонкие сепараторы, плавные микро-взаимодействия.
+   Не меняет layout (display/grid/flex из inline) — только полировка.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.training-screen {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.1px;
+  text-rendering: optimizeLegibility;
+}
+/* Large title / section headers */
+.training-screen h1 { font-weight: 800 !important; letter-spacing: -0.6px !important; }
+.training-screen h2 { font-weight: 700 !important; letter-spacing: -0.4px !important; line-height: 1.25 !important; }
+.training-screen h3, .training-screen h4 { font-weight: 700 !important; letter-spacing: -0.2px !important; }
+
+/* Frosted-glass карточки (все div с полупрозрачным тёмным фоном) */
+.training-screen div[style*="rgba(24,24,27"] {
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+  border-radius: 16px !important;
+  border-color: rgba(255,255,255,0.08) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.22), inset 0 0.5px 0 rgba(255,255,255,0.06) !important;
+}
+/* Accent-tinted мелкие блоки — лёгкий frost + мягкая тень */
+.training-screen div[style*="rgba(0,230,138,0.0"] {
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
+  backdrop-filter: blur(10px) saturate(130%);
+  border-radius: 12px !important;
+  box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.04) !important;
+}
+
+/* Плавные микро-взаимодействия для всех кнопок */
+.training-screen button {
+  transition: transform 0.12s cubic-bezier(0.2,0.8,0.2,1), background 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.training-screen button:active { transform: scale(0.97); }
+
+/* Сегментированный контрол (зона Планировщик) — iOS-вид */
+.training-screen div[style*="rgba(24,24,27,0.15)"] { border-radius: 12px !important; }
+.training-screen div[style*="rgba(24,24,27,0.15)"] button {
+  border-radius: 9px !important;
+  transition: all 0.22s cubic-bezier(0.2,0.8,0.2,1);
+}
+
+/* Инпуты/селекты — чистые, rounded, с focus-glow */
+.training-screen input,
+.training-screen select,
+.training-screen textarea {
+  border-radius: 12px !important;
+  background: rgba(118,118,128,0.12) !important;
+  border: 0.5px solid rgba(255,255,255,0.08) !important;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+.training-screen input:focus,
+.training-screen select:focus,
+.training-screen textarea:focus {
+  border-color: rgba(0,230,138,0.5) !important;
+  box-shadow: 0 0 0 3px rgba(0,230,138,0.15) !important;
+  outline: none !important;
+  background: rgba(118,118,128,0.16) !important;
+}
+
+/* Range-слайдеры — акцент, крупнее thumb */
+.training-screen input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(118,118,128,0.24) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.training-screen input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: #00e68a;
+  box-shadow: 0 2px 8px rgba(0,230,138,0.45), 0 0 0 4px rgba(0,230,138,0.12);
+  border: none;
+  cursor: pointer;
+}
+.training-screen input[type="range"]::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%; background: #00e68a; border: none;
+  box-shadow: 0 2px 8px rgba(0,230,138,0.45);
+}
+
+/* Тонкие сепараторы */
+.training-screen hr { border: none; border-top: 0.5px solid rgba(255,255,255,0.08); margin: 8px 0; }
+
+/* Чекбоксы — мягче */
+.training-screen input[type="checkbox"] {
+  width: 22px; height: 22px; border-radius: 6px; accent-color: #00e68a;
+}
+
+/* Скрытый мягкий скролл внутри блока */
+.training-screen ::-webkit-scrollbar { width: 3px; }
+.training-screen ::-webkit-scrollbar-thumb { background: rgba(0,230,138,0.25); border-radius: 3px; }
+.training-screen ::-webkit-scrollbar-track { background: transparent; }
+
+/* Чек-ин карточки / метрики — лёгкое всплывание (elevation) */
+.training-screen div[style*="rgba(0,230,138,0.05)"] {
+  box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.05) !important;
+}
+
+/* Заголовки-секции (uppercase labels inline) — дать воздух */
+.training-screen div[style*="text-transform: uppercase"],
+.training-screen div[style*="letterSpacing"] {
+  letter-spacing: 0.5px;
+}
+
+/* Pills (зонные/категорийные) — плавный переход активного состояния */
+.training-screen .zone-pill,
+.training-screen button[style*="border-radius: 20px"],
+.training-screen button[style*="border-radius:20px"] {
+  transition: all 0.2s cubic-bezier(0.2,0.8,0.2,1);
+}
+
+/* Градиентные CTA-кнопки — мягкая тень, пресс на active */
+.training-screen button[style*="linear-gradient(135deg,#00e68a"] {
+  box-shadow: 0 6px 20px rgba(0,230,138,0.3), inset 0 0.5px 0 rgba(255,255,255,0.2) !important;
+  border: none !important;
+}
+.training-screen button[style*="linear-gradient(135deg,#00e68a"]:active {
+  box-shadow: 0 2px 8px rgba(0,230,138,0.2) !important;
+}
+
+/* Expandable-карточки планировщика — чистый frosted */
+.training-screen .planner-seg,
+.training-screen div[style*="rgba(24,24,27,0.5)"] {
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+  border-radius: 14px !important;
+}
+
+
+
+/* 🍎 Доработки: hero-зоны, PlannerToolsPanel-rows, segmented active — точечная полировка */
+/* Hero-карточки выбора зоны — frosted glass с мягким border */
+.training-screen button[style*="rgba(20,22,30,0.35)"],
+.training-screen div[style*="rgba(20,22,30,0.35)"] {
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  border-radius: 16px !important;
+  border: 0.5px solid rgba(255,255,255,0.1) !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25), inset 0 0.5px 0 rgba(255,255,255,0.08) !important;
+  transition: transform 0.18s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.18s ease;
+}
+.training-screen button[style*="rgba(20,22,30,0.35)"]:active { transform: scale(0.98); }
+
+/* PlannerToolsPanel expandable rows — iOS inset-grouped list вид */
+.training-screen div[style*="rgba(24,24,27,0.5)"] button[style*="background: transparent"],
+.training-screen div[style*="rgba(24,24,27,0.5)"] > button {
+  border-radius: 10px !important;
+  transition: background 0.18s ease;
+}
+.training-screen div[style*="rgba(24,24,27,0.5)"] > button:active { background: rgba(118,118,128,0.12) !important; }
+
+/* Сегментированный planner — активная кнопка как iOS selector (мягкая подсветка) */
+.training-screen div[style*="rgba(24,24,27,0.15)"] button[style*="rgba(0,230,138,0.14)"] {
+  box-shadow: 0 2px 8px rgba(0,230,138,0.18), inset 0 0.5px 0 rgba(255,255,255,0.08) !important;
+}
+
+/* Универсальная мягкость для accent-чипов слабых групп / оборудования */
+.training-screen button[style*="border: 1px solid #00e68a"],
+.training-screen button[style*="border: 1px solid#00e68a"],
+.training-screen button[style*="border:1px solid #00e68a"] {
+  box-shadow: 0 2px 10px rgba(0,230,138,0.12) !important;
+}
+
+/* Улучшение читаемости dim-текста — Apple secondary label ~60% */
+.training-screen div[style*="rgba(255,255,255,0.5)"],
+.training-screen span[style*="rgba(255,255,255,0.5)"] { color: rgba(235,235,245,0.6) !important; }
+
+/* Карточки-метрики (MetricCard) — лёгкое всплывание, чистый border */
+.training-screen div[style*="rgba(0,230,138,0.05)"],
+.training-screen div[style*="rgba(0,230,138,0.06)"] {
+  border-radius: 12px !important;
+  box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.05) !important;
+}
+
+/* Инпуты внутри карточек — чуть светлее фон для контраста */
+.training-screen input[type="number"],
+.training-screen input[type="text"],
+.training-screen input[type="time"],
+.training-screen input[type="date"],
+.training-screen select {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Убрать резкие чёрные обводки у мелких блоков */
+.training-screen div[style*="rgba(255,255,255,0.03)"] {
+  border-radius: 10px !important;
+  border-color: rgba(255,255,255,0.06) !important;
 }

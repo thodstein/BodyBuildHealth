@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { getPeakingProtocol, PEAKING_PROTOCOLS, type PeakingProtocol, type PeakingWeek } from '../../../engines/peaking-protocols.engine';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: 12, marginBottom: 10 };
@@ -77,6 +78,10 @@ const PeakingProtocolTab: React.FC = () => {
           <p>3. Перед началом пика — обязательная разгрузка (делод).</p>
           <p>4. После пика — активный отдых 1 нед.</p>
         </div>
+      </div>
+<div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить пиковый протокол «{protocol.name}» к планировщику — финальная неделя: объём ×{Math.round(protocol.weeks[protocol.weeks.length - 1].volumePct * 100)}%, RIR→{protocol.weeks[protocol.weeks.length - 1].rirMin}.</div>
+        <button onClick={() => { const fw = protocol.weeks[protocol.weeks.length - 1]; applyToPlanner({ kind: 'peak', label: 'Пик «' + protocol.name + '»: объём ×' + fw.volumePct + ', RIR→' + fw.rirMin, data: { volumeMult: fw.volumePct, rirTarget: fw.rirMin } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить пик к планировщику</button>
       </div>
     </div>
   );

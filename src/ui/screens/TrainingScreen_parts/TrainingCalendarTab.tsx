@@ -8,6 +8,8 @@ import {
   DAY_NAMES_RU,
   MONTH_NAMES_RU,
   type CalendarDay,
+  getWaterStats, quickAddWater, type WaterStats,
+  exportWorkoutsToCSV, exportToJSON,
 } from '../../../engines/training-calendar.engine';
 import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../../core/types';
@@ -53,6 +55,16 @@ export const TrainingCalendarTab: React.FC = () => {
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
   const [historyWorkouts, setHistoryWorkouts] = useState<WorkoutLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [water, setWater] = useState<WaterStats>(() => getWaterStats());
+  const refreshWater = useCallback((amt: number) => { quickAddWater(amt); setWater(getWaterStats()); }, []);
+  const download = useCallback((filename: string, text: string, mime = 'text/plain') => {
+    try {
+      const blob = new Blob([text], { type: mime + ';charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { /* ignore */ }
+  }, []);
   const [flaggedDates, setFlaggedDates] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem('he_cal_manual') || '[]')); } catch { return new Set<string>(); }
   });
@@ -162,6 +174,29 @@ export const TrainingCalendarTab: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+      {/* Водный баланс — вода из training-calendar.engine (ранее неиспользуемая) */}
+      <div style={{ padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12, display:'flex', flexDirection:'column', gap: 8 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT }}>💧 Водный баланс</span>
+          <span style={{ fontSize: 11, color: water.today.percentComplete >= 100 ? '#22c55e' : water.today.percentComplete >= 60 ? '#eab308' : '#ef4444', fontWeight: 700 }}>{water.today.percentComplete}%</span>
+        </div>
+        <div style={{ height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+          <div style={{ width: Math.min(100, water.today.percentComplete) + '%', height: '100%', background: water.today.percentComplete >= 100 ? '#22c55e' : water.today.percentComplete >= 60 ? '#eab308' : '#ef4444', borderRadius: 4 }} />
+        </div>
+        <div style={{ fontSize: 10, color: DIM }}>{water.today.totalMl} / {water.today.goalMl} мл сегодня · нед.ср. {water.weekAvg} мл · серия {water.streak} дн. {water.trend>=0?'+':''}{water.trend}%</div>
+        <div style={{ display:'flex', gap: 6, flexWrap:'wrap' }}>
+          {[200, 300, 500].map(ml => <button key={ml} onClick={() => refreshWater(ml)} style={{ padding:'8px 14px', borderRadius:8, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color: ACCENT, cursor:'pointer', fontSize:12, fontWeight:700 }}>+{ml} мл</button>)}
+        </div>
+      </div>
+      {/* Экспорт тренировок — ранее неиспользуемые exportWorkoutsToCSV/exportToJSON */}
+      <div style={{ padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12, display:'flex', flexDirection:'column', gap: 8 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT }}>📤 Экспорт тренировок</span>
+        <div style={{ fontSize: 10, color: DIM }}>Сохранить журнал тренировок (he_workout_log_v2) в CSV/JSON для анализа или передачи тренеру.</div>
+        <div style={{ display:'flex', gap: 6, flexWrap:'wrap' }}>
+          <button onClick={() => download('workouts.csv', exportWorkoutsToCSV(), 'text/csv')} style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color: ACCENT, cursor:'pointer', fontSize:12, fontWeight:700 }}>⬇ Экспорт CSV</button>
+          <button onClick={() => download('workouts.json', exportToJSON(JSON.parse(localStorage.getItem('he_workout_log_v2') || '[]')), 'application/json')} style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.05)', color: '#fff', cursor:'pointer', fontSize:12, fontWeight:700 }}>⬇ Экспорт JSON</button>
+        </div>
+      </div>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

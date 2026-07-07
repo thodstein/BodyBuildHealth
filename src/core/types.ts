@@ -485,9 +485,15 @@ export interface UserProfile {
        secondaryGoals?: ('bulk' | 'cut' | 'maintenance' | 'strength' | 'endurance' | 'recomposition' | 'fitness' | 'health' | 'hypertrophy' | 'rehab')[];
       targetWeight?: number;
       targetBodyFat?: number;
-      goalTimelineWeeks?: number;
-      
-      baselineSleepHours?: number;
+goalTimelineWeeks?: number;
+
+      // Cycle info (for calculator auto-fill)
+      cycleWeeks?: number;
+      previousCycles?: number;
+      timeSinceLastCycle?: 'none' | '<3mo' | '3-6mo' | '>6mo' | 'trt';
+      trainingCycleGoal?: 'mass' | 'cut' | 'maintenance' | 'endurance';
+
+       baselineSleepHours?: number;
       baselineSleepQuality?: number;
       baselineHrvRatio?: number;
       baselineStressLevel?: number;

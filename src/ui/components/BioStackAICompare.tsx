@@ -1,11 +1,13 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { buildStack, explainStack } from '../../engines/supplement-finder.engine';
-import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
+import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS, ALL_SUBSTANCES } from '../../data/support-database';
+import { INTERACTION_ENRICHMENT } from '../../data/support-interaction-enrichment';
 import { GlassCard, estCost, showToast } from './BioStackAIConstants';
 import { toFinderProfile } from './BioStackAIConstants';
 import { PopupSelect } from './PopupXxx';
 import type { LinkedData } from '../../core/data-link';
+import { calcStackSynergyScore, suggestSynergyAdditions } from '../../engines/support-plan/display';
 
 type CompareView = 'all' | 'price' | 'mechanisms' | 'synergy' | 'coverage';
 
@@ -25,6 +27,74 @@ function resolveMech(m: string): string {
   return MECH_TRANSLATIONS_RU[m] || m.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+/* ─── Interactions helpers ─── */
+const MAX_ITEMS = 10;
+const TIER_COLORS: Record<string, string> = { core: '#00e68a', standard: '#60a5fa', advanced: '#a78bfa', specialty: '#f59e0b' };
+const LVL_COLORS: Record<string, string> = { excellent: '#22c55e', good: '#4ade80', moderate: '#f59e0b', poor: '#ef4444', risky: '#dc2626' };
+const LVL_LABELS: Record<string, string> = { excellent: 'Отлично', good: 'Хорошо', moderate: 'Умеренно', poor: 'Плохо', risky: 'Рискованно' };
+
+function cardTitleColor(tier?: string): string { return TIER_COLORS[tier || ''] || 'rgba(255,255,255,0.5)'; }
+
+const HEPATIC_KEYWORDS = ['hepatotox', 'liver', 'печень', 'ALT', 'AST', 'ГГТ'];
+const RENAL_KEYWORDS = ['nephrotox', 'kidney', 'почк', 'creatinine', 'креатинин'];
+const CARDIO_KEYWORDS = ['cardiotox', 'blood pressure', 'heart rate', 'pressure', 'давление', 'ЧСС', 'тромб'];
+
+function estimateOrganLoad(ids: string[]) {
+  const h = { score: 0, items: [] as string[] };
+  const r = { score: 0, items: [] as string[] };
+  const c = { score: 0, items: [] as string[] };
+  ids.forEach(id => {
+    const e = SUPPORT_CATALOG_DATA[id]; if (!e) return;
+    const desc = (e.description || '').toLowerCase();
+    const si = (e.specialInstructions || []).join(' ').toLowerCase();
+    const contra = (e.contraindications || []).join(' ').toLowerCase();
+    const se = (e.sideEffects || []).join(' ').toLowerCase();
+    const all = [desc, si, contra, se].join(' ');
+    const cat = Array.isArray(e.category) ? e.category.map((x: string) => x.toLowerCase()) : [];
+    if (HEPATIC_KEYWORDS.some(k => all.includes(k)) || cat.includes('hepatoprotector') || cat.includes('liver')) { h.score += 1; h.items.push(e.nameRu || e.name || id); }
+    if (RENAL_KEYWORDS.some(k => all.includes(k))) { r.score += 1; r.items.push(e.nameRu || e.name || id); }
+    if (CARDIO_KEYWORDS.some(k => all.includes(k)) || cat.includes('cardioprotector') || cat.includes('heart')) { c.score += 1; c.items.push(e.nameRu || e.name || id); }
+  });
+  return { hepatic: { score: Math.min(h.score, 5), items: h.items }, renal: { score: Math.min(r.score, 5), items: r.items }, cardio: { score: Math.min(c.score, 5), items: c.items } };
+}
+
+function buildTimingAdvice(ids: string[]): string[] {
+  const tips: string[] = [];
+  ids.forEach(id => {
+    const e = SUPPORT_CATALOG_DATA[id]; if (!e) return;
+    const si = (e.specialInstructions || []).join(' ').toLowerCase();
+    const name = e.nameRu || e.name || id;
+    if (si.includes('жир') || si.includes('fat') || si.includes('с едой')) tips.push(`${name} — принимать с жирной пищей для абсорбции`);
+    if (si.includes('натощак') || si.includes('fasting') || si.includes('до еды') || si.includes('за 30')) tips.push(`${name} — натощак за 30 мин до еды`);
+    if (si.includes('вечер') || si.includes('перед сном')) tips.push(`${name} — вечером перед сном`);
+    else if (si.includes('утро') || si.includes('утром')) tips.push(`${name} — утром после завтрака`);
+    if (si.includes('calcium') || si.includes('кальций') || si.includes('железо') || si.includes('iron') || si.includes('цинк') || si.includes('zinc')) tips.push(`⚠ ${name}: разделить с кальцием/железом/цинком (интервал 2 ч)`);
+  });
+  return [...new Set(tips)].slice(0, 6);
+}
+
+function checkProfileContraindications(ids: string[], profile: BioStackProfile) {
+  const issues: Array<{ id: string; name: string; issue: string }> = [];
+  if (!profile?.healthConditions?.length) return issues;
+  ids.forEach(id => {
+    const e = SUPPORT_CATALOG_DATA[id]; if (!e?.contraindications?.length) return;
+    const name = e.nameRu || e.name || id;
+    const c = e.contraindications.map((x: string) => x.toLowerCase());
+    profile.healthConditions!.forEach(cond => {
+      if (cond === 'heart' && c.some(x => x.includes('серд') || x.includes('cardio') || x.includes('pressure'))) issues.push({ id, name, issue: 'Противопоказан при заболеваниях ССС' });
+      if (cond === 'kidney' && c.some(x => x.includes('почк') || x.includes('kidney') || x.includes('renal'))) issues.push({ id, name, issue: 'Противопоказан при заболеваниях почек' });
+      if (cond === 'liver' && c.some(x => x.includes('печен') || x.includes('liver') || x.includes('hepat'))) issues.push({ id, name, issue: 'Противопоказан при заболеваниях печени' });
+      if (cond === 'diabetes' && c.some(x => x.includes('диабет') || x.includes('diabet') || x.includes('glucose'))) issues.push({ id, name, issue: 'Противопоказан при сахарном диабете' });
+      if (cond === 'stomach' && c.some(x => x.includes('желуд') || x.includes('ulcer') || x.includes('gastr'))) issues.push({ id, name, issue: 'Противопоказан при заболеваниях ЖКТ' });
+    });
+  });
+  return issues;
+}
+
+function getEnrichedMechanisms(pairKey: string): string[] {
+  const enr = INTERACTION_ENRICHMENT[pairKey]; if (enr?.mechanismRu?.length) return enr.mechanismRu; return [];
+}
+
 export function CompareTab({ profile, stackIds, setStackIds, linked }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void; linked?: LinkedData }) {
   const [stackB, setStackB] = useState<string[]>(() => {
     try { const s = localStorage.getItem('he_biostack_compare_b'); return s ? JSON.parse(s) : []; } catch { return []; }
@@ -32,6 +102,12 @@ export function CompareTab({ profile, stackIds, setStackIds, linked }: { profile
   const [loading, setLoading] = useState(false);
   const [showStackBPicker, setShowStackBPicker] = useState(false);
   const [view, setView] = useState<CompareView>('all');
+
+  /* ── Interactions state ── */
+  const [intSearch, setIntSearch] = useState('');
+  const [intSelected, setIntSelected] = useState<string[]>([]);
+  const [intExpandedSub, setIntExpandedSub] = useState<Record<string, boolean>>({});
+  const [intExpandedPair, setIntExpandedPair] = useState<Record<string, boolean>>({});
 
   // Save stackB to localStorage
   const setStackBAndSave = useCallback((ids: string[]) => {
@@ -116,6 +192,63 @@ export function CompareTab({ profile, stackIds, setStackIds, linked }: { profile
     }
     return { aPairs, bPairs, aCount: aPairs.length, bCount: bPairs.length };
   }, [stackIds, stackB]);
+
+  /* ── Interactions useMemo ── */
+  const intAllSubstances = useMemo(() => {
+    const seen = new Set<string>();
+    const items: Array<{ id: string; name: string; tier: string; category: string[] }> = [];
+    ALL_SUBSTANCES.forEach(s => {
+      const id = (s.id || '').toLowerCase();
+      if (!seen.has(id) && SUPPORT_CATALOG_DATA[id]) {
+        seen.add(id);
+        const entry = SUPPORT_CATALOG_DATA[id];
+        items.push({ id, name: entry?.nameRu || entry?.name || id, tier: entry?.tier || '', category: (entry?.category || []).slice(0, 2) });
+      }
+    });
+    Object.entries(SUPPORT_CATALOG_DATA).forEach(([key, val]) => {
+      const id = key.toLowerCase();
+      if (!seen.has(id)) { seen.add(id); items.push({ id, name: val?.nameRu || val?.name || id, tier: val?.tier || '', category: (val?.category || []).slice(0, 2) }); }
+    });
+    return items.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  }, []);
+
+  const intFiltered = useMemo(() => {
+    if (!intSearch) return intAllSubstances.slice(0, 20);
+    const q = intSearch.toLowerCase();
+    return intAllSubstances.filter(s => s.name.toLowerCase().includes(q) || s.id.includes(q)).slice(0, 15);
+  }, [intSearch, intAllSubstances]);
+
+  const intAddItem = (id: string) => { if (intSelected.length >= MAX_ITEMS || intSelected.includes(id)) return; setIntSelected(prev => [...prev, id]); setIntSearch(''); };
+  const intRemoveItem = (id: string) => setIntSelected(prev => prev.filter(x => x !== id));
+  const intClearAll = () => { setIntSelected([]); setIntExpandedSub({}); setIntExpandedPair({}); };
+  const intLoadFromStack = () => { setIntSelected(prev => { const set = new Set(prev); stackIds.forEach(id => set.add(id)); return Array.from(set).slice(0, MAX_ITEMS); }); };
+  const intToggleSub = (id: string) => setIntExpandedSub(prev => ({ ...prev, [id]: !prev[id] }));
+
+  const intAnalysis = useMemo(() => {
+    if (intSelected.length < 2) return null;
+    const ids = intSelected;
+    const stackScore = calcStackSynergyScore(ids);
+    const suggestions = suggestSynergyAdditions(ids, 5);
+    const pairs: any[] = [];
+    const pairSet = new Set<string>();
+    ALL_INTERACTIONS.forEach((i: any) => {
+      const a = (i.substanceA || '').toLowerCase(); const b = (i.substanceB || '').toLowerCase();
+      if (ids.includes(a) && ids.includes(b)) {
+        const key = [a, b].sort().join('|');
+        if (!pairSet.has(key)) {
+          pairSet.add(key);
+          pairs.push({ key, a, b, nameA: SUPPORT_CATALOG_DATA[a]?.nameRu || a, nameB: SUPPORT_CATALOG_DATA[b]?.nameRu || b, type: i.type || 'unknown', severity: i.severity || 'LOW', effect: i.effect || '', mechanisms: i.mechanisms || [], notes: i.notes || '' });
+        }
+      }
+    });
+    const critical = pairs.filter((p: any) => p.severity === 'HIGH' && p.type === 'conflict');
+    const moderate = pairs.filter((p: any) => p.severity === 'MEDIUM' || (p.severity === 'HIGH' && p.type !== 'conflict'));
+    const safe = pairs.filter((p: any) => p.severity === 'LOW' || p.type === 'synergy');
+    const organLoad = estimateOrganLoad(ids);
+    const timingTips = buildTimingAdvice(ids);
+    const contraIssues = checkProfileContraindications(ids, profile);
+    return { stackScore, suggestions, pairs, critical, moderate, safe, organLoad, timingTips, contraIssues };
+  }, [intSelected, profile]);
 
   if (stackIds.length === 0 && stackB.length === 0) {
     return (
@@ -626,6 +759,143 @@ export function CompareTab({ profile, stackIds, setStackIds, linked }: { profile
           </div>
         </div>
       )}
+
+      {/* ── Interactions Calculator ── */}
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '12px 0', paddingTop: 12 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 6, textAlign: 'center' }}>🔬 Калькулятор совместимости БАД</div>
+
+        <GlassCard title="🧪 Подбор препаратов для проверки" icon="⚡" color="#a855f7">
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>Проверка совместимости: синергии, конфликты, нагрузка на органы, режим приёма</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8, minHeight: 24 }}>
+            {intSelected.length === 0 ? (
+              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.15)', fontStyle: 'italic' }}>Нет выбранных препаратов</span>
+            ) : intSelected.map(id => {
+              const e = SUPPORT_CATALOG_DATA[id];
+              const n = e?.nameRu || e?.name || id; const tc = cardTitleColor(e?.tier);
+              return <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 7px', borderRadius: 6, fontSize: 8, fontWeight: 600, background: tc + '12', border: `1px solid ${tc}25`, color: tc }}>{n}<span onClick={() => intRemoveItem(id)} style={{ cursor: 'pointer', opacity: 0.4, fontSize: 10, marginLeft: 2 }}>✕</span></span>;
+            })}
+          </div>
+          {intSelected.length < MAX_ITEMS && (
+            <div style={{ position: 'relative', marginBottom: 6 }}>
+              <input value={intSearch} placeholder="🔍 Введите название БАД/препарата..." onChange={e => setIntSearch(e.target.value)} style={{ width: '100%', padding: '7px 10px', borderRadius: 8, fontSize: 9, background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', boxSizing: 'border-box', outline: 'none' }} />
+              {intSearch && intFiltered.length > 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, background: '#202023', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, maxHeight: 200, overflowY: 'auto', marginTop: 2 }}>
+                  {intFiltered.map(s => { const tc = cardTitleColor(s.tier);
+                    return <div key={s.id} onClick={() => intAddItem(s.id)} style={{ padding: '6px 10px', cursor: 'pointer', fontSize: 9, borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontWeight: 600, color: '#fff' }}>{s.name}</span>
+                      {s.tier && <span style={{ fontSize: 6, padding: '1px 5px', borderRadius: 3, background: tc + '22', color: tc, fontWeight: 600 }}>{s.tier}</span>}
+                      {intSelected.includes(s.id) && <span style={{ color: '#22c55e', fontSize: 8 }}>✓</span>}
+                    </div>;
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {intSelected.length > 0 && <button onClick={intClearAll} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 8, cursor: 'pointer', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444' }}>✕ Очистить все</button>}
+            {stackIds.length > 0 && <button onClick={intLoadFromStack} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 8, cursor: 'pointer', background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)', color: '#60a5fa' }}>📋 Из активного стека</button>}
+            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', alignSelf: 'center', marginLeft: 'auto' }}>{intSelected.length}/{MAX_ITEMS}</span>
+          </div>
+        </GlassCard>
+
+        {intAnalysis && (
+          <>
+            <GlassCard title="📊 Сводка совместимости" icon="🏥" color={LVL_COLORS[intAnalysis.stackScore.level]}>
+              <div style={{ padding: '10px 12px', borderRadius: 10, background: `${LVL_COLORS[intAnalysis.stackScore.level]}08`, border: `1px solid ${LVL_COLORS[intAnalysis.stackScore.level]}22`, marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: LVL_COLORS[intAnalysis.stackScore.level] }}>{intAnalysis.stackScore.score}/100</span>
+                  <span style={{ fontSize: 9, padding: '2px 10px', borderRadius: 6, fontWeight: 700, background: `${LVL_COLORS[intAnalysis.stackScore.level]}22`, color: LVL_COLORS[intAnalysis.stackScore.level] }}>{LVL_LABELS[intAnalysis.stackScore.level]}</span>
+                </div>
+                <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.05)', overflow: 'hidden', marginBottom: 6 }}>
+                  <div style={{ width: intAnalysis.stackScore.score + '%', height: '100%', background: LVL_COLORS[intAnalysis.stackScore.level], borderRadius: 3 }} />
+                </div>
+                <div style={{ display: 'flex', gap: 10, fontSize: 8, flexWrap: 'wrap' }}>
+                  <span style={{ color: '#22c55e' }}>⊕ {intAnalysis.stackScore.synergies} синергий</span>
+                  <span style={{ color: '#ef4444' }}>⊖ {intAnalysis.stackScore.conflicts} конфликтов</span>
+                  <span style={{ color: '#f59e0b' }}>⚠ {intAnalysis.stackScore.cautions} осторожностей</span>
+                  <span style={{ color: 'rgba(255,255,255,0.25)' }}>? {intAnalysis.stackScore.unknownPairs} неизвестно</span>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5, marginBottom: 6 }}>
+                {[{ key: 'hepatic', label: '🫁 Печень', color: intAnalysis.organLoad.hepatic.score >= 3 ? '#ef4444' : intAnalysis.organLoad.hepatic.score >= 2 ? '#f59e0b' : '#22c55e', score: intAnalysis.organLoad.hepatic.score },
+                 { key: 'renal', label: '🫘 Почки', color: intAnalysis.organLoad.renal.score >= 3 ? '#ef4444' : intAnalysis.organLoad.renal.score >= 2 ? '#f59e0b' : '#22c55e', score: intAnalysis.organLoad.renal.score },
+                 { key: 'cardio', label: '❤️ ССС', color: intAnalysis.organLoad.cardio.score >= 3 ? '#ef4444' : intAnalysis.organLoad.cardio.score >= 2 ? '#f59e0b' : '#22c55e', score: intAnalysis.organLoad.cardio.score },
+                ].map(g => <div key={g.key} style={{ padding: '6px 4px', borderRadius: 8, background: g.color + '06', border: `1px solid ${g.color}15`, textAlign: 'center' }}>
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', marginBottom: 1 }}>{g.label}</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: g.color }}>{g.score}/5</div>
+                  <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.04)', marginTop: 3 }}><div style={{ width: (g.score / 5) * 100 + '%', height: '100%', borderRadius: 2, background: g.color }} /></div>
+                </div>)}
+              </div>
+              {intAnalysis.timingTips.length > 0 && (
+                <div style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 8, fontWeight: 700, color: '#60a5fa', marginBottom: 3 }}>🕐 Рекомендации по режиму приёма</div>
+                  {intAnalysis.timingTips.map((tip: string, i: number) => <div key={i} style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', padding: '2px 6px', borderRadius: 4, background: 'rgba(96,165,250,0.04)', marginBottom: 2 }}>{tip}</div>)}
+                </div>
+              )}
+              {intAnalysis.contraIssues.length > 0 && (
+                <div style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 8, fontWeight: 700, color: '#ef4444', marginBottom: 3 }}>⚠ Противопоказания с учётом профиля</div>
+                  {intAnalysis.contraIssues.map((ci: any, i: number) => <div key={i} style={{ fontSize: 8, color: '#ef4444', padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.04)', marginBottom: 2 }}><strong>{ci.name}</strong>: {ci.issue}</div>)}
+                </div>
+              )}
+              {/* Recommendations */}
+              {intAnalysis.suggestions.length > 0 && (
+                <div style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>🔮 Рекомендации для усиления</div>
+                  {intAnalysis.suggestions.map((sug: any, si: number) => (
+                    <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6, marginBottom: 2, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.15)' }}>
+                      <button onClick={() => intAddItem(sug.id)} disabled={intSelected.includes(sug.id) || intSelected.length >= MAX_ITEMS} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 7, cursor: 'pointer', background: intSelected.includes(sug.id) ? 'rgba(255,255,255,0.05)' : 'rgba(168,85,247,0.15)', border: `1px solid ${intSelected.includes(sug.id) ? 'rgba(255,255,255,0.1)' : 'rgba(168,85,247,0.3)'}`, color: intSelected.includes(sug.id) ? 'rgba(255,255,255,0.2)' : '#a855f7', fontWeight: 700 }}>{intSelected.includes(sug.id) ? '✓' : '+ Добавить'}</button>
+                      <span style={{ fontSize: 8, fontWeight: 600, color: '#fff' }}>{sug.name}</span>
+                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>{sug.synergiesWith?.length || 0} синергий</span>
+                      <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 3, background: 'rgba(168,85,247,0.15)', color: '#a855f7', fontWeight: 700 }}>{sug.score}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {setStackIds && <button onClick={() => setStackIds(intSelected)} style={{ width: '100%', padding: '7px 0', borderRadius: 8, fontSize: 9, fontWeight: 700, cursor: 'pointer', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a' }}>📋 Сохранить как активный стек</button>}
+            </GlassCard>
+
+            {/* Critical pairs */}
+            {intAnalysis.critical.length > 0 && (
+              <GlassCard title={`🔴 Критические (${intAnalysis.critical.length})`} icon="🚫" color="#ef4444">
+                {intAnalysis.critical.map((p: any, i: number) => (
+                  <div key={i} style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 3, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span>🚫</span><span style={{ fontSize: 9, fontWeight: 600, color: '#fff' }}>{p.nameA} + {p.nameB}</span><span style={{ marginLeft: 'auto', padding: '1px 5px', borderRadius: 4, fontSize: 6, fontWeight: 700, background: '#ef444418', color: '#ef4444' }}>🔴 Высокий</span></div>
+                    {p.effect && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.65)', lineHeight: 1.3, marginTop: 2, paddingLeft: 16 }}>{p.effect}</div>}
+                  </div>
+                ))}
+              </GlassCard>
+            )}
+            {intAnalysis.moderate.length > 0 && (
+              <GlassCard title={`🟡 Умеренные (${intAnalysis.moderate.length})`} icon="⚡" color="#f59e0b">
+                {intAnalysis.moderate.map((p: any, i: number) => {
+                  const pk = p.key || `${p.a}|${p.b}`; const open = intExpandedPair[pk] ?? false;
+                  return <div key={i} style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 3, background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.1)' }}>
+                    <div onClick={() => setIntExpandedPair(prev => ({ ...prev, [pk]: !open }))} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: 10 }}>{p.type === 'caution' ? '⚡' : '⚠'}</span>
+                      <span style={{ fontSize: 9, fontWeight: 600, color: '#fff' }}>{p.nameA} ↔ {p.nameB}</span>
+                      <span style={{ marginLeft: 'auto', padding: '1px 5px', borderRadius: 4, fontSize: 6, fontWeight: 700, background: '#f59e0b18', color: '#f59e0b' }}>{p.severity === 'MEDIUM' ? '🟡 Средний' : '⚠ Высокий'}</span>
+                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.2)' }}>{open ? '▲' : '▼'}</span>
+                    </div>
+                    {open && <div style={{ paddingLeft: 16, marginTop: 3 }}>{p.effect && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>{p.effect}</div>}{p.notes && <div style={{ fontSize: 7, color: '#f59e0b' }}>{p.notes}</div>}</div>}
+                  </div>;
+                })}
+              </GlassCard>
+            )}
+            {intAnalysis.safe.length > 0 && (
+              <GlassCard title={`🟢 Безопасные (${intAnalysis.safe.length})`} icon="🤝" color="#22c55e">
+                {intAnalysis.safe.slice(0, 8).map((p: any, i: number) => <div key={i} style={{ padding: '4px 6px', borderRadius: 6, marginBottom: 2, background: 'rgba(34,197,94,0.03)', border: '1px solid rgba(34,197,94,0.06)', display: 'flex', alignItems: 'center', gap: 4 }}><span>{p.type === 'synergy' ? '🤝' : '➖'}</span><span style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)' }}>{p.nameA} ↔ {p.nameB}</span></div>)}
+                {intAnalysis.safe.length > 8 && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>+ ещё {intAnalysis.safe.length - 8}</div>}
+              </GlassCard>
+            )}
+            {intAnalysis.pairs.length === 0 && (
+              <GlassCard title="🔬 Нет зарегистрированных взаимодействий" icon="➖" color="#60a5fa">
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: 10 }}>Для данной комбинации не найдено известных взаимодействий в базе.</div>
+              </GlassCard>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
