@@ -6,6 +6,7 @@ import {
   getTodayMetric, quickCheckin, loadMetrics, getRollingAverages,
   weightTrend, getAllTimeStats, type DailyMetrics,
 } from '../../../engines/profile-settings.engine';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -61,6 +62,10 @@ export const CheckinMetricsCard: React.FC = () => {
         <input type="text" style={IN} value={form.notes || ''} onChange={e => set('notes', e.target.value)} placeholder="самочувствие, комментарий" />
         <button style={{ ...btn, marginTop: 10 }} onClick={submit}>💾 Сохранить чек-ин</button>
         {saved && <div style={{ fontSize: 10, color: ACCENT, marginTop: 6, textAlign: 'center' }}>✓ Сохранено. Сегодня: {today.date}</div>}
+        <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить готовность (из чек-ина) к планировщику: сон {form.sleepHours || 0}ч, HRV {form.hrvMs || 0}, боль {form.subjectiveSoreness || 0}/5, стресс {form.subjectiveStress || 0}/5 → корректировка объёма.</div>
+          <button onClick={() => { const e = form.subjectiveEnergy || 3; const s = form.subjectiveSoreness || 1; const st = form.subjectiveStress || 1; const mult = (s >= 4 || st >= 4 || e <= 2) ? 0.85 : (s >= 3 || st >= 3 || e <= 3) ? 0.93 : 1; const rsh = s >= 4 ? 1 : 0; applyToPlanner({ kind: 'pri', label: 'Чек-ин: готовность → объём ×' + mult + ', RIR +' + rsh, data: { volumeMult: mult, rirShift: rsh } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить готовность к планировщику</button>
+        </div>
       </div>
 
       <div style={CARD}>

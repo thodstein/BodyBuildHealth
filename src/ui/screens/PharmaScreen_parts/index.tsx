@@ -13,18 +13,12 @@ import { DiagnosticsTab } from './DiagnosticsTab';
 import { PharmaPeptideCalc } from './PharmaPeptideCalc';
 
 type PharmaPage = 'main' | 'course' | 'calculators' | 'info';
-type SubTab = 'catalog' | 'pkpd' | 'dosage' | 'peptides' | 'interactions';
+type SubTab = 'catalog' | 'pkpd' | 'dosage' | 'peptides' | 'mapper' | 'diagnostics' | 'interactions';
 
 export const PharmaScreen: React.FC = () => {
   const [page, setPage] = useState<PharmaPage>('main');
   const [subTab, setSubTab] = useState<SubTab>('catalog');
-  const [courseSub, setCourseSub] = useState<'course' | 'mapper' | 'diagnostics' | 'reports'>('course');
   const linked = useDataLink();
-  const [courseReportGenerated, setCourseReportGenerated] = useState(false);
-  useEffect(() => { try { if (localStorage.getItem('he_pharma_report_current')) setCourseReportGenerated(true); } catch {} }, []);
-  const [courseArchive, setCourseArchive] = useState<any[]>(() => {
-    try { return JSON.parse(localStorage.getItem('he_pharma_reports') || '[]'); } catch { return []; }
-  });
 
   const pharmaSubstances = useMemo(() => {
     return Object.values(PHARMA_DB).filter(s =>
@@ -39,8 +33,8 @@ export const PharmaScreen: React.FC = () => {
 
   if (page === 'main') {
     const cards = [
-      { key:'course' as const, icon:'📋', title:'Курс', desc:'Управление курсом, маппинг препаратов, диагностика', color:'#8b5cf6' },
-      { key:'calculators' as const, icon:'⚙️', title:'Калькуляторы', desc:'PK/PD симуляция, расчёт дозировок, пептиды', color:'#3b82f6' },
+      { key:'course' as const, icon:'📋', title:'Курс', desc:'Управление курсом, препараты, дозировки, фазы', color:'#8b5cf6' },
+      { key:'calculators' as const, icon:'⚙️', title:'Калькуляторы', desc:'PK/PD · Дозировки · Пептиды · Маппер · Диагностика', color:'#3b82f6' },
       { key:'info' as const, icon:'📖', title:'Общая информация', desc:'Каталог веществ и проверка взаимодействий', color:'#22c55e' },
     ];
     return (
@@ -116,24 +110,21 @@ export const PharmaScreen: React.FC = () => {
         </div>
       )}
       <div style={{ display:'flex', gap:4, overflowX:'auto', marginBottom:8, scrollbarWidth:'none' }}>
-{page === 'course' && (['course','mapper','diagnostics','reports'] as const).map(t => (
-  <button key={t} onClick={() => setCourseSub(t)} style={{
+{page === 'course' && (
+  <button style={{
+    padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap', cursor:'default', flexShrink:0,
+    background:'var(--accent)', color:'#000', border:'1px solid var(--accent)',
+  }}>📋 Курс</button>
+)}
+{page === 'calculators' && (['pkpd','dosage','peptides','mapper','diagnostics'] as const).map(t => (
+  <button key={t} onClick={() => setSubTab(t)} style={{
     padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
     cursor:'pointer', flexShrink:0,
-    background: courseSub === t ? 'var(--accent)' : 'var(--bg-secondary)',
-    color: courseSub === t ? '#000' : 'var(--text-dim)',
-    border: `1px solid ${courseSub === t ? 'var(--accent)' : 'var(--border)'}`,
-  }}>{t === 'course' ? '📋 Курс' : t === 'mapper' ? '🗺 Маппер' : t === 'diagnostics' ? '🩺 Диагностика' : '📄 Отчёты'}</button>
+    background: subTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
+    color: subTab === t ? '#000' : 'var(--text-dim)',
+    border: `1px solid ${subTab === t ? 'var(--accent)' : 'var(--border)'}`,
+  }}>{t === 'pkpd' ? '⚙️ PK/PD' : t === 'dosage' ? '💊 Дозировки' : t === 'peptides' ? '🧪 Пептиды' : t === 'mapper' ? '🗺 Маппер' : '🩺 Диагностика'}</button>
 ))}
-        {page === 'calculators' && (['pkpd','dosage','peptides'] as const).map(t => (
-          <button key={t} onClick={() => setSubTab(t)} style={{
-            padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
-            cursor:'pointer', flexShrink:0,
-            background: subTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
-            color: subTab === t ? '#000' : 'var(--text-dim)',
-            border: `1px solid ${subTab === t ? 'var(--accent)' : 'var(--border)'}`,
-          }}>{t === 'pkpd' ? '⚙️ PK/PD' : t === 'dosage' ? '💊 Дозировки' : '🧪 Пептиды'}</button>
-        ))}
         {page === 'info' && (['catalog','interactions'] as const).map(t => (
           <button key={t} onClick={() => setSubTab(t)} style={{
             padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
@@ -144,78 +135,12 @@ export const PharmaScreen: React.FC = () => {
           }}>{t === 'catalog' ? '📖 Каталог' : '⚡ Взаимодействия'}</button>
         ))}
       </div>
-      {page === 'course' && courseSub === 'course' && <PharmaCourseScreen />}
-      {page === 'course' && courseSub === 'mapper' && <MapperTab />}
-      {page === 'course' && courseSub === 'diagnostics' && <DiagnosticsTab />}
-      {page === 'course' && courseSub === 'reports' && (() => {
-        const saveArchive = (report: any) => {
-          const updated = [report, ...courseArchive].slice(0, 20);
-          setCourseArchive(updated);
-          try { localStorage.setItem('he_pharma_reports', JSON.stringify(updated)); } catch {}
-        };
-        const generateReport = () => {
-          const course = linked.course || [];
-          const compounds = course.map((c: any) => {
-            const ph = PHARMA_DB[c.substanceId];
-            return { id: c.substanceId, name: ph?.name || c.substanceId, cls: ph?.class || 'other', dose: c.doseValue, freq: c.frequency, start: c.startWeek, end: c.endWeek, unit: c.doseUnit };
-          });
-          const report = { id: Date.now().toString(), date: new Date().toISOString().slice(0, 10), generatedAt: new Date().toISOString(), compounds, compoundCount: compounds.length, totalWeeks: compounds.length ? Math.max(...compounds.map((c:any) => c.end || c.endWeek || 0)) : 0, totalDoseMg: compounds.reduce((s: number, c: any) => s + (c.dose || 0) * ((c.end || c.endWeek || 0) - (c.start || c.startWeek || 0) + 1), 0), risk: linked.risk?.overallRaw || 0, pctPlanned: compounds.some((c: any) => c.cls === 'serm' || c.cls === 'pct_gonadotropin'), timestamp: Date.now() };
-          saveArchive(report);
-          try { localStorage.setItem('he_pharma_report_current', JSON.stringify(report)); } catch {}
-          setCourseReportGenerated(true);
-        };
-        return (
-          <div style={{ padding:'0 12px 80px' }}>
-            <h3 style={{ fontSize:15, fontWeight:800, color:'#fff', margin:'0 0 4px' }}>📄 Отчёты по курсу</h3>
-            <p style={{ fontSize:10, color:'rgba(255,255,255,0.7)', margin:'0 0 12px' }}>Полный отчёт по препаратам, дозам, фазам и рискам</p>
-            <div style={{ display:'flex', gap:6, marginBottom:12 }}>
-              <button onClick={generateReport} style={{ padding:'8px 16px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:12, background:'var(--accent)', color:'#000', border:'none', flex:1 }}>📄 Сгенерировать отчёт</button>
-              <button onClick={() => { try { localStorage.removeItem('he_pharma_reports'); localStorage.removeItem('he_pharma_report_current'); setCourseArchive([]); setCourseReportGenerated(false); } catch {} }} style={{ padding:'8px 12px', borderRadius:10, cursor:'pointer', fontWeight:600, fontSize:11, background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.2)' }}>🗑 Очистить архив</button>
-            </div>
-            {courseReportGenerated && (
-              <div style={{ borderRadius:12, padding:14, marginBottom:10, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                  <h4 style={{ margin:0, fontSize:12, fontWeight:700, color:'#00e68a' }}>✅ Отчёт сгенерирован</h4>
-                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>{new Date().toLocaleString()}</span>
-                </div>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.5 }}>
-                  {(linked.course || []).map((c: any, i: number) => {
-                    const ph = PHARMA_DB[c.substanceId];
-                    return <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'3px 8px', borderRadius:4, background:i%2===0?'rgba(255,255,255,0.03)':'transparent', fontSize:9 }}>
-                      <span style={{ fontWeight:600 }}>{ph?.name || c.substanceId}</span>
-                      <span style={{ color:'rgba(255,255,255,0.6)' }}>{c.doseValue}{c.doseUnit} · {c.frequency} · нед {c.startWeek}-{c.endWeek}</span>
-                    </div>;
-                  })}
-                  <div style={{ marginTop:6, paddingTop:6, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
-                    <b>Всего препаратов:</b> {(linked.course||[]).length} · <b>Риск:</b> {Math.round(linked.risk?.overallRaw||0)}%
-                  </div>
-                </div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', textAlign:'center', marginTop:8 }}>Отчёт сохранён в архив. Доступен в Профиле → Отчёты.</div>
-              </div>
-            )}
-            {courseArchive.length > 0 && (
-              <div>
-                <h4 style={{ fontSize:12, fontWeight:700, color:'#fff', margin:'0 0 8px' }}>📦 Архив отчётов ({courseArchive.length})</h4>
-                {courseArchive.map((r: any) => (
-                  <div key={r.id} style={{ borderRadius:10, padding:10, marginBottom:4, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.03)' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between' }}>
-                      <span style={{ fontSize:11, fontWeight:700, color:'#00e68a' }}>Отчёт от {r.date}</span>
-                      <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>{r.compoundCount} препаратов</span>
-                    </div>
-                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginTop:2 }}>нед: {r.totalWeeks} · риск: {Math.round(r.risk)}%</div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {!courseReportGenerated && courseArchive.length === 0 && (
-              <div style={{ textAlign:'center', padding:40, fontSize:11, color:'rgba(255,255,255,0.5)' }}>Нажмите «Сгенерировать отчёт» для создания отчёта по курсу</div>
-            )}
-          </div>
-        );
-      })()}
+      {page === 'course' && <PharmaCourseScreen />}
       {page === 'calculators' && subTab === 'pkpd' && <PKPDSimulationTab />}
       {page === 'calculators' && subTab === 'dosage' && <DosageCalculatorTab />}
       {page === 'calculators' && subTab === 'peptides' && <PharmaPeptideCalc />}
+      {page === 'calculators' && subTab === 'mapper' && <MapperTab />}
+      {page === 'calculators' && subTab === 'diagnostics' && <DiagnosticsTab />}
       {page === 'info' && subTab === 'catalog' && <CatalogTab />}
       {page === 'info' && subTab === 'interactions' && <InteractionCheckerTab />}
     </div>

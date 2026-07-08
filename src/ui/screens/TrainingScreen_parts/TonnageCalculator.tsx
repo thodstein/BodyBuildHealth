@@ -37,7 +37,7 @@ export const TonnageCalculator: React.FC = () => {
       <h3 style={{ margin: '0 0 4px', fontSize: 13, color: ACCENT }}>📦 Калькулятор тоннажа / КПШ / интенсивности</h3>
       <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 10 }}>Тоннаж = Σ подходы × повторения × вес; КПШ = Σ подходы × повторения; УОИ ≈ средняя относительная интенсивность к 1ПМ.</div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', padding: '0 4px 2px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, fontSize:9, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', padding: '0 4px 2px' }}>
         <span style={{ textAlign: 'center' }}>Вес</span><span style={{ textAlign: 'center' }}>Повт</span><span style={{ textAlign: 'center' }}>Подходы</span><span></span>
       </div>
       {rows.map(r => (

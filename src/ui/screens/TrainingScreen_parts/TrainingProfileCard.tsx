@@ -2,7 +2,7 @@
  * TrainingProfileCard.tsx — единая карточка «Профиль тренированности».
  * Реальные входные данные, общие для ПЛ/ББ/ручного конструктора/калькуляторов.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import { EQUIPMENT_OPTIONS, WEAK_GROUP_OPTIONS, type TrainingProfile } from './training-profile';
 
@@ -28,6 +28,9 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <PopupSelect label="Цель" value={profile.goal} onChange={v => update({ goal: v })} options={[['bulk','Масса'],['cut','Сушка'],['strength','Сила'],['maintenance','Поддержание'],['recomp','Рекомпозиция'],['rehab','Реабилитация']].map(([id,l]) => ({ id, label: l }))} />
         <PopupSelect label="Уровень" value={profile.level} onChange={v => update({ level: v })} options={[['beginner','Новичок'],['intermediate','Средний'],['advanced','Продвинутый'],['enhanced','Enhanced']].map(([id,l]) => ({ id, label: l }))} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8, marginTop: 6 }}>
+        <PopupNumber label="Тренировочный стаж" value={profile.trainingYears} min={0} max={50} suffix=" лет" onChange={v => update({ trainingYears: v })} />
       </div>
 
       <div style={LABEL}>Антропометрия и восстановление</div>
@@ -70,12 +73,64 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
           return <button key={o.id} onClick={() => toggleArr('equipment', o.id)} style={{ padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: on ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: on ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>{o.label}{on ? ' ✓' : ''}</button>;
         })}
       </div>
+      <div style={LABEL}>🩹 Травмы / ограничения</div>
+      {(() => {
+        const [injMuscle, setInjMuscle] = useState('chest');
+        const [injFrom, setInjFrom] = useState('');
+        const [injTo, setInjTo] = useState('');
+        const INJ_GROUPS: [string, string][] = [['chest','Грудь'],['back','Спина'],['legs','Ноги'],['shoulders','Плечи'],['arms','Руки'],['core','Кор']];
+        return (
+          <div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginBottom: 6 }}>Указанные группы исключаются из генерации плана на активный период.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr auto', gap: 6, marginBottom: 8, alignItems: 'end' }}>
+              <div>
+                <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Группа</label>
+                <select value={injMuscle} onChange={e => setInjMuscle(e.target.value)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '6px 8px', fontSize: 11 }}>
+                  {INJ_GROUPS.map(([g, l]) => <option key={g} value={g}>{l}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>С</label>
+                <input type="date" value={injFrom} onChange={e => setInjFrom(e.target.value)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '6px 8px', fontSize: 11 }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>До (опц)</label>
+                <input type="date" value={injTo} onChange={e => setInjTo(e.target.value)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '6px 8px', fontSize: 11 }} />
+              </div>
+              <button onClick={() => { if (!injFrom) return; update({ injuries: [...(profile.injuries || []), { muscle: injMuscle, from: injFrom, to: injTo || undefined }] }); setInjFrom(''); setInjTo(''); }} style={{ padding: '7px 12px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Добавить</button>
+            </div>
+            {(profile.injuries || []).length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {profile.injuries.map((inj: any, i: number) => {
+                  const today = new Date().toISOString().slice(0, 10);
+                  const active = (inj.from || '') <= today && (!inj.to || inj.to >= today);
+                  const ru = INJ_GROUPS.find(([g]) => g === inj.muscle)?.[1] || inj.muscle;
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', borderRadius: 6, background: active ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.02)', border: '1px solid ' + (active ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.04)') }}>
+                      <span style={{ fontSize: 11, color: active ? '#fca5a5' : 'rgba(255,255,255,0.4)' }}>{ru} · {inj.from}–{inj.to || '…'}{active ? ' · активна' : ''}</span>
+                      <button onClick={() => update({ injuries: (profile.injuries || []).filter((_: any, j: number) => j !== i) })} style={{ padding: '2px 7px', borderRadius: 4, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: 9, cursor: 'pointer' }}>✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       <div style={LABEL}>Курс (PED-адаптация объёмов)</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <PopupSelect label='На курсе' value={profile.onCourse ? 'yes' : 'no'} onChange={v => update({ onCourse: v === 'yes' })} options={[['no','Нет (натурал)'],['yes','Да (на курсе)']].map(([id,l]) => ({ id, label: l }))} />
         <PopupSelect label='Интенсивность курса' value={profile.courseIntensity} onChange={v => update({ courseIntensity: v as any })} options={[['mild','Лёгкая'],['moderate','Умеренная'],['heavy','Тяжёлая']].map(([id,l]) => ({ id, label: l }))} />
       </div>
       {profile.onCourse && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>На курсе MRV повышается (~+20-30%), восстановление учитывается в готовности.</div>}
+
+      <div style={{ ...LABEL, marginTop: 10 }}>📊 Фармакологическая история</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+        <PopupNumber label="Всего курсов" value={profile.pharmaCoursesCount} min={0} max={99} onChange={v => update({ pharmaCoursesCount: v })} />
+        <PopupNumber label="С последнего курса" value={profile.monthsSinceLastCourse} min={0} max={999} suffix=" мес" onChange={v => update({ monthsSinceLastCourse: v })} />
+        <PopupNumber label="Лет на фарме" value={profile.totalYearsOnPharma} min={0} max={50} suffix=" лет" onChange={v => update({ totalYearsOnPharma: v })} />
+      </div>
       {compact !== true && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>Эти данные используются ПЛ, ББ, ручным конструктором и калькуляторами для расчётов.</div>}
     </div>
   );

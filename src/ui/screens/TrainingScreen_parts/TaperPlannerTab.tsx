@@ -12,6 +12,7 @@ import {
   type TaperPlan,
 } from '../../../engines/pro/taper.engine';
 import { PopupNumber, PopupSelect, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -229,6 +230,18 @@ export const TaperPlannerTab: React.FC = () => {
         >
           {saved ? '✓ План сохранён' : '💾 Сохранить taper-план'}
         </button>
+      )}
+      {plan && (
+        <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить taper-план к планировщику: тейпер = пиковая фаза (объём ×{plan.taperCurve[plan.taperCurve.length - 1]?.volumePctOfPeak ?? 0.5}, RIR→0).</div>
+           <button onClick={() => applyToPlanner({ kind: 'peak', label: 'Taper: объём ×' + (plan.taperCurve[plan.taperCurve.length - 1]?.volumePctOfPeak ?? 0.5) + ', RIR→0', data: { volumeMult: plan.taperCurve[plan.taperCurve.length - 1]?.volumePctOfPeak ?? 0.5, rirTarget: 0 } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить тейпер к планировщику</button>
+        </div>
+      )}
+      {plan && (
+        <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить ПМ соревнования ({squat1RM}/{bench1RM}/{deadlift1RM} кг) к планировщику.</div>
+          <button onClick={() => applyToPlanner({ kind: 'pm', label: 'ПМ taper: ' + squat1RM + '/' + bench1RM + '/' + deadlift1RM + ' кг', data: { squat: squat1RM, bench: bench1RM, dead: deadlift1RM } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить ПМ к планировщику</button>
+        </div>
       )}
     </div>
   );

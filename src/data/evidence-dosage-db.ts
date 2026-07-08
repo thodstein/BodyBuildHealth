@@ -36,7 +36,7 @@ export const EVIDENCE_DOSAGES: Record<DosageId, EvidenceDosage> = {
       'NIH ODS NAC Fact Sheet — пероральные дозы 600-1200 мг',
     ],
     notes: 'При ААС-курсе: 1200-1800 мг/сут. Пульс-терапия (печёночная токс.): до 3000 мг/сут в условиях стационара.',
-    adjustments: { phaseMultiplier: { course: 1.5, bridge: 1.0, pct: 0.75, fertility: 1.0 } },
+    adjustments: { phaseMultiplier: { course: 1.5, bridge: 1.0, pct: 0.75, fertility: 1.5 } },
     titration: [600, 1200, 1800],
     contraindications: ['Язвенная болезнь в обострении', 'Бронхиальная астма (с осторожностью)'],
   },
@@ -113,7 +113,7 @@ export const EVIDENCE_DOSAGES: Record<DosageId, EvidenceDosage> = {
     references: [
       'NIH ODS Zinc Fact Sheet — RDA 11 мг муж / 8 мг жен, UL 40 мг/сут',
     ],
-    notes: 'Элементарного цинка. Пиколинат: 30 мг ≈ 150% RDA. >50 мг/сут → риск дефицита меди.',
+    notes: 'Элементарного цинка. Пиколинат: 30 мг ≈ 150% RDA. >50 мг/сут → риск дефицита меди. Оптимальное Zn:Cu = 10:1 для фертильности.',
     adjustments: { phaseMultiplier: { course: 1.0, bridge: 1.5, pct: 1.5, fertility: 2.0 } },
     contraindications: ['Гемохроматоз', 'Длительно >50 мг (дефицит меди)'],
   },

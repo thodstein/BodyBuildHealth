@@ -69,14 +69,15 @@ export interface SupportCatalogEntry {
 export const ORGAN_LABELS: Record<string, string> = {
   LIVER: '🫁 Печень', KIDNEYS: '🫘 Почки', HEART: '❤️ Сердце', VESSELS: '🩸 Сосуды',
   BRAIN: '🧠 Мозг', NERVES: '⚡ Нервы', LUNGS: '🫁 Лёгкие', SKIN: '🧴 Кожа',
-  EYES: '👁️ Глаза', IMMUNE_SYSTEM: '🛡️ Иммунитет', REPRODUCTIVE: '🧬 Репродуктивная',
+  EYES: '👁️ Глаза', IMMUNE: '🛡️ Иммунитет', IMMUNE_SYSTEM: '🛡️ Иммунитет', REPRODUCTIVE: '🧬 Репродуктивная',
   MUSCLES: '💪 Мышцы', BONES: '🦴 Кости', JOINTS: '🦴 Суставы', PANCREAS: '🫁 Поджелудочная',
   THYROID: '🦋 Щитовидная', ADRENALS: '⚖️ Надпочечники', STOMACH: '🫁 Желудок',
   INTESTINES: '🫁 Кишечник', BLOOD: '🩸 Кровь', PROSTATE: '🔴 Простата', GUT: '🫁 Кишечник',
   BONE: '🦴 Кости', HAIR: '💇 Волосы', THYMUS: '🛡️ Тимус', MUCOSA: '🧴 Слизистая',
   GALLBLADDER: '🫁 Желчный пузырь', TESTES: '⚽ Яички',
   CELLS: '🔬 Клетки', MITOCHONDRIA: '🔋 Митохондрии', ENDOCRINE: '⚖️ Эндокринная',
-  BREAST: '🔴 Грудь', PITUITARY: '🧠 Гипофиз',
+  BREAST: '🔴 Грудь', PITUITARY: '🧠 Гипофиз', CARTILAGE: '🦴 Хрящ',
+  SMALL_INTESTINE: '🫁 Тонкий кишечник',
 };
 
 export const SYSTEM_LABELS_CATALOG: Record<string, string> = {
@@ -170,7 +171,7 @@ vitamin_d3: {
       { id: 'vitamin_d3', name: 'Vitamin D3 5000 IU', nameRu: 'Витамин D3 5000 МЕ', dose: '5000 МЕ с едой', best: true },
       { id: 'VIT_D3_LIP', name: 'Vitamin D3 Liposomal', nameRu: 'Липосомальный D3 5000 МЕ', dose: '5000 МЕ', best: false, notes: 'Лучшая биодоступность' },
     ],
-    organs: ['BONES', 'IMMUNE_SYSTEM', 'MUSCLES', 'REPRODUCTIVE'],
+    organs: ['BONES', 'IMMUNE_SYSTEM', 'MUSCLES', 'REPRODUCTIVE', 'ENDOCRINE'],
     systems: ['endocrine', 'hepatic', 'hematologic'],
     mechanisms: ['VDR_RECEPTOR_ACTIVATION', 'CALCIUM_REGULATION', 'TESTOSTERONE_SYNTHESIS', 'BONE_MINERALIZATION', 'STEROIDOGENESIS', 'PTH_SUPPRESSION', 'TCELL_PROLIFERATION', 'BONE_DENSITY'],
     description: 'Витамин D3 — прогормон, регулирующий кальций, иммунитет и гормональный баланс. 80% населения в дефиците. Критически важен на курсе ААС.',
@@ -215,7 +216,7 @@ zinc: {
       { id: 'MIN_ZN_BISGLYCINATE', name: 'Zinc Bisglycinate', nameRu: 'Цинк бисглицинат 30 мг', dose: '30 мг', best: false },
       { id: 'MIN_ZN_CITRATE', name: 'Zinc Citrate', nameRu: 'Цинк цитрат 30 мг', dose: '30 мг', best: false },
     ],
-    organs: ['REPRODUCTIVE', 'IMMUNE_SYSTEM', 'SKIN', 'PROSTATE'],
+    organs: ['REPRODUCTIVE', 'IMMUNE_SYSTEM', 'SKIN', 'PROSTATE', 'ENDOCRINE'],
     systems: ['reproductive', 'endocrine', 'hematologic'],
     mechanisms: ['TESTOSTERONE_SYNTHESIS', 'ZINC_COFACTOR', 'PROSTATE_PROTECTION', 'METALLOTHIONEIN_UP', 'DNA_SYNTHESIS', 'TCELL_PROLIFERATION', 'ANTIMICROBIAL_PEPTIDES', 'COLLAGEN_SYNTHESIS'],
     description: 'Цинк — эссенциальный микроэлемент для синтеза тестостерона, иммунитета и репродукции. Пиколинат — лучшая форма для усвоения.',
@@ -258,7 +259,7 @@ zinc: {
       { id: 'selenium', name: 'Selenium Methionine 200mcg', nameRu: 'Селен метионин 200 мкг', dose: '200 мкг с едой', best: true },
       { id: 'MIN_SE_YEAST', name: 'Selenium Yeast', nameRu: 'Селен дрожжевой 200 мкг', dose: '200 мкг', best: false },
     ],
-    organs: ['THYROID', 'LIVER', 'IMMUNE_SYSTEM', 'REPRODUCTIVE'],
+    organs: ['THYROID', 'LIVER', 'IMMUNE_SYSTEM', 'REPRODUCTIVE', 'ENDOCRINE'],
     systems: ['endocrine', 'hepatic', 'hematologic'],
     mechanisms: ['GPX_ACTIVATION', 'DIO1_ACTIVATION', 'SELENOPROTEIN_BINDING', 'SPERMATOGENESIS', 'T4_T3_CONVERSION', 'THYROID_STIMULATION', 'LIPID_PEROXIDATION_INHIBITION'],
     description: 'Селен — кофактор глутатионпероксидазы и дейодиназы щитовидной железы. Критически важен для антиоксидантной защиты и мужской фертильности.',
@@ -341,7 +342,7 @@ curcumin: {
       { id: 'PP_CURCUMIN_MERIVA', name: 'Curcumin Meriva (фитосомы)', nameRu: 'Куркумин Мерива 500 мг', dose: '500 мг', best: false, notes: 'Лучшая биодоступность' },
       { id: 'PP_CURCUMIN_THERACURMIN', name: 'Theracurmin', nameRu: 'Теракурмин 300 мг', dose: '300 мг', best: false, notes: 'Максимальная биодоступность' },
     ],
-    organs: ['LIVER', 'JOINTS', 'BRAIN', 'INTESTINES'],
+    organs: ['LIVER', 'JOINTS', 'BRAIN', 'INTESTINES', 'CARTILAGE', 'SMALL_INTESTINE'],
     systems: ['hepatic', 'musculoskeletal', 'neuro'],
     mechanisms: ['NF_KB_INHIBITION', 'COX2_INHIBITION', 'ANTI_FIBROTIC', 'BDNF_INCREASE', 'NLRP3_INHIBITION', 'CYTOKINE_MODULATION', 'MMP_REGULATION', 'EPIGENETIC_MODULATION'],
     description: 'Куркумин — мощный противовоспалительный агент. Ингибирует NF-kB и COX-2. Пиперин увеличивает биодоступность на 2000%. Обязателен для печени и суставов.',
@@ -385,7 +386,7 @@ ashwagandha: {
       { id: 'ashwagandha', name: 'Ashwagandha KSM-66 600mg', nameRu: 'Ашваганда KSM-66 600 мг', dose: '600 мг вечером', best: true },
       { id: 'AD_ASHWAGANDHA_SENSORIL', name: 'Ashwagandha Sensoril 250mg', nameRu: 'Ашваганда Sensoril 250 мг', dose: '250 мг', best: false, notes: 'Больше расслабления' },
     ],
-    organs: ['ADRENALS', 'BRAIN', 'THYROID', 'REPRODUCTIVE'],
+    organs: ['ADRENALS', 'BRAIN', 'THYROID', 'REPRODUCTIVE', 'ENDOCRINE'],
     systems: ['neuro', 'endocrine', 'reproductive'],
     mechanisms: ['CORTISOL_REDUCTION', 'GABA_RECEPTOR_AGONISM', 'TESTOSTERONE_SUPPORT', 'ANXIOLYTIC', 'STRESS_ADAPTATION', 'HPA_MODULATION', 'STEROIDOGENESIS', 'THYROID_STIMULATION'],
     description: 'Ашваганда KSM-66 — адаптоген, снижающий кортизол на 30%, повышающий тестостерон, улучшающий сон.',
@@ -428,7 +429,7 @@ vitamin_c: {
       { id: 'vitamin_c', name: 'Vitamin C 1000mg', nameRu: 'Витамин C 1000 мг', dose: '1000 мг натощак', best: true },
       { id: 'VIT_C_LIP', name: 'Liposomal Vitamin C', nameRu: 'Липосомальный витамин C 1000 мг', dose: '1000 мг', best: false, notes: 'Лучшая биодоступность' },
     ],
-    organs: ['IMMUNE_SYSTEM', 'SKIN', 'BLOOD', 'ADRENALS'],
+    organs: ['IMMUNE_SYSTEM', 'SKIN', 'BLOOD', 'ADRENALS', 'JOINTS', 'CARTILAGE'],
     systems: ['hematologic', 'hepatic', 'immune'],
     mechanisms: ['COLLAGEN_SYNTHESIS', 'IMMUNE_CELL_FUNCTION', 'IRON_ABSORPTION', 'GLUTATHIONE_RECYCLING', 'CONNECTIVE_TISSUE', 'IRON_METABOLISM', 'NEUTROPHIL_ACTIVATION', 'HEPCIDIN_DOWN'],
     description: 'Витамин C — водорастворимый антиоксидант, необходимый для синтеза коллагена, иммунитета и регенерации глутатиона.',
@@ -639,7 +640,7 @@ probiotics: {
       { id: 'PRO_B_BIFIDUM', name: 'B. Bifidum', nameRu: 'Б. Бифидум', dose: '5 млрд КОЕ', best: false },
       { id: 'PRO_SACCHAROMYCES', name: 'S. Boulardii', nameRu: 'С. Буларди', dose: '5 млрд КОЕ', best: false, notes: 'Дрожжевой пробиотик, не уничтожается антибиотиками' },
     ],
-    organs: ['INTESTINES', 'LIVER', 'IMMUNE_SYSTEM'],
+    organs: ['INTESTINES', 'LIVER', 'IMMUNE_SYSTEM', 'SMALL_INTESTINE'],
     systems: ['hepatic', 'immune', 'hematologic'],
     mechanisms: ['GUT_MICROBIOME_MODULATION', 'GUT_BARRIER_INTEGRITY', 'SHORT_CHAIN_FATTY_ACID_PRODUCTION', 'PATHOGEN_EXCLUSION', 'MICROBIOME_RESTORATION', 'GUT_BARRIER_PROTECTION', 'IGA_PRODUCTION', 'TREG_EXPANSION'],
     description: 'Пробиотики — живые микроорганизмы, улучшающие микробиом кишечника. Укрепляют кишечный барьер, модулируют иммунитет, подавляют патогенную флору. Обязательны на курсе ААС.',
@@ -680,7 +681,7 @@ collagen: {
       { id: 'collagen', name: 'Collagen Hydrolysate 10g', nameRu: 'Коллаген гидролизат 10 г', dose: '10 г с едой', best: true },
       { id: 'AA_COLLAGEN_AMINO', name: 'Collagen Peptides', nameRu: 'Коллагеновые пептиды 10 г', dose: '10 г', best: false },
     ],
-    organs: ['JOINTS', 'SKIN', 'BONES', 'MUSCLES'],
+    organs: ['JOINTS', 'SKIN', 'BONES', 'MUSCLES', 'CARTILAGE', 'SMALL_INTESTINE'],
     systems: ['musculoskeletal'],
     mechanisms: ['COLLAGEN_SYNTHESIS', 'CARTILAGE_REPAIR', 'TENDON_STRENGTH', 'COLLAGEN_COMPONENT', 'TISSUE_REPAIR', 'CONNECTIVE_TISSUE', 'HYALURONAN_SYNTHESIS', 'MMP_REGULATION'],
     description: 'Гидролизованный коллаген — источник аминокислот для восстановления хрящей, сухожилий и кожи. Синергичен с витамином C для синтеза нового коллагена.',
@@ -720,7 +721,7 @@ glucosamine: {
     forms: [
       { id: 'glucosamine', name: 'Glucosamine Sulfate 1500mg', nameRu: 'Глюкозамин сульфат 1500 мг', dose: '1500 мг с едой', best: true },
     ],
-    organs: ['JOINTS', 'BONES'],
+    organs: ['JOINTS', 'BONES', 'CARTILAGE'],
     systems: ['musculoskeletal'],
     mechanisms: ['CARTILAGE_REPAIR', 'PROTEOGLYCAN_SYNTHESIS', 'GAG_SYNTHESIS', 'HYALURONAN_SYNTHESIS', 'MMP_REGULATION', 'JOINT_PROTECTION', 'JOINT_FUNCTION'],
     description: 'Глюкозамин — строительный блок хрящевой ткани. Улучшает продукцию синовиальной жидкости и замедляет дегенерацию суставов.',
@@ -881,7 +882,7 @@ copper: {
       { id: 'copper', name: 'Copper Bisglycinate', nameRu: 'Медь бисглицинат', dose: '2 мг с едой', best: true },
       { id: 'MIN_COPPER', name: 'Copper Chelate', nameRu: 'Медь хелат', dose: '2 мг с едой', best: false },
     ],
-    organs: ['LIVER', 'BLOOD', 'BONES'],
+    organs: ['LIVER', 'BLOOD', 'BONES', 'JOINTS', 'CARTILAGE'],
     systems: ['hepatic', 'hematologic', 'musculoskeletal'],
     mechanisms: ['IRON_METABOLISM', 'CERULOPLASMIN', 'COLLAGEN_CROSS_LINKING', 'COPPER_DELIVERY', 'COPPER_TRANSPORT', 'HEME_SYNTHESIS', 'CONNECTIVE_TISSUE', 'DOPAMINE_SYNTHESIS'],
     description: 'Медь — кофактор церулоплазмина, критична для метаболизма железа и перекрёстных связей коллагена. На курсе ААС поддерживает кроветворение и прочность связок.',
@@ -1768,7 +1769,7 @@ prebiotics: {
       { id: 'prebiotics_2', name: 'Prebiotics', nameRu: 'Инулин 5 г', dose: '5 г', best: false },
       { id: 'prebiotics_3', name: 'Prebiotics', nameRu: 'ФОС 3 г', dose: '5 г', best: false }
     ],
-    organs: ['INTESTINES'],
+    organs: ['INTESTINES', 'SMALL_INTESTINE'],
     systems: ['hepatic', 'immune', 'metabolic'],
     mechanisms: ['PROBIOTIC_GROWTH', 'SHORT_CHAIN_FATTY_ACID_PRODUCTION', 'GUT_BARRIER_INTEGRITY', 'SCFA_PRODUCTION', 'BUTYRATE_PRODUCTION', 'GUT_FLORA_MODULATION', 'GUT_HEALING', 'TIGHT_JUNCTION', 'LPS_REDUCTION', 'NFKB_INHIBITION', 'SHORT_CHAIN_FATTY_ACIDS', 'GLUCAGON_LIKE_PEPTIDE_1', 'GLP1_AGONISM', 'BLOOD_SUGAR_REGULATION', 'CHOLESTEROL_BINDING', 'MINERAL_ABSORPTION'],
     description: 'Пребиотики — неперевариваемые пищевые волокна, питающие полезную микрофлору. На курсе ААС поддерживают микробиом.',
@@ -1808,7 +1809,7 @@ glutamine: {
       { id: 'glutamine_2', name: 'Glutamine', nameRu: 'Глутамин Премиум 5 г', dose: '5 г', best: false },
       { id: 'glutamine_3', name: 'Glutamine', nameRu: 'Аланил-глутамин 5 г', dose: '5 г', best: false }
     ],
-    organs: ['INTESTINES', 'IMMUNE_SYSTEM', 'MUSCLES'],
+    organs: ['INTESTINES', 'IMMUNE_SYSTEM', 'MUSCLES', 'SMALL_INTESTINE'],
     systems: ['immune', 'hepatic', 'metabolic'],
     mechanisms: ['INTESTINAL_CELL_FUEL', 'IMMUNE_CELL_PROLIFERATION', 'GLUTATHIONE_PRECURSOR', 'NITROGEN_TRANSPORT', 'GUT_HEALING', 'GUT_BARRIER_INTEGRITY', 'TIGHT_JUNCTION', 'MUCOSAL_HEALING', 'IMMUNE_SUPPORT', 'IMMUNE_CELL_FUEL', 'LYMPHOCYTE_PROLIFERATION', 'MACROPHAGE_ACTIVATION', 'AMINO_ACID_TRANSPORT', 'NITROGEN_BALANCE', 'GLUTATHIONE_SYNTHESIS', 'PROTEIN_SYNTHESIS', 'ANTICATABOLIC'],
     description: 'Глутамин — условно-незаменимая аминокислота, топливо для энтероцитов. Предшественник глутатиона. На курсе поддерживает кишечный барьер и иммунитет.',
@@ -1884,7 +1885,7 @@ boron: {
       { id: 'boron', name: 'Boron', nameRu: 'Бор цитрат 3 мг', dose: '3 мг', best: true },
       { id: 'boron_2', name: 'Boron', nameRu: 'Бор глицинат 3 мг', dose: '3 мг', best: false }
     ],
-    organs: ['BONES', 'REPRODUCTIVE'],
+    organs: ['BONES', 'REPRODUCTIVE', 'ENDOCRINE'],
     systems: ['endocrine', 'musculoskeletal'],
     mechanisms: ['BONE_MINERALIZATION', 'FREE_TESTOSTERONE_INCREASE', 'VITAMIN_D_ACTIVATION', 'ESTROGEN_MODULATION', 'SHBG_REDUCTION', 'AROMATASE_INHIBITION', 'TESTOSTERONE_UP', 'BONE_DENSITY', 'OSTEOCALCIN_ACTIVATION', 'OSTEOBLAST_STIMULATION', 'CALCIUM_METABOLISM', 'MAGNESIUM_ABSORPTION', 'PHOSPHORUS_METABOLISM', 'COX_INHIBITION', 'BRAIN_HEALTH'],
     description: 'Бор — следовой минерал, повышает свободный тестостерон и активирует витамин D. На курсе ААС поддерживает костную ткань.',
@@ -1923,7 +1924,7 @@ boron: {
       { id: 'silicon', name: 'Silicon', nameRu: 'Ортокремниевая кислота 10 мг', dose: '10 мг', best: true },
       { id: 'silicon_2', name: 'Silicon', nameRu: 'Экстракт хвоща 10 мг', dose: '10 мг', best: false }
     ],
-    organs: ['BONES', 'JOINTS', 'SKIN'],
+    organs: ['BONES', 'JOINTS', 'SKIN', 'CARTILAGE'],
     systems: ['musculoskeletal'],
     mechanisms: ['COLLAGEN_SYNTHESIS', 'BONE_MINERALIZATION', 'CONNECTIVE_TISSUE', 'CARTILAGE_PROTECTION', 'GAG_SYNTHESIS', 'PROTEOGLYCAN_SYNTHESIS', 'TISSUE_REPAIR', 'ANTI_GLYCATION', 'TENDON_STRENGTH', 'LIGAMENT_HEALING', 'BONE_DENSITY', 'CALCIUM_ABSORPTION', 'MMP_REGULATION', 'SULFUR_DONATION'],
     description: 'Кремний — важен для синтеза коллагена и минерализации костей. На курсе ААС поддерживает соединительную ткань.',
@@ -2043,7 +2044,7 @@ manganese: {
       { id: 'manganese', name: 'Manganese', nameRu: 'Марганца глицинат 5 мг', dose: '5 мг', best: true },
       { id: 'manganese_2', name: 'Manganese', nameRu: 'Марганца цитрат 5 мг', dose: '5 мг', best: false }
     ],
-    organs: ['BONES', 'LIVER', 'JOINTS'],
+    organs: ['BONES', 'LIVER', 'JOINTS', 'CARTILAGE'],
     systems: ['hepatic', 'musculoskeletal', 'metabolic'],
     mechanisms: ['ANTIOXIDANT_ENZYME', 'GLUTATHIONE_SYNTHESIS', 'BONE_MINERALIZATION', 'COLLAGEN_SYNTHESIS', 'GLUCONEOGENESIS_INHIBITION', 'CARTILAGE_PROTECTION', 'GAG_SYNTHESIS', 'PROTEOGLYCAN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'AMINO_ACID_METABOLISM', 'UREA_CYCLE', 'PROTEIN_SYNTHESIS', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'CHOLESTEROL_LOWERING'],
     description: 'Марганец — кофактор митохондриальной СОД. На курсе ААС защищает суставы.',
@@ -2232,7 +2233,7 @@ msm: {
       { id: 'msm', name: 'MSM', nameRu: 'МСМ 1500 мг', dose: '1.5 г 2x/д', best: true },
       { id: 'msm_2', name: 'MSM', nameRu: 'МСМ порошок 3 г', dose: '1.5 г', best: false }
     ],
-    organs: ['JOINTS', 'SKIN', 'MUSCLES'],
+    organs: ['JOINTS', 'SKIN', 'MUSCLES', 'CARTILAGE'],
     systems: ['musculoskeletal'],
     mechanisms: ['SULFUR_DONATION', 'COLLAGEN_SYNTHESIS', 'MUSCLE_PROTEIN_SYNTHESIS', 'JOINT_PROTECTION', 'JOINT_FUNCTION', 'CARTILAGE_PROTECTION', 'CARTILAGE_REPAIR', 'CONNECTIVE_TISSUE', 'TENDON_STRENGTH', 'LIGAMENT_HEALING', 'TISSUE_REPAIR', 'COX_INHIBITION', 'COX2_INHIBITION', 'NF_KB_INHIBITION', 'PAIN_RELIEF'],
     description: 'МСМ — органическая сера, донор сульфидных групп для синтеза коллагена. Синергичен с глюкозамином. На курсе защищает суставы.',
@@ -2647,7 +2648,7 @@ butyrate: {
       { id: 'butyrate', name: 'Butyrate', nameRu: 'Бутират натрия 1500 мг', dose: '1.5 г 2x/д', best: true },
       { id: 'butyrate_2', name: 'Butyrate', nameRu: 'Бутират кальция 1500 мг', dose: '1.5 г', best: false }
     ],
-    organs: ['INTESTINES', 'LIVER'],
+    organs: ['INTESTINES', 'LIVER', 'SMALL_INTESTINE'],
     systems: ['hepatic', 'metabolic'],
     mechanisms: ['GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH', 'MICROBIOME_RESTORATION', 'MITOCHONDRIAL_FUNCTION', 'ATP_PRODUCTION', 'FATTY_ACID_OXIDATION', 'LIVER_LIPID_METABOLISM', 'NF_KB_INHIBITION', 'NLRP3_INHIBITION', 'AUTOPHAGY_INDUCER', 'SIRTUIN_ACTIVATION', 'LIPID_METABOLISM'],
     description: 'Бутират — короткоцепочечная жирная кислота, главный энергетический субстрат колоноцитов. Укрепляет кишечный барьер.',
@@ -2684,7 +2685,7 @@ glycine: {
       { id: 'glycine', name: 'Glycine', nameRu: 'Глицин 1000 мг', dose: '3 г 2x/д', best: true },
       { id: 'glycine_2', name: 'Glycine', nameRu: 'Глицин порошок 3 г', dose: '3 г', best: false }
     ],
-    organs: ['BRAIN', 'LIVER', 'JOINTS'],
+    organs: ['BRAIN', 'LIVER', 'JOINTS', 'ENDOCRINE', 'CARTILAGE'],
     systems: ['neuro', 'hepatic', 'musculoskeletal'],
     mechanisms: ['GLUTATHIONE_SYNTHESIS', 'GLUTATHIONE_PRECURSOR', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'TENDON_STRENGTH', 'LIGAMENT_HEALING', 'GABA_MODULATION', 'GABA_AGONISM', 'SLEEP_IMPROVEMENT', 'SLEEP_QUALITY', 'SLEEP_REGULATION', 'SLEEP_PROMOTION', 'ANXIOLYTIC', 'EXCITOTOXICITY_PREVENTION', 'NMDA_MODULATION', 'CREATINE_KINASE'],
     description: 'Глицин — тормозной нейромедиатор, предшественник коллагена и глутатиона. Улучшает сон.',
@@ -2762,7 +2763,7 @@ tyrosine: {
       { id: 'tyrosine', name: 'L-Tyrosine', nameRu: 'Л-Тирозин 500 мг', dose: '500 мг 2x/д', best: true },
       { id: 'tyrosine_2', name: 'L-Tyrosine', nameRu: 'N-Ацетил-Л-Тирозин 300 мг', dose: '500 мг', best: false }
     ],
-    organs: ['BRAIN', 'ADRENALS'],
+    organs: ['BRAIN', 'ADRENALS', 'ENDOCRINE'],
     systems: ['neuro', 'endocrine'],
      mechanisms: ['DOPAMINE_SYNTHESIS', 'DOPAMINE_PRECURSOR', 'DOPAMINE_MODULATION', 'NEUROTRANSMITTER_SYNTHESIS', 'TYROSINE_HYDROXYLASE', 'CORTISOL_REGULATION', 'CORTISOL_REDUCTION', 'STRESS_ADAPTATION', 'HPA_MODULATION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'THYROID_SYNTHESIS', 'THYROID_SUPPORT', 'T4_T3_CONVERSION', 'ADAPTOGEN'],
     description: 'Л-Тирозин — предшественник дофамина, норадреналина и тиреоидных гормонов. Улучшает стрессоустойчивость и фокус.',
@@ -2876,8 +2877,8 @@ gaba: {
       { id: 'gaba_2', name: 'GABA', nameRu: 'ГАМК порошок 3 г', dose: '500 мг', best: false },
       { id: 'gaba_3', name: 'GABA', nameRu: 'Фенибут (производное)', dose: '500 мг', best: false }
     ],
-    organs: ['BRAIN', 'NERVES'],
-    systems: ['neuro'],
+    organs: ['BRAIN', 'NERVES', 'ENDOCRINE'],
+    systems: ['neuro', 'endocrine'],
      mechanisms: ['GABA_MODULATION', 'GABA_AGONISM', 'GABA_AGONIST', 'GABA_BOOST', 'GABA_SYNTHESIS', 'GABA_RECEPTOR_AGONISM', 'ANXIOLYTIC', 'STRESS_REDUCTION', 'ALPHA_WAVES', 'SLEEP_PROMOTION', 'SLEEP_QUALITY', 'SLEEP_IMPROVEMENT', 'SLEEP_REGULATION', 'MUSCLE_RELAXATION', 'CORTISOL_REDUCTION', 'HPA_MODULATION'],
     description: 'ГАМК — главный тормозной нейромедиатор. Снижает тревожность и улучшает сон. Плохо проникает ГГБ.',
     synergies: [
@@ -3244,7 +3245,7 @@ d_aspartic_acid: {
       { id: 'd_aspartic_acid', name: 'D-Aspartic Acid', nameRu: 'D-Аспарагиновая кислота', dose: '3 г 2x/д', best: true },
       { id: 'DAA_2', name: 'D-Aspartic Acid', nameRu: 'D-AA цитрат 3 г', dose: '3 г', best: false }
     ],
-    organs: ['REPRODUCTIVE', 'BRAIN'],
+    organs: ['REPRODUCTIVE', 'BRAIN', 'ENDOCRINE'],
     systems: ['reproductive', 'endocrine'],
      mechanisms: ['TESTOSTERONE_SYNTHESIS', 'TESTOSTERONE_PRODUCTION', 'TESTOSTERONE_UP', 'TESTOSTERONE_BOOST', 'STEROIDOGENESIS', 'HPTA_RESTORATION', 'LH_RELEASE', 'LH_STIMULATION', 'LH_FSH_STIMULATION', 'SPERMATOGENESIS', 'SPERMATOGENESIS_RESTORE', 'FERTILITY_SUPPORT', 'GNRH_STIMULATION', 'LEYDIG_CELL_FUNCTION', 'STEROID_HORMONE_SYNTHESIS', 'NMDA_MODULATION', 'GLUTAMATE_MODULATION', 'NEUROTRANSMITTER_SYNTHESIS'],
     description: 'D-Аспарагиновая кислота — стимулирует высвобождение ЛГ и синтез тестостерона. Эффект кратковременный (12-15 дней).',
@@ -3423,7 +3424,7 @@ phosphatidylserine: {
       { id: 'phosphatidylserine', name: 'Phosphatidylserine', nameRu: 'Фосфатидилсерин 100 мг 3x/д', dose: '300 мг 2x/д', best: true },
       { id: 'phosphatidylserine_2', name: 'Phosphatidylserine', nameRu: 'Фосфатидилсерин 300 мг на ночь', dose: '300 мг', best: false }
     ],
-    organs: ['BRAIN', 'NERVES', 'ADRENALS'],
+    organs: ['BRAIN', 'NERVES', 'ADRENALS', 'ENDOCRINE'],
     systems: ['neuro', 'endocrine'],
      mechanisms: ['CORTISOL_REDUCTION', 'CORTISOL_REGULATION', 'CORTISOL_DOWN', 'HPA_MODULATION', 'STRESS_REDUCTION', 'STRESS_ADAPTATION', 'ADAPTOGEN', 'MEMORY_IMPROVEMENT', 'COGNITION_ENHANCEMENT', 'COGNITIVE_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'NEUROGENESIS', 'NEUROPLASTICITY', 'BDNF_INCREASE', 'SYNAPTIC_PLASTICITY', 'MEMBRANE_PHOSPHOLIPID'],
     description: 'Фосфатидилсерин — фосфолипид мембран нейронов, снижает кортизол на 30% после нагрузки. Улучшает память и когницию.',
@@ -3539,7 +3540,7 @@ ginseng: {
       { id: 'ginseng', name: 'Ginseng', nameRu: 'Экстракт женьшеня 200 мг', dose: '200 мг 2x/д', best: true },
       { id: 'ginseng_2', name: 'Ginseng', nameRu: 'Женьшень Премиум 400 мг', dose: '200 мг', best: false }
     ],
-    organs: ['BRAIN', 'ADRENALS', 'REPRODUCTIVE'],
+    organs: ['BRAIN', 'ADRENALS', 'REPRODUCTIVE', 'ENDOCRINE'],
     systems: ['neuro', 'endocrine', 'reproductive'],
      mechanisms: ['ADAPTOGEN', 'STRESS_ADAPTATION', 'CORTISOL_REGULATION', 'CORTISOL_REDUCTION', 'HPA_MODULATION', 'NO_SYNTHESIS', 'NO_PRODUCTION', 'VASODILATION', 'ENERGY_METABOLISM', 'ATP_PRODUCTION', 'COGNITIVE_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'LIBIDO_ENHANCEMENT'],
      description: 'Женьшень — король адаптогенов, повышает энергетику, снижает кортизол, улучшает когницию и либидо. На курсе ААС помогает с восстановлением.',
@@ -3576,7 +3577,7 @@ rhodiola: {
       { id: 'rhodiola', name: 'Rhodiola', nameRu: 'Родиола 300 мг', dose: '300 мг 2x/д', best: true },
       { id: 'rhodiola_2', name: 'Rhodiola', nameRu: 'Родиола + Женьшень комплекс', dose: '300 мг', best: false }
     ],
-    organs: ['BRAIN', 'ADRENALS', 'HEART'],
+    organs: ['BRAIN', 'ADRENALS', 'HEART', 'ENDOCRINE'],
     systems: ['neuro', 'endocrine', 'cardio'],
      mechanisms: ['ADAPTOGEN', 'STRESS_ADAPTATION', 'STRESS_REDUCTION', 'CORTISOL_REDUCTION', 'CORTISOL_REGULATION', 'HPA_MODULATION', 'FOCUS_ENHANCEMENT', 'COGNITIVE_ENHANCEMENT', 'MAO_INHIBITION', 'PHYSICAL_ENDURANCE', 'MUSCLE_RECOVERY', 'NO_PRODUCTION', 'SEROTONIN_MODULATION'],
      description: 'Родиола розовая — адаптоген, снижает кортизол и утомление, повышает фокус и выносливость. На курсе ААС помогает с восстановлением.',
@@ -3728,7 +3729,7 @@ cordyceps: {
       { id: 'maca', name: 'Maca', nameRu: 'Мака порошок 1.5 г', dose: '1.5 г 2x/д', best: true },
       { id: 'maca_2', name: 'Maca', nameRu: 'Мака экстракт 500 мг', dose: '1.5 г', best: false }
     ],
-    organs: ['REPRODUCTIVE', 'ADRENALS'],
+    organs: ['REPRODUCTIVE', 'ADRENALS', 'ENDOCRINE'],
     systems: ['reproductive', 'endocrine'],
      mechanisms: ['LIBIDO_ENHANCEMENT', 'SEXUAL_FUNCTION', 'ENERGY_METABOLISM', 'ATP_PRODUCTION', 'HORMONE_BALANCE', 'TESTOSTERONE_SUPPORT', 'TESTOSTERONE_PRODUCTION', 'FERTILITY_SUPPORT', 'SPERMATOGENESIS', 'SPERMATOGENESIS_RESTORE', 'ADAPTOGEN', 'STRESS_ADAPTATION', 'HPA_MODULATION', 'CORTISOL_REGULATION', 'MOOD_ENHANCEMENT'],
      description: 'Мака — перуанский адаптоген, повышает либидо и энергетику. Не влияет на гормоны напрямую, но балансирует ГГЯ ось.',
@@ -3765,7 +3766,7 @@ holy_basil: {
       { id: 'holy_basil', name: 'Holy Basil', nameRu: 'Туласи 400 мг', dose: '400 мг 2x/д', best: true },
       { id: 'holy_basil_2', name: 'Holy Basil', nameRu: 'Святой базилик экстракт 300 мг', dose: '400 мг', best: false }
     ],
-    organs: ['BRAIN', 'ADRENALS', 'LIVER'],
+    organs: ['BRAIN', 'ADRENALS', 'LIVER', 'ENDOCRINE'],
     systems: ['neuro', 'endocrine', 'hepatic'],
      mechanisms: ['CORTISOL_REDUCTION', 'CORTISOL_REGULATION', 'CORTISOL_DOWN', 'HPA_MODULATION', 'STRESS_ADAPTATION', 'STRESS_REDUCTION', 'ADAPTOGEN', 'NFKB_INHIBITION', 'COX_INHIBITION', 'ANTIOXIDANT_ENZYME', 'NRF2_ACTIVATION', 'GLUCOSE_UPTAKE', 'INSULIN_SENSITIVITY'],
      description: 'Туласи — священный базилик Аюрведы, мощный адаптоген. Снижает кортизол, сахар и воспаление. На курсе ААС помогает с восстановлением.',
@@ -3915,7 +3916,7 @@ schisandra: {
       { id: 'schisandra', name: 'Schisandra', nameRu: 'Шизандра 500 мг', dose: '500 мг 2x/д', best: true },
       { id: 'schisandra_2', name: 'Schisandra', nameRu: 'Лимонник экстракт 300 мг', dose: '500 мг', best: false }
     ],
-    organs: ['LIVER', 'BRAIN', 'ADRENALS'],
+    organs: ['LIVER', 'BRAIN', 'ADRENALS', 'ENDOCRINE'],
     systems: ['hepatic', 'neuro', 'endocrine'],
      mechanisms: ['ADAPTOGEN', 'STRESS_ADAPTATION', 'CORTISOL_REGULATION', 'CORTISOL_REDUCTION', 'HPA_MODULATION', 'NRF2_ACTIVATION', 'ANTIOXIDANT_ENZYME', 'NFKB_INHIBITION', 'ENERGY_METABOLISM', 'PHYSICAL_ENDURANCE', 'LUNG_FUNCTION', 'COGNITIVE_ENHANCEMENT'],
      description: 'Шизандра — адаптоген и гепатопротектор, содержит схизандрины. Защищает печень и повышает выносливость.',
@@ -4064,7 +4065,7 @@ quercetin: {
       { id: 'quercetin', name: 'Quercetin', nameRu: 'Кверцетин 500 мг', dose: '500 мг 2x/д', best: true },
       { id: 'quercetin_2', name: 'Quercetin', nameRu: 'Кверцетин + Бромелайн', dose: '500 мг', best: false }
     ],
-    organs: ['HEART', 'LUNGS', 'BRAIN'],
+    organs: ['HEART', 'LUNGS', 'BRAIN', 'IMMUNE_SYSTEM', 'JOINTS', 'CARTILAGE'],
     systems: ['cardio', 'neuro', 'hepatic'],
      mechanisms: ['NFKB_INHIBITION', 'COX_INHIBITION', 'ANTIHISTAMINE', 'MAST_CELL_STABILIZATION', 'SENOLYTIC', 'APOPTOSIS_INDUCTION', 'NRF2_ACTIVATION', 'NRF2_UPREGULATION', 'ANTIOXIDANT_ENZYME', 'PI3K_INHIBITION', 'CARDIO_PROTECTION', 'VASODILATION', 'CHELATION'],
     description: 'Кверцетин — флавоноид с противовоспалительным и антигистаминным действием. Сенолитик.',
@@ -4176,8 +4177,8 @@ melatonin: {
       { id: 'melatonin', name: 'Melatonin', nameRu: 'Мелатонин 3 мг', dose: '3 мг', best: true },
       { id: 'melatonin_2', name: 'Melatonin', nameRu: 'Мелатонин 5 мг', dose: '3 мг', best: false }
     ],
-    organs: ['BRAIN', 'IMMUNE_SYSTEM', 'INTESTINES'],
-    systems: ['neuro', 'immune', 'metabolic'],
+    organs: ['BRAIN', 'IMMUNE_SYSTEM', 'INTESTINES', 'ENDOCRINE'],
+    systems: ['neuro', 'immune', 'metabolic', 'endocrine'],
      mechanisms: ['SLEEP_REGULATION', 'SLEEP_PROMOTION', 'SLEEP_QUALITY', 'CIRCADIAN_RHYTHM', 'MT1_AGONIST', 'MT2_AGONIST', 'SINGLET_OXYGEN_QUENCH', 'ROS_SCAVENGING', 'ANTIOXIDANT_ENZYME', 'IMMUNE_FUNCTION', 'APOPTOSIS_INHIBITION', 'MITOCHONDRIAL_PROTECTION', 'CORTISOL_REGULATION', 'HPA_MODULATION', 'GUT_HEALTH'],
     description: 'Мелатонин — гормон сна, мощный антиоксидант. На курсе улучшает восстановление.',
     synergies: [
@@ -9041,7 +9042,7 @@ fiber: {
       { id: 'fiber', name: 'Fiber', nameRu: 'Псиллиум 5 г', dose: '10 г 2x/д', best: true },
       { id: 'fiber_2', name: 'Fiber', nameRu: 'Псиллиум + Пребиотик комплекс 5 г', dose: '10 г', best: false }
     ],
-    organs: ['GUT', 'HEART', 'PANCREAS'],
+    organs: ['GUT', 'HEART', 'PANCREAS', 'SMALL_INTESTINE'],
     systems: ['gastrointestinal', 'metabolic', 'cardio'],
      mechanisms: ['GUT_MOTILITY', 'CHOLESTEROL_LOWERING', 'INSULIN_SENSITIVITY', 'SATIETY', 'GLUCOSE_UPTAKE', 'GLUCONEOGENESIS_INHIBITION', 'LIPID_METABOLISM', 'BLOOD_RHEOLOGY', 'BIOFLAVONOID_BINDING', 'BILE_ACID_BINDING', 'SHORT_CHAIN_FATTY_ACIDS', 'BUTYRATE_PRODUCTION', 'GUT_BARRIER_PROTECTION', 'MICROBIOME_RESTORATION', 'FIBER_ABSORPTION'],
     description: 'Клетчатка — пищевые волокна для нормализации моторики кишечника, снижения холестерина и контроля глюкозы.',
@@ -9148,7 +9149,7 @@ digestive_enzymes: {
       { id: 'digestive_enzymes', name: 'Digestive Enzymes', nameRu: 'Пищеварительные ферменты 500 мг', dose: '500 мг 2x/д', best: true },
       { id: 'digestive_enzymes_2', name: 'Digestive Enzymes', nameRu: 'Ферментный комплекс форте', dose: '500 мг', best: false }
     ],
-    organs: ['STOMACH', 'PANCREAS', 'GUT'],
+    organs: ['STOMACH', 'PANCREAS', 'GUT', 'SMALL_INTESTINE'],
     systems: ['gastrointestinal'],
      mechanisms: ['DIGESTION_IMPROVEMENT', 'PROTEIN_ABSORPTION', 'NUTRIENT_BIOAVAILABILITY', 'GUT_PROTECTION', 'AMINO_ACID_METABOLISM', 'GUT_BARRIER', 'ENTEROCYTE_HEALTH', 'MUCOUS_MEMBRANE_PROTECTION', 'NFKB_INHIBITION', 'MUSCLE_PROTEIN_SYNTHESIS', 'MICROBIOME_RESTORATION', 'FAT_METABOLISM'],
     description: 'Пищеварительные ферменты — амилаза, протеаза, липаза для улучшения усвоения белка и нутриентов. На курсе — ЖКТ.',
@@ -9185,7 +9186,7 @@ zinc_carnosine: {
       { id: 'zinc_carnosine', name: 'Zinc Carnosine', nameRu: 'Цинк-карнозин 75 мг', dose: '75 мг 2x/д', best: true },
       { id: 'zinc_carnosine_2', name: 'Zinc Carnosine', nameRu: 'Цинк-карнозин + Пищеварительные ферменты', dose: '75 мг', best: false }
     ],
-    organs: ['STOMACH', 'GUT', 'IMMUNE_SYSTEM'],
+    organs: ['STOMACH', 'GUT', 'IMMUNE_SYSTEM', 'SMALL_INTESTINE'],
     systems: ['gastrointestinal', 'immune'],
      mechanisms: ['GUT_BARRIER_STRENGTHENING', 'IMMUNE_SUPPORT', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH', 'GASTRIC_PROTECTION', 'MUCOUS_MEMBRANE_PROTECTION', 'ZINC_COFACTOR', 'APOPTOSIS_REGULATION', 'TISSUE_REPAIR', 'CARNOSINE_CHELATION', 'NFKB_INHIBITION', 'MEMBRANE_STABILIZATION'],
     description: 'Цинк-карнозин — комплекс цинка и карнозина, заживляет слизистую желудка и кишечника. На курсе — защита ЖКТ.',
@@ -9618,7 +9619,7 @@ dhea: {
       { id: 'dhea', name: 'DHEA', nameRu: 'ДГЭА 25 мг', dose: '25 мг 2x/д', best: true },
       { id: 'dhea_2', name: 'DHEA', nameRu: 'ДГЭА 50 мг', dose: '25 мг', best: false }
     ],
-    organs: ['ADRENALS', 'BRAIN', 'MUSCLES'],
+    organs: ['ADRENALS', 'BRAIN', 'MUSCLES', 'ENDOCRINE'],
     systems: ['endocrine', 'neuro', 'musculoskeletal'],
      mechanisms: ['DHEA_PRODUCTION', 'ANDROGEN_PRECURSOR', 'CORTISOL_BALANCE', 'ANTI_AGING', 'STEROIDOGENESIS', 'TESTOSTERONE_SYNTHESIS', 'TESTOSTERONE_SUPPORT', 'FREE_TESTOSTERONE_INCREASE', 'SHBG_REDUCTION', 'BONE_DENSITY', 'LIPID_METABOLISM', 'INSULIN_SENSITIVITY', 'APOPTOSIS_REGULATION'],
     description: 'ДГЭА — предшественник половых гормонов, снижается с возрастом. На курсе — гормональный баланс и анти-возраст.',
@@ -9861,8 +9862,8 @@ fadogia: {
     forms: [
       { id: 'fadogia', name: 'Fadogia', nameRu: 'Экстракт фадогии 500 мг', dose: '500 мг 2x/д', best: true }
     ],
-    organs: ['REPRODUCTIVE', 'MUSCLES'],
-    systems: ['reproductive', 'musculoskeletal'],
+    organs: ['REPRODUCTIVE', 'MUSCLES', 'ENDOCRINE'],
+    systems: ['reproductive', 'musculoskeletal', 'endocrine'],
      mechanisms: ['TESTOSTERONE_SYNTHESIS', 'LH_STIMULATION', 'LIBIDO_ENHANCEMENT', 'MUSCLE_RECOVERY', 'STEROIDOGENESIS', 'HPTA_RESTORATION', 'FSH_STIMULATION', 'GNRH_STIMULATION', 'FREE_TESTOSTERONE_INCREASE', 'SHBG_REDUCTION', 'LEYDIG_CELL_FUNCTION', 'MUSCLE_PROTEIN_SYNTHESIS', 'ANTI_CATABOLIC', 'NITRIC_OXIDE_PRODUCTION', 'PDE5_INHIBITION', 'CORTISOL_REDUCTION'],
     description: 'Фадогия агрестис — африканское растение, стимулирует ЛГ и тестостерон. На курсе — либидо и восстановление.',
     synergies: [
@@ -9898,7 +9899,7 @@ pregnenolone: {
       { id: 'pregnenolone', name: 'Pregnenolone', nameRu: 'Прегненолон 50 мг', dose: '50 мг 2x/д', best: true },
       { id: 'pregnenolone_2', name: 'Pregnenolone', nameRu: 'Прегненолон 100 мг', dose: '50 мг', best: false }
     ],
-    organs: ['ADRENALS', 'BRAIN', 'REPRODUCTIVE'],
+    organs: ['ADRENALS', 'BRAIN', 'REPRODUCTIVE', 'ENDOCRINE'],
     systems: ['endocrine', 'neuro'],
      mechanisms: ['NEUROSTEROID_PRECURSOR', 'CORTISOL_BALANCE', 'ANTI_AGING', 'STEROIDOGENESIS', 'TESTOSTERONE_SYNTHESIS', 'DHEA_PRODUCTION', 'MYELIN_SYNTHESIS', 'GABA_MODULATION', 'ANXIOLYTIC', 'BDNF_INCREASE', 'SYNAPTIC_PLASTICITY', 'NEUROGENESIS', 'COGNITIVE_ENHANCEMENT', 'HPA_MODULATION', 'SLEEP_REGULATION'],
     description: 'Прегненолон — прегормон, предшественник всех стероидных гормонов. Улучшает память и снижает кортизол на курсе.',
@@ -10005,7 +10006,7 @@ boswellia: {
       { id: 'boswellia', name: 'Boswellia', nameRu: 'Экстракт босвеллии 500 мг', dose: '500 мг 2x/д', best: true },
       { id: 'boswellia_2', name: 'Boswellia', nameRu: 'Босвеллия + Куркумин комплекс', dose: '500 мг', best: false }
     ],
-    organs: ['JOINTS', 'LUNGS', 'BRAIN'],
+    organs: ['JOINTS', 'LUNGS', 'BRAIN', 'CARTILAGE'],
     systems: ['musculoskeletal', 'respiratory', 'neuro'],
      mechanisms: ['JOINT_PROTECTION', '5_LOX_INHIBITION', 'PAIN_RELIEF', 'COX2_INHIBITION', 'NFKB_INHIBITION', 'LEUKOTRIENE_INHIBITION', 'CYTOKINE_MODULATION', 'NLRP3_INHIBITION', 'CARTILAGE_PROTECTION', 'CARTILAGE_REPAIR', 'MMP_REGULATION', 'BRONCHODILATION', 'BLOOD_BRAIN_BARRIER_PROTECTION', 'MEMBRANE_STABILIZATION'],
     description: 'Босвеллия — мощный ингибитор 5-ЛОГ, противовоспалительное для суставов и лёгких. На курсе — суставы.',
@@ -10043,7 +10044,7 @@ cissus: {
     forms: [
       { id: 'cissus', name: 'Cissus', nameRu: 'Экстракт циссуса 500 мг', dose: '500 мг 2x/д', best: true }
     ],
-    organs: ['JOINTS', 'BONES', 'MUSCLES'],
+    organs: ['JOINTS', 'BONES', 'MUSCLES', 'CARTILAGE'],
     systems: ['musculoskeletal'],
      mechanisms: ['BONE_HEALING', 'JOINT_PROTECTION', 'COLLAGEN_SYNTHESIS', 'TISSUE_REPAIR', 'BONE_MINERALIZATION', 'BONE_DENSITY', 'CARTILAGE_REPAIR', 'CARTILAGE_PROTECTION', 'CONNECTIVE_TISSUE', 'MMP_REGULATION', 'TENDON_STRENGTH', 'NFKB_INHIBITION', 'CALCIUM_REGULATION', 'ANTI_CATABOLIC', 'MUSCLE_PROTEIN_SYNTHESIS'],
     description: 'Циссус — растение для заживления костей и суставов, стимулирует синтез коллагена. На курсе — связки и кости.',
@@ -10854,7 +10855,7 @@ kpv: {
     id: 'SAME', name: 'SAM-e', nameRu: 'S-Аденозилметионин (SAMe)', tier: 'standard',
     category: ['amino','methylation','hepatoprotector'],
     forms: [{id:'same_400',name:'SAM-e 400mg',nameRu:'SAMe 400 мг',dose:'400-800 мг/д натощак',best:true}],
-    organs: ['LIVER','BRAIN','JOINTS'], systems: ['hepatic','neuro','musculoskeletal'],
+    organs: ['LIVER','BRAIN','JOINTS','CARTILAGE'], systems: ['hepatic','neuro','musculoskeletal'],
      mechanisms: ['METHYL_DONOR', 'METHYL_DONATION', 'METHYLATION', 'GLUTATHIONE_PRECURSOR', 'NEUROTRANSMITTER_SYNTHESIS', 'LIVER_DETOX', 'METHYLATION_CYCLE', 'GLUTATHIONE_SYNTHESIS', 'LIVER_LIPID_METABOLISM', 'SAM_SYNTHESIS', 'HOMOCYSTEINE_LOWERING', 'DOPAMINE_SYNTHESIS', 'SEROTONIN_SYNTHESIS', 'JOINT_PROTECTION', 'CARTILAGE_PROTECTION'],
     description: 'Метилированный метаболин метионина. Главный донор метильных групп в организме. Поддерживает функцию печени, синтез нейромедиаторов (дофамин, серотонин). Эффективен при холестазе.',
     dosage: { mg: 800, timing: '1x/д натощак за 30 мин до еды', form: 'таб EC' },
@@ -11249,7 +11250,7 @@ kpv: {
     id: 'magnesium', name: 'Magnesium', nameRu: 'Магний', tier: 'core',
     category: ['mineral','electrolyte','neuroprotector','cardioprotector'],
     forms: [{id:'magnesium_citrate',name:'Magnesium Citrate',nameRu:'Магний цитрат',dose:'400 мг/д',best:true},{id:'magnesium_glycinate',name:'Magnesium Glycinate',nameRu:'Магний глицинат',dose:'200 мг 2x/д',best:false}],
-    organs: ['BRAIN','HEART','MUSCLES','NERVES'], systems: ['neuro','cardio','musculoskeletal'],
+    organs: ['BRAIN','HEART','MUSCLES','NERVES','ENDOCRINE'], systems: ['neuro','cardio','musculoskeletal','endocrine'],
     mechanisms: ['ELECTROLYTE_BALANCE', 'MUSCLE_RELAXATION', 'GABA_MODULATION', 'NMDA_BLOCKADE', 'CALCIUM_CHANNEL_BLOCKADE', 'ATP_PRODUCTION', 'MUSCLE_CONTRACTION', 'NERVE_CONDUCTION', 'ANTIARRHYTHMIC', 'BLOOD_PRESSURE_LOWERING', 'HEART_RHYTHM', 'STRESS_REDUCTION', 'CORTISOL_REDUCTION', 'VITAMIN_D_ACTIVATION', 'INSULIN_SENSITIVITY', 'BONE_MINERALIZATION', 'CALCIUM_REGULATION', 'MUSCLE_FUNCTION', 'COENZYME'],
     description: 'Эссенциальный минерал. Кофактор >300 ферментов. Регулирует нервную проводимость, сокращение мышц, сердечный ритм. Критичен для энергетического обмена и синтеза белка.',
     dosage: { mg: 400, timing: '1x/д вечером', form: 'цитрат/глицинат' },
@@ -11289,7 +11290,7 @@ kpv: {
       {id:'heptral_inj',name:'Heptral 400mg',nameRu:'Гептрал 400 мг инъекции',dose:'400 мг в/в или в/м 1x/д',best:true},
       {id:'heptral_tab',name:'Heptral 500mg',nameRu:'Гептрал 500 мг таблетки',dose:'500 мг 2x/д',best:false},
     ],
-    organs: ['LIVER','BRAIN','JOINTS','GALLBLADDER'], systems: ['hepatic','neuro','musculoskeletal'],
+    organs: ['LIVER','BRAIN','JOINTS','GALLBLADDER','CARTILAGE'], systems: ['hepatic','neuro','musculoskeletal'],
      mechanisms: ['ADEMETIONINE', 'METHYL_DONATION', 'METHYLATION', 'METHYLATION_CYCLE', 'LIVER_DETOX', 'CHOLERETIC', 'ANTIDEPRESSANT', 'GLUTATHIONE_PRECURSOR', 'LIVER_LIPID_METABOLISM', 'GLUTATHIONE_SYNTHESIS', 'SAM_SYNTHESIS', 'HOMOCYSTEINE_LOWERING', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_SYNTHESIS', 'SEROTONIN_SYNTHESIS'],
     description: 'Адеметионин (S-аденозил-L-метионин) — основной донор метильных групп. Гепатопротектор с холекинетическим (желчегонным) и антидепрессивным действием. Восстанавливает глутатион, поддерживает детоксикацию печени.',
     dosage: { mg: 500, timing: '400 мг в/в 1x/д (инъекции) / 500 мг 2x/д (таб)', form: 'инъекции/таб' },
@@ -11391,7 +11392,7 @@ kpv: {
       { id: 'lactoferrin_250', name: 'Lactoferrin 250mg', nameRu: 'Лактоферрин 250 мг', dose: '250 мг/д', best: true },
       { id: 'lactoferrin_100', name: 'Lactoferrin 100mg', nameRu: 'Лактоферрин 100 мг', dose: '100 мг/д', best: false },
     ],
-    organs: ['GUT', 'BLOOD', 'IMMUNE'], systems: ['immune', 'hematologic', 'gi'],
+    organs: ['GUT', 'BLOOD', 'IMMUNE_SYSTEM'], systems: ['immune', 'hematologic', 'gi'],
      mechanisms: ['IRON_CHELATION', 'ANTIMICROBIAL', 'IRON_TRANSPORT', 'HEPCIDIN_DOWN', 'FERROPORTIN_UP', 'IMMUNE_FUNCTION', 'IMMUNE_CELL_FUNCTION', 'ANTIMICROBIAL_PEPTIDES', 'IGA_BOOST', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'IRON_METABOLISM', 'HEME_SYNTHESIS'],
     description: 'Железосвязывающий гликопротеин — иммуномодулятор с антимикробным и антиоксидантным действием. Связывает свободное железо, снижая окислительный стресс и рост патогенной флоры.',
     dosage: { mg: 250, timing: 'натощак за 30 мин до еды', form: 'капс' },

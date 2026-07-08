@@ -145,6 +145,8 @@ export function buildMapperCtx(
     hematocrit: labs['HEMATOCRIT'],
     hasHCG: state.pharma.hasHCG,
     hasAI: state.pharma.hasAI,
+    hasCabergoline: (state.pharma as any).hasCaber || false,
+    aasIds: (state.pharma.aas || []).map((a: any) => a.id || '').filter(Boolean),
     libidoLow: false,
     bpSystolic: state.cardio.bpStage === 'high' ? 150 : state.cardio.bpStage === 'normal' ? 120 : 135,
     lipidLdl: labs['LDL'],
@@ -167,6 +169,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply }) =>
   const [showGaps, setShowGaps] = useState(false);
   const [showGuardrails, setShowGuardrails] = useState(false);
   const [showBoosters, setShowBoosters] = useState(false);
+  const [showIntellPopup, setShowIntellPopup] = useState(false);
+  const [showManualPopup, setShowManualPopup] = useState(false);
+  const [manualSubInput, setManualSubInput] = useState('');
 
   const ctx = useMemo(
     () => buildMapperCtx(state, level, level === 'manual' ? { addSubs: manualSubs } : undefined, selectedStacks),
@@ -180,31 +185,6 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply }) =>
       return null;
     }
   }, [ctx]);
-
-  const levelBtn = (lv: SupportLevel, label: string, icon: string) => {
-    const active = level === lv;
-    return (
-      <button
-        key={lv}
-        onClick={() => setLevel(lv)}
-        style={{
-          flex: 1,
-          padding: '8px 4px',
-          borderRadius: 8,
-          fontSize: 9,
-          fontWeight: 700,
-          cursor: 'pointer',
-          textAlign: 'center',
-          background: active ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.04)',
-          border: active ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-          color: active ? '#000' : 'var(--text-dim)',
-        }}
-      >
-        <div style={{ fontSize: 14 }}>{icon}</div>
-        <div>{label}</div>
-      </button>
-    );
-  };
 
   const phaseInfo = rec ? PHASE_PROTOCOL[rec.phase] : null;
   const blockGuardrails = rec?.guardrails.filter(g => g.level === 'block') || [];
@@ -220,22 +200,354 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply }) =>
         Источник: tz-mapper-engine (5 файлов).
       </div>
 
-      {/* 3 пресета + Manual */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-        {levelBtn('base', 'База', '🟢')}
-        {levelBtn('medium', 'Средний', '🟡')}
-        {levelBtn('max', 'Максимум', '🔴')}
-        {levelBtn('manual', 'Вручную', '⚙️')}
+      {/* ===== КАРТОЧКА ФАЗЫ КУРСА (большая, красивая) ===== */}
+      {phaseInfo && (
+        <div style={{
+          marginBottom: 10,
+          borderRadius: 16,
+          background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.08))',
+          border: '1.5px solid rgba(139,92,246,0.25)',
+          padding: '14px 14px 12px',
+          boxShadow: '0 4px 20px rgba(99,102,241,0.08)',
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+          {/* Декоративная полоса */}
+          <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:'linear-gradient(90deg,#818cf8,#a78bfa)', borderTopLeftRadius:16, borderTopRightRadius:16 }} />
+          
+          {/* Заголовок */}
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+            <div style={{
+              width:36, height:36, borderRadius:10,
+              background:'linear-gradient(135deg,rgba(99,102,241,0.2),rgba(139,92,246,0.15))',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              fontSize:18,
+            }}>📋</div>
+            <div>
+              <div style={{ fontSize:13, fontWeight:800, color:'#818cf8', letterSpacing:'-0.3px' }}>
+                Фаза курса: {phaseInfo.label}
+              </div>
+              <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:1, letterSpacing:'-0.2px' }}>
+                {phaseInfo.description}
+              </div>
+            </div>
+          </div>
+
+          {/* Алгоритм */}
+          <div style={{
+            background:'rgba(0,0,0,0.2)', borderRadius:10, padding:'8px 10px',
+            border:'1px solid rgba(255,255,255,0.04)', marginBottom:8,
+          }}>
+            <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.5)', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.3px' }}>
+              Алгоритм фазы
+            </div>
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.75)', lineHeight:1.5, fontWeight:500 }}>
+              {phaseInfo.algorithm}
+            </div>
+          </div>
+
+          {/* Мета-инфа */}
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+            <span style={{ fontSize:8, padding:'3px 8px', borderRadius:6, background:'rgba(99,102,241,0.12)', color:'#818cf8', fontWeight:600 }}>
+              🎯 Приоритет: {phaseInfo.coreMechs.slice(0,4).join(', ')}{phaseInfo.coreMechs.length > 4 ? '…' : ''}
+            </span>
+            <span style={{ fontSize:8, padding:'3px 8px', borderRadius:6, background:'rgba(34,197,94,0.12)', color:'#22c55e', fontWeight:600 }}>
+              Бустеры: {phaseInfo.allowBoosters ? '✅ да' : '❌ нет'}
+            </span>
+            <span style={{ fontSize:8, padding:'3px 8px', borderRadius:6, background:'rgba(245,158,11,0.12)', color:'#f59e0b', fontWeight:600 }}>
+              Множитель доз: ×{phaseInfo.doseTier}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ===== ВЫБОР РЕЖИМА: ИНТЕЛЛЕКТ / РУЧНОЙ (в 1 строку) ===== */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
+
+      {/* ===== КАРТОЧКА ИНТЕЛЛЕКТУАЛЬНАЯ ПОДДЕРЖКА ===== */}
+      <div style={{
+        borderRadius: 16,
+        background: 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(0,200,83,0.03))',
+        border: '1.5px solid rgba(0,230,138,0.15)',
+        padding: '14px 14px 12px',
+        boxShadow: '0 4px 20px rgba(0,230,138,0.04)',
+        cursor: 'pointer',
+        transition: 'all 0.15s ease',
+      }}
+        onClick={() => setShowIntellPopup(true)}
+      >
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{
+            width:36, height:36, borderRadius:10,
+            background:'linear-gradient(135deg,rgba(0,230,138,0.15),rgba(0,200,83,0.1))',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:18,
+          }}>🧠</div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:12, fontWeight:800, color:'#00e68a', letterSpacing:'-0.3px' }}>
+              Интеллектуальная поддержка
+            </div>
+            <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:1 }}>
+              {level === 'base' && '🟢 База — core-препараты (NAC, омега-3, магний)'}
+              {level === 'medium' && '🟡 Средний — core + standard, оптимум цена/эффективность'}
+              {level === 'max' && '🔴 Максимум — полное покрытие + advanced'}
+              {level === 'manual' && '⚙️ Вручную — вы сами выбираете'}
+            </div>
+          </div>
+          <div style={{
+            width:24, height:24, borderRadius:12,
+            background:'rgba(0,230,138,0.1)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:12, color:'#00e68a',
+          }}>›</div>
+        </div>
       </div>
 
-      {/* Фаза */}
-      {phaseInfo && (
-        <div style={{ marginBottom: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: '#818cf8' }}>
-            📋 Фаза: {phaseInfo.label}
+      {/* ── Попап интеллектуального выбора ── */}
+      {showIntellPopup && (
+        <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)', backdropFilter:'blur(4px)' }}
+          onClick={() => setShowIntellPopup(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'88%', maxWidth:340, borderRadius:20, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.6)' }}>
+            <div style={{ height:3, background:'linear-gradient(90deg,#00e68a,#00c853)' }} />
+            <div style={{ padding:'18px 16px 14px' }}>
+              <div style={{ fontSize:14, fontWeight:800, color:'#00e68a', marginBottom:4, letterSpacing:'-0.3px' }}>🧠 Интеллектуальная поддержка</div>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginBottom:12, lineHeight:1.4 }}>
+                Движок ТЗ-28 подберёт оптимальный набор веществ под ваш профиль, лабы и фазу курса
+              </div>
+              {([
+                ['base','База','🟢','Только core-препараты: NAC, омега-3, магний, D3. Бюджетный вариант для низкого риска.'],
+                ['medium','Средний','🟡','Core + standard. Оптимальный баланс цены и покрытия. Рекомендуется для большинства.'],
+                ['max','Максимум','🔴','Все активированные механизмы + advanced препараты. Полная защита для高风险 (high-risk) курсов.'],
+              ] as const).map(([lv, label, icon, desc]) => {
+                const active = level === lv;
+                return (
+                  <div key={lv} onClick={() => { setLevel(lv as SupportLevel); setShowIntellPopup(false); }}
+                    style={{
+                      padding:'12px 12px', borderRadius:12, marginBottom:6, cursor:'pointer',
+                      background: active ? 'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(0,200,83,0.06))' : 'rgba(255,255,255,0.03)',
+                      border: active ? '1.5px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.05)',
+                      transition:'all 0.12s ease',
+                    }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <span style={{ fontSize:20 }}>{icon}</span>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:11, fontWeight:700, color: active ? '#00e68a' : 'var(--text)', letterSpacing:'-0.2px' }}>
+                          {label} {active && '✓'}
+                        </div>
+                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:2, lineHeight:1.3 }}>{desc}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.3 }}>
-            {phaseInfo.algorithm.slice(0, 120)}{phaseInfo.algorithm.length > 120 ? '…' : ''}
+        </div>
+      )}
+
+      {/* ===== КАРТОЧКА РУЧНОЙ РЕЖИМ ===== */}
+      <div style={{
+        borderRadius: 16,
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(59,130,246,0.03))',
+        border: '1.5px solid rgba(99,102,241,0.15)',
+        padding: '14px 14px 12px',
+        boxShadow: '0 4px 20px rgba(99,102,241,0.04)',
+        cursor: 'pointer',
+        transition: 'all 0.15s ease',
+      }}
+        onClick={() => setShowManualPopup(true)}
+      >
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{
+            width:36, height:36, borderRadius:10,
+            background:'linear-gradient(135deg,rgba(99,102,241,0.15),rgba(59,130,246,0.1))',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:18,
+          }}>⚙️</div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:12, fontWeight:800, color:'#818cf8', letterSpacing:'-0.3px' }}>
+              Ручной режим
+            </div>
+            <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:1 }}>
+              {manualSubs.length > 0 || selectedStacks.length > 0
+                ? `📦 ${selectedStacks.length} стеков · 💊 ${manualSubs.length} препаратов`
+                : 'Выберите стеки и препараты вручную'}
+            </div>
+          </div>
+          <div style={{
+            width:24, height:24, borderRadius:12,
+            background:'rgba(99,102,241,0.1)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:12, color:'#818cf8',
+          }}>›</div>
+        </div>
+      </div>
+
+      {/* ── Попап ручного режима ── */}
+      {showManualPopup && (
+        <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)', backdropFilter:'blur(4px)' }}
+          onClick={() => setShowManualPopup(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'88%', maxWidth:340, borderRadius:20, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.6)', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
+            <div style={{ height:3, background:'linear-gradient(90deg,#818cf8,#6366f1)' }} />
+            <div style={{ padding:'18px 16px 14px', overflowY:'auto' }}>
+              <div style={{ fontSize:14, fontWeight:800, color:'#818cf8', marginBottom:4, letterSpacing:'-0.3px' }}>⚙️ Ручной режим</div>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginBottom:12, lineHeight:1.4 }}>
+                Самостоятельно добавьте готовые стеки или отдельные препараты
+              </div>
+
+              {/* Добавить стек */}
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text)', marginBottom:6, letterSpacing:'-0.2px' }}>
+                📦 Добавить стек
+              </div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:14 }}>
+                {STACK_BOOSTER_TRIGGERS.slice(0,14).map(st => {
+                  const active = selectedStacks.includes(st.stackId);
+                  return (
+                    <button key={st.stackId}
+                      onClick={() => setSelectedStacks(prev => active ? prev.filter(s => s !== st.stackId) : [...prev, st.stackId])}
+                      style={{
+                        padding:'6px 10px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer',
+                        background: active ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.03)',
+                        border: active ? '1px solid rgba(168,85,247,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                        color: active ? '#c084fc' : 'rgba(255,255,255,0.5)',
+                      }}>
+                      {st.stackId.includes('neuro') && '🧠'}
+                      {st.stackId.includes('joint') || st.stackId.includes('articular') ? '🦴' : ''}
+                      {st.stackId.includes('sleep') && '😴'}
+                      {st.stackId.includes('stress') && '🧘'}
+                      {st.stackId.includes('skin') && '💆'}
+                      {st.stackId.includes('gi') && '🫀'}
+                      {st.stackId.includes('immun') && '🛡️'}
+                      {st.stackId.includes('liver') && '🫁'}
+                      {st.stackId.includes('renal') || st.stackId.includes('kidney') || st.stackId.includes('nephro') ? '💧' : ''}
+                      {st.stackId.includes('libido') && '🔥'}
+                      {st.stackId.includes('heart') || st.stackId.includes('cardio') ? '❤️' : ''}
+                      {st.stackId.includes('bone') && '🦷'}
+                      {st.stackId.includes('thyroid') && '🔬'}
+                      {st.stackId.includes('detox') && '🧪'}
+                      {st.stackId.includes('noo') && '🧠'}
+                      {' '}{st.stackId.replace(/_stack|_support|_35/g,'').replace(/_/g,' ')}
+                      {active && ' ✓'}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Добавить препарат */}
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text)', marginBottom:6, letterSpacing:'-0.2px' }}>
+                💊 Добавить препарат
+              </div>
+              <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+                <input value={manualSubInput} onChange={e => setManualSubInput(e.target.value)}
+                  placeholder="ID препарата: NAC, TUDCA, omega3, zinc..."
+                  style={{
+                    flex:1, padding:'8px 10px', borderRadius:8, fontSize:9,
+                    background:'rgba(0,0,0,0.3)', border:'1px solid rgba(255,255,255,0.08)',
+                    color:'#fff', outline:'none',
+                  }} />
+                <button onClick={() => {
+                  if (!manualSubInput.trim()) return;
+                  const ids = manualSubInput.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+                  setManualSubs(prev => [...new Set([...prev, ...ids])]);
+                  setManualSubInput('');
+                }} style={{
+                  padding:'8px 12px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
+                  background:'linear-gradient(135deg,#818cf8,#6366f1)', border:'none', color:'#000',
+                }}>+</button>
+              </div>
+
+              {/* Список выбранных препаратов */}
+              {manualSubs.length > 0 && (
+                <div style={{ marginBottom:10 }}>
+                  <div style={{ fontSize:8, fontWeight:600, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>
+                    Выбрано: {manualSubs.length} препаратов
+                  </div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                    {manualSubs.map((sid, i) => (
+                      <span key={sid + i} style={{
+                        fontSize:8, padding:'2px 8px', borderRadius:6, fontWeight:600,
+                        background:'rgba(99,102,241,0.12)', color:'#818cf8',
+                        display:'flex', alignItems:'center', gap:4,
+                      }}>
+                        {sid}
+                        <span onClick={() => setManualSubs(prev => prev.filter((_, j) => j !== i))}
+                          style={{ cursor:'pointer', color:'rgba(255,255,255,0.3)', fontSize:9 }}>✕</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Итог */}
+              {(selectedStacks.length > 0 || manualSubs.length > 0) && (
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', lineHeight:1.3, padding:'8px 10px', borderRadius:8, background:'rgba(0,0,0,0.2)', border:'1px solid rgba(255,255,255,0.04)' }}>
+                  📋 Итого: {selectedStacks.length} стеков · {manualSubs.length} препаратов
+                </div>
+              )}
+
+              <button onClick={() => { setLevel('manual'); setShowManualPopup(false); }}
+                style={{
+                  width:'100%', marginTop:12, padding:'10px', borderRadius:10,
+                  background:'linear-gradient(135deg,#818cf8,#6366f1)', border:'none',
+                  color:'#000', fontWeight:700, fontSize:11, cursor:'pointer',
+                }}>
+                ✅ Применить ручной выбор
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>{/* конец grid intellect + manual */}
+
+      {/* ===== ДОПОЛНИТЕЛЬНЫЕ МОДУЛИ (суставы, нейро, усиление) ===== */}
+      {level !== 'manual' && (
+        <div style={{
+          marginBottom: 10,
+          borderRadius: 14,
+          background: 'rgba(24,24,27,0.3)',
+          border: '1px solid rgba(255,255,255,0.04)',
+          padding: '10px 12px 8px',
+        }}>
+          <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.3)', marginBottom:6, letterSpacing:'0.5px', textTransform:'uppercase' }}>
+            + Дополнительные модули
+          </div>
+          <div style={{ display:'flex', gap:4 }}>
+            <button onClick={() => setSelectedStacks(prev => { const id='articular_stack'; return prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]; })}
+              style={{
+                flex:1, padding:'8px 4px', borderRadius:10, fontSize:8, fontWeight:600, cursor:'pointer',
+                display:'flex', flexDirection:'column', alignItems:'center', gap:1, transition:'all 0.12s ease',
+                background: selectedStacks.includes('articular_stack') ? 'linear-gradient(135deg,rgba(34,197,94,0.2),rgba(34,197,94,0.1))' : 'rgba(255,255,255,0.03)',
+                border: selectedStacks.includes('articular_stack') ? '1.5px solid rgba(34,197,94,0.35)' : '1px solid rgba(255,255,255,0.06)',
+                color: selectedStacks.includes('articular_stack') ? '#4ade80' : 'rgba(255,255,255,0.5)',
+              }}>
+              <span style={{fontSize:14}}>🦴</span>
+              <span>Суставы</span>
+              {selectedStacks.includes('articular_stack') && <span style={{fontSize:6,fontWeight:700,color:'#4ade80',marginTop:1}}>✓</span>}
+            </button>
+            <button onClick={() => setSelectedStacks(prev => { const id='neuroprotection_stack'; return prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]; })}
+              style={{
+                flex:1, padding:'8px 4px', borderRadius:10, fontSize:8, fontWeight:600, cursor:'pointer',
+                display:'flex', flexDirection:'column', alignItems:'center', gap:1, transition:'all 0.12s ease',
+                background: selectedStacks.includes('neuroprotection_stack') ? 'linear-gradient(135deg,rgba(99,102,241,0.2),rgba(99,102,241,0.1))' : 'rgba(255,255,255,0.03)',
+                border: selectedStacks.includes('neuroprotection_stack') ? '1.5px solid rgba(99,102,241,0.35)' : '1px solid rgba(255,255,255,0.06)',
+                color: selectedStacks.includes('neuroprotection_stack') ? '#818cf8' : 'rgba(255,255,255,0.5)',
+              }}>
+              <span style={{fontSize:14}}>🧠</span>
+              <span>Нейро</span>
+              {selectedStacks.includes('neuroprotection_stack') && <span style={{fontSize:6,fontWeight:700,color:'#818cf8',marginTop:1}}>✓</span>}
+            </button>
+            <button onClick={() => setSelectedStacks(prev => { const id='mega_total_support_35'; return prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]; })}
+              style={{
+                flex:1, padding:'8px 4px', borderRadius:10, fontSize:8, fontWeight:600, cursor:'pointer',
+                display:'flex', flexDirection:'column', alignItems:'center', gap:1, transition:'all 0.12s ease',
+                background: selectedStacks.includes('mega_total_support_35') ? 'linear-gradient(135deg,rgba(239,68,68,0.2),rgba(239,68,68,0.1))' : 'rgba(255,255,255,0.03)',
+                border: selectedStacks.includes('mega_total_support_35') ? '1.5px solid rgba(239,68,68,0.35)' : '1px solid rgba(255,255,255,0.06)',
+                color: selectedStacks.includes('mega_total_support_35') ? '#f87171' : 'rgba(255,255,255,0.5)',
+              }}>
+              <span style={{fontSize:14}}>🚀</span>
+              <span>Усиление</span>
+              {selectedStacks.includes('mega_total_support_35') && <span style={{fontSize:6,fontWeight:700,color:'#f87171',marginTop:1}}>✓</span>}
+            </button>
           </div>
         </div>
       )}
@@ -276,314 +588,29 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply }) =>
         </div>
       )}
 
-      {/* Результат — список веществ */}
+      {/* Результат — единый список препаратов */}
       {rec && rec.subs.length > 0 && (
         <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
-            💊 План ({rec.subs.length} веществ)
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
+            Назначено {rec.subs.length} препаратов
           </div>
           {rec.subs.map((s, i) => {
             const name = subNameRu(s.substanceId);
             const dose = subDosage(s.substanceId);
-            const tier = subTier(s.substanceId);
-            const tierCol = tier === 'core' ? 'rgba(0,230,138,0.15)' : tier === 'standard' ? 'rgba(99,102,241,0.15)' : tier === 'advanced' ? 'rgba(168,85,247,0.15)' : 'rgba(245,158,11,0.15)';
             return (
-              <div key={s.substanceId + i} style={{ ...GLASS, padding: '4px 8px', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6, fontSize: 8 }}>
-                <span style={{ fontSize: 11 }}>💊</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
-                    <span style={{ fontWeight: 700, color: 'var(--text)' }}>{name}</span>
-                    <span style={{ fontSize: 7, color: 'var(--text-dim)' }}>· {s.substanceId}</span>
-                    <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: tierCol, color: 'var(--text-light)' }}>{tier}</span>
-                  </div>
-                  {dose && (
-                    <div style={{ fontSize: 8, color: '#00e68a', fontWeight: 600, marginTop: 1 }}>
-                      💉 {dose.mg} мг · {dose.timing}
-                    </div>
-                  )}
-                  <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>
-                    {s.reason}
-                  </div>
-                  <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 1 }}>
-                    {s.mechsCovered.map(m => (
-                      <span key={m} style={{ fontSize: 7, color: '#818cf8' }}>{m}</span>
-                    ))}
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span style={BADGE('rgba(0,230,138,0.15)')}>k={s.k.toFixed(2)}</span>
-                  <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>док:{s.q}</div>
-                </div>
-              </div>
-            );
-          })}
-          <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
-            <span style={BADGE('rgba(99,102,241,0.15)')}>кат: {rec.subs.length}</span>
-            <span style={BADGE('rgba(34,197,94,0.12)')}>мехов покр.: {rec.coverage.reduce((a, o) => a + o.totalCovered, 0)}</span>
-            <span style={BADGE('rgba(239,68,68,0.12)')}>пробел: {rec.gaps.length}</span>
-            <span style={BADGE('rgba(168,85,247,0.12)')}>бустеры: {rec.boosters.length}</span>
-            <span style={BADGE('rgba(245,158,11,0.12)')}>конфл: {rec.conflicts.length}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Подавленные вещества */}
-      {rec && rec.suppression.length > 0 && (
-        <div style={{ marginTop: 6 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', marginBottom: 3 }}>
-            🚫 Подавлены ({rec.suppression.length})
-          </div>
-          {rec.suppression.map((s, i) => (
-            <div key={s.substanceId + i} style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 1 }}>
-              <b>{s.substanceId}</b> — {s.reason}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Guardrails */}
-      {rec && rec.guardrails.length > 0 && (
-        <div style={{ marginTop: 6 }}>
-          <button
-            onClick={() => setShowGuardrails(!showGuardrails)}
-            style={{
-              width: '100%',
-              padding: '6px 10px',
-              borderRadius: 8,
-              fontSize: 9,
-              fontWeight: 700,
-              cursor: 'pointer',
-              textAlign: 'left',
-              background: blockGuardrails.length > 0 ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.08)',
-              border: `1px solid ${blockGuardrails.length > 0 ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)'}`,
-              color: blockGuardrails.length > 0 ? '#ef4444' : '#f59e0b',
-              marginBottom: 2,
-            }}
-          >
-            🛡 Guardrails: {blockGuardrails.length} блок / {warnGuardrails.length} пред. {showGuardrails ? '▲' : '▼'}
-          </button>
-          {showGuardrails && rec.guardrails.map((g, i) => (
-            <div key={i} style={{ ...GLASS, padding: '4px 8px', marginBottom: 2, fontSize: 8, borderLeft: `3px solid ${g.level === 'block' ? '#ef4444' : '#f59e0b'}` }}>
-              <div style={{ fontWeight: 600, color: g.level === 'block' ? '#ef4444' : '#f59e0b' }}>
-                {g.level === 'block' ? '⛔' : '⚠️'} {g.substanceId || 'общее'} — {g.reason}
-              </div>
-              <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>{g.level === 'block' ? 'Блокировка: препарат нельзя назначать' : 'Предупреждение: проконсультируйтесь с врачом'}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Конфликты */}
-      {rec && rec.conflicts.length > 0 && (
-        <div style={{ marginTop: 4 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: '#ef4444', marginBottom: 3 }}>
-            ⚔️ Конфликты ({rec.conflicts.length})
-          </div>
-          {rec.conflicts.map((c, i) => (
-            <div key={i} style={{ fontSize: 8, color: 'var(--text)', marginBottom: 1 }}>
-              <b>{c.a}</b> + <b>{c.b}</b>: {c.reason}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Бустеры */}
-      {rec && rec.boosters.length > 0 && (
-        <div style={{ marginTop: 6 }}>
-          <button
-            onClick={() => setShowBoosters(!showBoosters)}
-            style={{
-              width: '100%',
-              padding: '6px 10px',
-              borderRadius: 8,
-              fontSize: 9,
-              fontWeight: 700,
-              cursor: 'pointer',
-              textAlign: 'left',
-              background: 'rgba(168,85,247,0.08)',
-              border: '1px solid rgba(168,85,247,0.15)',
-              color: '#a855f7',
-              marginBottom: 2,
-            }}
-          >
-            🚀 Бустеры ({rec.boosters.length}) {showBoosters ? '▲' : '▼'}
-          </button>
-          {showBoosters && rec.boosters.map((b, i) => (
-            <div key={i} style={{ ...GLASS, padding: '6px 8px', marginBottom: 2, fontSize: 8 }}>
-              <div style={{ fontWeight: 700, color: '#a855f7', marginBottom: 2 }}>
-                {b.key === 'neuro' ? '🧠' : b.key === 'joints' ? '🦴' : '📦'} {b.label}
-              </div>
-              <div style={{ fontSize: 7, color: 'var(--text-dim)' }}>{b.rationale}</div>
-              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 2 }}>
-                {b.subs.map(s => (
-                  <span key={s.substanceId} style={{ fontSize: 7, color: 'var(--accent)' }}>{s.substanceId} · {s.reason.slice(0, 25)}{s.reason.length > 25 ? '…' : ''}</span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Выбор стеков-бустеров */}
-      <div style={{ marginTop: 8 }}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text)', marginBottom: 3 }}>
-          📦 Стеки-бустеры
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-          {STACK_BOOSTER_TRIGGERS.slice(0, 10).map(st => {
-            const active = selectedStacks.includes(st.stackId);
-            return (
-              <button
-                key={st.stackId}
-                onClick={() => setSelectedStacks(prev => active ? prev.filter(s => s !== st.stackId) : [...prev, st.stackId])}
-                style={{
-                  padding: '4px 8px',
-                  borderRadius: 6,
-                  fontSize: 8,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  background: active ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.04)',
-                  border: active ? '1px solid rgba(168,85,247,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                  color: active ? '#a855f7' : 'var(--text-dim)',
-                }}
-              >
-                {st.stackId.replace(/_/g, ' ')}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Coverage matrix */}
-      {rec && (
-        <div style={{ marginTop: 6 }}>
-          <button
-            onClick={() => setShowCoverage(!showCoverage)}
-            style={{
-              width: '100%',
-              padding: '6px 10px',
-              borderRadius: 8,
-              fontSize: 9,
-              fontWeight: 700,
-              cursor: 'pointer',
-              textAlign: 'left',
-              background: 'rgba(34,197,94,0.08)',
-              border: '1px solid rgba(34,197,94,0.15)',
-              color: '#22c55e',
-              marginBottom: 2,
-            }}
-          >
-            📊 Покрытие: {rec.coverage.reduce((a, o) => a + o.totalCovered, 0)}/{rec.coverage.reduce((a, o) => a + o.totalMechs, 0)} мехов {showCoverage ? '▲' : '▼'}
-          </button>
-          {showCoverage && rec.coverage.map(oc => (
-            <div key={oc.organId} style={{ ...GLASS, padding: '4px 8px', marginBottom: 2 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--text)' }}>{oc.organLabel}</span>
-                <span style={{ fontSize: 8, fontWeight: 700, color: oc.coveragePercent >= 80 ? '#22c55e' : oc.coveragePercent >= 50 ? '#fbbf24' : '#ef4444' }}>
-                  {oc.totalCovered}/{oc.totalMechs} ({oc.coveragePercent}%)
+              <div key={s.substanceId + i} style={{ ...GLASS, padding: '6px 10px', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 8, fontSize: 9 }}>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>{name}</span>
                 </span>
-              </div>
-              <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden', marginBottom: 3 }}>
-                <div style={{ height: '100%', width: `${oc.coveragePercent}%`, background: oc.coveragePercent >= 80 ? '#22c55e' : oc.coveragePercent >= 50 ? '#fbbf24' : '#ef4444', borderRadius: 2 }} />
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                {oc.mechs.map(m => (
-                  <span key={m.mechId} style={{
-                    fontSize: 7,
-                    padding: '1px 4px',
-                    borderRadius: 3,
-                    background: m.covered ? 'rgba(0,230,138,0.08)' : 'rgba(239,68,68,0.08)',
-                    color: m.covered ? '#00e68a' : '#ef4444',
-                  }}>
-                    {m.mechId}
+                {dose && (
+                  <span style={{ fontSize: 8, color: '#00e68a', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    {dose.mg} мг · {dose.timing}
                   </span>
-                ))}
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
-      )}
-
-      {/* Gaps */}
-      {rec && rec.gaps.length > 0 && (
-        <div style={{ marginTop: 6 }}>
-          <button
-            onClick={() => setShowGaps(!showGaps)}
-            style={{
-              width: '100%',
-              padding: '6px 10px',
-              borderRadius: 8,
-              fontSize: 9,
-              fontWeight: 700,
-              cursor: 'pointer',
-              textAlign: 'left',
-              background: 'rgba(239,68,68,0.08)',
-              border: '1px solid rgba(239,68,68,0.15)',
-              color: '#ef4444',
-              marginBottom: 2,
-            }}
-          >
-            🕳 Пробелы ({rec.gaps.length}) {showGaps ? '▲' : '▼'}
-          </button>
-          {showGaps && rec.gaps.map((g, i) => (
-            <div key={i} style={{ ...GLASS, padding: '4px 8px', marginBottom: 2, fontSize: 8 }}>
-              <div style={{ fontWeight: 600, color: '#ef4444' }}>
-                {g.organLabel} → {g.mechLabel} ({g.mechId})
-              </div>
-              <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>
-                Рекомендации: {g.suggestions.slice(0, 3).join(', ')}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Активированные механизмы */}
-      {rec && rec.activatedMechs.length > 0 && (
-        <div style={{ marginTop: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.1)' }}>
-          <div style={{ fontSize: 8, fontWeight: 600, color: '#60a5fa', marginBottom: 2 }}>
-            ⚡ Активировано: {rec.activatedMechs.length} мехов
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-            {rec.activatedMechs.map(m => (
-              <span key={m.mechId} style={{
-                fontSize: 7,
-                padding: '1px 4px',
-                borderRadius: 3,
-                background: m.severity === 'severe' ? 'rgba(239,68,68,0.1)' : m.severity === 'moderate' ? 'rgba(245,158,11,0.1)' : 'rgba(34,197,94,0.08)',
-                color: m.severity === 'severe' ? '#ef4444' : m.severity === 'moderate' ? '#f59e0b' : '#22c55e',
-              }}>
-                {m.mechId}({m.severity.slice(0, 1)})
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Кнопка Применить */}
-      {onApply && rec && (
-        <button
-          onClick={() => onApply(rec)}
-          style={{
-            width: '100%',
-            marginTop: 8,
-            padding: '10px',
-            borderRadius: 10,
-            fontSize: 11,
-            fontWeight: 800,
-            cursor: 'pointer',
-            background: 'linear-gradient(135deg,#00e68a,#00c853)',
-            border: 'none',
-            color: '#000',
-          }}
-        >
-          ✅ Применить план ТЗ ({rec.subs.length} веществ)
-        </button>
-      )}
-
-      {/* ── Действия с планом: сохранить / копировать / отчёт врача ── */}
-      {rec && rec.subs.length > 0 && (
-        <CalcActions rec={rec} level={level} state={state} />
       )}
     </div>
   );

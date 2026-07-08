@@ -10,6 +10,7 @@ import { generateWeeklyReport, analyzeMeasurements, loadMeasurements, saveMeasur
 import { buildVisualDashboard, computeWeeklyChart, computeMuscleVolume, computeProgression, type VizSessionData } from '../../../engines/training-visualization.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../../engines/pro/training-load.engine';
+import { useIsMobile } from './useIsMobile';
 import { loadReadinessHistory } from './readiness-history';
 import { RIRCalibrationCard } from './RIRCalibrationCard';
 import MesoCorrectionCard from './MesoCorrectionCard';
@@ -68,6 +69,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
 }) => {
   const [mode, setMode] = useState<HubMode>('diary');
   const [search, setSearch] = useState('');
+  const isMobile = useIsMobile();
   const [historyExpanded, setHistoryExpanded] = useState<string | null>(null);
   const [hubAnalyticsExpanded, setHubAnalyticsExpanded] = useState(false);
 
@@ -294,8 +296,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             <input type="text" value={logNotes} onChange={e => setLogNotes(e.target.value)} placeholder="Самочувствие, особенности, инвентарь..." style={style.input} />
           </div>
           <div style={style.label}>🏋️ Упражнения</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.5fr 0.5fr 0.5fr auto', gap: 4, marginBottom: 6, alignItems: 'end' }}>
-            <div><label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Упражнение</label>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr 1fr auto' : '1fr 0.5fr 0.5fr 0.5fr auto', gap: 4, marginBottom: 6, alignItems: 'end' }}>
+            <div style={isMobile ? { gridColumn: '1 / -1' } : undefined}><label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Упражнение</label>
               <select value={exId} onChange={e => setExId(e.target.value)} style={style.input}><option value="">— Выбрать —</option>{EXERCISE_CATALOG.slice(0, 50).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
             </div>
             <div><label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Вес (кг)</label><input type="number" value={exW} onChange={e => setExW(parseFloat(e.target.value) || 0)} style={style.input} /></div>

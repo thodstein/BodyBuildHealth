@@ -7,6 +7,7 @@ import {
   getRecoveryProtocols, getMentalRoutines,
 } from '../../../engines/gym-competition.engine';
 import { loadTrainingProfile } from './training-profile';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -53,6 +54,10 @@ export const CompetitionCard: React.FC = () => {
           {cls.cuttingRequired && <div style={{ fontSize: 10, color: '#eab308' }}>Сушка: {cls.cuttingAmount} кг</div>}
           <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{cls.recommendation}</div>
         </div>
+        <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить ПМ (присед {squat} / жим {bench} / тяга {dead} кг, вес {bw} кг) к планировщику — план пересчитает веса.</div>
+          <button onClick={() => applyToPlanner({ kind: 'pm', label: 'Соревнование: ПМ ' + squat + '/' + bench + '/' + dead + ' кг', data: { squat, bench, dead } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить ПМ к планировщику</button>
+        </div>
       </div>
 
       <div style={CARD}>
@@ -72,6 +77,10 @@ export const CompetitionCard: React.FC = () => {
             <div style={{ fontSize: 9, color: ACCENT, marginTop: 2 }}>{a.warmupRoom}</div>
           </div>
         ))}
+        <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить пиковый протокол (соревнование) к планировщику: объём ×0.5, RIR→0 — выход на пик.</div>
+          <button onClick={() => applyToPlanner({ kind: 'peak', label: 'Соревнование: пик (объём ×0.5, RIR→0)', data: { volumeMult: 0.5, rirTarget: 0 } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить пик к планировщику</button>
+        </div>
       </div>
 
       <div style={CARD}>

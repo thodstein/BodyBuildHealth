@@ -7,6 +7,7 @@ import React, { useMemo, useState } from 'react';
 import { loadSRPESessions, saveSRPESession, clearSRPESessions, type SRPESession } from '../../../engines/pro/srpe-store';
 import { trainingLoadReport, sessionLoad } from '../../../engines/pro/training-load.engine';
 import { MetricCard, ExpandableCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.7)', fontSize: 11, lineHeight: 1.45 };
@@ -121,6 +122,10 @@ export const TrainingLoadCalculator: React.FC = () => {
             </div>
           </MetricCard>
 
+          <div style={{ margin: '0 0 8px',  marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить нагрузку (ACWR {report.acwr.ratio.toFixed(2)} — {ZONE_META[report.acwr.zone].label}) к планировщику: при ACWR {">"}1.5 — объём ×0.8 (делод), {">"}1.3 — ×0.9, {"<"}0.8 — ×1.1.</div>
+            <button onClick={() => { const r = report.acwr.ratio; const mult = r > 1.5 ? 0.8 : r > 1.3 ? 0.9 : r < 0.8 ? 1.1 : 1; const rsh = r > 1.5 ? 1 : 0; applyToPlanner({ kind: 'pri', label: 'Нагрузка ACWR ' + r.toFixed(2) + ' → объём ×' + mult, data: { volumeMult: mult, rirShift: rsh } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить ACWR к планировщику</button>
+          </div>
           {/* Рекомендации */}
           <MetricCard title="Рекомендации" icon="🎯" accent="#f59e0b">
             {report.recommendations.map((r, i) => <div key={i} style={{ ...SMALL, marginBottom: 4, padding: '6px 8px', background: 'rgba(245,158,11,0.06)', borderRadius: 8, border: '1px solid rgba(245,158,11,0.15)' }}>{r}</div>)}

@@ -306,17 +306,29 @@ function PopupSystems({ profile, u, onClose }: { profile: BioStackProfile; u: (p
   </PopupOverlay>;
 }
 
-/* ─── Popup: Текущие БАДы / Избегать ─── */
-function PopupSupplements({ profile, u, onClose }: { profile: BioStackProfile; u: (p: Partial<BioStackProfile>) => void; onClose: () => void }) {
+/* ─── Popup: Образ жизни (исключение БАДов и лекарств) ─── */
+function PopupLifestyle({ profile, u, onClose }: { profile: BioStackProfile; u: (p: Partial<BioStackProfile>) => void; onClose: () => void }) {
   const [avoid, setAvoid] = useState(profile.avoidIds.join(', '));
-  const save = () => { u({ avoidIds: avoid.split(',').map(s=>s.trim()).filter(Boolean) }); onClose(); };
-  return <PopupOverlay title="Избегать препараты" icon="💊" color="#8b5cf6" onClose={onClose}>
+  const [avoidMed, setAvoidMed] = useState(profile.avoidMeds.join(', '));
+  const save = () => {
+    u({
+      avoidIds: avoid.split(',').map(s=>s.trim()).filter(Boolean),
+      avoidMeds: avoidMed.split(',').map(s=>s.trim()).filter(Boolean),
+    });
+    onClose();
+  };
+  return <PopupOverlay title="Образ жизни" icon="🧘" color="#8b5cf6" onClose={onClose}>
     <div style={{fontSize:9,color:'rgba(255,255,255,0.45)',marginBottom:8,lineHeight:1.3}}>
-      Укажите id БАДов (через запятую), которые нужно исключить из подбора. Например: yohimbine, huperzine_a, dmaa
+      Укажите, что исключить из подбора поддержки.
     </div>
     <div style={{marginBottom:8}}>
-      <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',marginBottom:2,display:'block'}}>🔴 Исключить из подбора:</label>
+      <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',marginBottom:2,display:'block'}}>🔴 Исключить БАДы (id через запятую):</label>
       <input value={avoid} onChange={e => setAvoid(e.target.value)} placeholder="yohimbine, huperzine_a, dmaa"
+        style={{width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:11,boxSizing:'border-box'}} />
+    </div>
+    <div style={{marginBottom:8}}>
+      <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',marginBottom:2,display:'block'}}>💊 Исключить лекарства (id через запятую):</label>
+      <input value={avoidMed} onChange={e => setAvoidMed(e.target.value)} placeholder="telmisartan, nebivolol, anastrozole"
         style={{width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:11,boxSizing:'border-box'}} />
     </div>
     <button onClick={save} style={{width:'100%',padding:'10px 0',borderRadius:10,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#8b5cf6,#7c3aed)',color:'#fff',fontWeight:700,fontSize:12}}>✅ Применить</button>
@@ -656,19 +668,26 @@ export function ProfileTab({ profile, setProfile, setStackIds }: { profile: BioS
         </div>
       )}
 
-      {/* ── Avoid ── */}
-      {comp.groupStatus.avoid?.filled ? (
-        <SummaryCard icon="💊" title="Исключить БАДы" color="#8b5cf6" source={comp.groupStatus.avoid.source} onEdit={() => setPopup('supplements')}>
+      {/* ── Lifestyle ── */}
+      {comp.groupStatus.lifestyle?.filled ? (
+        <SummaryCard icon="🧘" title="Образ жизни" color="#8b5cf6" source={comp.groupStatus.lifestyle.source} onEdit={() => setPopup('lifestyle')}>
           {profile.avoidIds.map(a => (
-            <DataChip key={a} color="#a78bfa" dim>{a}</DataChip>
+            <DataChip key={a} color="#a78bfa" dim>🚫 {a}</DataChip>
+          ))}
+          {profile.avoidMeds.map(m => (
+            <DataChip key={m} color="#f87171" dim>💊 {m}</DataChip>
           ))}
         </SummaryCard>
       ) : (
-        <CardBtn icon="💊" title="Исключить БАДы" color="#8b5cf6"
-          subtitle={profile.avoidIds.length ? `${profile.avoidIds.length} исключено` : 'Не заданы'}
-          count={profile.avoidIds.length}
-          onClick={() => setPopup('supplements')}
-          badge={profile.avoidIds.length === 0 ? { text: 'Не заданы', source: 'empty' } : undefined} />
+        <CardBtn icon="🧘" title="Образ жизни" color="#8b5cf6"
+          subtitle={
+            profile.avoidIds.length || profile.avoidMeds.length
+              ? `${profile.avoidIds.length} БАД, ${profile.avoidMeds.length} лекарств`
+              : 'Не заданы'
+          }
+          count={profile.avoidIds.length + profile.avoidMeds.length}
+          onClick={() => setPopup('lifestyle')}
+          badge={(!profile.avoidIds.length && !profile.avoidMeds.length) ? { text: 'Не заданы', source: 'empty' } : undefined} />
       )}
 
       {/* ── Clinical ── */}
@@ -716,7 +735,7 @@ export function ProfileTab({ profile, setProfile, setStackIds }: { profile: BioS
       {popup === 'goals' && <PopupGoals profile={profile} u={u} onClose={() => setPopup(null)} />}
       {popup === 'organs' && <PopupOrgans profile={profile} u={u} onClose={() => setPopup(null)} />}
       {popup === 'systems' && <PopupSystems profile={profile} u={u} onClose={() => setPopup(null)} />}
-      {popup === 'supplements' && <PopupSupplements profile={profile} u={u} onClose={() => setPopup(null)} />}
+      {popup === 'lifestyle' && <PopupLifestyle profile={profile} u={u} onClose={() => setPopup(null)} />}
       {popup === 'clinical' && <PopupClinical profile={profile} u={u} onClose={() => setPopup(null)} />}
       {popup === 'presets' && <PopupPresets profile={profile} u={u} onClose={() => setPopup(null)} />}
       </>)}
@@ -854,19 +873,26 @@ export function BioStackAISettings({ onProfileChange }: { onProfileChange?: (p: 
         </div>
       )}
 
-      {/* ── Avoid ── */}
-      {comp.groupStatus.avoid?.filled ? (
-        <SummaryCard icon="💊" title="Исключить БАДы" color="#8b5cf6" source={comp.groupStatus.avoid.source} onEdit={() => setPopup('supplements')}>
+      {/* ── Lifestyle ── */}
+      {comp.groupStatus.lifestyle?.filled ? (
+        <SummaryCard icon="🧘" title="Образ жизни" color="#8b5cf6" source={comp.groupStatus.lifestyle.source} onEdit={() => setPopup('lifestyle')}>
           {profile.avoidIds.map(a => (
-            <DataChip key={a} color="#a78bfa" dim>{a}</DataChip>
+            <DataChip key={a} color="#a78bfa" dim>🚫 {a}</DataChip>
+          ))}
+          {profile.avoidMeds.map(m => (
+            <DataChip key={m} color="#f87171" dim>💊 {m}</DataChip>
           ))}
         </SummaryCard>
       ) : (
-        <CardBtn icon="💊" title="Исключить БАДы" color="#8b5cf6"
-          subtitle={profile.avoidIds.length ? `${profile.avoidIds.length} исключено` : 'Не заданы'}
-          count={profile.avoidIds.length}
-          onClick={() => setPopup('supplements')}
-          badge={profile.avoidIds.length === 0 ? { text: 'Не заданы', source: 'empty' } : undefined} />
+        <CardBtn icon="🧘" title="Образ жизни" color="#8b5cf6"
+          subtitle={
+            profile.avoidIds.length || profile.avoidMeds.length
+              ? `${profile.avoidIds.length} БАД, ${profile.avoidMeds.length} лекарств`
+              : 'Не заданы'
+          }
+          count={profile.avoidIds.length + profile.avoidMeds.length}
+          onClick={() => setPopup('lifestyle')}
+          badge={(!profile.avoidIds.length && !profile.avoidMeds.length) ? { text: 'Не заданы', source: 'empty' } : undefined} />
       )}
 
       {/* ── Clinical ── */}
@@ -892,7 +918,7 @@ export function BioStackAISettings({ onProfileChange }: { onProfileChange?: (p: 
       {popup === 'goals' && <PopupGoals profile={profile} u={u} onClose={() => setPopup(null)} />}
       {popup === 'organs' && <PopupOrgans profile={profile} u={u} onClose={() => setPopup(null)} />}
       {popup === 'systems' && <PopupSystems profile={profile} u={u} onClose={() => setPopup(null)} />}
-      {popup === 'supplements' && <PopupSupplements profile={profile} u={u} onClose={() => setPopup(null)} />}
+      {popup === 'lifestyle' && <PopupLifestyle profile={profile} u={u} onClose={() => setPopup(null)} />}
       {popup === 'clinical' && <PopupClinical profile={profile} u={u} onClose={() => setPopup(null)} />}
     </div>
   );

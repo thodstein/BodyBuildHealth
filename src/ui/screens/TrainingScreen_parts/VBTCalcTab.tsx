@@ -184,13 +184,13 @@ export const VBTCalcTab: React.FC = () => {
       {/* Intent zones */}
       <ExpandableCard title="🎯 Зоны по intent (целевые)" accent={ACCENT} short="Целевые %1RM, скорость, повт. по intent">
         {Object.entries(INTENT_ZONES).map(([k, z]) => (
-          <div key={k} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr', gap: 4, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
-            <span style={{ color: '#fff', fontWeight: 700, fontSize: 11 }}>{INTENT_RU[k as VBTIntent]}</span>
-            <span>{(z.pct[0] * 100).toFixed(0)}–{(z.pct[1] * 100).toFixed(0)}%</span>
-            <span>{z.velocity[0]}–{z.velocity[1]} м/с</span>
-            <span>повт: {z.reps[0]}–{z.reps[1]}</span>
-            <span style={{ color: ACCENT }}>цел. {z.idealPct * 100}%</span>
-            <span style={{ color: '#3b82f6' }}>{z.idealVelocity} м/с</span>
+          <div key={k} style={{ display: 'grid', gridTemplateColumns: 'minmax(64px,1.2fr) 1fr 1fr 1fr 0.8fr 0.8fr', gap: 4, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 10, color: 'rgba(255,255,255,0.6)', minWidth: 460 }}>
+            <span style={{ color: '#fff', fontWeight: 700, fontSize: 11, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{INTENT_RU[k as VBTIntent]}</span>
+            <span style={{ whiteSpace: 'nowrap' }}>{(z.pct[0] * 100).toFixed(0)}–{(z.pct[1] * 100).toFixed(0)}%</span>
+            <span style={{ whiteSpace: 'nowrap' }}>{z.velocity[0]}–{z.velocity[1]} м/с</span>
+            <span style={{ whiteSpace: 'nowrap' }}>повт: {z.reps[0]}–{z.reps[1]}</span>
+            <span style={{ color: ACCENT, whiteSpace: 'nowrap' }}>цел. {z.idealPct * 100}%</span>
+            <span style={{ color: '#3b82f6', whiteSpace: 'nowrap' }}>{z.idealVelocity} м/с</span>
           </div>
         ))}
       </ExpandableCard>

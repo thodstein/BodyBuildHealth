@@ -10,7 +10,8 @@ import { usePlanGeneration } from '../../../hooks/usePlanGeneration';
 import { generateMacrocycle, getCurrentWeekPlan, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../../../engines/training-periodization.engine';
 import { TrainingProfileCard } from '../TrainingProfileCard';
 import type { TrainingProfile } from '../training-profile';
-import { PCT_FOR_RIR, ACCENT, DIM, detectGroup, getMrv, type ManualResult, type ConstructorMode } from './types';
+import { PCT_FOR_RIR, ACCENT, DIM, detectGroup, getMrv, type ManualResult } from './types';
+const PHASE_LABELS_MAP: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', peaking: 'Пик', deload: 'Разгрузка', gpp: 'GPP', spp: 'SPP' };
 import { ConstructorProfile } from './ConstructorProfile';
 import { ConfigPanel } from './ConfigPanel';
 import { PlanDisplay } from './PlanDisplay';
@@ -47,10 +48,10 @@ export const TrainingConstructor: React.FC<Props> = ({
   mesoLength, setMesoLength,
   labAnalysis, setTab,
 }) => {
-  const [mode, setMode] = useState<ConstructorMode>(() => {
-    try { return localStorage.getItem('he_constructor_mode') as ConstructorMode || 'manual'; } catch { return 'manual'; }
+  const [constTab, setConstTab] = useState<'params' | 'editor' | 'tools'>(() => {
+    try { return (localStorage.getItem('he_constructor_tab') as 'params' | 'editor' | 'tools') || 'params'; } catch { return 'params'; }
   });
-  useEffect(() => { try { localStorage.setItem('he_constructor_mode', mode); } catch {} }, [mode]);
+  useEffect(() => { try { localStorage.setItem('he_constructor_tab', constTab); } catch {} }, [constTab]);
 
   const [manualCfg, setManualCfg] = useState<Record<string, string>>({});
   const setManual = useCallback((k: string, v: string) => setManualCfg(p => ({ ...p, [k]: v })), []);
@@ -68,6 +69,32 @@ export const TrainingConstructor: React.FC<Props> = ({
   useEffect(() => { try { localStorage.setItem('he_macro_session', JSON.stringify(macrocycle)); } catch {} }, [macrocycle]);
   const [selectedWeek, setSelectedWeek] = useState(1);
   const [currentMicrocycle, setCurrentMicrocycle] = useState<Microcycle | null>(null);
+
+  // 🔗 Адаптер: конвертация микроцикла макроцикла → ManualResult для редактора PlanDisplay
+  const microcycleToManualResult = useCallback((mc: Microcycle, weekNum: number): ManualResult => {
+    const wm: Record<string, number> = { chest: 100, back: 110, legs: 140, shoulders: 60, arms: 50, core: 60, full: 80, ...tprofile.workMax, ...manualWorkMax };
+    const days = mc.days.filter((d: any) => d.isTraining).map((d: any, di: number) => ({
+      day: di + 1,
+      groups: Array.from(new Set((d.exercises || []).map((e: any) => detectGroup(e.name)))) as string[],
+      exercises: (d.exercises || []).map((e: any) => {
+        const g = detectGroup(e.name);
+        const rir = e.rir ?? (e.rpe ? Math.max(0, 10 - e.rpe) : 2);
+        const pct = PCT_FOR_RIR[Math.max(0, Math.min(5, rir))] ?? 0.85;
+        return { name: e.name, sets: e.sets || 3, reps: String(e.reps || 10), rir, rest: e.restSeconds || 120, group: g, weight: Math.round((wm[g] || 80) * pct) };
+      }),
+    }));
+    return { splitName: `${PHASE_LABELS_MAP[mc.mesocycleType] || mc.mesocycleType} — Неделя ${weekNum}`, corrections: [`🔗 Неделя ${weekNum} из макроцикла (${mc.mesocycleType}). Объём ×${mc.volumeMultiplier}, RIR ${mc.rirRange?.[0] ?? 2}.`], days };
+  }, [tprofile.workMax, manualWorkMax]);
+
+  // При смене недели макроцикла → конвертировать в ManualResult для редактора (только при смене недели, не при смене workMax)
+  const lastSyncedWeekRef = useRef<number>(-1);
+  useEffect(() => {
+    if (currentMicrocycle && macrocycle && selectedWeek !== lastSyncedWeekRef.current) {
+      lastSyncedWeekRef.current = selectedWeek;
+      setManualResult(microcycleToManualResult(currentMicrocycle, selectedWeek));
+      setConstTab('editor'); // показать неделю в редакторе
+    }
+  }, [currentMicrocycle, selectedWeek, macrocycle, microcycleToManualResult]);
 
   const buildPlan = usePlanGeneration({
     goal, level, mesoLength, weakPoints,
@@ -102,7 +129,9 @@ export const TrainingConstructor: React.FC<Props> = ({
     const ws = built.weeklySets;
     Object.entries(ws).forEach(([g, s]: [string, any]) => { if (s < Math.max(4, mrv * 0.4) && s > 0) corrections.push(`Группа «${g}»: низкий объём (${s} сетов) — ниже зоны адаптации.`); });
     weakPoints.forEach(w => { if (!ws[w] || ws[w] === 0) corrections.push(`⚠ Слабая группа «${w}» не включена — добавьте специализированное упражнение.`); });
+    lastSyncedWeekRef.current = -1; // разрыв синхронизации с макроциклом
     setManualResult({ splitName: sp.name, corrections, days: built.days });
+    setConstTab('editor'); // показать собранный план
   }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, manualCfg, tprofile, labAnalysis, buildPlan, mrvOverride]);
 
   const loadProgramToConstructor = useCallback((programId: string) => {
@@ -126,7 +155,9 @@ export const TrainingConstructor: React.FC<Props> = ({
       'Программа доступна для редактирования, применения методик и выполнения.',
     ];
     if (prog.warnings?.length) corrections.push('Предупреждения: ' + prog.warnings.join('; '));
+    lastSyncedWeekRef.current = -1; // разрыв синхронизации с макроциклом
     setManualResult({ splitName: prog.name + ' (неделя 1)', corrections, days });
+    setConstTab('editor'); // показать загруженную программу
   }, [tprofile]);
 
   const manualToRuntime = useCallback(() => {
@@ -163,6 +194,8 @@ export const TrainingConstructor: React.FC<Props> = ({
   // 🔗 приём корректировок из калькуляторов (planner-bridge): сплит/PRI/слабые точки/ПМ.
   const [applyPayload, setApplyPayload] = useState<PlannerApply | null>(() => getPlannerApply());
   useEffect(() => subscribePlannerApply(p => setApplyPayload(p)), []);
+  // Очистка stale bridge-данных — внутри mountedRef useEffect ниже
+  // Авто-применение: см. после applyExternal (перемещено ниже для корректного порядка)
   const pendingApplyRef = useRef<PlannerApply | null>(null);
   const applyExternal = useCallback(() => {
     const p = getPlannerApply();
@@ -228,7 +261,15 @@ export const TrainingConstructor: React.FC<Props> = ({
       if (manualResult) setManualResult({ ...manualResult, corrections: [...manualResult.corrections, `🔗 Целевой объём по группам: ${Object.entries(sets).map(([g, s]) => g + '=' + s).join(', ')} сет/нед.`] });
     }
     clearPlannerApply(); setApplyPayload(null);
+    setConstTab('editor'); // показать результат в редакторе
   }, [buildPlan, level, tprofile, labAdj, manualResult, mrvOverride]);
+
+  // Авто-применение bridge: только НОВЫЕ события (не stale данные при монтировании)
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    if (!mountedRef.current) { mountedRef.current = true; clearPlannerApply(); setApplyPayload(null); return; }
+    if (applyPayload) applyExternal();
+  }, [applyPayload]);
 
   // достроить план после того, как weakPoints/ManualWorkMax обновились (buildPlan пересоздастся)
   useEffect(() => {
@@ -254,17 +295,13 @@ export const TrainingConstructor: React.FC<Props> = ({
         🛠 Конструктор тренировок
       </h2>
       <div style={{ fontSize: 11, color: DIM, lineHeight: 1.5, marginBottom: 4 }}>
-        Единый инструмент для построения тренировочных программ. Выберите режим: автоматический макроцикл или ручная сборка.
-        Доступны все сплиты, циклы, программы, методики, калькуляторы и инструменты качества.
+        Единый инструмент: параметры → построение → редактирование → инструменты. Источник (авто/LMS/шаблон/программа) → макроцикл → недели → редактор.
       </div>
 
       {applyPayload && (
-        <div style={{ padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700 }}>🔗 Калькулятор рекомендует: {applyPayload.label}</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={applyExternal} style={{ padding: '8px 14px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}>Применить</button>
-            <button onClick={() => { clearPlannerApply(); setApplyPayload(null); }} style={{ padding: '8px 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: DIM, fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>✕</button>
-          </div>
+        <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.25)', fontSize: 11, color: ACCENT, fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>✓ Применено: {applyPayload.label}</span>
+          <button onClick={() => { clearPlannerApply(); setApplyPayload(null); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: DIM, fontSize: 10, cursor: 'pointer' }}>✕</button>
         </div>
       )}
 
@@ -274,20 +311,16 @@ export const TrainingConstructor: React.FC<Props> = ({
         background: 'rgba(24,24,27,0.15)',
         border: '1px solid rgba(255,255,255,0.04)',
       }}>
-        <button onClick={() => setMode('macro')} style={{
-          flex: 1, padding: '10px 6px', borderRadius: 9,
-          fontSize: 12, fontWeight: 700, cursor: 'pointer',
-          border: mode === 'macro' ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.06)',
-          background: mode === 'macro' ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)',
-          color: mode === 'macro' ? ACCENT : DIM,
-        }}>📅 Макроцикл</button>
-        <button onClick={() => setMode('manual')} style={{
-          flex: 1, padding: '10px 6px', borderRadius: 9,
-          fontSize: 12, fontWeight: 700, cursor: 'pointer',
-          border: mode === 'manual' ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.06)',
-          background: mode === 'manual' ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)',
-          color: mode === 'manual' ? ACCENT : DIM,
-        }}>🛠 Ручная сборка</button>
+        {([['params','📋 Параметры'],['editor','✏️ Редактор'],['tools','🛠 Инструменты']] as const).map(([id,label]) => (
+          <button key={id} onClick={() => setConstTab(id)} style={{
+            flex: 1, padding: '10px 6px', borderRadius: 9,
+            fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            border: constTab === id ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.06)',
+            background: constTab === id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)',
+            color: constTab === id ? ACCENT : DIM,
+            position: 'relative' as const,
+          }}>{label}{id === 'editor' && manualResult && <span style={{ position: 'absolute', top: 4, right: 8, width: 6, height: 6, borderRadius: 3, background: ACCENT }} />}{id === 'params' && macrocycle && <span style={{ position: 'absolute', top: 4, right: 8, width: 6, height: 6, borderRadius: 3, background: '#60a5fa' }} />}</button>
+        ))}
       </div>
 
       <ConstructorProfile
@@ -320,8 +353,18 @@ export const TrainingConstructor: React.FC<Props> = ({
         </div>
       )}
 
-      {mode === 'manual' && (
+      {constTab === 'editor' && (
         <>
+          {manualResult && lastSyncedWeekRef.current > 0 && macrocycle && (
+            <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', marginBottom: 6, fontSize: 10, color: '#60a5fa', fontWeight: 700 }}>
+              🔗 Синхронизировано с макроциклом, неделя {lastSyncedWeekRef.current}. Смена недели в «Параметры» обновит этот план.
+            </div>
+          )}
+          {manualResult && (lastSyncedWeekRef.current <= 0 || !macrocycle) && (
+            <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', marginBottom: 6, fontSize: 10, color: ACCENT, fontWeight: 700 }}>
+              ✏️ Самостоятельный план (не из макроцикла). Редактируйте и отправляйте в выполнение.
+            </div>
+          )}
           <ConfigPanel manualCfg={manualCfg} setManual={setManual} onLoadProgram={loadProgramToConstructor} />
 
           <div style={{ marginTop: 4 }}>
@@ -344,22 +387,10 @@ export const TrainingConstructor: React.FC<Props> = ({
             onToRuntime={manualToRuntime}
             globalTempoStr={globalTempoStr}
           />
-
-          <ToolsPanel
-            result={manualResult}
-            setResult={setManualResult}
-            manualCfg={manualCfg}
-            tprofile={tprofile}
-            goal={goal} level={level}
-            mesoLength={mesoLength} daysPerWeek={daysPerWeek}
-            manualWorkMax={manualWorkMax}
-            labAnalysis={labAnalysis}
-            onToRuntime={manualToRuntime}
-          />
         </>
       )}
 
-      {mode === 'macro' && (
+      {constTab === 'params' && (
         <MacrocyclePanel
           goal={goal} level={level}
           daysPerWeek={daysPerWeek}
@@ -376,6 +407,20 @@ export const TrainingConstructor: React.FC<Props> = ({
           setCurrentMicrocycle={setCurrentMicrocycle}
           onToRuntime={macroToRuntime}
           setTab={setTab}
+        />
+      )}
+
+      {constTab === 'tools' && (
+        <ToolsPanel
+          result={manualResult}
+          setResult={setManualResult}
+          manualCfg={manualCfg}
+          tprofile={tprofile}
+          goal={goal} level={level}
+          mesoLength={mesoLength} daysPerWeek={daysPerWeek}
+          manualWorkMax={manualWorkMax}
+          labAnalysis={labAnalysis}
+          onToRuntime={manualToRuntime}
         />
       )}
     </div>

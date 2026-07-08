@@ -74,21 +74,21 @@ const getProductsFromDayPlan = (dp: any): { foodId: string; weightGrams: number 
 
 export const MealComposer: React.FC = () => {
   const {
-    dayPlan, threeDayPlan, generatePlan,
+    dayPlan, threeDayPlan, weekPlan, generatePlan,
     DAY_LABELS, planDays, setPlanDays,
     selectedDayIndex, setSelectedDayIndex,
     generated, setGenerated,
     renderMealList,
     recipePickerMeal, setRecipePickerMeal, replaceMealWithRecipe,
     effectiveKcal, effectiveP, effectiveF, effectiveC,
-    setDayPlan, saveUndo,
+    setDayPlan, setThreeDayPlan, setWeekPlan, saveUndo,
   } = usePlanCtx();
 
   const [composerMode, setComposerMode] = useState<ComposerMode>('basic');
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilter>({});
   const [selectedMealForTargeting, setSelectedMealForTargeting] = useState<number | null>(null);
 
-  const currentDay = dayPlan || (threeDayPlan ? threeDayPlan[selectedDayIndex] : null);
+  const currentDay = dayPlan || (threeDayPlan?.days ? threeDayPlan.days[selectedDayIndex] : null) || (weekPlan?.days ? weekPlan.days[selectedDayIndex] : null);
   const dayProducts = useMemo(() => getProductsFromDayPlan(currentDay), [currentDay]);
 
   const gapCacheRef = useRef<{ key: string; result: NutrientGapResult | null }>({ key: '', result: null });
@@ -114,6 +114,24 @@ export const MealComposer: React.FC = () => {
     comboCacheRef.current = { key, result };
     return result;
   }, [composerMode, dayProducts]);
+
+  // Sync dayPlan edits back to multi-day plan
+  const dayPlanKeyRef = useRef('');
+  React.useEffect(() => {
+    if (!planDays || planDays === 1 || !dayPlan || !dayPlan.meals) return;
+    const multiDay = planDays === 3 ? threeDayPlan : weekPlan;
+    if (!multiDay?.days?.[selectedDayIndex]) return;
+    const key = `${dayPlan.totals?.kcal}-${dayPlan.totals?.p}-${dayPlan.totals?.f}-${dayPlan.totals?.c}-${(dayPlan.meals||[]).length}`;
+    if (key === dayPlanKeyRef.current) return;
+    const oldKey = `${multiDay.days[selectedDayIndex]?.totals?.kcal}-${multiDay.days[selectedDayIndex]?.totals?.p}-${multiDay.days[selectedDayIndex]?.totals?.f}-${multiDay.days[selectedDayIndex]?.totals?.c}`;
+    if (key === oldKey) { dayPlanKeyRef.current = key; return; }
+    dayPlanKeyRef.current = key;
+    const days = [...multiDay.days];
+    days[selectedDayIndex] = JSON.parse(JSON.stringify(dayPlan));
+    const allTotals = { kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0), p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0), f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0), c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0) };
+    if (planDays === 3) setThreeDayPlan({ ...multiDay, days, totals: allTotals });
+    else setWeekPlan({ ...multiDay, days, totals: allTotals });
+  }, [dayPlan, planDays, selectedDayIndex]);
 
   const handleApplyCombo = (foodId: string, weightGrams: number) => {
     if (selectedMealForTargeting === null) return;
@@ -260,7 +278,7 @@ export const MealComposer: React.FC = () => {
           </div>
 
           {renderMealList ? (
-            renderMealList(dayPlan || (threeDayPlan ? threeDayPlan[selectedDayIndex] : null), true)
+            renderMealList(dayPlan || (threeDayPlan?.days ? threeDayPlan.days[selectedDayIndex] : null) || (weekPlan?.days ? weekPlan.days[selectedDayIndex] : null), true)
           ) : (
             <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', textAlign:'center', padding:20 }}>
               Выберите день для просмотра состава приёмов

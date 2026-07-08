@@ -6,8 +6,8 @@
  */
 import React from 'react';
 import { PopupSelect } from '../../components/PopupXxx';
-import { InfoErrorBoundary, getCategoryInfo, CLASS_BASE_NAMES, MECH_TRANSLATIONS_RU, TYPE_LABELS_RU, MECH_LABELS } from './SupportScreenData';
-import { ALL_STACKS, ALL_INTERACTIONS, SUPPORT_CATALOG_DATA, getSubstanceTier, TIER_LABELS, SYSTEM_LABELS_CATALOG, type SupportSubstance } from '../../../data/support-database';
+import { InfoErrorBoundary, getCategoryInfo, CLASS_BASE_NAMES, MECH_TRANSLATIONS_RU, TYPE_LABELS_RU, MECH_LABELS, CATEGORY_LABELS } from './SupportScreenData';
+import { ALL_STACKS, ALL_INTERACTIONS, SUPPORT_CATALOG_DATA, getSubstanceTier, TIER_LABELS, SYSTEM_LABELS_CATALOG, ORGAN_LABELS, type SupportSubstance } from '../../../data/support-database';
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../../data/support-db';
 import { SupportInteractionsView } from './SupportInteractionsView';
 
@@ -89,12 +89,12 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                   <div style={{ padding:'6px 10px 8px 18px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
                                     <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
                                     <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
-                                      {TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
-                                    </div>
-                                    {(sub.mechanisms||[]).length > 0 && (
-                                      <div style={{ marginBottom:3 }}>
-                                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Механизмы действия:</div>
-                                        <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                                       {TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).map((c: any) => CATEGORY_LABELS[c]?.label || c).join(', ') : ''}
+                                     </div>
+                                     {(sub.mechanisms||[]).length > 0 && (
+                                       <div style={{ marginBottom:3 }}>
+                                         <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Механизмы действия:</div>
+                                         <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
                                           {(sub.mechanisms||[]).map((m: any, i: any) => <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')||''}</span>)}
                                         </div>
                                       </div>
@@ -135,7 +135,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                     <div onClick={() => setSelectedSub(isSelected ? null : id)} style={{ display:'flex', alignItems:'center', gap:4, padding:'6px 10px 6px 18px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
                                       <div style={{ flex:1 }}>
                                         <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{sub.name||(sub.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
-                                        <div style={{ fontSize:8, color:'var(--text-dim)' }}>{(sub.categories||[]).slice(0,2).join(', ')}</div>
+                                         <div style={{ fontSize:8, color:'var(--text-dim)' }}>{(sub.categories||[]).slice(0,2).map((c: any) => CATEGORY_LABELS[c]?.label || c).join(', ')}</div>
                                       </div>
                                       <button onClick={e => { e.stopPropagation(); if (!enhancedSubs.includes(id)) setEnhancedSubs(prev => [...prev, id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(id) ? '✓' : '+ Мой стек'}</button>
                                        <button onClick={e => { e.stopPropagation(); try { let f:string[]=JSON.parse(localStorage.getItem('he_support_favorites')||'[]');const idx=f.indexOf(id);if(idx>=0)f.splice(idx,1);else f.push(id);localStorage.setItem('he_support_favorites',JSON.stringify(f));setFavRefresh(p=>p+1);}catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(()=>{try{return JSON.parse(localStorage.getItem('he_support_favorites')||'[]').includes(id)?'#fbbf24':'var(--text-dim)';}catch{return 'var(--text-dim)';}})() }}>★</button>
@@ -295,12 +295,12 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                          <div style={{ padding:'6px 10px 8px 22px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
                                            <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
                                           <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
-                                            {TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
-                                          </div>
-                                          {(sub.mechanisms||[]).length > 0 && (
-                                            <div style={{ marginBottom:3 }}>
-                                              <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Механизмы действия:</div>
-                                              <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                                           {TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).map((c: any) => CATEGORY_LABELS[c]?.label || c).join(', ') : ''}
+                                           </div>
+                                           {(sub.mechanisms||[]).length > 0 && (
+                                             <div style={{ marginBottom:3 }}>
+                                               <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Механизмы действия:</div>
+                                               <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
                                                 {(sub.mechanisms||[]).map((m: any, i: any) => (
                                                   <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || (m||'').replace(/_/g, ' ')}</span>
                                                 ))}
@@ -354,7 +354,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                     <div style={{ flex:1 }}>
                                       <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
                                       <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
-                                        {(sub?.categories||[]).slice(0,3).map((c: any) => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c||''}</span>)}
+                                      {(sub?.categories||[]).slice(0,3).map((c: any) => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{CATEGORY_LABELS[c]?.label || c||''}</span>)}
                                             {(sub?.mechanisms||[]).slice(0,4).map((m: any) => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')||''}</span>)}
                                       </div>
                                     </div>
@@ -367,12 +367,12 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                     <div style={{ padding:'6px 10px 8px 14px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
                                       <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
                                       <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
-                                        {TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
-                                      </div>
-                                      {(sub.mechanisms||[]).length > 0 && (
-                                        <div style={{ marginBottom:3 }}>
-                                          <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Механизмы действия:</div>
-                                          <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                                         {TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).map((c: any) => CATEGORY_LABELS[c]?.label || c).join(', ') : ''}
+                                       </div>
+                                       {(sub.mechanisms||[]).length > 0 && (
+                                         <div style={{ marginBottom:3 }}>
+                                           <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Механизмы действия:</div>
+                                           <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
                                             {(sub.mechanisms||[]).map((m: any, i: any) => (
                                               <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{(m||'')}</span>
                                             ))}
@@ -383,7 +383,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                          <div style={{ marginBottom:3 }}>
                                            <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Органы-мишени:</div>
                                            <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                                             {[...new Set(sub.organs||[])].map((o: any) => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{o||''}</span>)}
+                                              {[...new Set(sub.organs||[])].map((o: any) => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{ORGAN_LABELS[o]?.replace(/^[^\s]+\s/,'') || o||''}</span>)}
                                            </div>
                                          </div>
                                        )}
@@ -519,9 +519,9 @@ export const SupportCatalogTab: React.FC<{ s: Record<string, any> }> = ({ s }) =
                             <div style={{ flex: 1 }}>
                               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', lineHeight: 1.3 }}>{sub.name||(sub.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}{' '}<span style={{fontSize:8,padding:'0 3px',borderRadius:3,fontWeight:700,color:TIER_LABELS[getSubstanceTier(sub.id)]?.color||'var(--text-dim)',background:(TIER_LABELS[getSubstanceTier(sub.id)]?.color||'var(--text-dim)')+'18'}}>{TIER_LABELS[getSubstanceTier(sub.id)]?.label||'Стд'}</span></div>
                               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 2 }}>
-                                {(sub.categories||[]).slice(0, 3).map((c: any) => (
-                                  <span key={c} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{c}</span>
-                                ))}
+                                 {(sub.categories||[]).slice(0, 3).map((c: any) => (
+                                   <span key={c} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{CATEGORY_LABELS[c]?.label || c}</span>
+                                 ))}
                                 {(sub.mechanisms||[]).slice(0, 3).map((m: any) => {
                                   const tzLabel = TZ_MECH_LABELS[m as keyof typeof TZ_MECH_LABELS];
                                   return <span key={m} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(0,230,138,0.06)', color: 'var(--accent-green, #00e68a)' }}>{tzLabel || m.replace(/_/g, ' ').toLowerCase()}</span>;
@@ -535,7 +535,7 @@ export const SupportCatalogTab: React.FC<{ s: Record<string, any> }> = ({ s }) =
                               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, marginBottom: 6 }}>{sub.description}</div>
                               {/* Type badge */}
                               <div style={{ fontSize: 8, color: 'var(--accent-green, #00e68a)', marginBottom: 4 }}>
-                                {TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0, 3).join(', ') : ''}
+                                {TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0, 3).map((c: any) => CATEGORY_LABELS[c]?.label || c).join(', ') : ''}
                               </div>
                               {/* All mechanisms */}
                               {sub.mechanisms && sub.mechanisms.length > 0 && (
@@ -554,7 +554,7 @@ export const SupportCatalogTab: React.FC<{ s: Record<string, any> }> = ({ s }) =
                                   <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>Органы-мишени:</div>
                                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                                     {[...new Set(sub.organs||[])].map((o: any) => (
-                                      <span key={o} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(59,130,246,0.08)', color: '#60a5fa' }}>{o}</span>
+                                      <span key={o} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(59,130,246,0.08)', color: '#60a5fa' }}>{ORGAN_LABELS[o]?.replace(/^[^\s]+\s/,'') || o}</span>
                                     ))}
                                   </div>
                                 </div>

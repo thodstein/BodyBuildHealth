@@ -40,7 +40,7 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
         <PopupSelect label="Тип цикла" value={manualCfg.cycle || ''} onChange={v => setManual('cycle', v)}
           options={LMS_CYCLES.map((c: any) => ({
             id: c.meta.id, label: c.meta.title,
-            desc: (c.meta.id.startsWith('block') ? 'Блок' : c.meta.id.startsWith('embed') ? 'Встроенная' : 'СРЦ') + ' · ' + c.meta.level,
+            desc: (c.meta.id.startsWith('block') ? 'Блок' : c.meta.id.startsWith('embed') ? 'Встроенная' : 'Силовой') + ' · ' + c.meta.level,
           }))} hint="Все циклы по категориям" />
 
         <PopupSelect label="Программа тренировок" value={manualCfg.program || ''} onChange={v => setManual('program', v)}

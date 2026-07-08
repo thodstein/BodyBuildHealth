@@ -56,6 +56,13 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
   const [metabolicTab, setMetabolicTab] = useState('protocol');
   const [giTab, setGiTab] = useState('protocol');
   const [hairTab, setHairTab] = useState('protocol');
+  const [thyroidTab, setThyroidTab] = useState('protocol');
+  const [immuneTab, setImmuneTab] = useState('protocol');
+  const [e2Tab, setE2Tab] = useState('protocol');
+  const [sleepTab, setSleepTab] = useState('protocol');
+  const [detoxTab, setDetoxTab] = useState('protocol');
+  const [ghTab, setGhTab] = useState('protocol');
+  const [glp1Tab, setGlp1Tab] = useState('protocol');
 
   return (
         <div style={{ padding:'0 0 70px' }}>
@@ -86,6 +93,13 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
               ['joints','Суставы','#22c55e'],
               ['acne','Акне','#f97316'],
               ['injections','💉 Инъекции','#14b8a6'],
+              ['thyroid','🦋 Тиреоидный','#ec4899'],
+              ['immune','🛡️ Иммунитет','#6366f1'],
+              ['e2','🔬 Эстрадиол','#f472b6'],
+              ['sleep','💤 Сон','#8b5cf6'],
+              ['detox','🧬 Детокс','#22d3ee'],
+              ['gh','🫀 GH/IGF-1','#2dd4bf'],
+              ['glp1','🍪 GLP-1','#f59e0b'],
             ].map(([id, label, color]: [string, string, string]) => (
               <button key={id} onClick={() => setProtocolTab(id)} style={{
                 padding:'7px 16px', borderRadius:22, fontSize:12, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,

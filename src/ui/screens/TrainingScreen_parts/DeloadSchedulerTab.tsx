@@ -346,7 +346,8 @@ export const DeloadSchedulerTab: React.FC = () => {
       {/* Детальная таблица */}
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>📋 Детальный понедельный план</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '0.4fr 1fr 0.5fr 0.5fr 0.4fr 0.4fr', gap: 2, padding: '4px 8px', fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '0.4fr 1fr 0.5fr 0.5fr 0.4fr 0.4fr', gap: 2, padding: '4px 8px', fontSize:9, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', minWidth: 420 }}>
           <span>Нед</span><span>Фаза</span><span>Объём</span><span>Инт.</span><span>RPE</span><span>RIR</span>
         </div>
         {schedule.weeks.slice(0, 24).map((w, i) => {
@@ -359,6 +360,7 @@ export const DeloadSchedulerTab: React.FC = () => {
               borderTop: '1px solid rgba(255,255,255,0.04)',
               background: isDeload ? 'rgba(96,165,250,0.06)' : 'transparent',
               borderLeft: isDeload ? '3px solid #60a5fa' : '3px solid transparent',
+              minWidth: 420,
             }}>
               <span style={{ fontWeight: 700, color }}>{w.week}</span>
               <span style={{ color, fontWeight: 600, fontSize: 9 }}>{PHASE_LABELS_RU[w.phase]}{isDeload ? ' ⬇' : ''}</span>
@@ -369,6 +371,7 @@ export const DeloadSchedulerTab: React.FC = () => {
             </div>
           );
         })}
+        </div>
       </div>
 
       {/* Сводка делодов */}

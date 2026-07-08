@@ -66,6 +66,8 @@ import {
   type AppliedBooster,
 } from './tz-bridge-boosters';
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from '../data/support-db';
+import { canonId, sameClassIds } from './support-plan/shared-constants';
+import { getPrioritySubstances, deriveSeverity, type SeverityLevel } from '../data/lab-priority-map';
 
 // ════════════════════════════════════════════════════════════════════════════
 //  ТИПЫ РЕКОМЕНДАЦИИ
@@ -103,6 +105,13 @@ export interface OrganCoverage {
   coveragePercent: number;
 }
 
+export interface PhaseAssignedDrug {
+  substanceId: string;
+  reason: string;
+  trigger: string;
+  category: TzCategory;
+}
+
 export interface SupportRecommendation {
   level: SupportLevel;
   phase: PhaseKey;
@@ -117,6 +126,7 @@ export interface SupportRecommendation {
   activatedMechs: ActivatedMech[];
   summary: string;
   rationale: string;
+  phaseAssignedDrugs?: PhaseAssignedDrug[];
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -140,9 +150,11 @@ export interface MapperCtx {
   hematocrit?: number;
   hasHCG?: boolean;
   hasAI?: boolean;
+  hasCabergoline?: boolean;
   libidoLow?: boolean;
   bpSystolic?: number;
   lipidLdl?: number;
+  aasIds?: string[];  // список ID ААС в курсе (для фазовой логики)
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -192,18 +204,48 @@ function selectSubstances(
   const limits = CATEGORY_LIMITS[level];
   const totalLimit = TOTAL_LIMIT[level];
 
+  const shouldBlock = (id: string): boolean => {
+    const key = id.toLowerCase();
+    if (JOINT_BLOCK_AUTO.has(key)) return true;
+    if ((phase === 'course' || phase === 'bridge') && REPRO_COURSE_BLOCK_AUTO.has(key)) return true;
+    // ARB + АПФ вместе — врачебная ошибка. Если RAAS-блокатор уже назначен — не добавляем другой
+    if (RAAS_ALL.has(key) && subs.some(s => RAAS_ALL.has(s.substanceId.toLowerCase()))) return true;
+    if (STATIN_ALL.has(key) && subs.some(s => STATIN_ALL.has(s.substanceId.toLowerCase()))) return true;
+    return false;
+  };
+
   const usedSubs = new Set<string>();
+  const usedCanon = new Set<string>();
   const subs: RecommendedSub[] = [];
   const suppression: SuppressedSub[] = [];
   const categoryCount = new Map<TzCategory, number>();
   for (const cat of Object.keys(limits) as TzCategory[]) categoryCount.set(cat, 0);
+
+  // Дедупликация: canonId + sameClassIds
+  const isAlreadyUsed = (id: string): boolean => {
+    const c = canonId(id);
+    if (usedSubs.has(id.toLowerCase()) || usedCanon.has(c)) return true;
+    const cls = sameClassIds(id);
+    for (const alt of cls) {
+      if (usedSubs.has(alt.toLowerCase()) || usedCanon.has(canonId(alt))) return true;
+    }
+    return false;
+  };
+  const markUsed = (id: string) => {
+    usedSubs.add(id.toLowerCase());
+    usedCanon.add(canonId(id));
+    for (const alt of sameClassIds(id)) {
+      usedSubs.add(alt.toLowerCase());
+      usedCanon.add(canonId(alt));
+    }
+  };
 
   // ───────────────────────────────────────────────────────────────────
   // 0. Ручной режим — добавки из explicit list
   // ───────────────────────────────────────────────────────────────────
   if (level === 'manual' && manualChoices?.addSubs) {
     for (const sid of manualChoices.addSubs) {
-      if (usedSubs.has(sid.toLowerCase())) continue;
+      if (isAlreadyUsed(sid)) continue;
       // найти любое вхождение в TZ_MECH_TO_SUBS
       const mechsCovered: TzMechId[] = [];
       let bestK = 0;
@@ -231,7 +273,7 @@ function selectSubstances(
         mechsCovered,
         triggeredByMech: triggeredBy,
       });
-      usedSubs.add(sid.toLowerCase());
+      markUsed(sid);
     }
     // ───────────────────────────────────────────────────────────────────
     //  Ручной режим — БЕЗ авто-отбора
@@ -248,7 +290,8 @@ function selectSubstances(
     for (const cand of cands) {
       if (categoryCount.get(cat)! >= limits[cat]) break;
       if (subs.length >= totalLimit) break;
-      if (usedSubs.has(cand.substanceId.toLowerCase())) continue;
+      if (shouldBlock(cand.substanceId)) continue;
+      if (isAlreadyUsed(cand.substanceId)) continue;
       const cov = getMechs(cand.substanceId, activated);
       subs.push({
         substanceId: cand.substanceId,
@@ -258,7 +301,7 @@ function selectSubstances(
         reason: `Обязательная категория "${cat}" фазы "${phaseProto.label}"`,
         mechsCovered: cov,
       });
-      usedSubs.add(cand.substanceId.toLowerCase());
+      markUsed(cand.substanceId);
       categoryCount.set(cat, categoryCount.get(cat)! + 1);
     }
   }
@@ -277,7 +320,8 @@ function selectSubstances(
       if (subs.length >= totalLimit) break;
       const cat = cand.category;
       if (categoryCount.get(cat)! >= limits[cat]) continue;
-      if (usedSubs.has(cand.substanceId.toLowerCase())) continue;
+      if (shouldBlock(cand.substanceId)) continue;
+      if (isAlreadyUsed(cand.substanceId)) continue;
 
       // Собираем все покрываемые мехи для этой субстанции
       const mechsCovered = getMechs(cand.substanceId, activated);
@@ -291,7 +335,7 @@ function selectSubstances(
         mechsCovered,
         triggeredByMech: act.mechId,
       });
-      usedSubs.add(cand.substanceId.toLowerCase());
+      markUsed(cand.substanceId);
       categoryCount.set(cat, categoryCount.get(cat)! + 1);
 
       // Если мех-м покрыт ≥0.5 кумулятивно — break
@@ -309,7 +353,8 @@ function selectSubstances(
       const cat = classifyBySubstanceId(cand.substanceId);
       if (!isCategoryAllowed(phase, cat)) continue;
       if (categoryCount.get(cat)! >= limits[cat]) continue;
-      if (usedSubs.has(cand.substanceId.toLowerCase())) continue;
+      if (shouldBlock(cand.substanceId)) continue;
+      if (isAlreadyUsed(cand.substanceId)) continue;
 
       const mechsCovered = getMechs(cand.substanceId, activated);
       subs.push({
@@ -320,7 +365,7 @@ function selectSubstances(
         reason: `Расширение broad-spectrum (покрывает ${cand.breadth} мехов)`,
         mechsCovered,
       });
-      usedSubs.add(cand.substanceId.toLowerCase());
+      markUsed(cand.substanceId);
       categoryCount.set(cat, categoryCount.get(cat)! + 1);
     }
   }
@@ -339,7 +384,8 @@ function selectSubstances(
       if (subs.length >= totalLimit) break;
       const cat = cand.category;
       if (categoryCount.get(cat)! >= limits[cat]) continue;
-      if (usedSubs.has(cand.substanceId.toLowerCase())) continue;
+      if (shouldBlock(cand.substanceId)) continue;
+      if (isAlreadyUsed(cand.substanceId)) continue;
       subs.push({
         substanceId: cand.substanceId,
         category: cat,
@@ -349,7 +395,7 @@ function selectSubstances(
         mechsCovered: [mechId, ...getMechs(cand.substanceId, activated)],
         triggeredByMech: mechId,
       });
-      usedSubs.add(cand.substanceId.toLowerCase());
+      markUsed(cand.substanceId);
       categoryCount.set(cat, categoryCount.get(cat)! + 1);
       break;
     }
@@ -362,7 +408,8 @@ function selectSubstances(
     // топ-N потенциальных субстанций из этой категории
     const cands = topSubsByCategory(cat, 3);
     for (const cand of cands) {
-      if (usedSubs.has(cand.substanceId.toLowerCase())) continue;
+      if (shouldBlock(cand.substanceId)) continue;
+      if (isAlreadyUsed(cand.substanceId)) continue;
       suppression.push({
         substanceId: cand.substanceId,
         category: cat,
@@ -488,6 +535,121 @@ function buildCoverageMatrix(
 // ════════════════════════════════════════════════════════════════════════════
 //  ОСНОВНЫЕ API: 3 пресета + ручной режим
 // ════════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════
+//  ФАЗОВЫЕ НАЗНАЧЕНИЯ — логика auto-assign (hCG, AI, cabergoline, hepatic/renal)
+//  Зеркалит engine.ts:62-168 (calculateSupportTZ), но для tz-mapper-engine.
+// ════════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════
+//  АВТО-НАЗНАЧЕНИЕ: чёрные списки
+// ════════════════════════════════════════════════════════════════════════════
+const JOINT_BLOCK_AUTO = new Set([
+  'boswellia', 'chondroitin', 'chondroitin_sulfate', 'collagen',
+  'collagen_uc2', 'glucosamine', 'hyaluronic', 'hyaluronic_acid', 'msm',
+]);
+const REPRO_COURSE_BLOCK_AUTO = new Set([
+  'ashwagandha', 'boron', 'clomi', 'clomiphene', 'enclomiphene',
+  'dhea', 'fadogia', 'letrozole', 'maca', 'tamoxifen', 'tamox',
+  'tongkat_ali', 'tribulus', 'turkesterone', 'forskolin',
+  'pharma_clomiphene', 'pharma_enclomiphene', 'pharma_letrozole',
+  'fenugreek', 'dim', 'indinol', 'i3c', 'indole_3_carbinol',
+]);
+const RAAS_ALL = new Set([
+  'telmisartan', 'losartan', 'valsartan', 'irbesartan', 'olmesartan', 'candesartan',
+  'lisinopril', 'enalapril', 'ramipril', 'perindopril', 'captopril',
+]);
+const STATIN_ALL = new Set([
+  'atorvastatin', 'rosuvastatin', 'simvastatin', 'pravastatin', 'pitavastatin',
+  'red_yeast', 'red_yeast_rice', 'bergamot',
+]);
+
+function computePhaseDrugs(ctx: MapperCtx): PhaseAssignedDrug[] {
+  const phase = detectPhase(ctx.phaseCtx);
+  const onCourse = ctx.onCourse ?? (phase === 'course' || phase === 'bridge' || phase === 'trt');
+  if (!onCourse && phase !== 'pct') return [];
+  const aasIds = (ctx.aasIds || []).map(a => a.toLowerCase());
+  const hasTest = aasIds.some(id => id.includes('test'));
+  const hasTren = aasIds.some(id => id.includes('tren'));
+  const hasNandrolone = aasIds.some(id => ['nandrolone','deca','npp'].some(x => id.includes(x)));
+  const hasBoldenone = aasIds.some(id => id.includes('bold') || id.includes('equipoise'));
+  const hasOral = aasIds.some(id =>
+    ['oxandrolone','anavar','stanozolol','winstrol','methandienone','dianabol',
+     'fluoxymesterone','halotestin','oxymetholone','anadrol','turinabol',
+     'oral_turinabol','methyltestosterone']
+      .some(x => id.includes(x)));
+  const result: PhaseAssignedDrug[] = [];
+  const seen = new Set<string>();
+  const add = (id: string, reason: string, trigger: string, category: TzCategory | 'hcg' | 'ai' | 'cabergoline' | 'renal' | 'hepatic') => {
+    const catMap: Record<string, TzCategory> = {
+      hcg: 'hormonal', ai: 'pharma', cabergoline: 'pharma',
+      hepatic: 'hepatoprotector', renal: 'nephroprotector',
+    };
+    const mappedCat = (catMap[category] || category) as TzCategory;
+    const key = id.toLowerCase();
+    if (seen.has(key)) return;
+    if (ctx.hasHCG && key === 'hcg') return;
+    if (ctx.hasAI && (key === 'anastrozole' || key === 'tamoxifen')) return;
+    seen.add(key);
+    result.push({ substanceId: id, reason, trigger, category: mappedCat });
+  };
+
+  if (hasTest) {
+    add('hcg',
+      'ХГЧ 500 МЕ 2р/нед, схема 3/1. Имитирует ЛГ → поддержание клеток Лейдига, профилактика атрофии.',
+      'Тестостеронсодержащий AAS в курсе + hasHCG=false',
+      'hcg');
+    add('anastrozole',
+      'Анастрозол 0.5 мг 2р/нед (титровать по E2). Контроль эстрадиола (цель 20-40 pg/mL).',
+      'Тестостеронсодержащий AAS + нет AI',
+      'ai');
+  }
+
+  if (hasTren || hasNandrolone || hasBoldenone) {
+    add('cabergoline',
+      'Каберголин 0.25-0.5 мг 2р/нед. D2-агонист → подавление пролактина.',
+      'Прогестагенный AAS (трен/нандрон/болденон) + нет каберголина',
+      'cabergoline');
+  }
+
+  if (hasTren) {
+    add('nac',
+      'NAC 1200 мг/день. Донатор глутатиона → защита проксимальных канальцев почек.',
+      'Тренболон в курсе (нефропротекция)',
+      'renal');
+    add('astragalus',
+      'Астрагал 500 мг/день. Сапонины ↓ протеинурии, защита клубочков.',
+      'Тренболон в курсе (нефропротекция)',
+      'renal');
+    add('cordyceps',
+      'Кордицепс 1000 мг/день. ↓ BUN/креатинин, защита почек на тренболоне.',
+      'Тренболон в курсе (нефропротекция)',
+      'renal');
+  }
+
+  if (hasOral) {
+    add('tudca',
+      'TUDCA 500 мг/день. Снижение ER-стресса гепатоцитов, стимуляция BSEP-желчеоттока.',
+      'Оральный 17α-алкилированный AAS (гепатопротекция)',
+      'hepatic');
+    add('nac',
+      'NAC 1200 мг/день. Предшественник глутатиона → защита гепатоцитов.',
+      'Оральный 17α-алкилированный AAS (гепатопротекция)',
+      'hepatic');
+    add('milk_thistle',
+      'Силимарин 280 мг. Стабилизация мембран гепатоцитов, ↓ перекисного окисления.',
+      'Оральный 17α-алкилированный AAS (гепатопротекция)',
+      'hepatic');
+  }
+
+  if (onCourse && !hasTest && aasIds.length > 0) {
+    add('hcg',
+      'ХГЧ 500 МЕ 2р/нед. Профилактика атрофии яичек на любом AAS.',
+      'AAS в курсе (не тестостерон) + hasHCG=false',
+      'hcg');
+  }
+
+  return result;
+}
+
 function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
   // ── 1. активировать мехи ─
   const activated = getActivatedTzMechs(ctx.labs);
@@ -496,6 +658,164 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
   const phaseProto = getPhaseProtocol(phase);
   // ── 3. отбор ─
   const { subs, suppression } = selectSubstances(activated, phase, ctx.level, ctx.manualChoices);
+  // ── 3a. фазовые назначения (hCG, AI, cabergoline, hepatic/renal protect) ─
+  const phaseDrugsAll = computePhaseDrugs(ctx);
+  const subsBeforePhase = new Set(subs.map(s => s.substanceId.toLowerCase()));
+  const phaseDrugs: PhaseAssignedDrug[] = [];
+  for (const pd of phaseDrugsAll) {
+    const key = pd.substanceId.toLowerCase();
+    if (subsBeforePhase.has(key)) {
+      // Уже выбрано обычным отбором — помечаем как фазовое И добавляем в phaseDrugs.
+      const existing = subs.find(s => s.substanceId.toLowerCase() === key);
+      if (existing) {
+        existing.reason = `${pd.reason} [ФАЗОВОЕ]`;
+        existing.priority = 1;
+      }
+      phaseDrugs.push(pd);
+      continue;
+    }
+    // Проверяем канон-дубликаты (telmi ↔ telmisartan)
+    const altExisting = subs.find(s => canonId(s.substanceId) === canonId(pd.substanceId));
+    if (altExisting) {
+      altExisting.reason = `${pd.reason} [ФАЗОВОЕ]`;
+      altExisting.priority = 1;
+      phaseDrugs.push(pd);
+      continue;
+    }
+    subs.push({
+      substanceId: pd.substanceId,
+      category: pd.category,
+      k: 0.5,
+      q: 'A',
+      reason: `${pd.reason} [ФАЗОВОЕ]`,
+      mechsCovered: [],
+      triggeredByMech: undefined,
+      priority: 1,
+    });
+    phaseDrugs.push(pd);
+  }
+  // ── 3b. базовые витамины/минералы (всегда, независимо от фазы) ─
+  const BASE_VITAMINS: Array<{ id: string; category: TzCategory; reason: string }> = [
+    { id: 'vitamin_d3', category: 'vitamin', reason: 'D3 5000 МЕ — дефицит у 80% населения, иммунитет, костный метаболизм' },
+    { id: 'vitamin_k2', category: 'vitamin', reason: 'K2 MK-7 100 мкг — обязателен с D3: направляет Ca²⁺ в кости, предотвращает кальцификацию артерий' },
+    { id: 'magnesium', category: 'mineral', reason: 'Магний 400 мг — кофактор D3, вазодилатация, 300+ ферментов, сон, профилактика судорог на курсе' },
+    { id: 'coq10', category: 'antioxidant', reason: 'CoQ10 100 мг — митохондриальная защита миокарда, антиоксидант, кофактор при статинах' },
+    { id: 'vitamin_c', category: 'vitamin', reason: 'Витамин C 500 мг — антиоксидант, синтез коллагена (сосуды/связки), регенерация витамина E' },
+  ];
+  for (const bv of BASE_VITAMINS) {
+    if (subs.some(s => s.substanceId.toLowerCase() === bv.id)) continue;
+    subs.push({
+      substanceId: bv.id,
+      category: bv.category,
+      k: 0.5,
+      q: 'B',
+      reason: bv.reason + ' [БАЗОВОЕ]',
+      mechsCovered: [],
+      priority: 2,
+    });
+  }
+  // ── 3c. привязка к анализам (lab→substance priority map) ─
+  const LAB_NORMALS: Record<string, { default: number; higherIsWorse: boolean }> = {
+    ALT: { default: 40, higherIsWorse: true },
+    AST: { default: 40, higherIsWorse: true },
+    GGT: { default: 55, higherIsWorse: true },
+    BILIRUBIN: { default: 21, higherIsWorse: true },
+    BILIRUBIN_TOTAL: { default: 21, higherIsWorse: true },
+    TOTAL_BILIRUBIN: { default: 21, higherIsWorse: true },
+    LDL: { default: 3.0, higherIsWorse: true },
+    CHOLESTEROL_LDL: { default: 3.0, higherIsWorse: true },
+    HDL: { default: 1.0, higherIsWorse: false },
+    TRIGLYCERIDES: { default: 1.7, higherIsWorse: true },
+    HCT: { default: 50, higherIsWorse: true },
+    HEMATOCRIT: { default: 50, higherIsWorse: true },
+    HEMOGLOBIN: { default: 165, higherIsWorse: true },
+    HGB: { default: 165, higherIsWorse: true },
+    CREATININE: { default: 105, higherIsWorse: true },
+    EGFR: { default: 90, higherIsWorse: false },
+    URIC_ACID: { default: 420, higherIsWorse: true },
+    TSH: { default: 2.5, higherIsWorse: true },
+    E2: { default: 30, higherIsWorse: true },
+    ESTRADIOL: { default: 30, higherIsWorse: true },
+    PRL: { default: 15, higherIsWorse: true },
+    PROLACTIN: { default: 15, higherIsWorse: true },
+    TESTOSTERONE: { default: 20, higherIsWorse: false },
+    TOTAL_TESTOSTERONE: { default: 20, higherIsWorse: false },
+    CRP: { default: 3, higherIsWorse: true },
+    HSCRP: { default: 3, higherIsWorse: true },
+    VITAMIN_D: { default: 30, higherIsWorse: false },
+    B12: { default: 200, higherIsWorse: false },
+    FERRITIN: { default: 100, higherIsWorse: false },
+    GLUCOSE: { default: 5.5, higherIsWorse: true },
+    HBA1C: { default: 5.7, higherIsWorse: true },
+    CORTISOL: { default: 400, higherIsWorse: true },
+    DHEA_S: { default: 200, higherIsWorse: false },
+    HOMOCYSTEINE: { default: 12, higherIsWorse: true },
+    POTASSIUM: { default: 4.5, higherIsWorse: true },
+    CALCIUM: { default: 2.4, higherIsWorse: true },
+    MAGNESIUM: { default: 0.85, higherIsWorse: false },
+    ZINC: { default: 12, higherIsWorse: false },
+    SELENIUM: { default: 80, higherIsWorse: false },
+    CK: { default: 200, higherIsWorse: true },
+    PROTEIN_URINE: { default: 0.15, higherIsWorse: true },
+    UREA: { default: 8, higherIsWorse: true },
+    PLT: { default: 350, higherIsWorse: true },
+    D_DIMER: { default: 0.5, higherIsWorse: true },
+    FIBRINOGEN: { default: 4, higherIsWorse: true },
+    BIL: { default: 21, higherIsWorse: true },
+    TG: { default: 1.7, higherIsWorse: true },
+    INSULIN: { default: 10, higherIsWorse: true },
+    PSA: { default: 4, higherIsWorse: true },
+    PROGESTERONE: { default: 1.5, higherIsWorse: true },
+    PROG: { default: 1.5, higherIsWorse: true },
+    SHBG: { default: 40, higherIsWorse: false },
+    DHT: { default: 2.5, higherIsWorse: false },
+    CK_MB: { default: 5, higherIsWorse: true },
+    TROPONIN: { default: 0.04, higherIsWorse: true },
+    ESR: { default: 15, higherIsWorse: true },
+  };
+  if (ctx.labs && Object.keys(ctx.labs).length > 0) {
+    const labSubs: Array<{ id: string; reason: string; marker: string; severity: SeverityLevel }> = [];
+    for (const [marker, value] of Object.entries(ctx.labs)) {
+      if (typeof value !== 'number' || isNaN(value)) continue;
+      const norm = LAB_NORMALS[marker.toUpperCase()];
+      if (!norm) continue;
+      const sev = deriveSeverity(value, norm.default, norm.higherIsWorse);
+      const entries = getPrioritySubstances(marker, sev);
+      for (const e of entries) {
+        labSubs.push({ id: e.substanceId, reason: e.reason, marker, severity: sev });
+      }
+    }
+    // Дедупликация и отбор top-3 per marker
+    const labMap = new Map<string, { id: string; reason: string; marker: string; severity: SeverityLevel }>();
+    for (const ls of labSubs) {
+      const key = `${ls.marker}|${ls.id}`;
+      if (labMap.has(key)) continue;
+      labMap.set(key, ls);
+    }
+    for (const ls of labMap.values()) {
+      const canon = canonId(ls.id);
+      if (JOINT_BLOCK_AUTO.has(canon.toLowerCase())) continue;
+      if ((phase === 'course' || phase === 'bridge') && REPRO_COURSE_BLOCK_AUTO.has(canon.toLowerCase())) continue;
+      if (RAAS_ALL.has(canon.toLowerCase()) && subs.some(s => RAAS_ALL.has(s.substanceId.toLowerCase()))) continue;
+      if (STATIN_ALL.has(canon.toLowerCase()) && subs.some(s => STATIN_ALL.has(s.substanceId.toLowerCase()))) continue;
+      // Если AI уже назначен — цинк для E2 не нужен (дублирование механизма)
+      if (canon === 'zinc' && ls.marker.toUpperCase() === 'E2' && subs.some(s => s.substanceId === 'anastrozole' || s.substanceId === 'letrozole')) continue;
+      if (subs.some(s => s.substanceId.toLowerCase() === canon)) continue;
+      if (subs.some(s => canonId(s.substanceId) === canon)) continue;
+      // Дедупликация по классу
+      const cls = sameClassIds(ls.id);
+      if (cls.length > 0 && subs.some(s => cls.includes(s.substanceId.toLowerCase()))) continue;
+      subs.push({
+        substanceId: canon,
+        category: 'pharma' as TzCategory,
+        k: 0.6,
+        q: 'A',
+        reason: `[ЛАБ: ${ls.marker}] ${ls.reason}`,
+        mechsCovered: [],
+        priority: 1,
+      });
+    }
+  }
   // ── 4. guardrails ─
   const gCtx = buildGuardrailCtx(ctx);
   gCtx.hasTBooster = subs.some(s => isTBoosterById(s.substanceId));
@@ -521,6 +841,7 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     coverage, gaps, conflicts, guardrails,
     boosters, activatedMechs: activated,
     summary, rationale,
+    phaseAssignedDrugs: phaseDrugs,
   };
 }
 
@@ -570,7 +891,7 @@ function cacheKey(ctx: MapperCtx): string {
   const labsKey = JSON.stringify(ctx.labs);
   const phaseKey = JSON.stringify(ctx.phaseCtx);
   const boostKey = ctx.boosterCtx ? JSON.stringify(ctx.boosterCtx) : '';
-  return `${ctx.level}|${labsKey}|${phaseKey}|${boostKey}|${JSON.stringify(ctx.manualChoices||{})}|${ctx.onCourse||''}|${ctx.e2Level||''}|${ctx.hasHCG||''}`;
+  return `${ctx.level}|${labsKey}|${phaseKey}|${boostKey}|${JSON.stringify(ctx.manualChoices||{})}|${ctx.onCourse||''}|${ctx.e2Level||''}|${ctx.hasHCG||''}|${ctx.hasAI||''}|${ctx.hasCabergoline||''}|${(ctx.aasIds||[]).join(',')}`;
 }
 
 function getFromCache(ctx: MapperCtx): SupportRecommendation | null {

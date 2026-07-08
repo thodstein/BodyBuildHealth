@@ -11,7 +11,7 @@ export function calcFertility(i: FertilityInput): FertilityResult {
   const SW = SPERM_WEIGHTS;
   const P = FERTILITY_PENALTIES;
 
-  const V = Math.min(i.volumeMl, 1.5) / 1.5;
+  const V = Math.min(i.volumeMl, 1.4) / 1.4;
   const C = Math.min(i.concentrationMlMln, 16) / 16;
   const T = Math.min(i.totalCountMln, 39) / 39;
   const PR = Math.min(i.prPercent, 30) / 30;

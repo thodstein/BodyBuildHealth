@@ -46,7 +46,7 @@ export const IndividualPlanResults: React.FC = () => {
     generated, setGenerated, dayPlan, threeDayPlan, resultsRef,
     renderMealList, effectiveKcal, effectiveP, effectiveF, effectiveC,
     dayPlanNotes, setDayPlanNotes,
-    autoCorrectPlan, allergens, allergenExcludedCount,
+    autoCorrectPlan, allergens, allergenExcludedCount, excludedFoods, healthIssues,
     cyclingMode, waterCalc,
     showRecipeCreator, setShowRecipeCreator, newRecipe, setNewRecipe,
     userRecipes, setUserRecipes,
@@ -74,7 +74,7 @@ export const IndividualPlanResults: React.FC = () => {
     generateFullNutritionReport, nutritionReport, activeReports,
     editItem, setEditItem, editAmount, setEditAmount, replacingItem, setReplacingItem,
     removeFoodItem, replaceFoodItem, findSimilarFoods, updateItemAmount,
-    setDayPlan, planTargets, healthIssues, planType, variety,
+    setDayPlan, planTargets, planType, variety,
     linkToTraining, trainStart,
     workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType,
     v2Phase, v2Pharma, v2Labs, histamineSensitive,
@@ -110,9 +110,22 @@ export const IndividualPlanResults: React.FC = () => {
     profile.weightKg = weight || 80;
     profile.lbm = profile.weightKg * 0.85;
 
+    const excludedSet = new Set(excludedFoods || []);
+    const allergenSet = new Set(allergens || []);
+    const healthIssueFoodIds = new Set<string>();
+    (healthIssues || []).forEach((hi: string) => {
+      const found = HEALTH_ISSUES.find(h => h.id === hi);
+      if (found?.foodIds) found.foodIds.forEach(fid => healthIssueFoodIds.add(fid));
+    });
+    const isFoodBlocked = (foodId: string) => excludedSet.has(foodId) || healthIssueFoodIds.has(foodId) || allergenSet.has(foodId);
+
     const result: { mealIdx: number; mealName: string; issues: { type: string; text: string; severity: 'low' | 'medium' | 'high'; suggestion?: { foodId: string; name: string; reason: string }[] }[] }[] = [];
 
-    dayPlan.meals.forEach((m: any, mi: number) => {
+    const activePlan = planDays === 1 ? dayPlan : planDays === 3 ? threeDayPlan?.days?.[selectedDayIndex] : weekPlan?.days?.[selectedDayIndex];
+    if (!activePlan?.meals) return;
+
+    activePlan.meals.forEach((m: any, mi: number) => {
+      const currentFoodIds = new Set((m.items || []).map((it: any) => it.id).filter(Boolean));
       const issues: { type: string; text: string; severity: 'low' | 'medium' | 'high'; suggestion?: { foodId: string; name: string; reason: string }[] }[] = [];
       const products = (m.items || []).map((it: any) => {
         const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
@@ -125,18 +138,18 @@ export const IndividualPlanResults: React.FC = () => {
 
       // Low protein
       if (totalP < 25) {
-        const highProteinFoods = FOOD_DB.filter(f => f.protein > 25 && f.category !== 'protein').slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `${f.protein}г белка/100г` }));
-        issues.push({ type: 'low_protein', text: `🥩 Мало белка (${totalP}г) — <25г за приём`, severity: 'high', suggestion: highProteinFoods });
+        const highProteinFoods = FOOD_DB.filter(f => f.protein > 25 && f.category !== 'protein' && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id)).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `${f.protein}г белка/100г` }));
+        if (highProteinFoods.length > 0) issues.push({ type: 'low_protein', text: `🥩 Мало белка (${totalP}г) — <25г за приём`, severity: 'high', suggestion: highProteinFoods });
       }
       // High fat
       if (totalF > 30) {
-        const lowFatFoods = FOOD_DB.filter(f => f.fat < 5 && f.protein > 15).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Жиры ${f.fat}г/100г, белок ${f.protein}г/100г` }));
-        issues.push({ type: 'high_fat', text: `🧈 Много жиров (${totalF}г) — >30г за приём`, severity: 'medium', suggestion: lowFatFoods });
+        const lowFatFoods = FOOD_DB.filter(f => f.fat < 5 && f.protein > 15 && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id)).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Жиры ${f.fat}г/100г, белок ${f.protein}г/100г` }));
+        if (lowFatFoods.length > 0) issues.push({ type: 'high_fat', text: `🧈 Много жиров (${totalF}г) — >30г за приём`, severity: 'medium', suggestion: lowFatFoods });
       }
       // High carb
       if (totalC > 100 && profile.phase === 'EXTREME_CUT') {
-        const lowCarbFoods = FOOD_DB.filter(f => f.carbs < 10 && f.protein > 15).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Углеводы ${f.carbs}г/100г, белок ${f.protein}г/100г` }));
-        issues.push({ type: 'high_carb', text: `🍚 Много углеводов (${totalC}г) на сушке`, severity: 'high', suggestion: lowCarbFoods });
+        const lowCarbFoods = FOOD_DB.filter(f => f.carbs < 10 && f.protein > 15 && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id)).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Углеводы ${f.carbs}г/100г, белок ${f.protein}г/100г` }));
+        if (lowCarbFoods.length > 0) issues.push({ type: 'high_carb', text: `🍚 Много углеводов (${totalC}г) на сушке`, severity: 'high', suggestion: lowCarbFoods });
       }
       // Missing mTOR trigger
       const totalLeucine = products.reduce((s: number, p: any) => {
@@ -146,22 +159,22 @@ export const IndividualPlanResults: React.FC = () => {
       }, 0);
       if (totalLeucine < 3000 && totalLeucine > 0) {
         const getLeucine = (f: any) => f.amino_acid_profile_100g?.leucine_mg ?? (f.protein ? f.protein * 42 : 0);
-        const leucineFoods = FOOD_DB.filter(f => getLeucine(f) > 250).sort((a, b) => getLeucine(b) - getLeucine(a)).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Лейцин ${Math.round(getLeucine(f))}мг/100г` }));
-        issues.push({ type: 'low_leucine', text: `🧬 Нет лейцинового триггера (${Math.round(totalLeucine)}мг)`, severity: 'high', suggestion: leucineFoods });
+        const leucineFoods = FOOD_DB.filter(f => getLeucine(f) > 250 && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id)).sort((a, b) => getLeucine(b) - getLeucine(a)).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Лейцин ${Math.round(getLeucine(f))}мг/100г` }));
+        if (leucineFoods.length > 0) issues.push({ type: 'low_leucine', text: `🧬 Нет лейцинового триггера (${Math.round(totalLeucine)}мг)`, severity: 'high', suggestion: leucineFoods });
       }
       // Low fiber
       const totalFiber = products.reduce((s: number, p: any) => s + (p.food?.fiber || 0) * (p.amount || 100) / 100, 0);
       if (totalFiber < 3) {
-        const fiberFoods = FOOD_DB.filter(f => f.fiber > 4).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Клетчатка ${f.fiber}г/100г` }));
-        issues.push({ type: 'low_fiber', text: `🌾 Мало клетчатки (${totalFiber.toFixed(0)}г)`, severity: 'medium', suggestion: fiberFoods });
+        const fiberFoods = FOOD_DB.filter(f => f.fiber > 4 && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id)).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Клетчатка ${f.fiber}г/100г` }));
+        if (fiberFoods.length > 0) issues.push({ type: 'low_fiber', text: `🌾 Мало клетчатки (${totalFiber.toFixed(0)}г)`, severity: 'medium', suggestion: fiberFoods });
       }
       // DIAAS per meal
       const v2Products = products.filter((p: any) => p.food).map((p: any) => ({ foodId: p.food.id, weightGrams: p.amount || 100 }));
       if (v2Products.length > 0) {
         const diaas = calcMealDIAAS(v2Products);
         if (diaas.diaas < 0.75 && diaas.diaas > 0) {
-          const aaFoods = FOOD_DB.filter(f => f.protein > 15 && f.category === 'protein').slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Полноценный белок, ${f.protein}г/100г` }));
-          issues.push({ type: 'low_diaas', text: `💪 Низкий DIAAS (${diaas.diaas.toFixed(2)}) — лимит: ${diaas.limitingAA}`, severity: 'high', suggestion: aaFoods });
+          const aaFoods = FOOD_DB.filter(f => f.protein > 15 && f.category === 'protein' && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id)).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Полноценный белок, ${f.protein}г/100г` }));
+          if (aaFoods.length > 0) issues.push({ type: 'low_diaas', text: `💪 Низкий DIAAS (${diaas.diaas.toFixed(2)}) — лимит: ${diaas.limitingAA}`, severity: 'high', suggestion: aaFoods });
         }
       }
 
@@ -2150,30 +2163,36 @@ export const IndividualPlanResults: React.FC = () => {
                             <div>
                               <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>🔀 Заменить на:</div>
                               <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
-                                {issue.suggestion.map((s, si) => (
+                                {issue.suggestion.map((s, si) => {
+                                  const dayIdx = planDays === 1 ? 0 : selectedDayIndex + 1;
+                                  const activeMeal = planDays === 1 ? dayPlan?.meals?.[meal.mealIdx] : (planDays === 3 ? threeDayPlan?.days?.[selectedDayIndex]?.meals?.[meal.mealIdx] : weekPlan?.days?.[selectedDayIndex]?.meals?.[meal.mealIdx]);
+                                  return (
                                   <button key={si} onClick={() => {
-                                    const itemIdx = dayPlan?.meals?.[meal.mealIdx]?.items?.findIndex((it: any) => {
+                                    const itemIdx = activeMeal?.items?.findIndex((it: any) => {
                                       const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
                                       return food?.id === s.foodId || it.name === s.name;
                                     });
                                     if (itemIdx !== undefined && itemIdx >= 0) {
                                       saveUndo();
-                                      replaceFoodItem(0, meal.mealIdx, itemIdx, FOOD_DB.find(f => f.id === s.foodId));
+                                      replaceFoodItem(dayIdx, meal.mealIdx, itemIdx, FOOD_DB.find(f => f.id === s.foodId));
                                       analyzePlanIssues();
                                     }
                                   }} style={{ padding:'3px 8px', borderRadius:6, fontSize:7, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontWeight:600 }}>
                                     {s.name} <span style={{ fontWeight:400, color:'rgba(255,255,255,0.75)' }}>({s.reason})</span>
                                   </button>
-                                ))}
+                                  );
+                                })}
                                 <button onClick={() => {
-                                  const allItems = dayPlan?.meals?.[meal.mealIdx]?.items || [];
+                                  const dayIdx = planDays === 1 ? 0 : selectedDayIndex + 1;
+                                  const activeMeal = planDays === 1 ? dayPlan?.meals?.[meal.mealIdx] : (planDays === 3 ? threeDayPlan?.days?.[selectedDayIndex]?.meals?.[meal.mealIdx] : weekPlan?.days?.[selectedDayIndex]?.meals?.[meal.mealIdx]);
+                                  const allItems = activeMeal?.items || [];
                                   allItems.forEach((it: any, i: number) => {
                                     const similar = findSimilarFoods(it);
                                     if (similar.length > 0) {
                                       const targetFood = similar.find(f => issue.suggestion?.some(s => s.foodId === f.id));
                                       if (targetFood) {
                                         saveUndo();
-                                        replaceFoodItem(0, meal.mealIdx, i, targetFood);
+                                        replaceFoodItem(dayIdx, meal.mealIdx, i, targetFood);
                                       }
                                     }
                                   });

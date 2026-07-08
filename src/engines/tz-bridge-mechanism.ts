@@ -22,6 +22,47 @@ import { PHARMACY_DB } from '../data/support-db/pharmacy-db';
 import type { TzMechId, TzOrganId } from './tz-bridge-marker';
 import { ALL_TZ_MECH_IDS, ALL_TZ_ORGANS } from './tz-bridge-marker';
 
+// ════════════════════════════════════════════════════════════════════════════
+//  CLASS_BLOCKLIST — generic class-level substance IDs, которые НЕ могут быть
+//  рекомендованы TZ-mapper'ом. Это классы ("сартаны", "статины", "ББ"), а не
+//  конкретные препараты. Каждый механизм имеет конкретные препараты в БД, так
+//  что классовые абстракции исключаются во избежание дублей типа
+//  "telmisartan + arb_drugs" в одном плане.
+// ════════════════════════════════════════════════════════════════════════════
+export const CLASS_BLOCKLIST: ReadonlySet<string> = new Set([
+  // Кардио-препараты (классы) — есть конкретные: telmisartan, lisinopril,
+  // enalapril, ramipril, atorvastatin, rosuvastatin, bisoprolol, metoprolol,
+  // nebivolol, amlodipine, furosemide, spironolactone, aspirin, warfarin,
+  // rivaroxaban, apixaban.
+  'ace_inhibitor_drugs',
+  'anticoagulant_drugs',
+  'antiplatelet_drugs',
+  'arb_drugs',
+  'beta_blocker_drugs',
+  'ccb_drugs',
+  'diuretic_drugs',
+  'statin_drugs',
+  // ЦНС/прочие классы — нет конкретных препаратов в БД; классы не рекомендовать
+  // (alg будет показывать gap для этих механизмов вместо выдуманного класса).
+  'antibiotic_drugs',
+  'anticonvulsant_drugs',
+  'antidepressant_drugs',
+  'antidiabetic_drugs',
+  'antihistamine_drugs',
+  'antipsychotic_drugs',
+  'antithyroid_drugs',
+  'anxiolytic_drugs',
+  'corticosteroid_drugs',
+  'immunosuppressant_drugs',
+  'nsaid_drugs',
+  'ppi_drugs',
+  'thyroid_drugs',
+]);
+
+export function isClassLevel(id: string): boolean {
+  return CLASS_BLOCKLIST.has(id);
+}
+
 export type TzCategory =
   | 'hepatoprotector' | 'cardioprotector' | 'nephroprotector'
   | 'neuroprotector'  | 'hormonal'        | 'hematologic'
@@ -98,6 +139,9 @@ function buildMechToSubs(): Record<TzMechId, SubsByMech> {
   // ─── из SUPPLEMENTS_DB ───
   for (const [substanceId, entries] of Object.entries(SUPPLEMENTS_DB)) {
     if (!Array.isArray(entries)) continue;
+    // ★ Исключаем generic классы ("arb_drugs", "statin_drugs", …) — они не
+    //   могут быть назначены пользователю; конкретные препараты есть в БД.
+    if (isClassLevel(substanceId)) continue;
     for (const e of entries) {
       const mechId = e.mechId as TzMechId;
       if (!ALL_TZ_MECH_IDS.includes(mechId)) continue;
@@ -113,6 +157,7 @@ function buildMechToSubs(): Record<TzMechId, SubsByMech> {
   // ─── из PHARMACY_DB ───
   for (const [substanceId, entries] of Object.entries(PHARMACY_DB)) {
     if (!Array.isArray(entries)) continue;
+    if (isClassLevel(substanceId)) continue;
     for (const e of entries) {
       const mechId = e.mechId as TzMechId;
       if (!ALL_TZ_MECH_IDS.includes(mechId)) continue;

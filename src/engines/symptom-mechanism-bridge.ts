@@ -7,7 +7,7 @@
  *
  * Позволяет symptom-driven подбору использовать тот же движок, что и lab-driven.
  */
-import type { SymptomCategory } from './symptom-solver.engine';
+import type { SymptomCategory } from './symptom-solver.types';
 
 /** Bridge-ключи для каждой категории симптомов */
 export const SYMPTOM_CATEGORY_TO_BRIDGE: Record<SymptomCategory, string[]> = {

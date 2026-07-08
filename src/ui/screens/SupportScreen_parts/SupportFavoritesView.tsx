@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React from 'react';
 import { ALL_INTERACTIONS } from '../../../data/support-database';
+import { CATEGORY_LABELS } from './SupportScreenData';
 
 export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const {
@@ -66,7 +67,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{sub.name||sub.id}</div>
                 <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:2 }}>
-                  {(sub.categories||[]).slice(0,3).map((c: string) => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c}</span>)}
+                  {(sub.categories||[]).slice(0,3).map((c: string) => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{CATEGORY_LABELS[c]?.label || c}</span>)}
                 </div>
               </div>
               <button onClick={() => {

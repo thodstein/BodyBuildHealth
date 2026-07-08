@@ -38,7 +38,7 @@ export const PHASE_PROTOCOL: Record<PhaseKey, PhaseProtocol> = {
     key: 'course',
     label: 'Курс ААС',
     description: 'Фаза активного приёма ААС/GH/инсулина. HPTA подавлена, эстрадиол/arоматизация растёт, риски по ССС/печень/почки/гематология максимальны.',
-    mandatory: ['hepatoprotector', 'cardioprotector', 'antioxidant'],
+    mandatory: ['hepatoprotector', 'cardioprotector', 'antioxidant', 'vitamin'],
     suppressed: ['hormonal'],  // T-бустеры не нужны — HPTA и так подавлена экзогенным T
     allowBoosters: true,
     doseTier: 1.0,
@@ -50,7 +50,7 @@ export const PHASE_PROTOCOL: Record<PhaseKey, PhaseProtocol> = {
     key: 'bridge',
     label: 'Мост',
     description: 'Фаза между курсами (мост/крейз). Низкая доза TESTO (TRT-уровень). Риски снижены, но HPTA по-прежнему подавлена.',
-    mandatory: ['hepatoprotector', 'cardioprotector'],
+    mandatory: ['hepatoprotector', 'cardioprotector', 'vitamin'],
     suppressed: [], // на мосту можно T-бустеры (soft PCT)
     allowBoosters: true,
     doseTier: 0.6,
@@ -62,7 +62,7 @@ export const PHASE_PROTOCOL: Record<PhaseKey, PhaseProtocol> = {
     key: 'pct',
     label: 'ПКТ (восстановление)',
     description: 'Фаза восстановления HPTA после курса. Срочная необходимость в сермах (тамокс/клом), hCG 500-1000 МЕ, T-бустеры.',
-    mandatory: ['hormonal', 'antioxidant', 'adaptogen'],
+    mandatory: ['hormonal', 'antioxidant', 'adaptogen', 'vitamin'],
     suppressed: [], // ПКТ нужна гормональная поддержка
     allowBoosters: true,
     doseTier: 0.8,
@@ -74,7 +74,7 @@ export const PHASE_PROTOCOL: Record<PhaseKey, PhaseProtocol> = {
     key: 'fertility',
     label: 'Фертильность',
     description: 'Фаза целенаправленного восстановления сперматогенеза. Приоритет hCG + рФСГ или антиэстрогены, интенсивная репротективная поддержка.',
-    mandatory: ['hormonal', 'antioxidant', 'vitamin', 'mineral'],
+    mandatory: ['hormonal', 'antioxidant', 'vitamin'],
     suppressed: [],
     allowBoosters: false, // строгая фаза — меньше вмешательств
     doseTier: 1.0,
@@ -86,7 +86,7 @@ export const PHASE_PROTOCOL: Record<PhaseKey, PhaseProtocol> = {
     key: 'trt',
     label: 'ЗГТ (TRT)',
     description: 'Фаза заместительной гормональной терапии (TRT) — постоянный приём терапевтических доз тестостерона. HPTA подавлена хронически.',
-    mandatory: ['cardioprotector', 'hepatoprotector'],
+    mandatory: ['cardioprotector', 'hepatoprotector', 'vitamin'],
     suppressed: ['hormonal'], // на TRT T-бустеры не нужны
     allowBoosters: true,
     doseTier: 1.0,

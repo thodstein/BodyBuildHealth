@@ -2,6 +2,7 @@ import React from 'react';
 import type { UserProfile, LabPoint, WorkoutLog } from '../../../core/types';
 import { theme, glassCardStyle, sectionLabelStyle, HealthNumber, HealthBool } from './ProfileComponents';
 import { ProfessionalReports, ReportData } from './ProfessionalReports';
+import { PharmaBlockReports } from './PharmaBlockReports';
 
 interface Props {
   settings: UserProfile['settings'];
@@ -36,7 +37,7 @@ const COURSE_PHASES: { id: string; label: string }[] = [
 ];
 
 export const ProfileAnalyticsSection: React.FC<Props> = ({ settings, save, labs, workoutLogs, foodDiaryAvg, profileName, onNavigate }) => {
-  const [analyticsSubTab, setAnalyticsSubTab] = React.useState<'reports' | 'progress'>('reports');
+  const [analyticsSubTab, setAnalyticsSubTab] = React.useState<'reports' | 'pharma_reports'>('reports');
   const [reportTab, setReportTab] = React.useState<'current' | 'archive'>('current');
   const [showCustomReport, setShowCustomReport] = React.useState(false);
 
@@ -170,84 +171,23 @@ export const ProfileAnalyticsSection: React.FC<Props> = ({ settings, save, labs,
 
   return (
     <div>
-      <div style={{ display:'flex', gap:4, marginBottom:8 }}>
-        {[['reports', '📄 Отчёты'], ['progress', '📈 Дневник прогресса']].map(([id, label]) => (
-          <button key={id} onClick={() => setAnalyticsSubTab(id as any)}
-            style={{
-              padding:'6px 14px', borderRadius:16, fontSize:10, fontWeight:700, cursor:'pointer', border:'none',
-              background: analyticsSubTab === id ? '#00e68a' : 'rgba(255,255,255,0.06)',
-              color: analyticsSubTab === id ? '#000' : 'rgba(255,255,255,0.85)',
-            }}>{label}</button>
+      <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none', marginBottom:10, paddingBottom:2 }}>
+        {([
+          { id: 'reports' as const, label: '📊 Сводные отчёты' },
+          { id: 'pharma_reports' as const, label: '💊 Фарма-отчёты' },
+        ]).map(t => (
+          <button key={t.id} onClick={() => setAnalyticsSubTab(t.id)} style={{
+            padding:'5px 12px', borderRadius:18, fontSize:10, fontWeight:600, whiteSpace:'nowrap',
+            cursor:'pointer', flexShrink:0,
+            background: analyticsSubTab === t.id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+            border: analyticsSubTab === t.id ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
+            color: analyticsSubTab === t.id ? '#00e68a' : 'rgba(255,255,255,0.6)',
+            transition:'all 0.2s',
+          }}>{t.label}</button>
         ))}
       </div>
 
-      {analyticsSubTab === 'progress' ? (
-        <div>
-          {/* Weight */}
-          <div style={{ ...glassCardStyle, marginBottom:8 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-              <span style={{ fontSize:20 }}>⚖️</span>
-              <div>
-                <div style={{ fontSize:11, fontWeight:700, color: theme.textPrimary }}>Вес</div>
-                <div style={{ fontSize:18, fontWeight:800, color: theme.accent }}>{settings.weight || '—'} <span style={{ fontSize:10, color: theme.textDim, fontWeight:400 }}>кг</span></div>
-              </div>
-              <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:4 }}>
-                <span style={{ fontSize:9, color: theme.textDim }}>Цель:</span>
-                <input type="number" value={settings.targetWeight || ''}
-                  onChange={e => save({ targetWeight: Number(e.target.value) })}
-                  style={{ width:50, padding:'3px 6px', borderRadius:4, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontSize:10, textAlign:'center' }} />
-                <span style={{ fontSize:9, color: theme.textDim }}>кг</span>
-              </div>
-            </div>
-            {weightLog.length > 0 && (
-              <div style={{ fontSize:9, color: theme.textDim, marginBottom:4 }}>
-                Записей: {weightLog.length} | Мин: {Math.min(...weightLog.map((w: any) => w.weight ?? 0)).toFixed(1)} | Тек: {weightLog[weightLog.length - 1]?.weight?.toFixed(1) ?? '—'} | Макс: {Math.max(...weightLog.map((w: any) => w.weight ?? 0)).toFixed(1)}
-              </div>
-            )}
-            {weightLog.length > 2 && (
-              <div style={{ width:'100%', height:40, marginBottom:4 }}>
-                <svg width="100%" height="40" viewBox="0 0 100 40" preserveAspectRatio="none">
-                  <defs><linearGradient id="wa"><stop offset="0%" stopColor="#00e68a" stopOpacity="0.3"/><stop offset="100%" stopColor="#00e68a" stopOpacity="0"/></linearGradient></defs>
-                  <polyline fill="none" stroke="#00e68a" strokeWidth="1.5" points={weightLog.map((w: any, i: number) => `${(i / (weightLog.length - 1)) * 100},${(1 - (w.weight - Math.min(...weightLog.map((x: any) => x.weight))) / Math.max(1, Math.max(...weightLog.map((x: any) => x.weight)) - Math.min(...weightLog.map((x: any) => x.weight)))) * 35}`).join(' ')}/>
-                  <polygon fill="url(#wa)" points={`0,35 ${weightLog.map((w: any, i: number) => `${(i / (weightLog.length - 1)) * 100},${(1 - (w.weight - Math.min(...weightLog.map((x: any) => x.weight))) / Math.max(1, Math.max(...weightLog.map((x: any) => x.weight)) - Math.min(...weightLog.map((x: any) => x.weight)))) * 35}`).join(' ')} 100,35`}/>
-                </svg>
-              </div>
-            )}
-          </div>
-          {/* Measurements */}
-          <div style={{ ...glassCardStyle, marginBottom:8 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa', marginBottom:8 }}>📏 Замеры тела</div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:4, marginBottom:8 }}>
-              {[['waist','Талия',settings.waistCm],['chest','Грудь',settings.chestCm],['bicep','Бицепс',settings.bicepCm],['thigh','Бедро',settings.thighCm],['hip','Бёдра',settings.hipCm],['neck','Шея',settings.neckCm]].map(([key,label,val]) => (
-                <div key={key} style={{ padding:'6px', borderRadius:6, background:'rgba(167,139,250,0.04)', border:'1px solid rgba(167,139,250,0.08)', textAlign:'center' }}>
-                  <div style={{ fontSize:8, color: theme.textDim }}>{label}</div>
-                  <div style={{ fontSize:13, fontWeight:700, color:'#a78bfa' }}>{val || '—'}</div>
-                </div>
-              ))}
-            </div>
-            <button onClick={() => {
-              const entry = { date: new Date().toISOString().split('T')[0], waistCm: settings.waistCm || 0, chestCm: settings.chestCm || 0, bicepCm: settings.bicepCm || 0, thighCm: settings.thighCm || 0, hipCm: settings.hipCm || 0, bodyFat: settings.bodyFat || 0, neckCm: settings.neckCm || 0, forearmCm: 0 };
-              try { const log = JSON.parse(localStorage.getItem('he_measurements_log') || '[]'); log.push(entry); localStorage.setItem('he_measurements_log', JSON.stringify(log.slice(-30))); } catch {}
-            }} style={{ width:'100%', padding:'7px', borderRadius:8, border:'none', cursor:'pointer', background:'rgba(167,139,250,0.1)', color:'#a78bfa', fontWeight:700, fontSize:10 }}>💾 Сохранить текущие замеры</button>
-          </div>
-          {/* FFMI */}
-          {ffmiVal !== '—' && (
-            <div style={{ ...glassCardStyle, marginBottom:8 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🏋️ FFMI</div>
-              <div style={{ fontSize:22, fontWeight:800, color:'#fff' }}>{ffmiVal}<span style={{ fontSize:10, color: theme.textDim, fontWeight:400, marginLeft:4 }}>кг/м²</span></div>
-              <div style={{ marginTop:6, position:'relative', height:6, background:'rgba(255,255,255,0.06)', borderRadius:3 }}>
-                <div style={{ position:'absolute', top:-8, left:'15%', fontSize:7, color: theme.textDim }}>15</div>
-                <div style={{ position:'absolute', top:-8, left:'35%', fontSize:7, color: theme.textDim }}>20</div>
-                <div style={{ position:'absolute', top:-8, left:'55%', fontSize:7, color: theme.textDim }}>25</div>
-                <div style={{ position:'absolute', top:-8, left:'75%', fontSize:7, color: theme.textDim }}>30</div>
-                {ffmiVal !== '—' && parseFloat(ffmiVal) > 0 && (
-                  <div style={{ position:'absolute', bottom:-2, left:`${Math.min(90, Math.max(1, parseFloat(ffmiVal) * 3))}%`, width:8, height:8, borderRadius:'50%', background:'#00e68a', transform:'translateX(-50%)' }} />
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
+      {analyticsSubTab === 'reports' && (
         <ProfessionalReports
           data={reportData}
           reportTab={reportTab}
@@ -264,6 +204,7 @@ export const ProfileAnalyticsSection: React.FC<Props> = ({ settings, save, labs,
           }}
         />
       )}
+      {analyticsSubTab === 'pharma_reports' && <PharmaBlockReports />}
     </div>
   );
 };

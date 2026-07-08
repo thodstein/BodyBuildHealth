@@ -1,5 +1,5 @@
 /**
- * SessionPlayer.tsx — T3: экран выполнения СРЦ/BB-плана (Этап INT1).
+ * SessionPlayer.tsx — экран выполнения плана ПЛ/ББ.
  * REUSE workout-logger.engine: startSession → addExerciseToSession → logSet → finishSession.
  * Mobile-first, dark theme. Принимает нормализованный план (дни → упражнения → целевые сеты).
  */
@@ -68,11 +68,11 @@ export interface PlayerExercise {
   muscleGroup: string;
   targetSets: PlayerSet[];
   restSec?: number; // целевой отдых между подходами (сек), из presc
-  // LMS-поля для метрик (Этап D1). Передаются из плана; иначе — эвристика.
+  // Поля метрик (передаются из плана; иначе — эвристика).
   pm?: number;       // предельный максимум упражнения (кг)
   coef?: number;     // Коэф. тяжести (1.2 / 1.0 / 0.3)
   mnosz?: number;    // Множ (множитель нагрузки)
-  group?: string;    // группа LMS (ЖМ/ПР/ТГ/Ср)
+  group?: string;    // группа (ЖМ/ПР/ТГ/Ср)
 }
 export interface PlayerDay { label: string; exercises: PlayerExercise[] }
 
@@ -320,7 +320,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     try { return getSessionRIRFeedback(done, { exercises: day.exercises.map(ex => ({ name: ex.name, targetSets: ex.targetSets })) }); } catch { return null; }
   }, [done, day]);
 
-  // D1: LMS-метрики фактической сессии (Тоннаж/КПШ/Инт.отн/УОИ/Инт.Ф+Б) — считаются для done-состояния
+  // Метрики фактической сессии (Тоннаж/КПШ/Инт.отн/УОИ/Инт.Ф+Б) — считаются для done-состояния
   const lms = useMemo(() => computeSessionMetrics(done, day), [done, day]);
 
   if (days.length === 0) return <div style={SMALL}>Нет дней в плане.</div>;
@@ -561,7 +561,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
           )}
           {lms && (
             <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)' }}>
-              <div style={{ ...LABEL, color: ACCENT }}>📊 LMS-метрики сессии ({lms.exerciseCount} упр.)</div>
+              <div style={{ ...LABEL, color: ACCENT }}>📊 Метрики сессии ({lms.exerciseCount} упр.)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 6 }}>
                 <div style={SMALL}>Тоннаж: <b style={{ color: '#fff' }}>{Math.round(lms.metrics.tonnage)}</b> кг</div>
                 <div style={SMALL}>КПШ: <b style={{ color: '#fff' }}>{lms.metrics.kpsh}</b></div>

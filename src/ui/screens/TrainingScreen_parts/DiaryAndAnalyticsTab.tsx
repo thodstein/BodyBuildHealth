@@ -6,6 +6,7 @@ import { computeAnalytics, type AnalyticsSnapshot } from '../../../engines/analy
 import { weeklySetsByGroup } from '../../../engines/training-recommendations.engine';
 import { LEVEL_VOLUMES } from '../../../engines/training.engine';
 import type { MacrocyclePlan } from '../../../engines/training-periodization.engine';
+import { useIsMobile } from './useIsMobile';
 
 const ACCENT = '#00e68a';
 const GRP_RU: Record<string, string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор', hamstrings:'Бицепс бедра', glutes:'Ягодицы', calves:'Икры', triceps:'Трицепс', biceps:'Бицепс', quads:'Квадрицепсы' };
@@ -33,6 +34,7 @@ interface DiaryAndAnalyticsTabProps {
 
 export const DiaryAndAnalyticsTab: React.FC<DiaryAndAnalyticsTabProps> = ({ diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh }) => {
   const [mode, setMode] = useState<'diary' | 'history' | 'analytics'>('diary');
+  const isMobile = useIsMobile();
   const [search, setSearch] = useState('');
 
   // Logging state — multi-exercise session
@@ -216,8 +218,8 @@ export const DiaryAndAnalyticsTab: React.FC<DiaryAndAnalyticsTabProps> = ({ diar
           </div>
           {/* Add exercise */}
           <div style={style.label}>🏋️ Упражнения</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.5fr 0.5fr 0.5fr auto', gap: 4, marginBottom: 6, alignItems: 'end' }}>
-            <div>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr 1fr auto' : '1fr 0.5fr 0.5fr 0.5fr auto', gap: 4, marginBottom: 6, alignItems: 'end' }}>
+            <div style={isMobile ? { gridColumn: '1 / -1' } : undefined}>
               <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Упражнение</label>
               <select value={exId} onChange={e => setExId(e.target.value)} style={style.input}>
                 <option value="">— Выбрать —</option>

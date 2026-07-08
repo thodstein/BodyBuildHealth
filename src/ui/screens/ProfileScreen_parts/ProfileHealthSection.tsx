@@ -1,6 +1,7 @@
 import React from 'react';
 import type { UserProfile } from '../../../core/types';
 import { theme, glassCardStyle, sectionLabelStyle, ExpandableCard, HealthNumber, HealthBool, HealthSlider } from './ProfileComponents';
+import { ProfileGeneticsSection } from './ProfileGeneticsSection';
 
 interface Props {
   settings: UserProfile['settings'];
@@ -71,6 +72,16 @@ export const ProfileHealthSection: React.FC<Props> = ({ settings, save, calcData
               onClick={() => { const cur = settings.chronicConditions ?? []; save({ chronicConditions: active ? cur.filter((x: string) => x !== c.id) : [...cur, c.id] }); }} />;
           })}
         </div>
+      </ExpandableCard>
+
+      {/* Genetics */}
+      <ExpandableCard icon="🧬" title="Генетика (SNP)" color="#c084fc" open={false}
+        summary={(() => {
+          const g = settings.genetics ?? {};
+          const set = Object.entries(g).filter(([, v]) => v);
+          return set.length ? set.map(([k, v]) => `${k}:${v}`).join(', ') : 'Не указано';
+        })()}>
+        <ProfileGeneticsSection settings={settings} save={save} />
       </ExpandableCard>
 
       {/* Health systems from calcData */}
@@ -289,6 +300,23 @@ export const ProfileHealthSection: React.FC<Props> = ({ settings, save, calcData
           </ExpandableCard>
         );
       })}
+
+      {/* Exclude supplements & meds */}
+      <ExpandableCard icon="🚫" title="Исключить БАДы / лекарства" color="#8b5cf6" open={false}
+        summary={[settings.excludedSupplements ? `БАДы: ${settings.excludedSupplements}` : '', settings.excludedMeds ? `Лекарства: ${settings.excludedMeds}` : ''].filter(Boolean).join(' | ') || 'Не заданы'}>
+        <div style={{marginBottom:8}}>
+          <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',marginBottom:2,display:'block'}}>🔴 Исключить БАДы (id через запятую):</label>
+          <input value={settings.excludedSupplements || ''} onChange={e => save({ excludedSupplements: e.target.value })}
+            placeholder="yohimbine, huperzine_a, dmaa"
+            style={{width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:11,boxSizing:'border-box'}} />
+        </div>
+        <div>
+          <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',marginBottom:2,display:'block'}}>💊 Исключить лекарства (id через запятую):</label>
+          <input value={settings.excludedMeds || ''} onChange={e => save({ excludedMeds: e.target.value })}
+            placeholder="telmisartan, nebivolol, anastrozole"
+            style={{width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:11,boxSizing:'border-box'}} />
+        </div>
+      </ExpandableCard>
     </div>
   );
 };

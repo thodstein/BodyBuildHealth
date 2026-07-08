@@ -6,6 +6,7 @@ import { BPDiaryTab } from '../../components/BPDiaryTab';
 import { LabDiaryTab } from '../LabsScreen_parts/LabDiaryTab';
 import { ProfileMeasurementsTab } from './ProfileMeasurementsTab';
 import { ProfileInjuriesSection } from './ProfileInjuriesSection';
+import { InjectionDiaryTab } from './InjectionDiaryTab';
 
 interface Props {
   settings: UserProfile['settings'];
@@ -48,6 +49,7 @@ export const ProfileDiariesSection: React.FC<Props> = ({ settings, save, labs, w
   const internalTabs = [
     { id:'sleep', label:'🛌 Сон' },
     { id:'bp', label:'🫀 Давление' },
+    { id:'injections', label:'💉 Инъекции' },
     { id:'measurements', label:'📏 Замеры' },
     { id:'progress', label:'📈 Прогресс' },
     { id:'injuries', label:'🩼 Травмы' },
@@ -97,6 +99,9 @@ export const ProfileDiariesSection: React.FC<Props> = ({ settings, save, labs, w
 
       {/* BP diary */}
       {diarySubTab === 'bp' && <BPDiaryTab />}
+
+      {/* Injection diary */}
+      {diarySubTab === 'injections' && <InjectionDiaryTab />}
 
       {/* Measurements diary */}
       {diarySubTab === 'measurements' && <ProfileMeasurementsTab />}

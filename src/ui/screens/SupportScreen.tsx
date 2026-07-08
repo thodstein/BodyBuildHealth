@@ -63,6 +63,7 @@ type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'research' | 'f
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { PopupBool, PopupNumber, PopupSelect } from '../components/PopupXxx';
 import { BioStackAIScreen } from '../components/BioStackAIScreen';
+import { DrugCheckTab } from '../components/BioStackAIDrugCheck';
 import { SupportPeptideCalc } from './SupportScreen_parts/SupportPeptideCalc';
 import { SupportResearch } from './SupportScreen_parts/SupportResearch';
 import { SupportGeneratorInfo } from './SupportScreen_parts/SupportGeneratorInfo';
@@ -73,7 +74,7 @@ import { SupportFavoritesView } from './SupportScreen_parts/SupportFavoritesView
 import { SupportDiaryView } from './SupportScreen_parts/SupportDiaryView';
 import { SupportStacksView } from './SupportScreen_parts/SupportStacksView';
 
-import { DosageDatabaseView } from '../components/DosageCalculator';
+
 import { SupportProtocols } from './SupportScreen_parts/SupportProtocols';
 import { SupportBioavailability } from './SupportScreen_parts/SupportBioavailability';
 import { SymptomSolverTab } from './SupportScreen_parts/SymptomSolverTab';
@@ -85,7 +86,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [calcView, setCalcView] = useState<CalcView>('main');
   const [infoView, setInfoView] = useState<InfoView>('main');
   const [section, setSection] = useState<'home'|'generator'|'protocols'|'info'>('home');
-  const [genTab, setGenTab] = useState<'calculator'|'info'|'dosages'>('calculator');
+  const [genTab, setGenTab] = useState<'calculator'|'info'>('calculator');
   const [protocolTab, setProtocolTab] = useState<'pct'|'fertility'|'hrt'|'neuro'|'joints'|'acne'|'injections'>('pct');
   const [infoTab, setInfoTab] = useState<string>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
@@ -748,6 +749,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [favRefresh, setFavRefresh] = useState(0);
   const [favTab, setFavTab] = useState<string>('favorites');
   const [combinedFavDiaryTab, setCombinedFavDiaryTab] = useState<'favorites'|'diary'>('favorites');
+  const [combinedBioTab, setCombinedBioTab] = useState<'bioavailability'|'drugs'>('bioavailability');
   const [showSavedPicker, setShowSavedPicker] = useState(false);
   const [researchSource, setResearchSource] = useState<'pubmed' | 'pubchem' | 'scholar' | 'fda' | 'pharma'>('pubmed');
   const [pubchemResults, setPubchemResults] = useState<any[]>([]);
@@ -1268,6 +1270,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     BILE_DUCTS: { key: 'liver', label: 'Печень', emoji: '🫁' },
     GALLBLADDER: { key: 'liver', label: 'Печень', emoji: '🫁' },
     gallbladder: { key: 'liver', label: 'Печень', emoji: '🫁' },
+    CARTILAGE: { key: 'joints_bones', label: 'Суставы и кости', emoji: '🦴' },
     KIDNEYS: { key: 'kidneys', label: 'Почки', emoji: '🫘' },
     kidney: { key: 'kidneys', label: 'Почки', emoji: '🫘' },
     BLADDER: { key: 'kidneys', label: 'Почки', emoji: '🫘' },
@@ -1286,6 +1289,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     BONE_MARROW: { key: 'joints_bones', label: 'Суставы и кости', emoji: '🦴' },
     TEETH: { key: 'joints_bones', label: 'Суставы и кости', emoji: '🦴' },
     IMMUNE_SYSTEM: { key: 'immune', label: 'Иммунная система', emoji: '🛡️' },
+    IMMUNE: { key: 'immune', label: 'Иммунная система', emoji: '🛡️' },
     immune: { key: 'immune', label: 'Иммунная система', emoji: '🛡️' },
     LYMPH: { key: 'immune', label: 'Иммунная система', emoji: '🛡️' },
     LYMPHATIC: { key: 'immune', label: 'Иммунная система', emoji: '🛡️' },
@@ -1295,6 +1299,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     MICROBIOME: { key: 'gi', label: 'ЖКТ и пищеварение', emoji: '🫃' },
     ESOPHAGUS: { key: 'gi', label: 'ЖКТ и пищеварение', emoji: '🫃' },
     MOUTH: { key: 'gi', label: 'ЖКТ и пищеварение', emoji: '🫃' },
+    SMALL_INTESTINE: { key: 'gi', label: 'ЖКТ и пищеварение', emoji: '🫃' },
     THYROID: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
     PANCREAS: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
     ADRENALS: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
@@ -1306,6 +1311,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     OVARIES: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
     UTERUS: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
     PLACENTA: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
+    ENDOCRINE: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
     SKIN: { key: 'skin_hair', label: 'Кожа и волосы', emoji: '✨' },
     HAIR: { key: 'skin_hair', label: 'Кожа и волосы', emoji: '✨' },
     SCALP: { key: 'skin_hair', label: 'Кожа и волосы', emoji: '✨' },
@@ -1384,11 +1390,12 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           groups[mapping.key].items.push(sub);
           groups[mapping.key].count++;
         } else {
-          const formattedName = normOrg.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+          const ruLabel = CATALOG_ORGAN_LABELS[normOrg];
+          const label = ruLabel ? ruLabel.replace(/^[^\s]+\s/,'') : normOrg.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
           const key = `org_${normOrg.toLowerCase()}`;
           if (usedKeys.has(key)) continue;
           usedKeys.add(key);
-          if (!groups[key]) groups[key] = { key, label: formattedName || normOrg || 'Прочее', emoji: '🫀', items: [], count: 0 };
+          if (!groups[key]) groups[key] = { key, label, emoji: '🫀', items: [], count: 0 };
           groups[key].items.push(sub);
           groups[key].count++;
         }
@@ -3036,11 +3043,10 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['calculator','🧮 Калькулятор'],['dosages','📋 Дозировки'],['info','📖 О подборе']].map(([id,label]) => (
+            {[['calculator','🧮 Калькулятор'],['info','📖 О подборе']].map(([id,label]) => (
               <button key={id} onClick={() => { setGenTab(id as any); 
               const a: Record<string,()=>void> = {
                 calculator: ()=>{ setTab('calculator'); setSupportView('calc'); },
-                dosages: ()=>{ setTab('main'); setSupportView('calc'); },
                 info: ()=>{},
               };
               a[id]?.();
@@ -3132,8 +3138,36 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
               </div>
             )}
             {renderView(infoView, 'bioavailability', () =>
-              <div style={{ padding: '0 4px' }}>
-                <SupportBioavailability s={s} />
+              <div>
+                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
+                  {[['bioavailability','🧬 Калькулятор'],['drugs','💊 Лекарства']].map(([id,label]:any) => (
+                    <button key={id} onClick={() => setCombinedBioTab(id as any)} style={{
+                      padding:'6px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                      background: combinedBioTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
+                      color: combinedBioTab === id ? '#000' : 'var(--text-dim)',
+                      border: '1px solid ' + (combinedBioTab === id ? 'var(--accent)' : 'var(--border)'),
+                    }}>{label}</button>
+                  ))}
+                </div>
+                {combinedBioTab === 'bioavailability' && (
+                  <div style={{ padding: '0 4px' }}>
+                    <SupportBioavailability s={s} />
+                  </div>
+                )}
+                {combinedBioTab === 'drugs' && (
+                  <div style={{ padding: '0 4px' }}>
+                    {(() => {
+                      try {
+                        const bpRaw = localStorage.getItem('he_biostack_profile');
+                        const profile = bpRaw ? JSON.parse(bpRaw) : { currentMeds: [], drugAllergies: [], goals: [], healthConditions: [], experience: 'intermediate' as const, budget: 3000, aasStatus: 'off' as const, targetSystems: [], targetOrgans: [], stackComplexity: 'moderate' as const };
+                        const idsRaw = localStorage.getItem('he_my_stacks');
+                        const ids = idsRaw ? JSON.parse(idsRaw) : [];
+                        const stackIds = Array.isArray(ids) ? ids : (ids?.substances || []);
+                        return <DrugCheckTab profile={profile} stackIds={stackIds} />;
+                      } catch { return <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: 12 }}>Ошибка загрузки данных. Проверьте профиль BioStack.</div>; }
+                    })()}
+                  </div>
+                )}
               </div>
             )}
             {renderView(infoView, 'symptoms', () =>
@@ -3345,17 +3379,12 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
           embedded
           courseWeek={courseWeekState}
           courseLinked={linked.course as any}
-          labsLinked={(linked.labs && linked.labs.length > 0 ? linked.labs[0] : null) as any}
+          labsLinked={linked.labs as any}
           onApply={(r) => {
             setAutoCalcResult(r);
             setCalcDone(true);
           }}
         />
-      )}
-
-      {/* ===== DOSAGE DATABASE VIEW ===== */}
-      {section === 'generator' && genTab === 'dosages' && (
-        <DosageDatabaseView />
       )}
 
       {/* ===== PEPTIDE CALCULATOR ===== */}

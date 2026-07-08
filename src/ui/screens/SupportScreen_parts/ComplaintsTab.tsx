@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { SYMPTOM_DB, SymptomEntry, findSymptomById } from '../../../engines/symptom-solver.engine';
+import { SYMPTOM_DB } from '../../../engines/symptom-solver.data';
+import { findSymptomById } from '../../../engines/symptom-solver.engine';
+import type { SymptomEntry } from '../../../engines/symptom-solver.types';
 import { getSymptomDiaryStats, getSymptomChartData, getSymptomDiarySummary, updateSymptomToday, SymptomTrend, getSymptomDiary } from '../../../engines/symptom-diary.engine';
 // ─── Локальные стили ───
 const GLASS_CARD: React.CSSProperties = {

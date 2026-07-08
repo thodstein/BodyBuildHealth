@@ -5,6 +5,7 @@
  */
 
 import { SUPPORT_CATALOG_DATA, DEFAULT_DOSAGES } from '../../data/support-database';
+import type { TzSpecResult } from '../risk-engine-tz-spec';
 
 // ═══════════════════════════════════════════════════════════════
 //  БАЗОВЫЕ ТИПЫ
@@ -254,11 +255,26 @@ export interface CalculatorResult {
   selectedWeekAfter?: number;
   synergyRecommendations?: SynergyRecommendation[];
   boostAdded?: string[];
+  /** Сырой результат механизм-ориентированной модели (TzSpecResult) для отображения в UI */
+  tzSpecResult?: TzSpecResult | null;
   timestamp: string;
   /** Нутрициологические предупреждения */
   depletionWarnings?: Array<{ depleter: string; depleted: string; mechanism: string; severity: string; recommendation: string }>;
   ulWarnings?: Array<{ substanceId: string; currentDoseMg: number; ulMg: number; percentUL: number; risk: string; recommendation: string }>;
   dailyLoad?: Record<string, { totalMg: number; contributors: string[]; hasUL: boolean; ulMg?: number }>;
+  /**
+   * Фазовые назначения — вещества, автоматически добавленные движком
+   * calculateSupportTZ на основе контекста курса/препаратов по чётким
+   * клиническим правилам (ХГЧ при ААС, AI при тестостероне → ароматизация,
+   * каберголин при прогестагенных ААС, нефро/гепатопротекция при tren/oral 17α).
+   * Это «потерянная» логика, которая раньше не отображалась в UI калькулятора.
+   */
+  phaseAssignedDrugs?: Array<{
+    id: string;
+    reason: string;
+    trigger: string;
+    category: 'hcg' | 'ai' | 'cabergoline' | 'renal_protection' | 'hepatic_protection';
+  }>;
 }
 
 export interface TimelineWeekData {

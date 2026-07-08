@@ -7,7 +7,7 @@
  *   3. Группировку по системам организма
  *   4. Partial<CalculatorState> для передачи в calcSupport
  */
-import type { SymptomEntry, UrgencyLevel } from './symptom-solver.engine';
+import type { SymptomEntry, UrgencyLevel } from './symptom-solver.types';
 import { resolveCatalogId, isLifestyleOnly } from './symptom-catalog-bridge';
 
 export interface SelectedSymptom {

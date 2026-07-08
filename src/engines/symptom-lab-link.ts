@@ -6,7 +6,7 @@
  *
  * v2: + симптом → проблемная панель (symptom-panel-bridge)
  */
-import type { SymptomEntry } from './symptom-solver.engine';
+import type { SymptomEntry } from './symptom-solver.types';
 import { findSymptomById } from './symptom-solver.engine';
 
 export interface LabLinkedSymptom {
@@ -164,6 +164,36 @@ const LAB_LINK_RULES: Record<string, LabLinkRule> = {
     relevance: 0.6,
     explanation: (v, n) => `Пролактин ${v} (норма ${n}) — гиперпролактинемия`,
   },
+  TROPONIN: {
+    symptomIds: ['chest_pain', 'palpitations', 'syncope', 'dyspnea'],
+    direction: 'high',
+    relevance: 0.9,
+    explanation: (v, n) => `Тропонин ${v} (норма ${n}) — повреждение миокарда, ОКС/миокардит`,
+  },
+  D_DIMER: {
+    symptomIds: ['chest_pain', 'dyspnea', 'lower_back_pain', 'hemoptysis', 'syncope'],
+    direction: 'high',
+    relevance: 0.8,
+    explanation: (v, n) => `D-димер ${v} (норма ${n}) — тромбоз/ТЭЛА, необходима КТ-ангиография`,
+  },
+  HBA1C: {
+    symptomIds: ['polydipsia', 'thirst', 'frequent_urination', 'fatigue', 'hypoglycemia_symptoms'],
+    direction: 'high',
+    relevance: 0.7,
+    explanation: (v, n) => `HbA1c ${v} (норма ${n}) — гипергликемия/СД на курсе (контринсулярный эффект GH + ААС)`,
+  },
+  CALCIUM: {
+    symptomIds: ['fatigue', 'weakness', 'polydipsia', 'thirst', 'constipation'],
+    direction: 'high',
+    relevance: 0.5,
+    explanation: (v, n) => `Ca++ ${v} (норма ${n}) — гиперкальциемия (мобилизация из костей, GH, гиперпаратиреоз)`,
+  },
+  URIC_ACID: {
+    symptomIds: ['joint_pain', 'lower_back_pain', 'edema', 'hypertension_symptoms'],
+    direction: 'high',
+    relevance: 0.5,
+    explanation: (v, n) => `МК ${v} (норма ${n}) — гиперурикемия (ААС ↑ пуриновый обмен), риск подагры/камней`,
+  },
 };
 
 /** Дефолтные нормы для маркеров */
@@ -188,6 +218,11 @@ const LAB_NORMS: Record<string, { low: number; high: number; unit: string }> = {
   ESTRADIOL: { low: 0, high: 200, unit: 'пмоль/л' },
   ESTRADIOL_LOW: { low: 60, high: 200, unit: 'пмоль/л' },
   PROLACTIN: { low: 80, high: 400, unit: 'мМЕ/л' },
+  TROPONIN: { low: 0, high: 0.04, unit: 'нг/мл' },
+  D_DIMER: { low: 0, high: 500, unit: 'нг/мл' },
+  HBA1C: { low: 0, high: 6.0, unit: '%' },
+  CALCIUM: { low: 2.15, high: 2.55, unit: 'ммоль/л' },
+  URIC_ACID: { low: 200, high: 420, unit: 'мкмоль/л' },
 };
 
 /** Основная функция: лаборатория → подсвеченные симптомы */
@@ -304,7 +339,11 @@ const SYMPTOM_PANEL_MAP: Record<string, string[]> = {
   headache: ['hypertension_workup', 'polycythemia_workup'],
   dizziness: ['hypertension_workup', 'polycythemia_workup'],
   dyspnea: ['cardio_full', 'polycythemia_workup'],
-  chest_pain: ['cardio_full'],
+  chest_pain: ['cardio_full', 'emergency_chest_pain'],
+  syncope: ['cardio_full', 'emergency_syncope'],
+  hemoptysis: ['cardio_full', 'emergency_hemoptysis'],
+  hypertensive_crisis: ['hypertension_workup', 'emergency_hypertension'],
+  polydipsia: ['hormone_passport', 'nutritional_passport'],
   palpitations: ['cardio_full', 'ed_libido_workup'],
 
   flushed_skin: ['polycythemia_workup'],

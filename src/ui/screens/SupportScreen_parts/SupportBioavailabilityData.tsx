@@ -404,22 +404,128 @@ export const TIMING_SLOTS: TimingSlot[] = [
 // ─── Timing assignment for substance categories ───
 export interface SubstanceTiming { slot: TimeSlot; reason: string; }
 export const CATEGORY_TIMING: Record<string, SubstanceTiming> = {
+  // Жирорастворимые — с жирной пищей утром
   fat_soluble: { slot: 'morning_food', reason: 'Жирорастворимые: с завтраком для максимальной абсорбции с жирами.' },
-  mineral_ca: { slot: 'evening_food', reason: 'Ca — вечером (пик костной резорбции ночью).' },
+  // Минералы — по специфике
+  mineral_ca: { slot: 'evening_food', reason: 'Ca — вечером (пик костной резорбции ночью, не конкурирует с Mg/Zn).' },
   mineral_mg: { slot: 'night_empty', reason: 'Mg — перед сном (расслабление мышц, улучшение сна).' },
   mineral_zn: { slot: 'morning_empty', reason: 'Zn — натощак для максимальной абсорбции (нет конкуренции).' },
   mineral_fe: { slot: 'morning_empty', reason: 'Fe — натощак с витамином C за 30 мин до еды.' },
   mineral_se: { slot: 'morning_empty', reason: 'Se — утром, хорошо совместим с Zn.' },
+  iron: { slot: 'morning_empty', reason: 'Железо — натощак с вит. C за 30 мин до еды (без чая/кофе/Ca).' },
+  // Общий минерал — утром натощак
+  mineral: { slot: 'morning_empty', reason: 'Минерал — утром натощак для максимальной абсорбции.' },
+  electrolyte: { slot: 'morning_food', reason: 'Электролиты — с едой для равномерного усвоения.' },
+  // Антиоксиданты
   antioxidant_am: { slot: 'morning_empty', reason: 'NAC, ALA — натощак для быстрой абсорбции.' },
-  antioxidant_fat: { slot: 'morning_food', reason: 'CoQ10, куркума — с жирной пищей.' },
+  antioxidant_fat: { slot: 'morning_food', reason: 'CoQ10, куркума — с жирной пищей (повышает биодоступность).' },
+  antioxidant: { slot: 'morning_empty', reason: 'Антиоксидант — утром натощак.' },
+  // Аминокислоты и белок
   amino: { slot: 'morning_empty', reason: 'Аминокислоты — натощак за 30 мин до еды. Конкуренция за транспортёры.' },
-  probiotic: { slot: 'morning_empty', reason: 'Пробиотики — за 30 мин до завтрака или с едой.' },
+  amino_acid: { slot: 'morning_empty', reason: 'Аминокислоты — натощак, до или после тренировки.' },
+  protein: { slot: 'afternoon_empty', reason: 'Протеин — после тренировки или между приёмами пищи.' },
+  anabolic: { slot: 'morning_empty', reason: 'Анаболические аминокислоты — натощак.' },
+  // Витамины
+  b_vitamins: { slot: 'morning_empty', reason: 'B-витамины — утром (энергетический эффект, не пить вечером).' },
+  vitamin: { slot: 'morning_food', reason: 'Витамины — с завтраком для лучшего усвоения.' },
+  // Сердечно-сосудистая система
+  cardioprotector: { slot: 'morning_food', reason: 'Кардиопротектор — с завтраком (контроль АД на день).' },
+  cardio: { slot: 'morning_food', reason: 'Сердечно-сосудистый препарат — с едой.' },
+  bp: { slot: 'morning_food', reason: 'Препарат для АД — утром с едой (суточный контроль).' },
+  heart_rate: { slot: 'morning_food', reason: 'Препарат для ЧСС — утром с завтраком.' },
+
+  // Печень и желчеотток
+  hepatoprotector: { slot: 'morning_food', reason: 'Гепатопротектор — с едой (поддержка печени в течение дня).' },
+  liver: { slot: 'morning_food', reason: 'Препарат для печени — с едой.' },
+  bile: { slot: 'morning_food', reason: 'Желчегонное — с едой, особенно с завтраком.' },
+  choleretic: { slot: 'morning_food', reason: 'Желчегонное — с едой для стимуляции оттока желчи.' },
+  bile_acid: { slot: 'night_empty', reason: 'TUDCA/УДХК — перед сном натощак (2+ ч после ужина). Жёлчные кислоты конкурируют с пищей, утром — всасывание ↓.' },
+  detox: { slot: 'morning_empty', reason: 'Детокс — натощак для максимальной абсорбции.' },
+  // Иммунитет
+  immunomodulator: { slot: 'morning_food', reason: 'Иммуномодулятор — с завтраком.' },
+  immune: { slot: 'morning_food', reason: 'Иммунная поддержка — с едой.' },
+  // Нервная система и сон
+  neuro: { slot: 'morning_food', reason: 'Нейропротектор — утром с едой.' },
+  neuroprotector: { slot: 'morning_food', reason: 'Нейропротектор — с едой.' },
+  sleep: { slot: 'night_empty', reason: 'Снотворное/релаксант — перед сном.' },
+  anxiolytic: { slot: 'night_empty', reason: 'Анксиолитик — вечером для расслабления.' },
+  // Эндокринная
+  endocrine: { slot: 'morning_food', reason: 'Эндокринный модулятор — с едой.' },
+  hormonal: { slot: 'morning_empty', reason: 'Гормональный регулятор — натощак.' },
+  thyroid: { slot: 'morning_empty', reason: 'Препарат для щитовидной железы — натощак за 30 мин до еды.' },
+  stress: { slot: 'morning_food', reason: 'Антистресс — с завтраком.' },
+  adaptogen: { slot: 'morning_food', reason: 'Адаптоген — утром или днём с едой.' },
   herb_adaptogen: { slot: 'morning_empty', reason: 'Адаптогены — утром и днём. Не вечером (нарушение сна).' },
   herb_sedative: { slot: 'night_empty', reason: 'Ашваганда, валериана — перед сном.' },
-  b_vitamins: { slot: 'morning_empty', reason: 'B-витамины — утром (энергетический эффект).' },
-  creatine: { slot: 'afternoon_empty', reason: 'Креатин — после тренировки или в любое время.' },
-  omega3_any: { slot: 'noon_food', reason: 'Омега-3 — с самым большим приёмом пищи для лучшей абсорбции.' },
+  // ЖКТ
+  probiotic: { slot: 'morning_empty', reason: 'Пробиотики — за 30 мин до завтрака натощак (выживаемость штаммов выше без конкуренции с пищей).' },
+  gi: { slot: 'morning_empty', reason: 'Препарат для ЖКТ — натощак.' },
+  gut: { slot: 'morning_empty', reason: 'Поддержка кишечника — натощак (клетчатка/глютамин/бутират не конкурируют с пищей).' },
+  digestion: { slot: 'morning_food', reason: 'Пищеварение — с едой.' },
+  // Почки и мочевыделение
+  renal: { slot: 'morning_food', reason: 'Нефропротектор — с завтраком.' },
+  nephroprotector: { slot: 'morning_food', reason: 'Нефропротектор — с едой.' },
+  // Суставы, кости, кожа
+  joint: { slot: 'morning_food', reason: 'Для суставов — с едой.' },
+  bone: { slot: 'morning_food', reason: 'Для костей — с едой (жирорастворимые + Ca).' },
   collagen: { slot: 'morning_empty', reason: 'Коллаген — натощак или с вит. C для синтеза.' },
+  skin: { slot: 'morning_food', reason: 'Для кожи — с едой.' },
+  beauty: { slot: 'morning_food', reason: 'Красота — с едой.' },
+  // Протеолитические и муколитические ферменты
+  antiinflammatory: { slot: 'morning_food', reason: 'Противовоспалительное — с едой.' },
+  anti_inflammatory: { slot: 'morning_food', reason: 'Противовоспалительное — с едой.' },
+  enzyme: { slot: 'morning_empty', reason: 'Протеолитические ферменты (серрапептаза, бромелайн) — натощак за 30–40 мин до еды. С едой переваривают белки пищи, не всасываются системно.' },
+  proteolytic: { slot: 'morning_empty', reason: 'Протеолитический фермент — натощак. При контакте с пищей переваривает её, теряя системный эффект.' },
+  fibrinolytic: { slot: 'morning_empty', reason: 'Фибринолитик (наттокиназа, лумброкиназа) — натощак. Максимум фибринолитической активности утром. С едой → потеря эффекта.' },
+  mucolytic: { slot: 'morning_empty', reason: 'Муколитик — натощак для разжижения слизи и системной абсорбции.' },
+  hemorheologic: { slot: 'morning_empty', reason: 'Гемореологический — натощак (снижение вязкости крови, улучшение микроциркуляции).' },
+  anticoagulant: { slot: 'morning_empty', reason: 'Антикоагулянт — натощак утром. Контроль МНО/PT при варфарине.' },
+  antiagg: { slot: 'morning_food', reason: 'Антиагрегант — утром с едой (снижение риска тромбоза, защита ЖКТ).' },
+  // Пептиды и аминокислоты
+  peptide: { slot: 'morning_empty', reason: 'Пептиды — натощак за 30 мин до еды (гидролиз в ЖКТ конкурирует с пищей).' },
+  gh_secretagogue: { slot: 'morning_empty', reason: 'Секретагог ГР (голодный грелин) — натощак за 30 мин до завтрака.' },
+  gh_releasing: { slot: 'morning_food', reason: 'Рилизинг-пептиды — по инструкции, часто утром натощак.' },
+  // Нейро/ноотропы
+  dopamine: { slot: 'morning_empty', reason: 'Дофаминергический (L-DOPA, мукуна) — натощак. Аминокислоты из пищи конкурируют за L-аминотранспортёр.' },
+  nootropic: { slot: 'morning_empty', reason: 'Ноотроп — утром натощак (стимуляция когниции). Не вечером — нарушение сна.' },
+  serotonin: { slot: 'morning_food', reason: 'Серотонинергический (5-HTP) — с лёгкой едой для ↓ тошноты.' },
+  // Метаболизм и энергия
+  metabolic: { slot: 'morning_food', reason: 'Метаболический препарат — с завтраком.' },
+  energy: { slot: 'morning_empty', reason: 'Энергетик — утром натощак.' },
+  mitochondrial: { slot: 'morning_food', reason: 'Митохондриальная поддержка — с жирной пищей.' },
+  methylation: { slot: 'morning_empty', reason: 'Метилирование — натощак.' },
+  // Омега-3 и липиды
+  omega: { slot: 'noon_food', reason: 'Омега-3 — с самым большим приёмом пищи для лучшей абсорбции.' },
+  omega3: { slot: 'noon_food', reason: 'Омега-3 — с самым большим приёмом пищи.' },
+  omega3_any: { slot: 'noon_food', reason: 'Омега-3 — с самым большим приёмом пищи для лучшей абсорбции.' },
+  lipid_low: { slot: 'evening_food', reason: 'Липидснижающий — вечером с едой.' },
+  cholesterol: { slot: 'evening_food', reason: 'Холестерин-контроль — вечером.' },
+  // Флавоноиды/полифенолы
+  flavonoid: { slot: 'morning_food', reason: 'Флавоноид — с жирной пищей (биодоступность +).' },
+  polyphenol: { slot: 'morning_food', reason: 'Полифенол — с едой.' },
+  venotonic: { slot: 'morning_food', reason: 'Венотоник — с завтраком.' },
+  // Гормональные модуляторы
+  aromatase_inhibitor: { slot: 'morning_food', reason: 'Ингибитор ароматазы — утром с едой (↓ тошноты, стабильный уровень).' },
+  pharma: { slot: 'morning_food', reason: 'Фармацевтический препарат — с едой для ↓ раздражения ЖКТ, если не указано иное.' },
+  androgen: { slot: 'morning_food', reason: 'Андрогенный — с едой (жир для абсорбции тестостерона эфиров).' },
+  aas_derivative: { slot: 'morning_food', reason: 'Производное AAS — с едой (защита печени, ↑ биодоступность).' },
+  // Сердечно-сосудистые препараты
+  ace_inhibitor: { slot: 'morning_food', reason: 'иАПФ — утром с завтраком (контроль АД на день).' },
+  antihypertensive: { slot: 'morning_food', reason: 'Антигипертензивный — утром с едой.' },
+  hypocholesterolemic: { slot: 'evening_food', reason: 'Холестерин-снижающий — вечером с едой (пик синтеза холестерина ночью).' },
+  // Прочие категории
+  coagulation: { slot: 'morning_food', reason: 'Коагулянт/K2 — с жирной пищей (↑ абсорбции).' },
+  vitamin_der: { slot: 'morning_food', reason: 'Производное витамина — с едой для ↓ раздражения ЖКТ.' },
+  glucosinolate: { slot: 'morning_food', reason: 'Глюкозинолат (DIM/I3C) — с жирной пищей (↑ биодоступность).' },
+  vitamin_a_d: { slot: 'morning_food', reason: 'Жирорастворимые витамины A/D — с жирным завтраком.' },
+  herbal: { slot: 'morning_food', reason: 'Травяной экстракт — с едой. Уточнить по конкретному растению.' },
+  herb: { slot: 'morning_food', reason: 'Растительный экстракт — с едой.' },
+  // Прочее
+  creatine: { slot: 'afternoon_empty', reason: 'Креатин — после тренировки или в любое время (главное — ежедневно).' },
+  anti_aging: { slot: 'morning_food', reason: 'Антивозрастной — с завтраком.' },
+  recovery: { slot: 'afternoon_empty', reason: 'Восстановление — после тренировки.' },
+  // По умолчанию — разумный базовый вариант
+  default: { slot: 'morning_food', reason: 'Принимать с завтраком для лучшего усвоения и защиты ЖКТ.' },
 };
 
 // ─── Lab markers to monitor per substance class ───

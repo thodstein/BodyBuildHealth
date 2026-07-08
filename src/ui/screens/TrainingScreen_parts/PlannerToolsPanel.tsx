@@ -1,45 +1,127 @@
-﻿/** PlannerToolsPanel.tsx — инструменты планирования, доступные прямо в зоне «Планировщик».
- * Переиспользует уже созданные карточки (одна реализация — без дубля кода) и встраивает их
- * inline через expandable-секции в зависимости от режима (ПЛ-авто / ББ-авто / Ручной сбор). */
+/** PlannerToolsPanel.tsx — инструменты планирования, доступные прямо в зоне «Планировщик».
+ * Только инструменты, релевантные планированию — каждый подключён к planner-bridge.
+ * Состав подобран под режим (ПЛ-авто / ББ-авто / Ручной сбор). */
 import React, { useState } from 'react';
 import { ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
+
+// ПЛ-специфичные
 import { PlWeakpointsCard } from './PlWeakpointsCard';
-import { PriRepPatternCard } from './PriRepPatternCard';
 import { CompetitionCard } from './CompetitionCard';
+import { RelativeStrengthCalcTab } from './RelativeStrengthCalcTab';
+import PeakingProtocolTab from './PeakingProtocolTab';
+import { TaperPlannerTab } from './TaperPlannerTab';
+
+// Общие (сила/нагрузка/периодизация)
+import { PriRepPatternCard } from './PriRepPatternCard';
 import { StrengthAnalyticsCard } from './StrengthAnalyticsCard';
+import { OneRmCalcTab } from './OneRmCalcTab';
+import { MRVEstimatorTab } from './MRVEstimatorTab';
+import { FatigueIndexTab } from './FatigueIndexTab';
+import { DeloadSchedulerTab } from './DeloadSchedulerTab';
 import { LoadSafetyCard } from './LoadSafetyCard';
+import { VBTCalcTab } from './VBTCalcTab';
+import { PeriodizationDesignerTab } from './PeriodizationDesignerTab';
+import { MesocycleProgressionCard } from './MesocycleProgressionCard';
+import MesoCorrectionCard from './MesoCorrectionCard';
+import { TrainingLoadCalculator } from './TrainingLoadCalculator';
+import { WhatIfCard } from './WhatIfCard';
+import StickingPointAnalysisCard from './StickingPointAnalysisCard';
+import VolumeRecoveryCorrelationCard from './VolumeRecoveryCorrelationCard';
+
+// ББ-специфичные
 import { BbToolsCard } from './BbToolsCard';
 import { SplitGenCard } from './SplitGenCard';
-import { SynergyMatrixCard } from './SynergyMatrixCard';
-import { MixPresetsCard } from './MixPresetsCard';
-import { GoalsHabitsCard } from './GoalsHabitsCard';
+import { TempoTab } from './TempoTab';
+import { TargetMuscleCalcTab } from './TargetMuscleCalcTab';
+import { VolumeOptimizerTab } from './VolumeOptimizerTab';
+import ConjugateTab from './ConjugateTab';
 
 interface ToolDef { id: string; title: string; icon: string; short: string; render: () => React.ReactNode; }
+
 const TOOLS: Record<'pl' | 'bb' | 'manual', ToolDef[]> = {
+  // ═══ ПЛ-АВТО ═══
   pl: [
-    { id: 'weak', title: 'Слабые точки ПЛ', icon: '🎯', short: 'Диагностика мёртвой точки движения → ассистентные упражнения и %ПМ.', render: () => <PlWeakpointsCard /> },
-    { id: 'pri', title: 'PRI / схема повторений', icon: '🧠', short: 'Готовность к тренировке (PRI) + схема повторений по цели/паттерну.', render: () => <PriRepPatternCard /> },
-    { id: 'comp', title: 'Соревнование', icon: '🏆', short: 'Весовая категория, стратегия подходов, таймлайн, восстановление.', render: () => <CompetitionCard /> },
-    { id: 'str', title: 'Аналитика силы', icon: '💪', short: 'Процентиль, уровень, соотношения, объёмные ориентиры, прогноз.', render: () => <StrengthAnalyticsCard /> },
-    { id: 'load', title: 'Нагрузка / авторегуляция', icon: '🫀', short: 'Кардио-план, ортопедические ограничения, распределение недели, RPE-авторег.', render: () => <LoadSafetyCard /> },
+    { id: 'str', title: 'Аналитика силы', icon: '💪', short: 'Процентиль, уровень, соотношения, объёмные ориентиры.', render: () => <StrengthAnalyticsCard /> },
+    { id: '1rm', title: 'Калькулятор 1RM', icon: '🎯', short: 'Оценка максимума по весу и повторениям → ПМ планировщику.', render: () => <OneRmCalcTab /> },
+    { id: 'weak', title: 'Слабые точки ПЛ', icon: '🎯', short: 'Диагностика мёртвой точки движения → ассистентные упражнения.', render: () => <PlWeakpointsCard /> },
+    { id: 'relstr', title: 'Относительная сила', icon: '⚖️', short: 'Wilks/DOTS/GL — определение слабейшего движения.', render: () => <RelativeStrengthCalcTab /> },
+    { id: 'sticking', title: 'Анализ срывов', icon: '🔬', short: 'По истории тренировок: где срыв и какие мышцы слабые.', render: () => <StickingPointAnalysisCard sessions={[]} /> },
+    { id: 'pri', title: 'PRI / готовность', icon: '🧠', short: 'Готовность к тренировке (PRI) + RIR-корректировка.', render: () => <PriRepPatternCard /> },
+    { id: 'fatigue', title: 'Индекс усталости', icon: '📉', short: 'ACWR, монотонность, strain → корректировка объёма.', render: () => <FatigueIndexTab /> },
+    { id: 'load', title: 'Нагрузка / авторег', icon: '🫀', short: 'Кардио, ортопедия, распределение недели, RPE-авторегуляция.', render: () => <LoadSafetyCard /> },
+    { id: 'mrv', title: 'MRV-оценщик', icon: '📊', short: 'Индивидуальный MRV из истории sRPE и готовности.', render: () => <MRVEstimatorTab /> },
+    { id: 'volrec', title: 'Объём↔восстановление', icon: '🔄', short: 'Корреляция объёма и готовности → оценка MRV.', render: () => <VolumeRecoveryCorrelationCard sessions={[]} /> },
+    { id: 'loadcalc', title: 'Калькулятор нагрузки', icon: '📊', short: 'sRPE/ACWR/Banister — острая/хроническая нагрузка.', render: () => <TrainingLoadCalculator /> },
+    { id: 'meso', title: 'Прогрессия мезо', icon: '📈', short: 'Кривые V/I/RIR по неделям → стартовый объём планировщику.', render: () => <MesocycleProgressionCard weeks={12} startVolumeSets={18} startIntensityPct={0.75} startRIR={3} goal="hypertrophy" fatigueTrajectory={[]} /> },
+    { id: 'mesocorr', title: 'Коррекция мезо', icon: '🔧', short: 'Авто-корректировка объёма/RIR/deload по данным.', render: () => <MesoCorrectionCard profile={{} as any} acwr={1} monotony={1} avgReadiness={80} mesoWeeks={12} missedSessions={0} exercises={[]} currentVolume={18} currentRir={2} /> },
+    { id: 'peak', title: 'Пик-протокол', icon: '⚡', short: 'Пиковая фаза: объём ↓, RIR→0, интенсивность ↑.', render: () => <PeakingProtocolTab /> },
+    { id: 'taper', title: 'Taper-планер', icon: '🏁', short: 'Тейпер к соревнованию: объём ↓, прикиды, таймлайн.', render: () => <TaperPlannerTab /> },
+    { id: 'deload', title: 'Планировщик делода', icon: '🧘', short: 'Авто-расписание разгрузочных недель.', render: () => <DeloadSchedulerTab /> },
+    { id: 'period', title: 'Дизайнер периодизации', icon: '🔄', short: 'Блочный макроцикл: drag-and-drop фаз на таймлайн.', render: () => <PeriodizationDesignerTab /> },
+    { id: 'whatif', title: 'What-if сценарий', icon: '🔮', short: 'Прогноз риск/готовность от калорий/сна/AAS.', render: () => <WhatIfCard baseRisk={20} baseReadiness={75} /> },
+    { id: 'comp', title: 'Соревнование', icon: '🏆', short: 'Категория, стратегия подходов, таймлайн, восстановление.', render: () => <CompetitionCard /> },
   ],
+
+  // ═══ ББ-АВТО ═══
   bb: [
     { id: 'bb', title: 'ББ-инструменты', icon: '💪', short: 'Темп/отдых/TUT, техники интенсификации, слабые точки, демография.', render: () => <BbToolsCard /> },
     { id: 'split', title: 'Генератор сплитов', icon: '🧩', short: '9 типов сплитов под цель/дни/слабые группы.', render: () => <SplitGenCard /> },
-    { id: 'syn', title: 'Синергия веществ', icon: '🧬', short: 'Парная синергия/конфликт БАД (подбор стека под цель).', render: () => <SynergyMatrixCard /> },
-    { id: 'mix', title: 'Пресеты миксов', icon: '🧪', short: 'Готовые составы pre/intra/post (жир/суставы/ЖКТ/сон/гидратация/восст.).', render: () => <MixPresetsCard /> },
-    { id: 'load', title: 'Нагрузка / авторегуляция', icon: '🫀', short: 'Кардио, ортопедия, распределение недели, RPE-авторегуляция.', render: () => <LoadSafetyCard /> },
+    { id: 'target', title: 'Целевая мышца', icon: '🎯', short: 'Подбор упражнений по целевой мышце и её региону.', render: () => <TargetMuscleCalcTab /> },
+    { id: 'tempo', title: 'Темп повторений', icon: '⏱️', short: 'Эксцентрика/пауза/концентрика/пауза по цели.', render: () => <TempoTab /> },
+    { id: 'pri', title: 'PRI / готовность', icon: '🧠', short: 'Готовность к тренировке + RIR-корректировка.', render: () => <PriRepPatternCard /> },
+    { id: 'fatigue', title: 'Индекс усталости', icon: '📉', short: 'ACWR, монотонность, strain → корректировка объёма.', render: () => <FatigueIndexTab /> },
+    { id: 'load', title: 'Нагрузка / авторег', icon: '🫀', short: 'Кардио, ортопедия, распределение недели, RPE-авторегуляция.', render: () => <LoadSafetyCard /> },
+    { id: 'mrv', title: 'MRV-оценщик', icon: '📊', short: 'Индивидуальный MRV из истории sRPE и готовности.', render: () => <MRVEstimatorTab /> },
+    { id: 'volrec', title: 'Объём↔восстановление', icon: '🔄', short: 'Корреляция объёма и готовности → оценка MRV.', render: () => <VolumeRecoveryCorrelationCard sessions={[]} /> },
+    { id: 'volopt', title: 'Оптимизатор объёма', icon: '📐', short: 'Полный анализ объёма: per-muscle MEV/MAV/MRV, SFR, CNS.', render: () => <VolumeOptimizerTab /> },
+    { id: 'loadcalc', title: 'Калькулятор нагрузки', icon: '📊', short: 'sRPE/ACWR/Banister — острая/хроническая нагрузка.', render: () => <TrainingLoadCalculator /> },
+    { id: 'sticking', title: 'Анализ срывов', icon: '🔬', short: 'Где «зависает» прогресс и какие мышцы отстают.', render: () => <StickingPointAnalysisCard sessions={[]} /> },
+    { id: 'str', title: 'Аналитика силы', icon: '💪', short: 'Процентиль, уровень, соотношения, ориентиры.', render: () => <StrengthAnalyticsCard /> },
+    { id: '1rm', title: 'Калькулятор 1RM', icon: '🎯', short: 'Оценка максимума → ПМ планировщику.', render: () => <OneRmCalcTab /> },
+    { id: 'meso', title: 'Прогрессия мезо', icon: '📈', short: 'Кривые V/I/RIR по неделям → стартовый объём.', render: () => <MesocycleProgressionCard weeks={8} startVolumeSets={16} startIntensityPct={0.72} startRIR={3} goal="hypertrophy" fatigueTrajectory={[]} /> },
+    { id: 'mesocorr', title: 'Коррекция мезо', icon: '🔧', short: 'Авто-корректировка объёма/RIR/deload.', render: () => <MesoCorrectionCard profile={{} as any} acwr={1} monotony={1} avgReadiness={80} mesoWeeks={8} missedSessions={0} exercises={[]} currentVolume={16} currentRir={3} /> },
+    { id: 'deload', title: 'Планировщик делода', icon: '🧘', short: 'Авто-расписание разгрузочных недель.', render: () => <DeloadSchedulerTab /> },
+    { id: 'period', title: 'Дизайнер периодизации', icon: '🔄', short: 'Блочный макроцикл: drag-and-drop фаз.', render: () => <PeriodizationDesignerTab /> },
+    { id: 'whatif', title: 'What-if сценарий', icon: '🔮', short: 'Прогноз риск/готовность от калорий/сна/AAS.', render: () => <WhatIfCard baseRisk={20} baseReadiness={75} /> },
+    { id: 'conj', title: 'Конъюгат (Westside)', icon: '🔁', short: 'ME/DE/RE дни — фокус на одном движении.', render: () => <ConjugateTab /> },
   ],
+
+  // ═══ РУЧНОЙ СБОР (все инструменты) ═══
   manual: [
-    { id: 'split', title: 'Генератор сплитов', icon: '🧩', short: 'Подбор структуры сплита под цель/дни/слабые группы.', render: () => <SplitGenCard /> },
-    { id: 'bb', title: 'ББ-инструменты', icon: '💪', short: 'Темп/отдых, техники интенсификации, слабые точки, демография.', render: () => <BbToolsCard /> },
-    { id: 'pri', title: 'PRI / схема повторений', icon: '🧠', short: 'Готовность + схема повторений по цели/паттерну.', render: () => <PriRepPatternCard /> },
-    { id: 'str', title: 'Аналитика силы', icon: '💪', short: 'Процентиль, уровень, соотношения, объёмные ориентиры.', render: () => <StrengthAnalyticsCard /> },
-    { id: 'goals', title: 'Цели и привычки', icon: '🎯', short: 'Постановка целей с прогрессом + трекинг ежедневных привычек.', render: () => <GoalsHabitsCard /> },
+    { id: 'split', title: 'Генератор сплитов', icon: '🧩', short: '9 типов сплитов под цель/дни/слабые группы.', render: () => <SplitGenCard /> },
+    { id: 'bb', title: 'ББ-инструменты', icon: '💪', short: 'Темп/отдых, техники, слабые точки, демография.', render: () => <BbToolsCard /> },
+    { id: 'target', title: 'Целевая мышца', icon: '🎯', short: 'Подбор упражнений по целевой мышце.', render: () => <TargetMuscleCalcTab /> },
+    { id: 'tempo', title: 'Темп повторений', icon: '⏱️', short: 'Темп по цели движения.', render: () => <TempoTab /> },
+    { id: 'weak', title: 'Слабые точки ПЛ', icon: '🎯', short: 'Диагностика мёртвой точки движения.', render: () => <PlWeakpointsCard /> },
+    { id: 'str', title: 'Аналитика силы', icon: '💪', short: 'Процентиль, уровень, соотношения, ориентиры.', render: () => <StrengthAnalyticsCard /> },
+    { id: '1rm', title: 'Калькулятор 1RM', icon: '🎯', short: 'Оценка максимума → ПМ планировщику.', render: () => <OneRmCalcTab /> },
+    { id: 'vbt', title: 'VBT / скорость', icon: '⚡', short: 'Скорость штанги → %1RM и e1RM → ПМ.', render: () => <VBTCalcTab /> },
+    { id: 'relstr', title: 'Относительная сила', icon: '⚖️', short: 'Wilks/DOTS/GL — слабейшее движение.', render: () => <RelativeStrengthCalcTab /> },
+    { id: 'sticking', title: 'Анализ срывов', icon: '🔬', short: 'Где «зависает» прогресс и какие мышцы отстают.', render: () => <StickingPointAnalysisCard sessions={[]} /> },
+    { id: 'pri', title: 'PRI / готовность', icon: '🧠', short: 'Готовность + RIR-корректировка.', render: () => <PriRepPatternCard /> },
+    { id: 'fatigue', title: 'Индекс усталости', icon: '📉', short: 'ACWR, монотонность, strain → объём.', render: () => <FatigueIndexTab /> },
+    { id: 'load', title: 'Нагрузка / авторег', icon: '🫀', short: 'Кардио, ортопедия, распределение недели, RPE.', render: () => <LoadSafetyCard /> },
+    { id: 'mrv', title: 'MRV-оценщик', icon: '📊', short: 'Индивидуальный MRV из истории.', render: () => <MRVEstimatorTab /> },
+    { id: 'volrec', title: 'Объём↔восстановление', icon: '🔄', short: 'Корреляция объёма и готовности → MRV.', render: () => <VolumeRecoveryCorrelationCard sessions={[]} /> },
+    { id: 'volopt', title: 'Оптимизатор объёма', icon: '📐', short: 'Полный анализ: per-muscle MEV/MAV/MRV, SFR.', render: () => <VolumeOptimizerTab /> },
+    { id: 'loadcalc', title: 'Калькулятор нагрузки', icon: '📊', short: 'sRPE/ACWR/Banister.', render: () => <TrainingLoadCalculator /> },
+    { id: 'meso', title: 'Прогрессия мезо', icon: '📈', short: 'Кривые V/I/RIR → стартовый объём.', render: () => <MesocycleProgressionCard weeks={8} startVolumeSets={16} startIntensityPct={0.72} startRIR={3} goal="hypertrophy" fatigueTrajectory={[]} /> },
+    { id: 'mesocorr', title: 'Коррекция мезо', icon: '🔧', short: 'Авто-корректировка объёма/RIR/deload.', render: () => <MesoCorrectionCard profile={{} as any} acwr={1} monotony={1} avgReadiness={80} mesoWeeks={8} missedSessions={0} exercises={[]} currentVolume={16} currentRir={3} /> },
+    { id: 'peak', title: 'Пик-протокол', icon: '⚡', short: 'Пиковая фаза: объём ↓, RIR→0.', render: () => <PeakingProtocolTab /> },
+    { id: 'taper', title: 'Taper-планер', icon: '🏁', short: 'Тейпер к соревнованию.', render: () => <TaperPlannerTab /> },
+    { id: 'deload', title: 'Планировщик делода', icon: '🧘', short: 'Авто-расписание разгрузочных недель.', render: () => <DeloadSchedulerTab /> },
+    { id: 'period', title: 'Дизайнер периодизации', icon: '🔄', short: 'Блочный макроцикл: drag-and-drop фаз.', render: () => <PeriodizationDesignerTab /> },
+    { id: 'conj', title: 'Конъюгат (Westside)', icon: '🔁', short: 'ME/DE/RE дни.', render: () => <ConjugateTab /> },
+    { id: 'comp', title: 'Соревнование', icon: '🏆', short: 'Категория, стратегия, таймлайн.', render: () => <CompetitionCard /> },
+    { id: 'whatif', title: 'What-if сценарий', icon: '🔮', short: 'Прогноз риск/готовность.', render: () => <WhatIfCard baseRisk={20} baseReadiness={75} /> },
   ],
 };
 
-const TITLE_RU: Record<'pl' | 'bb' | 'manual', string> = { pl: '🏆 ПЛ — инструменты планирования', bb: '💪 ББ — инструменты планирования', manual: '🛠 Ручной сбор — инструменты планирования' };
+const TITLE_RU: Record<'pl' | 'bb' | 'manual', string> = {
+  pl: '🏆 ПЛ — инструменты планирования',
+  bb: '💪 ББ — инструменты планирования',
+  manual: '🛠 Ручной сбор — инструменты планирования',
+};
 
 export const PlannerToolsPanel: React.FC<{ mode: 'pl' | 'bb' | 'manual' }> = ({ mode }) => {
   const [openId, setOpenId] = useState<string | null>(null);
@@ -47,10 +129,10 @@ export const PlannerToolsPanel: React.FC<{ mode: 'pl' | 'bb' | 'manual' }> = ({ 
   return (
     <div style={{ marginTop: 10 }}>
       <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent)', margin: '12px 0 6px', textTransform: 'uppercase', letterSpacing: 0.3 }}>
-        🔧 Инструменты планирования (доступны здесь)
+        🔧 Инструменты планирования ({tools.length})
       </div>
       <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>
-        {TITLE_RU[mode]} — раскройте нужный инструмент, он откроется прямо здесь, без перехода в «Калькуляторы».
+        {TITLE_RU[mode]} — раскройте нужный инструмент, он откроется прямо здесь. Каждый имеет кнопку «🛠 Применить к планировщику».
       </div>
       {tools.map(t => {
         const open = openId === t.id;

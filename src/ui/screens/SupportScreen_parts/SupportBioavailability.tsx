@@ -3,10 +3,12 @@ import { SUPPORT_CATALOG_DATA, type SupportCatalogEntry } from '../../../data/su
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { PEPTIDE_DB } from '../../../engines/peptide-calculator.engine';
 import { InfoErrorBoundary } from './SupportScreenData';
+import { DosageDatabaseView } from '../../components/DosageCalculator';
 import { calcStackSynergyScore, suggestSynergyAdditions } from '../../../engines/support-plan/display';
 import { INTERACTION_ENRICHMENT } from '../../../data/support-interaction-enrichment';
 import { MECH_TRANSLATIONS_RU, MECH_LABELS } from './SupportScreenData';
 import { S } from './SupportShared';
+import { PopupSelect } from '../../components/PopupXxx';
 import {
   type FormWithBio, type EnrichedEntry, type EnhancerInfo, type CompetitorInfo, type StatsInfo,
   getCatalogFormBio, detectEnhancers, detectCompetition, classifySubstance,
@@ -60,7 +62,7 @@ function buildCatalog(): EnrichedEntry[] {
 import { ROUTE_LABELS_MAP } from './SupportBioavailabilityData';
 
 // ─── Main component ───
-type BTab = 'catalog' | 'calculator' | 'stats' | 'timing' | 'synergy' | 'interactions';
+type BTab = 'catalog' | 'calculator' | 'dosages' | 'timing' | 'interactions';
 
 export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const [tab, setTab] = useState<BTab>(() => (localStorage.getItem('he_bio_tab') as BTab) || 'catalog');
@@ -105,20 +107,19 @@ export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s
             Сравнение форм, расчёт эффективной дозы, стратегии улучшения всасывания · {stats.total} веществ
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 3, marginBottom: 8, flexWrap: 'wrap' }}>
-          {(['catalog', 'calculator', 'timing', 'synergy', 'interactions', 'stats'] as BTab[]).map(t => (
+        <div style={{ display: 'flex', gap: 4, marginBottom: 8, overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+          {(['catalog', 'calculator', 'timing', 'interactions', 'dosages'] as BTab[]).map(t => (
             <button key={t} onClick={() => { setTab(t); localStorage.setItem('he_bio_tab', t); }}
-              style={{ padding: '5px 10px', borderRadius: 14, fontSize: 9, fontWeight: 700, cursor: 'pointer', border: '1px solid var(--border)', background: tab === t ? 'var(--accent)' : 'var(--bg-secondary)', color: tab === t ? '#000' : 'var(--text-dim)', whiteSpace: 'nowrap' }}>
-              {t === 'catalog' ? '📋 Каталог' : t === 'calculator' ? '🧮 Расчёт' : t === 'timing' ? '⏰ Тайминг' : t === 'synergy' ? '🔄 Синергия' : t === 'interactions' ? '⚡ Взаимодействия' : '📊 Статистика'}
+              style={{ padding: '6px 12px', borderRadius: 16, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid var(--border)', background: tab === t ? 'var(--accent)' : 'var(--bg-secondary)', color: tab === t ? '#000' : 'var(--text-dim)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              {t === 'catalog' ? '📋 Каталог' : t === 'calculator' ? '🧮 Расчёт' : t === 'timing' ? '⏰ Тайминг' : t === 'interactions' ? '⚡ Синергия' : '📋 Дозировки'}
             </button>
           ))}
         </div>
         {tab === 'catalog' && <CatalogTab catalog={catalog} filtered={filtered} allCategories={allCategories} searchQuery={searchQuery} setSearchQuery={setSearchQuery} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} sourceFilter={sourceFilter} setSourceFilter={setSourceFilter} sortBy={sortBy} setSortBy={setSortBy} selectedId={selectedId} handleSelect={handleSelect} compareIds={compareIds} handleCompare={handleCompare} showCompare={showCompare} setShowCompare={setShowCompare} compareEntries={compareEntries} />}
         {tab === 'calculator' && <CalculatorTab catalog={catalog} />}
         {tab === 'timing' && <TimingTab catalog={catalog} />}
-        {tab === 'synergy' && <SynergyTab catalog={catalog} />}
-        {tab === 'interactions' && <InteractionsTab catalog={catalog} />}
-        {tab === 'stats' && <StatsTab stats={stats} catalog={catalog} />}
+        {tab === 'interactions' && <SynergyInteractionsTab catalog={catalog} />}
+        {tab === 'dosages' && <DosageDatabaseView />}
       </div>
     </InfoErrorBoundary>
   );
@@ -131,12 +132,18 @@ const CatalogTab: React.FC<CatalogTabProps> = ({ catalog, filtered, allCategorie
   if (selected) return <DetailView entry={selected} onBack={() => handleSelect(null)} catalog={catalog} />;
   return (
     <div>
-      <div style={{ ...S.card, marginBottom: 10, display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск..." style={{ flex: 1, minWidth: 100, padding: '6px 8px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-light)', fontSize: 10 }} />
-        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={{ padding: '5px 4px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-light)', fontSize: 9, maxWidth: 100 }}><option value="all">Все категории</option>{allCategories.map(c => <option key={c} value={c}>{c}</option>)}</select>
-        <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} style={{ padding: '5px 4px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-light)', fontSize: 9, maxWidth: 80 }}><option value="all">Все типы</option><option value="catalog">БАД</option><option value="pharma">Фарма</option><option value="peptide">Пептиды</option></select>
-        <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} style={{ padding: '5px 4px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-light)', fontSize: 9, maxWidth: 100 }}><option value="bio">По био</option><option value="name">По алфавиту</option><option value="forms">По формам</option></select>
-        <button onClick={() => setShowCompare(!showCompare)} style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer', background: showCompare ? 'rgba(0,230,138,0.1)' : 'var(--bg-primary)', color: showCompare ? '#00e68a' : 'var(--text-dim)', fontSize: 9, fontWeight: 700 }}>{showCompare ? '✓ Сравнение' : '⚖'}</button>
+      <div style={{ ...S.card, marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '4px 10px' }}>
+          <span style={{ fontSize: 13, flexShrink: 0, opacity: 0.5 }}>🔍</span>
+          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, описанию..." style={{ flex: 1, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.85)', fontSize: 11, outline: 'none', padding: '6px 0', fontFamily: 'inherit' }} />
+          {searchQuery && <span onClick={() => setSearchQuery('')} style={{ fontSize: 12, cursor: 'pointer', opacity: 0.4, padding: '2px 4px' }}>✕</span>}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 4 }}>
+          <PopupSelect label="📂 Категория" value={categoryFilter} options={[{id:'all',label:'Все категории'},...allCategories.map(c => ({id:c,label:c}))]} onChange={setCategoryFilter} />
+          <PopupSelect label="📦 Тип" value={sourceFilter} options={[{id:'all',label:'Все типы'},{id:'catalog',label:'БАД'},{id:'pharma',label:'Фарма'},{id:'peptide',label:'Пептиды'}]} onChange={setSourceFilter} />
+          <PopupSelect label="🔀 Сортировка" value={sortBy} options={[{id:'bio',label:'По биодоступности'},{id:'name',label:'По алфавиту'},{id:'forms',label:'По числу форм'}]} onChange={v => setSortBy(v as any)} />
+          <button onClick={() => setShowCompare(!showCompare)} style={{ width:38, height:38, borderRadius:10, cursor:'pointer', border: showCompare ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: showCompare ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(24,24,27,0.6)', color: showCompare ? '#000' : 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: 700, display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s' }} title="Сравнение">{showCompare ? '✓' : '⚖'}</button>
+        </div>
       </div>
       {showCompare && <ComparePanel compareEntries={compareEntries} compareIds={compareIds} handleCompare={handleCompare} />}
       <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>{filtered.length} из {catalog.length} веществ</div>
@@ -224,7 +231,7 @@ const DetailView: React.FC<{ entry: EnrichedEntry; onBack: () => void; catalog: 
         <button onClick={onBack} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontSize: 9, cursor: 'pointer' }}>←</button>
         <div><div style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)' }}>{entry.nameRu}</div><div style={{ fontSize: 8, color: 'var(--text-dim)' }}>{entry.nameEn} · {entry.source === 'catalog' ? 'БАД' : entry.source === 'pharma' ? 'Фарма' : 'Пептид'} · {entry.category.join(', ')}</div></div>
       </div>
-      {entry.description && <div style={{ ...S.card }}><div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.3 }}>{entry.description.slice(0, 300)}{entry.description.length > 300 ? '...' : ''}</div></div>}
+      {entry.description && <div style={{ ...S.card }}><div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.3 }}>{entry.description}</div></div>}
 
       {/* Forms table */}
       <div style={{ ...S.card }}>
@@ -326,7 +333,7 @@ const BioChart: React.FC<{ entry: EnrichedEntry; doseMg: number; enhancersOn: bo
 
 // ─── Clinical cards ───
 const ClinicalCards: React.FC<{ entry: EnrichedEntry }> = ({ entry }) => {
-  const labKey = entry.windowKey || entry.absorptionKey === 'mineral' ? entry.windowKey : '';
+  const labKey = entry.windowKey || (entry.absorptionKey === 'mineral' ? entry.windowKey : '');
   const labs = labKey ? LAB_MARKERS[labKey] : null;
   const recommender = entry.windowKey ? FORM_RECOMMENDER[entry.windowKey] : null;
   return (
@@ -434,28 +441,135 @@ const TimingTab: React.FC<{ catalog: EnrichedEntry[] }> = ({ catalog }) => {
   const [selectedSubs, setSelectedSubs] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_bio_timing_subs') || '[]'); } catch { return []; } });
   const [timingSearch, setTimingSearch] = useState('');
   const toggleSub = (id: string) => { const next = selectedSubs.includes(id) ? selectedSubs.filter(x => x !== id) : [...selectedSubs, id]; setSelectedSubs(next); localStorage.setItem('he_bio_timing_subs', JSON.stringify(next)); };
+  // Приоритет категорий для тайминга: 1 = наивысший
+  // Ферменты и гемореология — наивысший (должны строго натощак, иначе теряют эффективность)
+  const CATEGORY_PRIORITY: Record<string, number> = {
+    enzyme: 1, fibrinolytic: 1, mucolytic: 1, proteolytic: 1, hemorheologic: 1, anticoagulant: 1,
+    // Дофамин/L-DOPA — критичен натощак (конкуренция с аминокислотами пищи)
+    dopamine: 2, peptide: 2, gh_secretagogue: 2,
+    // Сон — строго ночь (выше serotonin: 5-HTP+serotonin+son комбо)
+    sleep: 1, herb_sedative: 3, serotonin: 3,
+    // Адаптогены и энергия — утро (не вечер)
+    herb_adaptogen: 4, adaptogen: 4, stress: 4,
+    // B-витамины и энергия — утро
+    b_vitamins: 5, energy: 5, thyroid: 5, nootropic: 5,
+    // Минералы — строгий тайминг (натощак или вечером)
+    mineral_fe: 6, mineral_zn: 6, mineral_se: 6, mineral: 6, mineral_ca: 6, mineral_mg: 6, iron: 6,
+    electrolyte: 6,
+    // ЖКТ и детокс — натощак (высший приоритет: пробиотики и дектокс строго натощак)
+    probiotic: 4, gi: 4, gut: 4, detox: 5, digestion: 5,
+    // Гепатопротекторы — с едой
+    hepatoprotector: 8, liver: 8, bile: 8, choleretic: 8, bile_acid: 8,
+    // ССС — утро с едой
+    cardioprotector: 9, cardio: 9, bp: 9, heart_rate: 9,
+    ace_inhibitor: 9, antihypertensive: 9,
+    // Омега — с большим приёмом пищи
+    omega: 10, omega3: 10,
+    // Аминокислоты — натощак
+    amino: 11, amino_acid: 11, protein: 11, anabolic: 11,
+    // Антиоксиданты — с едой/натощак
+    antioxidant: 12, mitochondrial: 12, anti_aging: 12,
+    antioxidant_fat: 12, antioxidant_am: 12,
+    // Витамины, кости, суставы
+    vitamin: 13, bone: 13, joint: 13,
+    coagulation: 13, vitamin_der: 13, vitamin_a_d: 13,
+    // Воспаление, холестерин — гибко
+    antiinflammatory: 14, antiagg: 14,
+    hypocholesterolemic: 14, lipid_low: 14, cholesterol: 14,
+    // Метилирование
+    methylation: 15, metabolic: 15, recovery: 16,
+    // Иммунитет
+    immunomodulator: 17, immune: 17,
+    // Нервная система (не сон)
+    neuro: 18, neuroprotector: 18, anxiolytic: 18,
+    // Почки
+    renal: 19, nephroprotector: 19,
+    // Эндокринная
+    endocrine: 20, hormonal: 20, aromatase_inhibitor: 20,
+    androgen: 20, aas_derivative: 20, pharma: 20,
+    // Кожа, волосы
+    skin: 21, beauty: 21, collagen: 21,
+    // Флавоноиды — с жирами
+    flavonoid: 22, polyphenol: 22, venotonic: 22,
+    glucosinolate: 22, herbal: 22, herb: 22,
+    // Остальное
+    creatine: 30,
+  };
+  // Именные подсказки для специфических веществ (категории могут не отражать все нюансы)
+  const NAME_TIMING_OVERRIDES: { pattern: RegExp; key: keyof typeof CATEGORY_TIMING }[] = [
+    // Ферменты — строго натощак (иначе переваривают еду, не всасываются)
+    { pattern: /серра|serra|серрапептаз|serrapeptas/, key: 'enzyme' },
+    { pattern: /натто|natto|наттокиназ|nattokinas/, key: 'fibrinolytic' },
+    { pattern: /лумбро|lumbro|люмброкиназ|lumbrokina/, key: 'fibrinolytic' },
+    { pattern: /бромелайн|bromelain/, key: 'enzyme' },
+    { pattern: /папаин|papain/, key: 'enzyme' },
+    // TUDCA — вечером натощак
+    { pattern: /tudca|тудц|урсодез|ursodez/, key: 'bile_acid' },
+    // Таурин — гибко, но лучше натощак (конкуренция с аминокислотами)
+    { pattern: /таурин|taurin/, key: 'amino' },
+    // Минералы
+    { pattern: /кальц|calcium|ca_/, key: 'mineral_ca' },
+    { pattern: /магн|magnesium/, key: 'mineral_mg' },
+    { pattern: /цинк|zinc/, key: 'mineral_zn' },
+    { pattern: /желез|iron|fe_/, key: 'mineral_fe' },
+    { pattern: /селен|selen/, key: 'mineral_se' },
+    // Жирорастворимые
+    { pattern: /d3|вит.*d|vit.*d/, key: 'fat_soluble' },
+    { pattern: /coq10|убихин|ubiquin/, key: 'antioxidant_fat' },
+    { pattern: /куркум|curcum/, key: 'antioxidant_fat' },
+    // Омега-3
+    { pattern: /омега|omega/, key: 'omega3_any' },
+    // B-витамины — утро
+    { pattern: /b12|b-12|фолат|folat|b6|b2|b1/, key: 'b_vitamins' },
+    // Адаптогены
+    { pattern: /ашваганд|ashwagan|валерьян|valerian|мелатон/, key: 'herb_sedative' },
+    { pattern: /родиол|rhodiol|женьшен|ginseng|элеутеро/, key: 'herb_adaptogen' },
+    // Прочее
+    { pattern: /5-htp|гидрокситриптофан|x5htp/, key: 'sleep' },
+    { pattern: /креатин|creatin/, key: 'creatine' },
+    { pattern: /коллаген|collagen/, key: 'collagen' },
+    { pattern: /(про|pro)(био|bio)/, key: 'probiotic' },
+    { pattern: /глутатион|glutathione/, key: 'antioxidant_am' },
+    { pattern: /nac\b/, key: 'antioxidant_am' },
+    { pattern: /ала|ala\b/, key: 'antioxidant_am' },
+  ];
+
   const assignedSlots = useMemo(() => {
     const slots: Record<TimeSlot, { entry: EnrichedEntry; reason: string }[]> = { morning_empty: [], morning_food: [], noon_food: [], afternoon_empty: [], evening_food: [], night_empty: [] };
     selectedSubs.forEach(sid => {
       const entry = catalog.find(e => e.id === sid); if (!entry) return;
-      const cats = entry.category.join(' ').toLowerCase(); const n = entry.nameRu.toLowerCase();
-      let timing: SubstanceTiming | undefined;
-      if (cats.includes('fat') || cats.includes('жирораствор') || n.match(/d3|coq10|куркум|curcumin|омега|omega/)) timing = CATEGORY_TIMING.fat_soluble;
-      else if (n.match(/кальц|calcium|ca_/)) timing = CATEGORY_TIMING.mineral_ca;
-      else if (n.match(/магн|magnesium/)) timing = CATEGORY_TIMING.mineral_mg;
-      else if (n.match(/цинк|zinc/)) timing = CATEGORY_TIMING.mineral_zn;
-      else if (n.match(/желез|iron|fe_/)) timing = CATEGORY_TIMING.mineral_fe;
-      else if (n.match(/селен|selen/)) timing = CATEGORY_TIMING.mineral_se;
-      else if (cats.includes('antiox') || n.match(/nac|ала|ala|глутатион/)) timing = CATEGORY_TIMING.antioxidant_am;
-      else if (cats.includes('amino') || cats.includes('аминокислот')) timing = CATEGORY_TIMING.amino;
-      else if (cats.includes('probiot')) timing = CATEGORY_TIMING.probiotic;
-      else if (n.match(/ашваганд|ashwagan|валерьян|valerian|мелатон/)) timing = CATEGORY_TIMING.herb_sedative;
-      else if (n.match(/родиол|rhodiol|женьшен|ginseng|элеутеро/)) timing = CATEGORY_TIMING.herb_adaptogen;
-      else if (n.match(/b12|b-12|фолат|folat|b6|b2|b1/)) timing = CATEGORY_TIMING.b_vitamins;
-      else if (n.match(/креатин|creatin/)) timing = CATEGORY_TIMING.creatine;
-      else if (n.match(/коллаген|collagen/)) timing = CATEGORY_TIMING.collagen;
-      else timing = CATEGORY_TIMING.antioxidant_am;
-      if (timing) slots[timing.slot].push({ entry, reason: timing.reason });
+      const n = entry.nameRu.toLowerCase();
+
+      // Шаг 1: проверить именные переопределения (конкретные вещества)
+      for (const ov of NAME_TIMING_OVERRIDES) {
+        if (n.match(ov.pattern) && CATEGORY_TIMING[ov.key]) {
+          slots[CATEGORY_TIMING[ov.key].slot].push({ entry, reason: CATEGORY_TIMING[ov.key].reason });
+          return;
+        }
+      }
+
+      // Шаг 2: проверить категории из CATEGORY_TIMING, выбрать с наивысшим приоритетом
+      let bestTiming: SubstanceTiming | undefined;
+      let bestPriority = 999;
+      for (const cat of entry.category) {
+        const catLower = cat.toLowerCase();
+        const direct = CATEGORY_TIMING[catLower];
+        if (direct) {
+          const prio = CATEGORY_PRIORITY[catLower] ?? 50;
+          if (prio < bestPriority) { bestPriority = prio; bestTiming = direct; }
+        }
+      }
+
+      // Шаг 3: если категория не дала результата — fallback на общую проверку
+      if (!bestTiming) {
+        const catJoined = entry.category.join(' ').toLowerCase();
+        if (catJoined.includes('fat') || catJoined.includes('жирораствор')) bestTiming = CATEGORY_TIMING.fat_soluble;
+        else if (catJoined.includes('amino') || catJoined.includes('аминокислот')) bestTiming = CATEGORY_TIMING.amino;
+        else if (catJoined.includes('probiot')) bestTiming = CATEGORY_TIMING.probiotic;
+        else bestTiming = CATEGORY_TIMING.default;
+      }
+
+      slots[bestTiming.slot].push({ entry, reason: bestTiming.reason });
     });
     return slots;
   }, [selectedSubs, catalog]);
@@ -517,20 +631,29 @@ const TimingTab: React.FC<{ catalog: EnrichedEntry[] }> = ({ catalog }) => {
 };
 
 // ─── Synergy tab (stack synergy) ───
-const SynergyTab: React.FC<{ catalog: EnrichedEntry[] }> = ({ catalog }) => {
-  const [stackIds, setStackIds] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_bio_synergy_stack') || '[]'); } catch { return []; } });
-  const toggleInStack = (id: string) => { const next = stackIds.includes(id) ? stackIds.filter(x => x !== id) : [...stackIds, id]; setStackIds(next); localStorage.setItem('he_bio_synergy_stack', JSON.stringify(next)); };
-  const stackEntries = stackIds.map(sid => catalog.find(e => e.id === sid)).filter(Boolean) as EnrichedEntry[];
+const SynergyInteractionsTab: React.FC<{ catalog: EnrichedEntry[] }> = ({ catalog }) => {
+  const [interactIds, setInteractIds] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_bio_interact_ids') || '[]'); } catch { return []; } });
+  const [interactSearch, setInteractSearch] = useState('');
+  const [interactSearchIdx, setInteractSearchIdx] = useState<number>(-1);
 
-  const synergyReport = useMemo(() => {
-    if (stackEntries.length < 2) return null;
-    const totalBio = stackEntries.reduce((s, e) => s + (e.bestForm?.bioavailability || e.maxBio), 0);
-    const avgBio = totalBio / stackEntries.length;
-    const hasMineralConflict = stackEntries.filter(e => e.competitors.length > 0).length >= 2;
-    const hasEnhancerSynergy = stackEntries.filter(e => e.enhancers.some(en => en.label.includes('пиперин') || en.label.includes('жирн') || en.label.includes('витамин C'))).length >= 2;
-    const broadCoverage = new Set<string>(); stackEntries.forEach(e => { if (e.absorptionKey) broadCoverage.add(e.absorptionKey); });
+  const suppEntries = catalog.filter(e => e.source === 'catalog');
+  const allSupport = useMemo(() => suppEntries.map(e => ({ id: e.id, name: e.nameRu })), [suppEntries]);
+  const catalogSubstances = useMemo(() => Object.entries(SUPPORT_CATALOG_DATA).map(([id, entry]) => ({ id, name: entry.nameRu || entry.name || id })), []);
+
+  const addInteraction = () => { if (interactIds.length < 10) { const next = [...interactIds, '']; setInteractIds(next); localStorage.setItem('he_bio_interact_ids', JSON.stringify(next)); } };
+  const updateInteraction = (idx: number, value: string) => { const next = [...interactIds]; next[idx] = value; setInteractIds(next); localStorage.setItem('he_bio_interact_ids', JSON.stringify(next)); };
+  const validIds = interactIds.filter(Boolean);
+  const validCatalogEntries = useMemo(() => validIds.map(id => catalog.find(e => e.id === id)).filter(Boolean) as EnrichedEntry[], [validIds, catalog]);
+
+  const bioReport = useMemo(() => {
+    if (validCatalogEntries.length < 2) return null;
+    const totalBio = validCatalogEntries.reduce((s, e) => s + (e.bestForm?.bioavailability || e.maxBio), 0);
+    const avgBio = totalBio / validCatalogEntries.length;
+    const broadCoverage = new Set<string>(); validCatalogEntries.forEach(e => { if (e.absorptionKey) broadCoverage.add(e.absorptionKey); });
+    const hasMineralConflict = validCatalogEntries.filter(e => e.competitors.length > 0).length >= 2;
+    const hasEnhancerSynergy = validCatalogEntries.filter(e => e.enhancers.some(en => en.label.includes('пиперин') || en.label.includes('жирн') || en.label.includes('витамин C'))).length >= 2;
     const conflictPairs: { a: string; b: string; reason: string }[] = [];
-    const mineralEnts = stackEntries.filter(e => e.competitors.length > 0);
+    const mineralEnts = validCatalogEntries.filter(e => e.competitors.length > 0);
     for (let i = 0; i < mineralEnts.length; i++) {
       for (let j = i + 1; j < mineralEnts.length; j++) {
         const a = mineralEnts[i]; const b = mineralEnts[j];
@@ -540,46 +663,344 @@ const SynergyTab: React.FC<{ catalog: EnrichedEntry[] }> = ({ catalog }) => {
           conflictPairs.push({ a: a.nameRu, b: b.nameRu, reason: 'Конкуренция за транспортёры' });
       }
     }
-    let score = 70; const notes: string[] = [];
-    if (avgBio > 0.6) { score += 15; notes.push('Высокая средняя биодоступность стека'); }
-    if (broadCoverage.size >= 2) { score += 10; notes.push(`Покрыто ${broadCoverage.size} разных зон всасывания`); }
-    if (hasEnhancerSynergy) { score += 5; notes.push('Синергия усилителей всасывания'); }
-    if (conflictPairs.length > 0) { score -= conflictPairs.length * 15; notes.push(`${conflictPairs.length} конфликтных пар`); }
-    return { score: Math.max(0, Math.min(100, score)), avgBio, conflictPairs, notes, broadCoverage: broadCoverage.size, hasMineralConflict, hasEnhancerSynergy };
-  }, [stackEntries]);
+    return { avgBio, broadCoverage: broadCoverage.size, hasMineralConflict, hasEnhancerSynergy, conflictPairs };
+  }, [validCatalogEntries]);
 
-  const suppEntries = catalog.filter(e => e.source === 'catalog');
+  const enhAll = useMemo(() => {
+    if (validCatalogEntries.length < 2) return [];
+    const map: { label: string; mult: number; subs: string[] }[] = [];
+    validCatalogEntries.forEach(e => { e.enhancers.forEach(en => { const existing = map.find(x => x.label === en.label); if (existing) existing.subs.push(e.nameRu); else map.push({ label: en.label, mult: en.mult, subs: [e.nameRu] }); }); });
+    return map.filter(x => x.subs.length >= 2);
+  }, [validCatalogEntries]);
+
+  // Catalog-based pair interactions (fallback when ALL_INTERACTIONS has no match)
+  const catalogPairs = useMemo(() => {
+    if (validIds.length < 2) return [];
+    const pairs: Array<{ a: string; b: string; aName: string; bName: string; type: string; severity: string; effect: string }> = [];
+    const seen = new Set<string>();
+    for (const id of validIds) {
+      const entry = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
+      if (!entry) continue;
+      const aName = entry.nameRu || entry.name || id;
+      const checkPairs = (pairsArr: Array<{ with: string; effect?: string; severity?: string }> | undefined, pType: string) => {
+        for (const p of (pairsArr || [])) {
+          const withId = p.with || '';
+          const withLow = withId.toLowerCase();
+          if (!withLow) continue;
+          const matchedId = validIds.find((sid: string) =>
+            sid.toLowerCase() === withLow ||
+            sid.toLowerCase().replace(/_/g, '') === withLow.replace(/_/g, '')
+          );
+          if (!matchedId) continue;
+          const pk = [aName, matchedId].sort().join('||');
+          if (seen.has(pk)) continue;
+          seen.add(pk);
+          const bEntry = SUPPORT_CATALOG_DATA[matchedId] || SUPPORT_CATALOG_DATA[matchedId.toUpperCase()];
+          const bName = bEntry?.nameRu || bEntry?.name || matchedId;
+          pairs.push({
+            a: id, b: matchedId, aName, bName,
+            type: pType,
+            severity: (p as any).severity || 'MEDIUM',
+            effect: (p as any).effect || String(p as any) || '',
+          });
+        }
+      };
+      checkPairs(entry.synergies || [], 'synergy');
+      checkPairs(entry.conflicts || [], 'conflict');
+      if ((entry as any).cautions) checkPairs((entry as any).cautions, 'caution');
+    }
+    return pairs;
+  }, [validIds]);
+
+  // Merge ALL_INTERACTIONS matrix with catalog pair data
+  const mergedStackData = useMemo(() => {
+    const stackScore = calcStackSynergyScore(validIds);
+    const existingKeys = new Set(stackScore.matrix.map((m: any) => [m.a.toLowerCase(), m.b.toLowerCase()].sort().join('||')));
+    const merged = [...stackScore.matrix];
+    for (const cp of catalogPairs) {
+      const key = [cp.a.toLowerCase(), cp.b.toLowerCase()].sort().join('||');
+      if (!existingKeys.has(key)) { existingKeys.add(key); merged.push({ a: cp.a, b: cp.b, aName: cp.aName, bName: cp.bName, type: cp.type, severity: cp.severity, effect: cp.effect }); }
+    }
+    const sevWeight: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+    let synWeight = stackScore.score >= 50 ? (stackScore.score - 50) * 2 : 0;
+    let confWeight = stackScore.conflicts * 2;
+    let sCount = stackScore.synergies, cCount = stackScore.conflicts, cautCount = stackScore.cautions;
+    for (const cp of catalogPairs) {
+      const w = sevWeight[cp.severity] || 2;
+      if (cp.type === 'synergy') { synWeight += w; sCount++; }
+      else if (cp.type === 'conflict') { confWeight += w; cCount++; }
+      else if (cp.type === 'caution') { cautCount++; }
+    }
+    const totalPairs = validIds.length * (validIds.length - 1) / 2;
+    const maxPossible = Math.max(1, totalPairs * 3);
+    let score = 50 + (synWeight * 50 / maxPossible) - (confWeight * 40 / maxPossible);
+    score = Math.max(0, Math.min(100, Math.round(score)));
+    let level: string = 'moderate';
+    if (confWeight > synWeight) level = 'risky';
+    else if (score >= 80) level = 'excellent';
+    else if (score >= 65) level = 'good';
+    else if (score >= 45) level = 'moderate';
+    else if (score >= 30) level = 'poor';
+    else level = 'risky';
+    return { score, synergies: sCount, conflicts: cCount, cautions: cautCount, totalPairs, level, matrix: merged, stackScore };
+  }, [validIds, catalogPairs]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Selection card */}
       <div style={{ ...S.card }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>🔄 Синергия стека БАД</div>
-        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>Соберите свой стек добавок — система оценит их совместимость по всасыванию.</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, maxHeight: 120, overflowY: 'auto', marginBottom: 6 }}>
-          {suppEntries.filter(e => !stackIds.includes(e.id)).map(e => (<div key={e.id} onClick={() => toggleInStack(e.id)} style={{ padding: '3px 6px', borderRadius: 5, cursor: 'pointer', fontSize: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-light)' }}>+ {e.nameRu}</div>))}
+        <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)', marginBottom: 2, letterSpacing: '-0.3px' }}>⚡ Синергия стека</div>
+        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 8, lineHeight: 1.4 }}>Выберите до 10 добавок — система проверит совместимость по взаимодействиям, биодоступности и органной нагрузке.</div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+          {interactIds.map((id: string, idx: number) => {
+            const entry = id ? SUPPORT_CATALOG_DATA[id] : null;
+            const selectedName = entry?.nameRu || entry?.name || id || '';
+            return (
+              <div key={idx} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '8px 10px', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                  <span style={{ fontSize: 8, color: 'var(--text-dim)', fontWeight: 600, background: 'rgba(255,255,255,0.04)', padding: '1px 5px', borderRadius: 3 }}>#{idx + 1}</span>
+                  <span style={{ flex: 1, fontSize: 9, color: 'var(--text-dim)' }}>{id ? selectedName : 'Добавка'}</span>
+                  {id && <button onClick={() => { updateInteraction(idx, ''); setInteractSearch(''); }} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>✕</button>}
+                </div>
+                <div style={{ position: 'relative' }}>
+                  {id ? (
+                    <div style={{ padding: '7px 8px', borderRadius: 6, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a', fontSize: 10, fontWeight: 600 }}>{selectedName}</div>
+                  ) : (
+                    <>
+                      <input value={interactSearchIdx === idx ? interactSearch : ''} placeholder="🔍 Введите название добавки..." onFocus={() => { setInteractSearchIdx(idx); setInteractSearch(''); }} onChange={e => { setInteractSearchIdx(idx); setInteractSearch(e.target.value); }} style={{ width: '100%', padding: '7px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10, boxSizing: 'border-box' }} />
+                      {interactSearch && interactSearchIdx === idx && (
+                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, maxHeight: 150, overflowY: 'auto', marginTop: 1 }}>
+                          {[...allSupport, ...catalogSubstances.filter((x: any) => !allSupport.find((s: any) => s.id === x.id))].filter((s: any) => (s.name || s.id || '').toLowerCase().includes(interactSearch.toLowerCase())).slice(0, 10).map((s: any) => (
+                            <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractSearch(''); setInteractSearchIdx(-1); }} style={{ padding: '7px 10px', cursor: 'pointer', fontSize: 10, borderBottom: '1px solid var(--border)' }}>
+                              <span style={{ fontWeight: 600, color: 'var(--text)' }}>{s.name}</span>
+                              <span style={{ fontSize: 8, color: 'var(--text-dim)', marginLeft: 4 }}>{s.id}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <button onClick={addInteraction} disabled={interactIds.length >= 10} style={{ flex: 1, padding: '8px', borderRadius: 8, fontSize: 10, fontWeight: 600, cursor: interactIds.length >= 10 ? 'not-allowed' : 'pointer', background: 'rgba(0,230,138,0.06)', border: '1px dashed rgba(0,230,138,0.3)', color: interactIds.length >= 10 ? '#666' : '#00e68a', opacity: interactIds.length >= 10 ? 0.5 : 1 }}>+ ДОБАВИТЬ ДОБАВКУ</button>
+            <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{interactIds.length}/10</span>
+          </div>
         </div>
-        {stackEntries.length > 0 && (<div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>{stackEntries.map(e => (<div key={e.id} onClick={() => toggleInStack(e.id)} style={{ padding: '3px 6px', borderRadius: 5, cursor: 'pointer', fontSize: 8, border: '1px solid #00e68a', background: 'rgba(0,230,138,0.1)', color: '#00e68a' }}>✓ {e.nameRu} ({(e.maxBio * 100).toFixed(0)}%)</div>))}</div>)}
       </div>
-      {synergyReport && (
-        <div style={{ ...S.cardAccent }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#00e68a', marginBottom: 6, textAlign: 'center' }}>🎯 Оценка синергии: {synergyReport.score}/100</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6 }}>
-            <div style={{ textAlign: 'center', padding: 4, borderRadius: 4, background: 'rgba(255,255,255,0.02)' }}><div style={{ fontSize: 14, fontWeight: 800, color: bioColor(synergyReport.avgBio) }}>{(synergyReport.avgBio * 100).toFixed(0)}%</div><div style={{ fontSize: 7, color: 'var(--text-dim)' }}>Сред. био</div></div>
-            <div style={{ textAlign: 'center', padding: 4, borderRadius: 4, background: 'rgba(255,255,255,0.02)' }}><div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{synergyReport.broadCoverage}</div><div style={{ fontSize: 7, color: 'var(--text-dim)' }}>Зон всасыв.</div></div>
-            <div style={{ textAlign: 'center', padding: 4, borderRadius: 4, background: 'rgba(255,255,255,0.02)' }}><div style={{ fontSize: 14, fontWeight: 800, color: synergyReport.conflictPairs.length > 0 ? '#f44336' : '#00e68a' }}>{synergyReport.conflictPairs.length}</div><div style={{ fontSize: 7, color: 'var(--text-dim)' }}>Конфликтов</div></div>
+
+      {validIds.length < 2 && interactIds.length > 0 && <div style={{ textAlign: 'center', padding: '20px 12px', background: 'var(--bg-secondary)', borderRadius: 10, border: '1px solid var(--border)' }}><div style={{ fontSize: 20, marginBottom: 4 }}>⚡</div><div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Выберите минимум 2 добавки для анализа</div></div>}
+
+      {validIds.length >= 2 && (() => {
+        const { score: mergedScore, synergies, conflicts, cautions, level: mLevel, matrix: mergedMatrix, stackScore } = mergedStackData;
+        const suggestions = suggestSynergyAdditions(validIds, 5);
+        const levelColors: Record<string, string> = { excellent: '#22c55e', good: '#4ade80', moderate: '#f59e0b', poor: '#ef4444', risky: '#dc2626' };
+        const levelLabels: Record<string, string> = { excellent: 'Отлично', good: 'Хорошо', moderate: 'Умеренно', poor: 'Плохо', risky: 'Рискованно' };
+        const cellColor = (type: string) => type === 'synergy' ? '#22c55e' : type === 'conflict' ? '#ef4444' : type === 'caution' ? '#f59e0b' : 'rgba(255,255,255,0.15)';
+        const cellEmoji = (type: string) => type === 'synergy' ? '⊕' : type === 'conflict' ? '⊖' : type === 'caution' ? '⚠' : '·';
+        const ids = validIds;
+        const pairCell = (a: string, b: string) => {
+          if (a === b) return null;
+          const pair = mergedMatrix.find((m: any) =>
+            (m.a === a && m.b === b) || (m.a === b && m.b === a) ||
+            (m.a.toLowerCase() === a.toLowerCase() && m.b.toLowerCase() === b.toLowerCase()) ||
+            (m.a.toLowerCase() === b.toLowerCase() && m.b.toLowerCase() === a.toLowerCase())
+          );
+          return pair || null;
+        };
+
+        return (
+          <div style={{ marginBottom: 10 }}>
+            {/* Score card */}
+              <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 14, border: `2px solid ${(levelColors as any)[mLevel]}44`, marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: (levelColors as any)[mLevel], letterSpacing: '-0.3px' }}>📊 Совместимость стека</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 22, fontWeight: 800, color: (levelColors as any)[mLevel] }}>{mergedScore}</span>
+                  <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>/ 100</span>
+                  <span style={{ fontSize: 8, padding: '2px 10px', borderRadius: 6, background: (levelColors as any)[mLevel] + '22', color: (levelColors as any)[mLevel], fontWeight: 700 }}>{(levelLabels as any)[mLevel]}</span>
+                </div>
+              </div>
+              <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 8 }}>
+                <div style={{ width: mergedScore + '%', height: '100%', background: (levelColors as any)[mLevel], borderRadius: 3, transition: 'width 0.3s' }} />
+              </div>
+              <div style={{ display: 'flex', gap: 10, fontSize: 8, color: 'var(--text-dim)', flexWrap: 'wrap' }}>
+                <span style={{ color: '#22c55e' }}>⊕ {synergies} синергий</span>
+                <span style={{ color: '#ef4444' }}>⊖ {conflicts} конфликтов</span>
+                <span style={{ color: '#f59e0b' }}>⚠ {cautions} осторожностей</span>
+                {catalogPairs.length > 0 && <span style={{ color: '#a78bfa' }}>📋 +{catalogPairs.length} из каталога</span>}
+              </div>
+            </div>
+
+            {/* ── Absorption / Bioavailability card (merged from SynergyTab) ── */}
+            {bioReport && (
+              <div style={{ background: 'rgba(0,230,138,0.03)', borderRadius: 12, padding: 14, border: '1px solid rgba(0,230,138,0.12)', marginBottom: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#00e68a', marginBottom: 6, letterSpacing: '-0.3px' }}>🧬 Биодоступность стека</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+                  <div style={{ textAlign: 'center', padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: bioColor(bioReport.avgBio) }}>{(bioReport.avgBio * 100).toFixed(0)}%</div>
+                    <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>Средняя био</div>
+                  </div>
+                  <div style={{ textAlign: 'center', padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: '#a78bfa' }}>{bioReport.broadCoverage}</div>
+                    <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>Зон всасывания</div>
+                  </div>
+                  <div style={{ textAlign: 'center', padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: bioReport.conflictPairs.length > 0 ? '#f44336' : '#00e68a' }}>{bioReport.conflictPairs.length}</div>
+                    <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>Минеральных конфликтов</div>
+                  </div>
+                </div>
+                {bioReport.conflictPairs.length > 0 && (
+                  <div style={{ padding: 6, borderRadius: 6, background: 'rgba(244,63,94,0.05)', border: '1px solid rgba(244,63,94,0.1)' }}>
+                    <div style={{ fontSize: 8, fontWeight: 700, color: '#f44336', marginBottom: 2 }}>Конфликтные пары:</div>
+                    {bioReport.conflictPairs.map((cp, i) => <div key={i} style={{ fontSize: 7, color: 'var(--text-dim)', lineHeight: 1.4 }}>{cp.a} ↔ {cp.b}: {cp.reason}</div>)}
+                  </div>
+                )}
+                {enhAll.length > 0 && (
+                  <div style={{ marginTop: 6, padding: 6, borderRadius: 6, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.1)' }}>
+                    <div style={{ fontSize: 8, fontWeight: 700, color: '#60a5fa', marginBottom: 2 }}>🚀 Общие усилители всасывания</div>
+                    {enhAll.map((s, i) => <div key={i} style={{ fontSize: 7, color: 'var(--text-dim)', lineHeight: 1.4 }}><b style={{ color: '#60a5fa' }}>{s.label}</b> (×{s.mult.toFixed(1)}): {s.subs.join(', ')}</div>)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Organ load */}
+            {(() => { const ol = calcOrganLoad(ids); return (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 8 }}>
+                {['hepatic', 'renal', 'cardio'].map(k => {
+                  const o = ol[k]; if (!o) return null;
+                  const c = o.score >= 3 ? '#ef4444' : o.score >= 2 ? '#f59e0b' : '#22c55e';
+                  return (
+                    <div key={k} style={{ padding: '8px 4px', borderRadius: 10, background: c + '08', border: `1px solid ${c}18`, textAlign: 'center' }}>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{ORGANS_H[k as keyof typeof ORGANS_H]?.label}</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: c }}>{o.score}/5</div>
+                      <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.04)', marginTop: 4 }}>
+                        <div style={{ width: (o.score / 5) * 100 + '%', height: '100%', borderRadius: 2, background: c }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ); })()}
+
+            {/* Timing tips */}
+            {(() => { const tt = buildTimingTips(ids); if (!tt.length) return null; return (
+              <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.1)' }}>
+                <div style={{ fontSize: 8, fontWeight: 700, color: '#60a5fa', marginBottom: 3 }}>🕐 Режим приёма</div>
+                {tt.map((t, i) => <div key={i} style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>{t}</div>)}
+              </div>
+            ); })()}
+
+            {/* Matrix */}
+            {ids.length >= 2 && ids.length <= 8 && (() => {
+              const names = ids.map((id: string) => resolveSubName(id) || id);
+              const shortNames = names.map((n: string) => n.length > 8 ? n.substring(0, 7) + '…' : n);
+              const cellSize = Math.max(28, Math.min(48, Math.floor(280 / ids.length)));
+              return (
+                <div style={{ marginBottom: 8, overflowX: 'auto' }}>
+                  <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 4, fontWeight: 600 }}>🔬 Матрица совместимости {ids.length}×{ids.length}</div>
+                  <div style={{ display: 'inline-block', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: `${cellSize + 4}px repeat(${ids.length}, ${cellSize}px)`, gap: 0 }}>
+                      <div style={{ padding: '2px', background: 'rgba(0,0,0,0.2)' }} />
+                      {shortNames.map((n: string, ci: number) => (
+                        <div key={ci} style={{ padding: '2px', background: 'rgba(0,0,0,0.2)', fontSize: 5, color: 'var(--text-dim)', textAlign: 'center', writingMode: ids.length > 5 ? 'vertical-rl' : 'horizontal-tb', transform: ids.length > 5 ? 'rotate(180deg)' : 'none', lineHeight: 1.1 }}>{n}</div>
+                      ))}
+                      {ids.map((rowId: string, ri: number) => (
+                        <React.Fragment key={ri}>
+                          <div style={{ padding: '2px 4px', background: 'rgba(0,0,0,0.2)', fontSize: 5, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', whiteSpace: 'nowrap', overflow: 'hidden' }}>{shortNames[ri]}</div>
+                          {ids.map((colId: string, ci: number) => {
+                            const cell = pairCell(rowId, colId);
+                            return (
+                              <div key={ci} style={{ width: cellSize, height: cellSize, display: 'flex', alignItems: 'center', justifyContent: 'center', background: cell ? cellColor(cell.type) + '15' : 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', fontSize: cellSize > 32 ? 10 : 7, color: cell ? cellColor(cell.type) : 'rgba(255,255,255,0.2)', fontWeight: 700, cursor: 'default' }} title={cell ? `${cell.aName} + ${cell.bName}: ${cell.effect}` : ''}>
+                                {cell ? cellEmoji(cell.type) : '·'}
+                              </div>
+                            );
+                          })}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: 6, color: 'var(--text-dim)' }}>
+                    <span><span style={{ color: '#22c55e', fontWeight: 700 }}>⊕</span> синергия</span>
+                    <span><span style={{ color: '#ef4444', fontWeight: 700 }}>⊖</span> конфликт</span>
+                    <span><span style={{ color: '#f59e0b', fontWeight: 700 }}>⚠</span> осторожность</span>
+                    <span><span style={{ color: 'rgba(255,255,255,0.3)' }}>·</span> неизвестно</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Synergy suggestions */}
+            {suggestions.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>🔮 Рекомендации для усиления синергии</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {suggestions.map((sug: any, si: number) => (
+                    <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.15)' }}>
+                      <button onClick={() => { if (!interactIds.includes(sug.id) && interactIds.length < 10) { const emptyIdx = interactIds.findIndex(x => !x); if (emptyIdx >= 0) updateInteraction(emptyIdx, sug.id); else setInteractIds([...interactIds, sug.id]); } }} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 8, cursor: 'pointer', background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)', color: '#a855f7', fontWeight: 700 }}>+ Добавить</button>
+                      <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-light)', minWidth: 50 }}>{sug.name}</span>
+                      <span style={{ fontSize: 7, color: 'var(--text-dim)', flex: 1 }}>⊕{sug.synergiesWith.length} синергий: {sug.synergiesWith.map((x: string) => resolveSubName(x) || x).slice(0, 3).join(', ')}</span>
+                      <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 3, background: 'rgba(168,85,247,0.15)', color: '#a855f7', fontWeight: 700 }}>{sug.score}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Pharmaceutical conclusion */}
+            <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)', marginBottom: 8 }}>
+              <div style={{ fontSize: 8, fontWeight: 700, color: '#22c55e', marginBottom: 4 }}>📋 Фармацевтическое заключение</div>
+              {(() => {
+                const ol = calcOrganLoad(ids);
+                const lines = buildConclusion(ids, mergedScore, ol, conflicts);
+                return lines.map((l, i) => <div key={i} style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>{l}</div>);
+              })()}
+            </div>
+
+            {/* Monographs */}
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 6 }}>💊 Монографии добавок</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {ids.map((id: string) => (
+                  <MonographCard key={id} id={id} />
+                ))}
+              </div>
+            </div>
           </div>
-          <div style={{ fontSize: 8, lineHeight: 1.4 }}>
-            {synergyReport.notes.map((n, i) => (<div key={i} style={{ color: n.includes('конфликт') ? '#f44336' : 'var(--text-dim)', marginBottom: 1 }}>{n.includes('конфликт') ? '⚠ ' : '✅ '}{n}</div>))}
-          </div>
-          {synergyReport.conflictPairs.length > 0 && (<div style={{ marginTop: 4, padding: 6, borderRadius: 4, background: 'rgba(244,63,94,0.06)', border: '1px solid rgba(244,63,94,0.12)' }}><div style={{ fontSize: 8, fontWeight: 700, color: '#f44336', marginBottom: 2 }}>Конфликтные пары:</div>{synergyReport.conflictPairs.map((cp, i) => (<div key={i} style={{ fontSize: 7, color: 'var(--text-dim)' }}>{cp.a} ↔ {cp.b}: {cp.reason}</div>))}</div>)}
+        );
+      })()}
+    </div>
+  );
+};
+
+// ─── Monograph card (per-substance expandable) ───
+const MonographCard: React.FC<{ id: string }> = ({ id }) => {
+  const [open, setOpen] = React.useState(false);
+  const entry = SUPPORT_CATALOG_DATA[id];
+  if (!entry) return null;
+  const name = entry.nameRu || entry.name || id;
+  const tierColor = ({ core: '#00e68a', standard: '#60a5fa', advanced: '#a78bfa', specialty: '#f59e0b' } as any)[entry.tier || ''] || 'rgba(255,255,255,0.4)';
+  return (
+    <div style={{ borderRadius: 8, background: 'rgba(255,255,255,0.012)', border: '1px solid rgba(255,255,255,0.04)', overflow: 'hidden' }}>
+      <div onClick={() => setOpen(!open)} style={{ padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ fontSize: 9, fontWeight: 700, color: '#00e68a' }}>{name}</span>
+        {entry.tier && <span style={{ fontSize: 6, padding: '1px 5px', borderRadius: 3, background: tierColor + '22', color: tierColor, fontWeight: 600 }}>{entry.tier}</span>}
+        <span style={{ marginLeft: 'auto', fontSize: 7, color: 'rgba(255,255,255,0.2)' }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && (
+        <div style={{ padding: '0 8px 8px', fontSize: 7, color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>
+          {entry.description && <div style={{ marginBottom: 3 }}>{entry.description}</div>}
+          {entry.mechanisms?.length > 0 && <div style={{ marginBottom: 2 }}><span style={{ color: '#a78bfa', fontWeight: 600 }}>⚙️ </span>{entry.mechanisms.join(', ')}</div>}
+          {entry.contraindications?.length > 0 && <div style={{ marginBottom: 2 }}><span style={{ color: '#ef4444', fontWeight: 600 }}>🚫 </span>{entry.contraindications.join('; ')}</div>}
+          {entry.sideEffects?.length > 0 && <div style={{ marginBottom: 2 }}><span style={{ color: '#f59e0b', fontWeight: 600 }}>⚠ </span>{entry.sideEffects.join(', ')}</div>}
+          {(entry.specialInstructions?.length ?? 0) > 0 && <div style={{ marginBottom: 2 }}><span style={{ color: '#60a5fa', fontWeight: 600 }}>📋 </span>{(entry.specialInstructions || []).join(' · ')}</div>}
+          {entry.monitoring?.length > 0 && <div><span style={{ color: '#22c55e', fontWeight: 600 }}>🔬 </span>{(entry.monitoring || []).map((m: any) => typeof m === 'string' ? m : `${m.what || ''} (${m.when || ''})`).join('; ')}</div>}
         </div>
       )}
-      {stackEntries.length >= 2 && (() => {
-        const enhAll: { label: string; mult: number; subs: string[] }[] = [];
-        stackEntries.forEach(e => { e.enhancers.forEach(en => { const existing = enhAll.find(x => x.label === en.label); if (existing) existing.subs.push(e.nameRu); else enhAll.push({ label: en.label, mult: en.mult, subs: [e.nameRu] }); }); });
-        const shared = enhAll.filter(x => x.subs.length >= 2);
-        if (shared.length === 0) return null;
-        return (<div style={{ ...S.cardBlue }}><div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>🚀 Общие усилители</div>{shared.map((s, i) => (<div key={i} style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}><b style={{ color: '#60a5fa' }}>{s.label}</b> (×{s.mult.toFixed(1)}): {s.subs.join(', ')}</div>))}</div>);
-      })()}
     </div>
   );
 };
@@ -637,266 +1058,4 @@ function showEffect(i: any): string {
   return i.effect || i.effectRu || '';
 }
 
-// ─── Interactions tab ───
-const InteractionsTab: React.FC<{ catalog: EnrichedEntry[] }> = ({ catalog }) => {
-  const [interactIds, setInteractIds] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_bio_interact_ids') || '[]'); } catch { return []; } });
-  const [interactSearch, setInteractSearch] = useState('');
-  const [interactSearchIdx, setInteractSearchIdx] = useState<number>(-1);
 
-  const suppEntries = catalog.filter(e => e.source === 'catalog');
-  const allSupport = useMemo(() => suppEntries.map(e => ({ id: e.id, name: e.nameRu })), [suppEntries]);
-  const catalogSubstances = useMemo(() => Object.entries(SUPPORT_CATALOG_DATA).map(([id, entry]) => ({ id, name: entry.nameRu || entry.name || id })), []);
-
-  const addInteraction = () => { if (interactIds.length < 10) { const next = [...interactIds, '']; setInteractIds(next); localStorage.setItem('he_bio_interact_ids', JSON.stringify(next)); } };
-  const updateInteraction = (idx: number, value: string) => { const next = [...interactIds]; next[idx] = value; setInteractIds(next); localStorage.setItem('he_bio_interact_ids', JSON.stringify(next)); };
-  const validIds = interactIds.filter(Boolean);
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ ...S.card }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>⚡ Калькулятор взаимодействий БАД</div>
-        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 8 }}>Выберите до 10 добавок — система проверит совместимость, рассчитает score стека и найдёт синергии/конфликты.</div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-          {interactIds.map((id: string, idx: number) => {
-            const entry = id ? SUPPORT_CATALOG_DATA[id] : null;
-            const selectedName = entry?.nameRu || entry?.name || id || '';
-            return (
-              <div key={idx} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '8px 10px', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                  <span style={{ fontSize: 8, color: 'var(--text-dim)', fontWeight: 600, background: 'rgba(255,255,255,0.04)', padding: '1px 5px', borderRadius: 3 }}>#{idx + 1}</span>
-                  <span style={{ flex: 1, fontSize: 9, color: 'var(--text-dim)' }}>{id ? selectedName : 'Добавка'}</span>
-                  {id && <button onClick={() => { updateInteraction(idx, ''); setInteractSearch(''); }} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>✕</button>}
-                </div>
-                <div style={{ position: 'relative' }}>
-                  {id ? (
-                    <div style={{ padding: '7px 8px', borderRadius: 6, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a', fontSize: 10, fontWeight: 600 }}>{selectedName}</div>
-                  ) : (
-                    <>
-                      <input value={interactSearchIdx === idx ? interactSearch : ''} placeholder="🔍 Введите название добавки..." onFocus={() => { setInteractSearchIdx(idx); setInteractSearch(''); }} onChange={e => { setInteractSearchIdx(idx); setInteractSearch(e.target.value); }} style={{ width: '100%', padding: '7px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10, boxSizing: 'border-box' }} />
-                      {interactSearch && interactSearchIdx === idx && (
-                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, maxHeight: 150, overflowY: 'auto', marginTop: 1 }}>
-                          {[...allSupport, ...catalogSubstances.filter((x: any) => !allSupport.find((s: any) => s.id === x.id))].filter((s: any) => (s.name || s.id || '').toLowerCase().includes(interactSearch.toLowerCase())).slice(0, 10).map((s: any) => (
-                            <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractSearch(''); setInteractSearchIdx(-1); }} style={{ padding: '7px 10px', cursor: 'pointer', fontSize: 10, borderBottom: '1px solid var(--border)' }}>
-                              <span style={{ fontWeight: 600, color: 'var(--text)' }}>{s.name}</span>
-                              <span style={{ fontSize: 8, color: 'var(--text-dim)', marginLeft: 4 }}>{s.id}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-            <button onClick={addInteraction} disabled={interactIds.length >= 10} style={{ flex: 1, padding: '8px', borderRadius: 8, fontSize: 10, fontWeight: 600, cursor: interactIds.length >= 10 ? 'not-allowed' : 'pointer', background: 'rgba(0,230,138,0.06)', border: '1px dashed rgba(0,230,138,0.3)', color: interactIds.length >= 10 ? '#666' : '#00e68a', opacity: interactIds.length >= 10 ? 0.5 : 1 }}>+ ДОБАВИТЬ ДОБАВКУ</button>
-            <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{interactIds.length}/10</span>
-          </div>
-        </div>
-
-        {validIds.length < 2 && interactIds.length > 0 && <div style={{ textAlign: 'center', padding: '20px 12px', background: 'var(--bg-secondary)', borderRadius: 10, border: '1px solid var(--border)' }}><div style={{ fontSize: 20, marginBottom: 4 }}>⚡</div><div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Выберите минимум 2 добавки</div></div>}
-
-        {validIds.length >= 2 && (() => {
-          const stackScore = calcStackSynergyScore(validIds);
-          const suggestions = suggestSynergyAdditions(validIds, 5);
-          const levelColors: Record<string, string> = { excellent: '#22c55e', good: '#4ade80', moderate: '#f59e0b', poor: '#ef4444', risky: '#dc2626' };
-          const levelLabels: Record<string, string> = { excellent: 'Отлично', good: 'Хорошо', moderate: 'Умеренно', poor: 'Плохо', risky: 'Рискованно' };
-          const cellColor = (type: string) => type === 'synergy' ? '#22c55e' : type === 'conflict' ? '#ef4444' : type === 'caution' ? '#f59e0b' : 'rgba(255,255,255,0.15)';
-          const cellEmoji = (type: string) => type === 'synergy' ? '⊕' : type === 'conflict' ? '⊖' : type === 'caution' ? '⚠' : '·';
-          const ids = validIds;
-          const pairCell = (a: string, b: string) => {
-            if (a === b) return null;
-            const pair = stackScore.matrix.find((m: any) =>
-              (m.a === a && m.b === b) || (m.a === b && m.b === a) ||
-              (m.a.toLowerCase() === a.toLowerCase() && m.b.toLowerCase() === b.toLowerCase()) ||
-              (m.a.toLowerCase() === b.toLowerCase() && m.b.toLowerCase() === a.toLowerCase())
-            );
-            return pair || null;
-          };
-
-          return (
-            <div style={{ marginBottom: 10 }}>
-              {/* Score card */}
-              <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 12, border: `2px solid ${levelColors[stackScore.level]}44`, marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: levelColors[stackScore.level] }}>📊 Совместимость стека</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 20, fontWeight: 800, color: levelColors[stackScore.level] }}>{stackScore.score}</span>
-                    <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>/ 100</span>
-                    <span style={{ fontSize: 8, padding: '2px 8px', borderRadius: 6, background: levelColors[stackScore.level] + '22', color: levelColors[stackScore.level], fontWeight: 700 }}>{levelLabels[stackScore.level]}</span>
-                  </div>
-                </div>
-                <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 6 }}>
-                  <div style={{ width: stackScore.score + '%', height: '100%', background: levelColors[stackScore.level], borderRadius: 3, transition: 'width 0.3s' }} />
-                </div>
-                <div style={{ display: 'flex', gap: 8, fontSize: 8, color: 'var(--text-dim)', flexWrap: 'wrap' }}>
-                  <span style={{ color: '#22c55e' }}>⊕ {stackScore.synergies} синергий</span>
-                  <span style={{ color: '#ef4444' }}>⊖ {stackScore.conflicts} конфликтов</span>
-                  <span style={{ color: '#f59e0b' }}>⚠ {stackScore.cautions} осторожностей</span>
-                  <span style={{ color: 'var(--text-dim)' }}>??? {stackScore.unknownPairs} неизвестно</span>
-                </div>
-              </div>
-
-              {/* Organ load */}
-              {(() => { const ol = calcOrganLoad(ids); return (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6 }}>
-                  {['hepatic', 'renal', 'cardio'].map(k => {
-                    const o = ol[k]; if (!o) return null;
-                    const c = o.score >= 3 ? '#ef4444' : o.score >= 2 ? '#f59e0b' : '#22c55e';
-                    return (
-                      <div key={k} style={{ padding: '6px 4px', borderRadius: 8, background: c + '06', border: `1px solid ${c}15`, textAlign: 'center' }}>
-                        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', marginBottom: 1 }}>{ORGANS_H[k as keyof typeof ORGANS_H]?.label}</div>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: c }}>{o.score}/5</div>
-                        <div style={{ height: 2, borderRadius: 2, background: 'rgba(255,255,255,0.04)', marginTop: 3 }}>
-                          <div style={{ width: (o.score / 5) * 100 + '%', height: '100%', borderRadius: 2, background: c }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ); })()}
-
-              {/* Timing tips */}
-              {(() => { const tt = buildTimingTips(ids); if (!tt.length) return null; return (
-                <div style={{ marginBottom: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.1)' }}>
-                  <div style={{ fontSize: 7, fontWeight: 700, color: '#60a5fa', marginBottom: 2 }}>🕐 Режим приёма</div>
-                  {tt.map((t, i) => <div key={i} style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', lineHeight: 1.3 }}>{t}</div>)}
-                </div>
-              ); })()}
-
-              {/* Matrix */}
-              {ids.length >= 2 && ids.length <= 8 && (() => {
-                const names = ids.map((id: string) => resolveSubName(id) || id);
-                const shortNames = names.map((n: string) => n.length > 8 ? n.substring(0, 7) + '…' : n);
-                const cellSize = Math.max(28, Math.min(48, Math.floor(280 / ids.length)));
-                return (
-                  <div style={{ marginBottom: 8, overflowX: 'auto' }}>
-                    <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 4 }}>🔬 Матрица совместимости {ids.length}×{ids.length}</div>
-                    <div style={{ display: 'inline-block', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: `${cellSize + 4}px repeat(${ids.length}, ${cellSize}px)`, gap: 0 }}>
-                        <div style={{ padding: '2px', background: 'rgba(0,0,0,0.2)' }} />
-                        {shortNames.map((n: string, ci: number) => (
-                          <div key={ci} style={{ padding: '2px', background: 'rgba(0,0,0,0.2)', fontSize: 5, color: 'var(--text-dim)', textAlign: 'center', writingMode: ids.length > 5 ? 'vertical-rl' : 'horizontal-tb', transform: ids.length > 5 ? 'rotate(180deg)' : 'none', lineHeight: 1.1 }}>{n}</div>
-                        ))}
-                        {ids.map((rowId: string, ri: number) => (
-                          <React.Fragment key={ri}>
-                            <div style={{ padding: '2px 4px', background: 'rgba(0,0,0,0.2)', fontSize: 5, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', whiteSpace: 'nowrap', overflow: 'hidden' }}>{shortNames[ri]}</div>
-                            {ids.map((colId: string, ci: number) => {
-                              const cell = pairCell(rowId, colId);
-                              return (
-                                <div key={ci} style={{ width: cellSize, height: cellSize, display: 'flex', alignItems: 'center', justifyContent: 'center', background: cell ? cellColor(cell.type) + '15' : 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', fontSize: cellSize > 32 ? 10 : 7, color: cell ? cellColor(cell.type) : 'rgba(255,255,255,0.2)', fontWeight: 700, cursor: 'default' }} title={cell ? `${cell.aName} + ${cell.bName}: ${cell.effect}` : ''}>
-                                  {cell ? cellEmoji(cell.type) : '·'}
-                                </div>
-                              );
-                            })}
-                          </React.Fragment>
-                        ))}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 4, fontSize: 6, color: 'var(--text-dim)' }}>
-                      <span><span style={{ color: '#22c55e', fontWeight: 700 }}>⊕</span> синергия</span>
-                      <span><span style={{ color: '#ef4444', fontWeight: 700 }}>⊖</span> конфликт</span>
-                      <span><span style={{ color: '#f59e0b', fontWeight: 700 }}>⚠</span> осторожность</span>
-                      <span><span style={{ color: 'rgba(255,255,255,0.3)' }}>·</span> неизвестно</span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Synergy suggestions */}
-              {suggestions.length > 0 && (
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>🔮 Рекомендации для усиления синергии</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    {suggestions.map((sug: any, si: number) => (
-                      <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 8px', borderRadius: 8, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.15)' }}>
-                        <button onClick={() => { if (!interactIds.includes(sug.id) && interactIds.length < 10) { const emptyIdx = interactIds.findIndex(x => !x); if (emptyIdx >= 0) updateInteraction(emptyIdx, sug.id); else setInteractIds([...interactIds, sug.id]); } }} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 8, cursor: 'pointer', background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)', color: '#a855f7', fontWeight: 700 }}>+ Добавить</button>
-                        <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-light)', minWidth: 50 }}>{sug.name}</span>
-                        <span style={{ fontSize: 7, color: 'var(--text-dim)', flex: 1 }}>⊕{sug.synergiesWith.length} синергий: {sug.synergiesWith.map((x: string) => resolveSubName(x) || x).slice(0, 3).join(', ')}</span>
-                        <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 3, background: 'rgba(168,85,247,0.15)', color: '#a855f7', fontWeight: 700 }}>{sug.score}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Pharmaceutical conclusion */}
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)', marginBottom: 8 }}>
-                <div style={{ fontSize: 8, fontWeight: 700, color: '#22c55e', marginBottom: 3 }}>📋 Фармацевтическое заключение</div>
-                {(() => {
-                  const ol = calcOrganLoad(ids);
-                  const lines = buildConclusion(ids, stackScore.score, ol, stackScore.conflicts);
-                  return lines.map((l, i) => <div key={i} style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>{l}</div>);
-                })()}
-              </div>
-
-              {/* Monographs */}
-              <div style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 6 }}>💊 Монографии добавок</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {ids.map((id: string, idx: number) => {
-                    const entry = SUPPORT_CATALOG_DATA[id];
-                    if (!entry) return null;
-                    const [open, setOpen] = React.useState(false);
-                    const name = entry.nameRu || entry.name || id;
-                    const tierColor = ({ core: '#00e68a', standard: '#60a5fa', advanced: '#a78bfa', specialty: '#f59e0b' } as any)[entry.tier || ''] || 'rgba(255,255,255,0.4)';
-                    return (
-                      <div key={idx} style={{ borderRadius: 8, background: 'rgba(255,255,255,0.012)', border: '1px solid rgba(255,255,255,0.04)', overflow: 'hidden' }}>
-                        <div onClick={() => setOpen(!open)} style={{ padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ fontSize: 9, fontWeight: 700, color: '#00e68a' }}>{name}</span>
-                          {entry.tier && <span style={{ fontSize: 6, padding: '1px 5px', borderRadius: 3, background: tierColor + '22', color: tierColor, fontWeight: 600 }}>{entry.tier}</span>}
-                          <span style={{ marginLeft: 'auto', fontSize: 7, color: 'rgba(255,255,255,0.2)' }}>{open ? '▲' : '▼'}</span>
-                        </div>
-                        {open && (
-                          <div style={{ padding: '0 8px 8px', fontSize: 7, color: 'rgba(255,255,255,0.6)', lineHeight: 1.35 }}>
-                            {entry.description && <div style={{ marginBottom: 3 }}>{entry.description}</div>}
-                            {entry.mechanisms?.length > 0 && <div style={{ marginBottom: 2 }}><span style={{ color: '#a78bfa', fontWeight: 600 }}>⚙️ </span>{entry.mechanisms.join(', ')}</div>}
-                            {entry.contraindications?.length > 0 && <div style={{ marginBottom: 2 }}><span style={{ color: '#ef4444', fontWeight: 600 }}>🚫 </span>{entry.contraindications.join('; ')}</div>}
-                            {entry.sideEffects?.length > 0 && <div style={{ marginBottom: 2 }}><span style={{ color: '#f59e0b', fontWeight: 600 }}>⚠ </span>{entry.sideEffects.join(', ')}</div>}
-                            {(entry.specialInstructions?.length ?? 0) > 0 && <div style={{ marginBottom: 2 }}><span style={{ color: '#60a5fa', fontWeight: 600 }}>📋 </span>{(entry.specialInstructions || []).join(' · ')}</div>}
-                            {entry.monitoring?.length > 0 && <div><span style={{ color: '#22c55e', fontWeight: 600 }}>🔬 </span>{(entry.monitoring || []).map((m: any) => typeof m === 'string' ? m : `${m.what || ''} (${m.when || ''})`).join('; ')}</div>}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
-    </div>
-  );
-};
-
-// ─── Stats tab ───
-const StatsTab: React.FC<{ stats: StatsInfo; catalog: EnrichedEntry[] }> = ({ stats, catalog }) => {
-  const suppEntries = catalog.filter(e => e.source === 'catalog');
-  const catStats = useMemo(() => {
-    const map = new Map<string, { count: number; totalBio: number }>();
-    suppEntries.forEach(e => { e.category.forEach(cat => { const prev = map.get(cat) || { count: 0, totalBio: 0 }; prev.count++; prev.totalBio += e.maxBio; map.set(cat, prev); }); });
-    return Array.from(map.entries()).map(([cat, v]) => ({ cat, count: v.count, avgBio: v.count ? v.totalBio / v.count : 0 })).sort((a, b) => b.count - a.count);
-  }, [suppEntries]);
-  const tierStats = useMemo(() => {
-    const map = new Map<string, { count: number; totalBio: number }>();
-    suppEntries.forEach(e => { const t = e.tier; const prev = map.get(t) || { count: 0, totalBio: 0 }; prev.count++; prev.totalBio += e.maxBio; map.set(t, prev); });
-    return Array.from(map.entries()).map(([tier, v]) => ({ tier, count: v.count, avgBio: v.count ? v.totalBio / v.count : 0 }));
-  }, [suppEntries]);
-
-  return (<div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-    <div style={{ ...S.card }}><div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>📊 Общая статистика</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-        {[{ label: 'Всего веществ', value: stats.total, color: 'var(--text-light)' }, { label: 'БАД', value: stats.supp, color: '#00e68a' }, { label: 'Фарма', value: stats.pharma, color: '#60a5fa' }, { label: 'Пептиды', value: stats.peptides, color: '#a78bfa' }, { label: 'Средняя био', value: `${(stats.avgBio * 100).toFixed(1)}%`, color: bioColor(stats.avgBio) }, { label: 'Медиана био', value: `${(stats.medianBio * 100).toFixed(1)}%`, color: bioColor(stats.medianBio) }].map(s => (<div key={s.label} style={{ textAlign: 'center', padding: '6px 4px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}><div style={{ fontSize: 16, fontWeight: 800, color: s.color }}>{s.value}</div><div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>{s.label}</div></div>))}
-      </div>
-    </div>
-    <div style={{ ...S.card }}><div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>📈 Распределение биодоступности</div>
-      {[{ label: 'Высокая (≥60%)', count: stats.highBio, color: '#00e68a' }, { label: 'Средняя (35-60%)', count: stats.midBio, color: '#ff9800' }, { label: 'Низкая (<35%)', count: stats.lowBio, color: '#f44336' }].map(b => { const pct = stats.supp ? (b.count / stats.supp * 100).toFixed(0) : '0'; return (<div key={b.label} style={{ marginBottom: 4 }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'var(--text-dim)', marginBottom: 1 }}><span>{b.label}</span><span style={{ fontWeight: 700, color: b.color }}>{b.count} ({pct}%)</span></div><div style={{ height: 5, background: 'rgba(255,255,255,0.04)', borderRadius: 3, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: 3, background: b.color, width: `${pct}%`, minWidth: 4 }} /></div></div>); })}
-    </div>
-    <div style={{ ...S.card }}><div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', marginBottom: 6 }}>📂 По категориям</div><div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>{catStats.slice(0, 20).map(cs => (<div key={cs.cat} style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ fontSize: 8, fontWeight: 600, color: 'var(--text-light)', minWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cs.cat}</span><div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.04)', borderRadius: 2, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: 2, minWidth: 2, background: bioColor(cs.avgBio), width: `${cs.avgBio * 100}%` }} /></div><span style={{ fontSize: 8, fontWeight: 600, color: bioColor(cs.avgBio), minWidth: 28, textAlign: 'right' }}>{(cs.avgBio * 100).toFixed(0)}%</span><span style={{ fontSize: 7, color: 'var(--text-dim)', minWidth: 20, textAlign: 'right' }}>{cs.count}</span></div>))}</div></div>
-    {tierStats.length > 0 && (<div style={{ ...S.card }}><div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>🏆 По уровню (tier)</div><div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>{tierStats.map(ts => (<div key={ts.tier} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 7, fontWeight: 700, background: ts.tier === 'core' ? 'rgba(0,230,138,0.15)' : ts.tier === 'standard' ? 'rgba(59,130,246,0.12)' : 'rgba(167,139,250,0.12)', color: ts.tier === 'core' ? '#00e68a' : ts.tier === 'standard' ? '#60a5fa' : '#a78bfa' }}>{ts.tier === 'core' ? '⭐ Core' : ts.tier === 'standard' ? '✦ Standard' : '⚡ Advanced'}</span><span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{ts.count} веществ</span><div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.04)', borderRadius: 2, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: 2, minWidth: 2, background: bioColor(ts.avgBio), width: `${ts.avgBio * 100}%` }} /></div><span style={{ fontSize: 8, fontWeight: 600, color: bioColor(ts.avgBio), minWidth: 28, textAlign: 'right' }}>{(ts.avgBio * 100).toFixed(0)}%</span></div>))}</div></div>)}
-    <div style={{ ...S.cardPink }}><div style={{ fontSize: 10, fontWeight: 700, color: '#f44336', marginBottom: 4 }}>🩺 Клинический контекст</div><div style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.3 }}><b>Уязвимые формы:</b> MgO (4%), CaCO₃ (25% без HCl), FeSO₄ (15%), B12 циано (2%).<br/><b>Критические факторы:</b> ИПП (↓ HCl → Ca, Fe, Mg, B12), возраст {'>'}60 (30% атрофия), метформин (↓ B12).<br/><b>Стратегия:</b> цитраты, бисглицинаты, липосомы + коррекция pH.</div></div>
-  </div>);
-};

@@ -24,7 +24,7 @@ export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 export interface BioStackProfile {
   age: number; weight: number; height: number; sex: 'male' | 'female';
   experience: ExperienceLevel; goals: GoalType[]; aasStatus: AASStatus;
-  healthConditions: HealthCondition[]; budget: BudgetLevel; avoidIds: string[];
+  healthConditions: HealthCondition[]; budget: BudgetLevel; avoidIds: string[]; avoidMeds: string[];
   maxStackSize: number;
   adClass: ADClass; stackComplexity: StackComplexity;
   targetOrgans: string[]; targetSystems: string[];
@@ -50,7 +50,7 @@ const FIELD_GROUPS: Record<string, string[]> = {
   goals: ['goals'],
   organs: ['targetOrgans'],
   systems: ['targetSystems'],
-  avoid: ['avoidIds'],
+  lifestyle: ['avoidIds', 'avoidMeds'],
   clinical: ['currentMeds','drugAllergies','adClass'],
 };
 
@@ -108,7 +108,7 @@ export function getDefaultBioStackProfile(): BioStackProfile {
     age: 30, weight: 80, height: 175, sex: 'male',
     experience: 'intermediate', goals: ['muscle_gain'],
     aasStatus: 'none', healthConditions: [], budget: 'medium',
-    avoidIds: [], maxStackSize: 8,
+    avoidIds: [], avoidMeds: [], maxStackSize: 8,
     adClass: 'none', stackComplexity: 'balanced',
     targetOrgans: [], targetSystems: [],
     currentMeds: [], drugAllergies: [],

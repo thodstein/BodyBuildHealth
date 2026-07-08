@@ -1,17 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import type { UserProfile, LabPoint, WorkoutLog } from '../../core/types';
-import { updateProfile, useProfileRefresh } from '../../core/profile-manager';
+import { getProfile, updateProfile, useProfileRefresh } from '../../core/profile-manager';
 import { saveContraindications } from '../../core/contraindications';
 import { db } from '../../core/db';
 import { syncAllProfiles } from '../../engines/profile-store';
-import { BioStackAISettings } from '../components/BioStackAIProfile';
 import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 
 import { ProfileBioSection } from './ProfileScreen_parts/ProfileBioSection';
 import { ProfileBodySection } from './ProfileScreen_parts/ProfileBodySection';
 import { ProfileLifestyleSection } from './ProfileScreen_parts/ProfileLifestyleSection';
 import { ProfileDietSection } from './ProfileScreen_parts/ProfileDietSection';
-import { ProfileGeneticsSection } from './ProfileScreen_parts/ProfileGeneticsSection';
 import { ProfileHealthSection } from './ProfileScreen_parts/ProfileHealthSection';
 import { ProfileInjuriesSection } from './ProfileScreen_parts/ProfileInjuriesSection';
 import { ProfileDiariesSection } from './ProfileScreen_parts/ProfileDiariesSection';
@@ -19,7 +17,7 @@ import { ProfileAnalyticsSection } from './ProfileScreen_parts/ProfileAnalyticsS
 import { ProfileContactsSection } from './ProfileScreen_parts/ProfileContactsSection';
 import { theme } from './ProfileScreen_parts/ProfileComponents';
 
-type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'health' | 'genetics' | 'injuries' | 'diaries' | 'biostack_profile' | 'progress' | 'analytics' | 'contacts' | 'measurements';
+type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'health' | 'injuries' | 'diaries' | 'progress' | 'analytics' | 'contacts' | 'measurements';
 type ProfilePage = 'hero' | 'tabs';
 type MainTab = 'info' | 'analytics' | 'contacts';
 
@@ -49,17 +47,29 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
     let o = next; for (let i = 0; i < keys.length - 1; i++) { o[keys[i]] = o[keys[i]] || {}; o = o[keys[i]]; }
     o[keys[keys.length - 1]] = v; setCalcData(next);
     try { localStorage.setItem('he_autocalc_state', JSON.stringify(next)); } catch {}
+    // sync matching fields to main profile settings for cross-tab visibility
+    const syncMap: Record<string, string> = {
+      'neuro.sleepQuality': 'baselineSleepQuality',
+      'psych.fearOfLoss': 'baselineStressLevel',
+    };
+    if (syncMap[k]) {
+      const mappedVal = typeof v === 'object' ? (v as any).score || 1 : v;
+      const numVal = typeof mappedVal === 'number' ? mappedVal : parseInt(String(mappedVal)) || 1;
+      const cur = getProfile().settings || ({} as UserProfile['settings']);
+      updateProfile({ settings: { ...cur, [syncMap[k]]: numVal } });
+    }
   };
 
   const save = (partial: Partial<UserProfile['settings']>) => {
-    if (partial.weight !== undefined && partial.weight !== settings.weight) {
+    const curSettings = getProfile().settings || ({} as UserProfile['settings']);
+    if (partial.weight !== undefined && partial.weight !== curSettings.weight) {
       const newEntry: WeightEntry = { date: new Date().toISOString().split('T')[0], weight: partial.weight };
       const updated = [...weightLog.filter(w => w.date !== newEntry.date), newEntry].sort((a, b) => a.date.localeCompare(b.date));
       setWeightLog(updated);
       saveWeightLog(updated);
     }
-    updateProfile({ settings: { ...settings, ...partial } });
-    syncAllProfiles({ ...settings, ...partial });
+    updateProfile({ settings: { ...curSettings, ...partial } });
+    syncAllProfiles({ ...curSettings, ...partial });
   };
 
   const toggleWeakPoint = (id: string) => {
@@ -75,9 +85,8 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
   const infoSubTabs: { id: ProfileTab; label: string }[] = [
     { id: 'overview', label: 'Обзор' }, { id: 'anthropometry', label: 'Тело' },
     { id: 'lifestyle', label: 'Образ жизни' }, { id: 'health', label: '🏥 Здоровье' },
-    { id: 'diet', label: 'Питание' }, { id: 'genetics', label: 'Генетика' },
+    { id: 'diet', label: 'Питание' },
     { id: 'injuries', label: 'Травмы' }, { id: 'diaries', label: '📓 Дневники' },
-    { id: 'biostack_profile', label: '🧬 BioStack' },
   ];
 
   useEffect(() => {
@@ -210,11 +219,6 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   <ProfileDietSection settings={settings} save={save} />
                 </InfoErrorBoundary>
               )}
-              {tab === 'genetics' && (
-                <InfoErrorBoundary label="Генетика">
-                  <ProfileGeneticsSection settings={settings} save={save} />
-                </InfoErrorBoundary>
-              )}
               {tab === 'injuries' && (
                 <InfoErrorBoundary label="Травмы">
                   <ProfileInjuriesSection settings={settings} save={save} />
@@ -223,11 +227,6 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
               {tab === 'diaries' && (
                 <InfoErrorBoundary label="Дневники">
                   <ProfileDiariesSection settings={settings} save={save} labs={labs} workoutLogs={workoutLogs} onNavigate={onNavigate} />
-                </InfoErrorBoundary>
-              )}
-              {tab === 'biostack_profile' && (
-                <InfoErrorBoundary label="BioStack">
-                  <BioStackAISettings />
                 </InfoErrorBoundary>
               )}
             </>)}

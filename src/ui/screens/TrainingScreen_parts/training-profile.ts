@@ -12,6 +12,7 @@ export interface TrainingProfile {
   bodyWeight: number;
   goal: string;
   level: string;
+  trainingYears: number;
   daysPerWeek: number;
   recovery: number;     // 1-10
   fatigue: number;      // 1-10
@@ -25,6 +26,9 @@ export interface TrainingProfile {
   workMax: Record<string, number>;
   onCourse: boolean;
   courseIntensity: 'mild' | 'moderate' | 'heavy';
+  pharmaCoursesCount: number;
+  monthsSinceLastCourse: number;
+  totalYearsOnPharma: number;
   injuries: { muscle: string; from: string; to?: string }[];
 }
 
@@ -32,6 +36,7 @@ export const DEFAULT_PROFILE: TrainingProfile = {
   bodyWeight: 80,
   goal: 'bulk',
   level: 'intermediate',
+  trainingYears: 3,
   daysPerWeek: 4,
   recovery: 7,
   fatigue: 3,
@@ -46,6 +51,9 @@ export const DEFAULT_PROFILE: TrainingProfile = {
     quads: 140, hamstrings: 90, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60 },
   onCourse: false,
   courseIntensity: 'moderate',
+  pharmaCoursesCount: 0,
+  monthsSinceLastCourse: 0,
+  totalYearsOnPharma: 0,
   injuries: [],
 };
 

@@ -1734,12 +1734,12 @@ input[type="range"]:active {
   opacity: 0.8;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   🍎 APPLE-STYLE POLISH — тренировочный блок (.training-screen)
-   Чистая типографика SF Pro, frosted-glass карточки, iOS-контролы,
-   мягкие тени, тонкие сепараторы, плавные микро-взаимодействия.
-   Не меняет layout (display/grid/flex из inline) — только полировка.
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ
+   рџЌЋ APPLE-STYLE POLISH вЂ” С‚СЂРµРЅРёСЂРѕРІРѕС‡РЅС‹Р№ Р±Р»РѕРє (.training-screen)
+   Р§РёСЃС‚Р°СЏ С‚РёРїРѕРіСЂР°С„РёРєР° SF Pro, frosted-glass РєР°СЂС‚РѕС‡РєРё, iOS-РєРѕРЅС‚СЂРѕР»С‹,
+   РјСЏРіРєРёРµ С‚РµРЅРё, С‚РѕРЅРєРёРµ СЃРµРїР°СЂР°С‚РѕСЂС‹, РїР»Р°РІРЅС‹Рµ РјРёРєСЂРѕ-РІР·Р°РёРјРѕРґРµР№СЃС‚РІРёСЏ.
+   РќРµ РјРµРЅСЏРµС‚ layout (display/grid/flex РёР· inline) вЂ” С‚РѕР»СЊРєРѕ РїРѕР»РёСЂРѕРІРєР°.
+   в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 .training-screen {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -1774,7 +1774,7 @@ input[type="range"]:active {
 }
 .training-screen button:active { transform: scale(0.97); }
 
-/* Сегментированный контрол (зона Планировщик) — iOS-вид */
+/* Сегментированный контроль (зона Планировщик) — iOS-вид */
 .training-screen div[style*="rgba(24,24,27,0.15)"] { border-radius: 12px !important; }
 .training-screen div[style*="rgba(24,24,27,0.15)"] button {
   border-radius: 9px !important;
@@ -1847,7 +1847,7 @@ input[type="range"]:active {
   letter-spacing: 0.5px;
 }
 
-/* Pills (зонные/категорийные) — плавный переход активного состояния */
+/* Pills (зонные/категорийные) — плавный переход активногоѕ СЃРѕСЃС‚РѕСЏРЅРёСЏ */
 .training-screen .zone-pill,
 .training-screen button[style*="border-radius: 20px"],
 .training-screen button[style*="border-radius:20px"] {
@@ -1886,7 +1886,7 @@ input[type="range"]:active {
 }
 .training-screen button[style*="rgba(20,22,30,0.35)"]:active { transform: scale(0.98); }
 
-/* PlannerToolsPanel expandable rows — iOS inset-grouped list вид */
+/* PlannerToolsPanel expandable rows вЂ” iOS inset-grouped list РІРёРґ */
 .training-screen div[style*="rgba(24,24,27,0.5)"] button[style*="background: transparent"],
 .training-screen div[style*="rgba(24,24,27,0.5)"] > button {
   border-radius: 10px !important;
@@ -1930,4 +1930,93 @@ input[type="range"]:active {
 .training-screen div[style*="rgba(255,255,255,0.03)"] {
   border-radius: 10px !important;
   border-color: rgba(255,255,255,0.06) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   МОБИЛЬНАЯ ОПТИМИЗАЦИЯ ТРЕНИРОВОЧНОГО БЛОКА (.training-screen)
+   Применяется ко ВСЕМ вкладкам и контенту без сокращения текста:
+   — нет горизонтального overflow страницы;
+   — таблицы скроллятся по горизонтали, не ломая вёрстку;
+   — flex/grid-детки сжимаются (min-width:0);
+   — длинные строки переносятся;
+   — touch-таргеты ≥40px; шрифты в табличных рядах не мельче 10px.
+   ════════════════════════════════════════════════════════════════ */
+
+.training-screen {
+  overflow-x: hidden !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* все потомки могут сжиматься — фиксит overflow flex/grid */
+.training-screen * {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* изображения, svg, видео не вылезают за экран */
+.training-screen img,
+.training-screen video,
+.training-screen svg,
+.training-screen canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+/* код/пре — перенос длинных строк */
+.training-screen pre,
+.training-screen code {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+  max-width: 100%;
+}
+
+/* настоящие <table> → горизонтальный скролл, не ломая страницу */
+.training-screen table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-collapse: collapse;
+}
+.training-screen th,
+.training-screen td {
+  white-space: nowrap;
+  padding: 6px 8px;
+}
+
+/* touch-таргеты для кнопок/чипов */
+.training-screen button {
+  min-height: 40px;
+}
+.training-screen button[style*="padding:2px"],
+.training-screen button[style*="padding: 2px"],
+.training-screen button[style*="padding:3px"],
+.training-screen button[style*="padding: 3px"],
+.training-screen button[style*="padding:4px"],
+.training-screen button[style*="padding: 4px"] {
+  min-height: 36px;
+}
+
+/* inputs/selects на мобилке — крупнее и не сжимаются */
+.training-screen select,
+.training-screen input[type="text"],
+.training-screen input[type="number"],
+.training-screen input[type="search"],
+.training-screen textarea {
+  min-height: 40px;
+  font-size: 13px;
+}
+
+/* горизонтальные списки-пилюли не вызывают page-scroll */
+.training-screen div[style*="overflowX"],
+.training-screen div[style*="overflow-x"] {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.training-screen div[style*="overflowX"]::-webkit-scrollbar,
+.training-screen div[style*="overflow-x"]::-webkit-scrollbar {
+  display: none;
 }

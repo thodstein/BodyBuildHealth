@@ -7,6 +7,7 @@ import type { ProExerciseRow, FullVolumeAnalysis, MuscleVolumeProAnaly, CNSFatig
 import type { TrainingLevel } from '../../../engines/volume-landmarks.engine';
 import { PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { useDataLink } from '../../../core/data-link';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -577,6 +578,12 @@ export const VolumeOptimizerTab: React.FC = () => {
               </div>
             </div>
           )}
+        </div>
+      )}
+      {analysis && (
+        <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить оптимизированный объём к планировщику: целевые сеты по группам (MAV) → планировщик учтёт при распределении объёма.</div>
+          <button onClick={() => { const sets: Record<string, number> = {}; analysis.perMuscle.forEach(m => { sets[m.muscle] = m.mav; }); applyToPlanner({ kind: 'volume', label: 'Оптимизация объёма: ' + Object.entries(sets).map(([g, s]) => g + '=' + s).join(', '), data: { sets } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить объём к планировщику</button>
         </div>
       )}
     </div>

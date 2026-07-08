@@ -29,7 +29,6 @@ import { PlannerBbAuto } from './TrainingScreen_parts/PlannerBbAuto';
 import { DiaryAnalyticsZone } from './TrainingScreen_parts/DiaryAnalyticsZone';
 import { LibraryZone } from './TrainingScreen_parts/LibraryZone';
 import { BbToolsCard } from './TrainingScreen_parts/BbToolsCard';
-import { PlWeakpointsCard } from './TrainingScreen_parts/PlWeakpointsCard';
 import { LoadSafetyCard } from './TrainingScreen_parts/LoadSafetyCard';
 import { SplitGenCard } from './TrainingScreen_parts/SplitGenCard';
 import { CompetitionCard } from './TrainingScreen_parts/CompetitionCard';
@@ -38,6 +37,11 @@ import { PriRepPatternCard } from './TrainingScreen_parts/PriRepPatternCard';
 import { MixPresetsCard } from './TrainingScreen_parts/MixPresetsCard';
 import { SynergyMatrixCard } from './TrainingScreen_parts/SynergyMatrixCard';
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
+import { StrengthAnalysisHub } from './TrainingScreen_parts/StrengthAnalysisHub';
+import { LoadManagementHub } from './TrainingScreen_parts/LoadManagementHub';
+import { DiagnosticsHub } from './TrainingScreen_parts/DiagnosticsHub';
+import { PeriodizationHub } from './TrainingScreen_parts/PeriodizationHub';
+import { BbToolsHub } from './TrainingScreen_parts/BbToolsHub';
 import { ExecutionZone } from './TrainingScreen_parts/ExecutionZone';
 import { TrainingDiaryHub } from './TrainingScreen_parts/TrainingDiaryHub';
 
@@ -152,10 +156,7 @@ export const TrainingScreen: React.FC = () => {
   const [exCalcEquip, setExCalcEquip] = useState('');
 
   // Unified program builder state
-  const [injMuscle, setInjMuscle] = useState<string>('chest');
-  const [injFrom, setInjFrom] = useState<string>('');
-  const [injTo, setInjTo] = useState<string>('');
-  const PCT_FOR_RIR_MAN: Record<number, number> = { 0: 1.0, 1: 0.96, 2: 0.92, 3: 0.88, 4: 0.84, 5: 0.80 };
+        const PCT_FOR_RIR_MAN: Record<number, number> = { 0: 1.0, 1: 0.96, 2: 0.92, 3: 0.88, 4: 0.84, 5: 0.80 };
   const [manualResult, setManualResult] = useState<{ splitName: string; corrections: string[]; days: { day: number; groups: string[]; exercises: { name: string; sets: number; reps: string; rir: number; rest: number; group: string; weight: number }[] }[] } | null>(() => { try { return JSON.parse(localStorage.getItem('he_manual_session') || 'null'); } catch { return null; } });
   useEffect(() => { try { localStorage.setItem('he_manual_session', JSON.stringify(manualResult)); } catch { /* ignore */ } }, [manualResult]);
   const GRP_RU_M: Record<string, string> = { chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор', full: 'Общее' };
@@ -636,7 +637,7 @@ export const TrainingScreen: React.FC = () => {
 
             {/* ═══════════ DIARY AND ANALYTICS TAB (объединённый дневник+аналитика+прогресс+визуализация+отчёты) ═══════════ */}
       {/* ═══════════ Дневник и аналитика (зона) ═══════════ */}
-      {(tab === 'diary' || tab === 'calendar' || tab === 'mmc_tracking' || tab === 'import_data') && (
+      {(tab === 'diary' || tab === 'insights' || tab === 'strength' || tab === 'goals' || tab === 'calendar' || tab === 'checkin' || tab === 'mmc_tracking' || tab === 'import_data') && (
         <DiaryAnalyticsZone
           tab={tab}
           diary={diary} diaryStats={diaryStats} diaryProgress={diaryProgress}
@@ -649,312 +650,24 @@ export const TrainingScreen: React.FC = () => {
       )}
 
 
-      {/* ═══════════ CYCLES TAB ═══════════ */}
-      {tab === 'cycles' && (
-        <InfoErrorBoundary label="Циклы">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <MicrocyclePlannerCard />
-          <div style={{ padding: 12, borderRadius: 14, background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)', marginBottom: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: '#ef4444', marginBottom: 2 }}>🩹 Травмы / ограничения</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>Указанные группы исключаются из генерации плана на активный период. Дата «до» — пусто = травма актуальна.</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr auto', gap: 6, marginBottom: 8, alignItems: 'end' }}>
-              <div>
-                <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Группа</label>
-                <select value={injMuscle} onChange={e => setInjMuscle(e.target.value)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: 6, fontSize: 11 }}>
-                  {MUSCLE_GROUPS.map(g => <option key={g} value={g}>{GROUP_LABELS[g]}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>С</label>
-                <input type="date" value={injFrom} onChange={e => setInjFrom(e.target.value)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: 6, fontSize: 11 }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>До (опц)</label>
-                <input type="date" value={injTo} onChange={e => setInjTo(e.target.value)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: 6, fontSize: 11 }} />
-              </div>
-              <button onClick={() => { if (!injFrom) return; updateTProfile({ injuries: [...(tprofile.injuries || []), { muscle: injMuscle, from: injFrom, to: injTo || undefined }] }); setInjFrom(''); setInjTo(''); }} disabled={!injFrom} style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: injFrom ? 'rgba(239,68,68,0.12)' : 'transparent', color: '#ef4444', cursor: injFrom ? 'pointer' : 'not-allowed', fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>+ Доб</button>
-            </div>
-            {(tprofile.injuries || []).length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {tprofile.injuries.map((inj, i) => {
-                  const today = new Date().toISOString().slice(0, 10);
-                  const active = (inj.from || '') <= today && (!inj.to || inj.to >= today);
-                  return (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', borderRadius: 6, background: active ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <span style={{ fontSize: 11, color: active ? '#fca5a5' : 'var(--text-dim)' }}>{GROUP_LABELS[inj.muscle] || inj.muscle} · {inj.from}–{inj.to || '…'} {active ? '🔴 активно' : '✅ прошло'}</span>
-                      <button onClick={() => updateTProfile({ injuries: (tprofile.injuries || []).filter((_, j) => j !== i) })} style={{ padding: '2px 7px', borderRadius: 5, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 10 }}>✕</button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          {/* Controls - glass card */}
-          <div style={{ padding:12, borderRadius:14, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)' }}>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, letterSpacing:'0.3px', textTransform:'uppercase', marginBottom:8 }}>🔄 Параметры цикла</div>
-            {/* Goal */}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:8 }}>
-              {GOALS.map(g => (
-                <button key={g.value} onClick={() => { setGoal(g.value); setTimeout(generatePlan, 50); }} style={{
-                  padding:'5px 8px', borderRadius:8, fontSize:10, fontWeight: goal === g.value ? 700 : 400,
-                  cursor:'pointer', border: goal === g.value ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
-                  background: goal === g.value ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: 'var(--text)', textAlign:'left',
-                }}>{g.icon} {g.label}</button>
-              ))}
-            </div>
-            {/* Periodization pills */}
-            <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:8, alignItems:'center' }}>
-              <span style={{ fontSize:9, color:'rgba(255,255,255,0.35)' }}>Периодизация:</span>
-              {[
-                { v:'auto', l:'Авто' }, { v:'linear', l:'Линейная' },
-                { v:'undulating', l:'DUP' }, { v:'block', l:'Блочная' },
-              ].map(p => (
-                <button key={p.v} onClick={() => { setPeriodizationType(p.v as 'auto' | 'linear' | 'undulating' | 'block' | 'conjugate'); setTimeout(generatePlan, 50); }} style={{
-                  padding:'3px 8px', borderRadius:6, fontSize:9, fontWeight: periodizationType === p.v ? 700 : 400, cursor:'pointer',
-                  border: periodizationType === p.v ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
-                  background: periodizationType === p.v ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: 'var(--text)',
-                }}>{p.l}</button>
-              ))}
-            </div>
-            {/* Cycle type - expanded with descriptions */}
-            <div style={{ fontSize:9, color:'rgba(255,255,255,0.35)', marginBottom:4 }}>Тип цикла:</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:3, marginBottom:8 }}>
-              {[
-                { v:'auto', l:'Авто', d:'Автоматический подбор по цели и уровню' },
-                { v:'bb_mass', l:'Масса', d:'Высокий объём, изоляция, wave-кривая' },
-                { v:'bb_specialization', l:'Специализация', d:'Акцент на отстающие группы' },
-                { v:'pl_peaking', l:'Пауэрлифтинг', d:'Силовой пик, 1ПМ, линейная кривая' },
-                { v:'wl_tech', l:'Тяжелоатлет', d:'Технические движения, рывок/толчок' },
-                { v:'cf_cond', l:'Кроссфит', d:'Кондиционирование, метконы, круговые' },
-                { v:'rehab', l:'Реабилитация', d:'Восстановление, низкий объём' },
-              ].map(c => (
-                <button key={c.v} onClick={() => { setCycleType(c.v); setTimeout(generatePlan, 50); }} title={c.d} style={{
-                  padding:'4px 6px', borderRadius:6, fontSize:8, fontWeight: cycleType === c.v ? 700 : 400, cursor:'pointer',
-                  border: cycleType === c.v ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-                  background: cycleType === c.v ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)', color: 'var(--text)',
-                  textAlign:'center', lineHeight:1.2,
-                }}><div style={{fontWeight: cycleType === c.v ? 700 : 500}}>{c.l}</div><div style={{fontSize:6, color:'rgba(255,255,255,0.3)', marginTop:1}}>{c.d}</div></button>
-              ))}
-            </div>
-            {/* Level pills + generate */}
-            <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>
-              <span style={{ fontSize:9, color:'rgba(255,255,255,0.35)' }}>Уровень:</span>
-              {LEVELS.map(l => (
-                <button key={l.value} onClick={() => setLevel(l.value)} style={{
-                  padding:'3px 8px', borderRadius:6, fontSize:9, fontWeight: level === l.value ? 700 : 400, cursor:'pointer',
-                  border: level === l.value ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
-                  background: level === l.value ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: 'var(--text)',
-                }}>{l.icon} {l.label}</button>
-              ))}
-            </div>
-            <button onClick={() => generatePlan()} style={{
-              width:'100%', padding:'9px', borderRadius:10, border:'none', cursor:'pointer',
-              background:'linear-gradient(135deg,var(--accent),#00cc7a)', color:'#000', fontWeight:700, fontSize:12,
-            }}>▶ Сгенерировать макроцикл</button>
-            {cyclesError && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontSize:10, marginTop:6, textAlign:'center' }}>{cyclesError}</div>}
-          </div>
-
-          {/* Empty state */}
-          {!macrocycle && !cyclesError && (
-            <div style={{ padding:24, borderRadius:14, background:'rgba(24,24,27,0.08)', border:'1px solid rgba(255,255,255,0.04)', textAlign:'center' }}>
-              <div style={{ fontSize:28, marginBottom:6 }}>🔄</div>
-              <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>Макроцикл ещё не сгенерирован</div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)' }}>Выберите параметры выше и нажмите «Сгенерировать макроцикл»</div>
-            </div>
-          )}
-
-          {macrocycle && (() => {
-            const gCard: React.CSSProperties = { padding:12, borderRadius:14, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)', marginBottom:8 };
-            const gLabel: React.CSSProperties = { fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, letterSpacing:'0.3px', textTransform:'uppercase', marginBottom:8 };
-            // Determine cycle type name
-            const ctName = cycleType === 'auto' ? 'Авто' : ({ bb_mass:'Масса', bb_specialization:'Специализация', pl_peaking:'Пауэрлифтинг', wl_tech:'Тяжелоатлет', cf_cond:'Кроссфит', rehab:'Реабилитация' } as Record<string,string>)[cycleType] || 'Авто';
-            const goalName = GOALS.find(g => g.value === macrocycle.goal)?.label || macrocycle.goal;
-            const levelName = LEVELS.find(l => l.value === macrocycle.level)?.label || macrocycle.level;
-            return (<>
-              {/* Volume/intensity chart */}
-              <div style={gCard}>
-                <div style={gLabel}>📊 Объём и интенсивность по неделям</div>
-                <div style={{ display:'flex', gap:1, height:80, alignItems:'flex-end' }}>
-                  {(macrocycle.mesocycles || []).flatMap(mc => mc.microcycles || []).map((mc, wi) => {
-                    const isCurrent = wi + 1 === selectedWeek;
-                    const volH = Math.max(4, (mc?.volumeMultiplier || 1) * 35);
-                    const intH = Math.max(4, (mc?.rpeTarget || 7) * 5);
-                    const color = mc?.mesocycleType === 'accumulation' ? '#22c55e' :
-                                 mc?.mesocycleType === 'intensification' ? '#eab308' :
-                                 mc?.mesocycleType === 'peaking' ? '#ef4444' : '#6b7280';
-                    return (
-                      <div key={wi} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:1, cursor:'pointer' }}
-                          onClick={() => { setSelectedWeek(wi + 1); goPlannerManual(); }}>
-                        <div style={{ width:'70%', height:volH, background:color, borderRadius:'2px 2px 0 0', opacity: isCurrent ? 1 : 0.4, transition:'height 0.2s' }} />
-                        <div style={{ width:'40%', height:intH, background:color, borderRadius:'2px 2px 0 0', opacity: isCurrent ? 0.8 : 0.3 }} />
-                        <span style={{ fontSize:7, color: isCurrent ? 'var(--accent)' : 'rgba(255,255,255,0.3)', fontWeight: isCurrent ? 700 : 400 }}>{wi + 1}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div style={{ display:'flex', justifyContent:'center', gap:12, fontSize:8, color:'rgba(255,255,255,0.3)', marginTop:4 }}>
-                  <span><span style={{ color:'#22c55e' }}>■</span> Накопление</span>
-                  <span><span style={{ color:'#eab308' }}>■</span> Интенсификация</span>
-                  <span><span style={{ color:'#ef4444' }}>■</span> Пик</span>
-                  <span><span style={{ color:'#6b7280' }}>■</span> Разгрузка</span>
-                </div>
-              </div>
-
-              {/* Macrocycle header + mesocycles */}
-              <div style={gCard}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
-                  <span style={gLabel}>📅 {macrocycle.totalWeeks}-недельный макроцикл</span>
-                  <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.1)', color:'#00e68a' }}>{ctName}</span>
-                </div>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginBottom:6 }}>
-                  {goalName} • {levelName} • Phase curve: {cycleType === 'bb_mass' || goal === 'bulk' ? '🌊 Wave' : goal === 'strength' || cycleType === 'pl_peaking' ? '📈 Linear' : goal === 'rehab' ? '📉 Inverted' : '⚖️ Balanced'}
-                  {cycleType !== 'auto' && <span style={{ marginLeft:6, color:'rgba(255,255,255,0.2)' }}>| {({ bb_mass:'Высокий объём, изоляция', bb_specialization:'Акцент на слабые группы', pl_peaking:'Силовой пик, низкий объём', wl_tech:'Технические движения', cf_cond:'Метконы, круговые', rehab:'Восстановление' } as Record<string,string>)[cycleType]}</span>}
-                </div>
-                {macrocycle.mesocycles.map((mc, mi) => (
-                  <div key={mi} style={{ marginBottom:6, borderRadius:10, overflow:'hidden', background:'rgba(255,255,255,0.02)', border: expandedMeso === mi ? '1px solid rgba(0,230,138,0.15)' : '1px solid rgba(255,255,255,0.03)' }}
-                    onClick={() => setExpandedMeso(expandedMeso === mi ? null : mi)}>
-                    <div style={{ display:'flex', justifyContent:'space-between', padding:'6px 8px', cursor:'pointer' }}>
-                      <span style={{ fontWeight:600, fontSize:11, color:'rgba(255,255,255,0.7)' }}>
-                        {PHASE_LABELS[mc.type] || 'Рабочая фаза'} <span style={{ fontSize:8, color:'rgba(255,255,255,0.2)' }}>Мезо {mi + 1}</span>
-                      </span>
-                      <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)' }}>{mc.weeks} нед ({mc.weekStart + 1}–{mc.weekStart + mc.weeks}) {expandedMeso === mi ? '▴' : '▾'}</span>
-                    </div>
-                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.25)', padding:'0 8px 4px' }}>
-                      {PHASE_HINTS[mc.type] || 'Стабильная рабочая фаза с контролем объёма, интенсивности и восстановления.'}
-                    </div>
-                    {/* Week squares */}
-                    <div style={{ display:'flex', gap:3, flexWrap:'wrap', padding:'0 8px 6px' }}>
-                      {Array.from({ length: mc.weeks }, (_, wi) => {
-                        const weekNum = mc.weekStart + wi + 1;
-                        const micro = mc.microcycles?.[wi];
-                        const isDeload = micro?.isDeload;
-                        return <div key={wi} style={{
-                          width:22, height:22, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center',
-                          background: selectedWeek === weekNum ? 'rgba(0,230,138,0.3)' : isDeload ? 'rgba(107,114,128,0.2)' : 'rgba(255,255,255,0.04)',
-                          border: selectedWeek === weekNum ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
-                          fontSize:8, color: selectedWeek === weekNum ? 'var(--accent)' : 'rgba(255,255,255,0.4)',
-                          cursor:'pointer', transition:'all 0.15s',
-                        }} onClick={(e) => { e.stopPropagation(); setSelectedWeek(weekNum); goPlannerManual(); }}>
-                          {weekNum}
-                        </div>;
-                      })}
-                    </div>
-                    {/* Expanded detail */}
-                    {expandedMeso === mi && (
-                      <div style={{ borderTop:'1px solid rgba(255,255,255,0.04)', padding:'6px 8px' }}>
-                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:4 }}>
-                          {[
-                            { label:'Тип', value: mc.type || 'Рабочий', color:'var(--accent)' },
-                            { label:'Объём', value: `${(mc.microcycles?.[0]?.volumeMultiplier ?? 1).toFixed(1)}×`, color:'#60a5fa' },
-                            { label:'RIR', value: `${mc.microcycles?.[0]?.rirRange?.[0] ?? 1}-${mc.microcycles?.[0]?.rirRange?.[1] ?? 3}`, color:'#f59e0b' },
-                          ].map((s,i) => <div key={i} style={{ background:'rgba(255,255,255,0.02)', borderRadius:6, padding:'3px 6px', textAlign:'center' }}>
-                            <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>{s.label}</div>
-                            <div style={{ fontSize:10, fontWeight:700, color:s.color }}>{s.value}</div>
-                          </div>)}
-                        </div>
-                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, fontSize:8 }}>
-                          {[
-                            { label:'RPE', value: `${mc.microcycles?.[0]?.rpeTarget ?? 7}`, color:'var(--accent)' },
-                            { label:'Сплит', value: goal === 'bulk' ? 'Гипертрофия' : goal === 'strength' ? 'Сила' : goal === 'cut' ? 'Сушка' : 'Баланс', color:'#a78bfa' },
-                            { label:'Дней', value: `${daysPerWeek}`, color:'#f59e0b' },
-                          ].map((s,i) => <div key={i} style={{ background:'rgba(255,255,255,0.02)', borderRadius:6, padding:'3px', textAlign:'center' }}>
-                            <span style={{ color:'rgba(255,255,255,0.3)' }}>{s.label}: <b style={{ color:s.color }}>{s.value}</b></span>
-                          </div>)}
-                        </div>
-                        {mc.microcycles && mc.microcycles.length > 0 && (
-                          <div style={{ fontSize:8, color:'rgba(255,255,255,0.25)', marginTop:4 }}>
-                            Микроциклов: {mc.microcycles.length} | Прогрессия: <b style={{ color:'var(--accent)' }}>{mc.type === 'accumulation' ? '+объём' : mc.type === 'intensification' ? '+интенсивность' : mc.type === 'peaking' ? 'пик' : 'разгрузка'}</b>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Projected max-out */}
-              {diaryStats.length > 0 && (
-                <div style={{ ...gCard, border:'1px solid rgba(0,230,138,0.15)' }}>
-                  <div style={gLabel}>🎯 Прогноз к концу макроцикла</div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginBottom:4 }}>
-                    {macrocycle?.totalWeeks || 12} нед × {(trainingOutput?.estimatedProgress || 2)}%/нед прогресс
-                  </div>
-                  {diaryStats.slice(0,3).map(s => {
-                    const projected = Math.round(s.max1RM * (1 + (trainingOutput?.estimatedProgress || 2) / 100 * (macrocycle?.totalWeeks || 12)));
-                    const gain = projected - Math.round(s.max1RM);
-                    return <div key={s.exerciseId} style={{ display:'flex', justifyContent:'space-between', fontSize:9, padding:'2px 0' }}>
-                      <span style={{ color:'rgba(255,255,255,0.5)' }}>{s.exerciseName}</span>
-                      <span style={{ color:'rgba(255,255,255,0.3)' }}>{Math.round(s.max1RM)} → <b style={{ color:'#34d399' }}>{projected}</b> кг <span style={{ color:'#34d399' }}>(+{gain})</span></span>
-                    </div>;
-                  })}
-                </div>
-              )}
-
-              {/* Phase params */}
-              <div style={gCard}>
-                <div style={gLabel}>📊 Параметры фаз</div>
-                {macrocycle?.mesocycles?.map((mc, mi) => {
-                  const firstMicro = mc.microcycles?.[0];
-                  const vol = firstMicro?.volumeMultiplier || 1;
-                  const rirLo = firstMicro?.rirRange?.[0] ?? 1;
-                  const rirHi = firstMicro?.rirRange?.[1] ?? 3;
-                  const rpe = firstMicro?.rpeTarget || 7;
-                  return <div key={mi} style={{ marginBottom:3, padding:'4px 6px', borderRadius:6, background:'rgba(255,255,255,0.02)', fontSize:9 }}>
-                    <span style={{ fontWeight:600, color:'rgba(255,255,255,0.6)' }}>{PHASE_LABELS[mc.type] || mc.type || 'Фаза'}</span>
-                    <span style={{ color:'rgba(255,255,255,0.25)', marginLeft:4 }}>Объём: {vol}× | RIR: {rirLo}-{rirHi} | RPE: {rpe} | {mc.weeks} нед</span>
-                  </div>;
-                })}
-              </div>
-
-              {/* Save to my cycles */}
-              <button onClick={() => { try {
-                const existing = JSON.parse(localStorage.getItem('myTrainingCycles') || '[]');
-                existing.push({ id:'cycle_' + Date.now(), name: (macrocycle?.totalWeeks || 12) + '-нед ' + goalName, date: new Date().toISOString(), weeks: macrocycle?.totalWeeks || 12, goal, level, days: daysPerWeek });
-                localStorage.setItem('myTrainingCycles', JSON.stringify(existing));
-                setMyCycleMsg('✅ Цикл добавлен в «Мои циклы»!');
-                setTimeout(() => setMyCycleMsg(''), 3000);
-              } catch {} }} style={{
-                width:'100%', padding:9, borderRadius:10, border:'1px solid rgba(0,230,138,0.3)', cursor:'pointer',
-                background:'rgba(0,230,138,0.06)', color:'var(--accent)', fontWeight:600, fontSize:11,
-              }}>📋 В мои циклы</button>
-              {myCycleMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', color:'#8b5cf6', fontSize:10, marginTop:4, textAlign:'center' }}>{myCycleMsg}</div>}
-            </>);
-          })()}
-          </div>
-          </InfoErrorBoundary>
-        )}
-      {/* history, analytics tabs moved to TrainingDiaryHub (diary tab sub-modes) */}
-      {/* visual, progress tabs moved to TrainingDiaryHub (diary tab sub-modes) */}
-        {tab === 'exercise_lab' && <InfoErrorBoundary label="Лаборатория упражнений"><ExerciseLab /></InfoErrorBoundary>}
+        {tab === 'strength_analysis' && <InfoErrorBoundary label="Анализ силы"><StrengthAnalysisHub /></InfoErrorBoundary>}
+      {tab === 'load_management' && <InfoErrorBoundary label="Управление нагрузкой"><LoadManagementHub /></InfoErrorBoundary>}
+      {tab === 'diagnostics' && <InfoErrorBoundary label="Диагностика"><DiagnosticsHub /></InfoErrorBoundary>}
+      {tab === 'periodization_hub' && <InfoErrorBoundary label="Периодизация"><PeriodizationHub /></InfoErrorBoundary>}
+      {tab === 'exercise_lab' && <InfoErrorBoundary label="Лаборатория упражнений"><ExerciseLab /></InfoErrorBoundary>}
       {tab === 'calc_plates' && <InfoErrorBoundary label="Калькулятор блинов"><PlateCalcTab /></InfoErrorBoundary>}
-      {tab === 'calc_vbt' && <InfoErrorBoundary label="VBT / скорость"><VBTCalcTab /></InfoErrorBoundary>}
-      {tab === 'calc_mrv' && <InfoErrorBoundary label="Оценщик MRV"><MRVEstimatorTab /></InfoErrorBoundary>}
 
-      {tab === 'calc_1rm' && <InfoErrorBoundary label="Калькулятор 1RM"><OneRmCalcTab /></InfoErrorBoundary>}
-      {tab === 'pl_norms' && <InfoErrorBoundary label="Нормативы ПЛ"><PlNormsCalcTab /></InfoErrorBoundary>}
-      {tab === 'pl_weakpoints' && <InfoErrorBoundary label="Слабые точки ПЛ"><PlWeakpointsCard /></InfoErrorBoundary>}
       {tab === 'volume' && <InfoErrorBoundary label="Расчёт объёма"><VolumeOptimizerTab /></InfoErrorBoundary>}
-      {tab === 'bb_tools' && <InfoErrorBoundary label="ББ-инструменты"><BbToolsCard /></InfoErrorBoundary>}
+      {tab === 'bb_tools' && <InfoErrorBoundary label="ББ-инструменты"><BbToolsHub /></InfoErrorBoundary>}
       {tab === 'load_safety' && <InfoErrorBoundary label="Нагрузка/авторег"><LoadSafetyCard /></InfoErrorBoundary>}
       {tab === 'split_gen' && <InfoErrorBoundary label="Генератор сплитов"><SplitGenCard /></InfoErrorBoundary>}
       {tab === 'competition' && <InfoErrorBoundary label="Соревнование"><CompetitionCard /></InfoErrorBoundary>}
       {tab === 'pri_reppat' && <InfoErrorBoundary label="PRI/схема повт"><PriRepPatternCard /></InfoErrorBoundary>}
       {tab === 'mix_presets' && <InfoErrorBoundary label="Пресеты миксов"><MixPresetsCard /></InfoErrorBoundary>}
       {tab === 'synergy' && <InfoErrorBoundary label="Синергия веществ"><SynergyMatrixCard /></InfoErrorBoundary>}
-      {tab === 'calculators' && <InfoErrorBoundary label="Тоннаж"><TonnageCalcTab /></InfoErrorBoundary>}
 
       {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
       {tab === 'pl_pro' && <InfoErrorBoundary label="Pro ПЛ-инструменты"><ProPlToolsTab /></InfoErrorBoundary>}
-      {tab === 'rel_strength' && <InfoErrorBoundary label="Относительная сила"><RelativeStrengthCalcTab /></InfoErrorBoundary>}
-      {tab === 'periodization_designer' && <InfoErrorBoundary label="Дизайнер периодизации"><PeriodizationDesignerTab /></InfoErrorBoundary>}
-      {tab === 'deload_scheduler' && <InfoErrorBoundary label="Планировщик делода"><DeloadSchedulerTab /></InfoErrorBoundary>}
-      {tab === 'meso_progression' && <InfoErrorBoundary label="Прогрессия мезо"><div style={{ maxWidth: 720, margin: '0 auto', padding: 12 }}><MesocycleProgressionCard weeks={mesoLength} goal={goal === 'strength' ? 'strength' : goal === 'bulk' ? 'hypertrophy' : 'hypertrophy'} /></div></InfoErrorBoundary>}
-      {tab === 'calc_taper' && <InfoErrorBoundary label="Тапер-планер"><TaperPlannerTab /></InfoErrorBoundary>}
-      {tab === 'calc_fatigue' && <InfoErrorBoundary label="Индекс усталости"><FatigueIndexTab /></InfoErrorBoundary>}
-      {tab === 'tempo' && <InfoErrorBoundary label="Темп повторений"><TempoTab /></InfoErrorBoundary>}
-      {tab === 'meso_tracker' && <InfoErrorBoundary label="Трекер мезоциклов"><MesocycleTrackerTab /></InfoErrorBoundary>}
-      {tab === 'specialization' && <InfoErrorBoundary label="Специализация"><SpecializationTab /></InfoErrorBoundary>}
-      {tab === 'peaking' && <InfoErrorBoundary label="Пик-протоколы"><PeakingProtocolTab /></InfoErrorBoundary>}
       {tab === 'conjugate' && <InfoErrorBoundary label="Конъюгат"><ConjugateTab /></InfoErrorBoundary>}
 
       {/* ═══════════ MY TRAINING TAB ═══════════ */}
@@ -972,8 +685,6 @@ import { CalcQualityTab } from './TrainingScreen_parts/CalcQualityTab';
 import { MuscleProgressCard } from './TrainingScreen_parts/MuscleProgressCard';
 import { MicrocyclePlannerCard } from './TrainingScreen_parts/MicrocyclePlannerCard';
 import { TrainingRecommendationsCard } from './TrainingScreen_parts/TrainingRecommendationsCard';
-import { OneRmCalcTab } from './TrainingScreen_parts/OneRmCalcTab';
-import { PlNormsCalcTab } from './TrainingScreen_parts/PlNormsCalcTab';
 import { LiftHistoryCard } from './TrainingScreen_parts/LiftHistoryCard';
 import { VolumeTrendCard } from './TrainingScreen_parts/VolumeTrendCard';
 import AllExercisesTrendCard from './TrainingScreen_parts/AllExercisesTrendCard';
@@ -989,7 +700,6 @@ import { ProgramsTab } from './TrainingScreen_parts/ProgramsTab';
 import { VolumeOptimizerTab } from './TrainingScreen_parts/VolumeOptimizerTab';
 import ExerciseLab from './TrainingScreen_parts/ExerciseLab';
 import { TrainingLoadCalculator } from './TrainingScreen_parts/TrainingLoadCalculator';
-import { TonnageCalcTab } from './TrainingScreen_parts/TonnageCalcTab';
 import { WhatIfCard } from './TrainingScreen_parts/WhatIfCard';
 import { ReadinessForecastCard } from './TrainingScreen_parts/ReadinessForecastCard';
 import { MethodologyEncyclopedia } from './TrainingScreen_parts/MethodologyEncyclopedia';
@@ -1009,22 +719,10 @@ import { StrengthLevelCard } from './TrainingScreen_parts/StrengthLevelCard';
 import { StructuredAnalyticsCard } from './TrainingScreen_parts/StructuredAnalyticsCard';
 import { TrainingMixTab } from './TrainingScreen_parts/TrainingMixTab';
 import { ProPlToolsTab } from './TrainingScreen_parts/ProPlToolsTab';
-import { RelativeStrengthCalcTab } from './TrainingScreen_parts/RelativeStrengthCalcTab';
 import { TrainingCalendarTab } from './TrainingScreen_parts/TrainingCalendarTab';
-import { PeriodizationDesignerTab } from './TrainingScreen_parts/PeriodizationDesignerTab';
-import { DeloadSchedulerTab } from './TrainingScreen_parts/DeloadSchedulerTab';
-import { MesocycleProgressionCard } from './TrainingScreen_parts/MesocycleProgressionCard';
-import { TaperPlannerTab } from './TrainingScreen_parts/TaperPlannerTab';
 import { PlateCalcTab } from './TrainingScreen_parts/PlateCalcTab';
-import { VBTCalcTab } from './TrainingScreen_parts/VBTCalcTab';
-import { FatigueIndexTab } from './TrainingScreen_parts/FatigueIndexTab';
-import { MRVEstimatorTab } from './TrainingScreen_parts/MRVEstimatorTab';
-import { TempoTab } from './TrainingScreen_parts/TempoTab';
-import { MesocycleTrackerTab } from './TrainingScreen_parts/MesocycleTrackerTab';
 import { RIRCalibrationCard } from './TrainingScreen_parts/RIRCalibrationCard';
 import MesoCorrectionCard from './TrainingScreen_parts/MesoCorrectionCard';
-import SpecializationTab from './TrainingScreen_parts/SpecializationTab';
-import PeakingProtocolTab from './TrainingScreen_parts/PeakingProtocolTab';
 import ConjugateTab from './TrainingScreen_parts/ConjugateTab';
 import MMCTrackingCard from './TrainingScreen_parts/MMCTrackingCard';
 import { loadRirCalibrationStats } from '../../engines/meso-correction.engine';

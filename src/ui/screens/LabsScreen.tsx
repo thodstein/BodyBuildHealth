@@ -130,22 +130,18 @@ const CATALOG_LAB_DESCRIPTIONS: Record<string, string> = {
 const MAIN_LAB_TABS: { id: MainLabTab; label: string; icon: string }[] = [
   { id: 'lab', label: 'Анализы', icon: '🔬' },
   { id: 'risks', label: 'Риски и индексы', icon: '⚠️' },
-  { id: 'reports', label: 'Отчёты', icon: '📄' },
 ];
 
-type MainLabTab = 'hero' | 'lab' | 'risks' | 'reports';
+type MainLabTab = 'hero' | 'lab' | 'risks';
 
 const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
   { id: 'overview', label: 'Обзор', icon: '📊' },
   { id: 'current', label: 'Текущие', icon: '🔬' },
-  { id: 'archive', label: 'Архив', icon: '📦' },
   { id: 'catalog', label: 'Каталог', icon: '📖' },
-  { id: 'chart', label: 'Динамика', icon: '📈' },
-  { id: 'reports', label: 'Отчёты', icon: '📄' },
-  { id: 'diary', label: 'Дневник', icon: '📓' },
+  { id: 'journal', label: 'Дневник и архив', icon: '📓' },
 ];
 
-type LabSubTab = 'hero' | 'overview' | 'current' | 'archive' | 'catalog' | 'chart' | 'reports' | 'diary';
+type LabSubTab = 'hero' | 'overview' | 'current' | 'catalog' | 'journal';
 
 export const LabsScreen: React.FC = () => {
   const linked = useDataLink();
@@ -165,6 +161,7 @@ export const LabsScreen: React.FC = () => {
   const [inputDate, setInputDate] = useState(new Date().toISOString().split('T')[0]);
   const [tick, setTick] = useState(0);
   const [catalogView, setCatalogView] = useState<'catalog' | 'schedule' | 'problems'>('catalog');
+  const [journalSubView, setJournalSubView] = useState<'diary' | 'reports' | 'archive'>('diary');
   const [showImport, setShowImport] = useState(false);
   const [ocrResult, setOcrResult] = useState<OCRResult | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -186,7 +183,7 @@ export const LabsScreen: React.FC = () => {
       if (localStorage.getItem('he_nav_to_lab_diary') === '1') {
         localStorage.removeItem('he_nav_to_lab_diary');
         setMainTab('lab');
-        setSubTab('diary');
+        setSubTab('journal'); setJournalSubView('diary');
       }
     } catch {}
   }, []);
@@ -1024,17 +1021,98 @@ export const LabsScreen: React.FC = () => {
         </div>
       )}
 
-      {/* ≡≡≡ ARCHIVE TAB ≡≡≡ */}
-      {subTab === 'archive' && (
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0' }}>
-            <span style={{ fontSize: 18 }}>📦</span>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>Архив результатов</span>
-            <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>{archiveLabs.length} записей • {new Set(archiveLabs.map(l => l.code.toUpperCase())).size} тестов</span>
+      {/* ≡≡≡ COMBINED JOURNAL TAB (diary + reports + archive) ≡≡≡ */}
+      {subTab === 'journal' && (
+        <div style={{ paddingBottom: 80 }}>
+          {/* Internal sub-tab segmented control */}
+          <div style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '8px 0 4px', scrollbarWidth: 'none' }}>
+            {([
+              { id: 'diary' as const, label: 'Дневник', icon: '📓' },
+              { id: 'reports' as const, label: 'Отчёты', icon: '📄' },
+              { id: 'archive' as const, label: 'Архив', icon: '📦' },
+            ]).map(v => (
+              <button key={v.id} onClick={() => setJournalSubView(v.id)} style={{
+                padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
+                whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
+                background: journalSubView === v.id ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: journalSubView === v.id ? '#000' : 'var(--text-dim)',
+                border: `1px solid ${journalSubView === v.id ? 'var(--accent)' : 'var(--border)'}`,
+              }}>
+                {v.icon} {v.label}
+              </button>
+            ))}
           </div>
 
-          {/* LabsResults — красивые карточки */}
-          <LabsResults labs={archiveLabs} />
+          {/* ≡≡≡ DIARY SUB-VIEW ≡≡≡ */}
+          {journalSubView === 'diary' && (
+            <LabDiaryTab labs={labs} />
+          )}
+
+          {/* ≡≡≡ REPORTS SUB-VIEW ≡≡≡ */}
+          {journalSubView === 'reports' && (
+            <div>
+              <div style={{ display:'flex', gap:6, marginTop:4, marginBottom:12 }}>
+                <button onClick={() => { const r = { id:Date.now().toString(), date:new Date().toISOString().slice(0,10), labs:(labs||[]).map((l:any)=>({code:l.code,name:l.name||l.code,value:l.value,unit:l.unit,date:l.date})), totalMarkers:labs.length, abnormalCount:deviationCount, timestamp:Date.now() }; const u=[r,...labArchive].slice(0,20); setLabArchive(u); try{localStorage.setItem('he_lab_reports',JSON.stringify(u));localStorage.setItem('he_labs_report_current',JSON.stringify(r))}catch{}; setLabReportGenerated(true); }} style={{ padding:'8px 16px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:12, background:'var(--accent)', color:'#000', border:'none', flex:1 }}>📄 Сгенерировать отчёт</button>
+                <button onClick={() => { try { localStorage.removeItem('he_lab_reports'); localStorage.removeItem('he_labs_report_current'); setLabArchive([]); setLabReportGenerated(false); } catch {} }} style={{ padding:'8px 12px', borderRadius:10, cursor:'pointer', fontWeight:600, fontSize:11, background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.2)' }}>🗑 Очистить</button>
+              </div>
+              {labReportGenerated && (
+                <div style={{ borderRadius:12, padding:14, marginBottom:10, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+                    <span style={{ fontSize:12, fontWeight:700, color:'#00e68a' }}>✅ Отчёт сгенерирован</span>
+                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)' }}>{new Date().toLocaleString()}</span>
+                  </div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)' }}><b>Маркеров:</b> {labs.length} ({deviationCount} с откл.)</div>
+                  <div style={{ maxHeight:160, overflowY:'auto', marginTop:4 }}>
+                    {labs.map((l:any,i:number) => (
+                      <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'2px 6px', borderRadius:4, background:i%2===0?'rgba(255,255,255,0.03)':'transparent', fontSize:9 }}>
+                        <span>{l.name||l.code}</span><span style={{ fontWeight:700 }}>{l.value} {l.unit}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', textAlign:'center', marginTop:6 }}>Сохранено в архив. Доступно в Профиле → Отчёты.</div>
+                </div>
+              )}
+              {labArchive.length > 0 && (
+                <div>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginBottom:4 }}>📦 Архив ({labArchive.length})</div>
+                  {labArchive.slice(0,20).map((r:any) => (
+                    <div key={r.id} onClick={() => setSelectedArchivedLabReport(selectedArchivedLabReport?.id === r.id ? null : r)} style={{ borderRadius:8, padding:8, marginBottom:4, background: selectedArchivedLabReport?.id === r.id ? 'rgba(0,230,138,0.08)' : 'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.03)', fontSize:9, cursor:'pointer' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between' }}>
+                        <span style={{ color:'#00e68a', fontWeight:700 }}>{r.date}</span>
+                        <span style={{ color:'rgba(255,255,255,0.5)' }}>{r.totalMarkers} марк. · {r.abnormalCount || 0} откл.</span>
+                      </div>
+                      {selectedArchivedLabReport?.id === r.id && (
+                        <div style={{ marginTop:6, padding:6, background:'rgba(0,0,0,0.15)', borderRadius:6 }}>
+                          <div style={{ fontSize:9, fontWeight:700, color:'#00e68a', marginBottom:4 }}>📋 Отчёт от {r.date}</div>
+                          {(r.labs||[]).map((l:any, i:number) => (
+                            <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:8, padding:'1px 0', color:'rgba(255,255,255,0.85)' }}>
+                              <span>{l.name || l.code}</span>
+                              <span>{l.value} {l.unit}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!labReportGenerated && labArchive.length === 0 && (
+                <div style={{ textAlign:'center', padding:30, fontSize:10, color:'rgba(255,255,255,0.4)' }}>Нажмите «Сгенерировать отчёт»</div>
+              )}
+            </div>
+          )}
+
+          {/* ≡≡≡ ARCHIVE SUB-VIEW ≡≡≡ */}
+          {journalSubView === 'archive' && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0' }}>
+                <span style={{ fontSize: 18 }}>📦</span>
+                <span style={{ fontSize: 14, fontWeight: 700 }}>Архив результатов</span>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>{archiveLabs.length} записей • {new Set(archiveLabs.map(l => l.code.toUpperCase())).size} тестов</span>
+              </div>
+              <LabsResults labs={archiveLabs} />
+            </div>
+          )}
         </div>
       )}
 
@@ -1163,66 +1241,6 @@ export const LabsScreen: React.FC = () => {
       )}
 
         </>)}
-      {/* ≡≡≡ LAB REPORTS SUB-TAB ≡≡≡ */}
-      {mainTab === 'lab' && subTab === 'reports' && (
-        <div style={{ padding:'0 0 80px' }}>
-          <div style={{ display:'flex', gap:6, marginTop:8, marginBottom:12 }}>
-            <button onClick={() => { const r = { id:Date.now().toString(), date:new Date().toISOString().slice(0,10), labs:(labs||[]).map((l:any)=>({code:l.code,name:l.name||l.code,value:l.value,unit:l.unit,date:l.date})), totalMarkers:labs.length, abnormalCount:deviationCount, timestamp:Date.now() }; const u=[r,...labArchive].slice(0,20); setLabArchive(u); try{localStorage.setItem('he_lab_reports',JSON.stringify(u));localStorage.setItem('he_labs_report_current',JSON.stringify(r))}catch{}; setLabReportGenerated(true); }} style={{ padding:'8px 16px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:12, background:'var(--accent)', color:'#000', border:'none', flex:1 }}>📄 Сгенерировать отчёт</button>
-            <button onClick={() => { try { localStorage.removeItem('he_lab_reports'); localStorage.removeItem('he_labs_report_current'); setLabArchive([]); setLabReportGenerated(false); } catch {} }} style={{ padding:'8px 12px', borderRadius:10, cursor:'pointer', fontWeight:600, fontSize:11, background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.2)' }}>🗑 Очистить</button>
-          </div>
-          {labReportGenerated && (
-            <div style={{ borderRadius:12, padding:14, marginBottom:10, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
-                <span style={{ fontSize:12, fontWeight:700, color:'#00e68a' }}>✅ Отчёт сгенерирован</span>
-                <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)' }}>{new Date().toLocaleString()}</span>
-              </div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)' }}><b>Маркеров:</b> {labs.length} ({deviationCount} с откл.)</div>
-              <div style={{ maxHeight:160, overflowY:'auto', marginTop:4 }}>
-                {labs.map((l:any,i:number) => (
-                  <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'2px 6px', borderRadius:4, background:i%2===0?'rgba(255,255,255,0.03)':'transparent', fontSize:9 }}>
-                    <span>{l.name||l.code}</span><span style={{ fontWeight:700 }}>{l.value} {l.unit}</span>
-                  </div>
-                ))}
-              </div>
-              <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', textAlign:'center', marginTop:6 }}>Сохранено в архив. Доступно в Профиле → Отчёты.</div>
-            </div>
-          )}
-          {labArchive.length > 0 && (
-            <div>
-              <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginBottom:4 }}>📦 Архив ({labArchive.length})</div>
-              {labArchive.slice(0,20).map((r:any) => (
-                <div key={r.id} onClick={() => setSelectedArchivedLabReport(selectedArchivedLabReport?.id === r.id ? null : r)} style={{ borderRadius:8, padding:8, marginBottom:4, background: selectedArchivedLabReport?.id === r.id ? 'rgba(0,230,138,0.08)' : 'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.03)', fontSize:9, cursor:'pointer' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between' }}>
-                    <span style={{ color:'#00e68a', fontWeight:700 }}>{r.date}</span>
-                    <span style={{ color:'rgba(255,255,255,0.5)' }}>{r.totalMarkers} марк. · {r.abnormalCount || 0} откл.</span>
-                  </div>
-                  {selectedArchivedLabReport?.id === r.id && (
-                    <div style={{ marginTop:6, padding:6, background:'rgba(0,0,0,0.15)', borderRadius:6 }}>
-                      <div style={{ fontSize:9, fontWeight:700, color:'#00e68a', marginBottom:4 }}>📋 Отчёт от {r.date}</div>
-                      {(r.labs||[]).map((l:any, i:number) => (
-                        <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:8, padding:'1px 0', color:'rgba(255,255,255,0.85)' }}>
-                          <span>{l.name || l.code}</span>
-                          <span>{l.value} {l.unit}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          {!labReportGenerated && labArchive.length === 0 && (
-            <div style={{ textAlign:'center', padding:30, fontSize:10, color:'rgba(255,255,255,0.4)' }}>Нажмите «Сгенерировать отчёт»</div>
-          )}
-        </div>
-      )}
-
-      {/* ≡≡≡ LAB DIARY TAB ≡≡≡ */}
-      {mainTab === 'lab' && subTab === 'diary' && (
-        <LabDiaryTab labs={labs} />
-      )}
-
-
       {/* ≡≡≡ RISKS & INDICES TAB ≡≡≡ */}
       {mainTab === 'risks' && (() => {
         const r = labAnalysisResult;

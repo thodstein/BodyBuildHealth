@@ -69,7 +69,7 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
   const {
     dayPlan, generated,
     saveUndo, setDayPlan, undoStack, setUndoStack,
-    setRecipePickerMeal,
+    setRecipePickerMeal, setThreeDayPlan, setWeekPlan,
   } = ctx;
 
   const [popup, setPopup] = useState<{
@@ -153,10 +153,20 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
     if (p.mode === 'replace_product') {
       const item = meals[mealIdx]?.items?.[itemIdx];
       if (!item) return;
-      const similar = FOOD_DB.filter((f: any) => {
-        return f.id !== item.id && f.name !== item.name && f.category === item.category;
-      }).slice(0, 10);
-      setPopup({ ...p, step: 'select_replacement', searchResults: similar });
+      const mealTarget = getMealKBJUTarget(dayPlan, mealIdx);
+      const mealCur = getMealCurrentKBJU(dayPlan, mealIdx);
+      const defaultTarget = mealTarget || { kcal: 600, protein: 40, fat: 20, carbs: 60 };
+      const itemFood = FOOD_DB.find((f: any) => f.id === item.id) || FOOD_DB.find((f: any) => f.name === item.name);
+      const itemCategory = itemFood?.category || '';
+      let raw = itemCategory ? FOOD_DB.filter((f: any) => f.category === itemCategory && f.id !== item.id) : [];
+      if (raw.length === 0) raw = FOOD_DB.filter((f: any) => f.id !== item.id && f.name !== item.name).slice(0, 20);
+      let scored: any[];
+      if (mode === 'targeting' && gapResult) {
+        scored = scoreFoodsWithGapPriority(raw, defaultTarget, gapResult, mealCur || undefined, advancedFilter, 10, 0.4);
+      } else {
+        scored = scoreFoodsForKBJU(raw, defaultTarget, mealCur || undefined, mode === 'advanced' ? advancedFilter : undefined, 10);
+      }
+      setPopup({ ...p, step: 'select_replacement', searchResults: raw.slice(0, 10), scoredResults: scored });
       return;
     }
     if (p.mode === 'edit_weight') {
@@ -170,13 +180,18 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
   const doReplaceProduct = (food: any) => {
     if (!popup || popup.selectedMealIdx === undefined || popup.selectedItemIdx === undefined) return;
     saveUndo();
+    const mealIdx = popup.selectedMealIdx;
+    const itemIdx = popup.selectedItemIdx;
+    const oldItem = dayPlan?.meals?.[mealIdx]?.items?.[itemIdx];
+    if (!oldItem) { closePopup(); return; }
+    const portion = (oldItem.amount || 100) / 100;
     setDayPlan((prev: any) => {
       if (!prev) return prev;
       const meals2 = prev.meals.map((m: any, mi: number) => {
-        if (mi !== popup.selectedMealIdx) return m;
+        if (mi !== mealIdx) return m;
         const items = m.items.map((it: any, ii: number) => {
-          if (ii !== popup.selectedItemIdx) return it;
-          return { ...it, name: food.name || food.foodName, id: food.id || food.foodId, kcal: food.kcal, p: food.protein ?? food.p, f: food.fat ?? food.f, c: food.carbs ?? food.c };
+          if (ii !== itemIdx) return it;
+          return { ...it, name: food.name || food.foodName, id: food.id || food.foodId, kcal: Math.round((food.kcal || 0) * portion), p: Math.round((food.protein ?? food.p ?? 0) * portion), f: Math.round((food.fat ?? food.f ?? 0) * portion), c: Math.round((food.carbs ?? food.c ?? 0) * portion) };
         });
         const totals = { kcal: items.reduce((s: number, x: any) => s + x.kcal, 0), p: items.reduce((s: number, x: any) => s + x.p, 0), f: items.reduce((s: number, x: any) => s + x.f, 0), c: items.reduce((s: number, x: any) => s + x.c, 0) };
         return { ...m, items, totals };
@@ -248,7 +263,10 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
 
   const undoLast = () => {
     if (undoStack.length === 0) return;
-    setDayPlan(undoStack[0]);
+    const snap = undoStack[0];
+    if (snap.dayPlan) setDayPlan(snap.dayPlan);
+    if (snap.threeDayPlan) setThreeDayPlan(snap.threeDayPlan);
+    if (snap.weekPlan) setWeekPlan(snap.weekPlan);
     setUndoStack(undoStack.slice(1));
   };
 
@@ -371,7 +389,7 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
         </div>
       )}
 
-      {/* POPUP: select replacement food */}
+      {/* POPUP: select replacement food — with quality scoring */}
       {popup && (popup.step === 'select_replacement') && popup.selectedMealIdx !== undefined && popup.selectedItemIdx !== undefined && (
         <div style={popupOverlay} onClick={closePopup}>
           <div onClick={e => e.stopPropagation()} style={popupSheet}>
@@ -380,26 +398,70 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
               {meals[popup.selectedMealIdx]?.items?.[popup.selectedItemIdx]?.name}
               {' → '}выберите замену:
+              {mode !== 'basic' && <span style={{ color: '#a78bfa', fontWeight: 600, marginLeft: 4 }}>(скор по качеству)</span>}
             </div>
             <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {popup.searchResults && popup.searchResults.length > 0 ? popup.searchResults.map((food: any) => (
-                <button key={food.id} onClick={() => doReplaceProduct(food)}
-                  style={productBtn}
-                  onMouseEnter={e => (e.target as HTMLElement).style.borderColor = 'rgba(0,230,138,0.3)'}
-                  onMouseLeave={e => (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <span style={{ fontWeight: 700 }}>{food.name}</span>
-                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginLeft: 4 }}>
-                        {CATEGORY_LABELS[food.category] || food.category || ''}
-                      </span>
-                    </div>
-                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 8 }}>
-                      {Math.round(food.kcal)} ккал · Б{food.protein}/Ж{food.fat}/У{food.carbs}
-                    </span>
-                  </div>
-                </button>
-              )) : (
+              {(popup.scoredResults && popup.scoredResults.length > 0 ? popup.scoredResults : popup.searchResults || []).length > 0 ? (
+                (popup.scoredResults && popup.scoredResults.length > 0 ? popup.scoredResults : popup.searchResults || []).map((result: any, ri: number) => {
+                  const isScored = !!(result.matchScore !== undefined);
+                  const food = isScored ? null : result;
+                  const r = isScored ? result : null;
+                  return (
+                    <button key={isScored ? result.foodId : result.id} onClick={() => isScored ? doReplaceProduct(FOOD_DB.find((f: any) => f.id === result.foodId) || result) : doReplaceProduct(result)}
+                      style={{ ...productBtn, padding: isScored && (mode === 'advanced' || mode === 'targeting') ? '8px 10px' : '10px 12px' }}
+                      onMouseEnter={e => (e.target as HTMLElement).style.borderColor = 'rgba(0,230,138,0.3)'}
+                      onMouseLeave={e => (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'}>
+                      {isScored ? (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span style={{ fontWeight: 700, fontSize: 9 }}>{r.foodName}</span>
+                                <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 4, background: `${r.color}18`, color: r.color, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                  {r.matchScore}% {r.label}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                                {Math.round(r.kcal)} ккал/100г · Б{r.protein} Ж{r.fat} У{r.carbs}
+                                {r.fiber > 0 && <span style={{ color: '#22c55e' }}> · клетч.{r.fiber}г</span>}
+                              </div>
+                              {(mode === 'advanced' || mode === 'targeting') && (
+                                <div style={{ display: 'flex', gap: 6, marginTop: 3, flexWrap: 'wrap', fontSize: 7 }}>
+                                  {r.diaas !== undefined && r.diaas > 0 && <span style={{ color: r.diaas >= 1 ? '#00e68a' : r.diaas >= 0.75 ? '#f59e0b' : '#ef4444' }}>🧬 DIAAS {r.diaas}</span>}
+                                  {r.gi > 0 && <span style={{ color: r.gi <= 55 ? '#22c55e' : r.gi <= 70 ? '#f59e0b' : '#ef4444' }}>🍬 ГИ {r.gi}</span>}
+                                  {r.pral !== undefined && <span style={{ color: (r.pral ?? 0) < 0 ? '#22c55e' : (r.pral ?? 0) <= 5 ? '#f59e0b' : '#ef4444' }}>⚡ PRAL {(r.pral ?? 0).toFixed(1)}</span>}
+                                  {r.bbQuality !== undefined && <span style={{ color: (r.bbQuality ?? 5) >= 7 ? '#00e68a' : (r.bbQuality ?? 5) >= 5 ? '#f59e0b' : '#ef4444' }}>⭐ {r.bbQuality?.toFixed(1)}</span>}
+                                  {r.aminoScore !== undefined && r.aminoScore > 0 && <span style={{ color: '#60a5fa' }}>💪 Амино {r.aminoScore}/8</span>}
+                                </div>
+                              )}
+                              {mode === 'targeting' && (r as any).isGapFiller && (
+                                <div style={{ fontSize: 6, marginTop: 2, color: '#06b6d4', fontWeight: 600 }}>
+                                  🎯 Закрывает {(r as any).gapsCovered}/{(r as any).totalGaps} дефицитов
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', flexShrink: 0, marginTop: 4 }}>
+                              <div style={{ width: `${r.matchScore}%`, height: '100%', borderRadius: 2, background: r.color }} />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <span style={{ fontWeight: 700 }}>{food.name}</span>
+                            <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginLeft: 4 }}>
+                              {CATEGORY_LABELS[food.category] || food.category || ''}
+                            </span>
+                          </div>
+                          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 8 }}>
+                            {Math.round(food.kcal)} ккал · Б{food.protein}/Ж{food.fat}/У{food.carbs}
+                          </span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })
+              ) : (
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', textAlign: 'center', padding: 12 }}>
                   Нет подходящих замен в этой категории
                 </div>

@@ -48,16 +48,15 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     color: '#3b82f6',
     subtitle: 'Все калькуляторы в одном месте: сила, нагрузка, периодизация, инвентарь',
     tabs: [
-      'exercise_lab', 'calc_1rm', 'calc_plates', 'calc_vbt', 'calc_mrv',
-      'calculators', 'calc_fatigue', 'tempo', 'deload_scheduler', 'calc_taper',
-      'periodization_designer', 'meso_progression', 'meso_tracker', 'rel_strength',
-      'pl_norms', 'pl_weakpoints', 'specialization', 'peaking', 'conjugate', 'pl_pro', 'calc_quality',
-      'volume', 'cycles', 'bb_tools', 'load_safety', 'split_gen', 'competition', 'pri_reppat', 'mix_presets', 'synergy',
+      'strength_analysis', 'load_management', 'diagnostics', 'periodization_hub',
+      'exercise_lab', 'bb_tools', 'load_safety', 'competition', 'split_gen', 'pri_reppat',
+      'calc_plates', 'calc_quality', 'volume', 'conjugate', 'pl_pro',
+      'goals', 'synergy', 'mix_presets',
     ],
     categories: [
-      { label: 'Сила и нагрузка', icon: '🏋️', tabs: ['calc_1rm', 'calc_vbt', 'rel_strength', 'pl_norms', 'pl_weakpoints', 'calculators', 'calc_mrv', 'calc_fatigue', 'volume'] },
-      { label: 'Периодизация', icon: '🔄', tabs: ['periodization_designer', 'meso_progression', 'meso_tracker', 'deload_scheduler', 'calc_taper', 'specialization', 'peaking', 'conjugate', 'cycles'] },
-      { label: 'Инструменты и качество', icon: '🧪', tabs: ['calc_plates', 'tempo', 'exercise_lab', 'bb_tools', 'load_safety', 'competition', 'calc_quality', 'pl_pro'] },
+      { label: 'Унифицированные', icon: '🧠', tabs: ['strength_analysis', 'load_management', 'diagnostics', 'periodization_hub', 'exercise_lab'] },
+      { label: 'Инструменты', icon: '🛠️', tabs: ['bb_tools', 'load_safety', 'competition', 'split_gen', 'pri_reppat', 'calc_plates', 'calc_quality', 'volume', 'conjugate', 'pl_pro'] },
+      { label: 'Прочее', icon: '📋', tabs: ['goals', 'synergy', 'mix_presets'] },
     ],
   },
   library: {
@@ -83,7 +82,7 @@ export function zoneForTab(tab: TrainingTab): TrainingZone {
 /** Режимы зоны 'planner' — сегментированный переключатель. */
 export type PlannerMode = 'pl' | 'bb' | 'manual';
 export const PLANNER_MODES: { id: PlannerMode; label: string; icon: string; hint: string }[] = [
-  { id: 'pl', label: 'ПЛ-авто', icon: '🏆', hint: 'Пауэрлифтинг: циклы СРЦ, ПМ-прогрессия, пик' },
+  { id: 'pl', label: 'ПЛ-авто', icon: '🏆', hint: 'Пауэрлифтинг: силовые циклы, ПМ-прогрессия, пик' },
   { id: 'bb', label: 'ББ-авто', icon: '💪', hint: 'Бодибилдинг: сплиты, объём по группам, прогрессия' },
   { id: 'manual', label: 'Ручной сбор', icon: '🛠', hint: 'Конструктор с полным ручным выбором параметров' },
 ];

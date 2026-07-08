@@ -4,7 +4,7 @@
  * Ежедневный трекинг выбранных симптомов: оценка динамики,
  * сохранение в localStorage, график за неделю/месяц.
  */
-import type { SymptomEntry, SymptomCategory, UrgencyLevel } from './symptom-solver.engine';
+import type { SymptomEntry, SymptomCategory, UrgencyLevel } from './symptom-solver.types';
 import { findSymptomById } from './symptom-solver.engine';
 
 export type SymptomTrend = 'improving' | 'stable' | 'worsening' | 'resolved';

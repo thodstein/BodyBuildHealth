@@ -567,6 +567,8 @@ goalTimelineWeeks?: number;
       bloodType?: string;          // I+, I-, II+, II-, III+, III-, IV+, IV-
       allergyNotes?: string;       // free-text allergies
       chronicConditions?: string[]; // hypertension, diabetes, asthma, etc
+      excludedSupplements?: string;  // comma-separated supplement IDs to exclude
+      excludedMeds?: string;         // comma-separated medication IDs to exclude
       emergencyName?: string;      // emergency contact name
       emergencyPhone?: string;     // emergency contact phone
     };

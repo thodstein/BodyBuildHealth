@@ -47,7 +47,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
       {tab === 'runtime' && (
         <InfoErrorBoundary label="Тренировка">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Запуск построенного плана СРЦ/ББ (перенесено из подвкладки «Выполнение») */}
+          {/* Запуск построенного плана ПЛ/ББ */}
           {plRuntime && plRuntime.days.length > 0 && !plRunOpen && !runtimeStarted && (
             <div className="card" style={{ padding: '12px', border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.06)' }}>
               <h3 style={{ margin: '0 0 4px', fontSize: 13, color: 'var(--accent)' }}>▶ Запустить построенный план ({plRuntime.track === 'bb' ? 'ББ' : 'ПЛ'})</h3>

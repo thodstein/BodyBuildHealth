@@ -222,7 +222,7 @@ export const MacrocyclePanel: React.FC<Props> = ({
           <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
             {[
               { v: 'auto', l: '🤖 Авто', d: 'Движок сам строит макроцикл' },
-              { v: 'lms', l: '📋 Готовый цикл (28)', d: 'Реальные раскладки СРЦ с прогрессией PM' },
+              { v: 'lms', l: '📋 Силовой цикл (28)', d: 'Реальные раскладки с прогрессией ПМ' },
               { v: 'template', l: '📐 Шаблон фаз (12)', d: 'Шаблоны bulk/cut/strength/recomp/rehab' },
               { v: 'custom', l: '🛠 Свой', d: 'Полностью ручная конфигурация ниже' },
               { v: 'mesopro', l: '📈 PRO мезо', d: 'Проф. кривые V/I/RIR + усталость' },
@@ -235,7 +235,7 @@ export const MacrocyclePanel: React.FC<Props> = ({
 
         {macroSource === 'lms' && (
           <div style={{ marginBottom: 8 }}>
-            <label style={{ fontSize: 10, color: DIM, marginBottom: 2, display: 'block' }}>Готовый СРЦ-цикл (реальная раскладка × прогрессия PM)</label>
+            <label style={{ fontSize: 10, color: DIM, marginBottom: 2, display: 'block' }}>Готовый силовой цикл (реальная раскладка × прогрессия ПМ)</label>
             <button onClick={() => { setShowLmsPicker(!showLmsPicker); }} style={{ width: '100%', padding: '6px 10px', borderRadius: 8, textAlign: 'left', cursor: 'pointer', background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>{lmsCycleId ? (LMS_CYCLES.find(cc => cc.meta.id === lmsCycleId)?.meta.title || lmsCycleId) : 'Выбрать цикл из 28...'}</span>
               <span style={{ fontSize: 9, color: DIM }}>{showLmsPicker ? '▴' : '▾'}</span>

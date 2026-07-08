@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { PROBLEM_PANELS, formatPanelAsReferral, type ProblemPanel } from '../../../data/labs-problem-panels';
 import { getProblemPanelsForSymptoms } from '../../../engines/symptom-lab-link';
+import { SYMPTOM_DB, findSymptomById, type SymptomEntry } from '../../../engines/symptom-solver.engine';
 
 const URGENCY_LABELS: Record<string, string> = {
   routine: 'Планово',
@@ -36,10 +37,65 @@ const LabsProblemPanelsTab: React.FC = () => {
   const [filterUrgency, setFilterUrgency] = useState<string>('all');
   const [symptomLinkedPanels, setSymptomLinkedPanels] = useState<string[]>([]);
   const [showSymptomLink, setShowSymptomLink] = useState(false);
-  const [symptomSearch, setSymptomSearch] = useState('');
+  const [symptomSearchQ, setSymptomSearchQ] = useState('');
+  const [selectedSymptomIds, setSelectedSymptomIds] = useState<string[]>([]);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [referralCopied, setReferralCopied] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const allPanels = useMemo(() => PROBLEM_PANELS, []);
+
+  const allSymptoms = useMemo(() => SYMPTOM_DB, []);
+
+  const filteredSymptoms = useMemo(() => {
+    const q = symptomSearchQ.toLowerCase().trim();
+    if (!q) return [];
+    return allSymptoms
+      .filter(s => s.symptom.toLowerCase().includes(q) || s.id.toLowerCase().includes(q))
+      .slice(0, 12);
+  }, [symptomSearchQ, allSymptoms]);
+
+  const selectedSymptoms = useMemo(() => {
+    return selectedSymptomIds
+      .map(id => findSymptomById(id))
+      .filter((s): s is SymptomEntry => s !== undefined);
+  }, [selectedSymptomIds]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
+          inputRef.current && !inputRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const addSymptom = useCallback((id: string) => {
+    setSelectedSymptomIds(prev => prev.includes(id) ? prev : [...prev, id]);
+    setSymptomSearchQ('');
+    setDropdownOpen(false);
+  }, []);
+
+  const removeSymptom = useCallback((id: string) => {
+    setSelectedSymptomIds(prev => prev.filter(x => x !== id));
+  }, []);
+
+  // Auto-search when selection changes
+  const handleSymptomSearch = useCallback(() => {
+    if (selectedSymptomIds.length === 0) { setSymptomLinkedPanels([]); return; }
+    const panels = getProblemPanelsForSymptoms(selectedSymptomIds);
+    setSymptomLinkedPanels(panels);
+  }, [selectedSymptomIds]);
+
+  useEffect(() => {
+    if (showSymptomLink && selectedSymptomIds.length > 0) {
+      handleSymptomSearch();
+    }
+  }, [selectedSymptomIds, showSymptomLink, handleSymptomSearch]);
 
   const filteredPanels = useMemo(() => {
     let panels = allPanels;
@@ -66,17 +122,9 @@ const LabsProblemPanelsTab: React.FC = () => {
   }, []);
 
   const handleSymptomLinkClick = useCallback(() => {
-    setShowSymptomLink(true);
-    setSymptomSearch('');
-    setSymptomLinkedPanels([]);
+    setShowSymptomLink(prev => !prev);
+    setSymptomSearchQ('');
   }, []);
-
-  const handleSymptomSearch = useCallback(() => {
-    if (!symptomSearch.trim()) { setSymptomLinkedPanels([]); return; }
-    const ids = symptomSearch.split(',').map(s => s.trim()).filter(Boolean);
-    const panels = getProblemPanelsForSymptoms(ids);
-    setSymptomLinkedPanels(panels);
-  }, [symptomSearch]);
 
   // Detail view for a specific panel
   if (selectedPanel) {
@@ -211,32 +259,77 @@ const LabsProblemPanelsTab: React.FC = () => {
         <div className="card" style={{ padding: 12, marginBottom: 12, border: '1px solid rgba(168,85,247,0.25)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 700, fontSize: 12, color: '#a855f7' }}>🔍 Симптом → анализы</span>
-            <button onClick={() => { setShowSymptomLink(false); setSymptomLinkedPanels([]); setSymptomSearch(''); }} style={{
+            <button onClick={() => { setShowSymptomLink(false); setSymptomLinkedPanels([]); setSymptomSearchQ(''); setSelectedSymptomIds([]); }} style={{
               background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)',
               borderRadius: 8, padding: '3px 10px', fontSize: 10, cursor: 'pointer',
             }}>✕</button>
           </div>
-          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', margin: '0 0 6px' }}>
-            Введите ID симптомов через запятую (например: liver_pain, hypertension_symptoms)
+          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', margin: '0 0 8px' }}>
+            Введите название симптома на русском — например «головная боль», «отёки», «тошнота»
           </p>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+
+          {/* Selected symptom chips */}
+          {selectedSymptoms.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+              {selectedSymptoms.map(s => (
+                <span key={s.id} onClick={() => removeSymptom(s.id)} style={{
+                  padding: '4px 8px', borderRadius: 10, cursor: 'pointer', fontSize: 10, fontWeight: 600,
+                  background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.25)',
+                  color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  ✓ {s.symptom} <span style={{ fontSize: 9, opacity: 0.6 }}>✕</span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Search input with dropdown */}
+          <div style={{ position: 'relative', marginBottom: 8 }}>
             <input
-              value={symptomSearch}
-              onChange={e => setSymptomSearch(e.target.value)}
-              placeholder="liver_pain, fatigue, headache"
+              ref={inputRef}
+              value={symptomSearchQ}
+              onChange={e => { setSymptomSearchQ(e.target.value); setDropdownOpen(true); }}
+              onFocus={() => symptomSearchQ.trim() && setDropdownOpen(true)}
+              placeholder="Начните вводить симптом..."
               style={{
-                flex: 1, padding: '8px 10px', borderRadius: 8,
+                width: '100%', padding: '10px 12px', borderRadius: 10, boxSizing: 'border-box',
                 background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                color: 'var(--text)', fontSize: 11,
+                color: 'var(--text)', fontSize: 12,
               }}
             />
-            <button onClick={handleSymptomSearch} style={{
-              padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 11,
-              background: 'var(--accent)', border: 'none', color: '#000',
-            }}>Найти</button>
+            {dropdownOpen && filteredSymptoms.length > 0 && (
+              <div ref={dropdownRef} style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                marginTop: 4, borderRadius: 10, overflow: 'hidden',
+                background: 'var(--bg)', border: '1px solid var(--border)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.4)', maxHeight: 220, overflowY: 'auto',
+              }}>
+                {filteredSymptoms.map(s => (
+                  <button key={s.id} onClick={() => addSymptom(s.id)} style={{
+                    width: '100%', padding: '8px 12px', textAlign: 'left', cursor: 'pointer',
+                    background: selectedSymptomIds.includes(s.id) ? 'rgba(0,230,138,0.06)' : 'transparent',
+                    border: 'none', fontSize: 11, color: 'var(--text)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  }}>
+                    <span>{s.symptom}</span>
+                    <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{s.category}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+
+          <button onClick={handleSymptomSearch} style={{
+            width: '100%', padding: '9px 14px', borderRadius: 10, cursor: 'pointer', fontWeight: 600, fontSize: 11,
+            background: selectedSymptomIds.length > 0 ? 'var(--accent)' : 'var(--bg-secondary)',
+            border: selectedSymptomIds.length > 0 ? 'none' : '1px solid var(--border)',
+            color: selectedSymptomIds.length > 0 ? '#000' : 'var(--text-dim)',
+          }}>
+            🔍 Найти анализы для {selectedSymptomIds.length > 0 ? `${selectedSymptomIds.length} симптомов` : 'симптомов'}
+          </button>
+
           {symptomLinkedPanels.length > 0 && (
-            <div>
+            <div style={{ marginTop: 8 }}>
               <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)' }}>Рекомендуемые панели:</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
                 {symptomLinkedPanels.map(id => {
@@ -252,6 +345,12 @@ const LabsProblemPanelsTab: React.FC = () => {
                   ) : null;
                 })}
               </div>
+            </div>
+          )}
+
+          {selectedSymptomIds.length > 0 && symptomLinkedPanels.length === 0 && (
+            <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-dim)', textAlign: 'center' }}>
+              Нет панелей для выбранных симптомов
             </div>
           )}
         </div>

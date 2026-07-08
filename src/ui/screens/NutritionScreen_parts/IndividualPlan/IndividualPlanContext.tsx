@@ -7,6 +7,7 @@ import { calcNutritionV2 } from "../../../../engines/nutrition-v2.engine";
 import { updateProfile } from "../../../../core/profile-manager";
 import { getRecipesByMeal, type Recipe } from "../../../../engines/nutrition-periodization.engine";
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type DailyDietReport, type MealScoreV2 } from "../../../../engines/product-usefulness-v2.engine";
+import { scoreFoodsForKBJU, getMealKBJUTarget, getMealCurrentKBJU } from "../../../../engines/kbju-food-match.engine";
 import { generateNutritionReport, type NutritionReport } from "../../../../engines/nutrition-report.engine";
 import type { UserProfile, LabPoint } from "../../../../core/types";
 import { getContraindications, saveContraindications } from "../../../../core/contraindications";
@@ -437,7 +438,33 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => { try { localStorage.setItem('he_planner_histamine', histamineSensitive ? 'true' : 'false'); } catch {} }, [histamineSensitive]);
   useEffect(() => { try { localStorage.setItem('he_nutrition_supps', JSON.stringify(takenSupplements)); } catch {} }, [takenSupplements]);
 
-  const saveUndo = () => { if (dayPlan) setUndoStack(prev => [JSON.parse(JSON.stringify(dayPlan)), ...prev].slice(0, 5)); };
+  const saveUndo = () => {
+    const snap: any = {};
+    if (dayPlan) snap.dayPlan = JSON.parse(JSON.stringify(dayPlan));
+    if (threeDayPlan) snap.threeDayPlan = JSON.parse(JSON.stringify(threeDayPlan));
+    if (weekPlan) snap.weekPlan = JSON.parse(JSON.stringify(weekPlan));
+    setUndoStack(prev => [snap, ...prev].slice(0, 5));
+  };
+
+  const calcItemTotals = (items: any[]) => ({ kcal: items.reduce((s: number, i: any) => s + (i.kcal || 0), 0), p: items.reduce((s: number, i: any) => s + (i.p || 0), 0), f: items.reduce((s: number, i: any) => s + (i.f || 0), 0), c: items.reduce((s: number, i: any) => s + (i.c || 0), 0) });
+  const calcMealTotals = (meals: any[]) => ({ kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0) });
+  const updateMealsInPlan = (prev: any, mealIdx: number, itemsUpdater: (items: any[]) => any[]) => {
+    if (!prev) return prev;
+    const meals = [...prev.meals];
+    const items = itemsUpdater([...meals[mealIdx].items]);
+    meals[mealIdx] = { ...meals[mealIdx], items, totals: calcItemTotals(items) };
+    return { ...prev, meals, totals: calcMealTotals(meals) };
+  };
+  const updateMultiDayPlan = (plan: any, dayIdx: number, mealIdx: number, itemsUpdater: (items: any[]) => any[]) => {
+    if (!plan?.days?.[dayIdx]) return;
+    const days = [...plan.days];
+    const updated = updateMealsInPlan(days[dayIdx], mealIdx, itemsUpdater);
+    if (!updated) return;
+    days[dayIdx] = updated;
+    const allTotals = { kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0), p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0), f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0), c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0) };
+    if (plan === threeDayPlan) setThreeDayPlan({ ...plan, days, totals: allTotals } as any);
+    else if (plan === weekPlan) setWeekPlan({ ...plan, days, totals: allTotals } as any);
+  };
 
   const moveFoodItem = (fromMealIdx: number, toMealIdx: number, itemIdx: number) => {
     setDayPlan((prev: any) => {
@@ -456,37 +483,72 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const findSimilarFoods = (item: any, count = 5) => { const food = FOOD_DB.find(f => f.id === item.id || f.name === item.name); if (!food) return []; const sameCat = FOOD_DB.filter(f => f.category === food.category && f.id !== food.id); const scored = sameCat.map(f => { const score = Math.abs(f.protein - food.protein) + Math.abs(f.fat - food.fat) * 0.5 + Math.abs(f.carbs - food.carbs) * 0.3; return { ...f, score }; }).sort((a, b) => a.score - b.score).slice(0, count); return scored; };
 
   const replaceFoodItem = (dayIdx: number, mealIdx: number, itemIdx: number, newFood: any) => {
-    const dayData = dayIdx === 0 ? dayPlan : threeDayPlan?.days?.[dayIdx] || weekPlan?.days?.[dayIdx];
+    const dayData = dayIdx === 0 ? dayPlan : threeDayPlan?.days?.[dayIdx - 1] || weekPlan?.days?.[dayIdx - 1];
     if (!dayData?.meals?.[mealIdx]?.items?.[itemIdx]) return;
+    saveUndo();
     const old = dayData.meals[mealIdx].items[itemIdx]; const portion = (old.amount || 100) / 100;
     const replacement = { ...old, name: newFood.name, id: newFood.id, kcal: Math.round(newFood.kcal * portion), p: Math.round(newFood.protein * portion), f: Math.round(newFood.fat * portion), c: Math.round(newFood.carbs * portion), amount: Math.round(portion * (parseInt(newFood.servingSize) || 100)) };
-    const updatePlan = (prev: any) => { if (!prev) return prev; const meals = [...prev.meals]; const items = [...meals[mealIdx].items]; items[itemIdx] = replacement; meals[mealIdx] = { ...meals[mealIdx], items, totals: { kcal: items.reduce((s: number, i: any) => s + i.kcal, 0), p: items.reduce((s: number, i: any) => s + i.p, 0), f: items.reduce((s: number, i: any) => s + i.f, 0), c: items.reduce((s: number, i: any) => s + i.c, 0) } }; const totals = { kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0) }; return { ...prev, meals, totals }; };
-    if (dayIdx === 0) setDayPlan(updatePlan); setReplacingItem(null);
+    if (dayIdx === 0) {
+      setDayPlan((prev: any) => updateMealsInPlan(prev, mealIdx, items => { items[itemIdx] = replacement; return items; }));
+    } else if (threeDayPlan && dayIdx >= 1 && dayIdx <= 3) {
+      updateMultiDayPlan(threeDayPlan, dayIdx - 1, mealIdx, items => { items[itemIdx] = replacement; return items; });
+    } else if (weekPlan) {
+      updateMultiDayPlan(weekPlan, dayIdx - 1, mealIdx, items => { items[itemIdx] = replacement; return items; });
+    }
+    setReplacingItem(null);
   };
 
   const updateItemAmount = (dayIdx: number, mealIdx: number, itemIdx: number, newAmount: number) => {
-    const updatePlan = (prev: any) => { if (!prev) return prev; const meals = [...prev.meals]; const items = [...meals[mealIdx].items]; const it = { ...items[itemIdx], amount: Math.max(1, newAmount), kcal: Math.round(items[itemIdx].kcal / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)) }; items[itemIdx] = it; meals[mealIdx] = { ...meals[mealIdx], items, totals: { kcal: items.reduce((s: number, i: any) => s + i.kcal, 0), p: items.reduce((s: number, i: any) => s + i.p, 0), f: items.reduce((s: number, i: any) => s + i.f, 0), c: items.reduce((s: number, i: any) => s + i.c, 0) } }; const totals = { kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0) }; return { ...prev, meals, totals }; };
-    if (dayIdx === 0) setDayPlan(updatePlan); setEditItem(null);
+    if (dayIdx === 0) {
+      setDayPlan((prev: any) => updateMealsInPlan(prev, mealIdx, items => {
+        const it = { ...items[itemIdx], amount: Math.max(1, newAmount), kcal: Math.round(items[itemIdx].kcal / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)) };
+        items[itemIdx] = it; return items;
+      }));
+    } else if (threeDayPlan && dayIdx >= 1 && dayIdx <= 3) {
+      updateMultiDayPlan(threeDayPlan, dayIdx - 1, mealIdx, items => {
+        const it = { ...items[itemIdx], amount: Math.max(1, newAmount), kcal: Math.round(items[itemIdx].kcal / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)) };
+        items[itemIdx] = it; return items;
+      });
+    } else if (weekPlan) {
+      updateMultiDayPlan(weekPlan, dayIdx - 1, mealIdx, items => {
+        const it = { ...items[itemIdx], amount: Math.max(1, newAmount), kcal: Math.round(items[itemIdx].kcal / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)) };
+        items[itemIdx] = it; return items;
+      });
+    }
+    setEditItem(null);
   };
 
   const removeFoodItem = (dayIdx: number, mealIdx: number, itemIdx: number) => {
     saveUndo();
-    const updatePlan = (prev: any) => { if (!prev) return prev; const meals = [...prev.meals]; const items = meals[mealIdx].items.filter((_: any, i: number) => i !== itemIdx); meals[mealIdx] = { ...meals[mealIdx], items, totals: { kcal: items.reduce((s: number, i: any) => s + i.kcal, 0), p: items.reduce((s: number, i: any) => s + i.p, 0), f: items.reduce((s: number, i: any) => s + i.f, 0), c: items.reduce((s: number, i: any) => s + i.c, 0) } }; const totals = { kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0) }; return { ...prev, meals, totals }; };
-    if (dayIdx === 0) setDayPlan(updatePlan);
+    if (dayIdx === 0) {
+      setDayPlan((prev: any) => updateMealsInPlan(prev, mealIdx, items => items.filter((_: any, i: number) => i !== itemIdx)));
+    } else if (threeDayPlan && dayIdx >= 1 && dayIdx <= 3) {
+      updateMultiDayPlan(threeDayPlan, dayIdx - 1, mealIdx, items => items.filter((_: any, i: number) => i !== itemIdx));
+    } else if (weekPlan) {
+      updateMultiDayPlan(weekPlan, dayIdx - 1, mealIdx, items => items.filter((_: any, i: number) => i !== itemIdx));
+    }
   };
 
-  const replaceMealWithRecipe = (recipe: Recipe, mealIdx: number) => {
+  const replaceMealWithRecipe = (recipe: Recipe, mealIdx: number, dayIdx = 0) => {
     saveUndo();
-    const updatePlan = (prev: any) => {
-      if (!prev) return prev;
-      const meals = [...prev.meals];
-      const matchedItems = recipe.ingredients.map((ing, ii) => { const lower = ing.toLowerCase(); const food = FOOD_DB.find(f => lower.includes(f.name.toLowerCase()) || lower.includes(f.id)); const item: any = food || { name: ing, id: ing, kcal: Math.round(recipe.kcal / recipe.ingredients.length), protein: Math.round(recipe.protein / recipe.ingredients.length), fat: Math.round(recipe.fat / recipe.ingredients.length), carbs: Math.round(recipe.carbs / recipe.ingredients.length) }; return { name: item.name || ing, id: item.id || ing, amount: 100, kcal: Math.round((item.kcal || 0) * (recipe.kcal / recipe.ingredients.length) / Math.max(1, item.kcal || 1)), p: Math.round(item.protein || recipe.protein / recipe.ingredients.length), f: Math.round(item.fat || recipe.fat / recipe.ingredients.length), c: Math.round(item.carbs || recipe.carbs / recipe.ingredients.length) }; });
-      const totals = { kcal: matchedItems.reduce((s, i) => s + i.kcal, 0), p: matchedItems.reduce((s, i) => s + i.p, 0), f: matchedItems.reduce((s, i) => s + i.f, 0), c: matchedItems.reduce((s, i) => s + i.c, 0) };
-      meals[mealIdx] = { ...meals[mealIdx], items: matchedItems, totals };
-      const dayTotals = { kcal: meals.reduce((s, m) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s, m) => s + (m.totals?.p || 0), 0), f: meals.reduce((s, m) => s + (m.totals?.f || 0), 0), c: meals.reduce((s, m) => s + (m.totals?.c || 0), 0) };
-      return { ...prev, meals, totals: dayTotals };
+    const buildRecipeItems = () => {
+      return recipe.ingredients.map((ing) => { const lower = ing.toLowerCase(); const food = FOOD_DB.find(f => lower.includes(f.name.toLowerCase()) || lower.includes(f.id)); const item: any = food || { name: ing, id: ing, kcal: Math.round(recipe.kcal / recipe.ingredients.length), protein: Math.round(recipe.protein / recipe.ingredients.length), fat: Math.round(recipe.fat / recipe.ingredients.length), carbs: Math.round(recipe.carbs / recipe.ingredients.length) }; return { name: item.name || ing, id: item.id || ing, amount: 100, kcal: Math.round((item.kcal || 0) * (recipe.kcal / recipe.ingredients.length) / Math.max(1, item.kcal || 1)), p: Math.round(item.protein || recipe.protein / recipe.ingredients.length), f: Math.round(item.fat || recipe.fat / recipe.ingredients.length), c: Math.round(item.carbs || recipe.carbs / recipe.ingredients.length) }; });
     };
-    setDayPlan(updatePlan); setRecipePickerMeal(null);
+    if (dayIdx === 0) {
+      setDayPlan((prev: any) => {
+        if (!prev) return prev;
+        const meals = [...prev.meals];
+        const matchedItems = buildRecipeItems();
+        const totals = calcItemTotals(matchedItems);
+        meals[mealIdx] = { ...meals[mealIdx], items: matchedItems, totals };
+        return { ...prev, meals, totals: calcMealTotals(meals) };
+      });
+    } else if (threeDayPlan && dayIdx >= 1 && dayIdx <= 3) {
+      updateMultiDayPlan(threeDayPlan, dayIdx - 1, mealIdx, () => buildRecipeItems());
+    } else if (weekPlan) {
+      updateMultiDayPlan(weekPlan, dayIdx - 1, mealIdx, () => buildRecipeItems());
+    }
+    setRecipePickerMeal(null);
   };
 
   const toggleAllergen = (id: string) => { setAllergens(prev => { const updated = prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]; localStorage.setItem('he_food_allergens', JSON.stringify(updated)); try { saveContraindications({ foodAllergies: updated }); } catch {} return updated; }); };
@@ -1972,9 +2034,23 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
                   <div style={{padding:'4px 10px 8px',background:'#18181b',borderTop:'1px solid rgba(255,255,255,0.04)'}}>
                     <input value={quickAddSearch} onChange={e=>setQuickAddSearch(e.target.value)} placeholder="Поиск продукта..." autoFocus style={{width:'100%',padding:'4px 8px',borderRadius:6,border:'1px solid rgba(0,230,138,0.2)',background:'#202023',color:'#fff',fontSize:9,marginBottom:4}} />
                     <div style={{maxHeight:120,overflowY:'auto',display:'flex',flexWrap:'wrap',gap:3}}>
-                      {FOOD_DB.filter(f => !quickAddSearch || f.name.toLowerCase().includes(quickAddSearch.toLowerCase())).slice(0, 15).map(f => (
-                        <span key={f.id} onClick={() => { setDayPlan((prev: any) => { if (!prev) return prev; const meals = prev.meals.map((m1: any, i: number) => { if (i !== mi) return m1; const items = [...m1.items, { name: f.name, id: f.id, amount: 100, kcal: f.kcal, p: f.protein, f: f.fat, c: f.carbs }]; const totals = { kcal: items.reduce((s: number, it: any) => s + it.kcal, 0), p: items.reduce((s: number, it: any) => s + it.p, 0), f: items.reduce((s: number, it: any) => s + it.f, 0), c: items.reduce((s: number, it: any) => s + it.c, 0) }; return { ...m1, items, totals }; }); const totals = { kcal: meals.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0) }; return { ...prev, meals, totals }; }); setQuickAddMealIdx(null); setQuickAddSearch(''); }} style={{padding:'3px 6px',borderRadius:4,fontSize:8,background:'#202023',border:'1px solid rgba(0,230,138,0.1)',color:'#fff',cursor:'pointer'}}>{f.name}</span>
-                      ))}
+                      {(() => {
+                        const raw = FOOD_DB.filter(f => !quickAddSearch || f.name.toLowerCase().includes(quickAddSearch.toLowerCase())).slice(0, 20);
+                        const mealTarget = getMealKBJUTarget(dayPlan, mi);
+                        const mealCur = getMealCurrentKBJU(dayPlan, mi);
+                        const defaultTarget = mealTarget || { kcal: 600, protein: 40, fat: 20, carbs: 60 };
+                        const scored = scoreFoodsForKBJU(raw, defaultTarget, mealCur || undefined, undefined, 10);
+                        const sorted = scored.length > 0 ? scored : raw.slice(0, 10).map(f => ({ foodId: f.id, foodName: f.name, matchScore: 0, color: '#00e68a', kcal: f.kcal, protein: f.protein, fat: f.fat, carbs: f.carbs, fiber: f.fiber || 0 }));
+                        return sorted.map((r: any) => {
+                          const food = FOOD_DB.find((f: any) => f.id === r.foodId);
+                          return (
+                            <span key={r.foodId} onClick={() => { if (!food) return; setDayPlan((prev: any) => { if (!prev) return prev; const meals = prev.meals.map((m1: any, i: number) => { if (i !== mi) return m1; const items = [...m1.items, { name: food.name, id: food.id, amount: 100, kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs }]; const totals = { kcal: items.reduce((s: number, it: any) => s + it.kcal, 0), p: items.reduce((s: number, it: any) => s + it.p, 0), f: items.reduce((s: number, it: any) => s + it.f, 0), c: items.reduce((s: number, it: any) => s + it.c, 0) }; return { ...m1, items, totals }; }); const totals = { kcal: meals.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0) }; return { ...prev, meals, totals }; }); setQuickAddMealIdx(null); setQuickAddSearch(''); }}
+                              style={{padding:'3px 6px',borderRadius:4,fontSize:8,background:'#202023',border:'1px solid rgba(0,230,138,0.1)',color:'#fff',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:3}}>
+                              {r.foodName}{r.matchScore > 0 && <span style={{fontSize:6,color:r.color,fontWeight:600}}>{r.matchScore}%</span>}
+                            </span>
+                          );
+                        });
+                      })()}
                     </div>
                     <button onClick={() => { setQuickAddMealIdx(null); setQuickAddSearch(''); }} style={{marginTop:4,padding:'3px 8px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.04)',color:'#ef4444',cursor:'pointer',fontSize:8,width:'100%'}}>✕ Закрыть</button>
                   </div>

@@ -534,8 +534,8 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
               <p style={{ fontSize: 11, margin: '0 0 8px' }}>20 мг/день — 4 недели.</p>
               <h5 style={{ fontSize: 12, margin: '0 0 4px' }}>Нутритивная поддержка</h5>
               <ul style={{ fontSize: 11, margin: '0 0 8px', paddingLeft: 16 }}>
-                <li>Цинк 30 мг/день</li><li>Селен 100 мкг/день</li><li>L-карнитин 1 г/день</li><li>CoQ10 200 мг/день</li><li>Витамин E 400 МЕ/день</li>
-              </ul>
+                 <li>Цинк (пиколинат) 30-50 мг/день + медь 3-5 мг</li><li>Селен (L-селенометионин) 200 мкг/день</li><li>L-карнитин + ALCAR 1:1, 2-3 г/день</li><li>CoQ10 (убихинон) 200-400 мг/день</li><li>Витамин E (смесь токоферолов) 400-800 МЕ/день</li>
+               </ul>
             </div>
           </div>
         </div>
@@ -805,8 +805,8 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 <div style={{ display:'flex', flexDirection:'column', gap:3, fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>
                   {[
                     { n:'CoQ10 (убихинон)', d:'200-400 мг/день' },
-                    { n:'L-карнитин + ALCAR', d:'2-3 г/день' },
-                    { n:'Цинк (пиколинат/цитрат) + Медь', d:'30-50 мг/день + 2 мг' },
+                    { n:'L-карнитин + ALCAR (1:1)', d:'2-3 г/день' },
+                    { n:'Цинк (пиколинат) + Медь (глюконат)', d:'30-50 мг/день + 3-5 мг' },
                     { n:'Селен (L-селенометионин)', d:'200 мкг/день' },
                     { n:'Витамин D3', d:'3000-5000 МЕ/день' },
                     { n:'Омега-3 (ЭПК+ДГК)', d:'2-4 г/день' },
@@ -1239,8 +1239,9 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                     { n:'Мелатонин', d:'1-3 мг перед сном' },
                     { n:'Ашваганда (KSM-66)', d:'600 мг/день' },
                     { n:'Мака (Lepidium meyenii)', d:'3-5 г/день' },
-                    { n:'D-аспарагиновая кислота', d:'3 г/день × 2 нед (циклами)' },
-                    { n:'Тадалафил', d:'5 мг/день (кровоток яичек)' },
+                    { n:'Myo-инозитол + D-хиро-инозитол (40:1)', d:'2 г + 50 мг/день' },
+                    { n:'Ликопин (томатный экстракт)', d:'15-20 мг/день' },
+                    { n:'Coleus forskohlii (10% форсколина)', d:'250 мг 2×/день (не при язве/низком АД)' },
                   ].map((it, i) => (
                     <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'3px 6px', borderRadius:4, background:i%2===0 ? 'rgba(34,197,94,0.05)' : 'transparent' }}>
                       <span style={{ flex:1 }}>{it.n}</span>
@@ -1414,6 +1415,122 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                   <div style={{ padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>☐ Ингибин B, АМГ, ЛГ, ФСГ, TT, E2, PRL, SHBG</div>
                   <div style={{ padding:'4px 6px', borderRadius:4 }}>☐ Планирование длительности курса (не {'>'}20 нед без перерыва при желании фертильности)</div>
                   <div style={{ padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>☐ hCG на курсе (500 МЕ 2р/нед, 3/1) или прегненолон backfill</div>
+                </div>
+              </div>
+
+              {/* ===== NEW PROTOCOL 1: DFI REDUCTION ===== */}
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#ef4444' }}>🧬 Протокол снижения DFI (фрагментация ДНК)</h4>
+                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
+                  DFI {'>'}15% — показание к агрессивной антиоксидантной терапии перед попытками зачатия. Курс 3 мес:<br/><br/>
+                  <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(239,68,68,0.05)', borderRadius:4 }}>
+                      <span>NAC</span><span style={{ fontWeight:600, color:'#22c55e' }}>600 мг 2×/день</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', borderRadius:4 }}>
+                      <span>Цинк + Селен + Витамин C</span><span style={{ fontWeight:600, color:'#22c55e' }}>50 мг + 200 мкг + 1 г</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(239,68,68,0.05)', borderRadius:4 }}>
+                      <span>CoQ10 (убихинон)</span><span style={{ fontWeight:600, color:'#22c55e' }}>400 мг/день</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', borderRadius:4 }}>
+                      <span>Астаксантин</span><span style={{ fontWeight:600, color:'#22c55e' }}>12 мг/день</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(239,68,68,0.05)', borderRadius:4 }}>
+                      <span>Мелатонин (на ночь)</span><span style={{ fontWeight:600, color:'#22c55e' }}>3-10 мг/день</span>
+                    </div>
+                  </div>
+                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.1)', marginTop:4 }}>
+                    <b>Цель:</b> DFI {'<'}15% перед зачатием. Контроль DFI каждые 3 мес. При DFI {'>'}30% — исключить варикоцеле, инфекции, курение, перегрев мошонки.
+                  </div>
+                </div>
+              </div>
+
+              {/* ===== NEW PROTOCOL 2: DECISION TREE HPTA ===== */}
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#8b5cf6' }}>🌳 Алгоритм восстановления HPTA (decision tree)</h4>
+                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.6 }}>
+                  <b>Старт:</b> энкломифен 25 мг/день + базовая нутрицевтика<br/><br/>
+                  <b>Нед 4 — контроль ЛГ/ФСГ:</b><br/>
+                  <span style={{ color:'#22c55e' }}>✓ ЛГ {'>'}5 и ФСГ {'>'}4</span> → продолжать 12 нед, контроль на 8 нед<br/>
+                  <span style={{ color:'#f59e0b' }}>⚠ ЛГ 3-5 или ФСГ 2-4</span> → ↑ энкломифен до 50 мг/день + добавить hCG 500 МЕ 2р/нед, 3/1<br/>
+                  <span style={{ color:'#ef4444' }}>✕ ЛГ {'<'}3 и ФСГ {'<'}2</span> → стоп СЕРМ → hCG 500 МЕ 2р/нед × 3 нед → затем hMG 75-150 МЕ 3×/нед<br/><br/>
+                  <b>Нед 8 — контроль TT + спермограмма:</b><br/>
+                  <span style={{ color:'#22c55e' }}>✓ TT {'>'}400 и концентрация {'>'}10 млн/мл</span> → продолжать до 12 нед<br/>
+                  <span style={{ color:'#ef4444' }}>✕ TT {'<'}300 или азооспермия</span> → hMG 75-150 МЕ 3×/нед, 3-6 мес<br/><br/>
+                  <b>Нед 12-24:</b><br/>
+                  <span style={{ color:'#22c55e' }}>✓ TT {'>'}400 + нормоспермия</span> → наблюдение<br/>
+                  <span style={{ color:'#f59e0b' }}>⚠ олигоспермия</span> → hMG ещё 3 мес<br/>
+                  <span style={{ color:'#ef4444' }}>✕ азооспермия после 6 мес hMG</span> → GnRH-насос (гонадорелин 100 мкг 2-3×/день) или TESE/биопсия
+                </div>
+              </div>
+
+              {/* ===== NEW PROTOCOL 3: CABERGOLINE ===== */}
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#ec4899' }}>💊 Каберголин — протокол при гиперпролактинемии</h4>
+                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
+                  Пролактин {'>'}15 нг/мл подавляет ЛГ/ФСГ и снижает либидо. Каберголин (D2-агонист) — препарат выбора:<br/><br/>
+                  <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(236,72,153,0.05)', borderRadius:4 }}>
+                      <span>PRL 15-30 нг/мл</span><span style={{ fontWeight:600, color:'#22c55e' }}>Каберголин 0.25 мг 2×/нед, 4 нед → контроль</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', borderRadius:4 }}>
+                      <span>PRL 30-60 нг/мл</span><span style={{ fontWeight:600, color:'#f59e0b' }}>Каберголин 0.5 мг 2×/нед, 4 нед → контроль</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(236,72,153,0.05)', borderRadius:4 }}>
+                      <span>PRL {'>'}60 нг/мл</span><span style={{ fontWeight:600, color:'#ef4444' }}>МРТ гипофиза + эндокринолог. Каберголин 0.5-1 мг 2×/нед</span>
+                    </div>
+                  </div>
+                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(236,72,153,0.05)', border:'1px solid rgba(236,72,153,0.1)', marginTop:4 }}>
+                    <b>Важно:</b> каберголин противопоказан при клапанных пороках сердца и фиброзе лёгких. Старт: 0.25 мг на ночь (тошнота 1-3 дня). Цель: PRL {'<'}15 нг/мл.
+                  </div>
+                </div>
+              </div>
+
+              {/* ===== NEW PROTOCOL 4: VARICOCELE ===== */}
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#06b6d4' }}>🩺 Варикоцеле — протокол принятия решения</h4>
+                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
+                  Варикоцеле — самая частая корректируемая причина мужского бесплодия (40% случаев). Решение зависит от степени и DFI:<br/><br/>
+                  <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(6,182,212,0.05)', borderRadius:4 }}>
+                      <span>Ст. 1 + DFI {'<'}15%</span><span style={{ fontWeight:600, color:'#22c55e' }}>Наблюдение + антиоксиданты 6 мес</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', borderRadius:4 }}>
+                      <span>Ст. 2-3 + DFI {'<'}15%</span><span style={{ fontWeight:600, color:'#f59e0b' }}>Эмболизация или варикоцелэктомия (субфертильность)</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(6,182,212,0.05)', borderRadius:4 }}>
+                      <span>Ст. 1-3 + DFI {'>'}15%</span><span style={{ fontWeight:600, color:'#ef4444' }}>Варикоцелэктомия — ↓ DFI на 8-12% за 6 мес</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', borderRadius:4 }}>
+                      <span>Билатеральное + олигозооспермия</span><span style={{ fontWeight:600, color:'#ef4444' }}>Хирургия (Лапароскопия/Мармара) — 70% улучшение</span>
+                    </div>
+                  </div>
+                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(6,182,212,0.05)', border:'1px solid rgba(6,182,212,0.1)', marginTop:4 }}>
+                    <b>Прогноз:</b> после успешной варикоцелэктомии — улучшение спермограммы у 70% пациентов, спонтанная беременность у 40-50% в течение 1 года.
+                  </div>
+                </div>
+              </div>
+
+              {/* ===== NEW PROTOCOL 5: INTERACTION WARNINGS ===== */}
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#f59e0b' }}>⚠ Взаимодействия — важные предупреждения</h4>
+                <div style={{ display:'flex', flexDirection:'column', gap:3, fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(245,158,11,0.05)', borderRadius:4 }}>
+                    <span><b>Zn 50 мг + Cu 2 мг</b></span><span>Соотношение 25:1 → дефицит Cu. Норма: Zn:Cu = 10:1 → Cu 3-5 мг</span>
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', borderRadius:4 }}>
+                    <span><b>NAC + TUDCA</b></span><span>NAC ускоряет выведение жёлчных кислот → ↓ эффективность TUDCA. Разнести приём на ≥4 ч</span>
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(245,158,11,0.05)', borderRadius:4 }}>
+                    <span><b>Ашваганда + Левотироксин</b></span><span>Ашваганда ↑ Т4 и ↑ ТТГ (ложный гипотиреоз). Контроль ТТГ через 4 нед при комбинации</span>
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', borderRadius:4 }}>
+                    <span><b>Se 200 мкг + VitE 800 МЕ + антикоагулянты</b></span><span>Потенцирование антикоагуляции → ↑ риск кровотечения. Избегать с НПВС, контроль INR</span>
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(245,158,11,0.05)', borderRadius:4 }}>
+                    <span><b>Тадалафил + нитраты/α-блокаторы</b></span><span>Риск тяжёлой гипотензии. Тадалафил — только без нитратов и α-блокаторов</span>
+                  </div>
                 </div>
               </div>
 

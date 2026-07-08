@@ -169,7 +169,8 @@ export const PlanDisplay: React.FC<Props> = ({
                 <button onClick={() => copyDay(di)} title="Копировать день" style={{ padding: '1px 6px', borderRadius: 4, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', fontSize: 9, fontWeight: 700 }}>📋</button>
               </span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '14px 1.8fr 0.7fr 0.7fr 0.5fr 0.5fr 0.5fr 0.7fr', gap: 2, padding: '4px 10px', fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', margin: '0 -4px', padding: '0 2px', scrollbarWidth: 'none' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '14px 1.8fr 0.7fr 0.7fr 0.5fr 0.5fr 0.5fr 0.7fr', gap: 2, padding: '4px 10px', fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', minWidth: 520 }}>
               <span></span><span>Упражнение</span><span>С×П</span><span>RIR</span><span>Вес</span><span>Группа</span><span>Отдых</span><span>Действия</span>
             </div>
             {d.exercises.map((e, ei) => {
@@ -177,7 +178,7 @@ export const PlanDisplay: React.FC<Props> = ({
               const overrideTempo = exerciseTempos[tempoKey];
               const tmpo = globalTempoStr ? { tempo: { toString: globalTempoStr } } : (overrideTempo ? { tempo: { toString: overrideTempo } } : generateRepTempo({ goal: goal === 'strength' ? 'strength' : 'hypertrophy', riskLevel: 'low', difficultyLevel: 'medium', techniqueIssues: [], isMainLift: ei === 0 }));
               return (
-                <div key={ei} draggable onDragStart={ev => handleDragStart(ev, di, ei)} onDragOver={handleDragOver} onDrop={ev => handleDrop(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'grid', gridTemplateColumns: '14px 1.8fr 0.7fr 0.7fr 0.5fr 0.5fr 0.5fr 0.7fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab', alignItems: 'center' }}>
+                <div key={ei} draggable onDragStart={ev => handleDragStart(ev, di, ei)} onDragOver={handleDragOver} onDrop={ev => handleDrop(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'grid', gridTemplateColumns: '14px 1.8fr 0.7fr 0.7fr 0.5fr 0.5fr 0.5fr 0.7fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab', alignItems: 'center', minWidth: 520 }}>
                   <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', cursor: 'grab', userSelect: 'none' }}>⠿</span>
                   <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                     {e.name}
@@ -195,6 +196,7 @@ export const PlanDisplay: React.FC<Props> = ({
                 </div>
               );
             })}
+            </div>
           </div>
         ))}
       </div>

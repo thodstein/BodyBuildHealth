@@ -48,6 +48,16 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     const phaseBlocked = PHASE_BLOCKLIST[phaseKey];
     if (phaseBlocked) for (const b of phaseBlocked) { used.add(b); usedCanon.add(canonId(b)); }
 
+    // Массив фазовых назначений (обоснования для UI).
+    // Заполняется параллельно с markUsed, чтобы зафиксировать потерянную ранее логику.
+    type PhaseDrug = {
+      id: string;
+      reason: string;
+      trigger: string;
+      category: 'hcg' | 'ai' | 'cabergoline' | 'renal_protection' | 'hepatic_protection';
+    };
+    const phaseAssignedDrugs: PhaseDrug[] = [];
+
     // ── 1. Обязательные препараты на курсе ААС (mandatory logic) ──
     if (state.pharma.aas.length > 0) {
       const aasIds = state.pharma.aas.map((a: any) => (a.id||'').toLowerCase());
@@ -63,30 +73,98 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
           .some(x => (a.id||'').toLowerCase().includes(x)));
 
       // hCG при любом AAS
-      if (!state.pharma.hasHCG && !isUsed('hcg')) { substances.push('hcg'); markUsed('hcg'); }
+      if (!state.pharma.hasHCG && !isUsed('hcg')) {
+        substances.push('hcg'); markUsed('hcg');
+        phaseAssignedDrugs.push({
+          id: 'hcg',
+          reason: 'ХГЧ 500 МЕ 2р/нед, схема 3/1 (3 нед приём, 1 нед отдых). Имитирует ЛГ → поддержание клеток Лейдига, профилактика атрофии яичек на фоне экзогенного тестостерона.',
+          trigger: 'AAS в курсе + отсутствует в плане (hasHCG=false)',
+          category: 'hcg',
+        });
+      }
 
       // Антиароматаза при тестостероне/метилтестостероне
       if (hasTest && !state.pharma.hasAI && !isUsed('anastrozole') && !isUsed('tamoxifen')) {
         substances.push('anastrozole'); markUsed('anastrozole');
+        phaseAssignedDrugs.push({
+          id: 'anastrozole',
+          reason: 'Анастрозол 0.5 мг 2р/нед (титровать по E2). Тестостерон ароматизируется в эстрадиол → контроль E2 (цель 20-40 pg/mL) для профилактики гинекомастии и задержки воды.',
+          trigger: 'Тестостеронсодержащий AAS в курсе + нет AI/SERM',
+          category: 'ai',
+        });
       }
 
       // Каберголин при прогестагенных (трен, нандрон, болденон)
       if ((hasTren || hasNandrolone || hasBoldenone) && !state.pharma.hasCaber && !isUsed('cabergoline')) {
         substances.push('cabergoline'); markUsed('cabergoline');
+        phaseAssignedDrugs.push({
+          id: 'cabergoline',
+          reason: 'Каберголин 0.25-0.5 мг 2р/нед. D2-агонист → подавление пролактина, который повышается при прогестагенных ААС (трен/нандролон/болденон).',
+          trigger: 'Прогестагенный AAS (трен/нандролон/болденон) в курсе + нет каберголина',
+          category: 'cabergoline',
+        });
       }
 
       // Тренболон → NAC + астрагал + кордицепс (нефропротекция)
       if (hasTren) {
-        if (!isUsed('nac')) { substances.push('nac'); markUsed('nac'); }
-        if (!isUsed('astragalus')) { substances.push('astragalus'); markUsed('astragalus'); }
-        if (!isUsed('cordyceps')) { substances.push('cordyceps'); markUsed('cordyceps'); }
+        if (!isUsed('nac')) {
+          substances.push('nac'); markUsed('nac');
+          phaseAssignedDrugs.push({
+            id: 'nac',
+            reason: 'NAC 1200 мг/день. Донатор глутатиона → защита проксимальных канальцев почек от окислительного стресса, который индуцируется тренболоном (метаболиты 17β-OH-Tren).',
+            trigger: 'Тренболон в курсе (нефропротекция)',
+            category: 'renal_protection',
+          });
+        }
+        if (!isUsed('astragalus')) {
+          substances.push('astragalus'); markUsed('astragalus');
+          phaseAssignedDrugs.push({
+            id: 'astragalus',
+            reason: 'Астрагал 500 мг/день. Сапонины ↓ протеинурии, анти-AP-1 → защита клубочков от гипертензии/воспаления на тренболоне.',
+            trigger: 'Тренболон в курсе (нефропротекция)',
+            category: 'renal_protection',
+          });
+        }
+        if (!isUsed('cordyceps')) {
+          substances.push('cordyceps'); markUsed('cordyceps');
+          phaseAssignedDrugs.push({
+            id: 'cordyceps',
+            reason: 'Кордицепс 1 г/день. ↓ гиперфильтрации клубочков, противовоспалительный эффект на почки на тренболоне.',
+            trigger: 'Тренболон в курсе (нефропротекция)',
+            category: 'renal_protection',
+          });
+        }
       }
 
       // Оральные 17α-алкилированные → TUDCA + NAC (гепатопротекция)
       if (hasOral) {
-        if (!isUsed('tudca')) { substances.push('tudca'); markUsed('tudca'); }
-        if (!isUsed('nac')) { substances.push('nac'); markUsed('nac'); }
-        if (!isUsed('milk_thistle')) { substances.push('milk_thistle'); markUsed('milk_thistle'); }
+        if (!isUsed('tudca')) {
+          substances.push('tudca'); markUsed('tudca');
+          phaseAssignedDrugs.push({
+            id: 'tudca',
+            reason: 'TUDCA 500 мг/день. Гидрофильная жёлчная кислота → снижение ER-стресса гепатоцитов, ↑ BSEP-зависимый жёлчеотток. 17α-алкилированные оралы индуцируют холестаз.',
+            trigger: 'Оральный 17α-алкил AAS в курсе (гепатопротекция)',
+            category: 'hepatic_protection',
+          });
+        }
+        if (!isUsed('nac')) {
+          substances.push('nac'); markUsed('nac');
+          phaseAssignedDrugs.push({
+            id: 'nac',
+            reason: 'NAC 1200 мг/день. ↑ Глутатион → связывание токсичных метаболитов 17α-алкилов (фаза II конъюгация). Защита гепатоцитов от цитолиза.',
+            trigger: 'Оральный 17α-алкил AAS в курсе (гепатопротекция)',
+            category: 'hepatic_protection',
+          });
+        }
+        if (!isUsed('milk_thistle')) {
+          substances.push('milk_thistle'); markUsed('milk_thistle');
+          phaseAssignedDrugs.push({
+            id: 'milk_thistle',
+            reason: 'Силимарин 280 мг/день. Стабилизация мембран гепатоцитов, ↓ перекисного окисления, ↑ РНК-полимеразы I для синтеза белка.',
+            trigger: 'Оральный 17α-алкил AAS в курсе (гепатопротекция)',
+            category: 'hepatic_protection',
+          });
+        }
       }
     }
 
@@ -411,22 +489,19 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     let tzResultFinal: TzSpecResult | null = null;
     let peakWeek = 0;
 
-    const tzInputFinal = buildTzInput(state, substances);
-    if (tzInputFinal) {
-      tzResultFinal = calculateTzSpecRisk(tzInputFinal);
-      finalScores = tzToScores(tzResultFinal, oldScores);
-      overallRaw = tzResultFinal.overallRaw;
-      overallAfterSupport = tzResultFinal.overallAfter;
-    } else {
-      finalScores = oldScores;
-      overallRaw = Math.round(Math.max(...Object.values(oldScores)));
-      const cw = state.courseWeek ?? 1;
-      const weekProtectionBonus = Math.min(0.15, cw * 0.015);
-      const protBase = 0.3 + (synergyIds.length * 0.02) + weekProtectionBonus;
-      const levelMult = state.powerLevel === 'max' ? 0.65 : state.powerLevel === 'mid' ? 0.50 : 0.35;
-      const protection = Math.min(0.85, protBase + levelMult);
-      overallAfterSupport = Math.round(Math.max(5, overallRaw - Math.round(overallRaw * protection)));
+    let tzInputFinal = buildTzInput(state, substances);
+    if (!tzInputFinal) {
+      tzInputFinal = {
+        drugClass: 'aas', drugName: 'none', dose: 0, duration: 12,
+        form: 'inject', combinations: 0, labCoverage: 0.3,
+        labValues: {}, supportSubstances: substances, drugs: [],
+        courseWeek: state.courseWeek,
+      };
     }
+    tzResultFinal = calculateTzSpecRisk(tzInputFinal);
+    finalScores = tzToScores(tzResultFinal, oldScores);
+    overallRaw = tzResultFinal.overallRaw;
+    overallAfterSupport = tzResultFinal.overallAfter;
 
     // ── 8. Понедельная динамика риска (timeline) ──
     let timelineData: TimelineWeekData[] | undefined;
@@ -525,6 +600,8 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       depletionWarnings: depletionWarnings.length > 0 ? depletionWarnings : undefined,
       ulWarnings: ulWarnings.length > 0 ? ulWarnings : undefined,
       dailyLoad: Object.keys(dailyLoad).length > 0 ? dailyLoad : undefined,
+      phaseAssignedDrugs: phaseAssignedDrugs.length > 0 ? phaseAssignedDrugs : undefined,
+      tzSpecResult: tzResultFinal,
     };
     result.risk.systems = tzResultFinal
       ? toSystemRisksFromTz(tzResultFinal, finalScores, synergyIds.length)

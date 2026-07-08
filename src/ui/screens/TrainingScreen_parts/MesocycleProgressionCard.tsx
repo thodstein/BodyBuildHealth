@@ -115,7 +115,8 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
 
       {/* Таблица прогрессии */}
       <div style={{ marginTop: 10 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '0.4fr 1fr 0.6fr 0.6fr 0.5fr 0.6fr', gap: 2, padding: '4px 8px', fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '0.4fr 1fr 0.6fr 0.6fr 0.5fr 0.6fr', gap: 2, padding: '4px 8px', fontSize:9, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', minWidth: 440 }}>
           <span>Нед</span><span>Фаза</span><span>Объём×</span><span>Сетов</span><span>%1RM</span><span>RIR</span>
         </div>
         {progression.map((p, i) => {
@@ -128,6 +129,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
               borderTop: '1px solid rgba(255,255,255,0.04)',
               background: isDeload ? 'rgba(96,165,250,0.06)' : p.fatigueAdjusted ? 'rgba(245,158,11,0.04)' : 'transparent',
               borderLeft: `3px solid ${color}55`,
+              minWidth: 440,
             }}>
               <span style={{ fontWeight: 700, color }}>{p.week}</span>
               <span style={{ color, fontWeight: 600, fontSize: 9 }}>{PHASE_RU[p.phase]}{p.fatigueAdjusted ? ' ⚡' : ''}</span>
@@ -138,6 +140,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
             </div>
           );
         })}
+        </div>
       </div>
 
       {/* Сводка роста между мезоциклами */}

@@ -37,7 +37,7 @@ export const WeekCompareCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions
         <span style={{ alignSelf: 'center', color: 'var(--text-dim)' }}>vs</span>
         <select value={b} onChange={e => setB(+e.target.value)} style={{ flex: 1, background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: 6, fontSize: 11 }}>{[0,1,2,3,4,5,6,7].map(opt)}</select>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize:9, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: 4 }}>
         <span>Метрика</span><span style={{ color: ACCENT }}>{A.label}</span><span style={{ color: '#a855f7' }}>{B.label}</span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10, color: 'rgba(255,255,255,0.85)', padding: '4px 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>

@@ -45,8 +45,8 @@ export const LibraryZone: React.FC<Props> = (p) => {
         <InfoErrorBoundary label="Каталог циклов">
           <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)', marginBottom: 2 }}>📖 Каталог тренировочных циклов</div>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Справочник готовых циклов (СРЦ / блочные / встроенные) с описанием, механизмом работы и условиями. Методики и программы — в соответствующих вкладках группы «Библиотека».</div>
-            <ExpandableCard title="🔄 Каталог циклов (СРЦ / блоки / встроенные)" icon="📖" short="Все доступные циклы с полным описанием. Нажмите, чтобы развернуть." full={
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Справочник готовых циклов (силовые / блочные / встроенные) с описанием, механизмом работы и условиями. Методики и программы — в соответствующих вкладках группы «Библиотека».</div>
+            <ExpandableCard title="🔄 Каталог циклов (силовые / блоки / встроенные)" icon="📖" short="Все доступные циклы с полным описанием. Нажмите, чтобы развернуть." full={
               <div>
                 {LMS_CYCLES.map(c => (
                   <ExpandableCard key={c.meta.id} title={c.meta.title} icon="" accent="#00e68a" short={c.meta.description} full={<><div style={{ marginBottom: 6 }}>{c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 2 }}>{cond}</li>)}</ul></div>}</>} />

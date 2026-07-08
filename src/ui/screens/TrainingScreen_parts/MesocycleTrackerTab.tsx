@@ -261,7 +261,7 @@ export const MesocycleTrackerTab: React.FC = () => {
             const isExpanded = expandedMeso === m.id;
             const maxVol = Math.max(1, ...proj.map(p => p.volumeSets));
             return (
-              <div key={m.id} style={{ marginBottom: 6 }}>
+              <div key={m.id} style={{ marginBottom: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
                 <div
                   onClick={() => setExpandedMeso(isExpanded ? null : m.id)}
                   style={{
@@ -269,7 +269,7 @@ export const MesocycleTrackerTab: React.FC = () => {
                     padding: '8px', borderRadius: 8, border: '1px solid ' + (isExpanded ? ACCENT : 'rgba(255,255,255,0.08)'),
                     background: isExpanded ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.03)',
                     cursor: 'pointer', alignItems: 'center', fontSize: 10, color: 'rgba(255,255,255,0.85)',
-                    transition: 'all 0.2s',
+                    transition: 'all 0.2s', minWidth: 440,
                   }}
                 >
                   <span style={{ fontWeight: 700, color: '#fff' }}>{m.name}</span>

@@ -1,13 +1,20 @@
 // @ts-nocheck
 import React, { useState, useMemo, useCallback } from 'react';
 import {
-  SYMPTOM_DB, SYMPTOM_CATEGORY_LABELS, SYMPTOM_CATEGORY_ICONS,
+  SYMPTOM_CATEGORY_LABELS, SYMPTOM_CATEGORY_ICONS,
   PROBABILITY_LABELS, PROBABILITY_COLORS, EVIDENCE_LABELS, EVIDENCE_COLORS,
   URGENCY_LABELS, URGENCY_COLORS, URGENCY_ICONS,
+} from '../../../engines/symptom-solver.types';
+import {
   DRUG_LABELS, DRUG_CATEGORIES, DRUG_CAT_COLORS,
+} from '../../../engines/symptom-solver.constants';
+import {
+  SYMPTOM_DB,
+} from '../../../engines/symptom-solver.data';
+import {
   searchSymptoms, findSymptomById, findSymptomsByDrug, getAllLinkedDrugs, getSymptomStats,
-  type SymptomEntry, type ProblemEntry, type SymptomCategory, type UrgencyLevel,
 } from '../../../engines/symptom-solver.engine';
+import type { SymptomEntry, ProblemEntry, SymptomCategory, UrgencyLevel } from '../../../engines/symptom-solver.types';
 import {
   resolveCatalogId, isLifestyleOnly, getSymptomSolutionDisplayName, getCatalogEntryForSymptomSolution,
 } from '../../../engines/symptom-catalog-bridge';
