@@ -228,11 +228,12 @@ export const MealComposer: React.FC = () => {
                         {s.gapNutrients.length > 3 && <span style={{ color: 'rgba(255,255,255,0.3)' }}> +{s.gapNutrients.length - 3}</span>}
                       </div>
                     </div>
-                    <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', flexShrink: 0 }}>
-                      {s.kcal} ккал
+                    <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', flexShrink: 0, textAlign: 'right' }}>
+                      {s.kcal} ккал<br/>
+                      <span style={{ color: '#00e68a', fontWeight: 600 }}>{s.recommendedGrams}г</span>
                     </div>
                     {selectedMealForTargeting !== null && (
-                      <button onClick={() => handleApplyCombo(s.foodId, 100)} style={{
+                      <button onClick={() => handleApplyCombo(s.foodId, s.recommendedGrams)} style={{
                         padding: '3px 8px', borderRadius: 6, fontSize: 7, fontWeight: 600, cursor: 'pointer',
                         background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', flexShrink: 0,
                       }}>+</button>

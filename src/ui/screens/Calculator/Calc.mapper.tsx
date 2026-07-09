@@ -820,6 +820,25 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply, onOp
           </div>
         );
       })()}
+
+      {/* Противопоказания по заболеваниям */}
+      {rec && rec.contraindications && rec.contraindications.length > 0 && (() => {
+        const abs = rec.contraindications.filter(c => c.severity === 'absolute');
+        const rel = rec.contraindications.filter(c => c.severity === 'relative');
+        return (
+          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: abs.length ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border: '1px solid ' + (abs.length ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)') }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: abs.length ? '#ef4444' : '#fbbf24', marginBottom: 4 }}>
+              {abs.length ? '⛔ Противопоказания' : '⚠ Осторожность'} ({rec.contraindications.length})
+            </div>
+            {rec.contraindications.map((c, i) => (
+              <div key={i} style={{ fontSize: 8, color: c.severity === 'absolute' ? '#fca5a5' : '#fbbf24', marginBottom: 2, lineHeight: 1.4 }}>
+                [{c.severity === 'absolute' ? '⛔' : '⚠'}] <b>{subNameRu(c.substanceId)}</b> — {c.message}
+                <div style={{ fontSize: 7, opacity: 0.8 }}>{c.action}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 };

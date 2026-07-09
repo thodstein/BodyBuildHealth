@@ -10,6 +10,8 @@ export interface GapAwareScore extends KbjuMatchResult {
   isGapFiller: boolean;
   gapNutrients: string[];
   gapEfficiency: number;
+  recommendedGrams: number;
+  gramsDetail: { nutrient: string; label: string; deficit: number; per100g: number; gramsToFill: number }[];
 }
 
 const NUTRIENT_FIELD_MAP: Record<string, string> = {
@@ -145,6 +147,8 @@ export function scoreFoodsWithGapPriority(
       isGapFiller: coverage.covered > 0,
       gapNutrients: coverage.nutrients,
       gapEfficiency: gapEff,
+      recommendedGrams: 100,
+      gramsDetail: [],
     };
   });
 
@@ -208,6 +212,23 @@ export function getGapAwareComboResult(
   const scored = FOOD_DB.map(food => {
     const coverage = getGapCoverageForFood(food, deficitGaps);
     const eff = calcGapEfficiency(food, deficitGaps);
+
+    const gramsDetail: { nutrient: string; label: string; deficit: number; per100g: number; gramsToFill: number }[] = [];
+    for (const gap of deficitGaps) {
+      const field = NUTRIENT_FIELD_MAP[gap.nutrient];
+      if (!field) continue;
+      const per100 = getNutrientValueFromFood(food, field);
+      if (per100 <= 0) continue;
+      const gramsToFill = Math.round((gap.deficit / per100) * 100);
+      if (gramsToFill > 5000) continue;
+      gramsDetail.push({ nutrient: gap.nutrient, label: gap.label, deficit: gap.deficit, per100g: per100, gramsToFill });
+    }
+
+    const maxGramsToFill = gramsDetail.length > 0
+      ? Math.max(...gramsDetail.map(d => d.gramsToFill))
+      : 100;
+    const recommendedGrams = Math.min(500, Math.max(50, maxGramsToFill));
+
     return {
       food,
       coveredCount: coverage.covered,
@@ -216,6 +237,8 @@ export function getGapAwareComboResult(
       efficiency: eff,
       kcal: food.kcal || 1,
       protein: food.protein || 0,
+      recommendedGrams,
+      gramsDetail,
     };
   })
     .filter(s => s.coveredCount > 0)
@@ -245,6 +268,8 @@ export function getGapAwareComboResult(
     isGapFiller: true,
     gapNutrients: s.nutrients,
     gapEfficiency: s.efficiency,
+    recommendedGrams: s.recommendedGrams,
+    gramsDetail: s.gramsDetail,
   }));
 
   return { gaps: gapResult, suggestions };

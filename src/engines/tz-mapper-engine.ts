@@ -70,6 +70,7 @@ import { canonId, sameClassIds } from './support-plan/shared-constants';
 import { getPrioritySubstances, deriveSeverity, type SeverityLevel } from '../data/lab-priority-map';
 import { computeTierAdjustments, type TierAdjustmentResult, type TierAddSub, type TierAlert, type TierTitration, type TierNutritionTip } from '../data/lab-tier-recommendations';
 import { computeSynergy } from '../data/lab-synergy-engine';
+import { checkContraindications, type ContraAlert } from '../data/substance-contraindications';
 
 // ════════════════════════════════════════════════════════════════════════════
 //  ТИПЫ РЕКОМЕНДАЦИИ
@@ -136,6 +137,7 @@ export interface SupportRecommendation {
   titrationFactors?: Map<string, number>;
   nutritionTips?: TierNutritionTip[];
   pedFlags?: PEDFlags;  // v5: warnings for UI (multi-oral, GH+ins, winny+oxy)
+  contraindications?: import('../data/substance-contraindications').ContraAlert[];
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -165,6 +167,7 @@ export interface MapperCtx {
   lipidLdl?: number;
   aasIds?: string[];   // legacy — список ID ААС (для обратной совместимости)
   pedDoses?: PEDDose[]; // v5 — PED с дозами + классами
+  healthConditions?: string[];  // заболевания пользователя для проверки противопоказаний
 }
 
 // Импорт PED-типов и helpers
@@ -1002,6 +1005,7 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     titrationFactors,
     nutritionTips: tierAdj.nutrition,
     pedFlags,
+    contraindications: checkContraindications(subs.map(s => s.substanceId), ctx.healthConditions),
   };
 }
 

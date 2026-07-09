@@ -77,6 +77,7 @@ import { SupportManualPicker } from './SupportScreen_parts/SupportManualPicker';
 
 import { SupportProtocols } from './SupportScreen_parts/SupportProtocols';
 import { SupportBioavailability } from './SupportScreen_parts/SupportBioavailability';
+import { SupportCalculatorsView } from './SupportScreen_parts/SupportCalculatorsView';
 import { AutoCalculator } from './Calculator';
 export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTab }) => {
   const linked = useDataLink();
@@ -85,7 +86,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [calcView, setCalcView] = useState<CalcView>('main');
   const [infoView, setInfoView] = useState<InfoView>('main');
   const [section, setSection] = useState<'home'|'generator'|'protocols'|'info'>('home');
-  const [genTab, setGenTab] = useState<'calculator'|'info'>('calculator');
+  const [genTab, setGenTab] = useState<'calculator'|'calculators'|'info'>('calculator');
   const [protocolTab, setProtocolTab] = useState<string>('');
   const [protocolView, setProtocolView] = useState<'menu'|'detail'>('menu');
   const [infoTab, setInfoTab] = useState<string>('catalog');
@@ -2173,7 +2174,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             if (item.id === 'generator') { setTab('calculator'); setSupportView('calc'); }
             if (item.id === 'info') { setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); }
             if (item.id === 'hormonal') { setTab('fertility-pct'); setSupportView('calc'); }
-            if (item.id === 'protocols') { setProtocolTab('pct'); }
+            if (item.id === 'protocols') { setProtocolTab(''); setProtocolView('menu'); }
           }} style={{
             flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2,
             padding:'4px 0', background:'transparent', border:'none', cursor:'pointer',
@@ -2748,6 +2749,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     planSubTab,
     planView,
     protocolTab,
+    protocolView,
     pubMedError,
     pubMedLoading,
     pubMedQuery,
@@ -2907,6 +2909,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     setPlanSubTab,
     setPlanView,
     setProtocolTab,
+    setProtocolView,
     setPubMedError,
     setPubMedLoading,
     setPubMedQuery,
@@ -3043,10 +3046,11 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['calculator','🧮 Калькулятор'],['info','📖 О подборе']].map(([id,label]) => (
+            {[['calculator','🧮 Калькулятор'],['calculators','🔬 Синералогия'],['info','📖 О подборе']].map(([id,label]) => (
               <button key={id} onClick={() => { setGenTab(id as any); 
               const a: Record<string,()=>void> = {
                 calculator: ()=>{ setTab('calculator'); setSupportView('calc'); },
+                calculators: ()=>{},
                 info: ()=>{},
               };
               a[id]?.();

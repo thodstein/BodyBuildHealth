@@ -5,7 +5,7 @@ import { calcStackSynergyScore, suggestSynergyAdditions } from '../../../engines
 import { SynergyEngine } from '../../../engines/synergy-score.engine';
 import type { SubstanceEntry, MasterDB } from '../../../core/types';
 import { INTERACTION_ENRICHMENT } from '../../../data/support-interaction-enrichment';
-import { KNOWN_DRUG_SUP_INTERACTIONS } from '../../../engines/biostack-clinical';
+
 
 /* ──────────────── DEPLETION DB ──────────────── */
 const DEPLETION_DB: Array<{ depleter: string; depleted: string; mechanism: string; severity: string; recommendation: string }> = [
@@ -27,6 +27,24 @@ const DEPLETION_DB: Array<{ depleter: string; depleted: string; mechanism: strin
   { depleter: 'VITAMIN_A', depleted: 'VITAMIN_D', mechanism: 'Конкуренция за RXR → ↓ VDR-опосредованной транскрипции', severity: 'MEDIUM', recommendation: 'A <3000 МЕ/сут. Соотношение A:D = 1:1.' },
   { depleter: 'PROBIOTICS', depleted: 'VITAMIN_K2', mechanism: 'Пробиотики (Bifidobacterium, Lactobacillus) синтезируют K2 → ↑ потребности', severity: 'LOW', recommendation: 'Добавить K2 (MK-7) 90-180 мкг/сут.' },
   { depleter: 'COLOSTRUM', depleted: 'CALCIUM', mechanism: 'Высокое содержание Ca в колоструме → конкуренция с Mg/Zn за всасывание', severity: 'LOW', recommendation: 'Интервал ≥1 ч с Mg/Zn.' },
+  { depleter: 'CURCUMIN', depleted: 'IRON', mechanism: 'Хелация Fe³⁺ куркумином → ↓ всасывания негемового железа', severity: 'MEDIUM', recommendation: 'Интервал ≥2 ч. Куркумин с едой, Fe отдельно.' },
+  { depleter: 'EGCG', depleted: 'FOLATE', mechanism: 'EGCG ингибирует DHFR → ↓ синтеза активного фолата', severity: 'MEDIUM', recommendation: 'EGCG >500 мг/сут → добавить 5-МТГФ 400 мкг. Интервал ≥2 ч.' },
+  { depleter: 'GREEN_TEA_EGCG', depleted: 'IRON', mechanism: 'Танины EGCG связывают Fe³⁺ → ↓ всасывания на 60-70%', severity: 'HIGH', recommendation: 'Зелёный чай за 1 ч до или через 2 ч после еды с Fe.' },
+  { depleter: 'OMEGA3', depleted: 'VITAMIN_E', mechanism: 'ПНЖК омега-3 ↑ потребность в вит.E для защиты от перекисного окисления', severity: 'LOW', recommendation: 'Вит.E 100-200 МЕ/сут при омега-3 >3 г/сут.' },
+  { depleter: 'GARLIC', depleted: 'IODINE', mechanism: 'Чеснок ↓ захват йода щитовидной железой', severity: 'LOW', recommendation: 'Контроль ТТГ при длительном приёме чеснока >500 мг/сут.' },
+  { depleter: 'CAFFEINE', depleted: 'VITAMIN_C', mechanism: 'Кофеин ↑ экскрецию C (осмотический диурез)', severity: 'LOW', recommendation: 'Интервал ≥1 ч между кофеином и вит.C.' },
+  { depleter: 'CAFFEINE', depleted: 'B_VITAMINS', mechanism: 'Кофеин ↓ всасывание B1 и B6 в кишечнике', severity: 'LOW', recommendation: 'B-комплекс утром, кофеин через 30 мин.' },
+  { depleter: 'GINSENG', depleted: 'POTASSIUM', mechanism: 'Женьшень ↑ калийурез через ↑ Na/K-АТФазы в почках', severity: 'LOW', recommendation: 'Контроль K+ при длительном приёме (>3 мес).' },
+  { depleter: 'LICORICE', depleted: 'POTASSIUM', mechanism: 'Глицирризиновая кислота ↓ 11β-HSD2 → ↓ K+ (псевдоальдостеронизм)', severity: 'HIGH', recommendation: 'Солодка >3 г/сут → гипокалиемия. Контроль K+, STOP за 2 нед до соревнований.' },
+  { depleter: 'ALPHA_LIPOIC', depleted: 'BIOTIN', mechanism: 'АЛЬК конкурирует с биотином за SMVT-транспортёр', severity: 'MEDIUM', recommendation: 'Интервал ≥2 ч. При дозе АЛЬК >600 мг → биотин 500 мкг.' },
+  { depleter: 'NAC', depleted: 'COPPER', mechanism: 'NAC хелатирует Cu²⁺ → ↓ всасывания при дозе >1200 мг/сут', severity: 'LOW', recommendation: 'Интервал ≥2 ч. Длительно NAC >1200 мг → контроль Cu.' },
+  { depleter: 'TUDCA', depleted: 'FAT_SOLUBLE_VITAMINS', mechanism: 'TUDCA ↑ объём желчи → ↓ абсорбции жирорастворимых витаминов', severity: 'LOW', recommendation: 'При TUDCA >1000 мг/сут → добавить K2+доп.D3.' },
+  { depleter: 'PSYLLIUM', depleted: 'CALCIUM', mechanism: 'Клетчатка связывает Ca в кишечнике → ↓ всасывания', severity: 'MEDIUM', recommendation: 'Интервал ≥1 ч между клетчаткой и Ca/Mg/Zn.' },
+  { depleter: 'BETAINE', depleted: 'B_VITAMINS', mechanism: 'Высокие дозы бетаина (TMG) ↑ потребность в B12+фолат для реметилирования Hcy', severity: 'LOW', recommendation: 'Бетаин + B12 + фолат + B6 — полный цикл метилирования.' },
+  { depleter: 'RESVERATROL', depleted: 'IRON', mechanism: 'Ресвератрол хелатирует Fe²⁺ → ↓ всасывания', severity: 'LOW', recommendation: 'Интервал ≥2 ч. При анемии — не совмещать.' },
+  { depleter: 'NARINGIN', depleted: 'IRON', mechanism: 'Грейпфрут ↓ всасывание Fe через ингибицию DMT1', severity: 'MEDIUM', recommendation: 'Не пить грейпфрутовый сок с едой, содержащей Fe.' },
+  { depleter: 'CHITOSAN', depleted: 'CALCIUM', mechanism: 'Хитозан связывает Ca, Mg, Zn в кишечнике', severity: 'MEDIUM', recommendation: 'Интервал ≥3 ч. Хитозан вечером, минералы утром.' },
+  { depleter: 'CHITOSAN', depleted: 'VITAMIN_E', mechanism: 'Хитозан ↓ всасывание жирорастворимых витаминов', severity: 'MEDIUM', recommendation: 'Вит.E в другое время дня.' },
 ];
 const UL_DB: Record<string, number> = {
   ZINC: 40, SELENIUM: 400, COPPER: 10, IRON: 45, CALCIUM: 2500, MAGNESIUM: 350,
@@ -317,56 +335,14 @@ const MARKER_SYSTEM: Record<string, string> = {
   IRON:'mineral',VITAMIN_D:'mineral',B12:'mineral',ZINC:'mineral',COPPER:'mineral',
 };
 
-/* ──────────────── DRUG CHECK HELPERS ──────────────── */
-const DRUG_SYNONYM_MAP: Record<string,string[]> = {
-  'иАПФ':['рамиприл','лизиноприл','эналаприл','каптоприл','периндоприл'],
-  'АРА':['лозартан','валсартан','ирбесартан','кандесартан','телмисартан'],
-  'бета-блокаторы':['бисопролол','метопролол','атенолол','пропранолол','небиволол','карведилол'],
-  'БКК':['амлодипин','нифедипин','фелодипин','верапамил','дилтиазем'],
-  'СИОЗС':['эсциталопрам','циталопрам','флуоксетин','пароксетин','сертралин'],
-  'СИОЗСиН':['венлафаксин','дулоксетин'],
-  'ИПП':['омепразол','эзомепразол','лансопразол','пантопразол','рабепразол'],
-  'статины':['аторвастатин','розувастатин','симвастатин','правастатин'],
-  'НПВС':['ибупрофен','диклофенак','напроксен','кетопрофен','мелоксикам','целекоксиб'],
-  'ГКС':['преднизолон','метилпреднизолон','дексаметазон'],
-  'диуретики':['гидрохлоротиазид','фуросемид','торасемид','индапамид','спиронолактон'],
-  'антикоагулянты':['варфарин','апиксабан','дабигатран','ривароксабан'],
-  'противоэпилептические':['вальпроат','карбамазепин','топирамат','ламотриджин','леветирацетам'],
-  'бензодиазепины':['диазепам','алпразолам','лоразепам','клоназепам'],
-  'антипсихотики':['оланзапин','клозапин','рисперидон','кветиапин','галоперидол'],
-  'метформин':['метформин','сиофор','глюкофаж'],
-  'ПДЭ-5':['силденафил','тадалафил','варденафил'],
-};
-function expandDrugMatches(input: string): string[] {
-  const lowered = input.toLowerCase().trim();
-  const results = new Set<string>();
-  results.add(lowered);
-  for (const [className, synonyms] of Object.entries(DRUG_SYNONYM_MAP)) {
-    const lc = className.toLowerCase();
-    if (lowered.includes(lc) || lc.includes(lowered)) { synonyms.forEach(s=>results.add(s.toLowerCase())); }
-    for (const syn of synonyms) {
-      if (lowered.includes(syn.toLowerCase()) || syn.toLowerCase().includes(lowered)) { results.add(lc); synonyms.forEach(s=>results.add(s.toLowerCase())); }
-    }
-  }
-  return [...results];
-}
-
-const CYP450_LABELS: Record<string,string> = { unknown:'Неизвестен', normal:'Нормальный (EM)', poor:'Медленный (PM)', intermediate:'Промежуточный (IM)', rapid:'Быстрый (RM)' };
-const CYP_DETAILS: Record<string,string> = {
-  unknown:'Стандартные дозировки. Для точной настройки — фармакогенетическое тестирование.',
-  normal:'Стандартный метаболизм через CYP450.',
-  poor:'Риск токсичности: дозы субстратов CYP снизить в 2-4 раза. Особое внимание — CYP2D6, CYP2C19, CYP3A4.',
-  intermediate:'Умеренное снижение метаболизма. Начинать с 50% дозы, титровать.',
-  rapid:'Ускоренный метаболизм: возможны более высокие дозы. Пролекарства — риск токсичных метаболитов.',
-};
-
 const CYP_ENZYMES: Record<string, string[]> = {
-  CYP3A4: ['BERBERINE','QUERCETIN','ST_JOHNS_WORT','GREEN_TEA_EGCG','GINSENG','ASHWAGANDHA','GINKGO','RESVERATROL','SILYMARIN','NARINGIN'],
-  CYP2D6: ['BERBERINE','ST_JOHNS_WORT','RESVERATROL','GREEN_TEA_EGCG','GINKGO'],
-  CYP2C9: ['BERBERINE','RESVERATROL','GINKGO','ST_JOHNS_WORT','ASHWAGANDHA'],
-  CYP2C19: ['BERBERINE','ST_JOHNS_WORT','CURCUMIN','RESVERATROL'],
-  CYP1A2: ['CURCUMIN','CAFFEINE','QUERCETIN','GREEN_TEA_EGCG','GINKGO','ST_JOHNS_WORT','NARINGIN'],
-  CYP2E1: ['NAC','RESVERATROL','QUERCETIN'],
+  CYP3A4: ['BERBERINE','QUERCETIN','ST_JOHNS_WORT','GREEN_TEA_EGCG','GINSENG','ASHWAGANDHA','GINKGO','RESVERATROL','SILYMARIN','NARINGIN','CURCUMIN','TUDCA','GLYCYRRHIZINIC','PIROXICAM','TELMISARTAN','NEBIVOLOL','NADOLOL'],
+  CYP2D6: ['BERBERINE','ST_JOHNS_WORT','RESVERATROL','GREEN_TEA_EGCG','GINKGO','CURCUMIN','BETA_ALANINE','ASHWAGANDHA','GINSENG','NEBIVOLOL','METOPROLOL','CARVEDILOL'],
+  CYP2C9: ['BERBERINE','RESVERATROL','GINKGO','ST_JOHNS_WORT','ASHWAGANDHA','CURCUMIN','TELMISARTAN','IBUPROFEN','PIROXICAM','VITAMIN_E','OMEGA3','NATTOKINASE'],
+  CYP2C19: ['BERBERINE','ST_JOHNS_WORT','CURCUMIN','RESVERATROL','GREEN_TEA_EGCG','GINKGO','ASHWAGANDHA','OMEGA3','MELATONIN'],
+  CYP1A2: ['CURCUMIN','CAFFEINE','QUERCETIN','GREEN_TEA_EGCG','GINKGO','ST_JOHNS_WORT','NARINGIN','MELATONIN','BETA_ALANINE','GRAPE_SEED','GINSENG'],
+  CYP2E1: ['NAC','RESVERATROL','QUERCETIN','CURCUMIN','GREEN_TEA_EGCG','GINGER','GARLIC','OMEGA3','GINSENG'],
+  CYP3A5: ['BERBERINE','CURCUMIN','ASHWAGANDHA','TELMISARTAN','NEBIVOLOL','GREEN_TEA_EGCG'],
 };
 
 function findCYPForSubstance(id: string): string[] {
@@ -426,7 +402,7 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
     return pairs;
   }, [validIds]);
 
-  // Enrich stack matrix with catalog pairs
+  // Enrich stack matrix with catalog pairs + fallback shared mechanisms
   const enrichedMatrix = useMemo(() => {
     if (!stackScore) return [];
     const existingKeys = new Set(stackScore.matrix.map((m:any)=>[m.a.toLowerCase(),m.b.toLowerCase()].sort().join('||')));
@@ -435,8 +411,25 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
       const key = [cp.a.toLowerCase(), cp.b.toLowerCase()].sort().join('||');
       if (!existingKeys.has(key)) { existingKeys.add(key); merged.push(cp); }
     }
+    // Fallback: fill missing pairs with shared mechanisms
+    for (let i = 0; i < validIds.length; i++) {
+      for (let j = i + 1; j < validIds.length; j++) {
+        const key = [validIds[i].toLowerCase(), validIds[j].toLowerCase()].sort().join('||');
+        if (existingKeys.has(key)) continue;
+        existingKeys.add(key);
+        const aEntry = SUPPORT_CATALOG_DATA[validIds[i]] || SUPPORT_CATALOG_DATA[validIds[i].toUpperCase()];
+        const bEntry = SUPPORT_CATALOG_DATA[validIds[j]] || SUPPORT_CATALOG_DATA[validIds[j].toUpperCase()];
+        if (!aEntry || !bEntry) continue;
+        const shared = (aEntry.mechanisms||[]).filter((m:string)=>(bEntry.mechanisms||[]).includes(m));
+        if (shared.length === 0) {
+          merged.push({ a: validIds[i], b: validIds[j], aName: aEntry.nameRu||aEntry.name||validIds[i], bName: bEntry.nameRu||bEntry.name||validIds[j], type: 'caution', severity: 'LOW', effect: 'Нет известных взаимодействий. Общих механизмов не обнаружено — комбинируйте с осторожностью.', mechanism: '' } as any);
+        } else {
+          merged.push({ a: validIds[i], b: validIds[j], aName: aEntry.nameRu||aEntry.name||validIds[i], bName: bEntry.nameRu||bEntry.name||validIds[j], type: 'synergy', severity: 'LOW', effect: `Общие механизмы: ${shared.join(', ')}. Потенциальная синергия через эти пути.`, mechanism: shared.join('; ') } as any);
+        }
+      }
+    }
     return merged.sort((x:any,y:any) => (sevW[y.severity]||1) - (sevW[x.severity]||1));
-  }, [stackScore, catalogPairs]);
+  }, [stackScore, catalogPairs, validIds]);
 
   // ── Clinical data from display.ts ──
   const conflictData = useMemo(() => validIds.length>=2 ? buildConflicts(validIds) : [], [validIds]);
@@ -639,70 +632,6 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
   }, [enrichedMatrix, validIds, stackScore]);
 
   // ── Drug check state ──
-  const [medInput, setMedInput] = useState('');
-  const [allergyInput, setAllergyInput] = useState('');
-  const [cypState, setCypState] = useState('unknown');
-  const [drugResults, setDrugResults] = useState<Array<{drug:string;substance:string;effect:string;severity:string;mechanism:string}>>([]);
-  const [drugCheckMode, setDrugCheckMode] = useState<'selected'|'catalog'>('selected');
-
-  const runDrugCheck = () => {
-    const drugs = medInput.split(',').map(d=>d.trim().toLowerCase()).filter(Boolean);
-    const allergies = allergyInput.split(',').map(d=>d.trim().toLowerCase()).filter(Boolean);
-    if (drugs.length===0) return;
-    const res: Array<{drug:string;substance:string;effect:string;severity:string;mechanism:string}> = [];
-    const targetIds = drugCheckMode==='selected' && validIds.length>0 ? validIds : Object.keys(SUPPORT_CATALOG_DATA);
-    for (const drug of drugs) {
-      const expanded = expandDrugMatches(drug);
-      for (const id of targetIds) {
-        const cat = SUPPORT_CATALOG_DATA[id]; if (!cat) continue;
-        const subName = (cat.nameRu||cat.name||id).toLowerCase();
-        const direct = KNOWN_DRUG_SUP_INTERACTIONS.filter(k =>
-          expanded.some(d=>d.includes(k.drug)||k.drug.includes(d)) &&
-          (subName.includes(k.substance)||id.includes(k.substance))
-        );
-        direct.forEach(d=>res.push({...d, substance: cat.nameRu||cat.name||id }));
-      }
-    }
-    for (const allergy of allergies) {
-      for (const id of targetIds) {
-        const cat = SUPPORT_CATALOG_DATA[id]; if (!cat) continue;
-        const subName = (cat.nameRu||cat.name||id).toLowerCase();
-        if (subName.includes(allergy)||allergy.includes(id)) {
-          res.push({ drug:allergy, substance:cat.nameRu||cat.name||id, effect:'ВОЗМОЖНА АЛЛЕРГИЧЕСКАЯ РЕАКЦИЯ', severity:'HIGH', mechanism:'Перекрёстная аллергия' });
-        }
-      }
-    }
-    if (res.length===0) {
-      res.push({ drug:drugs.join(', '), substance:drugCheckMode==='selected'?'Выбранные вещества':'Каталог', effect:'Клинически значимых взаимодействий не найдено', severity:'LOW', mechanism:'Нет данных о взаимодействии' });
-    }
-    setDrugResults(res);
-  };
-
-  const drugRiskNotes = useMemo(() => {
-    const drugs = medInput.split(',').map(d=>d.trim().toLowerCase()).filter(Boolean);
-    if (drugs.length===0) return null;
-    const rn: Record<string,[string,string]> = {};
-    for (const drug of drugs) {
-      const l = drug.trim();
-      if (l.includes('иапф')||l.includes('рамиприл')||l.includes('эналаприл')) rn['ren']=['ren','Гемодинамика почек (креатинин)'];
-      if (l.includes('ара')||l.includes('лозартан')||l.includes('валсартан')) rn['ren']=['ren','Нефропротекция'];
-      if (l.includes('блокатор')||l.includes('бисопролол')||l.includes('метопролол')) rn['cv']=['cv','ЧСС — защита, блокада'];
-      if (l.includes('бкк')||l.includes('амлодипин')||l.includes('нифедипин')) rn['cv']=['cv','Снижение АД'];
-      if (l.includes('диуретик')||l.includes('фуросемид')||l.includes('гидрохлоротиазид')) { rn['ren']=['ren','Водно-электролитные сдвиги']; rn['hem']=['hem','Гипокалиемия']; }
-      if (l.includes('сиозс')||l.includes('эсциталопрам')||l.includes('флуоксетин')) { rn['cns']=['cns','Серотонин']; rn['rep']=['rep','Либидо']; }
-      if (l.includes('статин')||l.includes('аторвастатин')||l.includes('розувастатин')) rn['liv']=['liv','Трансаминазы'];
-      if (l.includes('нпвс')||l.includes('ибупрофен')||l.includes('диклофенак')) { rn['ren']=['ren','Почечный кровоток']; rn['cv']=['cv','АД, тромботический']; }
-      if (l.includes('метформин')) rn['hem']=['hem','Инсулинорезистентность'];
-      if (l.includes('гкс')||l.includes('преднизолон')||l.includes('дексаметазон')) { rn['hem']=['hem','Инсулинорезистентность']; rn['cv']=['cv','Задержка Na/H2O']; }
-      if (l.includes('антикоагулянт')||l.includes('варфарин')||l.includes('апиксабан')) rn['hem']=['hem','Геморрагический риск'];
-    }
-    return Object.values(rn).length>0 ? Object.values(rn) : null;
-  }, [medInput]);
-
-  const drugMaxSev = drugResults ? Math.max(...drugResults.map(r=>r.severity==='HIGH'?2:r.severity==='MEDIUM'?1:0)) : 0;
-  const drugOverallColor = drugMaxSev===2?'#ef4444':drugMaxSev===1?'#f59e0b':'#22c55e';
-  const drugOverallText = drugMaxSev===2?'Найдены КРИТИЧЕСКИЕ взаимодействия':drugMaxSev===1?'Найдены умеренные взаимодействия':'Безопасно';
-
   // ── Interactions browser ──
   const [browseOpen, setBrowseOpen] = useState(false);
   const [browseSearch, setBrowseSearch] = useState('');
@@ -968,9 +897,9 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
           )}
 
           {/* ─── Depletion warnings ─── */}
-          {depletionData.length>0&&(
-            <div style={{ ...cardStyle, borderColor:'rgba(168,85,247,0.15)' }}>
-              <div style={{ fontSize:10, fontWeight:700, color:'#a855f7', marginBottom:6 }}>Истощения и антагонизмы ({depletionData.length})</div>
+          <div style={{ ...cardStyle, borderColor:'rgba(168,85,247,0.15)' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#a855f7', marginBottom:6 }}>Истощения и антагонизмы {depletionData.length>0?`(${depletionData.length})`:''}</div>
+            {depletionData.length>0 ? (
               <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                 {depletionData.map((d,i)=>(
                   <div key={i} style={{ padding:'6px 8px', borderRadius:8, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.1)' }}>
@@ -983,13 +912,15 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', lineHeight:1.3 }}>Истощений и антагонизмов между выбранными веществами не выявлено. Комбинация безопасна по этому параметру.</div>
+            )}
+          </div>
 
           {/* ─── Cumulative load ─── */}
-          {cumulativeLoad.length>0&&(
-            <div style={{ ...cardStyle, borderColor:'rgba(96,165,250,0.15)' }}>
-              <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>Совокупная суточная нагрузка по нутриентам</div>
+          <div style={{ ...cardStyle, borderColor:'rgba(96,165,250,0.15)' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>Совокупная суточная нагрузка по нутриентам</div>
+            {cumulativeLoad.length>0 ? (
               <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
                 {cumulativeLoad.map((l,i)=>{
                   const pct = l.ul>0 ? Math.round((l.total/l.ul)*100) : 0;
@@ -1008,14 +939,16 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
                   );
                 })}
               </div>
-            </div>
-          )}
+            ) : (
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', lineHeight:1.3 }}>Нутриенты в выбранных веществах не превышают верхних допустимых уровней потребления.</div>
+            )}
+          </div>
 
           {/* ─── CYP450 interactions ─── */}
-          {cypMap.length>0&&(
-            <div style={{ ...cardStyle, borderColor:'rgba(139,92,246,0.15)' }}>
-              <div style={{ fontSize:10, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>CYP450: карта ферментов</div>
-              <div style={{ fontSize:7, color:'rgba(255,255,255,0.35)', marginBottom:6, lineHeight:1.3 }}>Какие вещества влияют на ферменты цитохрома P450 — изменение метаболизма лекарств и других БАДов.</div>
+          <div style={{ ...cardStyle, borderColor:'rgba(139,92,246,0.15)' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>CYP450: карта ферментов</div>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.35)', marginBottom:6, lineHeight:1.3 }}>Какие вещества влияют на ферменты цитохрома P450 — изменение метаболизма лекарств и других БАДов.</div>
+            {cypMap.length>0 ? (
               <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
                 {cypMap.map((c,i)=>(
                   <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.08)' }}>
@@ -1028,8 +961,10 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', lineHeight:1.3 }}>Выбранные вещества не имеют известного влияния на ферменты CYP450. Стандартный метаболизм.</div>
+            )}
+          </div>
 
           {/* ─── Pill burden ─── */}
           {pillBurden&&(
@@ -1071,15 +1006,20 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
           </div>
 
           {/* ─── Timing recommendations (from display.ts) ─── */}
-          {specialInstr.length>0&&(
+          {specialInstr.length>0 ? (
             <div style={{ padding:'10px 12px', borderRadius:10, background:'rgba(96,165,250,0.04)', border:'1px solid rgba(96,165,250,0.1)', marginBottom:8 }}>
               <div style={{ fontSize:9, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>Режим приёма</div>
               {specialInstr.map((t,i)=><div key={i} style={{ fontSize:7, color:'rgba(255,255,255,0.5)', lineHeight:1.4, marginBottom:2 }}>{t}</div>)}
             </div>
+          ) : (
+            <div style={{ padding:'10px 12px', borderRadius:10, background:'rgba(96,165,250,0.02)', border:'1px solid rgba(96,165,250,0.04)', marginBottom:8 }}>
+              <div style={{ fontSize:9, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>Режим приёма</div>
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', lineHeight:1.4 }}>Специальных инструкций по режиму приёма для выбранной комбинации не требуется. Соблюдайте стандартные правила: с едой, запивая водой.</div>
+            </div>
           )}
 
           {/* ─── Synergy suggestions ─── */}
-          {suggestions.length>0&&(
+          {suggestions.length>0 ? (
             <div style={cardStyle}>
               <div style={{ fontSize:10, fontWeight:700, color:'#a855f7', marginBottom:6 }}>Рекомендации для усиления синергии</div>
               <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
@@ -1093,6 +1033,11 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
                   </div>
                 ))}
               </div>
+            </div>
+          ) : (
+            <div style={{ ...cardStyle, borderColor:'rgba(168,85,247,0.06)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#a855f7', marginBottom:6 }}>Рекомендации для усиления синергии</div>
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', lineHeight:1.3 }}>Для выбранной комбинации не найдено дополнительных веществ, существенно усиливающих синергию. Текущий набор сбалансирован.</div>
             </div>
           )}
 
@@ -1115,9 +1060,10 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
           })()}
 
           {/* ─── Lab Monitoring ─── */}
-          {labMonitor.length>0&&(
-            <div style={cardStyle}>
-              <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.5)', marginBottom:8 }}>Мониторинг анализов</div>
+          <div style={{...cardStyle, borderColor:labMonitor.length>0?'rgba(255,255,255,0.06)':'rgba(255,255,255,0.03)'}}>
+            <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.5)', marginBottom:8 }}>Мониторинг анализов</div>
+            {labMonitor.length>0 ? (
+              <>
               <div style={{ marginBottom:6, fontSize:7, color:'rgba(255,255,255,0.3)', lineHeight:1.3 }}>
                 На основе выбранных веществ определены следующие маркеры для лабораторного контроля.
                 При отклонениях — смотреть тиер-рекомендации и раздел конфликтов выше.
@@ -1171,8 +1117,11 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
                   );
                 });
               })()}
-            </div>
-          )}
+              </>
+            ) : (
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', lineHeight:1.3 }}>Для выбранных веществ нет специализированных маркеров мониторинга. Рекомендуется стандартный контроль: АЛТ, АСТ, ГГТ, креатинин, липидограмма, HCT — каждые 4-8 нед.</div>
+            )}
+          </div>
 
           {/* ─── Monographs ─── */}
           <div style={cardStyle}>
@@ -1183,76 +1132,6 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
           </div>
         </>
       )}
-
-      {/* ════════════════ DRUG CHECK (always visible) ════════════════ */}
-      <div style={{...cardStyle, borderColor:'rgba(239,68,68,0.15)'}}>
-        <div style={{ fontSize:12, fontWeight:700, color:'#ef4444', marginBottom:2 }}>Проверка лекарственных взаимодействий</div>
-        <div style={{ fontSize:8, color:'rgba(255,255,255,0.35)', marginBottom:8, lineHeight:1.3 }}>
-          Введите принимаемые лекарства (МНН, через запятую) — система проверит пересечения с выбранными веществами или со всем каталогом.
-        </div>
-        <div style={{ marginBottom:6 }}>
-          <label style={{ fontSize:8, color:'rgba(255,255,255,0.4)', display:'block', marginBottom:2 }}>Лекарства (МНН, через запятую):</label>
-          <textarea value={medInput} onChange={e=>setMedInput(e.target.value)} placeholder="варфарин, метформин, аторвастатин, рамиприл, эсциталопрам, омепразол..." rows={2} style={{...inputBase, resize:'none', fontSize:9}} />
-        </div>
-        <div style={{ display:'flex', gap:6, marginBottom:8 }}>
-          <div style={{ flex:1 }}>
-            <label style={{ fontSize:8, color:'rgba(255,255,255,0.4)', display:'block', marginBottom:2 }}>Аллергии:</label>
-            <input value={allergyInput} onChange={e=>setAllergyInput(e.target.value)} placeholder="пенициллин, сульфаниламиды..." style={{...inputBase, padding:'6px 8px', fontSize:9}} />
-          </div>
-          <div style={{ flex:1 }}>
-            <label style={{ fontSize:8, color:'rgba(255,255,255,0.4)', display:'block', marginBottom:2 }}>CYP450 фенотип:</label>
-            <select value={cypState} onChange={e=>setCypState(e.target.value)} style={{...inputBase, padding:'6px 8px', fontSize:9, appearance:'none'}}>
-              {Object.entries(CYP450_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
-            </select>
-          </div>
-        </div>
-        <div style={{ display:'flex', gap:4, marginBottom:8 }}>
-          <button onClick={()=>setDrugCheckMode('selected')} style={pillStyle(drugCheckMode==='selected','#60a5fa')}>По выбранным ({validIds.length})</button>
-          <button onClick={()=>setDrugCheckMode('catalog')} style={pillStyle(drugCheckMode==='catalog','#8b5cf6')}>По всему каталогу</button>
-        </div>
-        <button onClick={runDrugCheck} style={{ width:'100%', padding:'12px 0', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:10, background:'linear-gradient(135deg,#ef4444,#dc2626)', border:'none', color:'#fff' }}>Проверить взаимодействия</button>
-
-        {drugRiskNotes&&(
-          <div style={{ marginTop:8, padding:'7px 9px', borderRadius:8, background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.08)' }}>
-            <div style={{ fontSize:8, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>Влияние лекарств на системы риска</div>
-            {drugRiskNotes.map(([sys,note],i)=>(
-              <div key={i} style={{ display:'flex', gap:6, alignItems:'flex-start', marginBottom:i<drugRiskNotes.length-1?3:0 }}>
-                <span style={{ fontSize:8 }}>{sys}</span>
-                <span style={{ fontSize:7, color:'rgba(255,255,255,0.45)' }}>{note}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {drugResults&&(
-          <div style={{ marginTop:8 }}>
-            <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:8, background:`${drugOverallColor}10`, border:`1px solid ${drugOverallColor}25`, fontSize:10, fontWeight:700, color:drugOverallColor, textAlign:'center' }}>{drugOverallText} ({drugResults.length} находок)</div>
-            {cypState!=='unknown'&&(
-              <div style={{ padding:'6px 10px', borderRadius:8, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.12)', marginBottom:8 }}>
-                <div style={{ fontSize:8, fontWeight:700, color:'#a78bfa' }}>CYP450: {CYP450_LABELS[cypState]}</div>
-                <div style={{ fontSize:7, color:'rgba(255,255,255,0.45)', lineHeight:1.3 }}>{CYP_DETAILS[cypState]}</div>
-              </div>
-            )}
-            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-              {drugResults.map((r,i)=>(
-                <div key={i} style={{ padding:'7px 9px', borderRadius:8, background:r.severity==='HIGH'?'rgba(239,68,68,0.06)':r.severity==='MEDIUM'?'rgba(245,158,11,0.06)':'rgba(34,197,94,0.06)', border:`1px solid ${r.severity==='HIGH'?'rgba(239,68,68,0.12)':r.severity==='MEDIUM'?'rgba(245,158,11,0.12)':'rgba(34,197,94,0.12)'}` }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
-                    <span style={{ fontSize:7, fontWeight:700, padding:'1px 5px', borderRadius:4, background:r.severity==='HIGH'?'rgba(239,68,68,0.15)':r.severity==='MEDIUM'?'rgba(245,158,11,0.15)':'rgba(34,197,94,0.15)', color:r.severity==='HIGH'?'#ef4444':r.severity==='MEDIUM'?'#f59e0b':'#22c55e' }}>{r.severity==='HIGH'?'ВЫСОКИЙ':r.severity==='MEDIUM'?'СРЕДНИЙ':'НИЗКИЙ'}</span>
-                    <span style={{ fontSize:7, color:'rgba(255,255,255,0.25)' }}>{r.drug} + {r.substance}</span>
-                  </div>
-                  <div style={{ fontSize:8, color:'#fff', lineHeight:1.3 }}>{r.effect}</div>
-                  <div style={{ fontSize:7, color:'#a78bfa', lineHeight:1.2, marginTop:1 }}>{r.mechanism}</div>
-                </div>
-              ))}
-            </div>
-            {drugMaxSev===2&&(
-              <div style={{ marginTop:8, padding:'10px 12px', borderRadius:8, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.18)', fontSize:9, color:'#fca5a5', lineHeight:1.4 }}>
-                КЛИНИЧЕСКАЯ РЕКОМЕНДАЦИЯ: Выявлены высокорисковые взаимодействия. Проконсультируйтесь с врачом перед приёмом БАДов. Не меняйте дозировку лекарств самостоятельно.
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* ════════════════ INTERACTIONS BROWSER ════════════════ */}
       {mergedInteractions.length>0&&(

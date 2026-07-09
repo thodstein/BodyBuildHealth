@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LMS_CYCLES, getCycleById } from '../../data/lms-cycles/lms-cycle-index';
 import { rankCycles, selectBestCycle, explainSelection, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
-import { buildLMSPlan, type LMSBuildOutput } from '../../engines/lms/lms-builder.engine';
+import { buildLMSPlan, extractExercises, type LMSBuildOutput } from '../../engines/lms/lms-builder.engine';
 import { mesocyclePhaseForWeek } from '../../engines/rir-matrix.engine';
 import { autoRegulate, shouldTrainToday, type AutoRegOutput } from '../../engines/pro/autoregulation-pro.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
@@ -90,11 +90,34 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [pmSquat, setPmSquat] = useState<number>(_plSaved?.pmSquat ?? _profPL.pmSquat ?? 120);
   const [pmBench, setPmBench] = useState<number>(_plSaved?.pmBench ?? _profPL.pmBench ?? 100);
   const [pmDead, setPmDead] = useState<number>(_plSaved?.pmDead ?? _profPL.pmDead ?? 140);
+  const [exercisePMs, setExercisePMs] = useState<Record<string, number>>(_plSaved?.exercisePMs ?? {});
+  const initExercisePMs = (cycleId: string) => {
+    const tpl = getCycleById(cycleId);
+    if (!tpl) { setExercisePMs({}); return; }
+    const exs = extractExercises(tpl);
+    const pm: Record<string, number> = {};
+    for (const name of exs) {
+      const n = name.toLowerCase();
+      if (n.includes('присед')) pm[name] = pmSquat;
+      else if (n.includes('жим') && n.includes('лежа')) pm[name] = pmBench;
+      else if (n.includes('жим')) pm[name] = pmBench;
+      else if (n.includes('становая')) pm[name] = pmDead;
+      else if (n.includes('тяга')) pm[name] = pmDead;
+      else if (n.includes('подтягив')) pm[name] = Math.round(pmBench * 0.65);
+      else if (n.includes('трицепс') || n.includes('бицепс') || n.includes('пресс') || n.includes('кроссовер') || n.includes('наклон') || n.includes('гиперэкстензи')) pm[name] = 0;
+      else pm[name] = 80;
+    }
+    setExercisePMs(prev => ({ ...pm, ...prev }));
+  };
+  const setExPM = (name: string, val: number) => {
+    setExercisePMs(prev => ({ ...prev, [name]: val }));
+  };
   const [selectedCycleId, setSelectedCycleId] = useState<string>(_plSaved?.selectedCycleId || 'cycle-01');
   const [cycleWeeks, setCycleWeeks] = useState<number>(_plSaved?.cycleWeeks ?? 12);
   const [builtSrc, setBuiltSrc] = useState<LMSBuildOutput | null>(_plSaved?.builtSrc ?? null);
   const [srcWeek, setSrcWeek] = useState<number>(_plSaved?.srcWeek ?? 1);
-  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, level, goal, dir, bw, days, pmSquat, pmBench, pmDead]);
+  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs]);
+  useEffect(() => { initExercisePMs(selectedCycleId); }, [selectedCycleId]);
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), pmSquat, pmBench, pmDead, bodyWeight: bw }); } catch { /* ignore */ } }, [pmSquat, pmBench, pmDead, bw]);
   // U4: ручная правка поверх сгенерированного плана (оверлей правок по позиции сета)
   const [editMode, setEditMode] = useState<boolean>(false);
@@ -139,7 +162,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const buildSrc = () => {
     const tpl = getCycleById(selectedCycleId);
     if (!tpl) return;
-    const plan = buildLMSPlan({ template: tpl, pmMap: { 'Присед': pmSquat, 'Жим лежа': pmBench, 'Становая тяга': pmDead }, fallbackPm: 80, mode: 'natural', weeksOverride: cycleWeeks });
+    const pmMap: Record<string, number> = { ...exercisePMs };
+    if (!pmMap['Присед']) pmMap['Присед'] = pmSquat;
+    if (!pmMap['Жим лежа']) pmMap['Жим лежа'] = pmBench;
+    if (!pmMap['Становая тяга']) pmMap['Становая тяга'] = pmDead;
+    const plan = buildLMSPlan({ template: tpl, pmMap, fallbackPm: 80, mode: 'natural', weeksOverride: cycleWeeks });
     setBuiltSrc(plan); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setSrcAdditions({}); setPickerDay(null);
     // TRAINING INTEGRATION: конвертировать PL план в сессии
     try { const sessions = lmsPlanToSessions(plan); saveBridgeSessions(sessions); } catch { /* ignore */ }
@@ -425,12 +452,57 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           <div style={H}>📂 Каталог циклов ({LMS_CYCLES.length})</div>
           <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть." options={LMS_CYCLES.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${({ powerlifting: 'Троеборье', bench: 'Жим лёжа', deadlift_bench: 'Тяга+Жим', armwrestling: 'Армрестлинг', bodybuilding: 'Бодибилдинг' } as Record<string,string>)[c.meta.direction] || c.meta.direction} · ${c.meta.period} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
           {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
-          <div style={H}>💪 Предельные максимумы (ПМ)</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            <PopupNumber label="Присед" value={pmSquat} min={20} max={500} suffix=" кг" onChange={v => setPmSquat(v)} />
-            <PopupNumber label="Жим лёжа" value={pmBench} min={20} max={400} suffix=" кг" onChange={v => setPmBench(v)} />
-            <PopupNumber label="Становая тяга" value={pmDead} min={20} max={500} suffix=" кг" onChange={v => setPmDead(v)} />
-          </div>
+          <div style={H}>💪 Предельные максимумы (ПМ) по упражнениям цикла</div>
+          {(() => {
+            const tpl = getCycleById(selectedCycleId);
+            if (!tpl) return null;
+            const exs = extractExercises(tpl);
+            const isArmCycle = exs.some(e => e.includes('Кисть') || e.includes('Натяжка') || e.includes('Боковой') || e.includes('Приведение'));
+            const mainCount = exs.filter(e => e.includes('Присед') || e.includes('Жим') || e.includes('Становая') || e.includes('Тяга')).length;
+            const cols = exs.length <= 3 ? exs.length : exs.length <= 6 ? 3 : 4;
+            if (mainCount <= 3 && !isArmCycle) {
+              return (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    <PopupNumber label="Присед" value={pmSquat} min={20} max={500} suffix=" кг" onChange={v => setPmSquat(v)} />
+                    <PopupNumber label="Жим лёжа" value={pmBench} min={20} max={400} suffix=" кг" onChange={v => setPmBench(v)} />
+                    <PopupNumber label="Становая тяга" value={pmDead} min={20} max={500} suffix=" кг" onChange={v => setPmDead(v)} />
+                  </div>
+                  {exs.length > 3 && (
+                    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.1)' }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🔧 Дополнительные ПМ по упражнениям цикла</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr ' + (cols > 3 ? '1fr' : ''), gap: 6 }}>
+                        {exs.filter(e => {
+                          const n = e.toLowerCase();
+                          return !n.includes('присед') && !n.includes('жим') && !n.includes('становая');
+                        }).map(e => (
+                          <PopupNumber key={e} label={e} value={exercisePMs[e] ?? 80} min={0} max={500} suffix=" кг" onChange={v => setExPM(e, v)} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            }
+            return (
+              <>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>
+                  Цикл использует {exs.length} упражнений. Укажите ПМ для каждого:
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr ' + (cols > 3 ? '1fr' : ''), gap: 6 }}>
+                  {exs.map(e => {
+                    const n = e.toLowerCase();
+                    const isMain = n.includes('присед') || n.includes('жим') || n.includes('становая') || n.includes('тяга');
+                    return (
+                      <div key={e} style={isMain ? { gridColumn: 'span 1' } : {}}>
+                        <PopupNumber label={e} value={exercisePMs[e] ?? (isMain ? 80 : 0)} min={0} max={500} suffix=" кг" onChange={v => setExPM(e, v)} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
             <PopupSelect label="Длина мезоцикла" value={String(cycleWeeks)} onChange={v => setCycleWeeks(+v)} options={[['12','12 недель'],['16','16 недель'],['20','20 недель'],['24','24 недели']].map(([id,label]) => ({ id, label }))} />
           </div>

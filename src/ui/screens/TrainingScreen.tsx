@@ -33,7 +33,7 @@ import { LoadSafetyCard } from './TrainingScreen_parts/LoadSafetyCard';
 import { SplitGenCard } from './TrainingScreen_parts/SplitGenCard';
 import { CompetitionCard } from './TrainingScreen_parts/CompetitionCard';
 import { PriRepPatternCard } from './TrainingScreen_parts/PriRepPatternCard';
-import { TrainingMixHub } from './TrainingScreen_parts/TrainingMixHub';
+import { TrainingMixTab } from './TrainingScreen_parts/TrainingMixTab';
 
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { StrengthAnalysisHub } from './TrainingScreen_parts/StrengthAnalysisHub';
@@ -661,7 +661,7 @@ export const TrainingScreen: React.FC = () => {
       {tab === 'split_gen' && <InfoErrorBoundary label="Генератор сплитов"><SplitGenCard /></InfoErrorBoundary>}
       {tab === 'competition' && <InfoErrorBoundary label="Соревнование"><CompetitionCard /></InfoErrorBoundary>}
       {tab === 'pri_reppat' && <InfoErrorBoundary label="PRI/схема повт"><PriRepPatternCard /></InfoErrorBoundary>}
-      {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixHub /></InfoErrorBoundary>}
+      {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixTab /></InfoErrorBoundary>}
 
 
       {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
@@ -715,7 +715,6 @@ import { TimersTab } from './TrainingScreen_parts/TimersTab';
 import { ProgressTab } from './TrainingScreen_parts/ProgressTab';
 import { StrengthLevelCard } from './TrainingScreen_parts/StrengthLevelCard';
 import { StructuredAnalyticsCard } from './TrainingScreen_parts/StructuredAnalyticsCard';
-import { TrainingMixTab } from './TrainingScreen_parts/TrainingMixTab';
 import { ProPlToolsTab } from './TrainingScreen_parts/ProPlToolsTab';
 import { TrainingCalendarTab } from './TrainingScreen_parts/TrainingCalendarTab';
 import { PlateCalcTab } from './TrainingScreen_parts/PlateCalcTab';
