@@ -25,8 +25,8 @@ export async function renderSettingsModule(container: HTMLElement, profile: User
 
     <div class="card" style="margin-top:12px;"><h3>📅 Курс & Фаза</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
-        <input id="set-phase" type="text" value="${profile.settings.phase||'course'}" placeholder="Фаза (course/pct/bridge)" style="margin:0;">
-        <input id="set-start" type="date" value="${profile.settings.courseStartDate||new Date().toISOString().slice(0,10)}" style="margin:0;">
+        <input id="set-phase" type="text" value="${(profile.settings as any).pharma?.phase||'course'}" placeholder="Фаза (course/pct/bridge)" style="margin:0;">
+        <input id="set-start" type="date" value="${(profile.settings as any).pharma?.courseStartDate||new Date().toISOString().slice(0,10)}" style="margin:0;">
         <input id="set-duration" type="number" value="12" min="4" max="52" placeholder="Длительность (нед)" style="margin:0;">
         <select id="set-role" style="margin:0;">
           <option value="user" ${profile.role==='user'?'selected':''}>👤 Пользователь</option>

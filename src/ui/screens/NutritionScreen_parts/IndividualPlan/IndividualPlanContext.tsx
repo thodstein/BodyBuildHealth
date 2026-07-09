@@ -7,7 +7,7 @@ import { calcNutritionV2 } from "../../../../engines/nutrition-v2.engine";
 import { updateProfile } from "../../../../core/profile-manager";
 import { getRecipesByMeal, type Recipe } from "../../../../engines/nutrition-periodization.engine";
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type DailyDietReport, type MealScoreV2 } from "../../../../engines/product-usefulness-v2.engine";
-import { scoreFoodsForKBJU, getMealKBJUTarget, getMealCurrentKBJU } from "../../../../engines/kbju-food-match.engine";
+import { scoreFoodsForKBJU, getMealKBJUTarget, getMealCurrentKBJU, parseServingSizeGrams } from "../../../../engines/kbju-food-match.engine";
 import { generateNutritionReport, type NutritionReport } from "../../../../engines/nutrition-report.engine";
 import type { UserProfile, LabPoint } from "../../../../core/types";
 import { getContraindications, saveContraindications } from "../../../../core/contraindications";
@@ -480,14 +480,49 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     setDraggedItem(null); setDropTarget(null);
   };
 
-  const findSimilarFoods = (item: any, count = 5) => { const food = FOOD_DB.find(f => f.id === item.id || f.name === item.name); if (!food) return []; const sameCat = FOOD_DB.filter(f => f.category === food.category && f.id !== food.id); const scored = sameCat.map(f => { const score = Math.abs(f.protein - food.protein) + Math.abs(f.fat - food.fat) * 0.5 + Math.abs(f.carbs - food.carbs) * 0.3; return { ...f, score }; }).sort((a, b) => a.score - b.score).slice(0, count); return scored; };
+  const CATEGORY_CLUSTERS: Record<string, string[]> = {
+    protein: ['protein', 'dairy', 'supplement'],
+    dairy: ['dairy', 'protein', 'fat'],
+    grain: ['grain', 'carb', 'veg_fruit'],
+    carb: ['carb', 'grain', 'veg_fruit'],
+    veg_fruit: ['veg_fruit', 'carb', 'fat'],
+    fat: ['fat', 'dairy', 'protein', 'veg_fruit'],
+    supplement: ['supplement', 'protein', 'other'],
+    fast_food: ['fast_food', 'other', 'grain', 'protein'],
+    other: ['other', 'grain', 'fat'],
+  };
 
+  const findSimilarFoods = (item: any, count = 5) => {
+    const nameMatch = (name: string, query: string) => name?.toLowerCase().includes(query?.toLowerCase()) || query?.toLowerCase().includes(name?.toLowerCase());
+    let food: any = FOOD_DB.find(f => f.id === item.id);
+    if (!food) food = FOOD_DB.find(f => f.name === item.name);
+    if (!food) food = FOOD_DB.find(f => f.name && item.name && nameMatch(f.name, item.name));
+    if (!food) food = FOOD_DB.find(f => item.name && f.name && nameMatch(item.name, f.name));
+    if (!food) {
+      const fallback = FOOD_DB.filter(f => f.id !== item.id).slice(0, count);
+      return fallback.map(f => ({ ...f, score: 0 }));
+    }
+    const clusters = CATEGORY_CLUSTERS[food.category] || [food.category];
+    let sameCat = FOOD_DB.filter(f => clusters.includes(f.category) && f.id !== food.id);
+    if (sameCat.length < 3) sameCat = FOOD_DB.filter(f => f.id !== food.id).slice(0, 30);
+    const scored = sameCat.map(f => {
+      const pDiff = Math.abs(f.protein - food.protein);
+      const fDiff = Math.abs(f.fat - food.fat) * 0.5;
+      const cDiff = Math.abs(f.carbs - food.carbs) * 0.3;
+      const catBonus = f.category === food.category ? 0 : 5;
+      const kDiff = Math.abs(f.kcal - food.kcal) * 0.1;
+      const score = Math.round(pDiff + fDiff + cDiff + kDiff + catBonus);
+      return { ...f, score };
+    }).sort((a, b) => a.score - b.score).slice(0, count);
+    return scored;
+  };
+ 
   const replaceFoodItem = (dayIdx: number, mealIdx: number, itemIdx: number, newFood: any) => {
     const dayData = dayIdx === 0 ? dayPlan : threeDayPlan?.days?.[dayIdx - 1] || weekPlan?.days?.[dayIdx - 1];
     if (!dayData?.meals?.[mealIdx]?.items?.[itemIdx]) return;
     saveUndo();
     const old = dayData.meals[mealIdx].items[itemIdx]; const portion = (old.amount || 100) / 100;
-    const replacement = { ...old, name: newFood.name, id: newFood.id, kcal: Math.round(newFood.kcal * portion), p: Math.round(newFood.protein * portion), f: Math.round(newFood.fat * portion), c: Math.round(newFood.carbs * portion), amount: Math.round(portion * (parseInt(newFood.servingSize) || 100)) };
+    const replacement = { ...old, name: newFood.name, id: newFood.id, kcal: Math.round(newFood.kcal * portion), p: Math.round(newFood.protein * portion), f: Math.round(newFood.fat * portion), c: Math.round(newFood.carbs * portion), amount: Math.round(portion * (parseServingSizeGrams(newFood.servingSize) || 100)) };
     if (dayIdx === 0) {
       setDayPlan((prev: any) => updateMealsInPlan(prev, mealIdx, items => { items[itemIdx] = replacement; return items; }));
     } else if (threeDayPlan && dayIdx >= 1 && dayIdx <= 3) {

@@ -396,8 +396,8 @@ export function generateDailyProtocolWithProfile(
   const stackResult = generateStack(goalEffects, blacklist);
   const warnings: string[] = [...stackResult.errors, ...stackResult.warnings];
 
-  const effectivePhase = phase || profile?.settings?.phase || 'course';
-  const bodyWeight = profile?.settings?.weight ?? 80;
+  const effectivePhase = phase || (profile?.settings as any)?.pharma?.phase || 'course';
+  const bodyWeight = (profile?.settings as any)?.personal?.weight ?? 80;
 
   const labResult = adjustForLabs(labs);
   warnings.push(...labResult.warnings);
@@ -479,8 +479,8 @@ export function generateWeeklyProtocol(
   const dailyBase = generateDailyProtocolWithProfile(goalId, labs, blacklist, profile, phase);
   const allWarnings: string[] = [...dailyBase.warnings];
   const days: DailyProtocol[] = [];
-  const effectivePhase = phase || profile?.settings?.phase || 'course';
-  const bodyWeight = profile?.settings?.weight ?? 80;
+  const effectivePhase = phase || (profile?.settings as any)?.pharma?.phase || 'course';
+  const bodyWeight = (profile?.settings as any)?.personal?.weight ?? 80;
 
   const today = new Date();
   const dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];

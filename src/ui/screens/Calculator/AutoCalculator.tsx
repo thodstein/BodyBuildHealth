@@ -12,7 +12,7 @@ import { deriveStateFromLabs, labPointsToSlice } from './Calc.labs-derived';
 import { db } from '../../../core/db';
 import { CalcMapperCard } from './Calc.mapper';
 
-export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek, courseLinked, labsLinked }) => {
+export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek, courseLinked, labsLinked, onOpenManualPicker }) => {
   const [state, setState] = useState<CalculatorState>(() => {
     const h = hydrateState();
     return { ...DEFAULT_STATE, ...h, profile: { ...DEFAULT_STATE.profile, ...(h.profile || {}) }, pharma: { ...DEFAULT_STATE.pharma, ...(h.pharma || {}) }, labs: { ...DEFAULT_STATE.labs, ...(h.labs || {}), fullPanel: h.labs?.fullPanel || DEFAULT_STATE.labs.fullPanel } };
@@ -86,21 +86,21 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
   const fillProfile = () => {
     try {
       const p = getProfile();
-      const s = p?.settings || (p as any);
+      const s: any = p?.settings || {};
       uProf({
-        weight: s.weight ?? 80,
-        age: s.age ?? 30,
-        sex: (s.sex === 'female' ? 'female' : 'male') as any,
-        workoutsPerWeek: s.workoutsPerWeek ?? 3,
-        avgWorkoutMinutes: s.avgWorkoutMinutes ?? 60,
+        weight: s.personal?.weight ?? 80,
+        age: s.personal?.age ?? 30,
+        sex: (s.personal?.sex === 'female' ? 'female' : 'male') as any,
+        workoutsPerWeek: s.training?.daysPerWeek ?? 3,
+        avgWorkoutMinutes: s.training?.minutesPerSession ?? 60,
       });
       const goalMap: Record<string, string> = { 'bulk':'mass','mass':'mass','hypertrophy':'mass','strength':'mass','cut':'cut','maintenance':'maintenance','support':'maintenance','endurance':'endurance','recomposition':'mass' };
-      const goalRaw = s.trainingCycleGoal || s.primaryGoal || s.goal || 'mass';
+      const goalRaw = s.pharma?.trainingCycleType || s.training?.primaryGoal || s.personal?.goal || 'mass';
       uGoals({
         trainingCycle: (goalMap[goalRaw] || 'mass') as any,
-        cycleWeeks: s.cycleWeeks ?? 12,
-        previousCycles: s.previousCycles ?? 0,
-        timeSinceLastCycle: (s.timeSinceLastCycle || 'none') as any,
+        cycleWeeks: s.pharma?.trainingCycleWeeks ?? 12,
+        previousCycles: s.pharma?.previousCycles ?? 0,
+        timeSinceLastCycle: (s.pharma?.timeSinceLastCycle || 'none') as any,
       });
       setFillStatus('✅ Профиль и цели заполнены'); setTimeout(() => setFillStatus(''), 2000);
     } catch { setFillStatus('❌ Нет данных профиля'); setTimeout(() => setFillStatus(''), 2000); }
@@ -236,6 +236,41 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       {fillStatus && <div style={{ fontSize:9, color:'#00e68a', textAlign:'center', marginBottom:6, fontWeight: 700 }}>{fillStatus}</div>}
 
       
+
+      {/* ===== КАРТОЧКА ДОП PED (GH/инсулин/IGF/clen/T3) ===== */}
+      <div style={{
+        marginBottom: 10,
+        borderRadius: 14,
+        background: 'linear-gradient(135deg, rgba(59,130,246,0.06), rgba(99,102,241,0.04))',
+        border: '1.5px solid rgba(59,130,246,0.18)',
+        padding: '10px 12px',
+      }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:8, letterSpacing:'-0.2px' }}>
+          ⚙️ Дополнительные PED (GH/Инсулин/IGF/Clen/T3)
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+          <label style={{ display:'flex', flexDirection:'column', gap:3 }}>
+            <span style={{ fontSize:8, fontWeight:600, color:'var(--text-dim)' }}>GH (МЕ/день)</span>
+            <input type="number" min={0} step={0.5} value={(state.pharma as any).ghIU ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : 0; uPharm({ ...state.pharma, ghIU: v, hasGH: v > 0 } as any); }} placeholder="0" style={{ width:'100%', padding:'4px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:9, boxSizing:'border-box' }} />
+          </label>
+          <label style={{ display:'flex', flexDirection:'column', gap:3 }}>
+            <span style={{ fontSize:8, fontWeight:600, color:'var(--text-dim)' }}>Инсулин (МЕ/день)</span>
+            <input type="number" min={0} step={1} value={(state.pharma as any).insulinIU ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : 0; uPharm({ ...state.pharma, insulinIU: v, hasInsulin: v > 0 } as any); }} placeholder="0" style={{ width:'100%', padding:'4px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:9, boxSizing:'border-box' }} />
+          </label>
+          <label style={{ display:'flex', flexDirection:'column', gap:3 }}>
+            <span style={{ fontSize:8, fontWeight:600, color:'var(--text-dim)' }}>IGF-1 LR3 (мкг/день)</span>
+            <input type="number" min={0} step={10} value={(state.pharma as any).igfMcg ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : 0; uPharm({ ...(state.pharma as any), igfMcg: v } as any); }} placeholder="0" style={{ width:'100%', padding:'4px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:9, boxSizing:'border-box' }} />
+          </label>
+          <label style={{ display:'flex', flexDirection:'column', gap:3 }}>
+            <span style={{ fontSize:8, fontWeight:600, color:'var(--text-dim)' }}>Clenbuterol (мкг/день)</span>
+            <input type="number" min={0} step={10} value={(state.pharma as any).clenMcg ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : 0; uPharm({ ...(state.pharma as any), clenMcg: v } as any); }} placeholder="0" style={{ width:'100%', padding:'4px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:9, boxSizing:'border-box' }} />
+          </label>
+          <label style={{ display:'flex', flexDirection:'column', gap:3 }}>
+            <span style={{ fontSize:8, fontWeight:600, color:'var(--text-dim)' }}>T3 (мкг/день)</span>
+            <input type="number" min={0} step={5} value={(state.pharma as any).t3Mcg ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : 0; uPharm({ ...(state.pharma as any), t3Mcg: v } as any); }} placeholder="0" style={{ width:'100%', padding:'4px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:9, boxSizing:'border-box' }} />
+          </label>
+        </div>
+      </div>
 
       {/* ===== КАРТОЧКА КУРСА ААС (большая, красивая) ===== */}
       {state.pharma.aas.length > 0 && (
@@ -389,7 +424,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       <CalcMapperCard state={state} onApply={(rec) => {
         const subIds = rec.subs.map(s => s.substanceId);
         onApply({ level: rec.level, subs: subIds, tzRec: rec });
-      }} />
+      }} onOpenManualPicker={onOpenManualPicker} />
 
       {result.contraindicationAlerts.length > 0 && (
         <div style={{ ...GLASS, padding: 8, marginTop: 6 }}>

@@ -220,4 +220,5 @@ export interface AutoCalculatorProps {
   courseWeek?: number;
   courseLinked?: AutoCalculatorCourseEntry[];
   labsLinked?: LabSlice | null;
+  onOpenManualPicker?: () => void;
 }

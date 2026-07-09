@@ -241,14 +241,42 @@ export function scoreFoodsForKBJU(
   return results.slice(0, maxResults);
 }
 
+/**
+ * Извлекает вес порции в граммах из строки servingSize.
+ * "100 г" → 100, "1 шт (60 г)" → 60, "2 ст.л. (30 мл)" → 30, "1 порция" → 100
+ */
+export function parseServingSizeGrams(servingSize?: string): number {
+  if (!servingSize) return 100;
+  const m = servingSize.match(/(\d+)\s*г/i);
+  if (m) return parseInt(m[1], 10);
+  const n = servingSize.match(/(\d+)/);
+  return n ? parseInt(n[1], 10) : 100;
+}
+
+/** Весовые коэффициенты распределения КБЖУ по приёмам */
+const MEAL_WEIGHT: Record<string, number> = {
+  'завтрак': 0.2, 'завтрак1': 0.15, 'завтрак2': 0.15,
+  'обед': 0.3, 'ужин': 0.25, 'перекус': 0.1, 'перекус1': 0.1, 'перекус2': 0.1,
+  'ланч': 0.2, 'полдник': 0.15,
+};
+const DEFAULT_MEAL_WEIGHT = 1 / 3;
+
 export function getMealKBJUTarget(dayPlan: any, mealIdx: number): KbjuTarget | null {
   if (!dayPlan?.totals || !dayPlan?.meals) return null;
   const mealCount = dayPlan.meals.length || 1;
+  const meal = dayPlan.meals[mealIdx];
+  const label = (meal?.label || '').toLowerCase().replace(/[^а-яёa-z0-9]/g, '');
+  const weight = MEAL_WEIGHT[label] || DEFAULT_MEAL_WEIGHT;
+  const totalWeight = dayPlan.meals.reduce((s: number, m: any) => {
+    const l = (m?.label || '').toLowerCase().replace(/[^а-яёa-z0-9]/g, '');
+    return s + (MEAL_WEIGHT[l] || DEFAULT_MEAL_WEIGHT);
+  }, 0);
+  const ratio = totalWeight > 0 ? weight / totalWeight : 1 / mealCount;
   return {
-    kcal: Math.round(dayPlan.totals.kcal / mealCount),
-    protein: Math.round(dayPlan.totals.p / mealCount),
-    fat: Math.round(dayPlan.totals.f / mealCount),
-    carbs: Math.round(dayPlan.totals.c / mealCount),
+    kcal: Math.round(dayPlan.totals.kcal * ratio),
+    protein: Math.round(dayPlan.totals.p * ratio),
+    fat: Math.round(dayPlan.totals.f * ratio),
+    carbs: Math.round(dayPlan.totals.c * ratio),
   };
 }
 

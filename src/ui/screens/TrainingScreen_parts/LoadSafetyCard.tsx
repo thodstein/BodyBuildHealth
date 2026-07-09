@@ -129,11 +129,11 @@ export const LoadSafetyCard: React.FC = () => {
           {cardioPlan.sessions.length === 0
             ? <div style={{ fontSize: 10, color: DIM }}>Для этой цели кардио не назначается.</div>
             : cardioPlan.sessions.map((s, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', gap: 4, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 10, minWidth: 360, overflowX: 'auto' }}>
-                <span style={{ color: ACCENT, fontWeight: 700, whiteSpace: 'nowrap' }}>{TYPE_RU[s.type] || s.type}</span>
-                <span style={{ color: DIM, whiteSpace: 'nowrap' }}>{s.durationMin} мин ×{s.weeklyFrequency}/нед</span>
-                <span style={{ color: DIM, whiteSpace: 'nowrap' }}>{s.kcalPerSession} ккал/сесс</span>
-                <span style={{ color: '#fff', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{s.purpose}</span>
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', gap: 4, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 10, minWidth: 340 }}>
+                <span style={{ color: ACCENT, fontWeight: 700 }}>{TYPE_RU[s.type] || s.type}</span>
+                <span style={{ color: DIM }}>{s.durationMin} мин ×{s.weeklyFrequency}/нед</span>
+                <span style={{ color: DIM }}>{s.kcalPerSession} ккал/сесс</span>
+                <span style={{ color: '#fff' }}>{s.purpose}</span>
               </div>
             ))}
           <div style={{ fontSize: 10, color: ACCENT, marginTop: 6 }}>Σ {cardioPlan.totalKcalPerWeek} ккал/нед</div>

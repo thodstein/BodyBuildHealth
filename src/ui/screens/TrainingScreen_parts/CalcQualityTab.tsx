@@ -78,10 +78,10 @@ export const CalcQualityTab: React.FC<{ plan: Plan; level: string; onBuildPlan: 
       <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6 }}>Объём по группам (MEV / MAV / MRV)</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
         {analysis.rows.map(r => (
-          <div key={r.g} style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.4fr 0.8fr 0.7fr 0.9fr', gap: 4, fontSize: 11, color: 'rgba(255,255,255,0.85)', alignItems: 'center', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', minWidth: 380 }}>
+          <div key={r.g} style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.4fr 0.8fr 0.7fr 0.9fr', gap: 4, fontSize: 11, color: 'rgba(255,255,255,0.85)', alignItems: 'center', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', minWidth: 320 }}>
             <span style={{ fontWeight: 700 }}>{ru(r.g)}</span>
             <span style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>{r.sets}</span>
-            <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, whiteSpace: 'nowrap' }}>{r.mev}/{r.mav}/{r.gmrv}</span>
+            <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10 }}>{r.mev}/{r.mav}/{r.gmrv}</span>
             <span style={{ color: r.color, fontWeight: 700, fontSize: 10 }}>{r.label}</span>
             <span style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
               <span style={{ display: 'block', height: '100%', width: Math.min(100, Math.round((r.sets / Math.max(r.gmrv, 1)) * 100)) + '%', borderRadius: 3, background: r.color }} />

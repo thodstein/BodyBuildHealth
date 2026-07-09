@@ -53,10 +53,11 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
       const selectedIds = alreadyChosen.map(name => EXERCISE_CATALOG.find(ex => ex.name === name)?.id).filter(Boolean) as string[];
       const injuryProfile = injuries.map(i => i.muscle);
       const weakZonesList = isWeak(g) ? [g] : [];
+      const isPrimaryGroup = groups.indexOf(g) === 0;
       const smartCompounds = selectExercisesSmart({
         candidates: poolFinal,
         muscleGroup: g,
-        count: 2,
+        count: isPrimaryGroup ? 2 : 1,
         selectedIds,
         equipment,
         weakZones: weakZonesList,
@@ -68,7 +69,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
       const smartIsolations = selectExercisesSmart({
         candidates: poolFinal,
         muscleGroup: g,
-        count: 2,
+        count: isPrimaryGroup ? 1 : 0,
         selectedIds: [...selectedIds, ...smartCompounds.map(e => e.id)],
         equipment,
         weakZones: weakZonesList,
@@ -104,7 +105,10 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
       }
       if (capped) groupCorrections.push(`Группа «${g}»: объём достиг MRV (${Math.round(mrv)}) — лишние упражнения убраны (анти-перетрен).`);
     });
-    return { day: di + 1, groups, exercises: exs };
+    // Hard cap: максимум 8 упражнений в тренировке
+    const cappedExs = exs.slice(0, 8);
+    if (exs.length > 8) groupCorrections.push(`День ${di + 1}: ограничено до 8 упражнений (было ${exs.length}).`);
+    return { day: di + 1, groups, exercises: cappedExs };
   });
 
   return { days, weeklySets, groupCorrections };

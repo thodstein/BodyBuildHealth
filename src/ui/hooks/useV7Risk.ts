@@ -18,41 +18,41 @@ export function useV7Risk(): { v7Result: V7RiskResult | null; legacyResult: Risk
   const v7Result = useMemo<V7RiskResult | null>(() => {
     if (!linked.profile) return null;
 
-    const settings = linked.profile.settings;
-    const mode = (settings.phase === 'blast' ? 'blast' :
-                  settings.phase === 'cruise' ? 'cruise' :
-                  settings.phase === 'cut' ? 'cut' :
-                  settings.phase === 'recomp' ? 'recomp' : 'bulk') as V7RiskInput['mode'];
+    const s = linked.profile.settings as any;
+    const mode = ((s.pharma?.phase === 'blast' ? 'blast' :
+                  s.pharma?.phase === 'cruise' ? 'cruise' :
+                  s.pharma?.phase === 'cut' ? 'cut' :
+                  s.pharma?.phase === 'recomp' ? 'recomp' : 'bulk') as V7RiskInput['mode']);
 
     const genetics: GeneticProfile = {
-      COMT: settings.genetics?.COMT,
-      MTHFR: settings.genetics?.MTHFR,
-      ESR1: settings.genetics?.ESR1,
-      AGTR1: settings.genetics?.AGTR1,
-      NOS3: settings.genetics?.NOS3,
-      SRD5A2: settings.genetics?.SRD5A2,
-      CYP3A4: settings.genetics?.CYP3A4,
+      COMT: s.health?.genetics?.COMT,
+      MTHFR: s.health?.genetics?.MTHFR,
+      ESR1: s.health?.genetics?.ESR1,
+      AGTR1: s.health?.genetics?.AGTR1,
+      NOS3: s.health?.genetics?.NOS3,
+      SRD5A2: s.health?.genetics?.SRD5A2,
+      CYP3A4: s.health?.genetics?.CYP3A4,
     };
 
     const nutrition = {
-      proteinPerKg: settings.proteinPerKg ?? 1.8,
-      fiberG: settings.fiberG ?? 25,
-      omega3G: settings.omega3G ?? 1.5,
-      sodiumG: settings.sodiumG ?? 3.5,
-      potassiumG: settings.potassiumG ?? 3.0,
+      proteinPerKg: s.nutrition?.proteinPerKg ?? 1.8,
+      fiberG: s.nutrition?.fiberG ?? 25,
+      omega3G: s.nutrition?.omega3G ?? 1.5,
+      sodiumG: s.nutrition?.sodiumG ?? 3.5,
+      potassiumG: s.nutrition?.potassiumG ?? 3.0,
     };
 
     const training = {
-      workoutsPerWeek: settings.workoutsPerWeek ?? 3,
-      avgWorkoutMinutes: settings.avgWorkoutMinutes ?? 60,
-      hasHIIT: settings.hasHIIT ?? false,
-      volumeTonnes: settings.volumeTonnes ?? 8000,
-      lissMinutesPerWeek: settings.lissMinutesPerWeek ?? 90,
+      workoutsPerWeek: s.training?.daysPerWeek ?? 3,
+      avgWorkoutMinutes: s.training?.minutesPerSession ?? 60,
+      hasHIIT: s.system?.hasHIIT ?? false,
+      volumeTonnes: s.system?.volumeTonnes ?? 8000,
+      lissMinutesPerWeek: s.system?.lissMinutesPerWeek ?? 90,
     };
 
     const course = linked.course || [];
     const continuousWeeks = course.reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 0);
-    const stazhWeeks = (settings.totalCycles || 0) * 12 + continuousWeeks;
+    const stazhWeeks = (s.pharma?.totalCycles || 0) * 12 + continuousWeeks;
 
     const input: V7RiskInput = {
       labs: linked.labs || [],
@@ -63,17 +63,17 @@ export function useV7Risk(): { v7Result: V7RiskResult | null; legacyResult: Risk
       mode,
       stazhWeeks: Math.max(0, stazhWeeks),
       continuousWeeks: Math.max(0, continuousWeeks),
-      sleepHours: settings.sleepHours ?? settings.baselineSleepHours ?? 7,
-      stressLevel: settings.stressLevel ?? settings.baselineStressLevel ?? 5,
-      activityLevel: settings.activityLevel ?? 5,
-      alcoholPerWeek: settings.alcoholPerWeek ?? 0,
-      smoke: settings.smoke ?? false,
+      sleepHours: s.lifestyle?.sleepHours ?? 7,
+      stressLevel: s.lifestyle?.stressLevel ?? 5,
+      activityLevel: s.lifestyle?.activityLevel ?? 5,
+      alcoholPerWeek: s.nutrition?.alcoholPerWeek ?? 0,
+      smoke: s.lifestyle?.smoke ?? false,
       forceNoLabs: globalNoLabs,
       noLabSystems,
       // supportIds must be actual supplement IDs matching SUPPORT_REDUCTIONS keys in V7 matrix,
       // NOT system names from supportCoverage. Use profile's currentSupplements.
-      supportIds: (settings.currentSupplements || []).map(s => s.id).filter(Boolean),
-      mcRuns: settings.mcRuns ?? 0,
+      supportIds: (s.nutrition.currentSupplements || []).map((s_: any) => s_.id).filter(Boolean),
+      mcRuns: s.system.mcRuns ?? 0,
     };
 
     try {

@@ -20,6 +20,15 @@ export const PharmaScreen: React.FC = () => {
   const [subTab, setSubTab] = useState<SubTab>('catalog');
   const linked = useDataLink();
 
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('he_nav_pharma_diary') === '1') {
+        localStorage.removeItem('he_nav_pharma_diary');
+        setPage('course');
+      }
+    } catch {}
+  }, []);
+
   const pharmaSubstances = useMemo(() => {
     return Object.values(PHARMA_DB).filter(s =>
       PHARMA_CLASSES.includes(s.class as PharmaClass)

@@ -33,14 +33,14 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     icon: '▶️',
     color: '#22c55e',
     subtitle: 'Проведение тренировки, таймеры отдыха, учёт подходов',
-    tabs: ['runtime', 'timers', 'mixes'],
+    tabs: ['runtime', 'timers'],
   },
   diary: {
     title: '📊 Дневник и аналитика',
     icon: '📊',
     color: '#a855f7',
     subtitle: 'Дневник, история, аналитика, прогресс, календарь, отчёты',
-    tabs: ['diary', 'insights', 'strength', 'goals', 'calendar', 'checkin', 'mmc_tracking', 'import_data'],
+    tabs: ['diary', 'insights', 'strength', 'calendar', 'checkin', 'mmc_tracking', 'import_data'],
   },
   calculators: {
     title: '🧮 Калькуляторы',
@@ -51,12 +51,12 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
       'strength_analysis', 'load_management', 'diagnostics', 'periodization_hub',
       'exercise_lab', 'bb_tools', 'load_safety', 'competition', 'split_gen', 'pri_reppat',
       'calc_plates', 'calc_quality', 'volume', 'conjugate', 'pl_pro',
-      'goals', 'synergy', 'mix_presets',
+      'training_mix_hub',
     ],
     categories: [
       { label: 'Унифицированные', icon: '🧠', tabs: ['strength_analysis', 'load_management', 'diagnostics', 'periodization_hub', 'exercise_lab'] },
       { label: 'Инструменты', icon: '🛠️', tabs: ['bb_tools', 'load_safety', 'competition', 'split_gen', 'pri_reppat', 'calc_plates', 'calc_quality', 'volume', 'conjugate', 'pl_pro'] },
-      { label: 'Прочее', icon: '📋', tabs: ['goals', 'synergy', 'mix_presets'] },
+      { label: 'Прочее', icon: '📋', tabs: ['training_mix_hub'] },
     ],
   },
   library: {

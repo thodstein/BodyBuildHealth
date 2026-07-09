@@ -145,7 +145,7 @@ type LabSubTab = 'hero' | 'overview' | 'current' | 'catalog' | 'journal';
 
 export const LabsScreen: React.FC = () => {
   const linked = useDataLink();
-  const profilePhase = linked.profile?.settings?.phase || '';
+  const profilePhase = (linked.profile?.settings as any)?.pharma?.phase || '';
   const initialLabsPhase = PROFILE_PHASE_TO_LABS_PHASE[profilePhase] || 'baseline';
   const [mainTab, setMainTab] = useState<MainLabTab>('hero');
   const [subTab, setSubTab] = useState<LabSubTab>('current');
@@ -227,7 +227,7 @@ export const LabsScreen: React.FC = () => {
     setSelectedPhase(phase);
     try {
       const p = getProfile();
-      p.settings.phase = phase === 'on_cycle' ? 'course' : phase;
+      (p.settings as any).pharma.phase = phase === 'on_cycle' ? 'course' : phase;
       updateProfile(p);
       notifyDataChange();
     } catch {}
@@ -382,7 +382,7 @@ export const LabsScreen: React.FC = () => {
 
   const labPharmaAlerts = useMemo(() => {
     if (!hasLabs || linked.course.length === 0) return [];
-    return analyzeLabDrugCorrelation(currentLabs, linked.course, linked.profile?.settings?.phase || 'on_cycle');
+    return analyzeLabDrugCorrelation(currentLabs, linked.course, (linked.profile?.settings as any)?.pharma?.phase || 'on_cycle');
   }, [hasLabs, currentLabs, linked.course]);
 
   // ── Механизм-ориентированная модель (ТЗ) — данные из фазы ──
@@ -1272,9 +1272,9 @@ export const LabsScreen: React.FC = () => {
                 if (!latest) return [];
                 return Object.entries(latest).filter(([k, v]) => typeof v === 'number').map(([id, value]) => ({ id, value: value as number }));
               })()}
-              weight={linked.profile?.settings?.weight || 80}
-              age={linked.profile?.settings?.age || 30}
-              sex={linked.profile?.settings?.sex || 'male'}
+              weight={(linked.profile?.settings as any)?.personal?.weight || 80}
+              age={(linked.profile?.settings as any)?.personal?.age || 30}
+              sex={(linked.profile?.settings as any)?.personal?.sex || 'male'}
             />
 
             {/* Lab-Pharma Risks */}

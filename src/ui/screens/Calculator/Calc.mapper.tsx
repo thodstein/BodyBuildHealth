@@ -10,14 +10,41 @@ import { PHASE_PROTOCOL } from '../../../engines/tz-bridge-phase';
 import { STACK_BOOSTER_TRIGGERS } from '../../../engines/tz-bridge-boosters';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
+import { classifyPed } from '../../../data/ped-potency-table';
+import { getSubstanceForm, type SubstanceForm } from '../../../data/substance-forms';
+import { checkInteractions, type DrugInteraction } from '../../../data/drug-interactions';
+import { getTitrationProtocol, type TitrationProtocol } from '../../../data/titration-protocols';
 import { GLASS, BADGE } from './Calc.types';
 
 // ── Утилиты отображения вещества ─────────────────────────────────────────────
 const SUB_NAME_CACHE: Record<string, string> = {};
+const FALLBACK_NAMES: Record<string, string> = {
+  niacin: 'Ниацин (B3)', phosphatidylserine: 'Фосфатидилсерин', glycine: 'Глицин',
+  theanine: 'L-Теанин', quercetin: 'Кверцетин', garlic: 'Чеснок (экстракт)',
+  beetroot: 'Beetroot (экстракт)', lecithin: 'Лецитин (ФХ)',
+  iron_bisglycinate: 'Iron bisglycinate', tadalafil: 'Тадалафил',
+  agmatine: 'Агматин', tmg: 'TMG (Бетаин)', pycnogenol: 'Пикногенол',
+  citrulline: 'Цитруллин', bergamot: 'Бергамот', astaxanthin: 'Астаксантин',
+  dandelion: 'Dandelion (Одуванчик)', hesperidin: 'Гесперидин+Диосмин',
+  serrapeptase: 'Серрапептаза', nattokinase: 'Наттокиназа', bromelain: 'Бромелайн',
+  anastrozole: 'Анастрозол', cabergoline: 'Каберголин', hcg: 'ХГЧ',
+  telmisartan: 'Тельмисартан', tudca: 'TUDCA', nac: 'NAC',
+  milk_thistle: 'Силимарин', omega3: 'Омега-3', coq10: 'CoQ10',
+  taurine: 'Таурин', curcumin: 'Куркумин', piperine: 'Пиперин',
+  berberine: 'Берберин', astragalus: 'Астрагал', cordyceps: 'Кордицепс',
+  vitamin_d3: 'Витамин D3', vitamin_k2: 'Витамин K2', magnesium: 'Магний',
+  vitamin_b6: 'B6 (P5P)', vitamin_b12: 'B12 (метил)', folate: 'Фолат (5-MTHF)',
+  vitamin_c: 'Витамин C', vitamin_e: 'Витамин E', b_complex: 'B-Complex',
+  nebivolol: 'Небиволол', chromium: 'Хром (пиколинат)', tamoxifen: 'Тамоксифен',
+  spironolactone: 'Спиронолактон', melatonin: 'Мелатонин', calcium: 'Кальций',
+  metformin: 'Метформин', potassium: 'Калий', leucine: 'Лейцин',
+  saw_palmetto: 'Saw Palmetto',
+  alpha_lipoic: 'α-Липоевая', l_carnitine: 'L-Карнитин',
+};
 function subNameRu(id: string): string {
   if (SUB_NAME_CACHE[id]) return SUB_NAME_CACHE[id];
   const e = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toLowerCase()] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
-  const name = e?.nameRu || e?.name || id;
+  const name = e?.nameRu || e?.name || FALLBACK_NAMES[id] || FALLBACK_NAMES[id?.toLowerCase()] || id;
   SUB_NAME_CACHE[id] = name;
   return name;
 }
@@ -133,13 +160,33 @@ export function buildMapperCtx(
     triggeredStackIds: stackTriggers || [],
   };
 
+  // v5: построить pedDoses из state.pharma
+  const pedDoses = (state.pharma.aas || [])
+    .filter((a: any) => a && a.id)
+    .map((a: any) => ({
+      id: (a.id as string).toLowerCase(),
+      pClass: classifyPed(a.id),
+      mgPerWeek: a.mgPerWeek ?? a.dosePerWeek ?? (a.dose ? Number(String(a.dose).replace(/\D/g,''))*7 : 500),
+      form: (a.form === 'oral' ? 'oral' : 'inject') as 'oral' | 'inject',
+    }));
+  // Дополнить GH/insulin/IGF из state.pharma если есть
+  const ghIU = (state.pharma as any).ghIU || 0;
+  if (ghIU > 0) pedDoses.push({ id: 'somatropin', pClass: 'gh', iuPerDay: ghIU, form: 'subq' } as any);
+  const insulinIU = (state.pharma as any).insulinIU || 0;
+  if (insulinIU > 0) pedDoses.push({ id: 'insulin_rapid', pClass: 'insulin', iuPerDay: insulinIU, form: 'subq' } as any);
+  const igfMcg = (state.pharma as any).igfMcg || 0;
+  if (igfMcg > 0) pedDoses.push({ id: 'igf1_lr3', pClass: 'igf', mcgPerDay: igfMcg, form: 'subq' } as any);
+  const clenMcg = (state.pharma as any).clenMcg || 0;
+  if (clenMcg > 0) pedDoses.push({ id: 'clenbuterol', pClass: 'clenbut', mcgPerDay: clenMcg, form: 'oral' } as any);
+  const t3Mcg = (state.pharma as any).t3Mcg || 0;
+  if (t3Mcg > 0) pedDoses.push({ id: 't3', pClass: 't3', mcgPerDay: t3Mcg, form: 'oral' } as any);
   return {
     labs,
     phaseCtx,
     boosterCtx,
     level,
     manualChoices,
-    onCourse: state.pharma.aas.length > 0,
+    onCourse: state.pharma.aas.length > 0 || pedDoses.length > 0,
     e2Level: labs['ESTRADIOL'],
     hemoglobin: labs['HEMOGLOBIN'],
     hematocrit: labs['HEMATOCRIT'],
@@ -147,6 +194,7 @@ export function buildMapperCtx(
     hasAI: state.pharma.hasAI,
     hasCabergoline: (state.pharma as any).hasCaber || false,
     aasIds: (state.pharma.aas || []).map((a: any) => a.id || '').filter(Boolean),
+    pedDoses,
     libidoLow: false,
     bpSystolic: state.cardio.bpStage === 'high' ? 150 : state.cardio.bpStage === 'normal' ? 120 : 135,
     lipidLdl: labs['LDL'],
@@ -159,13 +207,15 @@ export function buildMapperCtx(
 export interface CalcMapperProps {
   state: CalculatorState;
   onApply?: (rec: SupportRecommendation) => void;
+  onOpenManualPicker?: () => void;
 }
 
-export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply }) => {
+export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply, onOpenManualPicker }) => {
   const [level, setLevel] = useState<SupportLevel>('medium');
   const [manualSubs, setManualSubs] = useState<string[]>([]);
   const [selectedStacks, setSelectedStacks] = useState<string[]>([]);
   const [showCoverage, setShowCoverage] = useState(false);
+  const [expandedSub, setExpandedSub] = useState<string | null>(null);
   const [showGaps, setShowGaps] = useState(false);
   const [showGuardrails, setShowGuardrails] = useState(false);
   const [showBoosters, setShowBoosters] = useState(false);
@@ -395,6 +445,18 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply }) =>
                 Самостоятельно добавьте готовые стеки или отдельные препараты
               </div>
 
+              {onOpenManualPicker && (
+                <button onClick={() => { setShowManualPopup(false); setTimeout(onOpenManualPicker, 200); }} style={{
+                  width:'100%', marginBottom:10, padding:'8px', borderRadius:8,
+                  background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.25)',
+                  color:'#a78bfa', fontWeight:700, fontSize:10, cursor:'pointer',
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+                }}>
+                  <span style={{fontSize:13}}>📂</span>
+                  <span>Выбрать из каталога / стеков / избранного</span>
+                </button>
+              )}
+
               {/* Добавить стек */}
               <div style={{ fontSize:10, fontWeight:700, color:'var(--text)', marginBottom:6, letterSpacing:'-0.2px' }}>
                 📦 Добавить стек
@@ -588,33 +650,190 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply }) =>
         </div>
       )}
 
+      {/* STOP COURSE banner (TIER 3) */}
+      {rec && rec.stopCourse && (
+        <div style={{ margin: '6px 0', padding: '10px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1.5px solid rgba(239,68,68,0.3)' }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#ef4444', marginBottom: 4 }}>⛔ ОСТАНОВИТЬ КУРС AAS</div>
+          {rec.alerts?.map((a, i) => (
+            <div key={i} style={{ fontSize: 9, color: '#fca5a5', marginBottom: 2, lineHeight: 1.4 }}>{a.message}</div>
+          ))}
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>Рекомендации — для специалиста. Не заменяют консультацию врача.</div>
+        </div>
+      )}
+
+      {/* TIER  alerts (без stopCourse) */}
+      {rec && !rec.stopCourse && rec.alerts && rec.alerts.length > 0 && (
+        <div style={{ margin: '6px 0', padding: '8px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+          {rec.alerts.map((a, i) => (
+            <div key={i} style={{ fontSize: 9, color: '#fbbf24', marginBottom: 2, lineHeight: 1.4 }}>⚠ {a.message}</div>
+          ))}
+        </div>
+      )}
+
       {/* Результат — единый список препаратов */}
       {rec && rec.subs.length > 0 && (
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
             Назначено {rec.subs.length} препаратов
+            {rec.titrationFactors && rec.titrationFactors.size > 0 && (
+              <span style={{ fontSize: 9, fontWeight: 600, color: '#f59e0b', padding: '1px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.15)' }}>
+                ↑{rec.titrationFactors.size} дозы скорректированы
+              </span>
+            )}
           </div>
           {rec.subs.map((s, i) => {
             const name = subNameRu(s.substanceId);
             const dose = subDosage(s.substanceId);
+            const titrFactor = rec.titrationFactors?.get(canonIdLocal(s.substanceId));
+            const isTitrated = !!titrFactor && titrFactor > 1;
+            const form = getSubstanceForm(s.substanceId);
+            const titr = getTitrationProtocol(s.substanceId);
+            const hasDetails = !!form || !!titr;
+            const isExpanded = expandedSub === s.substanceId;
             return (
-              <div key={s.substanceId + i} style={{ ...GLASS, padding: '6px 10px', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 8, fontSize: 9 }}>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>{name}</span>
-                </span>
-                {dose && (
-                  <span style={{ fontSize: 8, color: '#00e68a', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                    {dose.mg} мг · {dose.timing}
+              <div key={s.substanceId + i} >
+                <div
+                  onClick={() => hasDetails && setExpandedSub(isExpanded ? null : s.substanceId)}
+                  style={{ ...GLASS, padding: '6px 10px', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 8, fontSize: 9, borderLeft: isTitrated ? '3px solid #f59e0b' : undefined, cursor: hasDetails ? 'pointer' : 'default' }}
+                >
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>{name}</span>
+                    {isTitrated && (
+                      <span style={{ fontSize: 8, fontWeight: 700, color: '#f59e0b', marginLeft: 4, padding: '1px 4px', borderRadius: 4, background: 'rgba(245,158,11,0.15)' }}>↑{((titrFactor - 1) * 100).toFixed(0)}%</span>
+                    )}
+                    {hasDetails && (
+                      <span style={{ fontSize: 7, color: 'var(--text-dim)', marginLeft: 4 }}>{isExpanded ? '▲' : '▼'}</span>
+                    )}
                   </span>
+                  {dose && (
+                    <span style={{ fontSize: 8, color: isTitrated ? '#f59e0b' : '#00e68a', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      {titrFactor && titrFactor > 1 ? Math.round(dose.mg * titrFactor) : dose.mg} мг · {dose.timing}
+                    </span>
+                  )}
+                </div>
+                {isExpanded && hasDetails && (
+                  <div style={{ ...GLASS, padding: '8px 10px', marginBottom: 3, fontSize: 8, lineHeight: 1.5, borderLeft: '2px solid rgba(99,102,241,0.3)' }}>
+                    {form && form.optimalForm && (
+                      <div style={{ marginBottom: 3 }}>
+                        <span style={{ fontWeight: 700, color: '#818cf8' }}>Форма: </span>
+                        <span style={{ color: 'var(--text-light)' }}>{form.optimalForm}</span>
+                      </div>
+                    )}
+                    {form && form.pharmacyBrands && form.pharmacyBrands.length > 0 && (
+                      <div style={{ marginBottom: 3 }}>
+                        <span style={{ fontWeight: 700, color: '#818cf8' }}>Аптечные: </span>
+                        <span style={{ color: 'var(--text-light)' }}>{form.pharmacyBrands.join(', ')}</span>
+                      </div>
+                    )}
+                    {form && form.altForm && (
+                      <div style={{ marginBottom: 3 }}>
+                        <span style={{ fontWeight: 700, color: '#f59e0b' }}>Замена: </span>
+                        <span style={{ color: 'var(--text-light)' }}>{form.altForm}</span>
+                      </div>
+                    )}
+                    {form && form.bioavailability && (
+                      <div style={{ marginBottom: 3 }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-dim)' }}>Биодоступность: </span>
+                        <span style={{ color: 'var(--text-light)' }}>{form.bioavailability}</span>
+                      </div>
+                    )}
+                    {form && form.note && (
+                      <div style={{ marginBottom: 3, color: 'var(--text-light)', opacity: 0.8 }}>{form.note}</div>
+                    )}
+                    {titr && (
+                      <div style={{ marginTop: 4, padding: '6px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.12)' }}>
+                        <div style={{ fontWeight: 700, color: '#f59e0b', marginBottom: 2 }}>Титрация: {titr.startDose} → {titr.maxDose}</div>
+                        {titr.steps.map((step, si) => (
+                          <div key={si} style={{ fontSize: 7, color: 'var(--text-light)', marginBottom: 1 }}>
+                            <b>{step.dose}</b> ({step.duration})
+                            {step.trigger ? ' — ' + step.trigger : ''}
+                            {step.labTarget ? ' [цель: ' + step.labTarget + ']' : ''}
+                          </div>
+                        ))}
+                        {titr.flushWarning && (
+                          <div style={{ fontSize: 7, color: '#fbbf24', marginTop: 2 }}>{titr.flushWarning}</div>
+                        )}
+                        <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 2 }}>Контроль: {titr.monitorLabs.join(', ')} — {titr.frequency}</div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             );
           })}
         </div>
       )}
+
+      {/* Нутри-корректировки по анализам */}
+      {rec && rec.nutritionTips && rec.nutritionTips.length > 0 && (
+        <div style={{marginTop: 8 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#00e68a', marginBottom: 4 }}>Питание по анализам ({rec.nutritionTips.length})</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+            {rec.nutritionTips.slice(0, 12).map((n, i) => (
+              <div key={i} style={{ ...GLASS, padding: '4px 8px', fontSize: 8, color: 'var(--text-light)' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text)' }}>{n.action}</span>
+                <br />
+                <span style={{ opacity: 0.7 }}>{n.target}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+)}
+
+      {/* Warnings: multi-oral, GH+insulin, winny+oxy */}
+      {rec && (() => {
+        const warnings: string[] = [];
+        const flags = rec.pedFlags;
+        if (flags) {
+          if (flags.isMultiOral) warnings.push('⚠ Более 1 орального 17α — резко ↑ гепатотоксичность');
+          if (flags.isGHPlusInsulin) warnings.push('⚠ GH + Инсулин — высокий риск гипогликемии, обязателен мониторинг глюкозы');
+          if (flags.isWinnyPlusOxy) warnings.push('⚠ Winstrol + Anadrol — крайне нежелательная комбинация (липиды, печень)');
+          if (flags.has17AlphaAndGH) warnings.push('⚠ 17α-Орал + GH — синергичная гепатотоксичность, тщательный мониторинг АЛТ/АСТ');
+        }
+        if (warnings.length === 0) return null;
+        return (
+          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>Предупреждения о курсе</div>
+            {warnings.map((w, i) => (
+              <div key={i} style={{ fontSize: 9, color: '#c4b5fd', marginBottom: 2, lineHeight: 1.4 }}>{w}</div>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* Взаимодействия препаратов (drug-drug) */}
+      {rec && rec.subs.length > 1 && (() => {
+        const interactions = checkInteractions(rec.subs.map(s => s.substanceId));
+        if (interactions.length === 0) return null;
+        const blocks = interactions.filter(i => i.severity === 'block');
+        return (
+          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: blocks.length ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border: '1px solid ' + (blocks.length ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)') }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: blocks.length ? '#ef4444' : '#fbbf24', marginBottom: 4 }}>
+              {blocks.length ? '⛔ Взаимодействия (критичные)' : '⚠ Взаимодействия'} ({interactions.length})
+            </div>
+            {interactions.map((intr, i) => (
+              <div key={i} style={{ fontSize: 8, color: intr.severity === 'block' ? '#fca5a5' : '#fbbf24', marginBottom: 2, lineHeight: 1.4 }}>
+                [{intr.severity === 'block' ? '⛔' : '⚠'}] <b>{intr.a}</b> + <b>{intr.b}</b> — {intr.reason}
+                <div style={{ fontSize: 7, opacity: 0.8 }}>{intr.action}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 };
+
+// Локальный канон-нормализатор для titration lookup
+function canonIdLocal(id: string): string {
+  const map: Record<string, string> = {
+    telmi: 'telmisartan', tmg: 'betaine', pharma_anastrozole: 'anastrozole',
+    pharma_cabergoline: 'cabergoline', nac_sup: 'nac', silymarin: 'milk_thistle',
+    coq10: 'coq10', '5_mthf': 'folate', l_carnitine: 'l_carnitine',
+    agmatine_sulfate: 'agmatine',
+  };
+  return map[id?.toLowerCase()] || map[id] || (id?.toLowerCase() || id);
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 //  Действия с готовым планом: сохранить в избранное, копировать, отчёт врача

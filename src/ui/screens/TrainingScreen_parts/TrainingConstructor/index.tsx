@@ -16,6 +16,7 @@ import { ConstructorProfile } from './ConstructorProfile';
 import { ConfigPanel } from './ConfigPanel';
 import { PlanDisplay } from './PlanDisplay';
 import { ToolsPanel } from './ToolsPanel';
+import { PlannerToolsPanel } from '../PlannerToolsPanel';
 import { MacrocyclePanel } from './MacrocyclePanel';
 import { subscribePlannerApply, getPlannerApply, clearPlannerApply, type PlannerApply } from '../planner-bridge';
 
@@ -411,6 +412,7 @@ export const TrainingConstructor: React.FC<Props> = ({
       )}
 
       {constTab === 'tools' && (
+        <>
         <ToolsPanel
           result={manualResult}
           setResult={setManualResult}
@@ -422,6 +424,8 @@ export const TrainingConstructor: React.FC<Props> = ({
           labAnalysis={labAnalysis}
           onToRuntime={manualToRuntime}
         />
+        <PlannerToolsPanel mode="manual" />
+        </>
       )}
     </div>
   );

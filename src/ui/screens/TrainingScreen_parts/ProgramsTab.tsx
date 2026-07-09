@@ -295,7 +295,7 @@ export const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelected
                               {day.exercises.length} упр
                             </span>
                             {day.day && (
-                              <span style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>
+                              <span style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 1 }}>
                                 День {day.day}
                               </span>
                             )}

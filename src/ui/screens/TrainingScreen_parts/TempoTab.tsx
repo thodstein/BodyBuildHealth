@@ -249,7 +249,7 @@ export const TempoTab: React.FC = () => {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}
                     >
-                      <span style={{ fontSize: 6, fontWeight: 800, color: '#000' }}>{p.val}с</span>
+                      <span style={{ fontSize: 9, fontWeight: 800, color: '#000' }}>{p.val}с</span>
                     </div>
                   ))}
                 </div>

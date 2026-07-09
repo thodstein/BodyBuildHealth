@@ -85,7 +85,8 @@ export const ProfileContactsSection: React.FC<Props> = ({ settings, profileName,
   const doShareReport = () => {
     const tg = (window as any).Telegram?.WebApp;
     const bmiVal = settings.weight && settings.height ? (settings.weight / Math.pow(settings.height / 100, 2)).toFixed(1) : '—';
-    const lbm = settings.weight && settings.bodyFat ? settings.weight * (1 - settings.bodyFat / 100) : 0;
+    const pw = (settings as any).personal;
+    const lbm = pw?.weight && pw?.bodyFat ? pw.weight * (1 - pw.bodyFat / 100) : 0;
     const ffmiVal = lbm && settings.height ? (lbm / Math.pow(settings.height / 100, 2) + 6.1 * (1.8 - settings.height / 100)).toFixed(1) : '—';
     const riskRaw = (() => { try { return JSON.parse(localStorage.getItem('he_last_risk') || 'null'); } catch { return null; } })();
     const riskPct = riskRaw?.overallNet || '—';

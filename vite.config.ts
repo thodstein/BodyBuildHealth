@@ -3,11 +3,12 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      disable: command === 'serve',
       workbox: {
         runtimeCaching: [
           {
@@ -74,4 +75,4 @@ export default defineConfig({
       },
     },
   }
-});
+}));

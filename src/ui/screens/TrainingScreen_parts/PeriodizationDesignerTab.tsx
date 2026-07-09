@@ -204,7 +204,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
 
           {/* Timeline canvas */}
           <div style={{ ...CARD, padding: 0, overflowX: 'auto' }}>
-            <div style={{ minWidth: 500, padding: 12 }}>
+            <div style={{ minWidth: 380, padding: 12 }}>
               {/* Quarter nav */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <button onClick={() => setViewQuarter(Math.max(0, viewQuarter - 1))} disabled={viewQuarter === 0} style={{ ...btn, opacity: viewQuarter === 0 ? 0.3 : 1 }}>◀</button>
@@ -266,8 +266,8 @@ export const PeriodizationDesignerTab: React.FC = () => {
                         padding: '0 6px', cursor: 'pointer', zIndex: 2,
                         transition: 'border 0.15s',
                       }}>
-                      <span style={{ fontSize: 8, fontWeight: 600, color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                        {PHASE_ICONS[block.phaseKey]} {PHASE_LABELS_RU[block.phaseKey].slice(0, 14)}
+                      <span style={{ fontSize: 9, fontWeight: 600, color, flex: 1, wordBreak: 'break-word' }}>
+                        {PHASE_ICONS[block.phaseKey]} {PHASE_LABELS_RU[block.phaseKey]}
                       </span>
                       <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                         {/* Resize handle (drag right edge) */}

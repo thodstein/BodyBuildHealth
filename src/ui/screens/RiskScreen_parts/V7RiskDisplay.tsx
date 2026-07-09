@@ -138,15 +138,15 @@ export const V7RiskDisplay: React.FC<{
 
   const sensitivityResults = useMemo(() => {
     if (!linked.profile) return [];
-    const settings = linked.profile.settings;
+    const s = linked.profile.settings as any;
     const baseParams: Record<string, number> = {
-      proteinPerKg: settings.proteinPerKg ?? 1.8, fiberG: settings.fiberG ?? 25,
-      omega3G: settings.omega3G ?? 1.5, sodiumG: settings.sodiumG ?? 3.5,
-      potassiumG: settings.potassiumG ?? 3.0, sleepHours: settings.sleepHours ?? settings.baselineSleepHours ?? 7,
-      stressLevel: settings.stressLevel ?? settings.baselineStressLevel ?? 5, activityLevel: settings.activityLevel ?? 5,
-      workoutsPerWeek: settings.workoutsPerWeek ?? 3, avgWorkoutMinutes: settings.avgWorkoutMinutes ?? 60,
-      lissMinutes: settings.lissMinutesPerWeek ?? 90, hasHIIT: settings.hasHIIT ? 1 : 0,
-      volumeTonnes: settings.volumeTonnes ?? 8000, stazhWeeks: (settings.totalCycles ?? 0) * 12,
+      proteinPerKg: s.nutrition?.proteinPerKg ?? 1.8, fiberG: s.nutrition?.fiberG ?? 25,
+      omega3G: s.nutrition?.omega3G ?? 1.5, sodiumG: s.nutrition?.sodiumG ?? 3.5,
+      potassiumG: s.nutrition?.potassiumG ?? 3.0, sleepHours: s.lifestyle?.sleepHours ?? 7,
+      stressLevel: s.lifestyle?.stressLevel ?? 5, activityLevel: s.lifestyle?.activityLevel ?? 5,
+      workoutsPerWeek: s.training?.daysPerWeek ?? 3, avgWorkoutMinutes: s.training?.minutesPerSession ?? 60,
+      lissMinutes: s.system?.lissMinutesPerWeek ?? 90, hasHIIT: s.system?.hasHIIT ? 1 : 0,
+      volumeTonnes: s.system?.volumeTonnes ?? 8000, stazhWeeks: (s.pharma?.totalCycles ?? 0) * 12,
     };
     // Use a lightweight compute function based on the existing matrix result
     // instead of re-running full V7 simulation for each perturbation

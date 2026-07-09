@@ -60,6 +60,16 @@ export const RiskScreen: React.FC = () => {
   const [mainTab, setMainTab] = useState<'hero' | 'calculations' | 'clinical' | 'info' | 'tz_spec'>('hero');
   const [subTab, setSubTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'info' | 'reports' | 'mdss' | 'compliance' | 'clinical' | 'labs_risks'>('overview');
 
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('he_nav_risks') === '1') {
+        localStorage.removeItem('he_nav_risks');
+        setMainTab('calculations');
+        setSubTab('overview');
+      }
+    } catch {}
+  }, []);
+
   // Force subTab when mainTab changes
   useEffect(() => {
     if (mainTab === 'info') setSubTab('info');

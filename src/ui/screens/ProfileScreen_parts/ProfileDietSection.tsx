@@ -1,10 +1,10 @@
 import React from 'react';
-import type { UserProfile } from '../../../core/types';
-import { theme, glassCardStyle, sectionLabelStyle, ExpandableCard, HealthBool, HealthNumber } from './ProfileComponents';
+import type { UserProfile, UnifiedSettings } from '../../../core/types';
+import { theme, HealthBool, PopupCard, SliderPc } from './ProfileComponents';
 
 interface Props {
   settings: UserProfile['settings'];
-  save: (partial: Partial<UserProfile['settings']>) => void;
+  save: (partial: any) => void;
 }
 
 const DIET_TYPES: { id: string; label: string; icon: string }[] = [
@@ -28,13 +28,14 @@ const COOKING_SKILLS: { id: string; label: string }[] = [
 ];
 
 export const ProfileDietSection: React.FC<Props> = ({ settings, save }) => {
+  const s = settings as any as UnifiedSettings; const nu = s.nutrition || {} as any;
+  const total = (nu.foodAllergies ?? []).length + (nu.foodIntolerances ?? []).length;
   return (
-    <div>
-      <ExpandableCard icon="🥗" title="Тип питания" color="#34d399" open={false}
-        summary={DIET_TYPES.find(d => d.id === settings.dietType)?.label || 'Не выбран'}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+      <PopupCard icon="🥗" label="Тип питания" value={DIET_TYPES.find(d => d.id === nu.dietType)?.label || 'Не выбран'}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(100px,1fr))', gap: 4 }}>
           {DIET_TYPES.map(dt => {
-            const active = settings.dietType === dt.id;
+            const active = nu.dietType === dt.id;
             return (
               <button key={dt.id} onClick={() => save({ dietType: dt.id as any })}
                 style={{
@@ -49,81 +50,43 @@ export const ProfileDietSection: React.FC<Props> = ({ settings, save }) => {
             );
           })}
         </div>
-      </ExpandableCard>
-
-      <ExpandableCard icon="⚠️" title="Пищевые аллергии" color="#ef4444" open={false}
-        summary={(() => { const a = settings.foodAllergies ?? []; return a.length ? a.map((id: string) => ALLERGEN_OPTIONS.find(o => o.id === id)?.label || id).join(', ') : 'Нет'; })()}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+      </PopupCard>
+      <PopupCard icon="⚠️" label="Пищевые аллергии" value={(()=>{const a=nu.foodAllergies??[]; return a.length ? a.map((id:string)=>ALLERGEN_OPTIONS.find(o=>o.id===id)?.label||id).join(', ') : 'Нет';})()}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {ALLERGEN_OPTIONS.map(a => {
-            const active = (settings.foodAllergies ?? []).includes(a.id);
+            const active = (nu.foodAllergies ?? []).includes(a.id);
             return <HealthBool key={a.id} label={a.label} active={active}
-              onClick={() => { const cur = settings.foodAllergies ?? []; save({ foodAllergies: active ? cur.filter((x: string) => x !== a.id) : [...cur, a.id] }); }} />;
+              onClick={() => { const cur = nu.foodAllergies ?? []; save({ foodAllergies: active ? cur.filter((x: string) => x !== a.id) : [...cur, a.id] }); }} />;
           })}
         </div>
-      </ExpandableCard>
-
-      <ExpandableCard icon="🤢" title="Непереносимости" color="#f97316" open={false}
-        summary={(() => { const a = settings.foodIntolerances ?? []; return a.length ? a.map((id: string) => INTOLERANCE_OPTIONS.find(o => o.id === id)?.label || id).join(', ') : 'Нет'; })()}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+      </PopupCard>
+      <PopupCard icon="🤢" label="Непереносимости" value={(()=>{const a=nu.foodIntolerances??[]; return a.length ? a.map((id:string)=>INTOLERANCE_OPTIONS.find(o=>o.id===id)?.label||id).join(', ') : 'Нет';})()}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {INTOLERANCE_OPTIONS.map(it => {
-            const active = (settings.foodIntolerances ?? []).includes(it.id);
+            const active = (nu.foodIntolerances ?? []).includes(it.id);
             return <HealthBool key={it.id} label={it.label} active={active}
-              onClick={() => { const cur = settings.foodIntolerances ?? []; save({ foodIntolerances: active ? cur.filter((x: string) => x !== it.id) : [...cur, it.id] }); }} />;
+              onClick={() => { const cur = nu.foodIntolerances ?? []; save({ foodIntolerances: active ? cur.filter((x: string) => x !== it.id) : [...cur, it.id] }); }} />;
           })}
         </div>
-      </ExpandableCard>
-
-      <ExpandableCard icon="👨‍🍳" title="Навыки готовки" color="#fbbf24" open={false}
-        summary={COOKING_SKILLS.find(cs => cs.id === (settings.cookingSkill || ''))?.label || 'Не указан'}>
+      </PopupCard>
+      <PopupCard icon="👨‍🍳" label="Навыки готовки" value={COOKING_SKILLS.find(cs => cs.id === (nu.cookingSkill || ''))?.label || 'Не указан'}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
           {COOKING_SKILLS.map(cs => (
-            <HealthBool key={cs.id} label={cs.label} active={settings.cookingSkill === cs.id}
+            <HealthBool key={cs.id} label={cs.label} active={nu.cookingSkill === cs.id}
               onClick={() => save({ cookingSkill: cs.id as any })} />
           ))}
         </div>
-      </ExpandableCard>
-
-      <ExpandableCard icon="🍽️" title="Приёмов пищи в день" color="#60a5fa" open={false}
-        summary={`${settings.mealsPerDay ?? 4} раз/день`}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <input type="range" min={2} max={7} value={settings.mealsPerDay ?? 4}
-            onChange={e => save({ mealsPerDay: parseFloat(e.target.value) || 0 })}
-            style={{ flex: 1, accentColor: theme.accent }} />
-          <span style={{ fontSize: 18, fontWeight: 700, minWidth: 24, textAlign: 'center', color: theme.accent }}>
-            {settings.mealsPerDay ?? 4}
-          </span>
-        </div>
-      </ExpandableCard>
-
-      {/* Active restrictions summary */}
-      <ActiveRestrictions settings={settings} />
-    </div>
-  );
-};
-
-const ActiveRestrictions: React.FC<{ settings: UserProfile['settings'] }> = ({ settings }) => {
-  const total = (settings.foodAllergies ?? []).length + (settings.foodIntolerances ?? []).length;
-  if (total === 0 && !settings.dietType) return null;
-  return (
-    <div style={{ ...glassCardStyle, borderColor: 'rgba(0,230,138,0.2)' }}>
-      <div style={{ fontSize: 11, color: theme.accent, fontWeight: 600, marginBottom: 6 }}>Активные ограничения</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-        {settings.dietType && (
-          <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 12, background: 'rgba(0,230,138,0.1)', color: theme.accent }}>
-            {DIET_TYPES.find(d => d.id === settings.dietType)?.label}
-          </span>
-        )}
-        {(settings.foodAllergies ?? []).map(a => (
-          <span key={a} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 12, background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
-            {ALLERGEN_OPTIONS.find(o => o.id === a)?.label || a}
-          </span>
-        ))}
-        {(settings.foodIntolerances ?? []).map(it => (
-          <span key={it} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 12, background: 'rgba(249,115,22,0.1)', color: '#f97316' }}>
-            {INTOLERANCE_OPTIONS.find(o => o.id === it)?.label || it}
-          </span>
-        ))}
-      </div>
+      </PopupCard>
+      <SliderPc icon="🍽️" label="Приёмов пищи в день" value={nu.mealsPerDay ?? 4} min={2} max={7} step={1} onChange={v => save({ mealsPerDay: v })} color="#60a5fa" />
+      {total > 0 || nu.dietType ? (
+        <PopupCard icon="📋" label="Активные ограничения" value={`${total} ограничений · ${nu.dietType ? 'диета' : ''}`}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {nu.dietType && <span style={{ fontSize:10, padding:'3px 8px', borderRadius:12, background:'rgba(0,230,138,0.1)', color:theme.accent }}>{DIET_TYPES.find(d=>d.id===nu.dietType)?.label}</span>}
+            {(nu.foodAllergies ?? []).map(a => <span key={a} style={{ fontSize:10, padding:'3px 8px', borderRadius:12, background:'rgba(239,68,68,0.1)', color:'#ef4444' }}>{ALLERGEN_OPTIONS.find(o=>o.id===a)?.label || a}</span>)}
+            {(nu.foodIntolerances ?? []).map(it => <span key={it} style={{ fontSize:10, padding:'3px 8px', borderRadius:12, background:'rgba(249,115,22,0.1)', color:'#f97316' }}>{INTOLERANCE_OPTIONS.find(o=>o.id===it)?.label || it}</span>)}
+          </div>
+        </PopupCard>
+      ) : null}
     </div>
   );
 };

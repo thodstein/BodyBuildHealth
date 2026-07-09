@@ -84,14 +84,15 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
   useEffect(() => {
     const s = linked.profile?.settings;
     if (!s) return;
-    const w = s.weight || 70;
-    const h = s.height || 175;
-    const a = s.age || 25;
-    const sex = s.sex || 'male';
-    const goal = s.goal || s.primaryGoal || 'maintenance';
+    const ss: any = s;
+    const w = ss.personal?.weight || 70;
+    const h = ss.personal?.height || 175;
+    const a = ss.personal?.age || 25;
+    const sex = ss.personal?.sex || 'male';
+    const goal = ss.training?.primaryGoal || 'maintenance';
     setBmiWeight(w); setBmiHeight(h);
     setBmrWeight(w); setBmrHeight(h); setBmrAge(a); setBmrSex(sex);
-    setBmrKmWeight(w); if (s.bodyFat) setBmrKmBodyFat(s.bodyFat);
+    setBmrKmWeight(w); if (ss.personal?.bodyFat) setBmrKmBodyFat(ss.personal.bodyFat);
     setMacroWeight(w); setMacroHeight(h); setMacroAge(a); setMacroSex(sex); setMacroGoal(goal);
     setGripSex(sex); setGripAge(a);
   }, []);

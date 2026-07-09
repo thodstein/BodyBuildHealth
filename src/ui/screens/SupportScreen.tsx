@@ -58,12 +58,11 @@ import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'plan' | 'reports';
-type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'research' | 'favorites' | 'protocols' | 'biostack' | 'diary' | 'bioavailability' | 'symptoms';
+type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'research' | 'favorites' | 'protocols' | 'biostack' | 'diary' | 'bioavailability';
 
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { PopupBool, PopupNumber, PopupSelect } from '../components/PopupXxx';
 import { BioStackAIScreen } from '../components/BioStackAIScreen';
-import { DrugCheckTab } from '../components/BioStackAIDrugCheck';
 import { SupportPeptideCalc } from './SupportScreen_parts/SupportPeptideCalc';
 import { SupportResearch } from './SupportScreen_parts/SupportResearch';
 import { SupportGeneratorInfo } from './SupportScreen_parts/SupportGeneratorInfo';
@@ -73,11 +72,11 @@ import { SupportInteractionsView } from './SupportScreen_parts/SupportInteractio
 import { SupportFavoritesView } from './SupportScreen_parts/SupportFavoritesView';
 import { SupportDiaryView } from './SupportScreen_parts/SupportDiaryView';
 import { SupportStacksView } from './SupportScreen_parts/SupportStacksView';
+import { SupportManualPicker } from './SupportScreen_parts/SupportManualPicker';
 
 
 import { SupportProtocols } from './SupportScreen_parts/SupportProtocols';
 import { SupportBioavailability } from './SupportScreen_parts/SupportBioavailability';
-import { SymptomSolverTab } from './SupportScreen_parts/SymptomSolverTab';
 import { AutoCalculator } from './Calculator';
 export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTab }) => {
   const linked = useDataLink();
@@ -87,7 +86,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [infoView, setInfoView] = useState<InfoView>('main');
   const [section, setSection] = useState<'home'|'generator'|'protocols'|'info'>('home');
   const [genTab, setGenTab] = useState<'calculator'|'info'>('calculator');
-  const [protocolTab, setProtocolTab] = useState<'pct'|'fertility'|'hrt'|'neuro'|'joints'|'acne'|'injections'>('pct');
+  const [protocolTab, setProtocolTab] = useState<string>('');
+  const [protocolView, setProtocolView] = useState<'menu'|'detail'>('menu');
   const [infoTab, setInfoTab] = useState<string>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
   const [catalogOrgans, setCatalogOrgans] = useState<string[]>([]);
@@ -114,7 +114,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [supportPhase, setSupportPhase] = useState<SupportPhase>('course');
   const [subSearch, setSubSearch] = useState('');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'warning' | 'error' } | null>(null);
-  const showToast = (msg: string, type: 'success' | 'warning' | 'error' = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
+  const showToast = (msg: string, type: string = 'success') => { setToast({ msg, type: type as 'success' | 'warning' | 'error' }); setTimeout(() => setToast(null), 3000); };
   const [selectedAnalogs, setSelectedAnalogs] = useState<Record<string, string>>({});
   const [enhancedSubs, setEnhancedSubs] = useState<string[]>([]);
   const [supportGoal, setSupportGoal] = useState('muscle_gain');
@@ -221,7 +221,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [interactionTypeFilter, setInteractionTypeFilter] = useState<string>('all');
   const [interactionSeverityFilter, setInteractionSeverityFilter] = useState<string>('all');
   const [infoSynergySeverity, setInfoSynergySeverity] = useState<string>('all');
-  const [synergySubTab, setSynergySubTab] = useState<'all' | 'synergies' | 'conflicts' | 'cautions' | 'calculator'>('all');
+  const [synergySubTab, setSynergySubTab] = useState<'all' | 'synergies' | 'conflicts' | 'cautions' | 'calculator' | 'pair'>('all');
   const [activeSystems, setActiveSystems] = useState<Record<string, boolean>>({
     cardio: true, hepatic: true, renal: true, neuro: true, endocrine: true, hematologic: true, reproductive: true, musculoskeletal: true,
   });
@@ -265,6 +265,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [synergyOrganFilter, setSynergyOrganFilter] = useState<string>('');
   const SYNERGY_PAGE_SIZE = 30;
   const [interactionPage, setInteractionPage] = useState<number>(1);
+  const [showManualPicker, setShowManualPicker] = useState(false);
   const [showModal, setShowModal] = useState<string | null>(null);
   const [modalAddMode, setModalAddMode] = useState(false);
   const [modalLevel, setModalLevel] = useState<string | null>(null);
@@ -396,8 +397,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (goalMap[goal]) setSupportGoal(goalMap[goal]);
     // Проверка флага навигации из ProfileScreen → БАД-дневник
     try {
-      if (localStorage.getItem('he_nav_to_diary') === '1') {
-        localStorage.removeItem('he_nav_to_diary');
+      if (localStorage.getItem('he_nav_support_diary') === '1') {
+        localStorage.removeItem('he_nav_support_diary');
         setTab('main');
         setSupportView('calc');
         setCalcView('info');
@@ -749,7 +750,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [favRefresh, setFavRefresh] = useState(0);
   const [favTab, setFavTab] = useState<string>('favorites');
   const [combinedFavDiaryTab, setCombinedFavDiaryTab] = useState<'favorites'|'diary'>('favorites');
-  const [combinedBioTab, setCombinedBioTab] = useState<'bioavailability'|'drugs'>('bioavailability');
   const [showSavedPicker, setShowSavedPicker] = useState(false);
   const [researchSource, setResearchSource] = useState<'pubmed' | 'pubchem' | 'scholar' | 'fda' | 'pharma'>('pubmed');
   const [pubchemResults, setPubchemResults] = useState<any[]>([]);
@@ -3057,6 +3057,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
               border: '1px solid ' + (genTab === id ? 'var(--accent)' : 'var(--border)'),
             }}>{label}</button>
           ))}
+
           </div>
         </div>
       )}
@@ -3077,7 +3078,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['research','Исследования'],['favorites','⭐ Избранное · Дневник'],['bioavailability','🧬 Биодоступность'],['symptoms','🩺 Симптомы']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['research','Исследования'],['favorites','⭐ Избранное · Дневник'],['bioavailability','🧬 Биодоступность']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 if (id === 'peptides') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); }
                 else { setTab('main'); setSupportView('calc'); setCalcView('info'); setSection('home'); setInfoView(id as InfoView); }
@@ -3124,7 +3125,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
           {combinedFavDiaryTab === 'favorites' && <SupportFavoritesView s={s} />}
           {combinedFavDiaryTab === 'diary' && (
             <div style={{ padding: '0 4px' }}>
-              <SupportDiaryView s={s} onOpenSolver={() => setInfoView('symptoms' as any)} />
+              <SupportDiaryView s={s} onOpenSolver={() => { setSection('protocols'); setProtocolTab('symptoms'); setProtocolView('detail'); }} />
             </div>
           )}
         </div>
@@ -3138,41 +3139,8 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
               </div>
             )}
             {renderView(infoView, 'bioavailability', () =>
-              <div>
-                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
-                  {[['bioavailability','🧬 Калькулятор'],['drugs','💊 Лекарства']].map(([id,label]:any) => (
-                    <button key={id} onClick={() => setCombinedBioTab(id as any)} style={{
-                      padding:'6px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                      background: combinedBioTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
-                      color: combinedBioTab === id ? '#000' : 'var(--text-dim)',
-                      border: '1px solid ' + (combinedBioTab === id ? 'var(--accent)' : 'var(--border)'),
-                    }}>{label}</button>
-                  ))}
-                </div>
-                {combinedBioTab === 'bioavailability' && (
-                  <div style={{ padding: '0 4px' }}>
-                    <SupportBioavailability s={s} />
-                  </div>
-                )}
-                {combinedBioTab === 'drugs' && (
-                  <div style={{ padding: '0 4px' }}>
-                    {(() => {
-                      try {
-                        const bpRaw = localStorage.getItem('he_biostack_profile');
-                        const profile = bpRaw ? JSON.parse(bpRaw) : { currentMeds: [], drugAllergies: [], goals: [], healthConditions: [], experience: 'intermediate' as const, budget: 3000, aasStatus: 'off' as const, targetSystems: [], targetOrgans: [], stackComplexity: 'moderate' as const };
-                        const idsRaw = localStorage.getItem('he_my_stacks');
-                        const ids = idsRaw ? JSON.parse(idsRaw) : [];
-                        const stackIds = Array.isArray(ids) ? ids : (ids?.substances || []);
-                        return <DrugCheckTab profile={profile} stackIds={stackIds} />;
-                      } catch { return <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: 12 }}>Ошибка загрузки данных. Проверьте профиль BioStack.</div>; }
-                    })()}
-                  </div>
-                )}
-              </div>
-            )}
-            {renderView(infoView, 'symptoms', () =>
               <div style={{ padding: '0 4px' }}>
-                <SymptomSolverTab s={s} />
+                <SupportBioavailability s={s} />
               </div>
             )}
 
@@ -3384,12 +3352,32 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             setAutoCalcResult(r);
             setCalcDone(true);
           }}
+          onOpenManualPicker={() => setShowManualPicker(true)}
         />
       )}
 
       {/* ===== PEPTIDE CALCULATOR ===== */}
       {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'peptides' && (
         <SupportPeptideCalc s={s} />
+      )}
+
+      {/* ===== MANUAL PICKER MODAL ===== */}
+      {showManualPicker && (
+        <SupportManualPicker
+          onClose={() => setShowManualPicker(false)}
+          enhancedSubs={enhancedSubs}
+          setEnhancedSubs={setEnhancedSubs}
+          catalogSubstances={catalogSubstances}
+          allSupport={allSupport}
+          ALL_STACKS={ALL_STACKS}
+          catalogSupport={catalogSupport}
+          SUPPORT_LEVELS={SUPPORT_LEVELS}
+          supportLevel={supportLevel}
+          MECH_TRANSLATIONS_RU={MECH_TRANSLATIONS_RU}
+          MECH_LABELS={MECH_LABELS}
+          setFavRefresh={setFavRefresh}
+          showToast={showToast}
+        />
       )}
 
       {/* ===== MODAL OVERLAY ===== */}

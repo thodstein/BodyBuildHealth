@@ -238,6 +238,130 @@ export const PillGroup: React.FC<PillGroupProps> = ({ options, value, onChange, 
   </div>
 );
 
+/* ── PopupCard — clickable card → modal popup ── */
+interface PopupCardProps {
+  label: string;
+  value: string | number;
+  icon?: string;
+  color?: string;
+  children: React.ReactNode;
+  wide?: boolean;
+}
+export const PopupCard: React.FC<PopupCardProps> = ({ label, value, icon, color = theme.accent, children, wide }) => {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <>
+      <button onClick={() => setOpen(true)}
+        style={{
+          display:'flex', alignItems:'center', gap:8, width:'100%', padding:'10px 12px', borderRadius:10, cursor:'pointer', textAlign:'left',
+          background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', transition:'all 0.15s',
+        }}>
+        {icon && <span style={{ fontSize:16, flexShrink:0 }}>{icon}</span>}
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', marginBottom:1 }}>{label}</div>
+          <div style={{ fontSize:13, fontWeight:600, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{value}</div>
+        </div>
+        <span style={{ fontSize:14, color:'rgba(255,255,255,0.2)' }}>{'>'}</span>
+      </button>
+      {open && (
+        <div onClick={() => setOpen(false)}
+          style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.7)', backdropFilter:'blur(4px)', WebkitBackdropFilter:'blur(4px)', padding:16 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ width: wide ? '100%' : 300, maxHeight:'80vh', overflowY:'auto', background:'#18181b', borderRadius:16, border:'1px solid rgba(255,255,255,0.1)', padding:20, boxShadow:'0 20px 60px rgba(0,0,0,0.5)' }}>
+            <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
+              {icon && <span>{icon}</span>}
+              <span>{label}</span>
+            </div>
+            {children}
+            <button onClick={() => setOpen(false)}
+              style={{ width:'100%', padding:'10px 0', marginTop:14, borderRadius:10, border:'none', background:'rgba(255,255,255,0.06)', cursor:'pointer', fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.6)' }}>
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+/* ── NumberPc — PopupCard for a single number input ── */
+interface NumberPcProps {
+  label: string;
+  value: string | number;
+  icon?: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  suffix?: string;
+  color?: string;
+}
+export const NumberPc: React.FC<NumberPcProps> = ({ label, value, icon, onChange, placeholder, min, max, step, suffix, color }) => {
+  const display = value !== undefined && value !== '' ? `${value}${suffix ? ' ' + suffix : ''}` : '—';
+  return (
+    <PopupCard label={label} value={display} icon={icon || '#'} color={color}>
+      <input type="number" min={min} max={max} step={step || 1}
+        value={value} onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoFocus
+        style={{ width:'100%', padding:'12px 14px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:20, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
+    </PopupCard>
+  );
+};
+
+/* ── SliderPc — PopupCard with slider ── */
+interface SliderPcProps {
+  label: string;
+  value: number;
+  icon?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  onChange: (v: number) => void;
+  color?: string;
+}
+export const SliderPc: React.FC<SliderPcProps> = ({ label, value, icon, min=1, max=10, step=1, onChange, color }) => {
+  return (
+    <PopupCard label={label} value={`${value}/${max}`} icon={icon} color={color}>
+      <div style={{ textAlign:'center', marginBottom:12 }}>
+        <span style={{ fontSize:36, fontWeight:800, color: color || (value <= 3 ? '#00e68a' : value <= 6 ? '#f59e0b' : '#ef4444') }}>{value}</span>
+        <span style={{ fontSize:16, color:'rgba(255,255,255,0.3)', marginLeft:4 }}>/ {max}</span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(parseFloat(e.target.value) || 0)}
+        style={{ width:'100%', accentColor: theme.accent }} />
+    </PopupCard>
+  );
+};
+
+/* ── TextPc — PopupCard for text input ── */
+interface TextPcProps {
+  label: string;
+  value: string;
+  icon?: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  multiline?: boolean;
+  color?: string;
+}
+export const TextPc: React.FC<TextPcProps> = ({ label, value, icon, onChange, placeholder, multiline, color }) => {
+  const display = value || '—';
+  return (
+    <PopupCard label={label} value={display} icon={icon} color={color} wide>
+      {multiline ? (
+        <textarea value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+          autoFocus
+          style={{ width:'100%', padding:'12px 14px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:14, minHeight:100, outline:'none', resize:'vertical', boxSizing:'border-box' }} />
+      ) : (
+        <input type="text" value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+          autoFocus
+          style={{ width:'100%', padding:'12px 14px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:18, fontWeight:600, boxSizing:'border-box', outline:'none' }} />
+      )}
+    </PopupCard>
+  );
+};
+
 /* ── ExpandableCard ── */
 interface ExpandableCardProps {
   icon: string;

@@ -12,7 +12,6 @@ import { CsvImportTab } from './CsvImportTab';
 import MMCTrackingCard from './MMCTrackingCard';
 import { CheckinMetricsCard } from './CheckinMetricsCard';
 import { StrengthAnalyticsCard } from './StrengthAnalyticsCard';
-import { GoalsHabitsCard } from './GoalsHabitsCard';
 import { InsightsCard } from './InsightsCard';
 import type { TrainingTab } from './shared';
 
@@ -84,11 +83,6 @@ export const DiaryAnalyticsZone: React.FC<Props> = (p) => {
       {p.tab === 'strength' && (
         <InfoErrorBoundary label="Аналитика силы">
           <StrengthAnalyticsCard />
-        </InfoErrorBoundary>
-      )}
-      {p.tab === 'goals' && (
-        <InfoErrorBoundary label="Цели и привычки">
-          <GoalsHabitsCard />
         </InfoErrorBoundary>
       )}
       {p.tab === 'import_data' && (

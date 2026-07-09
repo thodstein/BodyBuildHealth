@@ -364,7 +364,7 @@ export const TechniqueDetail: React.FC<{
           return (
             <div key={i} style={{ flex: 1, textAlign: 'center', background: `${colors[i]}14`, borderRadius: 6, padding: '4px 2px', border: `1px solid ${colors[i]}22` }}>
               <div style={{ fontSize: 16 * s, fontWeight: 800, color: colors[i] }}>{sec === 0 ? 'X' : sec}</div>
-              <div style={{ fontSize: 7 * s, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{labels[i]}</div>
+              <div style={{ fontSize: 9 * s, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{labels[i]}</div>
             </div>
           );
         })}

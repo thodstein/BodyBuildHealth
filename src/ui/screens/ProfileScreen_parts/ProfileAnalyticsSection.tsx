@@ -1,12 +1,13 @@
 import React from 'react';
-import type { UserProfile, LabPoint, WorkoutLog } from '../../../core/types';
+import type { UserProfile, LabPoint, WorkoutLog, UnifiedSettings } from '../../../core/types';
 import { theme, glassCardStyle, sectionLabelStyle, HealthNumber, HealthBool } from './ProfileComponents';
 import { ProfessionalReports, ReportData } from './ProfessionalReports';
 import { PharmaBlockReports } from './PharmaBlockReports';
+import { GoalsHabitsCard as ProfileGoalsHabitsCard } from './ProfileGoalsHabitsCard';
 
 interface Props {
   settings: UserProfile['settings'];
-  save: (partial: Partial<UserProfile['settings']>) => void;
+  save: (partial: any) => void;
   labs: LabPoint[];
   workoutLogs: WorkoutLog[];
   foodDiaryAvg?: { avgKcal: number; avgProtein: number; avgFat: number; avgCarbs: number } | null;
@@ -37,19 +38,27 @@ const COURSE_PHASES: { id: string; label: string }[] = [
 ];
 
 export const ProfileAnalyticsSection: React.FC<Props> = ({ settings, save, labs, workoutLogs, foodDiaryAvg, profileName, onNavigate }) => {
-  const [analyticsSubTab, setAnalyticsSubTab] = React.useState<'reports' | 'pharma_reports'>('reports');
+  const s = settings as any as UnifiedSettings;
+  const p = s.personal || {} as any;
+  const tr = s.training || {} as any;
+  const ph = s.pharma || {} as any;
+  const hl = s.health || {} as any;
+  const nu = s.nutrition || {} as any;
+  const sys = s.system || {} as any;
+
+  const [analyticsSubTab, setAnalyticsSubTab] = React.useState<'reports' | 'pharma_reports' | 'goals_habits'>('reports');
   const [reportTab, setReportTab] = React.useState<'current' | 'archive'>('current');
   const [showCustomReport, setShowCustomReport] = React.useState(false);
 
-  const bmiVal = settings.weight && settings.height ? (settings.weight / Math.pow(settings.height / 100, 2)).toFixed(1) : '—';
-  const lbmVal = settings.weight && settings.bodyFat ? (settings.weight * (1 - settings.bodyFat / 100)).toFixed(1) : '—';
-  const ffmiVal = lbmVal !== '—' && settings.height ? (parseFloat(lbmVal) / Math.pow(settings.height / 100, 2) + 6.1 * (1.8 - settings.height / 100)).toFixed(1) : '—';
+  const bmiVal = p.weight && p.height ? (p.weight / Math.pow(p.height / 100, 2)).toFixed(1) : '—';
+  const lbmVal = p.weight && p.bodyFat ? (p.weight * (1 - p.bodyFat / 100)).toFixed(1) : '—';
+  const ffmiVal = lbmVal !== '—' && p.height ? (parseFloat(lbmVal) / Math.pow(p.height / 100, 2) + 6.1 * (1.8 - p.height / 100)).toFixed(1) : '—';
 
   const riskData = (() => { try { return JSON.parse(localStorage.getItem('he_last_risk') || 'null'); } catch { return null; } })();
-  const suppsList = (settings.currentSupplements || []).map((x: any) => `${x.name || x.label}${x.doseMg ? ` ${x.doseMg}${x.doseUnit || 'mg'}` : ''}`).join(', ') || 'нет';
-  const medsList = (settings.currentMedications || []).map((x: any) => `${x.name}${x.doseMg ? ` ${x.doseMg}${x.doseUnit || 'mg'} ${x.frequency || ''}` : ''}`).join(', ') || 'нет';
-  const chronicList = (settings.chronicConditions || []).map(c => CHRONIC_CONDITIONS.find(cc => cc.id === c)?.label || c).join(', ') || 'нет';
-  const goalLabelR = GOALS.find(g => g.id === (settings.primaryGoal || settings.goal))?.label || 'не указана';
+  const suppsList = (nu.currentSupplements || []).map((x: any) => `${x.name || x.label}${x.doseMg ? ` ${x.doseMg}${x.doseUnit || 'mg'}` : ''}`).join(', ') || 'нет';
+  const medsList = (nu.currentMedications || []).map((x: any) => `${x.name}${x.doseMg ? ` ${x.doseMg}${x.doseUnit || 'mg'} ${x.frequency || ''}` : ''}`).join(', ') || 'нет';
+  const chronicList = (hl.chronicConditions || []).map(c => CHRONIC_CONDITIONS.find(cc => cc.id === c)?.label || c).join(', ') || 'нет';
+  const goalLabelR = GOALS.find(g => g.id === (tr.primaryGoal || ''))?.label || 'не указана';
   const labsList = labs.map(l => `${l.code}: ${l.value} ${l.unit}`).join('\n  ') || 'нет данных';
   const last3Workouts = workoutLogs.slice(0, 3);
   const workoutSummary = last3Workouts.length > 0
@@ -64,7 +73,7 @@ export const ProfileAnalyticsSection: React.FC<Props> = ({ settings, save, labs,
 
   const weightLog = React.useMemo(() => {
     try { return JSON.parse(localStorage.getItem('he_weight_log') || '[]'); } catch { return []; }
-  }, [settings.weight]);
+  }, [p.weight]);
 
   const RISK_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal'];
   const RISK_LABELS_MAP: Record<string, string> = {
@@ -72,23 +81,25 @@ export const ProfileAnalyticsSection: React.FC<Props> = ({ settings, save, labs,
     hematologic:'Кровь', reproductive:'Репрод.', musculoskeletal:'Опорно-дв.',
   };
 
+  const phaseLabel = COURSE_PHASES.find(p => p.id === ph.phase)?.label || 'База';
+
   const trainerReport = [
     `═`.repeat(40), `  Отчет для тренера`, `═`.repeat(40), '',
     `ОСНОВНАЯ ИНФОРМАЦИЯ`, `  Имя: ${profileName || '—'}`,
-    `  Возраст: ${settings.age || '—'} лет | Пол: ${settings.sex === 'male' ? 'муж' : 'жен'}`,
-    `  Вес: ${settings.weight || '—'} кг | Рост: ${settings.height || '—'} см`,
-    `  BMI: ${bmiVal} | FFMI: ${ffmiVal} | BF%: ${settings.bodyFat || '—'}%`, '',
+    `  Возраст: ${p.age || '—'} лет | Пол: ${p.sex === 'male' ? 'муж' : 'жен'}`,
+    `  Вес: ${p.weight || '—'} кг | Рост: ${p.height || '—'} см`,
+    `  BMI: ${bmiVal} | FFMI: ${ffmiVal} | BF%: ${p.bodyFat || '—'}%`, '',
     `ЦЕЛЬ И ОПЫТ`, `  Цель: ${goalLabelR}`,
-    `  Стаж тренировок: ${settings.trainingExperience || '—'} лет`,
-    `  Уровень: ${settings.trainingLevel || '—'}`, `  Спорт: ${SPORT_TYPES.find(s => s.id === settings.sportType)?.label || '—'}`, '',
-    `ТРЕНИРОВОЧНЫЕ ПАРАМЕТРЫ`, `  Частота: ${settings.workoutsPerWeek || '—'} тренировок/нед`,
-    `  Длительность: ${settings.avgWorkoutMinutes || '—'} мин/тренировка`,
-    `  Недельный объём: ~${(settings.workoutsPerWeek || 0) * (settings.avgWorkoutMinutes || 0)} мин/нед`,
+    `  Стаж тренировок: ${tr.experience || '—'} лет`,
+    `  Уровень: ${tr.level || '—'}`, `  Спорт: ${SPORT_TYPES.find(s => s.id === tr.sportType)?.label || '—'}`, '',
+    `ТРЕНИРОВОЧНЫЕ ПАРАМЕТРЫ`, `  Частота: ${tr.daysPerWeek || '—'} тренировок/нед`,
+    `  Длительность: ${tr.minutesPerSession || '—'} мин/тренировка`,
+    `  Недельный объём: ~${(tr.daysPerWeek || 0) * (tr.minutesPerSession || 0)} мин/нед`,
     `  Программа: ${programName}`,
     `  Последняя тренировка: ${workoutLogs.length > 0 ? workoutLogs[0].date : 'нет записей'}`, '',
     `ПОСЛЕДНИЕ ТРЕНИРОВКИ (${last3Workouts.length})`, workoutSummary, '',
-    `ФАЗА КУРСА`, `  ${COURSE_PHASES.find(p => p.id === settings.phase)?.label || 'База'}${settings.courseStartDate ? ` (с ${settings.courseStartDate})` : ''}`, '',
-    `ПРОГРЕСС ВЕСА`, `  Текущий: ${settings.weight || '—'} кг | Целевой: ${settings.targetWeight || '—'} кг`,
+    `ФАЗА КУРСА`, `  ${phaseLabel}${ph.courseStartDate ? ` (с ${ph.courseStartDate})` : ''}`, '',
+    `ПРОГРЕСС ВЕСА`, `  Текущий: ${p.weight || '—'} кг | Целевой: ${sys.targetWeight || '—'} кг`,
     `  Изменений в логе: ${weightLog.length}`, '',
     `  Дата: ${new Date().toLocaleDateString('ru')}`, `═`.repeat(40),
   ].join('\n');
@@ -96,10 +107,10 @@ export const ProfileAnalyticsSection: React.FC<Props> = ({ settings, save, labs,
   const doctorReport = [
     `═`.repeat(40), `  Отчет для врача`, `═`.repeat(40), '',
     `ПАЦИЕНТ`, `  Имя: ${profileName || '—'}`,
-    `  Возраст: ${settings.age || '—'} лет | Пол: ${settings.sex === 'male' ? 'мужской' : 'женский'}`,
-    `  Группа крови: ${settings.bloodType || '—'}`,
-    `  Вес: ${settings.weight || '—'} кг | Рост: ${settings.height || '—'} см | BMI: ${bmiVal}`,
-    `  Аллергии: ${settings.allergyNotes || 'нет'}`, '',
+    `  Возраст: ${p.age || '—'} лет | Пол: ${p.sex === 'male' ? 'мужской' : 'женский'}`,
+    `  Группа крови: ${p.bloodType || '—'}`,
+    `  Вес: ${p.weight || '—'} кг | Рост: ${p.height || '—'} см | BMI: ${bmiVal}`,
+    `  Аллергии: ${hl.drugAllergies || 'нет'}`, '',
     `ЛАБОРАТОРНЫЕ АНАЛИЗЫ`, `  ${labsList}`,
     `  Последние анализы: ${labs.length > 0 ? labs.sort((a: LabPoint, b: LabPoint) => b.date.localeCompare(a.date)).slice(0, 5).map(l => `${l.code} ${l.value}${l.unit} (${l.date})`).join(', ') : 'нет данных'}`,
     '', `РИСКИ ПО СИСТЕМАМ`,
@@ -115,23 +126,23 @@ export const ProfileAnalyticsSection: React.FC<Props> = ({ settings, save, labs,
     ...(riskData?.systemSupport ? RISK_SYSTEMS.filter(sys => riskData.systemSupport[sys] !== undefined).map(sys => `    ${(RISK_LABELS_MAP[sys] || sys).padEnd(20)} покрытие ${Math.round(riskData.systemSupport[sys])}%`) : []),
     `  Общее покрытие поддержки: ${riskData?.totalSupport ? Math.round(riskData.totalSupport) + '%' : '—'}`, '',
     `ХРОНИЧЕСКИЕ ЗАБОЛЕВАНИЯ`, `  ${chronicList}`, '',
-    `ЭКСТРЕННЫЙ КОНТАКТ`, `  ${settings.emergencyName || '—'} / ${settings.emergencyPhone || '—'}`, '',
+    `ЭКСТРЕННЫЙ КОНТАКТ`, `  ${p.emergencyName || '—'} / ${p.emergencyPhone || '—'}`, '',
     `  Дата: ${new Date().toLocaleDateString('ru')}`, `═`.repeat(40),
   ].join('\n');
 
   const generalReport = [
     `═`.repeat(40), `  Общий отчет BodyBuildHealth`, `═`.repeat(40), '',
-    `ПРОФИЛЬ`, `  ${profileName || '—'} | ${settings.age || '—'} лет | ${settings.sex === 'male' ? 'М' : 'Ж'}`,
-    `  Вес: ${settings.weight || '—'} кг | Рост: ${settings.height || '—'} см`,
-    `  BMI: ${bmiVal} | FFMI: ${ffmiVal} | BF%: ${settings.bodyFat || '—'}%`, '',
-    `ТРЕНИРОВКИ`, `  Спорт: ${SPORT_TYPES.find(s => s.id === settings.sportType)?.label || '—'}`,
-    `  Стаж: ${settings.trainingExperience || '—'} лет | Уровень: ${settings.trainingLevel || '—'}`,
-    `  Цель: ${goalLabelR}`, `  ${settings.workoutsPerWeek || '—'} трен/нед × ${settings.avgWorkoutMinutes || '—'} мин`,
+    `ПРОФИЛЬ`, `  ${profileName || '—'} | ${p.age || '—'} лет | ${p.sex === 'male' ? 'М' : 'Ж'}`,
+    `  Вес: ${p.weight || '—'} кг | Рост: ${p.height || '—'} см`,
+    `  BMI: ${bmiVal} | FFMI: ${ffmiVal} | BF%: ${p.bodyFat || '—'}%`, '',
+    `ТРЕНИРОВКИ`, `  Спорт: ${SPORT_TYPES.find(s => s.id === tr.sportType)?.label || '—'}`,
+    `  Стаж: ${tr.experience || '—'} лет | Уровень: ${tr.level || '—'}`,
+    `  Цель: ${goalLabelR}`, `  ${tr.daysPerWeek || '—'} трен/нед × ${tr.minutesPerSession || '—'} мин`,
     `  Программа: ${programName}`, '',
-    `ПИТАНИЕ`, `  Тип: ... | Приёмы: ${settings.mealsPerDay || '—'} в день`,
+    `ПИТАНИЕ`, `  Тип: ... | Приёмы: ${nu.mealsPerDay || '—'} в день`,
     ...(foodDiaryAvg ? [`  Среднее (7 дней): ${foodDiaryAvg.avgKcal} ккал | Б:${foodDiaryAvg.avgProtein}г Ж:${foodDiaryAvg.avgFat}г У:${foodDiaryAvg.avgCarbs}г`] : []),
     '', `ФАРМАКОЛОГИЯ И ПОДДЕРЖКА`,
-    `  Фаза: ${COURSE_PHASES.find(p => p.id === settings.phase)?.label || 'База'}`,
+    `  Фаза: ${phaseLabel}`,
     `  Препараты: ${medsList}`, `  БАДы: ${suppsList}`,
     ...(riskData?.systemSupport ? RISK_SYSTEMS.filter(sys => riskData.systemSupport[sys] !== undefined).map(sys => `    ${sys}: покрытие ${Math.round(riskData.systemSupport[sys])}%`) : []),
     `  Покрытие поддержки: ${riskData?.totalSupport ? Math.round(riskData.totalSupport) + '%' : '—'}`, '',
@@ -139,8 +150,8 @@ export const ProfileAnalyticsSection: React.FC<Props> = ({ settings, save, labs,
     `  Общий: ${riskData?.overallNet || '—'}%`,
     ...(riskData?.systemBreakdown ? RISK_SYSTEMS.filter(sys => riskData.systemBreakdown[sys]?.net > 0).map(sys => `  ${sys}: ${riskData.systemBreakdown[sys].net}%`) : []),
     '', `ЗАМЕРЫ (последние 3)`, measSummary, '',
-    `ЗДОРОВЬЕ`, `  Кровь: ${settings.bloodType || '—'} | Хроника: ${chronicList}`,
-    `  Экстренный: ${settings.emergencyName || '—'} / ${settings.emergencyPhone || '—'}`, '',
+    `ЗДОРОВЬЕ`, `  Кровь: ${p.bloodType || '—'} | Хроника: ${chronicList}`,
+    `  Экстренный: ${p.emergencyName || '—'} / ${p.emergencyPhone || '—'}`, '',
     `  Дата: ${new Date().toLocaleDateString('ru')}`, `═`.repeat(40),
   ].join('\n');
 
@@ -152,13 +163,13 @@ export const ProfileAnalyticsSection: React.FC<Props> = ({ settings, save, labs,
   };
 
   const reportData: ReportData = {
-    profile: { name: profileName || '', age: settings.age || '', sex: settings.sex || 'male', weight: settings.weight || '', height: settings.height || '', bodyFat: settings.bodyFat || '', bloodType: settings.bloodType || '', allergyNotes: settings.allergyNotes || '', emergencyName: settings.emergencyName || '', emergencyPhone: settings.emergencyPhone || '' },
-    training: { experience: String(settings.trainingExperience || ''), level: settings.trainingLevel || '', sport: SPORT_TYPES.find(s => s.id === settings.sportType)?.label || '', goal: goalLabelR, workoutsPerWeek: String(settings.workoutsPerWeek || ''), avgWorkoutMinutes: String(settings.avgWorkoutMinutes || ''), programName, currentSplit: workoutLogs.length > 0 ? (workoutLogs[0].split || 'не указан') : 'не указан', lastWorkoutDate: workoutLogs.length > 0 ? workoutLogs[0].date : 'нет записей', weekVolume: (() => { const last7 = new Date(Date.now() - 7*86400000).toISOString().split('T')[0]; const wkLogs = workoutLogs.filter(w => w.date >= last7); const wkVol = wkLogs.reduce((s, w) => s + (w.exercises??[]).reduce((ss, e) => ss + (e.totalVolume ?? 0), 0), 0); return wkVol > 0 ? `${wkVol.toFixed(0)} кг` : 'нет данных'; })(), lastWorkouts: workoutSummary },
-    body: { bmi: String(bmiVal), ffmi: String(ffmiVal), lbm: String(lbmVal), targetWeight: String(settings.targetWeight || '') },
-    course: { phase: COURSE_PHASES.find(p => p.id === settings.phase)?.label || 'База', medsList, suppsList, courseStartDate: settings.courseStartDate },
+    profile: { name: profileName || '', age: p.age || '', sex: p.sex || 'male', weight: p.weight || '', height: p.height || '', bodyFat: p.bodyFat || '', bloodType: p.bloodType || '', allergyNotes: hl.drugAllergies || '', emergencyName: p.emergencyName || '', emergencyPhone: p.emergencyPhone || '' },
+    training: { experience: String(tr.experience || ''), level: tr.level || '', sport: SPORT_TYPES.find(s => s.id === tr.sportType)?.label || '', goal: goalLabelR, workoutsPerWeek: String(tr.daysPerWeek || ''), avgWorkoutMinutes: String(tr.minutesPerSession || ''), programName, currentSplit: workoutLogs.length > 0 ? (workoutLogs[0].split || 'не указан') : 'не указан', lastWorkoutDate: workoutLogs.length > 0 ? workoutLogs[0].date : 'нет записей', weekVolume: (() => { const last7 = new Date(Date.now() - 7*86400000).toISOString().split('T')[0]; const wkLogs = workoutLogs.filter(w => w.date >= last7); const wkVol = wkLogs.reduce((s, w) => s + (w.exercises??[]).reduce((ss, e) => ss + (e.totalVolume ?? 0), 0), 0); return wkVol > 0 ? `${wkVol.toFixed(0)} кг` : 'нет данных'; })(), lastWorkouts: workoutSummary },
+    body: { bmi: String(bmiVal), ffmi: String(ffmiVal), lbm: String(lbmVal), targetWeight: String(sys.targetWeight || '') },
+    course: { phase: phaseLabel, medsList, suppsList, courseStartDate: ph.courseStartDate },
     risk: riskData,
     labs: { list: labsList, recentList: labs.length > 0 ? labs.sort((a: LabPoint, b: LabPoint) => b.date.localeCompare(a.date)).slice(0, 5).map(l => `${l.code} ${l.value}${l.unit} (${l.date})`).join(', ') : 'нет данных' },
-    nutrition: { dietType: '', mealsPerDay: String(settings.mealsPerDay || ''), avgKcal: foodDiaryAvg?.avgKcal ? String(foodDiaryAvg.avgKcal) : undefined, avgProtein: foodDiaryAvg?.avgProtein ? String(foodDiaryAvg.avgProtein) : undefined, avgFat: foodDiaryAvg?.avgFat ? String(foodDiaryAvg.avgFat) : undefined, avgCarbs: foodDiaryAvg?.avgCarbs ? String(foodDiaryAvg.avgCarbs) : undefined },
+    nutrition: { dietType: '', mealsPerDay: String(nu.mealsPerDay || ''), avgKcal: foodDiaryAvg?.avgKcal ? String(foodDiaryAvg.avgKcal) : undefined, avgProtein: foodDiaryAvg?.avgProtein ? String(foodDiaryAvg.avgProtein) : undefined, avgFat: foodDiaryAvg?.avgFat ? String(foodDiaryAvg.avgFat) : undefined, avgCarbs: foodDiaryAvg?.avgCarbs ? String(foodDiaryAvg.avgCarbs) : undefined },
     measurements: measSummary,
     chronic: chronicList,
     weightLogCount: weightLog.length,
@@ -175,6 +186,7 @@ export const ProfileAnalyticsSection: React.FC<Props> = ({ settings, save, labs,
         {([
           { id: 'reports' as const, label: '📊 Сводные отчёты' },
           { id: 'pharma_reports' as const, label: '💊 Фарма-отчёты' },
+          { id: 'goals_habits' as const, label: '🎯 Цели и привычки' },
         ]).map(t => (
           <button key={t.id} onClick={() => setAnalyticsSubTab(t.id)} style={{
             padding:'5px 12px', borderRadius:18, fontSize:10, fontWeight:600, whiteSpace:'nowrap',
@@ -205,6 +217,7 @@ export const ProfileAnalyticsSection: React.FC<Props> = ({ settings, save, labs,
         />
       )}
       {analyticsSubTab === 'pharma_reports' && <PharmaBlockReports />}
+      {analyticsSubTab === 'goals_habits' && <ProfileGoalsHabitsCard />}
     </div>
   );
 };

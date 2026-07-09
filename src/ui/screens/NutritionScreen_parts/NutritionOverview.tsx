@@ -54,12 +54,12 @@ export const NutritionOverview: React.FC<{
   const pctFat = nutritionTargets ? Math.min(150, Math.round((avgWeeklyFat / nutritionTargets.fats) * 100)) : 0;
   const pctCarbs = nutritionTargets ? Math.min(150, Math.round((avgWeeklyCarbs / nutritionTargets.carbs) * 100)) : 0;
 
-  const goalInfo = s?.primaryGoal ? {
+  const goalInfo = s?.primaryGoal ? ({
     bulk: 'Масса', cut: 'Сушка', maintenance: 'Поддержание',
     strength: 'Сила', hypertrophy: 'Гипертрофия', recomposition: 'Рекомпозиция',
     health: 'Здоровье', rehab: 'Реабилитация', fitness: 'Фитнес',
     endurance: 'Выносливость',
-  }[s.primaryGoal] || s.primaryGoal : '';
+  } as Record<string, string>)[s.primaryGoal as string] || s.primaryGoal : '';
 
   return (
     <div className="nutrition-overview">

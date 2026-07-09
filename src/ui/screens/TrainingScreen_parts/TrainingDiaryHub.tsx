@@ -410,7 +410,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   return (
                     <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                       <div style={{ width: '70%', height: `${h}%`, background: w.totalVolume === maxVol2 ? 'var(--accent)' : 'rgba(0,230,138,0.3)', borderRadius: '2px 2px 0 0' }} />
-                      <span style={{ fontSize: 6, color: 'var(--text-dim)' }}>{w.week}</span>
+                      <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{w.week}</span>
                     </div>
                   );
                 })}
@@ -669,7 +669,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                       {top.flatMap((t, i) => t.arr.map((p, j) => <circle key={t.n + j} cx={6 + (j / Math.max(1, t.arr.length - 1)) * (W - 12)} cy={H - 8 - ((p.e1rm - minV) / Math.max(1, maxV - minV)) * (H - 16)} r={2} fill={colors[i % colors.length]} />))}
                     </svg>
                     <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>
-                      {top.map((t, i) => <span key={t.n} style={{ fontSize: 8, color: colors[i % colors.length] }}>● {t.n.slice(0, 18)}</span>)}
+                      {top.map((t, i) => <span key={t.n} style={{ fontSize: 9, color: colors[i % colors.length] }}>● {t.n}</span>)}
                     </div>
                   </>
                 )}
@@ -677,7 +677,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   <>
                     <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 8, marginBottom: 4 }}>Тоннаж по неделям:</div>
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 60 }}>
-                      {wkArr.map(([wk, v], i) => <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}><div style={{ width: '100%', maxWidth: 28, height: Math.max(2, (v / maxWk) * 48), borderRadius: 3, background: 'linear-gradient(180deg,#00e68a,#00c853)' }} /><span style={{ fontSize: 6, color: 'rgba(255,255,255,0.4)' }}>{wk.slice(5)}</span></div>)}
+                      {wkArr.map(([wk, v], i) => <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}><div style={{ width: '100%', maxWidth: 28, height: Math.max(2, (v / maxWk) * 48), borderRadius: 3, background: 'linear-gradient(180deg,#00e68a,#00c853)' }} /><span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>{wk.slice(5)}</span></div>)}
                     </div>
                   </>
                 )}
@@ -705,7 +705,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                       const maxV = Math.max(...visWeekly.map(x => x.volume), 1);
                       return <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                         <div style={{ width: '80%', borderRadius: '6px 6px 2px 2px', height: `${Math.max(6, (w.volume / maxV) * 100)}%`, background: 'linear-gradient(180deg,#00e68a,rgba(0,230,138,0.3))', transition: 'height 0.4s cubic-bezier(0.22,1,0.36,1)' }} />
-                        <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', marginTop: 4, fontWeight: 500 }}>Н{w.week}</span>
+                        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 4, fontWeight: 500 }}>Н{w.week}</span>
                       </div>;
                     })}
                   </div>
@@ -746,7 +746,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                           {p.weeks.map((w, wi) => (
                             <div key={wi} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                               <div style={{ width: '100%', borderRadius: '3px 3px 1px 1px', height: `${Math.max(3, (w.estimated1RM / maxRM) * 24)}px`, background: w.estimated1RM > (p.weeks[wi - 1]?.estimated1RM || 0) ? 'linear-gradient(180deg,#34d399,#059669)' : 'linear-gradient(180deg,#f87171,#dc2626)', transition: 'height 0.3s cubic-bezier(0.22,1,0.36,1)' }} />
-                              <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.25)', marginTop: 1 }}>Н{w.week}</span>
+                              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginTop: 1 }}>Н{w.week}</span>
                             </div>
                           ))}
                         </div>

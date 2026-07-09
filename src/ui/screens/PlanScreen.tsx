@@ -458,7 +458,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
 
 
-  const palForDisplay = useMemo(() => derivePAL(profile.settings.workoutsPerWeek, profile.settings.avgWorkoutMinutes), [profile.settings.workoutsPerWeek, profile.settings.avgWorkoutMinutes]);
+  const palForDisplay = useMemo(() => derivePAL((profile.settings as any).training?.daysPerWeek, (profile.settings as any).training?.minutesPerSession), [(profile.settings as any).training?.daysPerWeek, (profile.settings as any).training?.minutesPerSession]);
 
 
 
@@ -576,7 +576,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
             <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-dim)' }}>
 
-              PAL (коэффициент активности): {palForDisplay} | Тренировок: {profile.settings.workoutsPerWeek ?? 3}/нед × {profile.settings.avgWorkoutMinutes ?? 60} мин
+              PAL (коэффициент активности): {palForDisplay} | Тренировок: {(profile.settings as any).training?.daysPerWeek ?? 3}/нед × {(profile.settings as any).training?.minutesPerSession ?? 60} мин
 
             </div>
 

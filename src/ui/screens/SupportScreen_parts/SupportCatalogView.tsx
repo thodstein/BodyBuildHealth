@@ -9,7 +9,8 @@ import { PopupSelect } from '../../components/PopupXxx';
 import { InfoErrorBoundary, getCategoryInfo, CLASS_BASE_NAMES, MECH_TRANSLATIONS_RU, TYPE_LABELS_RU, MECH_LABELS, CATEGORY_LABELS } from './SupportScreenData';
 import { ALL_STACKS, ALL_INTERACTIONS, SUPPORT_CATALOG_DATA, getSubstanceTier, TIER_LABELS, SYSTEM_LABELS_CATALOG, ORGAN_LABELS, type SupportSubstance } from '../../../data/support-database';
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../../data/support-db';
-import { SupportInteractionsView } from './SupportInteractionsView';
+import { UnifiedSynergyCalculator } from './UnifiedSynergyCalculator';
+
 
 export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const {
@@ -242,7 +243,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                   )}
                 {/* ─── ВЗАИМОДЕЙСТВИЯ (подвкладка каталога) ─── */}
                 {catalogSubTab === 'interactions' && (
-                  <SupportInteractionsView s={s} />
+                  <UnifiedSynergyCalculator s={s} />
                 )}
                 {/* Complexes tab removed — all substances now in type/organ/tier views */}
                 {(catalogSubTab === 'type' || !catalogSubTab) && (

@@ -68,6 +68,8 @@ import {
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from '../data/support-db';
 import { canonId, sameClassIds } from './support-plan/shared-constants';
 import { getPrioritySubstances, deriveSeverity, type SeverityLevel } from '../data/lab-priority-map';
+import { computeTierAdjustments, type TierAdjustmentResult, type TierAddSub, type TierAlert, type TierTitration, type TierNutritionTip } from '../data/lab-tier-recommendations';
+import { computeSynergy } from '../data/lab-synergy-engine';
 
 // ════════════════════════════════════════════════════════════════════════════
 //  ТИПЫ РЕКОМЕНДАЦИИ
@@ -127,6 +129,13 @@ export interface SupportRecommendation {
   summary: string;
   rationale: string;
   phaseAssignedDrugs?: PhaseAssignedDrug[];
+  // TIER-system
+  tierAdjustments?: TierAdjustmentResult;
+  alerts?: TierAlert[];
+  stopCourse?: boolean;
+  titrationFactors?: Map<string, number>;
+  nutritionTips?: TierNutritionTip[];
+  pedFlags?: PEDFlags;  // v5: warnings for UI (multi-oral, GH+ins, winny+oxy)
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -154,8 +163,13 @@ export interface MapperCtx {
   libidoLow?: boolean;
   bpSystolic?: number;
   lipidLdl?: number;
-  aasIds?: string[];  // список ID ААС в курсе (для фазовой логики)
+  aasIds?: string[];   // legacy — список ID ААС (для обратной совместимости)
+  pedDoses?: PEDDose[]; // v5 — PED с дозами + классами
 }
+
+// Импорт PED-типов и helpers
+import type { PEDDose, PEDFlags } from '../data/ped-potency-table';
+import { computeIntensityFactor, derivePEDFlags, doseByIntensity, classifyPed, type PEDClass } from '../data/ped-potency-table';
 
 // ════════════════════════════════════════════════════════════════════════════
 //  ВСПОМОГАТЕЛЬНЫЕ
@@ -198,24 +212,33 @@ function selectSubstances(
   activated: ActivatedMech[],
   phase: PhaseKey,
   level: SupportLevel,
-  manualChoices?: { addSubs?: string[]; removeSubs?: string[]; explicitCategories?: TzCategory[] }
+  manualChoices?: { addSubs?: string[]; removeSubs?: string[]; explicitCategories?: TzCategory[] },
+  initialSubs?: string[]  // протокол subs — блокируют дубли заранее
 ): { subs: RecommendedSub[]; suppression: SuppressedSub[] } {
   const phaseProto = getPhaseProtocol(phase);
   const limits = CATEGORY_LIMITS[level];
   const totalLimit = TOTAL_LIMIT[level];
 
+  const protocolSet = new Set((initialSubs || []).map(s => s.toLowerCase()));
   const shouldBlock = (id: string): boolean => {
     const key = id.toLowerCase();
     if (JOINT_BLOCK_AUTO.has(key)) return true;
     if ((phase === 'course' || phase === 'bridge') && REPRO_COURSE_BLOCK_AUTO.has(key)) return true;
-    // ARB + АПФ вместе — врачебная ошибка. Если RAAS-блокатор уже назначен — не добавляем другой
-    if (RAAS_ALL.has(key) && subs.some(s => RAAS_ALL.has(s.substanceId.toLowerCase()))) return true;
-    if (STATIN_ALL.has(key) && subs.some(s => STATIN_ALL.has(s.substanceId.toLowerCase()))) return true;
+    if (RAAS_ALL.has(key) && (protocolSet.has(key) || subs.some(s => RAAS_ALL.has(s.substanceId.toLowerCase())))) return true;
+    if (STATIN_ALL.has(key) && (STATIN_ALL.has(key) && (protocolSet.has(key) || subs.some(s => STATIN_ALL.has(s.substanceId.toLowerCase()))))) return true;
+    if (protocolSet.has(key)) return true;
+    const cls = sameClassIds(id);
+    if (cls.length && cls.some(alt => protocolSet.has(alt.toLowerCase()))) return true;
     return false;
   };
 
   const usedSubs = new Set<string>();
   const usedCanon = new Set<string>();
+  // Протокол уже "used" — не добавлять дубли
+  for (const id of (initialSubs || [])) {
+    usedSubs.add(id.toLowerCase());
+    usedCanon.add(canonId(id));
+  }
   const subs: RecommendedSub[] = [];
   const suppression: SuppressedSub[] = [];
   const categoryCount = new Map<TzCategory, number>();
@@ -545,6 +568,7 @@ function buildCoverageMatrix(
 const JOINT_BLOCK_AUTO = new Set([
   'boswellia', 'chondroitin', 'chondroitin_sulfate', 'collagen',
   'collagen_uc2', 'glucosamine', 'hyaluronic', 'hyaluronic_acid', 'msm',
+  'gonadorelin', 'kisspeptin',
 ]);
 const REPRO_COURSE_BLOCK_AUTO = new Set([
   'ashwagandha', 'boron', 'clomi', 'clomiphene', 'enclomiphene',
@@ -562,89 +586,190 @@ const STATIN_ALL = new Set([
   'red_yeast', 'red_yeast_rice', 'bergamot',
 ]);
 
-function computePhaseDrugs(ctx: MapperCtx): PhaseAssignedDrug[] {
+// ════════════════════════════════════════════════════════════════════════════
+//  ПРОТОКОЛ v4 — специалист-фармацевт
+//  Уровни: 1=база(всегда) 2=тест-соло 3=тандем(трен/нандрон/болденон) 4=орал
+// ════════════════════════════════════════════════════════════════════════════
+function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
   const phase = detectPhase(ctx.phaseCtx);
-  const onCourse = ctx.onCourse ?? (phase === 'course' || phase === 'bridge' || phase === 'trt');
-  if (!onCourse && phase !== 'pct') return [];
-  const aasIds = (ctx.aasIds || []).map(a => a.toLowerCase());
-  const hasTest = aasIds.some(id => id.includes('test'));
-  const hasTren = aasIds.some(id => id.includes('tren'));
-  const hasNandrolone = aasIds.some(id => ['nandrolone','deca','npp'].some(x => id.includes(x)));
-  const hasBoldenone = aasIds.some(id => id.includes('bold') || id.includes('equipoise'));
-  const hasOral = aasIds.some(id =>
-    ['oxandrolone','anavar','stanozolol','winstrol','methandienone','dianabol',
-     'fluoxymesterone','halotestin','oxymetholone','anadrol','turinabol',
-     'oral_turinabol','methyltestosterone']
-      .some(x => id.includes(x)));
+  // v5: pedDoses (если задан) → peds. Иначе legacy aasIds → имитируем PEDDose без дозы.
+  let peds: PEDDose[] = ctx.pedDoses || [];
+  if (peds.length === 0 && ctx.aasIds && ctx.aasIds.length > 0) {
+    peds = ctx.aasIds.map(id => ({ id, pClass: classifyPed(id) }));
+  }
+  const flags = derivePEDFlags(peds);
+  if (peds.length === 0 && phase !== 'pct') return [];
+
+  const intensity = computeIntensityFactor(peds);
   const result: PhaseAssignedDrug[] = [];
   const seen = new Set<string>();
-  const add = (id: string, reason: string, trigger: string, category: TzCategory | 'hcg' | 'ai' | 'cabergoline' | 'renal' | 'hepatic') => {
-    const catMap: Record<string, TzCategory> = {
-      hcg: 'hormonal', ai: 'pharma', cabergoline: 'pharma',
-      hepatic: 'hepatoprotector', renal: 'nephroprotector',
-    };
-    const mappedCat = (catMap[category] || category) as TzCategory;
+  const add = (id: string, reason: string, trigger: string, category: TzCategory) => {
     const key = id.toLowerCase();
     if (seen.has(key)) return;
     if (ctx.hasHCG && key === 'hcg') return;
-    if (ctx.hasAI && (key === 'anastrozole' || key === 'tamoxifen')) return;
+    if (ctx.hasAI && (key === 'anastrozole' || key === 'tamoxifen' || key === 'letrozole')) return;
     seen.add(key);
-    result.push({ substanceId: id, reason, trigger, category: mappedCat });
+    result.push({ substanceId: id, reason, trigger, category });
   };
 
-  if (hasTest) {
-    add('hcg',
-      'ХГЧ 500 МЕ 2р/нед, схема 3/1. Имитирует ЛГ → поддержание клеток Лейдига, профилактика атрофии.',
-      'Тестостеронсодержащий AAS в курсе + hasHCG=false',
-      'hcg');
-    add('anastrozole',
-      'Анастрозол 0.5 мг 2р/нед (титровать по E2). Контроль эстрадиола (цель 20-40 pg/mL).',
-      'Тестостеронсодержащий AAS + нет AI',
-      'ai');
+  // ─── УРОВЕНЬ 1: БАЗА (при любом AAS) — dose-aware через intensity ───
+  if (flags.hasAAS || flags.hasSarm) {
+    const telDose = doseByIntensity(20, 80, intensity);
+    const tudcaDose = doseByIntensity(500, 1000, intensity) * (flags.hasOral17 ? 2 : 1);
+    const nacDose = doseByIntensity(1200, 1800, intensity) * (flags.hasOral17 ? 1.5 : 1);
+    const omegaDose = doseByIntensity(2, 4, intensity);
+    add('tadalafil', `Tadalafil 5 мг/день — PDE5i → вазодилатация + защита простаты`, 'PED в курсе', 'pharma');
+    add('telmisartan', `Telmisartan ${telDose} мг — ARB + PPAR-γ (АД, инсулин-чувствительность)`, 'PED в курсе', 'pharma');
+    add('agmatine', 'Agmatine 1 г 2р/день — eNOS → NO, инсулин-сенситайзер', 'PED в курсе', 'pharma');
+    add('tudca', `TUDCA ${tudcaDose} мг — BSEP-зависимый желчеотток${flags.hasOral17 ? ' (×2 орал)' : ''}`, 'PED в курсе', 'hepatoprotector');
+    add('nac', `NAC ${nacDose} мг — глутатион (фаза II детокс)${flags.hasOral17 ? ' (×1.5 орал)' : ''}`, 'PED в курсе', 'hepatoprotector');
+    add('omega3', `Omega-3 ${omegaDose} г — ↓ ТГ, ↑ HDL, мембраны, эндотелий`, 'PED в курсе', 'cardioprotector');
+    add('coq10', 'CoQ10 200 мг — митохондрии миокарда, кофактор', 'PED в курсе', 'antioxidant');
+    add('tmg', 'TMG 1000 мг — донатор CH₃ → ↓ гомоцистеин (AAS ↑ Hcy)', 'PED в курсе', 'amino');
+    add('taurine', 'Taurine 1000 мг — осмолит, кардиопротектор', 'PED в курсе', 'amino');
+    add('hcg', 'hCG 500 МЕ 2р/нед — клетки Лейдига', 'AAS в курсе', 'hormonal');
   }
 
-  if (hasTren || hasNandrolone || hasBoldenone) {
-    add('cabergoline',
-      'Каберголин 0.25-0.5 мг 2р/нед. D2-агонист → подавление пролактина.',
-      'Прогестагенный AAS (трен/нандрон/болденон) + нет каберголина',
-      'cabergoline');
+  // ─── ТЕСТОСТЕРОН-СПЕЦИФИКА (dose-aware anastrozole) ───
+  if (flags.hasTest) {
+    const testP = peds.find(p => p.pClass === 'aas_test');
+    const testMg = testP?.mgPerWeek ?? 500;
+    let aiDose = '0.5 мг 2р/нед';
+    if (testMg <= 250) aiDose = 'не нужно (или 0.25 мг при E2↑)';
+    else if (testMg <= 500) aiDose = '0.25-0.5 мг 2р/нед';
+    else if (testMg <= 1000) aiDose = '0.5 мг 2р/нед';
+    else aiDose = '1 мг/день (титровать)';
+    add('anastrozole', `Anastrozole ${aiDose} — ⚠ ТОЛЬКО ПОД КОНТРОЛЕМ АНАЛИЗОВ (E2 20-40 pg/mL) [test ${testMg} мг/нед]`, `Тестостерон ${testMg} мг/нед`, 'pharma');
+    add('pycnogenol', 'Pycnogenol 150 мг — eNOS + защита эндотелия', 'Тестостерон', 'antioxidant');
+    add('citrulline', 'Citrulline 6 г — NO-предшественник', 'Тестостерон', 'amino');
+    add('bergamot', 'Bergamot 500 мг — HMG-CoA редуктаза (липиды)', 'Тестостерон', 'cardioprotector');
+    add('astaxanthin', 'Astaxanthin 4 мг — липофильный антиоксидант', 'Тестостерон', 'antioxidant');
   }
 
-  if (hasTren) {
-    add('nac',
-      'NAC 1200 мг/день. Донатор глутатиона → защита проксимальных канальцев почек.',
-      'Тренболон в курсе (нефропротекция)',
-      'renal');
-    add('astragalus',
-      'Астрагал 500 мг/день. Сапонины ↓ протеинурии, защита клубочков.',
-      'Тренболон в курсе (нефропротекция)',
-      'renal');
-    add('cordyceps',
-      'Кордицепс 1000 мг/день. ↓ BUN/креатинин, защита почек на тренболоне.',
-      'Тренболон в курсе (нефропротекция)',
-      'renal');
+  // ─── НАНДРОЛОН — особый профиль (progestagen, объём, либидо↓) ───
+  if (flags.hasNandrolone) {
+    const np = peds.find(p => p.pClass === 'aas_nandrolone');
+    const nMg = np?.mgPerWeek ?? 300;
+    let caberDose = '0.25 мг 2р/нед';
+    if (nMg <= 200) caberDose = 'только при пролактине >15';
+    else if (nMg <= 400) caberDose = '0.25 мг 2р/нед';
+    else caberDose = '0.5 мг 2р/нед';
+    add('cabergoline', `Cabergoline ${caberDose} — ⚠ ТОЛЬКО ПОД КОНТРОЛЕМ АНАЛИЗОВ [nandrolone ${nMg} мг]`, `Нандролон ${nMg} мг/нед`, 'pharma');
+    add('nebivolol', 'Nebivolol 2.5 мг — ⚠ Под контролем ЧСС и АД (β1+NO, объём+HR↓)', `Нандролон (объём + HR)`, 'pharma');
+    add('hesperidin', 'Hesperidin 500 + Diosmin 450 — венотоник (объём, отёки)', 'Нандролон (отёки)', 'cardioprotector');
+    add('dandelion', 'Dandelion 500 мг 2р/день — K⁺-сберегающий диуретик', 'Нандролон (задержка)', 'pharma');
+    add('astragalus', 'Astragalus 500 мг — защита клубочков', 'Нандролон', 'nephroprotector');
+    add('cordyceps', 'Cordyceps 1000 мг — ↓ BUN/креатинин', 'Нандролон', 'nephroprotector');
   }
 
-  if (hasOral) {
-    add('tudca',
-      'TUDCA 500 мг/день. Снижение ER-стресса гепатоцитов, стимуляция BSEP-желчеоттока.',
-      'Оральный 17α-алкилированный AAS (гепатопротекция)',
-      'hepatic');
-    add('nac',
-      'NAC 1200 мг/день. Предшественник глутатиона → защита гепатоцитов.',
-      'Оральный 17α-алкилированный AAS (гепатопротекция)',
-      'hepatic');
-    add('milk_thistle',
-      'Силимарин 280 мг. Стабилизация мембран гепатоцитов, ↓ перекисного окисления.',
-      'Оральный 17α-алкилированный AAS (гепатопротекция)',
-      'hepatic');
+  // ─── ТРЕНБОЛОН — aggressive profile (нeuro, липиды↓↓, почки) ───
+  if (flags.hasTren) {
+    const tp = peds.find(p => p.pClass === 'aas_tren');
+    const tMg = tp?.mgPerWeek ?? 200;
+    const trenIntens = (tMg / 500) * 3.0; // внешний scale 3.0
+    const tudcaTren = Math.round(500 * (1 + trenIntens * 0.5));
+    add('cabergoline', `Cabergoline ${tMg > 400 ? '0.5 мг' : '0.25 мг'} 2р/нед — ⚠ ПОД КОНТРОЛЕМ АНАЛИЗОВ (пролактин)`, `Тренболон ${tMg} мг`, 'pharma');
+    add('nebivolol', 'Nebivolol 2.5-5 мг — ⚠ Под контролем ЧСС и АД', 'Тренболон', 'pharma');
+    add('astragalus', `Astragalus ${Math.round(500 * (1 + trenIntens * 0.5))} мг — клубочки (трен-нефротокс)`, 'Тренболон', 'nephroprotector');
+    add('cordyceps', `Cordyceps ${Math.round(1000 * (1 + trenIntens * 0.3))} мг — BUN/креатинин`, 'Тренболон', 'nephroprotector');
+    add('alpha_lipoic', 'Alpha-lipoic 300 мг — Nrf2 (трен окислительный)', 'Тренболон', 'antioxidant');
+    add('curcumin', 'Curcumin 500 мг — NF-κB (↓ CRP/IL-6)', 'Тренболон', 'antiinflam');
+    add('berberine', 'Berberine 1500 мг — AMPK (инсулинорезистентность)', 'Тренболон', 'pharma');
+    add('dandelion', 'Dandelion 500 мг 2р/день — отёки', 'Тренболон', 'pharma');
+    add('hesperidin', 'Hesperidin 500 + Diosmin 450 — венотоник', 'Тренболон', 'cardioprotector');
+    add('theanine', 'L-Theanine 200 мг — нейропротекция (трен-нейротокс) + сон', 'Тренболон (ЦНС)', 'amino');
+    add('glycine', 'Glycine 3 г — сон, нейропротекция (mTOR)', 'Тренболон (ЦНС)', 'amino');
   }
 
-  if (onCourse && !hasTest && aasIds.length > 0) {
-    add('hcg',
-      'ХГЧ 500 МЕ 2р/нед. Профилактика атрофии яичек на любом AAS.',
-      'AAS в курсе (не тестостерон) + hasHCG=false',
-      'hcg');
+  // ─── БОЛДЕНОН — HCT++ ───
+  if (flags.hasBold) {
+    add('serrapeptase', 'Serrapeptase 10 мг — ОБЯЗАТЕЛЬНО (HCT↑↑↑ на EQ)', 'Болденон (HCT)', 'pharma');
+    add('nattokinase', 'Nattokinase 100 мг — фибринолиз (HCT↑↑↑)', 'Болденон (HCT)', 'pharma');
+    add('bromelain', 'Bromelain 500 мг — ↓ PAI-1', 'Болденон (HCT)', 'antiinflam');
+    add('nebivolol', 'Nebivolol 2.5 мг — ⚠ Под контролем ЧСС и АД', 'Болденон', 'pharma');
+  }
+
+  // ─── ДГТ-inject (Masteron, Primo) — анти-эстро, липиды↓↓ ───
+  if (flags.hasDhtInject) {
+    add('niacin', 'Niacin 500-1500 мг на ночь — ↑HDL (Masteron/Primo ↓HDL)', 'ДГТ-inject (липиды)', 'vitamin');
+    add('bergamot', 'Bergamot 1000 мг — липиды (поверх базы)', 'ДГТ-inject (липиды)', 'cardioprotector');
+  }
+
+  // ─── ОРАЛЫ 17α: общее + спец ───
+  if (flags.hasOral17) {
+    add('milk_thistle', 'Milk thistle 280 мг — стабилизация мембран', 'Орал 17α', 'hepatoprotector');
+  }
+
+  // ─── WINSTROL special: липиды disaster + суставы ───
+  if (peds.some(p => p.pClass === 'aas_oral_winny')) {
+    add('niacin', 'Niacin 1500 мг на ночь — ⚠ Winny ↓HDL до 50% (lipid disaster)', 'Winstrol (липиды)', 'vitamin');
+    add('garlic', 'Garlic 1200 мг — ↓LDL (Winny)', 'Winstrol (липиды)', 'cardioprotector');
+    add('omega3', 'Omega-3 6 г — липиды (поверх) [переопределение базы]', 'Winstrol (липиды)', 'cardioprotector');
+  }
+
+  // ─── OXYMETHOLONE (Anadrol) special ───
+  if (peds.some(p => p.pClass === 'aas_oral_oxy')) {
+    add('tamoxifen', 'Tamoxifen 20 мг — ⚠ Anadrol НЕ ароматизируется, AI не работает. Гино → SERM', 'Anadrol (эстро-подобный)', 'pharma');
+    add('spironolactone', 'Spironolactone 25-50 мг — ⚠ через врача (отёки, ↑Aldo на Anadrol)', 'Anadrol (отеки)', 'pharma');
+    add('hesperidin', 'Hesperidin 500 + Diosmin 450 — венотоник', 'Anadrol (отеки)', 'cardioprotector');
+  }
+
+  // ─── GH (somatropin) — ИНДУСИРОРЕЗИСТЕНТНОСТЬ + BP ───
+  if (flags.hasGH) {
+    const ghP = peds.find(p => p.pClass === 'gh');
+    const ghIU = ghP?.iuPerDay ?? 4;
+    let berberineDose = '1000 мг';
+    if (ghIU > 6) berberineDose = '2000 мг';
+    add('berberine', `Berberine ${berberineDose} — AMPK (GH↑ IR)`, `GH ${ghIU} МЕ/день`, 'pharma');
+    add('alpha_lipoic', 'Alpha-lipoic 300 мг — инсулин-чувствительность (GH)', 'GH', 'antioxidant');
+    add('taurine', `Taurine ${ghIU > 4 ? '2000' : '1000'} мг — осмолит (GH ↑ вода)`, 'GH', 'amino');
+    add('hesperidin', 'Hesperidin 500 + Diosmin 450 — венотоник (GH BP↑)', 'GH', 'cardioprotector');
+    add('astaxanthin', 'Astaxanthin 4 мг — антиоксидант (GH)', 'GH', 'antioxidant');
+    if (ghIU > 6) {
+      add('metformin', 'Metformin 500 мг — ⚠ через врача (GH >6 МЕ IR↑↑)', 'GH >6 МЕ', 'pharma');
+    }
+  }
+
+  // ─── INSULIN — ⚠ HYPO RISK ───
+  if (flags.hasInsulin) {
+    const iP = peds.find(p => p.pClass === 'insulin');
+    const iIU = iP?.iuPerDay ?? 10;
+    add('berberine', 'Berberine ' + (iIU > 15 ? '2000' : '1500') + ' мг — AMPK (insulin IR)', 'Insulin ' + iIU + ' МЕ/день', 'pharma');
+    add('alpha_lipoic', 'Alpha-lipoic 300-600 мг — инсулин-чувствительность', 'Insulin', 'antioxidant');
+    add('chromium', 'Chromium picolinate 200 мкг — ⚠ ТОЛЬКО с инсулином (кофактор рецептора)', 'Insulin', 'mineral');
+    add('magnesium', 'Magnesium 600 мг — ↑ (insulin)', 'Insulin', 'mineral');
+    if (iIU > 20) {
+      add('metformin', 'Metformin 500 мг — ⚠ через врача (insulin >20 МЕ)', 'Insulin >20 МЕ', 'pharma');
+    }
+  }
+
+  // ─── IGF-1 (LR3/DES) — гипогликемия + glycine ───
+  if (flags.hasIGF) {
+    add('berberine', 'Berberine 1500 мг — glucose (IGF hypo risk)', 'IGF-1', 'pharma');
+    add('alpha_lipoic', 'Alpha-lipoic 300 мг — insulin sens', 'IGF-1', 'antioxidant');
+    add('glycine', 'Glycine 3 г — mTOR support', 'IGF-1 (satellite cell)', 'amino');
+    add('taurine', 'Taurine 2000 мг — osmolyte (cell volume)', 'IGF-1', 'amino');
+  }
+
+  // ─── MGF ───
+  if (flags.hasMGF) {
+    add('glycine', 'Glycine 3 г — satellite cell proliferation (mTOR)', 'MGF', 'amino');
+    add('taurine', 'Taurine 2000 мг — cell volume', 'MGF', 'amino');
+    add('b_complex', 'B-Complex — метилирование (satellite proliferation)', 'MGF', 'vitamin');
+  }
+
+  // ─── CLENBUTEROL — тратит таурин ───
+  if (flags.hasClenbut) {
+    add('taurine', 'Taurine 5000 мг — ⚠ Clen истощает таурин (судороги!)', 'Clenbuterol', 'amino');
+    add('magnesium', 'Magnesium 600 мг — судороги', 'Clenbuterol', 'mineral');
+    add('potassium', 'Potassium 200 мг — ⚠ (электролиты)', 'Clenbuterol', 'mineral');
+  }
+
+  // ─── T3/T4 (тиреоид) ───
+  if (flags.hasT3 || flags.hasT4) {
+    add('calcium', 'Calcium 1000 мг + D3+K2 — T3/T4 ↑ bone loss', 'Tireoid', 'mineral');
+    add('nebivolol', 'Nebivolol 2.5 мг — ⚠ при ЧСС>80 (T3↑HR)', 'Tireoid', 'pharma');
+    add('melatonin', 'Melatonin 0.3-1 мг — сон (T3 insomnia)', 'Tireoid', 'other');
   }
 
   return result;
@@ -656,65 +781,42 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
   // ── 2. фаза ─
   const phase = detectPhase(ctx.phaseCtx);
   const phaseProto = getPhaseProtocol(phase);
-  // ── 3. отбор ─
-  const { subs, suppression } = selectSubstances(activated, phase, ctx.level, ctx.manualChoices);
-  // ── 3a. фазовые назначения (hCG, AI, cabergoline, hepatic/renal protect) ─
-  const phaseDrugsAll = computePhaseDrugs(ctx);
-  const subsBeforePhase = new Set(subs.map(s => s.substanceId.toLowerCase()));
+  // ── 2a. вычислить PED-флаги (для UI warnings) ─
+  let peds = ctx.pedDoses || [];
+  if (peds.length === 0 && ctx.aasIds && ctx.aasIds.length > 0) {
+    peds = ctx.aasIds.map(id => ({ id, pClass: classifyPed(id) }));
+  }
+  const pedFlags = derivePEDFlags(peds);
+  // ── 3. протокол специалиста-фармацевта (ПЕРВЫМ — обязательный стек) ─
+  const protocolAll = computeProtocol(ctx);
+  const protocolIds = protocolAll.map(pd => pd.substanceId);
+  const subs: RecommendedSub[] = [];
   const phaseDrugs: PhaseAssignedDrug[] = [];
-  for (const pd of phaseDrugsAll) {
-    const key = pd.substanceId.toLowerCase();
-    if (subsBeforePhase.has(key)) {
-      // Уже выбрано обычным отбором — помечаем как фазовое И добавляем в phaseDrugs.
-      const existing = subs.find(s => s.substanceId.toLowerCase() === key);
-      if (existing) {
-        existing.reason = `${pd.reason} [ФАЗОВОЕ]`;
-        existing.priority = 1;
-      }
-      phaseDrugs.push(pd);
-      continue;
-    }
-    // Проверяем канон-дубликаты (telmi ↔ telmisartan)
-    const altExisting = subs.find(s => canonId(s.substanceId) === canonId(pd.substanceId));
-    if (altExisting) {
-      altExisting.reason = `${pd.reason} [ФАЗОВОЕ]`;
-      altExisting.priority = 1;
-      phaseDrugs.push(pd);
-      continue;
-    }
-    subs.push({
-      substanceId: pd.substanceId,
-      category: pd.category,
-      k: 0.5,
-      q: 'A',
-      reason: `${pd.reason} [ФАЗОВОЕ]`,
-      mechsCovered: [],
-      triggeredByMech: undefined,
-      priority: 1,
-    });
+  for (const pd of protocolAll) {
+    subs.push({ substanceId: pd.substanceId, category: pd.category, k: 0.5, q: 'A', reason: pd.reason, mechsCovered: [], priority: 1 });
     phaseDrugs.push(pd);
   }
-  // ── 3b. базовые витамины/минералы (всегда, независимо от фазы) ─
-  const BASE_VITAMINS: Array<{ id: string; category: TzCategory; reason: string }> = [
-    { id: 'vitamin_d3', category: 'vitamin', reason: 'D3 5000 МЕ — дефицит у 80% населения, иммунитет, костный метаболизм' },
-    { id: 'vitamin_k2', category: 'vitamin', reason: 'K2 MK-7 100 мкг — обязателен с D3: направляет Ca²⁺ в кости, предотвращает кальцификацию артерий' },
-    { id: 'magnesium', category: 'mineral', reason: 'Магний 400 мг — кофактор D3, вазодилатация, 300+ ферментов, сон, профилактика судорог на курсе' },
-    { id: 'coq10', category: 'antioxidant', reason: 'CoQ10 100 мг — митохондриальная защита миокарда, антиоксидант, кофактор при статинах' },
-    { id: 'vitamin_c', category: 'vitamin', reason: 'Витамин C 500 мг — антиоксидант, синтез коллагена (сосуды/связки), регенерация витамина E' },
-  ];
-  for (const bv of BASE_VITAMINS) {
-    if (subs.some(s => s.substanceId.toLowerCase() === bv.id)) continue;
-    subs.push({
-      substanceId: bv.id,
-      category: bv.category,
-      k: 0.5,
-      q: 'B',
-      reason: bv.reason + ' [БАЗОВОЕ]',
-      mechsCovered: [],
-      priority: 2,
-    });
+  // ── 4. gap-filling — ТОЛЬКО если протокол пустой (нет AAS) ─
+  let suppression: SuppressedSub[] = [];
+  if (protocolAll.length === 0) {
+    const { subs: mechSubs, suppression: supp } = selectSubstances(activated, phase, ctx.level, ctx.manualChoices);
+    for (const s of mechSubs) { if (!subs.some(x => canonId(x.substanceId) === canonId(s.substanceId))) subs.push(s); }
+    suppression = supp;
   }
-  // ── 3c. привязка к анализам (lab→substance priority map) ─
+  // ── 5. базовые витамины (D3+K2, Mg, B6, B12, Folate, VitC) ─
+  const BASE_VITS: Array<{ id: string; category: TzCategory; reason: string }> = [
+    { id: 'vitamin_d3', category: 'vitamin', reason: 'D3 5000 МЕ — иммунитет, костный метаболизм' },
+    { id: 'vitamin_k2', category: 'vitamin', reason: 'K2 MK-7 100 мкг — обязателен с D3' },
+    { id: 'b_complex', category: 'vitamin', reason: 'B-Complex (B6 P5P 25 мг + B12 метил 1000 мкг + 5-MTHF 400 мкг) — метилирование, гомоцистеин' },
+    { id: 'magnesium', category: 'mineral', reason: 'Mg 400 мг — кофактор D3, сон, вазодилатация' },
+    { id: 'vitamin_c', category: 'vitamin', reason: 'VitC 500 мг — антиоксидант, регенерация витамина E' },
+    { id: 'vitamin_e', category: 'antioxidant', reason: 'VitE 200 МЕ — липофильный антиоксидант (с Astaxanthin + VitC), защита мембран' },
+  ];
+  for (const bv of BASE_VITS) {
+    if (subs.some(s => canonId(s.substanceId) === canonId(bv.id))) continue;
+    subs.push({ substanceId: bv.id, category: bv.category, k: 0.5, q: 'B', reason: bv.reason, mechsCovered: [], priority: 2 });
+  }
+  // ── 6. привязка к анализам (lab→substance priority map) ─
   const LAB_NORMALS: Record<string, { default: number; higherIsWorse: boolean }> = {
     ALT: { default: 40, higherIsWorse: true },
     AST: { default: 40, higherIsWorse: true },
@@ -816,6 +918,58 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
       });
     }
   }
+  // ── 3d. TIER-ADJUSTMENTS: adaptive (addSubs), titration, nutrition, alerts + синергии ─
+  const tierAdj = computeTierAdjustments(ctx.labs);
+  // Добавить tier-adaptive препараты
+  for (const a of tierAdj.addSubs) {
+    const canon = canonId(a.id);
+    if (subs.some(s => canonId(s.substanceId) === canon)) continue;
+    if (JOINT_BLOCK_AUTO.has(canon.toLowerCase())) continue;
+    if (RAAS_ALL.has(canon.toLowerCase()) && subs.some(s => RAAS_ALL.has(s.substanceId.toLowerCase()))) continue;
+    if (STATIN_ALL.has(canon.toLowerCase()) && subs.some(s => STATIN_ALL.has(s.substanceId.toLowerCase()))) continue;
+    subs.push({
+      substanceId: canon,
+      category: 'pharma' as TzCategory,
+      k: 0.55,
+      q: 'B',
+      reason: `[TIER-${a.tier} ${a.marker}] ${a.reason}` + (a.dose ? ` (${a.dose})` : ''),
+      mechsCovered: [],
+      priority: 1,
+    });
+  }
+  // Титрация (факторы — для UI; dosis записываем в reason)
+  const titrationFactors = new Map<string, number>();
+  for (const t of tierAdj.titrations) {
+    const canon = canonId(t.id);
+    const existing = subs.find(s => canonId(s.substanceId) === canon);
+    if (existing) {
+      existing.reason += ` [TITR↑${t.factor}× по ${t.marker}: ${t.reason}]`;
+      existing.priority = 1;
+    }
+    titrationFactors.set(canon, (titrationFactors.get(canon) ?? 1) * t.factor);
+  }
+  // ── 3e. Синергии (после всех препаратов) ─
+  const synergyCtx = {
+    hasOral: (ctx.aasIds || []).some(id => ['oxandrolone','anavar','stanozolol','winstrol','methandienone','dianabol','oxymetholone','anadrol','turinabol','oral_turinabol','methyltestosterone'].some(x => id.toLowerCase().includes(x))),
+    hct: ctx.labs['HCT'] || ctx.labs['HEMATOCRIT'],
+    plt: ctx.labs['PLT'] || ctx.labs['PLATELETS'],
+    ldl: ctx.labs['LDL'] || ctx.labs['CHOLESTEROL_LDL'],
+    hdl: ctx.labs['HDL'],
+    tsh: ctx.labs['TSH'],
+  };
+  const synergyR = computeSynergy(subs.map(s => s.substanceId), synergyCtx);
+  for (const sa of synergyR.addedSubs) {
+    if (subs.some(s => canonId(s.substanceId) === canonId(sa.id))) continue;
+    subs.push({
+      substanceId: canonId(sa.id),
+      category: classifyBySubstanceId(sa.id),
+      k: 0.55,
+      q: 'B',
+      reason: `[СИНЕРГИЯ с ${sa.primary}: ${sa.reason}]`,
+      mechsCovered: [],
+      priority: 2,
+    });
+  }
   // ── 4. guardrails ─
   const gCtx = buildGuardrailCtx(ctx);
   gCtx.hasTBooster = subs.some(s => isTBoosterById(s.substanceId));
@@ -842,6 +996,12 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     boosters, activatedMechs: activated,
     summary, rationale,
     phaseAssignedDrugs: phaseDrugs,
+    tierAdjustments: tierAdj,
+    alerts: tierAdj.alerts,
+    stopCourse: tierAdj.stopCourse,
+    titrationFactors,
+    nutritionTips: tierAdj.nutrition,
+    pedFlags,
   };
 }
 

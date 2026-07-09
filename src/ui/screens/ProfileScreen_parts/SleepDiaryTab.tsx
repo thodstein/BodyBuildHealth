@@ -161,13 +161,37 @@ export const SleepDiaryTab: React.FC<{ settings: any; save: (data: any) => void 
   const [showForm, setShowForm] = useState(false);
   const [viewMode, setViewMode] = useState<'diary' | 'chart' | 'stats'>('diary');
   const [chartRange, setChartRange] = useState<'7d' | '30d'>('7d');
+  const [editDate, setEditDate] = useState<string | null>(null);
+
+  const resetForm = () => {
+    setDate(new Date().toISOString().split('T')[0]);
+    setHours(settings.baselineSleepHours ?? 7);
+    setQuality(settings.baselineSleepQuality ?? 5);
+    setAwakenings(settings.nightAwakenings ?? 1);
+    setBedtime(settings.bedtime ?? '23:00');
+    setWakeTime(settings.wakeTime ?? '07:00');
+    setNotes('');
+    setEditDate(null);
+  };
 
   const addEntry = () => {
     const entry: SleepEntry = { date, hours, quality, awakenings, bedtime, wakeTime, notes };
     saveSleepDiaryEntry(entry);
     setDiary(loadSleepDiary());
     setShowForm(false);
-    setNotes('');
+    resetForm();
+  };
+
+  const startEdit = (e: SleepEntry) => {
+    setDate(e.date);
+    setHours(e.hours);
+    setQuality(e.quality);
+    setAwakenings(e.awakenings);
+    setBedtime(e.bedtime);
+    setWakeTime(e.wakeTime);
+    setNotes(e.notes);
+    setEditDate(e.date);
+    setShowForm(true);
   };
 
   const removeEntry = (d: string) => {
@@ -226,12 +250,17 @@ export const SleepDiaryTab: React.FC<{ settings: any; save: (data: any) => void 
         border: apple.accentBorder, background: apple.accentDim,
         color: apple.accent, cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
       }}>
-        {showForm ? '✕ Закрыть' : '➕ Добавить запись сна'}
+        {showForm ? '✕ Закрыть' : editDate ? '✏️ Редактировать запись' : '➕ Добавить запись сна'}
       </button>
 
       {/* Форма */}
       {showForm && (
         <div style={glassCard}>
+          {editDate && (
+            <div style={{ fontSize:9, color:'#f59e0b', fontWeight:600, marginBottom:6 }}>
+              ✏️ Редактирование записи от {editDate}
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
             <div>
               <div style={{ fontSize: 9, color: apple.textDim, marginBottom: 3 }}>Дата</div>
@@ -438,9 +467,9 @@ export const SleepDiaryTab: React.FC<{ settings: any; save: (data: any) => void 
           ) : (
             <div style={{ maxHeight: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
               {diary.map((e, i) => (
-                <div key={i} style={{
+                <div key={i} onClick={() => startEdit(e)} style={{
                   padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.04)', cursor:'pointer', transition:'background 0.15s',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{e.date}</span>

@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { FertilityPCTScreen } from '../FertilityPCTScreen';
 import { InfoErrorBoundary } from './SupportScreenData';
+import { SymptomSolverTab } from './SymptomSolverTab';
 
 const cardBg = { background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' };
 const pillActive = (c: string) => ({ padding:'5px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap' as const, cursor:'pointer', background:c, color:'#000', border:'1px solid '+c });
@@ -33,6 +34,8 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
   const {
     protocolTab,
     setProtocolTab,
+    protocolView,
+    setProtocolView,
     neuroTab,
     setNeuroTab,
     jointPain,
@@ -44,6 +47,40 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
   } = s;
 
   const jointScore = Math.min(100, Math.round(jointPain * 10 + injuryHistory * 5 + trainLoad * 3));
+
+  // Protocol card definitions for the menu grid
+  const PROTOCOL_CARDS = [
+    { id:'symptoms', icon:'🩺', label:'Симптомы', desc:'Поиск и коррекция симптомов: база решений, дневник, приверженность', color:'#ef4444', system:'Общее', tags:['Симптомы','Решения','Дневник','Лабы'] },
+    { id:'neuro', icon:'🧠', label:'Нейропротекция', desc:'Нейротоксичность ААС: механизмы, калькулятор риска, протокол', color:'#06b6d4', system:'ЦНС', tags:['Нейротоксичность','BDNF','ГАМК','Глутамат'] },
+    { id:'cardio', icon:'❤️', label:'Кардио', desc:'СС-защита: АД, липиды, фиброз, аритмии на ААС', color:'#ef4444', system:'ССС', tags:['АД','Липиды','Аритмия','Фиброз'] },
+    { id:'hepatic', icon:'🫁', label:'Печень', desc:'Гепатопротекция: 17α-алкилированные, ферменты, стеатоз', color:'#84cc16', system:'Печень', tags:['АЛТ/АСТ','Холестаз','Стеатоз'] },
+    { id:'renal', icon:'💧', label:'Почки', desc:'Нефропротекция: RAAS, протеинурия, СКФ, электролиты', color:'#3b82f6', system:'Почки', tags:['СКФ','Протеинурия','RAAS'] },
+    { id:'joints', icon:'🦴', label:'Суставы', desc:'Здоровье суставов: коллаген, гиалуронан, сухожилия', color:'#22c55e', system:'ОДА', tags:['Коллаген','Сухожилия','Воспаление'] },
+    { id:'acne', icon:'🔴', label:'Акне', desc:'Андроген-индуцированное акне: топика, системная, рубцы', color:'#f97316', system:'Кожа', tags:['Андрогены','Себум','Рубцы'] },
+    { id:'injections', icon:'💉', label:'Инъекции', desc:'Техника, осложнения, постинъекционные абсцессы', color:'#14b8a6', system:'Общее', tags:['Техника','Абсцесс','Стерильность'] },
+    { id:'thyroid', icon:'🦋', label:'Тиреоидный', desc:'Щитовидная железа: T3/T4/ТТГ на ААС, GH, диете', color:'#ec4899', system:'Эндокринная', tags:['ТТГ','T3/T4','GH','Гипотиреоз'] },
+    { id:'immune', icon:'🛡️', label:'Иммунитет', desc:'Иммунная модуляция: SHBG, микроорганизмы, вакцинация', color:'#6366f1', system:'Иммунная', tags:['Инфекции','Вакцинация','SHBG'] },
+    { id:'e2', icon:'🔬', label:'Эстрадиол', desc:'Контроль E2: AI, SERM, гинекомастия, стероидный баланс', color:'#f472b6', system:'Гормоны', tags:['Ароматаза','AI','SERM','Гинекомастия'] },
+    { id:'sleep', icon:'💤', label:'Сон', desc:'Качество сна: мелатонин, GABA, кортизол, HPA-ось', color:'#8b5cf6', system:'Нервная', tags:['Мелатонин','ГАМК','Кортизол'] },
+    { id:'detox', icon:'🧬', label:'Детокс', desc:'Фаза II детокса: метилирование, глутатион, Nrf2', color:'#22d3ee', system:'Печень', tags:['Глутатион','Метилирование','Nrf2'] },
+    { id:'gh', icon:'🫀', label:'GH/IGF-1', desc:'Гормон роста: соматопауза, IGF-1, метаболические эффекты', color:'#2dd4bf', system:'Эндокринная', tags:['GH','IGF-1','Соматопауза'] },
+    { id:'glp1', icon:'🍪', label:'GLP-1', desc:'Инкретины: GLP-1, вес, глюкоза, липиды, вискеральный жир', color:'#f59e0b', system:'Метаболизм', tags:['GLP-1','Вес','Глюкоза','Липиды'] },
+    { id:'hemato', icon:'🩸', label:'Гематология', desc:'Гематокрит, вязкость крови, тромбоциты, эритроцитоз', color:'#ef4444', system:'Кровь', tags:['HCT','Тромбоциты','Вязкость'] },
+    { id:'metabolic', icon:'⚖️', label:'Метаболизм', desc:'Инсулин, липиды, глюкоза, мочевая кислота, гомоцистеин', color:'#f59e0b', system:'Метаболизм', tags:['ИР','Липиды','Глюкоза','Гомоцистеин'] },
+    { id:'gi', icon:'🫀', label:'ЖКТ', desc:'Желудочно-кишечный тракт: кишечник, всасывание, микробиом', color:'#84cc16', system:'ЖКТ', tags:['Микробиом','Всасывание','Проницаемость'] },
+    { id:'hair', icon:'💇', label:'Кожа/Волосы', desc:'Андрогенетическая алопеция, кожа, себум, акне', color:'#f97316', system:'Кожа', tags:['Алопеция','DHT','Андрогены'] },
+    { id:'electrolytes', icon:'⚡', label:'Электролиты', desc:'K⁺/Na⁺/Mg²⁺/Ca²⁺: коррекция, экстренная помощь', color:'#ef4444', system:'Общее', tags:['K⁺','Mg²⁺','Экстренная'] },
+    { id:'prolactin', icon:'🤱', label:'Пролактин', desc:'Гиперпролактинемия: каберголин, B6, фазы по PRL', color:'#ec4899', system:'Гормоны', tags:['PRL','Каберголин','D2-агонист'] },
+    { id:'adaptogen', icon:'🌿', label:'Адаптогены/HPA', desc:'Кортизол: фазы, HPA-ось, аддисонический криз', color:'#22c55e', system:'Нервная', tags:['Кортизол','HPA','Адаптогены'] },
+    { id:'mito', icon:'⚡', label:'Митохондрии', desc:'NAD⁺/CoQ10/PQQ: митохондриальный биогенез, энергия', color:'#06b6d4', system:'Метаболизм', tags:['NAD⁺','CoQ10','Митохондрии'] },
+    { id:'steatosis', icon:'🫁', label:'Стеатоз', desc:'НАЖБП: берберин, TUDCA, омега-3 EPA, HБП', color:'#84cc16', system:'Печень', tags:['НАЖБП','Стеатоз','Фиброз'] },
+    { id:'raas', icon:'🫀', label:'RAAS (АД/Почки)', desc:'Ренин-ангиотензин: АД, протеинурия, ХБП, фиброз', color:'#3b82f6', system:'ССС', tags:['АД','RAAS','Протеинурия'] },
+    { id:'peptide', icon:'🧬', label:'Пептиды', desc:'GHRP, BPC-157, ноотропы, иммунные — справочник', color:'#2dd4bf', system:'Общее', tags:['GHRP','BPC-157','Ноотропы'] },
+    { id:'postcycle', icon:'🔄', label:'Постцикл', desc:'Реабилитация после курса: липиды, HCT, HPTA, нейро', color:'#8b5cf6', system:'Общее', tags:['HPTA','ПКТ','Липиды','Гематокрит'] },
+    { id:'pct', icon:'💊', label:'ПКТ', desc:'Послекурсовая терапия: SERM, hCG, HPTA-восстановление', color:'#22c55e', system:'Гормоны', tags:['ПКТ','SERM','hCG','HPTA'] },
+    { id:'fertility', icon:'👶', label:'Фертильность', desc:'Репродуктивное здоровье: спермограмма, гормоны, DFI', color:'#ec4899', system:'Репродуктивная', tags:['Сперма','Гормоны','DFI','ЭКО'] },
+    { id:'hrt', icon:'🔄', label:'ГЗТ (HRT)', desc:'Заместительная гормональная терапия: протоколы, мониторинг', color:'#f59e0b', system:'Гормоны', tags:['ГЗТ','TRT','Замещение'] },
+  ];
 
   // Local sub-tabs for expanded protocols
   const [jointTab, setJointTab] = useState('protocol');
@@ -64,51 +101,169 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
   const [ghTab, setGhTab] = useState('protocol');
   const [glp1Tab, setGlp1Tab] = useState('protocol');
 
+  // NEW PROTOCOLS (Jul 09)
+  const [electrolytesTab, setElectrolytesTab] = useState('protocol');
+  const [prolactinTab, setProlactinTab] = useState('protocol');
+  const [adaptogenTab, setAdaptogenTab] = useState('protocol');
+  const [mitoTab, setMitoTab] = useState('protocol');
+  const [steatosisTab, setSteatosisTab] = useState('protocol');
+  const [starterLevel, setStarterLevel] = useState('level1');
+  const [raasTab, setRaasTab] = useState('protocol');
+  const [peptideTab, setPeptideTab] = useState('protocol');
+  const [postCycleTab, setPostCycleTab] = useState('protocol');
+
+  // Определение уровня риска/триажа для item
+  const triageBadge = (tier: 'ess' | 'rec' | 'opt') => {
+    const cfg: Record<string, { label: string; color: string; bg: string }> = {
+      ess: { label: '🔴 Обязательно', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
+      rec: { label: '🟡 Рекомендовано', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+      opt: { label: '🟢 Опционально', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+    };
+    const c = cfg[tier];
+    return <span style={{ fontSize:6, fontWeight:700, padding:'1px 5px', borderRadius:3, background:c.bg, color:c.color, marginLeft:4 }}>{c.label}</span>;
+  };
+
+  // Бейдж фазы цикла
+  const phaseBadge = (phase: string) => {
+    const colors: Record<string, string> = { blast:'#ef4444', cruise:'#f59e0b', pct:'#22c55e', bridge:'#6366f1', trt:'#3b82f6' };
+    return <span style={{ fontSize:6, fontWeight:700, padding:'1px 4px', borderRadius:3, background:(colors[phase]||'#888')+'22', color:colors[phase]||'#888', marginLeft:4 }}>{phase === 'blast' ? 'Курс' : phase === 'cruise' ? 'Крейсер' : phase === 'pct' ? 'ПКТ' : phase === 'bridge' ? 'Мост' : phase === 'trt' ? 'TRT' : phase}</span>;
+  };
+
+  // Полипрагмазия-чек
+  const [activeProtocolCount, setActiveProtocolCount] = useState(0);
+  const polypharmNote = activeProtocolCount > 3
+    ? <div style={{ borderRadius:8, padding:10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', marginBottom:8 }}>
+        <div style={{ fontSize:9, fontWeight:700, color:'#ef4444', marginBottom:2 }}>⚠️ Полипрагмазия: активных протоколов {'>'}3 ({activeProtocolCount})</div>
+        <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.3 }}>• CYP450-конкуренция: NAC + TUDCA (UGT2B7), берберин + статины (CYP3A4), омега-3 + аспирин (риск кровотечения)<br/>• Разделите NAC и TUDCA на 2 ч, берберин и статины — на 4 ч<br/>• При ≥15 препаратов — риск полипрагмазии: ↓ до 7-10 core</div>
+      </div>
+    : null;
+
+  // ── Единый ItemRow с триажем, фазой и отметкой обязательности ──
+  const ItemRowTriage: React.FC<{ name: string; dose: string; timing: string; note: string; color: string; tier?: 'ess' | 'rec' | 'opt'; phase?: string }> = ({ name, dose, timing, note, color, tier, phase }) => (
+    <div style={{ padding:'5px 8px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:2 }}>
+        <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{name}{tier ? triageBadge(tier) : null}{phase ? phaseBadge(phase) : null}</span>
+        <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+          <span style={{ fontSize:8, fontWeight:700, color }}>{dose}</span>
+          <span style={{ fontSize:7, color:'var(--text-dim)', padding:'1px 5px', borderRadius:4, background:'rgba(255,255,255,0.04)' }}>{timing}</span>
+        </div>
+      </div>
+      <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.3, marginTop:1 }}>{note}</div>
+    </div>
+  );
+
+  // ── Render phase card (единый для всех протоколов) ──
+  // ── Compact row for simple items ──
+  const renderRow = (x: any, i: number, color: string) => (
+    <div key={i} style={{ padding:'6px 8px', borderRadius:6, marginBottom:4, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)' }}>
+      <span style={{ fontSize:8, fontWeight:700, color:'var(--text-light)' }}>{x.n}</span>
+      {x.d ? <span style={{ fontSize:7, color, marginLeft:4 }}>{x.d}</span> : null}
+      <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>· {x.t}</span>
+      {x.o ? <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>💡 {x.o}</div> : null}
+    </div>
+  );
+
+  // ── Render phase card (единый для всех протоколов) ──
+  const renderPhase = (p: any, i: number) => (
+    <div key={i} style={{ borderRadius:12, background:p.color+'08', border:'1px solid '+p.color+'22', padding:10 }}>
+      <div style={{ fontSize:10, fontWeight:700, color:p.color }}>{p.phase}</div>
+      <div style={{ fontSize:8, fontWeight:600, color:p.color+'aa', marginBottom:2 }}>{p.label}</div>
+      <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:4 }}>{p.condition}</div>
+      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>{p.desc}</div>
+      {p.items.map((x: any, xi: number) => (
+        <div key={xi} style={{ padding:'5px 6px', borderRadius:6, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+          <span style={{ fontSize:8, fontWeight:700, color:'var(--text-light)' }}>{x.name}</span>
+          <span style={{ fontSize:7, color:p.color, marginLeft:4 }}>{x.dose}</span>
+          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>· {x.timing}</span>
+          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>{x.note}</div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // ── Render timing card ──
+  const timingBlock = (protocol: string, slots: Array<{time:string;items:Array<{n:string;why:string}>}>) => (
+    <div style={cardBg}>
+      <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>⏰ Тайминг приёма</div>
+      {slots.map((slot: any, si: number) => (
+        <div key={si} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.12)' }}>
+          <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>{slot.time}</div>
+          {slot.items.map((x: any, xi: number) => (
+            <div key={xi} style={{ padding:'5px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+              <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{x.n}</span>
+              <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:6 }}>— {x.why}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+
+  // ── Render monitoring card ──
+  const monitoringBlock = (markers: Array<{marker:string;target:string;when:string;action:string}>) => (
+    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+      <div style={cardBg}>
+        <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🧪 Лабораторный мониторинг</div>
+        {markers.map((m: any, i: number) => (
+          <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.08)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+              <span style={{ fontSize:9, fontWeight:700, color:'#60a5fa' }}>{m.marker}</span>
+              <span style={{ fontSize:8, fontWeight:600, color:'#3b82f6' }}>{m.when}</span>
+            </div>
+            <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}><b style={{color:'#60a5fa'}}>Цель: {m.target}</b></div>
+            <div style={{ fontSize:7, color:'#60a5fa', lineHeight:1.3, padding:'4px 6px', borderRadius:4, background:'rgba(59,130,246,0.06)' }}>💡 {m.action}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
         <div style={{ padding:'0 0 70px' }}>
-          {/* Warning card */}
-          <div style={{ borderRadius:12, padding:14, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)', marginBottom:8 }}>
-            <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#f59e0b' }}>⚠️ Важные замечания</h3>
-            <div style={{ margin:0 }}>
-              <p style={{ margin:'0 0 4px', fontSize:9, lineHeight:1.3 }}><b>Информация носит ознакомительный характер.</b> Подбор поддержки должен производиться врачом или профильным специалистом с учётом индивидуальных особенностей: возраста, веса, генетических полиморфизмов (MTHFR, COMT, CYP), сопутствующих заболеваний и принимаемых лекарств.</p>
-              <p style={{ margin:'0 0 4px', fontSize:9, lineHeight:1.3 }}><b>Без лабораторных данных</b> система использует среднестатистические риски по курсу. Для точного подбора необходимы свежие анализы (не старше 3 месяцев).</p>
-              <p style={{ margin:'0 0 4px', fontSize:9, lineHeight:1.3 }}><b>Противопоказания:</b> некоторые вещества несовместимы с определёнными заболеваниями или лекарствами. Проконсультируйтесь со специалистом.</p>
-              <p style={{ margin:'0 0 4px', fontSize:9, lineHeight:1.3 }}><b>Возраст:</b> гиполипидемическая терапия (статины/эзетимиб) — для {'>'}40 лет или при семейной гиперхолестеринемии.</p>
-              <p style={{ margin:'0 0 4px', fontSize:9, lineHeight:1.3 }}><b>Курс-риски:</b> тренболон + телмисартан → риск K+. Оральные ААС + статины → аддитивная гепатотоксичность. НПВС на курсе → обязательно ИПП.</p>
-              <p style={{ margin:'0 0 4px', fontSize:9, lineHeight:1.3 }}><b>💊 Рецептурные</b> помечены 💊 и требуют назначения врача.</p>
-              <p style={{ margin:0, fontSize:9, lineHeight:1.3 }}><b>Дозы:</b> часть рекомендаций — диапазон. При противоречиях с support-plan — приоритет у лечащего врача.</p>
+          {protocolView === 'menu' ? (
+            /* ── MENU: карточки-кнопки всех протоколов ── */
+            <div>
+              <div style={{ fontSize:14, fontWeight:800, color:'var(--text-light)', marginBottom:8 }}>📋 Выберите протокол поддержки</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                {PROTOCOL_CARDS.map(p => (
+                  <button key={p.id} onClick={() => { setProtocolTab(p.id); setProtocolView('detail'); }}
+                    style={{ display:'flex', flexDirection:'column', alignItems:'flex-start', textAlign:'left', gap:4,
+                      padding:'10px', borderRadius:10, cursor:'pointer', border:'1px solid '+p.color+'44',
+                      background:'rgba(24,24,27,0.8)', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
+                      transition:'all 0.15s'
+                    }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:6, width:'100%' }}>
+                      <span style={{ fontSize:20 }}>{p.icon}</span>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:11, fontWeight:700, color:'var(--text-light)' }}>{p.label}</div>
+                        <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.2, marginTop:1 }}>{p.desc}</div>
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginTop:3 }}>
+                      {p.tags.map((t: any, ti: number) => (
+                        <span key={ti} style={{ fontSize:6, fontWeight:600, padding:'1px 5px', borderRadius:4,
+                          background:p.color+'18', color:p.color }}>{t}</span>
+                      ))}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            /* ── DETAIL: выбранный протокол ── */
+            <div>
+              {/* Back button */}
+              <button onClick={() => setProtocolView('menu')} style={{ display:'flex', alignItems:'center', gap:4,
+                padding:'6px 12px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer', marginBottom:8,
+                background:'var(--bg-secondary)', color:'var(--text-light)', border:'1px solid var(--border)'
+              }}>← Назад к списку</button>
 
-          {/* Protocol sub-tab pills */}
-          <div style={{ display:'flex', gap:4, padding:'4px 0 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[
-              ['pct','ПКТ','#8b5cf6'],
-              ['fertility','Фертильность','#ec4899'],
-              ['hrt','ГЗТ','#f59e0b'],
-              ['neuro','Нейро','#06b6d4'],
-              ['cardio','Кардио','#ef4444'],
-              ['hepatic','Печень','#84cc16'],
-              ['renal','Почки','#3b82f6'],
-              ['joints','Суставы','#22c55e'],
-              ['acne','Акне','#f97316'],
-              ['injections','💉 Инъекции','#14b8a6'],
-              ['thyroid','🦋 Тиреоидный','#ec4899'],
-              ['immune','🛡️ Иммунитет','#6366f1'],
-              ['e2','🔬 Эстрадиол','#f472b6'],
-              ['sleep','💤 Сон','#8b5cf6'],
-              ['detox','🧬 Детокс','#22d3ee'],
-              ['gh','🫀 GH/IGF-1','#2dd4bf'],
-              ['glp1','🍪 GLP-1','#f59e0b'],
-            ].map(([id, label, color]: [string, string, string]) => (
-              <button key={id} onClick={() => setProtocolTab(id)} style={{
-                padding:'7px 16px', borderRadius:22, fontSize:12, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                background: protocolTab === id ? color : 'var(--bg-secondary)',
-                color: protocolTab === id ? '#000' : 'var(--text-dim)',
-                border: '1px solid ' + (protocolTab === id ? color : 'var(--border)'),
-              }}>{label}</button>
-            ))}
-          </div>
+              {/* Warning card (minimized) */}
+              <div style={{ borderRadius:10, padding:10, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)', marginBottom:8 }}>
+                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}>
+                  <b style={{color:'#f59e0b'}}>⚠️ Информация ознакомительная.</b> Подбор — врачом. Без лаборатории — среднестатистические риски. 💊 = рецептурный, требует врача.
+                </div>
+              </div>
 
           {/* Content: PCT / Fertility / HRT */}
           {(['pct','fertility','hrt'] as string[]).includes(protocolTab) && (
@@ -3285,6 +3440,1609 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
 
           </InfoErrorBoundary>)}
 
-        </div>
+          {/* ══════════ ТИРЕОИДНЫЙ ══════════ */}
+          {protocolTab === 'thyroid' && (<InfoErrorBoundary label="Тиреоидный">
+            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#ec4899', marginBottom:2 }}>🦋 Тиреоидная поддержка на курсе ААС</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Контроль функции щитовидной железы: T3, T4, ТТГ. ААС могут подавлять ось HPTA и влиять на метаболизм тиреоидных гормонов.</p>
+              </div>
+
+              <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
+                {[
+                  { id:'mechanisms', label:'🔬 Механизмы' },
+                  { id:'protocol', label:'💊 Фазы протокола' },
+                  { id:'timing', label:'⏰ Тайминг' },
+                  { id:'monitoring', label:'🧪 Мониторинг' },
+                ].map((t: any) => (
+                  <button key={t.id} onClick={() => setThyroidTab(t.id)}
+                    style={thyroidTab === t.id ? pillActive('#ec4899') : pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+
+              {thyroidTab === 'mechanisms' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🔬 Механизмы влияния ААС на щитовидную железу</div>
+                  {[{ m:'Снижение ТТГ', e:'Экзогенные андрогены подавляют гипоталамо-гипофизарную ось → ↓ ТТГ → ↓ T4 → ↓ T3. Аналогично центральному гипотиреозу' },
+                    { m:'Конверсия T4→T3', e:'ААС модулируют дейодиназу D1/D2: ↑ активность → относительный избыток T3 на фоне низкого T4' },
+                    { m:'Транспорт (TBG)', e:'Андрогены снижают тироксин-связывающий глобулин (TBG) в печени → ↓ общего T4/T3 при нормальном свободном' },
+                    { m:'Прямая токсичность', e:'Высокие дозы ААС (особенно тренболон) могут вызывать тиреоидит → ↑ обратного T3 (rT3) → тканевой гипотиреоз' },
+                  ].map((x, i) => (
+                    <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.08)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#f9a8d4', marginBottom:2 }}>{x.m}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>{x.e}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {thyroidTab === 'protocol' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    { phase:'ФАЗА 1 · ПРОФИЛАКТИКА', label:'ТТГ/Т3/Т4 в норме', color:'#22c55e', condition:'ТТГ 0.5-2.5, T4 св 10-22, T3 св 3.5-6.5', desc:'Мониторинг + нутритивная поддержка',
+                      items:[
+                        { name:'Селен (L-селенометионин)', dose:'200 мкг', timing:'Утро с едой', note:'Кофактор дейодиназ (↓ rT3, ↑ активность конверсии T4→T3). Снижает риск тиреоидита' },
+                        { name:'Цинк (пиколинат)', dose:'30 мг', timing:'Вечер', note:'Кофактор синтеза ТТГ. Дефицит цинка → ↓ ТТГ и T3' },
+                        { name:'Йод (калия йодид)', dose:'150 мкг', timing:'Утро', note:'Субстрат для синтеза T4/T3. Только при отсутствии аутоиммунного тиреоидита' },
+                        { name:'L-тирозин', dose:'500 мг', timing:'Утро натощак', note:'Аминокислота-предшественник тиреоидных гормонов' },
+                      ]},
+                    { phase:'ФАЗА 2 · СУБКЛИНИЧЕСКИЙ ГИПОТИРЕОЗ', label:'ТТГ 2.5-4.5 / T4 низкий', color:'#f59e0b', condition:'ТТГ {'>'}2.5, T4 св {'<'}10', desc:'Мягкая коррекция',
+                      items:[
+                        { name:'L-T4 (левотироксин) 25-50 мкг 💊', dose:'25-50 мкг', timing:'Утро натощак за 30-60 мин до еды', note:'Старт с 25 мкг. Титрация каждые 4-6 нед по ТТГ. Цель ТТГ 0.5-2.0' },
+                        { name:'Селен 200 мкг', dose:'200 мкг', timing:'Утро', note:'Продолжить. Оптимизация конверсии T4→T3' },
+                        { name:'Ашваганда (Withania)', dose:'300-600 мг', timing:'2×/день', note:'Адаптоген. Повышает ТТГ, T4 и T3 у субклинического гипотиреоза. Курс 8-12 нед' },
+                      ]},
+                    { phase:'ФАЗА 3 · МАНИФЕСТНЫЙ ГИПОТИРЕОЗ', label:'ТТГ {'>'}4.5 / T4 низкий', color:'#f97316', condition:'ТТГ {'>'}4.5, T4 св {'<'}9, симптомы', desc:'Заместительная терапия',
+                      items:[
+                        { name:'L-T4 (левотироксин) 50-100 мкг 💊', dose:'50-100 мкг', timing:'Утро натощак', note:'Доза по весу: 1.6 мкг/кг. Титрация каждые 4-6 нед' },
+                        { name:'L-T4 + L-T3 (комбинированная терапия) 💊', dose:'T4 50-75 мкг + T3 5-10 мкг', timing:'T4 утром, T3 дробно', note:'При недостаточном ответе на моно-T4. Контроль T3 св. Не превышать T3 {'>'}15 мкг/сут' },
+                        { name:'Исключить дефицит Fe, Se, Zn', dose:'По анализам', timing:'Коррекция до нормализации', note:'Дефицит железа → ↓ активности ТПО. Ферритин {'>'}70, Se {'>'}1.2 мкмоль/л' },
+                      ]},
+                    { phase:'ФАЗА 4 · ТИРЕОТОКСИКОЗ / ГИПЕРТИРЕОЗ', label:'ТТГ {'<'}0.1 / T3/T4 высокий', color:'#ef4444', condition:'ТТГ {'<'}0.1, T3 св {'>'}6.5, пульс {'>'}100', desc:'Неотложно. Исключить тиреоидит/тиреотоксикоз от ААС',
+                      items:[
+                        { name:'β-блокатор (пропранолол 20-40 мг)', dose:'20-40 мг', timing:'2-3×/день', note:'Контроль пульса {'<'}90. Симптоматическая терапия до нормализации T3' },
+                        { name:'Тионамиды (тиамазол 5-20 мг) 💊', dose:'5-20 мг', timing:'1-2×/день', note:'Ингибитор синтеза T3/T4. Только по назначению эндокринолога' },
+                        { name:'Отмена тиреоидных препаратов', dose:'—', timing:'Немедленно', note:'Отменить L-T4. Контроль T3/T4/ТТГ каждые 3-5 дней' },
+                        { name:'Консультация эндокринолога', dose:'—', timing:'Срочно', note:'При тиреотоксикозе — госпитализация при пульсе {'>'}120, аритмии' },
+                      ]},
+                  ].map((p: any, i: any) => (
+                    <div key={i} style={{ borderRadius:12, background:p.color+'08', border:'1px solid '+p.color+'22', padding:10 }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:p.color }}>{p.phase}</div>
+                      <div style={{ fontSize:8, fontWeight:600, color:p.color+'aa', marginBottom:2 }}>{p.label}</div>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:4 }}>{p.condition}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>{p.desc}</div>
+                      {p.items.map((x: any, xi: any) => (
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:6, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:700, color:'var(--text-light)' }}>{x.name}</span>
+                          <span style={{ fontSize:7, color:p.color, marginLeft:4 }}>{x.dose}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>· {x.timing}</span>
+                          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>💡 {x.note}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {thyroidTab === 'timing' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>⏰ Суточный тайминг тиреоидной поддержки</div>
+                  <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Левотироксин строго натощак за 30-60 мин до еды. Селен и цинк — в разное время суток.</p>
+                  {[
+                    { time:'🌅 Утро (06:00–09:00)', color:'#f59e0b', items:[
+                      { n:'L-T4 25-100 мкг (если назначен)', why:'Натощак за 30-60 мин до еды. Не запивать кальцием/железом — интервал 4 ч' },
+                      { n:'L-тирозин 500 мг', why:'Натощак. Предшественник тиреоидных гормонов' },
+                      { n:'Селен 200 мкг', why:'С завтраком. Кофактор дейодиназ' },
+                    ]},
+                    { time:'☀️ День (12:00–16:00)', color:'#f97316', items:[
+                      { n:'Ашваганда 300-600 мг', why:'С обедом. Адаптоген, ↑ ТТГ при субклиническом гипотиреозе' },
+                    ]},
+                    { time:'🌙 Вечер (19:00–22:00)', color:'#6366f1', items:[
+                      { n:'Цинк 30 мг', why:'На ночь. Кофактор синтеза ТТГ' },
+                      { n:'Избегать кальция/железа в течение 4 ч после L-T4', why:'Снижают всасывание левотироксина на 20-40%' },
+                    ]},
+                  ].map((slot: any, si: any) =>(
+                    <div key={si} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:slot.color+'0a', border:'1px solid '+slot.color+'22' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:slot.color, marginBottom:4 }}>{slot.time}</div>
+                      {slot.items.map((x: any, xi: any) =>(
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{x.n}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:6 }}>— {x.why}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {thyroidTab === 'monitoring' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={cardBg}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🧪 Лабораторный мониторинг щитовидной железы</div>
+                    {[{ marker:'ТТГ', target:'0.5-2.5 мМЕ/л', when:'Каждые 4-6 нед при терапии', action:'{'<'}0.1 — тиреотоксикоз. {'>'}4.5 — манифестный гипотиреоз. Цель на терапии 0.5-2.0' },
+                      { marker:'T4 свободный', target:'10-22 пмоль/л', when:'Каждые 4-6 нед', action:'{'<'}10 — гипотиреоз. {'>'}22 — гипертиреоз/передозировка L-T4' },
+                      { marker:'T3 свободный', target:'3.5-6.5 пмоль/л', when:'Каждые 4-6 нед', action:'T3 {'>'}6.5 + ТТГ {'<'}0.1 — тиреотоксикоз. T3 {'<'}3.0 + rT3 ↑ — тканевой гипотиреоз' },
+                      { marker:'Анти-ТПО / Анти-ТГ', target:'{'<'}30 МЕ/мл / {'<'}40 МЕ/мл', when:'1 раз до курса', action:'{'>'}нормы — аутоиммунный тиреоидит. Исключить избыток йода. Контроль ТТГ каждые 8 нед' },
+                      { marker:'Ферритин', target:'{'>'}70 нг/мл', when:'Каждые 12 нед', action:'{'<'}70 — дефицит железа → ↓ активности ТПО → ↓ синтеза T4' },
+                      { marker:'Селен в сыворотке', target:'1.2-2.0 мкмоль/л', when:'Каждые 12 нед', action:'{'<'}1.0 — дефицит → ↓ конверсии T4→T3. Коррекция 200 мкг/день' },
+                    ].map((m: any, i: any) =>(
+                      <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.08)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                          <span style={{ fontSize:9, fontWeight:700, color:'#f9a8d4' }}>{m.marker}</span>
+                          <span style={{ fontSize:8, fontWeight:600, color:'#ec4899' }}>{m.when}</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}><b style={{color:'#f9a8d4'}}>Цель: {m.target}</b></div>
+                        <div style={{ fontSize:7, color:'#f9a8d4', lineHeight:1.3, padding:'4px 6px', borderRadius:4, background:'rgba(236,72,153,0.06)' }}>💡 {m.action}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🔗 Перекрёстные предупреждения</div>
+              <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                • ❤️ <b>Кардио:</b> L-T4 повышает потребность миокарда в O₂. Контроль пульса. При тиреотоксикозе — β-блокаторы<br/>
+                • ⚖️ <b>Метаболизм:</b> Тиреоидные гормоны ↑ метаболизм → ↓ веса, ↑ теплопродукции. Контроль калорийности питания<br/>
+                • 🧠 <b>Нейро:</b> Гипотиреоз → депрессия, ↓ когниции. Тиреотоксикоз → тревога, тремор, инсомния<br/>
+                • 🩸 <b>Гематология:</b> L-T4 ↑ антикоагулянтный эффект варфарина. МНО контроль при комбинации
+              </div>
+            </div>
+
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ ИММУНИТЕТ ══════════ */}
+          {protocolTab === 'immune' && (<InfoErrorBoundary label="Иммунитет">
+            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#6366f1', marginBottom:2 }}>🛡️ Иммунная поддержка на курсе ААС</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Укрепление иммунитета, профилактика инфекций на фоне иммуносупрессии от высоких доз ААС, коррекция микробиома и L-глутаминового статуса.</p>
+              </div>
+
+              <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
+                {[
+                  { id:'mechanisms', label:'🔬 Механизмы' },
+                  { id:'protocol', label:'💊 Фазы протокола' },
+                  { id:'timing', label:'⏰ Тайминг' },
+                  { id:'monitoring', label:'🧪 Мониторинг' },
+                ].map((t: any) => (
+                  <button key={t.id} onClick={() => setImmuneTab(t.id)}
+                    style={immuneTab === t.id ? pillActive('#6366f1') : pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+
+              {immuneTab === 'mechanisms' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🔬 Механизмы иммуносупрессии на ААС</div>
+                  {[{ m:'↓ IgA/IgG', e:'Андрогены подавляют продукцию иммуноглобулинов B-клетками. Снижение IgA в слизистых → ↑ риск респираторных инфекций' },
+                    { m:'↓ NK-клеток', e:'Тестостерон ↓ активность и число натуральных киллеров (NK). Противоопухолевый и антивирусный иммунитет снижен' },
+                    { m:'↓ Т-клеточного ответа', e:'ААС ↑ IL-10 (противовоспалительный) и ↓ IL-2, IFN-γ → ↓ цитотоксических T-лимфоцитов' },
+                    { m:'↑ Окислительный стресс', e:'Высокий метаболизм на курсе → ↑ активных форм кислорода → ↓ функции нейтрофилов и макрофагов' },
+                    { m:'Дисбиоз кишечника', e:'Оральные 17α-алкилы нарушают микробиом → ↓ diversity → ↑ проницаемость → системное воспаление' },
+                  ].map((x, i) => (
+                    <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(99,102,241,0.04)', border:'1px solid rgba(99,102,241,0.08)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#a5b4fc', marginBottom:2 }}>{x.m}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>{x.e}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {immuneTab === 'protocol' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    { phase:'ФАЗА 1 · БАЗОВАЯ', label:'Профилактика', color:'#22c55e', condition:'Нет симптомов, инфекции {'<'}2/год', desc:'Базовая иммуноподдержка на любом курсе',
+                      items:[
+                        { name:'Витамин D3', dose:'2000-5000 МЕ', timing:'С жирной едой', note:'Модулятор врождённого и адаптивного иммунитета. ↓ риск респираторных инфекций на 40-70%' },
+                        { name:'Цинк (пиколинат)', dose:'30-50 мг', timing:'Вечер', note:'Кофактор тимулина. Дефицит → атрофия тимуса → ↓ T-клеток' },
+                        { name:'Витамин C (аскорбат натрия)', dose:'1-2 г', timing:'2×/день', note:'Антиоксидант. ↑ хемотаксис нейтрофилов. ↓ длительности простуд на 8-14%' },
+                        { name:'Пробиотики (Lacto+Bifido)', dose:'1 капс', timing:'Утро натощак', note:'Поддержка иммунитета через микробиом. 8+ штаммов, 10⁹ КОЕ' },
+                      ]},
+                    { phase:'ФАЗА 2 · УСИЛЕННАЯ', label:'Частые инфекции', color:'#f59e0b', condition:'Инфекции {'>'}2/год / вялое заживление', desc:'Целенаправленная иммуномодуляция',
+                      items:[
+                        { name:'Бета-глюканы (грибные 1,3/1,6)', dose:'250-500 мг', timing:'Утро натощак', note:'Активация макрофагов и NK-клеток через дектин-1. ↑ IgA в слюне' },
+                        { name:'Кверцетин', dose:'500 мг', timing:'2×/день', note:'Ингибитор TLR4/NF-kB. ↑ Nrf2. Противовоспалительный + антиоксидантный' },
+                        { name:'Лактоферрин', dose:'200-300 мг', timing:'Утро натощак', note:'Хелатор Fe → бактериостатический эффект. ↑ NK-активности' },
+                        { name:'Эхинацея пурпурная (Echinacea)', dose:'300-500 мг', timing:'2×/день', note:'↑ фагоцитоз макрофагов. Курс 8-12 нед с перерывом 1 нед' },
+                      ]},
+                    { phase:'ФАЗА 3 · ТЕРАПЕВТИЧЕСКАЯ', label:'Острая инфекция + курс', color:'#f97316', condition:'ОРВИ/ангина на курсе', desc:'Иммунотерапия + симптоматическая поддержка',
+                      items:[
+                        { name:'NAC 600 мг', dose:'600 мг', timing:'3×/день на 5-7 дней', note:'Муколитик + антиоксидант. ↓ репликации вирусов in vitro. Разжижает мокроту' },
+                        { name:'Витамин C в/в (аскорбат Na) 10-15 г', dose:'10-15 г', timing:'В/в капельно', note:'При пневмонии/тяжёлой инфекции. Противовирусный + антиоксидантный эффект' },
+                        { name:'Андрографис (Andrographis paniculata)', dose:'200-400 мг', timing:'3×/день', note:'Растительный иммуномодулятор. ↓ длительности ОРВИ на 3-5 дней. ↓ IL-6' },
+                        { name:'Цинк 50 мг + лозенги с цинком (25 мг)', dose:'75-100 мг/сут', timing:'Каждые 3-4 ч', note:'Лозенги — при боли в горле. ↓ длительности симптомов на 33%' },
+                      ]},
+                    { phase:'ФАЗА 4 · ПОСТ-ИНФЕКЦИОННАЯ', label:'Восстановление', color:'#ef4444', condition:'После инфекции / затяжной COVID', desc:'Восстановление иммунного ответа и энергии',
+                      items:[
+                        { name:'Креатин + D-рибоза', dose:'Креатин 5 г + рибоза 5 г', timing:'После тренировки', note:'Восстановление энергетического пула клеток. ↓ утомляемости' },
+                        { name:'КоА Q10 (убихинон)', dose:'200-400 мг', timing:'Утро с жирной едой', note:'Митохондриальная поддержка. ↑ энергии. Антиоксидант' },
+                        { name:'Адаптогены (родиола/элеутерококк)', dose:'Родиола 200-400 мг', timing:'Утро', note:'Адаптогены. ↑ сопротивляемости стрессу. ↓ усталости' },
+                      ]},
+                  ].map((p: any, i: any) => (
+                    <div key={i} style={{ borderRadius:12, background:p.color+'08', border:'1px solid '+p.color+'22', padding:10 }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:p.color }}>{p.phase}</div>
+                      <div style={{ fontSize:8, fontWeight:600, color:p.color+'aa', marginBottom:2 }}>{p.label}</div>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:4 }}>{p.condition}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>{p.desc}</div>
+                      {p.items.map((x: any, xi: any) => (
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:6, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:700, color:'var(--text-light)' }}>{x.name}</span>
+                          <span style={{ fontSize:7, color:p.color, marginLeft:4 }}>{x.dose}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>· {x.timing}</span>
+                          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>💡 {x.note}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {immuneTab === 'timing' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>⏰ Суточный тайминг иммуноподдержки</div>
+                  <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Пробиотики натощак, витамин D с жирной едой, цинк на ночь. Адаптогены утром.</p>
+                  {[
+                    { time:'🌅 Утро (06:00–09:00)', color:'#f59e0b', items:[
+                      { n:'Пробиотики 1 капс', why:'Натощак. Макс. выживаемость бактерий' },
+                      { n:'Бета-глюканы 250-500 мг (фаза 2)', why:'Натощак. Активация макрофагов' },
+                      { n:'Витамин C 1-2 г', why:'С завтраком. Антиоксидант + иммуномодулятор' },
+                      { n:'Адаптоген (родиола 200-400 мг)', why:'Утром. Энергия + стресс-устойчивость' },
+                    ]},
+                    { time:'☀️ День (12:00–16:00)', color:'#f97316', items:[
+                      { n:'Кверцетин 500 мг', why:'С обедом. Ингибитор TLR4/NF-kB' },
+                      { n:'Витамин D3 2000-5000 МЕ', why:'С жирной едой. Макс. абсорбция' },
+                      { n:'Эхинацея 300-500 мг (фаза 2+)', why:'С едой. ↑ фагоцитоз' },
+                    ]},
+                    { time:'🌙 Вечер (19:00–22:00)', color:'#6366f1', items:[
+                      { n:'Цинк 30-50 мг', why:'На ночь. Иммуномодулятор + антиоксидант' },
+                      { n:'NAC 600 мг (при инфекции)', why:'Вечером. Муколитик + антиоксидант' },
+                      { n:'Андрографис 200-400 мг (при инфекции)', why:'С ужином. ↓ IL-6, ↓ длительности ОРВИ' },
+                    ]},
+                  ].map((slot: any, si: any) =>(
+                    <div key={si} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:slot.color+'0a', border:'1px solid '+slot.color+'22' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:slot.color, marginBottom:4 }}>{slot.time}</div>
+                      {slot.items.map((x: any, xi: any) =>(
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{x.n}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:6 }}>— {x.why}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {immuneTab === 'monitoring' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={cardBg}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🧪 Лабораторный мониторинг иммунитета</div>
+                    {[{ marker:'IgA, IgG, IgM', target:'IgA 0.7-4.0, IgG 7-16, IgM 0.4-2.3 г/л', when:'Каждые 12-24 нед', action:'IgA {'<'}0.7 — риск инфекций слизистых. IgG {'<'}7 — гипогаммаглобулинемия' },
+                      { marker:'Лейкоциты + лимфоциты', target:'Лейк. 4-9 ×10⁹, лимф. 1.0-4.0', when:'Каждые 4-8 нед', action:'Лимф. {'<'}1.0 — лимфопения на фоне ААС. Поддержка иммунитета' },
+                      { marker:'СРБ (CRP высокочувствительный)', target:'{'<'}1 мг/л', when:'Каждые 8-12 нед', action:'СРБ {'>'}3 — системное воспаление. Кверцетин, куркумин, NAC' },
+                      { marker:'Витамин D (25-OH)', target:'75-150 нмоль/л', when:'Каждые 12-24 нед', action:'{'<'}50 — дефицит. Коррекция D3 5000-10000 МЕ/день 4-8 нед' },
+                      { marker:'Цинк в сыворотке', target:'0.75-1.5 мкг/мл', when:'Каждые 12 нед', action:'{'<'}0.75 — дефицит → ↓ функции тимуса. Цинк 50 мг/день' },
+                      { marker:'Ферритин', target:'30-150 нг/мл', when:'Каждые 12 нед', action:'{'<'}30 — дефицит Fe → ↓ T-клеточного ответа. Коррекция железа' },
+                    ].map((m: any, i: any) =>(
+                      <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(99,102,241,0.04)', border:'1px solid rgba(99,102,241,0.08)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                          <span style={{ fontSize:9, fontWeight:700, color:'#a5b4fc' }}>{m.marker}</span>
+                          <span style={{ fontSize:8, fontWeight:600, color:'#6366f1' }}>{m.when}</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}><b style={{color:'#a5b4fc'}}>Цель: {m.target}</b></div>
+                        <div style={{ fontSize:7, color:'#a5b4fc', lineHeight:1.3, padding:'4px 6px', borderRadius:4, background:'rgba(99,102,241,0.06)' }}>💡 {m.action}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🔗 Перекрёстные предупреждения</div>
+              <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                • 🫁 <b>Печень:</b> Высокие дозы витамина D3 — контроль АЛТ/АСТ при жировом гепатозе<br/>
+                • 💧 <b>Почки:</b> Эхинацея противопоказана при аутоиммунных заболеваниях (СКВ, ревматоидный артрит)<br/>
+                • 🫀 <b>ЖКТ:</b> Пробиотики + иммуносупрессия (кортикостероиды) — редкий риск бактериемии. Не для пациентов с ЦВК<br/>
+                • 🧠 <b>Нейро:</b> NAC {'>'}2400 мг/сут → головная боль, тошнота
+              </div>
+            </div>
+
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ ЭСТРАДИОЛ ══════════ */}
+          {protocolTab === 'e2' && (<InfoErrorBoundary label="Эстрадиол">
+            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#f472b6', marginBottom:2 }}>🔬 Контроль эстрадиола на курсе ААС</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Поддержание оптимального уровня эстрадиола (E2). Профилактика гинекомастии, контроль ароматизации, управление эстроген-зависимыми побочными эффектами.</p>
+              </div>
+
+              <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
+                {[
+                  { id:'mechanisms', label:'🔬 Механизмы' },
+                  { id:'protocol', label:'💊 Фазы протокола' },
+                  { id:'timing', label:'⏰ Тайминг' },
+                  { id:'monitoring', label:'🧪 Мониторинг' },
+                ].map((t: any) => (
+                  <button key={t.id} onClick={() => setE2Tab(t.id)}
+                    style={e2Tab === t.id ? pillActive('#f472b6') : pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+
+              {e2Tab === 'mechanisms' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🔬 Механизмы эстрогенного контроля</div>
+                  {[{ m:'Ароматизация андрогенов', e:'Ароматаза (CYP19A1) конвертирует тестостерон в эстрадиол в жировой ткани, печени, молочных железах. Чем выше T → тем выше E2' },
+                    { m:'Гинекомастия', e:'Эстрадиол стимулирует пролиферацию протоков молочных желёз через ERα. Риск при E2 {'>'}150 пг/мл у мужчин' },
+                    { m:'Задержка жидкости', e:'E2 ↑ альдостерон → ↑ реабсорбции Na⁺ → задержка воды, отёки, ↑ АД' },
+                    { m:'Либидо и настроение', e:'E2 необходим для либидо и когнитивной функции. Слишком низкий E2 ({'<'}20) = ↓ либидо, депрессия, упадок энергии' },
+                  ].map((x, i) => (
+                    <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(244,114,182,0.04)', border:'1px solid rgba(244,114,182,0.08)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#f9a8d4', marginBottom:2 }}>{x.m}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>{x.e}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {e2Tab === 'protocol' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    { phase:'ФАЗА 1 · ПРОФИЛАКТИКА', label:'E2 в норме', color:'#22c55e', condition:'E2 20-60 пг/мл', desc:'Мониторинг + превентивные меры',
+                      items:[
+                        { name:'DIM (дииндолилметан)', dose:'200-400 мг', timing:'2×/день', note:'Модулятор метаболизма E2: ↑ 2-OH (антипролиферативный), ↓ 16α-OH (пролиферативный). Профилактика гинекомастии' },
+                        { name:'Цинк (пиколинат)', dose:'30-50 мг', timing:'Вечер', note:'Слабая ингибиция ароматазы. Здоровый уровень E2' },
+                        { name:'Кальций-D-глюкарат', dose:'1-2 г', timing:'2×/день', note:'Связывает конъюгированные эстрогены в кишечнике → ↓ рециркуляции E2' },
+                        { name:'Ингибиторы ароматазы (только при симптомах)', dose:'—', timing:'—', note:'Анастрозол 0.5-1 мг/нед. ТОЛЬКО при E2 {'>'}80 и симптомах. Не для профилактики!' },
+                      ]},
+                    { phase:'ФАЗА 2 · ПОВЫШЕННЫЙ E2', label:'E2 60-120 пг/мл', color:'#f59e0b', condition:'E2 {'>'}60, лёгкие симптомы', desc:'Коррекция ароматизации',
+                      items:[
+                        { name:'Анастрозол 0.5-1 мг 💊', dose:'0.5-1 мг', timing:'1-2×/нед', note:'Ингибитор ароматазы. ↓ E2 на 50-80%. Старт с 0.5 мг × 1/нед. Титрация по E2. ⚠ ↓ ЛПВП, ↑ риск атеросклероза' },
+                        { name:'Тамоксифен 10-20 мг 💊', dose:'10-20 мг', timing:'Ежедневно', note:'Селективный модулятор ER. Блокирует ERα в груди → профилактика гинекомастии. Не снижает E2 — только блокирует рецепторы' },
+                        { name:'DIM 400 мг', dose:'400 мг', timing:'2×/день', note:'Продолжить. ↓ 16α-OH метаболита' },
+                        { name:'Контроль E2', dose:'—', timing:'Каждые 2-4 нед', note:'Целевой E2 20-40 пг/мл на терапии. Не снижать {'<'}20!' },
+                      ]},
+                    { phase:'ФАЗА 3 · ВЫСОКИЙ E2', label:'E2 {'>'}120 пг/мл', color:'#f97316', condition:'E2 {'>'}120, симптомы (отёки, чувствительность груди)', desc:'Активная терапия',
+                      items:[
+                        { name:'Анастрозол 1 мг', dose:'1 мг', timing:'2×/нед', note:'Увеличение дозы. Контроль E2 через 2 нед. Цель E2 {'<'}60' },
+                        { name:'Тамоксифен 20 мг', dose:'20 мг', timing:'Ежедневно', note:'Продолжить. При уже имеющейся sensitive груди' },
+                        { name:'Кальций-D-глюкарат 2 г', dose:'2 г', timing:'2×/день', note:'Усиление экскреции эстрогенов через ЖКТ' },
+                        { name:'Рассмотреть снижение дозы T', dose:'—', timing:'—', note:'При невозможности контролировать E2 анастрозолом — снизить дозу тестостерона' },
+                      ]},
+                    { phase:'ФАЗА 4 · НИЗКИЙ E2 (перелечили)', label:'E2 {'<'}20 пг/мл', color:'#ef4444', condition:'E2 {'<'}20, симптомы (суставы, либидо, настроение)', desc:'Восстановление E2',
+                      items:[
+                        { name:'Отменить/снизить анастрозол', dose:'—', timing:'Немедленно', note:'Снизить дозу АИ вдвое или отменить на 1-2 нед до восстановления E2' },
+                        { name:'D-аспарагиновая кислота (DAA)', dose:'3 г', timing:'2×/день', note:'↑ ароматазу → ↑ E2. Мягкое восстановление' },
+                        { name:'Хорионический гонадотропин (hCG)', dose:'500 МЕ', timing:'2×/нед', note:'Стимулирует эндогенный тестостерон → ароматизация → ↑ E2' },
+                        { name:'Контроль E2', dose:'—', timing:'Каждые 1-2 нед', note:'Целевое восстановление E2 до 20-40 пг/мл. Симптомы проходят при {'>'}20' },
+                      ]},
+                  ].map((p: any, i: any) => (
+                    <div key={i} style={{ borderRadius:12, background:p.color+'08', border:'1px solid '+p.color+'22', padding:10 }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:p.color }}>{p.phase}</div>
+                      <div style={{ fontSize:8, fontWeight:600, color:p.color+'aa', marginBottom:2 }}>{p.label}</div>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:4 }}>{p.condition}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>{p.desc}</div>
+                      {p.items.map((x: any, xi: any) => (
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:6, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:700, color:'var(--text-light)' }}>{x.name}</span>
+                          <span style={{ fontSize:7, color:p.color, marginLeft:4 }}>{x.dose}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>· {x.timing}</span>
+                          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>💡 {x.note}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {e2Tab === 'timing' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>⏰ Суточный тайминг контроля E2</div>
+                  <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Анастрозол 1-2×/нед в одно и то же время. Тамоксифен ежедневно. DIM 2×/день.</p>
+                  {[
+                    { time:'🌅 Утро (06:00–09:00)', color:'#f59e0b', items:[
+                      { n:'Анастрозол 0.5-1 мг (1-2×/нед)', why:'Фиксированный день (напр. ср/сб). После еды' },
+                      { n:'Тамоксифен 10-20 мг', why:'Ежедневно утром. Селективный модулятор ER' },
+                      { n:'DIM 200 мг', why:'С завтраком. Метаболизм E2' },
+                    ]},
+                    { time:'☀️ День (12:00–16:00)', color:'#f97316', items:[
+                      { n:'Кальций-D-глюкарат 1-2 г', why:'С обедом. Связывание эстрогенов в кишечнике' },
+                    ]},
+                    { time:'🌙 Вечер (19:00–22:00)', color:'#6366f1', items:[
+                      { n:'DIM 200 мг (вторая доза)', why:'С ужином. Равномерное подавление 16α-OH' },
+                      { n:'Цинк 30-50 мг', why:'На ночь. Слабая ингибиция ароматазы' },
+                    ]},
+                  ].map((slot: any, si: any) =>(
+                    <div key={si} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:slot.color+'0a', border:'1px solid '+slot.color+'22' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:slot.color, marginBottom:4 }}>{slot.time}</div>
+                      {slot.items.map((x: any, xi: any) =>(
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{x.n}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:6 }}>— {x.why}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {e2Tab === 'monitoring' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={cardBg}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🧪 Лабораторный мониторинг E2</div>
+                    {[{ marker:'Эстрадиол (E2, ECLIA/MS)', target:'20-60 пг/мл (мужчины)', when:'Каждые 2-4 нед при терапии АИ', action:'{'<'}20 — низкий (суставы, либидо). {'>'}60 — повышен. {'>'}120 — высокая ароматизация' },
+                      { marker:'Тестостерон общий', target:'{'>'}500 нг/дл (на терапии)', when:'Каждые 4-8 нед', action:'Коррелирует с E2. Высокий T → высокая ароматизация' },
+                      { marker:'Глобулин связывающий половые гормоны (ГСПГ/SHBG)', target:'10-50 нмоль/л', when:'Каждые 8-12 нед', action:'Низкий SHBG → ↑ свободного T → ↑ ароматизации. Высокий SHBG → ↓ свободного T' },
+                      { marker:'Пролактин', target:'{'<'}20 нг/мл', when:'Каждые 8-12 нед', action:'{'>'}20 — ↑ пролактина на 19-нор андрогенах (тренболон). Возможна галакторея' },
+                      { marker:'ЛПВП (HDL)', target:'{'>'}1.0 ммоль/л', when:'Каждые 4-8 нед', action:'Анастрозол ↓ ЛПВП на 15-30%. При {'<'}1.0 — рассмотреть тамоксифен вместо АИ' },
+                    ].map((m: any, i: any) =>(
+                      <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(244,114,182,0.04)', border:'1px solid rgba(244,114,182,0.08)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                          <span style={{ fontSize:9, fontWeight:700, color:'#f9a8d4' }}>{m.marker}</span>
+                          <span style={{ fontSize:8, fontWeight:600, color:'#f472b6' }}>{m.when}</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}><b style={{color:'#f9a8d4'}}>Цель: {m.target}</b></div>
+                        <div style={{ fontSize:7, color:'#f9a8d4', lineHeight:1.3, padding:'4px 6px', borderRadius:4, background:'rgba(244,114,182,0.06)' }}>💡 {m.action}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🔗 Перекрёстные предупреждения</div>
+              <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                • ❤️ <b>Кардио:</b> Анастрозол ↓ ЛПВП на 15-30% + ↑ ЛПНП на 10% — ухудшение липидного профиля. Тамоксифен — более безопасный профиль<br/>
+                • 🦴 <b>Суставы:</b> Низкий E2 ({'<'}20) → суставные боли, крепитация. Отмена/снижение АИ. Добавить хондропротекторы<br/>
+                • 🧠 <b>Нейро:</b> Низкий E2 → депрессия, ангедония, ↓ либидо. Восстановить E2 до {'>'}20 пг/мл<br/>
+                • 🩸 <b>Гематология:</b> Тамоксифен ↑ риск тромбоза (редко, {'<'}1%). Контроль D-димера
+              </div>
+            </div>
+
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ СОН ══════════ */}
+          {protocolTab === 'sleep' && (<InfoErrorBoundary label="Сон">
+            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#8b5cf6', marginBottom:2 }}>💤 Коррекция сна на курсе ААС</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Нормализация циркадных ритмов, борьба с бессонницей от стимулирующих ААС и нейротоксичности. Мелатонин, адаптогены, терморегуляция.</p>
+              </div>
+
+              <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
+                {[
+                  { id:'mechanisms', label:'🔬 Механизмы' },
+                  { id:'protocol', label:'💊 Фазы протокола' },
+                  { id:'timing', label:'⏰ Тайминг' },
+                  { id:'monitoring', label:'🧪 Мониторинг' },
+                ].map((t: any) => (
+                  <button key={t.id} onClick={() => setSleepTab(t.id)}
+                    style={sleepTab === t.id ? pillActive('#8b5cf6') : pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+
+              {sleepTab === 'mechanisms' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🔬 Механизмы нарушений сна на ААС</div>
+                  {[{ m:'↑ Симпатической активности', e:'ААС стимулируют ЦНС через β-адренорецепторы → ↑ норадреналина → ↑ бодрствования, ↓ медленноволнового сна' },
+                    { m:'↓ Мелатонина', e:'Высокий кортизол от тренировок + ААС → ↓ пика мелатонина. Нарушение циркадного ритма' },
+                    { m:'Термогенез', e:'ААС ↑ базальный метаболизм и термогенез → ↑ температура тела → ↓ качества сна. Оптимум {'<'}18°C' },
+                    { m:'Апноэ сна', e:'ААС ↑ мышечную массу шеи → ↑ риск обструктивного апноэ. Высокие дозы AAS + избыточный вес = риск' },
+                    { m:'НОР-19 (тренболон)', e:'Тренболон — мощный нейротоксин. ↑ глутаматную эксайтотоксичность → бессонница + кошмары (т.н. трен-сон)' },
+                  ].map((x, i) => (
+                    <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.08)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#c4b5fd', marginBottom:2 }}>{x.m}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>{x.e}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {sleepTab === 'protocol' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    { phase:'ФАЗА 1 · ГИГИЕНА СНА', label:'Базовая поддержка', color:'#22c55e', condition:'Лёгкие нарушения, {'<'}30 мин засыпания', desc:'Гигиена сна + базовые добавки',
+                      items:[
+                        { name:'Мелатонин (пролонгированный)', dose:'2-5 мг', timing:'За 30-60 мин до сна', note:'↓ времени засыпания на 15-30 мин. ↑ REM-фазы. Не применять {'>'}6 мес непрерывно' },
+                        { name:'Магний L-треонат / глицинат', dose:'200-400 мг', timing:'За 1 ч до сна', note:'Магний L-треонат проникает через ГЭБ — улучшает качество сна. ↓ кортизола' },
+                        { name:'Температура спальни', dose:'18-20°C', timing:'Постоянно', note:'Оптимальная для медленноволнового сна. Использовать кондиционер/вентилятор' },
+                        { name:'Экранный детокс', dose:'—', timing:'За 1-2 ч до сна', note:'Синий свет ↓ мелатонин. Использовать режим «тёплый свет» или очки с блокировкой синего' },
+                      ]},
+                    { phase:'ФАЗА 2 · УМЕРЕННАЯ БЕССОННИЦА', label:'30-60 мин засыпания', color:'#f59e0b', condition:'30-60 мин засыпания, 1-2 пробуждения', desc:'Фармакологическая поддержка',
+                      items:[
+                        { name:'Апигенин (экстракт ромашки)', dose:'50 мг', timing:'За 30-60 мин до сна', note:'Модулятор ГАМК-A (бензодиазепиновый сайт). Без привыкания. ↓ тревоги' },
+                        { name:'Глицин', dose:'3 г', timing:'Под язык за 20-30 мин до сна', note:'Тормозный нейромедиатор. Улучшает качество сна. ↓ времени засыпания' },
+                        { name:'L-теанин', dose:'200-400 мг', timing:'За 30-60 мин до сна', note:'↑ альфа-волн (расслабление). ↓ норадреналина. Мягкая седация' },
+                        { name:'ГАМК (GABA)', dose:'500-1000 мг', timing:'За 30 мин до сна', note:'Внешняя ГАМК ↓ тревоги. Слабая проницаемость ГЭБ, но эффект через блуждающий нерв' },
+                      ]},
+                    { phase:'ФАЗА 3 · ТЯЖЁЛАЯ БЕССОННИЦА', label:'{'>'}60 мин засыпания', color:'#f97316', condition:'{'>'}60 мин засыпания, {'>'}3 пробуждения/ночь', desc:'Интенсивная терапия сна',
+                      items:[
+                        { name:'Мелатонин 10 мг пролонг', dose:'5-10 мг', timing:'За 1-2 ч до сна', note:'Высокая доза для тяжёлых случаев. Контроль уровня кортизола!' },
+                        { name:'Глицин + L-теанин + магний (комплекс)', dose:'Глицин 3 г + L-теанин 400 мг + Mg 400 мг', timing:'За 30-60 мин до сна', note:'Комбинация трёх седативных. Синергия через разные нейромедиаторные системы' },
+                        { name:'Ашваганда (экстракт KSM-66)', dose:'600 мг', timing:'За 30 мин до сна', note:'Адаптоген. ↓ кортизола на 20-30%. Улучшает качество и продолжительность сна' },
+                        { name:'Травяной сбор (хмель+валериана+мелисса)', dose:'1 чашка', timing:'За 30 мин до сна', note:'Седативные травы. Не применять {'>'}4 нед — риск привыкания к валериане' },
+                      ]},
+                    { phase:'ФАЗА 4 · ТРЕБОЛОН/АПНОЭ', label:'Трен-сон / храп', color:'#ef4444', condition:'Кошмары (тренболон) / остановки дыхания', desc:'Специфическая терапия',
+                      items:[
+                        { name:'Празиозин 2-5 мг 💊', dose:'2-5 мг', timing:'На ночь', note:'α1-блокатор. ↓ кошмаров и ночных пробуждений (особенно на тренболоне). По назначению врача' },
+                        { name:'CPAP-терапия (при апноэ)', dose:'По настройкам', timing:'Всю ночь', note:'При апноэ сна (подтверждённом полисомнографией). Снижает сердечно-сосудистый риск' },
+                        { name:'Снижение дозы/отмена тренболона', dose:'—', timing:'—', note:'Самая эффективная мера при трен-сне. Замена на нандролон/примоболан' },
+                        { name:'Консультация сомнолога', dose:'—', timing:'—', note:'При неэффективности {'>'}4 нед. Полисомнография' },
+                      ]},
+                  ].map((p: any, i: any) => (
+                    <div key={i} style={{ borderRadius:12, background:p.color+'08', border:'1px solid '+p.color+'22', padding:10 }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:p.color }}>{p.phase}</div>
+                      <div style={{ fontSize:8, fontWeight:600, color:p.color+'aa', marginBottom:2 }}>{p.label}</div>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:4 }}>{p.condition}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>{p.desc}</div>
+                      {p.items.map((x: any, xi: any) => (
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:6, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:700, color:'var(--text-light)' }}>{x.name}</span>
+                          <span style={{ fontSize:7, color:p.color, marginLeft:4 }}>{x.dose}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>· {x.timing}</span>
+                          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>💡 {x.note}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {sleepTab === 'timing' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>⏰ Вечерний тайминг подготовки ко сну</div>
+                  <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Соблюдение интервалов: магний за 60 мин, мелатонин за 30-60 мин, экранный детокс за 60-120 мин.</p>
+                  {[
+                    { time:'🌆 За 2-3 ч до сна', color:'#f59e0b', items:[
+                      { n:'Экранный детокс', why:'Синий свет ↓ мелатонин. Чтение книги/аудиокнига' },
+                      { n:'Магний L-треонат 200-400 мг', why:'За 2 ч. Проникает через ГЭБ. ↓ кортизола' },
+                      { n:'Температура спальни 18-20°C', why:'Кондиционер/вентилятор. Оптимум для сна' },
+                    ]},
+                    { time:'🌃 За 30-60 мин до сна', color:'#f97316', items:[
+                      { n:'Мелатонин 2-10 мг', why:'За 30-60 мин. Пролонг — за 2 ч' },
+                      { n:'L-теанин 200-400 мг', why:'↑ альфа-волн расслабления' },
+                      { n:'Апигенин 50 мг/Глицин 3 г', why:'ГАМК-эргическая седация. Под язык' },
+                      { n:'Ашваганда 600 мг', why:'↓ кортизола на 20-30%' },
+                    ]},
+                    { time:'🌜 Непосредственно перед сном', color:'#6366f1', items:[
+                      { n:'Празиозин 2-5 мг (при трен-сне)', why:'α1-блокатор. ↓ кошмаров' },
+                      { n:'Травяной сбор (хмель+валериана)', why:'Мягкая седация. Чай без кофеина' },
+                      { n:'CPAP-маска (при апноэ)', why:'На всю ночь. Проверить герметичность' },
+                    ]},
+                  ].map((slot: any, si: any) =>(
+                    <div key={si} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:slot.color+'0a', border:'1px solid '+slot.color+'22' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:slot.color, marginBottom:4 }}>{slot.time}</div>
+                      {slot.items.map((x: any, xi: any) =>(
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{x.n}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:6 }}>— {x.why}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {sleepTab === 'monitoring' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={cardBg}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🧪 Мониторинг сна</div>
+                    {[{ marker:'Дневник сна', target:'{'>'}7 ч/ночь, {'<'}30 мин засыпания', when:'Ежедневно', action:'Записывать время засыпания, пробуждения, качество (1-5). Выявлять триггеры' },
+                      { marker:'Кортизол (вечерняя слюна)', target:'{'<'}3.0 нмоль/л', when:'При хронической бессоннице', action:'{'>'}3.0 — гиперкортизолемия. Ашваганда, фосфатидилсерин. Снизить объём тренировок' },
+                      { marker:'Мелатонин (6-SMT в моче)', target:'{'>'}10 нг/мг креатинина', when:'При подозрении на дефицит', action:'{'<'}10 — дефицит. Мелатонин 2-5 мг за 1 ч до сна' },
+                      { marker:'Полисомнография', target:'N3 {'>'}20%, REM {'>'}20%', when:'При подозрении на апноэ', action:'Апноэ {'>'}5/ч — CPAP-терапия. N3/REM {'<'}нормы — депривация сна' },
+                    ].map((m: any, i: any) =>(
+                      <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.08)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                          <span style={{ fontSize:9, fontWeight:700, color:'#c4b5fd' }}>{m.marker}</span>
+                          <span style={{ fontSize:8, fontWeight:600, color:'#8b5cf6' }}>{m.when}</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}><b style={{color:'#c4b5fd'}}>Цель: {m.target}</b></div>
+                        <div style={{ fontSize:7, color:'#c4b5fd', lineHeight:1.3, padding:'4px 6px', borderRadius:4, background:'rgba(139,92,246,0.06)' }}>💡 {m.action}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🔗 Перекрёстные предупреждения</div>
+              <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                • ❤️ <b>Кардио:</b> Хроническая бессонница → ↑ АД, ↑ риск ССЗ. Коррекция сна — часть кардиопротекции<br/>
+                • 🧠 <b>Нейро:</b> Дефицит сна → ↓ когнитивной функции, ↑ нейротоксичности. См. протокол нейропротекции<br/>
+                • ⚖️ <b>Метаболизм:</b> Недосып → ↓ лептина, ↑ грелина → ↑ аппетита. Контроль калорий<br/>
+                • 💪 <b>Тренировки:</b> {'<'}6 ч сна → ↓ восстановления на 30-50%. Приоритет сна = приоритет прогресса
+              </div>
+            </div>
+
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ ДЕТОКС ══════════ */}
+          {protocolTab === 'detox' && (<InfoErrorBoundary label="Детокс">
+            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#22d3ee', marginBottom:2 }}>🧬 Детоксикация на курсе ААС</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Поддержка фаз I/II детоксикации печени, элиминация ксенобиотиков и токсичных метаболитов ААС, хелатирование тяжёлых металлов.</p>
+              </div>
+
+              <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
+                {[
+                  { id:'mechanisms', label:'🔬 Механизмы' },
+                  { id:'protocol', label:'💊 Фазы протокола' },
+                  { id:'timing', label:'⏰ Тайминг' },
+                  { id:'monitoring', label:'🧪 Мониторинг' },
+                ].map((t: any) => (
+                  <button key={t.id} onClick={() => setDetoxTab(t.id)}
+                    style={detoxTab === t.id ? pillActive('#22d3ee') : pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+
+              {detoxTab === 'mechanisms' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🔬 Пути детоксикации</div>
+                  {[{ m:'Фаза I (CYP450)', e:'CYP3A4 метаболизирует большинство ААС (особенно 17α-алкилы). ↑ нагрузки на CYP → ↑ свободных радикалов — требуется антиоксидантная защита' },
+                    { m:'Фаза II (конъюгация)', e:'Глутатион-S-трансферазы (GST), UDP-глюкуронилтрансферазы (UGT) конъюгируют токсичные метаболиты → экскреция. Требуются кофакторы: глицин, глюкуроновая к-та, сульфат' },
+                    { m:'Метилирование', e:'COMT метилирует катехол-эстрогены (2-OH, 4-OH → нетоксичные метокси). Дефицит МТНFR → ↑ риск токсичности эстрогенов' },
+                    { m:'Антиоксидантная сеть', e:'Глутатион (GSH) — главный антиоксидант. NAC — лимитирующий субстрат синтеза GSH. АЛК регенерирует GSH из окисленной формы' },
+                    { m:'Экскреция (желчь/моча)', e:'Конъюгированные метаболиты экскретируются через желчь (энтерогепатическая рециркуляция) и мочу. Стимуляция желчеоттока — TUDCA, УДХК' },
+                  ].map((x, i) => (
+                    <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(34,211,238,0.04)', border:'1px solid rgba(34,211,238,0.08)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#67e8f9', marginBottom:2 }}>{x.m}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>{x.e}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {detoxTab === 'protocol' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    { phase:'ФАЗА 1 · БАЗОВАЯ ДЕТОКСИКАЦИЯ', label:'NAC + АЛК + TUDCA', color:'#22c55e', condition:'Нормальные АЛТ/АСТ, нет оральных 17α-алкилов', desc:'Базовая поддержка детоксикации на любом курсе',
+                      items:[
+                        { name:'NAC (N-ацетилцистеин)', dose:'600-1200 мг', timing:'2×/день (утро/вечер)', note:'Предшественник глутатиона. Лимитирующий субстрат синтеза GSH. Связывает активные метаболиты токсинов' },
+                        { name:'Альфа-липоевая кислота (АЛК)', dose:'300-600 мг', timing:'Утро', note:'Активатор Nrf2/ARE. ↑ фазу II детоксикации. Регенерирует GSH и витамины C/E. Хелатор тяжёлых металлов' },
+                        { name:'TUDCA (тауроурсодезоксихолевая)', dose:'500-1000 мг', timing:'На ночь', note:'Снижает ER-стресс, улучшает желчеотток, защищает гепатоциты от токсических метаболитов' },
+                        { name:'Гидратация', dose:'2.5-3.5 л/день', timing:'Равномерно', note:'Поддержка почечной экскреции конъюгированных метаболитов' },
+                      ]},
+                    { phase:'ФАЗА 2 · УСИЛЕННАЯ (17α-алкилы)', label:'NAC ×2 + TUDCA + силимарин', color:'#f59e0b', condition:'Оральные 17α-алкилы (метандростенолон, станозолол, оксиметолон)', desc:'Усиленная детоксикация при токсичных ААС',
+                      items:[
+                        { name:'NAC 1200 мг', dose:'1200 мг', timing:'2×/день (2400 мг/сут)', note:'Удвоенная доза для связывания токсичных метаболитов 17α-алкилов. Макс. 3000 мг/сут' },
+                        { name:'Силимарин (экстракт расторопши)', dose:'280-560 мг', timing:'2×/день', note:'Стабилизирует мембраны гепатоцитов. ↑ РНК-полимеразу I. ↓ перекисного окисления липидов' },
+                        { name:'TUDCA 1000 мг', dose:'1000 мг', timing:'На ночь', note:'Полная доза. Защита от ER-стресса, индуцированного 17α-алкилами' },
+                        { name:'АЛК 600 мг', dose:'600 мг', timing:'2×/день', note:'Удвоенная доза для активации Nrf2. ↑ GST, NQO1 (фаза II)' },
+                        { name:'Силимарин + TUDCA', dose:'Синергия', timing:'—', note:'Два независимых механизма: мембранная стабилизация + ↓ ER-стресса. Аддитивная защита' },
+                      ]},
+                    { phase:'ФАЗА 3 · МЕТИЛИРОВАНИЕ', label:'COMT + MTHFR', color:'#f97316', condition:'MTHFR C677T / дефицит метилирования', desc:'Поддержка метилирования (COMT, MTHFR)',
+                      items:[
+                        { name:'S-аденозилметионин (SAM-e)', dose:'400-800 мг', timing:'Утро натощак', note:'Главный донор метильных групп. Поддержка COMT. ↑ настроения, ↓ токсичности катехол-эстрогенов' },
+                        { name:'ТМГ (триметилглицин, бетаин)', dose:'500-1000 мг', timing:'С едой', note:'Донор метильных групп для реметилирования гомоцистеина. Альтернатива SAM-e' },
+                        { name:'Метилфолат (5-МТГФ) 400-800 мкг', dose:'400-800 мкг', timing:'Утро', note:'Активная форма фолата. Для MTHFR-мутантов. Поддержка синтеза SAM-e' },
+                        { name:'Метилкобаламин (B12) 1000-5000 мкг', dose:'1000-5000 мкг', timing:'Под язык', note:'Кофактор метионин-синтазы. Синергия с метилфолатом' },
+                      ]},
+                    { phase:'ФАЗА 4 · ХЕЛАТИРОВАНИЕ', label:'Тяжёлые металлы', color:'#ef4444', condition:'Высокий уровень Hg/Pb/Cd / перегрузка Fe', desc:'Хелатирование и элиминация тяжёлых металлов',
+                      items:[
+                        { name:'Хлорелла (Chlorella vulgaris)', dose:'3-5 г', timing:'2×/день до еды', note:'Связывает Hg, Pb, Cd в кишечнике. ↓ реабсорбции. Курс 4-8 нед' },
+                        { name:'NAC 1200 мг', dose:'1200 мг', timing:'2×/день', note:'Хелатор переходных металлов (Cu, Hg, Pb). ↑ экскреции с мочой' },
+                        { name:'АЛК 600 мг', dose:'600 мг', timing:'2×/день', note:'Хелатор переходных металлов (Fe, Cu). Проходит ГЭБ — хелатирует Hg в мозге' },
+                        { name:'Кордицепс (Cordyceps sinensis)', dose:'1-3 г', timing:'Утро', note:'↑ экскреции токсинов через почки. Адаптоген + иммуномодулятор' },
+                        { name:'Кинза (cilantro) — экстракт', dose:'30-50 капель', timing:'2×/день', note:'Связывает Hg в межклеточном пространстве — мобилизует из депо' },
+                      ]},
+                  ].map((p: any, i: any) => (
+                    <div key={i} style={{ borderRadius:12, background:p.color+'08', border:'1px solid '+p.color+'22', padding:10 }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:p.color }}>{p.phase}</div>
+                      <div style={{ fontSize:8, fontWeight:600, color:p.color+'aa', marginBottom:2 }}>{p.label}</div>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:4 }}>{p.condition}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>{p.desc}</div>
+                      {p.items.map((x: any, xi: any) => (
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:6, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:700, color:'var(--text-light)' }}>{x.name}</span>
+                          <span style={{ fontSize:7, color:p.color, marginLeft:4 }}>{x.dose}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>· {x.timing}</span>
+                          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>💡 {x.note}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {detoxTab === 'timing' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>⏰ Суточный тайминг детокса</div>
+                  <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>NAC и АЛК натощак или с едой (при чувствительном ЖКТ). TUDCA строго натощак перед сном. Силимарин с едой.</p>
+                  {[
+                    { time:'🌅 Утро (06:00–09:00)', color:'#f59e0b', items:[
+                      { n:'NAC 600-1200 мг', why:'Натощак за 1 ч до еды. Макс. абсорбция' },
+                      { n:'АЛК 300-600 мг', why:'С завтраком. Активатор Nrf2' },
+                      { n:'SAM-e 400-800 мг', why:'Натощак. Донор метильных групп' },
+                      { n:'Метилфолат + метилкобаламин', why:'С завтраком. Поддержка метилирования' },
+                    ]},
+                    { time:'☀️ День (12:00–16:00)', color:'#f97316', items:[
+                      { n:'Силимарин 280 мг', why:'С обедом. Стабилизация мембран гепатоцитов' },
+                      { n:'Хлорелла 3-5 г', why:'До еды. Связывание токсинов в кишечнике' },
+                      { n:'ТМГ 500-1000 мг', why:'С едой. Дополнительный донор метильных групп' },
+                      { n:'Гидратация 1-1.5 л', why:'Равномерно. Поддержка почечной экскреции' },
+                    ]},
+                    { time:'🌙 Вечер (19:00–22:00)', color:'#6366f1', items:[
+                      { n:'NAC 600-1200 мг (вторая доза)', why:'Вечером перед сном. Детоксикация во сне' },
+                      { n:'TUDCA 500-1000 мг', why:'Строго натощак (2-3 ч после еды). Макс. холеретический эффект' },
+                      { n:'АЛК 300 мг (вторая доза)', why:'С ужином. Продолжение Nrf2-активации' },
+                      { n:'Кинза (экстракт) 30-50 капель', why:'С водой. Мобилизация Hg из депо' },
+                    ]},
+                  ].map((slot: any, si: any) =>(
+                    <div key={si} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:slot.color+'0a', border:'1px solid '+slot.color+'22' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:slot.color, marginBottom:4 }}>{slot.time}</div>
+                      {slot.items.map((x: any, xi: any) =>(
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{x.n}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:6 }}>— {x.why}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {detoxTab === 'monitoring' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={cardBg}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🧪 Лабораторный мониторинг детоксикации</div>
+                    {[{ marker:'АЛТ/АСТ/ГГТ/ЩФ', target:'АЛТ/АСТ {'<'}40, ГГТ {'<'}55', when:'Каждые 4 нед', action:'АЛТ {'>'}80 (2×ВГН) — усилить фазу 2 детокса. ГГТ {'>'}55 — холестаз, TUDCA 1000 мг' },
+                      { marker:'Глутатион (GSH) в крови', target:'{'>'}600 мкмоль/л', when:'Каждые 8-12 нед', action:'{'<'}600 — истощение GSH. NAC 2400 мг/сут + АЛК 600 мг/сут + селен 200 мкг' },
+                      { marker:'8-OHdG (оксидативный стресс ДНК)', target:'{'<'}2.5 нг/мл', when:'Каждые 12-24 нед', action:'{'>'}2.5 — высокий окислительный стресс. АЛК 600 мг, NAC 2400 мг, куркумин' },
+                      { marker:'Гомоцистеин', target:'{'<'}10 мкмоль/л', when:'Каждые 12 нед', action:'{'>'}12 — дефицит метилирования. SAM-e, ТМГ, метилфолат, B12' },
+                      { marker:'Тяжёлые металлы (Hg, Pb, Cd)', target:'{'<'}5 мкг/л', when:'При симптомах', action:'{'>'}5 — хелатирование. Хлорелла + NAC + АЛК + кинза' },
+                    ].map((m: any, i: any) =>(
+                      <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(34,211,238,0.04)', border:'1px solid rgba(34,211,238,0.08)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                          <span style={{ fontSize:9, fontWeight:700, color:'#67e8f9' }}>{m.marker}</span>
+                          <span style={{ fontSize:8, fontWeight:600, color:'#22d3ee' }}>{m.when}</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}><b style={{color:'#67e8f9'}}>Цель: {m.target}</b></div>
+                        <div style={{ fontSize:7, color:'#67e8f9', lineHeight:1.3, padding:'4px 6px', borderRadius:4, background:'rgba(34,211,238,0.06)' }}>💡 {m.action}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🔗 Перекрёстные предупреждения</div>
+              <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                • ❤️ <b>Кардио:</b> NAC {'>'}2400 мг/сут → ↑ АД (редко). Контроль АД на высоких дозах NAC<br/>
+                • 🫁 <b>Печень:</b> TUDCA не применять при полной обструкции желчевыводящих путей. NAC с антибиотиками — интервал 2 ч<br/>
+                • 🧠 <b>Нейро:</b> SAM-e может вызывать тревогу при {'>'}1200 мг/сут. Начинать с 400 мг<br/>
+                • 🩸 <b>Гематология:</b> Хлорелла — богата витамином K. Контроль МНО при варфарине. Отменить за 2 нед до операции
+              </div>
+            </div>
+
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ GH/IGF-1 ══════════ */}
+          {protocolTab === 'gh' && (<InfoErrorBoundary label="GH/IGF-1">
+            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#2dd4bf', marginBottom:2 }}>🫀 Поддержка оси GH/IGF-1</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Оптимизация секреции гормона роста, IGF-1 и их метаболических эффектов. Протокол для курсов с соматотропином, GHRP/GHRH и природной стимуляции.</p>
+              </div>
+
+              <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
+                {[
+                  { id:'mechanisms', label:'🔬 Механизмы' },
+                  { id:'protocol', label:'💊 Фазы протокола' },
+                  { id:'timing', label:'⏰ Тайминг' },
+                  { id:'monitoring', label:'🧪 Мониторинг' },
+                ].map((t: any) => (
+                  <button key={t.id} onClick={() => setGhTab(t.id)}
+                    style={ghTab === t.id ? pillActive('#2dd4bf') : pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+
+              {ghTab === 'mechanisms' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🔬 Ось GH/IGF-1 и ААС</div>
+                  {[{ m:'Соматопауза (↓ GH с возрастом)', e:'После 30 лет секреция GH ↓ на 10-15% за десятилетие. ААС могут дополнительно подавлять эндогенную ось через ↑ соматостатина' },
+                    { m:'IGF-1 — медиатор анаболизма', e:'IGF-1 — главный медиатор анаболических эффектов GH. Стимулирует сателлитные клетки, синтез коллагена, гипертрофию' },
+                    { m:'GH + ААС = синергия', e:'GH ↑ IGF-1 → ↑ мышечной гипертрофии через mTOR. ААС ↑ AR-экспрессию → ↑ чувствительность к IGF-1. Комбинация = аддитивный анаболизм' },
+                    { m:'Инсулин-модуляция', e:'GH ↓ чувствительность к инсулину (↑ глюкозы). ААС ↑ ИР. Комбинация GH+ААС без метформина/берберина → риск гипергликемии' },
+                    { m:'Акромегалия/пролапс', e:'Супрафизиологический GH (10+ МЕ/день) → акромегалия (↓ 10 лет жизни). Контроль IGF-1 — абсолютный императив' },
+                  ].map((x, i) => (
+                    <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(45,212,191,0.04)', border:'1px solid rgba(45,212,191,0.08)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#5eead4', marginBottom:2 }}>{x.m}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>{x.e}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {ghTab === 'protocol' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    { phase:'ФАЗА 1 · ЭНДОГЕННАЯ СТИМУЛЯЦИЯ', label:'GHRP/GHRH/секретагоги', color:'#22c55e', condition:'Возраст 30-50, IGF-1 {'<'}200 нг/мл, нет GH в курсе', desc:'Природное повышение GH без экзогенного гормона',
+                      items:[
+                        { name:'GHRP-6/CJC-1295 (Ipamorelin)', dose:'100-200 мкг', timing:'1-3×/день п/к', note:'GHRP-6 стимулирует пульсирующую секрецию GH. CJC-1295 пролонгирует GHRH. Ipamorelin — селективен к GH (не ↑ пролактина/кортизола)' },
+                        { name:'Глицин + L-аргинин + L-орнитин', dose:'Глицин 3 г + аргинин 5 г + орнитин 2 г', timing:'Натощак за 30-60 мин до сна/тренировки', note:'Аминокислотный секретагог. ↑ GH на 50-150% на час. ⚠ Не с едой (инсулин ↓ секрецию GH)' },
+                        { name:'Глютамин', dose:'5-10 г', timing:'Натощак', note:'↑ GH через ↑ орнитина. Усиливает эффект секретагогов' },
+                        { name:'Максимальное качество сна', dose:'7-9 ч', timing:'Ежедневно', note:'Основной пульс GH — во 2-3 цикле медленноволнового сна. Без качественного сна — стимуляция бесполезна' },
+                      ]},
+                    { phase:'ФАЗА 2 · НИЗКИЕ ДОЗЫ GH', label:'GH 2-4 МЕ/день', color:'#f59e0b', condition:'IGF-1 200-350 нг/мл, контроль глюкозы', desc:'Метаболическая доза. Анаболизм + жиросжигание',
+                      items:[
+                        { name:'Соматотропин (GH) 2-4 МЕ/день', dose:'2-4 МЕ', timing:'Утро натощак (или п/к)', note:'Разделить на 2 инъекции при {'>'}3 МЕ. Контроль IGF-1 через 2-4 нед. Цель IGF-1 {'<'}350' },
+                        { name:'Метформин 500 мг', dose:'500 мг', timing:'2×/день с едой', note:'Обязательно на GH! ↓ риска гипергликемии. Контроль глюкозы натощак через 2 нед' },
+                        { name:'Калий + магний', dose:'K⁺ 500-1000 мг + Mg 400 мг', timing:'Вечер', note:'GH ↑ задержки Na⁺ → ↓ K⁺, Mg²⁺. Восполнение потерь' },
+                        { name:'Контроль глюкозы', dose:'—', timing:'Еженедельно', note:'Глюкоза натощак {'>'}5.6 — ↑ метформин до 1000 мг × 2/день или добавить берберин' },
+                      ]},
+                    { phase:'ФАЗА 3 · СРЕДНИЕ ДОЗЫ GH', label:'GH 4-8 МЕ/день', color:'#f97316', condition:'IGF-1 350-500 нг/мл', desc:'Анаболическая доза. Только для опытных',
+                      items:[
+                        { name:'Соматотропин (GH) 4-8 МЕ/день', dose:'4-8 МЕ', timing:'Утро + предтренировочно', note:'Разделить на 2-3 инъекции. IGF-1 не выше 500 нг/мл! Акромегалия при {'>'}600' },
+                        { name:'Метформин 1000 мг', dose:'1000 мг', timing:'2×/день с едой', note:'Максимальная доза. Контроль глюкозы + HbA1c каждые 8-12 нед' },
+                        { name:'Инсулин (при гипергликемии) 💊', dose:'По глюкозе', timing:'Предтренировочно или базальный', note:'Только при глюкозе {'>'}7.0 на метформине. Risky — ↑ гипогликемии' },
+                        { name:'L-карнитин (ацетил/тартрат)', dose:'1-3 г', timing:'Утро/предтренировочно', note:'↓ ИР от GH. ↑ окисления жиров. Митохондриальная поддержка' },
+                      ]},
+                    { phase:'ФАЗА 4 · ВЫСОКИЕ ДОЗЫ / ТОКСИЧНОСТЬ', label:'GH {'>'}8 МЕ/день', color:'#ef4444', condition:'IGF-1 {'>'}500, симптомы акромегалии', desc:'Неотложная коррекция',
+                      items:[
+                        { name:'Снижение/отмена GH', dose:'—', timing:'Немедленно', note:'IGF-1 {'>'}500 → ↓ дозу на 50%. {'>'}600 → отмена. Риск акромегалии + ↓ 10 лет жизни' },
+                        { name:'Агонисты дофамина (каберголин 💊)', dose:'0.25-0.5 мг', timing:'2×/нед', note:'↓ секреции GH через D2-рецепторы гипофиза. При IGF-1 {'>'}500' },
+                        { name:'Аналоги соматостатина (октреотид 💊)', dose:'По назначению', timing:'П/к', note:'Ингибитор секреции GH. Только при акромегалии. По назначению эндокринолога' },
+                        { name:'Контроль IGF-1', dose:'—', timing:'Каждые 2 нед', note:'Цель — нормализация IGF-1 ({'<'}350). Не возобновлять {'>'}4 МЕ/день после коррекции' },
+                      ]},
+                  ].map((p: any, i: any) => (
+                    <div key={i} style={{ borderRadius:12, background:p.color+'08', border:'1px solid '+p.color+'22', padding:10 }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:p.color }}>{p.phase}</div>
+                      <div style={{ fontSize:8, fontWeight:600, color:p.color+'aa', marginBottom:2 }}>{p.label}</div>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:4 }}>{p.condition}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>{p.desc}</div>
+                      {p.items.map((x: any, xi: any) => (
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:6, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:700, color:'var(--text-light)' }}>{x.name}</span>
+                          <span style={{ fontSize:7, color:p.color, marginLeft:4 }}>{x.dose}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>· {x.timing}</span>
+                          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>💡 {x.note}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {ghTab === 'timing' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>⏰ Суточный тайминг GH-поддержки</div>
+                  <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>GH утром натощак (имитация пульса). Секретагоги — перед сном. Еда — через 30-60 мин после GH (чтобы ↓ инсулинового ответа).</p>
+                  {[
+                    { time:'🌅 Утро (06:00–09:00)', color:'#f59e0b', items:[
+                      { n:'GH 2-4 МЕ (утренняя доза)', why:'Натощак. П/к. Без еды 30-60 мин' },
+                      { n:'L-карнитин 1-3 г', why:'Натощак. Транспорт жиров в митохондрии' },
+                      { n:'Метформин 500 мг', why:'С завтраком. Профилактика гипергликемии' },
+                    ]},
+                    { time:'☀️ День (12:00–16:00)', color:'#f97316', items:[
+                      { n:'GH 2-4 МЕ (предтренировочная доза)', why:'За 30-60 мин до тренировки. П/к. Плюс аргинин/орнитин' },
+                      { n:'Калий + магний', why:'С обедом. Восполнение электролитов' },
+                      { n:'Метформин 500 мг (вторая доза)', why:'С ужином. Контроль глюкозы' },
+                    ]},
+                    { time:'🌙 Вечер (19:00–22:00)', color:'#6366f1', items:[
+                      { n:'Секретагоги (GHRP-6/ипаморелин 100-200 мкг)', why:'Перед сном п/к. Пик GH во сне' },
+                      { n:'Глицин+аргинин+орнитин (при секретагогах)', why:'Натощак. Натуральный ↑ GH' },
+                      { n:'Глютамин 5-10 г', why:'На ночь. ↑ GH + восстановление ЖКТ' },
+                      { n:'Без еды за 1-2 ч до сна', why:'Инсулин блокирует секрецию GH. Сон натощак = макс. GH' },
+                    ]},
+                  ].map((slot: any, si: any) =>(
+                    <div key={si} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:slot.color+'0a', border:'1px solid '+slot.color+'22' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:slot.color, marginBottom:4 }}>{slot.time}</div>
+                      {slot.items.map((x: any, xi: any) =>(
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{x.n}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:6 }}>— {x.why}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {ghTab === 'monitoring' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={cardBg}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🧪 Лабораторный мониторинг GH/IGF-1</div>
+                    {[{ marker:'IGF-1 (соматомедин C)', target:'150-350 нг/мл (возраст-зависимо)', when:'Каждые 4-8 нед на GH', action:'{'<'}150 — ↓ дозу GH/секретагога. {'>'}500 — ↓ дозу GH на 50%. {'>'}600 — отмена GH. Акромегалия!' },
+                      { marker:'Глюкоза натощак', target:'{'<'}5.6 ммоль/л', when:'Еженедельно на GH', action:'5.6-7.0 — метформин 1000 мг. {'>'}7.0 — инсулин. {'>'}11.1 — диабет. Эндокринолог' },
+                      { marker:'HbA1c', target:'{'<'}6.0%', when:'Каждые 12 нед на GH', action:'{'>'}6.5% — преддиабет. Снизить/отменить GH, метформин 2 г/день' },
+                      { marker:'T4/T3/ТТГ', target:'ТТГ 0.5-2.5, T4 10-22', when:'Каждые 8-12 нед', action:'GH ↓ T4→T3 конверсию → возможен гипотиреоз. Контроль щитовидной железы' },
+                      { marker:'Калий (K⁺)', target:'3.5-5.0 ммоль/л', when:'Каждые 4-8 нед', action:'{'<'}3.5 — задержка Na⁺ от GH. Коррекция калия' },
+                    ].map((m: any, i: any) =>(
+                      <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(45,212,191,0.04)', border:'1px solid rgba(45,212,191,0.08)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                          <span style={{ fontSize:9, fontWeight:700, color:'#5eead4' }}>{m.marker}</span>
+                          <span style={{ fontSize:8, fontWeight:600, color:'#2dd4bf' }}>{m.when}</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}><b style={{color:'#5eead4'}}>Цель: {m.target}</b></div>
+                        <div style={{ fontSize:7, color:'#5eead4', lineHeight:1.3, padding:'4px 6px', borderRadius:4, background:'rgba(45,212,191,0.06)' }}>💡 {m.action}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🔗 Перекрёстные предупреждения</div>
+              <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                • ❤️ <b>Кардио:</b> GH ↑ задержку Na⁺ → ↑ АД + ↑ риск гипертрофии миокарда. Контроль АД каждую неделю<br/>
+                • ⚖️ <b>Метаболизм:</b> GH ↓ чувствительность к инсулину → гипергликемия. Метформин — обязательно на GH {'>'}2 МЕ/день<br/>
+                • 🫁 <b>Печень:</b> IGF-1 синтезируется печенью. При нарушении функции печени — ↓ IGF-1 даже при высоком GH<br/>
+                • 🦴 <b>Суставы:</b> GH ↑ синтез коллагена → ↓ риска травм. Но высокие дозы → акромегалия → остеоартрит. IGF-1 {'<'}350!
+              </div>
+            </div>
+
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ GLP-1 ══════════ */}
+          {protocolTab === 'glp1' && (<InfoErrorBoundary label="GLP-1">
+            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#f59e0b', marginBottom:2 }}>🍪 GLP-1 и метаболическая поддержка</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Управление аппетитом, гликемией и весом через GLP-1 агонисты (семаглутид, лираглутид) и природные GLP-1 секретагоги. Контроль побочных эффектов.</p>
+              </div>
+
+              <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
+                {[
+                  { id:'mechanisms', label:'🔬 Механизмы' },
+                  { id:'protocol', label:'💊 Фазы протокола' },
+                  { id:'timing', label:'⏰ Тайминг' },
+                  { id:'monitoring', label:'🧪 Мониторинг' },
+                ].map((t: any) => (
+                  <button key={t.id} onClick={() => setGlp1Tab(t.id)}
+                    style={glp1Tab === t.id ? pillActive('#f59e0b') : pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+
+              {glp1Tab === 'mechanisms' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🔬 Механизмы GLP-1 и метаболической регуляции</div>
+                  {[{ m:'GLP-1 — инкретиновый гормон', e:'GLP-1 (глюкагоноподобный пептид-1) секретируется L-клетками кишечника в ответ на еду. ↑ секрецию инсулина, ↓ глюкагона, замедляет опорожнение желудка' },
+                    { m:'Подавление аппетита', e:'GLP-1 действует на гипоталамус (ARC/обходной тракт) — ↑ чувства сытости, ↓ грелина. Центральное подавление аппетита' },
+                    { m:'GLP-1 и ААС', e:'ААС (особенно оральные 17α-алкилы) ↑ инсулинорезистентность + ↑ аппетит через ↑ грелина. GLP-1 агонисты — патогенетическая терапия' },
+                    { m:'Метаболические эффекты', e:'↓ глюкозы (гипогликемический), ↓ веса, ↓ АД, ↑ липолиза, ↓ воспаления (через ↓ IL-6, TNF-α). Защита β-клеток поджелудочной' },
+                  ].map((x, i) => (
+                    <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.08)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#fcd34d', marginBottom:2 }}>{x.m}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>{x.e}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {glp1Tab === 'protocol' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    { phase:'ФАЗА 1 · НАТУРАЛЬНАЯ МОДУЛЯЦИЯ', label:'Природные GLP-1 секретагоги', color:'#22c55e', condition:'Преддиабет/ожирение (ИМТ {'>'}27)', desc:'Повышение эндогенного GLP-1 без инъекционных препаратов',
+                      items:[
+                        { name:'Берберин 500 мг', dose:'500 мг', timing:'2-3×/день до еды', note:'↑ GLP-1 через ↑ активности L-клеток. ↓ глюкозы на 20-30%. AMPK-активатор' },
+                        { name:'Клетчатка (гуаровая камедь/пектин/инулин)', dose:'10-20 г', timing:'Перед едой с водой', note:'↑ GLP-1 через ферментацию в толстой кишке → ↑ короткоцепочечных жирных кислот. ↓ аппетита' },
+                        { name:'L-глютамин', dose:'5-10 г', timing:'За 30-60 мин до еды', note:'Мощный стимулятор GLP-1 через CaSR-рецепторы L-клеток. ↑ GLP-1 на 2-3× в течение часа' },
+                        { name:'Омега-3 (EPA/DHA)', dose:'2-4 г', timing:'С едой', note:'↑ GLP-1 через GPR120 на L-клетках. Системный противовоспалительный эффект' },
+                      ]},
+                    { phase:'ФАЗА 2 · НИЗКИЕ ДОЗЫ АГОНИСТОВ', label:'Семаглутид/лираглутид', color:'#f59e0b', condition:'ИМТ {'>'}30 / глюкоза {'>'}6.0 / ИР', desc:'Старт GLP-1 агонистов',
+                      items:[
+                        { name:'Семаглутид (Оземпик/Вегови) 💊', dose:'0.25-0.5 мг', timing:'1×/нед п/к', note:'Старт 0.25 мг × 4 нед. Титрация → 0.5 мг. ↓ веса на 5-10% за 6 мес. Контроль глюкозы' },
+                        { name:'Лираглутид (Саксенда/Виктоза) 💊', dose:'0.6-1.8 мг', timing:'Ежедневно п/к', note:'Старт 0.6 мг × 1 нед. Титрация +0.6 мг/нед до 1.8 мг. ↓ веса на 5-8% за 3-6 мес' },
+                        { name:'Метформин 500 мг', dose:'500 mg', timing:'2×/день с едой', note:'Синергия с GLP-1. ↓ глюкозы дополнительно на 15-20%. Профилактика гипогликемии' },
+                        { name:'Ингибиторы ДПП-4 (ситаглиптин) 💊', dose:'100 мг', timing:'Утро', note:'Блокирует DPP-4 — ↑ уровень эндогенного GLP-1. Мягче, чем инъекции. Альтернатива при страхе инъекций' },
+                      ]},
+                    { phase:'ФАЗА 3 · ТИТРАЦИЯ/ПОДДЕРЖАНИЕ', label:'Средние дозы', color:'#f97316', condition:'ИМТ {'>'}35 / глюкоза {'>'}7.0', desc:'Увеличение дозы для клинического эффекта',
+                      items:[
+                        { name:'Семаглутид 1.0-2.4 мг', dose:'1.0-2.4 мг', timing:'1×/нед п/к', note:'Максимальная доза. ↓ веса до 15% за 12 мес. Контроль HbA1c, глюкозы, АЛТ/АСТ' },
+                        { name:'Титрация', dose:'+0.5 мг каждые 4 нед', timing:'—', note:'Не титровать быстрее — ↑ риска тошноты/рвоты. При непереносимости — ↓ дозу и задержаться на 4 нед' },
+                        { name:'Контроль тошноты (ондансетрон)', dose:'4-8 мг', timing:'При тошноте', note:'Антагонист 5-HT3. При тошноте от GLP-1. Не более 32 мг/сут' },
+                        { name:'Пищевая дисциплина', dose:'—', timing:'Постоянно', note:'GLP-1 ↓ объём желудка → ↑ риска рефлюкса. Малые порции. Без жирного/жареного' },
+                      ]},
+                    { phase:'ФАЗА 4 · ПОБОЧНЫЕ ЭФФЕКТЫ/ОСЛОЖНЕНИЯ', label:'ЖКТ-токсичность', color:'#ef4444', condition:'Непереносимость / тошнота / рвота / панкреатит', desc:'Управление побочными эффектами GLP-1',
+                      items:[
+                        { name:'Симптоматическая терапия тошноты', dose:'Метоклопрамид 10 мг / домперидон 10 мг', timing:'За 30 мин до еды', note:'Прокинетики. Ускоряют опорожнение желудка. Короткий курс — не {'>'}2 нед' },
+                        { name:'Снижение дозы/увеличение интервала', dose:'—', timing:'—', note:'При выраженной тошноте — ↓ дозу GLP-1 на 50% или увеличить интервал между инъекциями' },
+                        { name:'Исключить панкреатит (липаза, амилаза)', target:'Липаза {'<'}60, амилаза {'<'}100', when:'При боли в эпигастрии', action:'{'>'}3× ВГН — панкреатит. Отмена GLP-1. Госпитализация' },
+                        { name:'Консультация эндокринолога', dose:'—', timing:'При неэффективности', note:'При {'<'}5% потери веса за 6 мес — пересмотреть терапию. Рассмотреть тирзепатид/ретатрутид' },
+                      ]},
+                  ].map((p: any, i: any) => (
+                    <div key={i} style={{ borderRadius:12, background:p.color+'08', border:'1px solid '+p.color+'22', padding:10 }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:p.color }}>{p.phase}</div>
+                      <div style={{ fontSize:8, fontWeight:600, color:p.color+'aa', marginBottom:2 }}>{p.label}</div>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:4 }}>{p.condition}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>{p.desc}</div>
+                      {p.items.map((x: any, xi: any) => (
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:6, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:700, color:'var(--text-light)' }}>{x.name}</span>
+                          <span style={{ fontSize:7, color:p.color, marginLeft:4 }}>{x.dose}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>· {x.timing}</span>
+                          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>💡 {x.note}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {glp1Tab === 'timing' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>⏰ Тайминг GLP-1 терапии</div>
+                  <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Семаглутид — 1×/нед (фиксированный день). Liraglutide — ежедневно. Берберин — до еды. Клетчатка — перед едой.</p>
+                  {[
+                    { time:'🗓 Раз в неделю (фиксированный день)', color:'#f59e0b', items:[
+                      { n:'Семаглутид 0.25-2.4 мг п/к', why:'Один и тот же день (напр. вск). В любое время дня, независимо от еды' },
+                      { n:'Запись дозы в дневник', why:'Отмечать дозу и побочные эффекты. Фото шприц-ручки с дозой' },
+                    ]},
+                    { time:'🌅 Ежедневно утром/вечером', color:'#f97316', items:[
+                      { n:'Лираглутид 0.6-1.8 мг п/к', why:'Ежедневно в одно и то же время (обычно утром)' },
+                      { n:'Метформин 500 мг', why:'2×/день с едой (завтрак+ужин). ↓ ЖКТ-побочки' },
+                      { n:'SitaGLP-1 (ингибитор DPP-4)', why:'Утром 100 мг. Вне еды' },
+                    ]},
+                    { time:'🍽 Связано с едой', color:'#6366f1', items:[
+                      { n:'Берберин 500 мг', why:'За 15-30 мин до еды (или с едой при чувствительном ЖКТ)' },
+                      { n:'L-глютамин 5-10 г', why:'За 30-60 мин до еды. Стимуляция GLP-1' },
+                      { n:'Клетчатка 10-20 г', why:'За 15-30 мин до еды с водой. ↑ сытости' },
+                      { n:'Ондансетрон 4-8 мг (при тошноте)', why:'За 30-60 мин до еды. При непереносимости GLP-1' },
+                    ]},
+                  ].map((slot: any, si: any) =>(
+                    <div key={si} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:slot.color+'0a', border:'1px solid '+slot.color+'22' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:slot.color, marginBottom:4 }}>{slot.time}</div>
+                      {slot.items.map((x: any, xi: any) =>(
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{x.n}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:6 }}>— {x.why}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {glp1Tab === 'monitoring' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={cardBg}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🧪 Лабораторный мониторинг GLP-1 терапии</div>
+                    {[{ marker:'Глюкоза натощак', target:'3.9-5.6 ммоль/л', when:'Еженедельно в первые 4 нед, затем ежемесячно', action:'{'<'}3.9 — гипогликемия (редко на моно-GLP-1). {'>'}7.0 — неадекватный контроль, ↑ дозу' },
+                      { marker:'HbA1c (гликированный гемоглобин)', target:'{'<'}6.5%', when:'Каждые 12 нед', action:'{'>'}6.5% — неадекватный ответ. Рассмотреть тирзепатид. {'>'}8.0% — эндокринолог' },
+                      { marker:'Липаза, амилаза (панкреатит)', target:'Липаза {'<'}60, амилаза {'<'}100 Ед/л', when:'При боли в эпигастрии', action:'{'>'}3× ВГН — панкреатит. Отмена GLP-1, госпитализация' },
+                      { marker:'АЛТ/АСТ', target:'АЛТ {'<'}40, АСТ {'<'}40', when:'Каждые 8-12 нед', action:'АЛТ {'>'}80 — может указывать на стеатоз/НЖБП. GLP-1 ↓ стеатоз — положительный эффект' },
+                      { marker:'Креатинин/СКФ', target:'СКФ {'>'}60 мл/мин', when:'Каждые 8-12 нед', action:'СКФ {'<'}45 — риск дегидратации от GLP-1. Гидратация! Коррекция диуретиков' },
+                      { marker:'Кальцитонин (риск медуллярного РЩЖ)', target:'{'<'}10 пг/мл', when:'До начала + каждые 12 мес', action:'{'>'}10 — исключить медуллярный рак щитовидной железы (противопоказание для GLP-1). УЗИ ЩЖ' },
+                    ].map((m: any, i: any) =>(
+                      <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.08)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                          <span style={{ fontSize:9, fontWeight:700, color:'#fcd34d' }}>{m.marker}</span>
+                          <span style={{ fontSize:8, fontWeight:600, color:'#f59e0b' }}>{m.when}</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}><b style={{color:'#fcd34d'}}>Цель: {m.target}</b></div>
+                        <div style={{ fontSize:7, color:'#fcd34d', lineHeight:1.3, padding:'4px 6px', borderRadius:4, background:'rgba(245,158,11,0.06)' }}>💡 {m.action}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🔗 Перекрёстные предупреждения</div>
+              <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                • 🫁 <b>Печень:</b> Семаглутид ↓ стеатоз печени (НЖБП). Контроль АЛТ/АСТ каждые 8-12 нед. Берберин — гепатопротекторная синергия<br/>
+                • 💧 <b>Почки:</b> GLP-1 → риск дегидратации (↓ потребления жидкости из-за ↓ аппетита). Принудительная гидратация 2+ л/день<br/>
+                • 🩸 <b>Гематология:</b> GLP-1 агонисты ↓ агрегацию тромбоцитов. +антикоагулянты = риск кровотечений. Контроль МНО<br/>
+                • ❤️ <b>Кардио:</b> Семаглутид ↓ риск сердечно-сосудистых событий на 26% (SELECT trial). GLP-1 — кардиопротективный эффект
+              </div>
+            </div>
+
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ MITO ══════════ */}
+          {protocolTab === 'mito' && (<InfoErrorBoundary label="Митохондрии">
+            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#06b6d4', marginBottom:2 }}>⚡ Митохондриальный (NAD⁺/энергия)</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Митохондриальная поддержка для энергетики, долголетия и профилактики метаболических нарушений на курсе ААС и GH.</p>
+              </div>
+              <div style={{ display:'flex', gap:4, overflowX:'auto' }}>
+                {[{id:'protocol',label:'Протокол'},{id:'timing',label:'⏰ Тайминг'},{id:'monitoring',label:'🧪 Мониторинг'}].map((t:any)=>(
+                  <button key={t.id} onClick={()=>setMitoTab(t.id)} style={mitoTab===t.id?pillActive('#06b6d4'):pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+              {mitoTab==='protocol'&&(
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    {phase:'ФАЗА 1 · БАЗОВАЯ МИТОХОНДРИАЛЬНАЯ ПОДДЕРЖКА', label:'NAD⁺-прекурсоры + CoQ10', color:'#22c55e', condition:'Базовый курс без GH', desc:'Поддержка энергетики и антиоксидантной защиты',
+                      items:[
+                        {name:'CoQ10 (убихинон) 100-200 мг', dose:'100-200 мг', timing:'Утро с жирной едой', note:triageBadge('ess')+' Ключевой переносчик электронов. ↓ с возрастом и на статинах. Убихинол — при ЖКТ-чувствительности'},
+                        {name:'L-карнитин (L-карнитин-L-тартрат) 1-2 г', dose:'1-2 г', timing:'Утро натощак / перед тренировкой', note:triageBadge('ess')+' Транспорт жирных кислот в митохондрии. ↑ выносливость, ↓ усталость. Карнитин + АЛК — синергия'},
+                        {name:'Альфа-липоевая кислота (АЛК) 300-600 мг', dose:'300-600 мг', timing:'Утро натощак', note:triageBadge('rec')+' Кофактор митохондриальных ферментов. ↑ захват глюкозы. Антиоксидант'},
+                        {name:'Магний (цитрат/глицинат) 400 мг', dose:'400 мг', timing:'Вечер', note:triageBadge('rec')+' Кофактор АТФ-синтазы. ↓ мышечные судороги'},
+                      ]},
+                    {phase:'ФАЗА 2 · ОПТИМАЛЬНАЯ (курс 8+ нед / высокий объём)', label:'+ NAD⁺-бустеры', color:'#f59e0b', condition:'Курс >8 нед, высокий тренировочный объём, возраст >35', desc:'Усиление митохондриального биогенеза',
+                      items:[
+                        {name:'NMN / NR (никотинамид-рибозид) 250-500 мг', dose:'250-500 мг', timing:'Утро натощак', note:triageBadge('rec')+' NAD⁺-прекурсор. ↑ NAD⁺ на 40-80%. ↓ усталость, ↑ восстановление. Дорого, но эффективно'},
+                        {name:'PQQ (пирролохинолинхинон) 10-20 мг', dose:'10-20 мг', timing:'Утро', note:triageBadge('opt')+' Стимулятор митохондриального биогенеза (PGC-1α). Синергия с CoQ10'},
+                        {name:'D-рибоза 5 г', dose:'5 г', timing:'После тренировки', note:triageBadge('opt')+' Субстрат для синтеза АТФ. ↓ крепатура, ↑ восстановление. При высоком объёме'},
+                        {name:'Берберин 500 мг', dose:'500 мг', timing:'2×/день до еды', note:triageBadge('rec')+' AMPK-активатор → PGC-1α → биогенез митохондрий. ↓ ИР, ↑ чувствительность к инсулину'},
+                      ]},
+                    {phase:'ФАЗА 3 · ИНТЕНСИВНАЯ (GH + ААС + высокий объём)', label:'Полный митохондриальный стек', color:'#f97316', condition:'GH + ААС + тренировки 6×/нед + возраст >40', desc:'Максимальная поддержка энергетики',
+                      items:[
+                        {name:'CoQ10 300 мг + PQQ 20 мг', dose:'300+20 мг', timing:'Утро', note:triageBadge('ess')+' Максимальные дозы. PQQ ↑ биогенез, CoQ10 — перенос электронов'},
+                        {name:'NMN 500-1000 мг + АЛК 600 мг', dose:'500-1000+600', timing:'Утро натощак', note:triageBadge('ess')+' NAD⁺-буст + антиоксидант. ↓ оксидативный стресс от GH'},
+                        {name:'L-карнитин 2-3 г + D-рибоза 5-10 г', dose:'2-3 г + 5-10 г', timing:'До/после тренировки', note:triageBadge('rec')+' ↑ энергия, ↓ усталость. Карнитин — до тренировки, рибоза — после'},
+                        {name:'Магний 600 мг + калий 400 мг', dose:'600+400 мг', timing:'Вечер', note:triageBadge('ess')+' Электролиты для митохондрий. Mg — кофактор АТФ'},
+                      ]},
+                  ].map((p:any,i:any)=>renderPhase(p,i))}
+                </div>
+              )}
+              {mitoTab==='timing' && timingBlock('mito', [
+                {time:'🌅 Утро натощак', items:[{n:'NMN/NR 250-500 мг',why:'NAD⁺-буст'},{n:'АЛК 300-600 мг',why:'Антиоксидант'},{n:'CoQ10 100-300 мг',why:'С жирной едой (завтрак)'}]},
+                {time:'🏋️ До тренировки', items:[{n:'L-карнитин 1-2 г',why:'↑ окисление жиров + энергия'}]},
+                {time:'🍽 После тренировки', items:[{n:'D-рибоза 5 г',why:'Синтез АТФ'}]},
+                {time:'🌙 Вечер', items:[{n:'Магний 400-600 мг',why:'Кофактор АТФ'},{n:'PQQ 10-20 мг (если не утром)',why:'Биогенез митохондрий'}]},
+              ])}
+              {mitoTab==='monitoring' && monitoringBlock([
+                {marker:'Энергия (субъективно)', target:'0-10', when:'Ежедневно', action:'Оценка энергии — ключевой критерий эффективности'},
+                {marker:'Крепатура (DOMS)', target:'<4/10', when:'Ежедневно', action:'↓ DOMS + ↑ восстановление → эффект митохондриальной поддержки'},
+                {marker:'Глюкоза натощак', target:'3.9-5.6 ммоль/л', when:'1×/нед', action:'Берберин ↓ глюкозу. При <3.9 — риск гипогликемии'},
+                {marker:'Лактат (после тренировки)', target:'<2 ммоль/л (через 5 мин)', when:'При оценке выносливости', action:'↑ лактат → ↓ митохондриальной функции'},
+              ])}
+            </div>
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ STEATOSIS ══════════ */}
+          {protocolTab === 'steatosis' && (<InfoErrorBoundary label="Стеатоз">
+            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#84cc16', marginBottom:2 }}>🫁 Стеатоз печени (НАЖБП)</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Неалкогольная жировая болезнь печени — частое осложнение ААС (оральные 17α-алкилированные, избыток калорий).</p>
+              </div>
+              <div style={{ display:'flex', gap:4, overflowX:'auto' }}>
+                {[{id:'protocol',label:'Протокол'},{id:'timing',label:'⏰ Тайминг'},{id:'monitoring',label:'🧪 Мониторинг'}].map((t:any)=>(
+                  <button key={t.id} onClick={()=>setSteatosisTab(t.id)} style={steatosisTab===t.id?pillActive('#84cc16'):pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+              {steatosisTab==='protocol'&&(
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    {phase:'ФАЗА 1 · ПРОФИЛАКТИКА (стеатоза нет)', label:'Гепатопротекция + метаболическая поддержка', color:'#22c55e', condition:'АЛТ/АСТ/ГГТ в норме, УЗИ печени без изменений', desc:'Профилактика стеатоза на курсе ААС',
+                      items:[
+                        {name:'Берберин 500 мг', dose:'500 мг', timing:'2-3×/день до еды', note:triageBadge('ess')+' AMPK-активатор → ↓ de novo липогенеза. ↓ глюкозы, ↓ ИР. Доказан при НАЖБП'},
+                        {name:'TUDCA 250-500 мг', dose:'250-500 мг', timing:'Вечер натощак', note:triageBadge('rec')+' ↓ ER-стресс, ↑ BSEP-экспрессию. Антиапоптотический. +NAC для синергии'},
+                        {name:'Омега-3 (EPA/DHA) 2-4 г', dose:'2-4 г', timing:'С едой', note:triageBadge('rec')+' ↓ триглицеридов печени на 25-40%. ↑ окисления жирных кислот'},
+                        {name:'Силимарин (расторопша) 140-280 мг', dose:'140-280 мг', timing:'Утро', note:triageBadge('opt')+' Стабилизация мембран гепатоцитов. Антиоксидант'},
+                      ]},
+                    {phase:'ФАЗА 2 · УМЕРЕННЫЙ СТЕАТОЗ (CAP 250-300 dB/м)', label:'Лечение стеатоза', color:'#f59e0b', condition:'УЗИ: стеатоз 1-2 ст. / CAP 250-300 / АЛТ 40-80', desc:'Терапия стеатоза',
+                      items:[
+                        {name:'Берберин 500-1000 мг', dose:'500-1000 мг', timing:'3×/день до еды', note:triageBadge('ess')+' ↑ дозу. ↓ HOMA-IR на 30%. ↓ стеатоза по данным МРТ'},
+                        {name:'TUDCA 500-750 мг', dose:'500-750 мг', timing:'Вечер натощак', note:triageBadge('ess')+' ↑ BSEP, ↓ стеатоз. Синергия с берберином'},
+                        {name:'Омега-3 (EPA) 4 г', dose:'4 г', timing:'С едой (2+2 г)', note:triageBadge('ess')+' EPA 4 г — минимальная эффективная доза для ↓ стеатоза'},
+                        {name:'Витамин E (RRR-α-токоферол) 400-800 МЕ', dose:'400-800 МЕ', timing:'С едой', note:triageBadge('rec')+' Антиоксидант. ↓ стеатоза (PIVENS trial). Контроль ПСА! (↑ риск рака простаты)'},
+                        {name:'Силимарин 280-420 мг', dose:'280-420 мг', timing:'Утро', note:triageBadge('opt')+' ↑ дозу. Стабилизация мембран'},
+                      ]},
+                    {phase:'ФАЗА 3 · ТЯЖЁЛЫЙ СТЕАТОЗ/НАСГ/ФИБРОЗ (CAP >300 / FIB-4 >2.67)', label:'НАСГ + риск цирроза', color:'#ef4444', condition:'CAP >300 / АЛТ >80 / FIB-4 >2.67 / эластография >8 кПа', desc:'Терапия под контролем гепатолога',
+                      items:[
+                        {name:'Берберин 1000 мг + TUDCA 1000 мг', dose:'1000+1000 мг', timing:'Берберин 3×, TUDCA вечер', note:triageBadge('ess')+' Максимальные дозы. Add-on: метформин/пиоглитазон'},
+                        {name:'Омега-3 (EPA) 6 г', dose:'6 г', timing:'3+3 г с едой', note:triageBadge('ess')+' Максимальная доза. ↑ окисления жирных кислот'},
+                        {name:'Пиоглитазон 15-30 мг 💊', dose:'15-30 мг', timing:'Утро', note:triageBadge('rec')+' ↓ ИР + ↓ стеатоза. Контроль веса (+2-4 кг). ↑ риска переломов (женщины)'},
+                        {name:'Эластография печени (FibroScan)', target:'<8 кПа', when:'Каждые 6 мес', action:'>8 кПа → фиброз. >12 кПа → цирроз. Гепатолог'},
+                        {name:'FIB-4 индекс', target:'<1.30 (низкий риск)', when:'Каждые 6 мес', action:'>2.67 → высокий риск фиброза. Биопсия/эластография'},
+                        {name:'Отмена/замена оральных ААС', dose:'—', timing:'—', note:triageBadge('ess')+' 17α-алкилированные → гепатотоксичность. Переход на инъекционные + GH не рекомендован'},
+                      ]},
+                  ].map((p:any,i:any)=>renderPhase(p,i))}
+                </div>
+              )}
+              {steatosisTab==='timing' && timingBlock('steatosis', [
+                {time:'🌅 Утро', items:[{n:'Берберин 500 мг',why:'За 15-30 мин до завтрака'},{n:'Силимарин 140-280 мг',why:'С едой'},{n:'Пиоглитазон 15-30 мг (при НАСГ)',why:'Утром с едой'}]},
+                {time:'🍽 День', items:[{n:'Омега-3 2 г (EPA)',why:'С обедом'},{n:'Берберин 500 мг',why:'До обеда'}]},
+                {time:'🌙 Вечер', items:[{n:'TUDCA 500-1000 мг',why:'Натощак за 2 ч до сна'},{n:'Омега-3 2 г (EPA)',why:'С ужином'},{n:'Берберин 500 мг',why:'До ужина'},{n:'Витамин E 400-800 МЕ',why:'С ужином (жирорастворимый)'}]},
+              ])}
+              {steatosisTab==='monitoring' && monitoringBlock([
+                {marker:'АЛТ/АСТ', target:'<40 Ед/л', when:'Каждые 4 нед', action:'>40 → ↑ дозу берберина/TUDCA. >80 → консультация гепатолога'},
+                {marker:'ГГТ, ЩФ', target:'ГГТ <60, ЩФ <150', when:'Каждые 4 нед', action:'↑ ГГТ → холестаз. ↑ TUDCA'},
+                {marker:'Глюкоза натощак', target:'3.9-5.6 ммоль/л', when:'1×/нед', action:'↑ глюкоза → ИР + стеатоз. Берберин ↓ глюкозу'},
+                {marker:'Липидный профиль (ТГ, ЛПВП)', target:'ТГ <1.7, ЛПВП >1.0', when:'Каждые 8-12 нед', action:'↑ ТГ → стеатоз. Омега-3 EPA 4 г ↓ ТГ на 25%'},
+                {marker:'УЗИ печени / CAP', target:'CAP <250 дБ/м / нет стеатоза', when:'Каждые 6-12 мес', action:'↑ CAP → прогрессия стеатоза'},
+                {marker:'FIB-4 / эластография', target:'FIB-4 <1.30', when:'Ежегодно', action:'>2.67 → продвинутый фиброз. Направить к гепатологу'},
+              ])}
+            </div>
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ RAAS ══════════ */}
+          {protocolTab === 'raas' && (<InfoErrorBoundary label="RAAS">
+            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#3b82f6', marginBottom:2 }}>🫀 RAAS (АД/почки/фиброз)</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Ренин-ангиотензин-альдостероновая система — ключевая мишень для контроля АД, протеинурии и фиброза на курсе ААС.</p>
+              </div>
+              <div style={{ display:'flex', gap:4, overflowX:'auto' }}>
+                {[{id:'protocol',label:'Протокол'},{id:'timing',label:'⏰ Тайминг'},{id:'monitoring',label:'🧪 Мониторинг'}].map((t:any)=>(
+                  <button key={t.id} onClick={()=>setRaasTab(t.id)} style={raasTab===t.id?pillActive('#3b82f6'):pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+              {raasTab==='protocol'&&(
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    {phase:'ФАЗА 1 · ПРОФИЛАКТИКА (АД <130/80, нет протеинурии)', label:'RAAS-модуляция + натрий-контроль', color:'#22c55e', condition:'АД <130/80, UACR <30 мг/г, СКФ >90', desc:'Профилактика АГ и нефропатии на ААС',
+                      items:[
+                        {name:'Натрий — контроль (<3 г/день)', dose:'<3 г', timing:'Постоянно', note:triageBadge('ess')+' ↓ натрия — первая линия. ААС ↑ Na⁺-реабсорбцию через RAAS'},
+                        {name:'Магний (цитрат/глицинат) 400 мг', dose:'400 мг', timing:'Вечер', note:triageBadge('rec')+' ↓ тонус сосудов. ↑ NO. ↓ АД на 3-5 мм рт.ст.'},
+                        {name:'Омега-3 2-4 г', dose:'2-4 г', timing:'С едой', note:triageBadge('rec')+' ↓ АД на 2-4 мм рт.ст. + ↓ воспаления сосудистой стенки'},
+                        {name:'Коэнзим Q10 100-200 мг', dose:'100-200 мг', timing:'Утро', note:triageBadge('opt')+' ↓ АД на 10-17 мм рт.ст. (при дефиците). Эндотелиальная функция'},
+                      ]},
+                    {phase:'ФАЗА 2 · АГ 1 СТЕПЕНИ (АД 130-139/80-89)', label:'Монотерапия телмисартаном', color:'#f59e0b', condition:'АД 130-139/80-89, UACR 30-300, СКФ 60-90', desc:'Старт RAAS-блокады',
+                      items:[
+                        {name:'Телмисартан 20-40 мг 💊', dose:'20-40 мг', timing:'Утро/вечер', note:triageBadge('ess')+' ARB. ↓ АД на 10-15/5-10. ↓ протеинурия. PPARγ-агонист (метаболические плюсы). Старт 20 мг'},
+                        {name:'Калий-контроль при телмисартане', target:'K⁺ <5.0', when:'Через 2 нед после старта', action:'↑ K⁺ риск при СКФ <60. При K⁺ >5.0 — ↓ дозу или отменить'},
+                        {name:'Натрий <2 г/день + DASH-диета', dose:'<2 г', timing:'Постоянно', note:triageBadge('rec')+' DASH-диета ↓ АД на 8-14 мм рт.ст. Синергия с телмисартаном'},
+                        {name:'Магний 400-600 мг + калий 400 мг', dose:'400-600+400', timing:'Магний вечер, калий с едой', note:triageBadge('rec')+' Добавить калий при K⁺ <4.0. Магний ↓ тонус сосудов'},
+                      ]},
+                    {phase:'ФАЗА 3 · АГ 2 СТЕПЕНИ / РЕФРАКТЕРНАЯ (АД >140/90)', label:'Комбинированная терапия', color:'#f97316', condition:'АД >140/90 на телмисартане 40 мг / иАПФ ранее', desc:'Add-on терапия',
+                      items:[
+                        {name:'Телмисартан 40-80 мг 💊', dose:'40-80 мг', timing:'Утро', note:triageBadge('ess')+' Максимальная доза. Добавить второй препарат'},
+                        {name:'+ Амлодипин 2.5-5 мг 💊', dose:'2.5-5 мг', timing:'Утро/вечер', note:triageBadge('ess')+' БКК. ↓ АД +10/5. Старт 2.5 мг. Отёки лодыжек — дозозависимый побочный эффект'},
+                        {name:'+ Спиронолактон 12.5-25 мг 💊', dose:'12.5-25 мг', timing:'Утро', note:triageBadge('rec')+' Антагонист альдостерона. ↓ АД +5-10. Антифибротический. Контроль K⁺+'},
+                        {name:'Петлевой диуретик (фуросемид/торасемид) 💊', dose:'20-40 мг', timing:'Утро при отёках', note:triageBadge('rec')+' При задержке жидкости. Контроль K⁺, Mg, Na⁺. Не >2×/нед'},
+                        {name:'Контроль K⁺, креатинина, СКФ каждые 2 нед', target:'K⁺ <5.0, СКФ >60', when:'Каждые 2 нед', action:'↑ K⁺ или ↓ СКФ >25% — ↓/отмена RAAS-блокады'},
+                      ]},
+                    {phase:'ФАЗА 4 · ПРОТЕИНУРИЯ / ХБП (UACR >300 / СКФ <60)', label:'Нефропротекция', color:'#ef4444', condition:'UACR >300 мг/г / СКФ <60 / микроальбуминурия', desc:'Максимальная нефропротекция',
+                      items:[
+                        {name:'Телмисартан 80 мг (макс) + иАПФ (рамиприл 5-10 мг) 💊', dose:'80 мг + 5-10 мг', timing:'Утро', note:triageBadge('ess')+' Двойная RAAS-блокада. ↓ протеинурия на 40-60%. Контроль K⁺+ 1×/нед!'},
+                        {name:'+ Спиронолактон 25-50 мг 💊', dose:'25-50 мг', timing:'Утро', note:triageBadge('ess')+' Антифибротический + ↓ протеинурии. ГиперK⁺ риск — мониторинг K⁺ 1×/нед'},
+                        {name:'+ Амлодипин 5-10 мг 💊', dose:'5-10 мг', timing:'Утро/вечер', note:triageBadge('rec')+' Контроль АД. Дозировка по АД'},
+                        {name:'Петлевой диуретик (фуросемид 20-40 мг)', dose:'20-40 мг', timing:'Утро при отёках', note:triageBadge('rec')+' При задержке жидкости/ХБП. Контроль K⁺, Mg, Na⁺'},
+                        {name:'Исключить: НПВС, аминогликозиды, контраст', dose:'—', timing:'—', note:triageBadge('ess')+' Нефротоксичные препараты противопоказаны. НПВС ↓ почечный кровоток'},
+                        {name:'Кетостерил (аналог кетоаналогов) 💊', dose:'1 таб/5 кг', timing:'С едой', note:triageBadge('opt')+' ↓ азотемии при ХБП 3-4 ст. Кетоаналоги незаменимых аминокислот'},
+                      ]},
+                  ].map((p:any,i:any)=>renderPhase(p,i))}
+                </div>
+              )}
+              {raasTab==='timing' && timingBlock('raas', [
+                {time:'🌅 Утро', items:[{n:'Телмисартан 20-80 мг',why:'Фиксированное время'},{n:'Амлодипин 2.5-10 мг',why:'Отдельно от телмисартана'},{n:'Спиронолактон 12.5-50 мг',why:'С едой ↓ ЖКТ'},{n:'Торасемид/фуросемид',why:'Утро — не вечер (↓ ночного диуреза)'}]},
+                {time:'🍽 День/Вечер', items:[{n:'Рамиприл 5-10 мг',why:'Вечер (↓ кашля?)'},{n:'Кетостерил',why:'С каждым приёмом еды'}]},
+              ])}
+              {raasTab==='monitoring' && monitoringBlock([
+                {marker:'АД (сист/диаст)', target:'<130/80 (протеинурия <125/75)', when:'Ежедневно × 2 нед после старта, затем 2-3×/нед', action:'>140/90 → ↑ терапию. <100/60 — ↓ дозу'},
+                {marker:'K⁺ (калий)', target:'3.5-5.0 ммоль/л', when:'Через 2 нед после старта/↑ дозы, затем 1×/мес', action:'>5.0 → ↓ RAAS-блокаду. <3.5 → ↓ диуретики'},
+                {marker:'Креатинин / СКФ', target:'СКФ >90 мл/мин', when:'Через 2 нед, затем 1×/3 мес', action:'↓ СКФ >25% после старта RAAS-блокады — отмена'},
+                {marker:'UACR (альбумин/креатинин мочи)', target:'<30 мг/г', when:'Каждые 3-6 мес', action:'>300 → протеинурия. RAAS-блокада обязательна'},
+                {marker:'ЭКГ', target:'Без изменений', when:'При старте терапии', action:'Гипертрофия ЛЖ → АГ-ремоделирование. контроль АД на фоне терапии'},
+              ])}
+            </div>
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ ELECTROLYTES ══════════ */}
+          {protocolTab === 'electrolytes' && (<InfoErrorBoundary label="Электролиты">
+            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#ef4444', marginBottom:2 }}>⚡ Электролиты (K⁺/Na⁺/Mg²⁺/Ca²⁺)</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Летальный риск: гипер-/гипокалиемия, гипомагниемия, гипонатриемия. Коррекция электролитов обязательна при ААС, диуретиках, GLP-1.</p>
+              </div>
+              <div style={{ display:'flex', gap:4, overflowX:'auto' }}>
+                {[{id:'protocol',label:'Протокол'},{id:'emergency',label:'🚑 Экстренная помощь'},{id:'timing',label:'⏰ Тайминг'},{id:'monitoring',label:'🧪 Мониторинг'}].map((t:any)=>(
+                  <button key={t.id} onClick={()=>setElectrolytesTab(t.id)} style={electrolytesTab===t.id?pillActive('#ef4444'):pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+              {electrolytesTab==='protocol'&&(
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    {phase:'ФАЗА 1 · ПРОФИЛАКТИКА (AAS <500 мг)', label:'Базовая поддержка', color:'#22c55e', condition:'Курс до 500 мг тестостерона/без диуретиков', desc:'Профилактика электролитного дисбаланса',
+                      items:[
+                        {name:'Калий (цитрат/глюконат)', dose:'200-400 мг', timing:'С едой', note:triageBadge('rec')+' ↓ риск гипокалиемии. Калий-сберегающие: спиронолактон, эплеренон'},
+                        {name:'Магний (цитрат/глицинат)', dose:'200-400 мг', timing:'Вечер, за 1-2 ч до сна', note:triageBadge('ess')+' Кofactor для K⁺. ↓ судороги, ↑ качество сна. Mg-цитрат — биодоступнее'},
+                        {name:'Натрий — контроль', dose:'—', timing:'—', note:triageBadge('opt')+' При ААС без диуретиков — натрий не ограничивать. Избегать избытка соли (>5 г/день)'},
+                      ]},
+                    {phase:'ФАЗА 2 · УМЕРЕННЫЙ РИСК (AAS 500-1000 мг + диуретики)', label:'Коррекция', color:'#f59e0b', condition:'Курс 500-1000 мг / тиазидные диуретики / GLP-1 / диарея', desc:'Превентивная коррекция при факторах риска',
+                      items:[
+                        {name:'Калий (цитрат)', dose:'400-800 мг', timing:'2×/день с едой', note:triageBadge('ess')+' При тиазидах/петлевых диуретиках. Контроль K⁺ 1×/нед'},
+                        {name:'Магний (цитрат)', dose:'400-600 мг', timing:'Вечер', note:triageBadge('ess')+' ↑ дозу при диуретиках. Mg ↓ потери K⁺ через почки'},
+                        {name:'Калий-сберегающие (спиронолактон)', dose:'25-50 мг', timing:'Утро', note:triageBadge('rec')+' При гипокалиемии <3.5. Контроль K⁺ через 5-7 дней после старта'},
+                      ]},
+                    {phase:'ФАЗА 3 · ВЫСОКИЙ РИСК (>1000 мг + диуретики + GLP-1)', label:'Интенсивная коррекция', color:'#f97316', condition:'Курс >1000 мг / калий-негативные диуретики (фуросемид) / рвота/диарея', desc:'Электролиты — ежедневный контроль',
+                      items:[
+                        {name:'Калий (цитрат)', dose:'800-1200 мг', timing:'3×/день с едой', note:triageBadge('ess')+' Дробно. Не превышать 1200 мг/день без контроля'},
+                        {name:'Магний (цитрат + глицинат)', dose:'600-800 мг', timing:'200 мг утро + 400-600 мг вечер', note:triageBadge('ess')+' Комбинация форм: цитрат (биодоступность) + глицинат (противосудорожное)'},
+                        {name:'Калий-сберегающие спиронолактон', dose:'50-100 мг', timing:'Утро', note:triageBadge('rec')+' При K⁺ <3.8. Контроль K⁺ 2×/нед. ЭКГ при K⁺ <3.0'},
+                        {name:'Кальций (цитрат)', dose:'500 мг', timing:'Вечер, отдельно от Mg', note:triageBadge('rec')+' При судорогах. Дефицит Ca²⁺ усугубляет гипомагниемию. Не принимать с Mg — конкурентное всасывание'},
+                      ]},
+                    {phase:'ФАЗА 4 · КРИТИЧЕСКИЙ ДИСБАЛАНС', label:'Госпитализация?', color:'#ef4444', condition:'K⁺<3.0 / K⁺>6.0 / Na⁺<125 / Mg⁺²<0.5', desc:'Экстренная коррекция',
+                      items:[
+                        {name:'🚑 K⁺ <3.0 (тяжёлая гипокалиемия)', dose:'В/в K⁺ 20-40 ммоль/ч', timing:'Экстренно', note:'ЭКГ: уплощение T, зубец U. Госпитализация. Перорально неэффективно'},
+                        {name:'🚑 K⁺ >6.0 (гиперкалиемия)', dose:'Глюконат Ca²⁺ 10% 10 мл + инсулин 10 ЕД + глюкоза 50 мл 40%', timing:'Экстренно', note:'ЭКГ: высокий T, широкий QRS. Отмена спиронолактона/ингибиторов РААС'},
+                        {name:'🚑 Mg²⁺ <0.5 (тяжёлая гипомагниемия)', dose:'В/в MgSO₄ 5-10 ммоль', timing:'Экстренно', note:'Судороги, тетания. Коррекция Mg без K⁺ неэффективна'},
+                        {name:'🚑 Na⁺ <125 (гипонатриемия)', dose:'В/в NaCl 3% 100-200 мл', timing:'Экстренно', note:'Коррекция <8 ммоль/л/сут. Быстрая коррекция → осмотический демиелинизирующий синдром'},
+                      ]},
+                  ].map((p:any,i:any)=>renderPhase(p,i))}
+                </div>
+              )}
+              {electrolytesTab==='emergency'&&(
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:6 }}>🚑 Экстренная помощь при электролитном кризе</div>
+                  <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Электролитный дисбаланс — наиболее частая причина летальности при самодеятельной фармакологии. При критических значениях — госпитализация.</p>
+                  {[
+                    {cond:'Гипокалиемия (K⁺ <3.5)', rec:'Увеличить калий до 800-1200 мг/день. Добавить спиронолактон 25-50 мг. Отменить тиазиды. ЭКГ. При <3.0 — в/в', source:'KDIGO, 2023'},
+                    {cond:'Гиперкалиемия (K⁺ >5.5)', rec:'Отменить спиронолактон/эплеренон. Отменить ингибиторы РААС (телмисартан). Петлевые диуретики. Глюконат Ca²⁺ в/в', source:'KDIGO, 2023'},
+                    {cond:'Гипомагниемия (Mg <0.75)', rec:'Mg-цитрат 400-800 мг/день. При <0.65 — в/в MgSO₄. Коррекция без Mg неэффективна для K⁺', source:'NICE, 2022'},
+                    {cond:'Гипонатриемия (Na⁺ <130)', rec:'↑ потребление соли (NaCl 1-3 г/день). Отменить тиазиды. Исключить ГЗТ. ГЛП-1 — риск дегидратации', source:'ESICM, 2021'},
+                  ].map((e:any,i:any)=>(
+                    <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#fca5a5', marginBottom:2 }}>{e.cond}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:2 }}>{e.rec}</div>
+                      <div style={{ fontSize:7, color:'#ef4444' }}>🔗 {e.source}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {electrolytesTab==='timing' && timingBlock('electrolytes', [
+                {time:'🌅 Утро', items:[{n:'Спиронолактон 25-50 мг',why:'С едой'},{n:'Магний цитрат 200 мг',why:'С завтраком'}]},
+                {time:'🍽 День', items:[{n:'Калий цитрат 200-400 мг',why:'С обедом'},{n:'Кальций цитрат 500 мг',why:'За 2 ч до Mg'}]},
+                {time:'🌙 Вечер', items:[{n:'Магний глицинат 200-400 мг',why:'За 1-2 ч до сна — расслабление'}]},
+              ])}
+              {electrolytesTab==='monitoring' && monitoringBlock([
+                {marker:'K⁺ (калий)', target:'3.5-5.0 ммоль/л', when:'1-2×/нед при терапии', action:'<3.5 → ↑ калий + спиронолактон. >5.5 → отменить калий + спиронолактон'},
+                {marker:'Mg²⁺ (магний)', target:'0.75-1.0 ммоль/л', when:'1×/нед', action:'<0.75 → ↑ Mg. <0.65 → в/в MgSO₄'},
+                {marker:'Na⁺ (натрий)', target:'135-148 ммоль/л', when:'1×/2 нед', action:'<130 → ↑ соль + отменить тиазиды. >150 → дегидратация'},
+                {marker:'ЭКГ', target:'Без изменений', when:'При K⁺ <3.0 или >6.0', action:' T (гипер-K⁺), уплощение T + U (гипо-K⁺)'},
+                {marker:'Мочевина/креатинин', target:'Мочевина <8.0, креатинин <110', when:'1×/2 нед', action:'↑ → риск дегидратации/почечной недостаточности'},
+              ])}
+            </div>
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ PROLACTIN ══════════ */}
+          {protocolTab === 'prolactin' && (<InfoErrorBoundary label="Пролактин">
+            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#ec4899', marginBottom:2 }}>🤱 Пролактин/Прогестерон</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Гиперпролактинемия от ААС (нандролон, тренболон) и антипсихотиков. Протокол коррекции по уровню PRL.</p>
+              </div>
+              <div style={{ display:'flex', gap:4, overflowX:'auto' }}>
+                {[{id:'protocol',label:'Протокол'},{id:'timing',label:'⏰ Тайминг'},{id:'monitoring',label:'🧪 Мониторинг'}].map((t:any)=>(
+                  <button key={t.id} onClick={()=>setProlactinTab(t.id)} style={prolactinTab===t.id?pillActive('#ec4899'):pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+              {prolactinTab==='protocol'&&(
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    {phase:'ФАЗА 1 · ПРОФИЛАКТИКА (PRL <600 мМЕ/л)', label:'Базовая поддержка нормы', color:'#22c55e', condition:'Все ААС-курсы с нандролоном/тренболоном', desc:'Профилактика гиперпролактинемии без каберголина',
+                      items:[
+                        {name:'Витамин B6 (пиридоксин) 50-100 мг', dose:'50-100 мг', timing:'Утро', note:triageBadge('ess')+' Кофактор дофамин-синтеза. Поддерживает D2-тонус. ↓ PRL на 15-25%'},
+                        {name:'Магний (глицинат) 200-400 мг', dose:'200-400 мг', timing:'Вечер', note:triageBadge('rec')+' Кофактор тирозингидроксилазы. ↓ стресс-индуцированного ↑ PRL'},
+                        {name:'Ашвагандха 300-600 мг', dose:'300-600 мг', timing:'Вечер', note:triageBadge('opt')+' ↓ кортизол → ↓ PRL. Синергия с магнием'},
+                        {name:'Избегать: домперидон, метоклопрамид, нейролептики', dose:'—', timing:'—', note:triageBadge('ess')+' Все блокаторы D2 ↑ PRL. Альтернатива: ондансетрон (5-HT3)'},
+                      ]},
+                    {phase:'ФАЗА 2 · УМЕРЕННАЯ (PRL 600-1000 мМЕ/л)', label:'Каберголин — старт', color:'#f59e0b', condition:'PRL 600-1000 / симптомы: ↓ либидо, галакторея, олигоменорея', desc:'Медикаментозная коррекция',
+                      items:[
+                        {name:'Каберголин (Достинекс) 💊', dose:'0.25 мг', timing:'1-2×/нед', note:triageBadge('ess')+' D2-агонист. Старт 0.25 мг × 1/нед. Контроль PRL через 2 нед'},
+                        {name:'B6 100 мг + Mg 400 мг', dose:'100+400 мг', timing:'Утро/вечер', note:triageBadge('rec')+' Адъювант. Повышает эффективность каберголина'},
+                        {name:'Контроль тошноты от каберголина', dose:'—', timing:'—', note:triageBadge('rec')+' Принимать с едой. Старт 0.125 мг при непереносимости. Домперидон НЕЛЬЗЯ (блокирует D2)'},
+                      ]},
+                    {phase:'ФАЗА 3 · ВЫСОКАЯ (PRL 1000-2000 мМЕ/л)', label:'Каберголин — титрация', color:'#f97316', condition:'PRL 1000-2000 / галакторея / гипогонадизм', desc:'Увеличение дозы каберголина',
+                      items:[
+                        {name:'Каберголин 0.5 мг', dose:'0.5 мг', timing:'1-2×/нед', note:triageBadge('ess')+' Титрация от 0.25→0.5 мг. Разделить приём на 2×/нед (напр. ср+вс)'},
+                        {name:'B6 200 мг + Mg 600 мг', dose:'200+600 мг', timing:'100 мг B6 утро + 100 мг вечер. Mg вечер', note:triageBadge('rec')+' ↑ дозу B6 при ↑ PRL. Мониторинг нейропатии (B6 >200 мг × >6 мес)'},
+                        {name:'Исключить пролактиному (МРТ гипофиза)', target:'Размер аденомы', when:'PRL >2000 или головные боли/нарушения полей зрения', action:'МРТ гипофиза с контрастом. КТ — если МРТ недоступна'},
+                      ]},
+                    {phase:'ФАЗА 4 · КРИТИЧЕСКАЯ (PRL >2000 + галакторея/аденома)', label:'Каберголин + эндокринолог', color:'#ef4444', condition:'PRL >2000 / макропролактинома / галакторея', desc:'Терапия под контролем эндокринолога',
+                      items:[
+                        {name:'Каберголин 1-2 мг', dose:'1-2 мг', timing:'2×/нед', note:triageBadge('ess')+' Высокие дозы. Контроль PRL ежемесячно. Эхокардиография каждые 6-12 мес (риск фиброза клапанов)'},
+                        {name:'МРТ гипофиза с контрастом', target:'Размер аденомы', when:'Каждые 12 мес', action:'↓ размеров на фоне каберголина — критерий эффективности'},
+                        {name:'Клинический осмотр', target:'Поля зрения, головные боли', when:'Каждые 6 мес', action:'При ↑ размеров аденомы → нейрохирург. При апоплексии гипофиза — экстренная госпитализация'},
+                      ]},
+                  ].map((p:any,i:any)=>renderPhase(p,i))}
+                </div>
+              )}
+              {prolactinTab==='timing' && timingBlock('prolactin', [
+                {time:'🌅 Утро (с едой)', items:[{n:'B6 50-100 мг',why:'С завтраком'},{n:'Каберголин 0.25-0.5 мг (1-2×/нед)',why:'С едой ↓ тошноты'}]},
+                {time:'🌙 Вечер', items:[{n:'Магний глицинат 200-400 мг',why:'За 1-2 ч до сна'},{n:'Ашвагандха 300-600 мг',why:'↓ кортизола'}]},
+              ])}
+              {prolactinTab==='monitoring' && monitoringBlock([
+                {marker:'Пролактин (PRL)', target:'60-600 мМЕ/л (2-20 нг/мл)', when:'Каждые 2-4 нед', action:'>600 → старт каберголина. <60 → ↓ каберголин'},
+                {marker:'Тестостерон (общий)', target:'20-30 нмоль/л (на курсе)', when:'Каждые 4-8 нед', action:'↓ тестостерон при ↑ PRL → подавление ГнРГ'},
+                {marker:'ЛГ/ФСГ', target:'ЛГ 1-8, ФСГ 1-10 МЕ/л', when:'Каждые 8-12 нед', action:'↓ ЛГ/ФСГ при ↑ PRL → гипогонадотропный гипогонадизм'},
+                {marker:'Эхокардиография', target:'Без фиброза клапанов', when:'Каждые 6-12 мес на каберголине', action:'Каберголин >2 мг/нед — риск фиброза сердечных клапанов'},
+              ])}
+            </div>
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ ADAPTOGENS ══════════ */}
+          {protocolTab === 'adaptogen' && (<InfoErrorBoundary label="Адаптогены">
+            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#22c55e', marginBottom:2 }}>🌿 Адаптогены/HPA-ось (кортизол)</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Кортизол — главный катаболик. Высокий → мышечный катаболизм, висцеральный жир, ИР, гипертония. Низкий → усталость, гипотония.</p>
+              </div>
+              <div style={{ display:'flex', gap:4, overflowX:'auto' }}>
+                {[{id:'protocol',label:'Протокол'},{id:'timing',label:'⏰ Тайминг'},{id:'monitoring',label:'🧪 Мониторинг'}].map((t:any)=>(
+                  <button key={t.id} onClick={()=>setAdaptogenTab(t.id)} style={adaptogenTab===t.id?pillActive('#22c55e'):pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+              {adaptogenTab==='protocol'&&(
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    {phase:'ФАЗА 1 · ПОДДЕРЖКА HPA-ОСИ (кортизол в норме)', label:'Адаптогены + Mg', color:'#22c55e', condition:'Без симптомов дисбаланса кортизола', desc:'Профилактика HPA-дисфункции на курсе ААС',
+                      items:[
+                        {name:'Ашвагандха (Withania somnifera) 300-600 мг', dose:'300-600 мг', timing:'Вечер, за 30-60 мин до сна', note:triageBadge('ess')+' ↓ кортизол на 15-28% за 60 дн. ↑ свободный T. Синергия с магнием'},
+                        {name:'Магний (глицинат) 200-400 мг', dose:'200-400 мг', timing:'Вечер', note:triageBadge('ess')+' Блокирует HPA-ось через ↓ АКТГ. ↑ качество сна. ↓ судороги'},
+                        {name:'Родиола розовая 200-400 мг', dose:'200-400 мг', timing:'Утро', note:triageBadge('rec')+' Адаптоген + ↑ стрессоустойчивость. Не принимать вечером — ↑ активность'},
+                        {name:'Фосфатидилсерин 100-200 мг', dose:'100-200 мг', timing:'При ↑ кортизола', note:triageBadge('opt')+' ↓ кортизол через ингибирование АКТГ. При высоком кортизоле (≥550 нмоль/л)'},
+                      ]},
+                    {phase:'ФАЗА 2 · ВЫСОКИЙ КОРТИЗОЛ (>550 нмоль/л)', label:'Кортизол-даун', color:'#f97316', condition:'Симптомы: тревога, висцеральный жир, ИР, гипертония, катаболизм', desc:'Снижение кортизола',
+                      items:[
+                        {name:'Фосфатидилсерин 300-400 мг', dose:'300-400 мг', timing:'200 мг утро + 200 мг вечер', note:triageBadge('ess')+' Прямой ингибитор АКТГ. ↓ кортизол на 20-30% за 2-4 нед'},
+                        {name:'Ашвагандха 600 мг', dose:'600 мг', timing:'Вечер', note:triageBadge('ess')+' ↑ до макс. дозы. Контроль ЩЖ — ашвагандха ↑ T4'},
+                        {name:'Магний 400-600 мг + B6 100 мг', dose:'400-600+100', timing:'Магний вечер, B6 утро', note:triageBadge('rec')+' B6 — кофактор дофамин-синтеза. Mg — ↓ АКТГ'},
+                        {name:'Теанин (L-теанин) 200-400 мг', dose:'200-400 мг', timing:'Утро + день', note:triageBadge('rec')+' ↑ α-волны мозга, ↓ кортизол. Анксиолитик. Кофеин + теанин — фокус'},
+                        {name:'Исключить: высокий кофеин (>400 мг/день), депривация сна', dose:'—', timing:'—', note:triageBadge('ess')+' Кофеин ↑ кортизол на 30-50%. Сон <6 ч → 2-3× кортизол'},
+                      ]},
+                    {phase:'ФАЗА 3 · ГИПОКОРТИЗОЛЕМИЯ (<150 нмоль/л)', label:'Кортизол-ап', color:'#3b82f6', condition:'Симптомы: усталость, гипотония, ↓ толерантности к стрессу, HPA-suppression от ААС', desc:'Восстановление HPA-оси',
+                      items:[
+                        {name:'Глицирризиновая кислота (корень солодки) 200-400 мг', dose:'200-400 мг', timing:'Утро', note:triageBadge('ess')+' Ингибитор 11β-HSD2 → ↑ кортизол. ↓ усталость, ↑ АД. Контроль K⁺!'},
+                        {name:'Пантотеновая кислота (B5) 500-1000 мг', dose:'500-1000 мг', timing:'Утро', note:triageBadge('rec')+' Кофактор синтеза кортизола. Адреналиновая поддержка'},
+                        {name:'Женьшень (Panax ginseng) 200-400 мг', dose:'200-400 мг', timing:'Утро', note:triageBadge('rec')+' Адаптоген. ↑ ACTH. Не принимать вечером'},
+                        {name:'Отмена ашвагандхи и фосфатидилсерина', dose:'—', timing:'—', note:triageBadge('ess')+' Эти вещества ↓ кортизол — противопоказаны при гипокортизолемии'},
+                      ]},
+                    {phase:'ФАЗА 4 · АДДИСОНИЧЕСКИЙ КРИЗ (кортизол <50 нмоль/л + коллапс)', label:'🚑 Экстренная помощь', color:'#ef4444', condition:'Симптомы: коллапс, гипогликемия, гипер-K⁺, гипо-Na⁺, рвота', desc:'Госпитализация!',
+                      items:[
+                        {name:'Гидрокортизон 100 мг в/в', dose:'100 мг в/в', timing:'Экстренно', note:'Первая линия. Затем 200 мг/день в/в + инфузия. Госпитализация в ОРИТ'},
+                        {name:'Инфузия NaCl 0.9% 1-2 л', dose:'1-2 л', timing:'Экстренно', note:'Коррекция гиповолемии. Декстроза 5% при гипогликемии'},
+                        {name:'Отмена всех ААС + адаптогенов', dose:'—', timing:'—', note:'ААС могут подавлять HPA-ось. Адаптогены могут маскировать симптомы'},
+                      ]},
+                  ].map((p:any,i:any)=>renderPhase(p,i))}
+                </div>
+              )}
+              {adaptogenTab==='timing' && timingBlock('adaptogen', [
+                {time:'🌅 Утро', items:[{n:'Родиола 200-400 мг',why:'↑ стрессоустойчивость'},{n:'B5 500-1000 мг (при гипокортизоле)',why:'Синтез кортизола'}]},
+                {time:'🍽 День', items:[{n:'Теанин 200 мг',why:'Утром + при стрессе'},{n:'Фосфатидилсерин 200 мг (при высоком кортизоле)',why:'После обеда'}]},
+                {time:'🌙 Вечер', items:[{n:'Ашвагандха 300-600 мг',why:'За 30-60 мин до сна'},{n:'Магний глицинат 200-400 мг',why:'За 1-2 ч до сна'},{n:'Фосфатидилсерин 200 мг (при высоком кортизоле)',why:'Перед сном'}]},
+              ])}
+              {adaptogenTab==='monitoring' && monitoringBlock([
+                {marker:'Кортизол утро (8:00)', target:'150-550 нмоль/л', when:'Каждые 4-8 нед', action:'>550 → старт кортизол-даун. <150 → старт кортизол-ап'},
+                {marker:'Кортизол вечер (23:00)', target:'<50% от утреннего', when:'Каждые 4-8 нед', action:'↓ циркадного ритма → HPA-дисфункция. Восстановление режима сна'},
+                {marker:'АКТГ', target:'10-60 пг/мл', when:'При подозрении на HPA-патологию', action:'↑ АКТГ + ↓ кортизол → первичная надпочечниковая недостаточность'},
+                {marker:'K⁺, Na⁺', target:'K⁺ 3.5-5.0, Na⁺ 135-148', when:'Каждые 2-4 нед на солодке', action:'Глицирризиновая кислота → ↓ K⁺, ↑ Na⁺. Контроль электролитов!'},
+                {marker:'АД', target:'<130/80', when:'1-2×/день на солодке', action:'↑ АД от глицирризиновой кислоты. Коррекция дозы/отмена при АГ'},
+              ])}
+            </div>
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ PEPTIDES ══════════ */}
+          {protocolTab === 'peptide' && (<InfoErrorBoundary label="Пептиды">
+            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#2dd4bf', marginBottom:2 }}>🧬 Пептиды (сводный справочник)</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Справочник пептидов: GHRP/GHRH, регенеративные (BPC-157, TB-500), ноотропные, иммунные.</p>
+              </div>
+              <div style={{ display:'flex', gap:4, overflowX:'auto' }}>
+                {[{id:'ghrh',label:'GHRP/GHRH'},{id:'repair',label:'Регенерация'},{id:'nootropic',label:'Ноотропы'},{id:'immune',label:'Иммунитет'},{id:'other',label:'Прочие'}].map((t:any)=>(
+                  <button key={t.id} onClick={()=>setPeptideTab(t.id)} style={peptideTab===t.id?pillActive('#2dd4bf'):pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+              {peptideTab==='ghrh'&&(<div style={cardBg}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#2dd4bf', marginBottom:6 }}>📈 GHRP/GHRH — стимуляторы GH</div>
+                {[{n:'GHRP-2 100-200 мкг',d:'100-200 мкг',t:'2-3×/день п/к',o:'Старт 100 мкг. ↓ кортизол. Контроль пролактина'},{n:'GHRP-6 100-200 мкг',d:'100-200 мкг',t:'2-3×/день п/к',o:'↑ аппетит. ↑ кортизол. Титровать 100→200'},{n:'Ipamorelin 200-300 мкг',d:'200-300 мкг',t:'2-3×/день п/к',o:'Селективный GHRP. Не ↑ кортизол/PRL. Старт 200×2'},{n:'CJC-1295 (без DAC) 100-200 мкг',d:'100-200 мкг',t:'1-2×/день п/к',o:'GHRH-аналог. DAC-версия 1×/нед'},{n:'Tesamorelin 2 мг',d:'2 мг',t:'1×/день п/к',o:'Одобрен FDA ↓ висцеральный жир'},{n:'GH 2-4 МЕ',d:'2-4 МЕ',t:'Утро/перед тренировкой',o:'Экзогенный GH. Старт 2 МЕ. Контроль IGF-1'}].map((x:any,i:any)=>renderRow(x,i,'#2dd4bf'))}
+              </div>)}
+              {peptideTab==='repair'&&(<div style={cardBg}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#2dd4bf', marginBottom:6 }}>🩹 Регенеративные пептиды (BPC-157 + TB-500)</div>
+                {[{n:'BPC-157 200-500 мкг',d:'200-500 мкг',t:'1-2×/день п/к',o:'Стабильный пентадекапептид. Ангиогенез + заживление сухожилий и ЖКТ'},{n:'TB-500 2.5-10 мг',d:'2.5-10 мг',t:'1×/нед в/м/п/к',o:'G-актин-связывающий. Миграция клеток. Старт 2.5 мг ×2/нед'},{n:'BPC+TB стек',d:'BPC 250+TB 2.5',t:'BPC 2×/д, TB 2×/нед',o:'Максимальная регенерация. Курс 4-6 нед'},{n:'GH 2-4 МЕ',d:'2-4 МЕ',t:'Утро + сон',o:'↑ IGF-1 → заживление. Синергия с BPC/TB'}].map((x:any,i:any)=>renderRow(x,i,'#2dd4bf'))}
+              </div>)}
+              {peptideTab==='nootropic'&&(<div style={cardBg}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#2dd4bf', marginBottom:6 }}>🧠 Ноотропные пептиды</div>
+                {[{n:'Semax 200-600 мкг',d:'200-600 мкг',t:'Интраназально 1-2/д',o:'BDNF ↑, внимание. Курс 10-14 дн'},{n:'Cerebrolysin 10-30 мл',d:'10-30 мл',t:'В/в капельно 10-20 дн',o:'↑ нейропластичность. NGF, BDNF'},{n:'Pinealon 1-2 мл',d:'1-2 мл',t:'В/м ×10 дн',o:'↑ мелатонин. Сон + когнитив'},{n:'Noopept 10-20 мг',d:'10-20 мг',t:'Сублингвально 2-3/д',o:'Синтетический ноотроп. 8-12 нед'}].map((x:any,i:any)=>renderRow(x,i,'#2dd4bf'))}
+              </div>)}
+              {peptideTab==='immune'&&(<div style={cardBg}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#2dd4bf', marginBottom:6 }}>🛡️ Иммунные пептиды</div>
+                {[{n:'Thymalin/Thymogen 5-10 мг',d:'5-10 мг',t:'В/м 5-10 дн 1-2×/год',o:'T-клеточный иммунитет'},{n:'TA-1 (тимозин α1) 1.6 мг',d:'1.6 мг',t:'П/к 2-4 нед',o:'Противовирусный + противоопухолевый'},{n:'Epitalon 5-10 мг',d:'5-10 мг',t:'В/м 10-20 дн',o:'↑ теломераза, мелатонин'},{n:'LL-37 0.5-1 мг',d:'0.5-1 мг',t:'Местно/п/к',o:'Антимикробный пептид. Экспериментальный'}].map((x:any,i:any)=>renderRow(x,i,'#2dd4bf'))}
+              </div>)}
+              {peptideTab==='other'&&(<div style={cardBg}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#2dd4bf', marginBottom:6 }}>🧪 Другие пептиды</div>
+                {[{n:'MGF (IGF-1Ec) 50-100 мкг',d:'50-100 мкг',t:'В мышцу после тренировки',o:'Локальная гипертрофия. Сателлитные клетки'},{n:'IGF-1 LR3 20-40 мкг',d:'20-40 мкг',t:'П/к/в/м 2-3/д',o:'↑ период полувыведения 3×. Гипогликемия!'},{n:'PEG-MGF 100-200 мкг',d:'100-200 мкг',t:'В/м 1-2/нед',o:'↑ сателлитные клетки. Старт 100 мкг'},{n:'АКТГ 15-30 мг',d:'15-30 мг',t:'В/м 1-2/д',o:'Только для диагностики — НЕ для курса!'}].map((x:any,i:any)=>renderRow(x,i,'#2dd4bf'))}
+              </div>)}
+            </div>
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ POST-CYCLE ══════════ */}
+          {protocolTab === 'postcycle' && (<InfoErrorBoundary label="Постцикл">
+            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#8b5cf6', marginBottom:2 }}>🔄 Послекурсовая реабилитация (3-6 мес)</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Комплексное восстановление HPTA-оси, липидного профиля, гематокрита и нейроэндокринного статуса.</p>
+              </div>
+              <div style={{ display:'flex', gap:4, overflowX:'auto' }}>
+                {[{id:'phases',label:'📅 Фазы'},{id:'lipids',label:'Липиды'},{id:'hemato',label:'Гематокрит'},{id:'neuro',label:'Нейро'},{id:'monitoring',label:'🧪 Мониторинг'}].map((t:any)=>(
+                  <button key={t.id} onClick={()=>setPostCycleTab(t.id)} style={postCycleTab===t.id?pillActive('#8b5cf6'):pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+              {postCycleTab==='phases'&&(<div style={cardBg}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>📅 Фазы восстановления</div>
+                <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(139,92,246,0.04)' }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>ФАЗА 1 · ОТМЕНА ААС (0-4 нед)</div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>• Отмена ААС. SERM (тамоксифен 20 мг, энкломифен 12.5 мг) с последней инъекции<br/>• AI — только при высоком E2. Каберголин 0.25×2/нед при ↑ PRL<br/>• hCG не показан (подавляет HPTA). Контроль T,E2,PRL,АЛТ,HCT каждые 2 нед</div>
+                </div>
+                <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(139,92,246,0.04)' }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>ФАЗА 2 · ПКТ (4-8 нед)</div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>• SERM: тамоксифен 20 + энкломифен 12.5 (кломифен 50/25)<br/>• Поддержка: цинк 30 мг, Mg 400 мг, D3 5000 МЕ, B6 100 мг<br/>• Адаптогены: ашвагандха 600 мг, фосфатидилсерин 200 мг<br/>• Контроль: T, ЛГ, ФСГ, кортизол каждые 2 нед</div>
+                </div>
+                <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(139,92,246,0.04)' }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>ФАЗА 3 · ВОССТАНОВЛЕНИЕ (8-16 нед)</div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>• Липиды: омега-3 EPA 4 г, бергамот 1000 мг, ниацин 500 мг<br/>• HCT: кровопускание при {'>'}54, аспирин 100 мг, куркумин<br/>• Нейро: NAC 1200 мг, АЛК 600 мг, PS 400 мг, Mg 600 мг</div>
+                </div>
+                <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(139,92,246,0.04)' }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>ФАЗА 4 · МОНИТОРИНГ (16-24+ нед)</div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>• Цель: T {'>'}15 нмоль/л, E2 80-150, ЛГ/ФСГ в норме<br/>• Полное восстановление HPTA — 4-12 мес<br/>• Следующий курс — только при T {'>'}15, ЛГ {'>'}3, липиды в норме</div>
+                </div>
+              </div>)}
+              {postCycleTab==='lipids'&&(<div style={cardBg}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>🩸 Коррекция липидного профиля</div>
+                {[{n:'Омега-3 EPA 4 г/день',d:'4 г',t:'2+2 г с едой',o:'↑ ЛПВП 10-15%, ↓ ТГ 25-30%'},{n:'Бергамот 1000 мг',d:'1000 мг',t:'2×/д до еды',o:'↓ ЛПНП 30-40%, ↑ ЛПВП 20-25%'},{n:'Ниацин B3 500 мг',d:'500 мг',t:'После еды 2-3×/д',o:'↑ ЛПВП 20-30% — мощный. Старт 100 мг титровать'},{n:'Кр. ферм. рис (монаколин K)',d:'10 мг',t:'Вечер',o:'↓ ЛПНП 20-40% +CoQ10. Контроль АЛТ'},{n:'Эзетимиб 10 мг 💊',d:'10 мг',t:'Утро',o:'↓ ЛПНП 15-20%. Аддитивно к статинам'}].map((x:any,i:any)=>renderRow(x,i,'#8b5cf6'))}
+              </div>)}
+              {postCycleTab==='hemato'&&(<div style={cardBg}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>🩸 Коррекция гематокрита</div>
+                {[{n:'Кровопускание 400-500 мл',d:'—',t:'При HCT >54 до <50',o:'Золотой стандарт. Донорство. Повтор через 4-6 нед'},{n:'Аспирин 100 мг',d:'100 мг',t:'Утро после еды',o:'↓ агрегация тромбоцитов. При HCT >52'},{n:'Чеснок Kyolic 1200 мг',d:'1200 мг',t:'2×/день',o:'↓ вязкость крови'},{n:'Гидратация 3+ л/день',d:'>3 л',t:'Постоянно',o:'Разжижение крови'},{n:'Наттокиназа 100 мг',d:'100 мг',t:'Утро натощак',o:'Фибринолитик. При HCT >50'}].map((x:any,i:any)=>renderRow(x,i,'#8b5cf6'))}
+              </div>)}
+              {postCycleTab==='neuro'&&(<div style={cardBg}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>🧠 Нейрореабилитация</div>
+                {[{n:'NAC 1200 мг',d:'1200 мг',t:'Утро+вечер',o:'↑ глутатион. ↓ глутамат-токсичность'},{n:'Mg глицинат 400-600 мг',d:'400-600 мг',t:'Вечер',o:'↓ глутамат, ГАМК-агонист'},{n:'PS 300-400 мг',d:'300-400 мг',t:'200 утро+200 вечер',o:'↓ кортизол. ↑ дофаминовые рецепторы'},{n:'АЛК 600 мг',d:'600 мг',t:'Утро',o:'Антиоксидант. ↑ глутатион в мозге'},{n:'L-теанин 200-400 мг',d:'200-400 мг',t:'Утро+день',o:'↑ α-волны. Анксиолитик'},{n:'Глицин 3 г',d:'3 г',t:'Перед сном',o:'ГАМК-агонист. Качество сна'},{n:'Куркумин Meriva 500-1000 мг',d:'500-1000 мг',t:'С едой',o:'↓ нейровоспаление NF-κB'}].map((x:any,i:any)=>renderRow(x,i,'#8b5cf6'))}
+              </div>)}
+              {postCycleTab==='monitoring' && monitoringBlock([
+                {marker:'T общий/свободный', target:'>15 нмоль/л', when:'Каждые 4 нед (фазы 1-2)', action:'<10 → add SERM/энкломифен'},
+                {marker:'ЛГ, ФСГ', target:'ЛГ 1-8 МЕ/л', when:'Каждые 4 нед', action:'ЛГ <1 → HPTA подавлена'},
+                {marker:'E2', target:'80-150 пмоль/л', when:'Каждые 4 нед', action:'>200 → AI. <30 → add SERM'},
+                {marker:'Липиды (ЛПВП, ЛПНП, ТГ)', target:'ЛПВП >1.0', when:'Каждые 4-8 нед', action:'ЛПВП <0.8 → старт коррекции'},
+                {marker:'HCT', target:'42-50%', when:'Каждые 4 нед', action:'>54% → кровопускание'},
+                {marker:'CRP', target:'<1 мг/л', when:'Каждые 8-12 нед', action:'>3 → персистирующее воспаление'},
+                {marker:'Кортизол, PRL', target:'150-550, 60-600', when:'Каждые 4-8 нед', action:'↑ PRL → каберголин'},
+                {marker:'ПСА (>40 лет)', target:'<2.5 нг/мл', when:'Ежегодно', action:'>4 → уролог'},
+              ])}
+            </div>
+          </InfoErrorBoundary>)}
+
+          {/* ══════════ STARTER PACK ══════════ */}
+          <div style={{ borderRadius:12, padding:14, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.2)', marginBottom:8 }}>
+            <div style={{ fontSize:13, fontWeight:800, color:'#22c55e', marginBottom:6 }}>🛡️ Базовый минимум (Starter Pack)</div>
+            <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Минимальный набор поддержки для любого курса ААС. Выберите уровень под бюджет и риски.</p>
+            <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto' }}>
+              {[
+                {id:'level1',label:'🌱 Минимум ~3000₽/мес'},
+                {id:'level2',label:'🌿 База ~6000₽/мес'},
+                {id:'level3',label:'🔶 Полный ~12000₽/мес'},
+                {id:'level4',label:'🔥 Максимум ~20000₽/мес'},
+              ].map((l:any)=>(
+                <button key={l.id} onClick={()=>setStarterLevel(l.id)} style={{
+                  padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, cursor:'pointer', border:'1px solid '+(starterLevel===l.id?'#22c55e':'var(--border)'),
+                  background:starterLevel===l.id?'rgba(34,197,94,0.12)':'transparent', color:starterLevel===l.id?'#22c55e':'var(--text-dim)'
+                }}>{l.label}</button>
+              ))}
+            </div>
+            {starterLevel==='level1'&&<div style={cardBg}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#22c55e', marginBottom:4 }}>🌱 Минимум ~3000₽/мес</div>
+              {[{n:'NAC 1200 мг (500₽)'},{n:'Магний цитрат 400 мг (400₽)'},{n:'D3 5000 МЕ (300₽)'},{n:'Цинк 30 мг (200₽)'},{n:'Омега-3 2 г (800₽)'},{n:'Витамин C 500 мг (200₽)'}].map((x:any,i:any)=><div key={i} style={{fontSize:8,color:'var(--text-dim)',padding:'3px 6px'}}>• {x.n}</div>)}
+            </div>}
+            {starterLevel==='level2'&&<div style={cardBg}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#22c55e', marginBottom:4 }}>🌿 База ~6000₽/мес</div>
+              {[{n:'NAC 1800 мг (800₽)'},{n:'Mg глицинат 600 мг (700₽)'},{n:'D3+K2 5000 МЕ (500₽)'},{n:'Цинк 30+Cu 2 мг (400₽)'},{n:'Омега-3 4 г (1600₽)'},{n:'TUDCA 500 мг (1200₽)'},{n:'CoQ10 100 мг (500₽)'},{n:'Берберин 500 мг (300₽)'}].map((x:any,i:any)=><div key={i} style={{fontSize:8,color:'var(--text-dim)',padding:'3px 6px'}}>• {x.n}</div>)}
+            </div>}
+            {starterLevel==='level3'&&<div style={cardBg}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#22c55e', marginBottom:4 }}>🔶 Полный ~12000₽/мес</div>
+              {[{n:'NAC 2400 мг + глицин 3 г'},{n:'Mg глицинат 600 + теанин 200'},{n:'D3+K2+Mg комплекс'},{n:'Zn 30 + Cu 2 + бор 3 + Se 100'},{n:'Омега-3 4 г + астаксантин 4 мг'},{n:'TUDCA 750 + силимарин 280'},{n:'CoQ10 200 + PQQ 10'},{n:'Берберин 1000 + АЛК 600'},{n:'Чеснок 1200 мг'},{n:'Ашвагандха 600 + родиола 200'},{n:'Пребиотик/пробиотик'},{n:'Vit C 1000 мг + цитрусовые биофлавоноиды'}].map((x:any,i:any)=><div key={i} style={{fontSize:8,color:'var(--text-dim)',padding:'3px 6px'}}>• {x.n}</div>)}
+            </div>}
+            {starterLevel==='level4'&&<div style={cardBg}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#22c55e', marginBottom:4 }}>🔥 Максимум ~20000₽/мес</div>
+              {[{n:'NAC 2400 + глицин 5 г + АЛК 600'},{n:'Mg глицинат 800 + теанин 400 + PS 400'},{n:'D3+K2+Mg+B12 (метилкобаламин)'},{n:'Zn 30++ бор 6 + Se 200 + хром 200'},{n:'Омега-3 6 г + астаксантин 8 + ликопин 10'},{n:'TUDCA 1000 + NAC 1200 + силимарин 420'},{n:'CoQ10 300 + PQQ 20 + NMN 500'},{n:'Берберин 1500 + АЛК 600 + R-АЛК'},{n:'Чеснок 1200 + куркумин Meriva 1000 + имбирь'},{n:'Ашвагандха 600 + родиола 400 + женьшень 400'},{n:'Бета-глюкан 500 + лактоферрин 200 + колострум'},{n:'Бромелайн 500 + серрапептаза 80k ЕД'},{n:'Vit E 400 + C 2000 + Se 200'},{n:'Пребиотик+постбиотик+глютамин'},{n:'Карнитин 2 г + таурин 2 г + креатин 5 г'}].map((x:any,i:any)=><div key={i} style={{fontSize:8,color:'var(--text-dim)',padding:'3px 6px'}}>• {x.n}</div>)}
+            </div>}
+          </div>
+
+          {protocolTab === 'symptoms' && (
+            <div style={{ padding: '0 0 0' }}>
+              <SymptomSolverTab s={s} />
+            </div>
+          )}
+
+          {/* Polypharm warning */}
+          {polypharmNote}
+
+          </div>
+        )}
+      </div>
   );
 };

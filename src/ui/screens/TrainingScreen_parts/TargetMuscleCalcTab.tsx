@@ -253,7 +253,7 @@ export const TargetMuscleCalcTab: React.FC = () => {
                               <span style={{ ...pill, background: ex.type === 'compound' ? 'rgba(0,230,138,0.15)' : 'rgba(59,130,246,0.15)', color: ex.type === 'compound' ? ACCENT : '#60a5fa' }}>{TYPE_RU[ex.type] || ex.type}</span>
                               <span style={{ ...pill, background: 'rgba(168,85,247,0.12)', color: '#c084fc' }}>{EQUIP_RU[ex.equipment] || ex.equipment}</span>
                               <span style={{ ...pill, background: ex.difficulty === 'beginner' ? 'rgba(34,197,94,0.12)' : ex.difficulty === 'advanced' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)', color: ex.difficulty === 'beginner' ? '#22c55e' : ex.difficulty === 'advanced' ? '#ef4444' : '#f59e0b' }}>{ex.difficulty === 'beginner' ? 'Новичок' : ex.difficulty === 'advanced' ? 'Продв.' : 'Средний'}</span>
-                              {ex.targetMuscle && <span style={{ ...pill, background: 'rgba(255,255,255,0.04)', color: DIM, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.targetMuscle}</span>}
+                              {ex.targetMuscle && <span style={{ ...pill, background: 'rgba(255,255,255,0.04)', color: DIM }}>{ex.targetMuscle}</span>}
                             </div>
                           </div>
                           <div style={{ textAlign: 'center', minWidth: 50 }}>

@@ -301,7 +301,7 @@ export const DiaryAndAnalyticsTab: React.FC<DiaryAndAnalyticsTabProps> = ({ diar
                     return (
                       <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                         <div style={{ width: '70%', height: `${h}%`, background: w.totalVolume === maxVol ? 'var(--accent)' : 'rgba(0,230,138,0.3)', borderRadius: '2px 2px 0 0' }} />
-                        <span style={{ fontSize: 6, color: 'var(--text-dim)' }}>{w.week}</span>
+                        <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{w.week}</span>
                       </div>
                     );
                   })}

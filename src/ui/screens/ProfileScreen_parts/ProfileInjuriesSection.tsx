@@ -34,15 +34,15 @@ export const ProfileInjuriesSection: React.FC<Props> = ({ settings, save }) => {
   };
 
   const saveInjury = (inj: InjuryRecord) => {
-    const existing = settings.injuries ?? [];
-    const idx = existing.findIndex(i => i.id === inj.id);
-    const updated = idx >= 0 ? existing.map(i => i.id === inj.id ? inj : i) : [...existing, inj];
+    const existing: InjuryRecord[] = settings.injuries ?? [];
+    const idx = existing.findIndex((i: InjuryRecord) => i.id === inj.id);
+    const updated = idx >= 0 ? existing.map((i: InjuryRecord) => i.id === inj.id ? inj : i) : [...existing, inj];
     save({ injuries: updated });
     setEditInjury(null);
   };
 
   const deleteInjury = (id: string) => {
-    save({ injuries: (settings.injuries ?? []).filter(i => i.id !== id) });
+    save({ injuries: ((settings.injuries ?? []) as InjuryRecord[]).filter((i: InjuryRecord) => i.id !== id) });
   };
 
   return (
@@ -58,7 +58,7 @@ export const ProfileInjuriesSection: React.FC<Props> = ({ settings, save }) => {
           Нет записей. Нажмите «+ Добавить» чтобы добавить травму.
         </div>
       )}
-      {(settings.injuries ?? []).map(inj => (
+      {((settings.injuries ?? []) as InjuryRecord[]).map((inj: InjuryRecord) => (
         <div key={inj.id} style={glassCardStyle}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
             <strong style={{ fontSize:12, color: theme.textPrimary }}>{inj.location || 'Не указана'} — {INJURY_TYPES.find(t => t.id === inj.type)?.label ?? inj.type}</strong>
@@ -75,7 +75,7 @@ export const ProfileInjuriesSection: React.FC<Props> = ({ settings, save }) => {
       ))}
       {editInjury && (
         <div style={{ ...glassCardStyle, border: theme.accentBorder }}>
-          <div style={sectionLabelStyle}>{editInjury.id && (settings.injuries ?? []).find(i => i.id === editInjury.id) ? 'Редактирование' : 'Новая травма'}</div>
+          <div style={sectionLabelStyle}>{editInjury.id && ((settings.injuries ?? []) as InjuryRecord[]).find(i => i.id === editInjury.id) ? 'Редактирование' : 'Новая травма'}</div>
           <div style={{ marginTop:8 }}>
             <span style={sectionLabelStyle}>Тип</span>
             <div style={{ display:'flex', gap:4, marginTop:2 }}>{INJURY_TYPES.map(t => <button key={t.id} style={pillBtn(editInjury.type === t.id)} onClick={() => setEditInjury({ ...editInjury, type: t.id })}>{t.label}</button>)}</div>
@@ -116,7 +116,7 @@ export const ProfileInjuriesSection: React.FC<Props> = ({ settings, save }) => {
             <textarea style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontSize:12, minHeight:50, outline:'none', resize:'vertical' }} value={editInjury.notes ?? ''} onChange={e => setEditInjury({ ...editInjury, notes: e.target.value })} />
           </div>
           <button onClick={() => saveInjury(editInjury)} style={{ width:'100%', padding:'10px', borderRadius:12, marginTop:10, cursor:'pointer', background: theme.gradientGreen, border:'none', color:'#000', fontWeight:700, fontSize:13 }}>
-            {editInjury.id && (settings.injuries ?? []).find(i => i.id === editInjury.id) ? 'Сохранить' : 'Добавить'}
+            {editInjury.id && ((settings.injuries ?? []) as InjuryRecord[]).find(i => i.id === editInjury.id) ? 'Сохранить' : 'Добавить'}
           </button>
           <button onClick={() => setEditInjury(null)} style={{ ...pillBtn(false), width:'100%', marginTop:6, textAlign:'center' as const }}>Отмена</button>
         </div>

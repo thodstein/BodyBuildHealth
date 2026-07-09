@@ -2020,3 +2020,134 @@ input[type="range"]:active {
 .training-screen div[style*="overflow-x"]::-webkit-scrollbar {
   display: none;
 }
+
+/* ============================================================
+   ПОЛНОТЕКСТОВАЯ МОБИЛЬНАЯ ОПТИМИЗАЦИЯ — весь блок без обрезок
+   ============================================================ */
+
+/* 1) Минимальный читаемый шрифт: 9px — всё мельче нечитаемо на телефоне */
+.training-screen div[style*="font-size:6"],
+.training-screen span[style*="font-size:6"],
+.training-screen div[style*="font-size: 6"],
+.training-screen span[style*="font-size: 6"],
+.training-screen div[style*="fontSize:6"],
+.training-screen span[style*="fontSize:6"],
+.training-screen div[style*="fontSize: 6"],
+.training-screen span[style*="fontSize: 6"] {
+  font-size: 9px !important;
+}
+.training-screen div[style*="font-size:7"],
+.training-screen span[style*="font-size:7"],
+.training-screen div[style*="font-size: 7"],
+.training-screen span[style*="font-size: 7"],
+.training-screen div[style*="fontSize:7"],
+.training-screen span[style*="fontSize:7"],
+.training-screen div[style*="fontSize: 7"],
+.training-screen span[style*="fontSize: 7"] {
+  font-size: 9px !important;
+}
+.training-screen div[style*="font-size:8"],
+.training-screen span[style*="font-size:8"],
+.training-screen div[style*="font-size: 8"],
+.training-screen span[style*="font-size: 8"],
+.training-screen div[style*="fontSize:8"],
+.training-screen span[style*="fontSize:8"],
+.training-screen div[style*="fontSize: 8"],
+.training-screen span[style*="fontSize: 8"] {
+  font-size: 10px !important;
+}
+
+/* 2) Запрет обрезки текста эллипсисом — строки должны быть ПОЛНЫМИ */
+.training-screen div[style*="textOverflow"],
+.training-screen div[style*="text-overflow"],
+.training-screen span[style*="textOverflow"],
+.training-screen span[style*="text-overflow"] {
+  text-overflow: clip !important;
+  overflow: visible !important;
+  white-space: normal !important;
+}
+
+/* 3) Контейнеры с minWidth > 340px — скролл по горизонтали, не ломая страницу */
+.training-screen div[style*="minWidth: 3"],
+.training-screen div[style*="minWidth: 4"],
+.training-screen div[style*="minWidth: 5"],
+.training-screen div[style*="minWidth:3"],
+.training-screen div[style*="minWidth:4"],
+.training-screen div[style*="minWidth:5"],
+.training-screen div[style*="minWidth: 6"],
+.training-screen div[style*="minWidth: 7"],
+.training-screen div[style*="minWidth: 8"],
+.training-screen div[style*="minWidth:6"],
+.training-screen div[style*="minWidth:7"],
+.training-screen div[style*="minWidth:8"] {
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 4) Кнопки-пилюли — убрать nowrap, дать тексту переноситься */
+.training-screen button[style*="nowrap"],
+.training-screen div[style*="nowrap"] button,
+.training-screen button[style*="white-space: nowrap"],
+.training-screen button[style*="whiteSpace: 'nowrap'"],
+.training-screen button[style*="whiteSpace:'nowrap'"] {
+  white-space: normal !important;
+  word-break: break-word;
+}
+
+/* 5) Все элементы с maxWidth + overflow hidden — убрать обрезку */
+.training-screen div[style*="maxWidth"][style*="overflow: hidden"],
+.training-screen span[style*="maxWidth"][style*="overflow: hidden"],
+.training-screen div[style*="maxWidth"][style*="overflow:hidden"],
+.training-screen span[style*="maxWidth"][style*="overflow:hidden"] {
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+/* 6) Hero-карточки зон — подзаголовки должны переноситься */
+.training-screen div[style*="fontSize: 10"][style*="rgba(255,255,255,0.7"] {
+  white-space: normal !important;
+  word-break: break-word;
+  line-height: 1.35 !important;
+}
+
+/* 7) Планировщик: hint-подписи под кнопками — перенос */
+.training-screen div[style*="fontSize: 8"][style*="rgba(255,255,255,0.5"] {
+  white-space: normal !important;
+  word-break: break-word;
+}
+
+/* 8) Таблицы на grid (div-сетки) — убрать nowrap на ячейках */
+.training-screen div[style*="minWidth:"] span,
+.training-screen div[style*="minWidth:"] div {
+  white-space: normal !important;
+  word-break: break-word;
+}
+.training-screen div[style*="grid-template-columns"] span {
+  white-space: normal !important;
+}
+
+/* 9) Мелкие чипсы/теги — вернуть читаемый размер и убрать обрезку */
+.training-screen span[style*="fontSize:6"],
+.training-screen span[style*="fontSize:7"],
+.training-screen span[style*="fontSize:8"] {
+  white-space: normal !important;
+  word-break: break-word;
+}
+
+/* 10) Планировщик: кнопки режимов с длинными названиями — flex-wrap */
+.training-screen div[style*="display: flex"][style*="gap: 10"],
+.training-screen div[style*="display:flex"][style*="gap: 10"],
+.training-screen div[style*="display: flex"][style*="gap:10"],
+.training-screen div[style*="display:flex"][style*="gap:10"] {
+  flex-wrap: wrap !important;
+}
+
+/* 11) Строки с длинным текстом в любых контейнерах — гарантированный перенос */
+.training-screen p,
+.training-screen label,
+.training-screen .card p,
+.training-screen div[style*="lineHeight"] {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}

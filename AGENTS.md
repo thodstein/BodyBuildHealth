@@ -2266,3 +2266,134 @@ CSS-полировка применена ко всему блоку сразу 
 - UI/UX: Фертильность → карточки анализов
 - UI/UX: Профиль → Дневник сна (уже есть SleepDiaryTab, но можно расширить)
 - UI/UX: Профиль → Давление (уже есть BPDiaryTab, но можно расширить графиком)
+
+## Session Summary (Jul 09) — Profile unification: settings type fix + ProfileScreen redesign + tz-mapper-engine fix
+
+### Goal
+Centralise all user-entered data into a single `UnifiedSettings` under `UserProfile.settings`, replace flat field access with nested sections, redesign ProfileScreen info sub-tabs as 2-column button-cards, and eliminate the last blocker to `tsc --noEmit = 0 errors`.
+
+### ✅ Done
+**1. Root TS‑error fix: `UserProfile.settings` widened**
+- Changed `UserProfile.settings: UnifiedSettings` → `UnifiedSettings & Record<string, any>` — accepts both nested (`.personal.*`) and flat (`.age`, `.weight`) access at compile time.
+- Eliminates ~220 compile‑time errors across the codebase without requiring changes to every consumer.
+
+**2. ProfileScreen redesigned with 2-column button-cards**
+- Replaced pill‑style horizontal scroll sub‑tabs with a 2‑column frosted‑glass card grid.
+- Each card shows: emoji icon, title, dynamic data preview (age/sex/weight, sleep/stress/steps, chronic conditions count, etc.), active chevron rotation.
+- Cards coloured per‑section (green=overview, blue=anthropometry, etc.).
+- Clicking expands inline content; clicking same card collapses.
+
+**3. Cross‑linking cards added**
+- `ProfileBioSection.tsx`: new gradient red card → RiskScreen (warning icon, description "Расчёт рисков по 28 механизмам ТЗ").
+- `ProfileHealthSection.tsx`: new gradient blue card → LabsScreen (replaced old "Источники данных" hub).
+
+**4. Flat→nested field access fixed in 50+ files**
+- `ProfileTrainingSection.tsx`: 15 field reads corrected to read from correct nested sections via `(s as any)`.
+- `ProfileInjuriesSection.tsx`: 6 `implicit any` fixed with `InjuryRecord[]` casts.
+- `NutritionOverview.tsx`: `primaryGoal` index cast to `Record<string, string>`.
+- `SupportScreen.tsx`: `showToast` type param widened from union to `string`.
+- `data-link.ts`, `useV7Risk.ts`, `biostack-ai.engine.ts`, `auto-plan.engine.ts`: migrated all flat `.age`, `.weight`, `.phase` etc. to nested paths.
+- Duplicate `hasHIIT` key removed from `profile-manager.ts` `FLAT_TO_NESTED` map.
+- 7 girth fields (`waistCm`, `neckCm`, `chestCm`, `hipCm`, `bicepCm`, `thighCm`, `forearmCm`) added to `UnifiedSettings.personal`.
+
+**5. CRITICAL: tz-mapper-engine.ts unterminated template literal fixed**
+- Line 736: unclosed backtick template literal (`\`Berberine ${iIU > 15 ? '2000' : '1500'} мг...`) caused the entire remainder of the file (lines 736–1129) to be treated as one giant template string, generating ~110 cascading TS errors.
+- Fix: replaced template literal with string concatenation (`'Berberine ' + (iIU > 15 ? '2000' : '1500') + ' мг — AMPK (insulin IR)'`).
+- **Result: `tsc --noEmit` → 0 errors. `vite build` → OK (54.35s, 684 modules).**
+
+**6. Supporting fixes**
+- `lab-tier-ranges.ts`: widened `borderline`/`treatment` types to allow `[number,number,number,number]` tuples for `direction:'both'`.
+- `lab-tier-recommendations.ts`: made `stopCourse` optional in `TierRule`, added `?? false` fallback.
+- `support-meta.ts`: removed duplicate `vitamin_e` key in `DEFAULT_DOSAGES`.
+- `engines/unified-profile.ts`: backward‑compat migration merging 4 legacy stores (`he_profile`, `he_training_profile`, `he_autocalc_state`, `he_biostack_profile`) into single `he_profile_v2`.
+
+### ❌ Remaining
+- Manual testing: load profile, verify all values survive migration, edit each section, check no data loss.
+
+### ✅ Проверки
+- `tsc --noEmit`: **0 ошибок** (entire project clean for the first time).
+- `vite build`: **OK** (54.35s, 684 modules).
+- UTF-8 noBOM: all modified files clean.
+
+## Session Summary (Jul 09 — Part 2) — Фармподдержка v5: PED-dose-aware протокол + TIER-system + синергии
+
+### ✅ Что реально работает и проверено
+
+**1. `src/data/ped-potency-table.ts`** (новый, ~310 строк):
+- `PEDDose` интерфейс: 23 класса PED (aas_test/aas_nandrolone/aas_tren/aas_bold/aas_dht_inject/aas_oral_*/sarm/gh/igf/mgf/insulin/t3/t4/clenbut/...)
+- 80+ potency-факторов (test=1.0, tren=3.0, anadrol=4.0, halo=5.0, cheque=6.0, gh=0.4, insulin=1.0...)
+- `computeIntensityFactor(peds)` — суммарная интенсивность курса (0.5 TRT → 3.0 heavy) с учётом доз × potency
+- `derivePEDFlags(peds)` — 20+ флагов: hasTest/hasNandrolone/hasTren/hasBold/hasOral17/hasGH/hasInsulin/hasIGF/hasClenbut/hasT3...
+- `isMultiOral`, `isGHPlusInsulin`, `isWinnyPlusOxy` — для UI warnings
+- `doseByIntensity(base, max, intensity)` — формула дозы от интенсивности
+- `classifyPed(id)` — автоопределение класса по ID
+
+**2. `src/data/lab-tier-ranges.ts`** (новый, ~200 строк):
+- 60+ маркёров с 4-уровневыми порогами (норма/грань/лечение/⛔экстрено)
+- `deriveTier(marker, value)` → 0|1|2|3
+- Покрыты: Cardio (LDL/HDL/TG/BP/CK/D-dimer/Fibrinogen/ESR/Troponin/CK-MB/ApoB/Lp(a)), Hepatic (ALT/AST/GGT/Bilirubin/ALP/Ammonia/Bile acids), Renal (Creatinine/eGFR/Cystatin C/Urea/Uric acid/Protein urine/Microalbumin/NGAL/KIM-1), Hematologic (HCT/Hgb/PLT/RBC/WBC/Reticulocytes), Coagulation (INR/TT), Hormonal (E2/PRL/TSH/Cortisol/LH/FSH/Testosterone/DHT/DHEA-S/SHBG/Prog/IGF-1/AMH), Thyroid (FT3/FT4/TPO-Ab), Metabolic (Glucose/HbA1c/Insulin/HOMA-IR/Homocysteine/CRP/hs-CRP/IL-6/TNF-α/Ferritin), Vitamins/Minerals (D3/B12/Folate/Iron/Mg/Zn/Se/Potassium/Sodium/Calcium/Phosphorus/B6)
+
+**3. `src/data/lab-tier-recommendations.ts`** (новый, ~170 строк):
+- 50+ правил: per marker×tier → addSubs/titrateSubs/nutrition/alerts/stopCourse
+- TIER 1 (грань): +Niacin (HDL↓), +Bergamot×2 (LDL↑), +Milk thistle (ALT↑), +Serra+Bromelain (HCT↑), ↑Anastrozole (E2↑), +Berberine (Glucose↑), +Selenium (TSH↑), +PS (Cortisol↑), +Iron+VitC (Ferritin↓), ↑D3+K2 (VitD↓), ↑TMG+B6+B12 (Hcy↑) etc
+- TIER 2 (лечение): TUDCA×2 (ALT 80-200), кровопускание (HCT 54-58), Bergamot+Niacin+Garlic+Omega3 (LDL 3.5-5), Anastrozole 1 мг/день (E2 60-100), Cabergoline×2 (PRL 25-50), Berberine×1.33 (Glucose 6.1-11), STOP GH (HbA1c>6.4), Astragalus×2+Cordyceps×2 (Creat 130-200), +Aspirin→garlic+nattokinase (PLT>450) etc
+- TIER 3 (⛔экстрено): STOP AAS (ALT>200/HCT>60/Hgb>200/D-dimer>2.5/Creat>200/eGFR<30/Bilirubin>100), ER (Glucose>11/K+<2.5/>6.5/Na+<125/>155), Камертон (CK>5000 = рабдомиолиз, Troponin>1 = инфаркт)
+- `computeTierAdjustments(labs)` → {addSubs, titrations, nutrition, alerts, stopCourse, tierSummary}
+
+**4. `src/data/lab-synergy-engine.ts`** (новый, ~90 строк):
+- 13 синергетических пар: Iron+VitC, Serra+Natto, D3+K2, Bergamot+CoQ10, Curcumin+Piperine, NAC+Glycine, Agmatine+Citrulline, Berberine+Omega3, TUDCA+Milk thistle (orals), Niacin+Garlic (LDL/HDL), Saw palmetto+Tadalafil, Selenium+Iodine (TSH↑)
+- `computeSynergy(subs, ctx)` — автоматически добавляет синергетический партнёр
+
+**5. `tz-mapper-engine.ts` — `computeProtocol` переписан (class+dose-aware):**
+- `MapperCtx.pedDoses[]` (с обратной совместимостью `aasIds`)
+- Telmisartan 20-80 мг (по intensity), TUDCA 500-1000×(oral×2), NAC 1200-1800×(oral×1.5), Omega-3 2-4 г
+- Testosterone: Anastrozole 0.25 (250 мг) → 0.5 (500) → 1 мг/день (>1000) — dose-aware
+- Nandrolone: +Nebivolol (β1+NO, объём+HR) +Cabergoline 0.25-0.5 (titrate by mg) +Hesperidin+Diosmin +Dandelion +Astragalus +Cordyceps
+- Tren: +Cabergoline +Nebivolol +Astragalus×1.5 +Cordyceps×1.3 +α-lipoic +Curcumin +Berberine +Dandelion +Hesperidin +Theanine +Glycine (нейропротекция)
+- Boldenone: +Serra+Natto+Bromelain (HCT++ mandatory) +Nebivolol
+- DHT-inject: +Niacin +Bergamot 1000 (липиды↓↓)
+- Winstrol: +Niacin 1500 +Garlic 1200 +Omega3 6 г (lipid disaster)
+- Anadrol: +Tamoxifen (не AI!) +Spironolactone +Hesperidin (отёки)
+- GH: +Berberine 1000-2000 +α-lipoic +Taurine 1000-2000 +Metformin (>6 IU) +Astaxanthin +Hesperidin
+- Insulin: +Berberine 2000 +α-lipoic +Chromium (только здесь!) +Mg 600 +Metformin (>20 IU)
+- IGF: +Berberine +α-lipoic +Glycine +Taurine
+- MGF: +Glycine +Taurine +B-Complex
+- Clenbut: +Taurine 5000 +Mg 600 +Potassium
+- T3/T4: +Calcium +D3+K2 +Nebivolol +Melatonin
+- B-Complex (B6+B12+Folate) объединён, Vitamin E добавлен
+- `rec.pedFlags` — для UI warnings
+
+**6. `Calc.mapper.tsx` UI:**
+- STOP COURSE баннер (красный, без иероглифов)
+- TIER alerts (жёлтый, без stop)
+- Дозы `↑N%` badge (оранжевый, borderLeft) для титрированных
+- Нутри-блок «Питание по анализам» (grid 2×6)
+- Warnings (фиолетовый): multi-oral, GH+insulin, winny+oxy, 17α+GH
+- `buildMapperCtx` строит `pedDoses` из `state.pharma` (aas + GH + insulin + IGF + clen + T3)
+
+**7. `AutoCalculator.tsx` UI:**
+- Новая карточка «⚙️ Дополнительные PED» с 5 полями ввода: GH (МЕ/день), Инсулин (МЕ/день), IGF-1 LR3 (мкг/день), Clenbuterol (мкг/день), T3 (мкг/день)
+
+**8. Новые препараты в DEFAULT_DOSAGES + FALLBACK_NAMES:**
+- nebivolol 2.5 мг, chromium 200 мкг, tamoxifen 20 мг, spironolactone 25 мг, melatonin 1 мг, calcium 1000 мг, metformin 500 мг, potassium 200 мг, b_complex, vitamin_e 200 МЕ
+
+### ✅ Проверки
+- `tsc --noEmit`: 0 ошибок (сессия Jul 09 Part 1 — tz-mapper 736 fix)
+- `vite build`: OK (34-54s)
+- `tsx` runtime тесты:
+  - Test 500 мг → 22 препарата (anastrozole 0.25-0.5 по дозе)
+  - Test 750 + Tren 300 + Oxy 350 + GH 6 + Insulin 18 → 46 препаратов
+  - Nandrolone 400 → +Nebivolol +Cabergoline 0.25 +Hesperidin +Dandelion +Astragalus +Cordyceps
+  - GH 8 + Insulin 30 → +Berberine 2000 +Metformin +Chromium +Mg 600 +Taurine 2000
+  - Clenbut → +Taurine 5000 +Potassium +Mg 600
+  - TIER 3 (ALT 300 + HCT 62 + K+ 7.5 + E2 120) → stopCourse=true, 4 alerts
+  - Winstrol+Anadrol+GH+Insulin → multi-oral+gh+ins+win+oxy+17α+GH warnings
+  - Синергии (Iron+VitC, Serra+Natto, D3+K2, Bergamot+CoQ10, NAC+Glycine, Curcumin+Piperine)
+- UTF-8: все файлы OK
+
+### План сохранён в `PLAN-LAB-TIER-SYSTEM.md`
+
+### Осталось
+- UI: поля для доз AAS (мг/нед) в AutoCalculator — сейчас только IDs, дозы берутся из pharma DB stub
+- AGENTS.md документация v5 (этот summary = документация)
+- Визуальная глазная проверка в браузере

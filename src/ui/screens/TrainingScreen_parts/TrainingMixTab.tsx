@@ -58,7 +58,7 @@ const chip = (active: boolean): React.CSSProperties => ({
   padding: '3px 7px',
   borderRadius: 8,
   cursor: 'pointer',
-  fontSize: 7,
+  fontSize: 9,
   fontWeight: 600,
   background: active ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.04)',
   border: active ? '1px solid rgba(139,92,246,0.4)' : '1px solid rgba(255,255,255,0.08)',

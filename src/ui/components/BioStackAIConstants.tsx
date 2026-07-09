@@ -3,7 +3,7 @@ import { type GoalType, type HealthCondition, type BioStackProfile } from '../..
 import { type FinderProfile, type GoalType as FinderGoal } from '../../engines/supplement-finder.engine';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 
-export type BSTab = 'profile' | 'search' | 'build' | 'stack' | 'risks' | 'compare' | 'reports' | 'drugcheck';
+export type BSTab = 'profile' | 'search' | 'build' | 'stack' | 'risks' | 'compare' | 'reports';
 
 export const SUB_TABS: { id: BSTab; label: string }[] = [
   { id: 'profile', label: '👤 Профиль' },
@@ -13,7 +13,6 @@ export const SUB_TABS: { id: BSTab; label: string }[] = [
   { id: 'risks', label: '⚠ Риски и лаб.' },
   { id: 'compare', label: '⚖ Сравнение и совм.' },
   { id: 'reports', label: '📊 Отчёты' },
-  { id: 'drugcheck', label: '💊 Лекарства' },
 ];
 
 export const GOALS: { key: GoalType; label: string }[] = [

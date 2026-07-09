@@ -170,7 +170,7 @@ export const PlanDisplay: React.FC<Props> = ({
               </span>
             </div>
             <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', margin: '0 -4px', padding: '0 2px', scrollbarWidth: 'none' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '14px 1.8fr 0.7fr 0.7fr 0.5fr 0.5fr 0.5fr 0.7fr', gap: 2, padding: '4px 10px', fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', minWidth: 520 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '14px 3fr 0.8fr 0.6fr 0.6fr 0.7fr 0.6fr 0.8fr', gap: 2, padding: '4px 10px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', minWidth: 380 }}>
               <span></span><span>Упражнение</span><span>С×П</span><span>RIR</span><span>Вес</span><span>Группа</span><span>Отдых</span><span>Действия</span>
             </div>
             {d.exercises.map((e, ei) => {
@@ -178,11 +178,11 @@ export const PlanDisplay: React.FC<Props> = ({
               const overrideTempo = exerciseTempos[tempoKey];
               const tmpo = globalTempoStr ? { tempo: { toString: globalTempoStr } } : (overrideTempo ? { tempo: { toString: overrideTempo } } : generateRepTempo({ goal: goal === 'strength' ? 'strength' : 'hypertrophy', riskLevel: 'low', difficultyLevel: 'medium', techniqueIssues: [], isMainLift: ei === 0 }));
               return (
-                <div key={ei} draggable onDragStart={ev => handleDragStart(ev, di, ei)} onDragOver={handleDragOver} onDrop={ev => handleDrop(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'grid', gridTemplateColumns: '14px 1.8fr 0.7fr 0.7fr 0.5fr 0.5fr 0.5fr 0.7fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab', alignItems: 'center', minWidth: 520 }}>
+                <div key={ei} draggable onDragStart={ev => handleDragStart(ev, di, ei)} onDragOver={handleDragOver} onDrop={ev => handleDrop(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'grid', gridTemplateColumns: '14px 3fr 0.8fr 0.6fr 0.6fr 0.7fr 0.6fr 0.8fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab', alignItems: 'center', minWidth: 380 }}>
                   <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', cursor: 'grab', userSelect: 'none' }}>⠿</span>
                   <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                     {e.name}
-                    <span onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); setTempoPicker({ dayIdx: di, exIdx: ei }); }} title="Сменить темп" style={{ fontSize: 7, color: '#a855f7', fontWeight: 700, background: 'rgba(168,85,247,0.1)', padding: '1px 5px', borderRadius: 4, whiteSpace: 'nowrap', cursor: 'pointer', border: overrideTempo ? '1px solid #a855f7' : '1px solid transparent' }}>{overrideTempo || tmpo.tempo.toString}{overrideTempo ? ' *' : ''}</span>
+                    <span onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); setTempoPicker({ dayIdx: di, exIdx: ei }); }} title="Сменить темп" style={{ fontSize: 9, color: '#a855f7', fontWeight: 700, background: 'rgba(168,85,247,0.1)', padding: '2px 6px', borderRadius: 4, cursor: 'pointer', border: overrideTempo ? '1px solid #a855f7' : '1px solid transparent' }}>{overrideTempo || tmpo.tempo.toString}{overrideTempo ? ' *' : ''}</span>
                   </span>
                   <span onClick={() => startInline(di, ei, 'sets', e.sets)} style={{ cursor: 'text', color: ACCENT, fontWeight: 700 }}>{e.sets}×{e.reps}</span>
                   <span onClick={() => startInline(di, ei, 'rir', e.rir)} style={{ cursor: 'text', color: '#f59e0b' }}>{e.rir}</span>
@@ -284,7 +284,7 @@ const MacroPreview: React.FC<{ result: ManualResult; mesoLength: number; level: 
                 <div style={{ display: 'grid', gridTemplateColumns: `repeat(${result.days.length}, 1fr)`, gap: 2 }}>
                   {result.days.map((_, di2) => (
                     <div key={di2} style={{ height: 18, borderRadius: 3, background: isDeload ? 'rgba(96,165,250,0.3)' : `rgba(0,230,138,${0.15 + heat * 0.35})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: 7, color: isDeload ? '#fff' : 'rgba(255,255,255,0.6)' }}>{isDeload ? '—' : `Д${di2 + 1}`}</span>
+                      <span style={{ fontSize: 9, color: isDeload ? '#fff' : 'rgba(255,255,255,0.6)' }}>{isDeload ? '—' : `Д${di2 + 1}`}</span>
                     </div>
                   ))}
                 </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import type { UserProfile, LabPoint, WorkoutLog } from '../../core/types';
+import type { UserProfile, LabPoint, WorkoutLog, UnifiedSettings } from '../../core/types';
 import { getProfile, updateProfile, useProfileRefresh } from '../../core/profile-manager';
 import { saveContraindications } from '../../core/contraindications';
 import { db } from '../../core/db';
@@ -11,13 +11,13 @@ import { ProfileBodySection } from './ProfileScreen_parts/ProfileBodySection';
 import { ProfileLifestyleSection } from './ProfileScreen_parts/ProfileLifestyleSection';
 import { ProfileDietSection } from './ProfileScreen_parts/ProfileDietSection';
 import { ProfileHealthSection } from './ProfileScreen_parts/ProfileHealthSection';
-import { ProfileInjuriesSection } from './ProfileScreen_parts/ProfileInjuriesSection';
+import { ProfileTrainingSection } from './ProfileScreen_parts/ProfileTrainingSection';
 import { ProfileDiariesSection } from './ProfileScreen_parts/ProfileDiariesSection';
 import { ProfileAnalyticsSection } from './ProfileScreen_parts/ProfileAnalyticsSection';
 import { ProfileContactsSection } from './ProfileScreen_parts/ProfileContactsSection';
 import { theme } from './ProfileScreen_parts/ProfileComponents';
 
-type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'health' | 'injuries' | 'diaries' | 'progress' | 'analytics' | 'contacts' | 'measurements';
+type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'health' | 'training' | 'diaries' | 'progress' | 'analytics' | 'contacts' | 'measurements';
 type ProfilePage = 'hero' | 'tabs';
 type MainTab = 'info' | 'analytics' | 'contacts';
 
@@ -60,20 +60,83 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
     }
   };
 
-  const save = (partial: Partial<UserProfile['settings']>) => {
-    const curSettings = getProfile().settings || ({} as UserProfile['settings']);
-    if (partial.weight !== undefined && partial.weight !== curSettings.weight) {
+  /** Deep-merge partial into UnifiedSettings. Supports both flat legacy keys and nested keys. */
+  const save = (partial: Record<string, any>) => {
+    const curSettings = getProfile().settings || ({} as UnifiedSettings);
+
+    // Log weight changes
+    if (partial.weight !== undefined && partial.weight !== (curSettings as any).personal?.weight) {
       const newEntry: WeightEntry = { date: new Date().toISOString().split('T')[0], weight: partial.weight };
       const updated = [...weightLog.filter(w => w.date !== newEntry.date), newEntry].sort((a, b) => a.date.localeCompare(b.date));
       setWeightLog(updated);
       saveWeightLog(updated);
     }
-    updateProfile({ settings: { ...curSettings, ...partial } });
-    syncAllProfiles({ ...curSettings, ...partial });
+
+    // Convert flat legacy keys to nested UnifiedSettings
+    const flatToNested: Record<string, string> = {
+      age: 'personal.age', sex: 'personal.sex', weight: 'personal.weight',
+      height: 'personal.height', bodyFat: 'personal.bodyFat',
+      goal: 'training.primaryGoal', primaryGoal: 'training.primaryGoal',
+      sportType: 'training.sportType', trainingExperience: 'training.experience',
+      trainingLevel: 'training.level', workoutsPerWeek: 'training.daysPerWeek',
+      avgWorkoutMinutes: 'training.minutesPerSession', weakPoints: 'training.weakPoints',
+      phase: 'pharma.phase', courseStartDate: 'pharma.courseStartDate',
+      pharmaExperience: 'pharma.experience', pharmaCoursesCount: 'pharma.totalCycles',
+      monthsSinceLastCourse: 'pharma.monthsSinceLastCourse',
+      trainingCycleGoal: 'pharma.trainingCycleType', cycleWeeks: 'pharma.trainingCycleWeeks',
+      previousCycles: 'pharma.previousCycles',
+      sleepHours: 'lifestyle.sleepHours', stressLevel: 'lifestyle.stressLevel',
+      fatigueLevel: 'lifestyle.fatigueLevel', baselineSleepQuality: 'lifestyle.sleepQuality',
+      baselineStressLevel: 'lifestyle.stressLevel',
+      dailySteps: 'lifestyle.dailySteps', dailyWaterLiters: 'lifestyle.dailyWaterLiters',
+      chronotype: 'lifestyle.chronotype', nightAwakenings: 'lifestyle.nightAwakenings',
+      bedtime: 'lifestyle.bedtime', wakeTime: 'lifestyle.wakeTime',
+      dietType: 'nutrition.dietType', mealsPerDay: 'nutrition.mealsPerDay',
+      cookingSkill: 'nutrition.cookingSkill',
+      foodAllergies: 'nutrition.foodAllergies', foodIntolerances: 'nutrition.foodIntolerances',
+      excludedFoods: 'nutrition.excludedFoods', preferredFoods: 'nutrition.preferredFoods',
+      proteinPerKg: 'nutrition.proteinPerKg', fiberG: 'nutrition.fiberG',
+      omega3G: 'nutrition.omega3G', sodiumG: 'nutrition.sodiumG',
+      potassiumG: 'nutrition.potassiumG', alcoholPerWeek: 'nutrition.alcoholPerWeek',
+      currentSupplements: 'nutrition.currentSupplements', currentMedications: 'nutrition.currentMedications',
+      chronicConditions: 'health.chronicConditions', genetics: 'health.genetics',
+      injuries: 'health.injuries', contraindications: 'health.contraindications',
+      drugAllergies: 'health.drugAllergies',
+      excludedSupplements: 'health.excludedSupplements', excludedMeds: 'health.excludedMeds',
+      allergyNotes: 'health.drugAllergies',
+      baselineHrvRatio: 'lifestyle.baselineHrvRatio',
+      hasHIIT: 'system.hasHIIT', volumeTonnes: 'system.volumeTonnes',
+      lissMinutesPerWeek: 'system.lissMinutesPerWeek',
+      targetWeight: 'system.targetWeight', targetBodyFat: 'system.targetBodyFat',
+      preferredUnits: 'system.preferredUnits',
+    };
+
+    const nested: UnifiedSettings = JSON.parse(JSON.stringify(curSettings));
+    for (const [k, v] of Object.entries(partial)) {
+      if (v === undefined || v === null) continue;
+      const path = flatToNested[k] || k;
+      const parts = path.split('.');
+      if (parts.length === 2) {
+        (nested as any)[parts[0]][parts[1]] = v;
+      } else if (parts.length === 3 && parts[0] === 'health' && parts[1] === 'contraindications') {
+        (nested as any).health.contraindications[parts[2]] = v;
+      } else {
+        // Section-level override (e.g. { training: { weakPoints: [...] } })
+        const section = parts[0] as keyof UnifiedSettings;
+        if (typeof v === 'object' && !Array.isArray(v)) {
+          (nested as any)[section] = { ...(nested as any)[section], ...v };
+        } else {
+          (nested as any)[section] = v;
+        }
+      }
+    }
+
+    updateProfile({ settings: nested });
+    syncAllProfiles(nested);
   };
 
   const toggleWeakPoint = (id: string) => {
-    const wp = settings.weakPoints ?? [];
+    const wp = us.training?.weakPoints ?? [];
     save({ weakPoints: wp.includes(id) ? wp.filter(x => x !== id) : [...wp, id] });
   };
 
@@ -83,19 +146,20 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
     { id: 'contacts', label: '📞 Контакты' },
   ];
   const infoSubTabs: { id: ProfileTab; label: string }[] = [
-    { id: 'overview', label: 'Обзор' }, { id: 'anthropometry', label: 'Тело' },
-    { id: 'lifestyle', label: 'Образ жизни' }, { id: 'health', label: '🏥 Здоровье' },
-    { id: 'diet', label: 'Питание' },
-    { id: 'injuries', label: 'Травмы' }, { id: 'diaries', label: '📓 Дневники' },
+    { id: 'overview', label: 'Общие сведения' }, { id: 'anthropometry', label: 'Антропометрия' },
+    { id: 'lifestyle', label: 'Образ жизни' }, { id: 'training', label: 'Тренировки' },
+    { id: 'health', label: 'Здоровье' },
+    { id: 'diet', label: 'Питание'},
+    { id: 'diaries', label: 'Дневники' },
   ];
-
+  const us = settings as UnifiedSettings;
   useEffect(() => {
-    if (settings) saveContraindications({
-      chronicConditions: settings.chronicConditions || [],
-      foodAllergies: settings.foodAllergies || [], foodIntolerances: settings.foodIntolerances || [],
-      excludedFoods: settings.excludedFoods || [], allergyNotes: settings.allergyNotes || '',
+    if (us) saveContraindications({
+      chronicConditions: us.health?.chronicConditions || [],
+      foodAllergies: us.nutrition?.foodAllergies || [], foodIntolerances: us.nutrition?.foodIntolerances || [],
+      excludedFoods: us.nutrition?.excludedFoods || [], allergyNotes: us.health?.drugAllergies || '',
     });
-  }, [settings.chronicConditions, settings.foodAllergies, settings.foodIntolerances, settings.excludedFoods, settings.allergyNotes]);
+  }, [us.health?.chronicConditions, us.nutrition?.foodAllergies, us.nutrition?.foodIntolerances, us.nutrition?.excludedFoods, us.health?.drugAllergies]);
 
   useEffect(() => {
     const load = async () => {
@@ -139,14 +203,14 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                 <div>
                   <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:0, textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Профиль</h1>
                   <p style={{ fontSize:12, color:'rgba(255,255,255,0.85)', margin:'4px 0 0', textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>
-                    {profile.name || 'Пользователь'} • {settings.age || '—'} лет
+                    {profile.name || 'Пользователь'} • {(settings as UnifiedSettings).personal?.age || '—'} лет
                   </p>
                 </div>
               </div>
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
-                { id: 'info', icon: '📋', title: 'Сведения о пользователе', desc: 'Персональные данные, образ жизни, питание, генетика, травмы, дневники', color: '#00e68a' },
+                { id: 'info', icon: '📋', title: 'Сведения о пользователе', desc: 'Персональные данные, антропометрия, тренировки, образ жизни, питание, здоровье, дневники', color: '#00e68a' },
                 { id: 'analytics', icon: '📊', title: 'Аналитика', desc: 'Отчёты по всем модулям, графики прогресса, архив отчётов', color: '#3b82f6' },
                 { id: 'contacts', icon: '📞', title: 'Контакты и друзья', desc: 'Список друзей, шаринг, поддержка и контакты', color: '#8b5cf6' },
               ].map(card => (
@@ -181,13 +245,14 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
               ))}
             </div>
 
-            {/* Info sub-tabs */}
+            {/* Sub‑tabs as pills (original design) */}
             {mainTab === 'info' && (
-              <div style={{ display:'flex', gap:3, overflowX:'auto', scrollbarWidth:'none', marginBottom:10, paddingBottom:2 }}>
+              <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none', marginBottom:12, paddingBottom:2 }}>
                 {infoSubTabs.map(t => (
                   <button key={t.id} onClick={() => setTab(t.id)}
-                    style={{ padding:'5px 12px', borderRadius:18, fontSize:10, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background: tab === t.id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', border: tab === t.id ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)', color: tab === t.id ? '#00e68a' : 'rgba(255,255,255,0.6)', transition:'all 0.2s' }}>
-                    {t.label}</button>
+                    style={{ padding:'8px 18px', borderRadius:22, fontSize:12, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background: tab === t.id ? 'rgba(0,230,138,0.12)' : 'rgba(24,24,27,0.12)', border: tab === t.id ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.04)', color: tab === t.id ? '#00e68a' : 'rgba(255,255,255,0.9)', transition:'all 0.2s' }}>
+                    {t.label}
+                  </button>
                 ))}
               </div>
             )}
@@ -196,7 +261,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
             {mainTab === 'info' && (<>
               {tab === 'overview' && (
                 <InfoErrorBoundary label="Сведения о пользователе">
-                  <ProfileBioSection settings={settings} save={save} calcData={calcData} upCalc={upCalc} />
+                  <ProfileBioSection settings={settings} save={save} calcData={calcData} upCalc={upCalc} onNavigate={onNavigate} />
                 </InfoErrorBoundary>
               )}
               {tab === 'anthropometry' && (
@@ -219,9 +284,9 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
                   <ProfileDietSection settings={settings} save={save} />
                 </InfoErrorBoundary>
               )}
-              {tab === 'injuries' && (
-                <InfoErrorBoundary label="Травмы">
-                  <ProfileInjuriesSection settings={settings} save={save} />
+              {tab === 'training' && (
+                <InfoErrorBoundary label="Тренировки">
+                  <ProfileTrainingSection settings={settings} save={save} calcData={calcData} upCalc={upCalc} toggleWeakPoint={toggleWeakPoint} />
                 </InfoErrorBoundary>
               )}
               {tab === 'diaries' && (

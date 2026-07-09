@@ -1476,19 +1476,21 @@ export const NutritionScreen: React.FC = () => {
   const cartCount = useMemo(() => { try { return JSON.parse(localStorage.getItem('he_nutrition_carts') || '[]').reduce((s:number,st:any) => s + (st.items?.length || 0), 0); } catch { return 0; } }, [tab]);
 
   const macroTargets = useMemo(() => {
-    const s = linked.profile?.settings;
-    if (!s?.weight) return { kcal: 2500, protein: 160, fats: 70, carbs: 300 };
-    const pal = derivePAL(s.workoutsPerWeek, s.avgWorkoutMinutes);
-    const goal = (s.primaryGoal as string) || 'maintenance';
+    const s: any = linked.profile?.settings;
+    const p = s?.personal;
+    const tr = s?.training;
+    if (!p?.weight) return { kcal: 2500, protein: 160, fats: 70, carbs: 300 };
+    const pal = derivePAL(tr?.daysPerWeek, tr?.minutesPerSession);
+    const goal = tr?.primaryGoal || 'maintenance';
     try {
-      const t = calcNutrition({ weightKg: s.weight, heightCm: s.height || 175, age: s.age || 30, sex: s.sex || 'male', pal, goal });
+      const t = calcNutrition({ weightKg: p.weight, heightCm: p.height || 175, age: p.age || 30, sex: p.sex || 'male', pal, goal });
       return { kcal: t.kcal, protein: t.protein, fats: t.fats, carbs: t.carbs };
     } catch { return { kcal: 2500, protein: 160, fats: 70, carbs: 300 }; }
   }, [linked.profile]);
 
   const renderContent = () => {
     switch (tab) {
-      case 'diary': return <InfoErrorBoundary label="Дневник питания"><NutritionDiary foodEntries={foodEntries} targets={macroTargets} weight={linked.profile?.settings?.weight} age={linked.profile?.settings?.age} sex={linked.profile?.settings?.sex} /></InfoErrorBoundary>;
+      case 'diary': return <InfoErrorBoundary label="Дневник питания"><NutritionDiary foodEntries={foodEntries} targets={macroTargets} weight={(linked.profile?.settings as any)?.personal?.weight} age={(linked.profile?.settings as any)?.personal?.age} sex={(linked.profile?.settings as any)?.personal?.sex} /></InfoErrorBoundary>;
       case 'charts': return <InfoErrorBoundary label="Графики"><Suspense fallback={<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Загрузка графиков...</div>}><NutritionCharts kcalData={chartKcalData} proteinData={chartProteinData} labels={chartLabels} dailyLogs={dailyLogs} /></Suspense></InfoErrorBoundary>;
       case 'mealplan': return <InfoErrorBoundary label="План питания"><IndividualPlan profile={linked.profile} course={linked.course} labs={linked.labs} labAnalysis={linked.labAnalysis} /></InfoErrorBoundary>;
       case 'cart': return <CartTab />;
@@ -1570,12 +1572,14 @@ export const NutritionScreen: React.FC = () => {
       {/* V2 adjustments bar — shows on mealplan tab */}
       {tab === 'mealplan' && (function() {
         const nv2 = getNutritionV2Data();
-        const s = linked.profile?.settings;
+        const s: any = linked.profile?.settings;
         const v2Result = (() => {
           if (!s) return null;
+          const p = s.personal || {};
+          const tr = s.training || {};
           try {
-            const engineGoal = ({ mass:'bulk', strength:'strength', fat_loss:'cut', cutting:'cut', maintenance:'maintenance', recomposition:'recomp' } as any)[s.primaryGoal || 'maintenance'] || 'maintenance';
-            return calcNutritionV2({ weightKg: s.weight || 80, heightCm: s.height || 175, age: s.age || 30, sex: s.sex || 'male', pal: 1.55, goal: engineGoal, bodyFatPercent: s.bodyFat });
+            const engineGoal = ({ mass:'bulk', strength:'strength', fat_loss:'cut', cutting:'cut', maintenance:'maintenance', recomposition:'recomp' } as any)[tr.primaryGoal || 'maintenance'] || 'maintenance';
+            return calcNutritionV2({ weightKg: p.weight || 80, heightCm: p.height || 175, age: p.age || 30, sex: p.sex || 'male', pal: 1.55, goal: engineGoal, bodyFatPercent: p.bodyFat });
           } catch { return null; }
         })();
         const active: string[] = [];

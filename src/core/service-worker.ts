@@ -1,4 +1,5 @@
 export async function registerSW() {
+  if (import.meta.env?.DEV) return; // отключено в dev
   if (!('serviceWorker' in navigator)) {
     return;
   }

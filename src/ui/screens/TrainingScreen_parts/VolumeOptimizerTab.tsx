@@ -45,7 +45,7 @@ export const VolumeOptimizerTab: React.FC = () => {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     muscles: true, cnsRecovery: true, quality: true, progression: false, gaps: true, swaps: false,
   });
-  const weakPoints = profile?.settings.weakPoints ?? [];
+  const weakPoints = (profile?.settings as any)?.training?.weakPoints ?? [];
 
   const getOneRM = useCallback((exerciseId: string): number => {
     const baseline = (profile?.settings.strengthBaselines ?? {})[exerciseId];
@@ -174,7 +174,7 @@ export const VolumeOptimizerTab: React.FC = () => {
         style={{
           padding: '4px 10px', borderRadius: 5, border: activeWeek === w ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.08)',
           background: activeWeek === w ? 'rgba(0,230,138,0.1)' : 'transparent', color: activeWeek === w ? ACCENT : DIM,
-          fontSize: 10, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+          fontSize: 10, fontWeight: 700, cursor: 'pointer',
         }}>
         Н{w}
       </button>
@@ -214,13 +214,13 @@ export const VolumeOptimizerTab: React.FC = () => {
             style={{
               padding: '4px 10px', borderRadius: 5, border: activeWeek === 'all' ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.08)',
               background: activeWeek === 'all' ? 'rgba(0,230,138,0.1)' : 'transparent', color: activeWeek === 'all' ? ACCENT : DIM,
-              fontSize: 10, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+              fontSize: 10, fontWeight: 700, cursor: 'pointer',
             }}>
             Все
           </button>
         </div>
         <button onClick={generateProgression}
-          style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, fontWeight: 700, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, fontWeight: 700, fontSize: 10, cursor: 'pointer' }}>
           Авто-прогрессия
         </button>
       </div>
@@ -475,7 +475,7 @@ export const VolumeOptimizerTab: React.FC = () => {
                         <td style={{ padding: 4, textAlign: 'center' }}>{w.targetTotalSets}</td>
                         <td style={{ padding: 4, textAlign: 'center', color: DIM }}>{w.intensityZone}</td>
                         <td style={{ padding: 4, textAlign: 'center', color: '#f59e0b' }}>{w.rirTarget}</td>
-                        <td style={{ padding: 4, fontSize: 7, color: DIM }}>
+                        <td style={{ padding: 4, fontSize: 9, color: DIM }}>
                           {Object.entries(w.setsByMuscle).slice(0, 5).map(([m, s]) => `${m}:${s}`).join(', ')}
                         </td>
                       </tr>
@@ -559,7 +559,7 @@ export const VolumeOptimizerTab: React.FC = () => {
                     if (!sfr || !ex) return null;
                     return (
                       <tr key={r.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                        <td style={{ padding: 3, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>{ex.name}</td>
+                        <td style={{ padding: 3, maxWidth: 200 }}>{ex.name}</td>
                         <td style={{ padding: 3, textAlign: 'center', color: SFR_TIER_COLOR[sfr.tier], fontWeight: 700 }}>{sfr.tier}</td>
                         <td style={{ padding: 3, textAlign: 'center', color: '#22c55e' }}>{sfr.sfrRatio.toFixed(2)}</td>
                         <td style={{ padding: 3, textAlign: 'center' }}>{sfr.stimulus}</td>

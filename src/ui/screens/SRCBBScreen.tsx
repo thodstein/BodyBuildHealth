@@ -64,7 +64,7 @@ const cardBg = CARD;
 const ACCENT = '#00e68a';
 const BTN: React.CSSProperties = { background: ACCENT, color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 12, minHeight: 40, cursor: 'pointer' };
 const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: ACCENT, border: `1px solid ${ACCENT}20` };
-const PILL = (active: boolean) => ({ padding:'6px 14px', borderRadius:20, fontSize:10, fontWeight: active ? 700 : 500, cursor:'pointer', border: active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: active ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#18181b', color: active ? '#000' : '#fff', whiteSpace:'nowrap' as const, flexShrink:0 } as React.CSSProperties);
+const PILL = (active: boolean) => ({ padding:'6px 14px', borderRadius:20, fontSize:10, fontWeight: active ? 700 : 500, cursor:'pointer', border: active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: active ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#18181b', color: active ? '#000' : '#fff', flexShrink:0 } as React.CSSProperties);
 const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 40, width: '100%', outline: 'none', boxSizing: 'border-box' };
 const IN: React.CSSProperties = { ...SEL, padding: '10px' };
 const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 10, margin: '6px 0 3px' };
@@ -590,9 +590,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                          return (
                          <div key={ei} style={{ display:'grid', gridTemplateColumns:'2fr 0.5fr 1.1fr 0.7fr', gap:2, padding:'5px 8px', fontSize:10, color:'rgba(255,255,255,0.9)', borderTop:'1px solid rgba(255,255,255,0.04)', alignItems:'center', minWidth:340 }}>
                            <span style={{ fontWeight:600, whiteSpace:'normal', overflowWrap:'anywhere' }}>{e.name}</span>
-                           <span style={{ color:'rgba(255,255,255,0.85)', whiteSpace:'nowrap' }}>{e.workSets.map((ws, si) => setStr(effSet(wk.week, di, ei, si, ws))).join('  ·  ')}</span>
+                           <span style={{ color:'rgba(255,255,255,0.85)' }}>{e.workSets.map((ws, si) => setStr(effSet(wk.week, di, ei, si, ws))).join('  ·  ')}</span>
                            <span style={{ fontSize:9, fontWeight:700, color:e.load === 'main' ? '#00e68a' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.4)' }}>{e.load === 'main' ? 'ОСН' : e.load === 'additional' ? 'ДОП' : 'АКС'}</span>
-                           <span style={{ fontSize:9, color:'#a855f7', fontWeight:700, background:'rgba(168,85,247,0.1)', padding:'2px 6px', borderRadius:4, textAlign:'center', whiteSpace:'nowrap' }}>{tempoStr || currentT[0]}</span>
+                           <span style={{ fontSize:9, color:'#a855f7', fontWeight:700, background:'rgba(168,85,247,0.1)', padding:'2px 6px', borderRadius:4, textAlign:'center' }}>{tempoStr || currentT[0]}</span>
                          </div>
                          );
                        })}
@@ -612,11 +612,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                           <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
                             {e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); const es = effSet(wk.week, di, ei, si, ws); const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'2px 4px', fontSize:9, textAlign:'center' }; return (
                                <div key={si} style={{ display:'flex', gap:3, alignItems:'center' }}>
-                                 <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>С{si+1}</span>
+                                 <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)' }}>С{si+1}</span>
                                  <input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], weight: +ev.target.value } }))} style={{ ...INM, width:44 }} />
-                                 <span style={{ fontSize:7 }}>×</span>
+                                 <span style={{ fontSize:9 }}>×</span>
                                  <input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, width:32 }} />
-                                 <span style={{ fontSize:7 }}>×</span>
+                                 <span style={{ fontSize:9 }}>×</span>
                                  <input type='number' value={es.sets} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], sets: +ev.target.value } }))} style={{ ...INM, width:28 }} />
                                  <input type='text' value={srcEdits[k]?.tempo || ''} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], tempo: ev.target.value } }))} style={{ ...INM, width:56, textAlign:'center', color:'#a855f7', fontWeight:700 }} placeholder='3-1-1-0' />
                                </div>
@@ -760,7 +760,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                       <span style={{ fontSize:9, color:ACCENT, fontWeight:700 }}>{s.sessionTag}</span>
                     </div>
                     <div style={{ padding: '4px 0', overflowX:'auto', WebkitOverflowScrolling:'touch', scrollbarWidth:'none' }}>
-                      <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr', gap:2, padding:'4px 10px', fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', minWidth:480 }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr', gap:2, padding:'4px 10px', fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', minWidth:340 }}>
                         <span>Мышца</span><span>Характер</span><span>Сеты×повт</span><span>RIR</span><span>Вес</span><span>Темп</span>
                       </div>
                       {s.exercises.map((e, ei) => {
@@ -770,13 +770,13 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                         const adjSets = Math.max(1, Math.round(adjSets0 * bridgeMult));
                         const tmpo = getTempo(e.muscle, bbGoal, e.character === 'тяж');
                         return (
-                        <div key={ei} style={{ display:'grid', gridTemplateColumns:'1.4fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr', gap:2, padding:'5px 10px', fontSize:10, color:'rgba(255,255,255,0.85)', borderTop:'1px solid rgba(255,255,255,0.04)', minWidth:480 }}>
+                        <div key={ei} style={{ display:'grid', gridTemplateColumns:'1.4fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr', gap:2, padding:'5px 10px', fontSize:10, color:'rgba(255,255,255,0.85)', borderTop:'1px solid rgba(255,255,255,0.04)', minWidth:340 }}>
                           <span style={{ fontWeight:600, whiteSpace:'normal', overflowWrap:'anywhere' }}>{e.muscle}</span>
                           <span style={{ color:'rgba(255,255,255,0.6)' }}>{e.character}</span>
                           <span>{adjSets}×{e.workSets[0].reps}</span>
                           <span style={{ color:'#f59e0b' }}>{peakRirTarget != null ? peakRirTarget : Math.max(0, e.rir + bridgeRir)}{autoRegOn && autoRegResult?.rirShift ? `+${autoRegResult.rirShift}` : ''}</span>
                           <span style={{ color: adjW !== rawW ? '#f59e0b' : ACCENT, fontWeight:700 }}>{adjW} кг{adjW !== rawW ? ' ⚡' : ''}</span>
-                          <span style={{ fontSize:9, color:'#a855f7', fontWeight:700, background:'rgba(168,85,247,0.1)', padding:'2px 6px', borderRadius:4, textAlign:'center', whiteSpace:'nowrap' }}>{tempoStr || tmpo.tempo.toString}</span>
+                          <span style={{ fontSize:9, color:'#a855f7', fontWeight:700, background:'rgba(168,85,247,0.1)', padding:'2px 6px', borderRadius:4, textAlign:'center' }}>{tempoStr || tmpo.tempo.toString}</span>
                         </div>
                         );
                       })}
@@ -796,11 +796,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               {/* Объём по мышцам */}
               <MetricCard title="Объём по мышцам (сетов/нед)" icon="🏋️" accent="#a855f7">
               <div style={{ overflowX:'auto', WebkitOverflowScrolling:'touch', scrollbarWidth:'none' }}>
-                <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', padding:'2px 0', minWidth:400 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', padding:'2px 0', minWidth:340 }}>
                   <span>Мышца</span><span>Сетов</span><span>Тяж</span><span>Памп</span><span>MRV</span>
                 </div>
                 {m.perMuscle.map(mm => { const over = mm.totalSets > (mm.mrv || 999); return (
-                  <div key={mm.muscle} style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:10, color:'rgba(255,255,255,0.85)', padding:'3px 0', borderTop:'1px solid rgba(255,255,255,0.04)', minWidth:400 }}>
+                  <div key={mm.muscle} style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:10, color:'rgba(255,255,255,0.85)', padding:'3px 0', borderTop:'1px solid rgba(255,255,255,0.04)', minWidth:340 }}>
                     <span style={{ fontWeight:600 }}>{mm.muscle}{over ? ' ⚠' : ''}</span>
                     <span style={{ color: over ? '#ef4444' : ACCENT, fontWeight:700 }}>{mm.totalSets}</span>
                     <span style={{ color:'#ef4444' }}>{mm.тяжSets}</span>

@@ -1,13 +1,14 @@
 // @ts-nocheck
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
 import { INTERACTION_ENRICHMENT } from '../../../data/support-interaction-enrichment';
 import { checkDrugInteractions, getClassInstructions, getCourseRecommendations } from '../../../engines/pharma-interactions.engine';
-import type { CourseEntry } from '../../../core/types';
+import type { CourseEntry, MasterDB, SubstanceEntry, InteractionEntry } from '../../../core/types';
 import { PopupSelect } from '../../components/PopupXxx';
 import { MECH_TRANSLATIONS_RU, MECH_LABELS, EFFECT_LABELS } from './SupportScreenData';
 import { calcStackSynergyScore, suggestSynergyAdditions } from '../../../engines/support-plan/display';
+import { SynergyEngine, type SynergyResult } from '../../../engines/synergy-score.engine';
 
 /* ─── Профессиональные хелперы ─── */
 const ORGANS_H = { hepatic: { label: '🫁 Печень', kw: ['hepatotox','liver','печень','ALT','AST','ГГТ'] }, renal: { label: '🫘 Почки', kw: ['nephrotox','kidney','почк','creatinine','креатинин'] }, cardio: { label: '❤️ ССС', kw: ['cardiotox','blood pressure','heart','pressure','давление','ЧСС','тромб'] } };
@@ -52,6 +53,23 @@ function buildConclusion(ids: string[], score: number, organLoad: Record<string,
   if (lines.length === 2) lines.push('📋 Дополнительных мер не требуется');
   return lines;
 }
+/* ─── Pair synergy: build Mini MasterDB from catalog ─── */
+const PAIR_DB = (() => {
+  const subs: SubstanceEntry[] = [];
+  const interactions: InteractionEntry[] = [];
+  const idList: { id: string; name: string }[] = [];
+  for (const k of Object.keys(SUPPORT_CATALOG_DATA)) {
+    const e: any = (SUPPORT_CATALOG_DATA as any)[k];
+    if (!e || !e.id) continue;
+    subs.push({ id: e.id, name: e.nameRu || e.name || e.id, category: Array.isArray(e.category) ? e.category.join('/') : (e.category || ''), mechanisms: e.mechanisms || [], risks: [] });
+    idList.push({ id: e.id, name: e.nameRu || e.name || e.id });
+    const sevN = (s: string) => s === 'HIGH' ? 3 : s === 'MEDIUM' ? 2 : 1;
+    for (const s of (e.synergies || [])) interactions.push({ substanceA: e.id, substanceB: s.with, type: 'synergy', severity: sevN(s.severity), mechanisms: (s.mechanism || '').split(/[,;]/).map((x:string)=>x.trim()).filter(Boolean), description: s.effect || '' });
+    for (const c of (e.conflicts || [])) interactions.push({ substanceA: e.id, substanceB: c.with, type: c.severity === 'HIGH' ? 'danger' : 'conflict', severity: sevN(c.severity), mechanisms: (c.mechanism || '').split(/[,;]/).map((x:string)=>x.trim()).filter(Boolean), description: c.effect || '' });
+  }
+  const masterDB: MasterDB = { effects: [], substances: subs, interactions, goals: [], stackTemplates: [], stacks: [], analyses: [], organs: [], systems: [], mechanisms: [], axes: [], risks: [], recommendations: [], tags: [], bands: [], brands: [], aliases: {}, substanceGroups: {}, effectGroups: {}, synergyMatrix: {}, conflictMatrix: {} };
+  return { db: masterDB, substances: subs, idList: idList.sort((a, b) => a.name.localeCompare(b.name)) };
+})();
 /* ─── Конец хелперов ─── */
 
 export const SupportInteractionsView: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -92,29 +110,108 @@ export const SupportInteractionsView: React.FC<{ s: Record<string, any> }> = ({ 
     { label: '🟡 Осторожности', count: allItems.filter((i:any) => i?.type === 'caution').length, color: '#f59e0b' },
   ];
 
+  // pair synergy state
+  const [pairAId, setPairAId] = useState(PAIR_DB.idList[0]?.id || '');
+  const [pairBId, setPairBId] = useState(PAIR_DB.idList[1]?.id || '');
+  const pairSubById = useMemo(() => { const m: Record<string, SubstanceEntry> = {}; PAIR_DB.substances.forEach(s => m[s.id] = s); return m; }, []);
+  const pairResult: SynergyResult | null = useMemo(() => {
+    const a = pairSubById[pairAId], b = pairSubById[pairBId];
+    if (!a || !b || pairAId === pairBId) return null;
+    try { return SynergyEngine.calculatePair(a, b, PAIR_DB.db); } catch { return null; }
+  }, [pairAId, pairBId, pairSubById]);
+  const pairTop = useMemo(() => {
+    const a = pairSubById[pairAId]; if (!a) return [];
+    const rows: { id: string; name: string; res: SynergyResult }[] = [];
+    for (const s of PAIR_DB.substances) {
+      if (s.id === pairAId) continue;
+      try { const r = SynergyEngine.calculatePair(a, s, PAIR_DB.db); rows.push({ id: s.id, name: s.name, res: r }); } catch {}
+    }
+    return rows.sort((x, y) => y.res.score - x.res.score).slice(0, 8);
+  }, [pairAId, pairSubById]);
+  const pairSharedMechs = useMemo(() => { const a = pairSubById[pairAId], b = pairSubById[pairBId]; if (!a || !b) return []; return (a.mechanisms || []).filter(m => (b.mechanisms || []).includes(m)); }, [pairAId, pairBId, pairSubById]);
+  const PAIR_LEVEL_COLOR: Record<string, string> = { STRONG_SYNERGY: '#22c55e', GOOD_SYNERGY: '#86efac', NEUTRAL: '#94a3b8', WEAK_CONFLICT: '#fbbf24', DANGEROUS_CONFLICT: '#ef4444' };
+  const PAIR_LEVEL_RU: Record<string, string> = { STRONG_SYNERGY: 'Сильная синергия', GOOD_SYNERGY: 'Хорошая синергия', NEUTRAL: 'Нейтрально', WEAK_CONFLICT: 'Слабый конфликт', DANGEROUS_CONFLICT: 'Опасный конфликт' };
+
   return (
     <div>
-      {/* Stats cards */}
-      <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' }}>
-        {stats.map((st: any) => (
-          <div key={st.label} style={{ flex:1, minWidth:80, padding:'8px 6px', borderRadius:10, textAlign:'center', background:st.color+'12', border:`1px solid ${st.color}22` }}>
-            <div style={{ fontSize:18, fontWeight:800, color:st.color }}>{st.count}</div>
-            <div style={{ fontSize:8, color:'var(--text-dim)', fontWeight:600 }}>{st.label}</div>
-          </div>
+      {/* Sub-tab pills */}
+      <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
+        {[['all','📋 Все'],['calculator','⚡ Калькулятор'],['pair','🧬 Парная синергия']].map(([id,label]) => (
+          <button key={id} onClick={() => setSynergySubTab(id as any)} style={{
+            padding:'6px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+            background: synergySubTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
+            color: synergySubTab === id ? '#000' : 'var(--text-dim)',
+            border: '1px solid ' + (synergySubTab === id ? 'var(--accent)' : 'var(--border)'),
+          }}>{label}</button>
         ))}
       </div>
 
-      {/* Interactions: все 3 типа с закрытыми секциями */}
-      {/* Sub-tab bar removed — show all types at once */}
+      {/* Stats cards — показаны для calculator и all */}
+      {synergySubTab !== 'pair' && (
+        <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' }}>
+          {stats.map((st: any) => (
+            <div key={st.label} style={{ flex:1, minWidth:80, padding:'8px 6px', borderRadius:10, textAlign:'center', background:st.color+'12', border:`1px solid ${st.color}22` }}>
+              <div style={{ fontSize:18, fontWeight:800, color:st.color }}>{st.count}</div>
+              <div style={{ fontSize:8, color:'var(--text-dim)', fontWeight:600 }}>{st.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Filters — показаны для calculator и all */}
+      {synergySubTab !== 'pair' && (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:6 }}>
+          <PopupSelect label="⚡ Эффективность" value={infoSynergySeverity} options={[['all','Все'],['LOW','Низкая'],['MEDIUM','Средняя'],['HIGH','Высокая']].map(([v, l]: [any, any]) =>({id:v as string,label:l as string}))} onChange={setInfoSynergySeverity} />
+          <PopupSelect label="🧪 Веществ" value={String(synergyCountFilter)} options={[[0,'Любое'],[2,'2'],[3,'3'],[5,'5'],[10,'10+']].map(([v, l]: [any, any]) =>({id:String(v),label:l as string}))} onChange={(v:string)=>setSynergyCountFilter(Number(v))} />
+          <PopupSelect label="🫀 Орган" value={synergyOrganFilter} options={[['','Все'], ...Object.entries(ORGAN_CATEGORY_MAP).filter(([k,v]:any,i:number,a:any[])=>a.findIndex((x:any)=>x[1].key===v.key)===i).map(([k,v]:any)=>[v.key,v.emoji+v.label])].map(([v, l]: [any, any]) =>({id:v as string,label:l as string}))} onChange={setSynergyOrganFilter} />
+        </div>
+      )}
 
-      {/* Severity / Count / Organ filters — кнопки-карточки с попапом */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:6 }}>
-        <PopupSelect label="⚡ Эффективность" value={infoSynergySeverity} options={[['all','Все'],['LOW','Низкая'],['MEDIUM','Средняя'],['HIGH','Высокая']].map(([v, l]: [any, any]) =>({id:v as string,label:l as string}))} onChange={setInfoSynergySeverity} />
-        <PopupSelect label="🧪 Веществ" value={String(synergyCountFilter)} options={[[0,'Любое'],[2,'2'],[3,'3'],[5,'5'],[10,'10+']].map(([v, l]: [any, any]) =>({id:String(v),label:l as string}))} onChange={(v:string)=>setSynergyCountFilter(Number(v))} />
-        <PopupSelect label="🫀 Орган" value={synergyOrganFilter} options={[['','Все'], ...Object.entries(ORGAN_CATEGORY_MAP).filter(([k,v]:any,i:number,a:any[])=>a.findIndex((x:any)=>x[1].key===v.key)===i).map(([k,v]:any)=>[v.key,v.emoji+v.label])].map(([v, l]: [any, any]) =>({id:v as string,label:l as string}))} onChange={setSynergyOrganFilter} />
-      </div>
-
-      {synergySubTab === 'calculator' ? (
+      {synergySubTab === 'pair' ? (
+        /* ─── ПАРНАЯ СИНЕРГИЯ ─── */
+        <div style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#00e68a', margin: '0 0 8px' }}>🧬 Парная синергия веществ</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>
+            Анализ пары БАД/препаратов: общие механизмы, синергия/конфликт, уровень. Источник — каталог (SUPPORT_CATALOG_DATA: mechanisms + synergies/conflicts).
+          </div>
+          <div style={{ padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', margin: '0 0 3px', fontWeight: 700 }}>Вещество A</div>
+                <select value={pairAId} onChange={e => setPairAId(e.target.value)} style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' }}>
+                  {PAIR_DB.idList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', margin: '0 0 3px', fontWeight: 700 }}>Вещество B</div>
+                <select value={pairBId} onChange={e => setPairBId(e.target.value)} style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' }}>
+                  {PAIR_DB.idList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                </select>
+              </div>
+            </div>
+            {pairResult ? (
+              <div style={{ background: (PAIR_LEVEL_COLOR[pairResult.level] || '#00e68a') + '14', border: '1px solid ' + (PAIR_LEVEL_COLOR[pairResult.level] || '#00e68a') + '40', borderRadius: 8, padding: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: PAIR_LEVEL_COLOR[pairResult.level] || '#00e68a' }}>{PAIR_LEVEL_RU[pairResult.level] || pairResult.level}</span>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: PAIR_LEVEL_COLOR[pairResult.level] || '#00e68a' }}>{pairResult.score}</span>
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Общих механизмов: <b style={{ color: '#fff' }}>{pairSharedMechs.length}</b>{pairSharedMechs.length > 0 && <span> — {pairSharedMechs.slice(0,4).join(', ')}</span>}</div>
+              </div>
+            ) : <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Выберите два разных вещества.</div>}
+          </div>
+          <div style={{ padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#00e68a', margin: '0 0 8px' }}>🏆 Топ-партнёры для {pairSubById[pairAId]?.name || 'A'}</div>
+            {pairTop.length === 0
+              ? <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Нет данных.</div>
+              : pairTop.map(p => (
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <button onClick={() => setPairBId(p.id)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 11, cursor: 'pointer', textAlign: 'left', flex: 1 }}>{p.name}</button>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: PAIR_LEVEL_COLOR[p.res.level] || 'rgba(255,255,255,0.5)', minWidth: 28, textAlign: 'right' }}>{p.res.score}</span>
+                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginLeft: 6, minWidth: 90, textAlign: 'right' }}>{PAIR_LEVEL_RU[p.res.level] || p.res.level}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      ) : synergySubTab === 'calculator' ? (
         /* ─── КАЛЬКУЛЯТОР ВЗАИМОДЕЙСТВИЙ ─── */
         <div>
           <div style={{ display:'flex', gap:4, marginBottom:8 }}>

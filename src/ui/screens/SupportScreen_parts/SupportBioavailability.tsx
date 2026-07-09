@@ -7,6 +7,8 @@ import { DosageDatabaseView } from '../../components/DosageCalculator';
 import { calcStackSynergyScore, suggestSynergyAdditions } from '../../../engines/support-plan/display';
 import { INTERACTION_ENRICHMENT } from '../../../data/support-interaction-enrichment';
 import { MECH_TRANSLATIONS_RU, MECH_LABELS } from './SupportScreenData';
+import { SynergyEngine, type SynergyResult } from '../../../engines/synergy-score.engine';
+import type { SubstanceEntry, MasterDB, InteractionEntry } from '../../../core/types';
 import { S } from './SupportShared';
 import { PopupSelect } from '../../components/PopupXxx';
 import {
@@ -62,7 +64,7 @@ function buildCatalog(): EnrichedEntry[] {
 import { ROUTE_LABELS_MAP } from './SupportBioavailabilityData';
 
 // ─── Main component ───
-type BTab = 'catalog' | 'calculator' | 'dosages' | 'timing' | 'interactions';
+type BTab = 'catalog' | 'calculator' | 'dosages' | 'timing';
 
 export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const [tab, setTab] = useState<BTab>(() => (localStorage.getItem('he_bio_tab') as BTab) || 'catalog');
@@ -108,17 +110,16 @@ export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s
           </div>
         </div>
         <div style={{ display: 'flex', gap: 4, marginBottom: 8, overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
-          {(['catalog', 'calculator', 'timing', 'interactions', 'dosages'] as BTab[]).map(t => (
+          {(['catalog', 'calculator', 'timing', 'dosages'] as BTab[]).map(t => (
             <button key={t} onClick={() => { setTab(t); localStorage.setItem('he_bio_tab', t); }}
               style={{ padding: '6px 12px', borderRadius: 16, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid var(--border)', background: tab === t ? 'var(--accent)' : 'var(--bg-secondary)', color: tab === t ? '#000' : 'var(--text-dim)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-              {t === 'catalog' ? '📋 Каталог' : t === 'calculator' ? '🧮 Расчёт' : t === 'timing' ? '⏰ Тайминг' : t === 'interactions' ? '⚡ Синергия' : '📋 Дозировки'}
+              {t === 'catalog' ? '📋 Каталог' : t === 'calculator' ? '🧮 Расчёт' : t === 'timing' ? '⏰ Тайминг' : '📋 Дозировки'}
             </button>
           ))}
         </div>
         {tab === 'catalog' && <CatalogTab catalog={catalog} filtered={filtered} allCategories={allCategories} searchQuery={searchQuery} setSearchQuery={setSearchQuery} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} sourceFilter={sourceFilter} setSourceFilter={setSourceFilter} sortBy={sortBy} setSortBy={setSortBy} selectedId={selectedId} handleSelect={handleSelect} compareIds={compareIds} handleCompare={handleCompare} showCompare={showCompare} setShowCompare={setShowCompare} compareEntries={compareEntries} />}
         {tab === 'calculator' && <CalculatorTab catalog={catalog} />}
         {tab === 'timing' && <TimingTab catalog={catalog} />}
-        {tab === 'interactions' && <SynergyInteractionsTab catalog={catalog} />}
         {tab === 'dosages' && <DosageDatabaseView />}
       </div>
     </InfoErrorBoundary>
@@ -745,8 +746,96 @@ const SynergyInteractionsTab: React.FC<{ catalog: EnrichedEntry[] }> = ({ catalo
     return { score, synergies: sCount, conflicts: cCount, cautions: cautCount, totalPairs, level, matrix: merged, stackScore };
   }, [validIds, catalogPairs]);
 
+  // ── Pair synergy state ──
+  const PAIR_DB = useMemo(() => {
+    const subs: SubstanceEntry[] = [];
+    const interactions: InteractionEntry[] = [];
+    const idList: { id: string; name: string }[] = [];
+    for (const k of Object.keys(SUPPORT_CATALOG_DATA)) {
+      const e: any = (SUPPORT_CATALOG_DATA as any)[k];
+      if (!e || !e.id) continue;
+      subs.push({ id: e.id, name: e.nameRu || e.name || e.id, category: Array.isArray(e.category) ? e.category.join('/') : (e.category || ''), mechanisms: e.mechanisms || [], risks: [] });
+      idList.push({ id: e.id, name: e.nameRu || e.name || e.id });
+      const sevN = (s: string) => s === 'HIGH' ? 3 : s === 'MEDIUM' ? 2 : 1;
+      for (const s of (e.synergies || [])) interactions.push({ substanceA: e.id, substanceB: s.with, type: 'synergy', severity: sevN(s.severity), mechanisms: (s.mechanism || '').split(/[,;]/).map((x: string) => x.trim()).filter(Boolean), description: s.effect || '' });
+      for (const c of (e.conflicts || [])) interactions.push({ substanceA: e.id, substanceB: c.with, type: c.severity === 'HIGH' ? 'danger' : 'conflict', severity: sevN(c.severity), mechanisms: (c.mechanism || '').split(/[,;]/).map((x: string) => x.trim()).filter(Boolean), description: c.effect || '' });
+    }
+    const db: MasterDB = { effects: [], substances: subs, interactions, goals: [], stackTemplates: [], stacks: [], analyses: [], organs: [], systems: [], mechanisms: [], axes: [], risks: [], recommendations: [], tags: [], bands: [], brands: [], aliases: {}, substanceGroups: {}, effectGroups: {}, synergyMatrix: {}, conflictMatrix: {} };
+    return { db, substances: subs, idList: idList.sort((a, b) => a.name.localeCompare(b.name)) };
+  }, []);
+  const [pairAId, setPairAId] = useState(PAIR_DB.idList[0]?.id || '');
+  const [pairBId, setPairBId] = useState(PAIR_DB.idList[1]?.id || '');
+  const [pairOpen, setPairOpen] = useState(false);
+  const pairSubById = useMemo(() => { const m: Record<string, SubstanceEntry> = {}; PAIR_DB.substances.forEach((s: SubstanceEntry) => m[s.id] = s); return m; }, [PAIR_DB]);
+  const pairResult: SynergyResult | null = useMemo(() => {
+    const a = pairSubById[pairAId], b = pairSubById[pairBId];
+    if (!a || !b || pairAId === pairBId) return null;
+    try { return SynergyEngine.calculatePair(a, b, PAIR_DB.db); } catch { return null; }
+  }, [pairAId, pairBId, pairSubById, PAIR_DB]);
+  const pairTop = useMemo(() => {
+    const a = pairSubById[pairAId]; if (!a) return [];
+    const rows: { id: string; name: string; res: SynergyResult }[] = [];
+    for (const s of PAIR_DB.substances) {
+      if (s.id === pairAId) continue;
+      try { const r = SynergyEngine.calculatePair(a, s, PAIR_DB.db); rows.push({ id: s.id, name: s.name, res: r }); } catch {}
+    }
+    return rows.sort((x, y) => y.res.score - x.res.score).slice(0, 8);
+  }, [pairAId, pairSubById, PAIR_DB]);
+  const pairSharedMechs = useMemo(() => { const a = pairSubById[pairAId], b = pairSubById[pairBId]; if (!a || !b) return []; return (a.mechanisms || []).filter(m => (b.mechanisms || []).includes(m)); }, [pairAId, pairBId, pairSubById]);
+  const PAIR_LEVEL_COLOR: Record<string, string> = { STRONG_SYNERGY: '#22c55e', GOOD_SYNERGY: '#86efac', NEUTRAL: '#94a3b8', WEAK_CONFLICT: '#fbbf24', DANGEROUS_CONFLICT: '#ef4444' };
+  const PAIR_LEVEL_RU: Record<string, string> = { STRONG_SYNERGY: 'Сильная синергия', GOOD_SYNERGY: 'Хорошая синергия', NEUTRAL: 'Нейтрально', WEAK_CONFLICT: 'Слабый конфликт', DANGEROUS_CONFLICT: 'Опасный конфликт' };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* ─── Pair synergy accordion ─── */}
+      <div style={{ ...S.card }}>
+        <button onClick={() => setPairOpen(!pairOpen)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 0, background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff', textAlign: 'left' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#a855f7', letterSpacing: '-0.3px' }}>🧬 Парная синергия веществ</div>
+          <span style={{ fontSize: 10, color: '#a855f7', transition: 'transform 0.2s', transform: pairOpen ? 'rotate(180deg)' : 'none' }}>▼</span>
+        </button>
+        {pairOpen && (
+          <div style={{ marginTop: 10, padding: 12, borderRadius: 10, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 8, lineHeight: 1.4 }}>
+              Анализ пары БАД/препаратов: общие механизмы, синергия/конфликт, уровень. Источник — каталог (SUPPORT_CATALOG_DATA: mechanisms + synergies/conflicts).
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 3, fontWeight: 700 }}>Вещество A</div>
+                <select value={pairAId} onChange={e => setPairAId(e.target.value)} style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' }}>
+                  {PAIR_DB.idList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 3, fontWeight: 700 }}>Вещество B</div>
+                <select value={pairBId} onChange={e => setPairBId(e.target.value)} style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' }}>
+                  {PAIR_DB.idList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                </select>
+              </div>
+            </div>
+            {pairResult ? (
+              <div style={{ background: (PAIR_LEVEL_COLOR[pairResult.level] || '#00e68a') + '14', border: '1px solid ' + (PAIR_LEVEL_COLOR[pairResult.level] || '#00e68a') + '40', borderRadius: 8, padding: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: PAIR_LEVEL_COLOR[pairResult.level] || '#00e68a' }}>{PAIR_LEVEL_RU[pairResult.level] || pairResult.level}</span>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: PAIR_LEVEL_COLOR[pairResult.level] || '#00e68a' }}>{pairResult.score}</span>
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Общих механизмов: <b style={{ color: '#fff' }}>{pairSharedMechs.length}</b>{pairSharedMechs.length > 0 && <span> — {pairSharedMechs.slice(0, 4).join(', ')}</span>}</div>
+              </div>
+            ) : <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Выберите два разных вещества.</div>}
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>🏆 Топ-партнёры для {pairSubById[pairAId]?.name || 'A'}</div>
+              {pairTop.length === 0
+                ? <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Нет данных.</div>
+                : pairTop.map(p => (
+                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <button onClick={() => setPairBId(p.id)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 11, cursor: 'pointer', textAlign: 'left', flex: 1 }}>{p.name}</button>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: PAIR_LEVEL_COLOR[p.res.level] || 'rgba(255,255,255,0.5)', minWidth: 28, textAlign: 'right' }}>{p.res.score}</span>
+                    <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginLeft: 6, minWidth: 90, textAlign: 'right' }}>{PAIR_LEVEL_RU[p.res.level] || p.res.level}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+      </div>
       {/* Selection card */}
       <div style={{ ...S.card }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)', marginBottom: 2, letterSpacing: '-0.3px' }}>⚡ Синергия стека</div>

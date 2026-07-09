@@ -349,7 +349,7 @@ export const ExerciseCalcTab: React.FC = () => {
     if (!profile) return;
     const lvl = profile?.settings.trainingLevel ?? 'intermediate';
     setLevel((lvl === 'enhanced' ? 'advanced' : lvl) as 'beginner' | 'intermediate' | 'advanced');
-    setGoal(profile?.settings.primaryGoal ?? 'strength');
+    setGoal((profile?.settings as any)?.training?.primaryGoal ?? 'strength');
   }, [profile]);
 
   useEffect(() => {

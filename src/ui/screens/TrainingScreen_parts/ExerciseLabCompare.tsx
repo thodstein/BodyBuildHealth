@@ -29,7 +29,7 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
     if (!profile) return;
     const lvl = profile?.settings.trainingLevel ?? 'intermediate';
     setLevel((lvl === 'enhanced' ? 'advanced' : lvl) as any);
-    setGoal(profile?.settings.primaryGoal ?? 'hypertrophy');
+    setGoal((profile?.settings as any)?.training?.primaryGoal ?? 'hypertrophy');
   }, [profile]);
 
   const getExData = (ex: any) => {

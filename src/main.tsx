@@ -1,3 +1,8 @@
+// Unregister stale service workers in development
+if ('serviceWorker' in navigator && import.meta.env.DEV) {
+  navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => { console.log('Unregistering stale SW:', r.scope); r.unregister(); }));
+}
+
 import { renderAuthModule } from './ui/auth-module';
 import { db } from './core/db';
 import { registry } from './core/data/registry';

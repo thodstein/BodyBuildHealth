@@ -32,10 +32,9 @@ import { BbToolsCard } from './TrainingScreen_parts/BbToolsCard';
 import { LoadSafetyCard } from './TrainingScreen_parts/LoadSafetyCard';
 import { SplitGenCard } from './TrainingScreen_parts/SplitGenCard';
 import { CompetitionCard } from './TrainingScreen_parts/CompetitionCard';
-import { GoalsHabitsCard } from './TrainingScreen_parts/GoalsHabitsCard';
 import { PriRepPatternCard } from './TrainingScreen_parts/PriRepPatternCard';
-import { MixPresetsCard } from './TrainingScreen_parts/MixPresetsCard';
-import { SynergyMatrixCard } from './TrainingScreen_parts/SynergyMatrixCard';
+import { TrainingMixHub } from './TrainingScreen_parts/TrainingMixHub';
+
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { StrengthAnalysisHub } from './TrainingScreen_parts/StrengthAnalysisHub';
 import { LoadManagementHub } from './TrainingScreen_parts/LoadManagementHub';
@@ -502,7 +501,7 @@ export const TrainingScreen: React.FC = () => {
                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                     {cat.tabs.map(k => (
                       <button key={k} onClick={() => { hapticImpact('light'); goTab(k); }} style={{
-                        padding: '6px 11px', borderRadius: 20, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+                        padding: '6px 11px', borderRadius: 20, fontSize: 11, fontWeight: 600,
                         background: tab === k ? 'var(--accent)' : 'var(--bg-secondary)',
                         color: tab === k ? '#000' : 'var(--text-dim)', border: 'none', cursor: 'pointer',
                         transition: 'all 0.2s',
@@ -518,7 +517,7 @@ export const TrainingScreen: React.FC = () => {
           <div style={{ display: 'flex', gap: 3, marginBottom: 10, flexWrap: 'wrap' }}>
             {ZONES[zone].tabs.map(k => (
               <button key={k} onClick={() => { hapticImpact('light'); goTab(k); }} style={{
-                padding: '7px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+                padding: '7px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
                 background: tab === k ? 'var(--accent)' : 'var(--bg-secondary)',
                 color: tab === k ? '#000' : 'var(--text-dim)', border: 'none', cursor: 'pointer',
                 transition: 'all 0.2s',
@@ -594,13 +593,12 @@ export const TrainingScreen: React.FC = () => {
                 setTab={goTab}
               />
             )}
-            <PlannerToolsPanel mode={planningTrack} />
           </div>
         </InfoErrorBoundary>
       )}
 
       {/* ═══════════ Тренировка / выполнение (зона) ═══════════ */}
-      {(tab === 'runtime' || tab === 'timers' || tab === 'mixes') && (
+      {(tab === 'runtime' || tab === 'timers') && (
         <ExecutionZone
           tab={tab}
           goal={goal} level={level} recovery={recovery}
@@ -663,8 +661,8 @@ export const TrainingScreen: React.FC = () => {
       {tab === 'split_gen' && <InfoErrorBoundary label="Генератор сплитов"><SplitGenCard /></InfoErrorBoundary>}
       {tab === 'competition' && <InfoErrorBoundary label="Соревнование"><CompetitionCard /></InfoErrorBoundary>}
       {tab === 'pri_reppat' && <InfoErrorBoundary label="PRI/схема повт"><PriRepPatternCard /></InfoErrorBoundary>}
-      {tab === 'mix_presets' && <InfoErrorBoundary label="Пресеты миксов"><MixPresetsCard /></InfoErrorBoundary>}
-      {tab === 'synergy' && <InfoErrorBoundary label="Синергия веществ"><SynergyMatrixCard /></InfoErrorBoundary>}
+      {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixHub /></InfoErrorBoundary>}
+
 
       {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
       {tab === 'pl_pro' && <InfoErrorBoundary label="Pro ПЛ-инструменты"><ProPlToolsTab /></InfoErrorBoundary>}

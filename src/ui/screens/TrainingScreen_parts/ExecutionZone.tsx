@@ -10,7 +10,6 @@ import { SessionPlayer, type PlayerDay } from '../SRCBBScreen_parts/SessionPlaye
 import { TimersTab } from './TimersTab';
 import { selectSetScheme } from '../../../engines/set-scheme.engine';
 import { selectTempo, formatTempo } from '../../../engines/tempo.engine';
-import { TrainingMixTab } from './TrainingMixTab';
 import type { TrainingTab } from './shared';
 
 type RuntimeLogEntry = { sets: { weight: number; reps: number; rpe: number; rir: number }[]; completed: boolean };
@@ -392,11 +391,6 @@ export const ExecutionZone: React.FC<Props> = (p) => {
         </InfoErrorBoundary>
       )}
       {tab === 'timers' && <InfoErrorBoundary label="Таймеры"><TimersTab /></InfoErrorBoundary>}
-      {tab === 'mixes' && (
-        <InfoErrorBoundary label="Тренировочные миксы">
-          <TrainingMixTab />
-        </InfoErrorBoundary>
-      )}
     </>
   );
 };

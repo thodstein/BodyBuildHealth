@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { EXERCISE_CATALOG, getExerciseById } from '../../../core/exercise-catalog';
 import { PopupSelect, PopupNumber, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
@@ -350,7 +351,11 @@ export const TonnageCalcTab: React.FC = () => {
           Загрузить расчёт
         </button>
       </div>
-    </div>
+          <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить рассчитанный объём к планировщику.</div>
+        <button onClick={() => { const sets: Record<string, number> = {}; Object.entries(memo.tonnageByMuscle).forEach(([m, t]) => { sets[m] = Math.max(1, Math.round((t as number) / (oneRMGlobal * 8))); }); applyToPlanner({ kind: 'volume', label: 'Тоннаж → объём', data: { sets } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить объём к планировщику</button>
+      </div>
+</div>
   );
 };
 

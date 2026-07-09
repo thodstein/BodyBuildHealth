@@ -1,6 +1,7 @@
 let deferredPrompt: any = null;
 
 export function initPWA() {
+  if (import.meta.env?.DEV) return; // отключено в dev
   if (!('serviceWorker' in navigator)) return;
 
   window.addEventListener('beforeinstallprompt', (e: Event) => {

@@ -122,21 +122,22 @@ export function autoFillFromMainProfile(): { patch: Partial<BioStackProfile>; au
     const s = p.settings; if (!s) return { patch: {}, autoKeys: [] };
     const filled: Partial<BioStackProfile> = {};
     const keys: string[] = [];
-    if (s.age) { filled.age = s.age; keys.push('age'); }
-    if (s.weight) { filled.weight = s.weight; keys.push('weight'); }
-    if (s.height) { filled.height = s.height; keys.push('height'); }
-    if (s.sex) { filled.sex = s.sex; keys.push('sex'); }
-    if (s.trainingLevel) {
-      filled.experience = s.trainingLevel === 'beginner' ? 'beginner' : s.trainingLevel === 'intermediate' ? 'intermediate' : 'advanced';
+    const ss = s as any;
+    if (ss.personal?.age) { filled.age = ss.personal.age; keys.push('age'); }
+    if (ss.personal?.weight) { filled.weight = ss.personal.weight; keys.push('weight'); }
+    if (ss.personal?.height) { filled.height = ss.personal.height; keys.push('height'); }
+    if (ss.personal?.sex) { filled.sex = ss.personal.sex; keys.push('sex'); }
+    if (ss.training?.level) {
+      filled.experience = ss.training.level === 'beginner' ? 'beginner' : ss.training.level === 'intermediate' ? 'intermediate' : 'advanced';
       keys.push('experience');
     }
-    if (s.primaryGoal) {
+    if (ss.training?.primaryGoal) {
       const g: Record<string, GoalType> = { bulk: 'muscle_gain', cut: 'fat_loss', maintenance: 'recovery', strength: 'muscle_gain', endurance: 'endurance', health: 'immunity' };
-      if (g[s.primaryGoal]) { filled.goals = [g[s.primaryGoal]]; keys.push('goals'); }
+      if (g[ss.training.primaryGoal]) { filled.goals = [g[ss.training.primaryGoal]]; keys.push('goals'); }
     }
-    if (s.medicalConditions) {
+    if (ss.health?.chronicConditions?.length) {
       const hc: HealthCondition[] = [];
-      for (const c of s.medicalConditions) {
+      for (const c of ss.health.chronicConditions) {
         const cl = c.toLowerCase();
         if (cl.includes('liver') || cl.includes('печень')) hc.push('liver');
         if (cl.includes('kidney') || cl.includes('почк')) hc.push('kidney');
@@ -149,12 +150,12 @@ export function autoFillFromMainProfile(): { patch: Partial<BioStackProfile>; au
       }
       if (hc.length > 0) { filled.healthConditions = hc; keys.push('healthConditions'); }
     }
-    if ((s as any).currentMedications?.length) {
-      filled.currentMeds = (s as any).currentMedications.map((m: any) => m.name || String(m));
+    if (ss.nutrition?.currentMedications?.length) {
+      filled.currentMeds = ss.nutrition.currentMedications.map((m: any) => m.name || String(m));
       keys.push('currentMeds');
     }
-    if ((s as any).allergies?.length) {
-      filled.drugAllergies = (s as any).allergies;
+    if (ss.health?.drugAllergies?.length) {
+      filled.drugAllergies = ss.health.drugAllergies;
       keys.push('drugAllergies');
     }
     return { patch: filled, autoKeys: keys };

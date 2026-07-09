@@ -142,7 +142,7 @@ const ProAnalysisTab: React.FC = () => {
       <div style={{ ...CARD, border: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: DIM, marginBottom: 8 }}>📋 Полная таблица анализа</div>
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: '2px 4px', fontSize:9, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 4, marginBottom: 4, minWidth: 440 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: '2px 4px', fontSize:9, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 4, marginBottom: 4, minWidth: 340 }}>
           <span style={{ color: DIM }}>Упражнение</span>
           <span style={{ color: DIM, textAlign: 'center' }}>Профиль</span>
           <span style={{ color: DIM, textAlign: 'center' }}>Force-вектор</span>
@@ -150,7 +150,7 @@ const ProAnalysisTab: React.FC = () => {
           <span style={{ color: DIM, textAlign: 'center' }}>Безоп.</span>
         </div>
         {groupExercises.map((g, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: '2px 4px', padding: '3px 0', fontSize:9, borderBottom: '1px solid rgba(255,255,255,0.02)', minWidth: 440 }}>
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: '2px 4px', padding: '3px 0', fontSize:9, borderBottom: '1px solid rgba(255,255,255,0.02)', minWidth: 340 }}>
             <span style={{ fontWeight: 600, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{g.exercise.name}</span>
             <span style={{ textAlign: 'center', color: g.rp.curve === 'stretch_mediated' ? '#22c55e' : g.rp.curve === 'mid_range' ? '#60a5fa' : '#f59e0b' }}>{g.rp.score}/10</span>
             <span style={{ textAlign: 'center', color: '#c084fc' }}>{g.fv.replace(/_/g, ' ')}</span>

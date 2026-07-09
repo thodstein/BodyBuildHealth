@@ -67,6 +67,39 @@ export function loadTrainingProfile(): TrainingProfile {
 
 export function saveTrainingProfile(p: TrainingProfile): void {
   try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* ignore */ }
+  // Also sync to UnifiedSettings for cross-module consistency
+  try {
+    const raw = localStorage.getItem('he_profile_v2');
+    if (raw) {
+      const prof = JSON.parse(raw);
+      const us = prof.settings || {};
+      const tr = us.training || {};
+      const pr = us.personal || {};
+      const ls = us.lifestyle || {};
+      if (p.bodyWeight) pr.weight = p.bodyWeight;
+      if (p.goal) tr.primaryGoal = p.goal;
+      if (p.level) tr.level = p.level;
+      if (p.daysPerWeek) tr.daysPerWeek = p.daysPerWeek;
+      if (p.recovery) tr.recovery = p.recovery;
+      if (p.fatigue !== undefined) ls.fatigueLevel = p.fatigue;
+      if (p.sleepHours) ls.sleepHours = p.sleepHours;
+      if (p.stressLevel) ls.stressLevel = p.stressLevel;
+      if (p.weakPoints?.length) tr.weakPoints = p.weakPoints;
+      if (p.equipment?.length) tr.equipment = p.equipment;
+      if (p.pmSquat) tr.pmSquat = p.pmSquat;
+      if (p.pmBench) tr.pmBench = p.pmBench;
+      if (p.pmDead) tr.pmDeadlift = p.pmDead;
+      if (p.workMax) tr.workMax = { ...tr.workMax, ...p.workMax };
+      if (p.pharmaCoursesCount) us.pharma = us.pharma || {}; us.pharma.totalCycles = p.pharmaCoursesCount;
+      if (p.monthsSinceLastCourse) us.pharma = us.pharma || {}; us.pharma.monthsSinceLastCourse = p.monthsSinceLastCourse;
+      if (p.totalYearsOnPharma) us.pharma = us.pharma || {}; us.pharma.yearsOnGear = p.totalYearsOnPharma;
+      us.training = tr;
+      us.personal = pr;
+      us.lifestyle = ls;
+      prof.settings = us;
+      localStorage.setItem('he_profile_v2', JSON.stringify(prof));
+    }
+  } catch { /* silent */ }
 }
 
 /** Хук: [profile, update]. update(patch) сливает patch и сохраняет. */

@@ -286,7 +286,7 @@ export const MacrocyclePanel: React.FC<Props> = ({
                         <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: (fitGoal && fitLevel) ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)', color: (fitGoal && fitLevel) ? '#22c55e' : '#f59e0b', fontWeight: 600, whiteSpace: 'nowrap' }}>{tt.minWeeks}-{tt.maxWeeks}н · {tt.intensityProfile}</span>
                       </div>
                       <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)' }}>{tt.description}</div>
-                      <div style={{ fontSize: 7, color: DIM, marginTop: 1 }}>цели: {tt.goals.join(', ')} · уровни: {tt.levels.join(', ')}</div>
+                      <div style={{ fontSize: 9, color: DIM, marginTop: 1 }}>цели: {tt.goals.join(', ')} · уровни: {tt.levels.join(', ')}</div>
                     </div>
                   );
                 })}
@@ -629,14 +629,14 @@ export const MacrocyclePanel: React.FC<Props> = ({
                       const restSec = ei === 0 ? (goal === 'strength' ? 180 : 120) : ei <= 2 ? 90 : 60;
                       return (
                         <div key={ei} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0', fontSize: 10, borderBottom: ei < day.exercises.length - 1 ? '1px solid var(--border)' : 'none', gap: 2 }}>
-                          <span style={{ fontSize: 7, padding: '1px 3px', borderRadius: 2, background: `${roleColor}22`, color: roleColor, fontWeight: 700, minWidth: 22, textAlign: 'center', flexShrink: 0 }}>{roleLabel}</span>
+                          <span style={{ fontSize: 9, padding: '1px 3px', borderRadius: 2, background: `${roleColor}22`, color: roleColor, fontWeight: 700, minWidth: 22, textAlign: 'center', flexShrink: 0 }}>{roleLabel}</span>
                           <span style={{ flex: 1 }}>{ex.name}</span>
                           <span style={{ color: ACCENT, fontWeight: 600, minWidth: 55, textAlign: 'right' }}>{ex.sets}×{ex.reps}</span>
-                          {estMax > 0 && <span style={{ fontSize: 8, color: '#00e68a', minWidth: 40, textAlign: 'right' }}>~{estMax}кг</span>}
-                          <span style={{ fontSize: 8, color: DIM, minWidth: 25, textAlign: 'right' }}>RIR{ex.rir}</span>
-                          <span style={{ fontSize: 6, padding: '1px 2px', borderRadius: 2, background: 'rgba(0,230,138,0.1)', color: '#00e68a', whiteSpace: 'nowrap' }}>{scheme?.schemeType?.slice(0, 6) || '—'}</span>
-                          <span style={{ fontSize: 6, padding: '1px 2px', borderRadius: 2, background: 'rgba(249,115,22,0.1)', color: '#f97316', whiteSpace: 'nowrap' }}>⏱{restSec}с</span>
-                          {substitute && <span style={{ fontSize: 6, color: DIM, maxWidth: 50, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>↔{substitute.name.slice(0, 8)}</span>}
+                          {estMax > 0 && <span style={{ fontSize: 9, color: '#00e68a', minWidth: 40, textAlign: 'right' }}>~{estMax}кг</span>}
+                          <span style={{ fontSize: 9, color: DIM, minWidth: 25, textAlign: 'right' }}>RIR{ex.rir}</span>
+                          <span style={{ fontSize: 9, padding: '1px 3px', borderRadius: 2, background: 'rgba(0,230,138,0.1)', color: '#00e68a' }}>{scheme?.schemeType || '—'}</span>
+                          <span style={{ fontSize: 9, padding: '1px 3px', borderRadius: 2, background: 'rgba(249,115,22,0.1)', color: '#f97316' }}>⏱{restSec}с</span>
+                          {substitute && <span style={{ fontSize: 9, color: DIM }}>↔{substitute.name}</span>}
                         </div>
                       );
                     })}

@@ -79,7 +79,7 @@ const MicrocyclePlannerCardBase: React.FC = () => {
           {rows.map(r => (
             <div key={r.week} title={`Нед ${r.week}: ${PHASE_LABELS[r.phase] || r.phase} · объём ${r.params.volumeLevel}`} style={{ flex: '1 0 28px', minWidth: 28, padding: '6px 4px', borderRadius: 6, textAlign: 'center', background: phaseColor[r.phase] + '18', border: `1px solid ${phaseColor[r.phase]}40` }}>
               <div style={{ fontSize: 9, fontWeight: 700, color: phaseColor[r.phase] }}>{r.week}</div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)' }}>{(PHASE_LABELS[r.phase] || '').slice(0, 4)}</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{PHASE_LABELS[r.phase] || ''}</div>
             </div>
           ))}
         </div>

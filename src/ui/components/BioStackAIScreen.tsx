@@ -11,7 +11,6 @@ import { StackTab } from './BioStackAIStack';
 import { RisksTab } from './BioStackAIRisks';
 import { CompareTab } from './BioStackAICompare';
 import { ReportsTab } from './BioStackAIReports';
-import { DrugCheckTab } from './BioStackAIDrugCheck';
 
 const BIO_TAB_KEY = 'he_biostack_tab';
 
@@ -108,7 +107,6 @@ export const BioStackAIScreen: React.FC = () => {
     risks: <RisksTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} activeAAS={activeAAS} />,
     compare: <CompareTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} />,
     reports: <ReportsTab profile={profile} stackIds={stackIds} linked={linked} />,
-    drugcheck: <DrugCheckTab profile={profile} stackIds={stackIds} />,
   };
 
   return (

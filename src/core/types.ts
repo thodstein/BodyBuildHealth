@@ -457,121 +457,277 @@ export interface CourseEntry {
 export type UserRole = 'user' | 'coach' | 'doctor' | 'admin' | 'editor';
 export type LabPhaseType = 'baseline' | 'course' | 'bridge' | 'pct';
 export interface UserProfile {
-   id: string;
-   name: string;
-   role: UserRole;
-   settings: {
-     // Demographics
-      dateOfBirth?: string;
-      age?: number;
-      sex: 'male' | 'female';
-      ethnicity?: string;
-      height?: number;
-      weight: number;
-      bodyFat?: number;
-      waistCm?: number;
-      neckCm?: number;
-      chestCm?: number;
-      hipCm?: number;
-      forearmCm?: number;
-      bicepCm?: number;
-      thighCm?: number;
-      
-       // Goals and objectives
-       primaryGoal?: 'bulk' | 'cut' | 'maintenance' | 'strength' | 'endurance' | 'recomposition' | 'fitness' | 'health' | 'hypertrophy' | 'rehab';
-       goal?: string;
-       phase?: string;
-       courseStartDate?: string;
-       secondaryGoals?: ('bulk' | 'cut' | 'maintenance' | 'strength' | 'endurance' | 'recomposition' | 'fitness' | 'health' | 'hypertrophy' | 'rehab')[];
-      targetWeight?: number;
-      targetBodyFat?: number;
-goalTimelineWeeks?: number;
+  id: string;
+  name: string;
+  role: UserRole;
+  settings: UnifiedSettings & Record<string, any>;
+}
 
-      // Cycle info (for calculator auto-fill)
-      cycleWeeks?: number;
-      previousCycles?: number;
-      timeSinceLastCycle?: 'none' | '<3mo' | '3-6mo' | '>6mo' | 'trt';
-      trainingCycleGoal?: 'mass' | 'cut' | 'maintenance' | 'endurance';
+/**
+ * Единая структура данных пользователя — каждое поле существует ровно один раз.
+ * Все потребители (тренировки, питание, риски, поддержка) читают отсюда.
+ * Дневниковые/временные данные остаются в localStorage (сон, давление, инъекции, замеры, симптомы).
+ */
+export interface UnifiedSettings {
+  // ─────────── 1. ЛИЧНЫЕ ДАННЫЕ ───────────
+  personal: {
+    age: number;
+    sex: 'male' | 'female';
+    height: number;           // см
+    weight: number;           // кг — один для всех модулей
+    bodyFat: number;          // % — один для тренировок/питания/рисков
+    bloodType: string;        // I+, I-, II+, II-, III+, III-, IV+, IV-
+    ethnicity?: string;
+    emergencyName?: string;
+    emergencyPhone?: string;
+    /** Girth fields (backward compat, will move to measurements log) */
+    waistCm?: number;
+    neckCm?: number;
+    chestCm?: number;
+    hipCm?: number;
+    bicepCm?: number;
+    thighCm?: number;
+    forearmCm?: number;
+  };
 
-       baselineSleepHours?: number;
-      baselineSleepQuality?: number;
-      baselineHrvRatio?: number;
-      baselineStressLevel?: number;
-      fatigueLevel?: number;
-      dailySteps?: number;
-      dailyWaterLiters?: number;
-      nightAwakenings?: number;
-      bedtime?: string;
-      wakeTime?: string;
-      chronotype?: 'lark' | 'owl' | 'mixed';
-      trainingLevel?: 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
-      workoutsPerWeek?: number;
-      avgWorkoutMinutes?: number;
-      pharmaExperience?: 'none' | 'beginner' | 'intermediate' | 'advanced';
-      
-      typicalLabValues?: Record<string, number>;
-      
-      strengthBaselines?: Record<string, number>;
-      enduranceBaselines?: Record<string, number>;
-      
-      currentSupplements?: SupplementEntry[];
-      currentMedications?: MedicationEntry[];
-      allergies?: string[];
-      medicalConditions?: string[];
-      injuries?: InjuryRecord[];
-      weakPoints?: string[];
+  // ─────────── 2. ТРЕНИРОВКИ ───────────
+  training: {
+    sportType: 'bodybuilding' | 'powerlifting' | 'crossfit' | 'fitness' | 'other';
+    experience: number;           // лет стажа
+    level: 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
+    daysPerWeek: number;
+    minutesPerSession: number;
+    primaryGoal: 'bulk' | 'cut' | 'maintenance' | 'strength' | 'hypertrophy' | 'rehab' | 'recomposition' | 'health';
+    weakPoints: string[];         // отстающие группы мышц
+    pmSquat: number;              // 1RM присед
+    pmBench: number;              // 1RM жим
+    pmDeadlift: number;           // 1RM становая
+    workMax: Record<string, number>;  // рабочие ПМ по группам
+    equipment: string[];          // доступный инвентарь
+    recovery: number;             // 1-10
+    motivation: number;           // 1-10
+    doms: number;                 // 1-10
+  };
 
-      dietType?: 'omnivore' | 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'paleo' | 'mediterranean';
-      foodAllergies?: string[];
-      foodIntolerances?: string[];
-      excludedFoods?: string[];
-      preferredFoods?: string[];
-      dietRestrictions?: string[];
-      mealsPerDay?: number;
-      cookingSkill?: 'none' | 'basic' | 'intermediate' | 'advanced';
+  // ─────────── 3. ФАРМА / КУРС ───────────
+  pharma: {
+    phase: 'baseline' | 'course' | 'bridge' | 'pct' | 'post_pct' | 'fertility';
+    courseStartDate: string;      // YYYY-MM-DD
+    experience: 'none' | 'beginner' | 'intermediate' | 'advanced';
+    totalCycles: number;
+    yearsOnGear: number;
+    monthsSinceLastCourse: number;
+    hcgEnabled: boolean;
+    aiEnabled: boolean;
+    trainingCycleType: 'mass' | 'cut' | 'maintenance' | 'endurance';
+    trainingCycleWeeks: number;
+    previousCycles: number;
+    timeSinceLastCycle: 'none' | '1-3mo' | '3-6mo' | '6-12mo' | '1y+';
+    currentSubstances: PharmaSubstanceEntry[];
+  };
 
-       genetics?: Record<string, string>;
-
-       email?: string;
-
-      nutritionFactor?: number;
-      trainingFactor?: number;
-      
-
-      // Nutrition inputs for V7 risk engine
-      proteinPerKg?: number;      // g/kg bodyweight (default 1.8)
-      fiberG?: number;             // g/day (default 25)
-      omega3G?: number;            // g/day (default 1.5)
-      sodiumG?: number;            // g/day (default 3.5)
-      potassiumG?: number;         // g/day (default 3.0)
-      alcoholPerWeek?: number;     // standard drinks/week (default 0)
-      smoke?: boolean;             // smoking status (default false)
-      totalCycles?: number;        // number of completed AAS cycles
-      hasHIIT?: boolean;          // includes HIIT in training
-      volumeTonnes?: number;      // weekly training volume in tonnes
-      lissMinutesPerWeek?: number;// low-intensity steady state min/week
-      sleepHours?: number;        // actual sleep hours
-      stressLevel?: number;       // 1-10 stress level
-      activityLevel?: number;     // 1-10 activity level
-      preferredUnits?: 'metric' | 'imperial';
-      notificationsEnabled?: boolean;
-      privacyLevel?: 'private' | 'friends' | 'public';
-      
-      // Penalty override flags (manual user choice)
-      forceNoLabsPenalty?: boolean; // Force apply penalty when no labs are entered
-      mcRuns?: number; // Monte Carlo simulation runs (0 = disabled, 50+ = enabled)
-      
-      // Extended profile fields
-      sportType?: string;           // bodybuilding, powerlifting, crossfit, fitness, other
-      trainingExperience?: number;  // years of training
-      bloodType?: string;          // I+, I-, II+, II-, III+, III-, IV+, IV-
-      allergyNotes?: string;       // free-text allergies
-      chronicConditions?: string[]; // hypertension, diabetes, asthma, etc
-      excludedSupplements?: string;  // comma-separated supplement IDs to exclude
-      excludedMeds?: string;         // comma-separated medication IDs to exclude
-      emergencyName?: string;      // emergency contact name
-      emergencyPhone?: string;     // emergency contact phone
+  // ─────────── 4. ЗДОРОВЬЕ ───────────
+  health: {
+    // Хронические
+    chronicConditions: string[];
+    contraindications: {
+      diabetes: boolean; cvd: boolean; thrombophilia: boolean;
+      liverDisease: boolean; kidneyDisease: boolean; giDisease: boolean;
+      prostateIssues: boolean; epilepsy: boolean; mentalIllness: boolean;
     };
+    // Генетика (SNP)
+    genetics: Record<string, string>;
+    // Травмы
+    injuries: InjuryRecord[];
+    // Кардио
+    bpStage: 'normal' | 'prehypertension' | 'hypertension1' | 'hypertension2';
+    hctElevation: 'none' | 'mild' | 'moderate' | 'severe';
+    heartRate: number;
+    ldlElevation: string;
+    hdlLow: boolean;
+    previousCVD: boolean;
+    familyCVD: boolean;
+    triglycerides: 'normal' | 'high';
+    // ЖКТ
+    bloating: boolean; heartburn: boolean; constipation: boolean;
+    diarrhea: boolean; diagnosedIBS: boolean;
+    enzymeSupport: boolean; probioticUse: boolean;
+    // Неврология
+    dopamineScore: number;        // 1-5
+    serotoninScore: number;       // 1-5
+    aggressionScore: number;      // 1-5
+    memoryIssues: boolean;
+    focusIssues: boolean;
+    slowThinking: boolean;
+    headaches: boolean;
+    weatherDependent: boolean;
+    // Психология
+    fearOfLoss: number;           // 1-5
+    mirrorObsession: number;      // 1-5
+    apathyOffCycle: number;       // 1-5
+    // ОДА
+    jointPain: boolean;
+    ligamentIssues: boolean;
+    backPain: boolean;
+    // Стоматология
+    bleedingGums: boolean;
+    looseTeeth: boolean;
+    cramps: boolean;
+    // Эпикриз
+    pastGyno: boolean;
+    pastLibidoDrop: boolean;
+    pastHctSpike: boolean;
+    pastLiverIssues: boolean;
+    pastKidneyIssues: boolean;
+    // Токсическая нагрузка
+    hazardousWork: boolean;
+    regularNSAIDs: boolean;
+    // Аллергии
+    drugAllergies: string;
+    // Исключения
+    excludedSupplements: string[];  // id БАДов
+    excludedMeds: string[];         // id лекарств
+  };
+
+  // ─────────── 5. ПИТАНИЕ ───────────
+  nutrition: {
+    dietType: 'omnivore' | 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'paleo' | 'mediterranean';
+    mealsPerDay: number;
+    cookingSkill: 'none' | 'basic' | 'intermediate' | 'advanced';
+    foodAllergies: string[];
+    foodIntolerances: string[];
+    excludedFoods: string[];
+    preferredFoods: string[];
+    histamineSensitive: boolean;
+    proteinPerKg: number;         // г/кг
+    fiberG: number;               // г/день
+    omega3G: number;              // г/день
+    sodiumG: number;              // г/день
+    potassiumG: number;           // г/день
+    alcoholPerWeek: number;       // стандартных дринков
+    currentSupplements: SupplementEntry[];
+    currentMedications: MedicationEntry[];
+  };
+
+  // ─────────── 6. ОБРАЗ ЖИЗНИ ───────────
+  lifestyle: {
+    sleepHours: number;           // часов — один для readiness/восстановления/рисков
+    sleepQuality: 'good' | 'fair' | 'poor';
+    chronotype: 'lark' | 'owl' | 'mixed';
+    stressLevel: number;          // 1-10 — один
+    fatigueLevel: number;         // 1-10 — один
+    baselineHrvRatio: number;
+    dailySteps: number;
+    dailyWaterLiters: number;
+    smoke: boolean;
+    activityLevel: number;        // 1-10
+    morningHRV: number;
+    restingHR: number;
+    bedtime?: string;
+    wakeTime?: string;
+    nightAwakenings: number;
+  };
+
+  // ─────────── 7. СИСТЕМНЫЕ ───────────
+  system: {
+    mcRuns: number;               // Monte Carlo runs
+    forceNoLabsPenalty: boolean;
+    preferredUnits: 'metric' | 'imperial';
+    notificationsEnabled: boolean;
+    privacyLevel: 'private' | 'friends' | 'public';
+    nutritionFactor: number;
+    trainingFactor: number;
+    hasHIIT: boolean;
+    volumeTonnes: number;
+    lissMinutesPerWeek: number;
+    goalTimelineWeeks?: number;
+    targetWeight?: number;
+    targetBodyFat?: number;
+    secondaryGoals?: string[];
+    email?: string;
+  };
+}
+
+export interface PharmaSubstanceEntry {
+  id: string;
+  name: string;
+  doseMg: number;
+  unit: string;
+  route: 'inject' | 'oral';
+  startWeek: number;
+  endWeek: number;
+}
+
+export function getDefaultSettings(): UnifiedSettings {
+  return {
+    personal: {
+      age: 30, sex: 'male', height: 175, weight: 70, bodyFat: 15,
+      bloodType: 'I+', ethnicity: undefined, emergencyName: undefined, emergencyPhone: undefined,
+    },
+    training: {
+      sportType: 'bodybuilding', experience: 3, level: 'intermediate',
+      daysPerWeek: 3, minutesPerSession: 60, primaryGoal: 'hypertrophy',
+      weakPoints: [], pmSquat: 120, pmBench: 100, pmDeadlift: 140,
+      workMax: { chest: 100, back: 110, legs: 140, shoulders: 60, arms: 50, core: 60 },
+      equipment: ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'],
+      recovery: 7, motivation: 7, doms: 3,
+    },
+    pharma: {
+      phase: 'baseline', courseStartDate: new Date().toISOString().slice(0, 10),
+      experience: 'none', totalCycles: 0, yearsOnGear: 0, monthsSinceLastCourse: 0,
+      hcgEnabled: false, aiEnabled: false,
+      trainingCycleType: 'mass', trainingCycleWeeks: 12, previousCycles: 0,
+      timeSinceLastCycle: 'none', currentSubstances: [],
+    },
+    health: {
+      chronicConditions: [],
+      contraindications: {
+        diabetes: false, cvd: false, thrombophilia: false,
+        liverDisease: false, kidneyDisease: false, giDisease: false,
+        prostateIssues: false, epilepsy: false, mentalIllness: false,
+      },
+      genetics: {},
+      injuries: [],
+      bpStage: 'normal', hctElevation: 'none', heartRate: 72,
+      ldlElevation: '', hdlLow: false, previousCVD: false, familyCVD: false,
+      triglycerides: 'normal',
+      bloating: false, heartburn: false, constipation: false,
+      diarrhea: false, diagnosedIBS: false, enzymeSupport: false, probioticUse: false,
+      dopamineScore: 3, serotoninScore: 3, aggressionScore: 3,
+      memoryIssues: false, focusIssues: false, slowThinking: false,
+      headaches: false, weatherDependent: false,
+      fearOfLoss: 1, mirrorObsession: 1, apathyOffCycle: 1,
+      jointPain: false, ligamentIssues: false, backPain: false,
+      bleedingGums: false, looseTeeth: false, cramps: false,
+      pastGyno: false, pastLibidoDrop: false, pastHctSpike: false,
+      pastLiverIssues: false, pastKidneyIssues: false,
+      hazardousWork: false, regularNSAIDs: false,
+      drugAllergies: '', excludedSupplements: [], excludedMeds: [],
+    },
+    nutrition: {
+      dietType: 'omnivore', mealsPerDay: 3, cookingSkill: 'basic',
+      foodAllergies: [], foodIntolerances: [], excludedFoods: [], preferredFoods: [],
+      histamineSensitive: false,
+      proteinPerKg: 1.8, fiberG: 25, omega3G: 1.5, sodiumG: 3.5, potassiumG: 3.0,
+      alcoholPerWeek: 0,
+      currentSupplements: [], currentMedications: [],
+    },
+    lifestyle: {
+      sleepHours: 7, sleepQuality: 'fair', chronotype: 'mixed',
+      stressLevel: 3, fatigueLevel: 3, baselineHrvRatio: 1.0,
+      dailySteps: 6000, dailyWaterLiters: 2, smoke: false,
+      activityLevel: 5, morningHRV: 0, restingHR: 0,
+      bedtime: undefined, wakeTime: undefined, nightAwakenings: 1,
+    },
+    system: {
+      mcRuns: 0, forceNoLabsPenalty: false,
+      preferredUnits: 'metric', notificationsEnabled: false,
+      privacyLevel: 'private', nutritionFactor: 1, trainingFactor: 1,
+      hasHIIT: false, volumeTonnes: 0, lissMinutesPerWeek: 0,
+      goalTimelineWeeks: undefined, targetWeight: undefined,
+      targetBodyFat: undefined, secondaryGoals: undefined, email: undefined,
+    },
+  };
 }
 
 export interface Article {
