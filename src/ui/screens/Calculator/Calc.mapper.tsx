@@ -242,37 +242,418 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply, onOp
 
   return (
     <div style={{ ...GLASS, padding: 10, marginBottom: 8, border: '2px solid rgba(0,230,138,0.2)' }}>
-      <div style={{ fontSize: 13, fontWeight: 800, color: '#00e68a', marginBottom: 8, letterSpacing: '-0.3px' }}>
-        Фармакологическая поддержка
+      <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent)', marginBottom: 6 }}>
+        🧬 Механизм-ориентированная модель (ТЗ-28)
+      </div>
+      <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 8, lineHeight: 1.4 }}>
+        Движок: лабы → 28 механизмов ТЗ → отбор веществ по k×breadth → фаза → guardrails → бустеры.
+        Источник: tz-mapper-engine (5 файлов).
       </div>
 
-      {/* Уровень: 3 кнопки-карточки */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 8 }}>
-        {([
-          ['base', 'База', '\u{1F7E2}'],
-          ['medium', 'Средний', '\u{1F7E1}'],
-          ['max', 'Максимум', '\u{1F534}'],
-        ] as const).map(([lv, label, icon]) => {
-          const active = level === lv;
-          return (
-            <button key={lv} onClick={() => setLevel(lv as SupportLevel)}
+      {/* ===== КАРТОЧКА ФАЗЫ КУРСА (большая, красивая) ===== */}
+      {phaseInfo && (
+        <div style={{
+          marginBottom: 10,
+          borderRadius: 16,
+          background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.08))',
+          border: '1.5px solid rgba(139,92,246,0.25)',
+          padding: '14px 14px 12px',
+          boxShadow: '0 4px 20px rgba(99,102,241,0.08)',
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+          {/* Декоративная полоса */}
+          <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:'linear-gradient(90deg,#818cf8,#a78bfa)', borderTopLeftRadius:16, borderTopRightRadius:16 }} />
+          
+          {/* Заголовок */}
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+            <div style={{
+              width:36, height:36, borderRadius:10,
+              background:'linear-gradient(135deg,rgba(99,102,241,0.2),rgba(139,92,246,0.15))',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              fontSize:18,
+            }}>📋</div>
+            <div>
+              <div style={{ fontSize:13, fontWeight:800, color:'#818cf8', letterSpacing:'-0.3px' }}>
+                Фаза курса: {phaseInfo.label}
+              </div>
+              <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:1, letterSpacing:'-0.2px' }}>
+                {phaseInfo.description}
+              </div>
+            </div>
+          </div>
+
+          {/* Алгоритм */}
+          <div style={{
+            background:'rgba(0,0,0,0.2)', borderRadius:10, padding:'8px 10px',
+            border:'1px solid rgba(255,255,255,0.04)', marginBottom:8,
+          }}>
+            <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.5)', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.3px' }}>
+              Алгоритм фазы
+            </div>
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.75)', lineHeight:1.5, fontWeight:500 }}>
+              {phaseInfo.algorithm}
+            </div>
+          </div>
+
+          {/* Мета-инфа */}
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+            <span style={{ fontSize:8, padding:'3px 8px', borderRadius:6, background:'rgba(99,102,241,0.12)', color:'#818cf8', fontWeight:600 }}>
+              🎯 Приоритет: {phaseInfo.coreMechs.slice(0,4).join(', ')}{phaseInfo.coreMechs.length > 4 ? '…' : ''}
+            </span>
+            <span style={{ fontSize:8, padding:'3px 8px', borderRadius:6, background:'rgba(34,197,94,0.12)', color:'#22c55e', fontWeight:600 }}>
+              Бустеры: {phaseInfo.allowBoosters ? '✅ да' : '❌ нет'}
+            </span>
+            <span style={{ fontSize:8, padding:'3px 8px', borderRadius:6, background:'rgba(245,158,11,0.12)', color:'#f59e0b', fontWeight:600 }}>
+              Множитель доз: ×{phaseInfo.doseTier}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ===== ВЫБОР РЕЖИМА: ИНТЕЛЛЕКТ / РУЧНОЙ (в 1 строку) ===== */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
+
+      {/* ===== КАРТОЧКА ИНТЕЛЛЕКТУАЛЬНАЯ ПОДДЕРЖКА ===== */}
+      <div style={{
+        borderRadius: 16,
+        background: 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(0,200,83,0.03))',
+        border: '1.5px solid rgba(0,230,138,0.15)',
+        padding: '14px 14px 12px',
+        boxShadow: '0 4px 20px rgba(0,230,138,0.04)',
+        cursor: 'pointer',
+        transition: 'all 0.15s ease',
+      }}
+        onClick={() => setShowIntellPopup(true)}
+      >
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{
+            width:36, height:36, borderRadius:10,
+            background:'linear-gradient(135deg,rgba(0,230,138,0.15),rgba(0,200,83,0.1))',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:18,
+          }}>🧠</div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:12, fontWeight:800, color:'#00e68a', letterSpacing:'-0.3px' }}>
+              Интеллектуальная поддержка
+            </div>
+            <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:1 }}>
+              {level === 'base' && '🟢 База — core-препараты (NAC, омега-3, магний)'}
+              {level === 'medium' && '🟡 Средний — core + standard, оптимум цена/эффективность'}
+              {level === 'max' && '🔴 Максимум — полное покрытие + advanced'}
+              {level === 'manual' && '⚙️ Вручную — вы сами выбираете'}
+            </div>
+          </div>
+          <div style={{
+            width:24, height:24, borderRadius:12,
+            background:'rgba(0,230,138,0.1)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:12, color:'#00e68a',
+          }}>›</div>
+        </div>
+      </div>
+
+      {/* ── Попап интеллектуального выбора ── */}
+      {showIntellPopup && (
+        <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)', backdropFilter:'blur(4px)' }}
+          onClick={() => setShowIntellPopup(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'88%', maxWidth:340, borderRadius:20, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.6)' }}>
+            <div style={{ height:3, background:'linear-gradient(90deg,#00e68a,#00c853)' }} />
+            <div style={{ padding:'18px 16px 14px' }}>
+              <div style={{ fontSize:14, fontWeight:800, color:'#00e68a', marginBottom:4, letterSpacing:'-0.3px' }}>🧠 Интеллектуальная поддержка</div>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginBottom:12, lineHeight:1.4 }}>
+                Движок ТЗ-28 подберёт оптимальный набор веществ под ваш профиль, лабы и фазу курса
+              </div>
+              {([
+                ['base','База','🟢','Только core-препараты: NAC, омега-3, магний, D3. Бюджетный вариант для низкого риска.'],
+                ['medium','Средний','🟡','Core + standard. Оптимальный баланс цены и покрытия. Рекомендуется для большинства.'],
+                ['max','Максимум','🔴','Все активированные механизмы + advanced препараты. Полная защита для高风险 (high-risk) курсов.'],
+              ] as const).map(([lv, label, icon, desc]) => {
+                const active = level === lv;
+                return (
+                  <div key={lv} onClick={() => { setLevel(lv as SupportLevel); setShowIntellPopup(false); }}
+                    style={{
+                      padding:'12px 12px', borderRadius:12, marginBottom:6, cursor:'pointer',
+                      background: active ? 'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(0,200,83,0.06))' : 'rgba(255,255,255,0.03)',
+                      border: active ? '1.5px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.05)',
+                      transition:'all 0.12s ease',
+                    }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <span style={{ fontSize:20 }}>{icon}</span>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:11, fontWeight:700, color: active ? '#00e68a' : 'var(--text)', letterSpacing:'-0.2px' }}>
+                          {label} {active && '✓'}
+                        </div>
+                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:2, lineHeight:1.3 }}>{desc}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== КАРТОЧКА РУЧНОЙ РЕЖИМ ===== */}
+      <div style={{
+        borderRadius: 16,
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(59,130,246,0.03))',
+        border: '1.5px solid rgba(99,102,241,0.15)',
+        padding: '14px 14px 12px',
+        boxShadow: '0 4px 20px rgba(99,102,241,0.04)',
+        cursor: 'pointer',
+        transition: 'all 0.15s ease',
+      }}
+        onClick={() => setShowManualPopup(true)}
+      >
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{
+            width:36, height:36, borderRadius:10,
+            background:'linear-gradient(135deg,rgba(99,102,241,0.15),rgba(59,130,246,0.1))',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:18,
+          }}>⚙️</div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:12, fontWeight:800, color:'#818cf8', letterSpacing:'-0.3px' }}>
+              Ручной режим
+            </div>
+            <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:1 }}>
+              {manualSubs.length > 0 || selectedStacks.length > 0
+                ? `📦 ${selectedStacks.length} стеков · 💊 ${manualSubs.length} препаратов`
+                : 'Выберите стеки и препараты вручную'}
+            </div>
+          </div>
+          <div style={{
+            width:24, height:24, borderRadius:12,
+            background:'rgba(99,102,241,0.1)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:12, color:'#818cf8',
+          }}>›</div>
+        </div>
+      </div>
+
+      {/* ── Попап ручного режима ── */}
+      {showManualPopup && (
+        <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)', backdropFilter:'blur(4px)' }}
+          onClick={() => setShowManualPopup(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'88%', maxWidth:340, borderRadius:20, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.6)', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
+            <div style={{ height:3, background:'linear-gradient(90deg,#818cf8,#6366f1)' }} />
+            <div style={{ padding:'18px 16px 14px', overflowY:'auto' }}>
+              <div style={{ fontSize:14, fontWeight:800, color:'#818cf8', marginBottom:4, letterSpacing:'-0.3px' }}>⚙️ Ручной режим</div>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginBottom:12, lineHeight:1.4 }}>
+                Самостоятельно добавьте готовые стеки или отдельные препараты
+              </div>
+
+              {onOpenManualPicker && (
+                <button onClick={() => { setShowManualPopup(false); setTimeout(onOpenManualPicker, 200); }} style={{
+                  width:'100%', marginBottom:10, padding:'8px', borderRadius:8,
+                  background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.25)',
+                  color:'#a78bfa', fontWeight:700, fontSize:10, cursor:'pointer',
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+                }}>
+                  <span style={{fontSize:13}}>📂</span>
+                  <span>Выбрать из каталога / стеков / избранного</span>
+                </button>
+              )}
+
+              {/* Добавить стек */}
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text)', marginBottom:6, letterSpacing:'-0.2px' }}>
+                📦 Добавить стек
+              </div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:14 }}>
+                {STACK_BOOSTER_TRIGGERS.slice(0,14).map(st => {
+                  const active = selectedStacks.includes(st.stackId);
+                  return (
+                    <button key={st.stackId}
+                      onClick={() => setSelectedStacks(prev => active ? prev.filter(s => s !== st.stackId) : [...prev, st.stackId])}
+                      style={{
+                        padding:'6px 10px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer',
+                        background: active ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.03)',
+                        border: active ? '1px solid rgba(168,85,247,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                        color: active ? '#c084fc' : 'rgba(255,255,255,0.5)',
+                      }}>
+                      {st.stackId.includes('neuro') && '🧠'}
+                      {st.stackId.includes('joint') || st.stackId.includes('articular') ? '🦴' : ''}
+                      {st.stackId.includes('sleep') && '😴'}
+                      {st.stackId.includes('stress') && '🧘'}
+                      {st.stackId.includes('skin') && '💆'}
+                      {st.stackId.includes('gi') && '🫀'}
+                      {st.stackId.includes('immun') && '🛡️'}
+                      {st.stackId.includes('liver') && '🫁'}
+                      {st.stackId.includes('renal') || st.stackId.includes('kidney') || st.stackId.includes('nephro') ? '💧' : ''}
+                      {st.stackId.includes('libido') && '🔥'}
+                      {st.stackId.includes('heart') || st.stackId.includes('cardio') ? '❤️' : ''}
+                      {st.stackId.includes('bone') && '🦷'}
+                      {st.stackId.includes('thyroid') && '🔬'}
+                      {st.stackId.includes('detox') && '🧪'}
+                      {st.stackId.includes('noo') && '🧠'}
+                      {' '}{st.stackId.replace(/_stack|_support|_35/g,'').replace(/_/g,' ')}
+                      {active && ' ✓'}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Добавить препарат */}
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text)', marginBottom:6, letterSpacing:'-0.2px' }}>
+                💊 Добавить препарат
+              </div>
+              <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+                <input value={manualSubInput} onChange={e => setManualSubInput(e.target.value)}
+                  placeholder="ID препарата: NAC, TUDCA, omega3, zinc..."
+                  style={{
+                    flex:1, padding:'8px 10px', borderRadius:8, fontSize:9,
+                    background:'rgba(0,0,0,0.3)', border:'1px solid rgba(255,255,255,0.08)',
+                    color:'#fff', outline:'none',
+                  }} />
+                <button onClick={() => {
+                  if (!manualSubInput.trim()) return;
+                  const ids = manualSubInput.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+                  setManualSubs(prev => [...new Set([...prev, ...ids])]);
+                  setManualSubInput('');
+                }} style={{
+                  padding:'8px 12px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
+                  background:'linear-gradient(135deg,#818cf8,#6366f1)', border:'none', color:'#000',
+                }}>+</button>
+              </div>
+
+              {/* Список выбранных препаратов */}
+              {manualSubs.length > 0 && (
+                <div style={{ marginBottom:10 }}>
+                  <div style={{ fontSize:8, fontWeight:600, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>
+                    Выбрано: {manualSubs.length} препаратов
+                  </div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                    {manualSubs.map((sid, i) => (
+                      <span key={sid + i} style={{
+                        fontSize:8, padding:'2px 8px', borderRadius:6, fontWeight:600,
+                        background:'rgba(99,102,241,0.12)', color:'#818cf8',
+                        display:'flex', alignItems:'center', gap:4,
+                      }}>
+                        {sid}
+                        <span onClick={() => setManualSubs(prev => prev.filter((_, j) => j !== i))}
+                          style={{ cursor:'pointer', color:'rgba(255,255,255,0.3)', fontSize:9 }}>✕</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Итог */}
+              {(selectedStacks.length > 0 || manualSubs.length > 0) && (
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', lineHeight:1.3, padding:'8px 10px', borderRadius:8, background:'rgba(0,0,0,0.2)', border:'1px solid rgba(255,255,255,0.04)' }}>
+                  📋 Итого: {selectedStacks.length} стеков · {manualSubs.length} препаратов
+                </div>
+              )}
+
+              <button onClick={() => { setLevel('manual'); setShowManualPopup(false); }}
+                style={{
+                  width:'100%', marginTop:12, padding:'10px', borderRadius:10,
+                  background:'linear-gradient(135deg,#818cf8,#6366f1)', border:'none',
+                  color:'#000', fontWeight:700, fontSize:11, cursor:'pointer',
+                }}>
+                ✅ Применить ручной выбор
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>{/* конец grid intellect + manual */}
+
+      {/* ===== ДОПОЛНИТЕЛЬНЫЕ МОДУЛИ (суставы, нейро, усиление) ===== */}
+      {level !== 'manual' && (
+        <div style={{
+          marginBottom: 10,
+          borderRadius: 14,
+          background: 'rgba(24,24,27,0.3)',
+          border: '1px solid rgba(255,255,255,0.04)',
+          padding: '10px 12px 8px',
+        }}>
+          <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.3)', marginBottom:6, letterSpacing:'0.5px', textTransform:'uppercase' }}>
+            + Дополнительные модули
+          </div>
+          <div style={{ display:'flex', gap:4 }}>
+            <button onClick={() => setSelectedStacks(prev => { const id='articular_stack'; return prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]; })}
               style={{
-                padding: '7px 4px', borderRadius: 10, fontSize: 9, fontWeight: 700, cursor: 'pointer',
-                background: active ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)',
-                border: active ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                color: active ? '#00e68a' : 'var(--text-dim)',
-                transition: 'all 0.12s ease',
+                flex:1, padding:'8px 4px', borderRadius:10, fontSize:8, fontWeight:600, cursor:'pointer',
+                display:'flex', flexDirection:'column', alignItems:'center', gap:1, transition:'all 0.12s ease',
+                background: selectedStacks.includes('articular_stack') ? 'linear-gradient(135deg,rgba(34,197,94,0.2),rgba(34,197,94,0.1))' : 'rgba(255,255,255,0.03)',
+                border: selectedStacks.includes('articular_stack') ? '1.5px solid rgba(34,197,94,0.35)' : '1px solid rgba(255,255,255,0.06)',
+                color: selectedStacks.includes('articular_stack') ? '#4ade80' : 'rgba(255,255,255,0.5)',
               }}>
-              {icon} {label}
+              <span style={{fontSize:14}}>🦴</span>
+              <span>Суставы</span>
+              {selectedStacks.includes('articular_stack') && <span style={{fontSize:6,fontWeight:700,color:'#4ade80',marginTop:1}}>✓</span>}
             </button>
-          );
-        })}
-      </div>
+            <button onClick={() => setSelectedStacks(prev => { const id='neuroprotection_stack'; return prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]; })}
+              style={{
+                flex:1, padding:'8px 4px', borderRadius:10, fontSize:8, fontWeight:600, cursor:'pointer',
+                display:'flex', flexDirection:'column', alignItems:'center', gap:1, transition:'all 0.12s ease',
+                background: selectedStacks.includes('neuroprotection_stack') ? 'linear-gradient(135deg,rgba(99,102,241,0.2),rgba(99,102,241,0.1))' : 'rgba(255,255,255,0.03)',
+                border: selectedStacks.includes('neuroprotection_stack') ? '1.5px solid rgba(99,102,241,0.35)' : '1px solid rgba(255,255,255,0.06)',
+                color: selectedStacks.includes('neuroprotection_stack') ? '#818cf8' : 'rgba(255,255,255,0.5)',
+              }}>
+              <span style={{fontSize:14}}>🧠</span>
+              <span>Нейро</span>
+              {selectedStacks.includes('neuroprotection_stack') && <span style={{fontSize:6,fontWeight:700,color:'#818cf8',marginTop:1}}>✓</span>}
+            </button>
+            <button onClick={() => setSelectedStacks(prev => { const id='mega_total_support_35'; return prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]; })}
+              style={{
+                flex:1, padding:'8px 4px', borderRadius:10, fontSize:8, fontWeight:600, cursor:'pointer',
+                display:'flex', flexDirection:'column', alignItems:'center', gap:1, transition:'all 0.12s ease',
+                background: selectedStacks.includes('mega_total_support_35') ? 'linear-gradient(135deg,rgba(239,68,68,0.2),rgba(239,68,68,0.1))' : 'rgba(255,255,255,0.03)',
+                border: selectedStacks.includes('mega_total_support_35') ? '1.5px solid rgba(239,68,68,0.35)' : '1px solid rgba(255,255,255,0.06)',
+                color: selectedStacks.includes('mega_total_support_35') ? '#f87171' : 'rgba(255,255,255,0.5)',
+              }}>
+              <span style={{fontSize:14}}>🚀</span>
+              <span>Усиление</span>
+              {selectedStacks.includes('mega_total_support_35') && <span style={{fontSize:6,fontWeight:700,color:'#f87171',marginTop:1}}>✓</span>}
+            </button>
+          </div>
+        </div>
+      )}
 
-      {/* STOP COURSE banner */}
+      {/* Summary */}
+      {rec && (
+        <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--text)', marginBottom: 6, lineHeight: 1.4 }}>
+          {rec.summary}
+        </div>
+      )}
+
+      {/* Manual mode — выбор веществ */}
+      {level === 'manual' && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
+            ⚙️ Ручной выбор веществ ({manualSubs.length})
+          </div>
+          <input
+            type="text"
+            value={manualSubs.join(', ')}
+            onChange={e => setManualSubs(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+            placeholder="NAC, TUDCA, omega3, zinc…"
+            style={{
+              width: '100%',
+              padding: '6px 10px',
+              borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(0,0,0,0.3)',
+              color: '#fff',
+              fontSize: 10,
+              boxSizing: 'border-box',
+              marginBottom: 4,
+            }}
+          />
+          <div style={{ fontSize: 7, color: 'var(--text-dim)' }}>
+            Введите id веществ через запятую. Guardrails и конфликты проверяются автоматически.
+          </div>
+        </div>
+      )}
+
+      {/* STOP COURSE banner (TIER 3) */}
       {rec && rec.stopCourse && (
         <div style={{ margin: '6px 0', padding: '10px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1.5px solid rgba(239,68,68,0.3)' }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: '#ef4444', marginBottom: 4 }}>\u26D4 ОСТАНОВИТЬ КУРС AAS</div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#ef4444', marginBottom: 4 }}>⛔ ОСТАНОВИТЬ КУРС AAS</div>
           {rec.alerts?.map((a, i) => (
             <div key={i} style={{ fontSize: 9, color: '#fca5a5', marginBottom: 2, lineHeight: 1.4 }}>{a.message}</div>
           ))}
@@ -280,40 +661,23 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply, onOp
         </div>
       )}
 
-      {/* TIER alerts */}
+      {/* TIER  alerts (без stopCourse) */}
       {rec && !rec.stopCourse && rec.alerts && rec.alerts.length > 0 && (
         <div style={{ margin: '6px 0', padding: '8px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
           {rec.alerts.map((a, i) => (
-            <div key={i} style={{ fontSize: 9, color: '#fbbf24', marginBottom: 2, lineHeight: 1.4 }}>\u26A0 {a.message}</div>
+            <div key={i} style={{ fontSize: 9, color: '#fbbf24', marginBottom: 2, lineHeight: 1.4 }}>⚠ {a.message}</div>
           ))}
         </div>
       )}
 
-      {/* Warnings */}
-      {rec && rec.pedFlags && (() => {
-        const f = rec.pedFlags;
-        const ws: string[] = [];
-        if (f.isMultiOral) ws.push('\u26A0 Более 1 орального 17\u03B1 — резко \u2191 гепатотоксичность');
-        if (f.isGHPlusInsulin) ws.push('\u26A0 GH + Инсулин — высокий риск гипогликемии');
-        if (f.isWinnyPlusOxy) ws.push('\u26A0 Winstrol + Anadrol — крайне нежелательная комбинация');
-        if (f.has17AlphaAndGH) ws.push('\u26A0 17\u03B1-Орал + GH — синергичная гепатотоксичность');
-        if (!ws.length) return null;
-        return (
-          <div style={{ margin: '6px 0', padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>Предупреждения о курсе</div>
-            {ws.map((w, i) => <div key={i} style={{ fontSize: 9, color: '#c4b5fd', marginBottom: 2, lineHeight: 1.4 }}>{w}</div>)}
-          </div>
-        );
-      })()}
-
-      {/* Список препаратов */}
+      {/* Результат — единый список препаратов */}
       {rec && rec.subs.length > 0 && (
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
             Назначено {rec.subs.length} препаратов
             {rec.titrationFactors && rec.titrationFactors.size > 0 && (
               <span style={{ fontSize: 9, fontWeight: 600, color: '#f59e0b', padding: '1px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.15)' }}>
-                \u2191{rec.titrationFactors.size} дозы скорректированы
+                ↑{rec.titrationFactors.size} дозы скорректированы
               </span>
             )}
           </div>
@@ -325,15 +689,21 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply, onOp
             const form = getSubstanceForm(s.substanceId);
             const titr = getTitrationProtocol(s.substanceId);
             const hasDetails = !!form || !!titr;
-            const expanded = expandedSub === s.substanceId;
+            const isExpanded = expandedSub === s.substanceId;
             return (
-              <div key={s.substanceId + i}>
-                <div onClick={() => hasDetails && setExpandedSub(expanded ? null : s.substanceId)}
-                  style={{ ...GLASS, padding: '6px 10px', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 8, fontSize: 9, borderLeft: isTitrated ? '3px solid #f59e0b' : undefined, cursor: hasDetails ? 'pointer' : 'default' }}>
+              <div key={s.substanceId + i} >
+                <div
+                  onClick={() => hasDetails && setExpandedSub(isExpanded ? null : s.substanceId)}
+                  style={{ ...GLASS, padding: '6px 10px', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 8, fontSize: 9, borderLeft: isTitrated ? '3px solid #f59e0b' : undefined, cursor: hasDetails ? 'pointer' : 'default' }}
+                >
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ fontWeight: 600, color: 'var(--text)' }}>{name}</span>
-                    {isTitrated && <span style={{ fontSize: 8, fontWeight: 700, color: '#f59e0b', marginLeft: 4, padding: '1px 4px', borderRadius: 4, background: 'rgba(245,158,11,0.15)' }}>\u2191{((titrFactor - 1) * 100).toFixed(0)}%</span>}
-                    {hasDetails && <span style={{ fontSize: 7, color: 'var(--text-dim)', marginLeft: 4 }}>{expanded ? '\u25B2' : '\u25BC'}</span>}
+                    {isTitrated && (
+                      <span style={{ fontSize: 8, fontWeight: 700, color: '#f59e0b', marginLeft: 4, padding: '1px 4px', borderRadius: 4, background: 'rgba(245,158,11,0.15)' }}>↑{((titrFactor - 1) * 100).toFixed(0)}%</span>
+                    )}
+                    {hasDetails && (
+                      <span style={{ fontSize: 7, color: 'var(--text-dim)', marginLeft: 4 }}>{isExpanded ? '▲' : '▼'}</span>
+                    )}
                   </span>
                   {dose && (
                     <span style={{ fontSize: 8, color: isTitrated ? '#f59e0b' : '#00e68a', fontWeight: 600, whiteSpace: 'nowrap' }}>
@@ -341,22 +711,48 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply, onOp
                     </span>
                   )}
                 </div>
-                {expanded && hasDetails && (
+                {isExpanded && hasDetails && (
                   <div style={{ ...GLASS, padding: '8px 10px', marginBottom: 3, fontSize: 8, lineHeight: 1.5, borderLeft: '2px solid rgba(99,102,241,0.3)' }}>
-                    {form && form.optimalForm && <div style={{ marginBottom: 3 }}><span style={{ fontWeight: 700, color: '#818cf8' }}>Форма: </span><span style={{ color: 'var(--text-light)' }}>{form.optimalForm}</span></div>}
-                    {form && form.pharmacyBrands && form.pharmacyBrands.length > 0 && <div style={{ marginBottom: 3 }}><span style={{ fontWeight: 700, color: '#818cf8' }}>Аптечные: </span><span style={{ color: 'var(--text-light)' }}>{form.pharmacyBrands.join(', ')}</span></div>}
-                    {form && form.altForm && <div style={{ marginBottom: 3 }}><span style={{ fontWeight: 700, color: '#f59e0b' }}>Замена: </span><span style={{ color: 'var(--text-light)' }}>{form.altForm}</span></div>}
-                    {form && form.bioavailability && <div style={{ marginBottom: 3 }}><span style={{ fontWeight: 600, color: 'var(--text-dim)' }}>Биодоступ.: </span><span style={{ color: 'var(--text-light)' }}>{form.bioavailability}</span></div>}
-                    {form && form.note && <div style={{ marginBottom: 3, color: 'var(--text-light)', opacity: 0.8 }}>{form.note}</div>}
+                    {form && form.optimalForm && (
+                      <div style={{ marginBottom: 3 }}>
+                        <span style={{ fontWeight: 700, color: '#818cf8' }}>Форма: </span>
+                        <span style={{ color: 'var(--text-light)' }}>{form.optimalForm}</span>
+                      </div>
+                    )}
+                    {form && form.pharmacyBrands && form.pharmacyBrands.length > 0 && (
+                      <div style={{ marginBottom: 3 }}>
+                        <span style={{ fontWeight: 700, color: '#818cf8' }}>Аптечные: </span>
+                        <span style={{ color: 'var(--text-light)' }}>{form.pharmacyBrands.join(', ')}</span>
+                      </div>
+                    )}
+                    {form && form.altForm && (
+                      <div style={{ marginBottom: 3 }}>
+                        <span style={{ fontWeight: 700, color: '#f59e0b' }}>Замена: </span>
+                        <span style={{ color: 'var(--text-light)' }}>{form.altForm}</span>
+                      </div>
+                    )}
+                    {form && form.bioavailability && (
+                      <div style={{ marginBottom: 3 }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-dim)' }}>Биодоступность: </span>
+                        <span style={{ color: 'var(--text-light)' }}>{form.bioavailability}</span>
+                      </div>
+                    )}
+                    {form && form.note && (
+                      <div style={{ marginBottom: 3, color: 'var(--text-light)', opacity: 0.8 }}>{form.note}</div>
+                    )}
                     {titr && (
                       <div style={{ marginTop: 4, padding: '6px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.12)' }}>
-                        <div style={{ fontWeight: 700, color: '#f59e0b', marginBottom: 2 }}>Титрация: {titr.startDose} \u2192 {titr.maxDose}</div>
+                        <div style={{ fontWeight: 700, color: '#f59e0b', marginBottom: 2 }}>Титрация: {titr.startDose} → {titr.maxDose}</div>
                         {titr.steps.map((step, si) => (
                           <div key={si} style={{ fontSize: 7, color: 'var(--text-light)', marginBottom: 1 }}>
-                            <b>{step.dose}</b> ({step.duration}){step.trigger ? ' — ' + step.trigger : ''}{step.labTarget ? ' [цель: ' + step.labTarget + ']' : ''}
+                            <b>{step.dose}</b> ({step.duration})
+                            {step.trigger ? ' — ' + step.trigger : ''}
+                            {step.labTarget ? ' [цель: ' + step.labTarget + ']' : ''}
                           </div>
                         ))}
-                        {titr.flushWarning && <div style={{ fontSize: 7, color: '#fbbf24', marginTop: 2 }}>{titr.flushWarning}</div>}
+                        {titr.flushWarning && (
+                          <div style={{ fontSize: 7, color: '#fbbf24', marginTop: 2 }}>{titr.flushWarning}</div>
+                        )}
                         <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 2 }}>Контроль: {titr.monitorLabs.join(', ')} — {titr.frequency}</div>
                       </div>
                     )}
@@ -368,34 +764,56 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply, onOp
         </div>
       )}
 
-      {/* Нутри-корректировки */}
+      {/* Нутри-корректировки по анализам */}
       {rec && rec.nutritionTips && rec.nutritionTips.length > 0 && (
-        <div style={{ marginTop: 8 }}>
+        <div style={{marginTop: 8 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#00e68a', marginBottom: 4 }}>Питание по анализам ({rec.nutritionTips.length})</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
             {rec.nutritionTips.slice(0, 12).map((n, i) => (
               <div key={i} style={{ ...GLASS, padding: '4px 8px', fontSize: 8, color: 'var(--text-light)' }}>
-                <span style={{ fontWeight: 600, color: 'var(--text)' }}>{n.action}</span><br />
+                <span style={{ fontWeight: 600, color: 'var(--text)' }}>{n.action}</span>
+                <br />
                 <span style={{ opacity: 0.7 }}>{n.target}</span>
               </div>
             ))}
           </div>
         </div>
-      )}
+)}
 
-      {/* Взаимодействия */}
+      {/* Warnings: multi-oral, GH+insulin, winny+oxy */}
+      {rec && (() => {
+        const warnings: string[] = [];
+        const flags = rec.pedFlags;
+        if (flags) {
+          if (flags.isMultiOral) warnings.push('⚠ Более 1 орального 17α — резко ↑ гепатотоксичность');
+          if (flags.isGHPlusInsulin) warnings.push('⚠ GH + Инсулин — высокий риск гипогликемии, обязателен мониторинг глюкозы');
+          if (flags.isWinnyPlusOxy) warnings.push('⚠ Winstrol + Anadrol — крайне нежелательная комбинация (липиды, печень)');
+          if (flags.has17AlphaAndGH) warnings.push('⚠ 17α-Орал + GH — синергичная гепатотоксичность, тщательный мониторинг АЛТ/АСТ');
+        }
+        if (warnings.length === 0) return null;
+        return (
+          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>Предупреждения о курсе</div>
+            {warnings.map((w, i) => (
+              <div key={i} style={{ fontSize: 9, color: '#c4b5fd', marginBottom: 2, lineHeight: 1.4 }}>{w}</div>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* Взаимодействия препаратов (drug-drug) */}
       {rec && rec.subs.length > 1 && (() => {
-        const ints = checkInteractions(rec.subs.map(s => s.substanceId));
-        if (!ints.length) return null;
-        const blocks = ints.filter(x => x.severity === 'block');
+        const interactions = checkInteractions(rec.subs.map(s => s.substanceId));
+        if (interactions.length === 0) return null;
+        const blocks = interactions.filter(i => i.severity === 'block');
         return (
           <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: blocks.length ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border: '1px solid ' + (blocks.length ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)') }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: blocks.length ? '#ef4444' : '#fbbf24', marginBottom: 4 }}>
-              {blocks.length ? '\u26D4 Взаимодействия' : '\u26A0 Взаимодействия'} ({ints.length})
+              {blocks.length ? '⛔ Взаимодействия (критичные)' : '⚠ Взаимодействия'} ({interactions.length})
             </div>
-            {ints.map((intr, i) => (
+            {interactions.map((intr, i) => (
               <div key={i} style={{ fontSize: 8, color: intr.severity === 'block' ? '#fca5a5' : '#fbbf24', marginBottom: 2, lineHeight: 1.4 }}>
-                [{intr.severity === 'block' ? '\u26D4' : '\u26A0'}] <b>{intr.a}</b> + <b>{intr.b}</b> — {intr.reason}
+                [{intr.severity === 'block' ? '⛔' : '⚠'}] <b>{intr.a}</b> + <b>{intr.b}</b> — {intr.reason}
                 <div style={{ fontSize: 7, opacity: 0.8 }}>{intr.action}</div>
               </div>
             ))}
@@ -403,33 +821,27 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply, onOp
         );
       })()}
 
-      {/* Противопоказания */}
+      {/* Противопоказания по заболеваниям */}
       {rec && rec.contraindications && rec.contraindications.length > 0 && (() => {
-        const abs = rec.contraindications.filter(cc => cc.severity === 'absolute');
+        const abs = rec.contraindications.filter(c => c.severity === 'absolute');
+        const rel = rec.contraindications.filter(c => c.severity === 'relative');
         return (
           <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: abs.length ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border: '1px solid ' + (abs.length ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)') }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: abs.length ? '#ef4444' : '#fbbf24', marginBottom: 4 }}>
-              {abs.length ? '\u26D4 Противопоказания' : '\u26A0 Осторожность'} ({rec.contraindications.length})
+              {abs.length ? '⛔ Противопоказания' : '⚠ Осторожность'} ({rec.contraindications.length})
             </div>
-            {rec.contraindications.map((cc, i) => (
-              <div key={i} style={{ fontSize: 8, color: cc.severity === 'absolute' ? '#fca5a5' : '#fbbf24', marginBottom: 2, lineHeight: 1.4 }}>
-                [{cc.severity === 'absolute' ? '\u26D4' : '\u26A0'}] <b>{subNameRu(cc.substanceId)}</b> — {cc.message}
-                <div style={{ fontSize: 7, opacity: 0.8 }}>{cc.action}</div>
+            {rec.contraindications.map((c, i) => (
+              <div key={i} style={{ fontSize: 8, color: c.severity === 'absolute' ? '#fca5a5' : '#fbbf24', marginBottom: 2, lineHeight: 1.4 }}>
+                [{c.severity === 'absolute' ? '⛔' : '⚠'}] <b>{subNameRu(c.substanceId)}</b> — {c.message}
+                <div style={{ fontSize: 7, opacity: 0.8 }}>{c.action}</div>
               </div>
             ))}
           </div>
         );
       })()}
-
-      {/* Усиление */}
-      <div style={{ marginTop: 8, display: 'flex', gap: 4 }}>
-        <button onClick={() => onOpenManualPicker?.()}
-          style={{ flex: 1, padding: '8px', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.2)', color: '#a855f7' }}>
-          \u{1F527} Усилить (суставы/связки)
-        </button>
-      </div>
     </div>
   );
+};
 
 // Локальный канон-нормализатор для titration lookup
 function canonIdLocal(id: string): string {

@@ -228,7 +228,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
           </div>
         </div>
       ) : (
-        <div style={{ position:'relative', minHeight:'100vh' }}>
+        <div style={{ position:'relative', minHeight:'100%' }}>
           <div style={{ position:'relative', zIndex:1, padding:'10px 12px 80px' }}>
             <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0, marginBottom:8 }}>
               <button onClick={() => setPage('hero')}
