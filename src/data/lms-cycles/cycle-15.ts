@@ -21,18 +21,18 @@ export const CYCLE_15: SRCycleTemplate = {
  },
  week1: [
  { exercises: [
- { name: 'Жим лежа', group: 'Тяжелая', coef: 1, mnosz: 1, load: 'Разгибание голени, трицепс на блоке, наружное вращение плеча, лодочка', sets: [{pct:0.56,reps:4,sets:1},{pct:0.63,reps:3,sets:3},{pct:0.7,reps:1,sets:2}] },
- { name: 'Присед', group: 'ЖМ', coef: 1.2, mnosz: 1, load: 'Разгибание голени, трицепс на блоке, наружное вращение плеча, лодочка', sets: [{pct:0.55,reps:4,sets:1},{pct:0.65,reps:4,sets:1},{pct:0.75,reps:3,sets:2}] },
- { name: 'Жим лежа', group: 'Тяжелая', coef: 1, mnosz: 1, load: 'Разгибание голени, трицепс на блоке, наружное вращение плеча, лодочка', sets: [{pct:0.58,reps:3,sets:1},{pct:0.67,reps:2,sets:2},{pct:0.75,reps:1,sets:2},{pct:0.8,reps:1,sets:2},{pct:0.85,reps:1,sets:1}] },
- { name: 'Бицепс стоя', group: 'ПР', coef: 0.5, mnosz: 1, load: 'ОФП', sets: [{pct:0.55,reps:5,sets:1},{pct:0.62,reps:5,sets:4}] },
- { name: 'Жим на наклонной', group: 'Тяжелая', coef: 0.8, mnosz: 2, load: 'ОФП', sets: [{pct:0.55,reps:6,sets:1},{pct:0.64,reps:5,sets:4}] },
- { name: 'Жим лежа', group: 'Тяжелая', coef: 1, mnosz: 1, load: 'Разгибание голени, трицепс на блоке, наружное вращение плеча, лодочка', sets: [{pct:0.55,reps:4,sets:1},{pct:0.65,reps:3,sets:1},{pct:0.72,reps:2,sets:2},{pct:0.8,reps:1,sets:2},{pct:0.83,reps:1,sets:2}] },
+ { name: 'Жим лежа', group: 'Тяжелая', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.56,reps:4,sets:1},{pct:0.63,reps:3,sets:3},{pct:0.7,reps:1,sets:2}] },
+ { name: 'Присед', group: 'ЖМ', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.55,reps:4,sets:1},{pct:0.65,reps:4,sets:1},{pct:0.75,reps:3,sets:2}] },
+ { name: 'Жим лежа', group: 'Тяжелая', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.58,reps:3,sets:1},{pct:0.67,reps:2,sets:2},{pct:0.75,reps:1,sets:2},{pct:0.8,reps:1,sets:2},{pct:0.85,reps:1,sets:1}] },
+ { name: 'Бицепс стоя', group: 'ПР', coef: 0.5, mnosz: 1, load: 'Средняя', sets: [{pct:0.55,reps:5,sets:1},{pct:0.62,reps:5,sets:4}] },
+ { name: 'Жим на наклонной', group: 'Тяжелая', coef: 0.8, mnosz: 2, load: 'Средняя', sets: [{pct:0.55,reps:6,sets:1},{pct:0.64,reps:5,sets:4}] },
+ { name: 'Жим лежа', group: 'Тяжелая', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.55,reps:4,sets:1},{pct:0.65,reps:3,sets:1},{pct:0.72,reps:2,sets:2},{pct:0.8,reps:1,sets:2},{pct:0.83,reps:1,sets:2}] },
  ] },
  { exercises: [
- { name: 'Присед', group: 'ЖМ', coef: 1.2, mnosz: 1, load: 'Разгибание голени, трицепс на блоке, наружное вращение плеча, лодочка', sets: [{pct:0.6,reps:4,sets:1},{pct:0.7,reps:3,sets:2},{pct:0.77,reps:1,sets:2}] },
- { name: 'Жим лежа', group: 'Тяжелая', coef: 1, mnosz: 1, load: 'Разгибание голени, трицепс на блоке, наружное вращение плеча, лодочка', sets: [{pct:0.6,reps:4,sets:1},{pct:0.7,reps:4,sets:4}] },
- { name: 'Жим гантелей', group: 'ПР', coef: 0.4, mnosz: 1, load: 'ОФП', sets: [{pct:0.5,reps:5,sets:5}] },
- { name: 'Пресс в тренажере (скручивания)', group: 'Тяжелая', coef: 1, mnosz: 1, load: 'Разгибание голени, трицепс на блоке, наружное вращение плеча, лодочка', sets: [{pct:0.5,reps:4,sets:1},{pct:0.6,reps:3,sets:1},{pct:0.7,reps:3,sets:3}] },
+ { name: 'Присед', group: 'ЖМ', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.6,reps:4,sets:1},{pct:0.7,reps:3,sets:2},{pct:0.77,reps:1,sets:2}] },
+ { name: 'Жим лежа', group: 'Тяжелая', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.6,reps:4,sets:1},{pct:0.7,reps:4,sets:4}] },
+ { name: 'Жим гантелей', group: 'ПР', coef: 0.4, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:5,sets:5}] },
+ { name: 'Пресс в тренажере (скручивания)', group: 'Тяжелая', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.5,reps:4,sets:1},{pct:0.6,reps:3,sets:1},{pct:0.7,reps:3,sets:3}] },
  ] },
  ],
 };

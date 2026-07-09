@@ -71,6 +71,7 @@ import { getPrioritySubstances, deriveSeverity, type SeverityLevel } from '../da
 import { computeTierAdjustments, type TierAdjustmentResult, type TierAddSub, type TierAlert, type TierTitration, type TierNutritionTip } from '../data/lab-tier-recommendations';
 import { computeSynergy } from '../data/lab-synergy-engine';
 import { checkContraindications, type ContraAlert } from '../data/substance-contraindications';
+import { checkInteractions } from '../data/drug-interactions';
 
 // ════════════════════════════════════════════════════════════════════════════
 //  ТИПЫ РЕКОМЕНДАЦИИ
@@ -168,6 +169,7 @@ export interface MapperCtx {
   aasIds?: string[];   // legacy — список ID ААС (для обратной совместимости)
   pedDoses?: PEDDose[]; // v5 — PED с дозами + классами
   healthConditions?: string[];  // заболевания пользователя для проверки противопоказаний
+  symptoms?: string[];         // симптомы: gynecomastia, edema_severe, joint_pain, insomnia, anxiety, low_libido, hair_loss, prostate_symptoms
 }
 
 // Импорт PED-типов и helpers
@@ -642,7 +644,9 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
     else if (testMg <= 500) aiDose = '0.25-0.5 мг 2р/нед';
     else if (testMg <= 1000) aiDose = '0.5 мг 2р/нед';
     else aiDose = '1 мг/день (титровать)';
-    add('anastrozole', `Anastrozole ${aiDose} — ⚠ ТОЛЬКО ПОД КОНТРОЛЕМ АНАЛИЗОВ (E2 20-40 pg/mL) [test ${testMg} мг/нед]`, `Тестостерон ${testMg} мг/нед`, 'pharma');
+    const hasOxy = peds.some(p => p.pClass === 'aas_oral_oxy');
+    const oxyNote = hasOxy ? ' ⚠ Anadrol: AI НЕ работает при гино — нужен Tamoxifen (через «Усилить»)' : '';
+    add('anastrozole', `Anastrozole ${aiDose} — ⚠ ТОЛЬКО ПОД КОНТРОЛЕМ АНАЛИЗОВ (E2 20-40 pg/mL) [test ${testMg} мг/нед]${oxyNote}`, `Тестостерон ${testMg} мг/нед`, 'pharma');
     add('pycnogenol', 'Pycnogenol 150 мг — eNOS + защита эндотелия', 'Тестостерон', 'antioxidant');
     add('citrulline', 'Citrulline 6 г — NO-предшественник', 'Тестостерон', 'amino');
     add('bergamot', 'Bergamot 500 мг — HMG-CoA редуктаза (липиды)', 'Тестостерон', 'cardioprotector');
@@ -712,9 +716,41 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
 
   // ─── OXYMETHOLONE (Anadrol) special ───
   if (peds.some(p => p.pClass === 'aas_oral_oxy')) {
-    add('tamoxifen', 'Tamoxifen 20 мг — ⚠ Anadrol НЕ ароматизируется, AI не работает. Гино → SERM', 'Anadrol (эстро-подобный)', 'pharma');
-    add('spironolactone', 'Spironolactone 25-50 мг — ⚠ через врача (отёки, ↑Aldo на Anadrol)', 'Anadrol (отеки)', 'pharma');
     add('hesperidin', 'Hesperidin 500 + Diosmin 450 — венотоник', 'Anadrol (отеки)', 'cardioprotector');
+    // Tamoxifen — ТОЛЬКО при симптомах гино
+    const symptoms = ctx.symptoms || [];
+    if (symptoms.includes('gynecomastia')) {
+      add('tamoxifen', 'Tamoxifen 20 мг — ⚠ ТОЛЬКО ПРИ ГИНО (Anadrol: AI не работает, нужен SERM)', 'Anadrol + гино', 'pharma');
+    }
+    // Spironolactone — ТОЛЬКО при выраженных отёках
+    if (symptoms.includes('edema_severe')) {
+      add('spironolactone', 'Spironolactone 25-50 мг — ⚠ ТОЛЬКО ПРИ ВЫРАЖЕННЫХ ОТЁКАХ (через врача, ↑Aldo на Anadrol)', 'Anadrol + отёки', 'pharma');
+    }
+  }
+
+  // ─── СИМПТОМ-ЗАВИСИМЫЕ ПРЕПАРАТЫ (по отметкам пользователя) ───
+  const symptoms = ctx.symptoms || [];
+  if (symptoms.includes('gynecomastia') && !seen.has('tamoxifen')) {
+    add('tamoxifen', 'Tamoxifen 20 мг — ⚠ ТОЛЬКО ПРИ ГИНО (симптом: гинекомастия)', 'Симптом: гино', 'pharma');
+  }
+  if (symptoms.includes('prostate_symptoms') && !seen.has('saw_palmetto')) {
+    add('saw_palmetto', 'Saw Palmetto 320 мг — ⚠ ДГПЖ симптомы (частое мочеиспускание, слабая струя)', 'Симптом: простата', 'pharma');
+  }
+  if (symptoms.includes('insomnia') && !seen.has('melatonin')) {
+    add('melatonin', 'Melatonin 0.3-1 мг — сон (симптом: бессонница)', 'Симптом: сон', 'other');
+    if (!seen.has('glycine')) add('glycine', 'Glycine 3 г — сон (симптом: бессонница)', 'Симптом: сон', 'amino');
+  }
+  if (symptoms.includes('anxiety') && !seen.has('theanine')) {
+    add('theanine', 'L-Theanine 200 мг — ↓ тревога (симптом: тревога/раздражительность)', 'Симптом: тревога', 'amino');
+  }
+  if (symptoms.includes('low_libido') && !seen.has('tadalafil')) {
+    // tadalafil уже в базе, но при low_libido — ↑ до 10 мг on-demand
+  }
+  if (symptoms.includes('hair_loss') && !seen.has('saw_palmetto')) {
+    add('saw_palmetto', 'Saw Palmetto 320 мг — 5α-редуктаза (симптом: облысение)', 'Симптом: волосы', 'pharma');
+  }
+  if (symptoms.includes('joint_pain')) {
+    // Суставы — через кнопку «Усилить», не в авто-протокол
   }
 
   // ─── GH (somatropin) — ИНДУСИРОРЕЗИСТЕНТНОСТЬ + BP ───
@@ -989,6 +1025,21 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
   // ── 8. summary ─
   const summary = buildSummary(subs, activated, phase, phaseProto, ctx.level, coverage, gaps, guardrails, boosters, suppression);
   const rationale = phaseProto.algorithm;
+
+  // ── Отсеивание block-конфликтов ПЕРЕД возвратом ──
+  const blockPairs = checkInteractions(subs.map(s => s.substanceId)).filter(i => i.severity === 'block');
+  if (blockPairs.length > 0) {
+    for (const intr of blockPairs) {
+      const aIdx = subs.findIndex(s => s.substanceId.toLowerCase() === intr.a.toLowerCase());
+      const bIdx = subs.findIndex(s => s.substanceId.toLowerCase() === intr.b.toLowerCase());
+      if (aIdx >= 0 && bIdx >= 0) {
+        const aPrio = subs[aIdx].priority ?? 3;
+        const bPrio = subs[bIdx].priority ?? 3;
+        if (aPrio <= bPrio) { subs.splice(aIdx, 1); }
+        else { subs.splice(bIdx, 1); }
+      }
+    }
+  }
 
   return {
     level: ctx.level,

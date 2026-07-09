@@ -21,7 +21,7 @@ export const CYCLE_01: SRCycleTemplate = {
  },
  week1: [
  { exercises: [
- { name: 'Присед', group: 'ЖМ', coef: 1.2, mnosz: 1, load: 'Разгибание с гантелью из-за головы', sets: [{pct:0.68,reps:6,sets:4}] },
+ { name: 'Присед', group: 'ЖМ', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.68,reps:6,sets:4}] },
  { name: 'Жим лежа', group: 'Средняя', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.45,reps:6,sets:3}] },
  { name: 'Присед на груди', group: 'ЖМ', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.5,reps:4,sets:4}] },
  { name: 'Пресс в тренажере (скручивания)', group: 'Средняя', coef: 1, mnosz: 2, load: 'Тяжелая', sets: [{pct:0.45,reps:6,sets:3}] },
@@ -35,7 +35,7 @@ export const CYCLE_01: SRCycleTemplate = {
  { name: 'Присед', group: 'ЖМ', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.45,reps:6,sets:3}] },
  ] },
  { exercises: [
- { name: 'Жим лежа', group: 'Средняя', coef: 1, mnosz: 1, load: 'Разгибание с гантелью из-за головы', sets: [{pct:0.68,reps:6,sets:2},{pct:0.75,reps:6,sets:2}] },
+ { name: 'Жим лежа', group: 'Средняя', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.68,reps:6,sets:2},{pct:0.75,reps:6,sets:2}] },
  { name: 'Присед в широкой постановке', group: 'ЖМ', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.4,reps:4,sets:4}] },
  { name: 'Наклоны', group: 'ТГ', coef: 0.5, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.46,reps:6,sets:3}] },
  { name: 'Бицепс стоя', group: 'ТГ', coef: 0.5, mnosz: 1, load: 'Легкая', sets: [{pct:0.7,reps:6,sets:3}] },

@@ -66,6 +66,9 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
 
         <PopupSelect label="Частота" value={manualCfg.frequency || ''} onChange={v => setManual('frequency', v)}
           options={getMethodsByCategory('frequency').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+
+        <PopupSelect label="Специализация" value={manualCfg.specialization || ''} onChange={v => setManual('specialization', v)}
+          options={getMethodsByCategory('specialization').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
       </div>
 
       {selectedList.length > 0 && (

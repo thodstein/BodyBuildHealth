@@ -675,6 +675,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       }
       const dayIdx = days === 1 ? selectedDayIndex : 0;
       const isTrainingDay = !!trainingDays[dayIdx];
+      // Каждый вызов generatePlan → новый salt → разный набор продуктов
+      const planRandomSalt = Math.floor(Math.random() * 1000000);
 
       const buildOneDay = (offset: number): any => {
         const input: MealPlanInput = {
@@ -690,6 +692,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           budget, isVegetarian: dietPrefs.includes('vegetarian'),
           isCutting: goal === 'cutting' || goal === 'fat_loss',
           dayOffset: offset, cyclePhase: phase as any,
+          randomSalt: planRandomSalt,
+          variety,
         };
         const v2 = buildDayPlanV2(input);
         // Преобразуем DayPlanV2 → совместимый формат старого dayPlan

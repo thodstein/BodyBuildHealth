@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { UnifiedSynergyCalculator } from './UnifiedSynergyCalculator';
 import { SupportTimingPlanner } from './SupportTimingPlanner';
-import { SupportEffectiveDose } from './SupportEffectiveDose';
 
-type CalcTab = 'synergy' | 'timing' | 'dose';
+type CalcTab = 'synergy' | 'timing';
 
 export const SupportCalculatorsView: React.FC<{ s?: Record<string, any> }> = ({ s }) => {
   const [calcTab, setCalcTab] = useState<CalcTab>('synergy');
@@ -11,7 +10,6 @@ export const SupportCalculatorsView: React.FC<{ s?: Record<string, any> }> = ({ 
   const pills: { id: CalcTab; label: string }[] = [
     { id: 'synergy', label: '🧬 Синергия и взаимодействия' },
     { id: 'timing', label: '⏰ Тайминг-планировщик' },
-    { id: 'dose', label: '🧮 Расчёт эффективной дозы' },
   ];
 
   return (
@@ -30,7 +28,6 @@ export const SupportCalculatorsView: React.FC<{ s?: Record<string, any> }> = ({ 
 
       {calcTab === 'synergy' && <UnifiedSynergyCalculator s={s} />}
       {calcTab === 'timing' && <SupportTimingPlanner />}
-      {calcTab === 'dose' && <SupportEffectiveDose />}
     </div>
   );
 };

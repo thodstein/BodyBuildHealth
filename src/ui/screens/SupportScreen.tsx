@@ -58,7 +58,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'plan' | 'reports';
-type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'research' | 'favorites' | 'protocols' | 'biostack' | 'diary' | 'bioavailability';
+type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'dose' | 'synergy_calc' | 'timing' | 'research' | 'favorites' | 'protocols' | 'biostack' | 'diary' | 'bioavailability';
 
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { PopupBool, PopupNumber, PopupSelect } from '../components/PopupXxx';
@@ -77,7 +77,9 @@ import { SupportManualPicker } from './SupportScreen_parts/SupportManualPicker';
 
 import { SupportProtocols } from './SupportScreen_parts/SupportProtocols';
 import { SupportBioavailability } from './SupportScreen_parts/SupportBioavailability';
-import { SupportCalculatorsView } from './SupportScreen_parts/SupportCalculatorsView';
+import { SupportEffectiveDose } from './SupportScreen_parts/SupportEffectiveDose';
+import { UnifiedSynergyCalculator } from './SupportScreen_parts/UnifiedSynergyCalculator';
+import { SupportTimingPlanner } from './SupportScreen_parts/SupportTimingPlanner';
 import { AutoCalculator } from './Calculator';
 export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTab }) => {
   const linked = useDataLink();
@@ -86,7 +88,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [calcView, setCalcView] = useState<CalcView>('main');
   const [infoView, setInfoView] = useState<InfoView>('main');
   const [section, setSection] = useState<'home'|'generator'|'protocols'|'info'>('home');
-  const [genTab, setGenTab] = useState<'calculator'|'calculators'|'info'>('calculator');
+  const [genTab, setGenTab] = useState<'calculator'|'info'>('calculator');
   const [protocolTab, setProtocolTab] = useState<string>('');
   const [protocolView, setProtocolView] = useState<'menu'|'detail'>('menu');
   const [infoTab, setInfoTab] = useState<string>('catalog');
@@ -2278,19 +2280,23 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     </div>
                     <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>⊕ {showEffect(interaction)}</div>
                     {(() => {
+                      const enrichment = INTERACTION_ENRICHMENT[interaction?.interactionId];
                       const subAInfo = catalogSubstances.find(s => s.id === interaction?.substanceA);
                       const subBInfo = catalogSubstances.find(s => s.id === interaction?.substanceB);
                       const aDesc = subAInfo?.description || '';
                       const bDesc = subBInfo?.description || '';
                       const aMechs = (subAInfo?.mechanisms || []).slice(0, 3);
                       const bMechs = (subBInfo?.mechanisms || []).slice(0, 3);
-                      if (!aDesc && !bDesc && aMechs.length === 0 && bMechs.length === 0) return null;
+                      if (!aDesc && !bDesc && aMechs.length === 0 && bMechs.length === 0 && !enrichment) return null;
                       return (
                         <div style={{ marginTop:3, padding:'4px 6px', background:'rgba(34,197,94,0.04)', borderRadius:4, border:'1px solid rgba(34,197,94,0.08)' }}>
                           {aDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#4ade80'}}>{aName}</b>: {aDesc}</div>}
                           {aMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1,marginBottom:2}}>{aMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(74,222,128,0.1)',color:'#4ade80'}}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>)}</div>}
                           {bDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#4ade80'}}>{bName}</b>: {bDesc}</div>}
                           {bMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1}}>{bMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(74,222,128,0.1)',color:'#4ade80'}}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>)}</div>}
+                          {enrichment?.mechanismRu?.length > 0 && <div style={{marginTop:2}}><div style={{fontSize:6,color:'#a78bfa',fontWeight:600,marginBottom:1}}>⚙️ Почему:</div><ul style={{margin:'2px 0',paddingLeft:12,fontSize:7,color:'rgba(255,255,255,0.7)',lineHeight:1.3}}>{enrichment.mechanismRu.map((txt:string,mi:number)=><li key={mi}>{txt}</li>)}</ul></div>}
+                          {enrichment?.riskDescription && <div style={{marginTop:2,padding:'3px 5px',borderRadius:4,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.15)'}}><div style={{fontSize:6,color:'#ef4444',fontWeight:700,marginBottom:1}}>⚠️ Риск:</div><div style={{fontSize:7,color:'rgba(255,255,255,0.75)',lineHeight:1.2}}>{enrichment.riskDescription}</div></div>}
+                          {enrichment?.parameters && <div style={{marginTop:2,padding:'3px 5px',borderRadius:4,background:'rgba(245,158,11,0.06)',border:'1px solid rgba(245,158,11,0.15)'}}><div style={{fontSize:6,color:'#f59e0b',fontWeight:700,marginBottom:1}}>📋 Параметры:</div><div style={{fontSize:7,color:'rgba(255,255,255,0.75)',lineHeight:1.2}}>{enrichment.parameters}</div></div>}
                         </div>
                       );
                     })()}
@@ -2338,19 +2344,23 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     </div>
                     <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>⊖ {showEffect(interaction)}</div>
                     {(() => {
+                      const enrichment = INTERACTION_ENRICHMENT[interaction?.interactionId];
                       const subAInfo = catalogSubstances.find(s => s.id === interaction?.substanceA) || (PHARMA_DB[interaction?.substanceA] ? { id: interaction?.substanceA, name: PHARMA_DB[interaction?.substanceA]?.name, description: PHARMA_DB[interaction?.substanceA]?.description || '', mechanisms: PHARMA_DB[interaction?.substanceA]?.mechanisms || [] } : null);
                       const subBInfo = catalogSubstances.find(s => s.id === interaction?.substanceB) || (PHARMA_DB[interaction?.substanceB] ? { id: interaction?.substanceB, name: PHARMA_DB[interaction?.substanceB]?.name, description: PHARMA_DB[interaction?.substanceB]?.description || '', mechanisms: PHARMA_DB[interaction?.substanceB]?.mechanisms || [] } : null);
                       const aDesc = subAInfo?.description || '';
                       const bDesc = subBInfo?.description || '';
                       const aMechs = ((subAInfo?.mechanisms || []) as string[]).slice(0, 3);
                       const bMechs = ((subBInfo?.mechanisms || []) as string[]).slice(0, 3);
-                      if (!aDesc && !bDesc && aMechs.length === 0 && bMechs.length === 0) return null;
+                      if (!aDesc && !bDesc && aMechs.length === 0 && bMechs.length === 0 && !enrichment) return null;
                       return (
                         <div style={{ marginTop:3, padding:'4px 6px', background:'rgba(239,68,68,0.04)', borderRadius:4, border:'1px solid rgba(239,68,68,0.08)' }}>
                           {aDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#f87171'}}>{aName}</b>: {aDesc}</div>}
                           {aMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1,marginBottom:2}}>{aMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(248,113,113,0.1)',color:'#f87171'}}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>)}</div>}
                           {bDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#f87171'}}>{bName}</b>: {bDesc}</div>}
                           {bMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1}}>{bMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(248,113,113,0.1)',color:'#f87171'}}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>)}</div>}
+                          {enrichment?.mechanismRu?.length > 0 && <div style={{marginTop:2}}><div style={{fontSize:6,color:'#a78bfa',fontWeight:600,marginBottom:1}}>⚙️ Почему:</div><ul style={{margin:'2px 0',paddingLeft:12,fontSize:7,color:'rgba(255,255,255,0.7)',lineHeight:1.3}}>{enrichment.mechanismRu.map((txt:string,mi:number)=><li key={mi}>{txt}</li>)}</ul></div>}
+                          {enrichment?.riskDescription && <div style={{marginTop:2,padding:'3px 5px',borderRadius:4,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.15)'}}><div style={{fontSize:6,color:'#ef4444',fontWeight:700,marginBottom:1}}>⚠️ Риск:</div><div style={{fontSize:7,color:'rgba(255,255,255,0.75)',lineHeight:1.2}}>{enrichment.riskDescription}</div></div>}
+                          {enrichment?.parameters && <div style={{marginTop:2,padding:'3px 5px',borderRadius:4,background:'rgba(245,158,11,0.06)',border:'1px solid rgba(245,158,11,0.15)'}}><div style={{fontSize:6,color:'#f59e0b',fontWeight:700,marginBottom:1}}>📋 Параметры:</div><div style={{fontSize:7,color:'rgba(255,255,255,0.75)',lineHeight:1.2}}>{enrichment.parameters}</div></div>}
                         </div>
                       );
                     })()}
@@ -2402,19 +2412,23 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     </div>
                     <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>⚠ {showEffect(interaction)}</div>
                     {(() => {
+                      const enrichment = INTERACTION_ENRICHMENT[interaction?.interactionId];
                       const subAInfo = catalogSubstances.find(s => s.id === interaction?.substanceA) || (PHARMA_DB[interaction?.substanceA] ? { id: interaction?.substanceA, name: PHARMA_DB[interaction?.substanceA]?.name, description: PHARMA_DB[interaction?.substanceA]?.description || '', mechanisms: PHARMA_DB[interaction?.substanceA]?.mechanisms || [] } : null);
                       const subBInfo = catalogSubstances.find(s => s.id === interaction?.substanceB) || (PHARMA_DB[interaction?.substanceB] ? { id: interaction?.substanceB, name: PHARMA_DB[interaction?.substanceB]?.name, description: PHARMA_DB[interaction?.substanceB]?.description || '', mechanisms: PHARMA_DB[interaction?.substanceB]?.mechanisms || [] } : null);
                       const aDesc = subAInfo?.description || '';
                       const bDesc = subBInfo?.description || '';
                       const aMechs = ((subAInfo?.mechanisms || []) as string[]).slice(0, 3);
                       const bMechs = ((subBInfo?.mechanisms || []) as string[]).slice(0, 3);
-                      if (!aDesc && !bDesc && aMechs.length === 0 && bMechs.length === 0) return null;
+                      if (!aDesc && !bDesc && aMechs.length === 0 && bMechs.length === 0 && !enrichment) return null;
                       return (
                         <div style={{ marginTop:3, padding:'4px 6px', background:'rgba(245,158,11,0.04)', borderRadius:4, border:'1px solid rgba(245,158,11,0.08)' }}>
                           {aDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#fbbf24'}}>{aName}</b>: {aDesc}</div>}
                           {aMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1,marginBottom:2}}>{aMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(251,191,36,0.1)',color:'#fbbf24'}}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>)}</div>}
                           {bDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#fbbf24'}}>{bName}</b>: {bDesc}</div>}
                           {bMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1}}>{bMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(251,191,36,0.1)',color:'#fbbf24'}}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g, ' ')}</span>)}</div>}
+                          {enrichment?.mechanismRu?.length > 0 && <div style={{marginTop:2}}><div style={{fontSize:6,color:'#a78bfa',fontWeight:600,marginBottom:1}}>⚙️ Почему:</div><ul style={{margin:'2px 0',paddingLeft:12,fontSize:7,color:'rgba(255,255,255,0.7)',lineHeight:1.3}}>{enrichment.mechanismRu.map((txt:string,mi:number)=><li key={mi}>{txt}</li>)}</ul></div>}
+                          {enrichment?.riskDescription && <div style={{marginTop:2,padding:'3px 5px',borderRadius:4,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.15)'}}><div style={{fontSize:6,color:'#ef4444',fontWeight:700,marginBottom:1}}>⚠️ Риск:</div><div style={{fontSize:7,color:'rgba(255,255,255,0.75)',lineHeight:1.2}}>{enrichment.riskDescription}</div></div>}
+                          {enrichment?.parameters && <div style={{marginTop:2,padding:'3px 5px',borderRadius:4,background:'rgba(245,158,11,0.06)',border:'1px solid rgba(245,158,11,0.15)'}}><div style={{fontSize:6,color:'#f59e0b',fontWeight:700,marginBottom:1}}>📋 Параметры:</div><div style={{fontSize:7,color:'rgba(255,255,255,0.75)',lineHeight:1.2}}>{enrichment.parameters}</div></div>}
                         </div>
                       );
                     })()}
@@ -3037,7 +3051,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'protocols' ? '40px' : section === 'generator' ? '85px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '120px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'protocols' ? '54px' : section === 'generator' ? '88px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '120px' : section !== 'home' ? '54px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (with back/home) ===== */}
       {section === 'generator' && (
@@ -3046,11 +3060,10 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['calculator','🧮 Калькулятор'],['calculators','🔬 Синералогия'],['info','📖 О подборе']].map(([id,label]) => (
+            {[['calculator','🧮 Калькулятор'],['info','📖 О подборе']].map(([id,label]) => (
               <button key={id} onClick={() => { setGenTab(id as any); 
               const a: Record<string,()=>void> = {
                 calculator: ()=>{ setTab('calculator'); setSupportView('calc'); },
-                calculators: ()=>{},
                 info: ()=>{},
               };
               a[id]?.();
@@ -3082,7 +3095,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['research','Исследования'],['favorites','⭐ Избранное · Дневник'],['bioavailability','🧬 Биодоступность']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['dose','🧮 Расчёт дозы'],['synergy_calc','🧬 Калькулятор синергии'],['timing','⏰ Тайминг-планировщик'],['research','Исследования'],['favorites','⭐ Избранное · Дневник'],['bioavailability','🧬 Биодоступность']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 if (id === 'peptides') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); }
                 else { setTab('main'); setSupportView('calc'); setCalcView('info'); setSection('home'); setInfoView(id as InfoView); }
@@ -3133,6 +3146,15 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             </div>
           )}
         </div>
+      )}
+      {renderView(infoView, 'dose', () =>
+        <SupportEffectiveDose />
+      )}
+      {renderView(infoView, 'synergy_calc', () =>
+        <UnifiedSynergyCalculator s={s} />
+      )}
+      {renderView(infoView, 'timing', () =>
+        <SupportTimingPlanner />
       )}
       {renderView(infoView, 'research', () =>
         <SupportResearch s={s} />
@@ -3358,13 +3380,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
           }}
           onOpenManualPicker={() => setShowManualPicker(true)}
         />
-      )}
-
-      {/* ===== CALCULATORS: synergy + timing + dose ===== */}
-      {section === 'generator' && genTab === 'calculators' && (
-        <div style={{ paddingTop: 8, paddingBottom: 16 }}>
-          <SupportCalculatorsView s={s} />
-        </div>
       )}
 
       {/* ===== PEPTIDE CALCULATOR ===== */}

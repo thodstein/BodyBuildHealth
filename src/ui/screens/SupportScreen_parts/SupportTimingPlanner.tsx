@@ -5,6 +5,7 @@ import { PEPTIDE_DB } from '../../../engines/peptide-calculator.engine';
 import {
   type EnrichedEntry, type TimeSlot, type TimingSlot, type SubstanceTiming, type FormWithBio,
   TIMING_SLOTS, CATEGORY_TIMING, getCatalogFormBio, detectEnhancers, detectCompetition, classifySubstance,
+  ROUTE_LABELS_MAP,
 } from './SupportBioavailabilityData';
 import { S } from './SupportShared';
 
@@ -37,12 +38,11 @@ function buildCatalog(): EnrichedEntry[] {
   }
   for (const [pepId, pp] of Object.entries(PEPTIDE_DB)) {
     if (!pp?.name) continue;
-    const { ROUTE_LABELS_MAP } = require('./SupportBioavailabilityData');
     const forms: FormWithBio[] = [];
     const raw = (pp as any).bioavailability || {};
     for (const [rt, b] of Object.entries(raw)) {
       if (typeof b !== 'number') continue;
-      forms.push({ id: `${pepId}_${rt}`, name: `${pp.name} (${(ROUTE_LABELS_MAP as any)[rt] || rt})`, nameRu: `${pp.name} (${(ROUTE_LABELS_MAP as any)[rt] || rt})`, dose: `${(pp as any).amountMg || '?'} мг`, best: rt === 'sc', bioavailability: b, bioLabel: `${(b * 100).toFixed(0)}%`, notes: '', effectiveDose: (d: number) => Math.round(d * b) });
+      forms.push({ id: `${pepId}_${rt}`, name: `${pp.name} (${ROUTE_LABELS_MAP[rt] || rt})`, nameRu: `${pp.name} (${ROUTE_LABELS_MAP[rt] || rt})`, dose: `${(pp as any).amountMg || '?'} мг`, best: rt === 'sc', bioavailability: b, bioLabel: `${(b * 100).toFixed(0)}%`, notes: '', effectiveDose: (d: number) => Math.round(d * b) });
     }
     entries.push({ id: pepId, source: 'peptide', nameRu: pp.name, nameEn: pp.name || pepId, tier: 'advanced', category: ['peptide', (pp as any).className || 'gh_peptide'].filter(Boolean), description: `${((pp as any).effects || []).join(', ') || ''}`, forms, maxBio: forms.length ? Math.max(...forms.map(f=>f.bioavailability)) : 0, minBio: forms.length ? Math.min(...forms.map(f=>f.bioavailability)) : 0, avgBio: forms.length ? forms.reduce((a, f) => a + f.bioavailability, 0) / forms.length : 0, bestForm: forms[0] || null, enhancers: [], competitors: [], absorptionKey: 'sublingual_area', halfLifeKey: '', foodKey: 'antioxidant', windowKey: '', costPerGram: null });
   }

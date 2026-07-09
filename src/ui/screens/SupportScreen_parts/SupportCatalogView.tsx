@@ -40,7 +40,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
               <div>
                  {/* Sub-tabs: По типам / По органам / Стеки / Взаимодействия */}
                   <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
-                    {(['type','organ','stack','interactions'] as const).map((t: any) => (
+                    {(['type','organ','stack'] as const).map((t: any) => (
                       <button key={t} onClick={() => { if (t === 'organ') { setExpandedCategories(prev => { const n: Record<string,boolean>={}; Object.keys(prev).forEach((k: any) =>{if(k.startsWith('organ_'))n[k]=true}); return {...prev,...n}; }); } setCatalogSubTab(t); }} style={{
                         padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
                         background: catalogSubTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
@@ -241,10 +241,6 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                       })}
                     </div>
                   )}
-                {/* ─── ВЗАИМОДЕЙСТВИЯ (подвкладка каталога) ─── */}
-                {catalogSubTab === 'interactions' && (
-                  <UnifiedSynergyCalculator s={s} />
-                )}
                 {/* Complexes tab removed — all substances now in type/organ/tier views */}
                 {(catalogSubTab === 'type' || !catalogSubTab) && (
                 /* По типам — все 280 препаратов, сгруппированы по типу (без органов/функций) */

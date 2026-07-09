@@ -198,6 +198,8 @@ export function buildMapperCtx(
     libidoLow: false,
     bpSystolic: state.cardio.bpStage === 'high' ? 150 : state.cardio.bpStage === 'normal' ? 120 : 135,
     lipidLdl: labs['LDL'],
+    symptoms: (state as any).symptoms || [],
+    healthConditions: (state as any).healthConditions || [],
   };
 }
 
@@ -222,10 +224,15 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply, onOp
   const [showIntellPopup, setShowIntellPopup] = useState(false);
   const [showManualPopup, setShowManualPopup] = useState(false);
   const [manualSubInput, setManualSubInput] = useState('');
+  const [symptoms, setSymptoms] = useState<string[]>([]);
 
   const ctx = useMemo(
-    () => buildMapperCtx(state, level, level === 'manual' ? { addSubs: manualSubs } : undefined, selectedStacks),
-    [state, level, manualSubs, selectedStacks],
+    () => {
+      const base = buildMapperCtx(state, level, level === 'manual' ? { addSubs: manualSubs } : undefined, selectedStacks);
+      if (symptoms.length > 0) base.symptoms = symptoms;
+      return base;
+    },
+    [state, level, manualSubs, selectedStacks, symptoms],
   );
 
   const rec = useMemo(() => {
@@ -649,6 +656,31 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onApply, onOp
           </div>
         </div>
       )}
+
+      {/* Карточка симптомов */}
+      <div style={{ margin: '6px 0', padding: '8px 10px', borderRadius: 10, background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#818cf8', marginBottom: 4 }}>Симптомы (отметьте актуальные)</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+          {([
+            ['gynecomastia', 'Гино'],
+            ['edema_severe', 'Отёки'],
+            ['joint_pain', 'Суставы'],
+            ['insomnia', 'Бессонница'],
+            ['anxiety', 'Тревога'],
+            ['low_libido', 'Либидо↓'],
+            ['hair_loss', 'Выпадение волос'],
+            ['prostate_symptoms', 'Простата'],
+          ] as const).map(([sym, label]) => {
+            const active = symptoms.includes(sym);
+            return (
+              <button key={sym} onClick={() => setSymptoms(prev => active ? prev.filter(s => s !== sym) : [...prev, sym])}
+                style={{ padding: '3px 8px', borderRadius: 6, fontSize: 8, fontWeight: 600, cursor: 'pointer', border: '1px solid ' + (active ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.06)'), background: active ? 'rgba(99,102,241,0.15)' : 'transparent', color: active ? '#a5b4fc' : 'var(--text-dim)', transition: 'all 0.12s ease' }}>
+                {active ? '✓' : ''} {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* STOP COURSE banner (TIER 3) */}
       {rec && rec.stopCourse && (

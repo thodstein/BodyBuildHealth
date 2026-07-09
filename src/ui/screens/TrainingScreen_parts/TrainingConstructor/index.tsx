@@ -10,13 +10,14 @@ import { usePlanGeneration } from '../../../hooks/usePlanGeneration';
 import { generateMacrocycle, getCurrentWeekPlan, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../../../engines/training-periodization.engine';
 import { TrainingProfileCard } from '../TrainingProfileCard';
 import type { TrainingProfile } from '../training-profile';
-import { PCT_FOR_RIR, ACCENT, DIM, detectGroup, getMrv, type ManualResult } from './types';
+import { PCT_FOR_RIR, ACCENT, DIM, detectGroup, getMrv, type ManualResult, type ManualDay, type ManualExercise } from './types';
 const PHASE_LABELS_MAP: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', peaking: 'Пик', deload: 'Разгрузка', gpp: 'GPP', spp: 'SPP' };
 import { ConstructorProfile } from './ConstructorProfile';
 import { ConfigPanel } from './ConfigPanel';
 import { PlanDisplay } from './PlanDisplay';
 import { ToolsPanel } from './ToolsPanel';
 import { PlannerToolsPanel } from '../PlannerToolsPanel';
+import { getMethodsByCategory } from '../../../../engines/training-methodology.engine';
 import { MacrocyclePanel } from './MacrocyclePanel';
 import { subscribePlannerApply, getPlannerApply, clearPlannerApply, type PlannerApply } from '../planner-bridge';
 
@@ -107,6 +108,112 @@ export const TrainingConstructor: React.FC<Props> = ({
   const [mrvOverride, setMrvOverride] = useState<number | null>(null);
   const globalTempoStr = tempoAdjust ? `${tempoAdjust.eccentric}-${tempoAdjust.bottomPause}-${tempoAdjust.concentric}-${tempoAdjust.topPause}` : undefined;
 
+  // Применение выбранных методик к плану: каждая модифицирует сеты/RIR/темп/объём
+  const applyMethodsToPlan = useCallback((days: ManualDay[], cfg: Record<string, string>, wm: Record<string, number>, gl: string, mrvVal: number) => {
+    const log: string[] = [];
+    let modified = days.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e })) }));
+    for (const [cat, name] of Object.entries(cfg)) {
+      if (!name || cat === 'split' || cat === 'cycle' || cat === 'program') continue;
+      const allM = getMethodsByCategory(cat);
+      if (!allM.some((m: any) => m.name === name)) { log.push(`Метод «${name}» не найден в категории ${cat}.`); continue; }
+      // ── Прогрессия ──
+      if (cat === 'progression') {
+        if (name.includes('Max Effort') || name.includes('Максимальных усилий')) {
+          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: Math.min(3, Math.round(e.sets * 0.5)), reps: '1-3', rir: 1, rest: 240 })) }));
+          log.push('Прогрессия Max Effort: 1-3П @90%+, RIR 1, отдых 4 мин — максимальная сила.');
+        } else if (name.includes('Dynamic Effort') || name.includes('Динамических усилий')) {
+          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: Math.max(5, Math.round(e.sets * 1.5)), reps: '2-3', rir: 3, rest: 60 })) }));
+          log.push('Прогрессия Dynamic Effort: 2-3П @50-65%, скорость, короткий отдых — мощность.');
+        } else if (name.includes('Repeated Effort') || name.includes('Повторных усилий')) {
+          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: Math.max(3, Math.round(e.sets * 0.9)), reps: '8-12', rir: 2, rest: 90 })) }));
+          log.push('Прогрессия Repeated Effort: 8-12П @65-80%, RIR 2 — гипертрофия.');
+        } else if (name.includes('Double Progression') || name.includes('Двойная прогрессия')) {
+          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, reps: '8-12', rir: 1, rest: 90 })) }));
+          log.push('Двойная прогрессия: растём по повторам 8→12, затем +вес. RIR=1 (2 в запасе = точка роста).');
+        } else if (name.includes('Triple Progression') || name.includes('Тройная прогрессия')) {
+          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, reps: '8-10', rir: 1, rest: 90 })) }));
+          log.push('Тройная прогрессия: повторы → подходы → вес. RIR=1, диапазон повторов 8-10.');
+        } else {
+          log.push(`Прогрессия: «${name}» — концепция применяется в долгосрочном планировании.`);
+        }
+      }
+      // ── Интенсивность ──
+      if (cat === 'intensity') {
+        if (name.includes('Cluster') || name.includes('Кластер')) {
+          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: 5, reps: '5 (2+2+1)', rir: 1, rest: 180 })) }));
+          log.push('Кластеры: 5×5 как (2+20с+2+20с+1), отдых 3 мин между подходами.');
+        } else if (name.includes('Drop-Set') || name.includes('Дроп-сет')) {
+          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: 3, reps: '8-10', rir: 0, rest: 120 })) }));
+          log.push('Drop-Set 4/8/12: последний подход до отказа +2 дропа −20%. RIR 0 на завершающей серии.');
+        } else if (name.includes('Rest-Pause') || name.includes('Rest Pause')) {
+          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: 1, reps: 'AMRAP', rir: 0, rest: 120 })) }));
+          log.push('Rest-Pause: 1 подход до отказа, 15с отдых, ещё 2-4П, 15с, ещё 1-3. RIR 0.');
+        } else if (name.includes('Myo-Reps') || name.includes('Myo Reps')) {
+          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: 1, reps: '15-20', rir: 1, rest: 120 })) }));
+          log.push('Myo-Reps: активация 15-20 @RPE 8, затем мини-сеты 3-5П с 5 вдохами отдыха.');
+        } else if (name.includes('Суперсет') || name.includes('Antagonist Superset')) {
+          log.push('Суперсеты антагонистов: упражнения идут парами (грудь/спина, бицепс/трицепс) без отдыха между.');
+        } else if (name.includes('Негатив') || name.includes('Эксцентрический')) {
+          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, reps: '3-5', rir: 2, rest: 180 })) }));
+          log.push('Негативы: эксцентрика 4-6с, вес 105-120% от ПМ, страхующий. RIR 2.');
+        } else if (name.includes('Метаболический') || name.includes('Giant')) {
+          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: Math.max(3, Math.round(e.sets * 0.7)), reps: '10-15', rir: 1, rest: 60 })) }));
+          log.push('Метаболический тренинг: гигантские сеты 4-6 упр, отдых 60с, ЧСС 130-150.');
+        } else if (name.includes('Форсированные') || name.includes('Forced Reps')) {
+          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, rir: 0, rest: 180 })) }));
+          log.push('Форсированные повторения: RIR 0, партнёр помогает +2-3 после отказа.');
+        } else if (name.includes('Трисет') || name.includes('Гигантские')) {
+          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: Math.max(3, Math.round(e.sets * 0.8)), reps: '8-12', rir: 1, rest: 90 })) }));
+          log.push('Трисеты/Гигантские сеты: 3-6 упражнений на группу без отдыха между ними.');
+        } else {
+          log.push(`Интенсивность: «${name}» — примените вручную через редактор (шаблоны/темп).`);
+        }
+      }
+      // ── Техника ──
+      if (cat === 'technique') {
+        if (name.includes('Tempo') || name.includes('Темповые')) {
+          const t = name.includes('3-1-1-0') ? '3-1-1-0' : name.includes('гипертроф') ? '3-1-1-0' : '4-1-1-0';
+          setTempoAdjust({ eccentric: parseInt(t[0]), bottomPause: parseInt(t[2]), concentric: parseInt(t[4]), topPause: parseInt(t[6]), label: t });
+          log.push(`Темп ${t}: ${t[0]}с эксцентрика, ${t[2]}с пауза внизу, ${t[4]}с концентрика, ${t[6]}с пауза вверху.`);
+        } else if (name.includes('Пауза') || name.includes('Bottom Pause') || name.includes('Paused')) {
+          setTempoAdjust({ eccentric: 3, bottomPause: 2, concentric: 1, topPause: 0, label: '3-2-1-0' });
+          log.push('Пауза 2с в нижней точке: убирает рефлекс растяжения, чистая концентрика.');
+        } else if (name.includes('1.5') || name.includes('полтора')) {
+          log.push('1.5 повторения: полное + половина + полное = 1 повтор. Растянутая позиция.');
+        } else if (name.includes('Pre-Exhaust') || name.includes('Предварительное')) {
+          log.push('Pre-Exhaust: изоляция → сразу compound. Отстающие группы — приоритет.');
+        } else if (name.includes('BFR')) {
+          log.push('BFR: 20-30% 1RM + манжеты, 30-15-15-15 повторов, 30с отдых. Гипертрофия без веса.');
+        } else {
+          log.push(`Техника: «${name}» — настройте темп в редакторе для каждого упражнения.`);
+        }
+      }
+      // ── Объём ──
+      if (cat === 'volume') {
+        if (name.includes('GVT') || name.includes('German Volume') || name.includes('10×10')) {
+          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: 10, reps: '10', rir: 3, rest: 60 })) }));
+          log.push('GVT 10×10: 10 подходов × 10 повторений @60% 1ПМ, отдых 60с. Экстремальный объём.');
+        } else if (name.includes('FST-7') || name.includes('Fascia')) {
+          log.push('FST-7: последнее упражнение на группу — 7×8-12 с 30-45с отдыха. Памп и фасция.');
+        } else if (name.includes('Gironda') || name.includes('8×8')) {
+          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: 8, reps: '8', rir: 2, rest: 20 })) }));
+          log.push('Gironda 8×8: 8×8 @50-60%, отдых 15-30с. Плотность и пампинг.');
+        } else if (name.includes('Volume Progression RP') || name.includes('Volume Landmarks')) {
+          log.push(`Volume Landmarks: объём ${Math.round(mrvVal * 0.7)}-${Math.round(mrvVal)} сетов/нед на группу. MEV→MAV→MRV.`);
+        } else {
+          log.push(`Объём: «${name}» — скорректируйте сетов в редакторе под целевую схему.`);
+        }
+      }
+      // ── Специализация ──
+      if (cat === 'specialization') {
+        if (name.includes('Bench') || name.includes('жим') || name.includes('Жимовое')) {
+          log.push('Специализация жим: приоритет жимовых вариаций, объём груди/трицепса/плеч повышен.');
+        }
+      }
+    }
+    return { days: modified, log };
+  }, []);
+
   const generateManualPlan = useCallback(() => {
     const corrections: string[] = [];
     const auto = selectSplit({ goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as any);
@@ -130,10 +237,16 @@ export const TrainingConstructor: React.FC<Props> = ({
     const ws = built.weeklySets;
     Object.entries(ws).forEach(([g, s]: [string, any]) => { if (s < Math.max(4, mrv * 0.4) && s > 0) corrections.push(`Группа «${g}»: низкий объём (${s} сетов) — ниже зоны адаптации.`); });
     weakPoints.forEach(w => { if (!ws[w] || ws[w] === 0) corrections.push(`⚠ Слабая группа «${w}» не включена — добавьте специализированное упражнение.`); });
-    lastSyncedWeekRef.current = -1; // разрыв синхронизации с макроциклом
-    setManualResult({ splitName: sp.name, corrections, days: built.days });
-    setConstTab('editor'); // показать собранный план
-  }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, manualCfg, tprofile, labAnalysis, buildPlan, mrvOverride]);
+
+    // Применить выбранные методики к плану
+    const methodResult = applyMethodsToPlan(built.days as ManualDay[], manualCfg, manualWorkMax, goal, mrv);
+    const methodCorrections = methodResult.log;
+    corrections.push(...methodCorrections);
+
+    lastSyncedWeekRef.current = -1;
+    setManualResult({ splitName: sp.name, corrections, days: methodResult.days });
+    setConstTab('editor');
+  }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, manualCfg, tprofile, labAnalysis, buildPlan, mrvOverride, manualWorkMax, applyMethodsToPlan]);
 
   const loadProgramToConstructor = useCallback((programId: string) => {
     const lib: FullProgram[] = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS];
@@ -211,7 +324,9 @@ export const TrainingConstructor: React.FC<Props> = ({
         `Допустимый объём (MRV): ${Math.round(mrvBase)} сетов/нед на группу.`,
         ...built.groupCorrections,
       ];
-      setManualResult({ splitName: p.data.name || p.label || 'Сплит из калькулятора', corrections, days: built.days });
+      const methodResult2 = applyMethodsToPlan(built.days as ManualDay[], manualCfg, manualWorkMax, goal, mrvBase);
+      corrections.push(...methodResult2.log);
+      setManualResult({ splitName: p.data.name || p.label || 'Сплит из калькулятора', corrections, days: methodResult2.days });
     } else if (p.kind === 'pri') {
       const mult = (p.data?.volumeMult ?? 1) as number;
       const rirShift = (p.data?.rirShift ?? 0) as number;
@@ -222,7 +337,9 @@ export const TrainingConstructor: React.FC<Props> = ({
         `🔗 PRI применён: объём ×${mult}, RIR +${rirShift}. MRV: ${Math.round(mrvBase)} → ${Math.round(Math.max(4, mrvBase * mult))}.`,
         ...built.groupCorrections,
       ];
-      setManualResult({ splitName: manualResult?.splitName || 'План с PRI', corrections, days: built.days });
+      const methodResult3 = applyMethodsToPlan(built.days as ManualDay[], manualCfg, manualWorkMax, goal, Math.max(4, mrvBase * mult));
+      corrections.push(...methodResult3.log);
+      setManualResult({ splitName: manualResult?.splitName || 'План с PRI', corrections, days: methodResult3.days });
     } else if (p.kind === 'weakpoints') {
       const groups: string[] = p.data?.groups || [];
       setWeakPoints(groups);
@@ -262,8 +379,8 @@ export const TrainingConstructor: React.FC<Props> = ({
       if (manualResult) setManualResult({ ...manualResult, corrections: [...manualResult.corrections, `🔗 Целевой объём по группам: ${Object.entries(sets).map(([g, s]) => g + '=' + s).join(', ')} сет/нед.`] });
     }
     clearPlannerApply(); setApplyPayload(null);
-    setConstTab('editor'); // показать результат в редакторе
-  }, [buildPlan, level, tprofile, labAdj, manualResult, mrvOverride]);
+    setConstTab('editor');
+  }, [buildPlan, level, tprofile, labAdj, manualResult, mrvOverride, manualCfg, manualWorkMax, goal, applyMethodsToPlan]);
 
   // Авто-применение bridge: только НОВЫЕ события (не stale данные при монтировании)
   const mountedRef = useRef(false);

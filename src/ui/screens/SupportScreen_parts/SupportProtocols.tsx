@@ -107,7 +107,6 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
   const [adaptogenTab, setAdaptogenTab] = useState('protocol');
   const [mitoTab, setMitoTab] = useState('protocol');
   const [steatosisTab, setSteatosisTab] = useState('protocol');
-  const [starterLevel, setStarterLevel] = useState('level1');
   const [raasTab, setRaasTab] = useState('protocol');
   const [peptideTab, setPeptideTab] = useState('protocol');
   const [postCycleTab, setPostCycleTab] = useState('protocol');
@@ -4997,40 +4996,7 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
             </div>
           </InfoErrorBoundary>)}
 
-          {/* ══════════ STARTER PACK ══════════ */}
-          <div style={{ borderRadius:12, padding:14, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.2)', marginBottom:8 }}>
-            <div style={{ fontSize:13, fontWeight:800, color:'#22c55e', marginBottom:6 }}>🛡️ Базовый минимум (Starter Pack)</div>
-            <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Минимальный набор поддержки для любого курса ААС. Выберите уровень под бюджет и риски.</p>
-            <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto' }}>
-              {[
-                {id:'level1',label:'🌱 Минимум ~3000₽/мес'},
-                {id:'level2',label:'🌿 База ~6000₽/мес'},
-                {id:'level3',label:'🔶 Полный ~12000₽/мес'},
-                {id:'level4',label:'🔥 Максимум ~20000₽/мес'},
-              ].map((l:any)=>(
-                <button key={l.id} onClick={()=>setStarterLevel(l.id)} style={{
-                  padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, cursor:'pointer', border:'1px solid '+(starterLevel===l.id?'#22c55e':'var(--border)'),
-                  background:starterLevel===l.id?'rgba(34,197,94,0.12)':'transparent', color:starterLevel===l.id?'#22c55e':'var(--text-dim)'
-                }}>{l.label}</button>
-              ))}
-            </div>
-            {starterLevel==='level1'&&<div style={cardBg}>
-              <div style={{ fontSize:10, fontWeight:700, color:'#22c55e', marginBottom:4 }}>🌱 Минимум ~3000₽/мес</div>
-              {[{n:'NAC 1200 мг (500₽)'},{n:'Магний цитрат 400 мг (400₽)'},{n:'D3 5000 МЕ (300₽)'},{n:'Цинк 30 мг (200₽)'},{n:'Омега-3 2 г (800₽)'},{n:'Витамин C 500 мг (200₽)'}].map((x:any,i:any)=><div key={i} style={{fontSize:8,color:'var(--text-dim)',padding:'3px 6px'}}>• {x.n}</div>)}
-            </div>}
-            {starterLevel==='level2'&&<div style={cardBg}>
-              <div style={{ fontSize:10, fontWeight:700, color:'#22c55e', marginBottom:4 }}>🌿 База ~6000₽/мес</div>
-              {[{n:'NAC 1800 мг (800₽)'},{n:'Mg глицинат 600 мг (700₽)'},{n:'D3+K2 5000 МЕ (500₽)'},{n:'Цинк 30+Cu 2 мг (400₽)'},{n:'Омега-3 4 г (1600₽)'},{n:'TUDCA 500 мг (1200₽)'},{n:'CoQ10 100 мг (500₽)'},{n:'Берберин 500 мг (300₽)'}].map((x:any,i:any)=><div key={i} style={{fontSize:8,color:'var(--text-dim)',padding:'3px 6px'}}>• {x.n}</div>)}
-            </div>}
-            {starterLevel==='level3'&&<div style={cardBg}>
-              <div style={{ fontSize:10, fontWeight:700, color:'#22c55e', marginBottom:4 }}>🔶 Полный ~12000₽/мес</div>
-              {[{n:'NAC 2400 мг + глицин 3 г'},{n:'Mg глицинат 600 + теанин 200'},{n:'D3+K2+Mg комплекс'},{n:'Zn 30 + Cu 2 + бор 3 + Se 100'},{n:'Омега-3 4 г + астаксантин 4 мг'},{n:'TUDCA 750 + силимарин 280'},{n:'CoQ10 200 + PQQ 10'},{n:'Берберин 1000 + АЛК 600'},{n:'Чеснок 1200 мг'},{n:'Ашвагандха 600 + родиола 200'},{n:'Пребиотик/пробиотик'},{n:'Vit C 1000 мг + цитрусовые биофлавоноиды'}].map((x:any,i:any)=><div key={i} style={{fontSize:8,color:'var(--text-dim)',padding:'3px 6px'}}>• {x.n}</div>)}
-            </div>}
-            {starterLevel==='level4'&&<div style={cardBg}>
-              <div style={{ fontSize:10, fontWeight:700, color:'#22c55e', marginBottom:4 }}>🔥 Максимум ~20000₽/мес</div>
-              {[{n:'NAC 2400 + глицин 5 г + АЛК 600'},{n:'Mg глицинат 800 + теанин 400 + PS 400'},{n:'D3+K2+Mg+B12 (метилкобаламин)'},{n:'Zn 30++ бор 6 + Se 200 + хром 200'},{n:'Омега-3 6 г + астаксантин 8 + ликопин 10'},{n:'TUDCA 1000 + NAC 1200 + силимарин 420'},{n:'CoQ10 300 + PQQ 20 + NMN 500'},{n:'Берберин 1500 + АЛК 600 + R-АЛК'},{n:'Чеснок 1200 + куркумин Meriva 1000 + имбирь'},{n:'Ашвагандха 600 + родиола 400 + женьшень 400'},{n:'Бета-глюкан 500 + лактоферрин 200 + колострум'},{n:'Бромелайн 500 + серрапептаза 80k ЕД'},{n:'Vit E 400 + C 2000 + Se 200'},{n:'Пребиотик+постбиотик+глютамин'},{n:'Карнитин 2 г + таурин 2 г + креатин 5 г'}].map((x:any,i:any)=><div key={i} style={{fontSize:8,color:'var(--text-dim)',padding:'3px 6px'}}>• {x.n}</div>)}
-            </div>}
-          </div>
+
 
           {protocolTab === 'symptoms' && (
             <div style={{ padding: '0 0 0' }}>

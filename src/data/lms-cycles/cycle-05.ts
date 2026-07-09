@@ -22,24 +22,24 @@ export const CYCLE_05: SRCycleTemplate = {
  week1: [
  { exercises: [
  { name: 'Жим лежа', group: 'Жим гантелей на наклонной', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.4,reps:6,sets:4}] },
- { name: 'Присед', group: 'ОФП', coef: 1.2, mnosz: 1, load: 'Французский жим', sets: [{pct:0.5,reps:5,sets:1},{pct:0.55,reps:4,sets:4}] },
+ { name: 'Присед', group: 'ОФП', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:5,sets:1},{pct:0.55,reps:4,sets:4}] },
  { name: 'Жим на наклонной', group: 'Жим гантелей на наклонной', coef: 0.8, mnosz: 2, load: 'Средняя', sets: [{pct:0.35,reps:5,sets:4}] },
- { name: 'Бицепс стоя', group: 'ЖМ', coef: 0.5, mnosz: 1, load: 'Французский жим', sets: [{pct:0.5,reps:6,sets:1},{pct:0.57,reps:6,sets:3}] },
- { name: 'Жим стоя', group: 'ЖМ', coef: 1, mnosz: 1, load: 'Французский жим', sets: [{pct:0.5,reps:5,sets:1},{pct:0.6,reps:4,sets:1},{pct:0.7,reps:4,sets:4}] },
+ { name: 'Бицепс стоя', group: 'ЖМ', coef: 0.5, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:6,sets:1},{pct:0.57,reps:6,sets:3}] },
+ { name: 'Жим стоя', group: 'ЖМ', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:5,sets:1},{pct:0.6,reps:4,sets:1},{pct:0.7,reps:4,sets:4}] },
  ] },
  { exercises: [
- { name: 'Жим средним хватом', group: 'Жим гантелей на наклонной', coef: 1, mnosz: 1, load: 'Французский жим', sets: [{pct:0.5,reps:6,sets:1},{pct:0.65,reps:5,sets:5}] },
- { name: 'Жим лежа', group: 'Жим гантелей на наклонной', coef: 1, mnosz: 1, load: 'Французский жим', sets: [{pct:0.55,reps:6,sets:3}] },
+ { name: 'Жим средним хватом', group: 'Жим гантелей на наклонной', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:6,sets:1},{pct:0.65,reps:5,sets:5}] },
+ { name: 'Жим лежа', group: 'Жим гантелей на наклонной', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.55,reps:6,sets:3}] },
  { name: 'Жим гантелей', group: 'ЖМ', coef: 0.4, mnosz: 1, load: 'Средняя', sets: [{pct:0.4,reps:5,sets:4}] },
- { name: 'Жим лежа', group: 'Жим гантелей на наклонной', coef: 1, mnosz: 1, load: 'Французский жим', sets: [{pct:0.5,reps:6,sets:1},{pct:0.65,reps:6,sets:4}] },
+ { name: 'Жим лежа', group: 'Жим гантелей на наклонной', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:6,sets:1},{pct:0.65,reps:6,sets:4}] },
  ] },
  { exercises: [
  { name: 'Пресс в тренажере (скручивания)', group: 'Жим гантелей на наклонной', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:6,sets:3}] },
  { name: 'Бицепс с гантелями', group: 'ЖМ', coef: 0.4, mnosz: 2, load: 'Средняя', sets: [{pct:0.4,reps:6,sets:3}] },
- { name: 'Присед', group: 'ОФП', coef: 1.2, mnosz: 1, load: 'Французский жим', sets: [{pct:0.5,reps:6,sets:1},{pct:0.6,reps:5,sets:4}] },
+ { name: 'Присед', group: 'ОФП', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:6,sets:1},{pct:0.6,reps:5,sets:4}] },
  ] },
  { exercises: [
- { name: 'Жим лежа', group: 'Жим гантелей на наклонной', coef: 1, mnosz: 1, load: 'Французский жим', sets: [{pct:0.5,reps:5,sets:5}] },
+ { name: 'Жим лежа', group: 'Жим гантелей на наклонной', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:5,sets:5}] },
  { name: 'Жим стоя', group: 'ЖМ', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:6,sets:5}] },
  { name: 'Жим средним хватом', group: 'Жим гантелей на наклонной', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.4,reps:5,sets:5}] },
  ] },

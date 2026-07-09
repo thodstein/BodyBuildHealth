@@ -96,16 +96,59 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (!tpl) { setExercisePMs({}); return; }
     const exs = extractExercises(tpl);
     const pm: Record<string, number> = {};
+    // Реалистичная оценка ПМ для любого упражнения по коэффициентам от основных движений
+    // Специфичные паттерны проверяются ДО общих (французский жим → до просто жим)
+    const EST: [RegExp, number][] = [
+      // ── Приседания ──
+      [/присед/i, pmSquat],
+      [/гакк/i, pmSquat], [/жим ногами/i, Math.round(pmSquat * 1.5)],
+      // ── Жимовые ── (специфичные ДО общего жима)
+      [/французский жим/i, Math.round(pmBench * 0.45)],
+      [/дожим/i, Math.round(pmBench * 1.15)],       // дожим с плинтов — «ПМ» больше жима (частичная амплитуда)
+      [/жим.*гантел/i, Math.round(pmBench * 0.70)],
+      [/жим.*(наклон|гор)/i, Math.round(pmBench * 0.82)],
+      [/жим.*средн/i, Math.round(pmBench * 0.92)],
+      [/жим.*стоя/i, Math.round(pmBench * 0.65)],
+      [/жим.*блок/i, Math.round(pmBench * 0.30)],
+      [/жим лежа/i, pmBench],
+      [/жим/i, pmBench],
+      // ── Тяговые ──
+      [/становая/i, pmDead],
+      [/тяга/i, pmDead],
+      [/наклон/i, Math.round(pmDead * 0.50)],
+      [/гиперэкстенз/i, Math.round(pmDead * 0.35)],
+      // ── Спина ──
+      [/подтягив/i, Math.round(pmBench * 0.65)],
+      [/пуловер/i, Math.round(pmBench * 0.40)],
+      // ── Руки (трицепс/бицепс/предплечья) ──
+      [/трицепс/i, Math.round(pmBench * 0.35)],
+      [/французский/i, Math.round(pmBench * 0.45)],   // самостоятельное имя без «жим»
+      [/разгиб/i, Math.round(pmBench * 0.35)],
+      [/бицепс/i, Math.round(pmBench * 0.30)],
+      [/сгибан/i, Math.round(pmBench * 0.30)],
+      [/молотк/i, Math.round(pmBench * 0.35)],
+      [/кисть/i, Math.round(pmBench * 0.20)],
+      [/концентрир/i, Math.round(pmBench * 0.25)],
+      // ── Плечи ──
+      [/face.?pull|тяга.*лиц/i, Math.round(pmBench * 0.30)],
+      [/отведени/i, Math.round(pmBench * 0.20)],
+      [/кроссовер/i, Math.round(pmBench * 0.25)],
+      // ── Пресс / кор ──
+      [/пресс/i, 0], [/скручив/i, 0],
+      // ── Специфические для армрестлинга ──
+      [/натяжк/i, Math.round(pmBench * 0.25)],
+      [/приведени/i, Math.round(pmBench * 0.20)],
+      [/имитаци/i, Math.round(pmBench * 0.25)],
+      [/боковой нажим/i, Math.round(pmBench * 0.30)],
+      [/отведение сб/i, Math.round(pmBench * 0.20)],
+    ];
     for (const name of exs) {
       const n = name.toLowerCase();
-      if (n.includes('присед')) pm[name] = pmSquat;
-      else if (n.includes('жим') && n.includes('лежа')) pm[name] = pmBench;
-      else if (n.includes('жим')) pm[name] = pmBench;
-      else if (n.includes('становая')) pm[name] = pmDead;
-      else if (n.includes('тяга')) pm[name] = pmDead;
-      else if (n.includes('подтягив')) pm[name] = Math.round(pmBench * 0.65);
-      else if (n.includes('трицепс') || n.includes('бицепс') || n.includes('пресс') || n.includes('кроссовер') || n.includes('наклон') || n.includes('гиперэкстензи')) pm[name] = 0;
-      else pm[name] = 80;
+      let found = false;
+      for (const [re, val] of EST) {
+        if (re.test(n)) { pm[name] = val; found = true; break; }
+      }
+      if (!found) pm[name] = 80; // fallback для неизвестных упражнений
     }
     setExercisePMs(prev => ({ ...pm, ...prev }));
   };
@@ -142,7 +185,17 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     setSrcAdditions(prev => ({ ...prev, [dk]: [...(prev[dk]||[]), { uid: 'add_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), name: pickerExName, group: pickerGroup, sets: pickerScheme.sets, reps: pickerScheme.reps, weight: pickerScheme.weight }] }));
     setPickerExName(''); setPickerDay(null);
   };
-  const addAccessory = (dk: string, name: string, group: string) => setSrcAdditions(prev => ({ ...prev, [dk]: [...(prev[dk]||[]), { uid: 'acc_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), name, group, sets: 3, reps: 10, weight: Math.round((loadTrainingProfile().workMax[group] || 80) * 0.7) }] }));
+  const addAccessory = (dk: string, name: string, group: string, phase?: string) => {
+    const PHASE_SCHEMES: Record<string,{reps:number;pct:number}> = { base:{reps:10,pct:0.67}, build:{reps:8,pct:0.73}, peak:{reps:5,pct:0.80}, deload:{reps:12,pct:0.50} };
+    const p = (phase && PHASE_SCHEMES[phase]) ? phase : 'base';
+    const s = PHASE_SCHEMES[p] || PHASE_SCHEMES.base;
+    const totalW = builtSrc?.weeks.length || 12;
+    // расчёт фазы из контекста вызова (сейчас глобальная переменная недоступна в момент вызова)
+    const wkNum = Number(dk.split('_')[0]) || 1;
+    const ph = mesocyclePhaseForWeek(wkNum, totalW);
+    const sc = PHASE_SCHEMES[ph] || PHASE_SCHEMES.base;
+    setSrcAdditions(prev => ({ ...prev, [dk]: [...(prev[dk]||[]), { uid: 'acc_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), name, group, sets: 3, reps: sc.reps, weight: Math.round((loadTrainingProfile().workMax[group] || 80) * sc.pct) }] }));
+  };
 
   // U7: связь композиции методик с планом (оверлей, безопасно — движок не трогаем)
   const [methodHints, setMethodHints] = useState<{ volumeMult: number; technique: string | null; label: string }>({ volumeMult: 1, technique: null, label: '' });
@@ -741,10 +794,123 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 </div>
               </MetricCard>
               <MesocycleProgressionCard weeks={totalW} startVolumeSets={Math.round(W.reduce((s, w) => s + w.days.reduce((ss, d) => ss + d.exercises.reduce((sss, e) => sss + e.workSets.reduce((a, ws) => a + ws.sets, 0), 0), 0), 0) / totalW / (days || 3))} startIntensityPct={0.72} startRIR={3} goal="strength" title="Прогрессия мезоцикла (ПЛ)" />
-              {weakPoints.length > 0 && (() => { const eq = loadTrainingProfile().equipment; const eqOk = (e: any) => eq.length === 0 || eq.includes(e.equipment); const GRP_RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' }; const dk0 = dayKey(wk.week, 0); return <MetricCard title='🎯 Рекомендации для слабых групп (добавить аксессуары)' icon='🎯' accent='#ff9100'>
-                {weakPoints.map(g => { const pool = getExercisesByGroup(g).filter(eqOk).filter(e => e.type === 'isolation').slice(0, 3); if (pool.length === 0) return null; return <div key={g} style={{ marginBottom: 6 }}><div style={{ fontSize: 10, fontWeight: 700, color: '#ff9100' }}>{GRP_RU[g] || g}</div>{pool.map(ex => <button key={ex.id} onClick={() => addAccessory(dk0, ex.name, g)} style={{ marginRight: 4, marginBottom: 3, padding: '4px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: '1px solid rgba(255,145,0,0.3)', background: 'rgba(255,145,0,0.08)', color: '#ff9100' }}>＋ {ex.name}</button>)}</div>; })}
-                <div style={{ ...SMALL, color: 'rgba(255,255,255,0.5)' }}>Добавляется в день 1 текущей недели (3×10, вес ~70% от workMax). Можно отредактировать в режиме правки.</div>
-              </MetricCard>; })()}
+              {/* ── ПРОФЕССИОНАЛЬНЫЕ ПЛ-РЕКОМЕНДАЦИИ для слабых групп ── */}
+              {weakPoints.length > 0 && (() => {
+                const GRP_RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' };
+                const GROUP_TO_LIFT: Record<string,string> = { chest:'bench', legs:'squat', back:'deadlift', shoulders:'bench', arms:'bench', core:'deadlift' };
+                // какой день недели соответствует какому движению:
+                const FIND_DAY = (mainName: string): number => {
+                  const kw: Record<string,string[]> = { bench:['жим'], squat:['присед'], deadlift:['становая','тяга'] };
+                  for (const [lift,kws] of Object.entries(kw)) {
+                    if (!kws.some(k => mainName.toLowerCase().includes(k))) continue;
+                    for (let di=0;di<wk.days.length;di++) {
+                      const first = wk.days[di].exercises[0]?.name.toLowerCase()||'';
+                      if (kws.some(k => first.includes(k))) return di;
+                    }
+                  }
+                  return 0;
+                };
+                const DAY_INDEX_FOR_LIFT: Record<string,number> = {};
+                for (const [g,l] of Object.entries(GROUP_TO_LIFT)) {
+                  if (DAY_INDEX_FOR_LIFT[l] === undefined) DAY_INDEX_FOR_LIFT[l] = FIND_DAY(l);
+                }
+                // схемы подходов по фазе цикла
+                const PHASE_SCHEMES: Record<string,{reps:number;pct:number;label:string}> = {
+                  base: { reps:10, pct:0.67, label:'гипертрофия (10П)' },
+                  build: { reps:8, pct:0.73, label:'силовая выносливость (8П)' },
+                  peak: { reps:5, pct:0.80, label:'специфическая сила (5П)' },
+                  deload: { reps:12, pct:0.50, label:'восстановление (12П)' },
+                };
+                const scheme = PHASE_SCHEMES[phase] || PHASE_SCHEMES.base;
+                // ПЛ-специфичные ассистентные упражнения (не изоляция — вариации соревновательных движений)
+                const PL_EXERCISES: Record<string,{name:string;note:string}[]> = {
+                  chest: [
+                    { name:'Жим с паузой 2 секунды', note:'убивает инерцию, усиливает старт' },
+                    { name:'Жим на наклонной скамье', note:'верх груди, помощь в средней фазе' },
+                    { name:'Дожим с 5 см', note:'трицепс + локдаун' },
+                    { name:'Французский жим', note:'изоляция длинной головки трицепса' },
+                    { name:'Жим гантелей лёжа', note:'дефицит стабильности → грудные+стабилизаторы' },
+                  ],
+                  legs: [
+                    { name:'Присед на груди', note:'квадрицепсы, выход из ямы' },
+                    { name:'Присед в широкой постановке', note:'приводящие + ягодицы, дожим' },
+                    { name:'Приседания со штангой', note:'общий объём квадрицепсов' },
+                    { name:'Наклоны со штангой', note:'разгибатели спины, фиксация корпуса' },
+                    { name:'Гакк-приседания', note:'латеральная головка квадрицепса' },
+                  ],
+                  back: [
+                    { name:'Становая тяга с плинтов', note:'дожим, работа выше колен' },
+                    { name:'Тяга на прямых ногах', note:'бицепс бедра + разгибатели, старт' },
+                    { name:'Тяга штанги в наклоне', note:'центр спины, фиксация лопаток' },
+                    { name:'Подтягивания (прямой хват)', note:'широчайшие, тянущая сила верха' },
+                    { name:'Тяга из ямы', note:'дефицит старта, работа с пола ниже обычного' },
+                  ],
+                  shoulders: [
+                    { name:'Жим стоя', note:'передняя+средняя дельта, жимовая стабильность' },
+                    { name:'Тяга к лицу (face pull)', note:'здоровье плеч, задняя дельта, ротаторная манжета' },
+                    { name:'Разводка гантелей в стороны', note:'средняя дельта — объём плечевого пояса' },
+                  ],
+                  arms: [
+                    { name:'Французский жим', note:'длинная головка трицепса — жимовой дожим' },
+                    { name:'Бицепс стоя', note:'сгибатели — стабильность в становой/подтягиваниях' },
+                    { name:'Молотковые сгибания', note:'брахиалис, объём рук, предплечья' },
+                  ],
+                  core: [
+                    { name:'Наклоны со штангой', note:'разгибатели спины, жёсткость корпуса в приседе' },
+                    { name:'Пресс в тренажере (скручивания)', note:'внутрибрюшное давление, защита поясницы' },
+                    { name:'Гиперэкстензия', note:'поясница + ягодицы, фиксация таза в тяге' },
+                  ],
+                };
+                const eq = loadTrainingProfile().equipment;
+                const eqOk = (ex: {name:string;note:string}): boolean => {
+                  if (eq.length === 0) return true;
+                  // допускаем штангу и вес тела всегда (подтягивания, наклоны со штангой)
+                  const nameLow = ex.name.toLowerCase();
+                  const hasBar = nameLow.includes('штанг') || nameLow.includes('гриф');
+                  const hasCable = nameLow.includes('блок') || nameLow.includes('кроссовер') || nameLow.includes('к лицу');
+                  const hasBW = nameLow.includes('подтягив') || nameLow.includes('гиперэкстенз');
+                  const hasDB = nameLow.includes('гантел') || nameLow.includes('разводк');
+                  // проверяем логически: если есть доступное оборудование, подходящее под упражнение
+                  if (hasBar && (eq.includes('barbell')||eq.includes('rack'))) return true;
+                  if (hasCable && eq.includes('cable')) return true;
+                  if (hasBW) return true;
+                  if (hasDB && eq.includes('dumbbell')) return true;
+                  // fallback: если ни одно упражнение не проходит — пускаем все (лучше показать, чем скрыть)
+                  return true;
+                };
+                return <MetricCard title='🎯 Рекомендации тренера: ПЛ-ассистенты по слабым группам' icon='🎯' accent='#ff9100'>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:6 }}>
+                    Фаза: <b style={{color:'#ff9100'}}>{PH_RU[phase]}</b> · схема: <b style={{color:'#ff9100'}}>{scheme.label}</b> (вес ≈ {Math.round(scheme.pct*100)}% workMax)
+                  </div>
+                  {weakPoints.map(g => {
+                    const lift = GROUP_TO_LIFT[g] || 'bench';
+                    const di = DAY_INDEX_FOR_LIFT[lift] ?? 0;
+                    const dk = dayKey(wk.week, di);
+                    const pool = (PL_EXERCISES[g] || PL_EXERCISES.chest).filter(eqOk).slice(0, 3);
+                    const dayLabel = `День ${di+1}`;
+                    return <div key={g} style={{ marginBottom: 8, padding:8, borderRadius:8, background:'rgba(255,145,0,0.04)', border:'1px solid rgba(255,145,0,0.1)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#ff9100', marginBottom:3, display:'flex', justifyContent:'space-between' }}>
+                        <span>{GRP_RU[g] || g}</span>
+                        <span style={{ fontSize:8, fontWeight:400, color:'rgba(255,255,255,0.45)' }}>→ {dayLabel} ({lift === 'bench' ? 'жимовой' : lift === 'squat' ? 'приседательный' : 'тяговый'} день)</span>
+                      </div>
+                      {pool.map(ex => (
+                        <button key={ex.name} onClick={() => addAccessory(dk, ex.name, g)}
+                          style={{ display:'block', width:'100%', marginBottom:3, padding:'5px 8px', borderRadius:6, fontSize:9, cursor:'pointer', textAlign:'left',
+                            border:'1px solid rgba(255,145,0,0.25)', background:'rgba(255,145,0,0.06)', color:'#ff9100', transition:'all 0.15s' }}>
+                          <span style={{fontWeight:700}}>＋ {ex.name}</span>
+                          <span style={{fontSize:8, color:'rgba(255,255,255,0.45)', marginLeft:6}}>— {ex.note}</span>
+                        </button>
+                      ))}
+                    </div>;
+                  })}
+                  <div style={{ ...SMALL, color: 'rgba(255,255,255,0.5)' }}>
+                    Добавляется в {phase === 'base' ? 'базовый' : phase === 'build' ? 'накопительный' : phase === 'peak' ? 'пиковый' : 'восстановительный'} день цикла: {scheme.reps}П × 3 подхода, вес {Math.round(scheme.pct*100)}% workMax (фазовая схема). Можно отредактировать в режиме правки.
+                  </div>
+                  <div style={{ fontSize:8, color:'rgba(255,145,0,0.5)', marginTop:4 }}>
+                    💡 Совет тренера: не ставьте изоляцию — для ПЛ слабая точка лечится вариациями соревновательного движения, а не махами гантелей. Каждое упражнение — это устранение конкретной фазы.
+                  </div>
+                </MetricCard>;
+              })()}
               <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
                 <div style={{ ...LABEL, color:'#60a5fa', margin:'0 0 4px' }}>➡️ Что дальше</div>
                 <div style={SMALL}>{phase === 'peak'

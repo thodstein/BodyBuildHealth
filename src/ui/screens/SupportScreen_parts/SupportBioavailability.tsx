@@ -3,7 +3,6 @@ import { SUPPORT_CATALOG_DATA, type SupportCatalogEntry } from '../../../data/su
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { PEPTIDE_DB } from '../../../engines/peptide-calculator.engine';
 import { InfoErrorBoundary } from './SupportScreenData';
-import { DosageDatabaseView } from '../../components/DosageCalculator';
 import { S } from './SupportShared';
 import { PopupSelect } from '../../components/PopupXxx';
 import {
@@ -59,10 +58,9 @@ function buildCatalog(): EnrichedEntry[] {
 import { ROUTE_LABELS_MAP } from './SupportBioavailabilityData';
 
 // ─── Main component ───
-type BTab = 'catalog' | 'dosages';
 
 export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s }) => {
-  const [tab, setTab] = useState<BTab>(() => (localStorage.getItem('he_bio_tab') as BTab) || 'catalog');
+  const [tab, setTab] = useState<'catalog'>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
@@ -104,15 +102,7 @@ export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s
             Сравнение форм, расчёт эффективной дозы, стратегии улучшения всасывания · {stats.total} веществ
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 4, marginBottom: 8, overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
-          {(['catalog', 'dosages'] as BTab[]).map(t => (
-            <button key={t} onClick={() => { setTab(t); localStorage.setItem('he_bio_tab', t); }}
-              style={{ padding: '6px 12px', borderRadius: 16, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid var(--border)', background: tab === t ? 'var(--accent)' : 'var(--bg-secondary)', color: tab === t ? '#000' : 'var(--text-dim)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-              {t === 'catalog' ? '📋 Каталог' : '📋 Дозировки'}
-            </button>
-          ))}
-        </div>
-{tab === 'catalog' && <CatalogTab catalog={catalog} filtered={filtered} allCategories={allCategories} searchQuery={searchQuery} setSearchQuery={setSearchQuery} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} sourceFilter={sourceFilter} setSourceFilter={setSourceFilter} sortBy={sortBy} setSortBy={setSortBy} selectedId={selectedId} handleSelect={handleSelect} compareIds={compareIds} handleCompare={handleCompare} showCompare={showCompare} setShowCompare={setShowCompare} compareEntries={compareEntries} />}
+<CatalogTab catalog={catalog} filtered={filtered} allCategories={allCategories} searchQuery={searchQuery} setSearchQuery={setSearchQuery} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} sourceFilter={sourceFilter} setSourceFilter={setSourceFilter} sortBy={sortBy} setSortBy={setSortBy} selectedId={selectedId} handleSelect={handleSelect} compareIds={compareIds} handleCompare={handleCompare} showCompare={showCompare} setShowCompare={setShowCompare} compareEntries={compareEntries} />
       </div>
     </InfoErrorBoundary>
   );

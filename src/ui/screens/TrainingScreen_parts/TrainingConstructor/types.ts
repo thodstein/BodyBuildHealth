@@ -47,7 +47,7 @@ export const CONFIG_LABELS: Record<string, string> = {
   split: 'сплит', cycle: 'цикл', program: 'программа',
   periodization: 'периодизация', progression: 'прогрессия',
   intensity: 'интенсивность', technique: 'техника',
-  volume: 'объём', frequency: 'частота',
+  volume: 'объём', frequency: 'частота', specialization: 'специализация',
 };
 
 export interface ManualDay {
