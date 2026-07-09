@@ -456,11 +456,11 @@ function pickRotationsForDay(dayOffset: number, randomSalt: number, count: numbe
 
 // ─── ОСНОВНОЙ ВХОД: построить дневной план ───────────────────────────
 export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
-  const pool = buildFoodPools(input.excludedIds || new Set(), !!input.isVegetarian, input.budget, varietyPoolSize);
   const randomSalt = input.randomSalt ?? 0;
-  const seedBase = (input.dayOffset + randomSalt) * 10007 + (input.isTrainingDay ? 3000 : 7000);
   const variety = input.variety ?? 'max';
   const varietyPoolSize = variety === 'max' ? 20 : variety === 'medium' ? 10 : 5;
+  const pool = buildFoodPools(input.excludedIds || new Set(), !!input.isVegetarian, input.budget, varietyPoolSize);
+  const seedBase = (input.dayOffset + randomSalt) * 10007 + (input.isTrainingDay ? 3000 : 7000);
   // Ротация: разные группы белка в разные приёмы (раньше — одна на весь день)
   const mealRotations = pickRotationsForDay(input.dayOffset, randomSalt, 4);
   function rotationForMeal(mealIdx: number): { label: string; ids: string[]; note: string } {
