@@ -74,7 +74,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
     pl: [['plan', '📋 План цикла'], ['bridge', '🔗 Мост план→сессия'], ['plates', '🧮 Калькулятор блинов'], ['autoreg', '🧠 Авторегуляция'], ['peak', '🏁 Пиковая фаза'], ['recovery', '🔋 Восстановление'], ['safety', '🛡 Безопасность'], ['demo', '🎬 Демонстрация']].map(([k, l]) => ({ key: k, label: l })),
-    bb: [['plan', '📋 План сплита'], ['bridge', '🔗 Мост план→сессия'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
+    bb: [['plan', '📋 План сплита'], ['bridge', '🔗 Мост план→сессия'], ['peak_bb', '🏆 Шоу ББ'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
     manual: [],
   };
   const [subView, setSubView] = useState<string>('plan');
@@ -236,6 +236,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   // ── TRAINING INTEGRATION: мост план→сессия ──
   const [bridgeSessions, setBridgeSessions] = useState<BridgeSession[]>([]);
   const [progressSnap, setProgressSnap] = useState<ProgressSnapshot[]>([]);
+  const [bridgeWeek, setBridgeWeek] = useState<number>(1);
   // сохраняем bridge-сессии при построении плана
   const saveBridgeSessions = (sessions: BridgeSession[]) => {
     setBridgeSessions(sessions);
@@ -249,7 +250,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   useEffect(() => {
     try {
       const saved = localStorage.getItem('he_bridge_sessions');
-      if (saved) setBridgeSessions(JSON.parse(saved));
+      if (saved) { const s = JSON.parse(saved); setBridgeSessions(s); setBridgeWeek(1); }
       const savedProgress = localStorage.getItem('he_bridge_progress');
       if (savedProgress) setProgressSnap(JSON.parse(savedProgress));
     } catch { /* ignore */ }
@@ -273,6 +274,19 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     };
     return autoregPlanBridge(r);
   }, [builtSrc, builtBb, linked.readiness, mainTab, goal, bbGoal, level, days, bbDays]);
+
+  // группировка bridge-сессий по неделям
+  const bridgeWeeks = useMemo(() => {
+    const uniq = [...new Set(bridgeSessions.map(s => s.weekNumber))].sort((a, b) => a - b);
+    return uniq;
+  }, [bridgeSessions]);
+  const bridgeWeekSessions = useMemo(() => {
+    return bridgeSessions.filter(s => s.weekNumber === bridgeWeek);
+  }, [bridgeSessions, bridgeWeek]);
+  const bridgeWeekPhase = useMemo(() => {
+    const totalW = bridgeWeeks.length || 12;
+    return mesocyclePhaseForWeek(bridgeWeek, Math.max(totalW, bridgeWeek));
+  }, [bridgeWeek, bridgeWeeks]);
 
   const bbRanked = useMemo(() => rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays }), [bbLevel, bbGoal, bbDays]);
   const bbBest = bbRanked[0];
@@ -925,19 +939,78 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             <div style={{ ...SMALL, padding: 12, textAlign: 'center' }}>Постройте план (ПЛ или ББ) — сессии появятся здесь.</div>
           ) : (
             <>
-              <div style={{ ...SMALL, marginBottom: 8 }}>Сгенерировано {bridgeSessions.length} сессий.</div>
-              {bridgeSessions.slice(0, 5).map((s, i) => (
-                <ExpandableCard key={i} title={`${s.focus} (${s.exercises.length} упр.)`} icon={s.source === 'SRC' ? '🏋️' : '💪'} short={`${s.totalSets} сет · ${Math.round(s.totalVolume)} кг·пов`} full={
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
-                    {s.exercises.map((e, ei) => (
-                      <div key={ei} style={{ marginBottom: 4 }}>
-                        <b>{e.exerciseName}</b> ({e.muscleGroup}): {e.sets.length} подходов · объём {e.totalVolume.toFixed(0)} кг·пов
-                      </div>
-                    ))}
+              <div style={{ ...SMALL, marginBottom: 8 }}>Сгенерировано {bridgeSessions.length} сессий · {bridgeWeeks.length} недель</div>
+              {/* селектор недель */}
+              {bridgeWeeks.length > 1 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 6 }}>Выберите неделю:</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(36px, 1fr))', gap: 4 }}>
+                    {bridgeWeeks.map(w => {
+                      const totalW = bridgeWeeks.length;
+                      const ph = mesocyclePhaseForWeek(w, Math.max(totalW, w));
+                      const active = w === bridgeWeek;
+                      const PH_COLOR_B: Record<string,string> = { base: '#22c55e', build: '#eab308', peak: '#ef4444', deload: '#60a5fa' };
+                      const PH_RU_B: Record<string,string> = { base: 'База', build: 'Накопление', peak: 'Пик', deload: 'Разгрузка' };
+                      return (
+                        <button key={w} onClick={() => setBridgeWeek(w)}
+                          title={`Неделя ${w}: ${PH_RU_B[ph] || ''}`}
+                          style={{
+                            padding: '7px 0', borderRadius: 7,
+                            border: active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                            background: active ? PH_COLOR_B[ph] : (PH_COLOR_B[ph] || '#22c55e') + '1a',
+                            color: active ? '#000' : '#fff',
+                            fontSize: 10, fontWeight: 700, cursor: 'pointer'
+                          }}
+                        >{w}</button>
+                      );
+                    })}
                   </div>
-                } />
+                </div>
+              )}
+              {/* сессии выбранной недели */}
+              <div style={{ ...SMALL, marginBottom: 6 }}>
+                Неделя {bridgeWeek} · {bridgeWeekSessions.length} {bridgeWeekSessions.length === 1 ? 'тренировка' : 'тренировок'}
+              </div>
+              {bridgeWeekSessions.map((s, i) => (
+                <ExpandableCard key={i}
+                  title={`${s.focus} · ${s.exercises.length} упр.`}
+                  icon={s.source === 'SRC' ? '🏋️' : '💪'}
+                  short={`${s.totalSets} сетов · ${Math.round(s.totalVolume)} кг·пов${s.planned ? ' · запланировано' : ''}`}
+                  full={
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.8 }}>
+                      {s.exercises.map((e, ei) => (
+                        <div key={ei} style={{
+                          marginBottom: 6, padding: '6px 8px', borderRadius: 6,
+                          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)'
+                        }}>
+                          <div style={{ fontWeight: 700, color: '#fff', marginBottom: 2 }}>
+                            {e.exerciseName}
+                            <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.5)', marginLeft: 6 }}>
+                              ({e.muscleGroup}) · ПМ {e.best1RM}кг
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                            {e.sets.map((set, si) => (
+                              <span key={si} style={{
+                                display: 'inline-block', padding: '2px 6px', borderRadius: 4, fontSize: 9,
+                                background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.12)',
+                                color: 'rgba(255,255,255,0.8)'
+                              }}>
+                                {set.reps}×{set.weightKg}кг
+                                {set.rir > 0 ? ` · RIR ${set.rir}` : ''}
+                              </span>
+                            ))}
+                          </div>
+                          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+                            Объём: {e.totalVolume.toFixed(0)} кг·пов · {e.sets.length} подходов
+                            {e.avgRPE > 0 ? ` · ср.RPE ${e.avgRPE.toFixed(1)}` : ''}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  }
+                />
               ))}
-              {bridgeSessions.length > 5 && <div style={{ ...SMALL, marginTop: 4 }}>… ещё {bridgeSessions.length - 5} сессий</div>}
               {bridgeAutoreg && (
                 <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>🧠 Авторегуляция (мост)</div>
@@ -964,6 +1037,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       {subView === 'plates' && <PlateCalculator initialWeight={workingWeight} />}
       {subView === 'autoreg' && <AutoregPanel />}
       {subView === 'peak' && <PeakingPanel />}
+      {subView === 'peak_bb' && <PeakingPanel defaultKind="bb" />}
       {subView === 'recovery' && (<><RecoveryPanel /><div style={{ marginTop: 10 }}><div style={{ fontSize: 14, fontWeight: 700, color: '#00e68a', margin: '10px 0 6px' }}>🧮 Training Score Engine</div><TrainingScoreCard workoutsPerWeek={mainTab === 'pl' ? days : bbDays} avgMinutes={75} intensity={autoRegResult.deload ? 'low' : 'moderate'} goal={mainTab === 'pl' ? 'strength' : 'hypertrophy'} experience={(mainTab === 'pl' ? (level === 'novice' ? 'beginner' : level === 'intermediate' ? 'intermediate' : 'advanced') : (bbLevel === 'beginner' ? 'beginner' : bbLevel === 'intermediate' ? 'intermediate' : 'advanced')) as 'beginner' | 'intermediate' | 'advanced'} sleepHours={(linked.readiness?.sleep ?? 7) as number} stressLevel={Math.round((linked.readiness?.stress ?? 3) as number)} jointPain={[]} deloadWeeksAgo={autoRegResult.deload ? 0 : 99} weight={mainTab === 'pl' ? bw : 80} age={30} sex={'male'} /></div><ReadinessForecastCard /></>)}
       {subView === 'safety' && <ExerciseSafetyPanel />}
       {subView === 'demo' && <ExerciseDemoPanel />}

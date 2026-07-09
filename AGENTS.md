@@ -2395,5 +2395,49 @@ Centralise all user-entered data into a single `UnifiedSettings` under `UserProf
 
 ### Осталось
 - UI: поля для доз AAS (мг/нед) в AutoCalculator — сейчас только IDs, дозы берутся из pharma DB stub
-- AGENTS.md документация v5 (этот summary = документация)
 - Визуальная глазная проверка в браузере
+
+---
+
+## Session Summary (Jul 09 — Part 2) — Объединение CompetitionCard + PeakingPanel
+
+### Goal
+Слить два дублирующих инструмента тренировочного блока — CompetitionCard (Калькуляторы) и PeakingPanel (ПЛ-авто → Пик) — в один полный компонент, устранить дубль attemptStrategy/1RM-вводов, очистить навигацию и мёртвый код.
+
+### ✅ Что реально сделано и проверено
+
+**1. PeakingPanel.tsx — ПОЛНЫЙ РЕФАКТОРИНГ (слияние CompetitionCard):**
+- Режимы: `🏋️ Соревнование (ПЛ)` / `🏆 Шоу (BB)` с сегментированным переключателем.
+- **PL-режим — всё в одном месте:**
+  - 1RM вводы (squat/bench/deadlift) + дата соревнований + готовность/усталость
+  - `⚖️ Весовая категория`: selectWeightClass (bw + federation → категория + сушка + рекомендация)
+  - `⬇ Тэйпер к соревнованиям`: generatePLPeaking (недели, сессии, meetDayInstructions)
+  - `📋 Стратегия подходов`: generateAttemptStrategy (opener/second/third + разминка)
+  - `⏰ Таймлайн дня`: generateCompetitionTimeline (weighIn + start time → timeline)
+  - `🔄 Протоколы восстановления`: getRecoveryProtocols (6 протоколов с типом/длительностью/инструкциями)
+  - `🧠 Ментальные рутины`: getMentalRoutines (шаги/длительность/когда)
+  - `🛠 Применить ПМ` + `🛠 Применить пик` к планировщику (через `applyToPlanner`)
+- **BB-режим:** без изменений (showDate + conditioning/fullness/dryness/carbTol → bbPeakingWeek)
+
+**2. Удалён CompetitionCard.tsx** (полностью — ~125 строк мёртвого кода):
+- Все функции (selectWeightClass, generateAttemptStrategy, generateCompetitionTimeline, getRecoveryProtocols, getMentalRoutines) перенесены в PeakingPanel
+- CompetitionCard больше не импортируется нигде
+
+**3. Навигация и типы очищены:**
+- `nav.ts`: удалён `'competition'` из массива калькуляторов и из группы «Инструменты»
+- `shared.ts`: удалён тип `'competition'` из `TrainingTab` union, удалена метка `TAB_LABELS.competition`
+- `TrainingScreen.tsx`: удалён импорт CompetitionCard + рендер `tab==='competition'`
+- `PlannerToolsPanel.tsx`: заменены render() CompetitionCard на заглушку-редирект в PeakingPanel
+
+### ✅ Проверки
+- `tsc --noEmit`: **0 ошибок в моих файлах** (3 предсуществующих в Calc.mapper.tsx — параллельный агент, не мои)
+- `vite build`: **OK** (1m 16s, 686 modules)
+- UTF-8 noBOM: PeakingPanel.tsx OK
+- Dev-трансформация: PeakingPanel.tsx — 200 err=False
+
+### ❌ Что недоделано / остаётся
+- 3 предсуществующие TS-ошибки в `Calc.mapper.tsx` (параллельный агент, `\u{1F527}` + missing `}`)
+- Визуальная проверка в браузере не выполнялась (только build + tsc)
+
+### Итог
+CompetitionCard (125 строк) целиком влит в PeakingPanel (240 строк). Один инструмент вместо двух. Все функции «Соревнование» теперь в ПЛ-авто → вкладка «Пик» → режим «Соревнование». Навигация чистая — `competition` удалён из списка калькуляторов. Дублей attemptStrategy/1RM больше нет.

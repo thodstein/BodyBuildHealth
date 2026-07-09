@@ -31,7 +31,6 @@ import { LibraryZone } from './TrainingScreen_parts/LibraryZone';
 import { BbToolsCard } from './TrainingScreen_parts/BbToolsCard';
 import { LoadSafetyCard } from './TrainingScreen_parts/LoadSafetyCard';
 import { SplitGenCard } from './TrainingScreen_parts/SplitGenCard';
-import { CompetitionCard } from './TrainingScreen_parts/CompetitionCard';
 import { PriRepPatternCard } from './TrainingScreen_parts/PriRepPatternCard';
 import { TrainingMixTab } from './TrainingScreen_parts/TrainingMixTab';
 
@@ -659,7 +658,6 @@ export const TrainingScreen: React.FC = () => {
       {tab === 'bb_tools' && <InfoErrorBoundary label="ББ-инструменты"><BbToolsHub /></InfoErrorBoundary>}
       {tab === 'load_safety' && <InfoErrorBoundary label="Нагрузка/авторег"><LoadSafetyCard /></InfoErrorBoundary>}
       {tab === 'split_gen' && <InfoErrorBoundary label="Генератор сплитов"><SplitGenCard /></InfoErrorBoundary>}
-      {tab === 'competition' && <InfoErrorBoundary label="Соревнование"><CompetitionCard /></InfoErrorBoundary>}
       {tab === 'pri_reppat' && <InfoErrorBoundary label="PRI/схема повт"><PriRepPatternCard /></InfoErrorBoundary>}
       {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixTab /></InfoErrorBoundary>}
 

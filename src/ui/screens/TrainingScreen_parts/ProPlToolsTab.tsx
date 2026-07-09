@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { taperPlan, warmupSequence, type AttemptStrategy, type Lift } from '../../../engines/pro/taper.engine';
 import { diagnoseLift, stickingPhases, barPathAnalysis, type BarPathIssue } from '../../../engines/pro/lift-diagnostics.engine';
-import { platesForWeight } from '../../../engines/training-integration.engine';
 
 const ACCENT = '#00e68a';
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
@@ -10,7 +9,7 @@ const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: 
 const LIFT_RU: Record<string, string> = { squat: 'Присед', bench: 'Жим', deadlift: 'Тяга' };
 
 export const ProPlToolsTab: React.FC = () => {
-  const [tab, setTab] = useState<'taper' | 'diag' | 'plates'>('taper');
+  const [tab, setTab] = useState<'taper' | 'diag'>('taper');
 
   // Taper
   const [meetDate, setMeetDate] = useState('');
@@ -32,16 +31,12 @@ export const ProPlToolsTab: React.FC = () => {
   const diag = useMemo(() => diagPhase ? diagnoseLift(diagLift, diagPhase as any) : null, [diagLift, diagPhase]);
   const barPath = useMemo(() => barIssues.length > 0 ? barPathAnalysis(diagLift, barIssues) : null, [diagLift, barIssues]);
 
-  // Plates
-  const [plateWeight, setPlateWeight] = useState(100);
-  const [barWeight, setBarWeight] = useState(20);
-  const plates = useMemo(() => platesForWeight(plateWeight, barWeight), [plateWeight, barWeight]);
-
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>🏋️ Pro ПЛ-инструменты</div>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>🧮 Калькулятор блинов перенесён в зону «Калькуляторы» → вкладка «🧮 Калькулятор блинов» (там все системы единиц, типы грифов, визуализация, пресеты).</div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        {([['taper', '🏁 Тапер'], ['diag', '🔬 Диагностика'], ['plates', '⚖️ Блины']] as const).map(([k, l]) => (
+        {([['taper', '🏁 Тапер'], ['diag', '🔬 Диагностика']] as const).map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} style={{ flex: 1, padding: 8, borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700, border: tab === k ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.08)', background: tab === k ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)', color: tab === k ? ACCENT : 'var(--text-dim)' }}>{l}</button>
         ))}
       </div>
@@ -128,26 +123,6 @@ export const ProPlToolsTab: React.FC = () => {
         </div>
       </>)}
 
-      {tab === 'plates' && (<>
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>Калькулятор блинов: вес → набор на гриф.</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-          <div><label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Целевой вес, кг</label><input type="number" value={plateWeight} min={20} max={500} step={2.5} onChange={e => setPlateWeight(+e.target.value)} style={IN} /></div>
-          <div><label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Вес грифа, кг</label><input type="number" value={barWeight} onChange={e => setBarWeight(+e.target.value)} style={IN} /></div>
-        </div>
-        {plates && (
-          <div style={CARD}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>{plateWeight} кг = гриф {barWeight} + {(plateWeight - barWeight) / 2} кг/сторона</div>
-            {plates.platesPerSide && plates.platesPerSide.length > 0 ? (
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                {plates.platesPerSide.map((p, i) => (
-                  <div key={i} style={{ padding: '8px 12px', borderRadius: '50%', background: p.plate >= 20 ? '#ef4444' : p.plate >= 15 ? '#f59e0b' : p.plate >= 10 ? '#3b82f6' : p.plate >= 5 ? '#22c55e' : '#a855f7', color: '#fff', fontWeight: 700, fontSize: 13, minWidth: 44, textAlign: 'center' }}>{p.plate}{p.count > 1 ? '×' + p.count : ''}</div>
-                ))}
-              </div>
-            ) : <div style={{ ...SMALL }}>Только гриф (вес ≤ весу грифа).</div>}
-            {plates.platesPerSide.length > 0 && <div style={{ ...SMALL, marginTop: 6 }}>Итого/сторона: {plates.platesPerSide.reduce((s: number, p: any) => s + p.plate * p.count, 0)} кг · блинов: {plates.totalPlates} шт</div>}
-          </div>
-        )}
-      </>)}
     </div>
   );
 };

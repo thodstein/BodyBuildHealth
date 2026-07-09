@@ -67,10 +67,27 @@ export const PlateCalcTab: React.FC = () => {
   // При смене системы или грифа: пересчитать вес грифа; если имперский → вес в lb
   const barOptions = useMemo(() => BAR_TYPES[unit].map(b => ({ id: b.id, label: b.label, desc: `${b.weight} ${unit === 'metric' ? 'кг' : 'lb'}` })), [unit]);
 
+  const BAR_PRESETS_BOTH: Record<string, { kg: number; lb: number }> = {
+    men_olympic: { kg: 20, lb: 45 },
+    women_olympic: { kg: 15, lb: 35 },
+    ez_curl: { kg: 10, lb: 15 },
+    standard: { kg: 7, lb: 15 },
+    trap_bar: { kg: 25, lb: 55 },
+    ssb: { kg: 20, lb: 45 },
+    swiss_bar: { kg: 15, lb: 35 },
+    technique: { kg: 5, lb: 10 },
+  };
+
   const applyBar = (id: string) => {
     setBarId(id);
     const b = BAR_TYPES[unit].find(x => x.id === id);
     if (b) setBarWeight(b.weight);
+  };
+
+  const applyBarPreset = (id: string) => {
+    setBarId(id);
+    const p = BAR_PRESETS_BOTH[id];
+    if (p) setBarWeight(unit === 'metric' ? p.kg : p.lb);
   };
 
   // Симметричный прайминг на гриф: равные блины по каждой стороне
@@ -84,14 +101,17 @@ export const PlateCalcTab: React.FC = () => {
 
   const devColor = Math.abs(plates.deviation) < 0.5 ? ACCENT : Math.abs(plates.deviation) > 2 ? '#ef4444' : '#f59e0b';
   const unitLabel = unit === 'metric' ? 'кг' : 'lb';
+  const sideWeight = Math.round(((targetWeight - barWeight) / 2) * 10) / 10;
+  const platesPerSideSum = plates.platesPerSide.reduce((s, p) => s + p.plate * p.count, 0);
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>🧮 Калькулятор блинов (метрические / имперские)</div>
       <div style={{ ...SMALL, color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}>
         Расчёт набора блинов на гриф под рабочий вес. Поддержка метрических (кг) и имперских (lb) систем,
-        разные типы грифов (олимпийские мужские/женские, EZ, SSB, трап, Swiss), настраиваемый набор доступных блинов,
-        разминочная последовательность и порядок навешивания.
+        8 типов грифов (олимпийские мужские/женские, EZ, SSB, трап, Swiss, техн., стандарт), быстрые пресеты,
+        настраиваемый набор доступных блинов, 1ПМ-калькулятор, SVG-визуализация грифа, разминочная последовательность
+        и порядок навешивания, сохранение пресетов, экспорт отчёта.
       </div>
 
       {/* Единицы + гриф */}
@@ -106,6 +126,23 @@ export const PlateCalcTab: React.FC = () => {
           <div>
             <div style={{ fontSize: 9, color: DIM, marginBottom: 3 }}>Вес грифа ({unitLabel})</div>
             <input type="number" min={1} max={60} value={barWeight} onChange={e => setBarWeight(+e.target.value || 0)} style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px', minHeight: 40, width: '100%', boxSizing: 'border-box' as const, fontSize: 12, textAlign: 'center' as const }} />
+          </div>
+        </div>
+        {/* Быстрые пресеты грифов */}
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 9, color: DIM, marginBottom: 3 }}>Быстрый выбор грифа</div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {['men_olympic', 'women_olympic', 'ez_curl', 'trap_bar', 'ssb', 'swiss_bar', 'technique', 'standard'].map(id => {
+              const p = BAR_PRESETS_BOTH[id];
+              const w = unit === 'metric' ? p.kg : p.lb;
+              const label = id === 'men_olympic' ? 'Ол.' : id === 'women_olympic' ? 'Жен.' : id === 'ez_curl' ? 'EZ' : id === 'trap_bar' ? 'Трап' : id === 'ssb' ? 'SSB' : id === 'swiss_bar' ? 'Swiss' : id === 'technique' ? 'Техн.' : 'Станд.';
+              return (
+                <button key={id} onClick={() => applyBarPreset(id)}
+                  style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: barId === id ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.08)', background: barId === id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)', color: barId === id ? ACCENT : 'rgba(255,255,255,0.7)' }}>
+                  {label} {w}
+                </button>
+              );
+            })}
           </div>
         </div>
         {/* Quick presets by %1RM */}
@@ -213,6 +250,22 @@ export const PlateCalcTab: React.FC = () => {
           </svg>
         </div>
       )}
+
+      {/* Формула расчёта */}
+      <div style={{ ...CARD, background: 'rgba(59,130,246,0.04)', borderColor: 'rgba(59,130,246,0.15)' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>📐 Формула</div>
+        <div style={{ fontSize: 13, color: '#fff', fontWeight: 600 }}>
+          {targetWeight} {unitLabel} = гриф {barWeight} {unitLabel} + {sideWeight} {unitLabel}/сторона
+        </div>
+        <div style={{ ...SMALL, marginTop: 4 }}>
+          {plates.platesPerSide.length > 0
+            ? `Блины на сторону: ${plates.platesPerSide.map(p => `${p.plate} ${unitLabel} × ${p.count}`).join(' + ')} = ${platesPerSideSum} ${unitLabel} · всего блинов: ${plates.totalPlates} шт`
+            : 'Вес ≤ вес грифа: блины не нужны.'}
+        </div>
+        <div style={{ ...SMALL, marginTop: 2, color: devColor }}>
+          Фактический вес: {plates.actualWeight} {unitLabel} (отклонение: {plates.deviation > 0 ? '+' : ''}{plates.deviation} {unitLabel})
+        </div>
+      </div>
 
       {/* Разминка */}
       <ExpandableCard title="🔥 Разминка к рабочему весу" accent={ACCENT} short="Разминочные подходы к рабочему весу">

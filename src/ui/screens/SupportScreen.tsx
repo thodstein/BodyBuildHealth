@@ -3360,6 +3360,13 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
         />
       )}
 
+      {/* ===== CALCULATORS: synergy + timing + dose ===== */}
+      {section === 'generator' && genTab === 'calculators' && (
+        <div style={{ paddingTop: 8, paddingBottom: 16 }}>
+          <SupportCalculatorsView s={s} />
+        </div>
+      )}
+
       {/* ===== PEPTIDE CALCULATOR ===== */}
       {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'peptides' && (
         <SupportPeptideCalc s={s} />

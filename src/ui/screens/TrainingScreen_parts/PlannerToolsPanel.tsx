@@ -6,7 +6,6 @@ import { ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
 
 // ПЛ-специфичные
 import { PlWeakpointsCard } from './PlWeakpointsCard';
-import { CompetitionCard } from './CompetitionCard';
 import { RelativeStrengthCalcTab } from './RelativeStrengthCalcTab';
 import PeakingProtocolTab from './PeakingProtocolTab';
 import { TaperPlannerTab } from './TaperPlannerTab';
@@ -59,7 +58,7 @@ const TOOLS: Record<'pl' | 'bb' | 'manual', ToolDef[]> = {
     { id: 'deload', title: 'Планировщик делода', icon: '🧘', short: 'Авто-расписание разгрузочных недель.', render: () => <DeloadSchedulerTab /> },
     { id: 'period', title: 'Дизайнер периодизации', icon: '🔄', short: 'Блочный макроцикл: drag-and-drop фаз на таймлайн.', render: () => <PeriodizationDesignerTab /> },
     { id: 'whatif', title: 'What-if сценарий', icon: '🔮', short: 'Прогноз риск/готовность от калорий/сна/AAS.', render: () => <WhatIfCard baseRisk={20} baseReadiness={75} /> },
-    { id: 'comp', title: 'Соревнование', icon: '🏆', short: 'Категория, стратегия подходов, таймлайн, восстановление.', render: () => <CompetitionCard /> },
+    { id: 'comp', title: 'Соревнование', icon: '🏆', short: 'Категория, стратегия подходов, таймлайн, восстановление.', render: () => <div style={{padding:12,fontSize:11,color:'var(--text-dim)'}}>🏋️ Соревнование перенесено в инструмент «Пиковая фаза» внутри ПЛ-авто (вкладка «Пик» → режим «Соревнование»).</div> },
   ],
 
   // ═══ ББ-АВТО ═══
@@ -112,7 +111,7 @@ const TOOLS: Record<'pl' | 'bb' | 'manual', ToolDef[]> = {
     { id: 'deload', title: 'Планировщик делода', icon: '🧘', short: 'Авто-расписание разгрузочных недель.', render: () => <DeloadSchedulerTab /> },
     { id: 'period', title: 'Дизайнер периодизации', icon: '🔄', short: 'Блочный макроцикл: drag-and-drop фаз.', render: () => <PeriodizationDesignerTab /> },
     { id: 'conj', title: 'Конъюгат (Westside)', icon: '🔁', short: 'ME/DE/RE дни.', render: () => <ConjugateTab /> },
-    { id: 'comp', title: 'Соревнование', icon: '🏆', short: 'Категория, стратегия, таймлайн.', render: () => <CompetitionCard /> },
+    { id: 'comp', title: 'Соревнование', icon: '🏆', short: 'Категория, стратегия, таймлайн.', render: () => <div style={{padding:12,fontSize:11,color:'var(--text-dim)'}}>🏋️ Соревнование перенесено в инструмент «Пиковая фаза» внутри ПЛ-авто (вкладка «Пик»).</div> },
     { id: 'whatif', title: 'What-if сценарий', icon: '🔮', short: 'Прогноз риск/готовность.', render: () => <WhatIfCard baseRisk={20} baseReadiness={75} /> },
   ],
 };

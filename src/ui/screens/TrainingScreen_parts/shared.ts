@@ -48,7 +48,7 @@ export type TrainingTab =
   | 'calc_quality' | 'calc_1rm' | 'import_data' | 'pl_norms' | 'pl_pro' | 'rel_strength' | 'calendar' | 'mixes' | 'periodization_designer' | 'deload_scheduler' | 'meso_progression'
   | 'calc_taper' | 'calc_fatigue' | 'calc_vbt' | 'calc_plates' | 'calc_mrv'
   | 'tempo' | 'meso_tracker' | 'specialization' | 'peaking' | 'conjugate' | 'mmc_tracking'
-  | 'checkin' | 'strength' | 'bb_tools' | 'pl_weakpoints' | 'load_safety' | 'split_gen' | 'competition' | 'goals' | 'pri_reppat' | 'insights'
+  | 'checkin' | 'strength' | 'bb_tools' | 'pl_weakpoints' | 'load_safety' | 'split_gen' | 'goals' | 'pri_reppat' | 'insights'
   | 'strength_analysis' | 'load_management' | 'diagnostics' | 'periodization_hub'
   | 'training_mix_hub';
 export type TrainingPage = 'hero' | 'tabs';
@@ -91,7 +91,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   pl_weakpoints: '🎯 Слабые точки ПЛ',
   load_safety: '🫀 Нагрузка/авторег',
   split_gen: '🧩 Генератор сплитов',
-  competition: '🏆 Соревнование',
+  // competition moved into PeakingPanel (SRCBBScreen)
   goals: '🎯 Цели и привычки',
   pri_reppat: '🧠 PRI/схема повт',
   insights: '💡 Авто-инсайты',
