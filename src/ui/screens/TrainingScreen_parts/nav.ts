@@ -47,24 +47,24 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     icon: '🧮',
     color: '#3b82f6',
     subtitle: 'Все калькуляторы в одном месте: сила, нагрузка, периодизация, инвентарь',
-    tabs: [
+      tabs: [
       'strength_analysis', 'load_management', 'diagnostics', 'periodization_hub',
       'exercise_lab', 'bb_tools', 'load_safety', 'split_gen', 'pri_reppat',
-      'calc_plates', 'calc_quality', 'volume', 'pl_pro',
-      'training_mix_hub', 'tonnage', 'health_calc',
+      'calc_plates', 'calc_quality', 'volume',
+      'training_mix_hub', 'tonnage', 'calc_taper',
     ],
     categories: [
       { label: 'Унифицированные', icon: '🧠', tabs: ['strength_analysis', 'load_management', 'diagnostics', 'periodization_hub', 'exercise_lab'] },
-      { label: 'Инструменты', icon: '🛠️', tabs: ['bb_tools', 'load_safety', 'split_gen', 'pri_reppat', 'calc_plates', 'calc_quality', 'volume', 'pl_pro', 'tonnage'] },
-      { label: 'Прочее', icon: '📋', tabs: ['training_mix_hub', 'health_calc'] },
+      { label: 'Инструменты', icon: '🛠️', tabs: ['bb_tools', 'load_safety', 'split_gen', 'pri_reppat', 'calc_plates', 'calc_quality', 'volume', 'tonnage', 'calc_taper'] },
+      { label: 'Прочее', icon: '📋', tabs: ['training_mix_hub'] },
     ],
   },
   library: {
     title: '📖 Библиотека',
     icon: '📖',
     color: '#f59e0b',
-    subtitle: 'Каталог тренировочных процессов: циклы, программы, методики, упражнения',
-    tabs: ['library', 'programs', 'methods', 'exercises', 'mytraining'],
+    subtitle: 'Каталог процессов: циклы, программы, методики, пик-протоколы, упражнения',
+    tabs: ['library', 'programs', 'methods', 'peaking', 'exercises', 'mytraining'],
   },
 };
 

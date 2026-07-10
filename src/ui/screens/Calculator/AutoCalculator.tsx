@@ -5,7 +5,7 @@ import { PHARMA_DB, PHARMA_CLASSES } from '../../../core/pharma-database';
 import { getProfile } from '../../../core/profile-manager';
 import { GLASS, BADGE, DEFAULT_STATE } from './Calc.types';
 import type { AutoCalculatorProps } from './Calc.types';
-import { Card } from './Calc.parts';
+import { Card, PopupPEDInput } from './Calc.parts';
 import { TzRiskCard } from './TzRiskCard';
 import { MechanismView } from './Calc.result';
 import { deriveStateFromLabs, labPointsToSlice } from './Calc.labs-derived';
@@ -245,32 +245,107 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         border: '1.5px solid rgba(59,130,246,0.18)',
         padding: '10px 12px',
       }}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:8, letterSpacing:'-0.2px' }}>
-          ⚙️ Дополнительные PED (GH/Инсулин/IGF/Clen/T3)
+        <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:8, letterSpacing:'-0.2px', display:'flex', alignItems:'center', gap:6 }}>
+          <span>⚙️</span>
+          <span>Дополнительные PED</span>
+          <span style={{ fontSize:8, fontWeight:600, color:'rgba(255,255,255,0.3)', letterSpacing:0 }}>(GH · Insulin · IGF · Clen · T3)</span>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-          <label style={{ display:'flex', flexDirection:'column', gap:3 }}>
-            <span style={{ fontSize:8, fontWeight:600, color:'var(--text-dim)' }}>GH (МЕ/день)</span>
-            <input type="number" min={0} step={0.5} value={(state.pharma as any).ghIU ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : 0; uPharm({ ...state.pharma, ghIU: v, hasGH: v > 0 } as any); }} placeholder="0" style={{ width:'100%', padding:'4px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:9, boxSizing:'border-box' }} />
-          </label>
-          <label style={{ display:'flex', flexDirection:'column', gap:3 }}>
-            <span style={{ fontSize:8, fontWeight:600, color:'var(--text-dim)' }}>Инсулин (МЕ/день)</span>
-            <input type="number" min={0} step={1} value={(state.pharma as any).insulinIU ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : 0; uPharm({ ...state.pharma, insulinIU: v, hasInsulin: v > 0 } as any); }} placeholder="0" style={{ width:'100%', padding:'4px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:9, boxSizing:'border-box' }} />
-          </label>
-          <label style={{ display:'flex', flexDirection:'column', gap:3 }}>
-            <span style={{ fontSize:8, fontWeight:600, color:'var(--text-dim)' }}>IGF-1 LR3 (мкг/день)</span>
-            <input type="number" min={0} step={10} value={(state.pharma as any).igfMcg ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : 0; uPharm({ ...(state.pharma as any), igfMcg: v } as any); }} placeholder="0" style={{ width:'100%', padding:'4px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:9, boxSizing:'border-box' }} />
-          </label>
-          <label style={{ display:'flex', flexDirection:'column', gap:3 }}>
-            <span style={{ fontSize:8, fontWeight:600, color:'var(--text-dim)' }}>Clenbuterol (мкг/день)</span>
-            <input type="number" min={0} step={10} value={(state.pharma as any).clenMcg ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : 0; uPharm({ ...(state.pharma as any), clenMcg: v } as any); }} placeholder="0" style={{ width:'100%', padding:'4px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:9, boxSizing:'border-box' }} />
-          </label>
-          <label style={{ display:'flex', flexDirection:'column', gap:3 }}>
-            <span style={{ fontSize:8, fontWeight:600, color:'var(--text-dim)' }}>T3 (мкг/день)</span>
-            <input type="number" min={0} step={5} value={(state.pharma as any).t3Mcg ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : 0; uPharm({ ...(state.pharma as any), t3Mcg: v } as any); }} placeholder="0" style={{ width:'100%', padding:'4px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:9, boxSizing:'border-box' }} />
-          </label>
+        <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+          <PopupPEDInput id="ghIU" value={(state.pharma as any).ghIU ?? 0} onChange={v => uPharm({ ...state.pharma, ghIU: v, hasGH: v > 0 } as any)} />
+          <PopupPEDInput id="insulinIU" value={(state.pharma as any).insulinIU ?? 0} onChange={v => uPharm({ ...state.pharma, insulinIU: v, hasInsulin: v > 0 } as any)} />
+          <PopupPEDInput id="igfMcg" value={(state.pharma as any).igfMcg ?? 0} onChange={v => uPharm({ ...(state.pharma as any), igfMcg: v } as any)} />
+          <PopupPEDInput id="clenMcg" value={(state.pharma as any).clenMcg ?? 0} onChange={v => uPharm({ ...(state.pharma as any), clenMcg: v } as any)} />
+          <PopupPEDInput id="t3Mcg" value={(state.pharma as any).t3Mcg ?? 0} onChange={v => uPharm({ ...(state.pharma as any), t3Mcg: v } as any)} />
         </div>
       </div>
+
+      {/* ===== КАРТОЧКА ВЫБОРА ФАЗЫ ===== */}
+      {(() => {
+        const phases: { key: string; icon: string; label: string; desc: string; gradient: string; color: string; }[] = [
+          { key:'course', icon:'💉', label:'Курс ААС', desc:'Активный приём ААС/GH/инсулина. Риски макс.', gradient:'linear-gradient(135deg,rgba(239,68,68,0.1),rgba(220,38,38,0.05))', color:'#ef4444' },
+          { key:'bridge', icon:'🌉', label:'Мост', desc:'Между курсами. Низкая доза, HPTA подавлена.', gradient:'linear-gradient(135deg,rgba(245,158,11,0.1),rgba(217,119,6,0.05))', color:'#f59e0b' },
+          { key:'pct', icon:'🔄', label:'ПКТ', desc:'Восстановление HPTA. SERM + hCG + T-бустеры.', gradient:'linear-gradient(135deg,rgba(59,130,246,0.1),rgba(37,99,235,0.05))', color:'#60a5fa' },
+          { key:'fertility', icon:'⚧', label:'Фертильность', desc:'Восстановление сперматогенеза. hCG + rFSH.', gradient:'linear-gradient(135deg,rgba(168,85,247,0.1),rgba(147,51,234,0.05))', color:'#a78bfa' },
+          { key:'trt', icon:'♾', label:'ЗГТ (TRT)', desc:'Терапевтический T. HPTA подавлена хронически.', gradient:'linear-gradient(135deg,rgba(34,197,94,0.1),rgba(22,163,74,0.05))', color:'#22c55e' },
+        ];
+        const current = (state.pharma as any).phase || 'course';
+        const protoDesc = (() => {
+          const map: Record<string, string> = {
+            course:'💉 Курс: гепатопротектор (NAC/TUDCA) · кардиопротектор (телмисартан/омега-3) · антиоксидант (АЛЬК/CoQ10) · hCG 500 МЕ 2р/нед · AI по E2',
+            bridge:'🌉 Мост: гепато- и кардиопротекция (доза ×0.6) · адаптогены · опционально T-бустеры · липиды + АЛТ/АСТ каждые 6 нед',
+            pct:'🔄 ПКТ: SERM (тамоксифен/кломифен) · hCG 500-1000 МЕ 2р/нед · T-бустеры · адаптогены · гепато/кардио 4-6 нед',
+            fertility:'⚧ Фертильность: hCG 1500-2500 МЕ 2-3р/нед · SERM (кломифен) · антиоксиданты · фолат + цинк · 8-12 нед',
+            trt:'♾ TRT: кардиопротектор (телмисартан) · гепатопротектор · контроль HCT · AI по E2 · T-бустеры НЕ назначать',
+          };
+          return map[current] || '';
+        })();
+
+        const handleAutoPhase = () => {
+          const aas = (state.pharma as any).aas || [];
+          const gh = (state.pharma as any).ghIU || 0;
+          const insulin = (state.pharma as any).insulinIU || 0;
+          const onCycle = aas.length > 0 || gh > 0 || insulin > 0;
+          const phase = onCycle ? 'course' : 'bridge';
+          uPharm({ ...(state.pharma as any), phase } as any);
+          setFillStatus('🔍 Фаза: ' + (onCycle ? 'Курс ААС' : 'Мост') + ' (авто)'); setTimeout(() => setFillStatus(''), 2000);
+        };
+
+        return (
+          <div style={{
+            marginBottom: 10,
+            borderRadius: 14,
+            background: 'linear-gradient(135deg, rgba(139,92,246,0.06), rgba(168,85,247,0.04))',
+            border: '1.5px solid rgba(139,92,246,0.18)',
+            padding: '10px 12px',
+          }}>
+            {/* Заголовок */}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', letterSpacing:'-0.2px', display:'flex', alignItems:'center', gap:6 }}>
+                <span>📋</span>
+                <span>Выбор фазы</span>
+              </div>
+              <button onClick={handleAutoPhase}
+                style={{ padding:'4px 10px', borderRadius:8, fontSize:8, fontWeight:700, cursor:'pointer',
+                  background:'rgba(168,85,247,0.12)', border:'1px solid rgba(168,85,247,0.25)',
+                  color:'#c084fc', display:'flex', alignItems:'center', gap:4 }}>
+                <span style={{fontSize:10}}>🔍</span>
+                <span>Автозаполнение</span>
+              </button>
+            </div>
+
+            {/* Сетка фаз 5 button-карточек */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr', gap:4, marginBottom:6 }}>
+              {phases.map(p => {
+                const active = current === p.key;
+                return (
+                  <div key={p.key} onClick={() => uPharm({ ...(state.pharma as any), phase: p.key } as any)}
+                    style={{
+                      padding:'6px 4px', borderRadius:10, cursor:'pointer', textAlign:'center',
+                      background: active ? p.gradient : 'rgba(255,255,255,0.02)',
+                      border: active ? `1.5px solid ${p.color}44` : '1px solid rgba(255,255,255,0.05)',
+                      transition:'all 0.15s',
+                    }}>
+                    <div style={{ fontSize:16, marginBottom:1 }}>{p.icon}</div>
+                    <div style={{ fontSize:7, fontWeight:700, color: active ? p.color : 'rgba(255,255,255,0.5)', lineHeight:1.2 }}>
+                      {p.label}
+                    </div>
+                    {active && <div style={{ fontSize:6, color:p.color, marginTop:1 }}>✓</div>}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Описание выбранной фазы */}
+            <div style={{
+              padding:'5px 8px', borderRadius:8, fontSize:7, lineHeight:1.5,
+              background:'rgba(0,0,0,0.15)', border:'1px solid rgba(255,255,255,0.04)',
+              color:'rgba(255,255,255,0.7)',
+            }}>
+              {protoDesc}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ===== КАРТОЧКА КУРСА ААС (большая, красивая) ===== */}
       {state.pharma.aas.length > 0 && (
@@ -300,7 +375,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
                 Курс ААС · {state.pharma.aas.length} препарат{state.pharma.aas.length > 1 ? 'а' : ''}
               </div>
               <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:1, letterSpacing:'-0.2px' }}>
-                Фаза: {state.pharma.phase} · Длительность: ~{Math.max(...state.pharma.aas.map(a => a.weeks || 12))} нед
+                Длительность: ~{Math.max(...state.pharma.aas.map(a => a.weeks || 12))} нед
               </div>
             </div>
           </div>

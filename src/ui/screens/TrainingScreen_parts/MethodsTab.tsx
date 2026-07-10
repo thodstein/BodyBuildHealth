@@ -23,6 +23,7 @@ import { generateWeeklyReport, analyzeMeasurements, loadMeasurements, saveMeasur
 import { getExerciseBio } from '../../../data/exercise-biomechanics-db';
 import { getStrengthLevel, getNextLevelTarget } from '../../../engines/performance-analytics.engine';
 import { computeStructuredAnalytics } from '../../../engines/structured-analytics.engine';
+import { TaperPlannerTab } from './TaperPlannerTab';
 import {
   WARMUP_LABELS, GOALS, LEVELS, MUSCLE_GROUPS, GROUP_LABELS, EQUIP_LABELS, JOINT_LABELS,
   PHASE_LABELS, PHASE_HINTS, TAB_LABELS,
@@ -433,6 +434,20 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
           <div style={{ fontSize:8, color:'rgba(255,255,255,0.55)', marginTop:2 }}>Шаблоны: {d.patterns.join(' · ')}</div>
         </div>)}
       </div>}
-    </div>)}
+      </div>)}
+    {(methodCat === 'all' || methodCat === 'periodization') && (
+      <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: '#00e68a', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+          🏁 Taper-планер (снижение объёма к соревнованию)
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 10 }}>
+          Полный инструмент: PL-taper (1-3 нед по усталости, прикиды, весовая категория, таймлайн, восстановление, ментал) + BB шоу-пик (углеводная загрузка, водная манипуляция).
+          Кнопки «🛠 Применить к планировщику» связывают результат с вашим планом.
+        </div>
+        <div style={{ borderRadius: 12, background: 'rgba(24,24,27,0.3)', border: '1px solid rgba(0,230,138,0.08)', overflow: 'hidden' }}>
+          <TaperPlannerTab />
+        </div>
+      </div>
+    )}
   </div>);
 };

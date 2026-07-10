@@ -23,6 +23,88 @@ import { CalcLabsCard } from './CalcLabsCard';
 import { ALL_STACKS } from '../../../data/support-stacks';
 import { CalcSubstanceManager } from './CalcSubstanceManager';
 
+// ── Конфигурация суставного модуля ──────────────────────────────────────────
+interface JointPreset {
+  id: string; name: string; desc: string; color: string;
+  subs: string[]; icon: string;
+}
+const JOINT_PRESETS: JointPreset[] = [
+  { id:'core', name:'Ядро', desc:'Профилактика (база)', color:'#22c55e', icon:'🟢',
+    subs:['collagen_uc2','vitamin_c','vitamin_d3','vitamin_k2','collagen'] },
+  { id:'base', name:'База', desc:'Умеренный риск', color:'#f59e0b', icon:'🟡',
+    subs:['glucosamine','chondroitin','msm','omega3','manganese'] },
+  { id:'enhanced', name:'Усиление', desc:'Высокий риск', color:'#f97316', icon:'🟠',
+    subs:['hyaluronic_acid','curcumin','boswellia','silicon'] },
+  { id:'max', name:'Максимум', desc:'Критический риск', color:'#ef4444', icon:'🔴',
+    subs:['bpc','tb500','calcium','boron'] },
+];
+const JOINT_CATALOG: { id: string; nameRu: string; dose: string; desc: string }[] = [
+  { id: 'glucosamine', nameRu: 'Глюкозамин сульфат', dose: '1500 мг', desc: 'Субстрат ГАГ, ↑ синтез протеогликанов хряща' },
+  { id: 'chondroitin', nameRu: 'Хондроитин сульфат', dose: '800 мг', desc: '↓ коллагеназу, ↓ IL-1β, ↑ гиалуроновую к-ту' },
+  { id: 'collagen', nameRu: 'Коллаген гидролизат', dose: '10 г', desc: 'Субстрат Gly-Pro-Hyp для коллагена I/II типа' },
+  { id: 'collagen_uc2', nameRu: 'Коллаген UC-II (неденатурир.)', dose: '40 мг', desc: 'Оральная толерантность, ↓ атаку на коллаген сустава' },
+  { id: 'msm', nameRu: 'MSM (Метилсульфонилметан)', dose: '2000 мг', desc: 'Донатор серы, ↓ NF-κB, ↓ боль на 25-40%' },
+  { id: 'vitamin_c', nameRu: 'Витамин C', dose: '1000 мг', desc: 'Кофактор пролил/лизил-гидроксилаз → тройная спираль' },
+  { id: 'vitamin_d3', nameRu: 'Витамин D3', dose: '5000 МЕ', desc: 'VDR-активация, Ca²⁺ гомеостаз, минерализация' },
+  { id: 'vitamin_k2', nameRu: 'Витамин K2', dose: '100 мкг', desc: 'Активация остеокальцина → Ca²⁺ в кости' },
+  { id: 'omega3', nameRu: 'Омега-3 (EPA/DHA)', dose: '3 г', desc: 'Резолвины/протектины, ↓ воспаления в синовии' },
+  { id: 'manganese', nameRu: 'Марганец', dose: '5-10 мг', desc: 'Кофактор гликозилтрансфераз → синтез ГАГ' },
+  { id: 'hyaluronic_acid', nameRu: 'Гиалуроновая кислота', dose: '200 мг', desc: 'Синовиальная жидкость, вязкоэластичность' },
+  { id: 'curcumin', nameRu: 'Куркумин + пиперин', dose: '500 мг', desc: '↓ COX-2, ↓ NF-κB, ↓ IL-1β' },
+  { id: 'boswellia', nameRu: 'Босвеллия (AKBA ≥30%)', dose: '300 мг', desc: '↓ 5-LOX, ↓ лейкотриены, ↓ боль при ОА' },
+  { id: 'silicon', nameRu: 'Кремний (монометанол-силанол)', dose: '10-20 мг', desc: 'Сшивка коллагена и эластина, стабилизация ГАГ' },
+  { id: 'bpc', nameRu: 'BPC-157 (пентадекапептид)', dose: '250-500 мкг', desc: '↑ VEGF → ангиогенез, заживление связок/сухожилий' },
+  { id: 'tb500', nameRu: 'TB-500 (Thymosin β4)', dose: '2.5-5 мг', desc: 'Полимеризация G-актина, ↑ миграцию клеток' },
+  { id: 'calcium', nameRu: 'Кальций', dose: '500 мг', desc: 'Минерализация костной ткани' },
+  { id: 'boron', nameRu: 'Бор', dose: '3 мг', desc: '↑ t½ вит. D и E₂, ↓ боль в суставах' },
+];
+const JOINT_RECOMMENDED_HIGH: Set<string> = new Set(['glucosamine','chondroitin','collagen','vitamin_c','msm']);
+const JOINT_RECOMMENDED_MEDIUM: Set<string> = new Set(['omega3','hyaluronic_acid','curcumin','boswellia']);
+
+// ── Конфигурация нейропротекторного модуля ──────────────────────────────────
+interface NeuroPreset {
+  id: string; name: string; desc: string; color: string;
+  subs: string[]; icon: string;
+}
+const NEURO_PRESETS: NeuroPreset[] = [
+  { id:'sleep', name:'Сон', desc:'Восстановление сна', color:'#22c55e', icon:'🟢',
+    subs:['magnesium_l_threonate','melatonin','theanine','glycine','gaba'] },
+  { id:'stress', name:'Стресс', desc:'Антикортизол + адаптация', color:'#f59e0b', icon:'🟡',
+    subs:['phosphatidylserine','ashwagandha','rhodiola','bacopa'] },
+  { id:'cognitive', name:'Когнитив', desc:'Память, фокус, холин', color:'#f97316', icon:'🟠',
+    subs:['citicoline','alpha_gpc','acetyl_l_carnitine','uridine_monophosphate'] },
+  { id:'neurogenesis', name:'Нейрогенез', desc:'Рост новых нейронов', color:'#ef4444', icon:'🔴',
+    subs:['lions_mane','theanine','curcumin','vitamin_d3','omega3'] },
+];
+const NEURO_CATALOG: { id: string; nameRu: string; dose: string; desc: string }[] = [
+  { id: 'magnesium_l_threonate', nameRu: 'Магний L-треонат (через ГЭБ)', dose: '1440 мг', desc: '↑ Mg в мозге, блок NMDA, ↑ синаптическую пластичность (LTP)' },
+  { id: 'melatonin', nameRu: 'Мелатонин', dose: '3 мг', desc: 'Циркадный ритм, ↓ латентность сна, антиоксидант в ЦНС' },
+  { id: 'theanine', nameRu: 'L-Теанин', dose: '200 мг', desc: '↑ α-волны ЭЭГ, ↑ ГАМК через глутаматный шунт' },
+  { id: 'glycine', nameRu: 'Глицин', dose: '3 г', desc: 'Тормозной нейромедиатор, ко-агонист NMDA, ↓ t° тела' },
+  { id: 'gaba', nameRu: 'ГАМК', dose: '500 мг', desc: '↓ возбудимость ЦНС, ↑ качество и глубину сна' },
+  { id: 'phosphatidylserine', nameRu: 'Фосфатидилсерин', dose: '300 мг', desc: 'Связывает кортизол, ↓ GR-активацию в гиппокампе' },
+  { id: 'ashwagandha', nameRu: 'Ашваганда KSM-66', dose: '600 мг', desc: '↓ кортизол на 20-30%, ↑ ГАМК-А, ↑ T4→T3' },
+  { id: 'rhodiola', nameRu: 'Родиола розовая', dose: '400 мг', desc: '↓ МАО-А, ↑ тирозин-гидроксилазу, ↑ дофамин' },
+  { id: 'bacopa', nameRu: 'Бакопа монье', dose: '300 мг', desc: '↑ ацетилхолин, ↑ дендритное ветвление, антиоксидант' },
+  { id: 'citicoline', nameRu: 'Цитиколин (CDP-холин)', dose: '500 мг', desc: 'Донатор холина для ACh, ↑ фосфатидилхолин мембран' },
+  { id: 'alpha_gpc', nameRu: 'Альфа-GPC', dose: '300 мг', desc: '↑ ACh в мозге, ↑ ГР через соматотропы' },
+  { id: 'acetyl_l_carnitine', nameRu: 'Ацетил-L-Карнитин (ALCAR)', dose: '500 мг', desc: '↑ митохондриальный ацетил-КоА, ↑ BDNF, антидепрессант' },
+  { id: 'uridine_monophosphate', nameRu: 'Уридин монофосфат', dose: '300 мг', desc: '↑ фосфатидилхолин, ↑ CDP-холин, ↑ синаптические P2Y2' },
+  { id: 'lions_mane', nameRu: 'Ежовик гребенчатый', dose: '1000 мг', desc: '↑ NGF через ERK1/2, ↑ миелинизацию аксонов' },
+  { id: 'tryptophan', nameRu: 'L-Триптофан', dose: '500 мг', desc: 'Предшественник серотонина → мелатонин, ↑ настроение' },
+  { id: 'x5htp', nameRu: '5-HTP', dose: '100 мг', desc: 'Прямой субстрат серотонина, ↓ тревожность, ↑ сон' },
+  { id: 'curcumin', nameRu: 'Куркумин + пиперин', dose: '500 мг', desc: '↓ NF-κB, ↓ нейровоспаление, ↑ BDNF' },
+  { id: 'omega3', nameRu: 'Омега-3 (DHA для мозга)', dose: '3 г', desc: 'DHA — структурный липид нейрональных мембран' },
+  { id: 'vitamin_d3', nameRu: 'Витамин D3', dose: '5000 МЕ', desc: '↑ BDNF, ↓ нейровоспаление, VDR в гиппокампе' },
+  { id: 'vitamin_b6', nameRu: 'B6 (P5P)', dose: '50 мг', desc: 'Кофактор синтеза ГАМК, серотонина, дофамина' },
+  { id: 'vitamin_b12', nameRu: 'B12 (метилкобаламин)', dose: '1000 мкг', desc: 'Синтез миелина, кофактор метионин-синтазы' },
+  { id: 'folate', nameRu: 'Фолат (5-MTHF)', dose: '400 мкг', desc: 'Метилирование, синтез SAME, обмен гомоцистеина' },
+  { id: 'taurine', nameRu: 'Таурин', dose: '2 г', desc: '↑ ГАМК-А, ↓ глутаматную эксайтотоксичность' },
+  { id: 'magnesium', nameRu: 'Магний (глицинат/цитрат)', dose: '400 мг', desc: '↓ NMDA-рецептор, ↑ ГАМК, ↓ кортизол, расслабление' },
+];
+const NEURO_RECOMMENDED_HIGH: Set<string> = new Set(['citicoline','lions_mane','magnesium_l_threonate','phosphatidylserine']);
+const NEURO_RECOMMENDED_MEDIUM: Set<string> = new Set(['ashwagandha','theanine','gaba','melatonin','acetyl_l_carnitine','bacopa','rhodiola']);
+
 // ── Утилиты отображения вещества ─────────────────────────────────────────────
 const SUB_NAME_CACHE: Record<string, string> = {};
 const FALLBACK_NAMES: Record<string, string> = {
@@ -48,6 +130,17 @@ const FALLBACK_NAMES: Record<string, string> = {
   saw_palmetto: 'Saw Palmetto (Пальма сереноа)',
   alpha_lipoic: 'α-Липоевая', l_carnitine: 'L-Карнитин',
   d_mannose: 'Д-манноза',
+  glucosamine: 'Глюкозамин сульфат', chondroitin: 'Хондроитин сульфат',
+  collagen: 'Коллаген гидролизат', collagen_uc2: 'Коллаген UC-II',
+  msm: 'MSM', hyaluronic_acid: 'Гиалуроновая кислота',
+  manganese: 'Марганец', silicon: 'Кремний', boron: 'Бор',
+  bpc: 'BPC-157', tb500: 'TB-500', boswellia: 'Босвеллия',
+  // нейропротекция
+  citicoline: 'Цитиколин', alpha_gpc: 'Альфа-GPC', uridine_monophosphate: 'Уридин UMP',
+  magnesium_l_threonate: 'Магний L-треонат', acetyl_l_carnitine: 'Ацетил-L-Карнитин',
+  gaba: 'ГАМК', x5htp: '5-HTP', tryptophan: 'L-Триптофан',
+  ashwagandha: 'Ашваганда', rhodiola: 'Родиола', bacopa: 'Бакопа',
+  lions_mane: 'Ежовик',
 };
 function subNameRu(id: string): string {
   if (SUB_NAME_CACHE[id]) return SUB_NAME_CACHE[id];
@@ -305,6 +398,12 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [addedSubs, setAddedSubs] = useState<string[]>([]);
   const [substanceManagerKey, setSubstanceManagerKey] = useState(0);
   const [stackModulePopup, setStackModulePopup] = useState<string | null>(null);
+  const [articularPreset, setArticularPreset] = useState<string | null>(null);
+  const [articularSelected, setArticularSelected] = useState<Set<string>>(new Set());
+  const [articularConfirm, setArticularConfirm] = useState<boolean>(false);
+  const [neuroPreset, setNeuroPreset] = useState<string | null>(null);
+  const [neuroSelected, setNeuroSelected] = useState<Set<string>>(new Set());
+  const [neuroConfirm, setNeuroConfirm] = useState<boolean>(false);
   const [applyFlash, setApplyFlash] = useState(false);
 
   const ctx = useMemo(() => {
@@ -467,7 +566,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             ] as const).map(([id, icon, label, col]) => {
               const active = selectedStacks.includes(id);
               return (
-                <button key={id} onClick={() => setStackModulePopup(id)}
+                <button key={id} onClick={() => {
+                  setStackModulePopup(id);
+                  if (id === 'articular_stack') { setArticularPreset(null); setArticularSelected(new Set()); setArticularConfirm(false); }
+                  if (id === 'neuroprotection_stack') { setNeuroPreset(null); setNeuroSelected(new Set()); setNeuroConfirm(false); }
+                }}
                   style={{ flex:1, padding:'7px 4px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:1,
                     background: active ? `linear-gradient(135deg,rgba(${col === '#4ade80' ? '34,197,94' : col === '#818cf8' ? '99,102,241' : '239,68,68'},0.2),rgba(${col === '#4ade80' ? '34,197,94' : col === '#818cf8' ? '99,102,241' : '239,68,68'},0.1))` : 'rgba(255,255,255,0.03)',
                     border: active ? `1.5px solid ${col}55` : '1px solid rgba(255,255,255,0.06)',
@@ -484,11 +587,250 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
       {/* ── Попап анализа доп. модуля ── */}
       {stackModulePopup && (() => {
+        // Для articular_stack — новый попап с протоколами и выбором
+        if (stackModulePopup === 'articular_stack') {
+          const planIds = new Set((rec?.subs || []).map(s => canonIdLocal(s.substanceId)));
+          const symptoms = (state as any).symptoms || [];
+          const labs = labSliceToValues(state.labs.fullPanel);
+          const jointPain = state.oda.jointPain;
+          const hasJointSymptom = symptoms.includes('joint_pain');
+          const crp = labs['CRP'] || labs['HSCRP'];
+          const jointScore = (hasJointSymptom ? 20 : 0) + (jointPain === 'severe' ? 30 : jointPain === 'moderate' ? 15 : jointPain === 'mild' ? 5 : 0) + (crp && crp > 3 ? 15 : 0);
+          const presetColor = jointScore < 20 ? '#22c55e' : jointScore < 40 ? '#f59e0b' : jointScore < 60 ? '#f97316' : '#ef4444';
+
+          const toggleSub = (id: string) => {
+            setArticularSelected(prev => {
+              const next = new Set(prev);
+              if (next.has(id)) next.delete(id); else next.add(id);
+              return next;
+            });
+          };
+
+          return (
+            <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => { setStackModulePopup(null); setArticularConfirm(false); }}>
+              <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'90vh', display:'flex', flexDirection:'column' }}>
+                <div style={{ height:3, background:'linear-gradient(90deg,#4ade80,#22c55e)' }} />
+                <div style={{ padding:'14px 14px 10px', overflowY:'auto' }}>
+                  {/* Заголовок + контекст */}
+                  <div style={{ fontSize:13, fontWeight:800, color:'#4ade80', marginBottom:4 }}>🦴 Суставы/Связки — подбор поддержки</div>
+                  <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', lineHeight:1.4, marginBottom:8, padding:'5px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                    {jointScore < 20 ? '🟢 Низкий риск — профилактика' : jointScore < 40 ? '🟡 Умеренный риск — базовая поддержка' : jointScore < 60 ? '🟠 Высокий риск — усиленная защита' : '🔴 Критический — максимальная защита'}
+                    {hasJointSymptom ? ' · боль в суставах' : ''}{crp && crp > 3 ? ` · CRP ${crp}` : ''}
+                  </div>
+
+                  {/* Пресеты-протоколы */}
+                  <div style={{ fontSize:9, fontWeight:700, color:'#4ade80', marginBottom:5 }}>📋 Примерные протоколы</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:8 }}>
+                    {JOINT_PRESETS.map(p => {
+                      const active = articularPreset === p.id;
+                      return (
+                        <div key={p.id} onClick={() => {
+                          if (articularPreset === p.id) {
+                            setArticularPreset(null);
+                            setArticularSelected(new Set());
+                          } else {
+                            setArticularPreset(p.id);
+                            setArticularSelected(new Set(p.subs));
+                          }
+                        }} style={{
+                          padding:'7px 8px', borderRadius:8, cursor:'pointer',
+                          background: active ? `${p.color}18` : 'rgba(255,255,255,0.02)',
+                          border: active ? `1.5px solid ${p.color}55` : '1px solid rgba(255,255,255,0.06)',
+                        }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                            <span style={{ fontSize:14 }}>{p.icon}</span>
+                            <div style={{ flex:1 }}>
+                              <div style={{ fontSize:9, fontWeight:700, color: active ? p.color : 'var(--text)' }}>{p.name} {active && '✓'}</div>
+                              <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>{p.desc}</div>
+                            </div>
+                          </div>
+                          <div style={{ fontSize:6, color:'rgba(255,255,255,0.3)', marginTop:3, display:'flex', flexWrap:'wrap', gap:2 }}>
+                            {p.subs.map(sid => <span key={sid} style={{ background:'rgba(255,255,255,0.04)', padding:'1px 4px', borderRadius:3 }}>{subNameRu(sid).slice(0,10)}</span>)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Рекомендация по пресету */}
+                  <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:6, padding:'4px 8px', borderRadius:6, background:presetColor+'10', border:`1px solid ${presetColor}22` }}>
+                    🔍 Рекомендованный: <b style={{color:presetColor}}>
+                      {jointScore < 20 ? 'Ядро' : jointScore < 40 ? 'Ядро + База' : jointScore < 60 ? 'Ядро + База + Усиление' : 'Полный протокол (все фазы)'}
+                    </b>
+                  </div>
+
+                  {/* Список веществ */}
+                  <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4 }}>💊 Выберите вещества ({articularSelected.size} из {JOINT_CATALOG.length})</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:8 }}>
+                    {JOINT_CATALOG.map(item => {
+                      const selected = articularSelected.has(item.id);
+                      const inPlan = planIds.has(canonIdLocal(item.id));
+                      const recommendedHigh = JOINT_RECOMMENDED_HIGH.has(item.id);
+                      const recommendedMed = JOINT_RECOMMENDED_MEDIUM.has(item.id);
+                      const isRecommended = recommendedHigh || (recommendedMed && (hasJointSymptom || crp && crp > 3));
+                      return (
+                        <div key={item.id} onClick={() => { if (!inPlan) toggleSub(item.id); }}
+                          style={{
+                            display:'flex', alignItems:'flex-start', gap:6, padding:'6px 8px', borderRadius:7, cursor: inPlan ? 'default' : 'pointer',
+                            background: inPlan ? 'rgba(0,230,138,0.04)' : selected ? 'rgba(129,140,248,0.06)' : 'rgba(255,255,255,0.02)',
+                            border: inPlan ? '1px solid rgba(0,230,138,0.12)' : selected ? '1px solid rgba(129,140,248,0.15)' : '1px solid rgba(255,255,255,0.04)',
+                            opacity: inPlan ? 0.5 : 1,
+                          }}>
+                          <div style={{ width:18, height:18, borderRadius:5, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:1,
+                            background: inPlan ? 'rgba(0,230,138,0.15)' : selected ? 'rgba(129,140,248,0.2)' : 'rgba(255,255,255,0.05)',
+                            fontSize:10, fontWeight:700, color: inPlan ? '#00e68a' : selected ? '#818cf8' : 'rgba(255,255,255,0.3)' }}>
+                            {inPlan ? '✓' : selected ? '✓' : ''}
+                          </div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
+                              <span style={{ fontSize:9, fontWeight:600, color: inPlan ? 'rgba(255,255,255,0.4)' : 'var(--text)' }}>{item.nameRu}</span>
+                              <span style={{ fontSize:7, fontWeight:600, color:'rgba(255,255,255,0.4)', padding:'0px 3px', borderRadius:3, background:'rgba(255,255,255,0.04)' }}>{item.dose}</span>
+                              {isRecommended && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(99,102,241,0.15)', color:'#a5b4fc', fontWeight:700 }}>рек.</span>}
+                              {inPlan && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.15)', color:'#00e68a', fontWeight:700 }}>в плане</span>}
+                            </div>
+                            <div style={{ fontSize:7, color:'rgba(255,255,255,0.35)', lineHeight:1.3, marginTop:1 }}>{item.desc}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Кнопки действий */}
+                  <div style={{ display:'flex', gap:6 }}>
+                    <button onClick={() => { setStackModulePopup(null); setArticularConfirm(false); }} style={{ flex:1, padding:'10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'var(--text)' }}>Отмена</button>
+                    <button onClick={() => {
+                      if (articularSelected.size === 0) return;
+                      setArticularConfirm(true);
+                    }} style={{ flex:2, padding:'10px', borderRadius:10, fontSize:10, fontWeight:800, cursor:'pointer', border:'none', color:'#000',
+                      background: articularSelected.size > 0 ? 'linear-gradient(135deg,#4ade80,#22c55e)' : 'rgba(255,255,255,0.06)',
+                    }}>
+                      ✅ Добавить ({articularSelected.size} вeществ)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        // ── Нейропротекция: пресеты + выбор ──
+        if (stackModulePopup === 'neuroprotection_stack') {
+          const planIds = new Set((rec?.subs || []).map(s => canonIdLocal(s.substanceId)));
+          const symptoms = (state as any).symptoms || [];
+          const hasInsomnia = symptoms.includes('insomnia');
+          const hasAnxiety = symptoms.includes('anxiety');
+          const sleepHours = state.profile.sleepHours || 7;
+          const stressLevel = state.profile.stressLevel || 5;
+          const aggressionScore = state.neuro.aggressionScore || 0;
+          const neuroScore = (hasInsomnia ? 20 : 0) + (hasAnxiety ? 15 : 0) + (sleepHours < 7 ? 15 : 0) + (stressLevel > 7 ? 20 : 0) + (aggressionScore > 6 ? 15 : 0);
+          const presetColor = neuroScore < 20 ? '#22c55e' : neuroScore < 40 ? '#f59e0b' : neuroScore < 60 ? '#f97316' : '#ef4444';
+
+          const toggleSub = (id: string) => { setNeuroSelected(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }); };
+
+          return (
+            <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => { setStackModulePopup(null); setNeuroConfirm(false); }}>
+              <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'90vh', display:'flex', flexDirection:'column' }}>
+                <div style={{ height:3, background:'linear-gradient(90deg,#818cf8,#6366f1)' }} />
+                <div style={{ padding:'14px 14px 10px', overflowY:'auto' }}>
+                  <div style={{ fontSize:13, fontWeight:800, color:'#818cf8', marginBottom:4 }}>🧠 Нейропротекция — подбор поддержки</div>
+                  <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', lineHeight:1.4, marginBottom:8, padding:'5px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                    {neuroScore < 20 ? '🟢 Низкий риск — профилактика' : neuroScore < 40 ? '🟡 Умеренный риск — базовая поддержка' : neuroScore < 60 ? '🟠 Высокий риск — усиленная защита' : '🔴 Критический — максимальная защита'}
+                    {hasInsomnia ? ' · бессонница' : ''}{hasAnxiety ? ' · тревога' : ''}{sleepHours < 7 ? ` · сон ${sleepHours}ч` : ''}{stressLevel > 7 ? ` · стресс ${stressLevel}/10` : ''}
+                  </div>
+
+                  {/* Пресеты */}
+                  <div style={{ fontSize:9, fontWeight:700, color:'#818cf8', marginBottom:5 }}>📋 Примерные протоколы</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:8 }}>
+                    {NEURO_PRESETS.map(p => {
+                      const active = neuroPreset === p.id;
+                      return (
+                        <div key={p.id} onClick={() => {
+                          if (neuroPreset === p.id) { setNeuroPreset(null); setNeuroSelected(new Set()); }
+                          else { setNeuroPreset(p.id); setNeuroSelected(new Set(p.subs)); }
+                        }} style={{
+                          padding:'7px 8px', borderRadius:8, cursor:'pointer',
+                          background: active ? `${p.color}18` : 'rgba(255,255,255,0.02)',
+                          border: active ? `1.5px solid ${p.color}55` : '1px solid rgba(255,255,255,0.06)',
+                        }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                            <span style={{ fontSize:14 }}>{p.icon}</span>
+                            <div style={{ flex:1 }}>
+                              <div style={{ fontSize:9, fontWeight:700, color: active ? p.color : 'var(--text)' }}>{p.name} {active && '✓'}</div>
+                              <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>{p.desc}</div>
+                            </div>
+                          </div>
+                          <div style={{ fontSize:6, color:'rgba(255,255,255,0.3)', marginTop:3, display:'flex', flexWrap:'wrap', gap:2 }}>
+                            {p.subs.slice(0,3).map(sid => <span key={sid} style={{ background:'rgba(255,255,255,0.04)', padding:'1px 4px', borderRadius:3 }}>{subNameRu(sid).slice(0,12)}</span>)}
+                            {p.subs.length > 3 && <span style={{ color:'rgba(255,255,255,0.2)' }}>+{p.subs.length-3}</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:6, padding:'4px 8px', borderRadius:6, background:presetColor+'10', border:`1px solid ${presetColor}22` }}>
+                    🔍 Рекомендованный: <b style={{color:presetColor}}>
+                      {neuroScore < 20 ? 'Сон' : neuroScore < 40 ? 'Сон + Стресс' : neuroScore < 60 ? 'Сон + Стресс + Когнитив' : 'Полный протокол (все фазы)'}
+                    </b>
+                  </div>
+
+                  {/* Вещества */}
+                  <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4 }}>💊 Выберите вещества ({neuroSelected.size} из {NEURO_CATALOG.length})</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:8 }}>
+                    {NEURO_CATALOG.map(item => {
+                      const selected = neuroSelected.has(item.id);
+                      const inPlan = planIds.has(canonIdLocal(item.id));
+                      const recHigh = NEURO_RECOMMENDED_HIGH.has(item.id);
+                      const recMed = NEURO_RECOMMENDED_MEDIUM.has(item.id);
+                      const isRecommended = recHigh || (recMed && (hasInsomnia || hasAnxiety || stressLevel > 5));
+                      return (
+                        <div key={item.id} onClick={() => { if (!inPlan) toggleSub(item.id); }}
+                          style={{
+                            display:'flex', alignItems:'flex-start', gap:6, padding:'6px 8px', borderRadius:7, cursor: inPlan ? 'default' : 'pointer',
+                            background: inPlan ? 'rgba(0,230,138,0.04)' : selected ? 'rgba(99,102,241,0.06)' : 'rgba(255,255,255,0.02)',
+                            border: inPlan ? '1px solid rgba(0,230,138,0.12)' : selected ? '1px solid rgba(99,102,241,0.15)' : '1px solid rgba(255,255,255,0.04)',
+                            opacity: inPlan ? 0.5 : 1,
+                          }}>
+                          <div style={{ width:18, height:18, borderRadius:5, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:1,
+                            background: inPlan ? 'rgba(0,230,138,0.15)' : selected ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)',
+                            fontSize:10, fontWeight:700, color: inPlan ? '#00e68a' : selected ? '#818cf8' : 'rgba(255,255,255,0.3)' }}>
+                            {inPlan ? '✓' : selected ? '✓' : ''}
+                          </div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
+                              <span style={{ fontSize:9, fontWeight:600, color: inPlan ? 'rgba(255,255,255,0.4)' : 'var(--text)' }}>{item.nameRu}</span>
+                              <span style={{ fontSize:7, fontWeight:600, color:'rgba(255,255,255,0.4)', padding:'0px 3px', borderRadius:3, background:'rgba(255,255,255,0.04)' }}>{item.dose}</span>
+                              {isRecommended && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(99,102,241,0.15)', color:'#a5b4fc', fontWeight:700 }}>рек.</span>}
+                              {inPlan && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.15)', color:'#00e68a', fontWeight:700 }}>в плане</span>}
+                            </div>
+                            <div style={{ fontSize:7, color:'rgba(255,255,255,0.35)', lineHeight:1.3, marginTop:1 }}>{item.desc}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ display:'flex', gap:6 }}>
+                    <button onClick={() => { setStackModulePopup(null); setNeuroConfirm(false); }} style={{ flex:1, padding:'10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'var(--text)' }}>Отмена</button>
+                    <button onClick={() => {
+                      if (neuroSelected.size === 0) return;
+                      setNeuroConfirm(true);
+                    }} style={{ flex:2, padding:'10px', borderRadius:10, fontSize:10, fontWeight:800, cursor:'pointer', border:'none', color:'#000',
+                      background: neuroSelected.size > 0 ? 'linear-gradient(135deg,#818cf8,#6366f1)' : 'rgba(255,255,255,0.06)',
+                    }}>
+                      ✅ Добавить ({neuroSelected.size} вeществ)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        // Старый попап для остальных модулей
         const { analysis, contextSummary } = analyzeStackModule(stackModulePopup, state, rec);
         const stackMeta = ALL_STACKS.find(s => s.id === stackModulePopup);
         const iconAndColor: Record<string, { icon: string; col: string }> = {
-          articular_stack: { icon: '🦴', col: '#4ade80' },
-          neuroprotection_stack: { icon: '🧠', col: '#818cf8' },
           mega_total_support_35: { icon: '🚀', col: '#f87171' },
         };
         const meta = iconAndColor[stackModulePopup] || { icon: '📦', col: '#818cf8' };
@@ -537,6 +879,80 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           </div>
         );
       })()}
+
+      {/* ── Карточка подтверждения для суставного модуля ── */}
+      {articularConfirm && !stackModulePopup && (
+        <div style={{ marginBottom:8, padding:'10px', borderRadius:12, background:'linear-gradient(135deg,rgba(34,197,94,0.08),rgba(22,163,74,0.04))', border:'2px solid rgba(34,197,94,0.25)' }}>
+          <div style={{ fontSize:11, fontWeight:800, color:'#22c55e', marginBottom:6, display:'flex', alignItems:'center', gap:4 }}>
+            🦴 Суставы/Связки — подтверждение
+          </div>
+          <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', marginBottom:5, lineHeight:1.3 }}>
+            Выбрано <b style={{color:'#4ade80'}}>{articularSelected.size}</b> веществ:
+          </div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:8 }}>
+            {Array.from(articularSelected).map(sid => (
+              <span key={sid} style={{ fontSize:8, padding:'2px 6px', borderRadius:5, fontWeight:600, background:'rgba(34,197,94,0.12)', border:'1px solid rgba(34,197,94,0.2)', color:'#4ade80' }}>
+                {subNameRu(sid)}
+              </span>
+            ))}
+          </div>
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:8, lineHeight:1.3 }}>
+            Вещества будут добавлены в план поддержки. Дубли с уже назначенными автоматически исключаются.
+          </div>
+          <div style={{ display:'flex', gap:6 }}>
+            <button onClick={() => { setArticularConfirm(false); setArticularPreset(null); setArticularSelected(new Set()); setStackModulePopup('articular_stack'); }}
+              style={{ flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'var(--text)' }}>
+              ✕ Отмена
+            </button>
+            <button onClick={() => {
+              const newSubs = Array.from(articularSelected).filter(sid => !(rec?.subs || []).some(s => canonIdLocal(s.substanceId) === canonIdLocal(sid)));
+              setAddedSubs(prev => [...new Set([...prev, ...newSubs])]);
+              setArticularConfirm(false);
+              setStackModulePopup(null);
+              if (!selectedStacks.includes('articular_stack')) setSelectedStacks(prev => [...prev, 'articular_stack']);
+            }} style={{ flex:2, padding:'8px', borderRadius:8, fontSize:9, fontWeight:800, cursor:'pointer', background:'linear-gradient(135deg,#22c55e,#16a34a)', border:'none', color:'#000' }}>
+              ✅ Подтвердить и добавить в план
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Карточка подтверждения для нейропротекторного модуля ── */}
+      {neuroConfirm && !stackModulePopup && (
+        <div style={{ marginBottom:8, padding:'10px', borderRadius:12, background:'linear-gradient(135deg,rgba(99,102,241,0.08),rgba(79,70,229,0.04))', border:'2px solid rgba(99,102,241,0.25)' }}>
+          <div style={{ fontSize:11, fontWeight:800, color:'#818cf8', marginBottom:6, display:'flex', alignItems:'center', gap:4 }}>
+            🧠 Нейропротекция — подтверждение
+          </div>
+          <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', marginBottom:5, lineHeight:1.3 }}>
+            Выбрано <b style={{color:'#a5b4fc'}}>{neuroSelected.size}</b> веществ:
+          </div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:8 }}>
+            {Array.from(neuroSelected).map(sid => (
+              <span key={sid} style={{ fontSize:8, padding:'2px 6px', borderRadius:5, fontWeight:600, background:'rgba(99,102,241,0.12)', border:'1px solid rgba(99,102,241,0.2)', color:'#a5b4fc' }}>
+                {subNameRu(sid)}
+              </span>
+            ))}
+          </div>
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:8, lineHeight:1.3 }}>
+            Вещества будут добавлены в план поддержки. Дубли с уже назначенными автоматически исключаются.
+          </div>
+          <div style={{ display:'flex', gap:6 }}>
+            <button onClick={() => { setNeuroConfirm(false); setNeuroPreset(null); setNeuroSelected(new Set()); setStackModulePopup('neuroprotection_stack'); }}
+              style={{ flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'var(--text)' }}>
+              ✕ Отмена
+            </button>
+            <button onClick={() => {
+              const newSubs = Array.from(neuroSelected).filter(sid => !(rec?.subs || []).some(s => canonIdLocal(s.substanceId) === canonIdLocal(sid)));
+              setAddedSubs(prev => [...new Set([...prev, ...newSubs])]);
+              setNeuroConfirm(false);
+              setStackModulePopup(null);
+              if (!selectedStacks.includes('neuroprotection_stack')) setSelectedStacks(prev => [...prev, 'neuroprotection_stack']);
+            }} style={{ flex:2, padding:'8px', borderRadius:8, fontSize:9, fontWeight:800, cursor:'pointer', background:'linear-gradient(135deg,#818cf8,#6366f1)', border:'none', color:'#000' }}>
+              ✅ Подтвердить и добавить в план
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ===== КАРТОЧКА СИМПТОМОВ ===== */}
       <div style={{ margin:'6px 0', padding:'7px 9px', borderRadius:10, background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.15)' }}>
@@ -715,22 +1131,58 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         );
       })()}
 
-      {/* Взаимодействия */}
+      {/* Взаимодействия — все пары (на русском) */}
       {finalRec && finalRec.subs.length > 1 && (() => {
         const interactions = checkInteractions(finalRec.subs.map(s => s.substanceId));
         if (interactions.length === 0) return null;
-        const blocks = interactions.filter(i => i.severity === 'block');
+
+        function fmtSub(id: string): string {
+          if (id.startsWith('@')) {
+            const classLabels: Record<string, string> = {
+              '@statin': 'статины', '@raas': 'РААС-препараты (ACEi/ARB)',
+              '@antidiabetic': 'антидиабетические', '@macrolide': 'макролиды',
+              '@anticoagulant': 'антикоагулянты', '@cyp3a4_inhibitor': 'CYP3A4-ингибиторы',
+              '@cyp3a4_substrate': 'CYP3A4-субстраты', '@alpha_blocker': 'α-блокаторы',
+              '@d2_antagonist': 'D2-антагонисты', '@alcohol': 'алкоголь',
+              '@nsaid': 'НПВС', '@contrast': 'контрастные вещества',
+              '@ssri': 'СИОЗС', '@tetracycline': 'тетрациклины',
+              '@levothyroxine': 'L-тироксин',
+            };
+            return classLabels[id] || id;
+          }
+          return subNameRu(id);
+        }
+
+        const groups: Record<string, DrugInteraction[]> = { block: [], warn: [], monitor: [] };
+        for (const intr of interactions) {
+          groups[intr.severity].push(intr);
+        }
+
+        const hasBlock = groups.block.length > 0;
+        const total = interactions.length;
+
+        const sevLabel: Record<string, string> = { block: '⛔', warn: '⚠', monitor: '🔬' };
+        const sevColor: Record<string, string> = { block: '#fca5a5', warn: '#fbbf24', monitor: '#60a5fa' };
+
         return (
-          <div style={{ marginTop:6, padding:'6px 9px', borderRadius:8, background: blocks.length ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border:'1px solid ' + (blocks.length ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)') }}>
-            <div style={{ fontSize:9, fontWeight:700, color: blocks.length ? '#ef4444' : '#fbbf24', marginBottom:3 }}>
-              {blocks.length ? '⛔ Взаимодействия (критичные)' : '⚠ Взаимодействия'} ({interactions.length})
+          <div style={{ marginTop:6, padding:'6px 9px', borderRadius:8, background: hasBlock ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border:'1px solid ' + (hasBlock ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)') }}>
+            <div style={{ fontSize:9, fontWeight:700, color: hasBlock ? '#ef4444' : '#fbbf24', marginBottom:3 }}>
+              {hasBlock ? '⛔ Взаимодействия (критичные)' : '⚠ Взаимодействия'} ({total})
             </div>
-            {interactions.map((intr, i) => (
-              <div key={i} style={{ fontSize:7, color: intr.severity === 'block' ? '#fca5a5' : '#fbbf24', marginBottom:1, lineHeight:1.4 }}>
-                [{intr.severity === 'block' ? '⛔' : '⚠'}] <b>{intr.a}</b> + <b>{intr.b}</b> — {intr.reason}
-                <div style={{ fontSize:6, opacity:0.8 }}>{intr.action}</div>
-              </div>
-            ))}
+            {(['block', 'warn', 'monitor'] as const).map(sev => {
+              const items = groups[sev];
+              if (items.length === 0) return null;
+              return (
+                <div key={sev} style={{ marginBottom: items.length > 0 && sev !== 'monitor' ? 3 : 0 }}>
+                  {items.map((intr, i) => (
+                    <div key={i} style={{ fontSize:7, color: sevColor[sev], marginBottom:2, lineHeight:1.4, marginLeft:4 }}>
+                      {sevLabel[sev]} <b>{fmtSub(intr.a)}</b> + <b>{fmtSub(intr.b)}</b> — {intr.reason}
+                      <div style={{ fontSize:6, opacity:0.8, marginTop:1 }}>{intr.action}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
           </div>
         );
       })()}
@@ -752,8 +1204,6 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           const e = SUPPORT_CATALOG_DATA[s.substanceId] || SUPPORT_CATALOG_DATA[s.substanceId.toLowerCase()] || SUPPORT_CATALOG_DATA[s.substanceId.toUpperCase()];
           if (e?.contraindications?.length) {
             for (const c of e.contraindications) {
-              const catKey = s.substanceId.toLowerCase();
-              // общие строки типа "Индивидуальная непереносимость" / "Беременность" — не дублируем, выводим
               flat.push({ substanceId: s.substanceId, label: c, severity: 'relative', source: 'catalog' });
             }
           }

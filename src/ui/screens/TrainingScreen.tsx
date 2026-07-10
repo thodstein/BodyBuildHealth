@@ -39,6 +39,7 @@ import { StrengthAnalysisHub } from './TrainingScreen_parts/StrengthAnalysisHub'
 import { LoadManagementHub } from './TrainingScreen_parts/LoadManagementHub';
 import { DiagnosticsHub } from './TrainingScreen_parts/DiagnosticsHub';
 import { PeriodizationHub } from './TrainingScreen_parts/PeriodizationHub';
+import { TaperPlannerTab } from './TrainingScreen_parts/TaperPlannerTab';
 import { BbToolsHub } from './TrainingScreen_parts/BbToolsHub';
 import { ExecutionZone } from './TrainingScreen_parts/ExecutionZone';
 import { TrainingDiaryHub } from './TrainingScreen_parts/TrainingDiaryHub';
@@ -659,13 +660,11 @@ export const TrainingScreen: React.FC = () => {
       {tab === 'load_safety' && <InfoErrorBoundary label="Нагрузка/авторег"><LoadSafetyCard /></InfoErrorBoundary>}
       {tab === 'split_gen' && <InfoErrorBoundary label="Генератор сплитов"><SplitGenCard /></InfoErrorBoundary>}
       {tab === 'pri_reppat' && <InfoErrorBoundary label="PRI/схема повт"><PriRepPatternCard /></InfoErrorBoundary>}
-      {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixTab /></InfoErrorBoundary>}
       {tab === 'tonnage' && <InfoErrorBoundary label="Тоннаж"><TonnageCalcTab /></InfoErrorBoundary>}
-      {tab === 'health_calc' && <InfoErrorBoundary label="Калькуляторы здоровья"><HealthCalculatorsTab /></InfoErrorBoundary>}
 
       {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
-      {tab === 'pl_pro' && <InfoErrorBoundary label="Pro ПЛ-инструменты"><ProPlToolsTab /></InfoErrorBoundary>}
-
+      {tab === 'calc_taper' && <InfoErrorBoundary label="Тапер-планер"><TaperPlannerTab /></InfoErrorBoundary>}
+      {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixTab /></InfoErrorBoundary>}
       {/* ═══════════ MY TRAINING TAB ═══════════ */}
 
       {/* reports tab moved to TrainingDiaryHub (diary tab sub-mode) */}
@@ -713,11 +712,9 @@ import { TimersTab } from './TrainingScreen_parts/TimersTab';
 import { ProgressTab } from './TrainingScreen_parts/ProgressTab';
 import { StrengthLevelCard } from './TrainingScreen_parts/StrengthLevelCard';
 import { StructuredAnalyticsCard } from './TrainingScreen_parts/StructuredAnalyticsCard';
-import { ProPlToolsTab } from './TrainingScreen_parts/ProPlToolsTab';
 import { TrainingCalendarTab } from './TrainingScreen_parts/TrainingCalendarTab';
 import { PlateCalcTab } from './TrainingScreen_parts/PlateCalcTab';
 import { TonnageCalcTab } from './TrainingScreen_parts/TonnageCalcTab';
-import { HealthCalculatorsTab } from './TrainingScreen_parts/HealthCalculatorsTab';
 import { RIRCalibrationCard } from './TrainingScreen_parts/RIRCalibrationCard';
 import MesoCorrectionCard from './TrainingScreen_parts/MesoCorrectionCard';
 import MMCTrackingCard from './TrainingScreen_parts/MMCTrackingCard';

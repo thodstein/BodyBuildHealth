@@ -12,6 +12,7 @@ import { MethodsTab } from './MethodsTab';
 import { ProgramsTab } from './ProgramsTab';
 import { MyTrainingTab } from './MyTrainingTab';
 import ExerciseLabCatalog from './ExerciseLabCatalog';
+import { PeakingProtocolsTab } from './PeakingProtocolsTab';
 import type { TrainingTab } from './shared';
 
 type CustomEx = { name: string; sets: number; reps: number; rir: number };
@@ -78,6 +79,11 @@ export const LibraryZone: React.FC<Props> = (p) => {
             setSelectedProgram={p.setSelectedProgram}
             onAddToMyTraining={(exs) => p.setCustomExercises(prev => [...prev, ...exs])}
           />
+        </InfoErrorBoundary>
+      )}
+      {p.tab === 'peaking' && (
+        <InfoErrorBoundary label="Пик-протоколы">
+          <PeakingProtocolsTab />
         </InfoErrorBoundary>
       )}
       {p.tab === 'exercises' && (

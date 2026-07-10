@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LABEL, SEV_OPTS } from './Calc.types';
+import { LABEL, SEV_OPTS, GLASS } from './Calc.types';
 
 export function SevSelect({
   label,
@@ -550,6 +550,218 @@ export function PopupText({
               >
                 OK
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  PopupPEDInput — кнопка-карточка с попапом для ввода PED-дозы
+// ════════════════════════════════════════════════════════════════════
+interface PedConfig {
+  icon: string;
+  label: string;
+  unit: string;
+  min: number;
+  max: number;
+  step: number;
+  presets: number[];
+  color: string;
+  gradient: string;
+}
+
+export const PED_CONFIGS: Record<string, PedConfig> = {
+  ghIU: { icon:'🧬', label:'GH', unit:'МЕ/день', min:0, max:20, step:0.5, presets:[2,4,6,8,10], color:'#60a5fa', gradient:'linear-gradient(135deg,#3b82f6,#2563eb)' },
+  insulinIU: { icon:'💉', label:'Инсулин', unit:'МЕ/день', min:0, max:50, step:1, presets:[5,10,15,20,30], color:'#fb923c', gradient:'linear-gradient(135deg,#f97316,#ea580c)' },
+  igfMcg: { icon:'🔬', label:'IGF-1 LR3', unit:'мкг/день', min:0, max:200, step:10, presets:[20,40,60,80,100], color:'#a78bfa', gradient:'linear-gradient(135deg,#8b5cf6,#7c3aed)' },
+  clenMcg: { icon:'🔥', label:'Clenbuterol', unit:'мкг/день', min:0, max:200, step:10, presets:[20,40,60,80,120], color:'#f87171', gradient:'linear-gradient(135deg,#ef4444,#dc2626)' },
+  t3Mcg: { icon:'⚡', label:'T3', unit:'мкг/день', min:0, max:100, step:5, presets:[12.5,25,37.5,50,75], color:'#fbbf24', gradient:'linear-gradient(135deg,#f59e0b,#d97706)' },
+};
+
+export function PopupPEDInput({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const cfg = PED_CONFIGS[id]!;
+  const [open, setOpen] = useState(false);
+  const [edit, setEdit] = useState(String(value));
+
+  const active = value > 0;
+
+  return (
+    <>
+      <button
+        onClick={() => { setEdit(String(value)); setOpen(true); }}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          padding: '7px 8px',
+          borderRadius: 10,
+          cursor: 'pointer',
+          background: active ? `${cfg.color}12` : 'rgba(255,255,255,0.03)',
+          border: active ? `1.5px solid ${cfg.color}40` : '1px solid rgba(255,255,255,0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 5,
+          transition: 'all 0.15s',
+        }}
+      >
+        <span style={{ fontSize: 14, lineHeight: 1 }}>{cfg.icon}</span>
+        <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+          <div style={{ fontSize: 8, fontWeight: 700, color: active ? cfg.color : 'var(--text-dim)', lineHeight: 1.2 }}>{cfg.label}</div>
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', lineHeight: 1.2 }}>{cfg.unit}</div>
+        </div>
+        {active ? (
+          <div style={{
+            fontSize: 9, fontWeight: 800, color: '#fff',
+            background: cfg.gradient,
+            padding: '2px 6px',
+            borderRadius: 6,
+            lineHeight: 1.4,
+          }}>
+            {value}{cfg.unit.startsWith('мкг') ? ' мкг' : ''}
+          </div>
+        ) : (
+          <div style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.2)' }}>0</div>
+        )}
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 300,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => setOpen(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '88%', maxWidth: 340,
+              borderRadius: 18,
+              background: '#1a1a1d',
+              border: '1px solid rgba(255,255,255,0.1)',
+              overflow: 'hidden',
+              boxShadow: `0 8px 40px ${cfg.color}20`,
+            }}
+          >
+            {/* Верхняя полоса */}
+            <div style={{ height: 3, background: cfg.gradient }} />
+
+            <div style={{ padding: '16px 18px' }}>
+              {/* Заголовок */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: `${cfg.color}18`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 18,
+                }}>{cfg.icon}</div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: cfg.color, letterSpacing: '-0.3px' }}>{cfg.label}</div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>{cfg.unit}</div>
+                </div>
+              </div>
+
+              {/* Большое число */}
+              <div style={{ textAlign: 'center', marginBottom: 14 }}>
+                <span style={{
+                  fontSize: 36, fontWeight: 800,
+                  color: active ? cfg.color : 'rgba(255,255,255,0.15)',
+                  letterSpacing: '-1px',
+                }}>
+                  {parseInt(edit) || 0}
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.3)', marginLeft: 6 }}>
+                  {cfg.unit.replace('/день','')}
+                </span>
+              </div>
+
+              {/* Ползунок */}
+              <input
+                type="range"
+                min={cfg.min}
+                max={cfg.max}
+                step={cfg.step}
+                value={parseFloat(edit) || 0}
+                onChange={e => setEdit(e.target.value)}
+                style={{
+                  width: '100%', height: 5, cursor: 'pointer',
+                  accentColor: cfg.color,
+                  marginBottom: 12, borderRadius: 3,
+                }}
+              />
+
+              {/* Быстрые пресеты */}
+              <div style={{ display: 'flex', gap: 5, marginBottom: 14, flexWrap: 'wrap' }}>
+                {cfg.presets.map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setEdit(String(p))}
+                    style={{
+                      flex: 1, minWidth: 48, padding: '5px 0',
+                      borderRadius: 6, cursor: 'pointer',
+                      fontSize: 8, fontWeight: 700,
+                      background: (parseFloat(edit) || 0) === p ? `${cfg.color}20` : 'rgba(255,255,255,0.04)',
+                      border: (parseFloat(edit) || 0) === p ? `1px solid ${cfg.color}40` : '1px solid rgba(255,255,255,0.06)',
+                      color: (parseFloat(edit) || 0) === p ? cfg.color : 'rgba(255,255,255,0.6)',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+
+              {/* Ручной ввод + кнопки */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="number"
+                  value={edit}
+                  onChange={e => setEdit(e.target.value)}
+                  placeholder="0"
+                  style={{
+                    flex: 1, padding: '8px 10px', borderRadius: 8, boxSizing: 'border-box',
+                    border: `1px solid ${cfg.color}30`,
+                    background: 'rgba(0,0,0,0.4)', color: '#fff',
+                    fontSize: 14, fontWeight: 700, textAlign: 'center',
+                  }}
+                />
+                <button
+                  onClick={() => { const v = parseFloat(edit); if (!isNaN(v) && v >= 0) onChange(v); setOpen(false); }}
+                  style={{
+                    padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                    background: cfg.gradient, color: '#fff',
+                    fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap',
+                  }}
+                >
+                  OK
+                </button>
+              </div>
+
+              {/* Сбросить */}
+              {active && (
+                <button
+                  onClick={() => { onChange(0); setOpen(false); }}
+                  style={{
+                    width: '100%', marginTop: 8, padding: '6px',
+                    borderRadius: 6, border: 'none', cursor: 'pointer',
+                    background: 'rgba(239,68,68,0.1)', color: '#f87171',
+                    fontSize: 8, fontWeight: 600,
+                  }}
+                >
+                  ✕ Сбросить (0)
+                </button>
+              )}
             </div>
           </div>
         </div>

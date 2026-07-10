@@ -8,11 +8,10 @@ import { MesocycleTrackerTab } from './MesocycleTrackerTab';
 import { MicrocyclePlannerCard } from './MicrocyclePlannerCard';
 import { DeloadSchedulerTab } from './DeloadSchedulerTab';
 import PeakingProtocolTab from './PeakingProtocolTab';
-import { TaperPlannerTab } from './TaperPlannerTab';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
-type PeriodizationHubMode = 'designer' | 'progression' | 'tracker' | 'micro' | 'deload' | 'peaking' | 'taper';
+type PeriodizationHubMode = 'designer' | 'progression' | 'tracker' | 'micro' | 'deload' | 'peaking';
 
 const MODE_DEFS: Array<{ m: PeriodizationHubMode; label: string; icon: string }> = [
   { m: 'designer', label: 'Дизайнер', icon: '🏗️' },
@@ -21,7 +20,6 @@ const MODE_DEFS: Array<{ m: PeriodizationHubMode; label: string; icon: string }>
   { m: 'micro', label: 'Микроциклы', icon: '🗓️' },
   { m: 'deload', label: 'Делод', icon: '🧘' },
   { m: 'peaking', label: 'Пик', icon: '⚡' },
-  { m: 'taper', label: 'Taper', icon: '🏁' }
 ];
 
 export const PeriodizationHub: React.FC = () => {
@@ -30,7 +28,7 @@ export const PeriodizationHub: React.FC = () => {
   return (
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🔄 Периодизация</div>
-      <div style={{ fontSize: 10, color: DIM, marginBottom: 12 }}>Дизайнер макроцикла, прогрессия мезо, трекер, микроциклы, делод, пик-протокол и тейпер к соревнованию.</div>
+      <div style={{ fontSize: 10, color: DIM, marginBottom: 12 }}>Дизайнер макроцикла, прогрессия мезо, трекер, микроциклы, делод, пик-протокол.</div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         {MODE_DEFS.map(({ m, label, icon }) => (
@@ -52,7 +50,6 @@ export const PeriodizationHub: React.FC = () => {
       {mode === 'micro' && <MicrocyclePlannerCard />}
       {mode === 'deload' && <DeloadSchedulerTab />}
       {mode === 'peaking' && <PeakingProtocolTab />}
-      {mode === 'taper' && <TaperPlannerTab />}
     </div>
   );
 };

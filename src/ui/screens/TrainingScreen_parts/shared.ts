@@ -43,10 +43,10 @@ export const PHASE_HINTS: Record<string, string> = {
  *  Актуальная 5-зонная группировка — в nav.ts (ZONES). */
 export type TrainingTab =
   | 'constructor' | 'runtime' | 'exercises' | 'exercise_lab' | 'calculators' | 'diary' | 'cycles' | 'history'
-  | 'tonnage' | 'health_calc'
+  | 'tonnage'
   | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress' | 'mytraining'
   | 'reports' | 'srcbb' | 'volume' | 'library' | 'powerlifting' | 'bodybuilding'
-  | 'calc_quality' | 'calc_1rm' | 'import_data' | 'pl_norms' | 'pl_pro' | 'rel_strength' | 'calendar' | 'mixes' | 'periodization_designer' | 'deload_scheduler' | 'meso_progression'
+  | 'calc_quality' | 'calc_1rm' | 'import_data' | 'pl_norms' | 'rel_strength' | 'calendar' | 'mixes' | 'periodization_designer' | 'deload_scheduler' | 'meso_progression'
   | 'calc_taper' | 'calc_fatigue' | 'calc_vbt' | 'calc_plates' | 'calc_mrv'
   | 'tempo' | 'meso_tracker' | 'specialization' | 'peaking' | 'mmc_tracking'
   | 'checkin' | 'strength' | 'bb_tools' | 'pl_weakpoints' | 'load_safety' | 'split_gen' | 'goals' | 'pri_reppat' | 'insights'
@@ -68,7 +68,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   calc_1rm: '🎯 Калькулятор 1RM',
   import_data: '📥 Импорт CSV',
   pl_norms: '🏆 Нормативы ПЛ',
-  pl_pro: '🏋️ Pro ПЛ-инструменты',
+
   rel_strength: '💪 Относительная сила',
   calendar: '📅 Календарь тренировок',
   mixes: '💪 Тренировочные миксы',
@@ -103,7 +103,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   periodization_hub: '🔄 Периодизация',
   training_mix_hub: '🧪 Тренировочные миксы',
   tonnage: '📦 Тоннаж калькулятор',
-  health_calc: '🏥 Калькуляторы здоровья',
+
 };
 
 // ══ Режим зоны «Планировщик»: ПЛ-авто / ББ-авто / Ручной сбор (сегментированный переключатель в nav.ts).
