@@ -11,6 +11,8 @@ interface Props {
   manualCfg: Record<string, string>;
   setManual: (k: string, v: string) => void;
   onLoadProgram: (programId: string) => void;
+  targetTonnage: Record<string, number>;
+  setTargetTonnage: (g: string, v: number) => void;
 }
 
 /* ─── Вспомогательный компонент секции конфигурации ─── */
@@ -30,13 +32,18 @@ const Sel: React.FC<{ label: string; value: string; onChange: (v: string) => voi
     <PopupSelect label={label} value={value} onChange={onChange} options={options} hint={hint} />
   );
 
-export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgram }) => {
+export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgram, targetTonnage, setTargetTonnage }) => {
   const allPrograms = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS];
   const selectedList = Object.entries(manualCfg).filter(([, v]) => v);
+  
+  const groups = [
+    { id: 'chest', label: 'Грудь' }, { id: 'back', label: 'Спина' }, { id: 'legs', label: 'Ноги' },
+    { id: 'shoulders', label: 'Плечи' }, { id: 'arms', label: 'Руки' }, { id: 'core', label: 'Кор' },
+  ];
 
   return (
-    <div>
-      {/* ─── БАЗОВАЯ СТРУКТУРА ─── */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* ─── БАЗОВАЯ СТРУКТУРА (Primary) ─── */}
       <ConfigSection title="🏗️ БАЗОВАЯ СТРУКТУРА" color="#60a5fa">
         <Sel label="Тип сплита" value={manualCfg.split || ''} onChange={v => setManual('split', v)}
           options={Object.entries(TRAINING_SPLITS).map(([id, s]: [string, any]) => ({ id, label: s.name, desc: s.desc }))}
@@ -53,28 +60,48 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
           options={getMethodsByCategory('frequency').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
       </ConfigSection>
 
-      {/* ─── ПЕРИОДИЗАЦИЯ И ПРОГРЕССИЯ ─── */}
-      <ConfigSection title="📈 ПЕРИОДИЗАЦИЯ И ПРОГРЕССИЯ" color="#a78bfa">
-        <Sel label="Периодизация" value={manualCfg.periodization || ''} onChange={v => setManual('periodization', v)}
-          options={getMethodsByCategory('periodization').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
-        <Sel label="Прогрессия" value={manualCfg.progression || ''} onChange={v => setManual('progression', v)}
-          options={getMethodsByCategory('progression').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+      {/* ─── ЦЕЛЕВОЙ ТОННАЖ (Tonnage) ─── */}
+      <ConfigSection title="⚖️ ЦЕЛЕВОЙ ТОННАЖ (кг/нед)" color="#00e68a">
+        {groups.map(g => (
+          <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
+            <span style={{ fontSize: 9, fontWeight: 600, color: DIM, flex: 1 }}>{g.label}</span>
+            <input 
+              type="number" value={targetTonnage[g.id] || ''} 
+              onChange={e => setTargetTonnage(g.id, parseInt(e.target.value) || 0)}
+              style={{ width: 60, background: '#000', border: '1px solid rgba(255,255,255,0.1)', color: ACCENT, borderRadius: 4, fontSize: 10, textAlign: 'center', padding: '2px 0' }}
+            />
+          </div>
+        ))}
       </ConfigSection>
 
-      {/* ─── ИНТЕНСИВНОСТЬ И ТЕХНИКА ─── */}
-      <ConfigSection title="🎯 ИНТЕНСИВНОСТЬ И ТЕХНИКА" color="#f59e0b">
-        <Sel label="Интенсивность" value={manualCfg.intensity || ''} onChange={v => setManual('intensity', v)}
-          options={getMethodsByCategory('intensity').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
-        <Sel label="Техника" value={manualCfg.technique || ''} onChange={v => setManual('technique', v)}
-          options={getMethodsByCategory('technique').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
-        <Sel label="Объём" value={manualCfg.volume || ''} onChange={v => setManual('volume', v)}
-          options={getMethodsByCategory('volume').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
-      </ConfigSection>
+      {/* ─── МЕТОДОЛОГИЯ (Secondary) ─── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <ConfigSection title="📈 ПРОГРЕССИЯ" color="#a78bfa">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <Sel label="Периодизация" value={manualCfg.periodization || ''} onChange={v => setManual('periodization', v)}
+              options={getMethodsByCategory('periodization').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+            <Sel label="Прогрессия" value={manualCfg.progression || ''} onChange={v => setManual('progression', v)}
+              options={getMethodsByCategory('progression').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+          </div>
+        </ConfigSection>
 
-      {/* ─── СПЕЦИАЛИЗАЦИЯ ─── */}
-      <ConfigSection title="🎯 СПЕЦИАЛИЗАЦИЯ (23 методики)" color="#ec4899">
-        <Sel label="Специализация" value={manualCfg.specialization || ''} onChange={v => setManual('specialization', v)}
-          options={getMethodsByCategory('specialization').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+        <ConfigSection title="🎯 ИНТЕНСИВНОСТЬ" color="#f59e0b">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <Sel label="Интенсивность" value={manualCfg.intensity || ''} onChange={v => setManual('intensity', v)}
+              options={getMethodsByCategory('intensity').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+            <Sel label="Техника" value={manualCfg.technique || ''} onChange={v => setManual('technique', v)}
+              options={getMethodsByCategory('technique').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+            <Sel label="Объём" value={manualCfg.volume || ''} onChange={v => setManual('volume', v)}
+              options={getMethodsByCategory('volume').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+          </div>
+        </ConfigSection>
+      </div>
+
+      <ConfigSection title="🎯 СПЕЦИАЛИЗАЦИЯ" color="#ec4899">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <Sel label="Метод специализации" value={manualCfg.specialization || ''} onChange={v => setManual('specialization', v)}
+            options={getMethodsByCategory('specialization').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+        </div>
       </ConfigSection>
 
       {/* ─── ВЫБРАННЫЕ ПАРАМЕТРЫ ─── */}
@@ -94,7 +121,6 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
         </div>
       )}
 
-      {/* ─── ЗАГРУЗИТЬ ПРОГРАММУ ─── */}
       {manualCfg.program && (
         <button onClick={() => onLoadProgram(manualCfg.program)}
           style={{

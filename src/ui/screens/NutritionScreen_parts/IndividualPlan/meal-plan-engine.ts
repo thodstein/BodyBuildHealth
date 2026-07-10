@@ -75,6 +75,10 @@ export interface MealPlanInput {
   cyclePhase?: 'course' | 'pct' | 'cutting' | 'bridge' | 'recovery' | 'maintenance';
   randomSalt?: number;
   variety?: 'minimal' | 'medium' | 'max';
+  // P1.2: Foods locked by user — must be included in plan (same food, recalculated grams)
+  lockedIds?: Set<string>;
+  // P1.3: Foods used in recent days — deprioritized to avoid repetition
+  recentFoodIds?: Set<string>;
 }
 
 // ─── Константы (клинические ориентиры) ─────────────────────────────────
@@ -128,6 +132,33 @@ function seededRandom(seed: number): number {
 
 function pick<T>(arr: T[], seed: number): T | undefined {
   if (arr.length === 0) return undefined;
+  return arr[Math.floor(seededRandom(seed) * arr.length)];
+}
+
+// P1.2: Pick from pool, but prefer locked foods, then preferred, then deprioritize recent
+function pickPriority<T extends { id: string }>(arr: T[], seed: number, opts?: { lockedIds?: Set<string>; preferredIds?: Set<string>; recentIds?: Set<string> }): T | undefined {
+  if (arr.length === 0) return undefined;
+  const locked = opts?.lockedIds;
+  const preferred = opts?.preferredIds;
+  const recent = opts?.recentIds;
+  // 1. Locked foods get absolute priority
+  if (locked && locked.size > 0) {
+    const lockedPool = arr.filter(f => locked.has(f.id));
+    if (lockedPool.length > 0) return lockedPool[Math.floor(seededRandom(seed) * lockedPool.length)];
+  }
+  // 2. Preferred foods get next priority (already handled by caller for most cases, but as fallback)
+  if (preferred && preferred.size > 0) {
+    const prefPool = arr.filter(f => preferred.has(f.id));
+    if (prefPool.length > 0) return prefPool[Math.floor(seededRandom(seed) * prefPool.length)];
+  }
+  // 3. Deprioritize recent foods: filter them out if enough alternatives exist
+  if (recent && recent.size > 0) {
+    const freshPool = arr.filter(f => !recent.has(f.id));
+    if (freshPool.length >= Math.min(3, arr.length)) {
+      return freshPool[Math.floor(seededRandom(seed) * freshPool.length)];
+    }
+  }
+  // 4. Normal pick
   return arr[Math.floor(seededRandom(seed) * arr.length)];
 }
 
@@ -225,9 +256,11 @@ function buildWholeMeal(
     includeFruit?: boolean;
     rationales: string[];
     preferredIds?: Set<string>;
+    lockedIds?: Set<string>;
+    recentIds?: Set<string>;
   }
 ): Meal {
-  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, rationales, preferredIds } = params;
+  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, rationales, preferredIds, lockedIds, recentIds } = params;
   const items: MealItem[] = [];
   let remP = proteinG, remC = carbG, remF = fatG;
 
@@ -235,7 +268,7 @@ function buildWholeMeal(
   const rotPool = pool.proteinSolid.filter(f => proteinRotationIds.includes(f.id));
   const preferredRot = preferredIds && preferredIds.size > 0 ? rotPool.filter(f => preferredIds.has(f.id)) : [];
   const proteinPool = preferredRot.length > 0 ? preferredRot : rotPool.length > 0 ? rotPool : pool.proteinLean.length > 0 ? pool.proteinLean : pool.proteinSolid;
-  const proteinSource = pick(proteinPool, seed);
+  const proteinSource = pickPriority(proteinPool, seed, { lockedIds, preferredIds: preferredRot.length > 0 ? undefined : preferredIds, recentIds });
   if (proteinSource) {
     const grams = gramsForMacro(proteinSource, remP, 'protein');
     if (grams > 0) {
@@ -257,9 +290,10 @@ function buildWholeMeal(
     }
   }
 
-  // 2. Углеводы: медленные по умолчанию
+  // 2. Углеводы: медленные по умолчанию (предпочтение — preferred)
   if (remC > 8) {
-    const carbSource = pick(pool.carbSlow, seed + 1);
+    const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
+    const carbSource = pickPriority(prefCarb.length > 0 ? prefCarb : pool.carbSlow, seed + 1, { lockedIds, recentIds });
     if (carbSource) {
       const grams = gramsForMacro(carbSource, remC, 'carbs');
       if (grams > 0) {
@@ -269,9 +303,11 @@ function buildWholeMeal(
     }
   }
 
-  // 3. Овощи (волокно + микро): порция ≥150 г, без учёта в приоритете макроса
+  // 3. Овощи (волокно + микро): порция ≥150 г (предпочтение — preferred)
   if (includeVeg) {
-    const vegSource = pick(pool.vegGreen, seed + 2) || pick(pool.vegColor, seed + 3);
+    const prefVegGreen = preferredIds && preferredIds.size > 0 ? pool.vegGreen.filter(f => preferredIds.has(f.id)) : [];
+    const prefVegColor = preferredIds && preferredIds.size > 0 ? pool.vegColor.filter(f => preferredIds.has(f.id)) : [];
+    const vegSource = pickPriority(prefVegGreen.length > 0 ? prefVegGreen : pool.vegGreen, seed + 2, { lockedIds, recentIds }) || pickPriority(prefVegColor.length > 0 ? prefVegColor : pool.vegColor, seed + 3, { lockedIds, recentIds });
     if (vegSource) {
       const grams = 150 + Math.floor(seededRandom(seed + 3) * 100);
       const item = makeItem(vegSource, grams, 'veg');
@@ -279,9 +315,10 @@ function buildWholeMeal(
     }
   }
 
-  // 4. Фрукт (ягоды/киви как пребиотик и антиоксидант)
+  // 4. Фрукт (ягоды/киви как пребиотик и антиоксидант) (предпочтение — preferred)
   if (includeFruit) {
-    const fSrc = pick(pool.carbFruit, seed + 4);
+    const prefFruit = preferredIds && preferredIds.size > 0 ? pool.carbFruit.filter(f => preferredIds.has(f.id)) : [];
+    const fSrc = pickPriority(prefFruit.length > 0 ? prefFruit : pool.carbFruit, seed + 4, { lockedIds, recentIds });
     if (fSrc) {
       const grams = 80 + Math.floor(seededRandom(seed + 5) * 60);
       const item = makeItem(fSrc, grams, 'fruit');
@@ -289,9 +326,10 @@ function buildWholeMeal(
     }
   }
 
-  // 5. Жиры: остаточный принцип (если remF > 5)
+  // 5. Жиры: остаточный принцип (если remF > 5) (предпочтение — preferred)
   if (remF > 5) {
-    const fatSource = pick(pool.fats, seed + 6);
+    const prefFat = preferredIds && preferredIds.size > 0 ? pool.fats.filter(f => preferredIds.has(f.id)) : [];
+    const fatSource = pickPriority(prefFat.length > 0 ? prefFat : pool.fats, seed + 6, { lockedIds, recentIds });
     if (fatSource) {
       const grams = gramsForMacro(fatSource, remF, 'fat');
       if (grams > 0) {
@@ -495,16 +533,23 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const restCarbDinner = Math.round(carbsTotal * 0.20);
   const fatTotal = Math.max(Math.round(input.weightKg * FAT_FLOOR_PER_KG), input.goalFatG);
 
+  // P1.4: Snack on non-training days to fill MPS gap (lunch 12:30 → dinner 19:00 = 6.5h)
+  const snackP = Math.max(15, Math.round(mpsPerMeal * 0.6));
+  const snackC = Math.round(carbsTotal * 0.10);
+  const snackF = Math.round(fatTotal * 0.10);
+  const hasSnack = !trainWindow && input.mealsCount >= 4;
+
   const mealBudget = {
     breakfast: { p: Math.max(25, mpsPerMeal), c: breakC, f: Math.round(fatTotal * 0.25) },
-    lunch: { p: Math.max(25, mpsPerMeal), c: trainWindow ? trainCarbLunch : restCarbLunch, f: Math.round(fatTotal * 0.2) },
+    lunch: { p: Math.max(25, mpsPerMeal), c: trainWindow ? trainCarbLunch : restCarbLunch - snackC, f: Math.round(fatTotal * 0.2) },
     dinner: { p: Math.max(25, mpsPerMeal), c: trainWindow ? trainCarbDinner : restCarbDinner, f: Math.round(fatTotal * 0.3) },
     prew: trainWindow ? { p: PREW_PROTEIN_G, c: PREW_CARB_SLOW_G, f: PREW_FAT_MAX_G } : null,
     postw: trainWindow ? { p: POSTW_FAST_PROTEIN_G, c: POSTW_FAST_CARB_G, f: 0 } : null,
+    snack: hasSnack ? { p: snackP, c: snackC, f: snackF } : null,
   };
 
-  const usedP = mealBudget.breakfast.p + mealBudget.lunch.p + mealBudget.dinner.p + (mealBudget.prew?.p || 0) + (mealBudget.postw?.p || 0);
-  const usedC = mealBudget.breakfast.c + mealBudget.lunch.c + mealBudget.dinner.c + (mealBudget.prew?.c || 0) + (mealBudget.postw?.c || 0);
+  const usedP = mealBudget.breakfast.p + mealBudget.lunch.p + mealBudget.dinner.p + (mealBudget.prew?.p || 0) + (mealBudget.postw?.p || 0) + (mealBudget.snack?.p || 0);
+  const usedC = mealBudget.breakfast.c + mealBudget.lunch.c + mealBudget.dinner.c + (mealBudget.prew?.c || 0) + (mealBudget.postw?.c || 0) + (mealBudget.snack?.c || 0);
   const residualP = Math.max(25, input.goalProteinG - usedP);
   const residualC = Math.max(0, carbsTotal - usedC);
 
@@ -525,6 +570,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     pool, proteinRotationIds: breakfastRot.ids, seed: seedBase + 1,
     includeVeg: false, includeFruit: true,
     preferredIds: input.preferredIds,
+    lockedIds: input.lockedIds, recentIds: input.recentFoodIds,
     rationales: [
       `Завтрак: белок (${breakfastRot.label}) + медленные углеводы + жиры + ягоды`,
       'Желчь активна, липаза готова — жиры хорошо усваиваются',
@@ -544,6 +590,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     pool, proteinRotationIds: lunchRot.ids, seed: seedBase + 2,
     includeVeg: true, includeFruit: false,
     preferredIds: input.preferredIds,
+    lockedIds: input.lockedIds, recentIds: input.recentFoodIds,
     rationales: [
       `Обед: цельная пища (${lunchRot.label} + злак + овощи + жиры)`,
       'Поддержание MPS — четверть суточного белка',
@@ -551,6 +598,28 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   });
   meals.push(lunch);
   lunch.items.forEach(i => allFoodsUsed.push(i.id));
+
+  // P1.4: 2b. Snack 15:00 — нетренировочный день (MPS gap fill)
+  if (hasSnack && mealBudget.snack) {
+    const snackRot = rotationForMeal(3);
+    const snack = buildWholeMeal({
+      label: 'Полдник', time: '15:30', type: 'snack',
+      proteinG: mealBudget.snack.p,
+      carbG: mealBudget.snack.c,
+      fatG: mealBudget.snack.f,
+      pool, proteinRotationIds: snackRot.ids, seed: seedBase + 8,
+      includeVeg: false, includeFruit: true,
+      preferredIds: input.preferredIds,
+      lockedIds: input.lockedIds, recentIds: input.recentFoodIds,
+      rationales: [
+        `Полдник: лёгкий белок (${snackRot.label}) + фрукт — поддержание MPS (интервал 3ч от обеда)`,
+        'Заполняет окно 6.5ч между обедом и ужином — предотвращает катаболизм',
+      ],
+    });
+    meals.push(snack);
+    snack.items.forEach(i => allFoodsUsed.push(i.id));
+    notes.push('Полдник 15:30: MPS gap fill (нетренировочный день) — белок + фрукт');
+  }
 
   // 3. Pre-workout (если тренировка) — за 90 мин до старта ─────────────
   if (trainWindow && mealBudget.prew && input.trainStartMin) {
@@ -588,6 +657,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     pool, proteinRotationIds: dinnerRot.ids, seed: seedBase + 6,
     includeVeg: true, includeFruit: false,
     preferredIds: input.preferredIds,
+    lockedIds: input.lockedIds, recentIds: input.recentFoodIds,
     rationales: [
       `Ужин: ${dinnerRot.label} + 30% жиров — медленная абсорбция на ночь`,
       'Поддержание MPS — обязательный приём после 4–5 ч без белка',

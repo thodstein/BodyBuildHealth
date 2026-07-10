@@ -24,6 +24,8 @@ export const INTENSITY_TECHNIQUES: TechniqueSpec[] = [
   { technique: 'mechanical_drop', name: 'Механический дроп', appliesTo: 'памп', level: ['intermediate','advanced','enhanced'], description: 'Смена на более выгодную biomechanics позицию без отдыха (напр. жим→жим в раме).', params: { steps: 2 } },
   { technique: 'pre_exhaust', name: 'Пре-истощение', appliesTo: 'тяж', level: ['intermediate','advanced'], description: 'Изоляция целевой мышцы перед базой. Снижение веса базы, но больший стимул мышцы.' },
   { technique: 'post_exhaust', name: 'Пост-истощение', appliesTo: 'тяж', level: ['intermediate','advanced'], description: 'Изоляция после базы. Добивка целевой мышцы.' },
+  { technique: 'triset', name: 'Трисет', appliesTo: 'памп', level: ['advanced','enhanced'], description: 'Три упражнения на одну группу без отдыха. Максимальная плотность и метаболический стресс.', params: { exercises: 3 } },
+  { technique: 'rest_pause_cluster', name: 'Кластерный rest-pause', appliesTo: 'тяж', level: ['advanced','enhanced'], description: 'Тяжёлый вес (85-90% 1RM) с 10-15с отдыха между повторениями. Сила + объём в одном подходе.', params: { pct1RM: 87, repsPerCluster: 2, clusters: 4, restSec: 15 } },
   { technique: 'slow_eccentric', name: 'Медленный эксцентрик', appliesTo: 'both', level: ['intermediate','advanced','enhanced'], description: '4с эксцентрик. Больше повреждений и натяжения в растянутой позиции.' },
 ];
 

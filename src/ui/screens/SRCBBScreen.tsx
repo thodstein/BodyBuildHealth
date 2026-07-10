@@ -219,7 +219,14 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (!pmMap['Присед']) pmMap['Присед'] = pmSquat;
     if (!pmMap['Жим лежа']) pmMap['Жим лежа'] = pmBench;
     if (!pmMap['Становая тяга']) pmMap['Становая тяга'] = pmDead;
-    const plan = buildLMSPlan({ template: tpl, pmMap, fallbackPm: 80, mode: 'natural', weeksOverride: cycleWeeks });
+    const plan = buildLMSPlan({ 
+      template: tpl, pmMap, fallbackPm: 80, mode: 'natural', weeksOverride: cycleWeeks,
+      volumeGoal: (linked.profile?.settings?.volumeGoal as any) || 'mav',
+      focusLift: (linked.profile?.settings?.focusLift as any),
+      currentReadiness: linked.readiness?.recovery,
+      equipment: linked.profile?.settings?.equipment,
+      weakPoints: weakPoints,
+    });
     setBuiltSrc(plan); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setSrcAdditions({}); setPickerDay(null);
     // TRAINING INTEGRATION: конвертировать PL план в сессии
     try { const sessions = lmsPlanToSessions(plan); saveBridgeSessions(sessions); } catch { /* ignore */ }
@@ -231,6 +238,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [bbGoal, setBbGoal] = useState<string>(_bbSaved?.bbGoal || 'mass');
   const [bbDays, setBbDays] = useState<number>(_bbSaved?.bbDays ?? 4);
   const [bbWeeks, setBbWeeks] = useState<number>(_bbSaved?.bbWeeks ?? 4);
+  const [bbVolGoal, setBbVolGoal] = useState<string>(_bbSaved?.bbVolGoal || 'mav');
+  const [bbFocus, setBbFocus] = useState<string>(_bbSaved?.bbFocus || '');
   const [peds, setPeds] = useState<PED[]>(_bbSaved?.peds ?? (_profPL.onCourse ? (['AAS'] as PED[]) : []));
   const [builtBb, setBuiltBb] = useState<BBPlan | null>(_bbSaved?.builtBb ?? null);
   const [bbWeekSel, setBbWeekSel] = useState<number>(_bbSaved?.bbWeekSel ?? 1);
@@ -346,7 +355,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
 
   const buildBb = () => {
     if (!bbBest) return;
-    const plan = buildBBPlan({ patternId: bbBest.pattern.id, level: bbLevel, goal: bbGoal as any, weeks: bbWeeks, workMax: bbWorkMax, weakPoints });
+    const plan = buildBBPlan({ 
+      patternId: bbBest.pattern.id, level: bbLevel, goal: bbGoal as any, weeks: bbWeeks, 
+      workMax: bbWorkMax, weakPoints, focusGroup: bbFocus, volumeGoal: bbVolGoal as any 
+    });
     setBuiltBb(plan); setBbWeekSel(1);
     // TRAINING INTEGRATION: конвертировать BB план в сессии
     try { const sessions = bbPlanToSessions(plan); saveBridgeSessions(sessions); } catch { /* ignore */ }
@@ -927,12 +939,15 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       {mainTab === 'bb' && subView === 'plan' && (
         <div>
           <div style={H}>💪 Авто-подбор бодибилдинг-сплита</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <PopupSelect label="Уровень спортсмена" value={bbLevel} onChange={setBbLevel} options={[['beginner','Новичок'],['intermediate','Средний'],['advanced','Опытный'],['enhanced','Enhanced (на курсе)']].map(([id,label]) => ({ id, label }))} />
-            <PopupSelect label="Цель" value={bbGoal} onChange={setBbGoal} options={[['mass','Мышечная масса'],['cut','Сушка'],['recomp','Рекомпозиция'],['maintenance','Поддержание'],['strength_mass','Сила + Масса']].map(([id,label]) => ({ id, label }))} />
-            <PopupNumber label="Дней в неделю" value={bbDays} min={3} max={6} onChange={v => setBbDays(v)} />
-            <PopupNumber label="Недель мезоцикла" value={bbWeeks} min={4} max={24} suffix=" нед" onChange={v => setBbWeeks(v)} />
-          </div>
+           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+             <PopupSelect label="Уровень спортсмена" value={bbLevel} onChange={setBbLevel} options={[['beginner','Новичок'],['intermediate','Средний'],['advanced','Опытный'],['enhanced','Enhanced (на курсе)']].map(([id,label]) => ({ id, label }))} />
+             <PopupSelect label="Цель" value={bbGoal} onChange={setBbGoal} options={[['mass','Мышечная масса'],['cut','Сушка'],['recomp','Рекомпозиция'],['maintenance','Поддержание'],['strength_mass','Сила + Масса']].map(([id,label]) => ({ id, label }))} />
+             <PopupNumber label="Дней в неделю" value={bbDays} min={3} max={6} onChange={v => setBbDays(v)} />
+             <PopupNumber label="Недель мезоцикла" value={bbWeeks} min={4} max={24} suffix=" нед" onChange={v => setBbWeeks(v)} />
+             <PopupSelect label="Цель по объёму" value={bbVolGoal} onChange={setBbVolGoal} options={[['mev','Минимум (MEV)'],['mav','Оптимум (MAV)'],['mrv','Максимум (MRV)']].map(([id,label]) => ({ id, label }))} />
+              <PopupSelect label="Группа фокуса" value={bbFocus} onChange={setBbFocus} options={[{ id: '', label: 'Нет' }, ...WEAK_GROUPS.map(([id,l]) => ({ id, label: l }))]} />
+           </div>
+
           {bbBest && <ExpandableCard title={'🏆 Рекомендован: ' + bbBest.pattern.name} icon='🏆' short={bbBest.pattern.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот сплит:</b> {explainBBSelection(bbBest)}</div><button onClick={buildBb} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 700, fontSize: 12 }}>✅ Применить сплит и собрать план</button></>} />}
           <div style={H}>💉 Фармакология (PED-адаптация объёмов)</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>

@@ -8,6 +8,7 @@ import { labTrainingAdjust } from '../lab-training-adjust';
 import { loadReadinessHistory } from '../readiness-history';
 import { usePlanGeneration } from '../../../hooks/usePlanGeneration';
 import { generateMacrocycle, getCurrentWeekPlan, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../../../engines/training-periodization.engine';
+import { EXERCISE_CATALOG } from '../../../../core/exercise-catalog';
 import { TrainingProfileCard } from '../TrainingProfileCard';
 import type { TrainingProfile } from '../training-profile';
 import { PCT_FOR_RIR, ACCENT, DIM, detectGroup, getMrv, type ManualResult, type ManualDay, type ManualExercise } from './types';
@@ -54,6 +55,9 @@ export const TrainingConstructor: React.FC<Props> = ({
     try { return (localStorage.getItem('he_constructor_tab') as 'params' | 'editor' | 'tools') || 'params'; } catch { return 'params'; }
   });
   useEffect(() => { try { localStorage.setItem('he_constructor_tab', constTab); } catch {} }, [constTab]);
+
+  const [readinessSlider, setReadinessSlider] = useState(tprofile.recovery || 70);
+  const [targetTonnage, setTargetTonnage] = useState<Record<string, number>>({});
 
   const [manualCfg, setManualCfg] = useState<Record<string, string>>({});
   const setManual = useCallback((k: string, v: string) => setManualCfg(p => ({ ...p, [k]: v })), []);
@@ -384,39 +388,55 @@ export const TrainingConstructor: React.FC<Props> = ({
     return { days: modified, log };
   }, []);
 
-  const generateManualPlan = useCallback(() => {
-    const corrections: string[] = [];
+  // ─── LIVE-GENERATION: План пересчитывается автоматически при изменении параметров ───
+  const { days: generatedDays, weeklySets: generatedWeeklySets, groupCorrections: generatedCorrections, patternBalance: generatedBalance } = useMemo(() => {
     const auto = selectSplit({ goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as any);
     const manualSp = manualCfg.split ? TRAINING_SPLITS[manualCfg.split] : null;
     const sp = manualSp ? { id: manualCfg.split!, name: manualSp.name, desc: manualSp.desc, groupsPerDay: manualSp.groupsPerDay, score: 100, rationale: ['Ручной выбор'] } as any : auto[0];
-    if (!sp) { setManualResult(null); return; }
-    if (manualSp) corrections.push(`Сплит выбран вручную: «${sp.name}».`); else corrections.push(`Сплит подобран автоматически: «${sp.name}».`);
+    
+    if (!sp) return { days: [], weeklySets: {}, groupCorrections: ['Ошибка подбора сплита'], patternBalance: {} };
+    
     const cycle: string[][] = []; let gi = 0;
     while (cycle.length < daysPerWeek) { cycle.push(sp.groupsPerDay[gi % sp.groupsPerDay.length]); gi++; }
     const labAdj = labTrainingAdjust(labAnalysis);
-
     const mrv = mrvOverride ?? getMrv(level, tprofile.onCourse, tprofile.courseIntensity, labAdj.mrvMultiplier);
-    corrections.push(`Допустимый объём (MRV): ${Math.round(mrv)} сетов/нед на группу${mrvOverride ? ' (из калькулятора MRV)' : ''}.`);
-    if (tprofile.onCourse) corrections.push(`MRV повышен на курсе (интенсивность: ${tprofile.courseIntensity}).`);
-    if (labAdj.mrvMultiplier < 1) corrections.push(`MRV снижен по лаборатории ×${labAdj.mrvMultiplier.toFixed(2)}: ${labAdj.warnings.join(' ')}`);
-    if (weakPoints.length > 0) corrections.push(`Слабые группы (${weakPoints.join(', ')}): приоритет + RIR ↓.`);
-    if (tprofile.equipment.length > 0) corrections.push(`Фильтр оборудования: только ${tprofile.equipment.join(', ')}.`);
-    try { const rh = loadReadinessHistory(); if (rh.length) { const last = rh[rh.length - 1]; if ((last?.recovery ?? 100) < 60) { corrections.push(`🩺 Готовность ${Math.round(last.recovery)}% (<60) — объём снижен на 15%.`); } } } catch {}
-    const built = buildPlan(cycle, mrv);
-    corrections.push(...built.groupCorrections);
-    const ws = built.weeklySets;
-    Object.entries(ws).forEach(([g, s]: [string, any]) => { if (s < Math.max(4, mrv * 0.4) && s > 0) corrections.push(`Группа «${g}»: низкий объём (${s} сетов) — ниже зоны адаптации.`); });
-    weakPoints.forEach(w => { if (!ws[w] || ws[w] === 0) corrections.push(`⚠ Слабая группа «${w}» не включена — добавьте специализированное упражнение.`); });
-
-    // Применить выбранные методики к плану
+    
+    const built = buildPlan(cycle, mrv, { currentReadiness: readinessSlider, targetTonnage, sequenceStrategy: (manualCfg.sequence || 'classic') as 'classic' | 'preexhaust' | 'antagonist' });
+    
     const methodResult = applyMethodsToPlan(built.days as ManualDay[], manualCfg, manualWorkMax, goal, mrv);
-    const methodCorrections = methodResult.log;
-    corrections.push(...methodCorrections);
+    
+    const finalCorrections = [...built.groupCorrections, ...methodResult.log];
+    
+    // ─── Детектор конфликтов: Слишком много тяжёлых базовых в один день ───
+    methodResult.days.forEach((d, di) => {
+      const heavyCount = d.exercises.filter(e => {
+        const cat = EXERCISE_CATALOG.find(c => c.name === e.name);
+        return (cat?.fatigueCost || 0) >= 8;
+      }).length;
+      if (heavyCount >= 3) {
+        finalCorrections.push(`⚠ День ${di + 1}: Критическая нагрузка! ${heavyCount} тяжёлых упражнений могут привести к переутомлению.`);
+      }
+    });
 
-    lastSyncedWeekRef.current = -1;
-    setManualResult({ splitName: sp.name, corrections, days: methodResult.days });
+    return { 
+      days: methodResult.days, 
+      weeklySets: built.weeklySets, 
+      groupCorrections: finalCorrections, 
+      patternBalance: built.patternBalance 
+    };
+  }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, manualCfg, tprofile, labAnalysis, buildPlan, mrvOverride, manualWorkMax, applyMethodsToPlan, readinessSlider, targetTonnage]);
+
+  const generateManualPlan = useCallback(() => {
+    const sp = manualCfg.split ? TRAINING_SPLITS[manualCfg.split] : null;
+    const splitName = (manualCfg.split ? TRAINING_SPLITS[manualCfg.split] : null)?.name || 'Авто-сплит';
+    
+    setManualResult({ 
+      splitName: splitName, 
+      corrections: generatedCorrections, 
+      days: generatedDays 
+    });
     setConstTab('editor');
-  }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, manualCfg, tprofile, labAnalysis, buildPlan, mrvOverride, manualWorkMax, applyMethodsToPlan]);
+  }, [generatedDays, generatedCorrections, manualCfg]);
 
   const loadProgramToConstructor = useCallback((programId: string) => {
     const lib: FullProgram[] = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS];
@@ -671,7 +691,11 @@ export const TrainingConstructor: React.FC<Props> = ({
       {/* ─── ВКЛАДКА EDITOR: конфиг + сборка + результат ─── */}
       {constTab === 'editor' && (
         <>
-          <ConfigPanel manualCfg={manualCfg} setManual={setManual} onLoadProgram={loadProgramToConstructor} />
+       <ConfigPanel 
+         manualCfg={manualCfg} setManual={setManual} onLoadProgram={loadProgramToConstructor} 
+         targetTonnage={targetTonnage} setTargetTonnage={(g: string, v: number) => setTargetTonnage(prev => ({ ...prev, [g]: v }))}
+       />
+
 
           {/* Кнопка сборки с превью */}
           <div style={{

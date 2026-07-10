@@ -188,7 +188,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
     </div>
     {Object.keys(appliedMethods).length > 0 && (
       <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginBottom:8 }}>
-        {Object.entries(appliedMethods).map(([c, n]) => <span key={c} onClick={() => onToggleMethod(n, c)} style={{ fontSize:9, padding:"3px 8px", borderRadius:10, cursor:"pointer", background:"rgba(0,230,138,0.12)", border:"1px solid rgba(0,230,138,0.3)", color:"#00e68a" }}>{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление' } as Record<string,string>)[c] || c}: {n} ✕</span>)}
+        {Object.entries(appliedMethods).map(([c, n]) => <span key={c} onClick={() => onToggleMethod(n, c)} style={{ fontSize:9, padding:"3px 8px", borderRadius:10, cursor:"pointer", background:"rgba(0,230,138,0.12)", border:"1px solid rgba(0,230,138,0.3)", color:"#00e68a" }}>{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление', mobility:'Мобильность', mindset:'Психология' } as Record<string,string>)[c] || c}: {n} ✕</span>)}
       </div>
     )}
     {/* ── Data Analysis Trigger ── */}
@@ -380,14 +380,16 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
     <h4 style={{ margin: '12px 0 8px', fontSize: 12, color: 'var(--accent)' }}>📚 Библиотека методик</h4>
     <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
       <button onClick={()=>setMethodCat('all')} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, background: methodCat==='all'?'var(--accent)':'var(--bg-secondary)', color: methodCat==='all'?'#000':'var(--text-dim)', border:'none', cursor:'pointer' }}>Все</button>
-      {cats.map(c => <button key={c} onClick={()=>setMethodCat(c)} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, background: methodCat===c?'rgba(139,92,246,0.2)':'var(--bg-secondary)', border: methodCat===c?'1px solid #8b5cf6':'1px solid var(--border)', color: methodCat===c?'#8b5cf6':'var(--text-dim)', cursor:'pointer' }}>{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление' } as Record<string,string>)[c] || c}</button>)}
+      {cats.map(c => <button key={c} onClick={()=>setMethodCat(c)} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, background: methodCat===c?'rgba(139,92,246,0.2)':'var(--bg-secondary)', border: methodCat===c?'1px solid #8b5cf6':'1px solid var(--border)', color: methodCat===c?'#8b5cf6':'var(--text-dim)', cursor:'pointer' }}>{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление', mobility:'Мобильность', mindset:'Психология' } as Record<string,string>)[c] || c}</button>)}
     </div>
     {filtered.map((m,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10, border: (appliedMethods[m.category] === m.name) ? '1px solid rgba(0,230,138,0.3)' : '1px solid var(--border)' }}>
-      <div style={{ fontWeight:600, fontSize:12 }}>{(appliedMethods[m.category] === m.name) ? '✓ ' : ''}{m.name} <span style={{ fontSize:9, color:'var(--text-dim)' }}>[{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление' } as Record<string,string>)[m.category] || m.category}]</span></div>
+      <div style={{ fontWeight:600, fontSize:12 }}>{(appliedMethods[m.category] === m.name) ? '✓ ' : ''}{m.name} <span style={{ fontSize:9, color:'var(--text-dim)' }}>[{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление', mobility:'Мобильность', mindset:'Психология' } as Record<string,string>)[m.category] || m.category}]</span></div>
       <div style={{ fontSize:9, color:'var(--text-light)', marginTop:2 }}>{m.description}</div>
       <div style={{ fontSize:8, color:'var(--text-dim)' }}>Лучше всего для: {m.bestFor}</div>
-      <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>Протокол: {m.example}</div>
+      <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>Как работает: {m.howItWorks}</div>
+      <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)' }}>Протокол: {m.example}</div>
       <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', marginTop:1 }}>Док-во: {m.evidenceLevel} | Авторы: {m.popularizedBy}</div>
+      {m.caveats?.length > 0 && <div style={{ fontSize:7, color:'#f87171', marginTop:2, padding:'4px 6px', background:'rgba(239,68,68,0.06)', borderRadius:4 }}>⚠ {m.caveats.join(' | ')}</div>}
       {(appliedMethods[m.category] === m.name) ? (
         <div style={{ marginTop:4, fontSize:8, color:'#00e68a', fontWeight:600 }}>✅ Применена к плану</div>
       ) : (

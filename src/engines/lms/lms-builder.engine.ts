@@ -9,18 +9,25 @@
 import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec } from '../../data/lms-cycles/lms-types';
 import { pmProgression, workWeight, progressionRationale, type ProgressionMode, type PMProgressionInput } from './lms-progression.engine';
 import { calcSessionMetrics, type SRExercise, type SRSessionMetrics, type SRCycleMetrics } from './lms-metrics.engine';
+import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
+import { selectExercisesSmart } from '../exercise-selector.engine';
 
 export interface LMSBuildInput {
   template: SRCycleTemplate;
-  /** PM юзера по ключевым упражнениям (кг). Если упражнения в раскладке нет — берётся из fallback. */
   pmMap: Record<string, number>;
   fallbackPm?: number;
   mode?: ProgressionMode;
   weeklyPercent?: number;
   courseIntensity?: 'mild' | 'moderate' | 'heavy';
-  /** Переопределение длины мезоцикла (нед). Если задано — цикл растягивается/сжимается сверх template.meta.weeks. */
   weeksOverride?: number;
+  /** ПРОФ-параметры */
+  volumeGoal?: 'mev' | 'mav' | 'mrv';
+  focusLift?: 'squat' | 'bench' | 'deadlift';
+  currentReadiness?: number; // 0-100
+  equipment?: string[];
+  weakPoints?: string[];
 }
+
 
 export interface LMSWorkSet {
   pct: number;
@@ -111,17 +118,43 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
         : mode === 'pct' ? -0.005 : template.meta.correctionPct);
       pmRow[name] = pm0Map[name] * Math.pow(1 + k, w);
     }
-    const days: LMSPlanDay[] = template.week1.map((day: SRDaySpec) => {
+    const days: LMSPlanDay[] = template.week1.map((day: SRDaySpec, di: number) => {
       const dayTag = dayLoadTag(day.exercises as { load?: string }[]);
+      
+      // S-MRV: Бюджет утомления на сессию
+      let dayFatigueBudget = 60 * ((input.currentReadiness || 80) / 100);
+      
       const planEx: LMSPlanExercise[] = day.exercises.map((spec: SRExerciseSpec) => {
         const pm = pmRow[spec.name];
-        const workSets: LMSWorkSet[] = spec.sets.map(s => ({
-          pct: s.pct, reps: s.reps, sets: s.sets,
-          weight: workWeight(pm, s.pct)  // AUD-FIX-A: mnosz не входит в вес грифа (только в тоннаж),
-        }));
+        const workSets: LMSWorkSet[] = spec.sets.map(s => {
+          let sets = s.sets;
+          
+          // Коррекция объёма по VolumeGoal (только для аксессуаров)
+          if (spec.load !== 'Тяжелая') {
+            const vMult = input.volumeGoal === 'mev' ? 0.8 : input.volumeGoal === 'mrv' ? 1.2 : 1.0;
+            const focusMult = (input.focusLift && spec.name.toLowerCase().includes(input.focusLift!)) ? 1.2 : 1.0;
+            sets = Math.round(sets * vMult * focusMult);
+          }
+          
+          return {
+            pct: s.pct, reps: s.reps, sets: Math.max(1, sets),
+            weight: workWeight(pm, s.pct)
+          };
+        });
+        
+        // Проверка S-MRV
+        const exCost = (EXERCISE_CATALOG.find(e => e.name === spec.name)?.fatigueCost || 5) * (workSets[0]?.sets || 1);
+        if (dayFatigueBudget < exCost && spec.load !== 'Тяжелая') {
+          // Срезаем сеты, чтобы влезть в бюджет
+          workSets.forEach(ws => {
+             ws.sets = Math.max(1, Math.floor(dayFatigueBudget / (EXERCISE_CATALOG.find(e => e.name === spec.name)?.fatigueCost || 5)));
+          });
+        }
+        dayFatigueBudget -= (EXERCISE_CATALOG.find(e => e.name === spec.name)?.fatigueCost || 5) * (workSets[0]?.sets || 1);
+
         return { name: spec.name, group: spec.group, coef: spec.coef, mnosz: spec.mnosz, load: cleanLoad(spec.load, dayTag), pm, workSets };
       });
-      // метрики сессии (преобразование в SRExercise для lms-metrics)
+      
       const metricsEx: SRExercise[] = planEx.map(pe => ({
         name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
         sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
@@ -131,15 +164,22 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     weeks.push({ week: w + 1, pmRow, days });
   }
 
-  // агрегатные метрики цикла (по первой неделе как представителю; полный агрегат — сумма всех недель)
   const allSessions = weeks.flatMap(wk => wk.days.map(d => d.exercises.map(pe => ({
     name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
     sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
   } as SRExercise))));
   const cycleMetrics = calcCycleMetricsAggregate(allSessions, totalWeeks);
 
-  return { template, progressionRationale: rationale, weeks, cycleMetrics };
+  const proRationale = [
+    rationale,
+    input.volumeGoal ? `Объём аксессуаров: ${input.volumeGoal === 'mev' ? 'минимальный (MEV)' : input.volumeGoal === 'mrv' ? 'максимальный (MRV)' : 'оптимальный (MAV)'}.` : '',
+    input.focusLift ? `Приоритет: акцент на ${input.focusLift === 'squat' ? 'присед' : input.focusLift === 'bench' ? 'жим' : 'тягу'} (+20% объёма).` : '',
+    `S-MRV: объём сессий автоматически ограничен бюджетом утомления (Ready: ${input.currentReadiness || 80}%).`,
+  ].filter(Boolean).join(' ');
+
+  return { template, progressionRationale: proRationale, weeks, cycleMetrics };
 }
+
 
 function calcCycleMetricsAggregate(sessions: SRExercise[][], weeksCount: number): SRCycleMetrics {
   const perSession = sessions.map(s => calcSessionMetrics(s));

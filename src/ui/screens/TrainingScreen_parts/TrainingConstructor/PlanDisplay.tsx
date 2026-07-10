@@ -48,6 +48,8 @@ export const PlanDisplay: React.FC<Props> = ({
       else if (field === 'rir') { const v = parseInt(value); if (!isNaN(v)) ne.rir = v; }
       else if (field === 'weight') { const v = parseInt(value); if (!isNaN(v)) ne.weight = v; }
       else if (field === 'rest') { const v = parseInt(value); if (!isNaN(v)) ne.rest = v; }
+      else if (field === 'loadMode') ne.loadMode = value as 'weight' | 'velocity';
+      else if (field === 'targetVelocity') { const v = parseFloat(value); if (!isNaN(v)) ne.targetVelocity = v; }
       return ne;
     }) } : d);
     setResult({ ...result, days, corrections: [...result.corrections, `✏️ ${old.name}: ${field}=${value}`] });
@@ -59,10 +61,35 @@ export const PlanDisplay: React.FC<Props> = ({
     const e = result.days[di]?.exercises[ei]; if (!e) return;
     const cat = EXERCISE_CATALOG.find(c => c.name === e.name) || getExerciseById(e.name);
     if (!cat) { setSubModal({ dayIdx: di, exIdx: ei, options: [] }); return; }
-    const sub = getSubstitutes(cat.id);
+    
     const opts: { id: string; name: string; reason: string }[] = [];
-    if (sub) { for (const s of sub.substitutes) { if (!canReplace(cat.id, s.id)) continue; const rep = getExerciseById(s.id); opts.push({ id: s.id, name: rep?.name || s.id, reason: s.reason }); } }
-    if (opts.length === 0) { EXERCISE_CATALOG.filter(c => c.group === cat.group && c.id !== cat.id && canReplace(cat.id, c.id)).slice(0, 6).forEach(c => opts.push({ id: c.id, name: c.name, reason: 'Альтернатива той же группы' })); }
+    
+    // SMART SWAP: Поиск по паттерну движения (одинаковый паттерн = идеальная замена)
+    const pattern = cat.movementPattern || 'unknown';
+    const patternMatches = EXERCISE_CATALOG.filter(ex => 
+      ex.group === cat.group && 
+      ex.movementPattern === pattern && 
+      ex.id !== cat.id
+    );
+    
+    patternMatches.forEach(ex => {
+      opts.push({ id: ex.id, name: ex.name, reason: `Идеальная замена (Паттерн: ${pattern})` });
+    });
+
+    // Fallback: Общие замены из каталога
+    const sub = getSubstitutes(cat.id);
+    if (sub) { 
+      for (const s of sub.substitutes) { 
+        if (opts.find(o => o.id === s.id)) continue;
+        const rep = getExerciseById(s.id); 
+        opts.push({ id: s.id, name: rep?.name || s.id, reason: s.reason }); 
+      } 
+    }
+
+    if (opts.length === 0) { 
+      EXERCISE_CATALOG.filter(c => c.group === cat.group && c.id !== cat.id).slice(0, 6)
+        .forEach(c => opts.push({ id: c.id, name: c.name, reason: 'Альтернатива той же группы' })); 
+    }
     setSubModal({ dayIdx: di, exIdx: ei, options: opts });
   }, [result]);
 
@@ -126,7 +153,21 @@ export const PlanDisplay: React.FC<Props> = ({
     setResult({ ...result, days, corrections: [...result.corrections, `⚡ Шаблон «${key}» → «${e.name}»: ${t.sets}×${t.reps}, RIR ${t.rir}.`] });
   }, [result, tprofile, manualWorkMax, setResult]);
 
+  const calculatePatternBalance = useCallback(() => {
+    if (!result) return {};
+    const balance: Record<string, number> = {};
+    result.days.forEach(d => {
+      d.exercises.forEach(e => {
+        const p = e.pattern || 'unknown';
+        balance[p] = (balance[p] || 0) + 1;
+      });
+    });
+    return balance;
+  }, [result]);
+
   if (!result) return null;
+
+  const balance = calculatePatternBalance();
 
   return (
     <div style={{ marginTop: 10, padding: 10, borderRadius: 12, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.05)' }}>
@@ -146,7 +187,26 @@ export const PlanDisplay: React.FC<Props> = ({
         </div>
       )}
 
-      {/* ─── ИНСТРУМЕНТЫ (сгруппированы) ─── */}
+       {/* ─── ПАЛЕТРА ПАТТЕРНОВ (Баланс нагрузки) ─── */}
+       <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.15)' }}>
+         <div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
+           <span>🔄 Баланс паттернов движения</span>
+           <span style={{ fontSize: 9, opacity: 0.7 }}>Всего: {Object.values(balance).reduce((a, b) => a + b, 0)}</span>
+         </div>
+         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+           {Object.entries(balance).map(([p, count]) => (
+             <div key={p} style={{ 
+               padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.05)', 
+               border: '1px solid rgba(255,255,255,0.1)', fontSize: 9, color: 'rgba(255,255,255,0.8)',
+               display: 'flex', alignItems: 'center', gap: 4
+             }}>
+               <span style={{ fontWeight: 700, color: '#a855f7' }}>{p.replace('_', ' ')}</span>
+               <span style={{ background: 'rgba(255,255,255,0.1)', padding: '0 4px', borderRadius: 3 }}>{count}</span>
+             </div>
+           ))}
+         </div>
+       </div>
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
 
         {/* НАГРУЗКА */}
@@ -189,15 +249,42 @@ export const PlanDisplay: React.FC<Props> = ({
               const overrideTempo = exerciseTempos[tempoKey];
               const tmpo = globalTempoStr ? { tempo: { toString: globalTempoStr } } : (overrideTempo ? { tempo: { toString: overrideTempo } } : generateRepTempo({ goal: goal === 'strength' ? 'strength' : 'hypertrophy', riskLevel: 'low', difficultyLevel: 'medium', techniqueIssues: [], isMainLift: ei === 0 }));
               return (
-                <div key={ei} draggable onDragStart={ev => handleDragStart(ev, di, ei)} onDragOver={handleDragOver} onDrop={ev => handleDrop(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'grid', gridTemplateColumns: '14px 3fr 0.8fr 0.6fr 0.6fr 0.7fr 0.6fr 0.8fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab', alignItems: 'center', minWidth: 380 }}>
-                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', cursor: 'grab', userSelect: 'none' }}>⠿</span>
-                  <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                    {e.name}
-                    <span onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); setTempoPicker({ dayIdx: di, exIdx: ei }); }} title="Сменить темп" style={{ fontSize: 9, color: '#a855f7', fontWeight: 700, background: 'rgba(168,85,247,0.1)', padding: '2px 6px', borderRadius: 4, cursor: 'pointer', border: overrideTempo ? '1px solid #a855f7' : '1px solid transparent' }}>{overrideTempo || tmpo.tempo.toString}{overrideTempo ? ' *' : ''}</span>
-                  </span>
+                            <div key={ei} draggable onDragStart={ev => handleDragStart(ev, di, ei)} onDragOver={handleDragOver} onDrop={ev => handleDrop(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'grid', gridTemplateColumns: '14px 3fr 0.8fr 0.6fr 0.6fr 0.7fr 0.6fr 0.8fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab', alignItems: 'center', minWidth: 380 }}>
+                              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', cursor: 'grab', userSelect: 'none' }}>⠿</span>
+                              <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                                <span style={{ 
+                                  fontSize: 8, 
+                                  padding: '1px 4px', 
+                                  borderRadius: 4, 
+                                  fontWeight: 800, 
+                                  textTransform: 'uppercase',
+                                  background: e.role === 'main' ? 'rgba(0,230,138,0.2)' : e.role === 'secondary' ? 'rgba(96,165,250,0.2)' : 'rgba(255,255,255,0.1)',
+                                  color: e.role === 'main' ? ACCENT : e.role === 'secondary' ? '#60a5fa' : DIM,
+                                  border: `0.5px solid ${e.role === 'main' ? ACCENT : e.role === 'secondary' ? '#60a5fa' : 'rgba(255,255,255,0.2)'}`
+                                }}>{e.role === 'main' ? 'База' : e.role === 'secondary' ? 'Доп' : 'Изо'}</span>
+                                {e.name}
+                                <span onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); setTempoPicker({ dayIdx: di, exIdx: ei }); }} title="Сменить темп" style={{ fontSize: 9, color: '#a855f7', fontWeight: 700, background: 'rgba(168,85,247,0.1)', padding: '2px 6px', borderRadius: 4, cursor: 'pointer', border: overrideTempo ? '1px solid #a855f7' : '1px solid transparent' }}>{overrideTempo || tmpo.tempo.toString}{overrideTempo ? ' *' : ''}</span>
+                              </span>
+
                   <span onClick={() => startInline(di, ei, 'sets', e.sets)} style={{ cursor: 'text', color: ACCENT, fontWeight: 700 }}>{e.sets}×{e.reps}</span>
                   <span onClick={() => startInline(di, ei, 'rir', e.rir)} style={{ cursor: 'text', color: '#f59e0b' }}>{e.rir}</span>
-                  <span onClick={() => startInline(di, ei, 'weight', e.weight)} style={{ cursor: 'text', color: '#60a5fa', fontWeight: 700 }}>{e.weight} кг</span>
+                   <span onClick={() => startInline(di, ei, 'weight', e.weight)} style={{ 
+                      cursor: 'text', color: '#60a5fa', fontWeight: 700, 
+                      display: 'flex', alignItems: 'center', gap: 4 
+                    }}>
+                      {e.loadMode === 'velocity' ? (
+                        <>
+                          <span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'targetVelocity', value: String(e.targetVelocity || 0.5) }); }} style={{ color: '#a855f7' }}>{e.targetVelocity || 0.5} m/s</span>
+                          <span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'loadMode', value: 'weight' }); }} style={{ fontSize: 8, opacity: 0.6, cursor: 'pointer' }}>→ кг</span>
+                        </>
+                      ) : (
+                        <>
+                          {e.weight} кг
+                          <span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'loadMode', value: 'velocity' }); }} style={{ fontSize: 8, opacity: 0.6, cursor: 'pointer' }}>→ m/s</span>
+                        </>
+                      )}
+                    </span>
+
                   <span style={{ color: 'rgba(255,255,255,0.6)' }}>{GROUP_RU[e.group] || e.group}</span>
                   <span onClick={() => startInline(di, ei, 'rest', e.rest)} style={{ cursor: 'text', color: 'rgba(255,255,255,0.6)' }}>{e.rest}с</span>
                   <span style={{ display: 'flex', gap: 2 }}>

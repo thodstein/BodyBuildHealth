@@ -17,11 +17,15 @@ const CAT: { id: string; label: string; icon: string }[] = [
   { id: 'volume', label: 'Объём', icon: '📦' },
   { id: 'frequency', label: 'Частота', icon: '🔁' },
   { id: 'specialization', label: 'Специализация', icon: '🎯' },
+  { id: 'recovery', label: 'Восстановление', icon: '🔄' },
+  { id: 'mobility', label: 'Мобильность', icon: '🤸' },
+  { id: 'mindset', label: 'Психология', icon: '🧠' },
 ];
 
 const CAT_LABEL: Record<string, string> = {
   periodization: 'Периодизация', progression: 'Прогрессия', intensity: 'Интенсивность',
-  technique: 'Техника', volume: 'Объём', frequency: 'Частота', specialization: 'Специализация', recovery: 'Восстановление',
+  technique: 'Техника', volume: 'Объём', frequency: 'Частота', specialization: 'Специализация',
+  recovery: 'Восстановление', mobility: 'Мобильность', mindset: 'Психология',
 };
 
 const EV_COLOR: Record<string, string> = { A: '#22c55e', B: '#eab308', C: '#f97316' };

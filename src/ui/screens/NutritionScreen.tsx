@@ -4,7 +4,6 @@ import { useDataLink, derivePAL } from '../../core/data-link';
 import { getRecipes, calculateUserRecipeUsefulness } from '../../engines/nutrition-periodization.engine';
 import { calcNutrition } from '../../engines/nutrition.engine';
 import { calcNutritionV2 } from '../../engines/nutrition-v2.engine';
-import { checkMetabolicAdaptation, suggestNextPhase } from '../../engines/nutrition-periodization-v2.engine';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { IndividualPlan } from './NutritionScreen_parts/IndividualPlan';
 import { NutritionReference } from './NutritionScreen_parts/NutritionReference';
@@ -14,7 +13,6 @@ import { NutritionOverview } from './NutritionScreen_parts/NutritionOverview';
 import { ProductUsefulnessPlanner } from './NutritionScreen_parts/ProductUsefulnessPlanner';
 import { ProgressTracker } from './NutritionScreen_parts/ProgressTracker';
 import { NutriAdvisor } from './NutritionScreen_parts/NutriAdvisor';
-import { CustomProducts } from './NutritionScreen_parts/CustomProducts';
 import { MealVisualizer } from './NutritionScreen_parts/MealVisualizer';
 import { Achievements } from './NutritionScreen_parts/Achievements';
 import { DailyQuests } from './NutritionScreen_parts/DailyQuests';
@@ -23,7 +21,7 @@ import { NutritionWeeklyComparison } from './NutritionScreen_parts/NutritionWeek
 
 const NutritionCharts = lazy(() => import('./NutritionScreen_parts/NutritionCharts').then(m => ({ default: m.NutritionCharts })));
 import { generateNutritionReport, NutritionReport } from '../../engines/nutrition-report.engine';
-import { getNutritionV2Data, saveNutritionV2Data } from '../../core/nutrition-v2-data';
+import { getNutritionV2Data } from '../../core/nutrition-v2-data';
 import { getQualityLabel } from '../../engines/nutrition-quality.engine';
 import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 
@@ -55,6 +53,17 @@ const TAB_LABELS: Record<string, string> = {
   quests: '🎯 Квесты',
   peri: '🥤 Пери-воркаут',
 };
+
+// U1: Group tabs into 4 collapsible sections
+const TAB_GROUPS: { id: string; title: string; icon: string; tabs: string[] }[] = [
+  { id: 'main',      title: 'Основное',              icon: '📋', tabs: ['diary', 'mealplan', 'reports', 'charts'] },
+  { id: 'products',  title: 'Продукты и планирование', icon: '🛒', tabs: ['catalog', 'cart', 'favorites', 'reference', 'recipes', 'restaurant', 'customfood', 'usefulness'] },
+  { id: 'analytics', title: 'Аналитика',             icon: '📊', tabs: ['overview', 'progress', 'peri', 'visualize'] },
+  { id: 'info',      title: 'Инфо и геймификация',    icon: '🧑\u200d\u2695\ufe0f', tabs: ['nutria', 'info', 'achievements', 'quests'] },
+];
+
+// Flatten for backward compat
+const ALL_GROUPED_TABS = TAB_GROUPS.flatMap(g => g.tabs);
 
 const cardBg = { background: '#18181b', borderRadius: 18, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 16px rgba(0,0,0,0.2)' };
 const pillActive = { background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700 as const, border: 'none', boxShadow: '0 2px 12px rgba(0,230,138,0.25)' };
@@ -1396,6 +1405,8 @@ export const NutritionScreen: React.FC = () => {
   const [tab, setTab] = useState<ActiveTab>('mealplan');
   const [page, setPage] = useState<NutritionPage>('hero');
   const [nutritionSection, setNutritionSection] = useState<NutritionSection>('all');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => { try { const s = localStorage.getItem('he_nutrition_collapsed_groups'); return s ? new Set(JSON.parse(s)) : new Set(); } catch { return new Set(); } });
+  const toggleGroup = (gid: string) => setCollapsedGroups(prev => { const next = new Set(prev); if (next.has(gid)) next.delete(gid); else next.add(gid); try { localStorage.setItem('he_nutrition_collapsed_groups', JSON.stringify([...next])); } catch {} return next; });
   const [foodEntries, setFoodEntries] = useState<DiaryEntry[]>([]);
   const [dailyLogs, setDailyLogs] = useState<Record<string, DiaryEntry[]>>({});
 
@@ -1421,6 +1432,32 @@ export const NutritionScreen: React.FC = () => {
     } catch {}
   }, []);
 
+  // B3: Reload diary data from localStorage when NutritionDiary reports changes
+  const reloadDiary = () => {
+    try {
+      const raw = localStorage.getItem('nutrition_diary');
+      if (raw) {
+        const diary = JSON.parse(raw);
+        const allEntries: DiaryEntry[] = [];
+        const logs: Record<string, DiaryEntry[]> = {};
+        Object.entries(diary).forEach(([date, d]: [string, any]) => {
+          const dayEntries: DiaryEntry[] = [];
+          Object.values(d.meals || {}).flat().forEach((m: any) => {
+            const entry = { name: m.name, kcal: m.kcal, p: m.p, f: m.f, c: m.c, date };
+            allEntries.push(entry);
+            dayEntries.push(entry);
+          });
+          logs[date] = dayEntries;
+        });
+        setFoodEntries(allEntries);
+        setDailyLogs(logs);
+      } else {
+        setFoodEntries([]);
+        setDailyLogs({});
+      }
+    } catch {}
+  };
+
   // Open diary tab directly when navigated from Profile → diaries → Питание
   useEffect(() => {
     try {
@@ -1445,19 +1482,19 @@ export const NutritionScreen: React.FC = () => {
     }));
   }, [dailyLogs]);
 
-  const avgWeeklyKcal = useMemo(() => {
+  const avgDailyKcal = useMemo(() => {
     if (dailyAggregates.length === 0) return 0;
     return dailyAggregates.reduce((s, d) => s + d.kcal, 0) / dailyAggregates.length;
   }, [dailyAggregates]);
-  const avgWeeklyProtein = useMemo(() => {
+  const avgDailyProtein = useMemo(() => {
     if (dailyAggregates.length === 0) return 0;
     return dailyAggregates.reduce((s, d) => s + d.protein, 0) / dailyAggregates.length;
   }, [dailyAggregates]);
-  const avgWeeklyFat = useMemo(() => {
+  const avgDailyFat = useMemo(() => {
     if (dailyAggregates.length === 0) return 0;
     return dailyAggregates.reduce((s, d) => s + d.fat, 0) / dailyAggregates.length;
   }, [dailyAggregates]);
-  const avgWeeklyCarbs = useMemo(() => {
+  const avgDailyCarbs = useMemo(() => {
     if (dailyAggregates.length === 0) return 0;
     return dailyAggregates.reduce((s, d) => s + d.carbs, 0) / dailyAggregates.length;
   }, [dailyAggregates]);
@@ -1488,9 +1525,39 @@ export const NutritionScreen: React.FC = () => {
     } catch { return { kcal: 2500, protein: 160, fats: 70, carbs: 300 }; }
   }, [linked.profile]);
 
+  // B2: Build meal visualizer items from saved day plan or today's diary
+  const visualizerItems = useMemo(() => {
+    try {
+      // Try day plan first
+      const planRaw = localStorage.getItem('he_plan_day');
+      if (planRaw) {
+        const plan = JSON.parse(planRaw);
+        if (plan?.meals) {
+          const items = plan.meals.flatMap((m: any) => (m.items || []).map((it: any) => ({
+            id: it.id || it.name, name: it.name, weightG: it.amount || 100,
+          }))).filter((it: any) => it.weightG > 0);
+          if (items.length > 0) return items;
+        }
+      }
+    } catch {}
+    // Fallback: today's diary entries (estimate weight from kcal using ~2 kcal/g average)
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const diary = JSON.parse(localStorage.getItem('nutrition_diary') || '{}');
+      const todayData = diary[today];
+      if (todayData?.meals) {
+        const items = Object.values(todayData.meals).flat().map((it: any, i: number) => ({
+          id: it.name + '_' + i, name: it.name, weightG: Math.max(50, Math.round((it.kcal || 0) / 2)),
+        })).filter((it: any) => it.weightG > 0);
+        if (items.length > 0) return items;
+      }
+    } catch {}
+    return [];
+  }, [tab, foodEntries]);
+
   const renderContent = () => {
     switch (tab) {
-      case 'diary': return <InfoErrorBoundary label="Дневник питания"><NutritionDiary foodEntries={foodEntries} targets={macroTargets} weight={(linked.profile?.settings as any)?.personal?.weight} age={(linked.profile?.settings as any)?.personal?.age} sex={(linked.profile?.settings as any)?.personal?.sex} /></InfoErrorBoundary>;
+      case 'diary': return <InfoErrorBoundary label="Дневник питания"><NutritionDiary foodEntries={foodEntries} targets={macroTargets} weight={(linked.profile?.settings as any)?.personal?.weight} age={(linked.profile?.settings as any)?.personal?.age} sex={(linked.profile?.settings as any)?.personal?.sex} onDiaryChange={reloadDiary} /></InfoErrorBoundary>;
       case 'charts': return <InfoErrorBoundary label="Графики"><Suspense fallback={<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Загрузка графиков...</div>}><NutritionCharts kcalData={chartKcalData} proteinData={chartProteinData} labels={chartLabels} dailyLogs={dailyLogs} /></Suspense></InfoErrorBoundary>;
       case 'mealplan': return <InfoErrorBoundary label="План питания"><IndividualPlan profile={linked.profile} course={linked.course} labs={linked.labs} labAnalysis={linked.labAnalysis} /></InfoErrorBoundary>;
       case 'cart': return <CartTab />;
@@ -1503,15 +1570,15 @@ export const NutritionScreen: React.FC = () => {
       case 'customfood': return <InfoErrorBoundary label="Свои продукты"><NutritionCustomFood /></InfoErrorBoundary>;
       case 'overview': return <InfoErrorBoundary label="Обзор"><NutritionOverview
         profile={linked.profile}
-        avgWeeklyKcal={avgWeeklyKcal}
-        avgWeeklyProtein={avgWeeklyProtein}
-        avgWeeklyFat={avgWeeklyFat}
-        avgWeeklyCarbs={avgWeeklyCarbs}
+        avgDailyKcal={avgDailyKcal}
+        avgDailyProtein={avgDailyProtein}
+        avgDailyFat={avgDailyFat}
+        avgDailyCarbs={avgDailyCarbs}
       /></InfoErrorBoundary>;
       case 'info': return <InfoTab />;
       case 'progress': return <InfoErrorBoundary label="Прогресс"><ProgressTracker /></InfoErrorBoundary>;
       case 'nutria': return <InfoErrorBoundary label="Нутрициолог"><NutriAdvisor /></InfoErrorBoundary>;
-      case 'visualize': return <InfoErrorBoundary label="Блюдо"><MealVisualizer items={[]} /></InfoErrorBoundary>;
+      case 'visualize': return <InfoErrorBoundary label="Блюдо"><MealVisualizer items={visualizerItems} /></InfoErrorBoundary>;
       case 'achievements': return <InfoErrorBoundary label="Достижения"><Achievements /></InfoErrorBoundary>;
       case 'quests': return <InfoErrorBoundary label="Квесты"><DailyQuests /></InfoErrorBoundary>;
       case 'peri': return <InfoErrorBoundary label="Пери-воркаут"><PeriWorkoutCard /></InfoErrorBoundary>;
@@ -1590,11 +1657,6 @@ export const NutritionScreen: React.FC = () => {
         if (nv2.metabolicAdaptation > 0) active.push(`📉 Адаптация -${Math.round(nv2.metabolicAdaptation * 100)}%`);
         if (v2Result && v2Result.adjustment !== 0) active.push(`📊 TDEE корр. ${v2Result.adjustment > 0 ? '+' : ''}${v2Result.adjustment}ккал`);
         if (s.bodyFat) active.push(`🧬 %жира: ${s.bodyFat}%`);
-        // Periodization suggestions
-        const metaCheck = checkMetabolicAdaptation();
-        metaCheck.suggestions.forEach(sug => {
-          active.push(`${sug.urgency === 'critical' ? '🔴' : sug.urgency === 'warning' ? '🟡' : 'ℹ️'} ${sug.action.slice(0, 40)}`);
-        });
 
         if (active.length === 0) return null;
         return (
@@ -1607,31 +1669,59 @@ export const NutritionScreen: React.FC = () => {
       })()}
 
       <div style={{ flex:1, minHeight:0, overflowY:'auto', padding:'0 8px 80px' }}>
-        <div style={{
-          display:'flex', gap:3, flexWrap:'nowrap', overflowX:'auto', overflowY:'hidden',
-          padding:'8px 4px 10px',
-          scrollbarWidth:'none', msOverflowStyle:'none',
-          WebkitOverflowScrolling:'touch', whiteSpace:'nowrap',
-        }}>
-          {(SECTION_TABS[nutritionSection] || SECTION_TABS.all).map(t => {
-            const isActive = tab === t;
-            return (
-              <button key={t} onClick={() => setTab(t as ActiveTab)} style={{
-                flexShrink:0, padding:'6px 14px', borderRadius:20, cursor:'pointer',
-                fontSize:10, fontWeight: isActive ? 700 : 500, letterSpacing:0.2,
-                border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-                background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#18181b',
-                color: isActive ? '#000' : '#fff',
-                transition:'all 0.2s cubic-bezier(0.22,1,0.36,1)',
-              }}>
-                {TAB_LABELS[t] || t}
-                {t === 'cart' && cartCount > 0 && (
-                  <span style={{ marginLeft:3, background:'rgba(0,0,0,0.2)', borderRadius:8, padding:'1px 5px', fontSize:8, fontWeight:700 }}>{cartCount}</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        {/* U1: Grouped collapsible tabs */}
+        {TAB_GROUPS.map(group => {
+          const isCollapsed = collapsedGroups.has(group.id);
+          const hasActive = group.tabs.includes(tab);
+          // When navigated from hero, section may filter; for 'all' show all groups
+          const sectionTabs = SECTION_TABS[nutritionSection] || SECTION_TABS.all;
+          const visibleTabs = nutritionSection === 'all' ? group.tabs : group.tabs.filter(t => sectionTabs.includes(t));
+          if (visibleTabs.length === 0) return null;
+          return (
+            <div key={group.id} style={{ marginBottom: 4 }}>
+              <div
+                onClick={() => toggleGroup(group.id)}
+                style={{
+                  display:'flex', alignItems:'center', gap:6, padding:'8px 10px 6px', cursor:'pointer',
+                  fontSize:9, fontWeight:700, color: hasActive ? '#00e68a' : 'rgba(255,255,255,0.5)',
+                  letterSpacing:0.3, textTransform:'uppercase', userSelect:'none',
+                }}
+              >
+                <span style={{ fontSize:7, transition:'transform 0.2s', display:'inline-block', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▼</span>
+                <span style={{ fontSize:10 }}>{group.icon}</span>
+                <span>{group.title}</span>
+                {hasActive && <span style={{ width:5, height:5, borderRadius:'50%', background:'#00e68a', marginLeft:2 }} />}
+              </div>
+              {!isCollapsed && (
+                <div style={{
+                  display:'flex', gap:3, flexWrap:'nowrap', overflowX:'auto', overflowY:'hidden',
+                  padding:'2px 4px 8px',
+                  scrollbarWidth:'none', msOverflowStyle:'none',
+                  WebkitOverflowScrolling:'touch', whiteSpace:'nowrap',
+                }}>
+                  {visibleTabs.map(t => {
+                    const isActive = tab === t;
+                    return (
+                      <button key={t} onClick={() => setTab(t as ActiveTab)} style={{
+                        flexShrink:0, padding:'6px 14px', borderRadius:20, cursor:'pointer',
+                        fontSize:10, fontWeight: isActive ? 700 : 500, letterSpacing:0.2,
+                        border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+                        background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#18181b',
+                        color: isActive ? '#000' : '#fff',
+                        transition:'all 0.2s cubic-bezier(0.22,1,0.36,1)',
+                      }}>
+                        {TAB_LABELS[t] || t}
+                        {t === 'cart' && cartCount > 0 && (
+                          <span style={{ marginLeft:3, background:'rgba(0,0,0,0.2)', borderRadius:8, padding:'1px 5px', fontSize:8, fontWeight:700 }}>{cartCount}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
         <div style={{ animation:'fadeSlideIn 0.3s ease' }}>
           {renderContent()}
         </div>

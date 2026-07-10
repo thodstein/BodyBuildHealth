@@ -603,34 +603,37 @@ export function PopupPEDInput({
         style={{
           flex: 1,
           minWidth: 0,
-          padding: '7px 8px',
+          padding: '7px 6px',
           borderRadius: 10,
           cursor: 'pointer',
           background: active ? `${cfg.color}12` : 'rgba(255,255,255,0.03)',
           border: active ? `1.5px solid ${cfg.color}40` : '1px solid rgba(255,255,255,0.06)',
           display: 'flex',
           alignItems: 'center',
-          gap: 5,
+          gap: 4,
+          overflow: 'hidden',
           transition: 'all 0.15s',
         }}
       >
-        <span style={{ fontSize: 14, lineHeight: 1 }}>{cfg.icon}</span>
-        <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-          <div style={{ fontSize: 8, fontWeight: 700, color: active ? cfg.color : 'var(--text-dim)', lineHeight: 1.2 }}>{cfg.label}</div>
+        <span style={{ fontSize: 13, lineHeight: 1, flexShrink: 0 }}>{cfg.icon}</span>
+        <div style={{ flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden' }}>
+          <div style={{ fontSize: 8, fontWeight: 700, color: active ? cfg.color : 'var(--text-dim)', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cfg.label}</div>
           <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', lineHeight: 1.2 }}>{cfg.unit}</div>
         </div>
         {active ? (
           <div style={{
             fontSize: 9, fontWeight: 800, color: '#fff',
             background: cfg.gradient,
-            padding: '2px 6px',
+            padding: '2px 5px',
             borderRadius: 6,
             lineHeight: 1.4,
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
           }}>
             {value}{cfg.unit.startsWith('мкг') ? ' мкг' : ''}
           </div>
         ) : (
-          <div style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.2)' }}>0</div>
+          <div style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.2)', flexShrink: 0 }}>0</div>
         )}
       </button>
 

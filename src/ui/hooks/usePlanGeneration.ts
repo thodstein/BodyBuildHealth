@@ -13,15 +13,34 @@ export interface PlanGenDeps {
   pctForRir: Record<number, number>;
 }
 
+export interface PlanGenResult {
+  days: PlanDay[];
+  weeklySets: Record<string, number>;
+  groupCorrections: string[];
+  patternBalance: Record<string, number>;
+}
+
+export interface PlanGenOpts {
+  currentReadiness?: number;
+  targetTonnage?: Record<string, number>;
+  sequenceStrategy?: 'classic' | 'preexhaust' | 'antagonist';
+}
+
 /**
- * usePlanGeneration — возвращает стабильную (по deps) функцию buildPlan(cycle, mrv),
+ * usePlanGeneration — возвращает стабильную (по deps) функцию buildPlan(cycle, mrv, opts?),
  * генерирующую дни плана ручного конструктора. Чистое ядро — в engine buildPlanDays (тестируется).
  */
 export function usePlanGeneration(deps: PlanGenDeps) {
   const { goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir } = deps;
   return useCallback(
-    (cycle: string[][], mrv: number): { days: PlanDay[]; weeklySets: Record<string, number>; groupCorrections: string[] } =>
-      buildPlanDays({ cycle, mrv, goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir }),
+    (cycle: string[][], mrv: number, opts?: PlanGenOpts): PlanGenResult =>
+      buildPlanDays({
+        cycle, mrv, goal, level, mesoLength, weakPoints, equipment,
+        workMax, manualWorkMax, injuries, pctForRir,
+        currentReadiness: opts?.currentReadiness ?? 100,
+        targetTonnage: opts?.targetTonnage,
+        sequenceStrategy: opts?.sequenceStrategy ?? 'classic',
+      }),
     [goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir]
   );
 }

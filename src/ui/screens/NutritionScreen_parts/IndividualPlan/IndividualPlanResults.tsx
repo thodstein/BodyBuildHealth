@@ -78,6 +78,7 @@ export const IndividualPlanResults: React.FC = () => {
     linkToTraining, trainStart,
     workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType,
     v2Phase, v2Pharma, v2Labs, histamineSensitive,
+    setErrorMsg,
   } = usePlanCtx();
 
   const [showCalcPopup, setShowCalcPopup] = useState(false);
@@ -303,6 +304,21 @@ export const IndividualPlanResults: React.FC = () => {
   return (
     <>
       <div ref={resultsRef as any} />
+      {!generated && (
+        <div style={{ padding: '24px 16px', textAlign: 'center', borderRadius: 14, background: '#18181b', border: '1px solid rgba(0,230,138,0.15)' }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>🥗</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 }}>План ещё не создан</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 14, lineHeight: 1.5 }}>
+            Перейдите на вкладку «Настройки», задайте параметры<br />и нажмите «Сгенерировать план питания».
+          </div>
+          <button onClick={() => { setErrorMsg(null); generatePlan(1); }} style={{
+            padding: '12px 24px', borderRadius: 10, cursor: 'pointer',
+            fontSize: 12, fontWeight: 700,
+            background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#000',
+            boxShadow: '0 4px 16px rgba(0,230,138,0.2)',
+          }}>✨ Создать план</button>
+        </div>
+      )}
       {generated && (<>
         <MealQuickControls />
         <GlassCard title="Выбор дней" icon="📅" color="#00e68a">

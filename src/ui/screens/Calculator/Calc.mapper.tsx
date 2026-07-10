@@ -405,6 +405,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [neuroSelected, setNeuroSelected] = useState<Set<string>>(new Set());
   const [neuroConfirm, setNeuroConfirm] = useState<boolean>(false);
   const [applyFlash, setApplyFlash] = useState(false);
+  const [showContraindications, setShowContraindications] = useState(false);
+  const [showMonitoring, setShowMonitoring] = useState(false);
+  const [showSymptoms, setShowSymptoms] = useState(true);
+  const [showNutrition, setShowNutrition] = useState(false);
+  const [showInteractions, setShowInteractions] = useState(false);
 
   const ctx = useMemo(() => {
     const base = buildMapperCtx(state, level, level === 'manual' ? { addSubs: manualSubs } : undefined, selectedStacks);
@@ -608,9 +613,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
           return (
             <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => { setStackModulePopup(null); setArticularConfirm(false); }}>
-              <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'90vh', display:'flex', flexDirection:'column' }}>
-                <div style={{ height:3, background:'linear-gradient(90deg,#4ade80,#22c55e)' }} />
-                <div style={{ padding:'14px 14px 10px', overflowY:'auto' }}>
+               <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'90vh', display:'flex', flexDirection:'column' }}>
+                 <div style={{ height:3, background:'linear-gradient(90deg,#4ade80,#22c55e)' }} />
+                 <div style={{ flex:'1 1 0%', minHeight:0, padding:'14px 14px 16px', overflowY:'auto' }}>
                   {/* Заголовок + контекст */}
                   <div style={{ fontSize:13, fontWeight:800, color:'#4ade80', marginBottom:4 }}>🦴 Суставы/Связки — подбор поддержки</div>
                   <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', lineHeight:1.4, marginBottom:8, padding:'5px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
@@ -698,14 +703,15 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   {/* Кнопки действий */}
                   <div style={{ display:'flex', gap:6 }}>
                     <button onClick={() => { setStackModulePopup(null); setArticularConfirm(false); }} style={{ flex:1, padding:'10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'var(--text)' }}>Отмена</button>
-                    <button onClick={() => {
-                      if (articularSelected.size === 0) return;
-                      setArticularConfirm(true);
-                    }} style={{ flex:2, padding:'10px', borderRadius:10, fontSize:10, fontWeight:800, cursor:'pointer', border:'none', color:'#000',
-                      background: articularSelected.size > 0 ? 'linear-gradient(135deg,#4ade80,#22c55e)' : 'rgba(255,255,255,0.06)',
-                    }}>
-                      ✅ Добавить ({articularSelected.size} вeществ)
-                    </button>
+               <button onClick={() => {
+                       if (articularSelected.size === 0) return;
+                       setArticularConfirm(true);
+                       setStackModulePopup(null);
+                     }} style={{ flex:2, padding:'10px', borderRadius:10, fontSize:10, fontWeight:800, cursor:'pointer', border:'none', color:'#000',
+                       background: articularSelected.size > 0 ? 'linear-gradient(135deg,#4ade80,#22c55e)' : 'rgba(255,255,255,0.06)',
+                     }}>
+                       ✅ Добавить ({articularSelected.size} веществ)
+                     </button>
                   </div>
                 </div>
               </div>
@@ -729,9 +735,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
           return (
             <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => { setStackModulePopup(null); setNeuroConfirm(false); }}>
-              <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'90vh', display:'flex', flexDirection:'column' }}>
-                <div style={{ height:3, background:'linear-gradient(90deg,#818cf8,#6366f1)' }} />
-                <div style={{ padding:'14px 14px 10px', overflowY:'auto' }}>
+               <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'90vh', display:'flex', flexDirection:'column' }}>
+                 <div style={{ height:3, background:'linear-gradient(90deg,#818cf8,#6366f1)' }} />
+                 <div style={{ flex:'1 1 0%', minHeight:0, padding:'14px 14px 16px', overflowY:'auto' }}>
                   <div style={{ fontSize:13, fontWeight:800, color:'#818cf8', marginBottom:4 }}>🧠 Нейропротекция — подбор поддержки</div>
                   <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', lineHeight:1.4, marginBottom:8, padding:'5px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
                     {neuroScore < 20 ? '🟢 Низкий риск — профилактика' : neuroScore < 40 ? '🟡 Умеренный риск — базовая поддержка' : neuroScore < 60 ? '🟠 Высокий риск — усиленная защита' : '🔴 Критический — максимальная защита'}
@@ -812,14 +818,15 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
                   <div style={{ display:'flex', gap:6 }}>
                     <button onClick={() => { setStackModulePopup(null); setNeuroConfirm(false); }} style={{ flex:1, padding:'10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'var(--text)' }}>Отмена</button>
-                    <button onClick={() => {
-                      if (neuroSelected.size === 0) return;
-                      setNeuroConfirm(true);
-                    }} style={{ flex:2, padding:'10px', borderRadius:10, fontSize:10, fontWeight:800, cursor:'pointer', border:'none', color:'#000',
-                      background: neuroSelected.size > 0 ? 'linear-gradient(135deg,#818cf8,#6366f1)' : 'rgba(255,255,255,0.06)',
-                    }}>
-                      ✅ Добавить ({neuroSelected.size} вeществ)
-                    </button>
+                     <button onClick={() => {
+                       if (neuroSelected.size === 0) return;
+                       setNeuroConfirm(true);
+                       setStackModulePopup(null);
+                     }} style={{ flex:2, padding:'10px', borderRadius:10, fontSize:10, fontWeight:800, cursor:'pointer', border:'none', color:'#000',
+                       background: neuroSelected.size > 0 ? 'linear-gradient(135deg,#818cf8,#6366f1)' : 'rgba(255,255,255,0.06)',
+                     }}>
+                       ✅ Добавить ({neuroSelected.size} веществ)
+                     </button>
                   </div>
                 </div>
               </div>
@@ -839,8 +846,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         return (
           <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setStackModulePopup(null)}>
             <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:360, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
-              <div style={{ height:3, background:`linear-gradient(90deg,${meta.col},${meta.col}88)` }} />
-              <div style={{ padding:'16px 14px 12px', overflowY:'auto' }}>
+               <div style={{ height:3, background:`linear-gradient(90deg,${meta.col},${meta.col}88)` }} />
+               <div style={{ flex:'1 1 0%', minHeight:0, padding:'16px 14px 16px', overflowY:'auto' }}>
                 <div style={{ fontSize:13, fontWeight:800, color:meta.col, marginBottom:6 }}>{meta.icon} {stackMeta?.name || stackModulePopup}</div>
                 <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', lineHeight:1.5, marginBottom:8 }}>{stackMeta?.problem || ''}</div>
                 <div style={{ fontSize:10, fontWeight:700, color:'var(--text)', marginBottom:4 }}>📊 Анализ контекста</div>
@@ -955,23 +962,30 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       )}
 
       {/* ===== КАРТОЧКА СИМПТОМОВ ===== */}
-      <div style={{ margin:'6px 0', padding:'7px 9px', borderRadius:10, background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.15)' }}>
-        <div style={{ fontSize:9, fontWeight:700, color:'#818cf8', marginBottom:4 }}>🩺 Симптомы (отметьте актуальные)</div>
-        <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
-          {([
-            ['gynecomastia','Гино'],['edema_severe','Отёки'],['joint_pain','Суставы'],
-            ['insomnia','Бессонница'],['anxiety','Тревога'],['low_libido','Либидо↓'],
-            ['hair_loss','Выпадение волос'],['prostate_symptoms','Простата'],
-          ] as const).map(([sym, label]) => {
-            const active = symptoms.includes(sym);
-            return (
-              <button key={sym} onClick={() => setSymptoms(prev => active ? prev.filter(s => s !== sym) : [...prev, sym])}
-                style={{ padding:'3px 7px', borderRadius:6, fontSize:8, fontWeight:600, cursor:'pointer', border:`1px solid ${active ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.06)'}`, background: active ? 'rgba(99,102,241,0.15)' : 'transparent', color: active ? '#a5b4fc' : 'var(--text-dim)' }}>
-                {active ? '✓' : ''} {label}
-              </button>
-            );
-          })}
+      <div style={{ margin:'6px 0', borderRadius:10, overflow:'hidden' }}>
+        <div onClick={() => setShowSymptoms(!showSymptoms)} style={{ padding:'7px 9px', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center', background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.15)', borderRadius: showSymptoms ? '10px 10px 0 0' : 10 }}>
+          <span style={{ fontSize:9, fontWeight:700, color:'#818cf8' }}>
+            🩺 Симптомы (отметьте актуальные) {symptoms.length > 0 ? `(${symptoms.length})` : ''}
+          </span>
+          <span style={{ fontSize:8, color:'var(--text-dim)' }}>{showSymptoms ? '▲ скрыть' : '▼ показать'}</span>
         </div>
+        {showSymptoms && (
+          <div style={{ padding:'7px 9px', background:'rgba(99,102,241,0.03)', border:'1px solid rgba(99,102,241,0.1)', borderTop:'none', borderRadius:'0 0 10px 10px', display:'flex', flexWrap:'wrap', gap:3 }}>
+            {([
+              ['gynecomastia','Гино'],['edema_severe','Отёки'],['joint_pain','Суставы'],
+              ['insomnia','Бессонница'],['anxiety','Тревога'],['low_libido','Либидо↓'],
+              ['hair_loss','Выпадение волос'],['prostate_symptoms','Простата'],
+            ] as const).map(([sym, label]) => {
+              const active = symptoms.includes(sym);
+              return (
+                <button key={sym} onClick={() => setSymptoms(prev => active ? prev.filter(s => s !== sym) : [...prev, sym])}
+                  style={{ padding:'3px 7px', borderRadius:6, fontSize:8, fontWeight:600, cursor:'pointer', border:`1px solid ${active ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.06)'}`, background: active ? 'rgba(99,102,241,0.15)' : 'transparent', color: active ? '#a5b4fc' : 'var(--text-dim)' }}>
+                  {active ? '✓' : ''} {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ===== ФАЗА КУРСА (компактно) ===== */}
@@ -1098,19 +1112,63 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       )}
 
       {/* Нутри-корректировки по анализам */}
-      {finalRec && finalRec.nutritionTips && finalRec.nutritionTips.length > 0 && (
-        <div style={{marginTop:6}}>
-          <div style={{ fontSize:9, fontWeight:700, color:'#00e68a', marginBottom:3 }}>🥗 Питание по анализам ({finalRec.nutritionTips.length})</div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:3 }}>
-            {finalRec.nutritionTips.slice(0, 12).map((n, i) => (
-              <div key={i} style={{ ...GLASS, padding:'3px 6px', fontSize:7, color:'var(--text-light)' }}>
-                <span style={{ fontWeight:600, color:'var(--text)' }}>{n.action}</span><br />
-                <span style={{ opacity:0.7 }}>{n.target}</span>
-              </div>
-            ))}
+      {finalRec && finalRec.nutritionTips && finalRec.nutritionTips.length > 0 && (() => {
+        const tipsByMarker: Record<string, { action: string; target: string; tier: number }[]> = {};
+        for (const t of finalRec.nutritionTips!) {
+          const m = (t as any).marker || 'общее';
+          if (!tipsByMarker[m]) tipsByMarker[m] = [];
+          tipsByMarker[m].push({ action: t.action, target: t.target, tier: (t as any).tier || 1 });
+        }
+        const markers = Object.keys(tipsByMarker);
+        const total = finalRec.nutritionTips.length;
+        const hasHigh = finalRec.nutritionTips.some((t: any) => t.tier >= 2);
+
+        return (
+        <div style={{ marginTop:6 }}>
+          <div onClick={() => setShowNutrition(!showNutrition)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showNutrition ? '8px 8px 0 0' : 8, background: hasHigh ? 'rgba(245,158,11,0.06)' : 'rgba(0,230,138,0.04)', border:'1px solid ' + (hasHigh ? 'rgba(245,158,11,0.15)' : 'rgba(0,230,138,0.12)') }}>
+            <span style={{ fontSize:10, fontWeight:700, color: hasHigh ? '#f59e0b' : '#22c55e', display:'flex', alignItems:'center', gap:5 }}>
+              🥗 Питание по анализам ({total})
+              {hasHigh && <span style={{ fontSize:7, fontWeight:600, color:'#f59e0b', padding:'1px 5px', borderRadius:4, background:'rgba(245,158,11,0.12)' }}>требует коррекции</span>}
+            </span>
+            <span style={{ fontSize:8, color:'var(--text-dim)' }}>{showNutrition ? '▲ скрыть' : '▼ показать'}</span>
           </div>
+          {showNutrition && (
+            <div style={{ padding:'6px 9px', background:'rgba(0,0,0,0.15)', border:'1px solid ' + (hasHigh ? 'rgba(245,158,11,0.1)' : 'rgba(0,230,138,0.08)'), borderTop:'none', borderRadius:'0 0 8px 8px' }}>
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:5, lineHeight:1.4 }}>
+                Рекомендации по питанию на основе отклонений лабораторных маркеров. Сгруппированы по показателю.
+              </div>
+              {markers.map(marker => {
+                const tips = tipsByMarker[marker];
+                const maxTier = Math.max(...tips.map(t => t.tier));
+                const tierColor = maxTier >= 3 ? '#ef4444' : maxTier >= 2 ? '#f59e0b' : '#22c55e';
+                const tierBg = maxTier >= 3 ? 'rgba(239,68,68,0.06)' : maxTier >= 2 ? 'rgba(245,158,11,0.05)' : 'rgba(34,197,94,0.04)';
+                const tierBorder = maxTier >= 3 ? 'rgba(239,68,68,0.12)' : maxTier >= 2 ? 'rgba(245,158,11,0.1)' : 'rgba(34,197,94,0.08)';
+                const tierLabel = maxTier >= 3 ? '⛔ Критично' : maxTier >= 2 ? '⚠ Требует внимания' : '🟢 Профилактика';
+                return (
+                  <div key={marker} style={{ marginBottom:5, padding:'5px 7px', borderRadius:6, background:tierBg, border:`1px solid ${tierBorder}` }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:3 }}>
+                      <span style={{ fontSize:8, fontWeight:700, color:'var(--text)' }}>{marker.toUpperCase()}</span>
+                      <span style={{ fontSize:7, fontWeight:600, color:tierColor, padding:'1px 4px', borderRadius:3, background:`${tierColor}15` }}>{tierLabel}</span>
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                      {tips.map((t, i) => (
+                        <div key={i} style={{ fontSize:8, color:'var(--text-light)', lineHeight:1.4, display:'flex', gap:4 }}>
+                          <span style={{ color:tierColor, flexShrink:0, fontWeight:700 }}>{maxTier >= 2 ? '⚠' : '•'}</span>
+                          <span>
+                            <span style={{ fontWeight:600, color:'var(--text)' }}>{t.action}</span>
+                            <span style={{ opacity:0.6, marginLeft:4 }}>→ {t.target}</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-      )}
+        );
+      })()}
 
       {/* Warnings: multi-oral, GH+insulin, winny+oxy */}
       {finalRec && (() => {
@@ -1160,29 +1218,55 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
         const hasBlock = groups.block.length > 0;
         const total = interactions.length;
-
-        const sevLabel: Record<string, string> = { block: '⛔', warn: '⚠', monitor: '🔬' };
+        const sevLabel: Record<string, string> = { block: '⛔ Запрещено', warn: '⚠ Осторожно', monitor: '🔬 Контроль' };
         const sevColor: Record<string, string> = { block: '#fca5a5', warn: '#fbbf24', monitor: '#60a5fa' };
+        const sevBg: Record<string, string> = { block: 'rgba(239,68,68,0.08)', warn: 'rgba(245,158,11,0.06)', monitor: 'rgba(96,165,250,0.04)' };
 
         return (
-          <div style={{ marginTop:6, padding:'6px 9px', borderRadius:8, background: hasBlock ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border:'1px solid ' + (hasBlock ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)') }}>
-            <div style={{ fontSize:9, fontWeight:700, color: hasBlock ? '#ef4444' : '#fbbf24', marginBottom:3 }}>
-              {hasBlock ? '⛔ Взаимодействия (критичные)' : '⚠ Взаимодействия'} ({total})
+          <div style={{ marginTop:6 }}>
+            <div onClick={() => setShowInteractions(!showInteractions)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showInteractions ? '8px 8px 0 0' : 8, background: hasBlock ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.05)', border:'1px solid ' + (hasBlock ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.12)') }}>
+              <span style={{ fontSize:10, fontWeight:700, color: hasBlock ? '#ef4444' : '#f59e0b', display:'flex', alignItems:'center', gap:5 }}>
+                {hasBlock ? '⛔ Взаимодействия' : '⚠ Взаимодействия'} ({total})
+                <span style={{ fontSize:7, fontWeight:600, color:'rgba(255,255,255,0.3)' }}>
+                  {groups.block.length > 0 && `⛔${groups.block.length} `}
+                  {groups.warn.length > 0 && `⚠${groups.warn.length} `}
+                  {groups.monitor.length > 0 && `🔬${groups.monitor.length}`}
+                </span>
+              </span>
+              <span style={{ fontSize:8, color:'var(--text-dim)' }}>{showInteractions ? '▲ скрыть' : '▼ показать'}</span>
             </div>
-            {(['block', 'warn', 'monitor'] as const).map(sev => {
-              const items = groups[sev];
-              if (items.length === 0) return null;
-              return (
-                <div key={sev} style={{ marginBottom: items.length > 0 && sev !== 'monitor' ? 3 : 0 }}>
-                  {items.map((intr, i) => (
-                    <div key={i} style={{ fontSize:7, color: sevColor[sev], marginBottom:2, lineHeight:1.4, marginLeft:4 }}>
-                      {sevLabel[sev]} <b>{fmtSub(intr.a)}</b> + <b>{fmtSub(intr.b)}</b> — {intr.reason}
-                      <div style={{ fontSize:6, opacity:0.8, marginTop:1 }}>{intr.action}</div>
-                    </div>
-                  ))}
+            {showInteractions && (
+              <div style={{ padding:'6px 9px', background:'rgba(0,0,0,0.12)', border:'1px solid ' + (hasBlock ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.08)'), borderTop:'none', borderRadius:'0 0 8px 8px' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:5, lineHeight:1.4 }}>
+                  Проверено {finalRec.subs.length} веществ на попарные взаимодействия. Учитываются фармакокинетика (CYP450, транспортёры) и фармакодинамика.
                 </div>
-              );
-            })}
+                {(['block', 'warn', 'monitor'] as const).map(sev => {
+                  const items = groups[sev];
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={sev} style={{ marginBottom:5, padding:'5px 7px', borderRadius:6, background:sevBg[sev], border:`1px solid ${sevColor[sev]}18` }}>
+                      <div style={{ fontSize:8, fontWeight:700, color:sevColor[sev], marginBottom:3 }}>{sevLabel[sev]} ({items.length})</div>
+                      {items.map((intr, i) => (
+                        <div key={i} style={{ fontSize:8, color:sevColor[sev], marginBottom:3, lineHeight:1.4, paddingLeft:2 }}>
+                          <div style={{ fontWeight:700, marginBottom:1 }}>
+                            <span style={{ fontSize:9, marginRight:2 }}>{sev === 'block' ? '⛔' : sev === 'warn' ? '⚠' : '🔬'}</span>
+                            <span style={{ color:'#fff' }}>{fmtSub(intr.a)}</span>
+                            <span style={{ opacity:0.5, margin:'0 3px' }}>+</span>
+                            <span style={{ color:'#fff' }}>{fmtSub(intr.b)}</span>
+                          </div>
+                          <div style={{ opacity:0.8, marginBottom:1 }}>
+                            <span style={{ fontWeight:600, opacity:0.6 }}>Механизм: </span>{intr.reason}
+                          </div>
+                          <div style={{ fontSize:7, opacity:0.6 }}>
+                            <span style={{ fontWeight:600 }}>Действие: </span>{intr.action}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })()}
@@ -1246,28 +1330,185 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         const total = deduped.length;
 
         return (
-          <div style={{ marginTop:6, padding:'6px 9px', borderRadius:8, background: hasAbs ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border:'1px solid ' + (hasAbs ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)') }}>
-            <div style={{ fontSize:9, fontWeight:700, color: hasAbs ? '#ef4444' : '#fbbf24', marginBottom:3 }}>
-              {hasAbs ? '⛔ Противопоказания' : '⚠ Осторожности'} ({total})
+          <div style={{ marginTop:6 }}>
+            <div onClick={() => setShowContraindications(!showContraindications)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showContraindications ? '8px 8px 0 0' : 8, background: hasAbs ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border:'1px solid ' + (hasAbs ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)') }}>
+              <span style={{ fontSize:10, fontWeight:700, color: hasAbs ? '#ef4444' : '#f59e0b' }}>
+                {hasAbs ? '⛔ Противопоказания' : '⚠ Противопоказания и осторожности'} ({total})
+              </span>
+              <span style={{ fontSize:8, color:'var(--text-dim)' }}>{showContraindications ? '▲ скрыть' : '▼ показать'}</span>
             </div>
-            {Object.entries(grouped).map(([id, g]) => {
-              const all = [...g.abs, ...g.rel];
-              return (
-                <div key={id} style={{ marginBottom: all.length > 0 ? 4 : 0 }}>
-                  <div style={{ fontSize:8, fontWeight:700, color:'var(--text)', marginBottom:2, marginTop:1 }}>{subNameRu(id)}</div>
-                  {g.abs.map((f, i) => (
-                    <div key={i} style={{ fontSize:7, color:'#fca5a5', marginBottom:1, lineHeight:1.4, marginLeft:6 }}>
-                      ⛔ {f.label}
+            {showContraindications && (
+              <div style={{ padding:'6px 9px 8px', background: hasAbs ? 'rgba(239,68,68,0.04)' : 'rgba(245,158,11,0.03)', border:'1px solid ' + (hasAbs ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.1)'), borderTop:'none', borderRadius:'0 0 8px 8px' }}>
+                {Object.entries(grouped).map(([id, g]) => {
+                  const all = [...g.abs, ...g.rel];
+                  return (
+                    <div key={id} style={{ marginBottom: all.length > 0 ? 4 : 0 }}>
+                      <div style={{ fontSize:8, fontWeight:700, color:'var(--text)', marginBottom:2, marginTop:1 }}>{subNameRu(id)}</div>
+                      {g.abs.map((f, i) => (
+                        <div key={i} style={{ fontSize:7, color:'#fca5a5', marginBottom:1, lineHeight:1.4, marginLeft:6 }}>
+                          ⛔ {f.label}
+                        </div>
+                      ))}
+                      {g.rel.map((f, i) => (
+                        <div key={i} style={{ fontSize:7, color:'#fbbf24', marginBottom:1, lineHeight:1.4, marginLeft:6 }}>
+                          ⚠ {f.label}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                  {g.rel.map((f, i) => (
-                    <div key={i} style={{ fontSize:7, color:'#fbbf24', marginBottom:1, lineHeight:1.4, marginLeft:6 }}>
-                      ⚠ {f.label}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ===== МОНИТОРИНГ АНАЛИЗОВ (врачебный протокол) ===== */}
+      {finalRec && finalRec.subs.length > 0 && (() => {
+        const subs = finalRec.subs;
+        const hasHepatic = subs.some(s => (s.mechsCovered || []).some(m => m.startsWith('liv')));
+        const hasCardio = subs.some(s => (s.mechsCovered || []).some(m => m.startsWith('cv')));
+        const hasRenal = subs.some(s => (s.mechsCovered || []).some(m => m.startsWith('ren')));
+        const hasHemat = subs.some(s => (s.mechsCovered || []).some(m => m.startsWith('hem')));
+        const hasCns = subs.some(s => (s.mechsCovered || []).some(m => m.startsWith('cns')));
+        const hasRepro = subs.some(s => (s.mechsCovered || []).some(m => m.startsWith('rep')));
+
+        return (
+          <div style={{ marginTop:6 }}>
+            <div onClick={() => setShowMonitoring(!showMonitoring)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showMonitoring ? '8px 8px 0 0' : 8, background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.2)' }}>
+              <span style={{ fontSize:10, fontWeight:700, color:'#60a5fa', display:'flex', alignItems:'center', gap:5 }}>
+                🩻 Мониторинг анализов и показателей
+                <span style={{ fontSize:7, fontWeight:600, color:'rgba(96,165,250,0.5)', padding:'1px 5px', borderRadius:4, background:'rgba(96,165,250,0.1)' }}>врачебный протокол</span>
+              </span>
+              <span style={{ fontSize:8, color:'var(--text-dim)' }}>{showMonitoring ? '▲ скрыть' : '▼ показать'}</span>
+            </div>
+            {showMonitoring && (
+              <div style={{ padding:'8px 9px', background:'rgba(96,165,250,0.03)', border:'1px solid rgba(96,165,250,0.1)', borderTop:'none', borderRadius:'0 0 8px 8px' }}>
+                {/* ── Витальные показатели (ежедневно) ── */}
+                <div style={{ marginBottom:7 }}>
+                  <div style={{ fontSize:8, fontWeight:700, color:'#93c5fd', marginBottom:3 }}>📊 Витальные показатели (ежедневно)</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:3 }}>
+                    <div style={{ padding:'5px 7px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ fontSize:7, fontWeight:700, color:'#f87171', marginBottom:1 }}>❤️ АД (утром, покой)</div>
+                      <div style={{ fontSize:6, color:'rgba(255,255,255,0.5)', lineHeight:1.3 }}>Цель: &lt;130/85 (идеал &lt;120/80)<br/>При ↑ &gt;140/90 — коррекция</div>
+                    </div>
+                    <div style={{ padding:'5px 7px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ fontSize:7, fontWeight:700, color:'#fbbf24', marginBottom:1 }}>💓 ЧСС (утром, покой)</div>
+                      <div style={{ fontSize:6, color:'rgba(255,255,255,0.5)', lineHeight:1.3 }}>Цель: 60–80 уд/мин<br/>Тахикардия &gt;90 — ЭКГ, коррекция</div>
+                    </div>
+                    <div style={{ padding:'5px 7px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ fontSize:7, fontWeight:700, color:'#4ade80', marginBottom:1 }}>⚖️ Вес (еженедельно)</div>
+                      <div style={{ fontSize:6, color:'rgba(255,255,255,0.5)', lineHeight:1.3 }}>Контроль задержки воды<br/>↑ &gt;2 кг/нед — отёки, Na⁺</div>
+                    </div>
+                    <div style={{ padding:'5px 7px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ fontSize:7, fontWeight:700, color:'#a78bfa', marginBottom:1 }}>🌡️ Температура</div>
+                      <div style={{ fontSize:6, color:'rgba(255,255,255,0.5)', lineHeight:1.3 }}>При симптомах — инфекция<br/>↑ на фоне ААС — риск абсцесса</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Лабораторный мониторинг ── */}
+                <div style={{ marginBottom:7 }}>
+                  <div style={{ fontSize:8, fontWeight:700, color:'#60a5fa', marginBottom:3 }}>🧪 Лабораторный мониторинг (график)</div>
+                  <div style={{ padding:'5px 7px', borderRadius:6, background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.12)', marginBottom:4 }}>
+                    <div style={{ fontSize:7, fontWeight:700, color:'#93c5fd', marginBottom:2 }}>⏱️ Периодичность сдачи</div>
+                    <div style={{ fontSize:6, color:'rgba(255,255,255,0.6)', lineHeight:1.5 }}>
+                      <span style={{ color:'#60a5fa', fontWeight:600 }}>До курса:</span> полная базовая панель (все маркеры ниже)<br/>
+                      <span style={{ color:'#fbbf24', fontWeight:600 }}>На курсе:</span> каждые <b>4 недели</b> (общий + биохимия + гормоны)<br/>
+                      <span style={{ color:'#4ade80', fontWeight:600 }}>ПКТ:</span> каждые <b>2–4 недели</b> (гормональная панель + печень)<br/>
+                      <span style={{ color:'#a78bfa', fontWeight:600 }}>После ПКТ:</span> через <b>8–12 недель</b> (контроль восстановления)
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Панели по системам ── */}
+                <div style={{ marginBottom:7 }}>
+                  <div style={{ fontSize:8, fontWeight:700, color:'var(--text)', marginBottom:4 }}>📋 Обязательные панели (назначено {subs.length} препаратов)</div>
+
+                  {[{ id:'hep', icon:'🫁', name:'Печёночная панель', color:'#f59e0b', active:hasHepatic, markers:'АЛТ, АСТ, ГГТ, ЩФ, билирубин общий/прямой, альбумин, ПТИ', freq:'Каждые 4 нед', targets:'АЛТ/АСТ <40 Ед/л, ГГТ <55, билирубин <21 мкмоль/л', alert:'АЛТ >80 → снижение доз · >200 → СТОП' },
+                    { id:'cardio', icon:'❤️', name:'Кардио-липидная панель', color:'#f87171', active:hasCardio, markers:'ЛПНП, ЛПВП, ТГ, АпоВ, Лп(а), hs-СРБ, Д-димер, тропонин I (при боли)', freq:'Каждые 4 нед', targets:'ЛПНП <2.6, ЛПВП >1.0, ТГ <1.7, hs-СРБ <1.0', alert:'ЛПНП >4.0 → статины · Д-димер >0.5 → УЗДГ вен' },
+                    { id:'renal', icon:'💧', name:'Почечная панель', color:'#38bdf8', active:hasRenal, markers:'Креатинин, рСКФ (CKD-EPI), цистатин C, мочевина, мочевая кислота, электролиты (Na⁺, K⁺, Cl⁻), общий белок мочи, микроальбуминурия', freq:'Каждые 4 нед', targets:'Креатинин <115, рСКФ >90, K⁺ 3.5–5.0, микроальбумин <30 мг/сут', alert:'Креатинин >130 → УЗИ почек · K⁺ <3.5/>5.5 → ЭКГ' },
+                    { id:'hema', icon:'🩸', name:'Гематологическая панель', color:'#ef4444', active:hasHemat, markers:'ОАК: HCT, Hgb, RBC, PLT, WBC, ретикулоциты, ферритин, сыв. железо, коагулограмма (МНО, АЧТВ)', freq:'Каждые 4 нед', targets:'HCT 40–50% (♂), Hgb 140–170 г/л, PLT 150–400×10⁹/л', alert:'HCT >54% → кровопускание · >60% → СТОП + госпитализация' },
+                    { id:'horm', icon:'🧬', name:'Гормональная панель', color:'#a78bfa', active:hasRepro || subs.some(s => (s.mechsCovered||[]).some(m => m.startsWith('rep')||m.startsWith('hem'))), markers:'Тестостерон общ./своб., эстрадиол (чувств.), пролактин, ЛГ, ФСГ, SHBG, кортизол (утро), ДГТ, прогестерон', freq:'Каждые 4 нед (на курсе), каждые 2 нед (ПКТ)', targets:'E2 20–50 пг/мл (♂ на курсе), пролактин <15 нг/мл, кортизол 140–690 нмоль/л', alert:'E2 >60 → ↑ИА · пролактин >25 → каберголин · ЛГ<1.0 → ХГЧ' },
+                    { id:'meta', icon:'🍬', name:'Метаболическая панель', color:'#f97316', active:hasHemat || hasCardio, markers:'Глюкоза натощак, HbA1c, инсулин, HOMA-IR, гомоцистеин, СРБ', freq:'Каждые 4–8 нед', targets:'Глюкоза <5.6, HbA1c <5.7%, HOMA-IR <2.5, гомоцистеин <10', alert:'HbA1c >6.0 → метформин · глюкоза >11 → ER · HOMA-IR >3 → берберин' },
+                    { id:'thy', icon:'🦋', name:'Тиреоидная панель', color:'#22d3ee', active:subs.some(s => s.substanceId === 'selenium' || s.substanceId === 'iodine' || s.substanceId === 't3' || s.substanceId === 't4'), markers:'ТТГ, Т3 своб., Т4 своб., АТ-ТПО', freq:'Каждые 8 нед (при приёме T3/T4 — каждые 4 нед)', targets:'ТТГ 0.4–4.0, Т3 св. 3.5–6.5, Т4 св. 11.5–22.7', alert:'ТТГ >4.5 → гипотиреоз · ТТГ <0.1 → гипертиреоз · ↑T3 → ↓дозу' },
+                    { id:'vit', icon:'💊', name:'Витамины и минералы', color:'#4ade80', active:true, markers:'Витамин D (25-OH), B12, фолат, ферритин, Mg²⁺, Zn²⁺, Se, Ca²⁺ общ., фосфор', freq:'Каждые 8 нед', targets:'D3 50–80 нг/мл, B12 200–900, фолат >4, ферритин 50–200, Mg²⁺ 0.8–1.0, Zn²⁺ 70–140', alert:'D3 <30 → нагрузка 50K МЕ/нед · ферритин <30 → Fe²⁺ + vitC' },
+                  ].map(panel => (
+                    <div key={panel.id} style={{ padding:'5px 7px', borderRadius:6, marginBottom:3, background: panel.active ? `${panel.color}08` : 'rgba(255,255,255,0.01)', border:`1px solid ${panel.active ? panel.color+'18' : 'rgba(255,255,255,0.04)'}`, opacity: panel.active ? 1 : 0.6 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
+                        <span style={{ fontSize:11 }}>{panel.icon}</span>
+                        <span style={{ fontSize:8, fontWeight:700, color: panel.active ? panel.color : 'var(--text-dim)' }}>{panel.name}</span>
+                        {!panel.active && <span style={{ fontSize:6, color:'rgba(255,255,255,0.3)', padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.04)' }}>плановая</span>}
+                      </div>
+                      <div style={{ fontSize:6, color:'rgba(255,255,255,0.5)', lineHeight:1.5, marginLeft:16 }}>
+                        <span style={{ fontWeight:600, color:'rgba(255,255,255,0.6)' }}>Маркеры:</span> {panel.markers}<br/>
+                        <span style={{ fontWeight:600, color:'rgba(255,255,255,0.6)' }}>Частота:</span> {panel.freq}<br/>
+                        <span style={{ fontWeight:600, color:'rgba(255,255,255,0.6)' }}>Цели:</span> {panel.targets}
+                        {panel.active && <><br/><span style={{ fontWeight:600, color:panel.color }}>⚠ Тревога:</span> <span style={{ color:panel.color, opacity:0.85 }}>{panel.alert}</span></>}
+                      </div>
                     </div>
                   ))}
                 </div>
-              );
-            })}
+
+                {/* ── Инструментальный мониторинг ── */}
+                <div style={{ marginBottom:7 }}>
+                  <div style={{ fontSize:8, fontWeight:700, color:'#a78bfa', marginBottom:3 }}>🖥️ Инструментальный мониторинг</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:3 }}>
+                    <div style={{ padding:'4px 6px', borderRadius:5, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.1)', fontSize:6, color:'rgba(255,255,255,0.6)', lineHeight:1.4 }}>
+                      <span style={{ fontWeight:700, color:'#c4b5fd' }}>ЭКГ</span><br/>Исходно + каждые 6 мес<br/>QTc, гипертрофия ЛЖ
+                    </div>
+                    <div style={{ padding:'4px 6px', borderRadius:5, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.1)', fontSize:6, color:'rgba(255,255,255,0.6)', lineHeight:1.4 }}>
+                      <span style={{ fontWeight:700, color:'#c4b5fd' }}>ЭхоКГ</span><br/>Ежегодно (GH/ААС &gt;1 года)<br/>ГЛЖ, ФВ, клапаны
+                    </div>
+                    <div style={{ padding:'4px 6px', borderRadius:5, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.1)', fontSize:6, color:'rgba(255,255,255,0.6)', lineHeight:1.4 }}>
+                      <span style={{ fontWeight:700, color:'#c4b5fd' }}>УЗИ печени</span><br/>Каждые 6 мес<br/>Стеатоз, фиброз, размер
+                    </div>
+                    <div style={{ padding:'4px 6px', borderRadius:5, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.1)', fontSize:6, color:'rgba(255,255,255,0.6)', lineHeight:1.4 }}>
+                      <span style={{ fontWeight:700, color:'#c4b5fd' }}>УЗИ почек</span><br/>Ежегодно<br/>Размер, паренхима, ЧЛС
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Дневник самоконтроля ── */}
+                <div style={{ marginBottom:4 }}>
+                  <div style={{ fontSize:8, fontWeight:700, color:'#fbbf24', marginBottom:3 }}>📝 Дневник самоконтроля (ежедневно)</div>
+                  <div style={{ padding:'5px 7px', borderRadius:6, background:'rgba(251,191,36,0.06)', border:'1px solid rgba(251,191,36,0.1)' }}>
+                    <div style={{ fontSize:6, color:'rgba(255,255,255,0.6)', lineHeight:1.8 }}>
+                      {[
+                        ['❤️', 'АД утром (сист/диаст) + пульс'],
+                        ['😴', 'Качество сна (1–5) + часы'],
+                        ['😤', 'Настроение/агрессия (1–5)'],
+                        ['🔥', 'Либидо (1–5)'],
+                        ['⚖️', 'Вес утром (еженедельно)'],
+                        ['💪', 'Отёки голеней/лица (да/нет)'],
+                        ['🩺', 'Гинекомастия (нет / чувств. / уплотнение)'],
+                        ['🧠', 'Головные боли / шум в ушах'],
+                      ].map(([icon, text], i) => (
+                        <div key={i} style={{ display:'flex', alignItems:'center', gap:4 }}>
+                          <span style={{ width:16, textAlign:'center', flexShrink:0 }}>{icon}</span>
+                          <span>{text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Экстренные показания ── */}
+                <div style={{ padding:'5px 7px', borderRadius:6, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)' }}>
+                  <div style={{ fontSize:7, fontWeight:700, color:'#fca5a5', marginBottom:2 }}>🚨 Немедленно обратиться к врачу:</div>
+                  <div style={{ fontSize:6, color:'rgba(255,255,255,0.55)', lineHeight:1.6 }}>
+                    • АД &gt;160/100 на фоне покоя<br/>
+                    • ЧСС &gt;120 в покое / аритмия<br/>
+                    • Боль в груди / одышка / кровохарканье<br/>
+                    • Желтуха (пожелтение кожи/склер)<br/>
+                    • Отёки лица/голеней + олигурия (&lt;500 мл/сут)<br/>
+                    • Сильная головная боль + нарушение зрения<br/>
+                    • Судороги / потеря сознания<br/>
+                    • Температура &gt;38.5°C + боль в месте инъекции (абсцесс)
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
       })()}

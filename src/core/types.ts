@@ -997,6 +997,7 @@ export interface Exercise {
   difficulty: string;
   jointStress: string;
   fatigueCost: number;
+  movementPattern?: MovementPattern;
   sets?: number;
   reps?: number;
   rest?: number;
@@ -1122,7 +1123,11 @@ export interface WorkoutLog {
 export type MovementPattern =
   | 'squat' | 'hinge' | 'horizontal_push' | 'horizontal_pull'
   | 'vertical_push' | 'vertical_pull' | 'lunge' | 'carry'
-  | 'rotation' | 'anti_rotation' | 'core';
+  | 'rotation' | 'anti_rotation' | 'core'
+  | 'incline_push' | 'dip_push' | 'decline_push'
+  | 'isolation_chest' | 'isolation_shoulders' | 'isolation_back'
+  | 'isolation_arms' | 'isolation_legs_quad' | 'isolation_legs_ham'
+  | 'isolation_calves' | 'glute_squat';
 
 export type ExerciseSlotRole = 'main' | 'secondary' | 'accessory' | 'rehab' | 'warmup';
 

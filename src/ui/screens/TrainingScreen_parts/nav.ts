@@ -49,13 +49,13 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     subtitle: 'Все калькуляторы в одном месте: сила, нагрузка, периодизация, инвентарь',
       tabs: [
       'strength_analysis', 'load_management', 'diagnostics', 'periodization_hub',
-      'exercise_lab', 'bb_tools', 'load_safety', 'split_gen', 'pri_reppat',
+      'exercise_lab', 'load_safety', 'split_gen', 'pri_reppat',
       'calc_plates', 'calc_quality', 'volume',
       'training_mix_hub', 'tonnage',
     ],
     categories: [
       { label: 'Унифицированные', icon: '🧠', tabs: ['strength_analysis', 'load_management', 'diagnostics', 'periodization_hub', 'exercise_lab'] },
-      { label: 'Инструменты', icon: '🛠️', tabs: ['bb_tools', 'load_safety', 'split_gen', 'pri_reppat', 'calc_plates', 'calc_quality', 'volume', 'tonnage'] },
+      { label: 'Инструменты', icon: '🛠️', tabs: ['load_safety', 'split_gen', 'pri_reppat', 'calc_plates', 'calc_quality', 'volume', 'tonnage'] },
       { label: 'Прочее', icon: '📋', tabs: ['training_mix_hub'] },
     ],
   },

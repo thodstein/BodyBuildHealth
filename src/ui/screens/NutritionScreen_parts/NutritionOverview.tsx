@@ -16,12 +16,12 @@ const NUTRITION_FACTOR_LABELS: Record<string, { label: string; desc: string; goo
 
 export const NutritionOverview: React.FC<{
   profile: UserProfile | null;
-  avgWeeklyKcal: number;
-  avgWeeklyProtein: number;
-  avgWeeklyFat: number;
-  avgWeeklyCarbs: number;
+  avgDailyKcal: number;
+  avgDailyProtein: number;
+  avgDailyFat: number;
+  avgDailyCarbs: number;
   microsIntake?: Record<string, number>;
-}> = ({ profile, avgWeeklyKcal, avgWeeklyProtein, avgWeeklyFat, avgWeeklyCarbs, microsIntake = {} }) => {
+}> = ({ profile, avgDailyKcal, avgDailyProtein, avgDailyFat, avgDailyCarbs, microsIntake = {} }) => {
   const s = profile?.settings;
   const pal = profile ? derivePAL(s?.workoutsPerWeek, s?.avgWorkoutMinutes) : 1.55;
 
@@ -49,10 +49,10 @@ export const NutritionOverview: React.FC<{
     });
   }, [profile]);
 
-  const pctKcal = nutritionTargets ? Math.min(150, Math.round((avgWeeklyKcal / nutritionTargets.kcal) * 100)) : 0;
-  const pctProtein = nutritionTargets ? Math.min(150, Math.round((avgWeeklyProtein / nutritionTargets.protein) * 100)) : 0;
-  const pctFat = nutritionTargets ? Math.min(150, Math.round((avgWeeklyFat / nutritionTargets.fats) * 100)) : 0;
-  const pctCarbs = nutritionTargets ? Math.min(150, Math.round((avgWeeklyCarbs / nutritionTargets.carbs) * 100)) : 0;
+  const pctKcal = nutritionTargets ? Math.min(150, Math.round((avgDailyKcal / nutritionTargets.kcal) * 100)) : 0;
+  const pctProtein = nutritionTargets ? Math.min(150, Math.round((avgDailyProtein / nutritionTargets.protein) * 100)) : 0;
+  const pctFat = nutritionTargets ? Math.min(150, Math.round((avgDailyFat / nutritionTargets.fats) * 100)) : 0;
+  const pctCarbs = nutritionTargets ? Math.min(150, Math.round((avgDailyCarbs / nutritionTargets.carbs) * 100)) : 0;
 
   const goalInfo = s?.primaryGoal ? ({
     bulk: 'Масса', cut: 'Сушка', maintenance: 'Поддержание',
@@ -80,10 +80,10 @@ export const NutritionOverview: React.FC<{
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
           {[
-            { label: 'Калории', val: avgWeeklyKcal, target: nutritionTargets?.kcal ?? 0, unit: 'ккал', color: '#22c55e' },
-            { label: 'Белки', val: avgWeeklyProtein, target: nutritionTargets?.protein ?? 0, unit: 'г', color: '#3b82f6' },
-            { label: 'Жиры', val: avgWeeklyFat, target: nutritionTargets?.fats ?? 0, unit: 'г', color: '#f97316' },
-            { label: 'Углеводы', val: avgWeeklyCarbs, target: nutritionTargets?.carbs ?? 0, unit: 'г', color: '#a855f7' },
+            { label: 'Калории', val: avgDailyKcal, target: nutritionTargets?.kcal ?? 0, unit: 'ккал', color: '#22c55e' },
+            { label: 'Белки', val: avgDailyProtein, target: nutritionTargets?.protein ?? 0, unit: 'г', color: '#3b82f6' },
+            { label: 'Жиры', val: avgDailyFat, target: nutritionTargets?.fats ?? 0, unit: 'г', color: '#f97316' },
+            { label: 'Углеводы', val: avgDailyCarbs, target: nutritionTargets?.carbs ?? 0, unit: 'г', color: '#a855f7' },
           ].map(m => {
             const pct = m.target > 0 ? Math.min(200, Math.round((m.val / m.target) * 100)) : 0;
             const status = pct < 80 ? '⬇️' : pct > 110 ? '⬆️' : '✅';
@@ -125,14 +125,14 @@ export const NutritionOverview: React.FC<{
             )}
 
             {/* Macro targets vs actual (enhanced display) */}
-            {nutritionTargets && avgWeeklyKcal > 0 && (
+            {nutritionTargets && avgDailyKcal > 0 && (
               <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>🎯 Цели vs Факт</div>
                 {[
-                  { l: 'Ккал', a: avgWeeklyKcal, t: nutritionTargets.kcal, u: 'ккал', c: '#22c55e' },
-                  { l: 'Белки', a: avgWeeklyProtein, t: nutritionTargets.protein, u: 'г', c: '#3b82f6' },
-                  { l: 'Жиры', a: avgWeeklyFat, t: nutritionTargets.fats, u: 'г', c: '#f97316' },
-                  { l: 'Углев.', a: avgWeeklyCarbs, t: nutritionTargets.carbs, u: 'г', c: '#a855f7' },
+                  { l: 'Ккал', a: avgDailyKcal, t: nutritionTargets.kcal, u: 'ккал', c: '#22c55e' },
+                  { l: 'Белки', a: avgDailyProtein, t: nutritionTargets.protein, u: 'г', c: '#3b82f6' },
+                  { l: 'Жиры', a: avgDailyFat, t: nutritionTargets.fats, u: 'г', c: '#f97316' },
+                  { l: 'Углев.', a: avgDailyCarbs, t: nutritionTargets.carbs, u: 'г', c: '#a855f7' },
                 ].map(m => {
                   const pct = m.t > 0 ? Math.min(150, Math.round((m.a / m.t) * 100)) : 0;
                   const color = pct >= 85 && pct <= 115 ? '#22c55e' : pct < 85 ? '#ff9100' : '#ef4444';

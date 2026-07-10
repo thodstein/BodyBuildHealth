@@ -8,6 +8,7 @@ import { MRVEstimatorTab } from './MRVEstimatorTab';
 import VolumeRecoveryCorrelationCard from './VolumeRecoveryCorrelationCard';
 import { WhatIfCard } from './WhatIfCard';
 import { CheckinMetricsCard } from './CheckinMetricsCard';
+import type { WorkoutLog } from '../../../core/types';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -22,7 +23,15 @@ const MODE_DEFS: Array<{ m: LoadManagementHubMode; label: string; icon: string }
   { m: 'checkin', label: 'Чек-ин', icon: '📋' }
 ];
 
-export const LoadManagementHub: React.FC = () => {
+export interface LoadManagementHubProps {
+  sessions: WorkoutLog[];
+  baseRisk: number;
+  baseReadiness: number;
+}
+
+export const LoadManagementHub: React.FC<LoadManagementHubProps> = ({
+  sessions, baseRisk, baseReadiness,
+}) => {
   const [mode, setMode] = useState<LoadManagementHubMode>('load');
 
   return (
@@ -47,8 +56,8 @@ export const LoadManagementHub: React.FC = () => {
       {mode === 'load' && <TrainingLoadCalculator />}
       {mode === 'fatigue' && <FatigueIndexTab />}
       {mode === 'mrv' && <MRVEstimatorTab />}
-      {mode === 'volrec' && <VolumeRecoveryCorrelationCard sessions={[]} />}
-      {mode === 'whatif' && <WhatIfCard baseRisk={20} baseReadiness={75} />}
+      {mode === 'volrec' && <VolumeRecoveryCorrelationCard sessions={sessions} />}
+      {mode === 'whatif' && <WhatIfCard baseRisk={baseRisk} baseReadiness={baseReadiness} />}
       {mode === 'checkin' && <CheckinMetricsCard />}
     </div>
   );

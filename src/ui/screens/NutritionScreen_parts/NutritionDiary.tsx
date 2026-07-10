@@ -18,7 +18,7 @@ interface DiaryItem { name: string; kcal: number; p: number; f: number; c: numbe
 
 interface NutritionTargets { kcal: number; protein: number; fats: number; carbs: number; }
 
-export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: number; p: number; f: number; c: number }[]; targets?: NutritionTargets; weight?: number; age?: number; sex?: 'male' | 'female' }> = ({ foodEntries, targets, weight: w, age: a, sex: s }) => {
+export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: number; p: number; f: number; c: number }[]; targets?: NutritionTargets; weight?: number; age?: number; sex?: 'male' | 'female'; onDiaryChange?: () => void }> = ({ foodEntries, targets, weight: w, age: a, sex: s, onDiaryChange }) => {
   const weight = w || 80;
   const age = a || 30;
   const sex = s || 'male';
@@ -89,7 +89,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2000); };
 
   useEffect(() => { try { setDiaryData(JSON.parse(localStorage.getItem('nutrition_diary') || '{}')); } catch {} }, [refreshKey, foodEntries]);
-  const saveDiary = (data: any) => { localStorage.setItem('nutrition_diary', JSON.stringify(data)); setDiaryData(data); setRefreshKey(k => k+1); };
+  const saveDiary = (data: any) => { localStorage.setItem('nutrition_diary', JSON.stringify(data)); setDiaryData(data); setRefreshKey(k => k+1); onDiaryChange?.(); };
   const addCustomMeal = () => { const name = customMealInput.trim(); if (!name || customMeals.includes(name)) return; const updated = [...customMeals, name]; setCustomMeals(updated); localStorage.setItem('he_custom_meals', JSON.stringify(updated)); setCustomMealInput(''); setShowCustomMeal(false); showToast('✅ Приём добавлен'); };
 
   const allMealTypes = [...MEAL_PRESETS, ...customMeals];
@@ -435,10 +435,10 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                   <button onClick={() => {
                     try {
                       const plans = JSON.parse(localStorage.getItem('he_saved_nutrition_plans') || '[]');
-                      if (plans.length === 0) return;
+                      if (plans.length === 0) { showToast('❌ Нет сохранённых планов'); return; }
                       const latest = plans[0];
                       const meals = latest.dayPlan?.meals || [];
-                      if (meals.length === 0) return;
+                      if (meals.length === 0) { showToast('❌ План пуст — нет приёмов пищи'); return; }
                       const data = { ...diaryData };
                       if (!data[selectedDate]) data[selectedDate] = { meals: {} };
                       meals.forEach((m: any) => {
@@ -450,7 +450,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                       });
                       saveDiary(data);
                       showToast('✅ Импортировано из плана');
-                    } catch { showToast('❌ Нет сохранённых планов'); }
+                    } catch { showToast('❌ Ошибка импорта плана'); }
                   }} style={{ padding:'4px 10px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.08)', color:'#00e68a', fontSize:8, fontWeight:600 }}>📥 Из плана</button>
                   <span style={{ fontSize:9, color:'rgba(255,255,255,0.85)' }}>{Object.keys(dayMeals).length} приёмов</span>
                 </div>

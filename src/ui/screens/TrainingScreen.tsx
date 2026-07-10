@@ -28,7 +28,6 @@ import { PlannerPlAuto } from './TrainingScreen_parts/PlannerPlAuto';
 import { PlannerBbAuto } from './TrainingScreen_parts/PlannerBbAuto';
 import { DiaryAnalyticsZone } from './TrainingScreen_parts/DiaryAnalyticsZone';
 import { LibraryZone } from './TrainingScreen_parts/LibraryZone';
-import { BbToolsCard } from './TrainingScreen_parts/BbToolsCard';
 import { LoadSafetyCard } from './TrainingScreen_parts/LoadSafetyCard';
 import { SplitGenCard } from './TrainingScreen_parts/SplitGenCard';
 import { PriRepPatternCard } from './TrainingScreen_parts/PriRepPatternCard';
@@ -40,7 +39,6 @@ import { LoadManagementHub } from './TrainingScreen_parts/LoadManagementHub';
 import { DiagnosticsHub } from './TrainingScreen_parts/DiagnosticsHub';
 import { PeriodizationHub } from './TrainingScreen_parts/PeriodizationHub';
 import { TaperPlannerTab } from './TrainingScreen_parts/TaperPlannerTab';
-import { BbToolsHub } from './TrainingScreen_parts/BbToolsHub';
 import { ExecutionZone } from './TrainingScreen_parts/ExecutionZone';
 import { TrainingDiaryHub } from './TrainingScreen_parts/TrainingDiaryHub';
 
@@ -649,14 +647,13 @@ export const TrainingScreen: React.FC = () => {
 
 
         {tab === 'strength_analysis' && <InfoErrorBoundary label="Анализ силы"><StrengthAnalysisHub /></InfoErrorBoundary>}
-      {tab === 'load_management' && <InfoErrorBoundary label="Управление нагрузкой"><LoadManagementHub /></InfoErrorBoundary>}
-      {tab === 'diagnostics' && <InfoErrorBoundary label="Диагностика"><DiagnosticsHub /></InfoErrorBoundary>}
+      {tab === 'load_management' && <InfoErrorBoundary label="Управление нагрузкой"><LoadManagementHub sessions={historyWorkouts} baseRisk={linked.risk?.overallRaw ?? 20} baseReadiness={readiness?.recovery ?? 75} /></InfoErrorBoundary>}
+      {tab === 'diagnostics' && <InfoErrorBoundary label="Диагностика"><DiagnosticsHub sessions={historyWorkouts} tprofile={tprofile} readinessRecovery={readiness?.recovery ?? 70} readinessFatigue={readiness?.fatigue ?? 30} mesoWeeks={mesoLength} missedSessions={0} currentVolume={manualResult?.days?.reduce((s: number, d: any) => s + d.exercises.length, 0) ?? 18} currentRir={2} /></InfoErrorBoundary>}
       {tab === 'periodization_hub' && <InfoErrorBoundary label="Периодизация"><PeriodizationHub /></InfoErrorBoundary>}
-      {tab === 'exercise_lab' && <InfoErrorBoundary label="Лаборатория упражнений"><ExerciseLab /></InfoErrorBoundary>}
+      {tab === 'exercise_lab' && <InfoErrorBoundary label="Лаборатория упражнений"><ExerciseLabMerged /></InfoErrorBoundary>}
       {tab === 'calc_plates' && <InfoErrorBoundary label="Калькулятор блинов"><PlateCalcTab /></InfoErrorBoundary>}
 
       {tab === 'volume' && <InfoErrorBoundary label="Расчёт объёма"><VolumeOptimizerTab /></InfoErrorBoundary>}
-      {tab === 'bb_tools' && <InfoErrorBoundary label="ББ-инструменты"><BbToolsHub /></InfoErrorBoundary>}
       {tab === 'load_safety' && <InfoErrorBoundary label="Нагрузка/авторег"><LoadSafetyCard /></InfoErrorBoundary>}
       {tab === 'split_gen' && <InfoErrorBoundary label="Генератор сплитов"><SplitGenCard /></InfoErrorBoundary>}
       {tab === 'pri_reppat' && <InfoErrorBoundary label="PRI/схема повт"><PriRepPatternCard /></InfoErrorBoundary>}
@@ -692,7 +689,7 @@ import { usePlanGeneration } from '../hooks/usePlanGeneration';
 import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
 import { ProgramsTab } from './TrainingScreen_parts/ProgramsTab';
 import { VolumeOptimizerTab } from './TrainingScreen_parts/VolumeOptimizerTab';
-import ExerciseLab from './TrainingScreen_parts/ExerciseLab';
+import ExerciseLabMerged from './TrainingScreen_parts/ExerciseLabMerged';
 import { TrainingLoadCalculator } from './TrainingScreen_parts/TrainingLoadCalculator';
 import { WhatIfCard } from './TrainingScreen_parts/WhatIfCard';
 import { ReadinessForecastCard } from './TrainingScreen_parts/ReadinessForecastCard';

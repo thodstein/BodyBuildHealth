@@ -28,10 +28,8 @@ import StickingPointAnalysisCard from './StickingPointAnalysisCard';
 import VolumeRecoveryCorrelationCard from './VolumeRecoveryCorrelationCard';
 
 // ББ-специфичные
-import { BbToolsCard } from './BbToolsCard';
 import { SplitGenCard } from './SplitGenCard';
 import { TempoTab } from './TempoTab';
-import TechniqueTab from './ExerciseLabTechnique';
 import { VolumeOptimizerTab } from './VolumeOptimizerTab';
 
 interface ToolDef { id: string; title: string; icon: string; short: string; render: () => React.ReactNode; }
@@ -62,9 +60,19 @@ const TOOLS: Record<'pl' | 'bb' | 'manual', ToolDef[]> = {
 
   // ═══ ББ-АВТО ═══
   bb: [
-    { id: 'bb', title: 'ББ-инструменты', icon: '💪', short: 'Темп/отдых/TUT, техники интенсификации, слабые точки, демография.', render: () => <BbToolsCard /> },
+    { id: 'bb', title: 'ББ-инструменты', icon: '💪', short: 'Темп/отдых, техники, слабые группы, демография — теперь в лаборатории упражнений.', render: () => (
+      <div style={{ padding: 12, fontSize: 11 }}>
+        <div style={{ color: 'rgba(255,255,255,0.6)', marginBottom: 8, lineHeight: 1.5 }}>
+          ББ-инструменты объединены с Лабораторией упражнений в единый ПРОФ-калькулятор.
+          Перейдите в зону «Калькуляторы» → «Лаборатория упражнений» → вкладка «ББ-инструменты».
+        </div>
+        <button onClick={() => { const ev = new CustomEvent('he_training_nav', { detail: { zone: 'calculators', tab: 'exercise_lab' } }); window.dispatchEvent(ev); }}
+          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', cursor: 'pointer', fontWeight: 700, fontSize: 11 }}>
+          🧬 Открыть Лабораторию упражнений
+        </button>
+      </div>
+    ) },
     { id: 'split', title: 'Генератор сплитов', icon: '🧩', short: '9 типов сплитов под цель/дни/слабые группы.', render: () => <SplitGenCard /> },
-    { id: 'target', title: 'Целевая мышца', icon: '🎯', short: 'Подбор упражнений по целевой мышце и её региону.', render: () => <TechniqueTab /> },
     { id: 'tempo', title: 'Темп повторений', icon: '⏱️', short: 'Эксцентрика/пауза/концентрика/пауза по цели.', render: () => <TempoTab /> },
     { id: 'pri', title: 'PRI / готовность', icon: '🧠', short: 'Готовность к тренировке + RIR-корректировка.', render: () => <PriRepPatternCard /> },
     { id: 'fatigue', title: 'Индекс усталости', icon: '📉', short: 'ACWR, монотонность, strain → корректировка объёма.', render: () => <FatigueIndexTab /> },
@@ -86,8 +94,18 @@ const TOOLS: Record<'pl' | 'bb' | 'manual', ToolDef[]> = {
   // ═══ РУЧНОЙ СБОР (все инструменты) ═══
   manual: [
     { id: 'split', title: 'Генератор сплитов', icon: '🧩', short: '9 типов сплитов под цель/дни/слабые группы.', render: () => <SplitGenCard /> },
-    { id: 'bb', title: 'ББ-инструменты', icon: '💪', short: 'Темп/отдых, техники, слабые точки, демография.', render: () => <BbToolsCard /> },
-    { id: 'target', title: 'Целевая мышца', icon: '🎯', short: 'Подбор упражнений по целевой мышце.', render: () => <TechniqueTab /> },
+    { id: 'bb', title: 'ББ-инструменты', icon: '💪', short: 'Темп/отдых, техники, слабые группы, демография — объединены с Лабораторией упражнений.', render: () => (
+      <div style={{ padding: 12, fontSize: 11 }}>
+        <div style={{ color: 'rgba(255,255,255,0.6)', marginBottom: 8, lineHeight: 1.5 }}>
+          ББ-инструменты и Целевая мышца объединены с Лабораторией упражнений в единый ПРОФ-калькулятор.
+          Перейдите в зону «Калькуляторы» → «Лаборатория упражнений».
+        </div>
+        <button onClick={() => { const ev = new CustomEvent('he_training_nav', { detail: { zone: 'calculators', tab: 'exercise_lab' } }); window.dispatchEvent(ev); }}
+          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', cursor: 'pointer', fontWeight: 700, fontSize: 11 }}>
+          🧬 Открыть Лабораторию упражнений
+        </button>
+      </div>
+    ) },
     { id: 'tempo', title: 'Темп повторений', icon: '⏱️', short: 'Темп по цели движения.', render: () => <TempoTab /> },
     { id: 'weak', title: 'Слабые точки ПЛ', icon: '🎯', short: 'Диагностика мёртвой точки движения.', render: () => <PlWeakpointsCard /> },
     { id: 'str', title: 'Аналитика силы', icon: '💪', short: 'Процентиль, уровень, соотношения, ориентиры.', render: () => <StrengthAnalyticsCard /> },

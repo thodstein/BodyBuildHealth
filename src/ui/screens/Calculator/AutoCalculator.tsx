@@ -250,7 +250,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           <span>Дополнительные PED</span>
           <span style={{ fontSize:8, fontWeight:600, color:'rgba(255,255,255,0.3)', letterSpacing:0 }}>(GH · Insulin · IGF · Clen · T3)</span>
         </div>
-        <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(100px, 1fr))', gap:5 }}>
           <PopupPEDInput id="ghIU" value={(state.pharma as any).ghIU ?? 0} onChange={v => uPharm({ ...state.pharma, ghIU: v, hasGH: v > 0 } as any)} />
           <PopupPEDInput id="insulinIU" value={(state.pharma as any).insulinIU ?? 0} onChange={v => uPharm({ ...state.pharma, insulinIU: v, hasInsulin: v > 0 } as any)} />
           <PopupPEDInput id="igfMcg" value={(state.pharma as any).igfMcg ?? 0} onChange={v => uPharm({ ...(state.pharma as any), igfMcg: v } as any)} />

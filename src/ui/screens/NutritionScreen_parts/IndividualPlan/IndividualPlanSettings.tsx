@@ -1192,23 +1192,42 @@ export const IndividualPlanSettings: React.FC = () => {
       </GlassCard>
 
       <GlassCard title="⚡ Быстрые пресеты" icon="⚡" color="#f97316">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {[
-            { id: 'max', label: '🚀 Максимум', desc: 'Топ-рейтинг + макс. калории + макс. разнообразие', fn: () => { setBudget('max'); setNutrLevel('max'); setVariety('max'); } },
-            { id: 'meat', label: '🥩 Мясной', desc: 'Курица, говядина, индейка', fn: () => { setPlanType('classic'); setPreferredFoods(['chicken_breast','beef_lean','turkey_breast','rice_white','broccoli']); } },
-            { id: 'fish', label: '🐟 Рыбный', desc: 'Лосось, тунец, треска', fn: () => { setPlanType('mediterranean'); setPreferredFoods(['salmon','tuna_canned','cod','rice_brown','broccoli','olive_oil']); } },
-            { id: 'vegan', label: '🌱 Веган', desc: 'Бобовые, тофу, киноа', fn: () => { setPlanType('vegetarian'); setPreferredFoods(['tofu','tempeh','lentils','quinoa','broccoli','avocado']); } },
-            { id: 'budget', label: '💰 Бюджет', desc: 'Яйца, курица, гречка', fn: () => { setBudget('low'); setPreferredFoods(['egg_whole','chicken_thigh','buckwheat','cabbage','apple']); } },
-          ].map(p => (
-            <button key={p.id} onClick={() => { p.fn(); }} style={{ flex: 1, minWidth: 80, padding: '8px 6px', borderRadius: 10, cursor: 'pointer', textAlign: 'center', background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.85)', fontSize: 8, fontWeight: 600, transition: 'all 0.15s' }}
-              onMouseEnter={e => { (e.target as HTMLElement).style.background = 'rgba(249,115,22,0.1)'; (e.target as HTMLElement).style.borderColor = 'rgba(249,115,22,0.3)'; }}
-              onMouseLeave={e => { (e.target as HTMLElement).style.background = '#202023'; (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'; }}>
-              <div style={{ fontSize: 16, marginBottom: 2 }}>{p.label.slice(0,2)}</div>
-              <div>{p.label.slice(2)}</div>
-              <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>{p.desc}</div>
-            </button>
-          ))}
-        </div>
+        {/* P2.1: 3 categories, 12 presets */}
+        {([
+          { cat: '🎯 По цели', color: '#00e68a', presets: [
+            { id: 'cut', label: '🔥 Сушка', desc: 'Дефицит, 2.5г белка/кг, низкий GI', fn: () => { setGoal('cutting'); setBudget('medium'); setVariety('max'); setPreferredFoods(['chicken_breast','turkey_breast','cod','egg_white','cottage_cheese_5','broccoli','spinach','cucumber']); localStorage.setItem('he_preferred_foods', JSON.stringify(['chicken_breast','turkey_breast','cod','egg_white','cottage_cheese_5','broccoli','spinach','cucumber'])); } },
+            { id: 'mass', label: '💪 Масса', desc: 'Профицит, 2г/кг, высоко-углеводные', fn: () => { setGoal('mass'); setBudget('medium'); setVariety('max'); setPreferredFoods(['beef_lean','chicken_breast','salmon','egg_whole','rice_white','oats','buckwheat','pasta_durum','banana','nuts_almonds']); localStorage.setItem('he_preferred_foods', JSON.stringify(['beef_lean','chicken_breast','salmon','egg_whole','rice_white','oats','buckwheat','pasta_durum','banana','nuts_almonds'])); } },
+            { id: 'recomp', label: '🔄 Рекомпозиция', desc: 'Maintenance, 2.5г/кг, carb cycling', fn: () => { setGoal('recomposition'); setBudget('medium'); setVariety('max'); setCyclingMode('macro'); setPreferredFoods(['chicken_breast','salmon','egg_whole','cottage_cheese_5','rice_brown','quinoa','broccoli','avocado','olive_oil']); localStorage.setItem('he_preferred_foods', JSON.stringify(['chicken_breast','salmon','egg_whole','cottage_cheese_5','rice_brown','quinoa','broccoli','avocado','olive_oil'])); } },
+            { id: 'maint', label: '⚖️ Поддержание', desc: 'Баланс 30/25/45', fn: () => { setGoal('maintenance'); setBudget('medium'); setVariety('medium'); setPreferredFoods(['chicken_breast','beef_lean','salmon','egg_whole','rice_brown','buckwheat','broccoli','tomato','olive_oil','yogurt_greek']); localStorage.setItem('he_preferred_foods', JSON.stringify(['chicken_breast','beef_lean','salmon','egg_whole','rice_brown','buckwheat','broccoli','tomato','olive_oil','yogurt_greek'])); } },
+          ]},
+          { cat: '🥗 По типу питания', color: '#3b82f6', presets: [
+            { id: 'meat', label: '🥩 Мясной', desc: 'Курица, говядина, индейка', fn: () => { setPlanType('classic'); setPreferredFoods(['chicken_breast','beef_lean','turkey_breast','rice_white','broccoli']); localStorage.setItem('he_preferred_foods', JSON.stringify(['chicken_breast','beef_lean','turkey_breast','rice_white','broccoli'])); } },
+            { id: 'fish', label: '🐟 Рыбный', desc: 'Лосось, тунец, треска', fn: () => { setPlanType('mediterranean'); setPreferredFoods(['salmon','tuna_canned','cod','rice_brown','broccoli','olive_oil']); localStorage.setItem('he_preferred_foods', JSON.stringify(['salmon','tuna_canned','cod','rice_brown','broccoli','olive_oil'])); } },
+            { id: 'vegan', label: '🌱 Веган', desc: 'Бобовые, тофу, киноа', fn: () => { setPlanType('vegetarian'); setPreferredFoods(['tofu','tempeh','lentils','quinoa','broccoli','avocado']); localStorage.setItem('he_preferred_foods', JSON.stringify(['tofu','tempeh','lentils','quinoa','broccoli','avocado'])); } },
+            { id: 'budget', label: '💰 Бюджет', desc: 'Яйца, курица, гречка', fn: () => { setBudget('low'); setPreferredFoods(['egg_whole','chicken_thigh','buckwheat','cabbage','apple']); localStorage.setItem('he_preferred_foods', JSON.stringify(['egg_whole','chicken_thigh','buckwheat','cabbage','apple'])); } },
+            { id: 'max', label: '🚀 Максимум', desc: 'Топ-рейтинг + макс. разнообразие', fn: () => { setBudget('max'); setNutrLevel('max'); setVariety('max'); } },
+          ]},
+          { cat: '💉 По фазе', color: '#a78bfa', presets: [
+            { id: 'course', label: '💉 Курс', desc: 'Высокий белок, печень-суппорт', fn: () => { setPhase('course'); setGoal('mass'); setPreferredFoods(['chicken_breast','beef_lean','salmon','egg_whole','rice_white','oats','broccoli','spinach','cottage_cheese_5','olive_oil']); localStorage.setItem('he_preferred_foods', JSON.stringify(['chicken_breast','beef_lean','salmon','egg_whole','rice_white','oats','broccoli','spinach','cottage_cheese_5','olive_oil'])); } },
+            { id: 'pct', label: '🔄 ПКТ', desc: 'Цинк, витамин D, антиоксиданты', fn: () => { setPhase('pct'); setGoal('maintenance'); setPreferredFoods(['beef_lean','egg_whole','oysters','pumpkin_seeds','nuts_almonds','broccoli','spinach','salmon','yogurt_greek','kiwi']); localStorage.setItem('he_preferred_foods', JSON.stringify(['beef_lean','egg_whole','oysters','pumpkin_seeds','nuts_almonds','broccoli','spinach','salmon','yogurt_greek','kiwi'])); } },
+            { id: 'train', label: '🏋️ Тренировочный', desc: 'Peri-workout акцент, carb cycling', fn: () => { setLinkToTraining(true); setCyclingMode('macro'); setPreferredFoods(['chicken_breast','whey_protein','rice_white','oats','banana','salmon','sweet_potato','broccoli']); localStorage.setItem('he_preferred_foods', JSON.stringify(['chicken_breast','whey_protein','rice_white','oats','banana','salmon','sweet_potato','broccoli'])); } },
+          ]},
+        ] as { cat: string; color: string; presets: { id: string; label: string; desc: string; fn: () => void }[] }[]).map(group => (
+          <div key={group.cat} style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 8, fontWeight: 700, color: group.color, marginBottom: 4, letterSpacing: 0.3 }}>{group.cat}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {group.presets.map(p => (
+                <button key={p.id} onClick={() => { p.fn(); }} style={{ flex: 1, minWidth: 75, padding: '7px 5px', borderRadius: 10, cursor: 'pointer', textAlign: 'center', background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.85)', fontSize: 7, fontWeight: 600, transition: 'all 0.15s' }}
+                  onMouseEnter={e => { (e.target as HTMLElement).style.background = group.color + '15'; (e.target as HTMLElement).style.borderColor = group.color + '40'; }}
+                  onMouseLeave={e => { (e.target as HTMLElement).style.background = '#202023'; (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'; }}>
+                  <div style={{ fontSize: 14, marginBottom: 2 }}>{p.label.slice(0,2)}</div>
+                  <div>{p.label.slice(2)}</div>
+                  <div style={{ fontSize: 5, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>{p.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </GlassCard>
 
       <GlassCard title="Предпочтения и исключения" icon="🍎" color="#f59e0b">
@@ -1273,6 +1292,16 @@ export const IndividualPlanSettings: React.FC = () => {
             })()}
             {excludedFoods.length === 0 && <span style={{ fontSize:7, color:'rgba(255,255,255,0.75)' }}>Не выбраны</span>}
           </div>
+          {excludedFoods.length > 12 && (
+            <div style={{ fontSize:7, color:'#f59e0b', padding:'3px 6px', borderRadius:4, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)', marginTop:4 }}>
+              ⚠️ Исключено {excludedFoods.length} продуктов — разнообразие рациона ограничено. Рекомендуется не более 10-15 исключений.
+            </div>
+          )}
+          {preferredFoods.length > 0 && (
+            <div style={{ fontSize:7, color:'#00e68a', padding:'3px 6px', borderRadius:4, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)', marginTop:4 }}>
+              ⭐ Любимых продуктов: {preferredFoods.length} — они будут приоритетны при генерации плана (белок, углеводы, жиры, овощи, фрукты).
+            </div>
+          )}
           {dietPrefs.length > 0 && (
             <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:4 }}>
               {dietPrefs.map(p => (

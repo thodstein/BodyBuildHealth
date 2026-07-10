@@ -246,7 +246,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [expectedLossKgWeek, setExpectedLossKgWeek] = useState(0.5);
   const [showWeightAdaptModal, setShowWeightAdaptModal] = useState(false);
   const [weightLogEntries, setWeightLogEntries] = useState<{ date: string; weight: number }[]>(() => {
-    try { const s = JSON.parse(localStorage.getItem('he_weight_log_entries') || 'null'); if (s && Array.isArray(s) && s.length > 0) return s; } catch {}
+    try { const savedEntries = JSON.parse(localStorage.getItem('he_weight_log_entries') || 'null'); if (savedEntries && Array.isArray(savedEntries) && savedEntries.length > 0) return savedEntries; } catch {}
     const e: { date: string; weight: number }[] = [];
     for (let i = 0; i < 3; i++) { const d = new Date(); d.setDate(d.getDate() - (2 - i)); e.push({ date: d.toISOString().split('T')[0], weight: 80 }); }
     return e;
@@ -260,8 +260,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [metabolicAdaptPct, setMetabolicAdaptPct] = useState(10);
   const [dietPauseMode, setDietPauseMode] = useState<'none' | 'refeed' | 'flex_80_20' | 'periodization_2_1' | 'diet_5_2'>('none');
   const [manualGPerKg, setManualGPerKg] = useState<Record<string, number>>({ protein: 0, fat: 0, carbs: 0 });
-  const [monthPlanMode, setMonthPlanMode] = useState(false);
-  const [monthPlan, setMonthPlan] = useState<any[]>([]);
+  const [monthPlanMode, setMonthPlanMode] = useState(() => { try { return localStorage.getItem("he_plan_month_mode") === "true"; } catch { return false; } });
+  const [monthPlan, setMonthPlan] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem("he_plan_month") || "[]"); } catch { return []; } });
   const [selectedWeek, setSelectedWeek] = useState(0);
   const [goal, setGoal] = useState<GoalId>((s?.primaryGoal as GoalId) || 'maintenance');
   const [phase, setPhase] = useState<PhaseId>('course');
@@ -399,15 +399,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [workScheduleType, setWorkScheduleType] = useState('standard');
   const [trainingDays, setTrainingDays] = useState<boolean[]>([true, false, true, false, true, true, false]);
   const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-  const [generated, setGenerated] = useState(false);
-  const [planDays, setPlanDays] = useState<1 | 3 | 7>(1);
-  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
-  const [planView, setPlanView] = useState<'list' | 'calendar'>('list');
-  const [dayPlan, setDayPlan] = useState<any>(null);
-  const [threeDayPlan, setThreeDayPlan] = useState<any>(null);
-  const [weekPlan, setWeekPlan] = useState<any>(null);
-  const [shoppingList, setShoppingList] = useState<any>(null);
-  const [waterCalc, setWaterCalc] = useState<any>(null);
+  const [generated, setGenerated] = useState(() => { try { return localStorage.getItem("he_plan_generated") === "true"; } catch { return false; } });
+  const [planDays, setPlanDays] = useState<1 | 3 | 7>(() => { try { const v = parseInt(localStorage.getItem("he_plan_days") || "1"); return (v === 3 || v === 7) ? v : 1; } catch { return 1; } });
+  const [selectedDayIndex, setSelectedDayIndex] = useState(() => { try { return parseInt(localStorage.getItem("he_plan_day_idx") || "0") || 0; } catch { return 0; } });
+  const [planView, setPlanView] = useState<'list' | 'calendar'>(() => { try { return (localStorage.getItem("he_plan_view") === "calendar") ? "calendar" : "list"; } catch { return "list"; } });
+  const [dayPlan, setDayPlan] = useState<any>(() => { try { return JSON.parse(localStorage.getItem("he_plan_day") || "null"); } catch { return null; } });
+  const [threeDayPlan, setThreeDayPlan] = useState<any>(() => { try { return JSON.parse(localStorage.getItem("he_plan_3day") || "null"); } catch { return null; } });
+  const [weekPlan, setWeekPlan] = useState<any>(() => { try { return JSON.parse(localStorage.getItem("he_plan_week") || "null"); } catch { return null; } });
+  const [shoppingList, setShoppingList] = useState<any>(() => { try { return JSON.parse(localStorage.getItem("he_plan_shopping") || "null"); } catch { return null; } });
+  const [waterCalc, setWaterCalc] = useState<any>(() => { try { return JSON.parse(localStorage.getItem("he_plan_water") || "null"); } catch { return null; } });
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>(() => { try { return JSON.parse(localStorage.getItem('he_saved_nutrition_plans') || '[]'); } catch { return []; } });
   const [lockedFoodIds, setLockedFoodIds] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('he_locked_foods') || '[]')); } catch { return new Set<string>(); } });
   const toggleLockFood = (foodId: string) => { setLockedFoodIds(prev => { const next = new Set(prev); if (next.has(foodId)) next.delete(foodId); else next.add(foodId); localStorage.setItem('he_locked_foods', JSON.stringify([...next])); return next; }); };
@@ -437,6 +437,19 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => { try { localStorage.setItem('he_planner_pharma', JSON.stringify(v2Pharma)); } catch {} }, [v2Pharma]);
   useEffect(() => { try { localStorage.setItem('he_planner_histamine', histamineSensitive ? 'true' : 'false'); } catch {} }, [histamineSensitive]);
   useEffect(() => { try { localStorage.setItem('he_nutrition_supps', JSON.stringify(takenSupplements)); } catch {} }, [takenSupplements]);
+
+  // B1: Persist generated plan data so it survives tab switching / remounts
+  useEffect(() => { try { localStorage.setItem("he_plan_generated", generated ? "true" : "false"); } catch {} }, [generated]);
+  useEffect(() => { try { localStorage.setItem("he_plan_days", String(planDays)); } catch {} }, [planDays]);
+  useEffect(() => { try { localStorage.setItem("he_plan_day_idx", String(selectedDayIndex)); } catch {} }, [selectedDayIndex]);
+  useEffect(() => { try { localStorage.setItem("he_plan_view", planView); } catch {} }, [planView]);
+  useEffect(() => { try { if (dayPlan) localStorage.setItem("he_plan_day", JSON.stringify(dayPlan)); else localStorage.removeItem("he_plan_day"); } catch {} }, [dayPlan]);
+  useEffect(() => { try { if (threeDayPlan) localStorage.setItem("he_plan_3day", JSON.stringify(threeDayPlan)); else localStorage.removeItem("he_plan_3day"); } catch {} }, [threeDayPlan]);
+  useEffect(() => { try { if (weekPlan) localStorage.setItem("he_plan_week", JSON.stringify(weekPlan)); else localStorage.removeItem("he_plan_week"); } catch {} }, [weekPlan]);
+  useEffect(() => { try { if (shoppingList) localStorage.setItem("he_plan_shopping", JSON.stringify(shoppingList)); else localStorage.removeItem("he_plan_shopping"); } catch {} }, [shoppingList]);
+  useEffect(() => { try { if (waterCalc) localStorage.setItem("he_plan_water", JSON.stringify(waterCalc)); else localStorage.removeItem("he_plan_water"); } catch {} }, [waterCalc]);
+  useEffect(() => { try { localStorage.setItem("he_plan_month_mode", monthPlanMode ? "true" : "false"); } catch {} }, [monthPlanMode]);
+  useEffect(() => { try { if (monthPlan.length > 0) localStorage.setItem("he_plan_month", JSON.stringify(monthPlan)); else localStorage.removeItem("he_plan_month"); } catch {} }, [monthPlan]);
 
   const saveUndo = () => {
     const snap: any = {};
@@ -599,6 +612,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   };
 
   useEffect(() => { if (profile) { try { updateProfile({ settings: { ...profile.settings, primaryGoal: goal as any } } as any); } catch {} } }, [goal]);
+  // B4: Sync weight/height/age/sex/bodyFat back to profile so other screens see updated values
+  useEffect(() => { if (profile) { try { const ps = profile.settings; if (ps?.weight !== weight || ps?.height !== height || ps?.age !== age || ps?.sex !== sex || ps?.bodyFat !== bodyFatPct) { updateProfile({ settings: { ...profile.settings, weight, height, age, sex, bodyFat: bodyFatPct } } as any); } } catch {} } }, [weight, height, age, sex, bodyFatPct]);
 
   // Auto-recalc macros when course changes
   useEffect(() => {
@@ -670,6 +685,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const trainStartMin = linkToTraining && trainStart?.includes(':') ? toMin(trainStart) : undefined;
       const excludedIds = new Set<string>(excludedFoods);
       healthIssues.forEach(hid => { const issue = HEALTH_ISSUES.find(h => h.id === hid); if (issue?.foodIds) issue.foodIds.forEach(fid => excludedIds.add(fid)); });
+      // P1.2: Pass locked foods to engine
+      const lockedIds = new Set<string>([...lockedFoodIds]);
+      // P1.3: Build recent foods set from existing plans to avoid repetition
+      const recentFoodIds = new Set<string>();
+      const collectFoods = (plan: any) => { if (plan?.meals) plan.meals.forEach((m: any) => m.items?.forEach((it: any) => { if (it.id) recentFoodIds.add(it.id); })); if (plan?.days) plan.days.forEach((d: any) => d?.meals?.forEach((m: any) => m.items?.forEach((it: any) => { if (it.id) recentFoodIds.add(it.id); }))); };
+      if (days >= 3 && dayPlan) collectFoods(dayPlan);
+      if (days >= 7 && threeDayPlan) collectFoods(threeDayPlan);
       if (dietPrefs.includes('vegetarian')) {
         Object.entries(FOOD_ALLERGEN_DIET).forEach(([fid, tags]) => { if (tags.isVegetarian === false) excludedIds.add(fid); });
       }
@@ -689,6 +711,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           trainStartMin: linkToTraining && trainingDays[offset % 7] ? toMin(trainStart) : undefined,
           allowIntraWorkout: trainIntensity === 'high',
           excludedIds, preferredIds: new Set(preferredFoods),
+          lockedIds, recentFoodIds,
           budget, isVegetarian: dietPrefs.includes('vegetarian'),
           isCutting: goal === 'cutting' || goal === 'fat_loss',
           dayOffset: offset, cyclePhase: phase as any,
@@ -2079,7 +2102,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
                 <div style={{display:'flex',flexWrap:'wrap',gap:3}}>{m.items.map((it:any,ii:number)=>{const isEditing=editItem?.mealIdx===mi&&editItem?.itemIdx===ii;const isReplacing=replacingItem?.mealIdx===mi&&replacingItem?.itemIdx===ii;return<span key={ii} draggable={!isEditing&&!isReplacing} onDragStart={e=>{e.dataTransfer.setData('text/plain',`${mi}:${ii}`);setDraggedItem({mealIdx:mi,itemIdx:ii});}} style={{padding:'3px 6px',borderRadius:6,fontSize:8,background:isEditing?'rgba(59,130,246,0.08)':isReplacing?'rgba(245,158,11,0.08)':'#202023',border:`1px solid ${isEditing?'rgba(59,130,246,0.2)':isReplacing?'rgba(245,158,11,0.2)':'rgba(255,255,255,0.15)'}`,cursor:'grab',color:'#fff',display:'inline-flex',alignItems:'center',gap:3,flexWrap:'wrap'}}>
                     {isEditing?<><input type="number" defaultValue={it.amount} onChange={e=>setEditAmount(+e.target.value||0)} style={{width:40,padding:'1px 4px',borderRadius:3,border:'1px solid rgba(255,255,255,0.06)',background:'#18181b',color:'#fff',fontSize:8}}/><span style={{fontSize:7,color:'rgba(255,255,255,0.85)'}}>г</span><button onClick={()=>setEditAmount(prev=>Math.round((prev||it.amount)+25))} style={{padding:'1px 3px',borderRadius:3,border:'1px solid rgba(59,130,246,0.2)',background:'rgba(59,130,246,0.08)',color:'#60a5fa',cursor:'pointer',fontSize:6}}>+25</button><button onClick={()=>setEditAmount(prev=>Math.round((prev||it.amount)*2))} style={{padding:'1px 3px',borderRadius:3,border:'1px solid rgba(139,92,246,0.2)',background:'rgba(139,92,246,0.08)',color:'#a78bfa',cursor:'pointer',fontSize:6}}>×2</button><button onClick={()=>setEditAmount(prev=>Math.round((prev||it.amount)/2))} style={{padding:'1px 3px',borderRadius:3,border:'1px solid rgba(245,158,11,0.2)',background:'rgba(245,158,11,0.08)',color:'#f59e0b',cursor:'pointer',fontSize:6}}>÷2</button><button onClick={()=>updateItemAmount(0,mi,ii,editAmount||it.amount)} style={{padding:'1px 4px',borderRadius:3,border:'none',background:'rgba(0,230,138,0.15)',color:'#00e68a',cursor:'pointer',fontSize:7}}>✓</button><button onClick={()=>setEditItem(null)} style={{padding:'1px 4px',borderRadius:3,border:'none',background:'rgba(239,68,68,0.1)',color:'#ef4444',cursor:'pointer',fontSize:7}}>✕</button></>
                     :isReplacing?<><span style={{fontWeight:600}}>{it.name}</span><select onChange={e=>{if(e.target.value){const f=FOOD_DB.find(x=>x.id===e.target.value);if(f)replaceFoodItem(0,mi,ii,f);}}} value="" style={{fontSize:7,padding:'1px 2px',borderRadius:3,border:'1px solid rgba(255,255,255,0.06)',background:'#18181b',color:'#fff',maxWidth:120}}><option value="">🔀 Заменить...</option>{findSimilarFoods(it).map((s:any)=><option key={s.id} value={s.id}>{s.name}</option>)}</select></>
-                    :<><span style={{fontWeight:600}}>{it.name}</span><span style={{color:'rgba(255,255,255,0.9)',fontSize:8}}>{it.amount}г</span>{lockedFoodIds.has(it.id)&&<span style={{fontSize:7,color:'#f59e0b',padding:'0 2px'}} title="Закреплено — не изменится при регенерации">🔒</span>}<span onClick={()=>addToCart({name:it.name,kcal:it.kcal*(it.amount/100),amount:it.amount,category:it.category})} style={{cursor:'pointer',fontSize:7,color:'#00e68a',opacity:0.35,padding:'0 2px'}}>🛒</span><span onClick={()=>toggleLockFood(it.id)} style={{cursor:'pointer',fontSize:7,color:lockedFoodIds.has(it.id)?'#f59e0b':'rgba(255,255,255,0.4)',padding:'0 2px'}} title={lockedFoodIds.has(it.id)?'Открепить':'Закрепить (не изменится при регенерации)'}>{lockedFoodIds.has(it.id)?'🔓':'🔒'}</span><span onClick={()=>{setEditItem({dayIdx:0,mealIdx:mi,itemIdx:ii});setEditAmount(it.amount);}} style={{cursor:'pointer',fontSize:7,color:'rgba(255,255,255,0.8)',padding:'0 2px'}}>✏️</span><span onClick={()=>setReplacingItem({dayIdx:0,mealIdx:mi,itemIdx:ii})} style={{cursor:'pointer',fontSize:7,color:'rgba(245,158,11,0.4)',padding:'0 2px'}}>🔄</span><span onClick={()=>removeFoodItem(0,mi,ii)} style={{cursor:'pointer',fontSize:7,color:'rgba(239,68,68,0.3)',padding:'0 2px'}}>✕</span></>}
+                    :<><span style={{fontWeight:600}}>{it.name}</span>{preferredFoods.includes(it.id)&&<span style={{fontSize:7,color:'#00e68a',padding:'0 1px'}} title="Любимый продукт">⭐</span>}<span style={{color:'rgba(255,255,255,0.9)',fontSize:8}}>{it.amount}г</span>{lockedFoodIds.has(it.id)&&<span style={{fontSize:7,color:'#f59e0b',padding:'0 2px'}} title="Закреплено — не изменится при регенерации">🔒</span>}<span onClick={()=>addToCart({name:it.name,kcal:it.kcal*(it.amount/100),amount:it.amount,category:it.category})} style={{cursor:'pointer',fontSize:7,color:'#00e68a',opacity:0.35,padding:'0 2px'}}>🛒</span><span onClick={()=>toggleLockFood(it.id)} style={{cursor:'pointer',fontSize:7,color:lockedFoodIds.has(it.id)?'#f59e0b':'rgba(255,255,255,0.4)',padding:'0 2px'}} title={lockedFoodIds.has(it.id)?'Открепить':'Закрепить (не изменится при регенерации)'}>{lockedFoodIds.has(it.id)?'🔓':'🔒'}</span><span onClick={()=>{setEditItem({dayIdx:0,mealIdx:mi,itemIdx:ii});setEditAmount(it.amount);}} style={{cursor:'pointer',fontSize:7,color:'rgba(255,255,255,0.8)',padding:'0 2px'}}>✏️</span><span onClick={()=>setReplacingItem({dayIdx:0,mealIdx:mi,itemIdx:ii})} style={{cursor:'pointer',fontSize:7,color:'rgba(245,158,11,0.4)',padding:'0 2px'}}>🔄</span><span onClick={()=>removeFoodItem(0,mi,ii)} style={{cursor:'pointer',fontSize:7,color:'rgba(239,68,68,0.3)',padding:'0 2px'}}>✕</span></>}
                   </span>;})}</div>
                 {m.totals&&<div style={{display:'flex',gap:6,marginTop:4,fontSize:8,alignItems:'center',flexWrap:'wrap'}}><span style={{color:'#3b82f6',fontWeight:600}}>Б {mealP}г</span><span style={{color:'#f59e0b',fontWeight:600}}>Ж {mealF}г</span><span style={{color:'#f97316',fontWeight:600}}>У {mealC}г</span>{mealDiaas.diaas > 0 && <span style={{fontSize:7,fontWeight:600,color:mealDiaas.diaas >= 1 ? '#22c55e' : mealDiaas.diaas >= 0.75 ? '#f59e0b' : '#ef4444',background:(mealDiaas.diaas >= 1 ? 'rgba(34,197,94,0.08)' : mealDiaas.diaas >= 0.75 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)') + ' none repeat scroll 0% 0%',padding:'1px 5px',borderRadius:4}}>DIAAS {mealDiaas.diaas.toFixed(2)}</span>}{m.synergyNotes&&m.synergyNotes.length>0&&<span style={{fontSize:7,color:'#22c55e',fontWeight:600}} title={m.synergyNotes.join('; ')}>✅ {(m.synergyNotes as string[]).length} синерги{((m.synergyNotes as string[]).length>1?'й':'я')}</span>}{m.conflictWarnings&&m.conflictWarnings.length>0&&<span style={{fontSize:7,color:'#ef4444',fontWeight:600}} title={m.conflictWarnings.join('; ')}>⚠️ {(m.conflictWarnings as string[]).length} конфликт{((m.conflictWarnings as string[]).length>1?'ов':'')}</span>}</div>}
                 {quickAddMealIdx === mi && (
@@ -2211,7 +2234,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     );
   };
 
-  const ctx: PlanCtx = {
+  const ctx = useMemo<PlanCtx>(() => ({
     profile, s, courseEntries,
     weight, setWeight, height, setHeight, age, setAge, sex, setSex,
     dailySteps, setDailySteps, cookTimeMin, setCookTimeMin,
@@ -2302,7 +2325,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     errorMsg, setErrorMsg,
     useProEngine, setUseProEngine,
     labs,
-  };
+  }), [weight, height, age, sex, dailySteps, cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, mealsCount, allergens, healthIssues, eveningLowCarb, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, useProEngine, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   return <PlanContext.Provider value={ctx}>{children}</PlanContext.Provider>;
 };

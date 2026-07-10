@@ -64,6 +64,10 @@ export interface ManualExercise {
   rest: number;
   group: string;
   weight: number;
+  role?: 'main' | 'secondary' | 'accessory';
+  pattern?: string;
+  loadMode?: 'weight' | 'velocity';
+  targetVelocity?: number;
 }
 
 export interface ManualResult {

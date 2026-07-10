@@ -15,8 +15,11 @@ import { SPLIT_PATTERNS, getPattern, sessionsOf, type SplitPattern, type Schedul
 import { FORCE_HEAVY_GROUPS, getPair, resolveCharacter, type DayCharacter, type MuscleSlot } from './bb-day-types';
 import { getAllVolumeLandmarks, landmarksForRotation, normLevel, type TrainingLevel } from '../volume-landmarks.engine';
 import { tempoFor, REST_BY_CHARACTER, type TempoSpec } from './bb-tempo-rest';
+import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
+import { selectExercisesSmart } from '../exercise-selector.engine';
 
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
+export type BBVolumeGoal = 'mev' | 'mav' | 'mrv';
 
 export interface BBBuilderInput {
   patternId: string;
@@ -25,6 +28,8 @@ export interface BBBuilderInput {
   weeks: number;                 // длительность мезоцикла
   workMax?: Record<string, number>; // рабочий максимум на мышцу/движение (кг)
   weakPoints?: string[];         // отстающие группы → MAV↑
+  focusGroup?: string;           // группа специализации → MAV↑↑
+  volumeGoal?: BBVolumeGoal;     // цель по объёму: MEV | MAV | MRV
   mode?: 'natural' | 'on_course' | 'pct';
 }
 
@@ -39,6 +44,7 @@ export interface BBSet {
 
 export interface BBExercise {
   muscle: string;
+  name: string;         // Добавлено: конкретное упражнение из каталога
   role: 'primary' | 'accessory';
   character: DayCharacter;
   sets: number;
@@ -94,7 +100,6 @@ function charReps(c: DayCharacter): [number, number] {
   return [10, 15];
 }
 function charRir(c: DayCharacter, week: number): number {
-  // тяж: RIR 2→0 к пику; памп: 3→2; лёг: 4
   if (c === 'лёг') return 4;
   const base = c === 'тяж' ? 2 : 3;
   return Math.max(0, base - Math.floor((week - 1) / 2));
@@ -105,35 +110,57 @@ function buildSession(
   muscleVolumeRotation: Record<string, number>,
   muscleSessionCount: Record<string, number>,   // сколько сессий в ротации тренируют мышцу
   musclePrimaryAssigned: Set<string>,            // мышцы, которым уже назначена primary в этой ротации
-  workMax: Record<string, number>, weakPoints: string[],
+  workMax: Record<string, number>, weakPoints: string[], focusGroup?: string,
 ): BBSession {
   const character = sched.character as DayCharacter;
   const muscles = musclesForTag(sched.sessionTag);
   const exercises: BBExercise[] = [];
+  
+  // S-MRV: Дневной бюджет утомления (база 40-60 единиц)
+  let dayFatigueBudget = 50;
+  
   for (const muscle of muscles) {
-    const forced = FORCE_HEAVY_GROUPS.has(muscle);
     const resolved = resolveCharacter(muscle, character);
+    
     // роль: primary если мышца ещё не имела primary в ротации И (это тяж-сессия ИЛИ forced-тяж)
     let role: 'primary' | 'accessory' = 'accessory';
     if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж')) {
       role = 'primary'; musclePrimaryAssigned.add(muscle);
-    } else if (musclePrimaryAssigned.has(muscle) && resolved === 'тяж') {
-      // второй тяж-слот для этой мышцы → добивка-тяж (для ног)
-      role = 'accessory';
     }
+
     // объём на эту мышцу в эту сессию
     const mavRot = muscleVolumeRotation[muscle] || 0;
     const sessionsForMuscle = muscleSessionCount[muscle] || 1;
-    const share = role === 'primary' ? 0.65 : 0.35 / Math.max(1, sessionsForMuscle - 1);
+    
     let sets = Math.max(1, Math.round(mavRot * (role === 'primary' ? 0.65 : 0.35)));
     if (weakPoints.includes(muscle)) sets = Math.round(sets * 1.2);
+    if (focusGroup === muscle) sets = Math.round(sets * 1.3);
+    
     const [rmin, rmax] = charReps(resolved);
     const rir = charRir(resolved, week);
     const wm = workMax[muscle] || 80;
     const pct = PCT_FOR_RIR[rir] ?? 0.9;
     const reps = Math.round((rmin + rmax) / 2);
     const weight = Math.round(wm * pct * 10) / 10;
-    // PRO: bb-tempo-rest — темп и отдых по характеру дня
+    
+    // SMART SELECTION: Выбор конкретного упражнения из каталога
+    const pool = getExercisesByGroup(muscle);
+    const selected = selectExercisesSmart({
+      candidates: pool, muscleGroup: muscle, count: 1,
+      selectedIds: exercises.map(e => e.name).map(n => EXERCISE_CATALOG.find(ex => ex.name === n)?.id).filter(Boolean) as string[],
+      equipment: [], weakZones: weakPoints, level: 'intermediate', injuryProfile: [], type: role === 'primary' ? 'compound' : 'isolation',
+    });
+    const exData = selected[0] || pool[0] || { name: muscle, fatigueCost: 5 };
+    
+    // Проверка S-MRV: если упражнение слишком тяжёлое для остатка бюджета
+    const cost = (exData.fatigueCost || 5) * sets;
+    if (dayFatigueBudget < cost) {
+      // Пытаемся снизить объём, чтобы втиснуть
+      sets = Math.floor(dayFatigueBudget / (exData.fatigueCost || 5));
+      if (sets < 1) continue; // Пропускаем, если даже 1 сет не лезет
+    }
+    dayFatigueBudget -= (exData.fatigueCost || 5) * sets;
+
     const tempoSpec = tempoFor(resolved);
     const restSeconds = REST_BY_CHARACTER[resolved];
     const workSets: BBSet[] = Array.from({ length: sets }, () => ({
@@ -141,9 +168,10 @@ function buildSession(
       tempo: tempoSpec.notation,
       restSeconds,
     }));
+    
     exercises.push({
-      muscle, role, character: resolved, sets, repsRange: [rmin, rmax], rir, workSets,
-      exerciseName: undefined,
+      muscle, name: exData.name, role, character: resolved, sets, repsRange: [rmin, rmax], rir, workSets,
+      exerciseName: exData.name,
       tempoSpec: tempoSpec.notation,
       restSeconds,
     });
@@ -156,18 +184,19 @@ export function buildBBPlan(input: BBBuilderInput): BBPlan {
   const level = normLevel(input.level) as TrainingLevel;
   const workMax = input.workMax || {};
   const weakPoints = input.weakPoints || [];
+  const focusGroup = input.focusGroup;
   const sessions = sessionsOf(pattern);
 
-  // сколько сессий в ротации тренируют каждую мышцу
   const muscleSessionCount: Record<string, number> = {};
   for (const s of sessions) for (const m of musclesForTag(s.sessionTag)) muscleSessionCount[m] = (muscleSessionCount[m] || 0) + 1;
 
-  // MAV×ротация на мышцу
   const muscleVolumeRotation: Record<string, number> = {};
   for (const m of Object.keys(muscleSessionCount)) {
     const lm = landmarksForRotation(level, m, pattern.rotationDays);
     if (lm) {
       let v = lm.mav;
+      if (input.volumeGoal === 'mev') v = lm.mev;
+      else if (input.volumeGoal === 'mrv') v = lm.mrv;
       if (input.goal === 'cut') v = Math.round(v * 0.9);
       if (input.goal === 'mass' || input.goal === 'strength_mass') v = Math.round(v * 1.1);
       muscleVolumeRotation[m] = v;
@@ -180,7 +209,7 @@ export function buildBBPlan(input: BBBuilderInput): BBPlan {
     const weekSessions: BBSession[] = [];
     for (let i = 0; i < sessions.length; i++) {
       const s = sessions[i];
-      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints);
+      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       weekSessions.push(sess);
     }
@@ -190,9 +219,10 @@ export function buildBBPlan(input: BBBuilderInput): BBPlan {
   const rationale: string[] = [
     `Сплит «${pattern.name}» (${pattern.rotationDays}дн ротация, ${pattern.sessionsPerRotation} сессий)`,
     `Уровень ${level}, цель ${input.goal}, ${input.weeks} нед`,
-    `Объём (MAV×ротация): ` + Object.entries(muscleVolumeRotation).map(([m, v]) => `${m}=${v}`).join(', '),
-    `Ноги всегда тяж (forceDayType); памп-акцент уходит на верх`,
+    `Объём ${input.volumeGoal || 'MAV'}: ` + Object.entries(muscleVolumeRotation).map(([m, v]) => `${m}=${v}`).join(', '),
+    `Специализация: ${focusGroup || 'нет'}`,
     `RIR-прогрессия: тяж 2→0, памп 3→2 к пику; вес = workMax×%1RM(RIR)`,
+    `S-MRV: автоматический кап объёма на основе бюджета утомления сессии.`,
   ];
 
   return { pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale };

@@ -6,6 +6,7 @@ import { calculatePRI, getPRIThreshold, autoregulate, getAutoregulationRecommend
 import { selectRepPattern } from '../../../engines/rep-pattern.engine';
 import { applyToPlanner } from './planner-bridge';
 import type { ReadinessScores, MovementPattern } from '../../../core/types';
+import type { CycleWeekPlan } from '../../../engines/cycle-types.engine';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -36,8 +37,9 @@ export const PriRepPatternCard: React.FC = () => {
   const applyPri = () => { applyToPlanner({ kind: 'pri', label: `PRI ×${thr.volumeMod} (${thr.label})`, data: { volumeMult: thr.volumeMod, rirShift: thr.rirAdd } }); setApplied(true); setTimeout(() => setApplied(false), 2500); };
   const auto = useMemo(() => {
     try {
+      const plannedWeek: CycleWeekPlan = { week: 1, phase: 'accumulation', phaseWeek: 1, volumeMultiplier: 1, intensityMultiplier: 1, rirBase: 2, rirPhase: 'base', isDeload: false, progressionType: 'linear' };
       const input: AutoregulationInput = {
-        readiness, trainingLoadRatio: 1, plannedWeek: {} as any, plannedExercises: [], goal, level: 'intermediate', weakPoints: [], doms, sleepQuality: sleep, stress,
+        readiness, trainingLoadRatio: 1, plannedWeek, plannedExercises: [], goal, level: 'intermediate', weakPoints: [], doms, sleepQuality: sleep, stress,
       };
       return autoregulate(input);
     } catch (e) { return null; }
