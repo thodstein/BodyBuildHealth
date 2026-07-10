@@ -100,6 +100,7 @@ export const SUBSTANCE_FORMS: Record<string, SubstanceForm> = {
     note: '↑HDL 15-35%, ↓LDL 5-25%, ↓TG 20-50%. '
         + 'Флаш — нормальный, проходит за 2-4 нед. Целевая доза 1000-2000 мг.',
     bestTime: 'на ночь, с едой',
+    cycleBreaks: '↑ постепенно 100→250→500→1000→1500 мг за 2-4 нед',
   },
   garlic: {
     id: 'garlic', optimalForm: 'Аллицин 1.8% стандартизированный (5-6 мг аллицина/таб)',
@@ -356,12 +357,56 @@ export const SUBSTANCE_FORMS: Record<string, SubstanceForm> = {
     note: '⚠ Большие дозы (5-10+ мг) могут панα-α-сенд → ↓ phản. Цель: 0.3-1 мг, '
         + 'прологалгированная форма — нарушения сна. SR — для второго цикла сна.',
     bestTime: '30 мин до сна',
+    cycleBreaks: '2 нед on → 2 нед off (не каждый день)',
   },
   phosphatidylserine: {
     id: 'phosphatidylserine', optimalForm: 'Phosphatidylserine 300 мг (soy-derived)',
     bioavailability: '60%',
     note: '↓ACTH (cortisol suppression). Для беспокойства + спорт. 300-600 мг. '
         + 'С опаской — ↓ кортизол может блоировать хрон адаптацию.',
+    bestTime: 'с едой',
+  },
+
+  // ─── НЕДОСТАЮЩИЕ ВЕЩЕСТВА ───
+  astragalus: {
+    id: 'astragalus', optimalForm: 'Экстракт корня астрагала (80% сапонины)',
+    bioavailability: '~40% (сапонины B-I)',
+    note: 'Защита клубочков почек: ↓ протеинурия, ↑ GFR. Адаптоген для иммунитета.',
+    bestTime: 'с едой',
+    cycleBreaks: '8 нед on → 2 нед off',
+  },
+  cordyceps: {
+    id: 'cordyceps', optimalForm: 'Cordyceps sinensis CS-4 (мицелий, не плодовое тело)',
+    bioavailability: '~60% (аденозин, кордицепин)',
+    note: '↓ BUN/креатинин, ↑ ATP, дыхательная выносливость. Остерегаться подделок (Cs-4 vs C. militaris).',
+    bestTime: 'утро, с едой',
+    cycleBreaks: '8 нед on → 2 нед off',
+  },
+  saw_palmetto: {
+    id: 'saw_palmetto', optimalForm: 'Экстракт ягод Serenoa repens (320 мг, 85-95% липостеролов)',
+    pharmacyBrands: ['Простамол Уно 320 мг'],
+    bioavailability: '~60% (липостеролы, с жирной едой ↑)',
+    note: '5α-редуктаза (снижение DHT → простата и волосяные фолликулы). Не применять с финастеридом одновременно.',
+    bestTime: 'с жирной едой',
+  },
+  d_mannose: {
+    id: 'd_mannose', optimalForm: 'D-манноза (простой сахар, ≥99% чистоты)',
+    bioavailability: '~90% — выводится с мочой, не метаболизируется',
+    note: 'Профилактика ИМП: предотвращает прикрепление E. coli к уротелию. Не антибиотик. Можно длительно.',
+    bestTime: 'натощак, запить водой',
+    cycleBreaks: '3 нед приём (1 г 2р/день) → 1 нед off',
+  },
+  tmg: {
+    id: 'tmg', optimalForm: 'TMG (триметилглицин, безводный)',
+    bioavailability: '~100%',
+    note: 'Донатор CH₃ — ↓ гомоцистеин (AAS ↑ Hcy). Сильнее SAMe, дешевле. 1000 мг = 750 мг SAMe по эквиваленту.',
+    bestTime: 'с едой',
+  },
+  potassium: {
+    id: 'potassium', optimalForm: 'Калия хлорид (ретард, НЕ простая форма)',
+    pharmacyBrands: ['Панангин', 'Калия хлорид ретард'],
+    bioavailability: '~100%',
+    note: '⚠ Рекомендация ⚠ Контроль K⁺ с анализами. Опасно при >5 моль/л (с п/к). НЕ на голодный желудок.',
     bestTime: 'с едой',
   },
 };

@@ -421,7 +421,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         </div>
       ) : null}
 
-      <CalcMapperCard state={state} onApply={(rec) => {
+      <CalcMapperCard state={state} onStateChange={(n) => setState(n)} onApply={(rec) => {
         const subIds = rec.subs.map(s => s.substanceId);
         onApply({ level: rec.level, subs: subIds, tzRec: rec });
       }} onOpenManualPicker={onOpenManualPicker} />

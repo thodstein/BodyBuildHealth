@@ -696,6 +696,15 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
     add('nebivolol', 'Nebivolol 2.5 мг — ⚠ Под контролем ЧСС и АД', 'Болденон', 'pharma');
   }
 
+  // ─── ОБЩИЙ: Serra+Natto+Bromelain на жёстких курсах (HCT++/фибринолиз) ───
+  // Назначается при intensity > 1.3 (нестандартные дозы, мультиндр-комбо)
+  // Болденон уже покрывает выше — seen исключает дубли
+  if (!flags.hasBold && flags.hasAAS && intensity > 1.3) {
+    add('serrapeptase', `Serrapeptase 10 мг — проф. фибринолиз (интен_${intensity.toFixed(1)})`, 'Жёсткий курс (HCT/фибрин)', 'pharma');
+    add('nattokinase', 'Nattokinase 100 мг — плазмин → ↓ фибрин (↑ вязкость на курсе)', 'Жёсткий курс', 'pharma');
+    add('bromelain', 'Bromelain 500 мг — ↓ PAI-1, фибринолитик', 'Жёсткий курс', 'antiinflam');
+  }
+
   // ─── ДГТ-inject (Masteron, Primo) — анти-эстро, липиды↓↓ ───
   if (flags.hasDhtInject) {
     add('niacin', 'Niacin 500-1500 мг на ночь — ↑HDL (Masteron/Primo ↓HDL)', 'ДГТ-inject (липиды)', 'vitamin');
@@ -1106,7 +1115,9 @@ function cacheKey(ctx: MapperCtx): string {
   const labsKey = JSON.stringify(ctx.labs);
   const phaseKey = JSON.stringify(ctx.phaseCtx);
   const boostKey = ctx.boosterCtx ? JSON.stringify(ctx.boosterCtx) : '';
-  return `${ctx.level}|${labsKey}|${phaseKey}|${boostKey}|${JSON.stringify(ctx.manualChoices||{})}|${ctx.onCourse||''}|${ctx.e2Level||''}|${ctx.hasHCG||''}|${ctx.hasAI||''}|${ctx.hasCabergoline||''}|${(ctx.aasIds||[]).join(',')}`;
+  const pedKey = (ctx.pedDoses||[]).map(p=>`${p.id}:${p.pClass}:${p.mgPerWeek||p.iuPerDay||p.mcgPerDay||0}`).join(',');
+  const symKey = (ctx.symptoms||[]).join(',');
+  return `${ctx.level}|${labsKey}|${phaseKey}|${boostKey}|${JSON.stringify(ctx.manualChoices||{})}|${ctx.onCourse||''}|${ctx.e2Level||''}|${ctx.hasHCG||''}|${ctx.hasAI||''}|${ctx.hasCabergoline||''}|${(ctx.aasIds||[]).join(',')}|${pedKey}|${symKey}`;
 }
 
 function getFromCache(ctx: MapperCtx): SupportRecommendation | null {
