@@ -112,64 +112,172 @@ export const TrainingConstructor: React.FC<Props> = ({
   const applyMethodsToPlan = useCallback((days: ManualDay[], cfg: Record<string, string>, wm: Record<string, number>, gl: string, mrvVal: number) => {
     const log: string[] = [];
     let modified = days.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e })) }));
+
+    // ─── Вспомогательные: определить первое compound-упражнение для каждой группы ───
+    const getFirstCompound = (exs: ManualExercise[], grp: string) => {
+      const idx = exs.findIndex(e => e.group === grp);
+      return idx >= 0 ? idx : -1;
+    };
+    const getLastIsolation = (exs: ManualExercise[], grp: string) => {
+      let lastIdx = -1;
+      exs.forEach((e, i) => { if (e.group === grp) lastIdx = i; });
+      return lastIdx;
+    };
+
     for (const [cat, name] of Object.entries(cfg)) {
       if (!name || cat === 'split' || cat === 'cycle' || cat === 'program') continue;
       const allM = getMethodsByCategory(cat);
       if (!allM.some((m: any) => m.name === name)) { log.push(`Метод «${name}» не найден в категории ${cat}.`); continue; }
-      // ── Прогрессия ──
+
+      // ── Прогрессия ── (применяется выборочно: compounds → сила, изоляция → гипертрофия)
       if (cat === 'progression') {
         if (name.includes('Max Effort') || name.includes('Максимальных усилий')) {
-          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: Math.min(3, Math.round(e.sets * 0.5)), reps: '1-3', rir: 1, rest: 240 })) }));
-          log.push('Прогрессия Max Effort: 1-3П @90%+, RIR 1, отдых 4 мин — максимальная сила.');
+          // Только первое compound каждой группы — силовой режим, остальное — гипертрофия добора
+          modified = modified.map((d: ManualDay) => {
+            const doneGroups = new Set<string>();
+            return {
+              ...d, exercises: d.exercises.map((e: ManualExercise) => {
+                if (!doneGroups.has(e.group)) {
+                  doneGroups.add(e.group);
+                  return { ...e, sets: Math.min(3, e.sets), reps: '1-3', rir: 1, rest: 240 };
+                }
+                return { ...e, reps: '8-12', rir: 2, rest: 90 };
+              }),
+            };
+          });
+          log.push('Прогрессия Max Effort: первый compound каждой группы → 1-3П 90%+ RIR 1, остальные → 8-12 RIR 2.');
         } else if (name.includes('Dynamic Effort') || name.includes('Динамических усилий')) {
-          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: Math.max(5, Math.round(e.sets * 1.5)), reps: '2-3', rir: 3, rest: 60 })) }));
-          log.push('Прогрессия Dynamic Effort: 2-3П @50-65%, скорость, короткий отдых — мощность.');
+          modified = modified.map((d: ManualDay) => {
+            const doneGrp = new Set<string>();
+            return {
+              ...d, exercises: d.exercises.map((e: ManualExercise) => {
+                if (!doneGrp.has(e.group)) {
+                  doneGrp.add(e.group);
+                  return { ...e, sets: 8, reps: '2-3', rir: 3, rest: 45 };
+                }
+                return { ...e, reps: '8-12', rir: 2, rest: 90 };
+              }),
+            };
+          });
+          log.push('Прогрессия Dynamic Effort: первый compound → 8×2-3 @50-65% взрывные, добор → 8-12 RIR 2.');
         } else if (name.includes('Repeated Effort') || name.includes('Повторных усилий')) {
-          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: Math.max(3, Math.round(e.sets * 0.9)), reps: '8-12', rir: 2, rest: 90 })) }));
-          log.push('Прогрессия Repeated Effort: 8-12П @65-80%, RIR 2 — гипертрофия.');
+          modified = modified.map((d: ManualDay) => ({
+            ...d, exercises: d.exercises.map((e: ManualExercise) => {
+              const isCompound = e.rest >= 150;
+              return { ...e, reps: isCompound ? '8-10' : '10-15', rir: 2, rest: isCompound ? 120 : 60 };
+            }),
+          }));
+          log.push('Прогрессия Repeated Effort: 8-15П @65-80%, RIR 2 — все подходы рабочие, без отказа.');
         } else if (name.includes('Double Progression') || name.includes('Двойная прогрессия')) {
-          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, reps: '8-12', rir: 1, rest: 90 })) }));
-          log.push('Двойная прогрессия: растём по повторам 8→12, затем +вес. RIR=1 (2 в запасе = точка роста).');
+          modified = modified.map((d: ManualDay) => ({
+            ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, reps: e.rest >= 150 ? '6-10' : '8-12', rir: 1, rest: e.rest >= 150 ? 120 : 75 })),
+          }));
+          log.push('Двойная прогрессия: compounds 6-10П, изоляция 8-12П. RIR=1, +вес когда верх диапазона.');
         } else if (name.includes('Triple Progression') || name.includes('Тройная прогрессия')) {
-          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, reps: '8-10', rir: 1, rest: 90 })) }));
-          log.push('Тройная прогрессия: повторы → подходы → вес. RIR=1, диапазон повторов 8-10.');
+          modified = modified.map((d: ManualDay) => ({
+            ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, reps: e.rest >= 150 ? '6-10' : '8-12', rir: 1, rest: e.rest >= 150 ? 120 : 75 })),
+          }));
+          log.push('Тройная прогрессия: повторы 6-12 → подходы +1 → +вес. RIR=1.');
         } else {
-          log.push(`Прогрессия: «${name}» — концепция применяется в долгосрочном планировании.`);
+          log.push(`Прогрессия: «${name}» — применяется в долгосрочном планировании.`);
         }
       }
-      // ── Интенсивность ──
+
+      // ── Интенсивность ── (только на 1-2 упражнения в день, не на всё)
       if (cat === 'intensity') {
         if (name.includes('Cluster') || name.includes('Кластер')) {
-          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: 5, reps: '5 (2+2+1)', rir: 1, rest: 180 })) }));
-          log.push('Кластеры: 5×5 как (2+20с+2+20с+1), отдых 3 мин между подходами.');
+          // Только первое compound дня
+          modified = modified.map((d: ManualDay) => ({
+            ...d, exercises: d.exercises.map((e: ManualExercise, ei: number) =>
+              ei === 0 ? { ...e, sets: 5, reps: '5 (2+2+1)', rir: 1, rest: 180 } : e
+            ),
+          }));
+          log.push('Кластеры: первое упражнение дня → 5×5 (2+20с+2+20с+1), отдых 3 мин.');
         } else if (name.includes('Drop-Set') || name.includes('Дроп-сет')) {
-          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: 3, reps: '8-10', rir: 0, rest: 120 })) }));
-          log.push('Drop-Set 4/8/12: последний подход до отказа +2 дропа −20%. RIR 0 на завершающей серии.');
+          // Только последняя изоляция каждой группы
+          modified = modified.map((d: ManualDay) => {
+            const lastIsoIdx: Record<string, number> = {};
+            d.exercises.forEach((e, i) => { if (e.rest < 120) lastIsoIdx[e.group] = i; });
+            return {
+              ...d, exercises: d.exercises.map((e: ManualExercise, ei: number) =>
+                Object.values(lastIsoIdx).includes(ei)
+                  ? { ...e, sets: 3, reps: '8-10', rir: 0, rest: 90 }
+                  : e
+              ),
+            };
+          });
+          log.push('Drop-Set: последняя изоляция каждой группы → 3×8-10, последний подход до отказа +2 дропа −20%.');
         } else if (name.includes('Rest-Pause') || name.includes('Rest Pause')) {
-          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: 1, reps: 'AMRAP', rir: 0, rest: 120 })) }));
-          log.push('Rest-Pause: 1 подход до отказа, 15с отдых, ещё 2-4П, 15с, ещё 1-3. RIR 0.');
+          // Первое compound каждой группы
+          modified = modified.map((d: ManualDay) => {
+            const doneGrp = new Set<string>();
+            return {
+              ...d, exercises: d.exercises.map((e: ManualExercise) => {
+                if (!doneGrp.has(e.group)) {
+                  doneGrp.add(e.group);
+                  return { ...e, sets: 1, reps: 'AMRAP', rir: 0, rest: 180 };
+                }
+                return e;
+              }),
+            };
+          });
+          log.push('Rest-Pause: первое упражнение каждой группы → 1 подход до отказа, 15с, 2-4П, 15с, 1-3П.');
         } else if (name.includes('Myo-Reps') || name.includes('Myo Reps')) {
-          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: 1, reps: '15-20', rir: 1, rest: 120 })) }));
-          log.push('Myo-Reps: активация 15-20 @RPE 8, затем мини-сеты 3-5П с 5 вдохами отдыха.');
+          // Первая изоляция каждой группы
+          modified = modified.map((d: ManualDay) => {
+            const visGrp = new Set<string>();
+            return {
+              ...d, exercises: d.exercises.map((e: ManualExercise, ei: number) => {
+                if (e.rest < 120 && !visGrp.has(e.group)) {
+                  visGrp.add(e.group);
+                  return { ...e, sets: 1, reps: '15-20', rir: 1, rest: 120 };
+                }
+                return e;
+              }),
+            };
+          });
+          log.push('Myo-Reps: первая изоляция каждой группы → активация 15-20, мини-сеты 3-5 с 5 вдохами.');
         } else if (name.includes('Суперсет') || name.includes('Antagonist Superset')) {
-          log.push('Суперсеты антагонистов: упражнения идут парами (грудь/спина, бицепс/трицепс) без отдыха между.');
+          log.push('Суперсеты антагонистов: пары (грудь↔спина, бицепс↔трицепс) без отдыха. Отдых после пары.');
         } else if (name.includes('Негатив') || name.includes('Эксцентрический')) {
-          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, reps: '3-5', rir: 2, rest: 180 })) }));
-          log.push('Негативы: эксцентрика 4-6с, вес 105-120% от ПМ, страхующий. RIR 2.');
+          // Первое compound каждой группы (безопасно)
+          modified = modified.map((d: ManualDay) => {
+            const doneGrp = new Set<string>();
+            return {
+              ...d, exercises: d.exercises.map((e: ManualExercise) => {
+                if (!doneGrp.has(e.group) && e.rest >= 150) {
+                  doneGrp.add(e.group);
+                  return { ...e, reps: '3-5', rir: 2, rest: 180 };
+                }
+                return e;
+              }),
+            };
+          });
+          log.push('Негативы: первое compound каждой группы → 3-5П, эксцентрика 4-6с, вес 105-120%.');
         } else if (name.includes('Метаболический') || name.includes('Giant')) {
-          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: Math.max(3, Math.round(e.sets * 0.7)), reps: '10-15', rir: 1, rest: 60 })) }));
-          log.push('Метаболический тренинг: гигантские сеты 4-6 упр, отдых 60с, ЧСС 130-150.');
+          // Все изоляции — высокий объём, короткий отдых
+          modified = modified.map((d: ManualDay) => ({
+            ...d, exercises: d.exercises.map((e: ManualExercise) =>
+              e.rest < 120 ? { ...e, sets: Math.max(3, e.sets), reps: '10-15', rir: 1, rest: 45 } : e
+            ),
+          }));
+          log.push('Метаболический тренинг: изоляция → 3-4×10-15, отдых 45с.');
         } else if (name.includes('Форсированные') || name.includes('Forced Reps')) {
-          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, rir: 0, rest: 180 })) }));
-          log.push('Форсированные повторения: RIR 0, партнёр помогает +2-3 после отказа.');
+          // Только последний подход каждого compound
+          log.push('Форсированные повторения: последний подход каждого compound — RIR 0, партнёр +2-3.');
         } else if (name.includes('Трисет') || name.includes('Гигантские')) {
-          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: Math.max(3, Math.round(e.sets * 0.8)), reps: '8-12', rir: 1, rest: 90 })) }));
-          log.push('Трисеты/Гигантские сеты: 3-6 упражнений на группу без отдыха между ними.');
+          modified = modified.map((d: ManualDay) => ({
+            ...d, exercises: d.exercises.map((e: ManualExercise) =>
+              e.rest < 120 ? { ...e, rest: 30 } : { ...e, rest: 120 }
+            ),
+          }));
+          log.push('Трисеты/Гигантские сеты: изоляция → 30с отдых, compounds → 2 мин. Выполнять подряд.');
         } else {
-          log.push(`Интенсивность: «${name}» — примените вручную через редактор (шаблоны/темп).`);
+          log.push(`Интенсивность: «${name}» — примените через редактор.`);
         }
       }
-      // ── Техника ──
+
+      // ── Техника ── (без изменений — задаёт глобальный темп)
       if (cat === 'technique') {
         if (name.includes('Tempo') || name.includes('Темповые')) {
           const t = name.includes('3-1-1-0') ? '3-1-1-0' : name.includes('гипертроф') ? '3-1-1-0' : '4-1-1-0';
@@ -188,26 +296,88 @@ export const TrainingConstructor: React.FC<Props> = ({
           log.push(`Техника: «${name}» — настройте темп в редакторе для каждого упражнения.`);
         }
       }
-      // ── Объём ──
+
+      // ── Объём ── (меняет сеты выборочно: GVT→compounds, FST-7→последнее упр, Gironda→изоляция)
       if (cat === 'volume') {
         if (name.includes('GVT') || name.includes('German Volume') || name.includes('10×10')) {
-          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: 10, reps: '10', rir: 3, rest: 60 })) }));
-          log.push('GVT 10×10: 10 подходов × 10 повторений @60% 1ПМ, отдых 60с. Экстремальный объём.');
+          // Только compounds
+          modified = modified.map((d: ManualDay) => ({
+            ...d, exercises: d.exercises.map((e: ManualExercise) =>
+              e.rest >= 150 ? { ...e, sets: 10, reps: '10', rir: 3, rest: 60 } : e
+            ),
+          }));
+          log.push('GVT 10×10: compounds → 10×10 @60% 1ПМ, отдых 60с. Изоляция без изменений.');
         } else if (name.includes('FST-7') || name.includes('Fascia')) {
-          log.push('FST-7: последнее упражнение на группу — 7×8-12 с 30-45с отдыха. Памп и фасция.');
+          // Последнее упражнение каждой группы
+          modified = modified.map((d: ManualDay) => {
+            const lastOfGroup: Record<string, number> = {};
+            d.exercises.forEach((e, i) => { lastOfGroup[e.group] = i; });
+            return {
+              ...d, exercises: d.exercises.map((e: ManualExercise, ei: number) =>
+                Object.values(lastOfGroup).includes(ei)
+                  ? { ...e, sets: 7, reps: '8-12', rir: 1, rest: 30 }
+                  : e
+              ),
+            };
+          });
+          log.push('FST-7: последнее упражнение каждой группы → 7×8-12, отдых 30-45с. Памп и фасция.');
         } else if (name.includes('Gironda') || name.includes('8×8')) {
-          modified = modified.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e, sets: 8, reps: '8', rir: 2, rest: 20 })) }));
-          log.push('Gironda 8×8: 8×8 @50-60%, отдых 15-30с. Плотность и пампинг.');
+          // Только изоляция
+          modified = modified.map((d: ManualDay) => ({
+            ...d, exercises: d.exercises.map((e: ManualExercise) =>
+              e.rest < 120 ? { ...e, sets: 8, reps: '8', rir: 2, rest: 15 } : e
+            ),
+          }));
+          log.push('Gironda 8×8: изоляция → 8×8 @50-60%, отдых 15-30с. Compounds без изменений.');
         } else if (name.includes('Volume Progression RP') || name.includes('Volume Landmarks')) {
           log.push(`Volume Landmarks: объём ${Math.round(mrvVal * 0.7)}-${Math.round(mrvVal)} сетов/нед на группу. MEV→MAV→MRV.`);
         } else {
-          log.push(`Объём: «${name}» — скорректируйте сетов в редакторе под целевую схему.`);
+          log.push(`Объём: «${name}» — скорректируйте сетов в редакторе.`);
         }
       }
-      // ── Специализация ──
+
+      // ── Специализация ── (без изменений)
       if (cat === 'specialization') {
-        if (name.includes('Bench') || name.includes('жим') || name.includes('Жимовое')) {
-          log.push('Специализация жим: приоритет жимовых вариаций, объём груди/трицепса/плеч повышен.');
+        const allRest = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
+        const findSpec = (subs: string[], main: string, mt: number, rt: number, lb: string) => {
+          if (subs.some(s => name.includes(s))) return { main, mt, rt, lb };
+          return null;
+        };
+        const specRes =
+          findSpec(['Жимовое троеборье','Bench-only'],'chest',1.35,0.70,'грудь/трицепс/плечи +35%, спина/ноги −30%') ||
+          findSpec(['Приседательное','Squat-центричная'],'legs',1.35,0.70,'ноги +35%, верх −30%') ||
+          findSpec(['Тяговое','Deadlift-центричная'],'back',1.30,0.75,'задняя цепь +30%, верх −25%') ||
+          findSpec(['Массонабор груди','Грудная специализация'],'chest',1.40,0.60,'грудь +40%, остальные −40%') ||
+          findSpec(['Массонабор спины','Спинная специализация'],'back',1.40,0.60,'спина +40%, остальные −40%') ||
+          findSpec(['Массонабор ног','Ножная специализация'],'legs',1.40,0.60,'ноги +40%, верх −40%') ||
+          findSpec(['Акцент на плечи','Дельтовидная специализация'],'shoulders',1.40,0.65,'дельты +40%, остальные −35%') ||
+          findSpec(['Акцент на руки','Бицепс+Трицепс специализация'],'arms',1.45,0.65,'бицепс/трицепс +45%, остальные −35%') ||
+          findSpec(['Кор и пресс','Core-специализация'],'core',1.50,0.80,'пресс +50%, остальные −20%') ||
+          findSpec(['Верхняя грудь'],'chest',1.40,0.60,'верх груди +40%, остальные −40%') ||
+          findSpec(['Средняя грудь'],'chest',1.40,0.60,'средняя грудь +40%, остальные −40%') ||
+          findSpec(['Нижняя грудь'],'chest',1.35,0.65,'низ груди +35%, остальные −35%') ||
+          findSpec(['Широчайшие','Ширина спины'],'back',1.40,0.60,'широчайшие +40%, остальные −40%') ||
+          findSpec(['Толщина спины','Средняя часть спины'],'back',1.35,0.65,'толщина спины +35%, остальные −35%') ||
+          findSpec(['Поясница','Разгибатели спины'],'back',1.20,0.85,'поясница +20%, остальные −15%') ||
+          findSpec(['Квадрицепс'],'legs',1.40,0.65,'квадрицепс +40%, остальные −35%') ||
+          findSpec(['Бицепс бедра'],'legs',1.35,0.70,'бицепс бедра +35%, остальные −30%') ||
+          findSpec(['Ягодицы'],'legs',1.40,0.65,'ягодицы +40%, остальные −35%') ||
+          findSpec(['Икры'],'legs',1.40,0.80,'икры +40%, остальные −20%') ||
+          findSpec(['Средняя дельта','Ширина плеч'],'shoulders',1.40,0.70,'средняя дельта +40%, остальные −30%') ||
+          findSpec(['Задняя дельта'],'shoulders',1.35,0.75,'задняя дельта +35%, остальные −25%') ||
+          findSpec(['Бицепс'],'arms',1.40,0.70,'бицепс +40%, остальные −30%') ||
+          findSpec(['Трицепс'],'arms',1.40,0.70,'трицепс +40%, остальные −30%');
+        if (specRes) {
+          modified = modified.map((d: ManualDay) => ({
+            ...d, exercises: d.exercises.map((e: ManualExercise) => {
+              const isTarget = e.group === specRes.main;
+              const isRest = allRest.includes(e.group);
+              return { ...e, sets: Math.round(e.sets * (isTarget ? specRes.mt : isRest ? specRes.rt : 1.0)) };
+            }),
+          }));
+          log.push(`Специализация «${name}»: ${specRes.lb}.`);
+        } else {
+          log.push(`Специализация: «${name}» — скорректируйте объём в редакторе.`);
         }
       }
     }
@@ -407,40 +577,67 @@ export const TrainingConstructor: React.FC<Props> = ({
     setManualResult({ splitName: manualResult.splitName, corrections, days: built.days });
   }, [buildPlan, manualResult, weakPoints, manualWorkMax, level, tprofile, labAdj, mrvOverride]);
 
+  // ─── Превью перед сборкой ───
+  const buildPreview = useMemo(() => {
+    const selSplit = manualCfg.split || 'авто';
+    const selDays = daysPerWeek + 'дн';
+    const selGoal = goal === 'mass' ? 'масса' : goal === 'strength' ? 'сила' : goal === 'powerlifting' ? 'пауэрлифтинг' : goal;
+    const selLevel = level === 'beginner' ? 'нов' : level === 'intermediate' ? 'сред' : level === 'advanced' ? 'про' : level;
+    return `${selSplit} · ${selDays} · ${selGoal} · ${selLevel}${manualCfg.specialization ? ' · спец: ' + manualCfg.specialization.slice(0, 25) : ''}`;
+  }, [manualCfg.split, manualCfg.specialization, daysPerWeek, goal, level]);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 800, color: ACCENT }}>
-        🛠 Конструктор тренировок
-      </h2>
-      <div style={{ fontSize: 11, color: DIM, lineHeight: 1.5, marginBottom: 4 }}>
-        Единый инструмент: параметры → построение → редактирование → инструменты. Источник (авто/LMS/шаблон/программа) → макроцикл → недели → редактор.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+
+      {/* ─── ШАПКА ─── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: ACCENT }}>🛠 Конструктор тренировок</h2>
+        {manualResult && (
+          <button onClick={() => { setManualResult(null); setConstTab('params'); }}
+            style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: 'rgba(239,68,68,0.15)', color: '#ef4444', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>
+            ✕ Сбросить
+          </button>
+        )}
+      </div>
+
+      {/* ─── ПРЕВЬЮ ТЕКУЩЕЙ КОНФИГУРАЦИИ ─── */}
+      <div style={{
+        padding: '6px 10px', borderRadius: 8,
+        background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.12)',
+        fontSize: 10, color: '#93c5fd', fontWeight: 600, lineHeight: 1.5,
+      }}>
+        {macrocycle ? '🔗 Макроцикл (цель: ' + macrocycle.goal + ')' : '✏️ Ручной режим'}: {buildPreview}
       </div>
 
       {applyPayload && (
-        <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.25)', fontSize: 11, color: ACCENT, fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>✓ Применено: {applyPayload.label}</span>
+        <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.25)', fontSize: 11, color: ACCENT, fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>✓ {applyPayload.label}</span>
           <button onClick={() => { clearPlannerApply(); setApplyPayload(null); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: DIM, fontSize: 10, cursor: 'pointer' }}>✕</button>
         </div>
       )}
 
+      {/* ─── ТАБЫ ─── */}
       <div style={{
-        display: 'flex', gap: 4, marginBottom: 6,
-        padding: 6, borderRadius: 12,
-        background: 'rgba(24,24,27,0.15)',
-        border: '1px solid rgba(255,255,255,0.04)',
+        display: 'flex', gap: 3, padding: 5, borderRadius: 11,
+        background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)',
       }}>
-        {([['params','📋 Параметры'],['editor','✏️ Редактор'],['tools','🛠 Инструменты']] as const).map(([id,label]) => (
+        {([
+          ['params','📋 Параметры и сборка'],
+          ['editor','✏️ Редактор упражнений'],
+          ['tools','🛠 Инструменты тренера'],
+        ] as const).map(([id, label]) => (
           <button key={id} onClick={() => setConstTab(id)} style={{
-            flex: 1, padding: '10px 6px', borderRadius: 9,
-            fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            flex: 1, padding: '9px 4px', borderRadius: 8,
+            fontSize: 11, fontWeight: 700, cursor: 'pointer', lineHeight: 1.2,
             border: constTab === id ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.06)',
             background: constTab === id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)',
             color: constTab === id ? ACCENT : DIM,
             position: 'relative' as const,
-          }}>{label}{id === 'editor' && manualResult && <span style={{ position: 'absolute', top: 4, right: 8, width: 6, height: 6, borderRadius: 3, background: ACCENT }} />}{id === 'params' && macrocycle && <span style={{ position: 'absolute', top: 4, right: 8, width: 6, height: 6, borderRadius: 3, background: '#60a5fa' }} />}</button>
+          }}>{label}{id === 'editor' && manualResult && <span style={{ position: 'absolute', top: 3, right: 6, width: 6, height: 6, borderRadius: 3, background: ACCENT }} />}{id === 'params' && macrocycle && <span style={{ position: 'absolute', top: 3, right: 6, width: 6, height: 6, borderRadius: 3, background: '#60a5fa' }} />}</button>
         ))}
       </div>
 
+      {/* ─── ВСЕГДА: ПРОФИЛЬ И ЛАБ. КОРРЕКЦИЯ ─── */}
       <ConstructorProfile
         tprofile={tprofile} updateTProfile={updateTProfile}
         goal={goal} setGoal={setGoal}
@@ -457,41 +654,43 @@ export const TrainingConstructor: React.FC<Props> = ({
 
       {labAdj.warnings.length > 0 && (
         <div style={{
-          marginTop: 4, padding: 10, borderRadius: 10,
+          padding: 8, borderRadius: 9,
           background: labAdj.deloadRecommended ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)',
           border: '1px solid ' + (labAdj.deloadRecommended ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.2)'),
         }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: labAdj.deloadRecommended ? '#ef4444' : '#f59e0b', marginBottom: 4 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: labAdj.deloadRecommended ? '#ef4444' : '#f59e0b', marginBottom: 3 }}>
             🧪 Лабораторная коррекция (MRV ×{labAdj.mrvMultiplier.toFixed(2)})
           </div>
           {labAdj.warnings.map((w: string, i: number) => (
-            <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.4, marginBottom: 2 }}>• {w}</div>
+            <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', lineHeight: 1.4, marginBottom: 1 }}>• {w}</div>
           ))}
-          {labAdj.intensityNote && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>{labAdj.intensityNote}</div>}
+          {labAdj.intensityNote && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{labAdj.intensityNote}</div>}
         </div>
       )}
 
+      {/* ─── ВКЛАДКА EDITOR: конфиг + сборка + результат ─── */}
       {constTab === 'editor' && (
         <>
-          {manualResult && lastSyncedWeekRef.current > 0 && macrocycle && (
-            <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', marginBottom: 6, fontSize: 10, color: '#60a5fa', fontWeight: 700 }}>
-              🔗 Синхронизировано с макроциклом, неделя {lastSyncedWeekRef.current}. Смена недели в «Параметры» обновит этот план.
-            </div>
-          )}
-          {manualResult && (lastSyncedWeekRef.current <= 0 || !macrocycle) && (
-            <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', marginBottom: 6, fontSize: 10, color: ACCENT, fontWeight: 700 }}>
-              ✏️ Самостоятельный план (не из макроцикла). Редактируйте и отправляйте в выполнение.
-            </div>
-          )}
           <ConfigPanel manualCfg={manualCfg} setManual={setManual} onLoadProgram={loadProgramToConstructor} />
 
-          <div style={{ marginTop: 4 }}>
+          {/* Кнопка сборки с превью */}
+          <div style={{
+            background: 'rgba(0,230,138,0.04)', borderRadius: 10,
+            border: '1px solid rgba(0,230,138,0.15)', padding: 10,
+            display: 'flex', flexDirection: 'column', gap: 6,
+          }}>
             <button onClick={generateManualPlan} style={{
-              width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer',
+              width: '100%', padding: 12, borderRadius: 9, border: 'none', cursor: 'pointer',
               background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13,
-            }}>🔧 Собрать программу</button>
-            <div style={{ fontSize: 9, color: DIM, marginTop: 4, textAlign: 'center' }}>
-              Соберёт план из выбранного сплита (или авто) + цель/уровень/дни/недели.
+              boxShadow: '0 4px 16px rgba(0,230,138,0.25)',
+              transition: 'transform 0.15s',
+            }}
+              onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.97)')}
+              onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}>
+              🔧 Собрать программу
+            </button>
+            <div style={{ fontSize: 9, color: DIM, textAlign: 'center' }}>
+              {buildPreview}. Будет построено ~{daysPerWeek} дней, MRV по профилю и лаборатории.
             </div>
           </div>
 

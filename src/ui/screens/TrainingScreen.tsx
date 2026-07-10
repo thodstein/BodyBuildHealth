@@ -660,11 +660,11 @@ export const TrainingScreen: React.FC = () => {
       {tab === 'split_gen' && <InfoErrorBoundary label="Генератор сплитов"><SplitGenCard /></InfoErrorBoundary>}
       {tab === 'pri_reppat' && <InfoErrorBoundary label="PRI/схема повт"><PriRepPatternCard /></InfoErrorBoundary>}
       {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixTab /></InfoErrorBoundary>}
-
+      {tab === 'tonnage' && <InfoErrorBoundary label="Тоннаж"><TonnageCalcTab /></InfoErrorBoundary>}
+      {tab === 'health_calc' && <InfoErrorBoundary label="Калькуляторы здоровья"><HealthCalculatorsTab /></InfoErrorBoundary>}
 
       {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
       {tab === 'pl_pro' && <InfoErrorBoundary label="Pro ПЛ-инструменты"><ProPlToolsTab /></InfoErrorBoundary>}
-      {tab === 'conjugate' && <InfoErrorBoundary label="Конъюгат"><ConjugateTab /></InfoErrorBoundary>}
 
       {/* ═══════════ MY TRAINING TAB ═══════════ */}
 
@@ -716,9 +716,10 @@ import { StructuredAnalyticsCard } from './TrainingScreen_parts/StructuredAnalyt
 import { ProPlToolsTab } from './TrainingScreen_parts/ProPlToolsTab';
 import { TrainingCalendarTab } from './TrainingScreen_parts/TrainingCalendarTab';
 import { PlateCalcTab } from './TrainingScreen_parts/PlateCalcTab';
+import { TonnageCalcTab } from './TrainingScreen_parts/TonnageCalcTab';
+import { HealthCalculatorsTab } from './TrainingScreen_parts/HealthCalculatorsTab';
 import { RIRCalibrationCard } from './TrainingScreen_parts/RIRCalibrationCard';
 import MesoCorrectionCard from './TrainingScreen_parts/MesoCorrectionCard';
-import ConjugateTab from './TrainingScreen_parts/ConjugateTab';
 import MMCTrackingCard from './TrainingScreen_parts/MMCTrackingCard';
 import { loadRirCalibrationStats } from '../../engines/meso-correction.engine';
 

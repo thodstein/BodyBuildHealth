@@ -12,7 +12,7 @@ import { buildBBPlan, type BBPlan } from '../../engines/bb/bb-builder.engine';
 import { calcBBPlanMetrics, explainBBMetrics } from '../../engines/bb/bb-metrics.engine';
 import { adaptForPEDs, explainPEDAdaptation, type PED } from '../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../engines/volume-landmarks.engine';
-import { PlateCalculator } from './SRCBBScreen_parts/PlateCalculator';
+import { PlateCalcTab } from './TrainingScreen_parts/PlateCalcTab';
 import { SessionPlayer, type PlayerDay } from './SRCBBScreen_parts/SessionPlayer';
 
 import { AutoregPanel } from './SRCBBScreen_parts/AutoregPanel';
@@ -1200,7 +1200,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
         </div>
       )}
 
-      {subView === 'plates' && <PlateCalculator initialWeight={workingWeight} />}
+      {subView === 'plates' && <PlateCalcTab initialWeight={workingWeight} onApply={() => {}} />}
       {subView === 'autoreg' && <AutoregPanel />}
       {subView === 'peak' && <PeakingPanel />}
       {subView === 'peak_bb' && <PeakingPanel defaultKind="bb" />}

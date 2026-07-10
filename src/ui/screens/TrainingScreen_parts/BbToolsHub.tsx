@@ -1,19 +1,17 @@
-/** BbToolsHub.tsx — унифицированный калькулятор с подвкладками.
- * Объединяет: Темп/техники, Целевая мышца, Специализация.
- * Структура как в Лаборатории упражнений (ExerciseLab). */
+/** BbToolsHub.tsx — унифицированный калькулятор.
+ * Объединяет: Темп/техники, Целевая мышца.
+ * Специализация перенесена в Библиотеку → Методики (категория Специализация). */
 import React, { useState } from 'react';
 import { BbToolsCard } from './BbToolsCard';
-import { TargetMuscleCalcTab } from './TargetMuscleCalcTab';
-import SpecializationTab from './SpecializationTab';
+import TechniqueTab from './ExerciseLabTechnique';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
-type BbToolsHubMode = 'tools' | 'target' | 'specialization';
+type BbToolsHubMode = 'tools' | 'target';
 
 const MODE_DEFS: Array<{ m: BbToolsHubMode; label: string; icon: string }> = [
   { m: 'tools', label: 'Темп/техники', icon: '⏱️' },
   { m: 'target', label: 'Целевая мышца', icon: '🎯' },
-  { m: 'specialization', label: 'Специализация', icon: '📏' }
 ];
 
 export const BbToolsHub: React.FC = () => {
@@ -22,7 +20,7 @@ export const BbToolsHub: React.FC = () => {
   return (
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>💪 ББ-инструменты</div>
-      <div style={{ fontSize: 10, color: DIM, marginBottom: 12 }}>Темп/отдых/техники интенсификации, целевая мышца, специализация и демография для бодибилдинга.</div>
+      <div style={{ fontSize: 10, color: DIM, marginBottom: 12 }}>Темп/отдых/техники интенсификации, целевая мышца и демография для бодибилдинга.</div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         {MODE_DEFS.map(({ m, label, icon }) => (
@@ -39,8 +37,7 @@ export const BbToolsHub: React.FC = () => {
       </div>
 
       {mode === 'tools' && <BbToolsCard />}
-      {mode === 'target' && <TargetMuscleCalcTab />}
-      {mode === 'specialization' && <SpecializationTab />}
+      {mode === 'target' && <TechniqueTab />}
     </div>
   );
 };

@@ -21,7 +21,7 @@ import {
   type CyclePlan,
 } from './cycle.engine';
 import { generateCycle, type CycleType, type CycleInput, type CycleOutput, type GoalType } from './cycle-periodization.engine';
-import { generateConjugateWeek } from './conjugate.engine';
+import { generateConjugateProgram, type ConjugateMode } from './conjugate.engine';
 import { generateMesocycleProgression, type MesocycleConfig, type MesoGoal } from './pro/mesocycle-progression.engine';
 import { taperPlan, taperWeeksForFatigue, peakWeekAttempts, type AttemptStrategy, type Lift, type TaperPlan } from './pro/taper.engine';
 
@@ -364,15 +364,16 @@ export function buildMacroFromConjugate(opts: ConjugateBuildOptions): Macrocycle
   const totalWeeks = Math.max(2, Math.min(24, opts.weeks));
   const wm = { ...DEFAULT_WORKMAX, ...(opts.workMax || {}) };
   const lifts: Array<'squat' | 'bench' | 'deadlift'> = ['squat', 'bench', 'deadlift'];
+  const program = generateConjugateProgram({ upper: 'bench', lower: 'squat' }, 'powerlifting' as ConjugateMode, [], 'none', totalWeeks);
   const micros: Microcycle[] = [];
   for (let w = 1; w <= totalWeeks; w++) {
     const mainLift = lifts[(w - 1) % 3];
-    const sched = generateConjugateWeek(mainLift, w - 1);
+    const weekData = program.weeks[w - 1];
     const rirBase = w <= Math.floor(totalWeeks * 0.7) ? 2 : w <= Math.floor(totalWeeks * 0.9) ? 1 : 0;
     const isDeload = w === totalWeeks && totalWeeks >= 8;
     const mesoType: MesocycleType = w <= Math.floor(totalWeeks * 0.6) ? 'accumulation' : w <= Math.floor(totalWeeks * 0.85) ? 'intensification' : 'peaking';
-    const days: TrainingDayPlan[] = sched.days.slice(0, Math.min(sched.days.length, opts.daysPerWeek)).map((d, di) => {
-      const exercises: PlannedExercise[] = d.exercises.map((ex) => {
+    const days: TrainingDayPlan[] = weekData.days.slice(0, Math.min(weekData.days.length, opts.daysPerWeek)).map((d: { exercises: any[]; name: any }, di: number) => {
+      const exercises: PlannedExercise[] = d.exercises.map((ex: { name: string; intensity: number; sets: any; reps: any; rir: any; type: string; focus: any }) => {
         const group = detectGroup(ex.name);
         const baseWm = (wm[group] || wm.full || 80);
         const weight = Math.round(baseWm * (ex.intensity || 0.6));

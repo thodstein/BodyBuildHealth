@@ -481,7 +481,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   };
 
   const CATEGORY_CLUSTERS: Record<string, string[]> = {
-    protein: ['protein', 'dairy', 'supplement'],
+    protein: ['protein', 'dairy'],
     dairy: ['dairy', 'protein', 'fat'],
     grain: ['grain', 'carb', 'veg_fruit'],
     carb: ['carb', 'grain', 'veg_fruit'],
@@ -503,8 +503,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       return fallback.map(f => ({ ...f, score: 0 }));
     }
     const clusters = CATEGORY_CLUSTERS[food.category] || [food.category];
-    let sameCat = FOOD_DB.filter(f => clusters.includes(f.category) && f.id !== food.id);
-    if (sameCat.length < 3) sameCat = FOOD_DB.filter(f => f.id !== food.id).slice(0, 30);
+    let sameCat = FOOD_DB.filter(f => clusters.includes(f.category) && f.id !== food.id && f.category !== 'supplement');
+    if (sameCat.length < 3) sameCat = FOOD_DB.filter(f => f.id !== food.id && f.category !== 'supplement').slice(0, 30);
     const scored = sameCat.map(f => {
       const pDiff = Math.abs(f.protein - food.protein);
       const fDiff = Math.abs(f.fat - food.fat) * 0.5;
@@ -1193,6 +1193,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const effectiveTierFilter = lazyDayMode ? (f: any) => f.tier === 'basic' : (f: any) => f.tier === 'basic' || f.tier === 'mid' || f.tier === 'max';
         const fastCarbs = qualityRange(FOOD_DB.filter(f => f.gi && f.gi >= 80)); const slowCarbs = qualityRange(FOOD_DB.filter(f => f.category === 'carb' || f.category === 'grain')); const proteinFoods = qualityRange(FOOD_DB.filter(f => f.category === 'protein' && effectiveTierFilter(f))); const allProtein = applyFoodPrefs(proteinFoods, 'protein');         const topProtein = highQuality ? qualitySort(allProtein, true).slice(0, 12) : qualitySort(allProtein, true).slice(0, 8);
         // pickItem: selects foods to meet macro target. macroType: 'p'|'f'|'c' controls which macro is used for portion calc
+        const SUPP_CAP: Record<string, number> = { creatine:10, whey_isolate:60, whey_protein:60, casein:60, bcaa:20, supp_eaas:20, glutamine:15, supp_hmb:6, supp_beta_alanine:6 };
         const pickItem = (foodPool: any[], targetG: number, macroType: 'p'|'f'|'c', seed: number, maxItems = 2): any[] => {
           const result: any[] = [];
           let pool = applyFoodPrefs(foodPool, 'any');
@@ -1220,7 +1221,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             const macroPer100 = getMacro(food);
             if (!macroPer100 || macroPer100 <= 0) continue;
             const portion = Math.min(3.5, targetG / macroPer100);
-            const amount = Math.round(portion * 100);
+            let amount = Math.round(portion * 100);
+            const idCap = SUPP_CAP[food.id];
+            if (idCap) amount = Math.min(idCap, amount);
             const r = portion;
             result.push({name:food.name,id:food.id,amount,kcal:Math.round(food.kcal*r),p:Math.round(food.protein*r),f:Math.round(food.fat*r),c:Math.round(food.carbs*r)});
             targetG -= macroPer100 * r;
@@ -1241,13 +1244,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           const preP = FOOD_DB.find(f=>f.id===prePId);
           if (preP) {
             const ratio = Math.min(2.0, prePG / Math.max(1, preP.protein));
-            const amt = Math.round(ratio * 100);
+            let amt = Math.round(ratio * 100);
+            const preCap = SUPP_CAP[prePId]; if (preCap) amt = Math.min(preCap, amt);
             items.push({name:preP.name,id:prePId,amount:amt,kcal:Math.round(preP.kcal*ratio),p:Math.round(preP.protein*ratio),f:Math.round(preP.fat*ratio),c:Math.round(preP.carbs*ratio)});
           }
           const preC = FOOD_DB.find(f=>f.id===preCId);
           if (preC) {
             const ratio = Math.min(2.5, preCG / Math.max(1, preC.carbs || 1));
-            const amt = Math.round(ratio * 100);
+            let amt = Math.round(ratio * 100);
             items.push({name:preC.name,id:preCId,amount:amt,kcal:Math.round(preC.kcal*ratio),p:Math.round(preC.protein*ratio),f:Math.round(preC.fat*ratio),c:Math.round(preC.carbs*ratio)});
           }
         } else if (isPostWorkout) {
@@ -1264,13 +1268,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           const pp = FOOD_DB.find(f=>f.id===ppId);
           if (pp) {
             const ratio = Math.min(2.5, postPG / Math.max(1, pp.protein));
-            const amt = Math.round(ratio * 100);
+            let amt = Math.round(ratio * 100);
+            const ppCap = SUPP_CAP[ppId]; if (ppCap) amt = Math.min(ppCap, amt);
             items.push({name:pp.name,id:ppId,amount:amt,kcal:Math.round(pp.kcal*ratio),p:Math.round(pp.protein*ratio),f:Math.round(pp.fat*ratio),c:Math.round(pp.carbs*ratio)});
           }
           const pc = FOOD_DB.find(f=>f.id===pcId);
           if (pc) {
             const ratio = Math.min(3.0, postCG / Math.max(1, pc.carbs || 1));
-            const amt = Math.round(ratio * 100);
+            let amt = Math.round(ratio * 100);
             items.push({name:pc.name,id:pcId,amount:amt,kcal:Math.round(pc.kcal*ratio),p:Math.round(pc.protein*ratio),f:Math.round(pc.fat*ratio),c:Math.round(pc.carbs*ratio)});
           }
         } else {
@@ -1294,7 +1299,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             const bfC = FOOD_DB.find(f => f.id === bf.carbId);
             const bfFat = FOOD_DB.find(f => f.id === bf.fatId);
             const bfBerry = FOOD_DB.find(f => f.id === bf.berryId);
-            if (bfP) { const r = Math.min(2.5, (weight * bf.pG) / Math.max(1, bfP.protein)); const amt = Math.round(r * 100); items.push({name:bfP.name,id:bf.pId,amount:amt,kcal:Math.round(bfP.kcal*r),p:Math.round(bfP.protein*r),f:Math.round(bfP.fat*r),c:Math.round(bfP.carbs*r)}); }
+            if (bfP) { const r = Math.min(2.5, (weight * bf.pG) / Math.max(1, bfP.protein)); let amt = Math.round(r * 100); const bfPCap = SUPP_CAP[bf.pId]; if (bfPCap) amt = Math.min(bfPCap, amt); items.push({name:bfP.name,id:bf.pId,amount:amt,kcal:Math.round(bfP.kcal*r),p:Math.round(bfP.protein*r),f:Math.round(bfP.fat*r),c:Math.round(bfP.carbs*r)}); }
             if (bfC) { const r = Math.min(2.5, (weight * bf.cG) / Math.max(1, bfC.carbs || 1)); const amt = Math.round(r * 100); items.push({name:bfC.name,id:bf.carbId,amount:amt,kcal:Math.round(bfC.kcal*r),p:Math.round(bfC.protein*r),f:Math.round(bfC.fat*r),c:Math.round(bfC.carbs*r)}); }
             if (bfFat) { const r = Math.min(2.0, (weight * bf.fG) / Math.max(1, bfFat.fat || 1)); const amt = Math.round(r * 100); items.push({name:bfFat.name,id:bf.fatId,amount:amt,kcal:Math.round(bfFat.kcal*r),p:Math.round(bfFat.protein*r),f:Math.round(bfFat.fat*r),c:Math.round(bfFat.carbs*r)}); }
             if (bfBerry) { items.push({name:bfBerry.name,id:bf.berryId,amount:80,kcal:Math.round(bfBerry.kcal*0.8),p:Math.round(bfBerry.protein*0.8),f:Math.round(bfBerry.fat*0.8),c:Math.round(bfBerry.carbs*0.8)}); }
@@ -1386,17 +1391,21 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           if (!fb) return;
           const per100 = macro === 'p' ? fb.protein : macro === 'f' ? fb.fat : fb.carbs;
           if (!per100) return;
-          const amount = Math.min(macro === 'f' ? 25 : 120, Math.max(macro === 'f' ? 5 : 20, Math.round(deficit / per100 * 100)));
-          const r = amount / 100;
-          const item = { name: fb.name, id: fb.id, amount, kcal: Math.round(fb.kcal * r), p: Math.round(fb.protein * r), f: Math.round(fb.fat * r), c: Math.round(fb.carbs * r) };
-          targetMeal.items.push(item);
-          targetMeal.totals = { kcal: targetMeal.items.reduce((s: number, i: any) => s + i.kcal, 0), p: targetMeal.items.reduce((s: number, i: any) => s + i.p, 0), f: targetMeal.items.reduce((s: number, i: any) => s + i.f, 0), c: targetMeal.items.reduce((s: number, i: any) => s + i.c, 0) };
-          return;
-        }
+        const rawAmount = Math.min(macro === 'f' ? 25 : 120, Math.max(macro === 'f' ? 5 : 20, Math.round(deficit / per100 * 100)));
+        const suppCap = ({ creatine:10, whey_isolate:60, whey_protein:60, casein:60, bcaa:20, supp_eaas:20, glutamine:15, supp_hmb:6, supp_beta_alanine:6 } as Record<string, number>)[fb.id];
+        const amount = suppCap ? Math.min(suppCap, rawAmount) : rawAmount;
+        const r = amount / 100;
+        const item = { name: fb.name, id: fb.id, amount, kcal: Math.round(fb.kcal * r), p: Math.round(fb.protein * r), f: Math.round(fb.fat * r), c: Math.round(fb.carbs * r) };
+        targetMeal.items.push(item);
+        targetMeal.totals = { kcal: targetMeal.items.reduce((s: number, i: any) => s + i.kcal, 0), p: targetMeal.items.reduce((s: number, i: any) => s + i.p, 0), f: targetMeal.items.reduce((s: number, i: any) => s + i.f, 0), c: targetMeal.items.reduce((s: number, i: any) => s + i.c, 0) };
+        return;
+      }
 
-        const per100 = macro === 'p' ? food.protein : macro === 'f' ? food.fat : food.carbs;
-        if (!per100) return;
-        const amount = Math.min(macro === 'f' ? 25 : 120, Math.max(macro === 'f' ? 5 : 20, Math.round(deficit / per100 * 100)));
+      const per100 = macro === 'p' ? food.protein : macro === 'f' ? food.fat : food.carbs;
+      if (!per100) return;
+      const rawAmount = Math.min(macro === 'f' ? 25 : 120, Math.max(macro === 'f' ? 5 : 20, Math.round(deficit / per100 * 100)));
+      const suppCap2 = ({ creatine:10, whey_isolate:60, whey_protein:60, casein:60, bcaa:20, supp_eaas:20, glutamine:15, supp_hmb:6, supp_beta_alanine:6 } as Record<string, number>)[food.id];
+      const amount = suppCap2 ? Math.min(suppCap2, rawAmount) : rawAmount;
         const r = amount / 100;
         const item = { name: food.name, id: food.id, amount, kcal: Math.round(food.kcal * r), p: Math.round(food.protein * r), f: Math.round(food.fat * r), c: Math.round(food.carbs * r) };
         targetMeal.items.push(item);
@@ -1411,11 +1420,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           const effScale = Math.min(1.3, Math.max(0.7, scales.reduce((s, v) => s + v, 0) / scales.length));
           meals.forEach((m: any) => {
             m.items.forEach((it: any) => {
-              it.amount = Math.round(it.amount * effScale);
-              it.kcal = Math.round(it.kcal * effScale);
-              it.p = Math.round(it.p * effScale);
-              it.f = Math.round(it.f * effScale);
-              it.c = Math.round(it.c * effScale);
+              const suppCap = ({ creatine:10, whey_isolate:60, whey_protein:60, casein:60, bcaa:20, supp_eaas:20, glutamine:15, supp_hmb:6, supp_beta_alanine:6 } as Record<string, number>)[it.id];
+              let newAmount = Math.round(it.amount * effScale);
+              if (suppCap) newAmount = Math.min(suppCap, newAmount);
+              const ratio = newAmount / (it.amount || 1);
+              it.amount = newAmount;
+              it.kcal = Math.round(it.kcal * ratio);
+              it.p = Math.round(it.p * ratio);
+              it.f = Math.round(it.f * ratio);
+              it.c = Math.round(it.c * ratio);
             });
             m.totals = { kcal: m.items.reduce((s: number, i: any) => s + i.kcal, 0), p: m.items.reduce((s: number, i: any) => s + i.p, 0), f: m.items.reduce((s: number, i: any) => s + i.f, 0), c: m.items.reduce((s: number, i: any) => s + i.c, 0) };
           });
@@ -1450,7 +1463,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
               Math.ceil(deficitP / (mpsWhey.protein || 25) * 100),
               Math.ceil(deficitLeu / ((mpsWhey.amino_acid_profile_100g?.leucine_mg || 3000) / 100) * 100)
             );
-            const topUpGrams = Math.min(50, needGrams || 10);
+            const topUpGrams = Math.min(40, needGrams || 10);
             const r = topUpGrams / 100;
             m.items.push({
               name: mpsWhey.name, id: mpsWheyId, amount: topUpGrams,

@@ -13,11 +13,12 @@
  *  - deload    : { volumeMult, rirShift, weeks: number[], label }  — делод-недели
  *  - volume    : { sets: Record<string, number>, label }           — целевой объём по группам
  *  - peak      : { volumeMult, rirTarget, label }                   — пиковая неделя (объём ↓, RIR→target)
+ *  - methodology: { methodName, category }                          — набор методик (из библиотеки)
  */
 const KEY = 'he_planner_apply';
 type Listener = (payload: PlannerApply | null) => void;
 
-export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak';
+export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology';
 
 export interface PlannerApply {
   kind: PlannerApplyKind;

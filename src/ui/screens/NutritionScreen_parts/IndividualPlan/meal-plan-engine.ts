@@ -90,6 +90,16 @@ const POSTW_FAST_PROTEIN_G = 35;
 const POSTW_FAST_CARB_G = 60;
 const INTRA_EAA_G = 12;
 const INTRA_CARB_G_PER_H = 40;
+// Максимально допустимые порции для добавок (г) — защита от абсурдных доз
+const SUPPLEMENT_MAX_G: Record<string, number> = {
+  creatine: 10, whey_isolate: 60, whey_protein: 60, whey_concentrate: 60,
+  casein: 60, casein_micellar: 60, bcaa: 20, supp_eaas: 20,
+  glutamine: 15, supp_hmb: 6, supp_beta_alanine: 6, supp_citrulline_dl_malate: 12,
+  supp_agmatine_sulfate: 2, supp_l_carnitine_tartrate: 4, supp_alpha_gpc: 2,
+  amylopectin: 80, dextrose: 80, coll_hydro: 20,
+};
+// Глобальный лимит на одну порцию любого продукта (г)
+const MAX_GRAM_PER_ITEM = 500;
 
 const MEAT_KEYWORDS = ['beef','pork','chicken','turkey','lamb','veal','duck','salmon','tuna','shrimp','cod','mackerel','trout','sardine','crab','lobster','squid','octopus','venison','rabbit','goose','pate','sausage','bacon','ham','pepperoni','salami','bologna','hot_dog','meatball','cutlet','steak','pollock','tilapia','herring','anchovy','clam','mussel','oyster','scallops','catfish','flounder','sole'];
 const isMeatId = (id: string): boolean => MEAT_KEYWORDS.some(k => id.toLowerCase().includes(k));
@@ -130,7 +140,9 @@ function getLeucine(food: FoodItem): number {
 function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carbs' | 'fat'): number {
   const per100 = macro === 'protein' ? (food.protein || 0) : macro === 'carbs' ? (food.carbs || 0) : (food.fat || 0);
   if (per100 <= 0) return 0;
-  return Math.min(500, Math.max(20, Math.round(targetG / per100 * 100)));
+  const base = Math.min(MAX_GRAM_PER_ITEM, Math.max(20, Math.round(targetG / per100 * 100)));
+  const supplementCap = SUPPLEMENT_MAX_G[food.id];
+  return supplementCap ? Math.min(supplementCap, base) : base;
 }
 
 function makeItem(food: FoodItem, grams: number, role: MealItem['role']): MealItem {
@@ -148,8 +160,11 @@ function makeItem(food: FoodItem, grams: number, role: MealItem['role']): MealIt
 
 // ─── Пулы продуктов по ролям (с фильтром аллергенов и диеты) ───────────
 function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPlanInput['budget'], varietyPoolSize?: number) {
+  const isMealFood = (f: FoodItem) =>
+    f.category !== 'supplement' && !['whey_protein','casein'].includes(f.id);
   const basePool = FOOD_DB.filter(f => {
     if (excludedIds.has(f.id)) return false;
+    if (!isMealFood(f)) return false;
     if (isVeg && isMeatId(f.id) && !f.isVegetarian && !f.isVegan) return false;
     return true;
   });
@@ -626,13 +641,17 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const scale = Math.min(1.3, Math.max(0.7, (scaleK + scaleP) / 2));
     meals.forEach(m => {
       m.items.forEach(it => {
-        it.amount = Math.round(it.amount * scale);
-        it.kcal = Math.round(it.kcal * scale);
-        it.p = Math.round(it.p * scale);
-        it.f = Math.round(it.f * scale);
-        it.c = Math.round(it.c * scale);
-        it.fiber = Math.round(it.fiber * scale);
-        it.leucine_mg = Math.round((it.leucine_mg || 0) * scale);
+        const supCap = SUPPLEMENT_MAX_G[it.id];
+        let newAmount = Math.round(it.amount * scale);
+        if (supCap) newAmount = Math.min(supCap, newAmount);
+        const factor = newAmount / (it.amount || 1);
+        it.amount = newAmount;
+        it.kcal = Math.round(it.kcal * factor);
+        it.p = Math.round(it.p * factor);
+        it.f = Math.round(it.f * factor);
+        it.c = Math.round(it.c * factor);
+        it.fiber = Math.round(it.fiber * factor);
+        it.leucine_mg = Math.round((it.leucine_mg || 0) * factor);
       });
       m.totals = m.items.reduce((acc, it) => ({
         kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
@@ -652,6 +671,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   if (input.isCutting) notes.push('Сушка: повышенная плотность белка, заниженные углеводы у ужина');
   if (mpsSummary.prePostWindow) notes.push('Pre/post-workout окно реализовано (полноценное анаболическое обеспечение тренировки)');
 
+  const deficiencyClosure = closeFoodDeficiencies(meals);
+  if (deficiencyClosure.length > 0) notes.push(...deficiencyClosure);
+
   return {
     dayIndex: input.dayOffset,
     isTrainingDay: input.isTrainingDay,
@@ -661,4 +683,45 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     diversity: { uniqueFoods, categories },
     notes,
   };
+}
+
+// ─── Покрытие микронутриентов: выявление дефицитов + рекомендации ─────
+const RDA_TARGETS: Record<string, { rda: number; unit: string; foodId: string; foodG: number }> = {
+  Fe: { rda: 18, unit: 'мг', foodId: 'beef_liver', foodG: 50 },
+  Mg: { rda: 400, unit: 'мг', foodId: 'pumpkin_seeds', foodG: 30 },
+  Zn: { rda: 15, unit: 'мг', foodId: 'oysters', foodG: 50 },
+  K: { rda: 3500, unit: 'мг', foodId: 'avocado', foodG: 100 },
+  Ca: { rda: 1000, unit: 'мг', foodId: 'sardines', foodG: 50 },
+  Omega3: { rda: 1600, unit: 'мг', foodId: 'salmon', foodG: 80 },
+};
+function getMicroFromFood(food: FoodItem, field: string): number {
+  const m = food.micros as Record<string, number> | undefined;
+  const e = food.electrolytes_100g as Record<string, number> | undefined;
+  const t = food.trace_elements_100g as Record<string, number> | undefined;
+  const mc = food.macro_100g as Record<string, number> | undefined;
+  return m?.[field] ?? e?.[field] ?? t?.[field] ?? mc?.[field] ?? 0;
+}
+function closeFoodDeficiencies(meals: Meal[]): string[] {
+  const allItems = meals.flatMap(m => m.items.map(it => ({ ...it, food: FOOD_DB.find(f => f.id === it.id) })));
+  const totals: Record<string, number> = {};
+  allItems.forEach(({ food, amount }) => {
+    if (!food) return;
+    Object.keys(RDA_TARGETS).forEach(k => {
+      const factor = (amount || 0) / 100;
+      totals[k] = (totals[k] || 0) + getMicroFromFood(food, k) * factor;
+    });
+  });
+  const notes: string[] = [];
+  Object.entries(RDA_TARGETS).forEach(([key, cfg]) => {
+    const val = totals[key] || 0;
+    if (val < cfg.rda * 0.6) {
+      const food = FOOD_DB.find(f => f.id === cfg.foodId);
+      const name = food?.name || cfg.foodId;
+      const pct = Math.round(val / cfg.rda * 100);
+      const addG = cfg.foodG;
+      const addMg = Math.round(getMicroFromFood(food!, key) * addG / 100);
+      notes.push(`⚠ Дефицит ${key}: ${pct}% RDA (${Math.round(val)}/${cfg.rda} ${cfg.unit}). Добавьте ${name} ${addG} г (ещё ${addMg} ${cfg.unit})`);
+    }
+  });
+  return notes;
 }

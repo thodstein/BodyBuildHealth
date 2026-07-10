@@ -1,20 +1,28 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
+import { EXERCISE_CATALOG, getExerciseById, getSubstitutes } from '../../../core/exercise-catalog';
 import { getExerciseBio } from '../../../data/exercise-biomechanics-db';
 import { getTechnique, getCues, getErrorsForExercise, getProgression } from '../../../engines/genetic-deload-technique.engine';
 import { classifyMovement, estimateDifficulty, getMuscleSynergy, getJointStress, assessSafety } from '../../../engines/movement-engines';
+import { generateRepTempo } from '../../../engines/rep-tempo-engine';
 import { forceVector, lengthenedPartials } from '../../../engines/pro/exercise-prescription.engine';
 import { getMappedIds } from '../../../data/exercise-id-mapping';
 import { PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import {
-  ACCENT, DIM, CARD, SMALL, BORDER,
+  ACCENT, DIM, CARD, BORDER,
   GROUPS, GROUP_RU, GROUP_ICON, TYPE_RU, EQUIP_RU,
   SUBREGION_DEFS, SUB_REGION_COLORS,
   TechniqueDetail, calcTechniqueScore, getRiskColor, getJointEmoji,
   filterBtn, pill, secTitle, chipRow,
 } from './ExerciseLabShared';
+import { applyToPlanner } from './planner-bridge';
 
-const TechniqueTab: React.FC<{ onSelectForCompare: (id: string) => void }> = ({ onSelectForCompare }) => {
+const COLLAPSED_HEIGHT = 42;
+
+interface TechniqueTabProps {
+  onSelectForCompare?: (id: string) => void;
+}
+
+const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare }) => {
   const [group, setGroup] = useState('chest');
   const [viewMode, setViewMode] = useState<'subregion' | 'list'>('subregion');
   const [expandedEx, setExpandedEx] = useState<string | null>(null);
@@ -70,7 +78,7 @@ const TechniqueTab: React.FC<{ onSelectForCompare: (id: string) => void }> = ({ 
     if (filterType !== 'all') list = list.filter(e => e.type === filterType);
     if (filterDiff !== 'all') list = list.filter(e => e.difficulty === filterDiff);
     if (filterEquip !== 'all') list = list.filter(e => e.equipment === filterEquip);
-    if (filterJoint !== 'all') list = list.filter(e => { const bio = getExerciseBio(e.id); return bio ? (bio.jointStress as any)[filterJoint] <= 4 : e.jointStress !== 'high' || filterJoint !== 'spine'; });
+    if (filterJoint !== 'all') list = list.filter(e => { const bio = getExerciseBio(e.id); return bio ? (bio.jointStress as any)[filterJoint] <= 4 : e.jointStress !== 'high'; });
     if (showFavOnly) list = list.filter(e => favorites.includes(e.id));
     return list.map(ex => {
       const map = getMappedIds(ex.id);
@@ -103,7 +111,7 @@ const TechniqueTab: React.FC<{ onSelectForCompare: (id: string) => void }> = ({ 
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{ex.name}</span>
             <button onClick={e => { e.stopPropagation(); toggleFav(ex.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: 0, color: isFav ? '#f59e0b' : DIM }}>{isFav ? '★' : '☆'}</button>
-            <button onClick={e => { e.stopPropagation(); onSelectForCompare(ex.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '2px 4px', color: DIM, fontWeight: 700 }} title="Добавить к сравнению">⇆</button>
+            {onSelectForCompare && <button onClick={e => { e.stopPropagation(); onSelectForCompare(ex.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '2px 4px', color: DIM, fontWeight: 700 }} title="Добавить к сравнению">⇆</button>}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 3 }}>
             <span style={{ ...pill, background: ex.type === 'compound' ? 'rgba(0,230,138,0.15)' : 'rgba(59,130,246,0.15)', color: ex.type === 'compound' ? ACCENT : '#60a5fa' }}>{TYPE_RU[ex.type] || ex.type}</span>
@@ -129,9 +137,21 @@ const TechniqueTab: React.FC<{ onSelectForCompare: (id: string) => void }> = ({ 
     </>
   );
 
+  const printExercise = (exId: string, htmlId: string) => {
+    const el = document.getElementById(htmlId);
+    if (el) {
+      const w = window.open('', '_blank', 'width=800,height=600');
+      if (w) {
+        w.document.write(`<html><head><title>Техника</title><style>body{font-family:sans-serif;font-size:12px;line-height:1.6;padding:20px;color:#000;background:#fff}h2{color:#333}.s{margin:12px 0;padding:8px;border-left:3px solid #00e68a}.l{font-weight:700;color:#00e68a}</style></head><body>${el.innerHTML}</body></html>`);
+        w.document.close();
+        setTimeout(() => w.print(), 300);
+      }
+    }
+  };
+
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
         <button onClick={() => setViewMode('subregion')} style={filterBtn(viewMode === 'subregion')}>📐 По подрегионам</button>
         <button onClick={() => setViewMode('list')} style={filterBtn(viewMode === 'list')}>📋 Списком</button>
         <button onClick={() => setShowFavOnly(v => !v)} style={filterBtn(showFavOnly)}>⭐ Избранное ({favorites.length})</button>
@@ -142,7 +162,7 @@ const TechniqueTab: React.FC<{ onSelectForCompare: (id: string) => void }> = ({ 
         {viewMode === 'list' && (
           <div>
             <div style={{ fontSize: 9, color: DIM, fontWeight: 600, marginBottom: 2 }}>Поиск</div>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Название…" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 11, boxSizing: 'border-box', width: '100%' }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Название упражнения…" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 11, boxSizing: 'border-box', width: '100%' }} />
           </div>
         )}
       </div>
@@ -165,7 +185,9 @@ const TechniqueTab: React.FC<{ onSelectForCompare: (id: string) => void }> = ({ 
       )}
 
       <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>
-        {viewMode === 'list' ? <>{flatList.length} из {totalInGroup} упражнений · {GROUP_RU[group]}{search ? ` · «${search}»` : ''}</> : <>{totalCategorized} из {totalInGroup} упражнений · {groupedExercises.length} подрегионов</>}
+        {viewMode === 'list'
+          ? <>{flatList.length} из {totalInGroup} упражнений · {GROUP_RU[group]}{search ? ` · «${search}»` : ''}{showFavOnly ? ' · ⭐ Избранное' : ''}</>
+          : <>{totalCategorized} из {totalInGroup} упражнений группы «{GROUP_RU[group]}» · {groupedExercises.length} подрегионов{showFavOnly ? ' · ⭐ Избранное' : ''}</>}
       </div>
 
       {/* SUB-REGION VIEW */}
@@ -196,20 +218,36 @@ const TechniqueTab: React.FC<{ onSelectForCompare: (id: string) => void }> = ({ 
                   const isExpanded = expandedEx === ex.id;
                   const safety = assessSafety(ex.id, [], score.total / 100);
                   const isFav = favorites.includes(ex.id);
+                  const printId = `elab-t-${ex.id}`;
                   return (
                     <div key={ex.id} style={{ ...CARD, border: isExpanded ? '1px solid rgba(0,230,138,0.2)' : CARD.border, marginLeft: 4 }}>
                       <div onClick={() => toggleExpandEx(ex.id)} style={{ cursor: 'pointer' }}>
                         {renderExHeader(ex, score, bio, isFav, safety)}
                       </div>
-                      {isExpanded && <TechniqueDetail ex={ex} technique={technique} score={score} cues={cues} errors={errors} progression={progression} synergy={synergy} jointStress={jointStress} classification={classification} fVector={fVector} lengthened={lengthened} safety={safety} bio={bio} cssScale={0.9} />}
+                      {isExpanded && <>
+                        <TechniqueDetail ex={ex} technique={technique} score={score} cues={cues} errors={errors} progression={progression} synergy={synergy} jointStress={jointStress} classification={classification} fVector={fVector} lengthened={lengthened} safety={safety} bio={bio} cssScale={0.9} />
+                        {ex.comments && (
+                          <div style={{ marginTop: 8 }}>
+                            <div style={secTitle}>💬 Комментарий</div>
+                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4, fontStyle: 'italic' }}>{ex.comments}</div>
+                          </div>
+                        )}
+                      </>}
                       <div style={{ marginTop: isExpanded ? 10 : 4, textAlign: 'center', display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
                         <button onClick={() => toggleExpandEx(ex.id)} style={{ padding: '3px 14px', borderRadius: 14, border: '1px solid rgba(0,230,138,0.15)', background: isExpanded ? 'rgba(0,230,138,0.06)' : 'transparent', color: isExpanded ? ACCENT : DIM, cursor: 'pointer', fontSize: 9, fontWeight: 600 }}>{isExpanded ? '▲ Свернуть' : '▼ Разбор'}</button>
                         {isExpanded && <>
-                          <button onClick={() => { const el = document.getElementById(`elab-t-${ex.id}`); if (el) { const w = window.open('', '_blank', 'width=800,height=600'); if (w) { w.document.write(`<html><head><title>${ex.name} - Техника</title><style>body{font-family:sans-serif;font-size:12px;line-height:1.6;padding:20px;color:#000;background:#fff}h2{color:#333}</style></head><body>${el.innerHTML}</body></html>`); w.document.close(); setTimeout(() => w.print(), 300); } } }} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 600, fontSize: 9 }}>🖨 Печать</button>
-                          <button onClick={() => { navigator.clipboard.writeText(document.getElementById(`elab-t-${ex.id}`)?.innerText || ''); }} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.06)', color: '#60a5fa', cursor: 'pointer', fontWeight: 600, fontSize: 9 }}>📋 Копировать</button>
+                          <button onClick={() => printExercise(ex.id, printId)} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 600, fontSize: 9 }}>🖨 Печать</button>
+                          <button onClick={() => { navigator.clipboard.writeText(document.getElementById(printId)?.innerText || ''); }} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.06)', color: '#60a5fa', cursor: 'pointer', fontWeight: 600, fontSize: 9 }}>📋 Копировать</button>
                         </>}
                       </div>
-                      {isExpanded && <div id={`elab-t-${ex.id}`} style={{ display: 'none' }}><h2>{ex.name}</h2><p>Тип: {TYPE_RU[ex.type]} · Оборудование: {EQUIP_RU[ex.equipment]} · Сложность: {score.label} ({score.total}/100)</p>{technique && <><p><b>Исходное положение:</b></p><ul>{technique.setup.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul><p><b>Выполнение:</b></p><ul>{technique.execution.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul><p><b>Дыхание:</b></p><ul>{technique.breathing.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></>}{errors.length > 0 && <><p><b>Ошибки:</b></p><ul>{errors.map((e: any, i: number) => <li key={i}><b>{e.error}</b> — {e.fix}</li>)}</ul></>}<p>Безопасность: {safety.score}/100 {safety.requiresSpotter ? '(требуется споттер)' : ''}</p></div>}
+                      {isExpanded && <div id={printId} style={{ display: 'none' }}>
+                        <h2>{ex.name}</h2>
+                        <p><b>Тип:</b> {TYPE_RU[ex.type]} · <b>Оборудование:</b> {EQUIP_RU[ex.equipment]} · <b>Сложность:</b> {score.label} ({score.total}/100)</p>
+                        {technique ? <><div className="s"><p className="l">Исходное положение:</p><ul>{technique.setup.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></div><div className="s"><p className="l">Выполнение:</p><ul>{technique.execution.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></div><div className="s"><p className="l">Дыхание:</p><ul>{technique.breathing.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></div></> : ex.technique ? <div className="s"><p className="l">Техника:</p><p>{ex.technique}</p></div> : null}
+                        {errors.length > 0 && <div className="s"><p className="l">Ошибки:</p><ul>{errors.map((e: any, i: number) => <li key={i}><b>{e.error}</b> — {e.fix}</li>)}</ul></div>}
+                        <p><b>Безопасность:</b> {safety.score}/100</p>
+                        {ex.comments && <div className="s"><p className="l">Комментарий:</p><p>{ex.comments}</p></div>}
+                      </div>}
                     </div>
                   );
                 })}
@@ -224,18 +262,33 @@ const TechniqueTab: React.FC<{ onSelectForCompare: (id: string) => void }> = ({ 
         const isExpanded = expandedEx === ex.id;
         const safety = assessSafety(ex.id, [], score.total / 100);
         const isFav = favorites.includes(ex.id);
+        const printId = `elab-l-${ex.id}`;
         return (
           <div key={ex.id} style={{ ...CARD, border: isExpanded ? '1px solid rgba(0,230,138,0.25)' : CARD.border, boxShadow: isExpanded ? '0 0 12px rgba(0,230,138,0.06)' : undefined, marginBottom: 8 }}>
             <div onClick={() => toggleExpandEx(ex.id)} style={{ cursor: 'pointer' }}>{renderExHeader(ex, score, bio, isFav, safety)}</div>
-            {isExpanded && <TechniqueDetail ex={ex} technique={technique} score={score} cues={cues} errors={errors} progression={progression} synergy={synergy} jointStress={jointStress} classification={classification} fVector={fVector} lengthened={lengthened} safety={safety} bio={bio} />}
+            {isExpanded && <>
+              <TechniqueDetail ex={ex} technique={technique} score={score} cues={cues} errors={errors} progression={progression} synergy={synergy} jointStress={jointStress} classification={classification} fVector={fVector} lengthened={lengthened} safety={safety} bio={bio} />
+              {ex.comments && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={secTitle}>💬 Комментарий</div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4, fontStyle: 'italic' }}>{ex.comments}</div>
+                </div>
+              )}
+            </>}
             <div style={{ marginTop: isExpanded ? 10 : 4, textAlign: 'center', display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={() => toggleExpandEx(ex.id)} style={{ padding: '3px 14px', borderRadius: 14, border: '1px solid rgba(0,230,138,0.15)', background: isExpanded ? 'rgba(0,230,138,0.06)' : 'transparent', color: isExpanded ? ACCENT : DIM, cursor: 'pointer', fontSize: 9, fontWeight: 600 }}>{isExpanded ? '▲ Свернуть разбор' : '▼ Развернуть разбор'}</button>
               {isExpanded && <>
-                <button onClick={() => { const el = document.getElementById(`elab-l-${ex.id}`); if (el) { const w = window.open('', '_blank', 'width=800,height=600'); if (w) { w.document.write(`<html><head><title>${ex.name} - Техника</title><style>body{font-family:sans-serif;font-size:12px;line-height:1.6;padding:20px}</style></head><body>${el.innerHTML}</body></html>`); w.document.close(); setTimeout(() => w.print(), 300); } } }} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 600, fontSize: 9 }}>🖨 Печать</button>
-                <button onClick={() => { navigator.clipboard.writeText(document.getElementById(`elab-l-${ex.id}`)?.innerText || ''); }} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.06)', color: '#60a5fa', cursor: 'pointer', fontWeight: 600, fontSize: 9 }}>📋 Копировать</button>
+                <button onClick={() => printExercise(ex.id, printId)} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 600, fontSize: 9 }}>🖨 Печать</button>
+                <button onClick={() => { navigator.clipboard.writeText(document.getElementById(printId)?.innerText || ''); }} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.06)', color: '#60a5fa', cursor: 'pointer', fontWeight: 600, fontSize: 9 }}>📋 Копировать</button>
               </>}
             </div>
-            {isExpanded && <div id={`elab-l-${ex.id}`} style={{ display: 'none' }}><h2>{ex.name}</h2><p>Тип: {TYPE_RU[ex.type]} · Сложность: {score.label} ({score.total}/100)</p>{technique && <><p><b>Техника:</b></p><ul>{technique.setup.map((s: string, i: number) => <li key={i}>{s}</li>)}{technique.execution.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></>}<p>Безопасность: {safety.score}/100</p></div>}
+            {isExpanded && <div id={printId} style={{ display: 'none' }}>
+              <h2>{ex.name}</h2>
+              <p><b>Тип:</b> {TYPE_RU[ex.type]} · <b>Оборудование:</b> {EQUIP_RU[ex.equipment]} · <b>Сложность:</b> {score.label} ({score.total}/100)</p>
+              {technique ? <><div className="s"><p className="l">Техника:</p><ul>{technique.setup.map((s: string, i: number) => <li key={i}>{s}</li>)}{technique.execution.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></div><div className="s"><p className="l">Дыхание:</p><ul>{technique.breathing.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></div></> : null}
+              {errors.length > 0 && <div className="s"><p className="l">Ошибки:</p><ul>{errors.map((e: any, i: number) => <li key={i}><b>{e.error}</b> — {e.fix}</li>)}</ul></div>}
+              <p><b>Безопасность:</b> {safety.score}/100</p>
+            </div>}
           </div>
         );
       })}
@@ -243,8 +296,19 @@ const TechniqueTab: React.FC<{ onSelectForCompare: (id: string) => void }> = ({ 
       {groupedExercises.length === 0 && flatList.length === 0 && (
         <div style={{ textAlign: 'center', padding: 40, color: DIM, fontSize: 12 }}>В этой группе нет упражнений с указанной целевой мышцей.</div>
       )}
+
+      {/* Apply to planner — from TargetMuscleCalcTab */}
+      <div style={{ marginTop: 12, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>
+          🔗 Применить целевую группу «{GROUP_RU[group]}» к планировщику как приоритет (доп. объём + ↓RIR).
+        </div>
+        <button onClick={() => applyToPlanner({ kind: 'weakpoints', label: 'Целевая группа: ' + GROUP_RU[group], data: { groups: [group] } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>
+          🛠 Целевая группа → планировщик
+        </button>
+      </div>
     </div>
   );
 };
 
+export { TechniqueTab };
 export default TechniqueTab;

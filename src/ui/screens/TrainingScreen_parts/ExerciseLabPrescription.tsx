@@ -3,12 +3,15 @@ import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { calcExercisePrescription } from '../../../engines/training.engine';
 import { mesocyclePhaseForWeek } from '../../../engines/rir-matrix.engine';
 import { calculateRepDuration, parseTempo } from '../../../engines/rep-tempo.engine';
+import { forceVector, lengthenedPartials } from '../../../engines/pro/exercise-prescription.engine';
+import { assessSafety } from '../../../engines/movement-engines';
 import { PopupSelect, PopupNumber, PopupText, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { useDataLink } from '../../../core/data-link';
 import {
-  ACCENT, DIM, CARD, SMALL, BORDER,
+  ACCENT, DIM, CARD, SMALL,
   GROUPS, GROUP_RU, TYPE_RU, EQUIP_RU, RIR_TO_RPE, RPE_LABEL,
   REGION_MAP, getExerciseRegion, getResistanceProfile, getDifficultyScaler,
+  SUBREGION_DEFS, calcTechniqueScore, getRiskColor,
 } from './ExerciseLabShared';
 
 const PrescriptionTab: React.FC = () => {
@@ -232,6 +235,71 @@ const PrescriptionTab: React.FC = () => {
     return { list: scored, currentScore, currentRank: rank === -1 ? scored.length + 1 : rank + 1, total: scored.length + 1 };
   }, [ex, goal, level, week, totalWeeks, resistanceProfile]);
 
+  // ── Pro Analysis (group-level) ──
+  const [showProAnalysis, setShowProAnalysis] = useState(false);
+
+  const proGroupExercises = useMemo(() =>
+    EXERCISE_CATALOG.filter(e => e.group === group).map(ex => ({
+      exercise: ex,
+      rp: getResistanceProfile(ex),
+      fv: forceVector(ex.group, ex.type, ex.name),
+      score: calcTechniqueScore(ex),
+      safety: assessSafety(ex.id, [], calcTechniqueScore(ex).total / 100),
+      lp: lengthenedPartials(ex.group),
+    })).sort((a, b) => b.rp.score - a.rp.score),
+  [group]);
+
+  const proFvDist = useMemo(() => {
+    const map: Record<string, number> = {};
+    proGroupExercises.forEach(g => { map[g.fv] = (map[g.fv] || 0) + 1; });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]);
+  }, [proGroupExercises]);
+
+  const proStretchLeaders = useMemo(() => proGroupExercises.filter(g => g.rp.curve === 'stretch_mediated').slice(0, 5), [proGroupExercises]);
+
+  const proSynergyPairs = useMemo(() => {
+    const pairs: Array<{ a: string; b: string; type: string; reason: string }> = [];
+    const seen = new Set<string>();
+    const antagonistMap: Record<string, string[]> = {
+      horizontal_push: ['horizontal_pull'], horizontal_pull: ['horizontal_push'],
+      vertical_push: ['vertical_pull'], vertical_pull: ['vertical_push'],
+      knee_dominant: ['hip_dominant'], hip_dominant: ['knee_dominant'],
+      core_anti: [], other: [],
+    };
+    proGroupExercises.forEach(a => {
+      proGroupExercises.forEach(b => {
+        if (a.exercise.id === b.exercise.id) return;
+        const key = [a.exercise.id, b.exercise.id].sort().join('|');
+        if (seen.has(key)) return;
+        const agn = antagonistMap[a.fv] || [];
+        if (agn.includes(b.fv)) {
+          seen.add(key);
+          pairs.push({ a: a.exercise.name, b: b.exercise.name, type: 'антагонист', reason: `${a.fv} ↔ ${b.fv} — суперсет без перекрёстного утомления` });
+        }
+        if (a.fv === b.fv && a.rp.curve !== b.rp.curve) {
+          seen.add(key);
+          pairs.push({ a: a.exercise.name, b: b.exercise.name, type: 'вариация', reason: `один вектор (${a.fv}), разные кривые: ${a.rp.label} vs ${b.rp.label}` });
+        }
+      });
+    });
+    return pairs.slice(0, 10);
+  }, [proGroupExercises]);
+
+  const proRegionalCoverage = useMemo(() => {
+    const regions = SUBREGION_DEFS[group] || [];
+    const covered: string[] = [];
+    const uncovered: string[] = [];
+    regions.forEach(r => {
+      const has = proGroupExercises.some(g => {
+        const tm = (g.exercise.targetMuscle || '').toLowerCase();
+        return r.keywords.some(kw => tm.includes(kw.toLowerCase()));
+      });
+      if (has) covered.push(r.name);
+      else uncovered.push(r.name);
+    });
+    return { covered, uncovered, total: regions.length };
+  }, [group, proGroupExercises]);
+
   const [savedCalcs, setSavedCalcs] = useState<Array<{ id: number; name: string; goal: string; level: string; week: number; oneRM: number; reps: string; sets: number; rir: number; rest: number; weight: number; date: string }>>(() => { try { return JSON.parse(localStorage.getItem('he_excalc_saved') || '[]'); } catch { return []; } });
   const [historyOpen, setHistoryOpen] = useState(false);
   const saveCalc = () => {
@@ -253,6 +321,11 @@ const PrescriptionTab: React.FC = () => {
     if (fatigueAnalysis) lines.push(`ЦНС: ${fatigueAnalysis.cnsLoad}/10 · Мышцы: ${fatigueAnalysis.muscularLoad}/10 · Восст.: ${fatigueAnalysis.recoveryHours}ч`);
     if (metabolicCost) lines.push(`Метаболизм: ${metabolicCost.totalCal} ккал · Гликоген: ${metabolicCost.glycogen}г · EPOC: +${metabolicCost.epoc} ккал`);
     if (oneRMProjection) lines.push(`Прогноз 1ПМ: ${oneRMProjection.projected} кг (+${oneRMProjection.pctGain}%) через ${oneRMProjection.progressionWeeks} нед`);
+    lines.push('--- PRO-анализ группы ---');
+    lines.push(`Force-векторы: ${proFvDist.map(([fv, c]) => `${fv.replace(/_/g, ' ')}:${c}`).join(', ')}`);
+    lines.push(`Подрегионы: ${proRegionalCoverage.covered.length}/${proRegionalCoverage.total} покрыто`);
+    if (proRegionalCoverage.uncovered.length > 0) lines.push(`Непокрытые: ${proRegionalCoverage.uncovered.join(', ')}`);
+    if (proStretchLeaders.length > 0) lines.push(`Stretch-лидеры: ${proStretchLeaders.map(g => g.exercise.name).join(', ')}`);
     navigator.clipboard?.writeText(lines.join('\n')).catch(() => {});
   };
 
@@ -485,6 +558,66 @@ const PrescriptionTab: React.FC = () => {
             ))}
           </div>
         )}
+
+        {/* PRO ANALYSIS — group-level */}
+        <div onClick={() => setShowProAnalysis(v => !v)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, marginTop: 14, marginBottom: 8, fontSize: 12, fontWeight: 700, color: '#a855f7' }}>
+          <span>{showProAnalysis ? '▲' : '▼'}</span> 📊 PRO-анализ группы «{GROUP_RU[group]}»
+        </div>
+        {showProAnalysis && (<>
+          <div style={{ ...CARD, marginBottom: 10, border: '1px solid rgba(168,85,247,0.2)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>📐 Распределение force-векторов</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              {proFvDist.map(([fv, count]) => (
+                <div key={fv} style={{ padding: '5px 10px', borderRadius: 6, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.12)', textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: '#c084fc' }}>{fv.replace(/_/g, ' ')}</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#c084fc' }}>{count}</div>
+                  <div style={{ fontSize: 7, color: DIM }}>упр.</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ ...CARD, marginBottom: 10, border: '1px solid rgba(34,197,94,0.2)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginBottom: 6 }}>🏆 Stretch-mediated лидеры (топ-5)</div>
+            {proStretchLeaders.length > 0 ? proStretchLeaders.map((g, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', borderRadius: 4, marginBottom: 2, background: i === 0 ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.02)', fontSize: 9 }}>
+                <span style={{ fontWeight: 600 }}>#{i + 1} {g.exercise.name}</span>
+                <span style={{ color: '#22c55e' }}>{g.rp.score}/10</span>
+                <span style={{ color: DIM, fontSize: 8 }}>{g.exercise.type === 'compound' ? 'База' : 'Изол.'}</span>
+              </div>
+            )) : <div style={{ fontSize: 9, color: DIM, padding: 6 }}>Нет stretch-mediated упражнений в этой группе.</div>}
+          </div>
+
+          <div style={{ ...CARD, marginBottom: 10, border: '1px solid rgba(59,130,246,0.2)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>📍 Покрытие подрегионов: {proRegionalCoverage.covered.length}/{proRegionalCoverage.total}</div>
+            {proRegionalCoverage.covered.length > 0 && (
+              <div style={{ marginBottom: 4 }}>
+                <div style={{ fontSize: 8, color: '#22c55e', fontWeight: 600, marginBottom: 2 }}>✅ Покрыты:</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                  {proRegionalCoverage.covered.map(r => <span key={r} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 7, background: 'rgba(34,197,94,0.08)', color: '#22c55e' }}>{r}</span>)}
+                </div>
+              </div>
+            )}
+            {proRegionalCoverage.uncovered.length > 0 && (
+              <div>
+                <div style={{ fontSize: 8, color: '#ef4444', fontWeight: 600, marginBottom: 2 }}>❌ Не покрыты:</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                  {proRegionalCoverage.uncovered.map(r => <span key={r} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 7, background: 'rgba(239,68,68,0.08)', color: '#ef4444' }}>{r}</span>)}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={{ ...CARD, marginBottom: 10, border: '1px solid rgba(251,146,60,0.2)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#fb923c', marginBottom: 6 }}>🔗 Сила синергии: лучшие пары</div>
+            {proSynergyPairs.length > 0 ? proSynergyPairs.map((p, i) => (
+              <div key={i} style={{ padding: '5px 6px', borderRadius: 4, marginBottom: 3, background: 'rgba(251,146,60,0.03)', border: '1px solid rgba(251,146,60,0.08)', fontSize: 8 }}>
+                <div style={{ fontWeight: 700, color: '#fff', marginBottom: 1 }}>{p.a} + {p.b}</div>
+                <div style={{ color: DIM }}>{p.type}: {p.reason}</div>
+              </div>
+            )) : <div style={{ fontSize: 9, color: DIM, padding: 6 }}>Нет явных синергетических пар в этой группе.</div>}
+          </div>
+        </>)}
 
         {ex && presc && (
           <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>

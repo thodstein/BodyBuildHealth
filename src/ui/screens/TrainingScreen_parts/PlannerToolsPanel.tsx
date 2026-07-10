@@ -31,9 +31,8 @@ import VolumeRecoveryCorrelationCard from './VolumeRecoveryCorrelationCard';
 import { BbToolsCard } from './BbToolsCard';
 import { SplitGenCard } from './SplitGenCard';
 import { TempoTab } from './TempoTab';
-import { TargetMuscleCalcTab } from './TargetMuscleCalcTab';
+import TechniqueTab from './ExerciseLabTechnique';
 import { VolumeOptimizerTab } from './VolumeOptimizerTab';
-import ConjugateTab from './ConjugateTab';
 
 interface ToolDef { id: string; title: string; icon: string; short: string; render: () => React.ReactNode; }
 
@@ -65,7 +64,7 @@ const TOOLS: Record<'pl' | 'bb' | 'manual', ToolDef[]> = {
   bb: [
     { id: 'bb', title: 'ББ-инструменты', icon: '💪', short: 'Темп/отдых/TUT, техники интенсификации, слабые точки, демография.', render: () => <BbToolsCard /> },
     { id: 'split', title: 'Генератор сплитов', icon: '🧩', short: '9 типов сплитов под цель/дни/слабые группы.', render: () => <SplitGenCard /> },
-    { id: 'target', title: 'Целевая мышца', icon: '🎯', short: 'Подбор упражнений по целевой мышце и её региону.', render: () => <TargetMuscleCalcTab /> },
+    { id: 'target', title: 'Целевая мышца', icon: '🎯', short: 'Подбор упражнений по целевой мышце и её региону.', render: () => <TechniqueTab /> },
     { id: 'tempo', title: 'Темп повторений', icon: '⏱️', short: 'Эксцентрика/пауза/концентрика/пауза по цели.', render: () => <TempoTab /> },
     { id: 'pri', title: 'PRI / готовность', icon: '🧠', short: 'Готовность к тренировке + RIR-корректировка.', render: () => <PriRepPatternCard /> },
     { id: 'fatigue', title: 'Индекс усталости', icon: '📉', short: 'ACWR, монотонность, strain → корректировка объёма.', render: () => <FatigueIndexTab /> },
@@ -82,14 +81,13 @@ const TOOLS: Record<'pl' | 'bb' | 'manual', ToolDef[]> = {
     { id: 'deload', title: 'Планировщик делода', icon: '🧘', short: 'Авто-расписание разгрузочных недель.', render: () => <DeloadSchedulerTab /> },
     { id: 'period', title: 'Дизайнер периодизации', icon: '🔄', short: 'Блочный макроцикл: drag-and-drop фаз.', render: () => <PeriodizationDesignerTab /> },
     { id: 'whatif', title: 'What-if сценарий', icon: '🔮', short: 'Прогноз риск/готовность от калорий/сна/AAS.', render: () => <WhatIfCard baseRisk={20} baseReadiness={75} /> },
-    { id: 'conj', title: 'Конъюгат (Westside)', icon: '🔁', short: 'ME/DE/RE дни — фокус на одном движении.', render: () => <ConjugateTab /> },
   ],
 
   // ═══ РУЧНОЙ СБОР (все инструменты) ═══
   manual: [
     { id: 'split', title: 'Генератор сплитов', icon: '🧩', short: '9 типов сплитов под цель/дни/слабые группы.', render: () => <SplitGenCard /> },
     { id: 'bb', title: 'ББ-инструменты', icon: '💪', short: 'Темп/отдых, техники, слабые точки, демография.', render: () => <BbToolsCard /> },
-    { id: 'target', title: 'Целевая мышца', icon: '🎯', short: 'Подбор упражнений по целевой мышце.', render: () => <TargetMuscleCalcTab /> },
+    { id: 'target', title: 'Целевая мышца', icon: '🎯', short: 'Подбор упражнений по целевой мышце.', render: () => <TechniqueTab /> },
     { id: 'tempo', title: 'Темп повторений', icon: '⏱️', short: 'Темп по цели движения.', render: () => <TempoTab /> },
     { id: 'weak', title: 'Слабые точки ПЛ', icon: '🎯', short: 'Диагностика мёртвой точки движения.', render: () => <PlWeakpointsCard /> },
     { id: 'str', title: 'Аналитика силы', icon: '💪', short: 'Процентиль, уровень, соотношения, ориентиры.', render: () => <StrengthAnalyticsCard /> },
@@ -110,7 +108,6 @@ const TOOLS: Record<'pl' | 'bb' | 'manual', ToolDef[]> = {
     { id: 'taper', title: 'Taper-планер', icon: '🏁', short: 'Тейпер к соревнованию.', render: () => <TaperPlannerTab /> },
     { id: 'deload', title: 'Планировщик делода', icon: '🧘', short: 'Авто-расписание разгрузочных недель.', render: () => <DeloadSchedulerTab /> },
     { id: 'period', title: 'Дизайнер периодизации', icon: '🔄', short: 'Блочный макроцикл: drag-and-drop фаз.', render: () => <PeriodizationDesignerTab /> },
-    { id: 'conj', title: 'Конъюгат (Westside)', icon: '🔁', short: 'ME/DE/RE дни.', render: () => <ConjugateTab /> },
     { id: 'comp', title: 'Соревнование', icon: '🏆', short: 'Категория, стратегия, таймлайн.', render: () => <div style={{padding:12,fontSize:11,color:'var(--text-dim)'}}>🏋️ Соревнование перенесено в инструмент «Пиковая фаза» внутри ПЛ-авто (вкладка «Пик»).</div> },
     { id: 'whatif', title: 'What-if сценарий', icon: '🔮', short: 'Прогноз риск/готовность.', render: () => <WhatIfCard baseRisk={20} baseReadiness={75} /> },
   ],

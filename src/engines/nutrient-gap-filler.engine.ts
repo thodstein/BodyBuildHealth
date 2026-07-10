@@ -22,10 +22,27 @@ export interface NutrientGap {
   percentCovered: number;
 }
 
+/** Максимальная разовая доза добавок (г) — зеркало из kbju-food-match.engine.ts */
+const SUPP_DOSE: Record<string, number> = {
+  creatine: 10, whey_isolate: 60, whey_protein: 60, whey_concentrate: 60,
+  casein: 60, casein_micellar: 60, bcaa: 20, supp_eaas: 20,
+  glutamine: 15, supp_hmb: 6, supp_beta_alanine: 6, supp_citrulline_dl_malate: 12,
+  supp_agmatine_sulfate: 2, supp_l_carnitine_tartrate: 4, supp_alpha_gpc: 2,
+  amylopectin: 80, dextrose: 80, coll_hydro: 20, supp_taurine: 5,
+  supp_glycine: 5, supp_carnitine: 2, supp_collagen_peptides: 20,
+  supp_beef_protein: 60, supp_egg_protein: 60, supp_soy_isolate: 60,
+  supp_pea_protein: 60, supp_rice_protein: 60, supp_hemp_protein: 60,
+  supp_pumpkin_protein: 60, supp_hydrolyzed_whey: 60, supp_mass_gainer: 100,
+  mass_gainer: 100, protein_bar: 80, bar_protein: 80,
+};
+
+const DEFAULT_SUPP_GRAMS = 30;
+
 export interface GapFillerSuggestion {
   foodId: string;
   name: string;
   category: FoodItem['category'];
+  type: 'food' | 'supplement';
   nutrientPer100g: number;
   gramsToFill: number;
   kcalCost: number;
@@ -220,11 +237,16 @@ export function analyzeNutrientGaps(
 
     const rawFillers: GapFillerSuggestion[] = [];
     for (const food of allFoods) {
+      const isSupp = food.category === 'supplement';
       const per100 = getNutrientValue(food, target);
       if (per100 <= 0) continue;
       const kcal = food.kcal || 1;
-      const gramsToFill = (deficit / per100) * 100;
+      let gramsToFill = (deficit / per100) * 100;
       if (gramsToFill <= 0 || gramsToFill > 30000) continue;
+      if (isSupp) {
+        const cap = SUPP_DOSE[food.id] ?? DEFAULT_SUPP_GRAMS;
+        gramsToFill = Math.min(cap, gramsToFill);
+      }
       const kcalCost = Math.round(kcal * gramsToFill / 100);
       const efficiency = per100 / Math.max(1, kcal);
       const proteinG = Math.round((food.protein || 0) * gramsToFill / 1000) / 10;
@@ -232,6 +254,7 @@ export function analyzeNutrientGaps(
         foodId: food.id,
         name: food.name,
         category: food.category,
+        type: isSupp ? 'supplement' : 'food',
         nutrientPer100g: Math.round(per100 * 100) / 100,
         gramsToFill: Math.round(gramsToFill),
         kcalCost,
@@ -323,19 +346,22 @@ export function findBestCombo(
     const gramsForA = Object.keys(gramsA).length > 0
       ? Math.max(...Object.values(gramsA))
       : 100;
-    const kcalA = Math.round(foodA.food.kcal * gramsForA / 100);
+    const cappedA = foodA.food.category === 'supplement'
+      ? Math.min(gramsForA, SUPP_DOSE[foodA.food.id] ?? DEFAULT_SUPP_GRAMS)
+      : gramsForA;
+    const kcalA = Math.round(foodA.food.kcal * cappedA / 100);
 
     const combo1: NutrientCombo = {
       items: [{
         foodId: foodA.food.id,
         name: foodA.food.name,
         category: foodA.food.category,
-        grams: Math.round(gramsForA),
+        grams: Math.round(cappedA),
         kcal: kcalA,
         coversNutrients: [...new Set(nutrientsA)],
       }],
       totalKcal: kcalA,
-      totalGrams: Math.round(gramsForA),
+      totalGrams: Math.round(cappedA),
       coveredNutrients: [...new Set(nutrientsA)],
       allNutrientsCovered: new Set(nutrientsA).size >= deficits.length,
     };
@@ -360,7 +386,10 @@ export function findBestCombo(
 
       if (nutrientsB.length === 0) continue;
 
-      const gramsB = nutrientsB.length > 0 ? 150 : 100;
+      const gramsBraw = nutrientsB.length > 0 ? 150 : 100;
+      const gramsB = foodB.food.category === 'supplement'
+        ? Math.min(gramsBraw, SUPP_DOSE[foodB.food.id] ?? DEFAULT_SUPP_GRAMS)
+        : gramsBraw;
       const kcalB = Math.round(foodB.food.kcal * gramsB / 100);
 
       const allCovered = [...new Set([...nutrientsA, ...nutrientsB])];
@@ -368,7 +397,7 @@ export function findBestCombo(
         items: [
           {
             foodId: foodA.food.id, name: foodA.food.name,
-            category: foodA.food.category, grams: Math.round(gramsForA), kcal: kcalA,
+            category: foodA.food.category, grams: Math.round(cappedA), kcal: kcalA,
             coversNutrients: [...new Set(nutrientsA)],
           },
           {
@@ -378,7 +407,7 @@ export function findBestCombo(
           },
         ],
         totalKcal: kcalA + kcalB,
-        totalGrams: Math.round(gramsForA + gramsB),
+        totalGrams: Math.round(cappedA + gramsB),
         coveredNutrients: allCovered,
         allNutrientsCovered: allCovered.length >= deficits.length,
       };
@@ -403,18 +432,21 @@ export function findBestCombo(
 
         if (nutrientsC.length === 0) continue;
 
-        const gramsC = 100;
+        const gramsCraw = 100;
+        const gramsC = foodC.food.category === 'supplement'
+          ? Math.min(gramsCraw, SUPP_DOSE[foodC.food.id] ?? DEFAULT_SUPP_GRAMS)
+          : gramsCraw;
         const kcalC = Math.round(foodC.food.kcal * gramsC / 100);
         const all3 = [...new Set([...nutrientsA, ...nutrientsB, ...nutrientsC])];
 
         combos.push({
           items: [
-            { foodId: foodA.food.id, name: foodA.food.name, category: foodA.food.category, grams: Math.round(gramsForA), kcal: kcalA, coversNutrients: [...new Set(nutrientsA)] },
+            { foodId: foodA.food.id, name: foodA.food.name, category: foodA.food.category, grams: Math.round(cappedA), kcal: kcalA, coversNutrients: [...new Set(nutrientsA)] },
             { foodId: foodB.food.id, name: foodB.food.name, category: foodB.food.category, grams: Math.round(gramsB), kcal: kcalB, coversNutrients: [...new Set(nutrientsB)] },
-            { foodId: foodC.food.id, name: foodC.food.name, category: foodC.food.category, grams: gramsC, kcal: kcalC, coversNutrients: [...new Set(nutrientsC)] },
+            { foodId: foodC.food.id, name: foodC.food.name, category: foodC.food.category, grams: Math.round(gramsC), kcal: kcalC, coversNutrients: [...new Set(nutrientsC)] },
           ],
           totalKcal: kcalA + kcalB + kcalC,
-          totalGrams: Math.round(gramsForA + gramsB + gramsC),
+          totalGrams: Math.round(cappedA + gramsB + gramsC),
           coveredNutrients: all3,
           allNutrientsCovered: all3.length >= deficits.length,
         });

@@ -1,10 +1,13 @@
 /**
  * MethodologyEncyclopedia.tsx — энциклопедия тренировочных методик по категориям
- * (Периодизация, Прогрессия, Интенсивность, Техника, Объём, Частота) с подробным описанием.
+ * (Периодизация, Прогрессия, Интенсивность, Техника, Объём, Частота, Специализация)
+ * с подробным описанием и кнопкой «Применить к планировщику».
  */
 import React, { useMemo, useState } from 'react';
 import { getTrainingMethods } from '../../../engines/training-methodology.engine';
 import { ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
+import { applyToPlanner } from './planner-bridge';
+import ConjugateDesigner from './ConjugateDesigner';
 
 const CAT: { id: string; label: string; icon: string }[] = [
   { id: 'periodization', label: 'Периодизация', icon: '🗓️' },
@@ -16,13 +19,25 @@ const CAT: { id: string; label: string; icon: string }[] = [
   { id: 'specialization', label: 'Специализация', icon: '🎯' },
 ];
 
+const CAT_LABEL: Record<string, string> = {
+  periodization: 'Периодизация', progression: 'Прогрессия', intensity: 'Интенсивность',
+  technique: 'Техника', volume: 'Объём', frequency: 'Частота', specialization: 'Специализация', recovery: 'Восстановление',
+};
+
 const EV_COLOR: Record<string, string> = { A: '#22c55e', B: '#eab308', C: '#f97316' };
 const EV_LABEL: Record<string, string> = { A: 'доказательность A', B: 'доказательность B', C: 'доказательность C' };
 
 export const MethodologyEncyclopedia: React.FC = () => {
   const methods = useMemo(() => getTrainingMethods(), []);
-  const [cat, setCat] = useState<string>('intensity');
+  const [cat, setCat] = useState<string>('specialization');
+  const [applied, setApplied] = useState<Record<string, string>>({});
   const list = methods.filter(m => m.category === cat);
+
+  const handleApply = (m: { name: string; category: string }) => {
+    applyToPlanner({ kind: 'methodology', label: m.name + ' (' + (CAT_LABEL[m.category] || m.category) + ')', data: { methodName: m.name, category: m.category } });
+    setApplied(p => ({ ...p, [m.category]: m.name }));
+    setTimeout(() => setApplied(p => { const n = { ...p }; delete n[m.category]; return n; }), 3000);
+  };
 
   return (
     <div style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', padding: 12, margin: '6px 0' }}>
@@ -44,6 +59,16 @@ export const MethodologyEncyclopedia: React.FC = () => {
             <div style={{ marginBottom: 6 }}><b style={{ color: '#00e68a' }}>Пример:</b> {m.example}</div>
             {m.popularizedBy && <div style={{ marginBottom: 6, fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Популяризатор: {m.popularizedBy}</div>}
             {m.caveats.length > 0 && <div><b style={{ color: '#ef4444' }}>Осторожно:</b> <ul style={{ margin: '4px 0 0 16px', padding: 0, fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>{m.caveats.map((c, j) => <li key={j}>{c}</li>)}</ul></div>}
+            {m.name.toLowerCase().includes('westside') ? (
+              <div style={{ marginTop: 8, padding: 10, background: 'rgba(255,107,53,0.06)', borderRadius: 10, border: '1px solid rgba(255,107,53,0.15)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#ff6b35', marginBottom: 4 }}>⚡ Генератор конъюгата (Westside)</div>
+                <ConjugateDesigner />
+              </div>
+            ) : (
+              <button onClick={() => handleApply(m)} style={{ marginTop: 8, padding: '6px 14px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: 'none', background: applied[m.category] === m.name ? 'rgba(0,230,138,0.3)' : 'linear-gradient(135deg,#00e68a,#00c853)', color: applied[m.category] === m.name ? '#00e68a' : '#000', transition: 'all 0.2s', width: '100%' }}>
+                {applied[m.category] === m.name ? '✅ Применена к планировщику' : '🛠 Применить к планировщику'}
+              </button>
+            )}
           </div>}
         />
       ))}

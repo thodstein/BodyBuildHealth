@@ -215,8 +215,11 @@ export function scoreFoodsForKBJU(
   currentKbju?: KbjuTarget,
   filter?: AdvancedFilter,
   maxResults = 20,
+  excludeSupplements = true,
 ): KbjuMatchResult[] {
-  let results = foods.map(f => calcKbjuMatchScore(f, target, currentKbju));
+  let results = foods
+    .filter(f => !excludeSupplements || f.category !== 'supplement')
+    .map(f => calcKbjuMatchScore(f, target, currentKbju));
 
   if (filter) {
     if (filter.diaasMin !== undefined) results = results.filter(r => (r.diaas || 0) >= (filter.diaasMin || 0));
@@ -284,6 +287,64 @@ export function getMealCurrentKBJU(dayPlan: any, mealIdx: number): KbjuTarget | 
   if (!dayPlan?.meals?.[mealIdx]?.totals) return null;
   const t = dayPlan.meals[mealIdx].totals;
   return { kcal: t.kcal || 0, protein: t.p || 0, fat: t.f || 0, carbs: t.c || 0 };
+}
+
+/** Максимальная разовая доза добавок (г) */
+export const SUPPLEMENT_DOSE_CAP: Record<string, number> = {
+  creatine: 10, whey_isolate: 60, whey_protein: 60, whey_concentrate: 60,
+  casein: 60, casein_micellar: 60, bcaa: 20, supp_eaas: 20,
+  glutamine: 15, supp_hmb: 6, supp_beta_alanine: 6, supp_citrulline_dl_malate: 12,
+  supp_agmatine_sulfate: 2, supp_l_carnitine_tartrate: 4, supp_alpha_gpc: 2,
+  amylopectin: 80, dextrose: 80, coll_hydro: 20, supp_taurine: 5, supp_glycine: 5,
+  supp_carnitine: 2, supp_beta_alanine_time: 6, supp_citrulline_malate: 12,
+  supp_arg_aakg: 8, supp_ornithine_akg: 8, supp_collagen_peptides: 20,
+  supp_collagen_hydro: 20, supp_beef_protein: 60, supp_egg_protein: 60,
+  supp_soy_isolate: 60, supp_pea_protein: 60, supp_rice_protein: 60,
+  supp_hemp_protein: 60, supp_pumpkin_protein: 60, rice_protein: 60,
+  supp_pea_protein_iso: 60, supp_beef_protein_iso: 60, supp_egg_white_powder: 60,
+  supp_goat_whey: 60, supp_hydrolyzed_whey: 60, supp_mass_gainer: 100,
+  mass_gainer: 100, protein_bar: 80, bar_protein: 80,
+  supp_probiotics: 2, supp_digestive_enzymes: 2, supp_zma: 4,
+  supp_melatonin: 1, supp_5htp: 1, supp_gaba: 3, supp_phenibut: 1,
+  supp_ashwagandha: 2, supp_rhodiola: 2, supp_cordyceps: 2, supp_reishi: 2,
+  supp_bacopa_monnieri: 1, supp_lions_maine: 2, supp_phosphatidylserine: 1,
+  supp_l_theanine: 1, supp_potassium_citrate: 3, supp_boron_glycinate: 1,
+  supp_chromium_picolinate: 1, supp_iodine_kelp: 1, supp_mct_powder: 30,
+  supp_greens_powder: 10, supp_beetroot_powder: 15, supp_electrolyte_tabs: 4,
+  supp_ketone_esters: 30, supp_glycerol: 10, supp_sodium_bicarbonate: 5,
+  pre_workout: 15, supp_creatine_hcl: 5, aminos_complex: 15, isotonic: 30,
+  supp_acetyl_carnitine: 2, supp_tyrosine: 3,
+  supp_betaine: 5, supp_cla: 3, supp_bone_broth_protein: 25,
+};
+
+/** Дефолтная доза (г), если ID нет в кап-карте */
+const DEFAULT_SUPP_DOSE = 30;
+
+export function getSupplementDose(id: string): number {
+  return SUPPLEMENT_DOSE_CAP[id] ?? DEFAULT_SUPP_DOSE;
+}
+
+/** Возвращает список добавок с пересчитанными КБЖУ на разовую дозу */
+export function buildSupplementPortions(): {
+  id: string; name: string; category: string; servingSize: string;
+  kcal: number; protein: number; fat: number; carbs: number; fiber: number; doseG: number;
+}[] {
+  return FOOD_DB
+    .filter(f => f.category === 'supplement')
+    .map(f => {
+      const doseG = getSupplementDose(f.id);
+      const r = doseG / 100;
+      const sv = f.servingSize || `${doseG} г`;
+      return {
+        id: f.id, name: f.name, category: f.category, servingSize: sv,
+        kcal: Math.round((f.kcal || 0) * r),
+        protein: Math.round((f.protein || 0) * r * 10) / 10,
+        fat: Math.round((f.fat || 0) * r * 10) / 10,
+        carbs: Math.round((f.carbs || 0) * r * 10) / 10,
+        fiber: Math.round((f.fiber || 0) * r * 10) / 10,
+        doseG,
+      };
+    });
 }
 
 export type { FoodItem };

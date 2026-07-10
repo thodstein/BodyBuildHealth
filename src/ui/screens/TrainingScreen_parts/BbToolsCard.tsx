@@ -5,7 +5,6 @@
 import React, { useState, useMemo } from 'react';
 import { tempoFor, tutForSet, TEMPO_BY_CHARACTER, REST_BY_CHARACTER, type DayCharacter } from '../../../engines/bb/bb-tempo-rest';
 import { techniquesFor, type TechniqueSpec } from '../../../engines/bb/bb-intensity-techniques';
-import { planWeakPoints } from '../../../engines/bb/bb-weakpoint';
 import { splitForDays, femaleAdjust, mastersAdjust, adjustVolumeForDemographic } from '../../../engines/bb/bb-demographics';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
 import { applyToPlanner } from './planner-bridge';
@@ -27,7 +26,6 @@ export const BbToolsCard: React.FC = () => {
   const [reps, setReps] = useState(8);
   const [level, setLevel] = useState<string>(prof.level || 'intermediate');
   const [weak, setWeak] = useState<string[]>(prof.weakPoints || []);
-  const [specialization, setSpecialization] = useState(false);
   const [saved, setSaved] = useState(false);
   const saveWeak = () => { saveTrainingProfile({ ...loadTrainingProfile(), weakPoints: weak }); applyToPlanner({ kind: 'weakpoints', label: 'Слабые группы (ББ): ' + (weak.join(', ') || 'нет'), data: { groups: weak } }); setSaved(true); setTimeout(() => setSaved(false), 2500); };
   const [demo, setDemo] = useState<'none' | 'female' | 'masters'>('none');
@@ -37,7 +35,6 @@ export const BbToolsCard: React.FC = () => {
   const rest = REST_BY_CHARACTER[character];
   const tut = useMemo(() => tutForSet(reps, character), [reps, character]);
   const techs = useMemo(() => techniquesFor(character === 'лёг' ? 'both' : character, level), [character, level]);
-  const wp = useMemo(() => planWeakPoints(weak, ALL_MUSCLES, level, specialization), [weak, level, specialization]);
   const demoAdj = useMemo(() => demo === 'female' ? femaleAdjust() : demo === 'masters' ? mastersAdjust(age) : null, [demo, age]);
   const demoMuscle = 'chest';
   const demoVol = useMemo(() => demoAdj ? adjustVolumeForDemographic(demoMuscle, level, demoAdj) : null, [demoAdj, level]);
@@ -97,30 +94,18 @@ export const BbToolsCard: React.FC = () => {
       </div>
 
       <div style={CARD}>
-        <div style={H}>🎯 Слабые точки / специализация</div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Отметьте отстающие группы — планер распределит объём (слабые на MAV+10%, остальные на MEV при специализации).</div>
+        <div style={H}>🎯 Слабые группы (профиль)</div>
+        <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Отметьте отстающие группы — планер даст им приоритет в объёме (+MAV, ↓RIR).</div>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
           {ALL_MUSCLES.map(m => {
             const on = weak.includes(m);
             return <button key={m} onClick={() => toggleWeak(m)} style={{ padding: '6px 10px', borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: on ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: on ? '#00e68a' : DIM }}>{MUSCLE_RU[m]}</button>;
           })}
         </div>
-        <label style={{ fontSize: 10, color: DIM, display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
-          <input type="checkbox" checked={specialization} onChange={e => setSpecialization(e.target.checked)} /> Блок специализации (топ-2 слабые на MAV+10%, остальное MEV)
-        </label>
-        {weak.length > 0 && (
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT, marginBottom: 4 }}>План объёма:</div>
-            {Object.entries(wp.volumeMap).map(([m, v]) => (
-              <div key={m} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, padding: '3px 0', fontSize: 10, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ color: '#fff' }}>{MUSCLE_RU[m] || m}</span>
-                <span style={{ color: DIM }}>{v.source}</span>
-                <span style={{ color: ACCENT, fontWeight: 700 }}>{v.sets} сет/нед</span>
-              </div>
-            ))}
-            <div style={{ fontSize: 9, color: DIM, marginTop: 4 }}>{wp.rationale.slice(0, 2).join(' · ')}</div>
-          </div>
-        )}
+        <div style={{ marginTop: 6, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+          <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>Слабые группы сохраняются в профиль и используются ББ-планировщиком и ручным конструктором.</div>
+          <button onClick={saveWeak} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>{saved ? '✓ Слабые группы сохранены' : '💾 Сохранить слабые группы в профиль'}</button>
+        </div>
       </div>
 
       <div style={CARD}>
@@ -148,10 +133,7 @@ export const BbToolsCard: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ marginTop: 6, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>🔗 Слабые группы из этого расчёта используются ББ-планировщиком и ручным конструктором. Сохраните — планеры дадут им приоритет (+MAV, ↓RIR).</div>
-        <button onClick={saveWeak} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>{saved ? '✓ Слабые группы сохранены' : '💾 Сохранить слабые группы в профиль'}</button>
-      </div>
+
     </div>
   );
 };

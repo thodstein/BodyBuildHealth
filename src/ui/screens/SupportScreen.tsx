@@ -58,7 +58,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'plan' | 'reports';
-type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'dose' | 'synergy_calc' | 'timing' | 'research' | 'favorites' | 'protocols' | 'biostack' | 'diary' | 'bioavailability';
+type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'calc_tools' | 'dose' | 'synergy_calc' | 'timing' | 'research' | 'favorites' | 'protocols' | 'biostack' | 'diary' | 'bioavailability';
 
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { PopupBool, PopupNumber, PopupSelect } from '../components/PopupXxx';
@@ -753,6 +753,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [favRefresh, setFavRefresh] = useState(0);
   const [favTab, setFavTab] = useState<string>('favorites');
   const [combinedFavDiaryTab, setCombinedFavDiaryTab] = useState<'favorites'|'diary'>('favorites');
+  const [calcToolsTab, setCalcToolsTab] = useState<'bioavailability'|'dose'|'synergy_calc'|'timing'>('bioavailability');
   const [showSavedPicker, setShowSavedPicker] = useState(false);
   const [researchSource, setResearchSource] = useState<'pubmed' | 'pubchem' | 'scholar' | 'fda' | 'pharma'>('pubmed');
   const [pubchemResults, setPubchemResults] = useState<any[]>([]);
@@ -3095,7 +3096,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['dose','🧮 Расчёт дозы'],['synergy_calc','🧬 Калькулятор синергии'],['timing','⏰ Тайминг-планировщик'],['research','Исследования'],['favorites','⭐ Избранное · Дневник'],['bioavailability','🧬 Биодоступность']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['calc_tools','🧮 Расчёты выбора препаратов'],['bioavailability','🧬 Биодоступность'],['research','Исследования'],['favorites','⭐ Избранное · Дневник']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 if (id === 'peptides') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); }
                 else { setTab('main'); setSupportView('calc'); setCalcView('info'); setSection('home'); setInfoView(id as InfoView); }
@@ -3156,6 +3157,11 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
       {renderView(infoView, 'timing', () =>
         <SupportTimingPlanner />
       )}
+            {renderView(infoView, 'bioavailability', () =>
+              <div style={{ padding: '0 4px' }}>
+                <SupportBioavailability s={s} />
+              </div>
+            )}
       {renderView(infoView, 'research', () =>
         <SupportResearch s={s} />
       )}
@@ -3164,9 +3170,24 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
                 <BioStackAIScreen />
               </div>
             )}
-            {renderView(infoView, 'bioavailability', () =>
-              <div style={{ padding: '0 4px' }}>
-                <SupportBioavailability s={s} />
+            {renderView(infoView, 'calc_tools', () =>
+              <div>
+                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
+                  {[['bioavailability','🧬 Биодоступность'],['dose','🧮 Расчёт дозы'],['synergy_calc','🧬 Калькулятор синергии'],['timing','⏰ Тайминг-планировщик']].map(([id,label]:any) => (
+                    <button key={id} onClick={() => setCalcToolsTab(id as any)} style={{
+                      padding:'6px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                      background: calcToolsTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
+                      color: calcToolsTab === id ? '#000' : 'var(--text-dim)',
+                      border: '1px solid ' + (calcToolsTab === id ? 'var(--accent)' : 'var(--border)'),
+                    }}>{label}</button>
+                  ))}
+                </div>
+                <div style={{ padding: '0 4px' }}>
+                  {calcToolsTab === 'bioavailability' && <SupportBioavailability s={s} />}
+                  {calcToolsTab === 'dose' && <SupportEffectiveDose />}
+                  {calcToolsTab === 'synergy_calc' && <UnifiedSynergyCalculator s={s} />}
+                  {calcToolsTab === 'timing' && <SupportTimingPlanner />}
+                </div>
               </div>
             )}
 

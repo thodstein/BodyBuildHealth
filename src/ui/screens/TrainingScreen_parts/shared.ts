@@ -43,11 +43,12 @@ export const PHASE_HINTS: Record<string, string> = {
  *  Актуальная 5-зонная группировка — в nav.ts (ZONES). */
 export type TrainingTab =
   | 'constructor' | 'runtime' | 'exercises' | 'exercise_lab' | 'calculators' | 'diary' | 'cycles' | 'history'
+  | 'tonnage' | 'health_calc'
   | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress' | 'mytraining'
   | 'reports' | 'srcbb' | 'volume' | 'library' | 'powerlifting' | 'bodybuilding'
   | 'calc_quality' | 'calc_1rm' | 'import_data' | 'pl_norms' | 'pl_pro' | 'rel_strength' | 'calendar' | 'mixes' | 'periodization_designer' | 'deload_scheduler' | 'meso_progression'
   | 'calc_taper' | 'calc_fatigue' | 'calc_vbt' | 'calc_plates' | 'calc_mrv'
-  | 'tempo' | 'meso_tracker' | 'specialization' | 'peaking' | 'conjugate' | 'mmc_tracking'
+  | 'tempo' | 'meso_tracker' | 'specialization' | 'peaking' | 'mmc_tracking'
   | 'checkin' | 'strength' | 'bb_tools' | 'pl_weakpoints' | 'load_safety' | 'split_gen' | 'goals' | 'pri_reppat' | 'insights'
   | 'strength_analysis' | 'load_management' | 'diagnostics' | 'periodization_hub'
   | 'training_mix_hub';
@@ -83,7 +84,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   meso_tracker: '📈 Трекер мезоциклов',
   specialization: '🎯 Специализация',
   peaking: '📈 Пик-протоколы',
-  conjugate: '🔁 Конъюгат (Westside)',
+
   mmc_tracking: '🔄 MMC/Пампинг/Суставы',
   checkin: '📋 Чек-ин метрик',
   strength: '💪 Аналитика силы',
@@ -101,6 +102,8 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   diagnostics: '🔬 Диагностика',
   periodization_hub: '🔄 Периодизация',
   training_mix_hub: '🧪 Тренировочные миксы',
+  tonnage: '📦 Тоннаж калькулятор',
+  health_calc: '🏥 Калькуляторы здоровья',
 };
 
 // ══ Режим зоны «Планировщик»: ПЛ-авто / ББ-авто / Ручной сбор (сегментированный переключатель в nav.ts).

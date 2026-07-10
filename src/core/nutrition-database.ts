@@ -291,7 +291,7 @@ export function enrichFoodItemV2(f: FoodItem): FoodItem {
   };
 
   f.bioactive_compounds_100g = {
-    creatine_mg: isSuppCreatine ? 1000 : isRedMeat ? Math.round(f.protein * 10) : isFish ? Math.round(f.protein * 5) : 0,
+    creatine_mg: isSuppCreatine ? 88000 : isRedMeat ? Math.round(f.protein * 10) : isFish ? Math.round(f.protein * 5) : 0,
     beta_alanine_mg: m.BetaAlanine ?? (hasCarnosine ? 1000 : isRedMeat ? Math.round(f.protein * 3) : 0),
     taurine_mg: hasTaurine ? 1000 : isFish ? Math.round(f.protein * 2) : isRedMeat ? Math.round(f.protein * 1.5) : 0,
     lignan_mg: f.id.includes('flax') || f.id.includes('linseed') ? 300 : f.id.includes('sesame') ? 50 : f.id.includes('bread') ? 20 : 0,
@@ -2148,7 +2148,7 @@ export { RATION_TIERS };
     creatine: {
       macro_100g: { proteins_animal:0,proteins_plant:0, fats_saturated:0,fats_monounsaturated:0,fats_polyunsaturated:0, omega_3_mg:0,omega_6_mg:0, mct_oil_g:0,cholesterol_mg:0, carbs_sugar:0,insulin_index:10 },
       amino_acid_profile_100g: { leucine_mg:0,isoleucine_mg:0,valine_mg:0,lysine_mg:0,methionine_mg:0,arginine_mg:0,glutamine_mg:0,tryptophan_mg:0,phenylalanine_mg:0,threonine_mg:0,histidine_mg:0,cysteine_mg:0 },
-      bioactive_compounds_100g: { creatine_mg:1000,beta_alanine_mg:0,taurine_mg:0,lignan_mg:0,indol_3_carbinol_mg:0 },
+      bioactive_compounds_100g: { creatine_mg:88000,beta_alanine_mg:0,taurine_mg:0,lignan_mg:0,indol_3_carbinol_mg:0 },
       metabolic_flags: { atherogenic_potential:'LOW',glycation_potential:'LOW',ammonia_source_level:'LOW',heavy_metal_risk:'LOW',cns_impact:'NEUTRAL',goitrogenic_potential:'LOW',hepatoprotective:false,anabolic_potential:'MEDIUM',detox_support_level:'LOW',histamine_level:'LOW',insulin_sensitivity_impact:'POSITIVE',thyroid_support_level:'LOW' },
       bb_quality_score: 8.5,
     },

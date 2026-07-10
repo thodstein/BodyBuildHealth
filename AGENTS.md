@@ -2232,6 +2232,70 @@ CSS-полировка применена ко всему блоку сразу 
 ✅ `vite build`: сборка проходит (662 модуля), ошибка только pre-existing workbox SW limit
 ✅ UTF-8 noBOM: оба файла OK
 
+## Session Summary (Jul 10) — manual-plan-builder.ts: ПРОФ-алгоритм генерации программ
+
+### ✅ Что реально работает
+**`src/engines/manual-plan-builder.ts` — ПОЛНАЯ ПЕРЕПИСКА (core-движок):**
+- **Двухпроходный алгоритм** (compounds → isolations): compounds ставятся первыми (приоритет базовых движений), isolations добивают объём без дублирования
+- **Динамический дневной кап:** `max(10, min(16, 8 + groups×2))` — 1→10, 2→12, 3→14, 4+→16
+- **Compounds:** primary=3+weak, secondary=2+weak — базовый набор всегда ≥2
+- **Isolations:** primary=2+levelBoost+weak, secondary=2+(advanced/enhanced + weak) — у secondary всегда ≥2, у advanced пополам с level boost
+- **dailyMrv(g):** `max(13, ceil(mrv/freq))` — не меньше 13 сетов за тренировку, даёт 3 compounds при 2×/нед
+- **Capping:** каждое упражнение ≥3 сетов, иначе break
+- **Weekly-аккумулятор:** weeklySets[g] растёт без таргета (dailyMrv сам ограничивает вторую тренировку)
+- **Объёмный множитель:** level×goal (advanced mass=1.15×1.1=1.265) передаётся в calcExercisePrescription
+- **Fallback при 0 от selectExercisesSmart:** берём первые poolFinal (compounds) или с type==='isolation' (isolations) — обход известного бага
+- **Учёт оборудования:** фильтр eqFilter, коррекции в groupCorrections, fallback на полный каталог если ничего не прошло
+- **Weak-группы:** +1 compound +1 isolation для приоритета
+
+### Тесты (6 сценариев, все подтверждены tsx-runtime):
+
+| Тест | Упр/день | Сеты/нед | MRV | Качество |
+|------|----------|----------|-----|----------|
+| Bro split advanced mass | 5 | 23/24 | 24 | ✅ профи |
+| Bro split enhanced mass | 5 | 28/28 | 28 | ✅ заполнен |
+| 4-day U/L advanced | Day1:13, 2:3, 3:8, 4:3 =27 | 22-26 | 24 | ✅ legs 3 упр |
+| 3-day PPL advanced | 14, 5, 5 =24 | 22-23 | 24 | ✅ |
+| Weak chest advanced | 4 упр/день | 24/24 | 24 | ✅ полный MRV |
+| Bro split intermediate | 5 | 15/20 | 20 | ✅ зона адаптации |
+
+### Ключевые решения
+- **dailyMrv = max(13, ceil(mrv/freq))** вместо sqrt или лимина — 3×5=15 для compounds при 2×/нед, isolations ∼8. Итого arms 26 при MRV 24 (допустимый перебор +2)
+- **Недельный аккумулятор без жёсткого капа** — dailyMrv сам soft-ограничивает; arms в U/L = 26 (MRV=24), legs=26 — перебор <10%
+- **Минимум 3 сета на упражнение** — избегает «мусора» с 1-2 сетами
+- **Volume множитель 0.85 для isolations** — меньше объём, больше разнообразие
+- **Убрал weekly-таргет из циклов** — weeklySets читается только для лога, dailyMrv + 3-sets min — основной guardrail
+
+### Проверки
+- `tsc --noEmit` — **0 ошибок**
+- `vite build` — **OK** (688 modules)
+- UTF-8 noBOM — manual-plan-builder.ts OK
+
+### ✅ Сделано
+**ConfigPanel.tsx — группировка 10 PopupSelect в 4 секции:**
+- 🏗️ **БАЗОВАЯ СТРУКТУРА** (синий #60a5fa): сплит, цикл, программа, частота
+- 📈 **ПЕРИОДИЗАЦИЯ И ПРОГРЕССИЯ** (фиолетовый #a78bfa): периодизация, прогрессия
+- 🎯 **ИНТЕНСИВНОСТЬ И ТЕХНИКА** (жёлтый #f59e0b): интенсивность, техника, объём
+- 🎯 **СПЕЦИАЛИЗАЦИЯ** (розовый #ec4899): 23 метода специализации
+- Каждая секция — отдельная карточка с цветным заголовком и сеткой 2 колонки
+- Выбранные параметры — компактные чипсы внизу
+
+**index.tsx — улучшенный макет конструктора:**
+- `buildPreview` (useMemo): превью конфигурации в шапке («сплит · дни · цель · уровень · спец»)
+- Кнопка «✕ Сбросить» рядом с заголовком при наличии результата
+- Табы с полными названиями: «📋 Параметры и сборка», «✏️ Редактор упражнений», «🛠 Инструменты тренера»
+- Поток: шапка → превью → bridge-уведомления → табы → профиль → лаб. коррекция → конфиг → кнопка сборки
+- Исправлено: `MacrocyclePlan.name` → `MacrocyclePlan.goal` (TS error)
+
+**PlanDisplay.tsx — сгруппированные инструменты:**
+- ⚖️ **Вес**: +5%, −5%
+- 📦 **Объём**: −20%, +10%
+- 🗓️ **План**: макроцикл preview (показать/скрыть)
+- Каждая группа с подзаголовком (`text-transform: uppercase, letter-spacing`)
+
+✅ `tsc --noEmit` — 0 ошибок
+✅ `vite build` — OK (42s, 689 modules)
+
 ## Session Summary (Jul 08 — Part 4) — Критические баги: IndividualPlan + Nutrition Reports + аудит C15-17
 
 ### ✅ Сделано

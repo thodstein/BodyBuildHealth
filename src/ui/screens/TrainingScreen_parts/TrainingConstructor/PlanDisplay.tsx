@@ -146,15 +146,26 @@ export const PlanDisplay: React.FC<Props> = ({
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 9, fontWeight: 700, color: DIM, alignSelf: 'center' }}>⚡ Масс-правка:</span>
-        <button onClick={() => massEditWeight(5)} style={massBtnStyle(ACCENT)}>+5% вес</button>
-        <button onClick={() => massEditWeight(-5)} style={massBtnStyle(ACCENT)}>−5% вес</button>
-        <button onClick={() => massEditVolume(-20)} style={massBtnStyle('#ef4444')}>−20% объём</button>
-        <button onClick={() => massEditVolume(10)} style={massBtnStyle(ACCENT)}>+10% объём</button>
-        <button onClick={() => setShowMacroPreview(v => !v)} style={massBtnStyle('#a855f7')}>
-          {showMacroPreview ? '▲ Скрыть' : '📅 Макроцикл'}
-        </button>
+      {/* ─── ИНСТРУМЕНТЫ (сгруппированы) ─── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+
+        {/* НАГРУЗКА */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.03em', textTransform: 'uppercase', minWidth: 40 }}>⚖️ Вес</span>
+          <button onClick={() => massEditWeight(5)} style={massBtnStyle(ACCENT)}>+5%</button>
+          <button onClick={() => massEditWeight(-5)} style={massBtnStyle(ACCENT)}>−5%</button>
+          <span style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.03em', textTransform: 'uppercase', marginLeft: 6, minWidth: 40 }}>📦 Объём</span>
+          <button onClick={() => massEditVolume(-20)} style={massBtnStyle('#ef4444')}>−20%</button>
+          <button onClick={() => massEditVolume(10)} style={massBtnStyle(ACCENT)}>+10%</button>
+        </div>
+
+        {/* ПЛАНИРОВАНИЕ */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.03em', textTransform: 'uppercase', minWidth: 40 }}>🗓️ План</span>
+          <button onClick={() => setShowMacroPreview(v => !v)} style={massBtnStyle('#a855f7')}>
+            {showMacroPreview ? '▲ Скрыть макроцикл' : '📅 Макроцикл'}
+          </button>
+        </div>
       </div>
 
       {showMacroPreview && <MacroPreview result={result} mesoLength={mesoLength} level={level} />}

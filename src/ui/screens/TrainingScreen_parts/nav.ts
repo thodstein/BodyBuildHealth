@@ -50,13 +50,13 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     tabs: [
       'strength_analysis', 'load_management', 'diagnostics', 'periodization_hub',
       'exercise_lab', 'bb_tools', 'load_safety', 'split_gen', 'pri_reppat',
-      'calc_plates', 'calc_quality', 'volume', 'conjugate', 'pl_pro',
-      'training_mix_hub',
+      'calc_plates', 'calc_quality', 'volume', 'pl_pro',
+      'training_mix_hub', 'tonnage', 'health_calc',
     ],
     categories: [
       { label: 'Унифицированные', icon: '🧠', tabs: ['strength_analysis', 'load_management', 'diagnostics', 'periodization_hub', 'exercise_lab'] },
-      { label: 'Инструменты', icon: '🛠️', tabs: ['bb_tools', 'load_safety', 'split_gen', 'pri_reppat', 'calc_plates', 'calc_quality', 'volume', 'conjugate', 'pl_pro'] },
-      { label: 'Прочее', icon: '📋', tabs: ['training_mix_hub'] },
+      { label: 'Инструменты', icon: '🛠️', tabs: ['bb_tools', 'load_safety', 'split_gen', 'pri_reppat', 'calc_plates', 'calc_quality', 'volume', 'pl_pro', 'tonnage'] },
+      { label: 'Прочее', icon: '📋', tabs: ['training_mix_hub', 'health_calc'] },
     ],
   },
   library: {

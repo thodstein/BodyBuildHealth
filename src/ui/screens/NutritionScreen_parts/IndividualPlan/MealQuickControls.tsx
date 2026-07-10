@@ -4,6 +4,7 @@ import { FOOD_DB } from "../../../../core/nutrition-database";
 import { getRecipesByMeal } from "../../../../engines/nutrition-periodization.engine";
 import {
   scoreFoodsForKBJU, getMealKBJUTarget, getMealCurrentKBJU, parseServingSizeGrams,
+  buildSupplementPortions, getSupplementDose,
   type KbjuMatchResult, type AdvancedFilter,
 } from "../../../../engines/kbju-food-match.engine";
 import { scoreFoodsWithGapPriority, type GapAwareScore } from "../../../../engines/composer-targeting-integration";
@@ -80,6 +81,10 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
     searchQuery?: string;
     searchResults?: any[];
     scoredResults?: KbjuMatchResult[];
+    suppResults?: {
+      id: string; name: string; category: string; servingSize: string;
+      kcal: number; protein: number; fat: number; carbs: number; fiber: number; doseG: number;
+    }[];
     editWeight?: number;
   } | null>(null);
 
@@ -159,7 +164,7 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
       const itemFood = FOOD_DB.find((f: any) => f.id === item.id) || FOOD_DB.find((f: any) => f.name === item.name);
       const itemCategory = itemFood?.category || '';
       const CATEGORY_CLUSTERS: Record<string, string[]> = {
-        protein: ['protein', 'dairy', 'supplement'],
+        protein: ['protein', 'dairy'],
         dairy: ['dairy', 'protein', 'fat'],
         grain: ['grain', 'carb', 'veg_fruit'],
         carb: ['carb', 'grain', 'veg_fruit'],
@@ -170,15 +175,18 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
         other: ['other', 'grain', 'fat'],
       };
       const clusters = CATEGORY_CLUSTERS[itemCategory as string] || [itemCategory];
-      let raw = FOOD_DB.filter((f: any) => clusters.includes(f.category) && f.id !== item.id);
-      if (raw.length < 5) raw = FOOD_DB.filter((f: any) => f.id !== item.id);
+      let raw = FOOD_DB.filter((f: any) => clusters.includes(f.category) && f.id !== item.id && f.category !== 'supplement');
+      if (raw.length < 5) raw = FOOD_DB.filter((f: any) => f.id !== item.id && f.category !== 'supplement');
       let scored: any[];
       if (mode === 'targeting' && gapResult) {
         scored = scoreFoodsWithGapPriority(raw, defaultTarget, gapResult, mealCur || undefined, advancedFilter, 15, 0.4);
       } else {
         scored = scoreFoodsForKBJU(raw, defaultTarget, mealCur || undefined, mode === 'advanced' ? advancedFilter : undefined, 15);
       }
-      setPopup({ ...p, step: 'select_replacement', scoredResults: scored });
+      const suppPortions = buildSupplementPortions()
+        .filter(s => s.id !== item.id)
+        .map(s => ({ ...s, matchScore: 70, label: 'Хорошо', color: '#22c55e' }));
+      setPopup({ ...p, step: 'select_replacement', scoredResults: scored, suppResults: suppPortions });
       return;
     }
     if (p.mode === 'edit_weight') {
@@ -186,6 +194,28 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
       setPopup({ ...p, step: 'enter_weight', editWeight: item?.amount || 100 });
       return;
     }
+    closePopup();
+  };
+
+  const doReplaceSupplement = (supp: any) => {
+    if (!popup || popup.selectedMealIdx === undefined || popup.selectedItemIdx === undefined) return;
+    saveUndo();
+    const mealIdx = popup.selectedMealIdx;
+    const itemIdx = popup.selectedItemIdx;
+    setDayPlan((prev: any) => {
+      if (!prev) return prev;
+      const meals2 = prev.meals.map((m: any, mi: number) => {
+        if (mi !== mealIdx) return m;
+        const items = m.items.map((it: any, ii: number) => {
+          if (ii !== itemIdx) return it;
+          return { ...it, name: '💊 ' + supp.name, id: supp.id, kcal: Math.round(supp.kcal || 0), p: Math.round(supp.protein || 0), f: Math.round(supp.fat || 0), c: Math.round(supp.carbs || 0), amount: Math.round(supp.doseG || 30) };
+        });
+        const totals = { kcal: items.reduce((s: number, x: any) => s + x.kcal, 0), p: items.reduce((s: number, x: any) => s + x.p, 0), f: items.reduce((s: number, x: any) => s + x.f, 0), c: items.reduce((s: number, x: any) => s + x.c, 0) };
+        return { ...m, items, totals };
+      });
+      const totals = { kcal: meals2.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals2.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals2.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals2.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0) };
+      return { ...prev, meals: meals2, totals };
+    });
     closePopup();
   };
 
@@ -414,6 +444,12 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
               {mode !== 'basic' && <span style={{ color: '#a78bfa', fontWeight: 600, marginLeft: 4 }}>(скор по качеству)</span>}
             </div>
             <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {/* 🍽 Продукты */}
+              {(popup.scoredResults || []).length > 0 && (
+                <div style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.5)', padding: '6px 4px 2px', letterSpacing: 0.5 }}>
+                  🍽 Продукты
+                </div>
+              )}
               {(popup.scoredResults || []).length > 0 ? (
                 (popup.scoredResults || []).map((r: any, ri: number) => (
                   <button key={r.foodId || ri} onClick={() => doReplaceProduct(FOOD_DB.find((f: any) => f.id === r.foodId) || r)}
@@ -457,6 +493,37 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', textAlign: 'center', padding: 12 }}>
                   Нет подходящих замен в этой категории
                 </div>
+              )}
+              {/* 💊 Добавки */}
+              {popup.suppResults && popup.suppResults.length > 0 && (
+                <>
+                  <div style={{ fontSize: 8, fontWeight: 700, color: '#a78bfa', padding: '10px 4px 2px', letterSpacing: 0.5, borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 4 }}>
+                    💊 Добавки с фиксированной дозой
+                  </div>
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', padding: '0 4px 4px' }}>
+                    Выберите, чтобы заменить продукт на стандартную порцию
+                  </div>
+                  {popup.suppResults.map((s: any, si: number) => (
+                    <button key={s.id || si} onClick={() => doReplaceSupplement(s)}
+                      style={{ ...productBtn, padding: '8px 10px', borderLeft: '2px solid rgba(167,139,250,0.3)' }}
+                      onMouseEnter={e => (e.target as HTMLElement).style.borderColor = 'rgba(167,139,250,0.3)'}
+                      onMouseLeave={e => (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ fontWeight: 700, fontSize: 9 }}>💊 {s.name}</span>
+                            <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 4, background: 'rgba(34,197,94,0.15)', color: '#22c55e', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                              {s.doseG} г
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                            {Math.round(s.kcal)} ккал · Б{s.protein} Ж{s.fat} У{s.carbs} за порцию ({s.servingSize})
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </>
               )}
             </div>
             <button onClick={closePopup} style={{

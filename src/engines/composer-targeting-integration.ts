@@ -130,7 +130,12 @@ export function scoreFoodsWithGapPriority(
   const baseResults = foods.map(f => calcKbjuMatchScore(f, target, currentKbju));
   const gaps = gapResult?.gaps || [];
 
-  let results: GapAwareScore[] = baseResults.map(r => {
+  let results: GapAwareScore[] = baseResults
+    .filter(r => {
+      const f = FOOD_DB.find(f => f.id === r.foodId);
+      return f && f.category !== 'supplement';
+    })
+    .map(r => {
     const food = FOOD_DB.find(f => f.id === r.foodId);
     const coverage = food ? getGapCoverageForFood(food, gaps) : { covered: 0, total: 0, nutrients: [], pct: 0 };
     const gapEff = food ? calcGapEfficiency(food, gaps) : 0;
@@ -209,7 +214,7 @@ export function getGapAwareComboResult(
   const deficitGaps = gapResult.gaps.filter(g => g.deficit > 0 && g.percentCovered < 50);
   if (deficitGaps.length === 0) return { gaps: gapResult, suggestions: [] };
 
-  const scored = FOOD_DB.map(food => {
+  const scored = FOOD_DB.filter(f => f.category !== 'supplement').map(food => {
     const coverage = getGapCoverageForFood(food, deficitGaps);
     const eff = calcGapEfficiency(food, deficitGaps);
 

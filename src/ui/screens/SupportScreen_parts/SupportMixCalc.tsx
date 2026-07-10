@@ -344,7 +344,7 @@ export const SupportMixCalc: React.FC<{ s: Record<string, any> }> = ({ s }) => {
                     <button onClick={()=>{
                       const entry={goal:mixGoal,timing:mixTiming,type:mixWorkoutType,tod:mixTimeOfDay,score:score.compositeScore,label:score.label,date:new Date().toLocaleDateString('ru-RU')};
                       const updated=[...mixHistory,entry].slice(-20);setMixHistory(updated);
-                      localStorage.setItem('he_training_mixes',JSON.stringify(updated));
+                      localStorage.setItem('he_support_mixes',JSON.stringify(updated));
                     }} style={{flex:1,padding:'4px',borderRadius:6,cursor:'pointer',fontSize:8,fontWeight:600,background:'rgba(139,92,246,0.08)',border:'1px solid rgba(139,92,246,0.15)',color:'#a78bfa'}}>💾 Сохранить тайминг</button>
                     <button onClick={()=>{
                       const kit = {
@@ -410,7 +410,7 @@ export const SupportMixCalc: React.FC<{ s: Record<string, any> }> = ({ s }) => {
                       setPlanSaved('✅ Микс добавлен в план поддержки');
                       setTimeout(() => setPlanSaved(''), 3000);
                     }} style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',fontSize:8,fontWeight:600,background:'rgba(255,183,77,0.08)',border:'1px solid rgba(255,183,77,0.15)',color:'#ffb74d',marginLeft:4}}>➕ План подд.</button>
-                    {mixHistory.length>0&&<button onClick={()=>{setMixHistory([]);localStorage.setItem('he_training_mixes','[]')}} style={{padding:'4px 8px',borderRadius:6,cursor:'pointer',fontSize:8,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.1)',color:'#ef4444'}}>✕</button>}
+                    {mixHistory.length>0&&<button onClick={()=>{setMixHistory([]);localStorage.setItem('he_support_mixes','[]')}} style={{padding:'4px 8px',borderRadius:6,cursor:'pointer',fontSize:8,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.1)',color:'#ef4444'}}>✕</button>}
                   </div>
 
                   <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
@@ -951,7 +951,7 @@ export const SupportMixCalc: React.FC<{ s: Record<string, any> }> = ({ s }) => {
               <div className="card" style={{ padding:10, marginTop:8 }}>
                 <div style={{ fontSize:10, fontWeight:700, color:'#8b5cf6', marginBottom:6, display:'flex', justifyContent:'space-between' }}>
                   <span>📂 История миксов ({mixHistory.length})</span>
-                  <button onClick={()=>{setMixHistory([]);localStorage.setItem('he_training_mixes','[]')}} style={{fontSize:7,color:'#ef4444',background:'none',border:'none',cursor:'pointer'}}>✕ очистить</button>
+                  <button onClick={()=>{setMixHistory([]);localStorage.setItem('he_support_mixes','[]')}} style={{fontSize:7,color:'#ef4444',background:'none',border:'none',cursor:'pointer'}}>✕ очистить</button>
                 </div>
                 {mixHistory.slice(-5).reverse().map((h:any,i:number)=>(
                   <div key={i} style={{padding:'6px 8px',borderRadius:6,marginBottom:3,background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.04)',fontSize:8}}>
