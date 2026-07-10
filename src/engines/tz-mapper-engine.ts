@@ -737,31 +737,6 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
     }
   }
 
-  // ─── СИМПТОМ-ЗАВИСИМЫЕ ПРЕПАРАТЫ (по отметкам пользователя) ───
-  const symptoms = ctx.symptoms || [];
-  if (symptoms.includes('gynecomastia') && !seen.has('tamoxifen')) {
-    add('tamoxifen', 'Tamoxifen 20 мг — ⚠ ТОЛЬКО ПРИ ГИНО (симптом: гинекомастия)', 'Симптом: гино', 'pharma');
-  }
-  if (symptoms.includes('prostate_symptoms') && !seen.has('saw_palmetto')) {
-    add('saw_palmetto', 'Saw Palmetto 320 мг — ⚠ ДГПЖ симптомы (частое мочеиспускание, слабая струя)', 'Симптом: простата', 'pharma');
-  }
-  if (symptoms.includes('insomnia') && !seen.has('melatonin')) {
-    add('melatonin', 'Melatonin 0.3-1 мг — сон (симптом: бессонница)', 'Симптом: сон', 'other');
-    if (!seen.has('glycine')) add('glycine', 'Glycine 3 г — сон (симптом: бессонница)', 'Симптом: сон', 'amino');
-  }
-  if (symptoms.includes('anxiety') && !seen.has('theanine')) {
-    add('theanine', 'L-Theanine 200 мг — ↓ тревога (симптом: тревога/раздражительность)', 'Симптом: тревога', 'amino');
-  }
-  if (symptoms.includes('low_libido') && !seen.has('tadalafil')) {
-    // tadalafil уже в базе, но при low_libido — ↑ до 10 мг on-demand
-  }
-  if (symptoms.includes('hair_loss') && !seen.has('saw_palmetto')) {
-    add('saw_palmetto', 'Saw Palmetto 320 мг — 5α-редуктаза (симптом: облысение)', 'Симптом: волосы', 'pharma');
-  }
-  if (symptoms.includes('joint_pain')) {
-    // Суставы — через кнопку «Усилить», не в авто-протокол
-  }
-
   // ─── GH (somatropin) — ИНДУСИРОРЕЗИСТЕНТНОСТЬ + BP ───
   if (flags.hasGH) {
     const ghP = peds.find(p => p.pClass === 'gh');
@@ -823,6 +798,44 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
   return result;
 }
 
+// ──────────────────────────────────────────────────────────────────
+//  СИМПТОМ-ЗАВИСИМЫЕ ПРЕПАРАТЫ (работают БЕЗ PED — отдельная функция)
+//  Вызывается из buildRecommendation, а не из computeProtocol,
+//  т.к. computeProtocol имеет early return при peds.length === 0.
+// ──────────────────────────────────────────────────────────────────
+function computeSymptomDrugs(ctx: MapperCtx): PhaseAssignedDrug[] {
+  const symptoms = ctx.symptoms || [];
+  if (symptoms.length === 0) return [];
+  const result: PhaseAssignedDrug[] = [];
+  const seen = new Set<string>();
+  const add = (id: string, reason: string, trigger: string, category: TzCategory) => {
+    const key = id.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.push({ substanceId: id, reason, trigger, category });
+  };
+  if (symptoms.includes('gynecomastia')) {
+    add('tamoxifen', 'Tamoxifen 20 мг — ⚠ ТОЛЬКО ПРИ ГИНО (симптом: гинекомастия)', 'Симптом: гино', 'pharma');
+  }
+  if (symptoms.includes('prostate_symptoms')) {
+    add('saw_palmetto', 'Saw Palmetto 320 мг — ⚠ ДГПЖ симптомы (частое мочеиспускание, слабая струя)', 'Симптом: простата', 'pharma');
+  }
+  if (symptoms.includes('insomnia')) {
+    add('melatonin', 'Melatonin 0.3-1 мг — сон (симптом: бессонница)', 'Симптом: сон', 'other');
+    add('glycine', 'Glycine 3 г — сон (симптом: бессонница)', 'Симптом: сон', 'amino');
+  }
+  if (symptoms.includes('anxiety')) {
+    add('theanine', 'L-Theanine 200 мг — ↓ тревога (симптом: тревога/раздражительность)', 'Симптом: тревога', 'amino');
+  }
+  if (symptoms.includes('hair_loss')) {
+    add('saw_palmetto', 'Saw Palmetto 320 мг — 5α-редуктаза (симптом: облысение)', 'Симптом: волосы', 'pharma');
+  }
+  if (symptoms.includes('low_libido')) {
+    add('tadalafil', 'Tadalafil 5-10 мг — либидо (симптом: ↓ либидо, on-demand 10 мг)', 'Симптом: либидо', 'pharma');
+  }
+  return result;
+}
+
 function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
   // ── 1. активировать мехи ─
   const activated = getActivatedTzMechs(ctx.labs);
@@ -843,6 +856,13 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
   for (const pd of protocolAll) {
     subs.push({ substanceId: pd.substanceId, category: pd.category, k: 0.5, q: 'A', reason: pd.reason, mechsCovered: [], priority: 1 });
     phaseDrugs.push(pd);
+  }
+  // ── 3a. симптом-зависимые препараты (работают БЕЗ PED) ─
+  const symptomDrugs = computeSymptomDrugs(ctx);
+  for (const sd of symptomDrugs) {
+    if (subs.some(s => canonId(s.substanceId) === canonId(sd.substanceId))) continue;
+    subs.push({ substanceId: sd.substanceId, category: sd.category, k: 0.5, q: 'A', reason: sd.reason, mechsCovered: [], priority: 1 });
+    phaseDrugs.push(sd);
   }
   // ── 4. gap-filling — ТОЛЬКО если протокол пустой (нет AAS) ─
   let suppression: SuppressedSub[] = [];

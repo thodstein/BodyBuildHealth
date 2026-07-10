@@ -19,6 +19,7 @@ import { CalcSubstanceDetail, buildStackSynergyDescription } from './CalcSubstan
 import { CalcPEDCard } from './CalcPEDCard';
 import { CalcProfileCard } from './CalcProfileCard';
 import { CalcLabsCard } from './CalcLabsCard';
+import { ALL_STACKS } from '../../../data/support-stacks';
 
 // ── Утилиты отображения вещества ─────────────────────────────────────────────
 const SUB_NAME_CACHE: Record<string, string> = {};
@@ -169,6 +170,117 @@ export function buildMapperCtx(
   };
 }
 
+// ── Анализ контекста для доп. модулей (суставы/нейро/усиление) ──────────────────
+interface StackModuleAnalysis {
+  subId: string;
+  subName: string;
+  dose: string;
+  mechanism: string;
+  inPlan: boolean;
+  contextReason: string;
+  recommended: boolean;
+}
+
+function analyzeStackModule(
+  stackId: string,
+  state: CalculatorState,
+  rec: SupportRecommendation | null,
+): { analysis: StackModuleAnalysis[]; contextSummary: string } {
+  const stack = ALL_STACKS.find(s => s.id === stackId);
+  if (!stack) return { analysis: [], contextSummary: '' };
+
+  const planIds = new Set((rec?.subs || []).map(s => canonIdLocal(s.substanceId)));
+  const symptoms = (state as any).symptoms || [];
+  const labs = labSliceToValues(state.labs.fullPanel);
+  const jointPain = state.oda.jointPain;
+  const hasJointSymptom = symptoms.includes('joint_pain');
+  const crp = labs['CRP'] || labs['HSCRP'];
+  const hasNeuroSymptom = symptoms.includes('insomnia') || symptoms.includes('anxiety');
+  const sleepHours = state.profile.sleepHours || 7;
+  const stressLevel = state.profile.stressLevel || 5;
+  const aggressionScore = state.neuro.aggressionScore || 0;
+  const aasCount = state.pharma.aas.length;
+  const pedCount = (state.pharma as any).ghIU ? 1 : 0 + (state.pharma as any).insulinIU ? 1 : 0 + aasCount;
+  const hasOral17 = (state.pharma.aas || []).some((a: any) => a.form === 'oral');
+  const altVal = labs['ALT'] || labs['AST'];
+  const hctVal = labs['HEMATOCRIT'] || labs['HCT'];
+
+  let contextSummary = '';
+  if (stackId === 'articular_stack') {
+    const triggers: string[] = [];
+    if (hasJointSymptom) triggers.push('симптом: боль в суставах');
+    if (jointPain === 'severe') triggers.push('сильная боль в суставах');
+    if (jointPain === 'moderate') triggers.push('умеренная боль');
+    if (crp && crp > 3) triggers.push(`CRP ↑ (${crp})`);
+    contextSummary = triggers.length > 0
+      ? 'Показания: ' + triggers.join(', ')
+      : 'Профилактика суставов — нет активных показаний, но рекомендуется при интенсивных тренировках';
+  } else if (stackId === 'neuroprotection_stack') {
+    const triggers: string[] = [];
+    if (symptoms.includes('insomnia')) triggers.push('бессонница');
+    if (symptoms.includes('anxiety')) triggers.push('тревога');
+    if (sleepHours < 7) triggers.push(`сон ${sleepHours}ч`);
+    if (stressLevel > 7) triggers.push(`стресс ${stressLevel}/10`);
+    if (aggressionScore > 6) triggers.push('раздражительность');
+    contextSummary = triggers.length > 0
+      ? 'Показания: ' + triggers.join(', ')
+      : 'Профилактика ЦНС — нет активных показаний';
+  } else if (stackId === 'mega_total_support_35') {
+    const triggers: string[] = [];
+    if (aasCount > 0) triggers.push(`${aasCount} ААС`);
+    if (hasOral17) triggers.push('оральный 17α');
+    if ((state.pharma as any).ghIU) triggers.push('GH');
+    if ((state.pharma as any).insulinIU) triggers.push('инсулин');
+    if (pedCount > 2) triggers.push('мульти-курс');
+    const alt = altVal;
+    if (alt && alt > 40) triggers.push(`АЛТ/АСТ ↑ (${alt})`);
+    const hct = hctVal;
+    if (hct && hct > 50) triggers.push(`HCT ↑ (${hct})`);
+    contextSummary = triggers.length > 0
+      ? 'Активные риски: ' + triggers.join(', ') + ' → максимальная защита показана'
+      : 'Максимальная защита — для high-risk курсов (множество PED, оральные, лаб-отклонения)';
+  }
+
+  const analysis: StackModuleAnalysis[] = stack.substances.map(sub => {
+    const inPlan = planIds.has(canonIdLocal(sub.id));
+    let contextReason = '';
+    let recommended = false;
+
+    if (stackId === 'articular_stack') {
+      if (sub.id === 'glucosamine') { contextReason = 'Субстрат ГАГ → синтез хряща'; recommended = hasJointSymptom || jointPain !== 'none'; }
+      else if (sub.id === 'chondroitin') { contextReason = 'Защита хряща от деградации'; recommended = hasJointSymptom || jointPain !== 'none'; }
+      else if (sub.id === 'collagen') { contextReason = 'Структурный белок хряща и связок'; recommended = true; }
+      else if (sub.id === 'msm') { contextReason = 'Сера для коллагена, ↓боль'; recommended = crp != null && crp > 3; }
+      else if (sub.id === 'vitamin_c') { contextReason = 'Кофактор синтеза коллагена'; recommended = true; }
+      else contextReason = sub.mechanism;
+    } else if (stackId === 'neuroprotection_stack') {
+      if (sub.id === 'citicoline') { contextReason = 'Ацетилхолин + мембраны нейронов'; recommended = hasNeuroSymptom || aggressionScore > 6; }
+      else if (sub.id === 'lions_mane') { contextReason = 'NGF — рост нейронов'; recommended = hasNeuroSymptom; }
+      else if (sub.id === 'magnesium_l_threonate') { contextReason = 'Mg через ГЭБ — ↓NMDA, сон'; recommended = symptoms.includes('insomnia') || sleepHours < 7; }
+      else if (sub.id === 'phosphatidylserine') { contextReason = '↓Кортизол — антистресс'; recommended = stressLevel > 7 || symptoms.includes('anxiety'); }
+      else contextReason = sub.mechanism;
+    } else if (stackId === 'mega_total_support_35') {
+      contextReason = sub.mechanism.slice(0, 60);
+      recommended = pedCount > 1 || hasOral17 || (altVal != null && altVal > 40) || (hctVal != null && hctVal > 50);
+    } else {
+      contextReason = sub.mechanism;
+      recommended = true;
+    }
+
+    return {
+      subId: sub.id,
+      subName: subNameRu(sub.id),
+      dose: sub.dose,
+      mechanism: sub.mechanism,
+      inPlan,
+      contextReason,
+      recommended,
+    };
+  });
+
+  return { analysis, contextSummary };
+}
+
 export interface CalcMapperProps {
   state: CalculatorState;
   onStateChange?: (next: CalculatorState) => void;
@@ -185,15 +297,13 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [showManualPopup, setShowManualPopup] = useState(false);
   const [manualSubInput, setManualSubInput] = useState('');
   const [symptoms, setSymptoms] = useState<string[]>([]);
-  const [showProfile, setShowProfile] = useState(false);
-  const [showPED, setShowPED] = useState(false);
-  const [showLabs, setShowLabs] = useState(false);
   const [showPrescription, setShowPrescription] = useState(true);
   const [showSynergy, setShowSynergy] = useState(true);
   const [corrPopup, setCorrPopup] = useState<string | null>(null);
   const [corrInput, setCorrInput] = useState('');
   const [removedSubs, setRemovedSubs] = useState<string[]>([]);
   const [addedSubs, setAddedSubs] = useState<string[]>([]);
+  const [stackModulePopup, setStackModulePopup] = useState<string | null>(null);
 
   const ctx = useMemo(() => {
     const base = buildMapperCtx(state, level, level === 'manual' ? { addSubs: manualSubs } : undefined, selectedStacks);
@@ -232,15 +342,6 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent)', marginBottom: 6 }}>
         🧬 Механизм-ориентированная модель (ТЗ-28)
       </div>
-
-      {/* ===== ПРОФИЛЬ ===== */} 
-      <CalcProfileCard state={state} onStateChange={(n) => onStateChange?.(n)} />
-
-      {/* ===== PED ===== */}
-      <CalcPEDCard state={state} onStateChange={(n) => onStateChange?.(n)} />
-
-      {/* ===== АНАЛИЗЫ ===== */}
-      <CalcLabsCard state={state} onStateChange={(n) => onStateChange?.(n)} onOpenLabs={onOpenLabs} />
 
       {/* ===== ВЫБОР РЕЖИМА (2 кнопки рядом) ===== */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
@@ -352,10 +453,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         </div>
       )}
 
-      {/* ===== ДОПОЛНИТЕЛЬНЫЕ МОДУЛИ (суставы/нейро/усиление) ===== */}
+      {/* ===== ДОПОЛНИТЕЛЬНЫЕ МОДУЛИ (анализ контекста → popup) ===== */}
       {level !== 'manual' && (
         <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:12, background:'rgba(24,24,27,0.3)', border:'1px solid rgba(255,255,255,0.04)' }}>
-          <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.3)', marginBottom:5, textTransform:'uppercase', letterSpacing:'0.3px' }}>Доп. модули</div>
+          <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.3)', marginBottom:5, textTransform:'uppercase', letterSpacing:'0.3px' }}>Доп. модули (анализ контекста)</div>
           <div style={{ display:'flex', gap:4 }}>
             {([
               ['articular_stack', '🦴', 'Суставы/Связки', '#4ade80'],
@@ -364,20 +465,76 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             ] as const).map(([id, icon, label, col]) => {
               const active = selectedStacks.includes(id);
               return (
-                <button key={id} onClick={() => setSelectedStacks(prev => active ? prev.filter(s => s !== id) : [...prev, id])}
+                <button key={id} onClick={() => setStackModulePopup(id)}
                   style={{ flex:1, padding:'7px 4px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:1,
                     background: active ? `linear-gradient(135deg,rgba(${col === '#4ade80' ? '34,197,94' : col === '#818cf8' ? '99,102,241' : '239,68,68'},0.2),rgba(${col === '#4ade80' ? '34,197,94' : col === '#818cf8' ? '99,102,241' : '239,68,68'},0.1))` : 'rgba(255,255,255,0.03)',
                     border: active ? `1.5px solid ${col}55` : '1px solid rgba(255,255,255,0.06)',
                     color: active ? col : 'rgba(255,255,255,0.5)' }}>
                   <span style={{fontSize:13}}>{icon}</span>
                   <span>{label}</span>
-                  {active && <span style={{fontSize:6,fontWeight:700,color:col,marginTop:1}}>✓</span>}
+                  {active && <span style={{fontSize:6,fontWeight:700,color:col,marginTop:1}}>✓ доб.</span>}
                 </button>
               );
             })}
           </div>
         </div>
       )}
+
+      {/* ── Попап анализа доп. модуля ── */}
+      {stackModulePopup && (() => {
+        const { analysis, contextSummary } = analyzeStackModule(stackModulePopup, state, rec);
+        const stackMeta = ALL_STACKS.find(s => s.id === stackModulePopup);
+        const iconAndColor: Record<string, { icon: string; col: string }> = {
+          articular_stack: { icon: '🦴', col: '#4ade80' },
+          neuroprotection_stack: { icon: '🧠', col: '#818cf8' },
+          mega_total_support_35: { icon: '🚀', col: '#f87171' },
+        };
+        const meta = iconAndColor[stackModulePopup] || { icon: '📦', col: '#818cf8' };
+        const alreadyActive = selectedStacks.includes(stackModulePopup);
+        const recommendedCount = analysis.filter(a => a.recommended && !a.inPlan).length;
+        return (
+          <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setStackModulePopup(null)}>
+            <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:360, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
+              <div style={{ height:3, background:`linear-gradient(90deg,${meta.col},${meta.col}88)` }} />
+              <div style={{ padding:'16px 14px 12px', overflowY:'auto' }}>
+                <div style={{ fontSize:13, fontWeight:800, color:meta.col, marginBottom:6 }}>{meta.icon} {stackMeta?.name || stackModulePopup}</div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', lineHeight:1.5, marginBottom:8 }}>{stackMeta?.problem || ''}</div>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--text)', marginBottom:4 }}>📊 Анализ контекста</div>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.5, marginBottom:10, padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                  {contextSummary || 'Нет активных показаний'}
+                </div>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--text)', marginBottom:6 }}>💊 Вещества в модуле ({analysis.length})</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:10 }}>
+                  {analysis.map((a, i) => (
+                    <div key={i} style={{ padding:'6px 8px', borderRadius:8, fontSize:8, background: a.inPlan ? 'rgba(0,230,138,0.06)' : a.recommended ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.02)', border:`1px solid ${a.inPlan ? 'rgba(0,230,138,0.15)' : a.recommended ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)'}` }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                        <span style={{ fontWeight:700, color:'var(--text)' }}>{a.subName} <span style={{ color:'rgba(255,255,255,0.4)', fontWeight:500 }}>{a.dose}</span></span>
+                        <div style={{ display:'flex', gap:3 }}>
+                          {a.inPlan && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.15)', color:'#00e68a', fontWeight:700 }}>в плане</span>}
+                          {a.recommended && !a.inPlan && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(99,102,241,0.15)', color:'#a5b4fc', fontWeight:700 }}>рекоменд.</span>}
+                          {!a.recommended && !a.inPlan && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.05)', color:'rgba(255,255,255,0.4)', fontWeight:700 }}>опц.</span>}
+                        </div>
+                      </div>
+                      <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', lineHeight:1.4 }}>{a.contextReason}</div>
+                      <div style={{ fontSize:7, color:'rgba(255,255,255,0.35)', lineHeight:1.3, marginTop:2 }}>{a.mechanism.slice(0, 80)}{a.mechanism.length > 80 ? '…' : ''}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display:'flex', gap:6 }}>
+                  <button onClick={() => setStackModulePopup(null)} style={{ flex:1, padding:'10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'var(--text)' }}>Отмена</button>
+                  <button onClick={() => {
+                    if (!alreadyActive) setSelectedStacks(prev => [...prev, stackModulePopup]);
+                    setStackModulePopup(null);
+                  }} style={{ flex:2, padding:'10px', borderRadius:10, fontSize:10, fontWeight:800, cursor:'pointer', background: alreadyActive ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg,${meta.col},${meta.col}cc)`, border:'none', color: alreadyActive ? 'var(--text-dim)' : '#000' }}>
+                    {alreadyActive ? '✓ Уже добавлен' : `Добавить модуль (${recommendedCount} рек.)`}
+                  </button>
+                </div>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', marginTop:6, textAlign:'center' }}>Модуль добавляется поверх пресета. Дубли с планом автоматически исключаются.</div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ===== КАРТОЧКА СИМПТОМОВ ===== */}
       <div style={{ margin:'6px 0', padding:'7px 9px', borderRadius:10, background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.15)' }}>
@@ -457,7 +614,31 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 <button onClick={() => { setCorrPopup('replace'); setCorrInput(''); }} style={{ flex:1, padding:'5px 4px', borderRadius:6, fontSize:7, fontWeight:600, cursor:'pointer', background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.2)', color:'#818cf8' }}>🔄 Заменить</button>
               </div>
 
-              {/* Список веществ */}
+              {/* Краткий список препаратов (compact summary) */}
+              <div style={{ marginBottom:6, padding:'6px 8px', borderRadius:8, background:'rgba(24,24,27,0.3)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.4)', marginBottom:3, textTransform:'uppercase', letterSpacing:'0.3px' }}>Список ({finalRec.subs.length})</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
+                  {finalRec.subs.map((s, i) => {
+                    const doseInfo = subDosage(s.substanceId);
+                    const titrF = finalRec.titrationFactors?.get(canonIdLocal(s.substanceId));
+                    const mg = doseInfo ? (titrF && titrF > 1 ? Math.round(doseInfo.mg * titrF) : doseInfo.mg) : null;
+                    const isTitr = !!titrF && titrF > 1;
+                    return (
+                      <span key={i} style={{
+                        fontSize:7, padding:'2px 6px', borderRadius:5, fontWeight:600,
+                        background: isTitr ? 'rgba(245,158,11,0.1)' : 'rgba(99,102,241,0.08)',
+                        border: isTitr ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(99,102,241,0.12)',
+                        color: isTitr ? '#fbbf24' : '#a5b4fc',
+                      }}>
+                        {subNameRu(s.substanceId)}{mg ? ` ${mg}мг` : ''}
+                        {isTitr && ` ↑${((titrF! - 1) * 100).toFixed(0)}%`}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Детальные карточки веществ */}
               {finalRec.subs.map((s, i) => (
                 <CalcSubstanceDetail
                   key={s.substanceId + i}
