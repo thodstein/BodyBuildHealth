@@ -13,6 +13,7 @@ import { ProgramsTab } from './ProgramsTab';
 import { MyTrainingTab } from './MyTrainingTab';
 import ExerciseLabCatalog from './ExerciseLabCatalog';
 import { PeakingProtocolsTab } from './PeakingProtocolsTab';
+import { TaperPlannerTab } from './TaperPlannerTab';
 import type { TrainingTab } from './shared';
 
 type CustomEx = { name: string; sets: number; reps: number; rir: number };
@@ -84,6 +85,11 @@ export const LibraryZone: React.FC<Props> = (p) => {
       {p.tab === 'peaking' && (
         <InfoErrorBoundary label="Пик-протоколы">
           <PeakingProtocolsTab />
+        </InfoErrorBoundary>
+      )}
+      {p.tab === 'calc_taper' && (
+        <InfoErrorBoundary label="Тапинг-методики">
+          <TaperPlannerTab />
         </InfoErrorBoundary>
       )}
       {p.tab === 'exercises' && (

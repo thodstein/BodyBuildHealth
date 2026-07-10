@@ -618,7 +618,7 @@ export const TrainingScreen: React.FC = () => {
       )}
 
       {/* ═══════════ Библиотека (зона) ═══════════ */}
-      {(tab === 'library' || tab === 'programs' || tab === 'methods' || tab === 'exercises' || tab === 'mytraining') && (
+      {(tab === 'library' || tab === 'programs' || tab === 'methods' || tab === 'peaking' || tab === 'calc_taper' || tab === 'exercises' || tab === 'mytraining') && (
         <LibraryZone
           tab={tab}
           linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts}
@@ -663,7 +663,6 @@ export const TrainingScreen: React.FC = () => {
       {tab === 'tonnage' && <InfoErrorBoundary label="Тоннаж"><TonnageCalcTab /></InfoErrorBoundary>}
 
       {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
-      {tab === 'calc_taper' && <InfoErrorBoundary label="Тапер-планер"><TaperPlannerTab /></InfoErrorBoundary>}
       {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixTab /></InfoErrorBoundary>}
       {/* ═══════════ MY TRAINING TAB ═══════════ */}
 

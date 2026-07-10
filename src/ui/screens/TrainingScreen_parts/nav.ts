@@ -51,11 +51,11 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
       'strength_analysis', 'load_management', 'diagnostics', 'periodization_hub',
       'exercise_lab', 'bb_tools', 'load_safety', 'split_gen', 'pri_reppat',
       'calc_plates', 'calc_quality', 'volume',
-      'training_mix_hub', 'tonnage', 'calc_taper',
+      'training_mix_hub', 'tonnage',
     ],
     categories: [
       { label: 'Унифицированные', icon: '🧠', tabs: ['strength_analysis', 'load_management', 'diagnostics', 'periodization_hub', 'exercise_lab'] },
-      { label: 'Инструменты', icon: '🛠️', tabs: ['bb_tools', 'load_safety', 'split_gen', 'pri_reppat', 'calc_plates', 'calc_quality', 'volume', 'tonnage', 'calc_taper'] },
+      { label: 'Инструменты', icon: '🛠️', tabs: ['bb_tools', 'load_safety', 'split_gen', 'pri_reppat', 'calc_plates', 'calc_quality', 'volume', 'tonnage'] },
       { label: 'Прочее', icon: '📋', tabs: ['training_mix_hub'] },
     ],
   },
@@ -64,7 +64,7 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     icon: '📖',
     color: '#f59e0b',
     subtitle: 'Каталог процессов: циклы, программы, методики, пик-протоколы, упражнения',
-    tabs: ['library', 'programs', 'methods', 'peaking', 'exercises', 'mytraining'],
+    tabs: ['library', 'programs', 'methods', 'peaking', 'calc_taper', 'exercises', 'mytraining'],
   },
 };
 

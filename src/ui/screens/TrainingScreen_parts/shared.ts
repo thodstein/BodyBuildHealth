@@ -75,7 +75,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   periodization_designer: '🎨 Дизайнер периодизации',
   deload_scheduler: '🧘 Планировщик делода',
   meso_progression: '📈 Прогрессия мезо',
-  calc_taper: '🔻 Тапер-планер',
+  calc_taper: '🔻 Тапинг-методики',
   calc_fatigue: '📉 Индекс усталости',
   calc_vbt: '⚡ VBT / скорость',
   calc_plates: '🧮 Калькулятор блинов',
