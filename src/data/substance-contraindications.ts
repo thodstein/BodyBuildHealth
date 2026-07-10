@@ -41,10 +41,26 @@ export const CONTRAINDICATIONS: Record<string, ContraindicationRule> = {
 
   spironolactone: {
     substanceId: 'spironolactone',
-    absolute: ['Гиперкалиемия (K⁺ >5.0)', 'ОПП/ХБП ст.4-5 (eGFR<30)', 'Болезнь Аддисона', 'Беременность'],
-    absoluteConditions: ['hyperkalemia', 'ckd_stage4_5', 'addison', 'pregnancy'],
+    absolute: ['Гиперкалиемия (K⁺ >5.0)', 'ОПП/ХБП ст.4-5 (eGFR<30)', 'Болезнь Аддисона', 'Беременность', '⛔ ААС-курс (блокатор AR + 5α-редуктаза + CYP17)'],
+    absoluteConditions: ['hyperkalemia', 'ckd_stage4_5', 'addison', 'pregnancy', 'aas_course'],
     relative: ['Пожилые (>65)', 'Сахарный диабет', 'Применение ACEi/ARBs (двойная K⁺)', 'Гинекомастия в анамнезе'],
     relativeConditions: ['elderly', 'diabetes', 'concurrent_raas', 'gynecomastia_history'],
+  },
+
+  hydrochlorothiazide: {
+    substanceId: 'hydrochlorothiazide',
+    absolute: ['Анурия', 'ХБП ст.4-5 (eGFR<30)', 'Гипокалиемия (K⁺ <3.5)', 'Гипонатриемия (Na⁺ <130)', 'Тяжёлая гипотензия (<90/60)', 'Аллергия к сульфаниламидам'],
+    absoluteConditions: ['anuria', 'ckd_stage4_5', 'hypokalemia', 'hyponatremia', 'severe_hypotension', 'sulfa_allergy'],
+    relative: ['Подагра (↑ мочевая кислота)', 'Сахарный диабет (↑ глюкоза)', 'Гиперурикемия', 'Беременность', 'Пожилые (>65)', 'Одновременный приём ACEi/ARBs'],
+    relativeConditions: ['gout', 'diabetes', 'hyperuricemia', 'pregnancy', 'elderly', 'concurrent_raas'],
+  },
+
+  indapamide: {
+    substanceId: 'indapamide',
+    absolute: ['Анурия', 'ХБП ст.4-5 (eGFR<30)', 'Тяжёлая гипокалиемия (K⁺ <3.0)', 'Печёночная энцефалопатия', 'Тяжёлая гипотензия (<90/60)', 'Аллергия к сульфаниламидам'],
+    absoluteConditions: ['anuria', 'ckd_stage4_5', 'hypokalemia', 'hepatic_encephalopathy', 'severe_hypotension', 'sulfa_allergy'],
+    relative: ['Подагра (меньше риск чем HCTZ)', 'Сахарный диабет', 'Беременность', 'Пожилые (>65)', 'Одновременный приём ACEi/ARBs'],
+    relativeConditions: ['gout', 'diabetes', 'pregnancy', 'elderly', 'concurrent_raas'],
   },
 
   metformin: {

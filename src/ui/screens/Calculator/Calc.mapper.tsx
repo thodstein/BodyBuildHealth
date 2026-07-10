@@ -14,12 +14,14 @@ import { classifyPed } from '../../../data/ped-potency-table';
 import { getSubstanceForm, type SubstanceForm } from '../../../data/substance-forms';
 import { checkInteractions, type DrugInteraction } from '../../../data/drug-interactions';
 import { getTitrationProtocol, type TitrationProtocol } from '../../../data/titration-protocols';
+import { CONTRAINDICATIONS, getContraindications, type ContraindicationRule } from '../../../data/substance-contraindications';
 import { GLASS, BADGE } from './Calc.types';
 import { CalcSubstanceDetail, buildStackSynergyDescription } from './CalcSubstanceDetail';
 import { CalcPEDCard } from './CalcPEDCard';
 import { CalcProfileCard } from './CalcProfileCard';
 import { CalcLabsCard } from './CalcLabsCard';
 import { ALL_STACKS } from '../../../data/support-stacks';
+import { CalcSubstanceManager } from './CalcSubstanceManager';
 
 // ── Утилиты отображения вещества ─────────────────────────────────────────────
 const SUB_NAME_CACHE: Record<string, string> = {};
@@ -41,7 +43,7 @@ const FALLBACK_NAMES: Record<string, string> = {
   vitamin_b6: 'B6 (P5P)', vitamin_b12: 'B12 (метил)', folate: 'Фолат (5-MTHF)',
   vitamin_c: 'Витамин C', vitamin_e: 'Витамин E', b_complex: 'B-Complex',
   nebivolol: 'Небиволол', chromium: 'Хром (пиколинат)', tamoxifen: 'Тамоксифен',
-  spironolactone: 'Спиронолактон', melatonin: 'Мелатонин', calcium: 'Кальций',
+  spironolactone: 'Спиронолактон', hydrochlorothiazide: 'Гидрохлоротиазид', indapamide: 'Индапамид', melatonin: 'Мелатонин', calcium: 'Кальций',
   metformin: 'Метформин', potassium: 'Калий', leucine: 'Лейцин',
   saw_palmetto: 'Saw Palmetto (Пальма сереноа)',
   alpha_lipoic: 'α-Липоевая', l_carnitine: 'L-Карнитин',
@@ -299,11 +301,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [showPrescription, setShowPrescription] = useState(true);
   const [showSynergy, setShowSynergy] = useState(true);
-  const [corrPopup, setCorrPopup] = useState<string | null>(null);
-  const [corrInput, setCorrInput] = useState('');
   const [removedSubs, setRemovedSubs] = useState<string[]>([]);
   const [addedSubs, setAddedSubs] = useState<string[]>([]);
+  const [substanceManagerKey, setSubstanceManagerKey] = useState(0);
   const [stackModulePopup, setStackModulePopup] = useState<string | null>(null);
+  const [applyFlash, setApplyFlash] = useState(false);
 
   const ctx = useMemo(() => {
     const base = buildMapperCtx(state, level, level === 'manual' ? { addSubs: manualSubs } : undefined, selectedStacks);
@@ -357,7 +359,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             <span style={{ fontSize:10, color:'#00e68a' }}>›</span>
           </div>
         </div>
-        <div onClick={() => setShowManualPopup(true)} style={{ borderRadius:14, background:'linear-gradient(135deg,rgba(99,102,241,0.06),rgba(59,130,246,0.03))', border:'1.5px solid rgba(99,102,241,0.15)', padding:'12px 12px 10px', cursor:'pointer' }}>
+        <div onClick={() => { if (onOpenManualPicker) onOpenManualPicker(); }} style={{ borderRadius:14, background:'linear-gradient(135deg,rgba(99,102,241,0.06),rgba(59,130,246,0.03))', border:'1.5px solid rgba(99,102,241,0.15)', padding:'12px 12px 10px', cursor:'pointer' }}>
           <div style={{ display:'flex', alignItems:'center', gap:6 }}>
             <span style={{ fontSize:16 }}>⚙️</span>
             <div style={{ flex:1 }}>
@@ -607,13 +609,6 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
           {showPrescription && (
             <>
-              {/* Кнопки ручной корректировки перед утверждением */}
-              <div style={{ display:'flex', gap:3, marginBottom:6 }}>
-                <button onClick={() => { setCorrPopup('add'); setCorrInput(''); }} style={{ flex:1, padding:'5px 4px', borderRadius:6, fontSize:7, fontWeight:600, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a' }}>➕ Добавить</button>
-                <button onClick={() => { setCorrPopup('remove'); setCorrInput(''); }} style={{ flex:1, padding:'5px 4px', borderRadius:6, fontSize:7, fontWeight:600, cursor:'pointer', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.15)', color:'#f87171' }}>➖ Удалить</button>
-                <button onClick={() => { setCorrPopup('replace'); setCorrInput(''); }} style={{ flex:1, padding:'5px 4px', borderRadius:6, fontSize:7, fontWeight:600, cursor:'pointer', background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.2)', color:'#818cf8' }}>🔄 Заменить</button>
-              </div>
-
               {/* Краткий список препаратов (compact summary) */}
               <div style={{ marginBottom:6, padding:'6px 8px', borderRadius:8, background:'rgba(24,24,27,0.3)', border:'1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.4)', marginBottom:3, textTransform:'uppercase', letterSpacing:'0.3px' }}>Список ({finalRec.subs.length})</div>
@@ -638,6 +633,21 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 </div>
               </div>
 
+              {/* ══ МЕНЕДЖЕР ПРЕПАРАТОВ (добавить/удалить/заменить) ══ */}
+              <CalcSubstanceManager
+                key={substanceManagerKey}
+                finalRec={finalRec}
+                onApplyChanges={(newSubs) => {
+                  // синхронизируем с состоянием добавления/удаления
+                  const current = finalRec.subs.map(s => s.substanceId);
+                  const toRemove = current.filter(id => !newSubs.includes(id));
+                  const toAdd = newSubs.filter(id => !current.includes(id));
+                  setRemovedSubs(toRemove);
+                  setAddedSubs(toAdd);
+                  setSubstanceManagerKey(prev => prev + 1);
+                }}
+              />
+
               {/* Детальные карточки веществ */}
               {finalRec.subs.map((s, i) => (
                 <CalcSubstanceDetail
@@ -653,32 +663,6 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               ))}
             </>
           )}
-        </div>
-      )}
-
-      {/* Попап ручной корректировки */}
-      {corrPopup && (
-        <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setCorrPopup(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'82%', maxWidth:280, borderRadius:14, background:'#1a1a1d', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden' }}>
-            <div style={{ height:2, background:'linear-gradient(90deg,#818cf8,#6366f1)' }} />
-            <div style={{ padding:14 }}>
-              <div style={{ fontSize:11, fontWeight:700, marginBottom:8 }}>
-                {corrPopup === 'add' && '➕ Добавить препарат'}
-                {corrPopup === 'remove' && '➖ Удалить препарат'}
-                {corrPopup === 'replace' && '🔄 Заменить препарат'}
-              </div>
-              <input value={corrInput} onChange={e => setCorrInput(e.target.value)} placeholder="ID препарата..." autoFocus
-                style={{ width:'100%', padding:'8px 10px', borderRadius:8, fontSize:10, background:'rgba(0,0,0,0.3)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', boxSizing:'border-box', marginBottom:6 }} />
-              <button onClick={() => {
-                const id = corrInput.trim().toLowerCase();
-                if (!id) { setCorrPopup(null); return; }
-                if (corrPopup === 'add') { setAddedSubs(prev => [...new Set([...prev, id])]); }
-                else if (corrPopup === 'remove') { setRemovedSubs(prev => [...new Set([...prev, id])]); }
-                else if (corrPopup === 'replace') { setRemovedSubs(prev => [...new Set([...prev, id])]); setAddedSubs(prev => [...new Set([...prev, id + '_alt'])]); }
-                setCorrPopup(null); setCorrInput('');
-              }} style={{ width:'100%', padding:'7px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer', background:'#818cf8', border:'none', color:'#000' }}>OK</button>
-            </div>
-          </div>
         </div>
       )}
 
@@ -751,33 +735,105 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         );
       })()}
 
-      {/* Противопоказания */}
-      {finalRec && finalRec.contraindications && finalRec.contraindications.length > 0 && (() => {
-        const abs = finalRec.contraindications.filter(c => c.severity === 'absolute');
+      {/* Противопоказания — все (каталог + правила + условия) */}
+      {finalRec && finalRec.subs.length > 0 && (() => {
+        interface FlatContra { substanceId: string; label: string; severity: 'absolute' | 'relative'; source: 'catalog' | 'rule' | 'condition'; }
+        const flat: FlatContra[] = [];
+
+        // 1) из checkContraindications (по healthConditions)
+        if (finalRec.contraindications) {
+          for (const c of finalRec.contraindications) {
+            flat.push({ substanceId: c.substanceId, label: c.message, severity: c.severity, source: 'condition' });
+          }
+        }
+
+        // 2) из SUPPORT_CATALOG_DATA.contraindications
+        for (const s of finalRec.subs) {
+          const e = SUPPORT_CATALOG_DATA[s.substanceId] || SUPPORT_CATALOG_DATA[s.substanceId.toLowerCase()] || SUPPORT_CATALOG_DATA[s.substanceId.toUpperCase()];
+          if (e?.contraindications?.length) {
+            for (const c of e.contraindications) {
+              const catKey = s.substanceId.toLowerCase();
+              // общие строки типа "Индивидуальная непереносимость" / "Беременность" — не дублируем, выводим
+              flat.push({ substanceId: s.substanceId, label: c, severity: 'relative', source: 'catalog' });
+            }
+          }
+        }
+
+        // 3) из CONTRAINDICATIONS general rules (absolute + relative)
+        for (const s of finalRec.subs) {
+          const rule = getContraindications(s.substanceId);
+          if (!rule) continue;
+          for (const abs of rule.absolute) {
+            flat.push({ substanceId: s.substanceId, label: abs, severity: 'absolute', source: 'rule' });
+          }
+          for (const rel of rule.relative) {
+            flat.push({ substanceId: s.substanceId, label: rel, severity: 'relative', source: 'rule' });
+          }
+        }
+
+        if (flat.length === 0) return null;
+
+        // дедупликация по substanceId + label
+        const deduped: FlatContra[] = [];
+        const seen = new Set<string>();
+        for (const f of flat) {
+          const key = f.substanceId.toLowerCase() + '::' + f.label;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          deduped.push(f);
+        }
+
+        // группировка по веществу
+        const grouped: Record<string, { abs: FlatContra[]; rel: FlatContra[] }> = {};
+        for (const f of deduped) {
+          const id = f.substanceId.toLowerCase();
+          if (!grouped[id]) grouped[id] = { abs: [], rel: [] };
+          if (f.severity === 'absolute') grouped[id].abs.push(f);
+          else grouped[id].rel.push(f);
+        }
+
+        const hasAbs = deduped.some(f => f.severity === 'absolute');
+        const total = deduped.length;
+
         return (
-          <div style={{ marginTop:6, padding:'6px 9px', borderRadius:8, background: abs.length ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border:'1px solid ' + (abs.length ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)') }}>
-            <div style={{ fontSize:9, fontWeight:700, color: abs.length ? '#ef4444' : '#fbbf24', marginBottom:3 }}>
-              {abs.length ? '⛔ Противопоказания' : '⚠ Осторожность'} ({finalRec.contraindications.length})
+          <div style={{ marginTop:6, padding:'6px 9px', borderRadius:8, background: hasAbs ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border:'1px solid ' + (hasAbs ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)') }}>
+            <div style={{ fontSize:9, fontWeight:700, color: hasAbs ? '#ef4444' : '#fbbf24', marginBottom:3 }}>
+              {hasAbs ? '⛔ Противопоказания' : '⚠ Осторожности'} ({total})
             </div>
-            {finalRec.contraindications.map((c, i) => (
-              <div key={i} style={{ fontSize:7, color: c.severity === 'absolute' ? '#fca5a5' : '#fbbf24', marginBottom:1, lineHeight:1.4 }}>
-                [{c.severity === 'absolute' ? '⛔' : '⚠'}] <b>{subNameRu(c.substanceId)}</b> — {c.message}
-                <div style={{ fontSize:6, opacity:0.8 }}>{c.action}</div>
-              </div>
-            ))}
+            {Object.entries(grouped).map(([id, g]) => {
+              const all = [...g.abs, ...g.rel];
+              return (
+                <div key={id} style={{ marginBottom: all.length > 0 ? 4 : 0 }}>
+                  <div style={{ fontSize:8, fontWeight:700, color:'var(--text)', marginBottom:2, marginTop:1 }}>{subNameRu(id)}</div>
+                  {g.abs.map((f, i) => (
+                    <div key={i} style={{ fontSize:7, color:'#fca5a5', marginBottom:1, lineHeight:1.4, marginLeft:6 }}>
+                      ⛔ {f.label}
+                    </div>
+                  ))}
+                  {g.rel.map((f, i) => (
+                    <div key={i} style={{ fontSize:7, color:'#fbbf24', marginBottom:1, lineHeight:1.4, marginLeft:6 }}>
+                      ⚠ {f.label}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
           </div>
         );
       })()}
 
       {/* ===== КНОПКА «ПРИМЕНИТЬ ПЛАН» ===== */}
       {finalRec && finalRec.subs.length > 0 && onApply && (
-        <button onClick={() => onApply(finalRec)} style={{
+        <button onClick={() => { onApply(finalRec); setApplyFlash(true); setTimeout(() => setApplyFlash(false), 1800); }} style={{
           width:'100%', marginTop:10, padding:'12px', borderRadius:12, fontSize:11, fontWeight:800, cursor:'pointer',
-          background:'linear-gradient(135deg,#00e68a,#00c853)', border:'none', color:'#000',
-          boxShadow:'0 4px 20px rgba(0,230,138,0.3)', display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+          background: applyFlash ? 'rgba(0,230,138,0.2)' : 'linear-gradient(135deg,#00e68a,#00c853)',
+          border: applyFlash ? '1.5px solid rgba(0,230,138,0.5)' : 'none',
+          color: applyFlash ? '#00e68a' : '#000',
+          boxShadow: applyFlash ? 'none' : '0 4px 20px rgba(0,230,138,0.3)',
+          display:'flex', alignItems:'center', justifyContent:'center', gap:6,
         }}>
-          <span style={{fontSize:14}}>✅</span>
-          <span>Применить план поддержки ({finalRec.subs.length} препаратов)</span>
+          <span style={{fontSize:14}}>{applyFlash ? '✓' : '✅'}</span>
+          <span>{applyFlash ? 'Готово' : `Применить план поддержки (${finalRec.subs.length} препаратов)`}</span>
         </button>
       )}
 

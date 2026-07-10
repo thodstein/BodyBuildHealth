@@ -731,9 +731,10 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
     if (symptoms.includes('gynecomastia')) {
       add('tamoxifen', 'Tamoxifen 20 мг — ⚠ ТОЛЬКО ПРИ ГИНО (Anadrol: AI не работает, нужен SERM)', 'Anadrol + гино', 'pharma');
     }
-    // Spironolactone — ТОЛЬКО при выраженных отёках
+    // Гидрохлоротиазид — при выраженных отёках (НЕ спиронолактон: он блокатор AR + 5α-редуктазу + CYP17)
     if (symptoms.includes('edema_severe')) {
-      add('spironolactone', 'Spironolactone 25-50 мг — ⚠ ТОЛЬКО ПРИ ВЫРАЖЕННЫХ ОТЁКАХ (через врача, ↑Aldo на Anadrol)', 'Anadrol + отёки', 'pharma');
+      add('hydrochlorothiazide', 'Гидрохлоротиазид 12.5-25 мг/утро — ⚠ через врача (отёки на Anadrol, ↓объём, мониторинг K+/Na+)', 'Anadrol + отёки', 'pharma');
+      add('potassium', 'Kалий 200 мг — ⚠ восполнение на диуретике (тиазид вымывает K+)', 'Anadrol + отёки (K+-защита)', 'mineral');
     }
   }
 
@@ -832,6 +833,18 @@ function computeSymptomDrugs(ctx: MapperCtx): PhaseAssignedDrug[] {
   }
   if (symptoms.includes('low_libido')) {
     add('tadalafil', 'Tadalafil 5-10 мг — либидо (симптом: ↓ либидо, on-demand 10 мг)', 'Симптом: либидо', 'pharma');
+  }
+  // ── Отёки ──
+  // НЕ спиронолактон ( блокатор AR + 5α-R + CYP17 — конфликт с AAS)
+  // 1-я линия: тиазидный диуретик (гидрохлоротиазид или индапамид)
+  // 2-я линия: фуросемид (коротко, при тяжёлых)
+  // + K+ восполнение (тиазиды/индапамид вымывают калий)
+  // + натуральная поддержка (dandelion, hesperidin+diosmin)
+  if (symptoms.includes('edema_severe')) {
+    add('hydrochlorothiazide', 'Гидрохлоротиазид 12.5-25 мг/утро — ⚠ через врача (отёки, ↓объём циркуляции, мониторинг K+/Na+ каждые 2 нед)', 'Симптом: отёки', 'pharma');
+    add('potassium', 'Kалий 200 мг — ⚠ восполнение на диуретике (тиазид → гипокалиемия)', 'Симптом: отёки (K+)', 'mineral');
+    add('dandelion', 'Dandelion 500 мг 2р/день — натуральный диуретик (↓задержка воды, ↑Na+ экскреция)', 'Симптом: отёки (натур.)', 'other');
+    add('hesperidin', 'Hesperidin 500 + Diosmin 450 — венотоник (↓капиллярная проницаемость, отёки ног)', 'Симптом: отёки (венотоник)', 'cardioprotector');
   }
   return result;
 }

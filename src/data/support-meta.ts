@@ -2903,6 +2903,8 @@ export const DEFAULT_DOSAGES: Record<string, SubstanceDosage> = {
   chromium: { mg: 200, timing: 'с едой (мкг)' },
   tamoxifen: { mg: 20, timing: 'утро' },
   spironolactone: { mg: 25, timing: 'утро ⚠ через врача' },
+  hydrochlorothiazide: { mg: 25, timing: 'утро ⚠ через врача (12.5-25 мг)' },
+  indapamide: { mg: 2.5, timing: 'утро ⚠ через врача (1.5-2.5 мг)' },
   melatonin: { mg: 1, timing: 'перед сном (до 3 мг)' },
   calcium: { mg: 1000, timing: 'в 2 приёма с D3+K2 (мг)' },
   metformin: { mg: 500, timing: 'после еды ⚠ через врача' },

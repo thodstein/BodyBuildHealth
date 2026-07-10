@@ -39,6 +39,12 @@ export const DRUG_INTERACTIONS: DrugInteraction[] = [
   { a: 'metformin', b: '@alcohol', severity: 'warn', reason: '↑ лактоацидоз риск', action: '⚠ ZERO или сильное ↓ алкоголя' },
   { a: 'spironolactone', b: '@nsaid', severity: 'warn', reason: 'Снижение антигипертензивного эффекта + K⁺ риск', action: '⚠ Избегать длительных НПВС' },
   { a: 'spironolactone', b: 'potassium', severity: 'block', reason: 'Гиперкалиемия', action: '⛔ Не добавлять K⁺-добавки на спиро' },
+  // ─── Тиазидные диуретики ───
+  { a: 'hydrochlorothiazide', b: '@raas', severity: 'warn', reason: 'Аддитивная гипотензия (↓↓АД), но K⁺ компенсируется (тиазид вымывает + ARB сберегает)', action: '⚠ Мониторинг АД и K⁺ каждые 2 нед. Снижение дозы может потребоваться' },
+  { a: 'hydrochlorothiazide', b: '@nsaid', severity: 'warn', reason: '↓ антигипертензивный эффект + ↑ K⁺ риск (НПВС ↓ диуретик efficacy)', action: '⚠ Избегать длительных НПВС. Краткие курсы + мониторинг АД' },
+  { a: 'hydrochlorothiazide', b: 'chromium', severity: 'monitor', reason: 'Тиазиды ↑ глюкозу → инсулинорезистентность, Cr может ↓ этот эффект', action: 'Мониторинг глюкозы натощак каждые 4 нед' },
+  { a: 'indapamide', b: '@raas', severity: 'warn', reason: 'Аддитивная гипотензия (как HCTZ), но меньше K+-потери', action: '⚠ Мониторинг АД и K⁺ каждые 2 нед' },
+  { a: 'indapamide', b: 'potassium', severity: 'monitor', reason: 'Индапамид вымывает K⁺ (меньше HCTZ, но всё же)', action: 'Мониторинг K⁺ каждые 2 нед. Калийсодержащие добавки безопасны (не блок!) — восполнение' },
   { a: 'iron_bisglycinate', b: '@tetracycline', severity: 'warn', reason: '↓ всасывание обоих', action: '⚠ Разнести на 3+ ч' },
   { a: 'iron_bisglycinate', b: '@levothyroxine', severity: 'warn', reason: '↓ T4 всасывание', action: '⚠ Разнести на 4+ ч (T4 утром iron вечером)' },
   { a: 'calcium', b: '@levothyroxine', severity: 'warn', reason: '↓ T4 всасывание', action: '⚠ Разнести на 4+ ч' },
