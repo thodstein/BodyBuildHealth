@@ -1,59 +1,14 @@
-import React, { useState } from 'react';
+/** TrainingIntelligenceDashboard.tsx — визуальная сетка карточек инструментов.
+ *  Категории с цветными заголовками, каждая карточка — иконка + название + описание.
+ *  Без коллапсов и мелких текстов: всё видно сразу, читаемо на 320px+ */
+import React from 'react';
 import type { ManualResult } from './TrainingConstructor/types';
 import type { WorkoutLog } from '../../../core/types';
+import type { TrainingTab } from './shared';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
-import { StrengthAnalysisHub } from './StrengthAnalysisHub';
-import { DiagnosticsHub } from './DiagnosticsHub';
-import { SplitGenCard } from './SplitGenCard';
-import { PlateCalcTab } from './PlateCalcTab';
-import VolumeOptimizerTab from './VolumeOptimizerTab';
-import { TonnageCalcTab } from './TonnageCalcTab';
-import { PriRepPatternCard } from './PriRepPatternCard';
-import { CalcQualityTab } from './CalcQualityTab';
-import { PeriodizationHub } from './PeriodizationHub';
-import { TrainingMixTab } from './TrainingMixTab';
-import { LoadSafetyCard } from './LoadSafetyCard';
-import ExerciseLabMerged from './ExerciseLabMerged';
 
-const DIM = 'rgba(235,235,245,0.6)';
-const SECTION_COLORS: Record<string, string> = {
-  показатели: '#3b82f6',
-  качество: '#a855f7',
-  сборки: '#22c55e',
-  периодизация: '#f59e0b',
-  подготовка: '#ec4899',
-};
-
-function SectionHeader({ icon, label, color, expanded, onToggle }: { icon: string; label: string; color: string; expanded: boolean; onToggle: () => void }) {
-  return (
-    <div onClick={onToggle} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0 4px', cursor: 'pointer', userSelect: 'none' }}>
-      <span style={{ fontSize: 14 }}>{icon}</span>
-      <span style={{ fontSize: 11, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: 0.4, flex: 1 }}>{label}</span>
-      <span style={{ fontSize: 10, color: DIM, transition: 'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'none' }}>▼</span>
-    </div>
-  );
-}
-
-function MetricBar({ label, value, max = 100, color }: { label: string; value: number; max?: number; color: string }) {
-  const pct = Math.min(100, Math.max(0, (value / max) * 100));
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-      <span style={{ fontSize: 9, color: DIM, minWidth: 52, flexShrink: 0 }}>{label}</span>
-      <div style={{ flex: 1, background: 'rgba(255,255,255,0.06)', borderRadius: 4, height: 5, overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 4, transition: 'width 0.3s' }} />
-      </div>
-      <span style={{ fontSize: 9, fontWeight: 700, color, minWidth: 30, textAlign: 'right' }}>{value}{max !== 100 ? '' : '%'}</span>
-    </div>
-  );
-}
-
-type ExpandableSection = 'показатели' | 'качество' | 'сборки' | 'периодизация' | 'подготовка';
-
-export default function TrainingIntelligenceDashboard({
-  manualResult, level, historyWorkouts, tprofile, readinessRecovery, readinessFatigue, mesoLength,
-  onBuildPlan,
-}: {
+interface Props {
   manualResult: ManualResult | null;
   level: string;
   historyWorkouts: WorkoutLog[];
@@ -62,201 +17,160 @@ export default function TrainingIntelligenceDashboard({
   readinessFatigue: number;
   mesoLength: number;
   onBuildPlan: () => void;
-}) {
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const toggle = (key: string) => setExpanded(p => ({ ...p, [key]: !p[key] }));
+  onOpenTool: (tab: TrainingTab) => void;
+}
 
+interface ToolCard {
+  icon: string;
+  label: string;
+  desc: string;
+  tab: TrainingTab;
+  badge?: { text: string; color: string };
+}
+
+type Category = {
+  icon: string;
+  label: string;
+  color: string;
+  tools: ToolCard[];
+};
+
+export default function TrainingIntelligenceDashboard(p: Props) {
   const srpe = loadSRPESessions();
   const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : null;
-  const acwrColor = acwr ? (acwr.ratio > 1.5 ? '#ef4444' : acwr.ratio > 1.3 ? '#eab308' : acwr.ratio < 0.8 ? '#3b82f6' : '#22c55e') : DIM;
   const acwrLabel = acwr ? (acwr.ratio > 1.5 ? 'опасно' : acwr.ratio > 1.3 ? 'осторожно' : acwr.ratio < 0.8 ? 'недотрен' : 'оптимум') : '—';
+  const acwrColor = acwr ? (acwr.ratio > 1.5 ? '#ef4444' : acwr.ratio > 1.3 ? '#eab308' : acwr.ratio < 0.8 ? '#3b82f6' : '#22c55e') : '#888';
 
-  // Estimate some 1RMs from historyWorkouts
-  const latest1RM: Record<string, number> = {};
-  historyWorkouts.slice(-50).forEach(w => {
-    (w.exercises || []).forEach((e: any) => {
-      const est = e.weight && e.reps ? e.weight * (1 + (e.reps || 0) / 30) : 0;
-      if (est > (latest1RM[e.name] || 0)) latest1RM[e.name] = Math.round(est);
-    });
-  });
+  const categories: Category[] = [
+    {
+      icon: '📊', label: 'Показатели', color: '#3b82f6',
+      tools: [
+        { icon: '🏋️', label: 'Сила', desc: '1RM, VBT, нормативы, относительная сила, аналитика', tab: 'strength_analysis',
+          badge: acwr ? { text: `ACWR ${acwr.ratio.toFixed(1)}`, color: acwrColor } : undefined },
+        { icon: '📈', label: 'Нагрузка', desc: 'sRPE, ACWR, монотонность, усталость, готовность', tab: 'load_management',
+          badge: { text: `${p.readinessRecovery}%`, color: p.readinessRecovery >= 70 ? '#22c55e' : '#eab308' } },
+      ],
+    },
+    {
+      icon: '🎯', label: 'Качество и диагностика', color: '#a855f7',
+      tools: [
+        { icon: '⭐', label: 'Качество программы', desc: 'Оценка плана, MRV, рекомендации', tab: 'calc_quality' },
+        { icon: '🔬', label: 'Диагностика', desc: 'Анализ плана, слабые места, погрешности', tab: 'diagnostics' },
+      ],
+    },
+    {
+      icon: '🛠', label: 'Инструменты сборки', color: '#22c55e',
+      tools: [
+        { icon: '🧩', label: 'Генератор сплитов', desc: '9 типов сплитов под цель и уровень', tab: 'split_gen' },
+        { icon: '🏋️', label: 'Лаборатория упражнений', desc: 'Каталог, биомеханика, подбор по группе', tab: 'exercise_lab' },
+        { icon: '⚖️', label: 'Тоннаж и КПШ', desc: 'Калькулятор нагрузки, УОИ, интенсивность', tab: 'tonnage' },
+        { icon: '🔄', label: 'PRI и схема повторов', desc: 'Готовность, RIR, паттерн, сложность', tab: 'pri_reppat' },
+        { icon: '🥞', label: 'Калькулятор блинов', desc: 'Гриф, блины, %1RM, разминка', tab: 'calc_plates' },
+        { icon: '📐', label: 'Расчёт объёма', desc: 'MEV/MAV/MRV, оптимизация по группам', tab: 'volume' },
+      ],
+    },
+    {
+      icon: '⚕', label: 'Периодизация', color: '#f59e0b',
+      tools: [
+        { icon: '📅', label: 'Фазы и циклы', desc: 'Дизайнер периодизации, делод, прогрессия', tab: 'periodization_hub' },
+        { icon: '🫀', label: 'Нагрузка и безопасность', desc: 'Кардио, ортопедия, распределение недели', tab: 'load_safety' },
+      ],
+    },
+    {
+      icon: '💊', label: 'Подготовка к тренировке', color: '#ec4899',
+      tools: [
+        { icon: '🧪', label: 'Тренировочные миксы', desc: 'Пресеты составов pre/intra/post, синергия веществ', tab: 'training_mix_hub' },
+      ],
+    },
+  ];
 
-  const sectionStyle: React.CSSProperties = {
-    marginBottom: 6, borderRadius: 14, padding: '10px 12px',
-    background: 'rgba(24,24,27,0.25)', border: '1px solid rgba(255,255,255,0.04)',
-  };
-
-  const cardStyle: React.CSSProperties = {
-    padding: '8px 10px', borderRadius: 10, marginBottom: 4,
-    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)',
-  };
-
-  const chipStyle = (color: string): React.CSSProperties => ({
-    display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 7px',
-    borderRadius: 8, fontSize: 9, fontWeight: 600, color, cursor: 'pointer',
-    background: color + '12', border: '1px solid ' + color + '20',
-  });
-
-  const btnStyle: React.CSSProperties = {
-    padding: '3px 10px', borderRadius: 7, fontSize: 9, fontWeight: 700,
-    border: 'none', cursor: 'pointer', color: '#000', background: 'var(--accent)',
-  };
+  const isWide = false; // always 2-col on mobile, 1-col at <=360px handled by CSS
 
   return (
-    <div style={{ padding: '4px 0 20px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {/* ═══ 🏋️ Твои показатели ═══ */}
-      <div style={sectionStyle}>
-        <SectionHeader icon="🏋️" label="Твои показатели" color={SECTION_COLORS.показатели} expanded={!!expanded.показатели} onToggle={() => toggle('показатели')} />
-        {!expanded.показатели ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 4 }}>
-            {/* Strength mini */}
-            <div style={cardStyle}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: SECTION_COLORS.показатели, marginBottom: 4 }}>🏋️ Сила</div>
-              {latest1RM && Object.entries(latest1RM).slice(0, 3).map(([k, v]) => (
-                <div key={k} style={{ fontSize: 10, color: '#fff', marginBottom: 1 }}>{k}: <b>{v} кг</b></div>
-              ))}
-              {!Object.keys(latest1RM).length && <div style={{ fontSize: 9, color: DIM }}>Нет данных тренировок</div>}
-              <div style={{ marginTop: 4, display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                <span style={chipStyle(SECTION_COLORS.показатели)} onClick={() => toggle('показатели')}>⚙ Подробнее</span>
-              </div>
-            </div>
-            {/* Load mini */}
-            <div style={cardStyle}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: SECTION_COLORS.показатели, marginBottom: 4 }}>📊 Нагрузка</div>
-              {acwr ? (
-                <>
-                  <MetricBar label="ACWR" value={Math.round(acwr.ratio * 50)} max={50} color={acwrColor} />
-                  <div style={{ fontSize: 8, color: acwrColor, fontWeight: 600, marginTop: 2 }}>ACWR {acwr.ratio.toFixed(2)} · {acwrLabel}</div>
-                </>
-              ) : (
-                <div style={{ fontSize: 9, color: DIM }}>Нет sRPE-сессий</div>
-              )}
-              <div style={{ marginTop: 4 }}>
-                <MetricBar label="Готовность" value={readinessRecovery} color={readinessRecovery >= 70 ? '#22c55e' : '#eab308'} />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div style={{ marginTop: 6 }}>
-            <StrengthAnalysisHub />
-          </div>
-        )}
+    <div style={{ padding: '2px 0 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Header */}
+      <div style={{ padding: '0 4px', marginBottom: 2 }}>
+        <h3 style={{ margin: '0 0 2px', fontSize: 15, fontWeight: 800, color: '#fff' }}>
+          ⚡ Интеллект тренировки
+        </h3>
+        <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.35 }}>
+          Инструменты анализа, сборки и контроля качества тренировочного процесса
+        </p>
       </div>
 
-      {/* ═══ 🎯 Качество плана ═══ */}
-      <div style={sectionStyle}>
-        <SectionHeader icon="🎯" label="Качество плана" color={SECTION_COLORS.качество} expanded={!!expanded.качество} onToggle={() => toggle('качество')} />
-        {!expanded.качество ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 4 }}>
-            {manualResult && (
-              <div style={cardStyle}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: SECTION_COLORS.качество, marginBottom: 4 }}>⭐ Оценка плана</div>
-                <CalcQualityTab plan={manualResult} level={level} onBuildPlan={onBuildPlan} />
-              </div>
-            )}
-            {!manualResult && (
-              <div style={cardStyle}>
-                <div style={{ fontSize: 9, color: DIM }}>План не построен</div>
-                <div style={{ marginTop: 4 }}>
-                  <span style={btnStyle} onClick={onBuildPlan}>→ Построить план</span>
+      {/* Categories */}
+      {categories.map(cat => (
+        <div key={cat.label} style={{
+          borderRadius: 14, overflow: 'hidden',
+          background: 'rgba(24,24,27,0.2)', border: '1px solid rgba(255,255,255,0.04)',
+        }}>
+          {/* Category header */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '8px 10px 6px',
+          }}>
+            <span style={{ fontSize: 13 }}>{cat.icon}</span>
+            <span style={{
+              fontSize: 10, fontWeight: 700, color: cat.color,
+              textTransform: 'uppercase', letterSpacing: 0.4, flex: 1,
+            }}>{cat.label}</span>
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{cat.tools.length}</span>
+          </div>
+
+          {/* Tool cards grid */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4,
+            padding: '0 6px 6px',
+          }}>
+            {cat.tools.map(t => (
+              <button key={t.tab} onClick={() => p.onOpenTool(t.tab)} style={{
+                display: 'flex', flexDirection: 'column', gap: 3,
+                padding: '10px 8px', borderRadius: 10,
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)',
+                cursor: 'pointer', textAlign: 'left', color: '#fff',
+                transition: 'all 0.15s', minHeight: 0,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 1 }}>
+                  <span style={{ fontSize: 15 }}>{t.icon}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: cat.color, lineHeight: 1.2 }}>
+                    {t.label}
+                  </span>
+                  {t.badge && (
+                    <span style={{
+                      marginLeft: 'auto', fontSize: 8, fontWeight: 700,
+                      color: t.badge.color, padding: '1px 5px', borderRadius: 4,
+                      background: t.badge.color + '15',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {t.badge.text}
+                    </span>
+                  )}
                 </div>
-              </div>
-            )}
-            <div style={cardStyle}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: SECTION_COLORS.качество, marginBottom: 4 }}>🔬 Диагностика</div>
-              <DiagnosticsHub sessions={historyWorkouts} tprofile={tprofile}
-                readinessRecovery={readinessRecovery} readinessFatigue={readinessFatigue}
-                mesoWeeks={mesoLength} missedSessions={0}
-                currentVolume={manualResult?.days?.reduce((s, d) => s + d.exercises.length, 0) ?? 18}
-                currentRir={2} />
-            </div>
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>
+                  {t.desc}
+                </span>
+              </button>
+            ))}
           </div>
-        ) : (
-          <div style={{ marginTop: 6 }}>
-            {manualResult && <div style={{ marginBottom: 8 }}><CalcQualityTab plan={manualResult} level={level} onBuildPlan={onBuildPlan} /></div>}
-            <DiagnosticsHub sessions={historyWorkouts} tprofile={tprofile}
-              readinessRecovery={readinessRecovery} readinessFatigue={readinessFatigue}
-              mesoWeeks={mesoLength} missedSessions={0}
-              currentVolume={manualResult?.days?.reduce((s, d) => s + d.exercises.length, 0) ?? 18}
-              currentRir={2} />
-          </div>
-        )}
-      </div>
+        </div>
+      ))}
 
-      {/* ═══ 🛠 Инструменты сборки ═══ */}
-      <div style={sectionStyle}>
-        <SectionHeader icon="🛠" label="Инструменты сборки" color={SECTION_COLORS.сборки} expanded={!!expanded.сборки} onToggle={() => toggle('сборки')} />
-        {!expanded.сборки ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 4 }}>
-            <div style={cardStyle}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: SECTION_COLORS.сборки, marginBottom: 4 }}>🧩 Сплиты</div>
-              <SplitGenCard />
-            </div>
-            <div style={cardStyle}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: SECTION_COLORS.сборки, marginBottom: 4 }}>🏋️ Лаб. упражнений</div>
-              <ExerciseLabMerged />
-            </div>
-            <div style={cardStyle}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: SECTION_COLORS.сборки, marginBottom: 4 }}>⚖️ Тоннаж</div>
-              <TonnageCalcTab />
-            </div>
-            <div style={cardStyle}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: SECTION_COLORS.сборки, marginBottom: 4 }}>🔄 PRI/схема</div>
-              <PriRepPatternCard />
-            </div>
-            <div style={cardStyle}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: SECTION_COLORS.сборки, marginBottom: 4 }}>🥞 Блины</div>
-              <PlateCalcTab />
-            </div>
-            <div style={cardStyle}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: SECTION_COLORS.сборки, marginBottom: 4 }}>📐 Объём</div>
-              <VolumeOptimizerTab />
-            </div>
-          </div>
-        ) : (
-          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <SplitGenCard />
-            <ExerciseLabMerged />
-            <TonnageCalcTab />
-            <PriRepPatternCard />
-            <PlateCalcTab />
-            <VolumeOptimizerTab />
-          </div>
-        )}
-      </div>
-
-      {/* ═══ ⚕ Периодизация ═══ */}
-      <div style={sectionStyle}>
-        <SectionHeader icon="⚕" label="Периодизация и восстановление" color={SECTION_COLORS.периодизация} expanded={!!expanded.периодизация} onToggle={() => toggle('периодизация')} />
-        {!expanded.периодизация ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 4 }}>
-            <div style={cardStyle}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: SECTION_COLORS.периодизация, marginBottom: 4 }}>📅 Фазы и циклы</div>
-              <PeriodizationHub />
-            </div>
-            <div style={cardStyle}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: SECTION_COLORS.периодизация, marginBottom: 4 }}>🫀 Нагрузка/безопасность</div>
-              <LoadSafetyCard />
-            </div>
-          </div>
-        ) : (
-          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <PeriodizationHub />
-            <LoadSafetyCard />
-          </div>
-        )}
-      </div>
-
-      {/* ═══ 💊 Подготовка ═══ */}
-      <div style={sectionStyle}>
-        <SectionHeader icon="💊" label="Подготовка к тренировке" color={SECTION_COLORS.подготовка} expanded={!!expanded.подготовка} onToggle={() => toggle('подготовка')} />
-        {!expanded.подготовка ? (
-          <div style={{ marginTop: 4 }}>
-            <TrainingMixTab />
-          </div>
-        ) : (
-          <div style={{ marginTop: 6 }}>
-            <TrainingMixTab />
-          </div>
+      {/* Quick actions */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4,
+        marginTop: 2,
+      }}>
+        {!p.manualResult && (
+          <button onClick={p.onBuildPlan} style={{
+            gridColumn: '1 / -1',
+            padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+            border: '1px solid rgba(0,230,138,0.25)',
+            background: 'rgba(0,230,138,0.06)',
+            color: '#00e68a', fontWeight: 700, fontSize: 11,
+            textAlign: 'center',
+          }}>
+            → Построить план тренировок
+          </button>
         )}
       </div>
     </div>

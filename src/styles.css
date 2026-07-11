@@ -1741,189 +1741,235 @@ input[type="range"]:active {
 }
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ
-   рџЌЋ APPLE-STYLE POLISH вЂ” С‚СЂРµРЅРёСЂРѕРІРѕС‡РЅС‹Р№ Р±Р»РѕРє (.training-screen)
-   Р§РёСЃС‚Р°СЏ С‚РёРїРѕРіСЂР°С„РёРєР° SF Pro, frosted-glass РєР°СЂС‚РѕС‡РєРё, iOS-РєРѕРЅС‚СЂРѕР»С‹,
-   РјСЏРіРєРёРµ С‚РµРЅРё, С‚РѕРЅРєРёРµ СЃРµРїР°СЂР°С‚РѕСЂС‹, РїР»Р°РІРЅС‹Рµ РјРёРєСЂРѕ-РІР·Р°РёРјРѕРґРµР№СЃС‚РІРёСЏ.
-   РќРµ РјРµРЅСЏРµС‚ layout (display/grid/flex РёР· inline) вЂ” С‚РѕР»СЊРєРѕ РїРѕР»РёСЂРѕРІРєР°.
-   в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+   🚀 PREMIUM DESIGN SYSTEM — тренировочный блок (.training-screen)
+   Глубокий frosted glass, неон-акценты, слоистые тени,
+   градиентные заголовки, микро-анимации появления.
+   Ничего не ломает: layout (display/grid/flex из inline) не трогается.
+   ════════════════════════════════════════════════════════════════ */
+/* ────────── АНИМАЦИИ ────────── */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(0,230,138,0.25); }
+  50%      { box-shadow: 0 0 40px rgba(0,230,138,0.5); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
 .training-screen {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  letter-spacing: -0.1px;
   text-rendering: optimizeLegibility;
 }
-/* Large title / section headers */
-.training-screen h1 { font-weight: 800 !important; letter-spacing: -0.6px !important; }
-.training-screen h2 { font-weight: 700 !important; letter-spacing: -0.4px !important; line-height: 1.25 !important; }
-.training-screen h3, .training-screen h4 { font-weight: 700 !important; letter-spacing: -0.2px !important; }
+
+/* ────────── ТИПОГРАФИКА ────────── */
+.training-screen h1 {
+  font-weight: 800 !important;
+  letter-spacing: -0.6px !important;
+  background: linear-gradient(135deg, #00e68a 0%, #06d6a0 50%, #38bdf8 100%);
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text;
+}
+.training-screen h2 {
+  font-weight: 700 !important;
+  letter-spacing: -0.4px !important;
+  line-height: 1.25 !important;
+  background: linear-gradient(135deg, #00e68a 0%, #38bdf8 100%);
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text;
+}
+.training-screen h3, .training-screen h4 {
+  font-weight: 700 !important;
+  letter-spacing: -0.2px !important;
+}
 
 /* Frosted-glass карточки (все div с полупрозрачным тёмным фоном) */
-.training-screen div[style*="rgba(24,24,27"] {
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
-  backdrop-filter: blur(18px) saturate(150%);
+/* Level 1: глубокий frosted glass для основных карточек */
+.training-screen [style*="rgba(24,24,27"] {
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
   border-radius: 16px !important;
-  border-color: rgba(255,255,255,0.08) !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.22), inset 0 0.5px 0 rgba(255,255,255,0.06) !important;
+  border: 0.5px solid rgba(255,255,255,0.08) !important;
+  box-shadow:
+    0 12px 40px rgba(0,0,0,0.3),
+    0 4px 12px rgba(0,0,0,0.15),
+    inset 0 0.5px 0 rgba(255,255,255,0.08) !important;
+  animation: fadeSlideUp 0.4s cubic-bezier(0.16,1,0.3,1) both;
 }
-/* Accent-tinted мелкие блоки — лёгкий frost + мягкая тень */
-.training-screen div[style*="rgba(0,230,138,0.0"] {
+/* Level 2: medium depth для вложенных карточек */
+.training-screen [style*="rgba(24,24,27,0.4)"] {
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  box-shadow:
+    0 6px 20px rgba(0,0,0,0.2),
+    inset 0 0.5px 0 rgba(255,255,255,0.05) !important;
+}
+/* Level 3: subtle для мелких чипов/баджей */
+.training-screen [style*="rgba(24,24,27,0.2)"] {
   -webkit-backdrop-filter: blur(10px) saturate(130%);
   backdrop-filter: blur(10px) saturate(130%);
+  box-shadow:
+    0 2px 8px rgba(0,0,0,0.12),
+    inset 0 0.5px 0 rgba(255,255,255,0.04) !important;
+}
+/* Accent-tinted мелкие блоки */
+.training-screen div[style*="rgba(0,230,138,0.0"] {
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
   border-radius: 12px !important;
-  box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.04) !important;
+  box-shadow:
+    inset 0 0.5px 0 rgba(255,255,255,0.06),
+    0 4px 16px rgba(0,230,138,0.08) !important;
 }
 
-/* Плавные микро-взаимодействия для всех кнопок */
+/* ────────── КНОПКИ: премиальные микро-взаимодействия ────────── */
 .training-screen button {
-  transition: transform 0.12s cubic-bezier(0.2,0.8,0.2,1), background 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1),
+              background 0.2s ease,
+              box-shadow 0.2s ease,
+              color 0.2s ease,
+              border-color 0.2s ease,
+              opacity 0.2s ease !important;
   -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
 }
-.training-screen button:active { transform: scale(0.97); }
+.training-screen button:active {
+  transform: scale(0.96) !important;
+}
 
-/* Сегментированный контроль (зона Планировщик) — iOS-вид */
-.training-screen div[style*="rgba(24,24,27,0.15)"] { border-radius: 12px !important; }
+/* ────────── СЕГМЕНТИРОВАННЫЙ КОНТРОЛЬ (Планировщик) ────────── */
+.training-screen div[style*="rgba(24,24,27,0.15)"] {
+  border-radius: 14px !important;
+  background: rgba(18,18,26,0.5) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+  backdrop-filter: blur(12px) saturate(130%);
+}
 .training-screen div[style*="rgba(24,24,27,0.15)"] button {
-  border-radius: 9px !important;
-  transition: all 0.22s cubic-bezier(0.2,0.8,0.2,1);
+  border-radius: 10px !important;
+  transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+}
+.training-screen div[style*="rgba(24,24,27,0.15)"] button[style*="rgba(0,230,138,0.14)"] {
+  box-shadow:
+    0 4px 16px rgba(0,230,138,0.25),
+    inset 0 0.5px 0 rgba(255,255,255,0.1) !important;
+  border-color: rgba(0,230,138,0.4) !important;
 }
 
-/* Инпуты/селекты — чистые, rounded, с focus-glow */
+/* ────────── ИНПУТЫ: глубокий focus-glow ────────── */
 .training-screen input,
 .training-screen select,
 .training-screen textarea {
   border-radius: 12px !important;
-  background: rgba(118,118,128,0.12) !important;
-  border: 0.5px solid rgba(255,255,255,0.08) !important;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  background: rgba(118,118,128,0.1) !important;
+  border: 0.5px solid rgba(255,255,255,0.06) !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 .training-screen input:focus,
 .training-screen select:focus,
 .training-screen textarea:focus {
-  border-color: rgba(0,230,138,0.5) !important;
-  box-shadow: 0 0 0 3px rgba(0,230,138,0.15) !important;
+  border-color: rgba(0,230,138,0.4) !important;
+  box-shadow:
+    0 0 0 3px rgba(0,230,138,0.12),
+    0 0 20px rgba(0,230,138,0.08) !important;
   outline: none !important;
-  background: rgba(118,118,128,0.16) !important;
+  background: rgba(118,118,128,0.15) !important;
 }
 
-/* Range-слайдеры — акцент, крупнее thumb */
+/* ────────── RANGE-СЛАЙДЕРЫ ────────── */
 .training-screen input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 4px;
-  border-radius: 4px;
-  background: rgba(118,118,128,0.24) !important;
-  border: none !important;
-  box-shadow: none !important;
+  -webkit-appearance: none; appearance: none;
+  height: 4px; border-radius: 4px;
+  background: rgba(118,118,128,0.2) !important;
+  border: none !important; box-shadow: none !important;
 }
 .training-screen input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 22px; height: 22px;
-  border-radius: 50%;
-  background: #00e68a;
-  box-shadow: 0 2px 8px rgba(0,230,138,0.45), 0 0 0 4px rgba(0,230,138,0.12);
-  border: none;
-  cursor: pointer;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: linear-gradient(135deg, #00e68a, #06d6a0);
+  box-shadow: 0 2px 12px rgba(0,230,138,0.5), 0 0 0 4px rgba(0,230,138,0.1);
+  border: none; cursor: pointer;
 }
 .training-screen input[type="range"]::-moz-range-thumb {
-  width: 22px; height: 22px; border-radius: 50%; background: #00e68a; border: none;
-  box-shadow: 0 2px 8px rgba(0,230,138,0.45);
+  width: 24px; height: 24px; border-radius: 50%;
+  background: linear-gradient(135deg, #00e68a, #06d6a0);
+  border: none;
+  box-shadow: 0 2px 12px rgba(0,230,138,0.5);
 }
 
-/* Тонкие сепараторы */
-.training-screen hr { border: none; border-top: 0.5px solid rgba(255,255,255,0.08); margin: 8px 0; }
+/* ────────── СЕПАРАТОРЫ ────────── */
+.training-screen hr {
+  border: none;
+  height: 0.5px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  margin: 12px 0;
+}
 
-/* Чекбоксы — мягче */
+/* ────────── ЧЕКБОКСЫ ────────── */
 .training-screen input[type="checkbox"] {
-  width: 22px; height: 22px; border-radius: 6px; accent-color: #00e68a;
+  width: 22px; height: 22px; border-radius: 6px;
+  accent-color: #00e68a;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.1);
 }
 
-/* Скрытый мягкий скролл внутри блока */
+/* ────────── СКРОЛЛ (тонкий, градиентный) ────────── */
 .training-screen ::-webkit-scrollbar { width: 3px; }
-.training-screen ::-webkit-scrollbar-thumb { background: rgba(0,230,138,0.25); border-radius: 3px; }
+.training-screen ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #00e68a, #06d6a0);
+  border-radius: 3px;
+}
 .training-screen ::-webkit-scrollbar-track { background: transparent; }
 
-/* Чек-ин карточки / метрики — лёгкое всплывание (elevation) */
-.training-screen div[style*="rgba(0,230,138,0.05)"] {
-  box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.05) !important;
-}
-
-/* Заголовки-секции (uppercase labels inline) — дать воздух */
-.training-screen div[style*="text-transform: uppercase"],
-.training-screen div[style*="letterSpacing"] {
-  letter-spacing: 0.5px;
-}
-
-/* Pills (зонные/категорийные) — плавный переход активногоѕ СЃРѕСЃС‚РѕСЏРЅРёСЏ */
-.training-screen .zone-pill,
-.training-screen button[style*="border-radius: 20px"],
-.training-screen button[style*="border-radius:20px"] {
-  transition: all 0.2s cubic-bezier(0.2,0.8,0.2,1);
-}
-
-/* Градиентные CTA-кнопки — мягкая тень, пресс на active */
-.training-screen button[style*="linear-gradient(135deg,#00e68a"] {
-  box-shadow: 0 6px 20px rgba(0,230,138,0.3), inset 0 0.5px 0 rgba(255,255,255,0.2) !important;
-  border: none !important;
-}
-.training-screen button[style*="linear-gradient(135deg,#00e68a"]:active {
-  box-shadow: 0 2px 8px rgba(0,230,138,0.2) !important;
-}
-
-/* Expandable-карточки планировщика — чистый frosted */
-.training-screen .planner-seg,
-.training-screen div[style*="rgba(24,24,27,0.5)"] {
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
-  backdrop-filter: blur(18px) saturate(150%);
-  border-radius: 14px !important;
-}
 
 
-
-/* 🍎 Доработки: hero-зоны, PlannerToolsPanel-rows, segmented active — точечная полировка */
-/* Hero-карточки выбора зоны — frosted glass с мягким border */
-.training-screen button[style*="rgba(20,22,30,0.35)"],
-.training-screen div[style*="rgba(20,22,30,0.35)"] {
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  backdrop-filter: blur(20px) saturate(160%);
-  border-radius: 16px !important;
+/* ────────── HERO-КАРТОЧКИ ЗОН ────────── */
+.training-screen button[style*="rgba(20,22,30,0.35)"] {
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  backdrop-filter: blur(24px) saturate(170%);
+  border-radius: 18px !important;
   border: 0.5px solid rgba(255,255,255,0.1) !important;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.25), inset 0 0.5px 0 rgba(255,255,255,0.08) !important;
-  transition: transform 0.18s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.18s ease;
+  box-shadow:
+    0 16px 48px rgba(0,0,0,0.35),
+    0 4px 12px rgba(0,0,0,0.15),
+    inset 0 0.5px 0 rgba(255,255,255,0.1) !important;
+  transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1),
+              box-shadow 0.2s ease !important;
+  animation: fadeSlideUp 0.5s cubic-bezier(0.16,1,0.3,1) both;
 }
-.training-screen button[style*="rgba(20,22,30,0.35)"]:active { transform: scale(0.98); }
-
-/* PlannerToolsPanel expandable rows вЂ” iOS inset-grouped list РІРёРґ */
-.training-screen div[style*="rgba(24,24,27,0.5)"] button[style*="background: transparent"],
-.training-screen div[style*="rgba(24,24,27,0.5)"] > button {
-  border-radius: 10px !important;
-  transition: background 0.18s ease;
-}
-.training-screen div[style*="rgba(24,24,27,0.5)"] > button:active { background: rgba(118,118,128,0.12) !important; }
-
-/* Сегментированный planner — активная кнопка как iOS selector (мягкая подсветка) */
-.training-screen div[style*="rgba(24,24,27,0.15)"] button[style*="rgba(0,230,138,0.14)"] {
-  box-shadow: 0 2px 8px rgba(0,230,138,0.18), inset 0 0.5px 0 rgba(255,255,255,0.08) !important;
+.training-screen button[style*="rgba(20,22,30,0.35)"]:active {
+  transform: scale(0.97);
+  box-shadow:
+    0 8px 24px rgba(0,0,0,0.25),
+    inset 0 0.5px 0 rgba(255,255,255,0.08) !important;
 }
 
-/* Универсальная мягкость для accent-чипов слабых групп / оборудования */
+/* ────────── ЧИПЫ АКЦЕНТА ────────── */
 .training-screen button[style*="border: 1px solid #00e68a"],
 .training-screen button[style*="border: 1px solid#00e68a"],
 .training-screen button[style*="border:1px solid #00e68a"] {
-  box-shadow: 0 2px 10px rgba(0,230,138,0.12) !important;
+  box-shadow: 0 2px 12px rgba(0,230,138,0.15) !important;
 }
 
-/* Улучшение читаемости dim-текста — Apple secondary label ~60% */
+/* ────────── DIM-ТЕКСТ ────────── */
 .training-screen div[style*="rgba(255,255,255,0.5)"],
-.training-screen span[style*="rgba(255,255,255,0.5)"] { color: rgba(235,235,245,0.6) !important; }
-
-/* Карточки-метрики (MetricCard) — лёгкое всплывание, чистый border */
-.training-screen div[style*="rgba(0,230,138,0.05)"],
-.training-screen div[style*="rgba(0,230,138,0.06)"] {
-  border-radius: 12px !important;
-  box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.05) !important;
+.training-screen span[style*="rgba(255,255,255,0.5)"] {
+  color: rgba(235,235,245,0.55) !important;
+}
+.training-screen div[style*="rgba(255,255,255,0.3)"],
+.training-screen span[style*="rgba(255,255,255,0.3)"] {
+  color: rgba(235,235,245,0.35) !important;
 }
 
-/* Инпуты внутри карточек — чуть светлее фон для контраста */
+/* ────────── ЧИСЛОВЫЕ ЗНАЧЕНИЯ ────────── */
 .training-screen input[type="number"],
 .training-screen input[type="text"],
 .training-screen input[type="time"],
@@ -1932,7 +1978,33 @@ input[type="range"]:active {
   font-variant-numeric: tabular-nums;
 }
 
-/* Убрать резкие чёрные обводки у мелких блоков */
+/* ────────── PROGRESS BAR (анимированные, градиентные) ────────── */
+.training-screen div[style*="background: rgba(255,255,255,0.05)"][style*="height: 4px"],
+.training-screen div[style*="background: var(--bg-secondary)"][style*="height: 4px"],
+.training-screen div[style*="background: var(--bg-secondary)"][style*="height: 6px"] {
+  border-radius: 4px !important;
+  overflow: hidden !important;
+}
+.training-screen div[style*="background: rgba(255,255,255,0.05)"][style*="height: 4px"] > div,
+.training-screen div[style*="background: var(--bg-secondary)"][style*="height: 4px"] > div,
+.training-screen div[style*="background: var(--bg-secondary)"][style*="height: 6px"] > div {
+  background: linear-gradient(90deg, #00e68a, #06d6a0, #38bdf8) !important;
+  border-radius: 4px !important;
+  transition: width 0.5s cubic-bezier(0.16,1,0.3,1);
+}
+
+/* ────────── ЗАГОЛОВКИ ДАШБОРДА ────────── */
+.training-screen div[style*="margin: 0 0 2px"][style*="fontSize: 15"] {
+  margin-bottom: 4px !important;
+}
+
+/* ────────── HERO-GRADIENT ────────── */
+.training-screen div[style*="background: linear-gradient(180deg, rgba(0,0,0,0.1)"] {
+  background: linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.9) 100%) !important;
+  border-bottom: 0.5px solid rgba(255,255,255,0.06);
+}
+
+/* ────────── МЕЛКИЕ БЛОКИ ────────── */
 .training-screen div[style*="rgba(255,255,255,0.03)"] {
   border-radius: 10px !important;
   border-color: rgba(255,255,255,0.06) !important;
@@ -1940,220 +2012,250 @@ input[type="range"]:active {
 
 /* ════════════════════════════════════════════════════════════════
    МОБИЛЬНАЯ ОПТИМИЗАЦИЯ ТРЕНИРОВОЧНОГО БЛОКА (.training-screen)
-   Применяется ко ВСЕМ вкладкам и контенту без сокращения текста:
-   — нет горизонтального overflow страницы;
-   — таблицы скроллятся по горизонтали, не ломая вёрстку;
-   — flex/grid-детки сжимаются (min-width:0);
-   — длинные строки переносятся;
-   — touch-таргеты ≥40px; шрифты в табличных рядах не мельче 10px.
+   ПОЛНОТЕКСТОВАЯ — НИЧЕГО НЕ ОБРЕЗАЕТСЯ, ВСЁ ВИДНО НА 320px+
+   ════════════════════════════════════════════════════════════════
+
+   Правила (по приоритету):
+   1. НИКАКОГО overflow:hidden на текстовых контейнерах
+   2. НИКАКОГО text-overflow:ellipsis — только clip/visible
+   3. Минимальный шрифт 10px (6-8px → 10px, 9px остаётся)
+   4. Все кнопки → white-space:normal (перенос длинных подписей)
+   5. Все inline-сетки (grid) схлопываются: 3-4 колонки → 2, при 360px → 1
+   6. flex-контейнеры с gap > 8px получают flex-wrap (перенос на малой ширине)
+   7. Карточки с min-width > 280px получают max-width:100%; overflow-x:auto
+   8. Изображения, svg, canvas — max-width:100%; height:auto
+   9. Каждый элемент умеет сжиматься (min-width:0)
+   10. Селекторы по [style*="..."] покрывают сотни inline-стилей
    ════════════════════════════════════════════════════════════════ */
 
+/* ────────── БАЗА ────────── */
 .training-screen {
   overflow-x: hidden !important;
   overflow-wrap: anywhere;
   word-break: break-word;
   -webkit-text-size-adjust: 100%;
 }
-
-/* все потомки могут сжиматься — фиксит overflow flex/grid */
 .training-screen * {
   min-width: 0;
   box-sizing: border-box;
 }
 
-/* изображения, svg, видео не вылезают за экран */
-.training-screen img,
-.training-screen video,
-.training-screen svg,
-.training-screen canvas {
-  max-width: 100%;
-  height: auto;
-}
+/* ────────── МЕДИА — ВСЕ МОБИЛЬНЫЕ ПРАВИЛА ВНУТРИ ────────── */
+@media (max-width: 480px) {
 
-/* код/пре — перенос длинных строк */
-.training-screen pre,
-.training-screen code {
-  white-space: pre-wrap !important;
+/* ── 1. ГЛОБАЛЬНЫЙ ЗАПРЕТ ОБРЕЗКИ ТЕКСТА ── */
+.training-screen * {
+  overflow-wrap: break-word !important;
   word-break: break-word !important;
-  max-width: 100%;
 }
 
-/* настоящие <table> → горизонтальный скролл, не ломая страницу */
+/* ── 2. ЗАПРЕТ text-overflow:ellipsis everywhere ── */
+.training-screen [style*="textOverflow"],
+.training-screen [style*="text-overflow"] {
+  text-overflow: clip !important;
+  overflow: visible !important;
+}
+
+/* ── 3. ЗАПРЕТ white-space:nowrap на всех кнопках, span, div ── */
+.training-screen button,
+.training-screen [style*="nowrap"],
+.training-screen [style*="white-space: nowrap"],
+.training-screen [style*="whiteSpace:"],
+.training-screen span[style*="overflow: hidden"] {
+  white-space: normal !important;
+}
+
+/* ── 4. Минимальный шрифт 10px ── */
+.training-screen [style*="font-size:6"],
+.training-screen [style*="font-size: 6"],
+.training-screen [style*="fontSize:6"],
+.training-screen [style*="fontSize: 6"],
+.training-screen [style*="font-size:7"],
+.training-screen [style*="font-size: 7"],
+.training-screen [style*="fontSize:7"],
+.training-screen [style*="fontSize: 7"],
+.training-screen [style*="font-size:8"],
+.training-screen [style*="font-size: 8"],
+.training-screen [style*="fontSize:8"],
+.training-screen [style*="fontSize: 8"] {
+  font-size: 10px !important;
+}
+/* 9px — читаемо, оставляем */
+.training-screen [style*="font-size:9"] {
+  font-size: 10px !important;
+}
+/* В герое подзаголовок 10px — оставляем, но даём line-height */
+
+/* ── 5. Сетки-гриды схлопываются ── */
+/* 4 колонки → 2 */
+.training-screen [style*="grid-template-columns: 1fr 1fr 1fr 1fr"],
+.training-screen [style*="grid-template-columns:1fr 1fr 1fr 1fr"] {
+  grid-template-columns: 1fr 1fr !important;
+}
+/* 3 колонки → 2 */
+.training-screen [style*="grid-template-columns: 1fr 1fr 1fr"],
+.training-screen [style*="grid-template-columns:1fr 1fr 1fr"] {
+  grid-template-columns: 1fr 1fr !important;
+}
+/* 5 колонки → 2 */
+.training-screen [style*="grid-template-columns: 1fr 1fr 1fr 1fr 1fr"] {
+  grid-template-columns: 1fr 1fr !important;
+}
+/* @media max-width:360px → 1 колонка */
+@media (max-width: 360px) {
+  .training-screen [style*="grid-template-columns: 1fr 1fr"],
+  .training-screen [style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── 6. flex-контейнеры с gap > 6px → flex-wrap ── */
+.training-screen [style*="display: flex"][style*="gap:"],
+.training-screen [style*="display:flex"][style*="gap:"] {
+  flex-wrap: wrap !important;
+}
+
+/* ── 7. Контейнеры с minWidth/width > 280 → не вылезают ── */
+.training-screen [style*="minWidth:"],
+.training-screen [style*="min-width:"] {
+  max-width: 100% !important;
+}
+/* Если был фиксированный minWidth, разрешаем скролл */
+.training-screen [style*="minWidth:"][style*="overflow"],
+.training-screen [style*="min-width:"][style*="overflow"] {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── 8. Изображения, svg ── */
+.training-screen img,
+.training-screen svg,
+.training-screen canvas,
+.training-screen video {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* ── 9. Таблицы (<table>) ── */
 .training-screen table {
   display: block;
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  border-collapse: collapse;
 }
 .training-screen th,
 .training-screen td {
+  padding: 4px 6px;
   white-space: nowrap;
-  padding: 6px 8px;
 }
 
-/* touch-таргеты для кнопок/чипов */
-.training-screen button {
-  min-height: 40px;
+/* ── 10. Touch-таргеты 44px ── */
+.training-screen button,
+.training-screen [role="button"],
+.training-screen a {
+  min-height: 44px !important;
 }
-.training-screen button[style*="padding:2px"],
-.training-screen button[style*="padding: 2px"],
-.training-screen button[style*="padding:3px"],
-.training-screen button[style*="padding: 3px"],
-.training-screen button[style*="padding:4px"],
-.training-screen button[style*="padding: 4px"] {
-  min-height: 36px;
+/* Исключение: очень мелкие чипсы-пилюли — 36px */
+.training-screen button[style*="padding:2"],
+.training-screen button[style*="padding: 2"],
+.training-screen button[style*="padding:3"],
+.training-screen button[style*="padding: 3"],
+.training-screen button[style*="padding:4"],
+.training-screen button[style*="padding: 4"] {
+  min-height: 36px !important;
 }
 
-/* inputs/selects на мобилке — крупнее и не сжимаются */
+/* ── 11. Inputs/selects — 44px ── */
+.training-screen input,
 .training-screen select,
-.training-screen input[type="text"],
-.training-screen input[type="number"],
-.training-screen input[type="search"],
 .training-screen textarea {
-  min-height: 40px;
-  font-size: 13px;
+  min-height: 44px !important;
+  font-size: 16px !important; /* iOS auto-zoom fix */
 }
 
-/* горизонтальные списки-пилюли не вызывают page-scroll */
-.training-screen div[style*="overflowX"],
-.training-screen div[style*="overflow-x"] {
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+/* ── 12. hero-страница — не фиксированная, скроллящаяся ── */
+.training-screen > div[style*="position:fixed"][style*="inset:0"] {
+  position: relative !important;
+  overflow-y: auto !important;
+  z-index: 1 !important;
+  min-height: 100% !important;
 }
-.training-screen div[style*="overflowX"]::-webkit-scrollbar,
-.training-screen div[style*="overflow-x"]::-webkit-scrollbar {
-  display: none;
+.training-screen > div[style*="position:fixed"][style*="inset:0"] img {
+  position: absolute !important;
+  min-height: 280px;
 }
-
-/* ============================================================
-   ПОЛНОТЕКСТОВАЯ МОБИЛЬНАЯ ОПТИМИЗАЦИЯ — весь блок без обрезок
-   ============================================================ */
-
-/* 1) Минимальный читаемый шрифт: 9px — всё мельче нечитаемо на телефоне */
-.training-screen div[style*="font-size:6"],
-.training-screen span[style*="font-size:6"],
-.training-screen div[style*="font-size: 6"],
-.training-screen span[style*="font-size: 6"],
-.training-screen div[style*="fontSize:6"],
-.training-screen span[style*="fontSize:6"],
-.training-screen div[style*="fontSize: 6"],
-.training-screen span[style*="fontSize: 6"] {
-  font-size: 9px !important;
+.training-screen > div[style*="position:fixed"][style*="inset:0"] > div[style*="justifyContent: flex-end"] {
+  padding: 12px 12px 24px !important;
 }
-.training-screen div[style*="font-size:7"],
-.training-screen span[style*="font-size:7"],
-.training-screen div[style*="font-size: 7"],
-.training-screen span[style*="font-size: 7"],
-.training-screen div[style*="fontSize:7"],
-.training-screen span[style*="fontSize:7"],
-.training-screen div[style*="fontSize: 7"],
-.training-screen span[style*="fontSize: 7"] {
-  font-size: 9px !important;
+.training-screen > div[style*="position:fixed"][style*="inset:0"] h1 {
+  font-size: 18px !important;
 }
-.training-screen div[style*="font-size:8"],
-.training-screen span[style*="font-size:8"],
-.training-screen div[style*="font-size: 8"],
-.training-screen span[style*="font-size: 8"],
-.training-screen div[style*="fontSize:8"],
-.training-screen span[style*="fontSize:8"],
-.training-screen div[style*="fontSize: 8"],
-.training-screen span[style*="fontSize: 8"] {
+.training-screen > div[style*="position:fixed"][style*="inset:0"] p[style*="fontSize: 11"] {
   font-size: 10px !important;
+  margin-bottom: 10px !important;
+}
+/* zone-кнопки на герое — компактнее */
+.training-screen > div[style*="position:fixed"][style*="inset:0"] button[style*="rgba(20,22,30,0.35)"] {
+  padding: 10px 12px !important;
+  gap: 8px !important;
+}
+.training-screen > div[style*="position:fixed"][style*="inset:0"] button[style*="rgba(20,22,30,0.35)"] > div[style*="width: 40"] {
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 16px !important;
+}
+.training-screen > div[style*="position:fixed"][style*="inset:0"] button[style*="rgba(20,22,30,0.35)"] div[style*="fontSize: 13"] {
+  font-size: 11px !important;
+}
+.training-screen > div[style*="position:fixed"][style*="inset:0"] button[style*="rgba(20,22,30,0.35)"] div[style*="fontSize: 10"] {
+  font-size: 9px !important;
 }
 
-/* 2) Запрет обрезки текста эллипсисом — строки должны быть ПОЛНЫМИ */
-.training-screen div[style*="textOverflow"],
-.training-screen div[style*="text-overflow"],
-.training-screen span[style*="textOverflow"],
-.training-screen span[style*="text-overflow"] {
-  text-overflow: clip !important;
-  overflow: visible !important;
+/* ── 13. Планировщик: сегментированный переключатель ── */
+/* Сами кнопки — без nowrap, hint 8px → 9px */
+.training-screen div[style*="rgba(24,24,27,0.15)"] button {
   white-space: normal !important;
+  word-break: break-word !important;
+  padding: 8px 4px !important;
+}
+.training-screen div[style*="rgba(24,24,27,0.15)"] button span[style*="fontSize: 8"],
+.training-screen div[style*="rgba(24,24,27,0.15)"] button span[style*="font-size:8"],
+.training-screen div[style*="rgba(24,24,27,0.15)"] button span[style*="font-size: 8"] {
+  font-size: 9px !important;
+  line-height: 1.2 !important;
 }
 
-/* 3) Контейнеры с minWidth > 340px — скролл по горизонтали, не ломая страницу */
-.training-screen div[style*="minWidth: 3"],
-.training-screen div[style*="minWidth: 4"],
-.training-screen div[style*="minWidth: 5"],
-.training-screen div[style*="minWidth:3"],
-.training-screen div[style*="minWidth:4"],
-.training-screen div[style*="minWidth:5"],
-.training-screen div[style*="minWidth: 6"],
-.training-screen div[style*="minWidth: 7"],
-.training-screen div[style*="minWidth: 8"],
-.training-screen div[style*="minWidth:6"],
-.training-screen div[style*="minWidth:7"],
-.training-screen div[style*="minWidth:8"] {
-  max-width: 100% !important;
-  overflow-x: auto !important;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* 4) Кнопки-пилюли — убрать nowrap, дать тексту переноситься */
-.training-screen button[style*="nowrap"],
-.training-screen div[style*="nowrap"] button,
-.training-screen button[style*="white-space: nowrap"],
-.training-screen button[style*="whiteSpace: 'nowrap'"],
-.training-screen button[style*="whiteSpace:'nowrap'"] {
-  white-space: normal !important;
-  word-break: break-word;
-}
-
-/* 5) Все элементы с maxWidth + overflow hidden — убрать обрезку */
-.training-screen div[style*="maxWidth"][style*="overflow: hidden"],
-.training-screen span[style*="maxWidth"][style*="overflow: hidden"],
-.training-screen div[style*="maxWidth"][style*="overflow:hidden"],
-.training-screen span[style*="maxWidth"][style*="overflow:hidden"] {
-  overflow: visible !important;
-  text-overflow: clip !important;
-}
-
-/* 6) Hero-карточки зон — подзаголовки должны переноситься */
-.training-screen div[style*="fontSize: 10"][style*="rgba(255,255,255,0.7"] {
-  white-space: normal !important;
-  word-break: break-word;
-  line-height: 1.35 !important;
-}
-
-/* 7) Планировщик: hint-подписи под кнопками — перенос */
-.training-screen div[style*="fontSize: 8"][style*="rgba(255,255,255,0.5"] {
-  white-space: normal !important;
-  word-break: break-word;
-}
-
-/* 8) Таблицы на grid (div-сетки) — убрать nowrap на ячейках */
-.training-screen div[style*="minWidth:"] span,
-.training-screen div[style*="minWidth:"] div {
-  white-space: normal !important;
-  word-break: break-word;
-}
-.training-screen div[style*="grid-template-columns"] span {
-  white-space: normal !important;
-}
-
-/* 9) Мелкие чипсы/теги — вернуть читаемый размер и убрать обрезку */
-.training-screen span[style*="fontSize:6"],
-.training-screen span[style*="fontSize:7"],
-.training-screen span[style*="fontSize:8"] {
-  white-space: normal !important;
-  word-break: break-word;
-}
-
-/* 10) Планировщик: кнопки режимов с длинными названиями — flex-wrap */
-.training-screen div[style*="display: flex"][style*="gap: 10"],
-.training-screen div[style*="display:flex"][style*="gap: 10"],
-.training-screen div[style*="display: flex"][style*="gap:10"],
-.training-screen div[style*="display:flex"][style*="gap:10"] {
+/* ── 14. Flex-строки с inline-gap — перенос ── */
+.training-screen [style*="display: flex"][style*="gap: 4"],
+.training-screen [style*="display: flex"][style*="gap:4"],
+.training-screen [style*="display:flex"][style*="gap: 4"],
+.training-screen [style*="display:flex"][style*="gap:4"],
+.training-screen [style*="display: flex"][style*="gap: 6"],
+.training-screen [style*="display: flex"][style*="gap:6"],
+.training-screen [style*="display:flex"][style*="gap: 6"],
+.training-screen [style*="display:flex"][style*="gap:6"] {
   flex-wrap: wrap !important;
 }
 
-/* 11) Строки с длинным текстом в любых контейнерах — гарантированный перенос */
-.training-screen p,
-.training-screen label,
-.training-screen .card p,
-.training-screen div[style*="lineHeight"] {
-  word-break: break-word;
-  overflow-wrap: break-word;
+/* ── 15. Overflow:hidden на текстовых div/span — убрать ── */
+.training-screen div[style*="overflow: hidden"],
+.training-screen span[style*="overflow: hidden"] {
+  overflow: visible !important;
 }
+
+/* ── 16. Пре/код — перенос ── */
+.training-screen pre,
+.training-screen code {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+  max-width: 100% !important;
+}
+
+/* ── 17. Все div с maxWidth+overflow — убрать обрезку ── */
+.training-screen [style*="maxWidth"][style*="overflow"],
+.training-screen [style*="max-width"][style*="overflow"] {
+  overflow: visible !important;
+}
+
+} /* end @media (max-width: 480px) */
